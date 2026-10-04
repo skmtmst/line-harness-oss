@@ -1,5 +1,31 @@
 -- Generated from schema.sql + migrations by scripts/generate-bootstrap.mjs.
 -- Do not edit manually. Run `pnpm --dir packages/db generate:bootstrap`.
+CREATE TABLE _556_folders_backup_auto_replies (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_broadcasts (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_common_vars (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_forms (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_friend_fields (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_media (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_media_upload_sessions (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_reminders (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_rich_menu_groups (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_scenarios (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_tags (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_templates (id TEXT PRIMARY KEY, folder_id TEXT);
+
+CREATE TABLE _556_folders_backup_webinars (id TEXT PRIMARY KEY, folder_id TEXT);
+
 CREATE TABLE account_handover_decisions (
   id              TEXT PRIMARY KEY,
   handover_id     TEXT NOT NULL REFERENCES account_handovers(id) ON DELETE CASCADE,
@@ -1483,7 +1509,7 @@ CREATE TABLE "bookings" (
   cancelled_at                 TEXT,
   completed_at                 TEXT,
   created_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)),
+  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)), cancel_claim_id TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
@@ -1516,6 +1542,36 @@ CREATE TABLE broadcast_approval_events (
   action          TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'rejected', 'cancelled', 'expired', 'reminded')),
   reason          TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE broadcast_asset_folders (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE broadcast_asset_publish_keys (
+  asset_id TEXT NOT NULL REFERENCES broadcast_message_assets(id) ON DELETE CASCADE,
+  idempotency_key TEXT NOT NULL,
+  published_version INTEGER NOT NULL,
+  draft_revision INTEGER NOT NULL,
+  draft_fingerprint TEXT NOT NULL DEFAULT '',
+  payload_json TEXT CHECK (payload_json IS NULL OR json_valid(payload_json)),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (asset_id, idempotency_key)
+);
+
+CREATE TABLE broadcast_asset_versions (
+  id TEXT PRIMARY KEY,
+  asset_id TEXT NOT NULL REFERENCES broadcast_message_assets(id) ON DELETE CASCADE,
+  version_number INTEGER NOT NULL,
+  payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
+  created_by_staff_id TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE (asset_id, version_number)
 );
 
 CREATE TABLE broadcast_insights (
@@ -1555,7 +1611,7 @@ CREATE TABLE broadcast_message_assets (
   payload_json    TEXT NOT NULL CHECK (json_valid(payload_json)),
   created_at      TEXT NOT NULL,
   updated_at      TEXT NOT NULL
-);
+, folder_id TEXT REFERENCES broadcast_asset_folders(id) ON DELETE SET NULL, published_version INTEGER NOT NULL DEFAULT 0, published_at TEXT, draft_payload_json TEXT CHECK (draft_payload_json IS NULL OR json_valid(draft_payload_json)), draft_revision INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE broadcast_saved_views (
   id               TEXT PRIMARY KEY,
@@ -2498,14 +2554,16 @@ CREATE TABLE "folders" (
   kind          TEXT NOT NULL CHECK (kind IN (
                   'tag','template','scenario','reminder','auto_reply',
                   'rich_menu','webinar','form','media','common_var',
-                  'mileage_rule','automation','event','entry_route','broadcast')),
+                  'mileage_rule','automation','event','entry_route','broadcast',
+                  'friend_field','common_action','webhook','conversion')),
   name          TEXT NOT NULL,
   parent_id     TEXT REFERENCES folders(id) ON DELETE CASCADE,
   display_order INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
-  color         TEXT
-, account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+  color         TEXT,
+  account_id    TEXT REFERENCES line_accounts(id) ON DELETE CASCADE
+);
 
 CREATE TABLE form_accounts (
   form_id         TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
@@ -2767,6 +2825,26 @@ CREATE TABLE friend_add_send_claims (
   claimed_at      TEXT NOT NULL,
   dispatched_at   TEXT,
   PRIMARY KEY (line_account_id, friend_id)
+);
+
+CREATE TABLE friend_bulk_message_approval_events (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES friend_bulk_runs(id),
+  actor_staff_id TEXT NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'confirmed', 'expired')),
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE friend_bulk_message_approvals (
+  run_id TEXT PRIMARY KEY REFERENCES friend_bulk_runs(id),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'confirmed', 'expired')),
+  recipient_count INTEGER NOT NULL,
+  threshold INTEGER NOT NULL,
+  requested_by TEXT NOT NULL,
+  requested_at TEXT NOT NULL,
+  decided_by TEXT,
+  decided_at TEXT,
+  confirmed_count INTEGER
 );
 
 CREATE TABLE friend_bulk_run_items (
@@ -3563,6 +3641,26 @@ CREATE TABLE line_account_connection_checks (
   UNIQUE (line_account_id, idempotency_key, check_kind)
 );
 
+CREATE TABLE line_account_tag_links (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  tag_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  PRIMARY KEY (line_account_id, tag_id),
+  FOREIGN KEY (tag_id, tenant_id) REFERENCES line_account_tags(id, tenant_id) ON DELETE CASCADE
+);
+
+CREATE TABLE line_account_tags (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+  color TEXT CHECK (color IS NULL OR (length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')),
+  display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (id, tenant_id),
+  UNIQUE (tenant_id, name)
+);
+
 CREATE TABLE line_accounts (
   id                     TEXT PRIMARY KEY,
   channel_id             TEXT NOT NULL UNIQUE,
@@ -3849,7 +3947,7 @@ CREATE TABLE meet_consultations (
                     CHECK (status IN ('confirmed', 'cancelled', 'completed')),
   created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, booking_id TEXT, booking_version INTEGER, cancel_claim_id TEXT);
 
 CREATE TABLE menu_versions (
   id TEXT PRIMARY KEY,
@@ -4438,6 +4536,27 @@ CREATE TABLE nen_lifetime_milestones (
   sort_order      INTEGER NOT NULL DEFAULT 0,
   created_at      TEXT NOT NULL,
   updated_at      TEXT NOT NULL
+);
+
+CREATE TABLE nen_member_rank_sync (
+  id TEXT PRIMARY KEY,
+  operation_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  friend_id TEXT NOT NULL,
+  customer_id TEXT,
+  rank_key TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  expected_version INTEGER CHECK (expected_version IS NULL OR expected_version >= 0),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'failed', 'synced')),
+  error_code TEXT,
+  error_reason TEXT,
+  result_version INTEGER,
+  duplicate INTEGER NOT NULL DEFAULT 0,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (operation_id, friend_id)
 );
 
 CREATE TABLE nen_pet_profiles (
@@ -5280,6 +5399,25 @@ CREATE TABLE pool_accounts (
   UNIQUE(pool_id, line_account_id)
 );
 
+CREATE TABLE postal_codes (
+  postal_code TEXT NOT NULL,
+  prefecture TEXT NOT NULL,
+  city TEXT NOT NULL,
+  town TEXT NOT NULL DEFAULT '',
+  source_name TEXT,
+  imported_at TEXT,
+  PRIMARY KEY (postal_code, prefecture, city, town)
+);
+
+CREATE TABLE postal_import_manifest (
+  id TEXT PRIMARY KEY,
+  source_url TEXT NOT NULL,
+  input_sha256 TEXT NOT NULL,
+  input_bytes INTEGER NOT NULL,
+  row_count INTEGER NOT NULL,
+  imported_at TEXT NOT NULL
+);
+
 CREATE TABLE "recipe_clone_items" (
   id         TEXT PRIMARY KEY,
   run_id     TEXT NOT NULL REFERENCES "recipe_clone_runs"(id) ON DELETE CASCADE,
@@ -5552,6 +5690,9 @@ CREATE TABLE rich_menu_groups (
   folder_id           TEXT REFERENCES folders(id) ON DELETE SET NULL,
   -- 160: 自分で決める並び順。小さいほど先。同じなら更新の新しい順。
   display_order       INTEGER NOT NULL DEFAULT 0,
+  -- V8: トークを開いたときメニューを出した状態にするか（LINE payload の
+  -- `selected`）。0=閉じておく（従来どおり）、1=開いておく。
+  default_open        INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , publishing_owner TEXT, publishing_expires_at TEXT, publishing_generation INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1);
@@ -6007,7 +6148,7 @@ CREATE TABLE rt_inventory_slots (
   line_capacity INTEGER NOT NULL DEFAULT 0 CHECK (line_capacity >= 0),
   walk_in_capacity INTEGER NOT NULL DEFAULT 0 CHECK (walk_in_capacity >= 0),
   reserved_count INTEGER NOT NULL DEFAULT 0 CHECK (reserved_count >= 0),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), updated_by TEXT,
   UNIQUE(store_id, starts_at)
 );
 
@@ -6048,6 +6189,21 @@ CREATE TABLE rt_memberships (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE rt_menu_change_requests (
+  id TEXT PRIMARY KEY,
+  approval_id TEXT NOT NULL UNIQUE REFERENCES rt_approval_requests(id),
+  menu_id TEXT NOT NULL REFERENCES rt_menu_items(id),
+  store_id TEXT NOT NULL REFERENCES rt_stores(id),
+  before_price INTEGER NOT NULL CHECK (before_price >= 0),
+  after_price INTEGER NOT NULL CHECK (after_price >= 0),
+  requested_by TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'returned', 'applied', 'failed')),
+  return_reason TEXT,
+  failure_reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE rt_menu_items (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -6060,6 +6216,14 @@ CREATE TABLE rt_menu_items (
   duration_minutes INTEGER,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'archived')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+, published_once INTEGER NOT NULL DEFAULT 0 CHECK (published_once IN (0, 1)), publication_history_unknown INTEGER NOT NULL DEFAULT 0 CHECK (publication_history_unknown IN (0, 1)));
+
+CREATE TABLE rt_opening_hours_settings (
+  store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
+  hours_json TEXT NOT NULL CHECK (json_valid(hours_json)),
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  updated_by TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -6764,6 +6928,24 @@ CREATE TABLE templates (
   CHECK (draft_question_json IS NULL OR json_valid(draft_question_json)), draft_question_status TEXT
   CHECK (draft_question_status IS NULL OR draft_question_status IN ('draft', 'published')), publish_idempotency_key TEXT, draft_revision INTEGER NOT NULL DEFAULT 0);
 
+CREATE TABLE tenant_data_purge_audit (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  -- immediate: 早期削除の要請による削除 / expired: 保存期限の満了による削除
+  reason TEXT NOT NULL,
+  -- 保存起点。どの時点から数えて期限が切れたのかを後から確かめられるようにする。
+  retention_anchor_at TEXT,
+  started_at TEXT NOT NULL,
+  -- 全ての表を消し終えた回だけ入る。途中で上限に達した回は空のままにする。
+  finished_at TEXT,
+  -- この回に消した行数の合計と、表ごとの内訳 {"friends": 12, ...}
+  deleted_rows INTEGER NOT NULL DEFAULT 0,
+  deleted_rows_by_table TEXT NOT NULL DEFAULT '{}',
+  -- この回に消した画像(R2)の数
+  deleted_objects INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE tenants (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -6771,7 +6953,7 @@ CREATE TABLE tenants (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , feature_packs TEXT NOT NULL DEFAULT '[]', plan_key TEXT, plan_status TEXT NOT NULL DEFAULT 'exempt'
-  CHECK (plan_status IN ('exempt', 'trialing', 'active', 'past_due', 'canceled')), trial_ends_at TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT, current_period_ends_at TEXT, plan_updated_at TEXT, signup_device_marker TEXT);
+  CHECK (plan_status IN ('exempt', 'trialing', 'active', 'past_due', 'canceled')), trial_ends_at TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT, current_period_ends_at TEXT, plan_updated_at TEXT, signup_device_marker TEXT, retention_anchor_at TEXT, purge_requested_at TEXT, data_purged_at TEXT);
 
 CREATE TABLE tiktok_pnl_order_lines (
   -- `<TikTok注文ID>:<行番号>`。シートのキー列（A列）にもこの値を使う。
@@ -7700,6 +7882,12 @@ CREATE INDEX idx_broadcast_after_action_runs_due
 CREATE INDEX idx_broadcast_approval_events_broadcast
   ON broadcast_approval_events (broadcast_id, created_at DESC);
 
+CREATE INDEX idx_broadcast_asset_folders_account
+  ON broadcast_asset_folders(line_account_id, display_order);
+
+CREATE INDEX idx_broadcast_asset_versions_asset
+  ON broadcast_asset_versions(asset_id, version_number DESC);
+
 CREATE INDEX idx_broadcast_insights_broadcast_id ON broadcast_insights(broadcast_id);
 
 CREATE INDEX idx_broadcast_insights_status ON broadcast_insights(status);
@@ -7987,9 +8175,9 @@ CREATE UNIQUE INDEX idx_field_migration_runs_idempotency
 CREATE INDEX idx_field_migration_runs_scope
   ON field_migration_runs(tenant_id, line_account_id, created_at DESC);
 
-CREATE INDEX idx_folders_kind_order ON folders(kind, display_order);
+CREATE INDEX idx_folders_kind_order_556 ON folders(kind, display_order);
 
-CREATE INDEX idx_folders_webinar_account_order_333
+CREATE INDEX idx_folders_webinar_account_order_556
   ON folders(kind, account_id, display_order, name);
 
 CREATE INDEX idx_form_accounts_account
@@ -8306,6 +8494,10 @@ CREATE INDEX idx_line_account_connection_checks_correlation
 CREATE INDEX idx_line_account_connection_checks_latest
   ON line_account_connection_checks(line_account_id, checked_at DESC);
 
+CREATE INDEX idx_line_account_tag_links_tag ON line_account_tag_links(tag_id, line_account_id);
+
+CREATE INDEX idx_line_account_tags_order ON line_account_tags(tenant_id, display_order, name);
+
 CREATE INDEX idx_line_accounts_archived
   ON line_accounts (archived_at, display_order, created_at);
 
@@ -8549,6 +8741,9 @@ CREATE INDEX idx_nen_lifetime_milestones_account
 
 CREATE INDEX idx_nen_member_rank ON nen_ec_member_snapshots(member_rank, purchase_amount DESC);
 
+CREATE INDEX idx_nen_member_rank_sync_operation
+  ON nen_member_rank_sync(line_account_id, operation_id, status);
+
 CREATE INDEX idx_nen_pet_profiles_birthday
   ON nen_pet_profiles(substr(birthday, 6, 2), friend_id);
 
@@ -8738,6 +8933,9 @@ CREATE INDEX idx_platform_knowledge_articles_review ON platform_knowledge_articl
 
 CREATE INDEX idx_platform_knowledge_jobs_pending ON platform_knowledge_jobs(status, lease_until);
 
+CREATE INDEX idx_postal_codes_code
+  ON postal_codes(postal_code);
+
 CREATE INDEX idx_recipe_clone_items_v316_run
   ON recipe_clone_items(run_id, created_at, id);
 
@@ -8903,6 +9101,8 @@ CREATE INDEX idx_rt_inventory_store_time ON rt_inventory_slots(store_id, starts_
 CREATE UNIQUE INDEX idx_rt_manual_email_import ON rt_reservations(inbound_email_id) WHERE parser_key = 'manual_import';
 
 CREATE INDEX idx_rt_memberships_org ON rt_memberships(organization_id, store_id, role);
+
+CREATE UNIQUE INDEX idx_rt_menu_change_pending ON rt_menu_change_requests(menu_id) WHERE status IN ('pending', 'approved');
 
 CREATE INDEX idx_rt_menu_store ON rt_menu_items(store_id, status, kind);
 
@@ -9134,6 +9334,13 @@ CREATE INDEX idx_templates_line_account
   ON templates(line_account_id, display_order, id);
 
 CREATE INDEX idx_templates_publish_key ON templates (publish_idempotency_key);
+
+CREATE INDEX idx_tenant_data_purge_audit_tenant
+  ON tenant_data_purge_audit (tenant_id, created_at DESC);
+
+CREATE INDEX idx_tenants_retention_pending
+  ON tenants (retention_anchor_at)
+  WHERE data_purged_at IS NULL;
 
 CREATE INDEX idx_tenants_signup_device_marker
   ON tenants(signup_device_marker) WHERE signup_device_marker IS NOT NULL;
@@ -9420,6 +9627,31 @@ WHEN NEW.id != OLD.id
   OR NEW.version != OLD.version
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_VERSION_BINDING_IMMUTABLE'); END;
 
+CREATE TRIGGER line_account_tag_links_scope
+BEFORE INSERT ON line_account_tag_links
+WHEN NOT EXISTS (
+  SELECT 1 FROM line_accounts WHERE id = NEW.line_account_id
+    AND COALESCE(tenant_id, '00000000-0000-4000-8000-000000000001') = NEW.tenant_id
+    AND archived_at IS NULL
+)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_TAG_SCOPE_INVALID'); END;
+
+CREATE TRIGGER rt_inventory_slot_insert AFTER INSERT ON rt_inventory_slots BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = NEW.store_id AND is_active = 1), 0) WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_inventory_table_delete AFTER DELETE ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = OLD.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id = OLD.store_id; END;
+
+CREATE TRIGGER rt_inventory_table_insert AFTER INSERT ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = NEW.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id = NEW.store_id; END;
+
+CREATE TRIGGER rt_inventory_table_update AFTER UPDATE OF max_capacity, is_active, store_id ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = rt_inventory_slots.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id IN (OLD.store_id, NEW.store_id); END;
+
+CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status = 'pending' AND NEW.status = 'approved' BEGIN UPDATE rt_menu_items SET price = NEW.after_price, updated_at = datetime('now') WHERE id = NEW.menu_id AND store_id = NEW.store_id AND price = NEW.before_price; UPDATE rt_menu_change_requests SET status = CASE WHEN changes() = 1 THEN 'applied' ELSE 'failed' END, failure_reason = CASE WHEN changes() = 1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END, updated_at = datetime('now') WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_menu_change_review AFTER UPDATE OF status ON rt_approval_requests WHEN NEW.kind = 'menu_change' AND OLD.status = 'pending' AND NEW.status IN ('approved', 'returned') BEGIN UPDATE rt_menu_change_requests SET status = NEW.status, return_reason = CASE WHEN NEW.status = 'returned' THEN NEW.review_comment ELSE NULL END, updated_at = datetime('now') WHERE approval_id = NEW.id AND status = 'pending'; END;
+
+CREATE TRIGGER rt_menu_published_insert AFTER INSERT ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_menu_published_update AFTER UPDATE OF status ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
+
 CREATE TRIGGER trg_action_score_published_version_immutable
 BEFORE UPDATE ON action_score_rule_versions
 WHEN OLD.status = 'published'
@@ -9565,10 +9797,6 @@ BEGIN SELECT RAISE(ABORT, 'published common action version cannot be deleted'); 
 CREATE TRIGGER trg_form_versions_immutable
 BEFORE UPDATE ON form_versions
 BEGIN SELECT RAISE(ABORT, 'published form versions are immutable'); END;
-
-CREATE TRIGGER trg_form_versions_no_delete
-BEFORE DELETE ON form_versions
-BEGIN SELECT RAISE(ABORT, 'published form versions cannot be deleted'); END;
 
 CREATE TRIGGER trg_forms_activation_requires_published_version
 BEFORE UPDATE OF is_active ON forms

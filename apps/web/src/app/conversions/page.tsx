@@ -209,7 +209,8 @@ function ingestionEventLabel(event: ConversionIngestionEvent): string {
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { conversionsTabTitle } from './conversions-tab-title'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
 import AffiliatePaymentTab from '@/app/affiliates/payment-tab'
 import { useAccount } from '@/contexts/account-context'
@@ -1199,7 +1200,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     ) : null}
                   </td>
                   <td className="text-ink-secondary w-1/4 px-4 py-3 text-sm">
-                    <span className="line-clamp-2" title={sourceTriggerLabel(point)}>{sourceTriggerLabel(point)}</span>
+                    <span className="line-clamp-2 break-all" title={sourceTriggerLabel(point)}>{sourceTriggerLabel(point)}</span>
                     <p className="text-ink-faint mt-0.5 truncate text-xs" title={`${measureLabel(point.measureMethod)}・${deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}`}>
                       {measureLabel(point.measureMethod)}・{deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}
                     </p>
@@ -1215,7 +1216,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   <td className={point.usageCount === 0
                     ? 'text-warning w-1/4 px-4 py-3 text-sm'
                     : 'text-ink-secondary w-1/4 px-4 py-3 text-sm'}>
-                    <span className="line-clamp-2" title={usageLabel(point)}>{usageLabel(point)}</span>
+                    <span className="line-clamp-2 break-all" title={usageLabel(point)}>{usageLabel(point)}</span>
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                     {/*
@@ -2096,9 +2097,23 @@ function ReportTab({ accountId }: { accountId: string | null }) {
   )
 }
 
+/**
+ * ★V8 で「成果とアフィリエイト」へ分かれたタブ（オーナー決定 案A）。
+ * 旧 `/conversions?tab=affiliates|offers|approvals|payment|report` のURLを
+ * 壊さないよう、v8 のときは /affiliates 側へ送る。
+ */
+const V8_AFFILIATE_TABS = new Set(['affiliates', 'offers', 'approvals', 'payment', 'report'])
+
 function ConversionsPageHost() {
   const tab = useMergedTab(MERGED_TABS, 'tab', DEFAULT_TAB)
   const { selectedAccountId } = useAccount()
+  const theme = useAdminTheme()
+  const router = useRouter()
+  useEffect(() => {
+    if (theme === 'v8' && V8_AFFILIATE_TABS.has(tab)) {
+      router.replace(`/affiliates?tab=${tab}`)
+    }
+  }, [theme, tab, router])
   /*
     R291: 紹介者の停止前確認からの `?affiliate=`。承認待ちは成果承認タブで
     この紹介者に絞り、リンクは紹介者タブでこの紹介者の内訳を開く。
@@ -2123,6 +2138,10 @@ function ConversionsPageHost() {
     approvals: 'n5VVTb',
     points: 'ZrpKn',
     report: 'GUxsj',
+  }
+  // v8 では成果とアフィリエイト系のタブは /affiliates へ送る（描き替わるまでの間）。
+  if (theme === 'v8' && V8_AFFILIATE_TABS.has(tab)) {
+    return <div className="text-ink-faint p-6 text-sm">移動中...</div>
   }
   return (
     <div data-design-node={nodeByTab[tab]}>

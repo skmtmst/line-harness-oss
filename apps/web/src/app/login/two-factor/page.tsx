@@ -88,8 +88,8 @@ export default function TwoFactorLoginPage() {
   return <main className="flex min-h-[100svh] items-center justify-center bg-canvas-sunken px-4 py-8">
     <section className="w-full max-w-md rounded-card bg-canvas px-6 py-8 shadow-card sm:px-10">
       <div className="flex items-center justify-center gap-3 text-sm font-semibold text-ink">
-        <span className="flex h-8 w-8 items-center justify-center rounded-control bg-accent-soft font-bold text-accent-deep">然</span>
-        {brand.name ?? '然-NEN- 公式'}
+        <span className="flex h-8 w-8 items-center justify-center rounded-control bg-accent-soft font-bold text-accent-deep">{brand.name?.slice(0, 1) ?? 'm'}</span>
+        {brand.name ?? 'musubo'}
       </div>
       {/*
         320px では2列がはみ出す（監査 m18e）。狭い幅では1列に積む。
@@ -110,7 +110,8 @@ export default function TwoFactorLoginPage() {
         : error ? <Notice tone="danger" message={error} id="two-factor-error" className="mt-5" /> : null}
       <p id="two-factor-code-label" className="mt-6 block text-xs font-semibold text-ink">認証コード</p>
       {/* ★V7 共通 認証コード入力（xHzFK）。貼り付け・自動入力も6マスへ振り分ける。 */}
-      <div className="mt-2 flex justify-center">
+      {/* V8-B `tOPeY`「6桁の確認」：6マスへの入力がこの板の中身。 */}
+      <div className="mt-2 flex justify-center" data-design-node="tOPeY">
         <OtpInput
           key={attempt}
           value={code}

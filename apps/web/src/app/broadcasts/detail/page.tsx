@@ -29,21 +29,44 @@ import { broadcastDetailCsv } from './broadcast-detail-export'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { broadcastCsvFilename } from '@/components/broadcasts/broadcast-csv-filename'
 import BroadcastMessagePreview from '@/components/broadcasts/broadcast-message-preview'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { useStaffRole } from '@/lib/staff-role'
+import { canEditFeature } from '@/lib/staff-capability'
+import BroadcastDetailV8 from '../detail-v8'
 
 function BroadcastDetailInner() {
   const params = useSearchParams()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   const id = params.get('id') ?? ''
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
-  usePageTitle(broadcast ? `配信結果：${broadcast.title}` : '配信の詳細')
+  const adminTheme = useAdminTheme()
+  /*
+   * ★V8：上の帯のパンくずは「一斉配信 › 配信名」、画面名は配信名だけ。
+   * v7 ではパンくずが描かれないので、渡しても見た目は変わらない。
+   */
+  usePageCrumbs([{ label: '一斉配信', href: '/broadcasts' }])
+  usePageTitle(
+    adminTheme === 'v8'
+      ? (broadcast ? broadcast.title : '一斉配信')
+      : (broadcast ? `配信結果：${broadcast.title}` : '配信の詳細'),
+  )
+  // 閲覧のみ（夕18）：V8 の詳細で変える操作を押せない形にする。
+  const staffRole = useStaffRole()
+  const canEdit = staffRole === null || canEditFeature('broadcast.definition.edit')
   const [insight, setInsight] = useState<(BroadcastInsight & { suppressedByAudienceSize: boolean }) | null>(null)
   // 集計は配信本体とは別に取る。取れていないのか、取りに行って失敗したのかを
   // 「—」に混ぜると、待てば出るのか操作が要るのかを運用者が判断できない。
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading')
   const [reloadToken, setReloadToken] = useState(0)
+  /*
+   * ★V8 `Q28Gb`：ほかの人の更新に気づいたら帯で知らせる。
+   * この画面は書き換えない（読み直すまで古い内容のまま）。
+   */
+  const [conflict, setConflict] = useState(false)
+  const shownVersionRef = useRef<number | null>(null)
   // BROADCAST-15: 宛先の条件に出すタグ名・シナリオ名。配信本体とは別に取る。
   // 読み込めないことと、宛先が消えていることは分けて出す。
   const [audienceNameState, setAudienceNameState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -128,6 +151,9 @@ function BroadcastDetailInner() {
         }
 
         setBroadcast(detail.data)
+        // 今見せている版を覚える。ほかの人の更新は版のずれで見つける。
+        shownVersionRef.current = detail.data.version ?? null
+        setConflict(false)
         setLoadState('ready')
 
         // 二者承認の今の状態。取れなくても詳細は出す。
@@ -223,6 +249,8 @@ function BroadcastDetailInner() {
             setReloadToken((value) => value + 1)
           }
           setBroadcast((prev) => (prev && prev.id === id ? detail.data : prev))
+          // 送り途中は自分の進みで版が進む。ほかの人の更新と混ぜない。
+          shownVersionRef.current = detail.data.version ?? shownVersionRef.current
         } catch {
           // 失敗は数えず、次の周期で取り直す。
         }
@@ -233,6 +261,38 @@ function BroadcastDetailInner() {
       clearInterval(timer)
     }
   }, [id, broadcast?.status])
+
+  /*
+   * ★V8 `Q28Gb`：別のタブから戻ってきたら版だけ確かめる。
+   * ずれていたら帯を出すだけで、画面は書き換えない。
+   * v7 では付けない（通信も増やさない）。
+   */
+  useEffect(() => {
+    if (adminTheme !== 'v8' || !id || loadState !== 'ready') return
+    const recheck = () => {
+      if (document.visibilityState !== 'visible') return
+      void (async () => {
+        try {
+          const detail = await api.broadcasts.get(id)
+          if (!detail.success) return
+          const shown = shownVersionRef.current
+          const latest = detail.data.version ?? null
+          if (shown !== null && latest !== null && latest !== shown) {
+            setConflict(true)
+          }
+        } catch {
+          // 取れなくても今の画面は残す。次の機会に確かめる。
+        }
+      })()
+    }
+    const onVisible = () => recheck()
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', recheck)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', recheck)
+    }
+  }, [adminTheme, id, loadState])
 
   if (!id) {
     return (
@@ -419,7 +479,8 @@ function BroadcastDetailInner() {
   return (
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <nav data-design="Crumb" className="text-ink-faint text-xs">
+      {/* ★V8 のパンくずは上の帯に出る（crumbs）。v7 だけ本文の戻り口を残す。 */}
+      <nav data-design="Crumb" className="v7-only text-ink-faint text-xs">
         <Link href="/broadcasts" className="hover:underline">
           ← 一斉配信一覧
         </Link>
@@ -431,6 +492,44 @@ function BroadcastDetailInner() {
       */}
       {loadState === 'loading' || !broadcast ? (
         <ListState kind="loading" title="配信を読み込んでいます" />
+      ) : adminTheme === 'v8' ? (
+        <BroadcastDetailV8
+          broadcast={broadcast}
+          insight={insight}
+          insightState={insightState}
+          audienceLabel={audienceLabel}
+          accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
+          tab={tab}
+          onSelectTab={selectTab}
+          onExportCsv={exportCsv}
+          onReload={() => setReloadToken((value) => value + 1)}
+          conflict={conflict}
+          onConflictReload={() => {
+            setConflict(false)
+            setReloadToken((value) => value + 1)
+          }}
+          canEdit={canEdit}
+          contentRef={contentRef}
+          approval={{
+            state: approvalState,
+            busy: approvalBusy,
+            message: approvalMessage,
+            requesterName: approvalRequesterName,
+            approverName: approvalApproverName,
+            candidates: approvalCandidates,
+            messageSummary: approvalMessageSummary,
+            canReRequest: Boolean(canReRequest),
+            reApproverId,
+            reApprovalNote,
+            onApproverChange: setReApproverId,
+            onNoteChange: setReApprovalNote,
+            onRequest: handleApprovalRequest,
+            onCancel: handleApprovalCancel,
+            onRemind: handleApprovalRemind,
+            onReject: handleApprovalReject,
+            onApprove: () => void handleApprovalApprove(),
+          }}
+        />
       ) : String(broadcast.status) === 'sent' ? (
         <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} tab={tab} selectTab={selectTab} approval={approvalState} onExportCsv={exportCsv} />
       ) : (

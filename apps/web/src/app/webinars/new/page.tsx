@@ -14,6 +14,10 @@ import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { Suspense } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ListState from '@/components/shared/list-state'
+import NewWebinarV8 from './new-v8'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { webinarApi, describeSaveFailure, type WebinarFolder } from '@/lib/api'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
@@ -26,6 +30,24 @@ type DeliveryKind = 'on-demand' | 'scheduled'
 const FOLDERS_BLOCKED_MESSAGE = 'フォルダを読み込めていないため、下書きを保存できません。フォルダをもう一度読み込んでください。'
 
 export default function NewWebinarPage() {
+  return (
+    <Suspense fallback={<ListState kind="loading" />}>
+      <NewWebinarPageThemed />
+    </Suspense>
+  )
+}
+
+/*
+ * ★V8 切替（①基本設定 `j7PP04`）。v7 の見た目は data-theme="v8" が付くまで
+ * 1画素も変えない。
+ */
+function NewWebinarPageThemed() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <NewWebinarV8 />
+  return <NewWebinarPageV7 />
+}
+
+function NewWebinarPageV7() {
   usePageTitle('ウェビナーを作成')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -160,7 +182,7 @@ export default function NewWebinarPage() {
                   id="webinar-title"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  placeholder="NEN活用スタートセミナー"
+                  placeholder="はじめての定期便セミナー"
                   className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                 />
               </div>

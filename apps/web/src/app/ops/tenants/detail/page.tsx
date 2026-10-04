@@ -4,7 +4,8 @@ import { ChevronLeft, Eye } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type OpsTenantDetail } from '@/lib/api'
-import OpsPageHeader from '@/components/ops/ops-page-header'
+import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import '@/app/ops/readonly-v8.css'
 import {
   PLAN_STATUS_LABEL,
   ROLE_LABEL,
@@ -24,10 +25,11 @@ import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
-import { TextArea, TextField } from '@/components/shared/text-field'
+import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
  * 契約先アカウント詳細。★V6 37-4 `vhwld`。第 1 段は 概要／店舗／権限者／監査 のタブ。
@@ -61,6 +63,10 @@ function OpsTenantDetailContent() {
   const [error, setError] = useState('')
   const [statusDialog, setStatusDialog] = useState<StatusTarget | null>(null)
   const [busy, setBusy] = useState(false)
+  const theme = useAdminTheme()
+  const v8 = theme === 'v8'
+  // 代理ログインは影響の大きい操作。V8では始める前に確認の小窓を出す。
+  const [impersonateConfirm, setImpersonateConfirm] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) { setError('契約先が指定されていません'); return }
@@ -72,11 +78,13 @@ function OpsTenantDetailContent() {
   useEffect(() => { void load() }, [load])
 
   const impersonate = async () => {
-    if (!detail) return
+    if (!detail || busy) return
     setBusy(true)
+    // 二重押しの応答が戻るまで小窓は閉じない。失敗したら小窓の中で理由を出す。
     const res = await opsCall(api.ops.impersonation.start(detail.tenant.id))
     setBusy(false)
     if (!res.success) { setError(res.error || '代理ログインを始められませんでした'); return }
+    setImpersonateConfirm(false)
     window.location.assign('/hq')
   }
 
@@ -105,7 +113,7 @@ function OpsTenantDetailContent() {
    */
   if (!id) {
     return (
-      <div data-design-node="vhwld">
+      <ReadonlyDesignNode node="Oub6x"><div data-design-node="vhwld">
         <TargetMissing
           kind="unspecified"
           title="見る契約先が指定されていません"
@@ -113,25 +121,25 @@ function OpsTenantDetailContent() {
           backHref="/ops/tenants"
           backLabel="契約先の一覧へ戻る"
         />
-      </div>
+      </div></ReadonlyDesignNode>
     )
   }
 
   if (!detail) {
     return (
-      <div data-design-node="vhwld">
+      <ReadonlyDesignNode node="Oub6x"><div data-design-node="vhwld">
         <OpsPageHeader title="契約先アカウント" actions={<BackToList />} />
         {error
           ? <ListState kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
           : <ListState kind="loading" title="契約先を読み込んでいます" />}
-      </div>
+      </div></ReadonlyDesignNode>
     )
   }
 
   const { tenant, accounts, members, audit } = detail
 
   return (
-    <div data-design-node="vhwld" className="flex flex-col gap-4">
+    <ReadonlyDesignNode node="Oub6x"><div data-design-node="vhwld" className="v8-ro-ops-page flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="契約先アカウント" actions={<BackToList />} />
 
@@ -141,7 +149,7 @@ function OpsTenantDetailContent() {
         {tenantUseStatusChip(tenant.status)}
         {planStatusChip(tenant.plan_status)}
         <div className="flex-1" />
-        <Button onClick={() => void impersonate()} disabled={busy || tenant.status === 'archived'}>
+        <Button onClick={() => { if (v8) setImpersonateConfirm(true); else void impersonate() }} disabled={busy || tenant.status === 'archived'}>
           <Eye aria-hidden="true" className="h-4 w-4" />
           代理ログイン
         </Button>
@@ -289,7 +297,19 @@ function OpsTenantDetailContent() {
           onDone={() => { setStatusDialog(null); void load() }}
         />
       ) : null}
-    </div>
+      {v8 && impersonateConfirm ? (
+        <ConfirmDialog
+          open
+          title={`「${tenant.name}」に代理ログインする`}
+          description="閲覧のみで始まります。契約先のデータを扱います。操作はすべて記録されます。"
+          confirmLabel="代理ログインを始める"
+          busy={busy}
+          error={error || undefined}
+          onConfirm={() => void impersonate()}
+          onCancel={() => { if (!busy) setImpersonateConfirm(false) }}
+        />
+      ) : null}
+    </div></ReadonlyDesignNode>
   )
 }
 
@@ -337,7 +357,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
       title={`${tenantName} を${label}`}
       description={
         target === 'suspended'
-          ? '停止すると、この契約先の権限者はログインできなくなります。'
+          ? '停止すると、この契約先の権限者はログインできなくなります。配信も止まります。'
           : target === 'archived'
             ? 'アーカイブすると一覧から外れます。データは消えません。'
             : '再開すると、権限者がまたログインできるようになります。'
@@ -346,6 +366,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
       destructive={needsName}
       busy={busy}
       error={error}
+      designNode={target === 'suspended' ? 'okXoi' : undefined}
       onConfirm={ready ? () => void submit() : undefined}
       onCancel={onClose}
     >
@@ -358,7 +379,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
         ) : null}
         <label className="block">
           <span className="mb-1.5 block text-caption font-medium text-ink">理由<RequiredBadge /><span className="font-normal text-ink-faint">（4文字以上）</span></span>
-          <TextArea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} />
+          <TextField value={reason} onChange={(event) => setReason(event.target.value)} placeholder="支払いの遅れが3か月続いたため" aria-label="理由（4文字以上）" />
         </label>
       </div>
     </ConfirmDialog>

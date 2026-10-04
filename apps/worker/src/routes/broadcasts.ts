@@ -28,6 +28,7 @@ import {
 import type { BroadcastDisplayStatus } from '@line-crm/db';
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
+import { listResponse } from '../lib/list-etag.js';
 import { getSendPermissionForAccount } from '../services/send-entitlements.js';
 import { processBroadcastSend, buildMessage, processQueuedBroadcasts, guardScheduledBroadcastQuota } from '../services/broadcast.js';
 import {
@@ -612,25 +613,30 @@ broadcasts.get('/api/broadcasts', async (c) => {
     const allItems = await getBroadcasts(c.env.DB, lineAccountId || undefined, scope, { order: sort });
     const status = c.req.query('status');
     const folderId = c.req.query('folderId');
-    const filtered = allItems.filter((item) =>
-      (!status || item.status === status)
-      && (!folderId || (folderId === 'unfiled' ? !item.folder_id : item.folder_id === folderId)));
-    const cursor = Math.max(0, Number.parseInt(c.req.query('cursor') ?? '0', 10) || 0);
-    const requestedLimit = c.req.query('limit');
-    const limit = requestedLimit ? Math.min(100, Math.max(1, Number.parseInt(requestedLimit, 10) || 20)) : filtered.length;
-    const pageItems = filtered.slice(cursor, cursor + limit);
-    const { getBroadcastStats } = await import('@line-crm/db');
-    const stats = await getBroadcastStats(c.env.DB, lineAccountId || undefined, scope);
+    /*
+     * ★V8 一覧：絞り込みの札（すべて・予約中・下書き・承認待ち・送信済み・
+     * エラー）は 10 の状態（displayStatus）で絞る。台帳の status は4つしか
+     * 無いので、displayStatus パラメータで画面の札と同じ分け方を受ける。
+     */
+    const displayStatusParam = c.req.query('displayStatus');
+    const wantedDisplayStatuses = displayStatusParam
+      ? new Set(displayStatusParam.split(',').map((value) => value.trim()).filter(Boolean))
+      : null;
+    /*
+     * 札の件数と displayStatus の絞りは、フォルダだけを効かせた集団で数える
+     * （状態の札そのもので絞った数を札へ書くと、選ぶたびに他の札が減る）。
+     */
+    const folderFiltered = allItems.filter((item) =>
+      !folderId || (folderId === 'unfiled' ? !item.folder_id : item.folder_id === folderId));
     // 一覧の状態（10の状態・#816）は台帳の集計と合わせて読む。N+1にしない。
     const ledgerMap = await ledgerCountsForBroadcasts(
       c.env.DB,
-      pageItems.map((item) => String((item as unknown as Record<string, unknown>).id)),
+      folderFiltered.map((item) => String((item as unknown as Record<string, unknown>).id)),
     );
-    const data = pageItems.map((item) => {
-      const raw = item as unknown as Record<string, unknown>;
+    const displayStatusOf = (item: unknown): BroadcastDisplayStatus => {
+      const raw = item as Record<string, unknown>;
       const counts = ledgerMap.get(String(raw.id)) ?? { sent: 0, failed: 0, unknown: 0, claimed: 0, temp: 0, perm: 0 };
-      const ledgerRows = counts.sent + counts.failed + counts.unknown + counts.claimed;
-      const displayStatus = deriveBroadcastDisplayStatus({
+      return deriveBroadcastDisplayStatus({
         status: String(raw.status ?? 'draft'),
         approvalStatus: (raw.approval_status as string | null | undefined) ?? 'none',
         scheduledAt: (raw.scheduled_at as string | null | undefined) ?? null,
@@ -638,15 +644,34 @@ broadcasts.get('/api/broadcasts', async (c) => {
         sent: counts.sent,
         failed: counts.failed,
         unknown: counts.unknown,
-        ledgerRows,
+        ledgerRows: counts.sent + counts.failed + counts.unknown + counts.claimed,
       });
+    };
+    // 札ごとの件数。札の横の数はここから出す（数の出所を画面に分散させない）。
+    const statusCounts: Record<string, number> = { all: folderFiltered.length };
+    for (const item of folderFiltered) {
+      const key = displayStatusOf(item);
+      statusCounts[key] = (statusCounts[key] ?? 0) + 1;
+    }
+    const filtered = folderFiltered.filter((item) =>
+      (!status || (item as unknown as Record<string, unknown>).status === status)
+      && (!wantedDisplayStatuses || wantedDisplayStatuses.has(displayStatusOf(item))));
+    const cursor = Math.max(0, Number.parseInt(c.req.query('cursor') ?? '0', 10) || 0);
+    const requestedLimit = c.req.query('limit');
+    const limit = requestedLimit ? Math.min(100, Math.max(1, Number.parseInt(requestedLimit, 10) || 20)) : filtered.length;
+    const pageItems = filtered.slice(cursor, cursor + limit);
+    const { getBroadcastStats } = await import('@line-crm/db');
+    const stats = await getBroadcastStats(c.env.DB, lineAccountId || undefined, scope);
+    const data = pageItems.map((item) => {
+      const displayStatus = displayStatusOf(item);
       return {
         ...serializeBroadcast(item),
         displayStatus,
         displayStatusLabel: BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
       };
     });
-    return c.json({
+    // 同じ中身なら304（list-etag）。
+    return listResponse(c, {
       success: true,
       data,
       kpis: {
@@ -656,6 +681,7 @@ broadcasts.get('/api/broadcasts', async (c) => {
         delivered: stats.delivered,
         openRate: stats.openRate,
       },
+      statusCounts,
       pagination: {
         total: filtered.length,
         limit,

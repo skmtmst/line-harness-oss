@@ -3,7 +3,8 @@
 import { Plus } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsMember, type OpsMemberSummary } from '@/lib/api'
-import OpsPageHeader from '@/components/ops/ops-page-header'
+import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import '@/app/ops/readonly-v8.css'
 import { formatDateTime, opsCall } from '@/components/ops/ops-ui'
 import NoticeLineAccountCard from '@/components/ops/notice-line-account-card'
 import Button from '@/components/shared/button'
@@ -96,7 +97,7 @@ export default function OpsMembersPage() {
   const totpMissing = summary ? summary.members - summary.totpEnabled : 0
 
   return (
-    <div data-design-node="POteo" className="flex flex-col gap-4">
+    <ReadonlyDesignNode node="FvbHW"><div data-design-node="POteo" className="v8-ro-ops-page flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="メンバー管理" />
       <div>
@@ -108,7 +109,7 @@ export default function OpsMembersPage() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="v8-ro-ops-metrics grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard variant="v6" title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `招待中 ${summary.invited}・2要素認証待ち ${summary.awaitingTotp}` : '—'} loading={!loaded} />
         <KpiCard variant="v6" title="2要素認証" value={summary ? summary.totpEnabled : null} unit={summary ? `/ ${summary.members}人` : '人'} detail={totpMissing > 0 ? `未設定 ${totpMissing}人` : '全員設定済み'} badge={totpMissing > 0 ? '要対応' : undefined} badgeTone="danger" loading={!loaded} />
         <KpiCard variant="v6" title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail={summary ? `書き込み ${summary.writeImpersonationsThisMonth}回` : '—'} loading={!loaded} />
@@ -224,15 +225,16 @@ export default function OpsMembersPage() {
         open={toggling !== null}
         title={toggling ? `${toggling.name} を${toggling.isActive ? '停止' : '再開'}しますか？` : ''}
         description={toggling?.isActive
-          ? '停止すると、この人は運営コンソールに入れなくなります。権限者としての登録は残ります。'
+          ? '停止すると、この人は運営コンソールに入れなくなります。あとで再開できます。'
           : '再開すると、この人はまた運営コンソールに入れるようになります。'}
         confirmLabel={toggling?.isActive ? '停止する' : '再開する'}
         destructive={Boolean(toggling?.isActive)}
         busy={busy}
         error={error}
+        designNode={toggling?.isActive ? 'VUyYu' : undefined}
         onConfirm={() => void toggle()}
         onCancel={() => { if (!busy) setToggling(null) }}
       />
-    </div>
+    </div></ReadonlyDesignNode>
   )
 }

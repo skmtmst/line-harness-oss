@@ -64,12 +64,36 @@
   background: var(--color-canvas-sunken);
 }
 
+/*
+ * G6 移し替え：「前の見た目に戻す」（V8 のときだけ出す）。
+ * 目立たせない文字ボタン。押せることが分かるよう乗せたら下線。
+ */
+.revert {
+  flex-shrink: 0;
+  background: none;
+  border: 0;
+  padding: 0 4px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: 36px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.revert:hover {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .logout:hover {
   border-color: var(--color-accent);
 }
 
 .manual:focus-visible,
-.logout:focus-visible {
+.logout:focus-visible,
+.revert:focus-visible {
   outline: 2px solid var(--color-status-info);
   outline-offset: 2px;
 }
@@ -304,6 +328,27 @@
   white-space: nowrap;
 }
 
+/* ページが渡した手前の段。戻れるのでリンク色＋押せる形にする。 */
+.crumbFromWrap {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.crumbFromLink {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crumbFromLink:hover {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
 .crumbSep {
   color: var(--color-ink-faint);
 }
@@ -395,8 +440,42 @@
   max-width: 128px;
 }
 
+/*
+ * ★V8 1152 の帯（parity 1003-2106：1152 の 29/31 板で札が 20px に
+ * 潰れて見えなくなっていた）。札は縮めない（長い名前は 128px の
+ * 「…」で受ける）。代わりにパンくずと自分の名前が縮む（どちらも
+ * 「…」持ち）。v7 は今までどおり。
+ */
+[data-theme='v8'] .accountPill {
+  flex-shrink: 0;
+}
+
+[data-theme='v8'] .crumbCurrent,
+[data-theme='v8'] .crumbFrom,
+[data-theme='v8'] .crumbFromLink,
+[data-theme='v8'] .user {
+  min-width: 0;
+}
+
 [data-theme="v8"] .user {
   max-width: 104px;
+}
+
+/*
+ * ★V8 1152 の帯（M3 報告・parity 1003-2106：1152 の 29/31 板で札が
+ * 20px に潰れて見えなくなっていた）。札は縮めない（長い名前は
+ * 128px の「…」で受ける）。代わりにパンくずと自分の名前が縮む
+ * （どちらも「…」持ち）。v7 は今までどおり。
+ */
+[data-theme='v8'] .accountPill {
+  flex-shrink: 0;
+}
+
+[data-theme='v8'] .crumbCurrent,
+[data-theme='v8'] .crumbFrom,
+[data-theme='v8'] .crumbFromLink,
+[data-theme='v8'] .user {
+  min-width: 0;
 }
 
 /* 1152 未満ではログアウトを印だけにする（板 NF3uI「1152 の帯」）。
@@ -411,5 +490,111 @@
     justify-content: center;
     padding: 0;
   }
+}
+
+/* ---------------------------------------------------------------------
+ * ★V8 殻合わせ（絵 `V8-B/JKjsE`・統括もふだんの画面も同じ殻）。
+ * v7 の土台クラスは触らない。ここは V8 の上書きだけ。
+ * ------------------------------------------------------------------- */
+
+/* v7 の中箱（名前＋役割）は素通しにする。V8 でだけ積む。 */
+.identityText {
+  display: contents;
+}
+
+/* ホームの格子印＋文字。手前の段の頭。 */
+.crumbHome {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.crumbHome:hover {
+  color: var(--color-ink);
+}
+
+/* 札の中の役割（統括など）。V8 で名前の上に小さい行で添える。 */
+.pillText {
+  display: contents;
+}
+
+[data-theme='v8'] .pillText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+
+[data-theme='v8'] .pillRole {
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* 札は2行ぶんの高さにする（役割＋名前）。幅の決めは変えない。 */
+[data-theme='v8'] .accountPill {
+  height: auto;
+  min-height: 44px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/*
+ * 自分：名前を太字・役割を下の小さい行に積む（絵どおり）。
+ * 役割の印（押せる統括ボタンも）は札の形をやめ小さい文字にする。
+ */
+[data-theme='v8'] .identityText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+
+[data-theme='v8'] .identityText .user {
+  order: -1;
+  max-width: 140px;
+  color: var(--color-ink);
+}
+
+[data-theme='v8'] .identityText .role,
+[data-theme='v8'] .identityText .roleButton {
+  height: auto;
+  border-radius: var(--radius-none);
+  background: none;
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 0;
+}
+
+[data-theme='v8'] .identityText .roleButton:hover {
+  background: none;
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+/*
+ * 『前の見た目に戻す』は名前の横に小さく残す（絵の指示）。
+ * v7 には出さない（tsx 側で V8 のときだけ渡る）。
+ */
+[data-theme='v8'] .revert {
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  line-height: 1.2;
+  padding: 0 2px;
+}
+
+[data-theme='v8'] .revert:hover {
+  color: var(--color-ink-secondary);
 }
 }

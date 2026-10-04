@@ -41,8 +41,8 @@ describe('統括 バナー生成', () => {
     expect(projectPage).not.toContain('<Header')
   })
 
-  it('L 一覧型の帯の順: タブ行 → 数値カード帯 → 案内帯 → 一覧本体', () => {
-    const order = ['<BannerTabs', '<BannerKpis', '<BannerNote', '<ProjectsSection']
+  it('V8（板 B9ZAr・W5Wxr）の帯の順: 数値カード帯 → 案内帯 → タブ行 → 一覧本体（操作と見るは左列）', () => {
+    const order = ['<BannerKpis', '<BannerNote', '<BannerTabs', '<ProjectsSection']
     const positions = order.map((needle) => listPage.indexOf(needle))
     expect(positions.every((p) => p >= 0)).toBe(true)
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)
@@ -69,9 +69,17 @@ describe('統括 バナー生成', () => {
   it('保存・実行は下部追従バーにしか置かない', () => {
     expect(projectPage).toContain('<StickyBar')
     expect(projectPage).toContain('生成する（{input.count}枚）')
-    expect(projectPage).toContain('残りをやめる')
+    expect(projectPage).toContain('生成をやめる')
     expect(projectPage).toContain('条件をクリア')
     expect(panel).not.toMatch(/生成する/)
+  })
+
+  it('V8（iMnph）は外枠に板IDを付け、切り替えに件数を出す', () => {
+    expect(projectPage).toContain("'iMnph'")
+    expect(projectPage).toContain('画像を押すと詳細・アカウントへ渡す')
+    for (const label of ['すべて', 'お気に入り', 'アカウントへ渡し済み']) {
+      expect(projectPage).toContain(label)
+    }
   })
 
   it('モーダルは全面1枚のオーバーレイで、幅は max-width（1920/1160 の固定幅を書かない）', () => {
@@ -132,11 +140,11 @@ describe('統括 バナー生成', () => {
     expect(panel).toContain("accept=\"image/png,image/jpeg,image/webp\"")
     expect(modal).toContain('参照画像にする')
     const picker = read('../../../components/hq/banners/reference-picker-dialog.tsx')
-    expect(picker).toContain('designNode="biOEb"')
-    expect(picker).toContain('この画像を参照にする')
-    expect(picker).toContain('手元のファイルを選ぶ')
+    expect(picker).toContain('designNode="UcBQ5"')
+    expect(picker).toContain('この画像を使う')
+    expect(picker).toContain('ファイルを選ぶ')
     // 手元のファイルはプロジェクトへ取り込んでから参照にする（ライブラリにも残る）
     expect(projectPage).toContain('const uploadReference = async (file: File)')
-    expect(projectPage).toContain('applyReference(uploaded)')
+    expect(projectPage).toContain('applyReference(uploaded, input.referenceMode)')
   })
 })

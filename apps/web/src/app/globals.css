@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/*
+ * `v7:` / `v8:` バリアント（★V8 移行）。
+ *
+ * Tailwind ユーティリティは部品の CSS Module より後の層に出るため、
+ * 呼び出し側の `h-9.5` のような指定が v8 規定にも勝ってしまう。
+ * 「v7 の見た目を1画素も変えない」ために、テーマのときだけ効く
+ * ユーティリティを `v7:h-9.5` の形で書けるようにする。
+ * data-theme は `<html>` に常に v7 か v8 が付く（layout.tsx）。
+ */
+@custom-variant v7 (&:where(:root:not([data-theme="v8"]) *));
+@custom-variant v8 (&:where([data-theme="v8"] *));
+
 [data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
 [data-design-node="YfTfJ"] [data-design-part="dialog"] { width: min(680px, calc(100% - 32px)); }
 [data-design-node="N2J629"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
@@ -188,7 +200,7 @@
   --color-line-answer-bg: #e6f7ed;
   --color-line-answer: #08783b;
 
-  /* 然-NEN- のLINEカード。Pen V2の必要な高級感を、生の色値ではなく共通語彙にする。 */
+  /* `app/nen/*`（1契約先の専用画面）のLINEカード。Pen V2の必要な高級感を、生の色値ではなく共通語彙にする。 */
   --color-nen-ivory: #fbf8f1;
   --color-nen-green: #1b3a31;
   --color-nen-gold: #b08d57;
@@ -227,6 +239,9 @@
   /* ★V7 の 12px 段（カード・ダイアログ・知らせ）。card と同値なのは意図。 */
   --radius-panel: 12px;
   --radius-icon: 3px;
+  --radius-none: 0;
+  --radius-chart-dot: 2px;
+  --radius-chart-bar: 4px;
   /* Pencil `$radius-xs`(6px)。行の中の小さな札（フォルダ・連動）。 */
   --radius-mini: 6px;
   /* Pencil ★V8 印のタイル（C9CaMS・E7USZ9・A2mryd）。小22→7、中28・大32→9。 */
@@ -457,6 +472,26 @@
   --motion-fast: 120ms;
   --motion-base: 200ms;
   --motion-slow: 300ms;
+  /*
+   * ★V8 仕上げ（M10）：閉じる 150ms・引き出し 240ms。
+   * 開く 200ms の逆再生と、横から出る面だけ少しゆっくりの指定。
+   * `@theme` ではなく `:root` に置く（使われないと出力されないため）。
+   */
+  --motion-exit: 150ms;
+  --motion-panel: 240ms;
+  /*
+   * ★A の組み合わせ（M10）：離したときのばね戻り 160ms・
+   * 手順とタブの中身は --motion-panel（240ms）を使う。
+   * 押す 80ms は --motion-instant がすでにある。
+   */
+  --motion-snap: 160ms;
+  --motion-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --motion-glide: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /*
+   * ★A の下の帯（M10）：下から浮かせたときのふんわり影
+   * （0 8px 24px 黒8%）。枠線は持たないので影だけ。
+   */
+  --shadow-bar-float: 0 8px 24px rgb(0 0 0 / 0.08);
   /* 骨組みの明滅 1 周期（★V7 仕上げ §3）。transition ではなく animation の周期専用。 */
   --motion-pulse: 1.2s;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -499,6 +534,26 @@
   --color-border-soft: #1d1d1f14;
   --shadow-segment-ring: inset 0 0 0 1px var(--color-border-soft);
   --shadow-segment-thumb: 0 1px 2px #1d1d1f1a;
+
+  /*
+   * 夕15 一斉配信の右欄のスマホ（app/broadcasts/phone-mock-v8.module.css）。
+   * 画面の中の飾りなので管理画面のテーマ色とは別物として `bphone` で分ける。
+   * 共有の LINE 見本（components/shared/line-preview）とは別の絵で、
+   * 角丸・地の色も違う。値は Pencil `F3X1Mo` / `cgiGB` / `cdZBf` の実測。
+   */
+  --v8-bphone-ink: #171a1f;          /* 器の地・島・帯の中の字・ホームの線 */
+  --v8-bphone-talk: #7f93c4;         /* トークの地 */
+  --v8-bphone-chrome: #ffffff;       /* 帯の地・緑の上の字 */
+  --v8-bphone-sub: #4a525e;          /* 帯の副の字 */
+  --v8-bphone-chip: rgb(255 255 255 / 0.55); /* トークの中の札の地 */
+  --v8-bphone-chip-ink: #3c4450;     /* 札の字 */
+  --v8-bphone-send: #06c755;         /* 送信ボタンの緑（LINE の緑） */
+  --v8-bphone-hairline: rgb(15 23 32 / 0.06); /* 帯の区切り線 */
+  --v8-bphone-shadow: 0 12px 32px rgb(15 23 32 / 0.18); /* 器が下へ落とす影 */
+  --v8-bphone-shell-radius: 44px;    /* 器の角丸 */
+  --v8-bphone-screen-radius: 34px;   /* 画面の角丸 */
+  /* 一覧の日付窓（list-v8.module.css の datePopover）が落とす影 */
+  --v8-popover-shadow: 0 8px 24px rgb(15 23 32 / 0.12);
 }
 
 /*
@@ -523,6 +578,33 @@
   --v8-line-shell-radius: 52px;       /* 器の角丸 */
   --v8-line-screen-radius: 42px;      /* 画面の角丸 */
   --v8-line-homebar-radius: 3px;      /* ホームの線の角丸 */
+  /* トークの吹き出し。届いた側（左・白）は左上、返す側（右・緑）は右上を小さく。 */
+  --v8-line-bubble-in-radius: 4px 14px 14px 14px;
+  --v8-line-bubble-out-radius: 14px 4px 14px 14px;
+}
+
+/*
+ * ★V8 LIFFプレビューのスマホ（予約設定 `owaS3` の右欄）：お客さまの
+ * LIFF 予約画面の写しの値。管理画面のテーマ色とは別物なので
+ * `--v8-liff-*` で分ける（LINEプレビューの `--v8-line-*` と同じ考え）。
+ * 値は Pencil の実寸の写しで、直値はここだけに置く。
+ */
+[data-theme="v8"] {
+  --v8-liff-line: #e6e9ed;            /* カード・帯の細い枠 */
+  --v8-liff-slot-line: #dfe3e8;       /* 時刻の枠の細い枠 */
+  --v8-liff-primary: #03873a;         /* 決めるボタン・選んだ印・値段 */
+  --v8-liff-primary-soft: #f0fbf4;    /* 選んだカード・日の地 */
+  --v8-liff-chip: #f1f3f5;            /* 分類の札・切り替えの溝 */
+  --v8-liff-off: #f7f8f9;             /* 休みの日・押せない枠 */
+  --v8-liff-idle: #b8bec6;            /* まだの段の字・押せない字 */
+  --v8-liff-sub: #5f6670;             /* 補足の字 */
+  --v8-liff-thumb: #e9e2d4;           /* 写真・顔の置き場の地 */
+  --v8-liff-thumb-ink: #6b5b3e;       /* 顔の置き場の字 */
+  --v8-liff-phone-radius: 40px;       /* スマホの器の角丸 */
+  --v8-liff-card-radius: 14px;        /* 選ぶカードの角丸 */
+  --v8-liff-step-radius: 2px;         /* 段の線の角丸 */
+  --v8-savebar-shadow: 0 -4px 12px #1d1d1f14; /* 板の下の帯が上へ落とす影 */
+  --color-v8-pill-off: #f1f2f4;       /* 「止めている」の札の地 */
 }
 
 /*
@@ -569,6 +651,19 @@ html:not([data-theme="v8"]) .v8-only {
   [data-theme="v8"] [data-scroll-x] > * {
     min-width: var(--scroll-min, 0px);
   }
+}
+
+/*
+ * ★V8 流入と計測 一覧（y1ztx）：1152幅で「最新追加」の日付（8月25日（火）・
+ * 約96px）が 8% 列（約85px）からはみ出す。1列目（流入元名）は伸び縮み・
+ * 日付は中身に合わせた幅にする。v7 は変えない。
+ */
+[data-theme="v8"] col.inflow-name-col {
+  width: auto;
+}
+
+[data-theme="v8"] col.inflow-date-col {
+  width: 7rem;
 }
 
 /* v8 では上の帯を 1024px から出す（v7 は 1280px から）。畳んだ左
@@ -713,6 +808,58 @@ aside[aria-label="フォルダ"] .shadow-lg {
 /* モーダルは中央から。最前面の影（★V7 段3）で浮かせる。 */
 [data-design-part="dialog"] {
   animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
+}
+
+/*
+ * ★V8 仕上げ（M10）：読み込み中の表示→中身はふっと出る
+ * （opacity＋少し下から 4px、200ms ease-out）。
+ * `data-content-in` を付けた器が載せ替わったときに1回だけ出る。
+ * 動きを減らす設定では末尾の規定で一瞬になる。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] [data-content-in] {
+    animation: v8-content-in var(--motion-base) var(--motion-ease-out);
+  }
+}
+
+@keyframes v8-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * ★V8 仕上げ3回目（M10）①④：表の行は上から順に少しずつ出る。
+ * 載せ替わり（タブ・絞り込み・ページ送り）や行の追加で載った行も
+ * 同じ速さで出る。v8-content-in（200ms ease-out）を使い回し、
+ * 1 行ずつ 40ms ずらし・4 行目以降は同時（全体 320ms 以内。
+ * v7 の v7-stagger と同じ刻み）。`both` の終端が最終表示なので、
+ * 動きを減らす設定では出ない代わりに正しく表示される。
+ * 層の外に書く（部品の CSS Module より勝つ必要はなく、
+ * 行に animation を持つ部品は今ないため）。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme="v8"] tbody > tr {
+    animation: v8-content-in var(--motion-base) var(--motion-ease-out) both;
+  }
+
+  [data-theme="v8"] tbody > tr:nth-child(2) {
+    animation-delay: 40ms;
+  }
+
+  [data-theme="v8"] tbody > tr:nth-child(3) {
+    animation-delay: 80ms;
+  }
+
+  [data-theme="v8"] tbody > tr:nth-child(n + 4) {
+    animation-delay: 120ms;
+  }
 }
 
 [data-design-part="dialog"][data-design-node] {

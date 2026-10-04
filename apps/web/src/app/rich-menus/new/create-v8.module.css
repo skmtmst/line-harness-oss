@@ -1,0 +1,755 @@
+/*
+ * ★V8 リッチメニューを作る（作る① 形と画像 `JeINq`、② ボタンの動き `Z0uO6`、
+ * ③ 誰に出すか `OxEMM`、④ 公開 `F4gELj`）。
+ * 左に積んだ白カード＋右に説明カードと本物のスマホ（LINEでの見え方）。
+ * 畳みの基準は板の幅（board の幅）。1100px 未満で右の列を下へ畳む。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+/* 戻る導線（← リッチメニューへ）。 */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+/* 画面名＋手順の段。 */
+.headRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.subNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 左=白カードの縦積み、右=説明カード＋スマホ。 */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+@container (max-width: 1100px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 入力欄の並び（名前＋フォルダを横に）。 */
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.fieldError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.fieldHint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 大きさの選択カード（大きい・小さい）。 */
+.choiceRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.choiceCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--color-ink);
+}
+
+.choiceCard:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.choiceCardOn {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.choiceCardOn:hover {
+  background: var(--color-accent-soft);
+}
+
+.choiceName {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.choiceNote {
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.choiceDot {
+  margin-left: auto;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-hairline);
+  align-self: flex-start;
+}
+
+.choiceCardOn .choiceDot {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+/* 切替タブの数・トークを開いたとき（セグメント＋説明文を横に）。 */
+.segRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.segLabel {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.segHint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* 面の分けかた（見本7つ）。 */
+.layoutGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@container (max-width: 760px) {
+  .layoutGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.layoutItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.layoutThumb {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-mini, 6px);
+  border: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+}
+
+.layoutItemOn .layoutThumb {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.layoutThumb svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.layoutName {
+  font-size: 11px;
+  color: var(--color-ink-secondary);
+}
+
+.layoutItemOn .layoutName {
+  color: var(--color-accent-deep);
+  font-weight: 700;
+}
+
+/* 画像カードの中身。 */
+.imageRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.imageThumb {
+  width: 140px;
+  height: auto;
+  border-radius: var(--radius-control, 8px);
+  border: 1px solid var(--color-hairline);
+  object-fit: cover;
+  background: var(--color-canvas-sunken);
+}
+
+.imageMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.imageGuideLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-action);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.imageGuideLink:hover {
+  text-decoration: underline;
+}
+
+/* 公開前に見ておくところ（右カードの行）。 */
+.summaryList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.summaryLabel {
+  color: var(--color-ink-secondary);
+}
+
+.summaryValue {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.summaryValueWarn {
+  color: var(--color-warning);
+}
+
+.summaryValueOk {
+  color: var(--color-success);
+}
+
+/* ページの札（切替タブ）。 */
+.pageChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pageChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pageChip:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.pageChipOn {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-deep);
+  color: var(--color-accent-deep);
+}
+
+.pageChipOn:hover {
+  background: var(--color-accent-soft);
+}
+
+.pageChipDefault {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+/* ページ名＋消す操作。 */
+.pageTools {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 面の一覧（画像の下）。 */
+.areaList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.areaRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.areaRow:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.areaRowOn {
+  background: var(--color-accent-soft);
+}
+
+.areaRowOn:hover {
+  background: var(--color-accent-soft);
+}
+
+.areaLetter {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.areaRowOn .areaLetter {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.areaName {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.areaAction {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.areaUnset {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-warning);
+}
+
+/* 切替タブの中で面を描くときの帯（見本表示用）。 */
+.previewMenuTabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  padding: 2px 4px 0;
+}
+
+.previewMenuTab {
+  flex: 1;
+  padding: 3px 4px;
+  border-radius: 4px 4px 0 0;
+  font-size: 8px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--color-ink-faint);
+  background: var(--color-canvas);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewMenuTabOn {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.previewMenuImage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.previewMenuImage img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.previewMenuAreas {
+  position: absolute;
+  inset: 0;
+}
+
+.previewMenuAreaBox {
+  position: absolute;
+  border: 1px dashed rgba(29, 29, 31, 0.4);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.previewMenuEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 2500 / 1686;
+  border: 1px dashed var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 10px;
+  padding: 8px;
+  text-align: center;
+}
+
+.previewMenuBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 8px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 11px;
+  border-top: 1px solid var(--color-hairline);
+}
+
+/* 出す順番（番号つきの並び）。 */
+.orderList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.orderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  font-size: 13px;
+}
+
+.orderRowSelf {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.orderNum {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.orderRowSelf .orderNum {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.orderName {
+  min-width: 0;
+  color: var(--color-ink);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.orderMeta {
+  margin-left: auto;
+  flex: none;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* 青い案内帯（既定が入れ替わる注意など）。 */
+.infoBand {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-info-bg, #eef4ff);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.infoBand svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-action);
+}
+
+/* 公開の前の確認（3つの行）。 */
+.checkList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.checkRow:first-child {
+  border-top: 0;
+}
+
+.checkIcon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+
+.checkIconOk {
+  color: var(--color-success);
+}
+
+.checkIconYet {
+  color: var(--color-ink-faint);
+}
+
+.checkIconNg {
+  color: var(--color-danger);
+}
+
+.checkBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.checkName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.checkNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.checkAction {
+  flex: none;
+}
+
+/* 「公開すると」の右カードの定義行。 */
+.factList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.factRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.factLabel {
+  color: var(--color-ink-faint);
+}
+
+.factValue {
+  color: var(--color-ink);
+  font-weight: 700;
+  text-align: right;
+}
+
+/* 「終わりを決める」の入力行（トグルの下）。 */
+.endRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+/* 面の動きカードの見出し。 */
+.areaEditTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* 読み込み・失敗の板。 */
+.stateCard {
+  padding: 32px 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  text-align: center;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}

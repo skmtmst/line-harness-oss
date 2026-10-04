@@ -1,5 +1,9 @@
 'use client'
 
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8, { ReadonlyDesignNode } from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState } from 'react'
@@ -13,6 +17,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextArea } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
@@ -36,6 +41,7 @@ type AccountDetailView = LineAccount & {
 
 /** 設計 ★V6 33-3（`T9rA9`）。概要 / 接続の確認 / 資格情報 / 乗り換え の 4 タブ。 */
 function AccountDetail() {
+  const theme = useAdminTheme()
   /*
     **`[id]` は使えない。** この管理画面は静的書き出し（`output: 'export'`）
     なので、ビルド時に全IDが分からない動的セグメントは書き出せない
@@ -261,7 +267,8 @@ function AccountDetail() {
   const webhook = webhookLabel(account)
 
   return (
-    <div data-design-node="T9rA9" className="flex flex-col gap-4">
+    <ReadonlyDesignNode node="ihjfd"><div data-design-node="T9rA9" className="flex flex-col gap-4 v8-ro-notifications-page">
+      {theme === 'v8' && <ReadonlyHeaderV8 title={account.name} description="登録の内容・接続状態・送受信の記録を確認します。秘密値は表示しません。" />}
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Head">
         <Breadcrumb items={[{ label: 'LINEアカウント', href: '/accounts' }, { label: account.name }]} />
@@ -558,25 +565,26 @@ function AccountDetail() {
         destructive={stopTarget?.isActive}
         busy={busy}
         error={dialogError || undefined}
+        designNode={stopTarget?.isActive ? 'CFAyf' : undefined}
         onCancel={() => { if (!busy) { setStopTarget(null); setStopReason(''); setDialogError('') } }}
         onConfirm={() => void toggleActive()}
       >
-        {/* 理由は必須（X-1）。あとから「なぜ止めたか」を追うため。 */}
+        {/* 理由は必須（X-1）。あとから「なぜ止めたか」を追うため。板 `CFAyf` は1行入力。 */}
         <label className="mt-3 block">
           <span className="text-ink-secondary text-xs">
             {stopTarget?.isActive ? '止める理由' : '再開する理由'}（必須）
           </span>
-          <TextArea
-            className="mt-1"
-            rows={2}
-            maxLength={500}
-            placeholder={stopTarget?.isActive
-              ? '例: LINE側の表示がおかしいので、確認するまで止める'
-              : '例: 接続を直したので再開する'}
-            value={stopReason}
-            onChange={(e) => setStopReason(e.target.value)}
-            disabled={busy}
-          />
+          <span className="mt-1 block">
+            <TextField
+              maxLength={500}
+              placeholder={stopTarget?.isActive
+                ? '例: LINE側の表示がおかしいので、確認するまで止める'
+                : '例: 接続を直したので再開する'}
+              value={stopReason}
+              onChange={(e) => setStopReason(e.target.value)}
+              aria-label={stopTarget?.isActive ? '止める理由（必須）' : '再開する理由（必須）'}
+            />
+          </span>
         </label>
       </ConfirmDialog>
 
@@ -588,6 +596,7 @@ function AccountDetail() {
         destructive
         busy={busy}
         error={dialogError || undefined}
+        designNode="WOfBN"
         onCancel={() => { if (!busy) { setArchiveTarget(null); setArchiveReason(''); setDialogError('') } }}
         onConfirm={() => void runArchive()}
       >
@@ -634,7 +643,7 @@ function AccountDetail() {
         />
       )}
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-    </div>
+    </div></ReadonlyDesignNode>
   )
 }
 

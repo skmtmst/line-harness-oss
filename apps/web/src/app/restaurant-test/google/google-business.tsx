@@ -122,10 +122,10 @@ function GoogleBusinessInner() {
     const messages: Record<string, { tone: 'info' | 'warn' | 'danger'; text: string }> = {
       connected: { tone: 'info', text: 'Googleアカウントを接続しました。口コミを取得します。' },
       reconnected: { tone: 'info', text: 'Googleアカウントを再接続しました。' },
-      select_location: { tone: 'warn', text: 'このGoogleアカウントは複数の店舗を管理しています。このLINEアカウントに結びつける店舗を1つ選んでください。' },
+      select_location: { tone: 'warn', text: 'このLINEアカウントに結びつける店舗を1つ選んでください。前につないでいた店舗とは別の店舗を選ぶと、切り替える前に確認します。' },
       'error:invalid_state': { tone: 'danger', text: '認可の確認に失敗しました。もう一度「Googleアカウントを接続」からやり直してください。' },
       'error:denied': { tone: 'danger', text: 'Googleでの許可が取り消されました。接続は変更していません。' },
-      'error:location_mismatch': { tone: 'danger', text: '別の店舗が選ばれたため保存しませんでした。店舗を変えるには、先に接続を解除してください。' },
+      'error:location_mismatch': { tone: 'danger', text: '選んだ店舗をGoogleで確認できなかったため保存しませんでした。店舗一覧をもう一度読み込んでから選び直してください。' },
       'error:no_locations': { tone: 'danger', text: 'このGoogleアカウントで管理できる店舗が見つかりませんでした。店舗を管理しているGoogleアカウントでログインしてください。' },
       'error:oauth_not_configured': { tone: 'danger', text: 'この環境にはGoogle接続の設定がありません。' },
     }
@@ -264,7 +264,11 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
   const [actionError, setActionError] = useState('')
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState('')
+  const [confirmSwitch, setConfirmSwitch] = useState(false)
   const { connection } = data
+  // 店舗の選択待ちなのに前の店舗名が残っている＝別の店舗へ切り替えようとしている状態。
+  const previousTitle = connection.status === 'pending_location' ? connection.locationTitle : null
+  const switchingLocation = Boolean(connection.locationName) && selectedLocation !== '' && selectedLocation !== connection.locationName
 
   const startConnect = async () => {
     setBusy(true)
@@ -278,12 +282,13 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
     }
   }
 
-  const selectLocation = async () => {
+  const selectLocation = async (confirmedSwitch = false) => {
     if (!selectedLocation) return
     setBusy(true)
     setActionError('')
     try {
-      await restaurantGoogleApi.selectLocation(accountId, selectedLocation)
+      await restaurantGoogleApi.selectLocation(accountId, selectedLocation, confirmedSwitch)
+      setConfirmSwitch(false)
       onChanged()
     } catch (err) {
       setActionError(errorMessage(err, '店舗を選べませんでした。'))
@@ -326,7 +331,7 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
             {!data.oauthConfigured ? <NoteBar tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</NoteBar> : null}
             {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
             <div>
-              <Button className="min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage || !data.oauthConfigured}><Link2 size={17} />Googleアカウントを接続</Button>
+              <Button className="v7:min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage || !data.oauthConfigured}><Link2 size={17} />Googleアカウントを接続</Button>
             </div>
             <div className="border-hairline border-t pt-5">
               <p className="text-ink-secondary text-label whitespace-pre-line leading-relaxed">初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。\n接続後は、このLINEアカウントの店舗だけを表示します。</p>
@@ -351,10 +356,15 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
               <span className="bg-accent-soft flex h-12 w-12 shrink-0 items-center justify-center rounded-card text-accent-deep" aria-hidden="true"><Link2 size={24} /></span>
               <div className="min-w-0">
                 <h3 id="google-location-title" className="text-heading leading-relaxed font-bold">接続する店舗を選ぶ</h3>
-                <p className="text-ink-faint text-label leading-relaxed">Googleアカウントの認証は完了しています</p>
+                <p className="text-ink-faint text-label leading-relaxed">Googleアカウントの認証は完了しています{connection.googleAccountEmail ? `（${connection.googleAccountEmail}）` : ''}</p>
               </div>
             </div>
             <p className="text-ink-secondary text-sm leading-relaxed">このLINEアカウント（{data.store.name}）に接続する店舗を1つ選んでください。接続後は、選んだ店舗だけを表示します。</p>
+            {previousTitle ? (
+              <NoteBar tone="warn">
+                いまは「{previousTitle}」につながっています。同じ店舗を選べばそのまま続けられます。別の店舗を選ぶと切り替わり、「{previousTitle}」で取り込んだ口コミ・下書き・プロフィール・投稿・数値は消えます（切り替える前に確認します）。
+              </NoteBar>
+            ) : null}
             <RadioCardGroup legend="接続するGoogleビジネスプロフィール" className="flex flex-col gap-2">
             {data.candidates.map((candidate) => (
               <RadioCard
@@ -370,12 +380,25 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
             </RadioCardGroup>
             {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
             <div className="border-hairline flex flex-wrap justify-center gap-2 border-t pt-4">
-              <Button onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>Googleアカウントを選び直す</Button>
-              <Button variant="primary" onClick={() => void selectLocation()} disabled={busy || !selectedLocation || !canManage}>この店舗を接続する</Button>
+              <Button onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>接続を取り消す</Button>
+              <Button onClick={() => void startConnect()} disabled={busy || !canManage}>別のGoogleアカウントでやり直す</Button>
+              <Button variant="primary" onClick={() => (switchingLocation ? setConfirmSwitch(true) : void selectLocation())} disabled={busy || !selectedLocation || !canManage}>
+                {switchingLocation ? 'この店舗に切り替える' : 'この店舗を接続する'}
+              </Button>
             </div>
           </section>
         </div>
         <ConfirmDialog open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} onConfirm={() => void disconnect()} onCancel={() => setConfirmDisconnect(false)} />
+        <ConfirmDialog
+          open={confirmSwitch}
+          title="接続する店舗を切り替えますか？"
+          description={`「${previousTitle ?? ''}」から切り替えます。これまでに取り込んだ口コミ・返信の下書き・プロフィール・投稿・数値は消え、戻せません。新しい店舗の分はこのあと取り込み直します。`}
+          confirmLabel="切り替える"
+          destructive
+          busy={busy}
+          onConfirm={() => void selectLocation(true)}
+          onCancel={() => setConfirmSwitch(false)}
+        />
       </div>
     )
   }
@@ -412,8 +435,8 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
           </dl>
           {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
           <div className="flex flex-wrap gap-3">
-            <Button className="min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage}><Link2 size={17} />Googleアカウントを再接続</Button>
-            <Button className="min-h-11" variant="danger" onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>接続を解除</Button>
+            <Button className="v7:min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage}><Link2 size={17} />Googleアカウントを再接続</Button>
+            <Button className="v7:min-h-11" variant="danger" onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>接続を解除</Button>
           </div>
           <div className="border-hairline border-t pt-5">
             <p className="text-ink-secondary text-label leading-relaxed">認可が切れた場合は、店舗を管理するGoogleアカウントで再接続してください。接続解除後は口コミの同期とGoogleへの返信を止めますが、取得済みの口コミと下書きは残ります。</p>

@@ -1,0 +1,386 @@
+/* ★V8 友だち情報欄を作る・編集（`w9zY5`）。段・種類カード・種類の札・右の欄・追従バーの配置。 */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.headDescription {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+/* 左の段と右の欄。右の欄は固定幅。 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 1つの「段」。 */
+.section {
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.sectionDesc {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink-faint);
+}
+
+.sectionBody {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: block;
+  min-width: 0;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.fieldHint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
+}
+
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  font-size: 14px;
+  color: var(--color-ink);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.input:disabled {
+  color: var(--color-ink-disabled);
+  background: var(--color-canvas-sunken);
+}
+
+.textarea {
+  composes: input;
+  min-height: 110px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* 差し込み名の見本 {{field.pet_name}} */
+.macroPreview {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px dashed var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+/* 種類を選ぶカード。 */
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.typeCard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  cursor: pointer;
+  text-align: left;
+}
+
+.typeCard:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.typeCardOn {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-canvas));
+}
+
+.typeCard:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.typeCardLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.typeCardHint {
+  font-size: 11px;
+  color: var(--color-ink-faint);
+}
+
+/* 読み取り専用の値（編集の種類・差し込み名）。 */
+.readonlyLabel {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+}
+
+.readonlyValue {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+/* 右の欄の「種類（つづき）」の札。 */
+.typeChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.typeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--color-canvas);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.typeChip:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.typeChipOn {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-canvas));
+  color: var(--color-accent-deep, var(--color-accent));
+}
+
+.typeChip:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 「値の扱い」の選択肢：1行1入力。 */
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.optionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.optionRemove {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  font-size: 14px;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.optionRemove:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+}
+
+.optionRemove:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* オプションのかっこ書き（板：ラベルに続く薄い字）。 */
+.optionNote {
+  font-size: 11px;
+  color: var(--color-ink-faint);
+}
+
+.noteText {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
+}
+
+.noteBand {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-warning-bg);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-warning);
+}
+
+/* 右の欄の「出す場所」「使っている所」。 */
+.useList {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.useRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.useName {
+  color: var(--color-ink-secondary);
+}
+
+.useCount {
+  font-weight: 600;
+  color: var(--color-ink);
+  text-align: right;
+}
+
+.warnCard {
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 40%, transparent);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-warning-bg);
+}
+
+.warnTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-warning);
+}
+
+.warnDesc {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-warning);
+}
+
+.emptyBox {
+  padding: 20px;
+  border: 1px dashed var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-ink-faint);
+}
+
+/* 削除の押し口（追従バーの左）。 */
+.dangerButton {
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-danger);
+  cursor: pointer;
+}
+
+.dangerButton:hover {
+  background: var(--color-danger-bg);
+}
+
+/* 横幅が足りないとき、右の欄を下へ。 */
+@media (max-width: 1180px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .typeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

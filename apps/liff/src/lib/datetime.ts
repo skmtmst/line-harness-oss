@@ -31,6 +31,19 @@ export function formatWeekday(date: string): string {
   return '日月火水木金土'[d.getUTCDay()];
 }
 
+/** '2026-10-02' → '10月2日（金）」。★V8 の週の空き・確認の行で使う。 */
+export function formatJpLong(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${'日月火水木金土'[d.getUTCDay()]}）`;
+}
+
+/** '13:00' + 105 → '14:45'。選んだ時間の終わり (13:00〜14:45) で使う。 */
+export function addMinutesHm(hhmm: string, minutes: number): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const t = h * 60 + m + minutes;
+  return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+}
+
 function jstParts(utcIso: string): string {
   return new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
 }

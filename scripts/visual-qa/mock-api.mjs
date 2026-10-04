@@ -78,6 +78,7 @@ import {
   SUPPORT_MARKS, SUPPORT_MARK_ARCHIVE_IMPACT, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, OUTGOING_WEBHOOK_TEST_RESULT, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, ENTRY_ROUTES, INFLOW_SUMMARY,
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS, TRACKED_LINKS,
+  AD_COST_ROWS, AD_COST_PLATFORMS,
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
@@ -881,6 +882,110 @@ const EC_CONNECTOR = {
   retryPolicy: null,
 }
 
+/*
+ * 飲食店向けテスト（`/restaurant-test/*`）のスナップショット。
+ * `restaurantTestApi.snapshot` が一度に返す形（`apps/worker` の restaurant-test）を
+ * そのまま写す。板 CHz31 の並び（渋谷・表参道・中目黒の3店舗）に寄せた固定データ。
+ * 日時は撮るたびに変わる絵にならないよう「今日」を基準に組み立てる。
+ */
+const RESTAURANT_TODAY = new Date()
+const restaurantAt = (hour, minute = 0, dayOffset = 0) => {
+  const d = new Date(RESTAURANT_TODAY)
+  d.setDate(d.getDate() + dayOffset)
+  d.setHours(hour, minute, 0, 0)
+  return d.toISOString()
+}
+const RESTAURANT_STORES = [
+  { id: 'store-sby', organization_id: 'org-nen', name: '然 渋谷店', code: 'SBY-01', area: '渋谷', capacity: 80, timezone: 'Asia/Tokyo', status: 'active', line_status: 'connected', google_status: 'connected', line_account_id: 'visual-qa-account', line_account_name: '然 渋谷店', friend_count: 1280 },
+  { id: 'store-omt', organization_id: 'org-nen', name: '然 表参道店', code: 'OMT-02', area: '表参道', capacity: 64, timezone: 'Asia/Tokyo', status: 'active', line_status: 'connected', google_status: 'warning', line_account_id: 'visual-qa-account-2', line_account_name: '然 表参道店', friend_count: 842 },
+  { id: 'store-nkm', organization_id: 'org-nen', name: '然 中目黒店', code: 'NKM-03', area: '中目黒', capacity: 48, timezone: 'Asia/Tokyo', status: 'active', line_status: 'error', google_status: 'connected', line_account_id: null, line_account_name: null, friend_count: null },
+]
+const RESTAURANT_TABLES = [
+  { id: 'tbl-1', store_id: 'store-sby', code: 'T-1', label: '窓際2名卓', seat_type: 'table', min_capacity: 1, max_capacity: 2, floor_x: 0, floor_y: 0, join_group: 'A', is_active: 1 },
+  { id: 'tbl-2', store_id: 'store-sby', code: 'T-2', label: '窓際2名卓', seat_type: 'table', min_capacity: 1, max_capacity: 2, floor_x: 1, floor_y: 0, join_group: 'A', is_active: 1 },
+  { id: 'tbl-3', store_id: 'store-sby', code: 'T-3', label: '中央4名卓', seat_type: 'table', min_capacity: 2, max_capacity: 4, floor_x: 0, floor_y: 1, join_group: null, is_active: 1 },
+  { id: 'tbl-4', store_id: 'store-sby', code: 'T-4', label: '中央4名卓', seat_type: 'table', min_capacity: 2, max_capacity: 4, floor_x: 1, floor_y: 1, join_group: 'B', is_active: 1 },
+  { id: 'tbl-5', store_id: 'store-sby', code: 'T-5', label: '中央4名卓', seat_type: 'table', min_capacity: 2, max_capacity: 4, floor_x: 2, floor_y: 1, join_group: 'B', is_active: 1 },
+  { id: 'tbl-6', store_id: 'store-sby', code: 'C-1', label: 'カウンター', seat_type: 'counter', min_capacity: 1, max_capacity: 1, floor_x: 0, floor_y: 2, join_group: null, is_active: 1 },
+  { id: 'tbl-7', store_id: 'store-sby', code: 'C-2', label: 'カウンター', seat_type: 'counter', min_capacity: 1, max_capacity: 1, floor_x: 1, floor_y: 2, join_group: null, is_active: 1 },
+  { id: 'tbl-8', store_id: 'store-sby', code: 'P-1', label: '個室 松', seat_type: 'private_room', min_capacity: 4, max_capacity: 8, floor_x: 2, floor_y: 2, join_group: null, is_active: 1 },
+  { id: 'tbl-9', store_id: 'store-sby', code: 'T-6', label: 'テラス4名卓', seat_type: 'terrace', min_capacity: 2, max_capacity: 4, floor_x: 2, floor_y: 0, join_group: null, is_active: 0 },
+]
+const RESTAURANT_MENU = [
+  { id: 'menu-1', store_id: 'store-sby', kind: 'course', name: 'おまかせコース', price: 6800, tax_mode: 'included', allergens_json: '["卵","小麦","乳"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'active' },
+  { id: 'menu-2', store_id: 'store-sby', kind: 'course', name: '季節の会席', price: 9800, tax_mode: 'included', allergens_json: '["小麦","大豆","海老"]', service_periods_json: '["dinner"]', duration_minutes: 150, status: 'active' },
+  { id: 'menu-3', store_id: 'store-sby', kind: 'a_la_carte', name: '鹿肉のロースト', price: 2400, tax_mode: 'included', allergens_json: '[]', service_periods_json: '["lunch","dinner"]', duration_minutes: null, status: 'active' },
+  { id: 'menu-4', store_id: 'store-sby', kind: 'a_la_carte', name: '本日のデザート', price: 800, tax_mode: 'included', allergens_json: '["卵","乳"]', service_periods_json: '["lunch","dinner"]', duration_minutes: null, status: 'active' },
+  { id: 'menu-5', store_id: 'store-sby', kind: 'course', name: 'ランチコース', price: 3800, tax_mode: 'included', allergens_json: '["小麦"]', service_periods_json: '["lunch"]', duration_minutes: 90, status: 'paused' },
+]
+const RESTAURANT_RESERVATIONS = [
+  { id: 'rsv-1', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '佐藤 花子', customer_phone: '090-1111-2222', line_uid: 'U-demo-1', guest_count: 2, starts_at: restaurantAt(12, 0), ends_at: restaurantAt(13, 30), table_id: 'tbl-1', table_label: '窓際2名卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-2', store_id: 'store-sby', store_name: '然 渋谷店', source: 'hotpepper', external_id: 'HP-88213', customer_name: '鈴木 一郎', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(18, 0), ends_at: restaurantAt(20, 0), table_id: 'tbl-3', table_label: '中央4名卓', course_id: 'menu-2', course_name: '季節の会席', status: 'confirmed', allergy_note: '海老アレルギー', note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-3', store_id: 'store-sby', store_name: '然 渋谷店', source: 'tabelog', external_id: 'TB-11230', customer_name: '田中 美咲', customer_phone: '080-3333-4444', line_uid: null, guest_count: 2, starts_at: restaurantAt(18, 30), ends_at: restaurantAt(20, 0), table_id: 'tbl-2', table_label: '窓際2名卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'pending', allergy_note: null, note: '記念日', sync_direction: 'inbound_only' },
+  { id: 'rsv-4', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '高橋 健', customer_phone: '03-5555-6666', line_uid: null, guest_count: 6, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 0), table_id: 'tbl-8', table_label: '個室 松', course_id: 'menu-2', course_name: '季節の会席', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-5', store_id: 'store-sby', store_name: '然 渋谷店', source: 'restaurant_board', external_id: 'RB-55210', customer_name: '伊藤 直樹', customer_phone: null, line_uid: null, guest_count: 2, starts_at: restaurantAt(19, 30), ends_at: restaurantAt(21, 0), table_id: null, table_label: null, course_id: null, course_name: null, status: 'pending', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-6', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '渡辺 あかり', customer_phone: null, line_uid: 'U-demo-2', guest_count: 3, starts_at: restaurantAt(20, 0), ends_at: restaurantAt(21, 30), table_id: 'tbl-4', table_label: '中央4名卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: '小麦抜き', note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-7', store_id: 'store-sby', store_name: '然 渋谷店', source: 'gurunavi', external_id: 'GN-33019', customer_name: '山本 翔', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(12, 30, 1), ends_at: restaurantAt(14, 0, 1), table_id: 'tbl-5', table_label: '中央4名卓', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-8', store_id: 'store-omt', store_name: '然 表参道店', source: 'line', external_id: null, customer_name: '中村 陽子', customer_phone: '090-7777-8888', line_uid: 'U-demo-3', guest_count: 2, starts_at: restaurantAt(18, 0), ends_at: restaurantAt(19, 30), table_id: null, table_label: null, course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-9', store_id: 'store-omt', store_name: '然 表参道店', source: 'hotpepper', external_id: 'HP-88400', customer_name: '小林 誠', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 0), table_id: null, table_label: null, course_id: 'menu-2', course_name: '季節の会席', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-10', store_id: 'store-omt', store_name: '然 表参道店', source: 'retty', external_id: 'RT-7781', customer_name: '加藤 裕子', customer_phone: null, line_uid: null, guest_count: 2, starts_at: restaurantAt(12, 0, 1), ends_at: restaurantAt(13, 30, 1), table_id: null, table_label: null, course_id: null, course_name: null, status: 'pending', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-11', store_id: 'store-nkm', store_name: '然 中目黒店', source: 'manual', external_id: null, customer_name: '松本 大輔', customer_phone: '070-9999-0000', line_uid: null, guest_count: 5, starts_at: restaurantAt(18, 30, 1), ends_at: restaurantAt(20, 30, 1), table_id: null, table_label: null, course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-12', store_id: 'store-sby', store_name: '然 渋谷店', source: 'ikyu', external_id: 'IK-20111', customer_name: '斎藤 真紀', customer_phone: null, line_uid: null, guest_count: 2, starts_at: restaurantAt(19, 0, 2), ends_at: restaurantAt(21, 0, 2), table_id: null, table_label: null, course_id: 'menu-2', course_name: '季節の会席', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+]
+const RESTAURANT_SNAPSHOT = {
+  environment: 'staging_test',
+  integrationPolicy: 'inbound_only',
+  organization: { id: 'org-nen', account_id: 'visual-qa-account', tenant_id: 'tenant-nen', tenant_name: '株式会社 然', name: '然フードホールディングス', status: 'active' },
+  stores: RESTAURANT_STORES,
+  memberships: [
+    { id: 'mem-1', store_id: null, staff_name: '高田 誠', email: 'takada@example.com', role: 'super_admin', line_uid: 'U-admin-1', google_email: 'takada@example.com', status: 'active' },
+    { id: 'mem-2', store_id: 'store-sby', staff_name: '中川 由美', email: 'nakagawa@example.com', role: 'store_manager', line_uid: 'U-mgr-1', google_email: 'nakagawa@example.com', status: 'active' },
+    { id: 'mem-3', store_id: 'store-omt', staff_name: '佐野 直人', email: 'sano@example.com', role: 'store_manager', line_uid: null, google_email: 'sano@example.com', status: 'active' },
+    { id: 'mem-4', store_id: 'store-sby', staff_name: '山田 花子', email: 'yamada@example.com', role: 'staff', line_uid: 'U-staff-1', google_email: null, status: 'active' },
+    { id: 'mem-5', store_id: 'store-nkm', staff_name: '林 直人', email: null, role: 'staff', line_uid: null, google_email: null, status: 'invited' },
+    { id: 'mem-6', store_id: 'store-omt', staff_name: '鈴木 一郎', email: 'suzuki@example.com', role: 'staff', line_uid: null, google_email: null, status: 'suspended' },
+  ],
+  /* 板 t8WgD8 の4枚：承認待ち2（Google投稿・メニュー改定）・差戻し1（LINE配信）・承認済1（Google投稿） */
+  approvals: [
+    { id: 'apr-1', store_id: 'store-sby', kind: 'gbp_post', title: '秋の鹿肉コース はじまりました', status: 'pending', requested_by: '中川 由美', review_comment: null, created_at: restaurantAt(10, 12, -2), payload_json: JSON.stringify({ typeLabel: 'イベント', title: '秋の鹿肉コース', body: '10月1日から、信州の鹿肉を使った秋のコースをはじめます。ご予約は LINE から。' }) },
+    { id: 'apr-2', store_id: 'store-omt', kind: 'menu_change', title: 'ランチコースの価格改定', status: 'pending', requested_by: '佐野 直人', review_comment: null, created_at: restaurantAt(18, 40, -3), payload_json: JSON.stringify({ before: 'ランチコース ¥3,800', after: 'ランチコース ¥4,200' }) },
+    { id: 'apr-3', store_id: null, kind: 'line_message', title: '来店お礼メッセージ', status: 'returned', requested_by: '中川 由美', review_comment: 'クーポンの期限を書いてください（高田）', created_at: restaurantAt(15, 2, -5), payload_json: JSON.stringify({ title: 'ご来店ありがとうございました', body: 'またのお越しをお待ちしております。次回使えるクーポンをお送りします。' }) },
+    { id: 'apr-4', store_id: 'store-nkm', kind: 'gbp_post', title: '10月の定休日のお知らせ', status: 'approved', requested_by: '高田 誠', review_comment: null, created_at: restaurantAt(9, 30, -7), payload_json: JSON.stringify({ typeLabel: '通常の投稿', body: '10月は毎週火曜が定休日です。' }) },
+  ],
+  reservations: RESTAURANT_RESERVATIONS,
+  reservationTotal: RESTAURANT_RESERVATIONS.length,
+  tables: RESTAURANT_TABLES,
+  inventory: [17, 18, 19, 20].flatMap((h) => [0, 30].map((m) => ({
+    id: `inv-${h}${m}`, store_id: 'store-sby', starts_at: restaurantAt(h, m), slot_minutes: 30,
+    total_capacity: 26, ota_capacity: 10, line_capacity: 10, walk_in_capacity: 6,
+    reserved_count: h === 19 ? 20 : 8,
+  }))),
+  menuItems: RESTAURANT_MENU,
+  connectors: [
+    { id: 'con-1', store_id: 'store-sby', provider: 'restaurant_board', mode: 'inbound_only', status: 'connected', last_synced_at: restaurantAt(8, 0), last_error: null },
+    { id: 'con-2', store_id: 'store-omt', provider: 'restaurant_board', mode: 'inbound_only', status: 'connected', last_synced_at: restaurantAt(8, 0), last_error: null },
+  ],
+  reviews: [
+    { id: 'rev-1', store_id: 'store-sby', author_name: 'Googleユーザー', rating: 5, comment: '雰囲気がよく料理も美味しかったです。', reviewed_at: restaurantAt(20, 5, -1), reply_status: 'replied', reply_draft: null, sentiment: 'positive' },
+    { id: 'rev-2', store_id: 'store-sby', author_name: 'K.Y', rating: 4, comment: '接客が丁寧でした。', reviewed_at: restaurantAt(13, 42), reply_status: 'unreplied', reply_draft: null, sentiment: 'positive' },
+    { id: 'rev-3', store_id: 'store-omt', author_name: 'M.S', rating: 3, comment: '料理は良いが少し待った。', reviewed_at: restaurantAt(21, 10, -1), reply_status: 'unreplied', reply_draft: null, sentiment: 'neutral' },
+    { id: 'rev-4', store_id: 'store-nkm', author_name: 'T.K', rating: 2, comment: '予約の確認が取れなかった。', reviewed_at: restaurantAt(10, 0, -2), reply_status: 'unreplied', reply_draft: 'ご不便をおかけし申し訳ありません。', sentiment: 'negative' },
+  ],
+  posts: [
+    { id: 'post-1', store_id: 'store-sby', post_type: 'standard', title: '週末ランチ始めました', body: '土日限定のランチコースをご用意しています。', status: 'draft', scheduled_at: null },
+    { id: 'post-2', store_id: 'store-sby', post_type: 'event', title: '臨時休業のお知らせ', body: '設備点検のため休業します。', status: 'pending', scheduled_at: null },
+  ],
+  lineFlows: [
+    { id: 'flow-1', store_id: null, flow_type: 'booking_confirm', title: '予約確認メッセージ', body: 'ご予約ありがとうございます。当日のご来店をお待ちしています。', timing_minutes: 0, is_enabled: 1, delivery_mode: 'preview_only' },
+    { id: 'flow-2', store_id: null, flow_type: 'visit_thanks', title: '来店後のお礼', body: '本日はご来店ありがとうございました。', timing_minutes: 120, is_enabled: 1, delivery_mode: 'preview_only' },
+    { id: 'flow-3', store_id: null, flow_type: 'review_request', title: '口コミのお願い', body: 'よろしければご感想をお聞かせください。', timing_minutes: 1440, is_enabled: 0, delivery_mode: 'preview_only' },
+    { id: 'flow-4', store_id: null, flow_type: 'rebooking', title: 'またのご来店を', body: '次回のご予約をお待ちしています。', timing_minutes: 10080, is_enabled: 0, delivery_mode: 'preview_only' },
+  ],
+}
+const RESTAURANT_INTAKE_ADDRESSES = [
+  { id: 'ia-1', storeId: 'store-sby', localPart: 'r-sby01', address: 'r-sby01@intake.example.jp', status: 'active', createdAt: restaurantAt(9, 0, -30), revokedAt: null },
+]
+
 /**
  * パスごとの形。ここに無いものは `EMPTY_PAGE` になる。
  *
@@ -978,14 +1083,15 @@ const ANALYTICS_SAVED = [
   },
 }))
 
+/*
+ * 承認待ちは V8 の板（`nJlxX`・`OylSV`）の 5 件にそろえる。
+ * 重複の疑い3件は残す（板にも出る）。
+ */
 const PENDING_APPROVALS = [
   ['木村 亮', '合同会社ノース', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, true],
   ['大西 健一', '合同会社ノース', 'ao-4', '資料請求', '資料請求', 1500, true],
   ['岡本 遥', '旧パートナーA（停止中）', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, true],
   ['高橋 直人', '田中 明', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, false],
-  ['藤井 理沙', '中村 彩', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, false],
-  ['前田 さくら', '木村 亮', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, false],
-  ['松本 圭', '山口 商店', 'ao-3', '友だち追加', '友だち追加', 100, false],
   ['石田 未来', '田中 明', 'ao-4', '資料請求', '資料請求', 6000, false],
 ].map(([friendName, affiliateName, offerId, offerName, conversionPointName, value, duplicateFlag], index) => ({
   eventId: `cv-p-${index + 1}`,
@@ -1003,7 +1109,8 @@ const PENDING_APPROVALS = [
   duplicateFlag,
 }))
 
-const APPROVED_APPROVALS = Array.from({ length: 34 }, (_, index) => {
+/* 今月認めた数は V8 の板（`OylSV`）の 33 件にそろえる。 */
+const APPROVED_APPROVALS = Array.from({ length: 33 }, (_, index) => {
   const offerIndex = index < 18 ? 1 : index < 26 ? 2 : index < 31 ? 3 : 4
   const rewards = [0, 3000, 5000, 100, 1500]
   const names = ['', '体験の申し込み', '定期便のお申し込み', '友だち追加', '資料請求']
@@ -1095,52 +1202,52 @@ const SHAPES = {
   '/api/analytics/friends': {
     lineAccountId: 'visual-qa-account',
     timeZone: 'Asia/Tokyo',
-    period: { from: '2026-08-04', to: '2026-09-02' },
-    dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    period: { from: '2026-09-01', to: '2026-09-30' },
+    dataCutoffAt: '2026-09-30T00:00:00+09:00',
     data: {
       state: 'available',
       stateReason: null,
       metrics: {
         added: METRIC(58), removed: METRIC(11), net: METRIC(47),
-        currentFriends: METRIC(1842), firstTime: METRIC(52), returning: METRIC(6),
+        currentFriends: METRIC(1284), firstTime: METRIC(52), returning: METRIC(6),
       },
       days: [
-      { date: '2026-08-04', added: 3, removed: 0, net: 3 },
-      { date: '2026-08-05', added: 1, removed: 1, net: 0 },
-      { date: '2026-08-06', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-07', added: 2, removed: 0, net: 2 },
-      { date: '2026-08-08', added: 5, removed: 1, net: 4 },
-      { date: '2026-08-09', added: 4, removed: 0, net: 4 },
-      { date: '2026-08-10', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-11', added: 1, removed: 0, net: 1 },
-      { date: '2026-08-12', added: 2, removed: 1, net: 1 },
-      { date: '2026-08-13', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-14', added: 6, removed: 2, net: 4 },
-      { date: '2026-08-15', added: 3, removed: 0, net: 3 },
-      { date: '2026-08-16', added: 1, removed: 0, net: 1 },
-      { date: '2026-08-17', added: 0, removed: 1, net: -1 },
-      { date: '2026-08-18', added: 2, removed: 0, net: 2 },
-      { date: '2026-08-19', added: 4, removed: 1, net: 3 },
-      { date: '2026-08-20', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-21', added: 1, removed: 0, net: 1 },
-      { date: '2026-08-22', added: 3, removed: 1, net: 2 },
-      { date: '2026-08-23', added: 2, removed: 0, net: 2 },
-      { date: '2026-08-24', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-25', added: 5, removed: 1, net: 4 },
-      { date: '2026-08-26', added: 1, removed: 0, net: 1 },
-      { date: '2026-08-27', added: 0, removed: 0, net: 0 },
-      { date: '2026-08-28', added: 2, removed: 0, net: 2 },
-      { date: '2026-08-29', added: 3, removed: 1, net: 2 },
-      { date: '2026-08-30', added: 1, removed: 0, net: 1 },
-      { date: '2026-08-31', added: 0, removed: 0, net: 0 },
-      { date: '2026-09-01', added: 4, removed: 1, net: 3 },
-      { date: '2026-09-02', added: 2, removed: 0, net: 2 },
+      { date: '2026-09-01', added: 3, removed: 0, net: 3 },
+      { date: '2026-09-02', added: 1, removed: 1, net: 0 },
+      { date: '2026-09-03', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-04', added: 2, removed: 0, net: 2 },
+      { date: '2026-09-05', added: 5, removed: 1, net: 4 },
+      { date: '2026-09-06', added: 4, removed: 0, net: 4 },
+      { date: '2026-09-07', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-08', added: 1, removed: 0, net: 1 },
+      { date: '2026-09-09', added: 2, removed: 1, net: 1 },
+      { date: '2026-09-10', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-11', added: 6, removed: 2, net: 4 },
+      { date: '2026-09-12', added: 3, removed: 0, net: 3 },
+      { date: '2026-09-13', added: 1, removed: 0, net: 1 },
+      { date: '2026-09-14', added: 0, removed: 1, net: -1 },
+      { date: '2026-09-15', added: 2, removed: 0, net: 2 },
+      { date: '2026-09-16', added: 4, removed: 1, net: 3 },
+      { date: '2026-09-17', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-18', added: 1, removed: 0, net: 1 },
+      { date: '2026-09-19', added: 3, removed: 1, net: 2 },
+      { date: '2026-09-20', added: 2, removed: 0, net: 2 },
+      { date: '2026-09-21', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-22', added: 5, removed: 1, net: 4 },
+      { date: '2026-09-23', added: 1, removed: 0, net: 1 },
+      { date: '2026-09-24', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-25', added: 2, removed: 0, net: 2 },
+      { date: '2026-09-26', added: 3, removed: 1, net: 2 },
+      { date: '2026-09-27', added: 1, removed: 0, net: 1 },
+      { date: '2026-09-28', added: 0, removed: 0, net: 0 },
+      { date: '2026-09-29', added: 4, removed: 1, net: 3 },
+      { date: '2026-09-30', added: 2, removed: 0, net: 2 },
       ],
       campaigns: [
-        { id: 'bc-1', name: '8月キャンペーンのお知らせ', kind: 'broadcast', occurredAt: '2026-08-24T10:00:00+09:00', date: '2026-08-24' },
-        { id: 'sc-1', name: '新しいシナリオ 8/18', kind: 'scenario', occurredAt: '2026-08-18T18:30:00+09:00', date: '2026-08-18' },
+        { id: 'bc-1', name: '秋の新商品のお知らせ', kind: 'broadcast', occurredAt: '2026-09-21T10:00:00+09:00', date: '2026-09-21' },
+        { id: 'sc-1', name: '新しいシナリオ 9/15', kind: 'scenario', occurredAt: '2026-09-15T18:30:00+09:00', date: '2026-09-15' },
       ],
-      historyAvailableFrom: '2026-08-04',
+      historyAvailableFrom: '2026-09-01',
     },
   },
   /* 分析・配信の反応。`AnalyticsReactionsOverview`。 */
@@ -1392,6 +1499,14 @@ function visualQaWriteBody(method, pathname) {
     }
     return FRIEND_ADD_RULE_VALIDATE
   }
+  if (method === 'PATCH' && pathname === '/api/friend-add-rules/reorder') {
+    // 本物は受け皿以外の全ID一致しか受け付けない (409 ORDER_CHANGED)。
+    // 画面確認では固定で成功を返す。失敗系は visualState=error。
+    if (query.get('visualState') === 'error') {
+      return { success: false, code: 'ORDER_CHANGED', error: 'ほかの画面で並び順が変わりました。' }
+    }
+    return { success: true }
+  }
   if (method === 'POST' && /^\/api\/friend-add-rules\/[^/]+\/publish$/.test(pathname)) {
     if (query.get('visualState') === 'error') {
       return { success: false, error: '公開前にテストを成功させてください' }
@@ -1555,6 +1670,18 @@ const RAW = {
   '/api/booking/admin/resources': { success: true, data: { resources: BOOKING_RESOURCES } },
   '/api/booking/admin/menus': { menus: BOOKING_MENUS },
   '/api/booking/admin/staff': { staff: BOOKING_STAFF },
+  /*
+    担当×メニューの一括表。実口（`booking.ts`）と同じ
+    `{staff: [{staff_id, matrix}]}` の形。`success` で包む・`staff` を
+    付けないと、設定画面の担当タブ・メニュー作成画面が
+    `c.value.staff is not iterable` で落ちる（2026-10-03 点検）。
+  */
+  '/api/booking/admin/staff-menus': {
+    staff: BOOKING_STAFF.map((staff) => ({
+      staff_id: staff.id,
+      matrix: BOOKING_STAFF_MENUS[staff.id] ?? [],
+    })),
+  },
   '/api/booking/admin/customer-context': { customer: BOOKING_CUSTOMER_CONTEXT },
   '/api/booking/admin/reminder-preview': BOOKING_REMINDER_PREVIEW,
   '/api/booking/admin/alternatives': BOOKING_CONFLICT_ALTERNATIVES,
@@ -1610,6 +1737,8 @@ const RAW_PATTERNS = [
   })],
   /* メニューに就ける担当。器は `{staff}`。包むと選ぶ口が0件になる。 */
   [/^\/api\/booking\/admin\/menus\/[^/]+\/staff$/, { staff: BOOKING_MENU_STAFF }],
+  /* スタッフロール本人の予約スタッフ（本人勤務 E3YDK）。器は `{staff}`。包むと `.find` で落ちる。 */
+  [/^\/api\/booking\/admin\/staff\/me$/, { staff: [BOOKING_STAFF[0]] }],
   /* `tksPc` の通常・読込中・失敗を分けるため、通常だけ本番と同じ器で返す。 */
   [/^\/api\/booking\/admin\/staff\/[^/]+\/shifts$/, { shifts: BOOKING_STAFF_SHIFTS }],
   [/^\/api\/booking\/admin\/staff\/[^/]+\/availability-rules$/, { rules: BOOKING_AVAILABILITY_RULES }],
@@ -1741,6 +1870,26 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       return { success: true, data: { ...HQ_SUPPORT_DETAIL, ...found, messages: HQ_SUPPORT_DETAIL.messages } }
     }
   }
+  /*
+   * 飲食店向けテスト（`/restaurant-test/*`）。`restaurant-test-api.ts` の
+   * 読み口だけを固定で返す。書き込み（発行・承認・保存）は従来どおり405。
+   */
+  if (method === 'GET' && pathname === '/api/restaurant-test/snapshot') {
+    return { success: true, data: RESTAURANT_SNAPSHOT }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/stores') {
+    return { success: true, data: { organization: RESTAURANT_SNAPSHOT.organization, stores: RESTAURANT_SNAPSHOT.stores } }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/store-context') {
+    return { success: true, data: { selectedStore: { id: 'store-sby', name: '然 渋谷店' } } }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/intake-addresses') {
+    return { success: true, data: RESTAURANT_INTAKE_ADDRESSES }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/terms-agreement') {
+    return { success: true, data: { documentKey: 'musubo-terms', agreedVersion: null, agreedAt: null } }
+  }
+
   if (pathname === '/api/auth/session') {
     /*
      * 運営コンソールの外枠（`OpsShell`）は `platformAdmin` を見る。
@@ -2205,10 +2354,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // 検索とフォルダ絞りはサーバ側で全件に効かせる (本物と同じ契約)。
     const q = (query.get('q') ?? '').trim().toLocaleLowerCase('ja-JP')
     const folder = query.get('folder') ?? ''
+    const status = query.get('status') ?? ''
     const items = FRIEND_ADD_RULES.items
-      .filter((item) => !q || item.name.toLocaleLowerCase('ja-JP').includes(q))
+      // 本物は設定名と流入リンク名の両方を検索する（V8 一覧の検索欄と同じ）。
+      .filter((item) => !q
+        || item.name.toLocaleLowerCase('ja-JP').includes(q)
+        || (item.routeNames ?? []).some((name) => name.toLocaleLowerCase('ja-JP').includes(q)))
       .filter((item) => !folder
         || (folder === '__uncategorized' ? item.folderName == null : item.folderName === folder))
+      .filter((item) => !status || item.status === status)
     const counts = new Map()
     for (const item of FRIEND_ADD_RULES.items) {
       counts.set(item.folderName ?? null, (counts.get(item.folderName ?? null) ?? 0) + 1)
@@ -2449,6 +2603,18 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: TEST_RECIPIENT_LOGIN_USERS }
   }
   // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
+  /*
+   * 配布URLの土台。無いと既定の器（`{items,total,page,limit}`）が返り、
+   * 画面が器に `.replace` して白画面になっていた。
+   * 本物は文字列か null を返す（`account-settings.ts`）。
+   */
+  if (pathname === '/api/account-settings/link-base-url') {
+    return { success: true, data: null }
+  }
+  if (pathname === '/api/account-settings/tracked-link-base-url') {
+    return { success: true, data: null }
+  }
+  // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
   if (method === 'POST' && pathname === '/api/forms/drafts') {
     return { success: true, data: { id: 'form-draft-qa', isActive: false } }
   }
@@ -2480,6 +2646,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const formDuplicate = method === 'POST' && /^\/api\/forms\/([^/]+)\/duplicate$/.exec(pathname)
   if (formDuplicate) {
     return { success: true, data: { id: 'form-duplicate-qa', isActive: false } }
+  }
+  /*
+    管理者確認（担当未割り当て）の口。実口（`forms.ts`）と同じく配列で返す。
+    既定の `{items,total,…}` に落ちると、画面が配列として読めず
+    `e is not iterable` で落ちる（2026-10-03 点検）。
+    見本のフォームはすべて担当付きなので空が正しい。
+  */
+  if (pathname === '/api/forms/unassigned') {
+    return { success: true, data: [] }
   }
   if (pathname === '/api/forms') {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
@@ -2833,6 +3008,68 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/chats') return { success: true, data: CHATS }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
+  /*
+    メールの会話の中身。実口（`support-inbox.ts`）と同じ
+    `{thread, messages, …}` の形。無いと既定の `{items,total,…}` に落ち、
+    受信箱でメールを開くと `reading 'id'`（`detail.thread.id`）で落ちる
+    （2026-10-03 点検）。載っていない ID は実口と同じく失敗にする。
+  */
+  const emailThread = /^\/api\/support\/email\/threads\/([^/]+)$/.exec(pathname)
+  if (emailThread) {
+    const item = SUPPORT_EMAIL_ITEMS.find((mail) => mail.threadId === emailThread[1])
+    if (!item) return { success: false, error: 'Thread not found' }
+    const thread = {
+      id: item.threadId,
+      customer_email: item.customerIdentifier,
+      customer_name: item.customerName,
+      subject: item.subject,
+      status: item.status,
+      assigned_staff_id: item.assignedStaffId,
+      notes: null,
+      last_message_at: item.lastIncomingAt,
+      last_incoming_at: item.lastIncomingAt,
+      last_outgoing_at: null,
+      resolved_at: null,
+      revision: item.revision,
+    }
+    const messages = [
+      {
+        id: `${item.threadId}-msg-1`,
+        direction: 'incoming',
+        sender_email: item.customerIdentifier,
+        sender_name: item.customerName,
+        recipient_email: 'support@example.com',
+        subject: item.subject,
+        body_text: item.preview,
+        sent_by_staff_id: null,
+        sent_by_staff_name: null,
+        created_at: item.lastIncomingAt,
+      },
+      {
+        id: `${item.threadId}-msg-2`,
+        direction: 'outgoing',
+        sender_email: 'support@example.com',
+        sender_name: null,
+        recipient_email: item.customerIdentifier,
+        subject: `Re: ${item.subject}`,
+        body_text: 'ご連絡ありがとうございます。確認してご案内します。',
+        sent_by_staff_id: 'operator-kenta',
+        sent_by_staff_name: 'Kenta',
+        created_at: item.lastIncomingAt,
+      },
+    ]
+    return {
+      success: true,
+      data: {
+        thread,
+        messages,
+        total: messages.length,
+        hasMoreOlder: false,
+        oldestCursor: null,
+        newestCursor: null,
+      },
+    }
+  }
   if (pathname === '/api/support/inbox') {
     /*
       **同じ口を2つの画面が読む。返す形が違う。**
@@ -3009,6 +3246,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
+  /*
+   * #818 流入元ごとの広告費の台帳。数は V8 の板（`qSTVR`・`ZxKL5`）にそろえる。
+   * この30日の広告費 ¥86,000・友だち追加 73 人・つないだ広告 2 件。
+   * 手入力の記録は無い（板にも無い）ので空で返す。
+   */
+  if (pathname === '/api/ad-costs') {
+    return {
+      success: true,
+      data: { rows: AD_COST_ROWS, platforms: AD_COST_PLATFORMS, manualEntries: [] },
+    }
+  }
   if (pathname === '/api/ad-platforms/logs') {
     const page = Math.max(1, Number(query.get('page')) || 1)
     const limit = Math.min(200, Math.max(1, Number(query.get('limit')) || 20))
@@ -3279,6 +3527,43 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/nen/health') {
     return { success: true, data: NEN_HEALTH_LIST }
   }
+  const nenHealthSummary = /^\/api\/nen\/health\/([^/]+)\/summary$/.exec(pathname)
+  if (method === 'GET' && nenHealthSummary) {
+    /*
+     * 本物は `GET /api/nen/health/:petId/summary` の形（apps/worker/src/routes/nen-pets.ts）。
+     * 無いと既定の器が返り、まとめ窓の `summary.pet.callName` で `/nen/health` が落ちていた。
+     */
+    const item = NEN_HEALTH_LIST.items.find((entry) => entry.pet.id === decodeURIComponent(nenHealthSummary[1]))
+    if (!item) return { success: false, error: 'Pet not found' }
+    const weights = (item.weightSeries ?? []).filter((value) => value != null)
+    const stoolCounts = item.latestStool ? { [item.latestStool]: item.count30d } : {}
+    const appetiteCounts = item.latestAppetite ? { [item.latestAppetite]: item.count30d } : {}
+    return {
+      success: true,
+      data: {
+        pet: { ...item.pet, weightKg: item.latestWeightKg },
+        owner: item.owner,
+        generatedAt: '2026-10-02T10:00:00+09:00',
+        summary: {
+          days: 30,
+          records: item.count30d,
+          weight: weights.length ? { first: weights[0], last: weights[weights.length - 1], min: Math.min(...weights), max: Math.max(...weights) } : null,
+          heartRateAvg: null,
+          respiratoryRateAvg: null,
+          stool: stoolCounts,
+          appetite: appetiteCounts,
+          skin: {},
+          tearStain: {},
+          notes: [],
+          logs: [],
+        },
+        labels: {
+          stool: { normal: '正常', soft: 'やわらかい', hard: 'かたい', diarrhea: '下痢', bloody: '血が混じる', other: 'その他' },
+          appetite: { good: '良好', normal: '普通', poor: '不良' },
+        },
+      },
+    }
+  }
   if (pathname === '/api/ec-commerce/notification-runs') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
     const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
@@ -3415,6 +3700,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /* 紹介者ひとりぶん。`/api/affiliates/:id/report` と `/links`。器の形が要る。 */
   if (/^\/api\/affiliates\/[^/]+\/report$/.test(pathname)) return { success: true, data: AFFILIATE_REPORT_DETAIL }
   if (/^\/api\/affiliates\/[^/]+\/links$/.test(pathname)) return { success: true, data: AFFILIATE_LINKS }
+  /*
+   * 紹介者の内訳（来た人の一覧）。無いと既定の器（`{items,total,page,limit}`）が
+   * 返り、画面が器に `.filter` して白画面になっていた。
+   * 本物は配列と次の印を返す（`affiliates.ts` の journeys）。
+   */
+  if (/^\/api\/affiliates\/[^/]+\/journeys$/.test(pathname)) {
+    return {
+      success: true,
+      data: [
+        { friendId: 'friend-4', displayName: 'さくら', addedAt: '2026-09-20T10:02:00.000+09:00', refCode: 'tanaka01', touchCount: 3, formCount: 1, conversionCount: 1, lastEventAt: '2026-09-21T09:00:00.000+09:00' },
+        { friendId: 'friend-9', displayName: null, addedAt: '2026-09-18T21:40:00.000+09:00', refCode: null, touchCount: 1, formCount: 0, conversionCount: 0, lastEventAt: '2026-09-18T21:40:00.000+09:00' },
+      ],
+      nextCursor: null,
+    }
+  }
   /*
    * 要対応の交換の一覧。型どおりの名前（items/pagination）で返す。
    * 失敗中と送ったか分からない配送中（照合待ち）を混ぜ、21件以上でも

@@ -241,11 +241,29 @@ describe('Googleビジネス：設定（接続）', () => {
     const state = url.searchParams.get('state')!;
     expect(json.mode).toBe('connect');
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+    // ブラウザが別のGoogleアカウントでログイン済みでも、アカウント選択画面を出す。
+    expect(url.searchParams.get('prompt')).toBe('select_account consent');
     expect(response.headers.get('set-cookie')).toContain(`lh_gb_state=${state}`);
     expect(response.headers.get('set-cookie')).toContain('HttpOnly');
     const row = testDb.raw.prepare('SELECT store_id, mode, code_verifier_enc FROM rt_google_oauth_states WHERE state = ?').get(state) as { store_id: string; mode: string; code_verifier_enc: string };
     expect(row.store_id).toBe('store-shibuya');
     expect(row.code_verifier_enc.startsWith('v1.')).toBe(true);
+  });
+
+  it('リダイレクトURIは呼び出し元ホストではなく WORKER_PUBLIC_URL に固定する（redirect_uri_mismatch 防止）', async () => {
+    seedStore();
+    // Workerは独自ドメインでも workers.dev でも開ける。どちらから呼ばれても
+    // Googleへ送るURIが1つでないと redirect_uri_mismatch になる。
+    env.WORKER_PUBLIC_URL = 'https://api.example.test/';
+    const response = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
+    expect(response.status).toBe(200);
+    const url = new URL(((await response.json()) as { authorizeUrl: string }).authorizeUrl);
+    expect(url.searchParams.get('redirect_uri')).toBe('https://api.example.test/api/restaurant-test/google/oauth/callback');
+    // 未設定の環境ではこれまでどおりリクエストのoriginへ退避する。
+    delete env.WORKER_PUBLIC_URL;
+    const fallback = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
+    const fallbackUrl = new URL(((await fallback.json()) as { authorizeUrl: string }).authorizeUrl);
+    expect(fallbackUrl.searchParams.get('redirect_uri')).toBe('http://localhost/api/restaurant-test/google/oauth/callback');
   });
 
   async function startAndCallback(callbackQuery: (state: string) => string, cookie?: ((state: string) => string) | null) {
@@ -318,9 +336,11 @@ describe('Googleビジネス：設定（接続）', () => {
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_location_candidates').get()).toEqual({ n: 0 });
   });
 
-  it('再接続：別の店舗が選ばれたら保存せずに止める', async () => {
+  it('再接続：以前の店舗を持たないアカウントでも店舗選択へ進み、確認したときだけ切り替えて前の店舗のデータを消す', async () => {
     seedStore();
     await seedConnection();
+    testDb.raw.prepare(`UPDATE rt_google_connections SET average_rating = 4.5, total_review_count = 12, last_synced_at = '2026-09-30T00:00:00Z'`).run();
+    testDb.raw.prepare(`INSERT INTO rt_google_reviews (id, store_id, review_name, star_rating, create_time) VALUES ('rv-old', 'store-shibuya', ?, 5, '2026-09-01T00:00:00Z')`).run(`${LOCATION}/reviews/r1`);
     googleHandler = (url) => {
       if (url === 'https://oauth2.googleapis.com/token') return jsonResponse({ access_token: 'a2', refresh_token: 'r2', expires_in: 3600 });
       if (url.includes('userinfo')) return jsonResponse({ email: 'other@example.test' });
@@ -331,11 +351,43 @@ describe('Googleビジネス：設定（接続）', () => {
     const start = await call('/api/restaurant-test/google/connect/start?account_id=account-2', { body: {} });
     expect(((await start.json()) as { mode: string }).mode).toBe('reconnect');
     const response = await startAndCallback((state) => `state=${state}&code=c`);
-    expect(new URL(response.headers.get('location')!).searchParams.get('google')).toBe('error:location_mismatch');
-    const row = testDb.raw.prepare('SELECT location_name, google_account_email, refresh_token_enc FROM rt_google_connections').get() as Record<string, string>;
+    expect(new URL(response.headers.get('location')!).searchParams.get('google')).toBe('select_location');
+    const row = testDb.raw.prepare('SELECT status, location_name, location_title, google_account_email, refresh_token_enc FROM rt_google_connections').get() as Record<string, string>;
+    // 前の店舗はまだ残したまま「選択待ち」にする（切り替え確認の表示に使う）。
+    expect(row.status).toBe('pending_location');
     expect(row.location_name).toBe(LOCATION);
-    expect(row.google_account_email).toBe('owner@example.test');
-    expect(await decryptCredential(row.refresh_token_enc, ENC_KEY)).toBe('refresh-secret');
+    expect(row.google_account_email).toBe('other@example.test');
+    expect(await decryptCredential(row.refresh_token_enc, ENC_KEY)).toBe('r2');
+    const candidates = testDb.raw.prepare('SELECT location_name FROM rt_google_location_candidates').all() as Array<{ location_name: string }>;
+    expect(candidates.map((candidate) => candidate.location_name)).toEqual(['accounts/555/locations/777']);
+
+    // 確認なしでは切り替えない。
+    const unconfirmed = await call('/api/restaurant-test/google/connect/select-location?account_id=account-2', {
+      body: { locationName: 'accounts/555/locations/777' },
+    });
+    expect(unconfirmed.status).toBe(400);
+    expect(((await unconfirmed.json()) as { code?: string }).code).toBe('switch_confirmation_required');
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_reviews').get()).toEqual({ n: 1 });
+
+    const confirmed = await call('/api/restaurant-test/google/connect/select-location?account_id=account-2', {
+      body: { locationName: 'accounts/555/locations/777', confirmSwitch: true },
+    });
+    expect(confirmed.status).toBe(200);
+    expect(
+      testDb.raw.prepare('SELECT status, location_name, location_title, average_rating, total_review_count, last_synced_at FROM rt_google_connections').get(),
+    ).toEqual({
+      status: 'connected',
+      location_name: 'accounts/555/locations/777',
+      location_title: '別の店',
+      average_rating: null,
+      total_review_count: null,
+      last_synced_at: null,
+    });
+    // 前の店舗の取り込み済みデータは消す。切り替えの記録は残す。
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_reviews').get()).toEqual({ n: 0 });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_location_candidates').get()).toEqual({ n: 0 });
+    const log = testDb.raw.prepare(`SELECT kind, target_name, before_text, result FROM rt_google_write_log WHERE result = 'accepted' ORDER BY created_at DESC`).get() as Record<string, string>;
+    expect(log).toMatchObject({ kind: 'reconnect', target_name: 'accounts/555/locations/777', before_text: LOCATION });
   });
 
   it('接続解除は確認が必須。トークンは消し、口コミの履歴は残す', async () => {

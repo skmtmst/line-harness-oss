@@ -511,6 +511,13 @@ function OverviewStep({
   onNext: () => void
 }) {
   const descLen = (draft.description ?? '').length
+  /* 保存前に欄を離れたとき出す直し方（文は保存時と同じ）。 */
+  const [nameError, setNameError] = useState<string | null>(null)
+  function checkName(value: string): string | null {
+    if (!value.trim()) return 'イベント名は必須です'
+    if (value.length > EVENT_NAME_MAX_LENGTH) return 'イベント名は255字以内で入力してください'
+    return null
+  }
   const previewCapacity = Number(firstSlot.capacity)
   const previewDate = firstSlot.date
     ? formatDay(new Date(`${firstSlot.date}T00:00:00+09:00`))
@@ -535,14 +542,19 @@ function OverviewStep({
       <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-3 border p-4">
       <FormSection step={1} label="イベントの中身" note="友だちの予約ページにそのまま出ます">
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="イベント名" htmlFor="ev-name" required>
+          <Field label="イベント名" htmlFor="ev-name" required error={nameError}>
             <input
               id="ev-name"
               value={draft.name}
-              onChange={(e) => update('name', e.target.value)}
+              onChange={(e) => {
+                update('name', e.target.value)
+                if (nameError !== null) setNameError(checkName(e.target.value))
+              }}
+              onBlur={() => setNameError(checkName(draft.name))}
               maxLength={EVENT_NAME_MAX_LENGTH}
               placeholder="例：第1回 定期便のはじめ方 説明会"
               className={inputClass}
+              aria-invalid={nameError !== null}
             />
           </Field>
           <Field label="開催場所" htmlFor="ev-venue">
@@ -1529,7 +1541,7 @@ function PublishStep({
       <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-80">
         <AsideCard title="確定したときに届くメッセージ" note="プレビュー">
           <div className="bg-canvas-sunken rounded-card p-3">
-            <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
+            <p className="text-ink-faint mb-1 text-xs">LINE公式アカウント</p>
             <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
               {preview}
             </p>

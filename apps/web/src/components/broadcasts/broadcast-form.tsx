@@ -17,6 +17,7 @@ import {
   type BroadcastPreflight,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
 import {
@@ -186,8 +187,8 @@ const MESSAGE_TYPE_TABS = [
  */
 const VALIDATION_STEP_LABEL: Record<'basic' | 'audience' | 'message', string> = {
   basic: '基本設定',
-  audience: '対象者',
-  message: 'メッセージ',
+  audience: '配信対象',
+  message: 'メッセージを作成',
 }
 
 export function moveMessageTypeTabFocus(
@@ -615,6 +616,8 @@ export default function BroadcastForm({
   onStepChange,
   visualQaAugustCampaign = false,
 }: BroadcastFormProps) {
+  const theme = useAdminTheme()
+  const v8 = theme === 'v8'
   const { selectedAccountId, loading: accountLoading } = useAccount()
   /*
    * テスト送信と本番予約で同じ下書きを使う。
@@ -1995,6 +1998,8 @@ export default function BroadcastForm({
         }
       }
       setConfirmOpen(false)
+      // 単頁の保存でも知らせを出す。予約の申込みは遷移先が状態を出すので出さない。
+      if (!scheduledAtIso()) notifyToast('下書きを保存しました。')
       onSuccess(saved)
     } catch {
       // R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
@@ -2033,7 +2038,7 @@ export default function BroadcastForm({
     }
   }
 
-  return <div className="broadcast-form-v6 mb-8">
+  return <div className="broadcast-form-v6 mb-8" data-design-node={v8 ? 'FU2aU' : undefined}>
     {currentStep ? (
       <Link href="/broadcasts" className="mb-5 inline-flex text-sm font-semibold text-action hover:underline">
         ← 一斉配信一覧
@@ -2400,7 +2405,7 @@ export default function BroadcastForm({
             */}
             <div>
               <h3 className="text-lg font-bold text-ink">メッセージを作成</h3>
-              <p className="mt-1 text-xs text-ink-faint">外部サービスの配信形式に加え、LINE Harnessの拡張形式も選択できます。</p>
+              <p className="mt-1 text-xs text-ink-faint">外部サービスの配信形式に加え、musuboの拡張形式も選択できます。</p>
             </div>
             <button
               type="button"
@@ -2857,15 +2862,14 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 space-y-3 text-sm">
-                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-medium text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${formatNumber(audienceDisplayCount)}人`}</dd></div>
-                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-medium text-ink">未設定</dd></div>
-                <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-medium text-ink">{bubbles.length}通</dd></div>
+                <div><dt className="text-xs text-ink-faint">送る相手</dt><dd className="font-medium text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${formatNumber(audienceDisplayCount)}人`}</dd></div>
+                <div><dt className="text-xs text-ink-faint">送る日時</dt><dd className="font-medium text-ink">{scheduledLabel ?? '未設定'}</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信後のアクション</dt><dd className="font-medium text-ink">{publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'なし'}</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">対象の確認ポイント</h3>
-              <p className="mt-2 text-xs text-ink-faint">送信できない友だちを事前に除外します。</p>
-              <ul className="mt-3 space-y-2 text-xs text-ink-secondary"><li>✓ ブロック・非表示を除外</li><li>✓ 同一人物の重複を除外</li><li>✓ 配信停止中を除外</li></ul>
+              <p className="mt-2 text-xs text-ink-secondary">・人数は送る直前にもう一度数え直します ・ブロック中の人には届きません</p>
             </section>
           </div>
         ) : (

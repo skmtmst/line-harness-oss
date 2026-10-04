@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import '@/app/hq/readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import MenuPortal from '@/components/shared/menu-portal'
@@ -24,7 +26,7 @@ const LIST_DESCRIPTIONS: Record<TemplateType, string> = {
   form: '回答フォームのひな形を作成し、各LINEアカウントへ配布します。',
 }
 const MODES: Record<DistributionMode, string> = { create: '新規作成', overwrite: '上書き', alias: '別名で作成' }
-const NODES = { list: 'rsyjI', edit: 'ZsLly', accounts: 'E0CmCp', duplicates: 'Uhd35', result: 'FxHyL' }
+const NODES = { list: 'rsyjI', edit: 'X4JcOf', accounts: 'meBRB', duplicates: 'meBRB', result: 'FxHyL' }
 type Stage = keyof typeof NODES
 const STEPS: readonly { stage: Stage; label: string }[] = [
   { stage: 'list', label: '一覧' },
@@ -74,6 +76,16 @@ function TemplateRowMenu({ name, busy, onEdit, onDistribute, onRemove }: {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const close = () => setOpen(false)
+  // 矢印・Home・Endで中の押し口を移動する（共通ActionMenuと同じ動き）。
+  const moveMenuFocus = (event: KeyboardEvent<HTMLElement>) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled])'))
+    if (items.length === 0) return
+    event.preventDefault()
+    const current = items.indexOf(document.activeElement as HTMLElement)
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : event.key === 'ArrowDown' ? (current + 1) % items.length : (current - 1 + items.length) % items.length
+    items[next].focus()
+  }
   return (
     <>
       <button
@@ -88,7 +100,7 @@ function TemplateRowMenu({ name, busy, onEdit, onDistribute, onRemove }: {
         …
       </button>
       <MenuPortal open={open} align="end" getAnchor={() => triggerRef.current} onClose={close}>
-        <div role="menu" aria-label={`${name}の操作`} className={styles.rowMenuItems} style={{ position: 'static' }}>
+        <div role="menu" aria-label={`${name}の操作`} className={styles.rowMenuItems} style={{ position: 'static' }} onKeyDown={moveMenuFocus}>
           <Button disabled={busy} onClick={() => { onEdit(); close() }} aria-label={`${name}を編集`}>編集</Button>
           <Button disabled={busy} onClick={() => { onDistribute(); close() }} aria-label={`${name}を配布`}>配布</Button>
           <Button disabled={busy} onClick={() => { onRemove(); close() }} aria-label={`${name}を削除`}>削除する</Button>
@@ -99,6 +111,7 @@ function TemplateRowMenu({ name, busy, onEdit, onDistribute, onRemove }: {
 }
 
 export default function TemplateConsole({ type, useCanonicalEditors = true }: { type: TemplateType; useCanonicalEditors?: boolean }) {
+  const theme = useAdminTheme()
   const [stage, setStage] = useState<Stage>('list')
   const [templates, setTemplates] = useState<HqTemplate[]>([])
   const [accounts, setAccounts] = useState<HqAccount[]>([])
@@ -363,7 +376,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     await save(false, next, nextName, nextDescription, andAnother)
   }
 
-  return <div className={styles.console} data-design-node={NODES[stage]} aria-busy={busy}>
+  return <div className={`${styles.console} ${theme === 'v8' && stage === 'list' ? 'v8-ro-hq-page' : ''}`} data-design-node={theme === 'v8' && stage === 'list' ? 'LRc93' : NODES[stage]} aria-busy={busy}>
     {stage !== 'list' && <nav aria-label="配布の進捗"><ol className={styles.steps}>{STEPS.map((step, i) => <li key={step.stage} aria-current={step.stage === stage ? 'step' : undefined}>{i + 1} {step.label}</li>)}</ol></nav>}
     {stage === 'edit' && <p className={styles.breadcrumb}><button type="button" disabled={busy || createUncertain} onClick={toList}>ひな形一覧</button> / {detail ? '編集' : '新規作成'}</p>}
     <header className={styles.header}><div><h1>{title}</h1><p className={styles.muted}>{stage === 'list' ? LIST_DESCRIPTIONS[type] : stage === 'accounts' ? '1アカウントだけ、または複数アカウントを選択して一括配布できます' : stage === 'duplicates' ? '一括設定のあと、必要な項目だけ個別に変更できます' : stage === 'edit' ? `LINEアカウント内と同じ項目で${LABELS[type]}のひな形を作成します` : detail?.template.name}</p></div>
@@ -437,16 +450,24 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
       <p className={styles.muted}>成功済みアカウントは保持され、失敗分だけ再確認できます。別名はアカウント内で重複しない名前になります。</p>
       <footer className={styles.footer}><Button disabled={busy} onClick={() => { setPreflight(null); setStage('accounts') }}>戻る</Button>{expired && <Button disabled={busy} onClick={() => checkStores(selected)}>現在版を再確認</Button>}<Button variant="primary" disabled={busy || expired || !resolutions || !!pendingRun} onClick={run}>この内容で{preflight.stores.length}アカウントへ配布</Button></footer>
     </>}
-    {stage === 'result' && <>
+    {stage === 'result' && <div data-design-node="dEvJM">
       <div className={styles.toolbar}><p className={styles.muted}>配布番号：{pendingRun}</p><Button disabled={busy} onClick={refreshResult}>結果を再確認</Button></div>
-      {!result ? <p className={`${styles.panel} ${styles.empty}`} role="status">結果を確認中です。確認できるまでは再配布しません。</p> : <>
+      {!result ? (theme === 'v8' ? (
+        <section className={`${styles.panel} ${styles.progress}`} aria-label="配布の進み具合">
+          <h2>配布の進み具合</h2>
+          <div className={styles.progressTrack} aria-hidden="true"><span className={styles.progressFill} /></div>
+          <p role="status" className={styles.muted}>配布番号：{pendingRun} の結果を確認しています。確認できるまでは再配布しません。</p>
+        </section>
+      ) : (
+        <p className={`${styles.panel} ${styles.empty}`} role="status">結果を確認中です。確認できるまでは再配布しません。</p>
+      )) : <>
         <div className={styles.metrics}>{[['成功', `${successes.length}アカウント`], ['失敗', `${failures.length}アカウント`], ['新規作成', `${totals.created}件`], ['上書き', `${totals.overwritten}件`], ['別名作成', `${totals.aliased}件`]].map(([label, value]) => <section key={label} className={styles.panel}><span>{label}</span><strong>{value}</strong></section>)}</div>
         <div className={styles.grid}><div className={styles.stack}>{result.stores.map(store => <section key={store.accountId} className={`${styles.panel} ${failures.includes(store) ? styles.failed : ''}`}><div className={styles.toolbar}><h2>{store.accountName ?? accountName(store.accountId)}</h2><span className={styles.badge}>{store.status === 'succeeded' ? '成功' : failures.includes(store) ? '失敗' : '確認中'}</span></div>
           {store.status === 'succeeded' ? <p>新規 {store.counts.created}件　上書き {store.counts.overwritten}件　別名 {store.counts.aliased}件{Boolean(store.counts.reused) && <>　既存参照 {store.counts.reused}件を再利用</>}</p> : failures.includes(store) ? <><p>このアカウントの変更は取り消しました</p><p className={`${styles.notice} ${styles.error}`}>{store.reason || '配布できませんでした。アカウントの現在版を再確認してください。'}</p>{store.cleanupPending && <p className={styles.notice}>画像の後片付けを自動で再試行中です。「結果を再確認」で状態を更新できます。</p>}{done && <div className={styles.footer}><Button variant="primary" disabled={busy} onClick={() => { checkStores([store.accountId]) }}>このアカウントだけ再確認して配布</Button></div>}</> : <p>まだ処理の完了を確認できていません。</p>}
         </section>)}</div><aside className={styles.panel}><h2>再実行の動作</h2><p>成功アカウントは再送せず、失敗アカウントの現在版を取得して重複確認へ戻ります。</p></aside></div>
       </>}
       <footer className={styles.footer}><Button disabled={busy} onClick={toList}>ひな形一覧へ</Button>{done && failures.length > 0 && <Button variant="primary" disabled={busy} onClick={() => { checkStores(failures.map(s => s.accountId)) }}>失敗{failures.length}アカウントを再確認</Button>}</footer>
-    </>}
+    </div>}
     <ConfirmDialog open={!!remove} title="ひな形を削除" description={`「${remove?.name ?? ''}」を削除します。配布済みのアカウントデータは残ります。`} destructive confirmLabel="削除する" busy={busy} onCancel={() => { if (!busy) setRemove(null) }} onConfirm={() => void perform(async () => { if (!remove) return; await hqTemplatesApi.remove(remove.id, remove.revision); setTemplates(current => current.filter(t => t.id !== remove.id)); setRemove(null); setMessage('ひな形を削除しました。') })} />
   </div>
 }

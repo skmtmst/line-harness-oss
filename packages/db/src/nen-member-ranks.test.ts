@@ -168,6 +168,31 @@ describe('listNenMembers / getNenMemberKpis', () => {
     expect((await listNenMembers(db, { accountIds: [], })).total).toBe(0);
   });
 
+  it('今月の購入は入金済みの当月注文だけを数える（返金・取消・先月は数えない）', async () => {
+    // 本体と同じくJSTで月を取る。JSTの15日正午（＝UTCの15日3時）は実行月の中に必ず入る。
+    const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const stamp = (monthOffset: number) =>
+      new Date(Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth() + monthOffset, 15, 3, 0, 0))
+        .toISOString().replace('T', ' ').slice(0, 19);
+    const thisMonth = stamp(0);
+    const lastMonth = stamp(-1);
+    sqlite.exec(`
+      INSERT INTO ec_events (id, source, external_event_id, event_type, line_user_id, payload, received_at, updated_at)
+      VALUES ('ev-1', 'eccube', 'ext-1', 'order.created', 'U-a', '{}', '${thisMonth}', '${thisMonth}');
+      INSERT INTO ec_orders (id, line_account_id, source_key, external_order_id, friend_id, order_number,
+        normalized_status, provider_status, total_amount_minor, ordered_at, last_event_id, created_at, updated_at) VALUES
+        ('o-a1', '${ACCOUNT}', 'ec', 'ext-a1', 'friend-a', 'N1', 'current', 'paid', 5000, '${thisMonth}', 'ev-1', '${thisMonth}', '${thisMonth}'),
+        ('o-a2', '${ACCOUNT}', 'ec', 'ext-a2', 'friend-a', 'N2', 'current', 'paid', 3000, '${thisMonth}', 'ev-1', '${thisMonth}', '${thisMonth}'),
+        ('o-b1', '${ACCOUNT}', 'ec', 'ext-b1', 'friend-b', 'N3', 'current', 'paid', 2000, '${thisMonth}', 'ev-1', '${thisMonth}', '${thisMonth}'),
+        ('o-b2', '${ACCOUNT}', 'ec', 'ext-b2', 'friend-b', 'N4', 'refunded', 'refunded', 90000, '${thisMonth}', 'ev-1', '${thisMonth}', '${thisMonth}'),
+        ('o-a3', '${ACCOUNT}', 'ec', 'ext-a3', 'friend-a', 'N5', 'current', 'paid', 70000, '${lastMonth}', 'ev-1', '${lastMonth}', '${lastMonth}');
+    `);
+    const kpis = await getNenMemberKpis(db, [ACCOUNT]);
+    // 同じ人の2件は金額だけ足し、人数は1人。返金・先月は入らない。
+    expect(kpis.monthPurchaseYen).toBe(10_000);
+    expect(kpis.monthBuyers).toBe(2);
+  });
+
   it('数値カードの合計はブロック中と別アカウントを含めない', async () => {
     const kpis = await getNenMemberKpis(db, [ACCOUNT]);
     expect(kpis).toEqual({
@@ -177,6 +202,11 @@ describe('listNenMembers / getNenMemberKpis', () => {
       balanceTotal: 3_960,
       usedThisMonth: 500,
       byRank: { platinum: 1, gold: 1 },
+      // ★V8 会員帯の3つ。両方ともEC連携済み・ペットあり。当月の注文は無い。
+      linkedMembers: 2,
+      petMembers: 2,
+      monthPurchaseYen: 0,
+      monthBuyers: 0,
     });
   });
 });

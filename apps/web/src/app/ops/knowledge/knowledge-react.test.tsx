@@ -101,12 +101,20 @@ describe('V6 knowledge UI', () => {
     expect(host.querySelectorAll('th')).toHaveLength(8)
   })
   it('requires evidence confirmation and saves the edited version before approval', async () => {
+    // 板 `eSXxA`「記事を承認する前に」：2つ確かめてから保存して承認する。
     const closed = vi.fn()
     await act(async () => root.render(<KnowledgeEditor article={article} onClose={closed} onSaved={() => {}} />))
-    expect(button('承認して有効にする').disabled).toBe(true)
-    await act(async () => (document.querySelector('input[type="checkbox"]') as HTMLInputElement).click())
-    expect(button('承認して有効にする').disabled).toBe(false)
     await act(async () => button('承認して有効にする').click())
+    const confirm = document.body.querySelector('[data-design-node="eSXxA"]')
+    expect(confirm, '承認前の確認の窓が出ない').not.toBeNull()
+    for (const row of ['記事を承認する前に', '本文と手順を読み', '下書きで保存', '保存して承認']) {
+      expect(confirm?.textContent ?? '', `「${row}」がない`).toContain(row)
+    }
+    const approveInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.trim() === '保存して承認') as HTMLButtonElement
+    expect(approveInDialog.disabled, '読む前に承認できてしまう').toBe(true)
+    await act(async () => ((confirm as HTMLElement).querySelector('input[type="checkbox"]') as HTMLInputElement).click())
+    expect(approveInDialog.disabled).toBe(false)
+    await act(async () => approveInDialog.click())
     expect(mocks.update).toHaveBeenCalledWith('article', 1, expect.objectContaining({ answer: article.answer }))
     expect(mocks.review).toHaveBeenCalledWith('article', { version: 2, action: 'approve', confirmed: true })
     expect(closed).toHaveBeenCalledOnce()
@@ -114,7 +122,6 @@ describe('V6 knowledge UI', () => {
   it('does not enable approval for stale or uncertain evidence', async () => {
     await act(async () => root.render(<KnowledgeEditor article={{ ...article, sourceCurrent: false }} onClose={() => {}} onSaved={() => {}} />))
     expect(button('承認して有効にする').disabled).toBe(true)
-    expect((document.querySelector('input[type="checkbox"]') as HTMLInputElement).disabled).toBe(true)
     expect(document.body.textContent).toContain('元のやり取りが更新されています')
   })
   it('labels an answer example and allows approval after the operator confirms its nonempty answer', async () => {
@@ -124,15 +131,35 @@ describe('V6 knowledge UI', () => {
     ], reviewReason: 'お客様の成功確認はありません。回答内容を確認して承認してください。' }
     await act(async () => root.render(<KnowledgeEditor article={example} onClose={() => {}} onSaved={() => {}} />))
     expect(document.body.textContent).toContain('回答例（お客様の確認なし）')
-    expect(document.body.textContent).toContain('回答内容が正しいことを元のやり取りで確認しました')
     expect(document.body.textContent).toContain('成功確認を示すものではありません')
-    await act(async () => (document.querySelector('input[type="checkbox"]') as HTMLInputElement).click())
-    expect(button('承認して有効にする').disabled).toBe(false)
+    await act(async () => button('承認して有効にする').click())
+    const confirm = document.body.querySelector('[data-design-node="eSXxA"]')
+    expect(confirm, '承認前の確認の窓が出ない').not.toBeNull()
+    expect(confirm?.textContent ?? '').toContain('本文と手順を読み')
+    await act(async () => ((confirm as HTMLElement).querySelector('input[type="checkbox"]') as HTMLInputElement).click())
+    const approveInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.trim() === '保存して承認') as HTMLButtonElement
+    expect(approveInDialog.disabled).toBe(false)
+  })
+  it('blocks approval while the source ticket is still open (board eSXxA)', async () => {
+    await act(async () => root.render(<KnowledgeEditor
+      article={article}
+      ticket={{ label: '#1045', resolved: false, stageLabel: '対応中' }}
+      onClose={() => {}}
+      onSaved={() => {}}
+    />))
+    await act(async () => button('承認して有効にする').click())
+    const confirm = document.body.querySelector('[data-design-node="eSXxA"]')
+    expect(confirm, '承認前の確認の窓が出ない').not.toBeNull()
+    expect(confirm?.textContent ?? '').toContain('元の問い合わせ #1045 が「解決」になっている')
+    expect(confirm?.textContent ?? '').toContain('まだ「対応中」です。解決にしてから承認できます')
+    await act(async () => ((confirm as HTMLElement).querySelector('input[type="checkbox"]') as HTMLInputElement).click())
+    const approveInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.trim() === '保存して承認') as HTMLButtonElement
+    expect(approveInDialog.disabled, '対応中のまま承認できてしまう').toBe(true)
+    expect(mocks.review).not.toHaveBeenCalled()
   })
   it('keeps a question-only example blocked until an answer is written', async () => {
     await act(async () => root.render(<KnowledgeEditor article={{ ...article, articleKind: 'answer_example', answer: '', evidence: [], reviewState: 'needs_review' }} onClose={() => {}} onSaved={() => {}} />))
     expect(document.body.textContent).toContain('運営の回答がありません。答えを書いて承認できます')
-    await act(async () => (document.querySelector('input[type="checkbox"]') as HTMLInputElement).click())
     expect(button('承認して有効にする').disabled).toBe(true)
     expect(mocks.review).not.toHaveBeenCalled()
   })
@@ -159,5 +186,22 @@ describe('V6 knowledge UI', () => {
     const retry = Array.from(host.querySelectorAll('button')).find(b => /再|もう一度/.test(b.textContent ?? ''))!
     await act(async () => retry.click()); await flush()
     expect(host.textContent).toContain(article.title)
+  })
+})
+
+
+describe('V8 ナレッジの集計範囲', () => {
+  it('全件の総数とこのページの数を区別し、開いただけでは承認しない', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    try {
+      mocks.list.mockResolvedValue({ success: true, data: [{ ...article, usedCount: 7 }], total: 104 })
+      await act(async () => root.render(<OpsKnowledgePage />)); await flush()
+      expect(host.querySelector('[data-design-node="h114s"]')).not.toBeNull()
+      expect(host.textContent).toContain('条件に合う記事104')
+      expect(host.textContent).toContain('このページの承認待ち1')
+      expect(host.textContent).toContain('このページの利用回数7')
+      expect(host.textContent).toContain('104件中 1〜1件')
+      expect(mocks.review).not.toHaveBeenCalled()
+    } finally { delete document.documentElement.dataset.theme }
   })
 })

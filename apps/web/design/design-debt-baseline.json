@@ -1,12 +1,28 @@
 {
+  "app/accounts/handover/handover-v8.tsx": {
+    "unresolved-classname": 48
+  },
   "app/accounts/new/page.tsx": {
     "arbitrary-value": 1
   },
   "app/accounts/page.tsx": {
     "arbitrary-value": 1
   },
+  "app/accounts/uid-migration-v8.tsx": {
+    "unresolved-classname": 99,
+    "direct-th": 8
+  },
+  "app/affiliate-offers/new-offer-v8.tsx": {
+    "unresolved-classname": 53
+  },
   "app/affiliate-offers/new/page.tsx": {
     "unresolved-classname": 4
+  },
+  "app/affiliates/affiliates-v8.tsx": {
+    "unresolved-classname": 7
+  },
+  "app/affiliates/new-affiliate-v8.tsx": {
+    "unresolved-classname": 82
   },
   "app/affiliates/new/page.tsx": {
     "unresolved-classname": 6
@@ -15,14 +31,58 @@
     "arbitrary-value": 12,
     "direct-th": 20
   },
+  "app/affiliates/v8-affiliates-tab.tsx": {
+    "unresolved-classname": 25,
+    "direct-th": 7
+  },
+  "app/affiliates/v8-approvals-tab.tsx": {
+    "unresolved-classname": 33,
+    "direct-th": 8
+  },
+  "app/affiliates/v8-drawer.tsx": {
+    "unresolved-classname": 48,
+    "direct-th": 8
+  },
+  "app/affiliates/v8-offers-tab.tsx": {
+    "unresolved-classname": 33,
+    "direct-th": 6
+  },
+  "app/affiliates/v8-payment-tab.tsx": {
+    "unresolved-classname": 38,
+    "direct-th": 6
+  },
+  "app/affiliates/v8-report-tab.tsx": {
+    "unresolved-classname": 25,
+    "direct-th": 7
+  },
+  "app/affiliates/v8-shared.tsx": {
+    "unresolved-classname": 39
+  },
   "app/analytics/page.tsx": {
     "arbitrary-value": 6
+  },
+  "app/analytics/reports/new/page.tsx": {
+    "unresolved-classname": 31
+  },
+  "app/analytics/reports/new/report-head-v8.tsx": {
+    "unresolved-classname": 4
+  },
+  "app/auto-replies/edit/wizard-v8.tsx": {
+    "unresolved-classname": 244
+  },
+  "app/auto-replies/list-v8.tsx": {
+    "unresolved-classname": 75,
+    "direct-th": 7
   },
   "app/auto-replies/page.tsx": {
     "arbitrary-value": 18
   },
   "app/auto-replies/runs/page.tsx": {
     "unresolved-classname": 30
+  },
+  "app/auto-replies/runs/runs-v8.tsx": {
+    "unresolved-classname": 71,
+    "direct-th": 7
   },
   "app/automations/new/page.tsx": {
     "unresolved-classname": 55
@@ -36,40 +96,84 @@
   "app/booking/bookings/page.tsx": {
     "unresolved-classname": 2
   },
+  "app/booking/menus/liff-phone-v8.tsx": {
+    "unresolved-classname": 75
+  },
+  "app/booking/menus/new/menu-form-v8.tsx": {
+    "unresolved-classname": 115
+  },
   "app/booking/menus/new/page.tsx": {
     "unresolved-classname": 11
+  },
+  "app/booking/menus/settings-v8.tsx": {
+    "unresolved-classname": 208
+  },
+  "app/booking/menus/staff/assign-v8.tsx": {
+    "unresolved-classname": 61,
+    "direct-th": 3
   },
   "app/booking/menus/staff/page.tsx": {
     "arbitrary-value": 6,
     "unresolved-classname": 1
   },
+  "app/booking/prepay-badge-v8.tsx": {
+    "unresolved-classname": 7
+  },
   "app/booking/staff/new/page.tsx": {
     "arbitrary-value": 1,
     "unresolved-classname": 5
   },
-  "app/booking/staff/page.tsx": {
-    "arbitrary-value": 1
+  "app/booking/staff/new/staff-new-v8.tsx": {
+    "unresolved-classname": 69
   },
   "app/booking/staff/shifts/liff-preview.tsx": {
     "direct-primary-button": 2,
     "direct-secondary-button": 2,
     "arbitrary-value": 2
   },
+  "app/booking/staff/shifts/staff-detail-v8.tsx": {
+    "unresolved-classname": 153
+  },
+  "app/booking/staff/staff-edit-dialog.tsx": {
+    "arbitrary-value": 1
+  },
+  "app/broadcasts/detail-v8.tsx": {
+    "unresolved-classname": 78
+  },
   "app/broadcasts/detail/page.tsx": {
     "direct-secondary-button": 1
+  },
+  "app/broadcasts/list-v8.tsx": {
+    "unresolved-classname": 76
   },
   "app/broadcasts/page.tsx": {
     "arbitrary-value": 2,
     "unresolved-classname": 1,
     "direct-secondary-button": 1
   },
+  "app/broadcasts/phone-mock-v8.tsx": {
+    "unresolved-classname": 16
+  },
+  "app/broadcasts/reserved-v8.tsx": {
+    "unresolved-classname": 35
+  },
   "app/chats/page.tsx": {
     "arbitrary-value": 37,
-    "unresolved-classname": 2,
+    "unresolved-classname": 0,
     "direct-secondary-button": 2
   },
   "app/contents/page.tsx": {
     "arbitrary-value": 5
+  },
+  "app/contents/vars/edit/edit-v8.tsx": {
+    "unresolved-classname": 109
+  },
+  "app/contents/vars/list-v8.tsx": {
+    "unresolved-classname": 119,
+    "direct-th": 6
+  },
+  "app/contents/vars/new/new-v8.tsx": {
+    "unresolved-classname": 55
   },
   "app/contents/vars/page.tsx": {
     "arbitrary-value": 3
@@ -77,8 +181,15 @@
   "app/conversions/new/page.tsx": {
     "unresolved-classname": 5
   },
+  "app/duplicates/duplicates-v8.tsx": {
+    "unresolved-classname": 65,
+    "direct-th": 12
+  },
   "app/ec-commerce/connector-panel.tsx": {
     "unresolved-classname": 30
+  },
+  "app/ec-commerce/ec-connector-v8.tsx": {
+    "unresolved-classname": 6
   },
   "app/ec-commerce/identity-candidates/page.tsx": {
     "unresolved-classname": 11
@@ -92,12 +203,30 @@
   "app/ec-commerce/subscriptions-panel.tsx": {
     "unresolved-classname": 10
   },
+  "app/emergency/control-v8.tsx": {
+    "unresolved-classname": 81,
+    "direct-th": 6
+  },
   "app/emergency/page.tsx": {
     "unresolved-classname": 4,
     "arbitrary-value": 6
   },
+  "app/events/bookings/bookings-v8.tsx": {
+    "unresolved-classname": 45
+  },
   "app/events/bookings/page.tsx": {
     "direct-th": 6
+  },
+  "app/events/change-review/change-review-v8.tsx": {
+    "unresolved-classname": 31
+  },
+  "app/events/events-list-v8.tsx": {
+    "unresolved-classname": 49,
+    "arbitrary-value": 7,
+    "direct-th": 6
+  },
+  "app/events/new/events-new-v8.tsx": {
+    "unresolved-classname": 4
   },
   "app/events/page.tsx": {
     "direct-primary-button": 1
@@ -106,21 +235,53 @@
     "unresolved-classname": 4,
     "arbitrary-value": 1
   },
+  "app/form-submissions/list-v8.tsx": {
+    "unresolved-classname": 91,
+    "direct-th": 6
+  },
   "app/form-submissions/page.tsx": {
-    "arbitrary-value": 4
+    "arbitrary-value": 0
+  },
+  "app/friend-add-settings/editor-v8.tsx": {
+    "unresolved-classname": 189
+  },
+  "app/friend-add-settings/list-v8.tsx": {
+    "unresolved-classname": 76,
+    "direct-th": 6
   },
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
   },
+  "app/friend-add-settings/publish/done-v8.tsx": {
+    "unresolved-classname": 18
+  },
   "app/friend-add-settings/publish/page.tsx": {
     "unresolved-classname": 38
   },
+  "app/friend-add-settings/runs/detail/detail-v8.tsx": {
+    "unresolved-classname": 39
+  },
+  "app/friend-add-settings/runs/runs-v8.tsx": {
+    "unresolved-classname": 69,
+    "direct-th": 7
+  },
   "app/friends/detail/page.tsx": {
-    "unresolved-classname": 3,
+    "unresolved-classname": 4,
     "arbitrary-value": 5
+  },
+  "app/friends/friends-nav-v8.tsx": {
+    "unresolved-classname": 11
+  },
+  "app/friends/identity-candidates/identity-candidates-v8.tsx": {
+    "unresolved-classname": 18,
+    "direct-th": 4
   },
   "app/friends/identity-candidates/page.tsx": {
     "unresolved-classname": 6
+  },
+  "app/friends/migrations/migrations-v8.tsx": {
+    "unresolved-classname": 62,
+    "direct-th": 5
   },
   "app/friends/page.tsx": {
     "unresolved-classname": 2
@@ -131,11 +292,8 @@
   "app/health/page.tsx": {
     "unresolved-classname": 5
   },
-  "app/hq/billing/page.tsx": {
-    "unresolved-classname": 1
-  },
   "app/hq/templates/template-console.tsx": {
-    "unresolved-classname": 82
+    "unresolved-classname": 86
   },
   "app/hq/templates/template-definition-editor.tsx": {
     "unresolved-classname": 6
@@ -147,22 +305,27 @@
     "arbitrary-value": 1
   },
   "app/inflow-links/detail/page.tsx": {
+    "unresolved-classname": 92,
     "direct-secondary-button": 1
   },
   "app/inflow-links/new/page.tsx": {
     "unresolved-classname": 4
   },
   "app/inflow-links/page.tsx": {
-    "arbitrary-value": 14,
-    "direct-secondary-button": 1
+    "unresolved-classname": 63,
+    "arbitrary-value": 0,
+    "direct-secondary-button": 0
   },
   "app/layout.tsx": {
     "unresolved-classname": 1
   },
+  "app/line-notifications/operator/new/operator-new-v8.tsx": {
+    "unresolved-classname": 58
+  },
   "app/line-notifications/page.tsx": {
     "direct-primary-button": 1,
-    "arbitrary-value": 7,
-    "unresolved-classname": 3
+    "arbitrary-value": 6,
+    "unresolved-classname": 0
   },
   "app/login/two-factor/page.tsx": {
     "arbitrary-value": 1
@@ -170,22 +333,86 @@
   "app/login/two-factor/setup/page.tsx": {
     "arbitrary-value": 1
   },
+  "app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx": {
+    "unresolved-classname": 60
+  },
   "app/mileage/earning-rules/new/page.tsx": {
     "direct-th": 3,
     "unresolved-classname": 2
   },
+  "app/mileage/earning-rules/new/v8-earning-rule-new.tsx": {
+    "unresolved-classname": 83
+  },
+  "app/mileage/friends/detail/v8-friend-detail.tsx": {
+    "unresolved-classname": 67,
+    "direct-th": 7
+  },
+  "app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx": {
+    "unresolved-classname": 51
+  },
+  "app/mileage/mileage-v8.tsx": {
+    "unresolved-classname": 9
+  },
   "app/mileage/page.tsx": {
     "arbitrary-value": 7
+  },
+  "app/mileage/rewards/edit/v8-reward-edit.tsx": {
+    "unresolved-classname": 54
+  },
+  "app/mileage/v8-balances-tab.tsx": {
+    "unresolved-classname": 73,
+    "direct-th": 7
+  },
+  "app/mileage/v8-earning-rules-tab.tsx": {
+    "unresolved-classname": 72,
+    "direct-th": 7
+  },
+  "app/mileage/v8-history-tab.tsx": {
+    "unresolved-classname": 60,
+    "direct-th": 6
+  },
+  "app/mileage/v8-rewards-tab.tsx": {
+    "unresolved-classname": 86,
+    "direct-th": 12
+  },
+  "app/mileage/v8-score-tab.tsx": {
+    "unresolved-classname": 130,
+    "direct-th": 14
+  },
+  "app/nen-campaigns/columns/new/column-new-v8.tsx": {
+    "unresolved-classname": 47
   },
   "app/nen-campaigns/columns/new/page.tsx": {
     "unresolved-classname": 36
   },
+  "app/nen-campaigns/edit/campaign-editor-v8.tsx": {
+    "unresolved-classname": 65
+  },
   "app/nen-campaigns/edit/campaign-editor.tsx": {
     "unresolved-classname": 5
+  },
+  "app/nen-campaigns/nen-campaigns-v8.tsx": {
+    "unresolved-classname": 58
   },
   "app/nen-members/page.tsx": {
     "unresolved-classname": 13,
     "arbitrary-value": 1
+  },
+  "app/nen-members/photo-review-v8.tsx": {
+    "unresolved-classname": 85
+  },
+  "app/nen/health/health-v8.tsx": {
+    "unresolved-classname": 56
+  },
+  "app/nen/members/members-v8.tsx": {
+    "unresolved-classname": 62
+  },
+  "app/nen/pets/pets-v8.tsx": {
+    "unresolved-classname": 89,
+    "direct-th": 3
+  },
+  "app/no-permission/no-permission-v8.tsx": {
+    "unresolved-classname": 10
   },
   "app/page.tsx": {
     "arbitrary-value": 8,
@@ -194,20 +421,44 @@
   "app/pools/new/page.tsx": {
     "unresolved-classname": 2
   },
+  "app/pools/new/pool-new-v8.tsx": {
+    "unresolved-classname": 2
+  },
   "app/recipes/clone/page.tsx": {
     "unresolved-classname": 30
   },
   "app/recipes/page.tsx": {
     "unresolved-classname": 17
   },
+  "app/reminders/basics-form-v8.tsx": {
+    "unresolved-classname": 39
+  },
+  "app/reminders/detail/detail-v8.tsx": {
+    "unresolved-classname": 69,
+    "direct-th": 23
+  },
   "app/reminders/detail/page.tsx": {
     "unresolved-classname": 29
+  },
+  "app/reminders/edit/edit-v8.tsx": {
+    "unresolved-classname": 168,
+    "direct-th": 4
+  },
+  "app/reminders/list-v8.tsx": {
+    "unresolved-classname": 71,
+    "direct-th": 7
+  },
+  "app/reminders/new/new-v8.tsx": {
+    "unresolved-classname": 6
   },
   "app/reminders/new/page.tsx": {
     "unresolved-classname": 7
   },
   "app/reminders/page.tsx": {
     "arbitrary-value": 4
+  },
+  "app/reminders/wizard-v8-ui.tsx": {
+    "unresolved-classname": 33
   },
   "app/restaurant-test/restaurant-console.tsx": {
     "arbitrary-value": 11,
@@ -219,19 +470,75 @@
   "app/restaurant-test/stores/new/terms-consent.tsx": {
     "arbitrary-value": 1
   },
+  "app/restaurant-test/v8/approvals.tsx": {
+    "unresolved-classname": 43
+  },
+  "app/restaurant-test/v8/dashboard.tsx": {
+    "unresolved-classname": 7
+  },
+  "app/restaurant-test/v8/google.tsx": {
+    "unresolved-classname": 23
+  },
+  "app/restaurant-test/v8/inventory.tsx": {
+    "unresolved-classname": 45
+  },
+  "app/restaurant-test/v8/menu.tsx": {
+    "unresolved-classname": 24
+  },
+  "app/restaurant-test/v8/organization.tsx": {
+    "unresolved-classname": 58
+  },
+  "app/restaurant-test/v8/reservation-phone.tsx": {
+    "unresolved-classname": 33
+  },
+  "app/restaurant-test/v8/reservations.tsx": {
+    "unresolved-classname": 46
+  },
+  "app/restaurant-test/v8/shell.tsx": {
+    "unresolved-classname": 26
+  },
+  "app/restaurant-test/v8/tables.tsx": {
+    "unresolved-classname": 37
+  },
   "app/rich-menus/edit/page.tsx": {
     "arbitrary-value": 10
   },
-  "app/rich-menus/page.tsx": {
-    "arbitrary-value": 10,
+  "app/rich-menus/external-import.tsx": {
+    "arbitrary-value": 5,
     "direct-secondary-button": 1
+  },
+  "app/rich-menus/list-v8.tsx": {
+    "unresolved-classname": 91,
+    "direct-th": 6,
+    "arbitrary-value": 1
+  },
+  "app/rich-menus/new/create-v8.tsx": {
+    "unresolved-classname": 184
+  },
+  "app/rich-menus/page.tsx": {
+    "arbitrary-value": 5
+  },
+  "app/scenarios/detail/detail-v8.tsx": {
+    "arbitrary-value": 2,
+    "unresolved-classname": 109
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {
     "arbitrary-value": 5
   },
+  "app/scenarios/first-step-v8.tsx": {
+    "unresolved-classname": 46
+  },
   "app/scenarios/first-step/page.tsx": {
     "arbitrary-value": 1,
     "unresolved-classname": 4
+  },
+  "app/scenarios/list-v8.tsx": {
+    "unresolved-classname": 64,
+    "direct-th": 6
+  },
+  "app/scenarios/mode-v8.tsx": {
+    "unresolved-classname": 31,
+    "direct-th": 3
   },
   "app/scenarios/mode/page.tsx": {
     "arbitrary-value": 5
@@ -242,8 +549,22 @@
   "app/scenarios/results/page.tsx": {
     "unresolved-classname": 17
   },
+  "app/scenarios/results/results-v8.tsx": {
+    "unresolved-classname": 46
+  },
   "app/search-console/page.tsx": {
     "arbitrary-value": 2
+  },
+  "app/settings/feature-settings-v8.tsx": {
+    "unresolved-classname": 55
+  },
+  "app/settings/file-scan/file-scan-v8.tsx": {
+    "unresolved-classname": 29,
+    "direct-th": 4
+  },
+  "app/settings/manual-links/manual-links-v8.tsx": {
+    "unresolved-classname": 14,
+    "direct-th": 6
   },
   "app/settings/manual-links/page.tsx": {
     "unresolved-classname": 4
@@ -252,6 +573,9 @@
     "unresolved-classname": 1,
     "arbitrary-value": 15
   },
+  "app/settings/settings-nav-v8.tsx": {
+    "unresolved-classname": 9
+  },
   "app/staff/new/page.tsx": {
     "direct-secondary-button": 1,
     "arbitrary-value": 2
@@ -259,8 +583,14 @@
   "app/staff/page.tsx": {
     "arbitrary-value": 16
   },
+  "app/tags/field-editor-v8.tsx": {
+    "unresolved-classname": 91
+  },
+  "app/tags/field-migrate-v8.tsx": {
+    "unresolved-classname": 72
+  },
   "app/tags/fields-tab-v8.tsx": {
-    "unresolved-classname": 58
+    "unresolved-classname": 53
   },
   "app/tags/fields/migrate/page.tsx": {
     "arbitrary-value": 1
@@ -271,42 +601,119 @@
   "app/tags/list-v8.tsx": {
     "unresolved-classname": 6
   },
+  "app/tags/mark-editor-v8.tsx": {
+    "unresolved-classname": 48
+  },
   "app/tags/marks-v8.tsx": {
-    "unresolved-classname": 51
+    "unresolved-classname": 46
+  },
+  "app/tags/search-editor-v8.tsx": {
+    "unresolved-classname": 53
   },
   "app/tags/searches-v8.tsx": {
-    "unresolved-classname": 59
+    "unresolved-classname": 54
+  },
+  "app/tags/tag-editor-v8.tsx": {
+    "unresolved-classname": 113
+  },
+  "app/tags/tag-rows-skeleton.tsx": {
+    "unresolved-classname": 5
   },
   "app/tags/tags-tab-v8.tsx": {
-    "unresolved-classname": 67
+    "unresolved-classname": 61
+  },
+  "app/templates/asset-editor-v8.tsx": {
+    "unresolved-classname": 63
+  },
+  "app/templates/carousel/carousel-v8.tsx": {
+    "unresolved-classname": 49
   },
   "app/templates/carousel/page.tsx": {
     "unresolved-classname": 7,
     "arbitrary-value": 1
   },
+  "app/templates/detail/detail-v8.tsx": {
+    "unresolved-classname": 85,
+    "direct-th": 5
+  },
   "app/templates/detail/page.tsx": {
     "arbitrary-value": 2,
     "direct-secondary-button": 1
   },
+  "app/templates/edit-v8.tsx": {
+    "unresolved-classname": 24
+  },
   "app/templates/edit/page.tsx": {
     "unresolved-classname": 1
+  },
+  "app/templates/editor-v8.tsx": {
+    "unresolved-classname": 19
+  },
+  "app/templates/list-v8.tsx": {
+    "unresolved-classname": 94,
+    "direct-th": 8
   },
   "app/templates/page.tsx": {
     "unresolved-classname": 6,
     "arbitrary-value": 12
   },
+  "app/templates/questions/question-v8.tsx": {
+    "unresolved-classname": 17
+  },
+  "app/users/users-v8.tsx": {
+    "unresolved-classname": 55,
+    "direct-th": 5
+  },
+  "app/webhooks/apitokens-v8.tsx": {
+    "unresolved-classname": 26,
+    "direct-th": 6
+  },
   "app/webhooks/edit/page.tsx": {
     "unresolved-classname": 4
   },
+  "app/webhooks/incoming-v8.tsx": {
+    "unresolved-classname": 84,
+    "direct-th": 4
+  },
+  "app/webhooks/interactions-v8.tsx": {
+    "unresolved-classname": 42,
+    "direct-th": 6
+  },
+  "app/webhooks/new/new-v8.tsx": {
+    "unresolved-classname": 57
+  },
   "app/webhooks/new/page.tsx": {
     "unresolved-classname": 5
+  },
+  "app/webhooks/outgoing-v8.tsx": {
+    "unresolved-classname": 34,
+    "direct-th": 6
+  },
+  "app/webhooks/samples-v8.tsx": {
+    "unresolved-classname": 23
+  },
+  "app/webhooks/sheets-v8.tsx": {
+    "unresolved-classname": 48,
+    "direct-th": 4
   },
   "app/webhooks/webhook-interactions.tsx": {
     "unresolved-classname": 35
   },
   "app/webinars/edit/page.tsx": {
     "arbitrary-value": 21,
-    "unresolved-classname": 9
+    "unresolved-classname": 7
+  },
+  "app/webinars/edit/participants-shared.tsx": {
+    "unresolved-classname": 2
+  },
+  "app/webinars/edit/participants-v8.tsx": {
+    "unresolved-classname": 1
+  },
+  "app/webinars/list-v8.tsx": {
+    "unresolved-classname": 43
+  },
+  "app/webinars/new/new-v8.tsx": {
+    "unresolved-classname": 43
   },
   "app/webinars/page.tsx": {
     "arbitrary-value": 4,
@@ -349,7 +756,8 @@
   },
   "components/chats/friend-info-sidebar.tsx": {
     "unresolved-classname": 12,
-    "arbitrary-value": 50
+    "arbitrary-value": 59,
+    "direct-secondary-button": 1
   },
   "components/chats/inbox-dropdown.tsx": {
     "unresolved-classname": 9,
@@ -496,6 +904,10 @@
   "components/merged-person/merged-delivery-dialog.tsx": {
     "unresolved-classname": 11
   },
+  "components/merged-person/merged-person-detail-v8.tsx": {
+    "unresolved-classname": 44,
+    "direct-th": 8
+  },
   "components/merged-person/merged-person-detail.tsx": {
     "unresolved-classname": 15
   },
@@ -583,6 +995,9 @@
   "components/shared/delta-chip.tsx": {
     "unresolved-classname": 1
   },
+  "components/shared/detail-panel.tsx": {
+    "unresolved-classname": 11
+  },
   "components/shared/disclosure.tsx": {
     "unresolved-classname": 6
   },
@@ -594,6 +1009,9 @@
   },
   "components/shared/icon-tile.tsx": {
     "unresolved-classname": 1
+  },
+  "components/shared/inline-edit.tsx": {
+    "unresolved-classname": 6
   },
   "components/shared/line-preview.tsx": {
     "unresolved-classname": 17
@@ -650,7 +1068,7 @@
     "unresolved-classname": 4
   },
   "components/shared/tabs.tsx": {
-    "unresolved-classname": 4
+    "unresolved-classname": 5
   },
   "components/shared/target-missing.tsx": {
     "unresolved-classname": 5
@@ -665,7 +1083,7 @@
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 31
+    "unresolved-classname": 43
   },
   "components/support/email-thread.tsx": {
     "arbitrary-value": 7

@@ -1001,7 +1001,7 @@ export function ActionConfigEditor({
             {tags.map((tag) => {
               const on = selected.includes(tag.id)
               return (
-                <Button variant="primary" className={(`rounded-pill h-8 px-3 text-xs transition-colors ${
+                <Button variant="primary" className={(`rounded-pill v7:h-8 px-3 text-xs transition-colors ${
                     on ? 'bg-accent-deep text-on-accent' : 'border-hairline text-ink-secondary border'
                   }`) + ' whitespace-normal'} key={tag.id} type="button" onClick={() =>
                     onChange({

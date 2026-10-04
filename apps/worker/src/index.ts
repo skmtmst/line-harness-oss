@@ -63,6 +63,7 @@ import { broadcasts } from './routes/broadcasts.js';
 import { broadcastApprovals } from './routes/broadcast-approvals.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
+import { lineAccountTags } from './routes/line-account-tags.js';
 import { lineAccounts } from './routes/line-accounts.js';
 import { gettingStarted } from './routes/getting-started.js';
 import { recipes } from './routes/recipes.js';
@@ -104,6 +105,7 @@ import { richMenus } from './routes/rich-menus.js';
 import { trackedLinks } from './routes/tracked-links.js';
 import { entryRoutes } from './routes/entry-routes.js';
 import { forms } from './routes/forms.js';
+import { postalCode } from './routes/postal-code.js';
 import { adPlatforms } from './routes/ad-platforms.js';
 import { adCosts } from './routes/ad-costs.js';
 import { webMeasurement } from './routes/web-measurement.js';
@@ -307,6 +309,8 @@ export type Env = {
     GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
     ECCUBE_WEBHOOK_SECRET?: string;
     NEN_EC_BASE_URL?: string;
+    /** ECの会員別ランクAPIを配備した後だけ true にする。未設定は送信停止。 */
+    NEN_EC_MEMBER_RANK_SYNC_ENABLED?: string;
     NEN_RICH_MENU_STORE_URL?: string;
     WORKER_URL: string;
     // Admin auth topology (see middleware/admin-auth-config.ts):
@@ -487,6 +491,7 @@ app.route('/', broadcastApprovals);
 app.route('/', broadcasts);
 app.route('/', broadcastMessageAssets);
 app.route('/', users);
+app.route('/', lineAccountTags);
 app.route('/', lineAccounts);
 app.route('/', brand);
 app.route('/', conversions);
@@ -523,6 +528,7 @@ app.route('/', richMenus);
 app.route('/', trackedLinks);
 app.route('/', entryRoutes);
 app.route('/', forms);
+app.route('/', postalCode);
 app.route('/', adPlatforms);
 app.route('/', adCosts);
 // Web計測の公開口と計測サイトの管理(#819)。
@@ -1850,6 +1856,20 @@ async function runSixHourlyHeavyJobs(
         }
       },
     },
+    {
+      // ★V6 36-2: 退会・無料体験切れから保存期限が過ぎた統括の顧客データを消す。
+      // 1回の行数に上限があり、途中で止まっても次の回が続きから消す。
+      name: 'tenant data retention purge',
+      run: async () => {
+        const { processTenantDataPurge } = await import('./services/tenant-data-purge.js');
+        const result = await processTenantDataPurge(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.anchoredTrials + result.tenants + result.deletedRows > 0) {
+          console.log(JSON.stringify({ event: 'tenant_data_retention_purge', ...result }));
+        }
+      },
+    },
   ];
 
   if (restaurantTestEnabled(env)) {
@@ -1873,6 +1893,20 @@ async function runSixHourlyHeavyJobs(
         });
         if (result.synced + result.failed > 0) {
           console.log(JSON.stringify({ event: 'google_business_metrics_tick', ...result }));
+        }
+      },
+    });
+    jobs.push({
+      // Googleビジネス: 認可を切らさないための先回り更新。再同期が回らない接続
+      // （場所未選択・機能off）のトークンも6時間ごとに使って、放置による失効を防ぐ。
+      name: 'google business token keepalive',
+      run: async () => {
+        const { processGoogleBusinessTokenKeepalive } = await import('./services/google-business-resync.js');
+        const result = await processGoogleBusinessTokenKeepalive(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.refreshed + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'google_business_token_keepalive_tick', ...result }));
         }
       },
     });
@@ -2018,6 +2052,7 @@ async function scheduled(
       const now = new Date(event.scheduledTime).toISOString();
       const executors = createAutomationActionExecutors({
         credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        operatorMailEnv: env,
       });
       const scheduledResult = await processScheduledAutomationTriggers(env.DB, {
         now, executors, limit: 100,
@@ -2364,7 +2399,7 @@ async function scheduled(
     const buildGroupInput = async (snapshot: unknown, fallbackGroupId: string) => {
       const record = snapshot as {
         id?: string; size?: 'large' | 'compact'; chatBarText?: string;
-        isDefaultForAll?: boolean; pages?: Array<{
+        isDefaultForAll?: boolean; defaultOpen?: boolean; pages?: Array<{
           id: string; orderIndex: number; name: string;
           imageR2Key: string | null; imageContentType: string | null;
           lineRichmenuId: string | null;
@@ -2400,6 +2435,7 @@ async function scheduled(
           size: record.size ?? 'large',
           chatBarText: record.chatBarText ?? '',
           isDefaultForAll: record.isDefaultForAll ?? false,
+          defaultOpen: record.defaultOpen === true,
           formBaseUrl,
           pages: (record.pages ?? []).map((page) => ({
             id: page.id,
@@ -2482,6 +2518,7 @@ async function scheduled(
           size: restoreGroup.size,
           chatBarText: restoreGroup.chat_bar_text,
           isDefaultForAll: restoreGroup.is_default_for_all === 1,
+          defaultOpen: restoreGroup.default_open === 1,
           formBaseUrl,
           pages: restoreGroup.pages.map((page) => ({
             id: page.id,

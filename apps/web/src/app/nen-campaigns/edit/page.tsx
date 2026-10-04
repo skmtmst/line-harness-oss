@@ -3,12 +3,14 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { api, type NenColumn } from '@/lib/api'
+import { ApiError, api, type NenColumn } from '@/lib/api'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import CampaignEditor from './campaign-editor'
+import CampaignEditorV8 from './campaign-editor-v8'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatDay } from '@/lib/format'
 import Button from '@/components/shared/button'
 
@@ -18,7 +20,7 @@ import Button from '@/components/shared/button'
  * 以前はここだけヘビ語の別型で読んでいたため、下書きが常に空になり
  * 保存ボタンがずっと押せないままだった（#512 重大1）。
  */
-type Column = Pick<NenColumn, 'id' | 'slug' | 'title' | 'introText' | 'publishedAt'>
+type Column = Pick<NenColumn, 'id' | 'slug' | 'title' | 'introText' | 'publishedAt' | 'updatedAt'>
 
 /**
  * NENコラムに添える紹介文の編集。
@@ -44,6 +46,13 @@ function NenColumnEditInner() {
   const [savedId, setSavedId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<{ id: string; message: string } | null>(null)
   /*
+   * M507残差: 409で止めるだけでは元受入「最新を見せる」に届かない。
+   * 読み直した最新の紹介文を、下書きを置き換えず同カード内に
+   * 読み取り専用で別表示するためのもの。保存成功・読み直しで消す。
+   * 書き直しても消さない（比べながら直す助けに残す）。
+   */
+  const [latestIntro, setLatestIntro] = useState<{ id: string; text: string } | null>(null)
+  /*
    * #935 N-301: 紹介文を書きかけのまま離れると消えていた。
    * 保存済みの紹介文と違う間だけ、ブラウザ離脱・画面内リンク・戻る操作を止めて確認する。
    * hooksは分岐の前に置く（下の早期returnより先に呼ぶ）。
@@ -57,6 +66,7 @@ function NenColumnEditInner() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
+    setLatestIntro(null)
     if (!selectedAccountId) {
       setColumns([])
       setLoading(false)
@@ -89,21 +99,49 @@ function NenColumnEditInner() {
     setSaveError(null)
     setSavedId(null)
     try {
-      const res = await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, drafts[column.id] ?? '')
+      // M507: 開いたときの版を添える。ほかの人が先に保存していたら409で止まる。
+      const res = await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, drafts[column.id] ?? '', column.updatedAt)
       if (!res.success) {
         setSaveError({ id: column.id, message: '保存に失敗しました。時間をおいてもう一度お試しください。' })
         return
       }
+      // 版を成功応答の新しい版へ進める。他のカードの入力は残したままにする。
+      setColumns((current) => current.map((item) => item.id === column.id
+        ? { ...item, introText: drafts[column.id] ?? item.introText, updatedAt: res.data?.updatedAt ?? item.updatedAt }
+        : item))
       setSavedId(column.id)
-      void load()
+      // M507残差: 保存を通したら比べる相手は要らない。比較表示を消す。
+      setLatestIntro(null)
     } catch (e) {
+      // M507: 競合時は最新の紹介文を読み直し、入力は残したまま比べながら
+      // 保存し直せるようにする。
+      if (e instanceof ApiError && e.status === 409 && e.code === 'VERSION_CONFLICT') {
+        const latest = (e.data as { latest?: { introText?: string; updatedAt?: string } } | null)?.latest
+        if (latest) {
+          setColumns((current) => current.map((item) => item.id === column.id
+            ? { ...item, introText: latest.introText ?? item.introText, updatedAt: latest.updatedAt ?? item.updatedAt }
+            : item))
+          // M507残差: 下書きは置き換えない。最新の紹介文は同カードに別表示する。
+          setLatestIntro({ id: column.id, text: latest.introText ?? '' })
+        } else {
+          setLatestIntro(null)
+          void load()
+        }
+        setSaveError({ id: column.id, message: 'ほかの人が先に保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。' })
+        return
+      }
       setSaveError({ id: column.id, message: e instanceof Error ? e.message : '保存に失敗しました。時間をおいてもう一度お試しください。' })
     } finally {
       setSavingId(null)
     }
   }
 
-  if (campaignKey) return <CampaignEditor campaignKey={campaignKey} />
+  /*
+   * ★V8-B：data-theme="v8" のときだけ新しい配信編集画面（w5pwG）へ切り替える。
+   * v7 の見た目はそのまま。取得・保存の決めごとは変えない。
+   */
+  const theme = useAdminTheme()
+  if (campaignKey) return theme === 'v8' ? <CampaignEditorV8 campaignKey={campaignKey} /> : <CampaignEditor campaignKey={campaignKey} />
 
   return (
     <div className="flex flex-col gap-4">
@@ -159,6 +197,19 @@ function NenColumnEditInner() {
                 className="border-hairline rounded-control w-full resize-y border px-3 py-2 text-sm"
               />
               {/*
+                M507残差: 下書きは置き換えず、読み直した最新の紹介文を
+                同カード内に読み取り専用で別表示する。箱の中に箱は作らず
+                余白と文字の段（見出し12・本文14）だけで区切る。
+              */}
+              {latestIntro?.id === column.id && (
+                <div className="mt-2">
+                  <p className="text-ink-faint text-xs">ほかの人が保存した最新の紹介文</p>
+                  <p className="text-ink-secondary mt-1 text-sm whitespace-pre-wrap">
+                    {latestIntro.text === '' ? '（空になっています）' : latestIntro.text}
+                  </p>
+                </div>
+              )}
+              {/*
                 U102: 1つの保存ボタンのために72pxの StickyBar を
                 カードごとに繰り返していた。状態と保存を1行の行操作へ
                 まとめ、変更あり・保存中・保存済み・失敗をカード単位で
@@ -179,8 +230,8 @@ function NenColumnEditInner() {
                           ? '変更があります。保存するまで反映されません。'
                           : ''}
                 </p>
-                <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 py-1.5 font-medium h-auto whitespace-normal" onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}>
-                  {savingId === column.id ? '保存中...' : '保存する'}
+                <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 py-1.5 font-medium h-auto whitespace-normal" onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')} busy={savingId === column.id} done={savedId === column.id}>
+                  保存する
                 </Button>
               </div>
             </div>

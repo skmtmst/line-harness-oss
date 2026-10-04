@@ -7,6 +7,8 @@
  *
  * 例外: app/scenarios/mode/page.tsx の比較カード1件は、表入りの見比べを
  * 残すため素のまま（使いやすさ優先の判断。詳細は報告に書く）。
+ * app/scenarios/mode-v8.tsx は同じ画面の★V8版で、同じ見比べカードを
+ * 持つため同じ扱いにする。
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -14,7 +16,22 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)))
-const EXCEPTIONS = new Set(['app/scenarios/mode/page.tsx'])
+const EXCEPTIONS = new Set([
+  'app/scenarios/mode/page.tsx',
+  'app/scenarios/mode-v8.tsx',
+  /*
+   * リマインダV8の選ぶカード（ChoiceCardV8）は共通 RadioCard が持たない
+   * 「アイコン左上・丸右上」の形。丸は本物の input[type=radio] で、
+   * 意味は保ったまま。★V8板（YChR6等）の見た目を守るために残す。
+   */
+  'app/reminders/wizard-v8-ui.tsx',
+  /*
+   * イベント変更確認V8の開催回選択は表の行内の単一選択。共通 RadioCard は
+   * カード型で表のセルに入らず、共通 Checkbox は複数選択の意味になる。
+   * 本物の input[type=radio]（name 群・aria-label 付き）で意味を保つ。
+   */
+  'app/events/change-review/change-review-v8.tsx',
+])
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {

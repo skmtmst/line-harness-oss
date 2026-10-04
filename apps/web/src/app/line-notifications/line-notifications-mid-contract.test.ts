@@ -8,7 +8,7 @@ const OPERATOR_RULES = fs.readFileSync(
   'utf8',
 )
 const OPERATOR_NEW = fs.readFileSync(
-  path.join(__dirname, 'operator/new/page.tsx'),
+  path.join(__dirname, 'operator/new/operator-new-v8.tsx'),
   'utf8',
 )
 const RUN_LIST = fs.readFileSync(
@@ -21,7 +21,8 @@ describe('点検・中: LINE通知の画面契約', () => {
     expect(OPERATOR_RULES).not.toContain('うち止めている 2')
     expect(OPERATOR_RULES).not.toContain('3つのチームに')
     expect(OPERATOR_RULES).toContain('summary?.stopped')
-    expect(OPERATOR_RULES).toContain('summary?.missingRecipients')
+    // 板 u8xibp：受け取る人の実数は summary?.recipients。受け取れない人の内訳は出さない。
+    expect(OPERATOR_RULES).toContain('summary?.recipients')
   })
 
   it('中5: 押せないページ送りの飾りを置かない', () => {
@@ -31,7 +32,8 @@ describe('点検・中: LINE通知の画面契約', () => {
   })
 
   it('中6: 新規作成は保存し直せて、公開前に最新を保存する', () => {
-    expect(OPERATOR_NEW).toContain('保存し直す')
+    // 板 gjUz3：下書きボタンは「下書きを保存」の1つ。
+    expect(OPERATOR_NEW).toContain('下書きを保存')
     // N-342 (#943): 正本APIの下書き口。作り直さず書き換える。
     expect(OPERATOR_NEW).toContain('operatorRules.updateDraft(savedRuleId')
     expect(OPERATOR_NEW).not.toContain('savedRuleId ?? await saveDraft()')
@@ -65,12 +67,19 @@ describe('点検・軽: LINE通知の画面契約(#580)', () => {
     expect(PAGE).toContain("tab === 'customer'")
     expect(PAGE).toContain('needCustomer')
     expect(PAGE).toContain('? api.lineNotifications.definitions(selectedAccountId)')
-    expect(PAGE).toContain('? api.lineNotifications.metrics(selectedAccountId)')
+    // 板 g3iDs：LINE上の表示数は出さないので集計は取らない。行は送信履歴の数だけ。
+    expect(PAGE).not.toContain('api.lineNotifications.metrics(selectedAccountId)')
+    expect(PAGE).toContain('? api.lineNotifications.sendCounts(selectedAccountId)')
     expect(PAGE).toContain('[selectedAccountId, tab]')
   })
 
   it('軽4: 出す・止めるスイッチに読み上げ名を付ける', () => {
     expect(PAGE).toContain('role="switch"')
     expect(PAGE).toContain('のお知らせを出す・止める')
+  })
+
+  it('読み上げ: 運用者知らせの失敗は alert・成功は status で出す', () => {
+    expect(OPERATOR_RULES).toContain("role={notice.error ? 'alert' : 'status'}")
+    expect(OPERATOR_RULES).toContain('{notice.text}')
   })
 })

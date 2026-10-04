@@ -5,6 +5,8 @@ import type { Friend } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { NewAffiliateV8 } from '../new-affiliate-v8'
 import CreatePage, {
   AsideCard,
   ChoiceCard,
@@ -94,7 +96,17 @@ const PAYOUT_KINDS: Array<{ value: PayoutKind; label: string; note: string }> = 
   { value: 'none', label: '報酬なし（計測のみ）', note: '成果の件数だけを記録します' },
 ]
 
+/*
+ * ★V8-B の切り替え。v8 の器は別ファイル（new-affiliate-v8.tsx）に置き、
+ * v7 の器・動きはこの下の V7 のまま残す。
+ */
 export default function NewAffiliatePage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <NewAffiliateV8 />
+  return <NewAffiliatePageV7 />
+}
+
+function NewAffiliatePageV7() {
   /* ★V7: 画面名は共通トップバーにだけ置く。本文の重複見出しは出さない。 */
   usePageTitle('アフィリエイターを登録する')
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -194,6 +206,8 @@ export default function NewAffiliatePage() {
     : friends
 
   return (
+    /* ★V8-B `RaMf3`（アフィリエイターを作る）：中身はこの画面そのもの。V6 の印は残す。 */
+    <div data-design-node="RaMf3">
     <CreatePage
       title="アフィリエイターを登録する"
       description="紹介してくれる方に専用のリンクを渡し、成果と報酬を記録します。"
@@ -617,5 +631,6 @@ export default function NewAffiliatePage() {
         </div>
       </FormSection>
     </CreatePage>
+    </div>
   )
 }

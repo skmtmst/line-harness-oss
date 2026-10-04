@@ -147,6 +147,6 @@ describe('R606 参照画像の検索0件と未登録0件の区別（本物のRea
     await flush()
 
     expect(optionCount()).toBe(3)
-    expect(bodyText()).toContain('春のキャンペーン #1')
+    expect(bodyText()).toContain('haru')
   })
 })

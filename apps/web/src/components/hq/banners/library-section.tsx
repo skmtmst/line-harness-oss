@@ -1,13 +1,17 @@
 'use client'
 
+import '@/app/hq/readonly-v8.css'
+import Select from '@/components/shared/select'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import FilterChip from '@/components/shared/filter-chip'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import type { AccountWithStats } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, ApiError } from '@/lib/api'
 import {
   SHAPE_FILTERS,
@@ -18,8 +22,10 @@ import {
   type BannerProject,
   type ShapeFilter,
 } from '@/lib/hq-banners'
+import BannerSideNav, { type BannerChrome } from './banner-side-nav-v8'
 import ImageDetailModal from './image-detail-modal'
 import ImageTile from './image-tile'
+import UploadTargetDialog from './upload-target-dialog'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 type Filter = 'all' | 'favorite' | 'delivered' | 'unused'
@@ -37,12 +43,20 @@ export default function LibrarySection({
   presets,
   accounts,
   onChanged,
+  onChrome,
 }: {
   presets: BannerPreset[]
   accounts: AccountWithStats[]
   /** 渡す・外すで数が変わったとき。 */
   onChanged: () => void
+  /** 板の左列（操作＋見る）に置く中身を、親へ渡す。 */
+  onChrome?: (chrome: BannerChrome) => void
 }) {
+  // v7 の取得は30枚を保つ。件数選択は V8 だけ（v7 を変えない）。
+  const theme = useAdminTheme()
+  const [v8PageSize, setV8PageSize] = useState(10)
+  const pageSize = theme === 'v8' ? v8PageSize : PAGE_SIZE
+  const [uploadOpen, setUploadOpen] = useState(false)
   const router = useRouter()
   const [images, setImages] = useState<BannerImage[]>([])
   const [nextBefore, setNextBefore] = useState<string | null>(null)
@@ -61,10 +75,11 @@ export default function LibrarySection({
   const load = useCallback(async () => {
     const requestId = ++requestRef.current
     setStatus('loading')
+    setLoadingMore(false)
     setActionError('')
     try {
       const [imageRes, activeRes, archivedRes] = await Promise.all([
-        api.hqBanners.images.list({ favorite: filter === 'favorite', limit: PAGE_SIZE }),
+        api.hqBanners.images.list({ favorite: filter === 'favorite', limit: pageSize }),
         api.hqBanners.projects.list(),
         api.hqBanners.projects.list({ archived: true }),
       ])
@@ -80,7 +95,7 @@ export default function LibrarySection({
       if (requestId !== requestRef.current) return
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [filter])
+  }, [filter, pageSize])
 
   useEffect(() => {
     void load()
@@ -91,16 +106,19 @@ export default function LibrarySection({
 
   const loadMore = async () => {
     if (!nextBefore || loadingMore) return
+    const requestId = requestRef.current
     setLoadingMore(true)
     try {
-      const res = await api.hqBanners.images.list({ favorite: filter === 'favorite', before: nextBefore, limit: PAGE_SIZE })
+      const res = await api.hqBanners.images.list({ favorite: filter === 'favorite', before: nextBefore, limit: pageSize })
+      if (requestId !== requestRef.current) return
       if (!res.success) throw new Error(res.error)
       setImages((prev) => [...prev, ...res.data.filter((i) => !prev.some((p) => p.id === i.id))])
       setNextBefore(res.nextBefore ?? null)
     } catch {
+      if (requestId !== requestRef.current) return
       setActionError('続きを読み込めませんでした。もう一度お試しください。')
     } finally {
-      setLoadingMore(false)
+      if (requestId === requestRef.current) setLoadingMore(false)
     }
   }
 
@@ -161,6 +179,22 @@ export default function LibrarySection({
     }
   }
 
+  useEffect(() => {
+    onChrome?.({
+      action: <UploadTargetDialog.Trigger onClick={() => setUploadOpen(true)} />,
+      nav: status === 'ready' ? (
+        <BannerSideNav
+          items={[
+            { key: 'all', label: 'すべて', count: images.length, selected: filter === 'all', onSelect: () => setFilter('all') },
+            { key: 'favorite', label: 'お気に入り', count: images.filter((i) => i.isFavorite).length, selected: filter === 'favorite', onSelect: () => setFilter('favorite') },
+            { key: 'delivered', label: '渡し済み', count: images.filter((i) => i.deliveredAccountIds.length > 0).length, selected: filter === 'delivered', onSelect: () => setFilter('delivered') },
+            { key: 'unused', label: '未使用', count: images.filter((i) => i.deliveredAccountIds.length === 0).length, selected: filter === 'unused', onSelect: () => setFilter('unused') },
+          ]}
+        />
+      ) : null,
+    })
+  }, [onChrome, status, images, filter])
+
   const shapeKeys = useMemo(() => (shape ? new Set(presetKeysForShape(presets, shape)) : null), [presets, shape])
   const visible = useMemo(
     () =>
@@ -209,6 +243,23 @@ export default function LibrarySection({
             </span>
           ) : null}
         </div>
+        {theme === 'v8' && (
+          <div className="flex flex-wrap items-center justify-end gap-3 px-4 pb-4">
+            <span className="inline-flex items-center gap-1 whitespace-nowrap text-caption text-ink-secondary">
+              取得件数
+              <HelpTip label="画像の取得件数の説明">
+                一度に読み込む画像の枚数です。検索と用途・渡し済みの条件は、読み込んだ画像に適用します。
+              </HelpTip>
+            </span>
+            <Select
+              aria-label="画像の取得件数"
+              value={String(v8PageSize)}
+              size="page-size"
+              onChange={(value) => setV8PageSize(Number(value))}
+              options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}枚` }))}
+            />
+          </div>
+        )}
         <div className="border-t border-hairline" />
 
         {actionError ? <p className="px-4 pt-4 text-label text-danger" role="alert">{actionError}</p> : null}
@@ -234,7 +285,7 @@ export default function LibrarySection({
           ) : visible.length === 0 ? (
             <ListState kind="empty" />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <div className="v8-ro-hq-bannerGrid grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {visible.map((image) => (
                 <ImageTile
                   key={image.id}
@@ -254,12 +305,21 @@ export default function LibrarySection({
           {status === 'ready' && nextBefore ? (
             <div className="flex justify-center">
               <Button onClick={() => void loadMore()} disabled={loadingMore} busy={loadingMore} busyLabel="読み込んでいます…">
-                {`さらに${PAGE_SIZE}枚を表示`}
+                {`さらに${pageSize}枚を表示`}
               </Button>
             </div>
           ) : null}
         </div>
       </section>
+
+      <UploadTargetDialog
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onPick={(projectId) => {
+          setUploadOpen(false)
+          router.push(`/hq/banners/project?id=${encodeURIComponent(projectId)}`)
+        }}
+      />
 
       {openImage ? (
         <ImageDetailModal

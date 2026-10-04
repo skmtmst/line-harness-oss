@@ -5,8 +5,10 @@ import { useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import { readFileAsBase64 } from '@/lib/hq-banners'
 
-const ACCEPT = ['image/png', 'image/jpeg', 'image/webp']
-const MAX_BYTES = 10 * 1024 * 1024
+export const BANNER_UPLOAD_ACCEPT = ['image/png', 'image/jpeg', 'image/webp']
+export const BANNER_UPLOAD_MAX_BYTES = 10 * 1024 * 1024
+const ACCEPT = BANNER_UPLOAD_ACCEPT
+const MAX_BYTES = BANNER_UPLOAD_MAX_BYTES
 
 /**
  * 「画像を取り込む」。Pencil 35-2 `e5PzbL`。

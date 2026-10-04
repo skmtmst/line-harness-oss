@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { formatRelative } from '@/lib/format'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
@@ -34,20 +35,15 @@ function functionBody(source: string, name: string): string {
   return region(source, `function ${name}(`, '\nfunction ')
 }
 
+const lineRow = region(PAGE, 'const waitingLabel = needsAttention', '{/* Right Panel: Chat Detail */}')
+
 describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
-  const listDate = functionBody(PAGE, 'formatInboxListDate')
   const waiting = functionBody(PAGE, 'formatWaitingDuration')
-  const lineRow = region(PAGE, 'const waitingLabel = needsAttention', '{/* Right Panel: Chat Detail */}')
 
-  it('日付は年を出さず MM/DD だけにする', () => {
-    expect(listDate).toContain("getMonth() + 1")
-    expect(listDate).toContain('getDate()')
-    expect(listDate).not.toContain('getFullYear()')
-  })
-
-  it('取れない日時は空欄や Invalid Date ではなく — を出す', () => {
-    expect(listDate).toContain("if (!iso) return '—'")
-    expect(listDate).toContain("if (Number.isNaN(d.getTime())) return '—'")
+  it('V8は共通書式で経過時間を出し、取れない日時は — を出す', () => {
+    expect(formatRelative('2026-10-04T00:00:00Z', '2026-10-04T00:05:00Z')).toBe('5分前')
+    expect(formatRelative(null)).toBe('—')
+    expect(formatRelative('invalid')).toBe('—')
     expect(waiting).toContain('if (!iso) return null')
     expect(waiting).toContain('if (!Number.isFinite(at)) return null')
   })
@@ -60,7 +56,7 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
 
   it('行は待ち時間があればそれを、無ければ日付を出す', () => {
     expect(lineRow).toContain('{waitingLabel ? (')
-    expect(lineRow).toContain('formatInboxListDate(chat.lastMessageAt)')
+    expect(lineRow).toContain('formatRelative(chat.lastMessageAt)')
     // 年入りの旧書式へ戻さない。
     expect(lineRow).not.toContain('formatDatetime(')
   })
@@ -71,16 +67,16 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
 })
 
 describe('f0zn6 一覧の未読表示', () => {
-  const row = region(PAGE, 'const waitingLabel = needsAttention', '<div className="flex items-start gap-3">')
 
   it('設計に無い右端の「自分の未読」操作を置かない', () => {
     expect(PAGE).not.toContain('data-inbox-v6="mine-unread-toggle"')
     expect(PAGE).not.toContain('mineUnreadOnly')
   })
 
-  it('自分あての未読の行は地の色を変える', () => {
-    expect(row).toContain('chat.isUnread')
-    expect(row).toContain('bg-status-danger-soft')
+  it('V8の未読は顔の赤い点と名前の太字で示す', () => {
+    expect(lineRow).toContain('chat.isUnread')
+    expect(lineRow).toContain('aria-label="未読"')
+    expect(lineRow).toContain("chat.isUnread ? 'font-semibold' : 'font-medium'")
   })
 })
 
@@ -111,7 +107,7 @@ describe('H3lAOB / xGLVe トーク見出しの操作', () => {
     // 折り返しは sm 未満だけ。sm 以上では従来どおり1行を保つ。
     expect(header).toContain('sm:flex-nowrap')
     // V8 移行 ①: 共通 Button の inline-flex は部品側が持つので高さだけを見る。
-    expect(header).toContain('className="h-10 shrink-0')
+    expect(header).toContain('className="v7:h-10 shrink-0')
     expect(header).toContain('compact={showFriendInfo}')
     expect(INBOX_DROPDOWN).toContain('whitespace-nowrap border px-2.5 text-xs')
   })
@@ -135,7 +131,7 @@ describe('#455 受信箱の上端と入力欄', () => {
 
   it('改行案内を入力欄の下へ置く', () => {
     const composer = region(PAGE, 'data-inbox-v4="composer"', '<TemplatePicker')
-    expect(composer.indexOf('aria-label="メッセージを入力"')).toBeLessThan(composer.indexOf("'Shift + Enter で改行'"))
+    expect(composer.indexOf('aria-label="メッセージを入力"')).toBeLessThan(composer.indexOf("'Enter で送る・Shift + Enter で改行'"))
   })
 })
 

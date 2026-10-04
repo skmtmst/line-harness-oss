@@ -1,19 +1,28 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import type { CSSProperties } from 'react'
+import { Info, MoreHorizontal, X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
+import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import EditRouteModal from '../_components/edit-route-modal'
 import RefOrdersPanel, { type RefOrdersResult } from '../_components/ref-orders'
+import ReferralQrModal from '../referral-qr-modal'
 import Select from '@/components/shared/select'
+import SearchField from '@/components/shared/search-field'
+import PageSizeSelect from '@/components/ui/page-size-select'
+import FilterChip from '@/components/shared/filter-chip'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import styles from './inflow-detail-v8.module.css'
 import type {
   ApiResponse,
   EntryRoute,
@@ -201,6 +210,17 @@ function InflowLinkDetailPageContent() {
 
   /** コピーできなかったとき、選んでコピーできる欄をその場に出す（ブラウザの入力窓は使わない。V6R-S3-f）。 */
   const [copyFailed, setCopyFailed] = useState(false)
+  const { accounts } = useAccount()
+  // 板 Q5le3 の操作の口。
+  const [qrOpen, setQrOpen] = useState(false)
+  const [showOrders, setShowOrders] = useState(false)
+  const [afterMenuOpen, setAfterMenuOpen] = useState(false)
+  const [openFriendMenuId, setOpenFriendMenuId] = useState<string | null>(null)
+  const [friendSearch, setFriendSearch] = useState('')
+  const [friendChip, setFriendChip] = useState<'all' | 'month' | 'blocked' | 'converted'>('all')
+  const [friendPeriod, setFriendPeriod] = useState<'all' | 'this' | 'last'>('all')
+  const [friendPage, setFriendPage] = useState(1)
+  const [friendPageSize, setFriendPageSize] = useState(20)
 
   async function copyUrl() {
     if (!url) return
@@ -274,6 +294,90 @@ function InflowLinkDetailPageContent() {
     return Math.round((funnel.friend_add_count / funnel.click_count) * 1000) / 10
   }, [funnel])
 
+  // 板 Q5le3 の月別の数。trackedAt（来た日時）から今月・先月に分ける。
+  const monthKeyOf = (iso: string | null): string | null => {
+    if (!iso) return null
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return null
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+  const nowDate = new Date()
+  const thisMonthKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}`
+  const lastMonthDate = new Date(nowDate.getFullYear(), nowDate.getMonth() - 1, 1)
+  const lastMonthKey = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
+  const isBlockedFriend = (friend: AttributedFriend) => (friend.currentStatus ?? '').includes('ブロック')
+  const monthFriends = friends.filter((friend) => monthKeyOf(friend.trackedAt) === thisMonthKey)
+  const lastMonthFriends = friends.filter((friend) => monthKeyOf(friend.trackedAt) === lastMonthKey)
+  const blockedFriends = friends.filter(isBlockedFriend)
+  const convertedFriends = friends.filter((friend) => !!friend.conversion)
+  const blockRate = funnel && funnel.friend_add_count > 0
+    ? Math.round((blockedFriends.length / funnel.friend_add_count) * 100)
+    : null
+
+  const accountName = route?.lineAccountId
+    ? (accounts.find((account) => account.id === route.lineAccountId)?.name ?? route.lineAccountId)
+    : '—'
+  const createdDate = route
+    ? `${Number(route.createdAt.slice(5, 7))}月${Number(route.createdAt.slice(8, 10))}日`
+    : ''
+  const yen = (amount: number | null | undefined) =>
+    amount == null ? '—' : `¥${formatNumber(amount)}`
+
+  // 友だち表の絞り込み。検索・札・期間の3つを重ねる。
+  const normalizedFriendSearch = friendSearch.trim().toLocaleLowerCase('ja')
+  const friendRows = friends.filter((friend) => {
+    if (normalizedFriendSearch && !friend.displayName.toLocaleLowerCase('ja').includes(normalizedFriendSearch)) return false
+    if (friendChip === 'month' && monthKeyOf(friend.trackedAt) !== thisMonthKey) return false
+    if (friendChip === 'blocked' && !isBlockedFriend(friend)) return false
+    if (friendChip === 'converted' && !friend.conversion) return false
+    if (friendPeriod === 'this' && monthKeyOf(friend.trackedAt) !== thisMonthKey) return false
+    if (friendPeriod === 'last' && monthKeyOf(friend.trackedAt) !== lastMonthKey) return false
+    return true
+  })
+  const friendPageCount = Math.max(1, Math.ceil(friendRows.length / friendPageSize))
+  const friendPageRows = friendRows.slice((friendPage - 1) * friendPageSize, friendPage * friendPageSize)
+  const resetFriendPage = () => setFriendPage(1)
+
+  // 削除の窓を開く。板の頭の「…」と青い帯の「止める」から、選ぶ内容だけ変える。
+  const openDelete = (choice: 'stop' | 'redirect' | 'delete') => {
+    setDeleteError('')
+    setDeleteChoice(choice)
+    setDeleteConfirmationName('')
+    setRedirectTargetId('')
+    setAfterMenuOpen(false)
+    setDeleteOpen(true)
+  }
+
+  // 受付を再開する（止まっているときの青い帯）。
+  const reopenRoute = async () => {
+    if (!route) return
+    try {
+      const res = await api.entryRoutes.update(route.id, { isActive: true })
+      if (res.success) setRoute({ ...route, isActive: true })
+    } catch {
+      // 失敗しても画面はそのまま。止まったままなのが分かる。
+    }
+  }
+
+  const afterMenuItems: ActionMenuItem[] = route ? [
+    {
+      id: 'stop',
+      label: '受付を止める',
+      onSelect: () => openDelete('stop'),
+    },
+    {
+      id: 'redirect',
+      label: '別リンクへ送る',
+      onSelect: () => openDelete('redirect'),
+    },
+    {
+      id: 'delete',
+      label: '削除する',
+      tone: 'danger' as const,
+      onSelect: () => openDelete('delete'),
+    },
+  ] : []
+
   if (!selectedId) {
     return (
       <TargetMissing
@@ -309,14 +413,23 @@ function InflowLinkDetailPageContent() {
     )
   }
 
+  const happenParts: string[] = []
+  if (tagName) happenParts.push(`タグ「${tagName}」を付けて`)
+  if (scenarioName) happenParts.push(`シナリオ「${scenarioName}」を始めて`)
+  if (introTemplateName) happenParts.push(`メッセージ「${introTemplateName}」を送ります`)
+  const happenTitle = happenParts.length > 0
+    ? `友だちになったとき：${happenParts.join('、')}`
+    : '友だちになったときの動きは、まだ何も決めていません'
+  const qrDownloadUrl = route && url
+    ? `${workerBase.replace(/\/$/, '')}/api/qr?size=320x320&data=${encodeURIComponent(url)}&download=1&filename=${encodeURIComponent(`referral-${route.refCode}`)}`
+    : null
+
   return (
-    <div data-design-node="JupxW" data-design="Body">
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
-        <Link href="/inflow-links" className="hover:underline">
-          流入経路
+    <div data-design-node="Q5le3" data-design="Body" className={styles.board}>
+      <nav data-design="Crumb" aria-label="パンくず">
+        <Link href="/inflow-links" className={styles.backLink}>
+          ← 流入と計測へ
         </Link>
-        <span className="mx-1.5">/</span>
-        <span>リンクの詳細</span>
       </nav>
 
       {!route ? (
@@ -324,9 +437,18 @@ function InflowLinkDetailPageContent() {
           読み込み中…
         </div>
       ) : <>
-        <div data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div><div className="flex items-center gap-2"><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold"># {route.refCode}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.genre || '未分類'}</span>{/* R273: 一覧・一括操作と同じ言葉で受付状態を出す。赤は使わない（★V7）。 */}<span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.isActive ? '受付中' : '停止中'}</span></div><p className="mt-2 text-sm text-ink-faint">{route.createdAt.slice(5, 10).replace('-', '/')} に発行。{url} を通った人の記録です。</p></div>
-          <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の${canPermanentlyDelete ? '削除' : '受付停止'}を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setDeleteConfirmationName(''); setRedirectTargetId(''); setDeleteOpen(true) }}>{canPermanentlyDelete ? 'この経路を削除する' : '受付を止める'}</Button></div>
+        <div data-design="Head" className={styles.head}>
+          <div className="min-w-0">
+            <h2 className={styles.title}>{route.name}</h2>
+            <p className={styles.sub}>
+              {route.genre || '未分類'}・{url}・{accountName}・作った日 {createdDate}
+            </p>
+          </div>
+          <div className={styles.headActions}>
+            <Button variant="secondary" onClick={() => setQrOpen(true)}>QRコードを表示</Button>
+            <Button variant="secondary" onClick={() => void copyUrl()}>{copied ? 'コピーしました' : 'URLをコピー'}</Button>
+            <Button variant="secondary" onClick={() => setEditingRoute(true)}>リンクを編集</Button>
+          </div>
         </div>
         {copyFailed && url && (
           <div role="alert" className="mb-4 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3 text-sm text-ink-secondary">
@@ -342,49 +464,374 @@ function InflowLinkDetailPageContent() {
           </div>
         )}
         {/*
-          口から取れない数は書かない（#514 重大3）。funnel の4数は累計。
-          残数・ブロック数・1人あたり金額の集計口は無いので「—」+理由表示。
+          板 Q5le3 の数の帯。左の2枚は月で分けられる実績（来た日時を持つ）、
+          累計・成果は funnel の累計。ブロックは状態が分かる行だけ数える。
         */}
-        {/*
-          IDEA-18: 購入・返金もこの経路へ連結して出す。数は下の注文明細と同じ口
-          （/api/analytics/ref/:ref/orders）から取り、first-touch（その経路で
-          最初に来た友だち）の注文だけを数える。友だちに結びついていない注文や
-          経路の分からない注文は未計測としてここには出ない。
-        */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6"><MetricCard label="クリック" value={funnel?.click_count} unit="回" detail="累計" /><MetricCard label="友だちになった" value={funnel?.friend_add_count} unit="人" detail={`追加率 ${addRate ?? '—'}%`} /><MetricCard label="いま残っている" value={null} unit="人" detail="残数とブロック数の集計は未接続です" /><MetricCard label="成果" value={funnel?.cv_count} unit="件" detail="1人あたりの金額は未接続です" /><MetricCard label="購入" value={ordersSummary?.total ?? null} unit="件" detail={ordersSummary ? 'この経路から来た人の注文（累計）' : '注文の集計を取得できていません'} /><MetricCard label="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detail={ordersSummary ? `返金 ${formatNumber(ordersSummary.refunded)}・取消 ${formatNumber(ordersSummary.cancelled)}` : '注文の集計を取得できていません'} /></div>
-        {/*
-          IDEA-18: 集計の期間・帰属ルール・計測できる範囲の断り書き。
-          未計測を0と読ませないため、数えられないものを明記する。
-        */}
-        <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-          期間は累計（全期間）です。購入・返金は、この経路のURLをはじめて通って追加された友だちに結びついた注文だけを数えます
-          （はじめて来た経路にだけ付く帰属＝first-touch）。LINEの友だちと結びついていない注文、
-          経路の分からない友だちの注文、URLを開くだけで友だち追加に進まなかったクリックは計測できず、この数には入りません。
-          同じ注文は取り込み元ごとの注文番号で1件にまとまるため、再取込で二重に増えません。
-        </p>
-        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-4">
-          <div data-design="Left" className="space-y-4 xl:col-span-3">
-            <section><h2 className="text-lg font-bold text-ink">この経路から来た人の、その後</h2><p className="text-xs text-ink-faint">来ただけで終わっていないかを見ます。</p><div className="mt-3 rounded-card border border-hairline bg-canvas p-4">{funnel ? <FunnelView funnel={funnel} /> : funnelError ? <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-ink-secondary">段階を取得できませんでした。集計データは消えていません。</p><Button variant="secondary" onClick={() => setFunnelAttempt((n) => n + 1)}>段階を再読み込み</Button></div> : <p className="text-xs text-ink-faint">読み込み中…</p>}</div></section>
-            <section><h2 className="text-lg font-bold text-ink">この経路から来た友だち</h2><p className="text-xs text-ink-faint">新しい順</p>{friends.length === 0 ? <p className="mt-3 text-xs text-ink-faint">この経路から来た友だちは、まだ記録されていません。</p> : <div className="mt-3 overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-xs"><thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>友だち</Th><Th>いつ来たか</Th><Th>いまの状態</Th><Th>この人の成果</Th><Th>マイル</Th><Th align="right">確認</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{friends.slice(0, 5).map((friend) => <tr key={friend.id}><td className="px-3 py-3 font-semibold text-ink"><span className="block">{friend.displayName}</span><span className="block truncate font-normal text-ink-faint">はじめて見たページ {friend.firstPage ?? '—'}</span></td><td className="px-3 py-3 text-ink-secondary">{friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/') : '日時不明'}</td><td className="px-3 py-3 font-semibold text-ink-secondary">{friend.currentStatus ?? '—'}</td><td className="px-3 py-3 text-ink-secondary">{friend.conversion ?? '—'}</td><td className="px-3 py-3 font-semibold text-ink">{friend.miles ?? '—'}</td><td className="px-3 py-3 text-right"><Link href={`/friends/detail?id=${encodeURIComponent(friend.id)}`} className="text-action hover:underline">友だちを見る</Link></td></tr>)}</tbody></table></div>}</section>
-            {/*
-              IDEA-18: 経路別集計（上の購入カード）と同じ条件の注文明細。
-              「購入 ○件」とこの一覧の全件数をそのままつき合わせられる。
-            */}
-            <section><h2 className="text-lg font-bold text-ink">この経路からの注文</h2><p className="text-xs text-ink-faint">上の「購入」の数と同じ条件の明細です。返金・取り消しは状態に出ます。</p><div className="mt-3 rounded-card border border-hairline bg-canvas p-4">{route ? <RefOrdersPanel refCode={route.refCode} onSummaryChange={setOrdersSummary} /> : null}</div></section>
+        <div className={styles.band} role="group" aria-label={`${route.name}の概要`}>
+          <div className={styles.tile}>
+            <div className={styles.tileTitle}>今月友だちになった</div>
+            <div className={styles.tileValue}>
+              {formatNumber(monthFriends.length)}
+              <span className={styles.tileUnit}>人</span>
+            </div>
+            <div className={styles.tileSub}>
+              先月より {monthFriends.length - lastMonthFriends.length >= 0 ? '+' : ''}{formatNumber(monthFriends.length - lastMonthFriends.length)}
+            </div>
           </div>
-          <aside data-design="Right" className="space-y-4">
-            {/*
-              R269: 口にマイル付与の欄は無い。設計見本のマイル固定値は
-              実動作として出さず、実際の設定（シナリオ・タグ・追加直後メッセージ）
-              だけを組み立てる。連動先の名前が取れないときは取得できない旨を出す。
-            */}
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">この経路にしていること</h2><ul className="mt-3 space-y-3 text-xs text-ink-secondary"><li>{route.scenarioId ? `シナリオ「${scenarioName ?? '取得できません'}」を始める` : 'シナリオは始めない'}</li><li>{route.tagId ? `タグ「${tagName ?? '取得できません'}」を付ける` : 'タグは付けない'}</li><li>{route.introTemplateId ? `追加直後に「${introTemplateName ?? '取得できません'}」を送る` : '追加直後に送るメッセージはない'}</li></ul></section>
-            <Notice tone="warn"><h2 className="text-sm font-bold">気づいたこと</h2><p className="mt-3 text-xs">反応・ブロックの集計は未接続のため表示できません</p></Notice>
-            {/* R272: 関連5項目は実際のリンクにする。押せない飾りにしない。 */}
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h2 className="text-sm font-bold text-ink">つながる先</h2><ul className="mt-3 space-y-2 text-xs font-semibold text-action"><li><Link href="/scenarios">→ シナリオ配信</Link></li><li><Link href="/friends">→ 友だち</Link></li><li><Link href="/conversions?tab=affiliates">→ 成果とアフィリエイト</Link></li><li><Link href="/conversions">→ コンバージョン</Link></li><li><Link href="/analytics">→ 分析</Link></li></ul></section>
-          </aside>
+          <div className={styles.tile}>
+            <div className={styles.tileTitle}>累計</div>
+            <div className={styles.tileValue}>
+              {funnel ? formatNumber(funnel.friend_add_count) : '—'}
+              <span className={styles.tileUnit}>人</span>
+            </div>
+            <div className={styles.tileSub}>{createdDate}から</div>
+          </div>
+          <div className={styles.tile}>
+            <div className={styles.tileTitle}>ブロック</div>
+            <div className={styles.tileValue}>
+              {formatNumber(blockedFriends.length)}
+              <span className={styles.tileUnit}>人</span>
+            </div>
+            <div className={styles.tileSub}>
+              {blockRate == null ? '割合は集計できません' : `友だちになった人の ${blockRate}%`}
+            </div>
+          </div>
+          <div className={styles.tile}>
+            <div className={styles.tileTitle}>成果（コンバージョン）</div>
+            <div className={styles.tileValue}>
+              {funnel ? formatNumber(funnel.cv_count) : '—'}
+              <span className={styles.tileUnit}>件</span>
+            </div>
+            <div className={styles.tileSub}>累計</div>
+          </div>
+        </div>
+
+        <div data-design="Left">
+          <section className={styles.afterCard} aria-label="その後（この経路から来た人）">
+            <div className={styles.afterHead}>
+              <h2 className={styles.afterTitle}>その後（この経路から来た人）</h2>
+              <div className={styles.moreCell}>
+                <button
+                  type="button"
+                  className={styles.moreButton}
+                  title="板の頭の操作（受付を止める・別リンクへ送る・削除する）"
+                  aria-label="板の頭の操作（受付を止める・別リンクへ送る・削除する）"
+                  aria-expanded={afterMenuOpen}
+                  onClick={() => setAfterMenuOpen((current) => !current)}
+                >
+                  <MoreHorizontal size={16} aria-hidden="true" />
+                </button>
+                <ActionMenu
+                  open={afterMenuOpen}
+                  onClose={() => setAfterMenuOpen(false)}
+                  ariaLabel="板の頭の操作"
+                  items={afterMenuItems}
+                />
+              </div>
+            </div>
+            {funnel ? (
+              <div className={styles.miniGrid}>
+                <div className={styles.mini}>
+                  <div className={styles.miniTitle}>クリック</div>
+                  <div className={styles.miniValue}>{formatNumber(funnel.click_count)}</div>
+                </div>
+                <div className={styles.mini}>
+                  <div className={styles.miniTitle}>友だち追加</div>
+                  <div className={styles.miniValue}>{formatNumber(funnel.friend_add_count)}</div>
+                  <div className={styles.miniSub}>追加率 {addRate ?? '—'}%</div>
+                </div>
+                <div className={styles.mini}>
+                  <div className={styles.miniTitle}>フォーム</div>
+                  <div className={styles.miniValue}>{formatNumber(funnel.form_submission_count)}</div>
+                </div>
+                <div className={styles.mini}>
+                  <div className={styles.miniTitle}>購入</div>
+                  <div className={styles.miniValue}>{ordersSummary ? formatNumber(ordersSummary.total) : '—'}</div>
+                  <div className={styles.miniSub}>{ordersSummary ? yen(ordersSummary.totalAmount) : '集計を取得できていません'}</div>
+                </div>
+                <div className={styles.mini}>
+                  <div className={styles.miniTitle}>返金・取消</div>
+                  <div className={styles.miniValue}>
+                    {ordersSummary ? formatNumber(ordersSummary.refunded + ordersSummary.cancelled) : '—'}
+                  </div>
+                  <div className={styles.miniSub}>
+                    {ordersSummary
+                      ? (ordersSummary.refundedAmount == null
+                        ? '—'
+                        : `-${yen(ordersSummary.refundedAmount)}`)
+                      : '集計を取得できていません'}
+                  </div>
+                </div>
+              </div>
+            ) : funnelError ? (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-ink-secondary">段階を取得できませんでした。集計データは消えていません。</p>
+                <Button variant="secondary" onClick={() => setFunnelAttempt((n) => n + 1)}>段階を再読み込み</Button>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-ink-faint">読み込み中…</p>
+            )}
+            <div className={styles.ordersRow}>
+              <h3 className={styles.ordersTitle}>
+                注文の明細 {ordersSummary ? formatNumber(ordersSummary.total) : '—'}件
+              </h3>
+              <Button variant="secondary" onClick={() => setShowOrders((current) => !current)} aria-expanded={showOrders}>
+                注文を見る
+              </Button>
+            </div>
+            {showOrders && route ? (
+              <div className={styles.ordersPanel}>
+                <RefOrdersPanel refCode={route.refCode} onSummaryChange={setOrdersSummary} />
+              </div>
+            ) : null}
+          </section>
+
+          <div className={styles.happenBand}>
+            <span className={styles.happenIcon} aria-hidden="true"><Info size={16} /></span>
+            <div className={styles.happenText}>
+              <p className={styles.happenTitle}>{happenTitle}</p>
+              <p className={styles.happenSub}>
+                何も決めないと「動きが未設定」になります。変えると、これから友だちになる人に効きます（もういる人には効きません）
+              </p>
+            </div>
+            <div className={styles.happenActions}>
+              {route.isActive ? (
+                <Button variant="secondary" onClick={() => openDelete('stop')}>止める</Button>
+              ) : (
+                <Button variant="secondary" onClick={() => void reopenRoute()}>受付を再開する</Button>
+              )}
+              <Button variant="primary" onClick={() => setEditingRoute(true)}>
+                {happenParts.length > 0 ? 'することを変える' : 'ことを決める'}
+              </Button>
+            </div>
+          </div>
+
+          <section aria-label="この経路から来た友だち">
+            <h2 className="sr-only">この経路から来た友だち</h2>
+            <div className={styles.friendTools}>
+              <div className={styles.friendSearch}>
+                <SearchField
+                  aria-label="友だちの名前で探す"
+                  placeholder="友だちの名前で探す"
+                  value={friendSearch}
+                  onChange={(value) => {
+                    setFriendSearch(value)
+                    resetFriendPage()
+                  }}
+                />
+              </div>
+              {([
+                ['all', `すべて ${friends.length}`, friends.length],
+                ['month', `今月 ${monthFriends.length}`, monthFriends.length],
+                ['blocked', `ブロック ${blockedFriends.length}`, blockedFriends.length],
+                ['converted', `成果あり ${convertedFriends.length}`, convertedFriends.length],
+              ] as Array<['all' | 'month' | 'blocked' | 'converted', string, number]>).map(([value, label, total]) => (
+                <FilterChip
+                  key={value}
+                  selected={friendChip === value}
+                  count={total}
+                  onChange={() => {
+                    setFriendChip(friendChip === value && value !== 'all' ? 'all' : value)
+                    resetFriendPage()
+                  }}
+                >
+                  {label}
+                </FilterChip>
+              ))}
+              <div className={styles.friendRight}>
+                <Select
+                  aria-label="期間"
+                  value={friendPeriod}
+                  options={[
+                    { value: 'all', label: 'すべて' },
+                    { value: 'this', label: '今月' },
+                    { value: 'last', label: '先月' },
+                  ]}
+                  onChange={(value) => {
+                    setFriendPeriod(value as 'all' | 'this' | 'last')
+                    resetFriendPage()
+                  }}
+                />
+                <PageSizeSelect
+                  value={friendPageSize}
+                  options={[10, 20, 50]}
+                  onChange={(value) => {
+                    setFriendPageSize(value)
+                    resetFriendPage()
+                  }}
+                  aria-label="表示件数"
+                />
+              </div>
+            </div>
+            {friendRows.length === 0 ? (
+              <p className="mt-3 text-xs text-ink-faint">
+                {friends.length > 0
+                  ? '条件に合う友だちがいません。検索や絞り込みを変えてください。'
+                  : 'この経路から来た友だちは、まだ記録されていません。'}
+              </p>
+            ) : (
+              <div className={`${styles.tableShell} mt-3`} data-scroll-x style={{ '--scroll-min': '900px' } as CSSProperties}>
+                <table>
+                  <thead>
+                    <TableHeadRow>
+                      <Th>日時</Th>
+                      <Th>友だち</Th>
+                      <Th>入ったLINEアカウント</Th>
+                      <Th>今の状態</Th>
+                      <Th>付いたタグ・その後</Th>
+                      <Th align="right">成果</Th>
+                      <Th aria-label="操作"><span className="sr-only">操作</span></Th>
+                    </TableHeadRow>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {friendPageRows.map((friend) => {
+                      const blocked = isBlockedFriend(friend)
+                      return (
+                        <tr key={friend.id} className="hover:bg-canvas-sunken">
+                          <td className="whitespace-nowrap px-3 py-3 text-ink-faint">
+                            {friend.trackedAt ? friend.trackedAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/') : '日時不明'}
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={styles.friendCell}>
+                              <span className={styles.avatar} aria-hidden="true">
+                                {friend.displayName.slice(0, 1)}
+                              </span>
+                              <Link
+                                href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}
+                                className={styles.friendName}
+                                title={friend.displayName}
+                              >
+                                {friend.displayName}
+                              </Link>
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-ink-secondary">
+                            <span className="block truncate whitespace-nowrap" title={accountName}>{accountName}</span>
+                          </td>
+                          <td className="px-3 py-3">
+                            {blocked ? (
+                              <span className={`${styles.stateChip} ${styles.stateBlocked}`}>
+                                <span className={styles.stateDot} aria-hidden="true" />
+                                ブロック
+                              </span>
+                            ) : friend.currentStatus === '友だち中' ? (
+                              <span className={`${styles.stateChip} ${styles.stateFriend}`}>
+                                <span className={styles.stateDot} aria-hidden="true" />
+                                友だち
+                              </span>
+                            ) : (
+                              <span className="text-ink-secondary">{friend.currentStatus ?? '—'}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-ink-secondary">
+                            <span className="block truncate whitespace-nowrap">
+                              {tagName ? `タグ「${tagName}」` : '—'}
+                            </span>
+                            <span className="block truncate whitespace-nowrap text-xs">
+                              {friend.conversion ?? '—'}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-right text-ink-secondary">
+                            {friend.conversion ?? '—'}
+                          </td>
+                          <td className={`px-3 py-3 ${styles.moreCell}`}>
+                            <button
+                              type="button"
+                              className={styles.moreButton}
+                              title={`「${friend.displayName}」の操作`}
+                              aria-label={`「${friend.displayName}」の操作`}
+                              aria-expanded={openFriendMenuId === friend.id}
+                              onClick={() => setOpenFriendMenuId((current) => (current === friend.id ? null : friend.id))}
+                            >
+                              <MoreHorizontal size={16} aria-hidden="true" />
+                            </button>
+                            <ActionMenu
+                              open={openFriendMenuId === friend.id}
+                              onClose={() => setOpenFriendMenuId(null)}
+                              ariaLabel={`「${friend.displayName}」の操作`}
+                              items={[
+                                {
+                                  id: 'view',
+                                  label: '友だちを見る',
+                                  onSelect: () => {
+                                    setOpenFriendMenuId(null)
+                                    router.push(`/friends/detail?id=${encodeURIComponent(friend.id)}`)
+                                  },
+                                },
+                                {
+                                  id: 'chat',
+                                  label: 'チャットを開く',
+                                  onSelect: () => {
+                                    setOpenFriendMenuId(null)
+                                    router.push(`/chats?friend=${encodeURIComponent(friend.id)}`)
+                                  },
+                                },
+                              ]}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className={`${styles.pager} mt-3`}>
+              <span className="tabular-nums">
+                {friendRows.length}人中 {friendRows.length === 0 ? 0 : (friendPage - 1) * friendPageSize + 1}〜
+                {Math.min(friendPage * friendPageSize, friendRows.length)}人
+              </span>
+              <Pagination page={friendPage} pageCount={friendPageCount} onPageChange={setFriendPage} />
+            </div>
+          </section>
+        </div>
+
+        <div data-design="Right" className={styles.bottomGrid}>
+          <section className={styles.linkCard} aria-label="この経路のつながる先">
+            <h2 className={styles.linkCardTitle}>この経路のつながる先</h2>
+            <div className={styles.linkRow}>
+              <span>コンバージョン</span>
+              <span className={styles.linkRowValue}>
+                {funnel ? `${formatNumber(funnel.cv_count)}件` : '—'}
+              </span>
+            </div>
+            <div className={styles.linkRow}>
+              <span>シナリオ配信</span>
+              <span className={styles.linkRowValue}>{scenarioName ?? 'なし'}</span>
+            </div>
+            <div className={styles.linkRow}>
+              <span>マイル</span>
+              <span className={styles.linkRowValue}>なし</span>
+            </div>
+          </section>
+          <section className={styles.linkCard} aria-label="QRコード">
+            <h2 className={styles.linkCardTitle}>QRコード</h2>
+            <div className={styles.linkRow}>
+              <span>大きさ</span>
+              <span className={styles.linkRowValue}>320 × 320</span>
+            </div>
+            <div className={styles.linkRow}>
+              <span>形式</span>
+              <span className={styles.linkRowValue}>PNG</span>
+            </div>
+            <div className={styles.linkRow}>
+              <span>作った日</span>
+              <span className={styles.linkRowValue}>{createdDate}</span>
+            </div>
+            {qrDownloadUrl ? (
+              <a className={styles.qrSave} href={qrDownloadUrl} download={`referral-${route.refCode}.png`}>
+                → QRコードを保存
+              </a>
+            ) : null}
+          </section>
         </div>
       </>}
+      {qrOpen && route && url ? (
+        <ReferralQrModal
+          route={{ refCode: route.refCode, name: route.name, genre: route.genre, isActive: route.isActive }}
+          onClose={() => setQrOpen(false)}
+        />
+      ) : null}
       {editingRoute && route && <EditRouteModal
         route={route}
         pools={pools}
@@ -401,7 +848,7 @@ function InflowLinkDetailPageContent() {
       />}
       {deleteOpen && route && <div className="fixed inset-0 z-70 flex items-center justify-center bg-ink/35 p-4" data-design-node="UIaM7" role="dialog" aria-modal="true" aria-labelledby="inflow-delete-title">
         <div ref={deleteDialogRef} tabIndex={-1} className="w-full overflow-hidden rounded-card bg-canvas shadow-overlay" style={{ maxWidth: 840 }}>
-          <div className="flex items-start gap-3 border-b border-hairline px-6 py-5" style={{ minHeight: 96 }}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-danger-bg text-xl font-bold text-danger">!</span><div className="min-w-0 flex-1"><h2 id="inflow-delete-title" className="text-xl font-bold text-ink">「{route.name}」を削除しますか？</h2><p className="mt-1 text-sm text-ink-faint">このURLは {route.createdAt.slice(5, 10).replace('-', '/')} から使われています。消すと同じURLは開けなくなります。</p></div><button type="button" onClick={() => setDeleteOpen(false)} disabled={deleting} aria-label="閉じる" className="rounded-mini shrink-0 p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div>
+          <div className="flex items-start gap-3 border-b border-hairline px-6 py-5" style={{ minHeight: 96 }}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-pill bg-danger-bg text-xl font-bold text-danger">!</span><div className="min-w-0 flex-1"><h2 id="inflow-delete-title" className="text-xl font-bold text-ink">「{route.name}」を削除しますか？</h2><p className="mt-1 text-sm text-ink-faint">このURLは {route.createdAt.slice(5, 10).replace('-', '/')} から使われています。削除すると同じURLは開けなくなります。</p></div><button type="button" onClick={() => setDeleteOpen(false)} disabled={deleting} aria-label="閉じる" className="rounded-mini shrink-0 p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div>
           <div className="space-y-4 p-6">
             <Notice tone="danger"><h3 className="text-sm font-bold">削除すると、次のことが起きます</h3><div className="mt-3 divide-y divide-danger/15"><div className="flex items-center justify-between gap-4 py-2"><div><p className="text-sm font-bold">貼り付けたURL・QRコード</p><p className="mt-0.5 text-xs">このURLを置いた投稿や広告から開けなくなります。</p></div><span className="rounded-pill bg-canvas px-3 py-1 text-xs font-bold">差し替えが必要</span></div><div className="flex items-center justify-between gap-4 py-2"><div><p className="text-sm font-bold">この経路から来た記録</p><p className="mt-0.5 text-xs">{funnel?.friend_add_count ?? 0}人の流入元と成果は過去の記録として残ります。</p></div><span className="rounded-pill bg-canvas px-3 py-1 text-xs font-bold">記録は残る</span></div><div className="flex items-center justify-between gap-4 py-2"><div><p className="text-sm font-bold">追加時の動き</p><p className="mt-0.5 text-xs">新しい友だちへのタグ付けとシナリオ開始が止まります。</p></div><span className="rounded-pill bg-canvas px-3 py-1 text-xs font-bold">受付を停止</span></div></div></Notice>
             <p className="rounded-control bg-success-bg px-4 py-3 text-xs font-semibold text-success">この経路から来た友だちと、付いたタグ・進んでいるシナリオは消えません。</p>
@@ -417,61 +864,6 @@ function InflowLinkDetailPageContent() {
   )
 }
 
-function MetricCard({ label, value, unit, detail }: { label: string; value: number | null | undefined; unit: string; detail: string }) {
-  return (
-    <div className="rounded-card border border-hairline bg-canvas p-4">
-      <dt className="text-ink-faint text-xs">{label}</dt>
-      <dd className="text-ink text-xl font-bold tabular-nums">
-        {value == null ? '—' : formatNumber(value)}
-        <span className="text-ink-faint ml-0.5 text-xs font-normal">{unit}</span>
-      </dd>
-      <p className="mt-1 text-xs text-ink-faint">{detail}</p>
-    </div>
-  )
-}
-
-function FunnelView({ funnel }: { funnel: EntryRouteFunnel }) {
-  const stages = [
-    { label: 'クリックした', value: funnel.click_count, prev: null as number | null },
-    { label: '友だち追加', value: funnel.friend_add_count, prev: funnel.click_count },
-    // 「いま残っている」の集計口は無い。定数を書かず「—」にする（#514 重大3）。
-    { label: 'いま残っている', value: null as number | null, prev: funnel.friend_add_count },
-    { label: '返事をした・押した', value: funnel.form_submission_count, prev: null as number | null },
-    { label: '成果になった', value: funnel.cv_count, prev: funnel.form_submission_count },
-  ]
-
-  return (
-    <ol className="grid grid-cols-1 gap-2 md:grid-cols-5">
-      {stages.map((s) => {
-        // ひとつ前が0のときは割合を出さない。0で割ると Infinity になるし、
-        // 「0人のうち何%」は意味を持たない。
-        const pct = typeof s.value === 'number' && typeof s.prev === 'number' && s.prev > 0
-          ? ((s.value / s.prev) * 100).toFixed(1)
-          : null
-        return (
-          <li key={s.label} className="relative rounded-control bg-canvas-sunken px-3 py-3">
-            <div>
-              <span className="block text-xs text-ink-secondary">{s.label}</span>
-              <span className="mt-1 block text-xl font-bold tabular-nums text-ink">
-                {/*
-                  **取れていない段は `—`。** 0 と書くと「その段まで誰も
-                  進まなかった」に読める。取れていないだけなら、
-                  施策を止める判断を誤る。
-                */}
-                {typeof s.value === 'number' ? formatNumber(s.value) : '—'}
-                {typeof s.value === 'number' && pct !== null && (
-                  <span className="ml-1.5 text-xs font-normal text-ink-faint">{pct}%</span>
-                )}
-              </span>
-            </div>
-          </li>
-        )
-      })}
-    </ol>
-  )
-}
-
-// useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
 export default function InflowLinkDetailPage() {
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

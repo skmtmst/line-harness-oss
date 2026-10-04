@@ -2888,6 +2888,44 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   return res.json() as Promise<T>
 }
 
+/**
+ * よく開く一覧の取り方（前のデータをすぐ出して裏で取り直す用）。
+ *
+ * - readCachedList：覚えている分だけすぐ返す（無いときは null）。画面はこちらを先に出す。
+ * - refreshCachedList：ETag を付けて取り直す。変わっていなければ 304 で覚えていた分を返す。
+ * 覚えるのは本文と ETag だけ。秘密値・個人情報を鍵や値に混ぜない（path をそのまま鍵にする）。
+ */
+const listCache = new Map<string, { etag: string | null; body: unknown }>()
+
+export function readCachedList<T>(path: string): T | null {
+  return (listCache.get(path)?.body ?? null) as T | null
+}
+
+export async function refreshCachedList<T>(path: string): Promise<T> {
+  const cached = listCache.get(path)
+  const headers: Record<string, string> = { ...adminSessionHeaders() }
+  if (cached?.etag) headers['If-None-Match'] = cached.etag
+  const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
+    credentials: 'include',
+    headers,
+  })
+  if (res.status === 304 && cached) return cached.body as T
+  if (!res.ok) {
+    const raw = await res.text()
+    throw new ApiError(
+      res.status,
+      extractApiErrorMessage(raw, res.status),
+      extractApiErrorCode(raw),
+      undefined,
+      extractApiErrorTrackingId(raw),
+      parseRetryAfterSeconds(res.headers.get('Retry-After')),
+    )
+  }
+  const body = (await res.json()) as T
+  listCache.set(path, { etag: res.headers.get('ETag'), body })
+  return body
+}
+
 async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
@@ -3787,7 +3825,17 @@ export type ListStats = {
     completed: number
     sentThisWeek: number
   }
-  reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
+  reminders: { total: number; active: number; waiting: number; sentThisMonth: number; failed: number }
+  /** ★V8 回答フォーム一覧の数の帯。古いWorkerの応答には無いので、画面は欠けたら「—」を出す。 */
+  forms?: {
+    total: number
+    published: number
+    draft: number
+    monthlySubmits: number
+    prevMonthSubmits: number
+    monthlyCompletionRate: number | null
+    pendingPostActions: number
+  }
 }
 
 /**
@@ -3882,6 +3930,10 @@ export type ReminderDeliveryRunsResponse = {
     errors: number
     targetCount: number
     nextScheduledAt: string | null
+    /** 日本時間の当月に送信済みの件数。 */
+    sentThisMonth: number
+    /** 今後7日以内（期限切れの未送分を含む）に送る予定の件数。 */
+    scheduledNext7Days: number
   }
   steps: Array<{
     id: string
@@ -3991,7 +4043,15 @@ export type RichMenuGroupListItem = {
   targetingEnabled: boolean
   folderId: string | null
   displayOrder: number
+  /** トークを開いたときメニューを出した状態にするか（公開する形に含まれる）。 */
+  defaultOpen: boolean
   thumbnailR2Key: string | null
+  /** ★V8 一覧の「大・6面・切替タブ N」。ページの束の数。 */
+  pageCount?: number
+  /** 代表ページ（既定、なければ先頭）の面の数。 */
+  defaultPageAreaCount?: number
+  /** ★V8 一覧の「対象 N人」。条件で出し分ける行だけ、当てはまる友だちの数。 */
+  audienceCount?: number | null
   monthlyStats?: {
     from: string
     to: string
@@ -5057,6 +5117,8 @@ export type NenPetProfile = {
   birthday: string | null
   ownerName: string | null
   lineUserId: string
+  /** M511: 更新の版照合に使う。 */
+  updatedAt: string
 }
 
 export type NenUnavailableMetric = {
@@ -7452,6 +7514,19 @@ export const api = {
         }`,
         { method: 'DELETE' },
       ),
+    /*
+     * B 元に戻す: 保管の取り消し。戻した直後は受付停止のまま。
+     * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+     */
+    unarchive: (id: string, accountId: string, expectedRevision: number) =>
+      fetchApi<ApiResponse<{
+        status: 'active'
+        revision: number
+        isActive: boolean
+      }>>(`/api/forms/${id}/unarchive?account_id=${encodeURIComponent(accountId)}`, {
+        method: 'POST',
+        body: JSON.stringify({ expectedRevision }),
+      }),
   },
   /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
   siteTracking: {
@@ -8309,6 +8384,11 @@ export const api = {
       limit?: number
       cursor?: string | number
       status?: string
+      /**
+       * ★V8: 絞り込みの札は10の状態（displayStatus）で絞る。
+       * カンマ区切りで複数受ける（例 'failed,partial_failed' = エラー）。
+       */
+      displayStatus?: string
       folderId?: string
       /** 'newest' (既定) または 'oldest'。一覧の並び順選択と連動する。 */
       sort?: 'newest' | 'oldest'
@@ -8318,11 +8398,14 @@ export const api = {
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.cursor !== undefined && params.cursor !== '') query.set('cursor', String(params.cursor))
       if (params?.status) query.set('status', params.status)
+      if (params?.displayStatus) query.set('displayStatus', params.displayStatus)
       if (params?.folderId) query.set('folderId', params.folderId)
       if (params?.sort && params.sort !== 'newest') query.set('sort', params.sort)
       const qs = query.toString()
       return fetchApi<ApiResponse<ApiBroadcast[]> & {
         kpis?: BroadcastListKpis
+        /** ★V8: 札ごとの件数（フォルダは効く、状態の札は効かせない集団）。 */
+        statusCounts?: Record<string, number>
         pagination?: { total: number; limit: number; cursor: number; nextCursor: string | null }
       }>(`/api/broadcasts${qs ? `?${qs}` : ''}`)
     },
@@ -8831,8 +8914,20 @@ export const api = {
       list: () => fetchApi<ApiResponse<OpsAnnouncement[]> & { linked: { linked: number; total: number }; noticeLineConfigured: boolean }>('/api/ops/announcements'),
       preview: (input: { audienceKind: OpsAnnouncementAudience; audiencePlans: string[]; audienceTenantIds: string[] }) =>
         fetchApi<ApiResponse<OpsAudiencePreview>>('/api/ops/announcements/preview', { method: 'POST', body: JSON.stringify(input) }),
-      create: (input: OpsAnnouncementInput) => fetchApi<ApiResponse<OpsAnnouncement>>('/api/ops/announcements', { method: 'POST', body: JSON.stringify(input) }),
-      update: (id: string, input: OpsAnnouncementInput) => fetchApi<ApiResponse<OpsAnnouncement>>(`/api/ops/announcements/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input) }),
+      /**
+       * M512: idempotencyKey（UUID）を渡すと二重押しでも1件だけ作り、再送は
+       * 保存済みを返す。省略時は従来どおり作る。
+       */
+      create: (input: OpsAnnouncementInput, idempotencyKey?: string) => fetchApi<ApiResponse<OpsAnnouncement>>('/api/ops/announcements', {
+        method: 'POST',
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+        body: JSON.stringify(input),
+      }),
+      /** M513: expectedUpdatedAt を渡すと、古い画面からの保存は最新つきで409になる。省略時は従来どおり通す。 */
+      update: (id: string, input: OpsAnnouncementInput, expectedUpdatedAt?: string) => fetchApi<ApiResponse<OpsAnnouncement>>(`/api/ops/announcements/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(expectedUpdatedAt === undefined ? input : { ...input, expectedUpdatedAt }),
+      }),
       remove: (id: string) => fetchApi<ApiResponse<null>>(`/api/ops/announcements/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     },
     noticeLineAccount: () => fetchApi<ApiResponse<OpsNoticeLineAccount>>('/api/ops/notice-line-account'),
@@ -10198,6 +10293,21 @@ export const api = {
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(body),
       }),
+    /*
+     * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。再開は update で行う。
+     * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+     */
+    restore: (id: string) =>
+      fetchApi<ApiResponse<{
+        id: string;
+        isActive: boolean;
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
+      }>>(`/api/auto-replies/${id}/restore`, {
+        method: 'POST',
+      }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?accountId=' + encodeURIComponent(params.accountId) : ''
       return fetchApi<ApiResponse<Array<{
@@ -11083,6 +11193,15 @@ export const api = {
         `/api/friend-add-rules/${encodeURIComponent(ruleId)}?account_id=${encodeURIComponent(accountId)}`,
         { method: 'DELETE' },
       ),
+    /**
+     * 一覧のつまみで動かした順を優先順位としてまとめて書く（★V8 MRhef）。
+     * 受け皿を除く全件を順に渡す。件数が違えば 409（読み直し）。
+     */
+    reorder: (accountId: string, friendKind: FriendAddRuleKind, ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>('/api/friend-add-rules/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ accountId, friendKind, ids }),
+      }),
   },
   nenCampaigns: {
     /** 期間は日数か、★V6 37-6 の「今月・先月」のための from/to（ISO 8601）。 */
@@ -11130,8 +11249,14 @@ export const api = {
       `/api/nen-campaigns/settings?lineAccountId=${encodeURIComponent(accountId)}`,
     ),
     updateSetting: (accountId: string, campaignKey: string, data: Pick<NenCampaignSetting,
-      'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl' | 'dedupWindowDays' | 'excludeFormRespondents' | 'afterActions'>) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
+      'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl' | 'dedupWindowDays' | 'excludeFormRespondents' | 'afterActions'> & {
+      /**
+       * M507: 開いたときに見た版。違う版からの保存は最新の内容つきで409に
+       * なる。省略時は従来どおり通す。
+       */
+      expectedUpdatedAt?: string
+    }) =>
+      fetchApi<{ success: boolean; data?: { updatedAt: string } }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),
     /** 一覧の停止・再開だけを切り替える。本文の長さに関わらず必ず実行できる（#659）。 */
@@ -11203,19 +11328,29 @@ export const api = {
       fetchApi<ApiResponse<{ queued: number }>>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/deliver`, {
         method: 'POST', body: JSON.stringify(data),
       }),
-    updateColumnMessage: (accountId: string, id: string, introText: string) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/message?lineAccountId=${encodeURIComponent(accountId)}`, {
-        method: 'PUT', body: JSON.stringify({ introText }),
+    /** M507: expectedUpdatedAt を渡すと、古い画面からの保存は最新の紹介文つきで409になる。省略時は従来どおり通す。成功時は新しい版を返す。 */
+    updateColumnMessage: (accountId: string, id: string, introText: string, expectedUpdatedAt?: string) =>
+      fetchApi<{ success: boolean; data?: { updatedAt: string } }>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/message?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'PUT', body: JSON.stringify(expectedUpdatedAt === undefined ? { introText } : { introText, expectedUpdatedAt }),
       }),
     pets: (accountId: string, search?: string) => {
       const query = new URLSearchParams({ lineAccountId: accountId })
       if (search) query.set('search', search)
       return fetchApi<ApiResponse<NenPetProfile[]>>(`/api/nen-campaigns/pets?${query}`)
     },
-    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }) =>
-      fetchApi<ApiResponse<{ id: string }>>(`/api/nen-campaigns/pets?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: JSON.stringify(data) }),
-    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    /**
+     * M510: idempotencyKey（UUID）を渡すと二重押しでも1頭だけ作り、再送は
+     * 保存済みを返す。省略時は従来どおり作る。
+     */
+    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null }, idempotencyKey?: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(`/api/nen-campaigns/pets?lineAccountId=${encodeURIComponent(accountId)}`, {
+        method: 'POST',
+        ...(idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {}),
+        body: JSON.stringify(data),
+      }),
+    /** M511: expectedUpdatedAt を渡すと、古い画面からの保存は最新の内容つきで409になる。省略時は従来どおり通す。成功時は新しい版を返す。 */
+    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string; breed?: string; weightKg?: number | null; expectedUpdatedAt?: string }) =>
+      fetchApi<{ success: boolean; data?: { updatedAt: string } }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
     deletePet: (accountId: string, id: string) => fetchApi<{ success: boolean }>(
       `/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`,
       { method: 'DELETE' },
@@ -11230,7 +11365,8 @@ export const api = {
   nenMembers: {
     overview: () => fetchApi<ApiResponse<{ pets: number; healthLogs: number; activeCare: number; pendingPhotos: number; members: number; consultations: number }>>('/api/nen-members/overview'),
     careFlags: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/care-flags'),
-    updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    /** M509: expectedUpdatedAt を渡すと、古い画面からの保存は最新の状態つきで409になる。省略時は従来どおり通す。 */
+    updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean; expectedUpdatedAt?: string }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
     photos: (accountId: string) => fetchApi<ApiResponse<Array<Record<string, unknown>>>>(`/api/nen-members/photos?accountId=${encodeURIComponent(accountId)}`),
     photoReviewMetrics: (accountId: string) => fetchApi<ApiResponse<PhotoReviewMetrics>>(
       `/api/nen-members/photos/review-metrics?accountId=${encodeURIComponent(accountId)}`,
@@ -11714,6 +11850,14 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/reminders/${id}`, { method: 'DELETE' }),
+    /*
+     * B 元に戻す: 削除の取り消し（定義のみ。登録・配信予定は戻さない）。
+     * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+     */
+    restore: (id: string) =>
+      fetchApi<ApiResponse<Reminder>>(`/api/reminders/${id}/restore`, {
+        method: 'POST',
+      }),
     addStep: (
       id: string,
       data: {
@@ -12140,6 +12284,15 @@ export const api = {
           `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
         ),
+      /*
+       * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。
+       * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+       */
+      restore: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<IncomingWebhookDetail>>(
+          `/api/webhooks/incoming/${id}/restore?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST' },
+        ),
       /* 人が見つからなかった届物の箱(#939 N-367)。R401: 50件超えは limit/offset で辿る。 */
       unmatched: (
         id: string,
@@ -12193,6 +12346,15 @@ export const api = {
         fetchApi<ApiResponse<null>>(
           `/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
+        ),
+      /*
+       * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。
+       * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+       */
+      restore: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<OutgoingWebhook>>(
+          `/api/webhooks/outgoing/${id}/restore?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST' },
         ),
       test: (id: string, lineAccountId: string) =>
         fetchApi<ApiResponse<{ delivered: boolean; responseStatus: number | null }>>(
@@ -12606,6 +12768,8 @@ export const api = {
         targetingPriority: number;
         targetingEnabled: boolean;
         folderId: string | null;
+        /** トークを開いたときメニューを出した状態にするか（公開する形に含まれる）。 */
+        defaultOpen: boolean;
         /** M951: 保存時に送り返す版。古い版での保存は 409 で止まる。 */
         version: number;
         createdAt: string;
@@ -12677,6 +12841,8 @@ export const api = {
       targetingEnabled?: boolean;
       targetingCondition?: string | null;
       targetingPriority?: number;
+      /** V8: トークを開いたときメニューを出した状態にするか。 */
+      defaultOpen?: boolean;
       /** N-164: 登録メディアを既定ページの画像として使う。 */
       imageMediaId?: string;
       pages: Array<{
@@ -12712,6 +12878,8 @@ export const api = {
       folderId?: string | null;
       /** 160: 自分で決める並び順。 */
       displayOrder?: number;
+      /** V8: トークを開いたときメニューを出した状態にするか。 */
+      defaultOpen?: boolean;
       pages?: Array<{
         id?: string;
         name: string;
@@ -14120,7 +14288,38 @@ function withAccount(path: string, accountId: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}account_id=${encodeURIComponent(accountId)}`;
 }
 
+/** 前払いのみの印を付け外しした記録（理由は店だけが見る）。 */
+export interface BookingNoshowFlagEvent {
+  action: 'manual_on' | 'manual_off';
+  reason: string | null;
+  staffId: string | null;
+  staffName: string | null;
+  at: string;
+}
+
+/** 友だちの無断キャンセルから決めた前払いのみの判定。 */
+export interface BookingPrepayDecision {
+  noshowCount: number;
+  threshold: number;
+  enabled: boolean;
+  windowMonths: number;
+  noPaymentMode: 'notice' | 'notice_call';
+  prepayOnly: boolean;
+  manual: boolean;
+  recentDates: string[];
+  lastEvent: BookingNoshowFlagEvent | null;
+}
+
 export const bookingApi = {
+  getFriendNoshow: (accountId: string, friendId: string) =>
+    fetchApi<{ success: true; data: BookingPrepayDecision }>(
+      withAccount(`/api/booking/admin/friends/${encodeURIComponent(friendId)}/noshow`, accountId),
+    ),
+  setFriendPrepay: (accountId: string, friendId: string, body: { mode: 'manual_on' | 'manual_off'; reason?: string }) =>
+    fetchApi<{ success: true; data: BookingPrepayDecision }>(
+      withAccount(`/api/booking/admin/friends/${encodeURIComponent(friendId)}/prepay`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   previewReminders: (accountId: string, startsAt: string) => {
     const params = new URLSearchParams({ account_id: accountId, starts_at: startsAt });
     return fetchApi<{ reminders: Array<{ kind: 'day_before' | 'hours_before'; scheduledAt: string }> }>(
@@ -14192,6 +14391,11 @@ export const bookingApi = {
     fetchApi<{ success: true; data: { id: string } }>(
       withAccount(`/api/booking/admin/resources/${id}`, accountId),
       { method: 'DELETE', body: JSON.stringify({ expectedVersion }) },
+    ),
+  /** 例外日の一覧（store/staff/resource すべて）。 */
+  listExceptions: (accountId: string) =>
+    fetchApi<{ success: true; data: { items: BookingException[] } }>(
+      withAccount('/api/booking/admin/exceptions', accountId),
     ),
   createException: (
     accountId: string,

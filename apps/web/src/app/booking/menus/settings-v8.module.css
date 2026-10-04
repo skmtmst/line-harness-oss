@@ -1,0 +1,1611 @@
+/*
+ * ★V8 予約設定（owaS3・yRPxl・KRgTQ・x1OZS6・VLEaj・xCoDe・P6EdLW・VFxWU）。
+ *
+ * 白い板1枚：頭（戻る・題・説明・タブ）→ 中身（左＝タブの中身、右＝LIFFの見本）→
+ * 下の帯（保存）。折り畳みの基準は板の幅（container）で、画面幅ではない。
+ * 板が狭い（≒1152画面）と右欄はスマホを畳んで操作ボタンだけにする。
+ *
+ * 値は全部トークン（直書きを数える試験がある）。板だけの色は
+ * globals.css の [data-theme="v8"] にある --v8-* を読む。
+ */
+
+/* 白い板自体は app-shell が持つ（板・余白・角16）。ここでは中身だけ。 */
+.shell {
+  display: flex;
+  flex-direction: column;
+  /* 板の幅で折り畳みを決める（画面幅ではない）。 */
+  container-type: inline-size;
+  /* 頭の下線・右欄の区切り・下の帯を板の端まで届かせるため、
+     .content の余白（20px 24px 28px）を打ち消して中で持ち直す。 */
+  margin: -20px -24px -28px;
+}
+
+/* 板の頭：戻る・題・説明・タブ。下の線だけ。 */
+.boardHead {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 24px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* タブ行は頭の下に張り付く（下線が板の頭の線に重なる）。 */
+.boardHead :global([role='tablist']) {
+  margin-bottom: -1px;
+}
+
+/* 中身：左＝タブの中身、右＝お客さまの画面の見本。 */
+.body {
+  display: flex;
+  align-items: stretch;
+}
+
+.main {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 24px 28px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 14px;
+  width: 380px;
+  padding: 24px;
+  border-left: 1px solid var(--color-hairline);
+}
+
+.sideActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 板 VFxWU（1152）：畳んだスマホの代わりの「見え方」ボタン。
+   スマホが見えている広い板では出さない。 */
+.sidePhoneButton {
+  display: flex;
+  flex-direction: column;
+}
+
+.sideAction {
+  display: flex;
+}
+
+.sideTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* 板が狭いとき（≒画面1152）：右欄は細くしてスマホを畳み、操作だけ残す。 */
+@container (max-width: 1080px) {
+  .side {
+    width: 280px;
+    padding: 16px;
+  }
+
+  /* 板 P6EdLW（1152）：メニューの表は「担当」「30日」を畳み、
+     メニュー・時間・金額・状態だけにする。 */
+  .colStaff,
+  .colCount {
+    display: none;
+  }
+
+  .sidePhone {
+    display: none;
+  }
+
+  .sideTitle {
+    display: none;
+  }
+}
+
+@container (min-width: 1081px) {
+  .sideLineLink {
+    display: none;
+  }
+
+  .sidePhoneButton {
+    display: none;
+  }
+}
+
+/* ===== 帯・段 ===== */
+
+/* 青い案内の帯（ⓘ）。 */
+.hintBand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.hintBand svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* 注意の帯（黄）。 */
+.warnBand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.warnBand svg {
+  flex-shrink: 0;
+  color: var(--color-warning);
+}
+
+/* 白い板の中の段（枠付き・角12）。 */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.sectionHead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.sectionDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 段の頭に右はしのボタンを付けるとき（設備の「設備を追加する」）。 */
+.sectionHeadRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ===== 道具の段（検索・絞り・作る） ===== */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+.searchBox {
+  width: 220px;
+  min-width: 160px;
+}
+
+/* ===== メニュー表 ===== */
+
+.tableHead,
+.menuRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 8px;
+}
+
+.tableHead {
+  padding: 0 8px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tableHead > span {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.menuRow {
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.menuRow:last-child {
+  border-bottom: 0;
+}
+
+.thText {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 列幅：1列目（名）は伸び縮み、ほかは内容幅に合わせる。 */
+.colOrder {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 44px;
+  flex-shrink: 0;
+}
+
+.grip {
+  color: var(--color-ink-faint);
+  cursor: grab;
+}
+
+.grip:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.orderNum {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.colName {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.nameLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.menuName {
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.menuName:hover {
+  text-decoration: underline;
+}
+
+/* 分類の札。 */
+.tagChip {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-mini);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.menuDesc {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.colTime {
+  width: 56px;
+  flex-shrink: 0;
+}
+
+.colPrice {
+  width: 64px;
+  flex-shrink: 0;
+}
+
+.colStaff {
+  width: 92px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.colCount {
+  width: 42px;
+  flex-shrink: 0;
+}
+
+.colStatus {
+  width: 96px;
+  flex-shrink: 0;
+}
+
+.colMenu {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.cellText {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellSub {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.cellNum {
+  color: var(--color-ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cellWarn {
+  color: var(--color-warning);
+  font-size: 12px;
+}
+
+/* 状態の札（公開中/止めている/受付中）。 */
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statePillOn {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.statePillOff {
+  background: var(--color-v8-pill-off);
+  color: var(--color-ink-secondary);
+}
+
+.stateDot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: currentcolor;
+}
+
+/* 行末の「…」。28角・細い枠。 */
+.rowMenuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.rowMenuButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.rowMenuButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ===== 状態（空・0件・読込中・失敗） ===== */
+
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+.stateActions {
+  margin-top: 8px;
+}
+
+/* 読み込み中の骨格。 */
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 8px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.skeletonRow:last-child {
+  border-bottom: 0;
+}
+
+.skeletonDot {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.skeletonBar {
+  height: 12px;
+  flex: 1;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+}
+
+.skeletonBarShort {
+  width: 96px;
+  flex: none;
+}
+
+/* ===== 下の帯（保存） ===== */
+
+.saveBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  box-shadow: var(--v8-savebar-shadow);
+}
+
+.saveBarStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  margin-right: auto;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.saveBarStatusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-warning);
+}
+
+/* ===== 受付枠（曜日の行） ===== */
+
+/* 見本：左に「トグル＋曜日」、右に縦に並ぶ時間帯の行（yRPxl）。 */
+.dayRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.dayRow:last-of-type {
+  border-bottom: 0;
+}
+
+.dayName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 64px;
+  flex-shrink: 0;
+  padding: 6px 0;
+}
+
+.dayLabel {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dayBody {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dayOff {
+  padding: 8px 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.intervalLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.intervalTilde {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.sameTimeLabel {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* TimeField は中に自分の欄（枠・時計・消す）を持つ。外には幅だけを当てて、
+   内側の欄を見本の大きさ（高さ32・12px）へ揃える。 */
+.timeInput {
+  width: 84px;
+  flex-shrink: 0;
+}
+
+.timeInput > button:first-of-type {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+/* 見本の箱は「9:00」だけ。時計アイコンと中の消すボタンは隠す
+   （時間帯の消去は行はしの×でできる）。 */
+.timeInput > button:first-of-type :global(svg) {
+  display: none;
+}
+
+.timeInput > button:not(:first-of-type) {
+  display: none;
+}
+
+.numInput {
+  width: 56px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.numInput:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.numInput:disabled {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.iconRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.iconRemove:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+  color: var(--color-danger);
+}
+
+.iconRemove:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* 見本：「＋ 時間帯を足す」は文字ボタン（36px・角10・灰の文字）。 */
+.addLine {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addLine:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.addLine:disabled {
+  cursor: not-allowed;
+  color: var(--color-ink-faint);
+}
+
+/* ===== 休業日（月の暦） ===== */
+
+.calNav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calNavButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.calNavButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.calMonth {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.calAdd {
+  margin-left: auto;
+}
+
+.calGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.calWeekday {
+  padding: 4px 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  text-align: center;
+}
+
+.calWeekdaySun {
+  color: var(--color-status-danger);
+}
+
+.calWeekdaySat {
+  color: var(--color-action);
+}
+
+.calDay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+}
+
+.calDay:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.calDayOutside {
+  color: var(--color-ink-faint);
+  opacity: 0.5;
+}
+
+.calDayClosed {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
+
+.calDayToday {
+  box-shadow: var(--shadow-segment-ring);
+  font-weight: 700;
+}
+
+.calMark {
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.calMarkRegular {
+  color: var(--color-status-danger);
+}
+
+.calMarkExtra {
+  color: var(--color-status-danger);
+}
+
+/* 臨時休業の一覧行。 */
+.exceptionRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.exceptionRow:last-child {
+  border-bottom: 0;
+}
+
+.exceptionDates {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.exceptionReason {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== ルール ===== */
+
+.ruleFields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fieldLabelOptional {
+  color: var(--color-ink-faint);
+  font-weight: 400;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.toggleRow:last-child {
+  border-bottom: 0;
+}
+
+.toggleRowLabel {
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.toggleRowLabel b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* お知らせの行（左：いつ、右：送るもの）。 */
+.noticeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.noticeRow:last-child {
+  border-bottom: 0;
+}
+
+.noticeWhen {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.noticeWhat {
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ===== 担当スタッフ ===== */
+
+.staffHeadRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.staffRow > span {
+  min-width: 0;
+}
+
+.staffHeadTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.staffHeadActions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.staffRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.staffRow:last-child {
+  border-bottom: 0;
+}
+
+.staffName {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.staffNameLink {
+  width: fit-content;
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staffNameLink:hover {
+  text-decoration: underline;
+}
+
+.staffRole {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+.staffColMenus {
+  width: 70px;
+  flex-shrink: 0;
+}
+
+.staffColNoAssign {
+  width: 48px;
+  flex-shrink: 0;
+}
+
+.staffColWork {
+  width: 96px;
+  flex-shrink: 0;
+}
+
+.staffColLink {
+  width: 150px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.staffColStatus {
+  width: 64px;
+  flex-shrink: 0;
+}
+
+.staffColMenu {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.staffCellMain {
+  display: block;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.staffCellSub {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* 見本：「つながっている」は薄緑の札＋緑の点。つないでいないは灰。 */
+.linkState {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-v8-pill-off);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.linkStateDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-faint);
+}
+
+.linkStateOn {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.linkStateOn .linkStateDot {
+  background: var(--color-success);
+}
+
+.noteText {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ===== 設備 ===== */
+
+.equipHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.equipRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.equipRow:last-child {
+  border-bottom: 0;
+}
+
+.equipName {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.equipType {
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.equipCap {
+  width: 88px;
+  flex-shrink: 0;
+}
+
+/* ===== 空きを確かめる ===== */
+
+.checkGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 見本：「確かめる」ボタンと結果を横に並べる。 */
+.checkAction {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.checkResult {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkOk {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.checkOk::before {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-success);
+  content: '';
+}
+
+.checkNg {
+  color: var(--color-status-warn-deep);
+  font-size: 12px;
+}
+
+/* ===== LIFF の見本（右のスマホ） ===== */
+
+.phone {
+  display: flex;
+  flex-direction: column;
+  width: 330px;
+  height: 714px;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 8px solid var(--color-ink);
+  border-radius: var(--v8-liff-phone-radius);
+  background: var(--color-canvas);
+}
+
+.phoneStatusBar {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 24px;
+}
+
+.phoneTime {
+  color: var(--color-ink);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneStatusIcons {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: var(--color-ink);
+}
+
+.phoneLiffBar {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--v8-liff-line);
+}
+
+/* 左の×・右の•••（LIFF の共通バー）。 */
+.phoneLiffSide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  flex-shrink: 0;
+  color: var(--color-ink);
+}
+
+.phoneLiffTitle {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  text-align: center;
+}
+
+.phoneLiffTitleMain {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.phoneLiffTitleShop {
+  color: var(--color-ink-faint);
+  font-size: 9px;
+  line-height: 1.3;
+}
+
+.phoneSteps {
+  display: flex;
+  gap: 4px;
+  padding: 12px 16px 4px;
+}
+
+.phoneStep {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.phoneStepLine {
+  height: 3px;
+  border-radius: var(--v8-liff-step-radius);
+  background: var(--v8-liff-line);
+}
+
+.phoneStepDone .phoneStepLine,
+.phoneStepNow .phoneStepLine {
+  background: var(--v8-liff-primary);
+}
+
+.phoneStepLabel {
+  color: var(--v8-liff-idle);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.phoneStepNow .phoneStepLabel {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.phoneBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  padding: 12px 16px;
+  overflow-y: auto;
+}
+
+.phoneTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.phoneSub {
+  margin: -8px 0 0;
+  color: var(--v8-liff-sub);
+  font-size: 11.5px;
+}
+
+/* メニューの分類札の帯。 */
+.phoneCats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.phoneCat {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--v8-liff-chip);
+  color: var(--v8-liff-sub);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.phoneCatNow {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+/* 選ぶカード（メニュー・担当）。 */
+.phoneCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--v8-liff-line);
+  border-radius: var(--v8-liff-card-radius);
+  background: var(--color-canvas);
+  text-align: left;
+}
+
+.phoneCardPicked {
+  border-color: var(--v8-liff-primary);
+  background: var(--v8-liff-primary-soft);
+  outline: 1px solid var(--v8-liff-primary);
+  outline-offset: 0;
+}
+
+.phoneThumb {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: var(--radius-control);
+  background: var(--v8-liff-thumb);
+  color: var(--v8-liff-thumb-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.phoneCardBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.phoneCardName {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phoneCardDesc {
+  overflow: hidden;
+  color: var(--v8-liff-sub);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phoneCardMeta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.phoneCardMin {
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneCardPrice {
+  color: var(--v8-liff-primary);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 担当の顔の置き場（正円・頭文字）。指名なしは絵文字ではなく人型の印。 */
+.phoneAvatar {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--radius-control);
+  background: var(--v8-liff-thumb);
+  color: var(--v8-liff-thumb-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.phoneAvatarPlain {
+  background: var(--v8-liff-chip);
+  color: var(--v8-liff-sub);
+}
+
+.phoneCardCheck {
+  flex-shrink: 0;
+  color: var(--v8-liff-primary);
+}
+
+/* 週の日付の札。両はしに週送りの ‹ › 。 */
+.phoneDays {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.phoneDayNav {
+  flex-shrink: 0;
+  color: var(--v8-liff-sub);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.phoneDay {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border: 1px solid var(--v8-liff-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  min-width: 0;
+}
+
+.phoneDayNow {
+  border-color: var(--v8-liff-primary);
+  background: var(--v8-liff-primary-soft);
+  outline: 1px solid var(--v8-liff-primary);
+  outline-offset: 0;
+}
+
+.phoneDayOff {
+  border-color: var(--v8-liff-line);
+  background: var(--v8-liff-off);
+}
+
+.phoneDayDow {
+  color: var(--color-ink-faint);
+  font-size: 10px;
+}
+
+.phoneDayNum {
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneDayState {
+  color: var(--v8-liff-primary);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.phoneDayOff .phoneDayState {
+  color: var(--color-ink-faint);
+}
+
+/* 時刻の札。 */
+.phoneSlots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.phoneSlot {
+  padding: 9px 0;
+  border: 1px solid var(--v8-liff-slot-line);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneSlotNow {
+  border-color: var(--v8-liff-primary);
+  background: var(--v8-liff-primary);
+  color: var(--color-canvas);
+}
+
+.phoneSlotOff {
+  border-color: var(--v8-liff-off);
+  background: var(--v8-liff-off);
+  color: var(--v8-liff-idle);
+}
+
+.phoneSectionLabel {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 下の帯（固定）。 */
+.phoneFoot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 30px;
+  border-top: 1px solid var(--v8-liff-line);
+}
+
+.phoneFootPick {
+  color: var(--v8-liff-primary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneCta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--v8-liff-primary);
+  color: var(--color-canvas);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.phoneCtaOff {
+  background: var(--v8-liff-chip);
+  color: var(--v8-liff-idle);
+}
+
+.phoneBack {
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* 週で見る／カレンダーの切替。 */
+.phoneViewSwitch {
+  display: flex;
+  border-radius: var(--radius-control);
+  background: var(--v8-liff-chip);
+  padding: 3px;
+}
+
+.phoneViewItem {
+  flex: 1;
+  padding: 6px 0;
+  border: 0;
+  border-radius: var(--radius-segment);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.phoneViewItemNow {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-segment-thumb);
+}

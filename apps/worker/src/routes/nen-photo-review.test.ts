@@ -55,6 +55,8 @@ function harness(options: {
   settledState?: Record<string, unknown> | null;
   notificationRetryKey?: string | null;
   previousDecision?: Record<string, unknown> | null;
+  /** ほかの担当者が先に決めた写真にする（版が進み pending でない）。 */
+  decidedPhoto?: boolean;
   resubmitInvite?: number;
   savedRotation?: number;
   rotationKey?: string | null;
@@ -138,7 +140,9 @@ function harness(options: {
           if (query.includes('FROM nen_photo_submissions ps') && query.includes('JOIN line_accounts')) {
             if (entry.bindings[1] !== photoAccount || entry.bindings[2] !== photoAccount) return null;
             return {
-              id: 'photo-1', friend_id: 'friend-1', status: 'pending', review_version: 1,
+              id: 'photo-1', friend_id: 'friend-1',
+              status: options.decidedPhoto ? 'adopted' : 'pending',
+              review_version: options.decidedPhoto ? 2 : 1,
               customer_id: options.customerId ?? null,
               line_user_id: 'U1', line_account_id: photoAccount, is_following: 1,
               channel_access_token: 'token', channel_access_token_encrypted: null,
@@ -469,6 +473,11 @@ describe('NEN photo review', () => {
     expect(batches).toHaveLength(0);
   });
 
+  /*
+   * 失敗の理由は、ほかの送信失敗と同じ安全な文言にそろえる（2026-10-02）。
+   * ここだけ生のエラー本文を記録していたため、管理画面の失敗一覧に LINE 側の
+   * 応答本文がそのまま出ていた。原因を追うための生の本文はログにだけ残す。
+   */
   it('keeps the review saved and records a failed LINE notification', async () => {
     mocks.push.mockRejectedValueOnce(new Error('LINE unavailable'));
     const { app, batches, runs } = harness();
@@ -479,7 +488,8 @@ describe('NEN photo review', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ data: { notificationStatus: 'failed' } });
     expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      decisionId: expect.any(String), generation: 1, status: 'failed', error: 'LINE unavailable',
+      decisionId: expect.any(String), generation: 1, status: 'failed',
+      error: '送信に失敗しました。設定とLINE連携を確認してください。',
     }));
     const mirror = runs.find((entry) => entry.query.includes('review_notification_status'));
     expect(mirror?.bindings[0]).toBe('failed');
@@ -487,12 +497,27 @@ describe('NEN photo review', () => {
   });
 
   it('returns a conflict when another reviewer decided first', async () => {
-    const { app } = harness({ duplicate: true });
+    const { app } = harness({ decidedPhoto: true });
     const response = await app.request('/api/nen-members/photos/photo-1/review', {
       method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'reject-conflict-1' },
       body: JSON.stringify({ accountId: 'account-a', status: 'rejected', expectedVersion: 1, reasonCode: 'duplicate' }),
     });
     expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'VERSION_CONFLICT' });
+  });
+
+  it('returns 500 instead of a version conflict when saving fails (M508)', async () => {
+    // 保存のbatchが制約違反で落ちても、誰も決めていない・何も保存されて
+    // いないときは「ほかの担当者」に化けず保存失敗として返す。
+    const { app } = harness({ duplicate: true });
+    const response = await app.request('/api/nen-members/photos/photo-1/review', {
+      method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'reject-midfail-1' },
+      body: JSON.stringify({ accountId: 'account-a', status: 'rejected', expectedVersion: 1, reasonCode: 'quality' }),
+    });
+    expect(response.status).toBe(500);
+    const body = await response.json() as { code: string; error: string };
+    expect(body.code).toBe('REVIEW_SAVE_FAILED');
+    expect(body.error).not.toContain('ほかの担当者');
   });
 
   it('commits approval and a single reward outbox entry before external EC processing', async () => {

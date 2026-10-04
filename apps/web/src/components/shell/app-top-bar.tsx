@@ -10,6 +10,8 @@ import { MENU_SECTIONS } from '@/lib/menu'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useManualHref } from '@/lib/use-manual-href'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { applyAdminTheme } from '@/components/theme-preview-switch'
 
 /**
  * 共通トップバーを、いまの画面の値へつなぐ層。
@@ -47,7 +49,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function AppTopBar() {
   const pathname = usePathname() ?? '/'
-  const { title, } = usePageChrome()
+  const { title, crumbs } = usePageChrome()
   const router = useRouter()
   const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
   const [staffName, setStaffName] = useState('')
@@ -123,6 +125,12 @@ export default function AppTopBar() {
   const logout = () => logoutAndGoToLogin()
 
   /*
+   * G6 移し替え：V8 のときだけ「前の見た目に戻す」を出す。
+   * 効き方は設定画面の切り替えと同じ（このブラウザに残して覚える）。
+   */
+  const revertTheme = useAdminTheme() === 'v8' ? () => applyAdminTheme('v7') : undefined
+
+  /*
    * ★V8：帯の探す欄は V8 の外側から外した（オーナー決定 2026-10-01）。
    * `?q=` の受け口自体は友だち一覧が持ち続ける。
    */
@@ -149,19 +157,26 @@ export default function AppTopBar() {
       v7 はこれまでどおり 1280px から。
     */}
     <div className="hidden xl:block v8-topbar-wrap">
+    {/*
+      ★V8 殻合わせ（絵 V8-B/JKjsE）：統括の画面にも切替の札を出す。
+      選ぶのは状態の切替だけで、画面の移動はしない（従来どおり）。
+      未選択の統括では「店舗を選択」と出る。
+    */}
     <TopBar
       title={shownTitle}
       manualHref={manualHref}
       accounts={options}
       selectedAccountId={selectedAccountId ?? ''}
       onAccountChange={setSelectedAccountId}
-      showAccountSwitcher={!isHq}
+      showAccountSwitcher={true}
       roleLabel={ROLE_LABELS[staffRole] ?? ''}
       onRoleClick={canReturnToHq ? returnToHq : undefined}
       userName={staffName}
       onLogout={logout}
+      onRevertTheme={revertTheme}
       notificationUnreadCount={notificationUnread}
       v8Chrome
+      crumbs={crumbs}
     />
     </div>
     {accountsLoadFailed ? (

@@ -1,5 +1,8 @@
 'use client'
 
+import ReadonlyHeader from '@/app/hq/readonly-header-v8'
+import '@/app/hq/readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Archive, ArchiveRestore, Copy, LoaderCircle, Pencil, Sparkles, Star } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -35,6 +38,7 @@ import {
   type BannerImage,
   type BannerPreset,
   type BannerProject,
+  type BannerReferenceMode,
   type BannerUsage,
 } from '@/lib/hq-banners'
 
@@ -57,6 +61,7 @@ export default function HqBannerProjectPage() {
 }
 
 function ProjectInner() {
+  const theme = useAdminTheme()
   const router = useRouter()
   const params = useSearchParams()
   const projectId = params.get('id') ?? ''
@@ -332,10 +337,10 @@ function ProjectInner() {
     return res.data
   }
 
-  /** 参照画像として使う。実体を手元に置き、パネルの入力に ID を入れる。 */
-  const applyReference = (image: BannerImage) => {
+  /** 参照画像として使う。実体を手元に置き、パネルの入力に ID と使い方を入れる。 */
+  const applyReference = (image: BannerImage, usage: BannerReferenceMode) => {
     setReferenceImage(image)
-    setInput((cur) => ({ ...cur, referenceImageId: image.id }))
+    setInput((cur) => ({ ...cur, referenceImageId: image.id, referenceMode: usage }))
     setPickerOpen(false)
   }
 
@@ -354,7 +359,7 @@ function ProjectInner() {
     try {
       const data = await readFileAsBase64(file)
       const uploaded = await upload({ filename: file.name, mimeType: file.type, data })
-      if (uploaded) applyReference(uploaded)
+      if (uploaded) applyReference(uploaded, input.referenceMode)
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした')
     } finally {
@@ -433,7 +438,8 @@ function ProjectInner() {
   const busy = busyAction !== null
 
   return (
-    <div data-design-node={running ? 'QGiQI' : 'g1WVyR'} className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' && running ? 'p03ImY' : theme === 'v8' && usage && (usage.blocked || usage.paused || usage.month.remaining <= 0 || usage.today.remaining <= 0) ? 'zOpMG' : running ? 'QGiQI' : 'g1WVyR'} className="flex flex-col gap-4">
+      {theme === 'v8' && <ReadonlyHeader title={project.name} description={running ? `${running.requestedCount}枚中 ${running.doneCount}枚できました。生成の状況を確認できます。` : 'プロジェクトの画像と利用状況を確認します。'} />}
       <div data-design-node="G6NIIg" className="flex flex-wrap items-center gap-2">
         <Breadcrumb items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />
         <span className="flex-1" />
@@ -476,11 +482,12 @@ function ProjectInner() {
       {actionError ? <p className="text-label text-danger" role="alert">{actionError}</p> : null}
       {project.description ? <p className="text-caption text-ink-faint">{project.description}</p> : null}
 
-      <div data-design-node="H2eb7f" className="flex flex-col gap-4 xl:flex-row xl:items-start">
-        <section data-design-node="ZwrHR" className="flex min-w-0 flex-1 flex-col rounded-card border border-hairline bg-canvas">
+      <div data-design-node={theme === 'v8' ? 'iMnph' : 'H2eb7f'} className="flex flex-col gap-4 xl:flex-row xl:items-start">
+        <section data-design-node="ZwrHR" className="v8-ro-hq-generationGallery flex min-w-0 flex-1 flex-col rounded-card border border-hairline bg-canvas">
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
             <h2 className="text-body font-bold text-ink">このプロジェクトの画像</h2>
             <span className="text-caption text-ink-faint">{images.length}枚</span>
+            {theme === 'v8' ? <span className="text-micro text-ink-faint">画像を押すと詳細・アカウントへ渡す</span> : null}
             {running ? (
               <span className="inline-flex h-5 items-center gap-1 rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info" role="status">
                 <LoaderCircle aria-hidden="true" className="h-3 w-3 animate-spin" />
@@ -488,9 +495,9 @@ function ProjectInner() {
               </span>
             ) : null}
             <span className="flex-1" />
-            <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
-            <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り</FilterChip>
-            <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>アカウントへ渡し済み</FilterChip>
+            <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて{theme === 'v8' ? ` ${images.length}` : null}</FilterChip>
+            <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り{theme === 'v8' ? ` ${images.filter((image) => image.isFavorite).length}` : null}</FilterChip>
+            <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>アカウントへ渡し済み{theme === 'v8' ? ` ${images.filter((image) => image.deliveredAccountIds.length > 0).length}` : null}</FilterChip>
           </div>
           <div className="border-t border-hairline" />
           {generationError ? (
@@ -544,6 +551,8 @@ function ProjectInner() {
             onPickReference={openPicker}
             onUploadReference={(file) => void uploadReference(file)}
             referenceBusy={referenceBusy}
+            usage={usage}
+            onReloadUsage={loadUsage}
           />
         </div>
       </div>
@@ -562,7 +571,7 @@ function ProjectInner() {
           actions={
             running ? (
               <>
-                <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">残りをやめる
+                <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">生成をやめる
                 </Button>
                 <Button variant="primary" disabled>
                   <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
@@ -615,6 +624,7 @@ function ProjectInner() {
           confirmLabel="アーカイブする"
           destructive
           busy={busy}
+          designNode="I0w2e"
           onConfirm={() => {
             void patchProject('アーカイブ', { archived: true }).then((updated) => {
               setArchiveConfirm(false)
@@ -652,7 +662,7 @@ function ProjectInner() {
               : undefined
           }
           onUseAsReference={() => {
-            applyReference(openImage)
+            applyReference(openImage, input.referenceMode)
             setOpenImage(null)
             panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
           }}
@@ -665,6 +675,7 @@ function ProjectInner() {
         presets={presets}
         projects={allProjects.length > 0 ? allProjects : [project]}
         selectedId={input.referenceImageId}
+        initialUsage={input.referenceMode}
         onClose={() => setPickerOpen(false)}
         onPick={applyReference}
         onUpload={(file) => {

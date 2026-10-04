@@ -1,7 +1,7 @@
 /*
  * ★V8 移行③「外側 v8」の固定。
  *
- *   - 地は灰（--color-shell）、中身は白い板1枚（radius 16・枠・影・右下 12px）
+ *   - 地は灰（--color-shell）、中身は白い板1枚（radius 16・枠・影・右下左 12px）
  *   - 上の帯は高さ 60・パンくず（アカウント › 画面名）・通知ベル・自分。
  *     探す欄は帯から外した（オーナー決定 2026-10-01）。
  *     左メニューは畳める（64px・⌘\・localStorage）
@@ -30,13 +30,19 @@ describe('外側の殻（V8 移行③）', () => {
     expect(globals).toContain('.v8-only')
   })
 
-  it('中身は白い板1枚（radius 16・枠・薄い影・右下に 12px）で、v8 のときだけ', () => {
+  it('テーマのときだけ効くユーティリティ v7: / v8: がある（@custom-variant）', () => {
+    expect(globals).toContain('@custom-variant v7')
+    expect(globals).toContain('@custom-variant v8')
+    expect(globals).toContain(':root:not([data-theme="v8"])')
+  })
+
+  it('中身は白い板1枚（radius 16・枠・薄い影・右下左に 12px）で、v8 のときだけ', () => {
     const board = appShellCss.match(/\[data-theme="v8"\] \.main \{([\s\S]*?)\}/)
     expect(board, 'v8 の .main の板の規定が無い').not.toBeNull()
     expect(board![1]).toContain('border-radius: var(--radius-panel)')
     expect(board![1]).toContain('border: 1px solid var(--color-board-line)')
     expect(board![1]).toContain('box-shadow: var(--shadow-board)')
-    expect(board![1]).toContain('margin: 0 12px 12px 0')
+    expect(board![1]).toContain('margin: 0 12px 12px 12px')
   })
 
   it('黄色の版の帯は v8 では出さない（v7-only で包む）', () => {

@@ -38,6 +38,8 @@ import { mileStatusLabel, reviewVersionOf, text } from './photo-text'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import MetricValue from '@/components/ui/metric-value'
 import styles from './photo-review.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import PhotoReviewV8 from './photo-review-v8'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 /*
@@ -485,6 +487,10 @@ export default function PhotoReviewsPage() {
       if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
       reviewKeys.current.delete(id)
+      // M508フォロー：成功が確定した同generationで前の失敗案内を消す。
+      // review()のcatchが入れた案内が対象。入力チェックは reasonError・
+      // accountNotice、読み直しの失敗は setLoadError と別の置き場なので消えない。
+      setNotice('')
       const notification = response.data.notificationStatus === 'sent'
         ? '投稿者へLINEで通知しました。'
         : '審査結果は保存しましたが、LINE通知は送れませんでした。一覧から再送できます。'
@@ -516,6 +522,12 @@ export default function PhotoReviewsPage() {
     } catch (error) {
       if (generation === accountGeneration.current) {
         setNotice(photoNoticeFor(error, '審査結果を保存できませんでした。'))
+        // M508: ほかの人が先に決めていたときは一覧を読み直し、最新の状態を
+        // 見せる。保存の失敗（500）は読み直さず、同じ内容で再試行できる。
+        if (error instanceof ApiError && error.status === 409) {
+          reviewKeys.current.delete(id)
+          await load()
+        }
       }
     }
     finally { setReviewing(null) }
@@ -697,6 +709,16 @@ export default function PhotoReviewsPage() {
     anchor.download = `photo-${text(detailPhoto.id)}-original`
     anchor.click()
     URL.revokeObjectURL(url)
+  }
+
+  /*
+   * ★V8-B：data-theme="v8" のときだけ新しい投稿画面
+   * （TkA4D・Jn95h・cniyw・SyQA1・ujcar・N1br7）へ切り替える。
+   * v7 の見た目はそのまま。
+   */
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return <PhotoReviewV8 accountId={selectedAccountId} />
   }
 
   if (view === 'publications' && selectedAccountId) {

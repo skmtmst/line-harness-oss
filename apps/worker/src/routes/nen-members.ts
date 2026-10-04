@@ -8,6 +8,7 @@ import {
   getFriendByLineUserIdForAccount,
   getPhotoNotificationState,
   jstNow,
+  nextVersionToken,
   resolveLineCredential,
   findOrCreateGlobalTag,
   toJstString,
@@ -18,6 +19,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { requirePhotoPermission } from './nen-photo-operations.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
+import { classifyExternalDeliveryError } from '../services/external-delivery-retry.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import { imageDimensions, stripImageMetadata } from '../services/media-metadata.js';
 import {
@@ -406,7 +408,14 @@ export async function deliverPhotoReviewNotification(
     );
     relayed = true;
   } catch (error) {
-    sendError = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
+    /*
+     * ここだけ生のエラー本文を使っていたため、写真の一括審査の失敗一覧
+     * （管理画面）に `LINE Harness proxy error: 500 …` と LINE 側の応答本文が
+     * そのまま出ていた。他の送信失敗と同じ安全な理由へそろえる（2026-10-02）。
+     * 原因を追うための生の本文はログにだけ残す。
+     */
+    console.error('photo review notification failed', input.decisionId, error);
+    sendError = classifyExternalDeliveryError(error).message;
   }
   try {
     const completed = await completePhotoNotificationDelivery(db, {
@@ -1374,13 +1383,32 @@ nenMembers.get('/api/nen-members/care-flags', async (c) => {
 });
 
 nenMembers.put('/api/nen-members/care-flags/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
-  const body = await c.req.json<{ status?: string; adviceReady?: boolean }>().catch(() => null);
+  const body = await c.req.json<{ status?: string; adviceReady?: boolean; expectedUpdatedAt?: string }>().catch(() => null);
   if (!body || !['active', 'resolved'].includes(String(body.status))) return c.json({ success: false, error: 'Invalid status' }, 400);
-  const flag = await c.env.DB.prepare(`SELECT cf.friend_id, f.line_account_id FROM nen_care_flags cf JOIN friends f ON f.id=cf.friend_id WHERE cf.id=?`)
-    .bind(c.req.param('id')).first<{ friend_id: string; line_account_id: string | null }>();
+  const flag = await c.env.DB.prepare(`SELECT cf.friend_id, cf.status, cf.advice_ready, cf.updated_at, f.line_account_id FROM nen_care_flags cf JOIN friends f ON f.id=cf.friend_id WHERE cf.id=?`)
+    .bind(c.req.param('id')).first<{ friend_id: string; status: string; advice_ready: number; updated_at: string; line_account_id: string | null }>();
   if (!flag || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [flag.line_account_id])) return c.json({ success: false, error: 'Not found' }, 404);
-  await c.env.DB.prepare(`UPDATE nen_care_flags SET status=?, advice_ready=?, resolved_at=CASE WHEN ?='resolved' THEN ? ELSE NULL END, updated_at=? WHERE id=?`)
-    .bind(body.status, body.adviceReady === false ? 0 : 1, body.status, jstNow(), jstNow(), c.req.param('id')).run();
+  /*
+   * M509: 見守りフラグの同時解決＋再開は後勝ちで先の変更が黙って消えていた。
+   * 版（expectedUpdatedAt）が送られてきたときだけ updated_at の一致も
+   * 条件に入れる。古い画面からの保存は409で止め、最新の状態を
+   * data.latest で返す。送られてこない従来の呼び出しはそのまま通す。
+   */
+  const flagExpectedUpdatedAt = typeof body.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : null;
+  // M509: 版つきの保存は版を必ず単調に進める（同じミリ秒の連打でも見分けられる）。
+  const flagNewUpdatedAt = flagExpectedUpdatedAt === null ? jstNow() : nextVersionToken(flag.updated_at);
+  const written = await c.env.DB.prepare(`UPDATE nen_care_flags SET status=?, advice_ready=?, resolved_at=CASE WHEN ?='resolved' THEN ? ELSE NULL END, updated_at=? WHERE (? IS NULL OR updated_at=?) AND id=?`)
+    .bind(body.status, body.adviceReady === false ? 0 : 1, body.status, jstNow(), flagNewUpdatedAt, flagExpectedUpdatedAt, flagExpectedUpdatedAt, c.req.param('id')).run();
+  if (!written.meta.changes) {
+    const latest = await c.env.DB.prepare(`SELECT cf.status, cf.advice_ready, cf.updated_at, f.line_account_id FROM nen_care_flags cf JOIN friends f ON f.id=cf.friend_id WHERE cf.id=?`)
+      .bind(c.req.param('id')).first<{ status: string; advice_ready: number; updated_at: string; line_account_id: string | null }>();
+    if (!latest) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({
+      success: false, code: 'VERSION_CONFLICT',
+      error: 'ほかの人が先に見守りの状態を変えました。最新の内容を確認してから保存し直してください。',
+      data: { latest: { status: latest.status, adviceReady: latest.advice_ready === 1, updatedAt: latest.updated_at } },
+    }, 409);
+  }
   await syncNenHealthTags(c.env.DB, flag.friend_id);
   return c.json({ success: true });
 });
@@ -1790,6 +1818,43 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
   });
 });
 
+type SavedReviewEvent = {
+  to_status: string; reason_code: string | null; reason_note: string | null;
+  awarded_points: number; notification_status: string;
+};
+
+/** 同じ再実行キーで来た再送が、保存済みと「同じ操作」かの判定。 */
+function isSameReviewRequest(
+  previous: SavedReviewEvent,
+  status: string,
+  reasonCode: string,
+  reasonNote: string,
+): boolean {
+  return previous.to_status === status
+    && (previous.reason_code ?? null) === (status === 'rejected' ? reasonCode : null)
+    && (previous.reason_note ?? null) === (status === 'rejected' ? (reasonNote || null) : null);
+}
+
+/** 同じ再実行キーの再送には保存済みの結果だけを返し、作り直さない。 */
+function reviewDuplicateResponse(
+  c: Context<Env>,
+  customerId: unknown,
+  previous: SavedReviewEvent,
+): Response {
+  return c.json({
+    success: true,
+    duplicate: true,
+    data: {
+      awardedPoints: Number(previous.awarded_points),
+      pointBalance: null,
+      pointSync: Number(previous.awarded_points) > 0
+        ? (customerId ? 'pending' : 'needs_attention')
+        : 'not_required',
+      notificationStatus: previous.notification_status === 'sent' ? 'sent' : 'failed',
+    },
+  });
+}
+
 nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
   const body = await c.req.json<{
     accountId?: string;
@@ -1843,27 +1908,14 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
     awarded_points: number; notification_status: string;
   }>();
   if (previous) {
-    const same = previous.to_status === status
-      && (previous.reason_code ?? null) === (status === 'rejected' ? reasonCode : null)
-      && (previous.reason_note ?? null) === (status === 'rejected' ? (reasonNote || null) : null);
+    const same = isSameReviewRequest(previous, status, reasonCode, reasonNote);
     if (!same) {
       return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
     }
-    return c.json({
-      success: true,
-      duplicate: true,
-      data: {
-        awardedPoints: Number(previous.awarded_points),
-        pointBalance: null,
-        pointSync: Number(previous.awarded_points) > 0
-          ? (photo.customer_id ? 'pending' : 'needs_attention')
-          : 'not_required',
-        notificationStatus: previous.notification_status === 'sent' ? 'sent' : 'failed',
-      },
-    });
+    return reviewDuplicateResponse(c, photo.customer_id, previous);
   }
   if (photo.status !== 'pending' || Number(photo.review_version) !== body!.expectedVersion) {
-    return c.json({ success: false, error: 'Already reviewed' }, 409);
+    return c.json({ success: false, error: 'Already reviewed', code: 'VERSION_CONFLICT' }, 409);
   }
   if (status === 'adopted') {
     // 検査が終わるまで採用しない。失敗時は審査へ流さない（v6-22 §4）。
@@ -1977,13 +2029,36 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
       ).bind(now, photo.friend_id, accountId)] : []),
     ]);
     if (!results[0]?.meta.changes || !results[1]?.meta.changes) {
-      return c.json({ success: false, error: 'Already reviewed' }, 409);
+      return c.json({ success: false, error: 'Already reviewed', code: 'VERSION_CONFLICT' }, 409);
     }
   } catch (error) {
-    if (!String(error).includes('UNIQUE constraint failed')) {
-      console.error('photo review decision failed', error);
+    /*
+     * M508: 保存の失敗を「ほかの担当者により更新されました」に化けない。
+     * 版の不一致だけが409で、それ以外の保存失敗は500で理由を分ける。
+     * 同じ再実行キーの並行到達（UNIQUE）は保存済みを読み直して区別する。
+     */
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('UNIQUE constraint failed')) {
+      const saved = await c.env.DB.prepare(
+        `SELECT to_status, reason_code, reason_note, awarded_points, notification_status
+           FROM nen_photo_review_events
+          WHERE photo_id = ? AND line_account_id = ? AND idempotency_key = ?`,
+      ).bind(c.req.param('id'), accountId, key).first<SavedReviewEvent>();
+      if (saved) {
+        if (!isSameReviewRequest(saved, status, reasonCode, reasonNote)) {
+          return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
+        }
+        return reviewDuplicateResponse(c, photo.customer_id, saved);
+      }
+      const fresh = await loadPhotoReviewRecipient(
+        c.env.DB, { photoId: c.req.param('id'), lineAccountId: accountId },
+      );
+      if (!fresh || fresh.status !== 'pending' || Number(fresh.review_version) !== body!.expectedVersion) {
+        return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました', code: 'VERSION_CONFLICT' }, 409);
+      }
     }
-    return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました' }, 409);
+    console.error('photo review decision failed', error);
+    return c.json({ success: false, code: 'REVIEW_SAVE_FAILED', error: '保存できませんでした。もう一度お試しください' }, 500);
   }
   await syncNenPhotoTags(c.env.DB, String(photo.friend_id));
   /*

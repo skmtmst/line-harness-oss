@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
@@ -11,6 +11,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -19,6 +20,13 @@ import GoogleSheetsPanel from './google-sheets-panel'
 import ApiTokensPanel from './api-tokens-panel'
 import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import OutgoingV8Page from './outgoing-v8'
+import InteractionsV8Page from './interactions-v8'
+import IncomingV8Page from './incoming-v8'
+import ApiTokensV8Page from './apitokens-v8'
+import SheetsV8Page from './sheets-v8'
+import SamplesV8Page from './samples-v8'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 
@@ -592,8 +600,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     }
   }
 
-  const handleCreateIncoming = async (e: React.FormEvent, stepUpToken?: string) => {
-    e.preventDefault()
+  const handleCreateIncoming = async (stepUpToken?: string) => {
     setError('')
     setCreateFieldError({})
     const requestAccountId = selectedAccountId
@@ -628,7 +635,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     } catch (caught) {
       // 秘密の値の登録は大事な操作。本人確認を求められたら窓を立てる（V-1）。
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.secret', action: '受け取り口を登録する', retry: (token) => handleCreateIncoming(e, token) })
+        setStepUp({ purpose: 'webhook.secret', action: '受け取り口を登録する', retry: (token) => handleCreateIncoming(token) })
         return
       }
       if (selectedAccountIdRef.current !== requestAccountId) return
@@ -766,8 +773,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       <div className="mb-4 mt-4 flex flex-wrap items-center gap-2">
         {tab === 'incoming' ? (
           canCreate ? (
-            <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
-              {showCreate ? 'キャンセル' : '＋ 受け取り口を作る'}
+            <Button variant="primary" onClick={() => setShowCreate(true)}>
+              ＋ 受け取り口を作る
             </Button>
           ) : (
             <p className="text-ink-secondary text-sm">{createGuidance}</p>
@@ -928,99 +935,97 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         </Notice>
       ))}
 
-      {/* Create forms */}
-      {showCreate && tab === 'incoming' && (
-        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-control border border-hairline p-6">
-          <h3 className="text-sm font-semibold text-ink mb-4">受け取る設定を追加</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-ink-secondary mb-1">名前</label>
-              <input
-                value={inForm.name}
-                onChange={(e) => {
-                  setInForm({ ...inForm, name: e.target.value })
-                  if (createFieldError.name) setCreateFieldError((current) => ({ ...current, name: undefined }))
-                }}
-                className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
-                placeholder="LINE公式アカウント"
-                required
-              />
-              {createFieldError.name ? (
-                <p className="text-danger mt-1 text-xs" role="alert">{createFieldError.name}</p>
-              ) : null}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-secondary mb-1">どこから来るか</label>
-              <Select
-                value={sourceIsOther ? SOURCE_OTHER : inForm.sourceType}
-                onChange={(value) => {
-                  const next = value
-                  if (next === SOURCE_OTHER) { setSourceIsOther(true); setInForm({ ...inForm, sourceType: '' }); return }
-                  setSourceIsOther(false)
-                  setInForm({ ...inForm, sourceType: next })
-                }}
-                aria-label="受信元の種類"
-                size="full"
-                options={[
-                  { value: '', label: '選んでください' },
-                  ...SOURCE_PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),
-                  { value: SOURCE_OTHER, label: 'その他（自分で書く）' },
-                ]}
-              />
-              {/* 選んだものが何を受け取るのかを、選んだ直後に出す。 */}
-              {selectedPreset ? (
-                <p className="text-ink-faint mt-1 text-xs">{selectedPreset.hint}</p>
-              ) : null}
-              {sourceIsOther ? (
-                <input
-                  value={inForm.sourceType}
-                  onChange={(e) => setInForm({ ...inForm, sourceType: e.target.value })}
-                  className="border-hairline rounded-control mt-2 w-full border px-3 py-2 text-sm"
-                  placeholder="送ってくるサービスの名前"
-                  aria-label="どこから来るか（自分で書く）"
-                />
-              ) : null}
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-ink-secondary mb-1">
-                シークレット (最低{MIN_SECRET_LENGTH}文字)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  value={inForm.secret}
-                  onChange={(e) => {
-                    setInForm({ ...inForm, secret: e.target.value })
-                    if (createFieldError.secret) setCreateFieldError((current) => ({ ...current, secret: undefined }))
-                  }}
-                  className="flex-1 border border-hairline rounded-control px-3 py-2 text-sm font-mono"
-                  placeholder="ランダムな英数字32文字以上"
-                  required
-                  minLength={MIN_SECRET_LENGTH}
-                />
-                <Button
-                  type="button"
-                  onClick={() => setInForm({ ...inForm, secret: generateSecret() })}
-                >
-                  自動生成
-                </Button>
-              </div>
-              {createFieldError.secret ? (
-                <p className="text-danger mt-1 text-xs" role="alert">{createFieldError.secret}</p>
-              ) : null}
-              <p className="text-xs text-ink-faint mt-1">
-                外部システムが Webhook 受信時に X-Webhook-Signature ヘッダで HMAC-SHA256 署名する際に使用します。
-              </p>
-            </div>
+      {/* 板 `H031gC`「受け取る設定を追加」。作る操作は小窓で出す。 */}
+      <Dialog
+        open={showCreate && tab === 'incoming'}
+        title="受け取る設定を追加"
+        confirmLabel="作る"
+        cancelLabel="キャンセル"
+        confirmIcon={<Plus size={16} aria-hidden="true" />}
+        designNode="H031gC"
+        onConfirm={() => void handleCreateIncoming()}
+        onCancel={() => setShowCreate(false)}
+      >
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-ink-secondary mb-1">名前</label>
+            <input
+              value={inForm.name}
+              onChange={(e) => {
+                setInForm({ ...inForm, name: e.target.value })
+                if (createFieldError.name) setCreateFieldError((current) => ({ ...current, name: undefined }))
+              }}
+              className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
+              placeholder="LINE公式アカウント"
+              aria-label="名前"
+            />
+            {createFieldError.name ? (
+              <p className="text-danger mt-1 text-xs" role="alert">{createFieldError.name}</p>
+            ) : null}
           </div>
-          <Button
-            type="submit"
-            variant="primary"
-            className="mt-4"
-          >
-            作る
-          </Button>
-        </form>
-      )}
+          <div>
+            <label className="block text-sm font-medium text-ink-secondary mb-1">どこから来るか</label>
+            <Select
+              value={sourceIsOther ? SOURCE_OTHER : inForm.sourceType}
+              onChange={(value) => {
+                const next = value
+                if (next === SOURCE_OTHER) { setSourceIsOther(true); setInForm({ ...inForm, sourceType: '' }); return }
+                setSourceIsOther(false)
+                setInForm({ ...inForm, sourceType: next })
+              }}
+              aria-label="受信元の種類"
+              size="full"
+              options={[
+                { value: '', label: '選んでください' },
+                ...SOURCE_PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),
+                { value: SOURCE_OTHER, label: 'その他（自分で書く）' },
+              ]}
+            />
+            {/* 選んだものが何を受け取るのかを、選んだ直後に出す。 */}
+            {selectedPreset ? (
+              <p className="text-ink-faint mt-1 text-xs">{selectedPreset.hint}</p>
+            ) : null}
+            {sourceIsOther ? (
+              <input
+                value={inForm.sourceType}
+                onChange={(e) => setInForm({ ...inForm, sourceType: e.target.value })}
+                className="border-hairline rounded-control mt-2 w-full border px-3 py-2 text-sm"
+                placeholder="送ってくるサービスの名前"
+                aria-label="どこから来るか（自分で書く）"
+              />
+            ) : null}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink-secondary mb-1">
+              シークレット (最低{MIN_SECRET_LENGTH}文字)
+            </label>
+            <div className="flex gap-2">
+              <input
+                value={inForm.secret}
+                onChange={(e) => {
+                  setInForm({ ...inForm, secret: e.target.value })
+                  if (createFieldError.secret) setCreateFieldError((current) => ({ ...current, secret: undefined }))
+                }}
+                className="flex-1 border border-hairline rounded-control px-3 py-2 text-sm font-mono"
+                placeholder="ランダムな英数字32文字以上"
+                aria-label={`シークレット (最低${MIN_SECRET_LENGTH}文字)`}
+              />
+              <Button
+                type="button"
+                onClick={() => setInForm({ ...inForm, secret: generateSecret() })}
+              >
+                自動生成
+              </Button>
+            </div>
+            {createFieldError.secret ? (
+              <p className="text-danger mt-1 text-xs" role="alert">{createFieldError.secret}</p>
+            ) : null}
+            <p className="text-xs text-ink-faint mt-1">
+              作るときに本人確認が出ます。
+            </p>
+          </div>
+        </div>
+      </Dialog>
 
       {tab === 'incoming' ? (
         <IncomingOverview
@@ -1095,7 +1100,18 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
 function WebhooksPageHost() {
   const tab = useMergedTab(MERGED_TABS)
+  const theme = useAdminTheme()
   usePageTitle('外部連携')
+  /*
+   * ★V8 切替（一覧 `ZSbFY`）。v7 の見た目は data-theme="v8" が付くまで
+   * 1画素も変えない。ほかのタブは v7 のまま（1タブずつV8化する）。
+   */
+  if (theme === 'v8' && tab === 'outgoing') return <OutgoingV8Page />
+  if (theme === 'v8' && tab === 'interactions') return <InteractionsV8Page />
+  if (theme === 'v8' && tab === 'incoming') return <IncomingV8Page />
+  if (theme === 'v8' && tab === 'api-tokens') return <ApiTokensV8Page />
+  if (theme === 'v8' && tab === 'sheets') return <SheetsV8Page />
+  if (theme === 'v8' && tab === 'notify') return <SamplesV8Page />
   if (tab === 'incoming' || tab === 'outgoing') return <WebhooksPageInner key={tab} tab={tab} />
   return (
     <div className="flex flex-col gap-4">

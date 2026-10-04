@@ -59,6 +59,7 @@ const formMatchesListFilter = (f, filter) => {
   if (filter === 'published') return f.isActive
   if (filter === 'draft') return !f.isActive
   if (filter === 'stored') return hasStoredDestination(f.layout, f.onSubmitTagId)
+  if (filter === 'pending') return (f.pendingPostActionCount ?? 0) > 0
   return true
 }
 const formMatchesListQuery = (f, raw) => {
@@ -178,6 +179,7 @@ function form(index, overrides = {}) {
     monthlySubmitCount: index,
     monthlyOpenCount: index + 1,
     monthlyCompletionRate: 50,
+    pendingPostActionCount: 0,
     destinationSummary: { friendFieldCount: 0, tagCount: 0 },
     createdAt: `2025-01-${day}T00:00:00.000Z`,
     updatedAt: `2026-09-${day}T00:00:00.000Z`,
@@ -286,7 +288,7 @@ async function openHarness(browser, {
        */
       const rawFilter = url.searchParams.get('filter')
       const rawSort = url.searchParams.get('sort')
-      const filter = ['published', 'draft', 'stored'].includes(rawFilter) ? rawFilter : 'all'
+      const filter = ['published', 'draft', 'stored', 'pending'].includes(rawFilter) ? rawFilter : 'all'
       const sort = ['answers', 'updated', 'name'].includes(rawSort) ? rawSort : 'latest-answer'
       const search = url.searchParams.get('q') ?? ''
       let list = filter === 'all' ? all : all.filter((f) => formMatchesListFilter(f, filter))
@@ -376,20 +378,20 @@ async function openHarness(browser, {
 /**
  * この画面が「出し終えた」と言える条件。
  *
- * 認証の確認が済んで本体（`EMBIK`）が現れ、一覧が読み込み中でなくなり、
+ * 認証の確認が済んで本体（`I3L41O`）が現れ、一覧が読み込み中でなくなり、
  * 表の行か「1件も無い／読み込めなかった」のどれかが立っている状態。
- * `ListState` が出す `data-list-state` をそのまま使う。
+ * V8の一覧本体が出す `data-list-state` をそのまま使う。
  */
 async function waitForFormList(page) {
   try {
     await page.waitForFunction(() => {
-      const root = document.querySelector('[data-design-node="EMBIK"]')
+      const root = document.querySelector('[data-design-node="I3L41O"]')
       if (!root) return false
-      if (root.querySelector('[data-list-state="loading"]')) return false
+      if (root.dataset.listState === 'loading') return false
       return Boolean(
         root.querySelector('tbody tr')
-        || root.querySelector('[data-list-state="empty"]')
-        || root.querySelector('[data-list-state="error"]'),
+        || root.dataset.listState === 'empty'
+        || root.dataset.listState === 'error',
       )
     }, undefined, { timeout: 15_000 })
   } catch (error) {
@@ -466,11 +468,11 @@ try {
     await context.close()
   }
 
-  // 2. 回答の導線と更新日時が、その行のフォームの実データを指す（N-173 / N-180）
+  // 2. 回答の導線と月次集計が、その行のフォームの実データを指す（N-173 / N-180）
   {
     const forms = [
       form(1, { id: 'sales-new', name: '営業フォーム', createdAt: '2020-01-01T00:00:00.000Z', updatedAt: '2026-09-08T00:00:00.000Z' }),
-      form(2, { id: 'sales-old', name: '古い営業フォーム', updatedAt: null }),
+      form(2, { id: 'sales-old', name: '古い営業フォーム', updatedAt: null, monthlySubmitCount: null, monthlyCompletionRate: null }),
     ]
     const { context, page } = await openHarness(browser, { formsByAccount: { 'account-a': forms } })
     await openList(page)
@@ -481,21 +483,14 @@ try {
     assert.equal(await oldLink.getAttribute('href'), '/form-submissions/responses?id=sales-old')
 
     const newRow = rows(page).filter({ has: newLink })
-    const newRowText = await newRow.innerText()
-    assert.equal(newRowText.includes('9月8日'), true, '更新列に updated_at が出る')
-    assert.equal(newRowText.includes('1月1日'), false, '更新列に created_at を出さない')
-    assert.equal(
-      await rows(page).filter({ hasText: '古い営業フォーム' }).getByTitle('更新日時を取得できません').innerText(),
-      '—',
-      '更新日時が無い状態を0や作成日にすり替えない',
-    )
-    // R27: 行の「編集」は名前変更の窓ではなく、質問の編集（編集画面）へ。
-    const editLink = rows(page).filter({ has: newLink }).getByRole('link', { name: '編集' })
-    assert.equal(
-      await editLink.getAttribute('href'),
-      '/form-submissions/edit?id=sales-new&tab=basic',
-      'R27: 行の編集は質問の編集へ',
-    )
+    // V8は更新日時の独立列を廃止し、回答数と今月の回答・完了率をまとめる。
+    assert.equal((await newRow.innerText()).includes('今月 1・完了 50%'), true, 'その行の月次集計を出す')
+    assert.equal((await rows(page).filter({ has: oldLink }).innerText()).includes('今月 —・完了 —'), true,
+      '取れていない月次集計を0と表示しない')
+    // R27: 行の「編集」は質問の編集へ。「…」内の操作から対象を引き継ぐ。
+    await newRow.getByRole('button', { name: /その他の操作/ }).click()
+    await page.getByRole('menuitem', { name: '編集', exact: true }).click()
+    await page.waitForURL('**/form-submissions/edit?id=sales-new&tab=basic')
     await context.close()
   }
 
@@ -507,14 +502,14 @@ try {
     const { context, page, state } = await openHarness(browser, { role: 'staff', formsByAccount: { 'account-a': [form(1)] } })
     await openList(page)
     await page.getByRole('button', { name: /^すべて\s*\d/ }).waitFor()
-    assert.equal(await page.getByRole('button', { name: 'フォルダを追加する', exact: true }).count(), 0, 'staff にフォルダ追加を出さない')
+    assert.equal(await page.getByRole('button', { name: 'フォルダを追加', exact: true }).count(), 0, 'staff にフォルダ追加を出さない')
     assert.equal(state.folderWrites.length, 0, 'フォルダ作成の要求を出さない')
     await context.close()
   }
   for (const role of ['owner', 'admin']) {
     const { context, page, state } = await openHarness(browser, { role, formsByAccount: { 'account-a': [form(1)] } })
     await openList(page)
-    const addFolder = page.getByRole('button', { name: 'フォルダを追加する', exact: true })
+    const addFolder = page.getByRole('button', { name: 'フォルダを追加', exact: true })
     await addFolder.waitFor()
     assert.equal(await addFolder.isDisabled(), false, `${role} は箱を作れる`)
     await addFolder.click()
@@ -536,13 +531,13 @@ try {
       formsByAccount: { 'account-a': [], 'account-b': [form(7, { id: 'prod-form', name: '本店フォーム' })] },
     })
     await openList(page)
-    await page.getByText('まだフォームがありません', { exact: true }).waitFor()
-    await page.getByText('最初の1つを作ると、集まった回答もここから見られます。').waitFor()
+    await page.getByText('まだ回答フォームはありません', { exact: true }).waitFor()
+    await page.getByText('アンケートや申し込みを LINE の中で受け付けられます。答えは友だち情報に保存できます。').waitFor()
     assert.equal(await page.getByText(/見え方です/).count(), 0, '実装事情の文を出さない')
 
     await page.getByLabel('LINEアカウント').selectOption('account-b')
     await page.getByText('本店フォーム', { exact: true }).waitFor()
-    assert.equal(await page.getByText('まだフォームがありません', { exact: true }).count(), 0)
+    assert.equal(await page.getByText('まだ回答フォームはありません', { exact: true }).count(), 0)
     assert.deepEqual([...new Set(state.listCalls)].sort(), ['account-a', 'account-b'], '選んだアカウント以外を読まない')
     await context.close()
   }
@@ -576,7 +571,7 @@ try {
     await openList(page)
     await page.getByText('表示できませんでした', { exact: true }).waitFor()
     assert.equal(await page.getByRole('button', { name: 'もう一度読み込む' }).count(), 1)
-    assert.equal(await page.getByText('まだフォームがありません', { exact: true }).count(), 0, '失敗を0件と言わない')
+    assert.equal(await page.getByText('まだ回答フォームはありません', { exact: true }).count(), 0, '失敗を0件と言わない')
     await context.close()
   }
 
@@ -700,7 +695,7 @@ try {
    */
   {
     const detail = {
-      ...form(1, { id: 'form-1', name: '停止するフォーム' }),
+      ...form(1, { id: 'form-1', name: '停止するフォーム', isActive: true }),
       contentRevision: 4,
     }
     const { context, page, state } = await openHarness(browser, {
@@ -708,10 +703,10 @@ try {
       detail,
     })
     await openList(page)
-    // 削除は行の「…」メニューの中の危ない操作へ移したので、 menu から開く。
-    await page.getByRole('button', { name: '停止するフォームのその他操作' }).click()
-    await page.getByRole('menuitem', { name: '削除する' }).click()
-    const stop = page.getByRole('button', { name: '受付だけ止める' })
+    // V8では受付停止の確認へ行の「…」メニューから直接入る。
+    await page.getByRole('button', { name: /「停止するフォーム」のその他の操作/ }).click()
+    await page.getByRole('menuitem', { name: '受付を止める', exact: true }).click()
+    const stop = page.getByRole('button', { name: '受付を止める', exact: true })
     await stop.waitFor({ timeout: 15_000 })
     await stop.click()
     await page.waitForFunction(() => true)
