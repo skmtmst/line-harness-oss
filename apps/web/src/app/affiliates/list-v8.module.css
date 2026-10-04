@@ -846,3 +846,20 @@
     display: inline-flex;
   }
 }
+
+/* KdFRI: PCでも主要な列と操作を板の幅に収める。 */
+.affiliateTable { table-layout: fixed; }
+.checkColumn { width: 44px; }
+.metricColumn { width: 88px; }
+.rewardColumn { width: 100px; }
+.actionsColumn { width: 156px; }
+.affiliateTable .personName, .affiliateTable .personCode, .affiliateTable .personPlan { max-width: 100%; }
+@container (max-width: 900px) {
+  .affiliateTable thead th, .affiliateTable tbody td { padding-left: 10px; padding-right: 10px; }
+  .metricColumn { width: 72px; }
+  .rewardColumn { width: 84px; }
+  .actionsColumn { width: 140px; }
+}
+@container (max-width: 600px) {
+  .affiliateTable { min-width: 760px; }
+}

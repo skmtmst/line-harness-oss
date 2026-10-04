@@ -523,7 +523,13 @@ export default function AffiliatesTabV8({
       ) : (
         <div className={styles.tableWrap}>
           <div className={styles.tableScroll}>
-            <table className={styles.table}>
+            <table className={`${styles.table} ${styles.affiliateTable}`}>
+              <colgroup>
+                <col className={styles.checkColumn} /><col />
+                <col className={styles.metricColumn} /><col className={styles.metricColumn} />
+                <col className={styles.metricColumn} /><col className={styles.rewardColumn} />
+                <col className={styles.actionsColumn} />
+              </colgroup>
               <thead>
                 <tr>
                   <th className={styles.cellCheck}>
