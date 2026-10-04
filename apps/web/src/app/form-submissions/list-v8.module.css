@@ -69,12 +69,18 @@
 }
 
 .kpiLabel {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
   color: var(--color-ink-secondary);
   font-size: 12px;
   font-weight: 600;
+}
+
+/* 板のタイル右上の「…」（飾りの印。押しても何も起きない）。 */
+.kpiDots {
+  margin-left: auto;
+  flex: none;
 }
 
 .kpiLabel svg {
@@ -89,7 +95,7 @@
   margin: 0;
   color: var(--color-ink);
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
 }
@@ -182,8 +188,16 @@
   color: var(--color-ink);
 }
 
-/* 道具の段：検索・札・並び順・件数。 */
+/* 道具の段1：作る・フォルダ選び・検索・件数。 */
 .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 道具の段2：絞り込みの札・並び順（板 I3L41O の2段目）。 */
+.chipRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;

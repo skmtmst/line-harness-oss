@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 const list = readFileSync(new URL('../../app/line-notifications/operator-notification-rules.tsx', import.meta.url), 'utf8')
 const page = readFileSync(new URL('../../app/line-notifications/page.tsx', import.meta.url), 'utf8')
-const create = readFileSync(new URL('../../app/line-notifications/operator/new/page.tsx', import.meta.url), 'utf8')
+const createPage = readFileSync(new URL('../../app/line-notifications/operator/new/page.tsx', import.meta.url), 'utf8')
+const create = readFileSync(new URL('../../app/line-notifications/operator/new/operator-new-v8.tsx', import.meta.url), 'utf8')
 const db = readFileSync(new URL('../../../../../packages/db/src/notifications.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../../../../worker/src/routes/notifications.ts', import.meta.url), 'utf8')
 const dispatch = readFileSync(new URL('../../../../worker/src/services/operator-notification-dispatch.ts', import.meta.url), 'utf8')
@@ -14,16 +15,20 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
     expect(page).toContain('<OperatorNotificationRules lineAccountId={selectedAccountId}')
   })
 
-  it('V6の実Node IDを一覧と作成画面に固定する', () => {
+  it('板の印を一覧と作成画面に固定する', () => {
     expect(list).toContain('data-design-node="DpxOK"')
-    expect(create).toContain('data-design-node="N2gAza"')
+    // 板 gjUz3：作る画面はV8だけ。v7の作成画面は捨てた。
+    expect(create).toContain('data-design-node="gjUz3"')
+    expect(createPage).toContain('./operator-new-v8')
+    expect(createPage).not.toContain('NewOperatorNotificationInner')
   })
 
   it('一覧はアカウント別の実行記録APIを読み、未取得を0件にしない', () => {
     // N-342 (#943): 運用者通知の正本APIは /api/line-notifications 配下。
     expect(list).toContain('api.lineNotifications.operatorRules.list(lineAccountId)')
     expect(list).toContain("state === 'ready' ? summary?.published ?? null : null")
-    expect(list).toContain("summary?.total ?? '—'")
+    // 板 u8xibp：受け取る人の実数。未取得のとき0件にしない。
+    expect(list).toContain("state === 'ready' ? summary?.recipients ?? null : null")
     expect(list).toContain('kind="error"')
     expect(list).toContain('kind="forbidden"')
     expect(list).toContain('data-list-state={listState}')
@@ -32,12 +37,12 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
 
   it('作成は実在するスタッフを選び、下書き後に公開・本人テストできる', () => {
     expect(create).toContain("lifecycle: 'draft'")
-    expect(create).toContain('下書きを保存する')
+    expect(create).toContain('下書きを保存')
     expect(create).toContain('operatorRules.previewRecipients')
     expect(create).toContain('operatorRules.publish')
     expect(create).toContain('operatorRules.test')
     // 要件 §12-2: Pencil の仮ラベル「出す」は実装で「運用者へのお知らせを公開」へ変える。
-    expect(create).toContain('>運用者へのお知らせを公開</Button>')
+    expect(create).toContain('運用者へのお知らせを公開')
     expect(create).not.toContain('>出す</Button>')
     expect(create).toContain('自分にテストを送る')
     expect(create).toContain('LINEログイン済みの人にだけ届きます')
@@ -61,7 +66,7 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
 
   it('本文側に大きな画面タイトルを重ねない', () => {
     // NOTIFY-04: ?id= で保存済み下書きを開き直せるため、タイトルは新規/編集で分かれる。
-    expect(create).toContain("usePageTitle(editId ? '運用者へのお知らせをなおす' : '運用者へのお知らせをつくる')")
+    expect(create).toContain("usePageTitle(editId ? '運用者へのお知らせをなおす' : '運用者へのお知らせを作る')")
     expect(create).not.toContain('<Header')
     expect(list).not.toContain('<Header')
   })

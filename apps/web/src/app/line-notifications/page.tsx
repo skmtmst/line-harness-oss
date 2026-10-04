@@ -2,22 +2,18 @@
 
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationRunList from '@/components/line-notifications/notification-run-list'
 import OperatorNotificationRules from './operator-notification-rules'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
 import {
   ApiError,
   api,
@@ -25,7 +21,6 @@ import {
   type EcCommerceOverview,
   type EcNotificationSetting,
   type LineNotificationDefinition,
-  type LineNotificationMetric,
   type LineNotificationSendCounts,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -35,15 +30,14 @@ import {
   type CustomerNotificationKpi,
   type LineNotificationQuota,
 } from './customer-kpis'
-import KpiCollapse from '@/components/ui/kpi-collapse'
+import KpiCard from '@/components/shared/kpi-card'
+import FilterChip from '@/components/shared/filter-chip'
+import { DataTable, NameCell, Td, Th, Tr } from '@/components/shared/table'
 import {
   isForbidden,
   isForbiddenOrRateLimited,
   loadFailureNotice,
 } from '@/components/shared/api-error-message'
-import styles from './customer-notifications.module.css'
-import { formatDateTime } from '@/lib/format'
-
 const customerFilters = [
   ['all', 'すべて'],
   ['enabled', '出している'],
@@ -52,35 +46,13 @@ const customerFilters = [
 ] as const
 type CustomerFilter = typeof customerFilters[number][0]
 type CustomerLoadState = 'loading' | 'ready' | 'error' | 'forbidden'
-const categories = [
-  ['order', '注文'],
-  ['payment', '銀行振込'],
-  ['shipping', '発送'],
-  ['support', 'キャンセル・返金'],
-  ['subscription', '定期便'],
-] as const
-const CUSTOMER_PAGE_SIZE = 6
 
 /**
  * 見出しの下に、**内部のイベントキーを出さない**。
  *
- * ここは `ec_order.confirmed` のような値をそのまま描き、全文を `title` にも
- * 入れていた。設計 `Q55bb` の言う「運用者に伝わる言葉」ではないし、
- * V6の「内部IDを画面に出さない」にも反する。
- * APIが返す区分は、運用者が分かる言葉へ置き換える。
+ * 出来事の言葉は下の eventDeliveryWords（運用者の言葉の一覧）だけから取る。
+ * `ec.order.confirmed` のような口の値をそのまま描かない。
  */
-function categoryLabel(value: EcNotificationSetting['category']): string {
-  return categories.find(([key]) => key === value)?.[1] ?? '区分なし'
-}
-
-/** 「いつ直したか」。取れないときは数を作らず `—`。 */
-function formatUpdatedAt(iso: string | null | undefined): string {
-  if (!iso) return '最終更新 —'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '最終更新 —'
-  return `最終更新 ${formatDateTime(date)}`
-}
-
 function isIncomplete(setting: EcNotificationSetting): boolean {
   return !setting.title?.trim() || !setting.introText.trim() || !setting.outroText.trim()
 }
@@ -655,8 +627,6 @@ function CustomerNotificationEditor({
 }
 
 function LineNotificationsPage() {
-  const theme = useAdminTheme()
-  const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
   /*
    * N-340: `loadGeneration` は load() の useEffect の中でしか進まない。
@@ -673,13 +643,11 @@ function LineNotificationsPage() {
   const [settings, setSettings] = useState<EcNotificationSetting[]>([])
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
   const [definitions, setDefinitions] = useState<LineNotificationDefinition[]>([])
-  const [metrics, setMetrics] = useState<LineNotificationMetric[]>([])
   const [sendCounts, setSendCounts] = useState<LineNotificationSendCounts | null>(null)
   // send-countsだけ取れなかった・形が違ったときの印。一覧全体は表示を続ける。
   const [sendCountsFailed, setSendCountsFailed] = useState(false)
   const [quota, setQuota] = useState<LineNotificationQuota | null>(null)
   const [filter, setFilter] = useState<CustomerFilter>('all')
-  const [customerPage, setCustomerPage] = useState(1)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loadState, setLoadState] = useState<CustomerLoadState>('loading')
   const [busy, setBusy] = useState<string | null>(null)
@@ -721,7 +689,6 @@ function LineNotificationsPage() {
     setSettings([])
     setOverview(null)
     setDefinitions([])
-    setMetrics([])
     setSendCounts(null)
     setSendCountsFailed(false)
     setQuota(null)
@@ -769,16 +736,10 @@ function LineNotificationsPage() {
     // 設定口は列車側で店別になったため、持ち回しはしない。
     const needCustomer = tab === 'customer'
     try {
-      const [settingRes, overviewRes, definitionRes, metricRes, sendCountsRes, quotaRes] = await Promise.all([
+      const [settingRes, overviewRes, definitionRes, sendCountsRes, quotaRes] = await Promise.all([
         api.ecCommerce.settings(selectedAccountId), api.ecCommerce.overview(selectedAccountId),
         needCustomer
           ? api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
-              if (error instanceof ApiError && error.status === 403) throw error
-              return null
-            })
-          : Promise.resolve(null),
-        needCustomer
-          ? api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
               if (error instanceof ApiError && error.status === 403) throw error
               return null
             })
@@ -852,7 +813,6 @@ function LineNotificationsPage() {
       setSettings(withDrafts)
       setOverview(overviewRes.data)
       setDefinitions(loadedDefinitions)
-      setMetrics(metricRes?.success ? metricRes.data.items : [])
       if (sendCountsRes?.success && isSendCountsData(sendCountsRes.data)) {
         setSendCounts(sendCountsRes.data)
         setSendCountsFailed(false)
@@ -909,17 +869,8 @@ function LineNotificationsPage() {
     if (filter === 'incomplete') return isIncomplete(setting)
     return true
   }), sentCountOf), [filter, settings, sentCountOf])
-  const customerPageCount = Math.max(1, Math.ceil(visible.length / CUSTOMER_PAGE_SIZE))
-  const visiblePage = visible.slice((customerPage - 1) * CUSTOMER_PAGE_SIZE, customerPage * CUSTOMER_PAGE_SIZE)
   const expandedSetting = settings.find((setting) => setting.eventType === expanded) ?? null
   const definitionByEvent = useMemo(() => new Map(definitions.map((definition) => [definition.sourceEventType, definition])), [definitions])
-  const metricByEvent = useMemo(() => {
-    const definitionById = new Map(definitions.map((definition) => [definition.id, definition.sourceEventType]))
-    return new Map(metrics.flatMap((metric) => {
-      const eventType = definitionById.get(metric.definitionId)
-      return eventType ? [[eventType, metric] as const] : []
-    }))
-  }, [definitions, metrics])
   const filterCount = (value: CustomerFilter): number => {
     if (value === 'enabled') return settings.filter((setting) => setting.isEnabled).length
     if (value === 'stopped') return settings.filter((setting) => !setting.isEnabled).length
@@ -942,10 +893,9 @@ function LineNotificationsPage() {
    */
   const customerLoadFailed = loadState === 'error' || loadState === 'forbidden'
   const kpis = customerNotificationKpis({
-    ready: loadState === 'ready' && overview !== null,
-    settingsCount: settings.length,
-    enabledCount: settings.filter((setting) => setting.isEnabled).length,
+    ready: loadState === 'ready',
     sentToday: typeof sendCounts?.sentToday === 'number' ? sendCounts.sentToday : null,
+    sentLast30d: typeof sendCounts?.sentLast30d === 'number' ? sendCounts.sentLast30d : null,
     sentBreakdown,
     failed: overview?.failed ?? null,
     quota,
@@ -967,21 +917,20 @@ function LineNotificationsPage() {
     return item
   })
   const update = (eventType: string, patch: Partial<EcNotificationSetting>) => setSettings((current) => current.map((setting) => setting.eventType === eventType ? { ...setting, ...patch } : setting))
-  const renderKpiCard = (kpi: CustomerNotificationKpi) => {
-    const { label, value, unit, note, href } = kpi
-    return <div key={label} className="bg-canvas rounded-card border-hairline border p-3.5">
-      <p className="text-ink-faint text-micro font-semibold">{label}</p>
-      <p className="text-ink text-title mt-1 font-semibold tabular-nums">
-        {value === null ? '—' : value}
-        {value === null || unit === null ? null : <span className="text-ink-faint text-micro ml-1 font-normal">{unit}</span>}
-      </p>
-      <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
-      {/* 0件のときは押し口を出さない。押しても何も無い。 */}
-      {canOpenCustomerNotificationKpi(kpi) && href
-        ? <Button onClick={() => router.replace(href)} className="mt-2">送れなかったものを見る</Button>
-        : null}
-    </div>
-  }
+  // 板 g3iDs：共通の数カード4枚。0件のときは押し口を出さない。押しても何も無い。
+  // 共通カードは数しか受けないので、「上限なし」の文字は valueText へ回す。
+  const renderKpiCard = (kpi: CustomerNotificationKpi) => (
+    <KpiCard
+      key={kpi.label}
+      title={kpi.label}
+      value={typeof kpi.value === 'number' || kpi.value === null ? kpi.value : null}
+      valueText={kpi.valueText ?? (typeof kpi.value === 'string' ? kpi.value : undefined)}
+      unit={kpi.unit ?? ''}
+      detail={kpi.note}
+      loading={loadState === 'loading'}
+      action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '送れなかったものを見る', href: kpi.href } : undefined}
+    />
+  )
   // N-340: 入力のたびに端末へ下書きを置き、未保存の印を付ける。
   const edit = (eventType: string, patch: Partial<EcNotificationSetting>) => {
     const current = settings.find((setting) => setting.eventType === eventType)
@@ -1144,8 +1093,8 @@ function LineNotificationsPage() {
     setBusy(null)
   }
 
-  return <div className={`flex flex-col gap-4 ${expandedSetting === null ? 'v8-ro-notifications-page' : ''}`} data-design-node={theme === 'v8' && expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}>
-    {theme === 'v8' && expandedSetting === null && <ReadonlyHeaderV8 title="LINE通知" description="注文・予約・運用の出来事を知らせます。顧客向けと運用者向けの記録を分けて確認できます。" />}
+  return <div className={`flex flex-col gap-4 ${expandedSetting === null ? 'v8-ro-notifications-page' : ''}`} data-design-node={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}>
+    {expandedSetting === null && <ReadonlyHeaderV8 title="LINE通知" description="注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。" />}
     {expandedSetting === null ? <MergedTabs basePath="/line-notifications" tabs={tabsWithCounts} active={tab} defaultKey="customer" /> : null}
     {/*
       * #634: 運用者タブの件数だけが取れなかったとき、タブの「取得失敗」の
@@ -1246,31 +1195,19 @@ function LineNotificationsPage() {
     {tab === 'customer' && !expandedSetting ? <div
       data-design-node="festr"
       data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
-      className={styles.root}
+      className="flex flex-col gap-4"
     >
-    {/* #975 U060: 7指標を390pxで積まない。先頭2件を出し、残りは「集計を見る」で開く。 */}
-    {/*
-      帯は「お知らせの数」と「月の送信枠」の2まとまり。7枚を4列に流すと
-      2段目が3枚だけ伸びる非対称グリッドになっていた（監査 A13）。
-      送信枠の3枚は全幅のまとまりとして2段目へ置き、中で3列に並べる。
-      KpiCollapseの中に入れるのは、狭い幅で畳む対象から外さないため。
-    */}
-    <KpiCollapse data-design="KPIs" data-ro-kpis="true" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {kpisWithSendCountsState.filter((kpi) => kpi.group === 'notice').map(renderKpiCard)}
-      <section className="sm:col-span-2 xl:col-span-4" aria-label="今月の送信枠">
-        <p className="text-ink-faint mb-2 text-xs font-semibold">今月の送信枠（LINE公式アカウントの月間上限）</p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {kpisWithSendCountsState.filter((kpi) => kpi.group === 'quota').map(renderKpiCard)}
-        </div>
-      </section>
-    </KpiCollapse>
+    {/* 板 g3iDs：数カードは4枚をそのまま並べる。 */}
+    <div data-design="KPIs" data-ro-kpis="true" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {kpisWithSendCountsState.map(renderKpiCard)}
+    </div>
     {/*
       R611: 一覧の取得に失敗したときは、上部の件数も取れていないことを添え、
       下の一覧の再読み込みへ案内する。読み直しの口は一覧の ListState が持つ
       ので、ここにはボタンも帯も置かない。赤も使わない（★V7 `x63W5x`）。
     */}
     {loadState === 'error' ? <p className="text-xs text-ink-secondary">お知らせの件数は取得失敗です。下の一覧の「もう一度読み込む」から読み直してください。</p> : null}
-    <div><NoteBar help="お知らせは売り込みではなく取引に必要な連絡です" helpLabel="お知らせの意味">これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
+    <div><NoteBar help="お知らせは売り込みではなく取引に必要な連絡です" helpLabel="お知らせの意味">これは「お知らせ」であって「売り込みの配信」ではありません。お客さまが配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
     {/*
       send-countsだけ読み込めなかったときの部分表示。一覧全体は残す。
       共通ボタン（副・小）で読み直せる。赤は使わない（★V7 `x63W5x`）。
@@ -1280,11 +1217,9 @@ function LineNotificationsPage() {
       <Button variant="secondary" size="compact" onClick={() => void load()}>もう一度読み込む</Button>
     </div> : null}
 
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="grid w-full max-w-[48rem] grid-cols-2 gap-2 lg:grid-cols-4" aria-label="お知らせの絞り込み">
-        {customerFilters.map(([value, label]) => <button key={value} type="button" onClick={() => { setFilter(value); setCustomerPage(1) }} className={`${styles.category} ${filter === value ? styles.categoryCurrent : ''}`}><span>{label}</span><span className={styles.categoryCount}>{loadState === 'ready' ? filterCount(value) : '—'}</span></button>)}
-      </div>
-      <p className="text-xs text-ink-faint">送った数が多い順</p>
+    {/* 板 g3iDs：絞り込みは共通の札。並びは送った数が多い順のまま。 */}
+    <div className="flex flex-wrap items-center gap-2" aria-label="お知らせの絞り込み">
+      {customerFilters.map(([value, label]) => <FilterChip key={value} selected={filter === value} onChange={() => setFilter(value)}>{label} {loadState === 'ready' ? filterCount(value) : '—'}</FilterChip>)}
     </div>
 
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
@@ -1323,33 +1258,17 @@ function LineNotificationsPage() {
         : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" error={customerLoadError ?? undefined} onRetry={() => void load()} />
         : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />
         : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="絞り込みを変えてください。" />
-        : <>
-        <div className="line-notification-v6-header">
-          <span>お知らせ</span><span>いつ送るか</span><span className="inline-flex items-center gap-1">今日<HelpTip label="今日の件数の説明">今日の0時からいままでに送った数です</HelpTip></span><span className="inline-flex items-center gap-1">この30日<HelpTip label="この30日の件数の説明">今日を含む30日間に送った数です</HelpTip></span><span>LINE上で表示</span><span>操作</span>
-        </div>
-        {visiblePage.map((setting) => <article key={setting.eventType} className="border-b border-hairline last:border-b-0">
-          <div className="line-notification-v6-row">
-            <div className="min-w-0">
-              <h2 className="truncate text-caption font-semibold text-ink" title={setting.title?.trim() || setting.label}>{setting.title?.trim() || setting.label}</h2>
-              <p className="mt-0.5 truncate text-xs text-ink-faint" title={triggerLabel(setting)}>{categoryLabel(setting.category)}・{triggerLabel(setting)}</p>
-              <p className="mt-0.5 truncate text-xs text-ink-faint">{formatUpdatedAt(setting.updatedAt)}</p>
-            </div>
-            <span className="text-caption text-ink-secondary">{timingLabel(setting)}</span>
-            <span className="text-caption tabular-nums text-ink-secondary">{sendCountsFailed ? '取得失敗' : `${sentCountOf(setting.eventType) ?? '—'}通`}</span>
-            <span className="text-caption tabular-nums text-ink-secondary">{sendCountsFailed ? '取得失敗' : `${sent30dOf(setting.eventType) ?? '—'}通`}</span>
-            <span className="text-caption text-ink-faint">{(() => {
-              const displayed = metricByEvent.get(setting.eventType)?.displayed
-              if (!displayed || displayed.value === null) return displayed?.state === 'pending' ? '集計待ち' : '— 未取得'
-              return `${displayed.value}人`
-            })()}</span>
-            <div className="flex items-center justify-end gap-2"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : '止めている'}</span><button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className="line-notification-v6-row-action">{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button></div>
-          </div>
-        </article>)}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-4 py-3">
-          <p className="text-xs text-ink-faint">お知らせの種類 {settings.length}つのうち {visiblePage.length}つを表示</p>
-          <Pagination page={customerPage} pageCount={customerPageCount} onPageChange={setCustomerPage} ariaLabel="お知らせのページ送り" />
-        </div>
-        </>}
+        : <DataTable><thead><tr><Th>お知らせの種類（きっかけ）</Th><Th>いつ送るか</Th><Th>だれに</Th><Th>この30日</Th><Th>状態</Th><Th>出す</Th><Th>内容を編集</Th></tr></thead><tbody>
+        {visible.map((setting) => <Tr key={setting.eventType}>
+          <NameCell name={setting.title?.trim() || setting.label} sub={deliveryWords(setting).trigger} />
+          <Td>{timingLabel(setting)}</Td>
+          <Td>{audienceLabel(setting)}</Td>
+          <Td>{sendCountsFailed ? '取得失敗' : `${sent30dOf(setting.eventType) ?? '—'}通`}</Td>
+          <Td><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : !setting.isEnabled && isIncomplete(setting) ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : isIncomplete(setting) ? '文面が未設定' : '止めている'}</span></Td>
+          <Td><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /></Td>
+          <Td><div className="flex justify-end"><Button variant="secondary" size="compact" onClick={() => setExpanded(setting.eventType)}>内容を編集</Button></div></Td>
+        </Tr>)}
+        </tbody></DataTable>}
     </section>
     </div> : null}
   </div>
