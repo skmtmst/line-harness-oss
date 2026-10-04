@@ -141,8 +141,8 @@ describe('統括 バナー生成', () => {
     expect(modal).toContain('参照画像にする')
     const picker = read('../../../components/hq/banners/reference-picker-dialog.tsx')
     expect(picker).toContain('designNode="UcBQ5"')
-    expect(picker).toContain('この画像を参照にする')
-    expect(picker).toContain('手元のファイルを選ぶ')
+    expect(picker).toContain('この画像を使う')
+    expect(picker).toContain('ファイルを選ぶ')
     // 手元のファイルはプロジェクトへ取り込んでから参照にする（ライブラリにも残る）
     expect(projectPage).toContain('const uploadReference = async (file: File)')
     expect(projectPage).toContain('applyReference(uploaded, input.referenceMode)')
