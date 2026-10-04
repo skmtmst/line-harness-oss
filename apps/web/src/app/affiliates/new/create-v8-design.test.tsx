@@ -69,6 +69,16 @@ describe('Gqve5 作る画面の競合の絵合わせ', () => {
     expect((screen.getByLabelText(/名前（表示名）/) as HTMLInputElement).value).toBe('ペットライフ編集部')
   })
 
+  test('足元の3つが絵どおり（発行に ✓）', async () => {
+    render(<NewAffiliateV8 />)
+    await waitFor(() => {
+      expect(screen.getByText('アフィリエイターを作る')).toBeTruthy()
+    })
+    expect(screen.getByRole('link', { name: 'キャンセル' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '保存して続けて作る' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '登録して紹介リンクを発行する' })).toBeTruthy()
+  })
+
   test('報酬の決め方の文言が絵どおり', async () => {
     render(<NewAffiliateV8 />)
     await waitFor(() => {

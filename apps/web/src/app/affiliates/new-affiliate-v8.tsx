@@ -11,6 +11,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { Check } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { Friend } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -623,7 +624,7 @@ export function NewAffiliateV8() {
               busyLabel="登録中..."
               onClick={() => void runSave('finish')}
             >
-              登録して紹介リンクを発行する
+              <Check size={15} aria-hidden="true" /> 登録して紹介リンクを発行する
             </Button>
           </>
         )}
