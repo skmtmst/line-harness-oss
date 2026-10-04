@@ -3,7 +3,6 @@
 import ReadonlyHeader from './readonly-header-v8'
 import AccountBrowser from './account-browser-v8'
 import './readonly-v8.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, fetchApi } from '@/lib/api'
@@ -14,7 +13,6 @@ import { classifyApiFailure, loadFailureNotice } from '@/components/shared/api-e
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import { AccountArchiveDialog, AccountRestoreDialog, AccountSettingsDialog } from './account-settings-dialogs'
 import KpiCard from '@/components/shared/kpi-card'
@@ -23,7 +21,6 @@ import OperatorHistory from '@/components/hq/operator-history'
 import PlatformNotices from '@/components/hq/platform-notices'
 
 export default function HqPage() {
-  const theme = useAdminTheme()
   // 左のメニューと同じ名前を見出しにする（バナー生成・課金プランなどと同じ書き方）。
   usePageTitle('アカウント')
   const router = useRouter()
@@ -118,9 +115,9 @@ export default function HqPage() {
   const month = new Date().getMonth() + 1
 
   return (
-    <div data-design-node={theme === 'v8' ? 'JKjsE' : 'MjMCg'} className="v8-ro-hq-page flex flex-col gap-4">
+    <div data-design-node="JKjsE" className="v8-ro-hq-page flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      {theme === 'v8' && <ReadonlyHeader title="統括のアカウント" description="各アカウントの接続状態、友だち、配信の状況を確認できます。" />}
+      <ReadonlyHeader title="統括のアカウント" description="各アカウントの接続状態、友だち、配信の状況を確認できます。" />
       <PlatformNotices />
       <div data-design="Actions" data-design-node="x5Tkb6" className="flex flex-wrap justify-end gap-2">
         <Button
@@ -129,9 +126,6 @@ export default function HqPage() {
           disabled={checkingConnections || loading || accounts.length === 0}
           onClick={() => { void refreshConnectionInfo() }} busy={checkingConnections} busyLabel="接続情報を更新中">LINE ID・接続状態を更新する
         </Button>
-        {theme !== 'v8' && <Button href="/accounts/new" variant="primary" className="shrink-0">
-          ＋ LINEアカウントを登録する
-        </Button>}
       </div>
 
       {connectionProgress ? <p className="mb-4 text-sm text-ink-secondary" role="status">{connectionProgress}</p> : null}
@@ -188,7 +182,16 @@ export default function HqPage() {
       ) : null}
 
       {!loadError && !loading && accounts.length > 0 ? (
-        theme === 'v8' ? <AccountBrowser accounts={accounts} onSelect={login} onSettings={setSettingsAccount} /> : <HqAccountList accounts={accounts} onSelect={login} onSettings={setSettingsAccount} />
+        <AccountBrowser
+          accounts={accounts}
+          onSelect={login}
+          onSettings={setSettingsAccount}
+          onDetail={setEditingAccount}
+          onRestore={(account) => setArchiveTarget({ account, mode: 'restore' })}
+          onRefreshConnection={() => { void refreshConnectionInfo() }}
+          checkingConnections={checkingConnections}
+          onChanged={() => { void reloadAfterSave() }}
+        />
       ) : null}
 
       {/* 運営が書き込みを伴う操作をしたときだけ出る（★V6 37-5）。 */}

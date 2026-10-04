@@ -87,9 +87,10 @@ describe('お問い合わせ（36-3）', () => {
     expect(support).toContain('accept="image/png,image/jpeg"')
   })
 
-  it('送信は下部追従バーにしか置かず、控えが届くことを状態文で言う', () => {
-    expect(support).toContain('<StickyBar')
-    expect(support).toContain('送信すると、控えが登録メールアドレスにも届きます')
+  it('送信は問い合わせカードの中に置き、下部追従バーは出さない（板 b8xBtZ）', () => {
+    expect(support).not.toContain('<StickyBar')
+    expect(support).toContain('内容をクリア')
+    expect(support).toContain('控えが登録メールアドレスにも届きます')
     expect(support).toContain('api.hqSupport.create(')
   })
 
