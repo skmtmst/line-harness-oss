@@ -11,13 +11,13 @@ function measureLayout() {
     display: getComputedStyle(element).display,
     rect: element.getBoundingClientRect().toJSON(),
   }))
-  return { width: innerWidth, frame: frame.getBoundingClientRect().toJSON(), board: board.getBoundingClientRect().toJSON(), regions }
+  return { width: innerWidth, height: innerHeight, frame: frame.getBoundingClientRect().toJSON(), board: board.getBoundingClientRect().toJSON(), regions }
 }
 
-export async function probeTemplates(tab, viewport, fs, base, output) {
+export async function probeTemplates(tab, viewport, fs, base, output, height = 1000) {
   const measurements = []
   for (const width of [1152, 1280, 1440, 1920]) {
-    await viewport.set({ width, height: 900 })
+    await viewport.set({ width, height })
     for (const kind of kinds) {
       await tab.goto(`${base}/v8-templates?type=${kind}&capture=1`)
       await tab.playwright.locator('[data-page-template]').waitFor({ state: 'visible', timeoutMs: 15000 })
@@ -32,7 +32,7 @@ export async function probeTemplates(tab, viewport, fs, base, output) {
       if (collapsible.some((region) => (region.display === 'none') !== narrow)) issues.push('板幅1100pxの折り畳みが効いていない')
       if (kind === 'create' || kind === 'settings') {
         const footer = result.regions.find((region) => region.region === 'footer')
-        if (!footer || footer.rect.bottom > 900 || footer.rect.top < 60 || footer.rect.height < 36) issues.push('保存の帯が画面内に収まっていない')
+        if (!footer || footer.rect.bottom > height || footer.rect.top < 60 || footer.rect.height < 36) issues.push('保存の帯が画面内に収まっていない')
       }
       if (kind === 'settings') {
         const content = result.regions.find((region) => region.region === 'content')

@@ -27,6 +27,9 @@ regions = {
 summary = {}
 for kind, capture in captures.items():
  impl, ref = capture['implementation'], capture['reference']
+ for mode,data in [('implementation',impl),('reference',ref)]:
+  if data.get('viewport') != {'width':1440,'height':1000}:
+   raise ValueError(f'正本と同じ1440×1000の撮影が必要です: {kind}/{mode}')
  if len(impl['boxes']) < 20 or len(ref['boxes']) < 20:
   raise ValueError(f'途中の描画を撮っています: {kind}')
  measurements = []
@@ -60,7 +63,7 @@ for kind, capture in captures.items():
  images=[]
  for mode,data in [('implementation',impl),('reference',ref)]:
   im=Image.open(source/f'{kind}-{mode}.jpg').convert('RGB')
-  if im.width!=1440:raise ValueError(f'1440幅ではありません: {kind}/{mode}')
+  if im.size!=(1440,1000):raise ValueError(f'1440×1000の画像ではありません: {kind}/{mode}')
   draw=ImageDraw.Draw(im)
   for r in data['texts']:
    if r['width']>0 and r['height']>0:
