@@ -316,48 +316,48 @@ function mileageSourceLabel(source: string): string {
 }
 
 /**
- * 貯まったマイル (S3uBl の上の深い緑のカード)。
+ * 貯まったマイル (白地に緑の数のカード。オーナー「黒がいや」)。
  * 使えるマイル・確定待ち・内訳4つ・合算の注記を出す。
  */
 function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
   const { mileage, insights } = wallet;
   return (
-    <section aria-label="貯まったマイル" className="rounded-2xl bg-liff-deep p-[18px] text-white">
+    <section aria-label="貯まったマイル" className="rounded-2xl border border-hairline bg-canvas p-[18px] text-ink">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs text-white/70">使えるマイル</p>
+        <p className="text-xs text-ink-secondary">使えるマイル</p>
         {mileage.pending > 0 && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-bold whitespace-nowrap">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-liff-soft px-2.5 py-1 text-xs font-bold whitespace-nowrap text-liff-primary">
             確定待ち {mileage.pending.toLocaleString()}
             <HelpTip label="確定待ちの説明" align="right">条件の確定を待っているマイルです。</HelpTip>
           </span>
         )}
       </div>
-      <p className="mt-3 text-4xl font-bold tracking-tight tabular-nums">
+      <p className="mt-3 text-4xl font-bold tracking-tight tabular-nums text-liff-primary">
         {mileage.available.toLocaleString()}
-        <span className="ml-1 text-[13px] text-white/70">マイル</span>
+        <span className="ml-1 text-[13px] text-ink-secondary">マイル</span>
       </p>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-[11px] text-white/70">これまでに得た</p>
-          <p className="mt-1 text-lg font-bold tabular-nums">{mileage.lifetimeEarned.toLocaleString()}</p>
+        <div className="rounded-xl bg-liff-soft p-3">
+          <p className="text-[11px] text-ink-secondary">これまでに得た</p>
+          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{mileage.lifetimeEarned.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-[11px] text-white/70">紹介で得た</p>
-          <p className="mt-1 text-lg font-bold tabular-nums">{insights.referralMiles.toLocaleString()}</p>
+        <div className="rounded-xl bg-liff-soft p-3">
+          <p className="text-[11px] text-ink-secondary">紹介で得た</p>
+          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{insights.referralMiles.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-[11px] text-white/70">使った</p>
-          <p className="mt-1 text-lg font-bold tabular-nums">{mileage.spent.toLocaleString()}</p>
+        <div className="rounded-xl bg-liff-soft p-3">
+          <p className="text-[11px] text-ink-secondary">使った</p>
+          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{mileage.spent.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-[11px] text-white/70">良質な紹介</p>
-          <p className="mt-1 text-lg font-bold tabular-nums">{insights.qualityReferralCount.toLocaleString()}人</p>
+        <div className="rounded-xl bg-liff-soft p-3">
+          <p className="text-[11px] text-ink-secondary">良質な紹介</p>
+          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{insights.qualityReferralCount.toLocaleString()}人</p>
         </div>
       </div>
 
       {insights.accountCount > 1 && (
-        <p className="mt-3 text-xs leading-relaxed text-white/70">
+        <p className="mt-3 text-xs leading-relaxed text-ink-secondary">
           {insights.accountCount}個のLINE公式アカウントで貯めたマイルを合算しています
         </p>
       )}

@@ -45,20 +45,26 @@
 
 /* 数の帯：4つのマス。アイコンつき。 */
 .kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
 }
 
 .kpi {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
+  padding: 10px 16px;
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpi:first-child {
+  border-left: 0;
 }
 
 .kpiLabel {
@@ -67,7 +73,7 @@
   gap: 6px;
   color: var(--color-ink-secondary);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .kpiLabel svg {
@@ -78,7 +84,7 @@
   margin: 0;
   color: var(--color-ink);
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
 }
@@ -508,10 +514,7 @@
 
 /* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
 @container (max-width: 1099px) {
-  .kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
+  /* 数の帯は1本のまま（`wjfLe`）。2段にしない。 */
   .split {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -530,12 +533,8 @@
   }
 }
 
-/* さらに狭い板では数の帯も1列に。 */
+/* さらに狭い板でも数の帯は1本のまま。 */
 @container (max-width: 560px) {
-  .kpis {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .searchWrap {
     width: 100%;
   }
