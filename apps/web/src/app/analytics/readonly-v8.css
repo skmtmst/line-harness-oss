@@ -80,3 +80,18 @@
 [data-theme='v8'] .v8-ro-analytics-page > [data-design='Head'],
 [data-theme='v8'] .v8-ro-analytics-page > .v8-ro-analytics-space-y-5 { margin-inline: 24px; }
 [data-theme='v8'] .v8-ro-analytics-content .grid:has(> [data-design-version]:nth-child(5)) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+/* ws9wt: HTMLの余白をグラフと右欄に配る。 */
+[data-theme='v8'] .v8-ro-analytics-page { container-type: inline-size; container-name: analytics-board; }
+[data-theme='v8'] .v8-ro-analytics-friendsBody { grid-template-columns: minmax(0, 1fr) 320px; padding: 0; gap: 0; }
+[data-theme='v8'] .v8-ro-analytics-trend { border: 0; border-radius: 0; padding: 24px 28px; }
+[data-theme='v8'] .v8-ro-analytics-friendsAside { padding: 24px; border-left: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
+[data-theme='v8'] .v8-ro-analytics-breakdown { padding: 20px; background: var(--color-canvas); }
+@container analytics-board (max-width: 1099px) {
+  [data-theme='v8'] .v8-ro-analytics-friendsBody { grid-template-columns: minmax(0, 1fr); }
+  [data-theme='v8'] .v8-ro-analytics-friendsAside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-left: 0; border-top: 1px solid var(--color-hairline); }
+}
+@container analytics-board (max-width: 650px) {
+  [data-theme='v8'] .v8-ro-analytics-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-theme='v8'] .v8-ro-analytics-friendsAside { grid-template-columns: minmax(0, 1fr); }
+}

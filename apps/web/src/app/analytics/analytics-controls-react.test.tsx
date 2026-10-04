@@ -24,7 +24,7 @@ const net = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: ({ children }: { children?: unknown }) => children }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/analytics',
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/components/layout/merged-tabs', () => ({

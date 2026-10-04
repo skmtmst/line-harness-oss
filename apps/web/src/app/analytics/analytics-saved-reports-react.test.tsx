@@ -29,7 +29,7 @@ vi.mock('next/link', () => ({
     <a href={href}>{children}</a>
   ),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/analytics',
   useSearchParams: () => new URLSearchParams(),
 }))
 
