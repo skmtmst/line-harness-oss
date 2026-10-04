@@ -52,6 +52,22 @@ describe('テーマの切り替え（V8 移行②）', () => {
     expect(settings).toContain('ThemePreviewSwitch')
   })
 
+  it('G6：検証環境の既定は V8・本番は付けない（v7 のまま）', () => {
+    const staging = readFileSync(join(WEB, '..', '..', '.github', 'workflows', 'deploy-cloudflare-staging.yml'), 'utf8')
+    expect(staging).toContain("NEXT_PUBLIC_ADMIN_THEME: 'v8'")
+    const prod = readFileSync(join(WEB, '..', '..', '.github', 'workflows', 'deploy-cloudflare-admin.yml'), 'utf8')
+    expect(prod).not.toContain('NEXT_PUBLIC_ADMIN_THEME')
+  })
+
+  it('G6：上バーに「前の見た目に戻す」があり、V8 のときだけ渡す', () => {
+    const topBar = readFileSync(join(WEB, 'src', 'components', 'shared', 'top-bar.tsx'), 'utf8')
+    const appTopBar = readFileSync(join(WEB, 'src', 'components', 'shell', 'app-top-bar.tsx'), 'utf8')
+    expect(topBar).toContain('前の見た目に戻す')
+    expect(topBar).toContain('onRevertTheme')
+    expect(appTopBar).toContain("applyAdminTheme('v7')")
+    expect(appTopBar).toContain("=== 'v8'")
+  })
+
   // 画面列挙でリポジトリを走査するため CI の遅い環境でも間に合う余裕を持つ。
   it('台帳が部品ごと・画面ごとの状態を数える', { timeout: 60_000 }, () => {
     const report = collectReport()
