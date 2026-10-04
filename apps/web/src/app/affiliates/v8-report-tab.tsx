@@ -294,7 +294,7 @@ export default function ReportTabV8({
       </KpiStrip>
 
       <NoticeBar>
-        期間は{monthLabel(period)}です。数は「認めた成果」だけ。成果地点ごとのレポートは「分析›レポート」で見られます。
+        期間は{monthLabel(period)}。数は「認めた成果」だけ。成果地点ごとのレポートは「分析 › レポート」で見られます。
       </NoticeBar>
 
       <div className={styles.tools}>
@@ -309,6 +309,23 @@ export default function ReportTabV8({
         <FilterChip selected={view === 'affiliate'} onChange={() => setView('affiliate')}>アフィリエイターごと</FilterChip>
         <FilterChip selected={view === 'offer'} onChange={() => setView('offer')}>案件ごと</FilterChip>
         <span className={styles.toolsSpacer} />
+        <Select
+          aria-label="よく使う絞り込み"
+          value=""
+          options={[
+            { value: '', label: 'よく使う絞り込み' },
+            { value: 'affiliate-this', label: 'アフィリエイターごと・今月' },
+            { value: 'offer-this', label: '案件ごと・今月' },
+            { value: 'affiliate-last', label: 'アフィリエイターごと・先月' },
+            { value: 'offer-last', label: '案件ごと・先月' },
+          ]}
+          onChange={(value) => {
+            if (value === 'affiliate-this') { setView('affiliate'); setPeriod('this_month') }
+            else if (value === 'offer-this') { setView('offer'); setPeriod('this_month') }
+            else if (value === 'affiliate-last') { setView('affiliate'); setPeriod('last_month') }
+            else if (value === 'offer-last') { setView('offer'); setPeriod('last_month') }
+          }}
+        />
         <Select
           aria-label="期間"
           value={period}
@@ -342,7 +359,7 @@ export default function ReportTabV8({
                   <th>アフィリエイター（いちばん多い案件）</th>
                   <th className={styles.numRight}>成果・売上</th>
                   <th className={styles.numRight}>報酬{period !== 'all' ? '（先月より）' : ''}</th>
-                  <th className={styles.numRight}>操作</th>
+                  <th aria-label="操作" className={styles.numRight} />
                 </tr>
               </thead>
               <tbody>
