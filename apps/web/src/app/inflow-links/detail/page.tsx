@@ -55,16 +55,6 @@ interface AttributedFriend {
 }
 
 function InflowLinkDetailPageContent() {
-  /*
-   * ★V8-B 流入と計測の詳細（板 `Q5le3`）。
-   * v8 のときだけ新しい見せ方。v7 の描画は下のまま残す。
-   */
-  const theme = useAdminTheme()
-  if (theme === 'v8') return <InflowDetailV8 />
-  return <InflowLinkDetailBody />
-}
-
-function InflowLinkDetailBody() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
@@ -870,7 +860,6 @@ function InflowLinkDetailBody() {
           <div className="flex items-center justify-between border-t border-hairline px-6 py-4" style={{ minHeight: 82 }}><p className="max-w-md text-xs text-ink-faint">選んだ方法を確認してから進みます。過去の友だち・タグ・分析記録は消えません。</p><div className="flex gap-2"><Button variant="secondary" disabled={deleting} onClick={() => setDeleteOpen(false)}>キャンセル</Button><Button onClick={() => void applyDeleteChoice()} disabled={deleting || (deleteChoice === 'delete' && deleteConfirmationName !== route.name)}>{deleteChoice === 'stop' ? '受けるのをやめる' : deleteChoice === 'redirect' ? '別のリンクへ送る' : 'この経路を削除する'}</Button></div></div>
         </div>
       </div>}
-    </div>
     </div>
   )
 }

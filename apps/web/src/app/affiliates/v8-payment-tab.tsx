@@ -24,7 +24,6 @@ import {
 } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
-import StatusBadge from '@/components/shared/status-badge'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -356,7 +355,7 @@ export default function PaymentTabV8({
             <span className={`af-list-statusBadge ${closed ? 'af-list-statusOk' : 'af-list-statusWarn'}`}>
               <span className="af-list-statusDot" aria-hidden="true" />
               {closed ? '締め済み' : 'まだ締めていません'}
-            </StatusBadge>
+            </span>
           </div>
           <div className="af-list-closeCell">
             <span className="af-list-closeLabel">期間</span>

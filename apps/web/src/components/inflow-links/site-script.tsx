@@ -655,7 +655,6 @@ export default function SiteScript() {
         onCancel={() => { if (!siteBusy) setResumeTarget(null) }}
       />
     </div>
-    </div>
   )
 }
 

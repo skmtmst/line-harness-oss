@@ -985,7 +985,6 @@ export default function AdIntegration({
         ) : null}
       </Dialog>
     </div>
-    </div>
   )
 }
 

@@ -10,9 +10,10 @@
  * v7 を直す必要が出たら向こうも同じ判断を入れる（V8 完成までの二重管理）。
  *
  * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
+ * - 状態の「止めている」：止めた鍵は一覧に出ないので、一覧の行は
+ *   「使っている」だけ出す。
  * - 行の「…」の中身：止めるだけ出す。名前を変える・できることを変えるは
- *   変える口が無いので足さない。止めている行の「…」も止める操作が無いので
- *   出さず、「動かす」ボタンだけ出す。
+ *   変える口が無いので足さない。
  * - 失効・ローテーションの確認：入れ替え確認の文と発行直後の1回表示で
  *   見せる（`ralAc` の指摘どおり維持する）。
  */
@@ -75,7 +76,6 @@ function ApiTokensV8Inner() {
   const [copied, setCopied] = useState(false)
   const [rotateTarget, setRotateTarget] = useState<IntegrationApiTokenInfo | null>(null)
   const [revokeTarget, setRevokeTarget] = useState<IntegrationApiTokenInfo | null>(null)
-  const [reactivateTarget, setReactivateTarget] = useState<IntegrationApiTokenInfo | null>(null)
   const [mutating, setMutating] = useState(false)
   const [dialogError, setDialogError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
@@ -109,7 +109,7 @@ function ApiTokensV8Inner() {
     setStatus('loading')
     setLoadError('')
     try {
-      const res = await api.webhooks.apiTokens.list(requestAccountId, true)
+      const res = await api.webhooks.apiTokens.list(requestAccountId)
       if (loadGenerationRef.current !== requestGeneration || selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
         setStatus('error')
@@ -257,39 +257,6 @@ function ApiTokensV8Inner() {
       if (selectedAccountIdRef.current !== requestAccountId) return
       setDialogError(describeApiFailure(caught, '停止', {
         forbidden: '鍵の停止は統括だけができます。必要なときは統括に頼んでください。',
-      }))
-    } finally {
-      if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
-    }
-  }
-
-  const handleReactivate = async (stepUpToken?: string) => {
-    setDialogError('')
-    const requestAccountId = selectedAccountId
-    if (!requestAccountId || !reactivateTarget) return
-    setMutating(true)
-    try {
-      const res = await api.webhooks.apiTokens.reactivate(reactivateTarget.id, requestAccountId, stepUpToken)
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      if (!res.success) {
-        setDialogError(res.error)
-        return
-      }
-      setReactivateTarget(null)
-      await load()
-    } catch (caught) {
-      if (!stepUpToken && isStepUpRequired(caught)) {
-        const target = reactivateTarget
-        setStepUp({
-          purpose: 'webhook.api_token',
-          action: `「${target?.name ?? ''}」の鍵を動かす`,
-          retry: (token) => handleReactivate(token),
-        })
-        return
-      }
-      if (selectedAccountIdRef.current !== requestAccountId) return
-      setDialogError(describeApiFailure(caught, '再開', {
-        forbidden: '鍵の再開は統括だけができます。必要なときは統括に頼んでください。',
       }))
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setMutating(false)
@@ -475,22 +442,8 @@ function ApiTokensV8Inner() {
                         <td><span className={styles.nameCell} title={token.scopes.map(scopeLabel).join('・')}>{token.scopes.map(scopeLabel).join('・')}</span></td>
                         <td className={styles.dimCell}>{formatDateTime(token.createdAt)}</td>
                         <td className={styles.dimCell}>{formatDateTime(token.lastUsedAt)}</td>
-                        <td>
-                          {revoked
-                            ? <span className={`${styles.pill} ${styles.pillStopped}`}>● 止めている</span>
-                            : <span className={`${styles.pill} ${styles.pillActive}`}>● 使っている</span>}
-                        </td>
+                        <td><span className={`${styles.pill} ${styles.pillActive}`}>● 使っている</span></td>
                         <td className={styles.opsCell}>
-                          {revoked ? (
-                            <Button
-                              onClick={() => {
-                                setDialogError('')
-                                setReactivateTarget(token)
-                              }}
-                            >
-                              動かす
-                            </Button>
-                          ) : (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                             <Button
                               onClick={() => {
@@ -523,11 +476,9 @@ function ApiTokensV8Inner() {
                               }]}
                             />
                           </span>
-                          )}
                         </td>
                       </tr>
-                      )
-                    })}
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -564,20 +515,6 @@ function ApiTokensV8Inner() {
         onCancel={() => {
           if (mutating) return
           setRevokeTarget(null)
-          setDialogError('')
-        }}
-      />
-      <ConfirmDialog
-        open={reactivateTarget !== null}
-        title={`「${reactivateTarget?.name ?? ''}」の鍵を動かしますか？`}
-        description="この鍵での外からの操作をもう一度受け付けます。鍵の文字は変わりません。"
-        confirmLabel="動かす"
-        busy={mutating}
-        error={dialogError}
-        onConfirm={() => void handleReactivate()}
-        onCancel={() => {
-          if (mutating) return
-          setReactivateTarget(null)
           setDialogError('')
         }}
       />

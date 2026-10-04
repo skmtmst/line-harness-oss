@@ -733,6 +733,6 @@ export default function NewInflowLinkPage() {
     </div>
 
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した流入リンク" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </>
   )
 }
