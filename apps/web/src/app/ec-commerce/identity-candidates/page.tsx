@@ -25,6 +25,7 @@ import { useIdentityReview } from '@/components/identity/identity-review'
 import { impactText, maskedText, NOT_AVAILABLE } from '@/components/identity/identity-view'
 import styles from '@/components/identity/identity-review.module.css'
 import { useAccount } from '@/contexts/account-context'
+import { formatNumber } from '@/lib/format'
 import { ApiError, api, type EcIdentityCandidateOperationsList } from '@/lib/api'
 import { ORDER_IMPACT_KEYS, REVENUE_IMPACT_KEYS, type IdentityCandidateImpactMetric } from '@line-crm/shared'
 import EcTabs from '../ec-tabs-view'
@@ -70,7 +71,8 @@ export default function EcIdentityCandidatesPage() {
   const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)
   const [operationsState, setOperationsState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
   const [view, setView] = useState<'all' | 'candidate' | 'none' | 'conflict'>('all')
-  const [sort, setSort] = useState<'newest' | 'confidence'>('newest')
+  /* w1W8h：絵の並び順は「確からしさが高い順」。 */
+  const [sort, setSort] = useState<'newest' | 'confidence'>('confidence')
 
   /*
    * R600残件：アカウント切替で先行した集計要求の応答が後から届いても
@@ -189,14 +191,18 @@ export default function EcIdentityCandidatesPage() {
 
       {pageState === 'ready' ? (
         <>
+          {/*
+            w1W8h：絵の順番・言葉に寄せる（自動で結びついた→候補が見つかった→
+            結びついていない→結びついていない注文の金額、単位は人／¥）。
+            つき合わせ総数は2枚目の補足へ移し、カードでは繰り返さない。
+          */}
           <div data-ro-kpis="true" className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             <KpiCard
               variant="v6"
-              title="結びついていない"
-              value={operationsReady ? (operations?.summary.unmatched ?? null) : null}
-              unit="件"
-              detail={operationsDetail('確認待ちの注文・会員')}
-              badge="要対応"
+              title="自動で結びついた"
+              value={operationsReady ? (operations?.summary.linked ?? null) : null}
+              unit="人"
+              detail={operationsDetail('メールか電話番号が同じ')}
               loading={operationsState === 'loading'}
               onRetry={operationsRetry}
             />
@@ -204,30 +210,33 @@ export default function EcIdentityCandidatesPage() {
               variant="v6"
               title="候補が見つかった"
               value={operationsReady ? candidateCount : null}
-              unit="件"
-              detail={operationsDetail('')}
+              unit="人"
+              detail={operationsReady
+                ? `人が決める（つき合わせ ${formatNumber(operations?.summary.unmatched ?? 0)} のうち）`
+                : operationsDetail('人が決める')}
               help="名前や電話が近い人がいます"
               loading={operationsState === 'loading'}
             />
             <KpiCard
               variant="v6"
-              title="自動で結びついた"
-              value={operationsReady ? (operations?.summary.linked ?? null) : null}
-              unit="件"
-              detail={operationsDetail('')}
-              help="同じ人として結びついた会員です"
+              title="結びついていない"
+              value={operationsReady ? noneCount : null}
+              unit="人"
+              detail={operationsDetail('候補なし')}
+              help="候補が見つからなかった注文・会員です"
               loading={operationsState === 'loading'}
             />
-            {/*
-              m22d: 「24件」は「結びついていない」のカードと一覧の件数に集約し、
-              ここでは繰り返さない。売上の中身は「？」へ移す。
-            */}
             <KpiCard
               variant="v6"
-              title="結びつけると増える売上"
-              value={operationsReady ? (operations?.summary.potentialRevenue ?? null) : null}
-              unit="円"
-              detail={operationsDetail('分析にも入ります')}
+              title="結びついていない注文の金額"
+              value={null}
+              unit=""
+              valueText={operationsReady && operations?.summary.potentialRevenue != null
+                ? `¥${formatNumber(operations.summary.potentialRevenue)}`
+                : undefined}
+              detail={operationsReady
+                ? `候補 ${formatNumber(candidateCount)} 人の注文`
+                : operationsDetail('分析にも入ります')}
               help="結びついていない注文・会員の売上見込みです"
               loading={operationsState === 'loading'}
             />

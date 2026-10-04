@@ -52,7 +52,8 @@ describe('V6 EC integration screens', () => {
     for (const wording of ['処理完了', '処理中', '送信なし', '失敗']) {
       expect(page).toContain(wording)
     }
-    for (const wording of ['候補が見つかった', '自動で結びついた', '結びつけると増える売上', '同じ人が2人いる疑い']) {
+    /* w1W8h：4枚目の見出しは絵どおり「結びついていない注文の金額」。 */
+    for (const wording of ['候補が見つかった', '自動で結びついた', '結びついていない注文の金額', '同じ人が2人いる疑い']) {
       expect(identity).toContain(wording)
     }
     expect(page).toContain('order.orderLines.map')
