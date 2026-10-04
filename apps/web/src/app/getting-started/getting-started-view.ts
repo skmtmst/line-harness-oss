@@ -39,7 +39,7 @@ export const STEP_STATE_LABEL: Record<StepState, string> = {
   unknown: '確かめられません',
 }
 
-export type StepKey = 'accounts' | 'featureSet' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
+export type StepKey = GettingStartedStep['key']
 
 export interface StepResult {
   key: StepKey
@@ -278,13 +278,14 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
   })
 
   return display
-    .filter((base) => base.key !== 'featureSet')
+    .filter((base) => base.key !== 'featureSet' || byKey.has('featureSet'))
     .map((base) => {
     const server = byKey.get(base.key)
     if (!server) return { ...base, state: 'unknown', action: null, blockedReason: '状態を取得できませんでした' }
 
     const state = server.state
     const nextByState: Record<StepKey, Partial<Record<StepState, string>>> = {
+      featureSet: { done: '終わっています。機能設定で見直せます。', todo: '業種に合わせて使う機能を選び、保存してください。' },
       accounts: {
         done: '終わっています。つなぎ先を見直したいときはこちらから。',
         stalled: server.reason ?? 'Webhookかシークレットがまだ確かめられていません。',

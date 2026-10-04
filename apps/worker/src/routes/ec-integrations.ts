@@ -1,3 +1,5 @@
+import { savePublicationDailyViews } from '@line-crm/db';
+import type { PublicationViewSample } from '@line-crm/shared';
 import { Hono } from 'hono';
 import {
   decryptCredential,
@@ -126,11 +128,7 @@ export type EcEvent = {
    * 公式サイトの掲載写真の閲覧数（F-20）。
    * ECが数えた累計を写真ID単位で送る。musuboは大きい方だけ残す。
    */
-  publication_views?: Array<{
-    photo_id?: string | number | null;
-    view_count?: number | null;
-    placement_label?: string | null;
-  }> | null;
+  publication_views?: PublicationViewSample[] | null;
 };
 
 function utf8Length(value: string): number {
@@ -169,10 +167,16 @@ function isValidPublicationViews(value: unknown): boolean {
   if (!Array.isArray(value) || value.length === 0 || value.length > 100) return false;
   for (const item of value) {
     if (!item || typeof item !== 'object') return false;
-    const view = item as { photo_id?: unknown; view_count?: unknown; placement_label?: unknown };
+    const view = item as { photo_id?: unknown; view_count?: unknown; placement_label?: unknown; view_date?: unknown };
     const photoId = String(view.photo_id ?? '').trim();
     if (!photoId || photoId.length > 128) return false;
-    if (!Number.isFinite(view.view_count) || Number(view.view_count) < 0) return false;
+    if (!Number.isSafeInteger(view.view_count) || Number(view.view_count) < 0) return false;
+    if (view.view_date !== undefined) {
+      if (typeof view.view_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(view.view_date)) return false;
+      const date = new Date(`${view.view_date}T00:00:00Z`);
+      if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0,10) !== view.view_date
+        || view.view_date > new Date().toISOString().slice(0,10)) return false;
+    }
     if (view.placement_label != null
       && (typeof view.placement_label !== 'string' || view.placement_label.trim().length > 512)) return false;
   }
@@ -487,9 +491,17 @@ export async function applyPublicationViewCounts(
       unknownPhotos.push(photoId);
       continue;
     }
+    if (view.view_date) {
+      await savePublicationDailyViews(db, {
+        publicationId: publication.id, lineAccountId, viewDate: view.view_date,
+        placementLabel: view.placement_label?.trim() ?? '', viewCount: reported, now,
+      });
+      saved.push({ photo_id: photoId, view_count: reported, placement_label: view.placement_label?.trim() || null });
+      continue;
+    }
     const next = Math.max(Number(publication.view_count ?? 0), reported);
     await db.prepare(
-      `UPDATE nen_photo_publications SET view_count = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE nen_photo_publications SET view_count = MAX(COALESCE(view_count,0),?), updated_at = ? WHERE id = ?`,
     ).bind(next, now, publication.id).run();
     const label = typeof view.placement_label === 'string' ? view.placement_label.trim().slice(0, 512) : '';
     if (label) {
@@ -723,16 +735,18 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
    */
   if (event.event_type === PUBLICATION_VIEW_EVENT_TYPE) {
     // 台帳に既にある event_id（EC側の再送）は触らず、受け付け済みとして返す。
-    if (!inserted.meta.changes) {
+    if (!inserted.meta.changes && (row.status === 'processed' || row.status === 'skipped')) {
       return c.json({ success: true, duplicate: true, status: row.status });
     }
     try {
       const result = await applyPublicationViewCounts(
         c.env.DB, lineAccountId, event.publication_views ?? [], now,
       );
+      await c.env.DB.prepare(`UPDATE ec_events SET status = 'processed', processed_at = ?, updated_at = ?, error_message = NULL WHERE id = ?`).bind(now,now,row.id).run();
       return c.json({ success: true, status: 'view_counts_saved', ...result });
     } catch (viewError) {
-      console.error(`[ec-event] publication views failed event=${event.event_id}`, viewError);
+      await c.env.DB.prepare(`UPDATE ec_events SET status = 'failed', error_message = 'publication_views_failed', updated_at = ? WHERE id = ?`).bind(now,row.id).run().catch(() => undefined);
+      console.error('[ec-event] publication views failed');
       return c.json({ success: false, error: 'Event processing failed' }, 503);
     }
   }

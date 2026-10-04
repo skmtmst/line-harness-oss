@@ -4818,14 +4818,7 @@ export type EcOrderDetail = {
   }
 }
 
-export type EcIdentityCandidateSummary = {
-  unmatched: number
-  candidates: number
-  candidateExternalCustomers: number
-  duplicateSuspicions: number
-  linked: number
-  potentialRevenue: number | null
-}
+export type EcIdentityCandidateSummary = import('@line-crm/shared').EcIdentityCandidateSummary
 
 export type EcIdentityCandidateOperationsList = {
   items: Array<{
@@ -5313,6 +5306,7 @@ export type NenPhotoPublicationRecord = {
   photo_id?: string
   status: 'published' | 'withdrawn'
   view_count: number | null
+  view_count_30_days?: number | null
   version?: number
   published_at: string | null
   withdrawn_at: string | null
@@ -5370,6 +5364,7 @@ export type NenPhotoPublicationList = {
     publishedCount: number
     placementCount: number
     topPhoto: Record<string, unknown> | null
+    topPhoto30Days?: (Record<string, unknown> & import('@line-crm/shared').PublicationThirtyDayCount) | null
     consentedCount: number
     attentionCount: number
     withdrawnCount: number
@@ -5510,14 +5505,7 @@ function rangeQuery(params?: { from?: string; to?: string; accountId?: string })
 
 
 /** はじめの設定の段。設計 ★V6 34-1（`RAW35`）。 */
-export interface GettingStartedStep {
-  key: 'accounts' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
-  state: 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown'
-  href: string | null
-  reason: string | null
-  /** 段1だけ。Webhook をアカウントごとに確かめた結果。 */
-  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'; active?: boolean | null }>
-}
+export type GettingStartedStep = import('@line-crm/shared').GettingStartedStep
 
 /** レシピ。設計 ★V6 34-2（`y0P0Qx`）。 */
 export interface Recipe {
@@ -9140,7 +9128,7 @@ export const api = {
   },
   /** はじめの設定の順路。台帳 #134。**毎回いまの中身を数える（キャッシュしない）。** */
   gettingStarted: {
-    get: (accountId?: string) =>
+    get: (accountId?: string, version?: 'v8') =>
       fetchApi<ApiResponse<{
         steps: GettingStartedStep[]
         doneCount: number
@@ -9148,7 +9136,7 @@ export const api = {
         allDone: boolean
         /** 進捗帯を閉じたか（本人単位）。**完了判定には使わない。** */
         dismissed: boolean
-      }>>(`/api/getting-started${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`),
+      }>>(`/api/getting-started?${new URLSearchParams({ ...(accountId ? { account_id: accountId } : {}), ...(version ? { version } : {}) })}`),
     /** 進捗帯を閉じる。**閉じた日時は帯を出さないためだけの記憶。** */
     dismiss: () =>
       fetchApi<ApiResponse<{ dismissed: boolean }>>('/api/getting-started/dismiss', {
@@ -9456,6 +9444,7 @@ export const api = {
           | 'ogDefaultImageUrl'
           | 'friendCapacity'
           | 'capacityWarnAt'
+          | 'timezone'
           | 'iconUrl'
         >
       >,
@@ -9464,7 +9453,7 @@ export const api = {
       const touchesMessagingCredentials =
         data.channelAccessToken !== undefined || data.channelSecret !== undefined
       return fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}`, {
-        method: touchesMessagingCredentials ? 'PUT' : 'PATCH',
+        method: touchesMessagingCredentials || data.timezone !== undefined ? 'PUT' : 'PATCH',
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
       })
@@ -12521,6 +12510,12 @@ export const api = {
     },
   },
   notifications: {
+    teams: {
+      list: (lineAccountId: string) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam[]>>(`/api/notifications/teams?lineAccountId=${encodeURIComponent(lineAccountId)}`),
+      create: (data: { lineAccountId: string; name: string; staffIds: string[] }) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam>>('/api/notifications/teams', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: { lineAccountId: string; name: string; staffIds: string[]; expectedVersion: number }) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam>>(`/api/notifications/teams/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+      archive: (id: string, lineAccountId: string, expectedVersion: number) => fetchApi<ApiResponse<null>>(`/api/notifications/teams/${encodeURIComponent(id)}`, { method: 'DELETE', body: JSON.stringify({ lineAccountId, expectedVersion }) }),
+    },
     operatorRules: {
       list: (lineAccountId: string) =>
         fetchApi<ApiResponse<{
@@ -13304,7 +13299,7 @@ export const api = {
         options,
       ),
     get: (id: string) => fetchApi<ApiResponse<TrafficPool>>(`/api/traffic-pools/${id}`),
-    create: (data: { slug: string; name: string; activeAccountId: string }) =>
+    create: (data: import('@line-crm/shared').CreateTrafficPoolRequest) =>
       fetchApi<ApiResponse<TrafficPool>>('/api/traffic-pools', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -13681,6 +13676,8 @@ export const api = {
       ),
   },
   adPlatforms: {
+    mappings: (accountId: string) => fetchApi<ApiResponse<import('@line-crm/shared').AdEventMapping[]>>(`/api/ad-platforms/mappings?account_id=${encodeURIComponent(accountId)}`),
+    saveMapping: (pointId: string, data: import('@line-crm/shared').SaveAdEventMappingRequest) => fetchApi<ApiResponse<import('@line-crm/shared').AdEventMapping>>(`/api/ad-platforms/mappings/${encodeURIComponent(pointId)}`, { method: 'PUT', body: JSON.stringify(data) }),
     list: (lineAccountId?: string | null) =>
       fetchApi<ApiResponse<AdPlatform[]>>(`/api/ad-platforms${lineAccountId ? `?lineAccountId=${encodeURIComponent(lineAccountId)}` : ''}`),
     logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string; lineAccountId?: string | null }) => {

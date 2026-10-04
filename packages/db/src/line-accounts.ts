@@ -1323,6 +1323,7 @@ export async function listAutoSwitchedOutPoolAccounts(
 }
 
 export interface UpdateLineAccountFieldsInput {
+  timezone?: string;
   country?: string | null;
   role?: string | null;
   isActive?: boolean;
@@ -1362,6 +1363,11 @@ export async function updateLineAccountFields(
   const sets: string[] = [];
   const binds: unknown[] = [];
 
+  if (input.timezone !== undefined) {
+    new Intl.DateTimeFormat("ja-JP", { timeZone: input.timezone }).format();
+    sets.push("timezone = ?");
+    binds.push(input.timezone);
+  }
   if (input.country !== undefined) {
     sets.push('country = ?');
     binds.push(input.country); // empty string normalization happens at the route layer

@@ -1959,6 +1959,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
       return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
     }
     const body = await c.req.json<{
+      timezone?: string;
       name?: string;
       channelAccessToken?: string;
       channelSecret?: string;
@@ -1981,6 +1982,13 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
       }, 422);
     }
 
+    if (body.timezone !== undefined) {
+      if (typeof body.timezone !== 'string' || !body.timezone.trim()) {
+        return c.json({ success: false, error: 'timezone must be a valid IANA time zone' }, 422);
+      }
+      try { new Intl.DateTimeFormat('ja-JP', { timeZone: body.timezone.trim() }).format(); }
+      catch { return c.json({ success: false, error: 'timezone must be a valid IANA time zone' }, 422); }
+    }
     const country = normalizeOptionalString(body.country);
     const role = normalizeOptionalString(body.role);
     const loginChannelId = normalizeOptionalString(body.loginChannelId);
@@ -2048,6 +2056,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
     }
 
     if (
+      body.timezone !== undefined ||
       country !== undefined ||
       role !== undefined ||
       ogSiteName !== undefined ||
@@ -2056,6 +2065,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
       officialProfileUrlTouched
     ) {
       updated = await updateLineAccountFields(c.env.DB, id, {
+        timezone: body.timezone?.trim(),
         country,
         role,
         ogSiteName,

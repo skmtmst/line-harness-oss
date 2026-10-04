@@ -186,6 +186,12 @@ CREATE TABLE action_score_rule_versions (
   CHECK (high_min < max_score)
 );
 
+CREATE TABLE ad_conversion_event_accounts (
+  conversion_event_id TEXT PRIMARY KEY REFERENCES conversion_events(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  platform_ids_json TEXT NOT NULL CHECK(json_valid(platform_ids_json))
+);
+
 CREATE TABLE ad_conversion_logs (
   id                  TEXT PRIMARY KEY,
   ad_platform_id      TEXT NOT NULL,
@@ -248,6 +254,28 @@ CREATE TABLE ad_cost_import_runs (
   error_message  TEXT,
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   UNIQUE (ad_platform_id, day)
+);
+
+CREATE TABLE ad_event_mapping_dispatches (
+  conversion_event_id TEXT NOT NULL REFERENCES conversion_events(id) ON DELETE CASCADE,
+  ad_platform_id TEXT NOT NULL REFERENCES ad_platforms(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  snapshot_json TEXT NOT NULL CHECK(json_valid(snapshot_json)),
+  completed INTEGER NOT NULL DEFAULT 0 CHECK(completed IN (0,1)),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY(conversion_event_id,ad_platform_id)
+);
+
+CREATE TABLE ad_event_mappings (
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  provider TEXT NOT NULL CHECK(provider IN ('meta','google')),
+  mode TEXT NOT NULL CHECK(mode IN ('auto','manual','off')),
+  event_name TEXT,
+  google_action_id TEXT,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(conversion_point_id,line_account_id,provider)
 );
 
 CREATE TABLE ad_platforms (
@@ -4670,6 +4698,16 @@ CREATE TABLE nen_photo_original_download_grants (
   UNIQUE(line_account_id, requested_by, idempotency_key)
 );
 
+CREATE TABLE nen_photo_publication_daily_views (
+  publication_id TEXT NOT NULL REFERENCES nen_photo_publications(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  view_date TEXT NOT NULL CHECK (length(view_date) = 10),
+  placement_label TEXT NOT NULL DEFAULT '',
+  view_count INTEGER NOT NULL CHECK (view_count >= 0),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (publication_id, view_date, placement_label)
+);
+
 CREATE TABLE nen_photo_publication_placements (
   id TEXT PRIMARY KEY,
   publication_id TEXT NOT NULL REFERENCES nen_photo_publications(id) ON DELETE CASCADE,
@@ -5146,6 +5184,17 @@ CREATE TABLE operation_request_receipts (
   resource_id     TEXT NOT NULL,
   created_at      TEXT NOT NULL,
   PRIMARY KEY (action, actor_id, idempotency_key)
+);
+
+CREATE TABLE operator_notification_teams (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 100),
+  staff_ids TEXT NOT NULL CHECK(json_valid(staff_ids) AND json_type(staff_ids) = 'array'),
+  version INTEGER NOT NULL DEFAULT 1,
+  archived_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
 );
 
 CREATE TABLE operators (
@@ -7557,6 +7606,8 @@ CREATE UNIQUE INDEX idx_ad_cost_entries_unique_day
     day
   );
 
+CREATE INDEX idx_ad_mapping_dispatch_account ON ad_event_mapping_dispatches(line_account_id,completed);
+
 CREATE INDEX idx_ad_platforms_account ON ad_platforms(line_account_id);
 
 CREATE UNIQUE INDEX idx_ad_platforms_account_name
@@ -8895,6 +8946,8 @@ CREATE UNIQUE INDEX idx_operator_notification_instance_source
   )
   WHERE audience_type = 'operator';
 
+CREATE INDEX idx_operator_notification_teams_account ON operator_notification_teams(line_account_id, archived_at);
+
 CREATE INDEX idx_outbound_send_requests_account_failure
   ON outbound_send_requests(line_account_id, status, next_retry_at, updated_at DESC);
 
@@ -8913,6 +8966,9 @@ CREATE INDEX idx_outgoing_webhook_deliveries_webhook
 
 CREATE INDEX idx_outgoing_webhooks_line_account
   ON outgoing_webhooks(line_account_id, is_active, updated_at DESC);
+
+CREATE INDEX idx_photo_daily_views_account_date
+  ON nen_photo_publication_daily_views(line_account_id, view_date);
 
 CREATE INDEX idx_photo_reward_policies_version
   ON photo_reward_policies (version_number DESC);
@@ -9536,6 +9592,8 @@ BEFORE UPDATE ON booking_resource_consumptions
 FOR EACH ROW
 BEGIN
   SELECT RAISE(ABORT, 'booking_resource_consumption_immutable'); END;
+
+CREATE TRIGGER capture_ad_conversion_account AFTER INSERT ON conversion_events BEGIN INSERT INTO ad_conversion_event_accounts(conversion_event_id,line_account_id,platform_ids_json) SELECT NEW.id,f.line_account_id,(SELECT json_group_array(p.id) FROM ad_platforms p WHERE p.line_account_id = f.line_account_id AND p.is_active = 1 AND p.verified_at IS NOT NULL AND p.name IN ('meta','google')) FROM friends f WHERE f.id = NEW.friend_id AND f.line_account_id IS NOT NULL; END;
 
 CREATE TRIGGER conversion_points_prevent_delete
 BEFORE DELETE ON conversion_points

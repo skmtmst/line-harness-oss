@@ -1102,6 +1102,8 @@ export interface LineAccountTagInput {
 export interface LineAccount {
   /** 統括内での分類。友だちタグとは別。 */
   tags?: LineAccountTagSummary[];
+  /** 表示と新しい日時入力に使う IANAタイムゾーン。 */
+  timezone?: string;
   /** 主キー (UUIDv4) */
   id: string;
   /** LINE Channel ID (Messaging API) */
@@ -1274,7 +1276,20 @@ export interface CreateEntryRouteInput {
   lineAccountId?: string | null;
 }
 
+export interface EntryRouteMonth {
+  month: string;
+  friendAddCount: number;
+  remainingCount: number;
+  blockedCount: number;
+  conversionCount: number;
+  conversionValueSum: number;
+}
 export interface EntryRouteFunnel {
+  remainingCount?: number;
+  blockedCount?: number;
+  conversionValueSum?: number;
+  valuePerFriend?: number | null;
+  monthly?: EntryRouteMonth[];
   click_count: number;
   friend_add_count: number;
   form_submission_count: number;
@@ -2576,4 +2591,69 @@ export interface HqTemplateTextOverride { accountId: string; text: string }
 export interface LineAccountConnectInput {
  name?: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string
  tagIds?: string[]; parentLineAccountId?: string | null; staffIds?: string[]; liffId?: string
+}
+
+/** プールを1回の保存で全所属とともに作る。旧1所属の入力も有効。 */
+export interface CreateTrafficPoolRequest {
+  slug: string;
+  name: string;
+  activeAccountId: string;
+  accountIds?: string[];
+}
+
+export interface GettingStartedStep {
+  key: 'accounts' | 'featureSet' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage';
+  state: 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown';
+  href: string | null;
+  reason: string | null;
+  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'; active?: boolean | null }>;
+}
+
+export interface EcIdentityCandidateSummary {
+  unmatched: number;
+  candidates: number;
+  candidateExternalCustomers: number;
+  withoutCandidates?: number;
+  duplicateSuspicions: number;
+  linked: number;
+  /** pending候補の全件合計。同一EC会員は1回、金額未取得はnull。 */
+  potentialRevenue: number | null;
+}
+
+/** ec.site.publication_viewed: 日付ありはその日の累計、なしは互換の生涯累計。 */
+export interface PublicationViewSample {
+  photo_id?: string | number | null;
+  view_count?: number | null;
+  placement_label?: string | null;
+  view_date?: string;
+}
+export interface PublicationThirtyDayCount { view_count_30_days?: number | null }
+
+export interface OperatorNotificationTeam {
+  id: string;
+  lineAccountId: string;
+  name: string;
+  staffIds: string[];
+  version: number;
+  archivedAt: string | null;
+}
+
+export interface AdEventMapping {
+  pointId: string;
+  pointName: string;
+  eventType: string;
+  provider: 'meta' | 'google';
+  mode: 'auto' | 'manual' | 'off';
+  eventName: string | null;
+  automaticEventName: string | null;
+  googleActionId: string | null;
+  version: number;
+}
+export interface SaveAdEventMappingRequest {
+  account_id: string;
+  provider: 'meta' | 'google';
+  mode: 'auto' | 'manual' | 'off';
+  eventName?: string | null;
+  googleActionId?: string | null;
+  expectedVersion: number;
 }

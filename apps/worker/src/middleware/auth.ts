@@ -229,7 +229,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/dashboard', '/'],
   ['/api/getting-started', '/getting-started'],
   ['/api/conversions', '/conversions'], ['/api/measurement-sites', '/conversions'], ['/api/scoring', '/scoring'], ['/api/scoring-rules', '/scoring'],
-  ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
+  ['/api/ad-platforms/mappings', '/inflow-links'], ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
   ['/api/mileage', '/mileage'], ['/api/action-scores', '/mileage'],
   ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
   ['/api/automation-templates', '/automations'], ['/api/automation-drafts', '/automations'],

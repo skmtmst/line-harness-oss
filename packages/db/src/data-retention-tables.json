@@ -109,6 +109,13 @@
       "parentColumn": "id"
     }
   },
+  "ad_conversion_event_accounts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "ad_conversion_logs": {
     "category": "purge",
     "scope": {
@@ -137,6 +144,20 @@
       "column": "ad_platform_id",
       "parent": "ad_platforms",
       "parentColumn": "id"
+    }
+  },
+  "ad_event_mapping_dispatches": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ad_event_mappings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
     }
   },
   "ad_platforms": {
@@ -2239,6 +2260,13 @@
       "column": "line_account_id"
     }
   },
+  "nen_photo_publication_daily_views": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "nen_photo_publication_placements": {
     "category": "purge",
     "scope": {
@@ -2441,6 +2469,13 @@
   },
   "operation_request_receipts": {
     "category": "global"
+  },
+  "operator_notification_teams": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
   },
   "operators": {
     "category": "global"

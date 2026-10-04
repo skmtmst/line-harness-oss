@@ -72,6 +72,7 @@ function AccountDetail() {
   const [editSection, setEditSection] = useState<null | 'basic' | 'credentials'>(null)
   /** 保存口は統括・管理者だけ。運用担当には入力の入口を見せない。 */
   const [canManage, setCanManage] = useState(false)
+  const [canEditTimezone, setCanEditTimezone] = useState(false)
   /** ダイアログ内のエラー（必須漏れ・接続失敗など）。窓を閉じずに見せる。 */
   const [dialogError, setDialogError] = useState('')
   /** 止めている間に送らなかった配信の一覧（X-1）。 */
@@ -124,7 +125,10 @@ function AccountDetail() {
   useEffect(() => {
     let active = true
     void api.staff.me().then((response) => {
-      if (active && response.success) setCanManage(response.data.role === 'owner' || response.data.role === 'admin')
+      if (active && response.success) {
+        setCanManage(response.data.role === 'owner' || response.data.role === 'admin')
+        setCanEditTimezone(response.data.role === 'owner')
+      }
     })
     return () => { active = false }
   }, [])
@@ -625,6 +629,7 @@ function AccountDetail() {
       />
       {editSection !== null && (
         <AccountEditModal
+          initialTimezone={theme === 'v8' && canEditTimezone ? account.timezone ?? 'Asia/Tokyo' : undefined}
           accountId={account.id}
           initialName={account.name}
           initialChannelId={account.channelId}

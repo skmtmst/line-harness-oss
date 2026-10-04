@@ -1,6 +1,6 @@
 import { jstNow } from './utils.js';
 import { ensureEntryRouteGenre } from './entry-route-genres.js';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, type EntryRouteMonth } from '@line-crm/shared';
 export interface EntryRoute {
   id: string;
   ref_code: string;
@@ -95,6 +95,8 @@ export interface EntryRouteFunnel {
   remainingCount: number;
   blockedCount: number;
   conversionValueSum: number;
+  valuePerFriend: number | null;
+  monthly: EntryRouteMonth[];
 }
 
 export async function getEntryRoutes(db: D1Database, tenantId: string): Promise<EntryRoute[]> {
@@ -346,14 +348,28 @@ export async function getEntryRouteFunnel(
          (SELECT COUNT(*) FROM first_touch WHERE is_following = 1) AS remainingCount,
          (SELECT COUNT(*) FROM first_touch WHERE is_following = 0) AS blockedCount,
          (SELECT COALESCE(SUM(COALESCE(ce.value_snapshot, cp.value, 0)), 0) FROM conversion_events ce
-            JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+            LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id
             WHERE ce.friend_id IN (SELECT friend_id FROM first_touch)) AS conversionValueSum`,
     )
     .bind(entryRouteId)
     .first<EntryRouteFunnel>();
-  return (
-    row ?? { click_count: 0, friend_add_count: 0, form_submission_count: 0, cv_count: 0, remainingCount: 0, blockedCount: 0, conversionValueSum: 0 }
-  );
+  const monthly = await db.prepare(`WITH route AS (SELECT ref_code FROM entry_routes WHERE id = ?),
+    cv AS (SELECT ce.friend_id, COUNT(*) AS n, SUM(COALESCE(ce.value_snapshot, cp.value, 0)) AS amount
+      FROM conversion_events ce LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+      WHERE ce.friend_id IN (SELECT f.id FROM friends f JOIN route r ON r.ref_code = f.ref_code) GROUP BY ce.friend_id)
+    SELECT strftime('%Y-%m', CASE
+        WHEN substr(f.created_at,-1) = 'Z' OR substr(f.created_at,-6,1) IN ('+','-')
+        THEN datetime(f.created_at,'+9 hours') ELSE f.created_at END) AS month,
+      COUNT(*) AS friendAddCount,
+      SUM(CASE WHEN f.is_following = 1 THEN 1 ELSE 0 END) AS remainingCount,
+      SUM(CASE WHEN f.is_following = 0 THEN 1 ELSE 0 END) AS blockedCount,
+      SUM(COALESCE(cv.n,0)) AS conversionCount,
+      SUM(COALESCE(cv.amount,0)) AS conversionValueSum
+    FROM friends f JOIN route r ON r.ref_code = f.ref_code LEFT JOIN cv ON cv.friend_id = f.id
+    GROUP BY month ORDER BY month DESC`).bind(entryRouteId).all<EntryRouteMonth>();
+  const summary = row ?? { click_count: 0, friend_add_count: 0, form_submission_count: 0, cv_count: 0, remainingCount: 0, blockedCount: 0, conversionValueSum: 0 };
+  return { ...summary, valuePerFriend: summary.friend_add_count > 0 ? summary.conversionValueSum / summary.friend_add_count : null, monthly: monthly.results };
+
 }
 
 export interface EntryRouteSource {

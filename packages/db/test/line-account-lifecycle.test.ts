@@ -34,6 +34,12 @@ function setup() {
 }
 
 describe('LINE account default and archive lifecycle', () => {
+  it('saves timezone without changing credentials and rejects invalid zones', async () => {
+    const { sqlite, db } = setup();
+    await updateLineAccountFields(db, 'account-b', { timezone: 'Europe/Paris' });
+    expect(sqlite.prepare("SELECT timezone, channel_access_token FROM line_accounts WHERE id = 'account-b'").get()).toEqual({ timezone: 'Europe/Paris', channel_access_token: 'token' });
+    await expect(updateLineAccountFields(db, 'account-b', { timezone: 'invalid/zone' })).rejects.toThrow();
+  });
   it('stores and clears an official profile short URL', async () => {
     const { sqlite, db } = setup();
 

@@ -1,5 +1,7 @@
 'use client'
 
+import { useAdminTheme } from '@/lib/use-admin-theme'
+
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -34,6 +36,7 @@ type PublicationsData = {
     publishedCount: number
     placementCount: number
     topPhoto: Record<string, unknown> | null
+    topPhoto30Days?: Record<string, unknown> | null
     consentedCount: number
     attentionCount?: number
     withdrawnCount?: number
@@ -82,6 +85,7 @@ function pendingReason(item: PublicationRow): string {
 }
 
 export function PhotoPublications({ accountId, onBack }: { accountId: string; onBack: () => void }) {
+  const theme = useAdminTheme()
   const [data, setData] = useState<PublicationsData | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [notice, setNotice] = useState('')
@@ -163,7 +167,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
     return <div className="flex flex-col gap-4"><div><Button onClick={onBack}>写真審査へ戻る</Button></div><section className="bg-canvas rounded-card border-hairline border"><ListState kind="empty" title="公式サイト掲載中の写真はありません" description="同意のある写真を掲載すると、使っている場所と表示回数がここに出ます。" /></section></div>
   }
 
-  const top = data.summary.topPhoto
+  const top = theme === 'v8' ? data.summary.topPhoto30Days : data.summary.topPhoto
   {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
   return <><div data-photo-view="publications" className="flex flex-col gap-4">
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
@@ -175,7 +179,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
     <section className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
       <Card padding="default"><span className="block text-xs text-ink-faint">公式サイト掲載中の写真</span><strong className="my-1 block text-2xl text-ink">{data.summary.publishedCount}枚</strong><small className="block text-xs text-ink-faint">採用した写真のうち</small></Card>
       <Card padding="default"><span className="block text-xs text-ink-faint">どこで使っているか</span><strong className="my-1 block text-2xl text-ink">{data.summary.placementCount}か所</strong><small className="block text-xs text-ink-faint">現在つながっている掲載先</small></Card>
-      <Card padding="default"><span className="block text-xs text-ink-faint">いちばん見られた</span><strong className="my-1 block truncate text-2xl text-ink">{top ? photoPetDisplayName(top.pet_name, { honorific: false }) : '—（未取得）'}</strong><small className="block text-xs text-ink-faint">{top ? views(top.view_count) : '表示回数は未取得'}</small></Card>
+      <Card padding="default"><span className="block text-xs text-ink-faint">いちばん見られた{theme === 'v8' ? '（この30日）' : ''}</span><strong className="my-1 block truncate text-2xl text-ink">{top ? photoPetDisplayName(top.pet_name, { honorific: false }) : '—（未取得）'}</strong><small className="block text-xs text-ink-faint">{top ? views(theme === 'v8' ? top.view_count_30_days : top.view_count) : '表示回数は未取得'}</small></Card>
       <Card padding="default"><span className="block text-xs text-ink-faint">ご本人の同意</span><strong className="my-1 block text-2xl text-ink">{data.summary.consentedCount}枚 すべて</strong><small className="block text-xs text-ink-faint">投稿時に同意をいただいています</small></Card>
     </section>
     <div><NoteBar>公式サイト掲載中の写真は、投稿してくださった方の名前を写真ごとに伏せられます。ご本人の希望があれば、すべての掲載先から外せます。外しても採用時に付けたマイルは戻りません。</NoteBar></div>
@@ -187,7 +191,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
           const imageSrc = safePhotoSrc(item.image_url)
           return <Card key={text(item.id)} layout="vertical" overflow="hidden">
             {imageSrc ? <img className="h-36 w-full object-cover" src={imageSrc} alt={`${photoPetDisplayName(item.pet_name, { honorific: false })}の公開写真`} loading="lazy" /> : <div className="grid h-36 w-full place-items-center bg-canvas-sunken text-xs font-medium text-ink-faint">{text(item.image_url) ? '画像を表示できません' : '公開用画像を作成中です'}</div>}
-            <div className="p-2.5"><strong className="text-sm text-ink">{views(item.view_count)}</strong><h2 className="mt-0.5 text-base font-extrabold text-ink">{photoPetDisplayName(item.pet_name, { fallback: 'ペット名未取得', honorific: false })}</h2><p className="mt-0.5 text-xs text-ink-faint">{text(item.owner_name) || '名前は伏せています'}</p>
+            <div className="p-2.5"><strong className="text-sm text-ink">{views(theme === 'v8' ? item.view_count_30_days : item.view_count)}</strong><h2 className="mt-0.5 text-base font-extrabold text-ink">{photoPetDisplayName(item.pet_name, { fallback: 'ペット名未取得', honorific: false })}</h2><p className="mt-0.5 text-xs text-ink-faint">{text(item.owner_name) || '名前は伏せています'}</p>
               <div className="mt-1 text-xs text-ink-faint">{placements.length ? placements.map((placement) => <PlacementLine key={text(placement.id)} placement={placement} />) : <span>どこにも出していません</span>}</div>
               {/*
                * 公開先ごとの同意・採用・マイルの記録（Issue #1040 IDEA-22）。

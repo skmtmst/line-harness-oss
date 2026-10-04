@@ -510,7 +510,10 @@
     "569_restaurant_booking_policy.sql",
     "570_hq_template_folders.sql",
     "571_hq_scenario_templates.sql",
-    "572_hq_template_text_overrides.sql"
+    "572_hq_template_text_overrides.sql",
+    "573_ad_event_mappings.sql",
+    "574_operator_notification_teams.sql",
+    "575_photo_publication_daily_views.sql"
   ],
-  "migrationCount": 511
+  "migrationCount": 514
 }
