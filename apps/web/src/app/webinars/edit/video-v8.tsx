@@ -1,15 +1,8 @@
 'use client'
 
-/*
- * ★V8 動画と公開期間（`VWNaA`）・開催回（`LPOe7`）。
- * v7 の見た目は 1画素も変えない。編集画面で data-theme="v8" のときだけ、
- * 動画の段をこの部品で描く（V7 の VideoDesignStep は触らない）。
- *
- * 配信枠（毎日・毎週・単発）は Webinar.schedule の読み書き。
- * 行ごとの定員・残りは開催回ごとの口にしか無いので出さない。
- * 「まとめて作る」は単発の枠を日付の範囲でまとめて足す。
- */
-import { useState } from 'react'
+/* ★V8 動画と公開期間（VWNaA）・開催回（LPOe7）。 */
+import { useEffect, useRef, useState } from 'react'
+import StatusBadge from '@/components/shared/status-badge'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
@@ -39,6 +32,12 @@ function formatDateTime(value: string | null): string {
   const week = WEEKDAY[date.getDay()]
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())}（${week}） ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function dateTimeLocalJst(value: string | null | undefined): string {
+  if (!value) return ''
+  const time = Date.parse(value)
+  return Number.isNaN(time) ? '' : new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)
 }
 
 /** datetime-local の字面（`2026-10-01T10:00`）を JST の ISO にする。 */
@@ -90,9 +89,13 @@ export default function VideoV8({
   const [bulkFrom, setBulkFrom] = useState('')
   const [bulkTo, setBulkTo] = useState('')
   const [bulkTime, setBulkTime] = useState('10:00')
-  const [startsAt, setStartsAt] = useState('')
-  const [endsAt, setEndsAt] = useState('')
+  const [startsAt, setStartsAt] = useState(() => dateTimeLocalJst(webinar.publicationStartsAt))
+  const [endsAt, setEndsAt] = useState(() => dateTimeLocalJst(webinar.publicationEndsAt))
   const [noEnd, setNoEnd] = useState(!webinar.publicationEndsAt)
+  const savedPeriod = useRef(JSON.stringify([startsAt, endsAt, noEnd]))
+  const [detailsDirty, setDetailsDirty] = useState(false)
+  const detailsSave = useRef<(() => Promise<boolean>) | null>(null)
+  const periodDirty = JSON.stringify([startsAt, endsAt, noEnd]) !== savedPeriod.current
   const [periodBusy, setPeriodBusy] = useState(false)
   const [periodError, setPeriodError] = useState('')
   const [policy, setPolicy] = useState(editor.actionPolicy.missingResultPolicy)
@@ -164,7 +167,13 @@ export default function VideoV8({
     if (await saveSchedule([...webinar.schedule, ...rules])) setBulk(false)
   }
 
-  const savePeriod = async () => {
+  const savePeriod = async (): Promise<boolean> => {
+    if (periodBusy) return false
+    if (!noEnd && endsAt && startsAt && new Date(toJstIso(endsAt)) <= new Date(toJstIso(startsAt))) {
+      setPeriodError('公開の終了は開始より後にしてください。')
+      return false
+    }
+    const saved = JSON.stringify([startsAt, endsAt, noEnd])
     setPeriodBusy(true)
     setPeriodError('')
     try {
@@ -174,9 +183,12 @@ export default function VideoV8({
         publicationEndsAt: noEnd || !endsAt ? null : toJstIso(endsAt),
         expectedVersion: fresh.data.version,
       })
+      savedPeriod.current = saved
       onWebinarSaved(res.data)
+      return true
     } catch (cause) {
       setPeriodError(describeSaveFailure(cause))
+      return false
     } finally {
       setPeriodBusy(false)
     }
@@ -202,8 +214,23 @@ export default function VideoV8({
     setNewDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
   }
 
+  const saveCurrent = useRef<() => Promise<boolean>>(async () => true)
+  saveCurrent.current = async () => {
+    if (adding || bulk) { setError('追加中の配信枠を保存するか、キャンセルしてから進んでください。'); return false }
+    if (periodDirty && !(await savePeriod())) return false
+    if (detailsDirty && detailsSave.current) return detailsSave.current()
+    return true
+  }
+  useEffect(() => {
+    onDirtyChange?.(periodDirty || detailsDirty || adding || bulk)
+  }, [periodDirty, detailsDirty, adding, bulk, onDirtyChange])
+  useEffect(() => {
+    registerSave?.(() => saveCurrent.current())
+    return () => registerSave?.(null)
+  }, [registerSave])
+
   return (
-    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="VWNaA">
+    <div className="min-w-0" data-webinar-pane="video" data-design-node="VWNaA">
       <div className="min-w-0 flex-1 space-y-3">
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="動画">
           <h2 className="text-ink text-base font-bold">動画</h2>
@@ -273,13 +300,7 @@ export default function VideoV8({
               const summary = ruleSummary(rule)
               return (
                 <li key={index} className="flex items-center gap-3 px-4 py-3">
-                  <span
-                    className="bg-accent-soft text-accent-deep inline-flex shrink-0 items-center gap-1 rounded-pill px-2 py-0.5 text-xs font-semibold"
-                    aria-hidden="true"
-                  >
-                    <span aria-hidden="true">●</span>
-                    {summary.kind}
-                  </span>
+                  <StatusBadge tone={rule.type === 'daily' ? 'success' : rule.type === 'weekly' ? 'neutral' : 'warning'}>{summary.kind}</StatusBadge>
                   <span className="text-ink min-w-0 flex-1 truncate text-sm">{summary.detail}</span>
                   <span className="relative shrink-0">
                     <Button
@@ -468,14 +489,14 @@ export default function VideoV8({
             initial={webinar}
             hideBar
             onSaved={onWebinarSaved}
-            onDirtyChange={onDirtyChange}
-            registerSave={registerSave}
+            onDirtyChange={setDetailsDirty}
+            registerSave={(save) => { detailsSave.current = save }}
           />
         </Disclosure>
       </div>
 
-      <aside className="w-full shrink-0 xl:w-95" aria-label="公開ページでの見え方">
-        <div className="border-hairline bg-canvas rounded-card border p-4 shadow-card xl:sticky xl:top-4">
+      <aside className="min-w-0" aria-label="公開ページでの見え方">
+        <div className="border-hairline bg-canvas rounded-card border p-4">
           <h2 className="text-ink text-base font-bold">公開ページでの見え方</h2>
           <p className="text-ink mt-2 truncate text-sm font-semibold">{webinar.title}</p>
           <span className="bg-ink mt-2 flex aspect-video w-full items-center justify-center rounded-control" aria-hidden="true">

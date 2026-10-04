@@ -307,7 +307,7 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
     await flush()
 
     /* 固定バーの「下書き保存」は通知の保存を呼ぶ。成功で未保存の印が降りる。 */
-    await act(async () => { buttonByText('下書きを保存する').click() })
+    await act(async () => { buttonByText('下書きを保存').click() })
     await flush()
     expect(host.textContent).not.toContain('保存していない変更があります')
 
@@ -410,19 +410,19 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     await flush()
 
     /* 固定バーの「下書き保存」は飾りではない。押せて、実際に保存する。 */
-    expect(buttonByText('下書きを保存する').disabled).toBe(false)
+    expect(buttonByText('下書きを保存').disabled).toBe(false)
 
     await act(async () => { buttonContaining('動画へ').click() })
     await flush()
 
     expect(putCalls()).toHaveLength(1)
-    expect(paneVisible('div[data-design-node="PV1Vh"]')).toBe(true)
+    expect(paneVisible('div[data-design-node="VWNaA"]')).toBe(true)
 
     /* STEP 1 へ戻る。保存済みの新しいタイトルがそのまま残る。 */
     await act(async () => { buttonContaining('STEP 1').click() })
     await flush()
 
-    expect(paneVisible('div[data-design-node="PV1Vh"]')).toBe(false)
+    expect(paneVisible('div[data-design-node="VWNaA"]')).toBe(false)
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '変更したタイトル')).toBe(true)
   })
 
@@ -449,12 +449,12 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     await flush()
 
     await act(async () => { fireEvent.change(titleInput(), { target: { value: '下書きで保存する題名' } }) })
-    await act(async () => { buttonByText('下書きを保存する').click() })
+    await act(async () => { buttonByText('下書きを保存').click() })
     await flush()
 
     expect(putCalls()).toHaveLength(1)
     /* 段は基本設定のまま。保存できたので未保存の印は消える。 */
-    expect(host.querySelector('div[data-design-node="PV1Vh"]')).toBeNull()
+    expect(host.querySelector('div[data-design-node="VWNaA"]')).toBeNull()
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '下書きで保存する題名')).toBe(true)
     expect(host.textContent).not.toContain('保存していない変更があります')
   })
@@ -471,30 +471,30 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
 
     expect(putCalls()).toHaveLength(1)
     /* 動画の段へは進まず、入力は消えない。 */
-    expect(host.querySelector('div[data-design-node="PV1Vh"]')).toBeNull()
+    expect(host.querySelector('div[data-design-node="VWNaA"]')).toBeNull()
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '失敗時に残る題名')).toBe(true)
     expect(host.textContent).toContain('保存できませんでした')
   })
 })
 
 describe('DETAIL-05 無反応のボタンを残さない', () => {
-  it('動画の段: 非公開では「公開ページを見る」を押せない形にして理由を出す', async () => {
+  it('動画の段: 非公開では「PCで見る」を押せない形にして理由を出す', async () => {
     fixture.params = new URLSearchParams('id=webinar-1&pane=video')
     await render()
     await flush()
 
-    const button = buttonByText('公開ページを見る')
+    const button = buttonByText('PCで見る')
     expect(button.disabled).toBe(true)
     expect(host.textContent).toContain('公開すると、友だちが見るページを確認できます。')
   })
 
-  it('動画の段: 公開中なら「公開ページを見る」は公開URLへのリンクになる', async () => {
+  it('動画の段: 公開中なら「PCで見る」は公開URLへのリンクになる', async () => {
     net.webinarStatus = 'active'
     fixture.params = new URLSearchParams('id=webinar-1&pane=video')
     await render()
     await flush()
 
-    const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('公開ページを見る'))
+    const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('PCで見る'))
     expect(link?.getAttribute('href')).toBe('https://liff.example.test/preview')
   })
 

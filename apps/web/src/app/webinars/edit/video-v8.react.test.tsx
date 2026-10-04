@@ -100,6 +100,14 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     expect(host.textContent).toContain('単発')
   })
 
+  it('取得した公開期間を表示し、変更せず保存しても開始日時を消さない', async () => {
+    const host = render()
+    expect((host.querySelector('input[type="datetime-local"]') as HTMLInputElement).value).toBe('2026-10-01T10:00')
+    const save = [...host.querySelectorAll('button')].find((button) => button.textContent === '公開期間を保存する')!
+    await act(async () => save.click())
+    expect(apiMocks.update).toHaveBeenCalledWith('webinar-1', expect.objectContaining({ publicationStartsAt: '2026-10-01T10:00:00+09:00', publicationEndsAt: null }))
+  })
+
   it('枠を足すと保存の口へ枠つきで送る', async () => {
     const host = render()
     const add = [...host.querySelectorAll('button')].find((el) => el.textContent?.includes('枠を足す'))

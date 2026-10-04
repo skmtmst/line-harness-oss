@@ -7,6 +7,7 @@ import CtaV8 from './cta-v8'
 import ReviewV8 from './review-v8'
 import NotificationsV8 from './notifications-v8'
 import VideoV8 from './video-v8'
+import './editor-v8.css'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import {
   fmtSec,
@@ -1107,47 +1108,6 @@ function VideoMediaLabel({ webinar }: { webinar: Webinar }) {
   )
 }
 
-function VideoDesignStep({ webinar, editor, registrations, publicUrl, canOpenPublicPage, publicPageReason, onWebinarSaved, onDirtyChange, registerSave }: { webinar: Webinar; editor: WebinarEditor; registrations: number | null; publicUrl: string | null; canOpenPublicPage: boolean; publicPageReason: string; onWebinarSaved: (next: Webinar) => void; onDirtyChange?: (dirty: boolean) => void; registerSave?: (save: (() => Promise<boolean>) | null) => void }) {
-  return (
-    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="PV1Vh">
-      <div className="min-w-0 flex-1 space-y-3">
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-          <h2 className="text-ink text-base font-bold">動画設定</h2>
-          <p className="text-ink-faint mt-1 text-xs">動画ファイルまたは外部動画URLを設定します。</p>
-          <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(240px,1fr)]">
-            <div><p className="text-ink-faint text-xs font-semibold">動画</p><div className="border-hairline text-ink mt-1 rounded-control border px-3 py-3 text-sm font-semibold"><VideoMediaLabel webinar={webinar} /></div></div>
-            <div><p className="text-ink-faint text-xs font-semibold">再生時間</p><div className="border-hairline text-ink mt-1 rounded-control border px-3 py-3 text-sm font-semibold">{durationLabel(webinar.durationSeconds)}</div></div>
-          </div>
-          <VideoStages webinarId={webinar.id} hasVideo={Boolean(webinar.videoPrefix || webinar.videoMediaId)} />
-        </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-          <h2 className="text-ink text-base font-bold">公開設定</h2>
-          <p className="text-ink-faint mt-1 text-xs">公開期間・視聴条件・自動再生を設定します。</p>
-          <div className="mt-4 space-y-3">
-            <div className="border-hairline flex items-center justify-between gap-4 rounded-control border bg-canvas-sunken px-4 py-4"><div><p className="text-ink text-sm font-semibold">公開期間</p><p className="text-ink-faint mt-1 text-xs">{deliveryWindow(webinar)}</p></div><span className="text-action">›</span></div>
-            <div className="border-hairline flex items-center justify-between gap-4 rounded-control border bg-canvas-sunken px-4 py-4"><div><p className="text-ink text-sm font-semibold">視聴条件</p><p className="text-ink-faint mt-1 text-xs">{editor.viewingCondition.label}</p></div><span className="text-action">›</span></div>
-          </div>
-        </section>
-        <EditorDetails label="動画・公開の詳細を編集する"><WebinarForm key={`${webinar.id}-${webinar.updatedAt}`} initial={webinar} hideBar onSaved={onWebinarSaved} onDirtyChange={onDirtyChange} registerSave={registerSave} /></EditorDetails>
-      </div>
-      <SummaryAside rows={[
-        ['動画', webinar.videoPrefix ? 'アップロード済み' : '未設定'],
-        ['公開', webinarStatusLabel(webinar.status)],
-        ['申込', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
-      ]} previewBody={videoPreview(webinar).body ?? videoPreview(webinar).empty}>
-        <div className="flex gap-2"><Button disabled title="確認の段で実行します">テストを送る</Button>{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
-        {/* 押せないときは理由を文字で出す。実行できるように見せて無反応にしない。 */}
-        {!(canOpenPublicPage && publicUrl) && publicPageReason ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
-      </SummaryAside>
-    </div>
-  )
-}
-
-/*
-  通知概要の状態は1つの定義から描く。文字だけ変えて成功色のままにすると、
-  未設定・確認中・取得失敗まで設定済みと同じ緑になる(監査 DETAIL-19)。
-  色が見分けにくくてもアイコンと文字で区別できるようにする。
-*/
 type NotificationRowState = 'configured' | 'unset' | 'pending' | 'failed'
 
 const NOTIFICATION_ROW_STATE: Record<
@@ -2336,8 +2296,8 @@ function EditWebinarInner() {
 
   const paneTitle: Record<PaneKey, string> = {
     basic: 'ウェビナー編集',
-    video: '動画と公開設定',
-    cta: 'CTAと申込フォーム',
+    video: '動画と公開期間',
+    cta: 'CTA・フォーム',
     notifications: '通知とリマインド',
     review: 'ウェビナー・公開前確認',
     comments: 'コメント演出',
@@ -2511,16 +2471,17 @@ function EditWebinarInner() {
     : nextPaneLabel
 
   return (
-    <div className="flex flex-col gap-4 pb-24 pt-4">
+    <div className="min-w-0" data-webinar-editor="v8">
       {/* ★V7: 左右の余白は共通の枠が持つ。画面側で幅と横余白を足すと 24px ずれる。 */}
+      <h1 className="text-ink text-xl font-semibold">{showSteps ? paneTitle[pane] : webinar.title}</h1>
       <nav data-design="Crumb" className="text-action text-xs font-semibold"><Link href="/webinars" className="hover:underline">← ウェビナー一覧</Link></nav>
 
       {showSteps ? (
-        <ol data-design="Steps" className="border-hairline bg-canvas flex flex-wrap items-center gap-1 rounded-card border p-3 shadow-card">
+        <ol data-design="Steps" className="flex" data-webinar-steps="true">
           {STEPS.map((step) => {
             const state = stepStateOf(step.key, railPane, webinar, ctaCount)
             return (
-              <li key={step.key} className="flex min-w-0 flex-1 items-center gap-2">
+              <li key={step.key} className="flex items-center gap-2">
                 <button
                   type="button"
                   data-qa-open={step.mark}
@@ -2560,7 +2521,7 @@ function EditWebinarInner() {
         R94: 参加者・分析・コメント演出への常設導線。作る手順の段（STEPS）
         とは別に、公開後の運用で開く面をいつでも選べるようにする。
       */}
-      <nav aria-label="参加者・分析・演出へ移動" className="border-hairline bg-canvas flex flex-wrap items-center gap-1 rounded-card border p-3 shadow-card">
+      <nav aria-label="参加者・分析・演出へ移動" className="flex" data-webinar-tabs="true">
         {([
           { key: 'participants', label: '参加者' },
           { key: 'analytics', label: '分析' },
@@ -2597,8 +2558,7 @@ function EditWebinarInner() {
             ★V8 切替（動画 `VWNaA`・開催回 `LPOe7`）。v7 の見た目は
             data-theme="v8" が付くまで 1画素も変えない。
           */}
-          {adminTheme === 'v8' ? (
-            <VideoV8
+<VideoV8
               webinar={webinar}
               editor={editor}
               publicUrl={publicUrl}
@@ -2610,9 +2570,6 @@ function EditWebinarInner() {
               registerSave={saveRegistrarFor('video')}
               onEditVideo={() => goStep('basic')}
             />
-          ) : (
-            <VideoDesignStep webinar={webinar} editor={editor} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onWebinarSaved={handleWebinarSaved} onDirtyChange={dirtyReporterFor('video')} registerSave={saveRegistrarFor('video')} />
-          )}
         </div>
       ) : null}
       {visitedPanes.has('cta') ? (
@@ -2684,7 +2641,8 @@ function EditWebinarInner() {
           status={unsavedPanes.size > 0 ? '保存していない変更があります' : undefined}
           actions={(
             <>
-              <Button disabled={savingForNav !== false || !savablePanes.has(pane)} title={savablePanes.has(pane) ? undefined : 'この段の中の保存ボタンから保存します'} onClick={() => void handleDraftSave()} busy={savingForNav === 'draft'}>下書きを保存する</Button>
+              <Button href="/webinars">キャンセル</Button>
+              <Button disabled={savingForNav !== false || !savablePanes.has(pane)} title={savablePanes.has(pane) ? undefined : 'この段の中の保存ボタンから保存します'} onClick={() => void handleDraftSave()} busy={savingForNav === 'draft'}>下書きを保存</Button>
               <Button variant="primary" disabled={savingForNav !== false} onClick={() => void handlePrimaryAction()} busy={savingForNav === 'next'}>{primaryLabel}</Button>
             </>
           )}
