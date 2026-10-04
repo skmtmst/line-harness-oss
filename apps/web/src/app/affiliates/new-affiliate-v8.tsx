@@ -86,6 +86,7 @@ export function NewAffiliateV8() {
   const [friendError, setFriendError] = useState('')
   const [friendReload, setFriendReload] = useState(0)
   const [copied, setCopied] = useState(false)
+  const [issuedUrl, setIssuedUrl] = useState<string | null>(null)
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [partialSave, setPartialSave] = useState(false)
   const [savedIsActive, setSavedIsActive] = useState<boolean | null>(null)
@@ -106,6 +107,7 @@ export function NewAffiliateV8() {
     if (draftAccountRef.current === selectedAccountId) return
     draftAccountRef.current = selectedAccountId
     setCreatedId(null)
+    setIssuedUrl(null)
     setPartialSave(false)
     setSavedIsActive(null)
     setOperationId(crypto.randomUUID())
@@ -145,8 +147,7 @@ export function NewAffiliateV8() {
     }
   }, [friendPage, friendReload, friendSearch, selectedAccountId])
 
-  const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
-  const previewUrl = code.trim() ? `${workerBase}/r/${code.trim()}` : null
+  const previewUrl = issuedUrl
   const friendPageCount = Math.max(1, Math.ceil(friendTotal / FRIEND_PAGE_SIZE))
   const friendOptions = selectedFriend && !friends.some((friend) => friend.id === selectedFriend.id)
     ? [selectedFriend, ...friends]
@@ -184,6 +185,7 @@ export function NewAffiliateV8() {
     setStartTracking(true)
     setCopied(false)
     setCreatedId(null)
+    setIssuedUrl(null)
     setPartialSave(false)
     setSavedIsActive(null)
     setOperationId(crypto.randomUUID())
@@ -217,6 +219,7 @@ export function NewAffiliateV8() {
         }
         affiliateId = res.data.id
         setCreatedId(affiliateId)
+        setIssuedUrl(res.link?.url ?? null)
         const persistedIsActive =
           typeof res.data.isActive === 'boolean' ? res.data.isActive : startTracking
         setStartTracking(persistedIsActive)
@@ -581,9 +584,9 @@ export function NewAffiliateV8() {
             <p className="af-create-footnote">
               {previewUrl
                 ? copied
-                  ? 'コピーしました。保存すると、このURLで確定します。'
-                  : '保存すると、このURLで確定します。'
-                : '紹介コードを空欄のままにすると、保存したときに自動で決まります。決まる前のURLはコピーできません。'}
+                  ? 'コピーしました。発行済みの紹介リンクです。'
+                  : '発行済みの紹介リンクです。'
+                : '紹介リンクは登録後に表示されます。'}
             </p>
           </section>
 

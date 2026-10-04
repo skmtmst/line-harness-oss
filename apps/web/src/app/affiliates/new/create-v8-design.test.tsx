@@ -86,6 +86,16 @@ describe('Gqve5 作る画面の競合の絵合わせ', () => {
     expect((screen.getByRole('textbox', { name: /紹介コード（/ }) as HTMLInputElement).value).toBe('usedcode')
   })
 
+  test('登録前の推測したURLを渡さず、発行された紹介リンクを表示する', async () => {
+    create.mockResolvedValue({ success: true, data: { id: 'a1' }, link: { url: 'https://example.com/r/issued', refCode: 'issued' } })
+    render(<NewAffiliateV8 />)
+    expect(screen.queryByRole('button', { name: 'コピー' })).toBeNull()
+    fireEvent.change(screen.getByLabelText(/名前（表示名）/), { target: { value: '紹介者' } })
+    fireEvent.click(screen.getByRole('button', { name: '登録して紹介リンクを発行する' }))
+    await waitFor(() => expect(screen.getByText('https://example.com/r/issued')).toBeTruthy())
+    expect(screen.getByRole('button', { name: 'コピー' })).toBeTruthy()
+  })
+
   test('足元の3つが絵どおり（発行に ✓）', async () => {
     render(<NewAffiliateV8 />)
     await waitFor(() => {
