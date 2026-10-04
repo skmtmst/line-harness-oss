@@ -96,7 +96,9 @@ const GENERATE_BODY = {
   presetKey: 'line_rich_message',
   count: 2,
   textLines: ['春の感謝祭', '今すぐチェック'],
+  baseColor: '#FFFFFF',
   mainColor: '#FF6600',
+  accentColor: '#FFD400',
   personOption: 'without',
 };
 

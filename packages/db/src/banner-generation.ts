@@ -52,8 +52,10 @@ export interface BannerGeneration {
   api_size: string;
   quality: BannerQuality;
   text_lines: string;
+  base_color: string | null;
   main_color: string | null;
   sub_color: string | null;
+  accent_color: string | null;
   person_option: BannerPersonOption;
   custom_prompt: string;
   free_prompt: string;
@@ -209,8 +211,10 @@ export async function createBannerGeneration(
     apiSize: string;
     quality: BannerQuality;
     textLines: string[];
+    baseColor: string | null;
     mainColor: string | null;
     subColor: string | null;
+    accentColor: string | null;
     personOption: BannerPersonOption;
     customPrompt: string;
     freePrompt: string;
@@ -229,10 +233,11 @@ export async function createBannerGeneration(
     .prepare(
       `INSERT INTO banner_generations
          (id, tenant_id, project_id, status, mode, preset_key, aspect_ratio, api_size, quality,
-          text_lines, main_color, sub_color, person_option, custom_prompt, free_prompt, final_prompt,
+          text_lines, base_color, main_color, sub_color, accent_color,
+          person_option, custom_prompt, free_prompt, final_prompt,
           engine, model_name, requested_count, done_count, failed_count, units_per_image,
           error_message, reference_image_id, reference_mode, created_by, created_at)
-       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -244,8 +249,10 @@ export async function createBannerGeneration(
       input.apiSize,
       input.quality,
       JSON.stringify(input.textLines),
+      input.baseColor,
       input.mainColor,
       input.subColor,
+      input.accentColor,
       input.personOption,
       input.customPrompt,
       input.freePrompt,
@@ -434,7 +441,8 @@ export async function listBannerImages(
               m.uploaded_by AS m_uploaded_by, m.created_at AS m_created_at,
               g.id AS g_id, g.status AS g_status, g.mode AS g_mode, g.preset_key AS g_preset_key,
               g.aspect_ratio AS g_aspect_ratio, g.api_size AS g_api_size, g.quality AS g_quality,
-              g.text_lines AS g_text_lines, g.main_color AS g_main_color, g.sub_color AS g_sub_color,
+              g.text_lines AS g_text_lines, g.base_color AS g_base_color,
+              g.main_color AS g_main_color, g.sub_color AS g_sub_color, g.accent_color AS g_accent_color,
               g.person_option AS g_person_option, g.custom_prompt AS g_custom_prompt,
               g.free_prompt AS g_free_prompt, g.final_prompt AS g_final_prompt, g.engine AS g_engine,
               g.model_name AS g_model_name, g.requested_count AS g_requested_count,
@@ -482,7 +490,8 @@ async function listBannerImagesById(
               m.uploaded_by AS m_uploaded_by, m.created_at AS m_created_at,
               g.id AS g_id, g.status AS g_status, g.mode AS g_mode, g.preset_key AS g_preset_key,
               g.aspect_ratio AS g_aspect_ratio, g.api_size AS g_api_size, g.quality AS g_quality,
-              g.text_lines AS g_text_lines, g.main_color AS g_main_color, g.sub_color AS g_sub_color,
+              g.text_lines AS g_text_lines, g.base_color AS g_base_color,
+              g.main_color AS g_main_color, g.sub_color AS g_sub_color, g.accent_color AS g_accent_color,
               g.person_option AS g_person_option, g.custom_prompt AS g_custom_prompt,
               g.free_prompt AS g_free_prompt, g.final_prompt AS g_final_prompt, g.engine AS g_engine,
               g.model_name AS g_model_name, g.requested_count AS g_requested_count,

@@ -5,6 +5,15 @@
   display: inline-flex;
 }
 
+/* 2 列に並べるとき（Pencil `KkTNS`：役割ごとに 174px の枠へ伸びる） */
+.rootBlock {
+  display: flex;
+}
+
+.rootBlock .well {
+  width: 100%;
+}
+
 /* 呼び出し元のコントロール（見本＋区切り線＋矢印） */
 .well {
   display: inline-flex;
@@ -43,6 +52,17 @@
     var(--color-canvas);
 }
 
+/* 今の色の値（Pencil `XaBKL`：12px・左寄せで余白を埋める） */
+.wellValue {
+  flex: 1;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 12px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .divider {
   width: 1px;
   height: 20px;
@@ -78,7 +98,7 @@
   }
 }
 
-/* 単色／グラデーションのタブ（Pencil `vy3Ku`：h36・pad3・gap2・r10） */
+/* 色の種類の見出し（Pencil `vy3Ku`：h36・pad3・gap2・r10） */
 .tabs {
   display: flex;
   gap: 2px;
@@ -89,14 +109,16 @@
 }
 
 .tab {
+  display: flex;
   flex: 1;
+  align-items: center;
+  justify-content: center;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   color: var(--color-ink-secondary);
   font-size: 13px;
   font-weight: 500;
-  cursor: pointer;
 }
 
 .tabOn {
@@ -105,11 +127,6 @@
   box-shadow: 0 1px 2px #1d1d1f1a;
   color: var(--color-ink);
   font-weight: 600;
-}
-
-.tab:disabled {
-  color: var(--color-ink-disabled);
-  cursor: not-allowed;
 }
 
 /* 彩度・明度の面（Pencil `K4fPq4`：h168・r8） */

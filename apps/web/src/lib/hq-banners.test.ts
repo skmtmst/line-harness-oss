@@ -49,8 +49,10 @@ const generation: BannerGeneration = {
   apiSize: '1024x1024',
   quality: 'medium',
   textLines: ['2周年 春の感謝祭', '8/10〜8/23'],
+  baseColor: '#FFFFFF',
   mainColor: '#D7263D',
   subColor: null,
+  accentColor: null,
   personOption: 'without',
   customPrompt: '桜の花びら',
   freePrompt: null,
@@ -101,7 +103,7 @@ describe('切り抜きの位置（R120）', () => {
 })
 
 describe('生成条件の手元の検査', () => {
-  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', cropPosition: 'center' as const, textLines: ['A'], mainColor: null, subColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: null, referenceMode: 'edit' as const }
+  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', cropPosition: 'center' as const, textLines: ['A'], baseColor: null, mainColor: null, subColor: null, accentColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: null, referenceMode: 'edit' as const }
 
   it('用途・テキスト・枚数がそろえば通る', () => {
     expect(validateGenerationInput(base, 4)).toBeNull()
@@ -112,10 +114,17 @@ describe('生成条件の手元の検査', () => {
     [{ ...base, count: 5 }, '枚数'],
     [{ ...base, textLines: [' ', ''] }, 'テキスト'],
     [{ ...base, textLines: ['あ'.repeat(41)] }, '40文字'],
+    [{ ...base, baseColor: 'white' }, 'ベースカラー'],
     [{ ...base, mainColor: 'red' }, 'メインカラー'],
+    [{ ...base, subColor: '#12345' }, 'サブカラー'],
+    [{ ...base, accentColor: '#1234567' }, '強調カラー'],
     [{ ...base, mode: 'free' as const, freePrompt: '' }, '説明'],
   ])('だめなときは理由を返す: %o', (input, fragment) => {
     expect(validateGenerationInput(input, 4)).toContain(fragment)
+  })
+
+  it('色はすけ具合つきの8桁も通る（★BG-2 P8ZUj）', () => {
+    expect(validateGenerationInput({ ...base, mainColor: '#d7263d80' }, 4)).toBeNull()
   })
 
   it('自由入力ではテキストが無くてもよい', () => {
@@ -177,8 +186,8 @@ describe('画像の表示', () => {
     const rows = generationConditionRows(image, presets)
     expect(rows.map((r) => r.label)).toEqual(['用途', 'テキスト', '色', '人物', '追加の指示', '作成'])
     expect(rows[1].value).toBe('1. 2周年 春の感謝祭\n2. 8/10〜8/23')
-    expect(rows[2].value).toBe('メイン #D7263D')
-    expect(inputFromGeneration(generation)).toMatchObject({ mode: 'banner', presetKey: 'line_rich_message', textLines: ['2周年 春の感謝祭', '8/10〜8/23'], mainColor: '#D7263D', count: 1 })
+    expect(rows[2].value).toBe('ベース #FFFFFF・メイン #D7263D')
+    expect(inputFromGeneration(generation)).toMatchObject({ mode: 'banner', presetKey: 'line_rich_message', textLines: ['2周年 春の感謝祭', '8/10〜8/23'], baseColor: '#FFFFFF', mainColor: '#D7263D', subColor: null, accentColor: null, count: 1 })
   })
 
   it('検索はテキスト・指示・プロジェクト名に当たる', () => {
@@ -202,7 +211,7 @@ describe('画像の表示', () => {
 })
 
 describe('参照画像（35-2）', () => {
-  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', cropPosition: 'center' as const, textLines: [''], mainColor: null, subColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: 'i1', referenceMode: 'edit' as const }
+  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', cropPosition: 'center' as const, textLines: [''], baseColor: null, mainColor: null, subColor: null, accentColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: 'i1', referenceMode: 'edit' as const }
 
   it('土台に描き直すなら、テキストが無くても指示があれば通る', () => {
     expect(validateGenerationInput({ ...base, customPrompt: '文字を秋にする' }, 4)).toBeNull()

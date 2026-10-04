@@ -52,3 +52,27 @@ describe('R120 切り抜きの位置とプレビュー', () => {
     expect(screen.queryByText(/生成後にこの範囲で/)).toBeNull()
   })
 })
+
+/*
+ * ★BG-B `KkTNS` / 補足 `pQlYK`: 色は4つの役割で指定する。承認済みデザインの
+ * 並び（ベース・メイン・サブ・強調）と言葉をそのまま出していることを押さえる。
+ */
+describe('カラーの4つの役割（★BG-B KkTNS）', () => {
+  it('4つの役割が承認どおりの順で並び、補足の文も出る', () => {
+    open()
+    expect(screen.getByText('カラー')).toBeTruthy()
+    expect(screen.getByText('4つの役割で指定します')).toBeTruthy()
+    for (const label of ['ベースカラー', 'メインカラー', 'サブカラー', '強調カラー']) {
+      expect(screen.getByRole('button', { name: `${label}（今の色 指定なし）` })).toBeTruthy()
+    }
+    expect(screen.getByText('色の決め方')).toBeTruthy()
+    expect(screen.getByText(/ベースは背景、メインは主役、サブは差し色、強調は特に目立たせたい文字/)).toBeTruthy()
+  })
+
+  it('役割ごとに選んだ色が、その役割だけに入る', () => {
+    const onChange = open()
+    fireEvent.click(screen.getByRole('button', { name: 'サブカラー（今の色 指定なし）' }))
+    fireEvent.click(screen.getByRole('option', { name: '#06c755' }))
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ subColor: '#06c755', baseColor: null, mainColor: null, accentColor: null }))
+  })
+})

@@ -3,22 +3,22 @@
 import { Images, Plus, Sparkles, Upload, X } from 'lucide-react'
 import { useId, useRef, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import ColorWell from '@/components/shared/color-well'
 import HelpTip from '@/components/shared/help-tip'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import {
+  COLOR_ROLES,
   CROP_POSITION_OPTIONS,
   CUSTOM_PROMPT_MAX,
   FREE_PROMPT_MAX,
-  MAIN_COLOR_SWATCHES,
-  SUB_COLOR_SWATCHES,
   TEXT_LINE_LENGTH_MAX,
   TEXT_LINE_MAX,
   groupPresets,
-  isHexColor,
   presetOptionLabel,
   tileCaption,
+  type BannerColorRoleKey,
   type BannerCropPosition,
   type BannerGenerationInput,
   type BannerImage,
@@ -242,25 +242,7 @@ export default function GenerationPanel({
               </div>
             </Field>
 
-            <div className="grid grid-cols-2 gap-3">
-              <ColorPicker
-                name={`${uid}-main`}
-                label="メインカラー"
-                swatches={MAIN_COLOR_SWATCHES}
-                value={value.mainColor}
-                onChange={(v) => set('mainColor', v)}
-                disabled={disabled}
-              />
-              <ColorPicker
-                name={`${uid}-sub`}
-                label="サブカラー"
-                note="任意"
-                swatches={SUB_COLOR_SWATCHES}
-                value={value.subColor}
-                onChange={(v) => set('subColor', v)}
-                disabled={disabled}
-              />
-            </div>
+            <ColorRoles value={value} onPick={(key, next) => set(key, next)} disabled={disabled} />
 
             <Field label="人物">
               <fieldset className="grid grid-cols-2 gap-1.5" disabled={disabled}>
@@ -402,59 +384,52 @@ function SegmentOption({ name, value, checked, onSelect, label }: { name: string
   )
 }
 
-/** 色の見本＋HEX。Pencil `l69Th` / `l6UwE`。見本を押すか、HEXを直接書く。 */
-function ColorPicker({
-  name,
-  label,
-  note,
-  swatches,
+/**
+ * 色の4つの役割。Pencil ★BG-B `KkTNS`。
+ *
+ * ベース＝背景、メイン＝主役、サブ＝差し色、強調＝目立たせたい文字。
+ * 色そのものは共通の「色を選ぶ」（★BG-2 `P8ZUj`）で選ぶ。
+ */
+export function ColorRoles({
   value,
-  onChange,
+  onPick,
   disabled,
 }: {
-  name: string
-  label: string
-  note?: string
-  swatches: readonly string[]
-  value: string | null
-  onChange: (next: string | null) => void
+  value: BannerGenerationInput
+  onPick: (key: BannerColorRoleKey, next: string | null) => void
   disabled?: boolean
 }) {
-  const invalid = value !== null && value !== '' && !isHexColor(value)
+  // いま使っている色を「このデザインの色」として見せ、役割どうしで使い回せるようにする。
+  const used = Array.from(new Set(COLOR_ROLES.map((role) => value[role.key]).filter((c): c is string => Boolean(c))))
   return (
-    <fieldset className="flex flex-col gap-1.5" disabled={disabled}>
-      <legend className="flex w-full items-baseline justify-between gap-2">
-        <span className="text-label font-medium text-ink">{label}</span>
-        {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
-      </legend>
-      <div className="flex flex-wrap gap-1.5">
-        {swatches.map((hex) => {
-          const checked = (value ?? '').toUpperCase() === hex
-          return (
-            <RadioCard
-              key={hex}
-              name={name}
-              value={hex}
-              checked={checked}
-              onChange={() => onChange(hex)}
-              title={hex}
-              note={<span aria-hidden="true" style={{ backgroundColor: hex }} className="border-hairline inline-block h-4 w-4 rounded-pill border" />}
-            />
-          )
-        })}
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-label font-medium text-ink">カラー</span>
+        <span className="text-micro text-ink-faint">4つの役割で指定します</span>
       </div>
-      <TextField
-        aria-label={`${label} のHEX`}
-        value={value ?? ''}
-        placeholder="#RRGGBB"
-        maxLength={7}
-        invalid={invalid}
-        onChange={(event) => {
-          const raw = event.target.value.trim()
-          onChange(raw === '' ? null : raw.startsWith('#') ? raw.toUpperCase() : `#${raw.toUpperCase()}`)
-        }}
-        className="w-full"
-      />
-    </fieldset>
+      <div className="grid grid-cols-2 gap-3">
+        {COLOR_ROLES.map((role) => (
+          <div key={role.key} className="flex flex-col gap-1.5">
+            <span className="text-label font-medium text-ink">{role.label}</span>
+            <ColorWell
+              block
+              label={role.label}
+              value={value[role.key] ?? null}
+              fallback={role.sample}
+              savedColors={used}
+              disabled={disabled}
+              onChange={(next) => onPick(role.key, next)}
+            />
+          </div>
+        ))}
+      </div>
+      {/* 補足（Pencil `pQlYK`）。色の役割の意味を言葉で置いておく。 */}
+      <div className="rounded-mini bg-canvas-sunken p-3">
+        <p className="text-label font-semibold text-ink">色の決め方</p>
+        <p className="mt-1 text-micro text-ink-secondary">
+          色をタップすると、好きな色を選べる画面が開きます。画面の中の色をそのまま拾うスポイトも使えます。ベースは背景、メインは主役、サブは差し色、強調は特に目立たせたい文字に使います。
+        </p>
+      </div>
+    </div>
   )
 }

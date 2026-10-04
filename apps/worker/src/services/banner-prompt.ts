@@ -71,7 +71,8 @@ export const BANNER_MAX_FREE_PROMPT_LENGTH = 1200;
 /** 一度に作れる枚数。暴走防止の安全弁の1つ。 */
 export const BANNER_MAX_COUNT = 4;
 
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+/** `#RRGGBB`。すけ具合つき（`#RRGGBBAA`）も受ける。 */
+const HEX_COLOR = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
 
 export function isHexColor(value: unknown): value is string {
   return typeof value === 'string' && HEX_COLOR.test(value);
@@ -85,8 +86,11 @@ export interface BannerPromptInput {
   /** 参照画像の使い方。参照画像が無いときは null。 */
   referenceMode?: BannerReferenceMode | null;
   textLines: string[];
+  /** 色の4つの役割（★BG-B `KkTNS`）。指定なしは null。 */
+  baseColor: string | null;
   mainColor: string | null;
   subColor: string | null;
+  accentColor: string | null;
   personOption: BannerPersonOption;
   customPrompt: string;
   freePrompt: string;
@@ -127,11 +131,18 @@ export function buildBannerPrompt(input: BannerPromptInput): string {
       parts.push('文字は入れないでください。');
     }
 
+    // 色の4つの役割（★BG-B `KkTNS`）。使う場所まで言い切る。
+    if (input.baseColor) {
+      parts.push(`背景のベースカラーは ${input.baseColor} にしてください。`);
+    }
     if (input.mainColor) {
       parts.push(`メインカラーは ${input.mainColor} を基調にしてください。`);
     }
     if (input.subColor) {
-      parts.push(`アクセントカラーとして ${input.subColor} を組み合わせてください。`);
+      parts.push(`サブカラーとして ${input.subColor} を差し色に組み合わせてください。`);
+    }
+    if (input.accentColor) {
+      parts.push(`特に目立たせたい文字には強調カラー ${input.accentColor} を使ってください。`);
     }
     parts.push(
       input.personOption === 'with'
@@ -168,8 +179,10 @@ export interface BannerRequestValidation {
     mode: BannerMode;
     preset: BannerPreset;
     textLines: string[];
+    baseColor: string | null;
     mainColor: string | null;
     subColor: string | null;
+    accentColor: string | null;
     personOption: BannerPersonOption;
     customPrompt: string;
     freePrompt: string;
@@ -206,13 +219,26 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
     return { ok: false, error: `1行は${BANNER_MAX_TEXT_LINE_LENGTH}文字までにしてください（「${tooLong.slice(0, 12)}…」）` };
   }
 
-  const mainColor = body.mainColor == null || body.mainColor === '' ? null : body.mainColor;
-  if (mainColor !== null && !isHexColor(mainColor)) {
-    return { ok: false, error: 'メインカラーは #RRGGBB の形式で指定してください' };
-  }
-  const subColor = body.subColor == null || body.subColor === '' ? null : body.subColor;
-  if (subColor !== null && !isHexColor(subColor)) {
-    return { ok: false, error: 'サブカラーは #RRGGBB の形式で指定してください' };
+  // 色の4つの役割（★BG-B `KkTNS`）。空文字は「指定なし」として扱う。
+  const colorRoles = [
+    { key: 'baseColor', label: 'ベースカラー' },
+    { key: 'mainColor', label: 'メインカラー' },
+    { key: 'subColor', label: 'サブカラー' },
+    { key: 'accentColor', label: '強調カラー' },
+  ] as const;
+  const colors: Record<(typeof colorRoles)[number]['key'], string | null> = {
+    baseColor: null,
+    mainColor: null,
+    subColor: null,
+    accentColor: null,
+  };
+  for (const role of colorRoles) {
+    const raw = body[role.key];
+    if (raw == null || raw === '') continue;
+    if (!isHexColor(raw)) {
+      return { ok: false, error: `${role.label}は #RRGGBB の形式で指定してください` };
+    }
+    colors[role.key] = raw;
   }
 
   const personOption: BannerPersonOption = body.personOption === 'with' ? 'with' : 'without';
@@ -250,8 +276,10 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
       mode,
       preset,
       textLines,
-      mainColor: mainColor as string | null,
-      subColor: subColor as string | null,
+      baseColor: colors.baseColor,
+      mainColor: colors.mainColor,
+      subColor: colors.subColor,
+      accentColor: colors.accentColor,
       personOption,
       customPrompt,
       freePrompt,

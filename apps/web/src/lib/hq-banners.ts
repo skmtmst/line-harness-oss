@@ -80,8 +80,12 @@ export interface BannerGeneration {
   apiSize: string
   quality: string
   textLines: string[]
+  /** 背景に敷く色（Pencil ★BG-B `KkTNS` ベースカラー）。 */
+  baseColor: string | null
   mainColor: string | null
   subColor: string | null
+  /** 目立たせたい文字の色（同 強調カラー）。 */
+  accentColor: string | null
   personOption: BannerPersonOption
   customPrompt: string | null
   freePrompt: string | null
@@ -169,8 +173,10 @@ export interface BannerGenerationInput {
   /** 切り抜きの位置。run のときに送り、条件の登録ではサーバーが無視する。 */
   cropPosition: BannerCropPosition
   textLines: string[]
+  baseColor: string | null
   mainColor: string | null
   subColor: string | null
+  accentColor: string | null
   personOption: BannerPersonOption
   customPrompt: string
   freePrompt: string
@@ -186,8 +192,10 @@ export const EMPTY_GENERATION_INPUT: BannerGenerationInput = {
   presetKey: '',
   cropPosition: 'center',
   textLines: [''],
+  baseColor: null,
   mainColor: null,
   subColor: null,
+  accentColor: null,
   personOption: 'without',
   customPrompt: '',
   freePrompt: '',
@@ -196,17 +204,33 @@ export const EMPTY_GENERATION_INPUT: BannerGenerationInput = {
   referenceMode: 'edit',
 }
 
-/** 見本の色。Pencil 35-2 `h5eMj` / `fRYho` のとおり。 */
-export const MAIN_COLOR_SWATCHES = ['#D7263D', '#06C755', '#175CD3', '#F5C56B', '#1D1D1F'] as const
-export const SUB_COLOR_SWATCHES = ['#FFFFFF', '#F5F5F7', '#FFE8B0', '#FFD6DB', '#1D1D1F'] as const
+/** 色を入れる4つの欄。 */
+export type BannerColorRoleKey = 'baseColor' | 'mainColor' | 'subColor' | 'accentColor'
+
+/**
+ * 色の4つの役割（Pencil ★BG-B `KkTNS`）。
+ * 見本の色と説明は承認した版のとおり。
+ */
+export const COLOR_ROLES: readonly {
+  key: BannerColorRoleKey
+  label: string
+  /** 何も選んでいないときにピッカーが開く色（承認した見本の色）。 */
+  sample: string
+}[] = [
+  { key: 'baseColor', label: 'ベースカラー', sample: '#FFFFFF' },
+  { key: 'mainColor', label: 'メインカラー', sample: '#D7263D' },
+  { key: 'subColor', label: 'サブカラー', sample: '#F3E9DC' },
+  { key: 'accentColor', label: '強調カラー', sample: '#FFD400' },
+]
 
 export const TEXT_LINE_MAX = 6
 export const TEXT_LINE_LENGTH_MAX = 40
 export const CUSTOM_PROMPT_MAX = 600
 export const FREE_PROMPT_MAX = 1200
 
+/** `#RRGGBB`。すけ具合つき（`#RRGGBBAA`）も受ける。 */
 export function isHexColor(value: string): boolean {
-  return /^#[0-9A-Fa-f]{6}$/.test(value)
+  return /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(value)
 }
 
 /**
@@ -232,8 +256,10 @@ export function validateGenerationInput(
     if (lines.some((line) => line.length > TEXT_LINE_LENGTH_MAX)) {
       return `テキストは1行${TEXT_LINE_LENGTH_MAX}文字までです`
     }
-    if (input.mainColor && !isHexColor(input.mainColor)) return 'メインカラーは #RRGGBB の形で入力してください'
-    if (input.subColor && !isHexColor(input.subColor)) return 'サブカラーは #RRGGBB の形で入力してください'
+    for (const role of COLOR_ROLES) {
+      const color = input[role.key]
+      if (color && !isHexColor(color)) return `${role.label}は #RRGGBB の形で入力してください`
+    }
     if (input.customPrompt.length > CUSTOM_PROMPT_MAX) return `追加の指示は${CUSTOM_PROMPT_MAX}文字までです`
   } else {
     if (!input.freePrompt.trim()) return '作りたい画像の説明を入力してください'
@@ -398,7 +424,10 @@ export function generationConditionRows(
     rows.push({ label: 'テキスト', value: g.textLines.map((line, i) => `${i + 1}. ${line}`).join('\n') || '（文字なし）' })
     rows.push({
       label: '色',
-      value: [g.mainColor ? `メイン ${g.mainColor}` : null, g.subColor ? `サブ ${g.subColor}` : null].filter(Boolean).join('・') || '指定なし',
+      value:
+        COLOR_ROLES.map((role) => (g[role.key] ? `${role.label.replace('カラー', '')} ${g[role.key]}` : null))
+          .filter(Boolean)
+          .join('・') || '指定なし',
     })
     rows.push({ label: '人物', value: g.personOption === 'with' ? '入れる' : '入れない' })
     rows.push({ label: '追加の指示', value: g.customPrompt || '（なし）' })
@@ -418,8 +447,10 @@ export function inputFromGeneration(g: BannerGeneration): BannerGenerationInput 
     // 切り抜き位置は保存していないので中央に戻す（R120・migration 不要のため）。
     cropPosition: 'center',
     textLines: g.textLines.length > 0 ? [...g.textLines] : [''],
+    baseColor: g.baseColor,
     mainColor: g.mainColor,
     subColor: g.subColor,
+    accentColor: g.accentColor,
     personOption: g.personOption,
     customPrompt: g.customPrompt ?? '',
     freePrompt: g.freePrompt ?? '',

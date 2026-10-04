@@ -94,7 +94,7 @@ function normalizeHex(input: string): string | null {
  * 色を選ぶ（Pencil ★V8 `KVkPg` ／開いた状態 ★BG-2 `P8ZUj`・`d6PU4a`）。
  *
  * 今の色の見本＋区切り線＋矢印の 36px のコントロール。押すと下にピッカーが
- * 開く。中身は、単色／グラデーションのタブ、彩度・明度の面、色相と不透明度の
+ * 開く。中身は、色の種類（単色）の見出し、彩度・明度の面、色相と不透明度の
  * バー、十六進と不透明度の入力、スポイト、よく使う色、このデザインの色、
  * そして「指定なしに戻す」「この色にする」。
  *
@@ -111,6 +111,8 @@ export default function ColorWell({
   allowClear = true,
   savedColors,
   onSaveColor,
+  block = false,
+  fallback = '#ffffff',
 }: {
   /** 今の色（`#rrggbb`／半透明なら `#rrggbbaa`）。指定なしは null。 */
   value: string | null
@@ -127,12 +129,16 @@ export default function ColorWell({
   savedColors?: string[]
   /** 「＋この色を保存」を押したとき。渡すと保存の欄が出る。 */
   onSaveColor?: (color: string) => void
+  /** 横幅を親に合わせる（Pencil ★BG-B `KkTNS` の 2 列並び用）。 */
+  block?: boolean
+  /** 指定なしのときにピッカーを開く色（★BG-B の役割ごとの見本の色）。 */
+  fallback?: string
 }) {
   const [open, setOpen] = useState(false)
-  const initial = parseValue(value)
+  const initial = parseValue(value ?? fallback)
   const [hsv, setHsv] = useState<Hsv>(initial.hsv)
   const [alpha, setAlpha] = useState(initial.alpha)
-  const [hexText, setHexText] = useState(value ? value.slice(1, 7) : '')
+  const [hexText, setHexText] = useState((value ?? fallback).replace(/^#/, '').slice(0, 6))
   const emitted = useRef<string | null>(value ?? null)
   const rootRef = useRef<HTMLSpanElement | null>(null)
   const hasDropper = typeof window !== 'undefined' && 'EyeDropper' in window
@@ -141,11 +147,11 @@ export default function ColorWell({
   useEffect(() => {
     if ((value ?? null) === emitted.current) return
     emitted.current = value ?? null
-    const next = parseValue(value)
+    const next = parseValue(value ?? fallback)
     setHsv(next.hsv)
     setAlpha(next.alpha)
-    setHexText(value ? value.slice(1, 7) : '')
-  }, [value])
+    setHexText((value ?? fallback).replace(/^#/, '').slice(0, 6))
+  }, [value, fallback])
 
   useEffect(() => {
     if (!open) return
@@ -242,7 +248,7 @@ export default function ColorWell({
   const showSaved = onSaveColor !== undefined || (savedColors?.length ?? 0) > 0
 
   return (
-    <span ref={rootRef} className={styles.root}>
+    <span ref={rootRef} className={block ? `${styles.root} ${styles.rootBlock}` : styles.root}>
       <button
         type="button"
         className={styles.well}
@@ -257,26 +263,25 @@ export default function ColorWell({
           style={value ? { backgroundColor: value } : undefined}
           aria-hidden="true"
         />
+        {/* 呼び出し元には今の色を文字でも出す（Pencil `xeedd` の「値」）。 */}
+        <span className={styles.wellValue} aria-hidden="true">
+          {value ? value.toUpperCase() : '指定なし'}
+        </span>
         <span className={styles.divider} aria-hidden="true" />
         <ChevronDown size={14} aria-hidden="true" className={styles.caret} />
       </button>
       {open ? (
         <div className={styles.pop} role="dialog" aria-label={label}>
-          {/* 単色／グラデーション */}
-          <div className={styles.tabs} role="tablist" aria-label="色の種類">
-            <button type="button" role="tab" aria-selected={true} className={`${styles.tab} ${styles.tabOn}`}>
-              単色
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={false}
-              className={styles.tab}
-              disabled
-              title="グラデーションは準備中です"
-            >
-              グラデーション
-            </button>
+          {/*
+            色の種類の見出し。承認した見た目（★BG-2 `P8ZUj`）には「単色／
+            グラデーション」の2つのタブが並ぶが、グラデーションはまだ扱えない
+            （色は `#RRGGBB(AA)` の1色で持っているため）。共通ルール 2-2・5-5
+            の「押せないものを完成画面に置かない／そもそも描かない」に従って、
+            押せないタブは出さず、ここが単色を選ぶ場所だと分かる見出しだけ置く。
+            グラデーションを扱えるようにするときにタブへ戻す。
+          */}
+          <div className={styles.tabs}>
+            <span className={`${styles.tab} ${styles.tabOn}`}>単色</span>
           </div>
 
           {/* 彩度・明度の面 */}

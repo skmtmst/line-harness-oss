@@ -9,8 +9,9 @@ import ColorWell from './color-well'
 /**
  * 色を選ぶ（Pencil ★BG-2 `P8ZUj`／ピッカー本体 `d6PU4a`）の試験。
  *
- * - 閉じている間はピッカーを出さない。押すと単色タブ・面・バー・よく使う色・
- *   「指定なしに戻す」「この色にする」が出る。
+ * - 閉じている間はピッカーを出さない。押すと「単色」の見出し・面・バー・
+ *   よく使う色・「指定なしに戻す」「この色にする」が出る。
+ * - 扱えないグラデーションは、押せないタブとしても描かない（共通ルール 2-2・5-5）。
  * - よく使う色、十六進の入力、色あい、すけ具合で呼び出し元へ色が返る。
  * - すけ具合を下げたときは 8 桁（`#rrggbbaa`）で返す。
  * - 寸法（288 幅・面 168・バー 12・ボタン 36）は承認した版のまま。
@@ -32,13 +33,14 @@ describe('ColorWell（★BG-2 カラーピッカー）', () => {
     expect(screen.getByRole('button', { name: 'メインカラー（今の色 #d7263d）' })).toBeTruthy()
   })
 
-  it('開くと単色タブ・面・バー・よく使う色・決定の操作が出る', () => {
+  it('開くと「単色」の見出し・面・バー・よく使う色・決定の操作が出る', () => {
     render(<ColorWell value="#d7263d" onChange={vi.fn()} />)
     openWell()
     expect(screen.getByRole('dialog')).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '単色' }).getAttribute('aria-selected')).toBe('true')
-    // グラデーションは承認した見た目どおりに並べるが、まだ選べない。
-    expect((screen.getByRole('tab', { name: 'グラデーション' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText('単色')).toBeTruthy()
+    // グラデーションはまだ扱えないので、押せないタブとしても置かない。
+    expect(screen.queryByText('グラデーション')).toBeNull()
+    expect(screen.queryAllByRole('tab').length).toBe(0)
     expect(screen.getByRole('slider', { name: '鮮やかさと明るさ' })).toBeTruthy()
     expect(screen.getByRole('slider', { name: '色あい' })).toBeTruthy()
     expect(screen.getByRole('slider', { name: 'すけ具合' })).toBeTruthy()
@@ -115,6 +117,12 @@ describe('ColorWell（★BG-2 カラーピッカー）', () => {
   it('色がないときは見本を空にし、読み上げも「指定なし」にする', () => {
     render(<ColorWell value={null} onChange={vi.fn()} label="ベースカラー" />)
     expect(screen.getByRole('button', { name: 'ベースカラー（今の色 指定なし）' })).toBeTruthy()
+    expect(screen.getByRole('button', { expanded: false }).textContent).toContain('指定なし')
+  })
+
+  it('呼び出し元に今の色を文字でも出す（★BG-2 `xeedd` の「値」）', () => {
+    render(<ColorWell value="#d7263d" onChange={vi.fn()} label="メインカラー" />)
+    expect(screen.getByRole('button', { expanded: false }).textContent).toContain('#D7263D')
   })
 
   it('このデザインの色を渡すと保存の欄が出る', () => {
