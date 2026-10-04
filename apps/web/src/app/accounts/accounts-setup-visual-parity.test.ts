@@ -83,7 +83,11 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
 
   it('再利用する編集モーダルは秘密値を読まず、狭い画面でも入力欄を切らない', () => {
     expect(editModalSource).toContain('Edit modal never reads persisted credential values')
-    expect(editModalSource).not.toContain('sm:items-center')
+    // 相対import先の別部品でなく、このモーダルの外枠を調べる。
+    const modalOverlay = editModalSource.match(/className="fixed inset-0[^\"]*"/)?.[0]
+    expect(modalOverlay).toContain('items-start')
+    expect(modalOverlay).toContain('overflow-y-auto')
+    expect(modalOverlay).not.toContain('sm:items-center')
     expect(editModalSource).toContain('sticky top-0')
     expect(editModalSource).toContain('grid grid-cols-1 gap-3 sm:grid-cols-2')
   })
