@@ -7,6 +7,8 @@ import { ApiError, downloadApiFile, webinarApi, type WebinarAnalytics } from '@/
 import type { ParticipantExport } from './participants-v8'
 import AnalyticsFunnelV8 from './analytics-funnel-v8'
 import RetentionSection from './retention-section'
+import ViewerComments from './viewer-comments'
+import AnalyticsDetails from './analytics-details'
 
 export default function AnalyticsV8({ webinarId, durationSeconds, analytics, analyticsState, onRetry, onExportChange }: {
   webinarId: string
@@ -67,5 +69,7 @@ export default function AnalyticsV8({ webinarId, durationSeconds, analytics, ana
     {permission === 'error' ? <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>CSVを書き出す権限を確認できませんでした。分析の集計は表示しています。</Notice> : error ? <Notice tone="info">{error}</Notice> : null}
     <AnalyticsFunnelV8 summary={analytics.summary} daily={analytics.daily} />
     <RetentionSection retention={analytics.retention ?? { bucketSeconds: 60, started: 0, points: [] }} completed={analytics.summary.completed} ctaAtSeconds={analytics.ctaAtSeconds ?? null} heartbeatRejects={analytics.heartbeatRejects ?? 0} durationSeconds={durationSeconds} />
+    <AnalyticsDetails analytics={analytics} />
+    <ViewerComments webinarId={webinarId} />
   </div>
 }

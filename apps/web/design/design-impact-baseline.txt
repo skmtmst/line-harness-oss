@@ -459,3 +459,4 @@ shared-button-importer app/contents/vars/new/new-v8.tsx
 shared-button-importer app/contents/vars/edit/edit-v8.tsx
 shared-button-importer app/webinars/edit/basic-v8.tsx
 shared-button-importer app/webinars/edit/scheduled-session-row.tsx
+shared-button-importer app/webinars/edit/viewer-comments.tsx
