@@ -205,6 +205,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/accounts/migrations/:migrationId',
     'GET /api/ad-platforms',
     'GET /api/ad-platforms/:id/logs',
+    // F-21: 既存の広告連携と同様、staff は authMiddleware で拒否する。
+    'GET /api/ad-platforms/event-mappings',
     'GET /api/ad-platforms/logs',
     'GET /api/admin/auto-reply-stats',
     'GET /api/admin/automations-summary',
@@ -358,6 +360,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/accounts/:id/migrate',
     'POST /api/ad-platforms',
     'POST /api/ad-platforms/:id/cost-import',
+    // F-22: 送信のやり直しは owner/admin 専用。
+    'POST /api/ad-platforms/logs/:id/resend',
     'POST /api/ad-platforms/test',
     'POST /api/admin/broadcast-coverage',
     'POST /api/admin/broadcasts/:id/reset-to-draft',
@@ -487,6 +491,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'PUT /api/account-settings/test-recipients',
     'PUT /api/account-settings/tracked-link-base-url',
     'PUT /api/ad-platforms/:id',
+    // F-21: 対応表の保存は owner 専用。
+    'PUT /api/ad-platforms/event-mappings',
     'PUT /api/affiliate-offers/:id',
     'PUT /api/affiliates/:id',
     'PUT /api/broadcast-message-assets/:id',
