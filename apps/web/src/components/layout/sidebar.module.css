@@ -226,6 +226,8 @@
 [data-theme="v8"] .desktop {
   width: 240px;
   flex-basis: 240px;
+  /* 画面の高さいっぱい（zUg8S）。項目が多いときは .nav だけ縦に送る。 */
+  height: 100dvh;
   border-right: 0;
   background: transparent;
   transition: width var(--motion-base) var(--motion-ease-out),
