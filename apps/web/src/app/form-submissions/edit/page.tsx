@@ -289,18 +289,12 @@ function FormEditInner() {
           ? `/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}`
           : '/api/tags'
         const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
-        const [tagRes, ffRes, scenarioRes, reminderRes, templateRes, menuRes] = await Promise.all([
+        const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
           fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath),
           selectedAccountId ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }) : Promise.resolve({ success: true as const, data: [] }),
           api.scenarios.list(accountFilter),
           api.reminders.list(accountFilter),
           api.templates.list(undefined, selectedAccountId ?? undefined),
-          // 「予約を入れる」欄のメニュー選び。予約を使わない店では空になる。
-          selectedAccountId
-            ? bookingApi
-              .listMenus(selectedAccountId)
-              .catch(() => ({ menus: [] as BookingMenu[] }))
-            : Promise.resolve({ menus: [] as BookingMenu[] }),
         ])
         setRefs({
           tags: tagRes.success ? tagRes.data.map((t) => ({ id: t.id, name: t.name })) : [],
@@ -316,11 +310,22 @@ function FormEditInner() {
           templates: templateRes.success
             ? templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType }))
             : [],
-          bookingMenus: (menuRes.menus ?? [])
-            .filter((m) => m.is_active === 1)
-            .map((m) => ({ id: m.id, name: m.name, durationMinutes: m.duration_minutes })),
+          bookingMenus: [],
           bookingMenuStaff: {},
         })
+        // 「予約を入れる」欄のメニュー選び。本体の読み込みを待たせないよう後追い。
+        // 予約を使わない店では空のまま。読めなくても欄は置ける。
+        if (selectedAccountId) {
+          bookingApi
+            .listMenus(selectedAccountId)
+            .then((menuRes) => {
+              const bookingMenus = (menuRes.menus ?? [])
+                .filter((m) => m.is_active === 1)
+                .map((m) => ({ id: m.id, name: m.name, durationMinutes: m.duration_minutes }))
+              setRefs((prev) => ({ ...prev, bookingMenus }))
+            })
+            .catch(() => {})
+        }
 
         const ok = await loadForm()
         // id なし・未選択は別の面で出す。ここは取得して見つからないときだけ。

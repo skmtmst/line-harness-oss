@@ -150,4 +150,13 @@ describe('予約を入れる', () => {
     expect(createRequest).toHaveBeenCalledTimes(2);
     expect(createRequest.mock.calls[0][1]).toBe(createRequest.mock.calls[1][1]);
   });
+
+  it('予約連携のブロックの外枠に板の印（g9osGN）が付いている', async () => {
+    setup();
+    // メニューの札が出たら枠が描かれている。外枠に印が無いと数に入らない。
+    expect(await screen.findByText('トリミング（小型犬）・105分')).toBeTruthy();
+    const frame = document.querySelector('[data-design-node="g9osGN"]');
+    expect(frame).toBeTruthy();
+    expect(frame?.textContent).toContain('トリミング（小型犬）');
+  });
 });

@@ -6,7 +6,7 @@
       "lcpMs": 348,
       "pressMs": 84,
       "longTaskMs": 51,
-      "jsBytes": 4415133
+      "jsBytes": 4415545
     },
     "inbox": {
       "route": "/chats",
@@ -76,9 +76,7 @@
       "jsBytes": 4414962,
       "lcpMs": 660,
       "longTaskMs": 51,
-      "pressMs": 69,
-      "route": "/",
-      "showMs": 1247
+      "jsBytes": 3709664
     },
     "friends": {
       "route": "/friends",
@@ -94,7 +92,7 @@
       "lcpMs": 296,
       "pressMs": 106,
       "longTaskMs": 67,
-      "jsBytes": 4287667
+      "jsBytes": 4288007
     },
     "friends-2000": {
       "route": "/friends",
