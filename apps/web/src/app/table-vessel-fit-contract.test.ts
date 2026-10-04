@@ -72,19 +72,10 @@ describe('表は器の幅にぴったり収める', () => {
 
   it('/inflow-links: 友だち追加・クリックの列は中身に合わせた幅にする', () => {
     const page = read('inflow-links/page.tsx')
-    // 数字の列が中身より狭い（友だち追加 72>68・クリック 60>53）と
-    // 器からはみ出す。流入元名から回し、割合の合計は変えない（86%）。
-    // v7 は w-[13%] のまま。V8 だけ流入元名を伸び縮みにする（1152 の決まり）。
-    // 掛け金クラスを外すと V8 の上書きが効かなくなる。
-    expect(page).toMatch(/<col className="w-\[11%\]" \/>\s*<col className="w-\[9%\]" \/>/)
-    expect(page).toMatch(/<col className="w-\[13%\][^"]*" \/>/)
-    expect(page).toContain('inflow-name-col')
-    const css = read('globals.css')
-    expect(css).toMatch(/\[data-theme="v8"\] col\.inflow-name-col \{\s*width:\s*auto;/)
-    expect(page).not.toContain('<col className="w-[17%]" />')
-    expect(page).not.toContain('<col className="w-[7%]" />')
-    const values = [...page.matchAll(/w-\[(\d+(?:\.\d+)?)%\]/g)].map((m) => Number(m[1]))
-    expect(values.reduce((sum, value) => sum + value, 0)).toBe(86)
+    // V8は関連情報を2行へまとめ、数値は折り返さず右へそろえる。
+    expect(page).toContain('styles.numCell')
+    const css = read('inflow-links/inflow-list-v8.module.css')
+    expect(css).toMatch(/\.numCell\s*\{[^}]*text-align:\s*right;[^}]*white-space:\s*nowrap;/)
     // 見出しは折り返さず1行（共通 Th が white-space:nowrap を持つ）。
     // 狭い列に戻しても割れないようにする。重ね書きはしない。
     expect(page).toMatch(/<Th align="right"[^>]*>\s*友だち追加/)

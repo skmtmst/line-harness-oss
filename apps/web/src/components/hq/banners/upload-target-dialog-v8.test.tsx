@@ -15,7 +15,7 @@ import UploadTargetDialog from './upload-target-dialog'
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
+
 
 const PROJECTS = [
   { id: 'pj-a', name: '秋のキャンペーン', description: null, isFavorite: false, archivedAt: null, imageCount: 0, runningCount: 0, createdBy: null, createdAt: '2026-09-20T00:00:00Z', updatedAt: '2026-09-21T00:00:00Z' },

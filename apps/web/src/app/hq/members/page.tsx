@@ -1,12 +1,10 @@
 'use client'
 
+import HqSettingsNav from '@/app/hq/hq-settings-nav-v8'
 import ReadonlyHeader from '@/app/hq/readonly-header-v8'
 import '@/app/hq/readonly-v8.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import OperatorHistory from '@/components/hq/operator-history'
 import { Plus } from 'lucide-react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import MemberDialog, { type MemberDialogValue } from '@/components/hq/members/member-dialog'
 import StepUpPrompt from '@/components/step-up-prompt'
@@ -14,13 +12,7 @@ import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
-import StickyBar from '@/components/shared/sticky-bar'
-import KpiCard from '@/components/shared/kpi-card'
-import KpiCollapse from '@/components/ui/kpi-collapse'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import ScrollableTabs from '@/components/layout/scrollable-tabs'
-import { TextField } from '@/components/shared/text-field'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api, ApiError } from '@/lib/api'
@@ -29,20 +21,19 @@ import {
   STATUS_LABELS,
   canResendInvite,
   lastLoginLabel,
-  memberKpis,
   memberStatus,
   scopeLabel,
   sortMembers,
 } from '@/lib/hq-members'
+import './hq-members-v8.css'
 
-type Tab = 'members' | 'tenant'
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /**
- * メンバー管理。★V6 36-5（`CRL4w`）。旧「統括設定」（/hq/settings）の権限者と統括名をここへ移した。
+ * メンバー管理。板 yLKwV（招待）・BHEl9（権限の変更）（V8 のみ）。
  *
- * L 一覧型: 1行目（タブ＋招待）→ 数値カード帯 → 案内帯 → 権限者の表。
- * 「統括の情報」タブは統括名の変更（旧設定画面のフォーム）。
+ * 左に「統括の設定」の中のメニュー、右に権限者の表。
+ * 「統括の情報」（統括名の変更）は /hq/settings に置く。
  */
 export default function HqMembersPage() {
   return (
@@ -53,11 +44,7 @@ export default function HqMembersPage() {
 }
 
 function MembersInner() {
-  const theme = useAdminTheme()
   usePageTitle('メンバー管理')
-  const router = useRouter()
-  const params = useSearchParams()
-  const tab: Tab = params.get('tab') === 'tenant' ? 'tenant' : 'members'
 
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [members, setMembers] = useState<StaffMember[]>([])
@@ -108,7 +95,6 @@ function MembersInner() {
   }, [load])
 
   const accountNames = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts])
-  const kpis = memberKpis(members)
   const rows = sortMembers(members, me?.id ?? null)
   const canManage = me?.role === 'owner' || me?.role === 'admin'
   const restricted = me?.accountScope === 'accounts'
@@ -175,47 +161,23 @@ function MembersInner() {
     }
   }
 
-  const changeTab = (next: Tab) => router.replace(next === 'tenant' ? '/hq/members?tab=tenant' : '/hq/members')
-
   return (
-    <div data-design-node={theme === 'v8' ? tab === 'tenant' ? 'K7HYu' : 'r4ARpV' : 'CRL4w'} className="v8-ro-hq-page flex flex-col gap-4">
-      {theme === 'v8' && <ReadonlyHeader title={tab === 'tenant' ? '統括の情報' : 'メンバー'} description={tab === 'tenant' ? '統括の名前と、運営による操作を確認します。' : '権限者の役割、担当範囲、招待とログインの状況を確認します。'} />}
-      <div data-design="Tabs" data-design-node="oGWXI">
-        {/* U091: 右にはみ出すタブへ届くよう、横スクロール＋端の送りボタン付き。 */}
-        <ScrollableTabs
-          items={[
-            { label: '権限者', current: tab === 'members', onClick: () => changeTab('members') },
-            { label: '統括の情報', current: tab === 'tenant', onClick: () => changeTab('tenant') },
-          ]}
-          actions={
-            tab === 'members' && canManage && !restricted ? (
-              <Button variant="primary" onClick={() => { setDialogError(''); setDialog({ open: true, member: null }) }}>
-                <Plus aria-hidden="true" className="h-4 w-4" />
-                権限者を招待
-              </Button>
-            ) : undefined
-          }
-        />
-      </div>
-
-      {tab === 'tenant' ? (
-        <TenantInfoTab canEdit={Boolean(canManage)} />
-      ) : (
-        <>
-          {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-          <KpiCollapse data-ro-kpis data-design="KPIs" data-design-node="kCaRU" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <KpiCard variant="v6" title="権限者" value={status === 'ready' ? kpis.total : null} unit="人" detail={status === 'ready' ? `有効 ${kpis.active}人` : '—'} loading={status === 'loading'} />
-            <KpiCard variant="v6" title="招待中" value={status === 'ready' ? kpis.invited : null} unit="人" detail="" help="まだ承諾していない招待です" loading={status === 'loading'} />
-            <KpiCard variant="v6" title="閲覧のみ" value={status === 'ready' ? kpis.viewers : null} unit="人" detail="" help="編集できない権限者です" loading={status === 'loading'} />
-            <KpiCard variant="v6" title="担当アカウントの割り当て" value={status === 'ready' ? kpis.scopedAccounts : null} unit="アカウント" detail={status === 'ready' ? `全アカウントを担当 ${kpis.allScope}人` : '—'} loading={status === 'loading'} />
-          </KpiCollapse>
-
-          <div data-design="Note" data-design-node="Y1EarL">
-            <NoteBar tone="info" help="権限者は統括の管理画面に入れる人です" helpLabel="権限者の意味">
-              権限者は統括の管理画面に入れる人です。担当アカウントを限定すると、そのアカウントの管理画面だけが見えます。招待メールの有効期限は7日間です。
-            </NoteBar>
-          </div>
-
+    <div data-design-node="r4ARpV" className="flex flex-col gap-4">
+      <ReadonlyHeader
+        title="メンバー"
+        description="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。"
+        actions={
+          status === 'ready' && canManage && !restricted ? (
+            <Button variant="primary" onClick={() => { setDialogError(''); setDialog({ open: true, member: null }) }}>
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              権限者を招待
+            </Button>
+          ) : undefined
+        }
+      />
+      <div className="hq-members-v8">
+        <HqSettingsNav active="members" />
+        <div className="hq-members-v8__main">
           {notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null}
           {actionError ? <p className="text-label text-danger" role="alert">{actionError}</p> : null}
 
@@ -367,24 +329,14 @@ function MembersInner() {
                         </Td>
                         <Td><span className="block truncate text-label text-ink" title={scopeLabel(member, accountNames)}>{scopeLabel(member, accountNames)}</span></Td>
                         <Td>
-                          <span
-                            className={
-                              state === 'active'
-                                ? 'inline-flex h-5.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
-                                : state === 'invited'
-                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-medium text-status-warn-deep'
-                                  : state === 'expired'
-                                    ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-medium text-danger'
-                                    : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-medium text-ink-secondary'
-                            }
-                          >
+                          <Chip tone={state === 'active' ? 'ok' : state === 'invited' ? 'warn' : state === 'expired' ? 'danger' : 'neutral'}>
                             {STATUS_LABELS[state]}
-                          </span>
+                          </Chip>
                         </Td>
                         <Td><span className="text-label text-ink-faint">{lastLoginLabel(lastLogins[member.id])}</span></Td>
                         <Td align="right">
                           {canManage ? (
-                            <span className="inline-flex items-center gap-3">
+                            <span className="inline-flex items-center gap-2">
                               {canResendInvite(member) ? (
                                 <button
                                   type="button"
@@ -395,14 +347,13 @@ function MembersInner() {
                                   {resendingId === member.id ? '送信中…' : '再送'}
                                 </button>
                               ) : null}
-                              <button
-                                type="button"
+                              <Button
+                                size="compact"
                                 onClick={() => { setDialogError(''); setDialog({ open: true, member }) }}
                                 aria-label={`${member.name}さんの権限を変更`}
-                                className="text-label font-semibold text-action hover:underline"
                               >
                                 変更
-                              </button>
+                              </Button>
                             </span>
                           ) : null}
                         </Td>
@@ -457,8 +408,8 @@ function MembersInner() {
               onClose={() => setStepUp(null)}
             />
           ) : null}
-        </>
-      )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -518,85 +469,5 @@ function MemberChangeConfirm({ member, value, accountNames, busy, error, onCance
         ))}
       </dl>
     </ConfirmDialog>
-  )
-}
-
-/** 「統括の情報」タブ。統括名の変更（旧 /hq/settings のフォーム）。 */
-function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
-  const theme = useAdminTheme()
-  const [name, setName] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    void api.tenants.me()
-      .then((response) => {
-        if (!cancelled && response.success) setName(response.data.name ?? '')
-      })
-      .catch(() => {
-        if (!cancelled) setError('統括名を読み込めませんでした。時間をおいてもう一度お試しください。')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [])
-
-  const save = async (event?: FormEvent) => {
-    event?.preventDefault()
-    const trimmed = name.trim()
-    setSaved(false)
-    if (!trimmed) return setError('統括名を入力してください。')
-    if (trimmed.length > 100) return setError('統括名は100文字以内で入力してください。')
-    setSaving(true)
-    setError('')
-    try {
-      const response = await api.tenants.updateName(trimmed)
-      if (!response.success) throw new Error(response.error)
-      setName(response.data.name ?? trimmed)
-      setSaved(true)
-    } catch (caught) {
-      // M026：再試行の言葉がない代替文にしない。共通の状態別案内へ渡す。
-      setError(japaneseDetailOf(caught) || describeApiFailure(caught, '統括名の保存', {
-        forbidden: '統括名の変更は管理者だけができます。必要なときは管理者の方に操作してもらってください。',
-      }))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <>
-      <NoteBar tone="info" help="統括名は統括コンソールとメールの差出人に使われます" helpLabel="統括名の意味">統括名は、統括コンソールとメールの差出人に使われます。アカウントの名前はそれぞれのアカウントの設定で変えます。</NoteBar>
-      {theme === 'v8' && !canEdit ? <section className="rounded-card border border-hairline p-5"><dl><dt className="text-caption text-ink-secondary">統括名</dt><dd className="mt-2 text-label text-ink">{loading ? '読み込んでいます…' : error ? '読み込めませんでした' : name || '—'}</dd></dl>{error && <p role="alert" className="mt-2 text-caption text-danger">{error}</p>}</section> : <form onSubmit={save} className="flex max-w-2xl flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="tenant-name" className="text-label font-medium text-ink">統括名</label>
-          <p className="text-micro text-ink-faint">100文字以内で入力してください。</p>
-          <TextField
-            id="tenant-name"
-            value={name}
-            maxLength={100}
-            disabled={loading || saving || !canEdit}
-            onChange={(event) => { setName(event.target.value); setSaved(false) }}
-            className="w-full"
-          />
-        </div>
-        {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
-        {saved ? <p className="text-label text-accent-deep" role="status">保存しました。</p> : null}
-      </form>}
-      {theme === 'v8' && <OperatorHistory />}
-      <div className="sticky bottom-0 z-10">
-        <StickyBar
-          status={canEdit ? undefined : '統括名の変更は管理者だけができます'}
-          actions={
-            <Button variant="primary" onClick={() => void save()} disabled={loading || saving || !canEdit} busy={saving}>統括名を保存する
-            </Button>
-          }
-        />
-      </div>
-    </>
   )
 }

@@ -102,6 +102,19 @@ function MileageV8Inner() {
    * 回って無限に描き直す（新しい JSX を入れる setState のため）。
    */
   const registerHeaderActions = useCallback((node: ReactNode) => setHeaderActions(node), [])
+  /*
+   * タブの名の横の件数（板 `OC0gy`：たまる決めごと 6・使い道 5・
+   * 友だちの残高 1,284）。数は各タブの読み物のため、タブ側が読み直す
+   * たびにここへ載せる。取れている間は直前を残し、読み直し中は消す。
+   */
+  const [tabCounts, setTabCounts] = useState<Partial<Record<MileageV8TabKey, string>>>({})
+  const registerTabCount = useCallback((key: MileageV8TabKey, text: string | null) => {
+    setTabCounts((current) => {
+      const normalized = text ?? undefined
+      if (current[key] === normalized) return current
+      return { ...current, [key]: normalized }
+    })
+  }, [])
 
   return (
     <div data-design-node={MileageV8Node({ tab })} className={styles.board}>
@@ -116,6 +129,7 @@ function MileageV8Inner() {
             aria-current={item.key === tab ? 'page' : undefined}
           >
             {item.label}
+            {tabCounts[item.key] ? ` ${tabCounts[item.key]}` : null}
           </Link>
         ))}
       </nav>
@@ -127,9 +141,9 @@ function MileageV8Inner() {
         </p>
       ) : null}
 
-      {tab === 'earning-rules' ? <V8EarningRulesTab key={tab} readonly={readonly} registerHeaderActions={registerHeaderActions} /> : null}
-      {tab === 'rewards' ? <V8RewardsTab key={tab} readonly={readonly} registerHeaderActions={registerHeaderActions} /> : null}
-      {tab === 'balances' ? <V8BalancesTab key={tab} readonly={readonly} registerHeaderActions={registerHeaderActions} /> : null}
+      {tab === 'earning-rules' ? <V8EarningRulesTab key={tab} readonly={readonly} registerHeaderActions={registerHeaderActions} registerTabCount={registerTabCount} /> : null}
+      {tab === 'rewards' ? <V8RewardsTab key={tab} readonly={readonly} registerHeaderActions={registerHeaderActions} registerTabCount={registerTabCount} /> : null}
+      {tab === 'balances' ? <V8BalancesTab key={tab} readonly={readonly} registerHeaderActions={registerHeaderActions} registerTabCount={registerTabCount} /> : null}
       {tab === 'history' ? <V8HistoryTab key={tab} readonly={readonly} registerHeaderActions={registerHeaderActions} /> : null}
       {tab === 'score' ? <V8ScoreTab key={tab} readonly={readonly} registerHeaderActions={registerHeaderActions} /> : null}
     </div>

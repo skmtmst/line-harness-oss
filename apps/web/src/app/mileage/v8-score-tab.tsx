@@ -49,13 +49,20 @@ import {
   type ActionScoreSort,
   type FriendScoreDetail,
 } from '@/lib/api'
-import { actionScoreReasonLabel, formatMileageDate, formatMileageNumber } from './mileage-display'
+import { actionScoreReasonLabel, formatMileageChange, formatMileageDate, formatMileageMonthDay, formatMileageNumber } from './mileage-display'
 import { actionScoreAdjustmentErrorMessage } from './action-score-adjustment-dialog'
 import styles from './mileage-v8.module.css'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
   normal: '中くらい',
+  low: '低い',
+}
+
+/* 友だちの表の帯の札（絵は「高い・ふつう・低い」）。 */
+const FRIEND_BAND_LABELS: Record<ActionScoreBand, string> = {
+  high: '高い',
+  normal: 'ふつう',
   low: '低い',
 }
 
@@ -545,19 +552,20 @@ export default function V8ScoreTab({
                     <p className={styles.cellMain} title={item.displayName}>{item.displayName}</p>
                   </td>
                   <td><span className={styles.num}>{formatMileageNumber(item.currentScore)}</span></td>
-                  <td><span className={bandPill(item.band)}>{BAND_LABELS[item.band]}</span></td>
+                  <td><span className={bandPill(item.band)}>{FRIEND_BAND_LABELS[item.band]}</span></td>
                   <td>
                     <span className={styles.num}>
                       {typeof item.change30d === 'number' && Number.isFinite(item.change30d)
-                        ? `${item.change30d > 0 ? '+' : ''}${formatMileageNumber(item.change30d)}`
+                        ? formatMileageChange(item.change30d)
                         : '—'}
                     </span>
                   </td>
                   <td>
                     <p className={styles.cellSubDark} title={actionScoreReasonLabel(item.lastReason)}>
-                      {actionScoreReasonLabel(item.lastReason)}
+                      {formatMileageMonthDay(item.lastChangedAt) === '—'
+                        ? actionScoreReasonLabel(item.lastReason)
+                        : `${formatMileageMonthDay(item.lastChangedAt)} ${actionScoreReasonLabel(item.lastReason)}`}
                     </p>
-                    <p className={styles.cellSub}>{formatMileageDate(item.lastChangedAt)}</p>
                   </td>
                   <td>
                     <span className={styles.rowActions}>
@@ -794,7 +802,7 @@ export default function V8ScoreTab({
             </Button>
           </div>
         ) : null}
-        <p className={styles.footnote}>行の「…」から 編集・外す。表の下の「＋できごとを足す」で増やせます。公開中のルールを止めるときは、題の横の「…」から。</p>
+        <p className={styles.footnote}>行の「…」から 編集・外す。表の下の「＋ できごとを足す」で増やせます（30日間反応がない、も選べる）。公開中のルールを止めるときは、題の横の「…」から。</p>
       </section>
 
       {adjustTarget && !readonly ? (

@@ -53,7 +53,6 @@ const KNOWN_FILES: string[] = [
   'app/events/bookings/page.tsx',
   'app/events/edit/page.tsx',
   'app/events/page.tsx',
-  'app/form-submissions/page.tsx',
   'app/form-submissions/responses/page.tsx',
   'app/form-submissions/responses/response-summary.ts',
   'app/friend-add-settings/runs/page.tsx',

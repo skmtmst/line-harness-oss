@@ -187,6 +187,33 @@
   flex: 1;
 }
 
+/* 板 `REIxB`：件数の選びは「20件表示」だけ出す（「表示件数」の字は置かない）。 */
+.pageSize > span:first-child {
+  display: none;
+}
+
+/* 板 `REIxB`：友だちの丸い印＋名前。 */
+.friendCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.friendAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .csvNote {
   margin: 0;
   color: var(--color-ink-faint);

@@ -131,6 +131,15 @@ export default function TopBar({
           </button>
           <nav className={styles.crumbs} aria-label="パンくず">
             {/*
+              ★V8 殻合わせ（絵 `V8-B/JKjsE`）：手前はホーム。格子印＋
+              「ホーム」で最初の画面へ（統括もふだんの画面も同じ殻）。
+              v8-only の帯にだけ出すので v7 は変わらない。
+            */}
+            <Link href="/" className={styles.crumbHome}>
+              <HomeGridIcon /><span>ホーム</span>
+            </Link>
+            <span className={styles.crumbSep} aria-hidden="true">›</span>
+            {/*
               手前の段。ページが crumbs を渡したらそれを出す
               （一覧からの詳細で「一斉配信 › 配信名」）。渡さない画面は
               従来どおり選んでいるアカウント名。未選択（統括の一覧など）
@@ -182,7 +191,18 @@ export default function TopBar({
           */}
           <span className={styles.accountPill}>
             <span className={styles.accountMark} aria-hidden="true">{current?.mark ?? current?.label.slice(0, 1) ?? ''}</span>
-            <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+            {/*
+              ★V8 殻合わせ（絵 `V8-B/JKjsE`）：札に役割（統括など）を小さい
+              行で添える。v8-only なので v7 の1行札は変わらない。
+            */}
+            {roleLabel ? (
+              <span className={styles.pillText}>
+                <span className={`${styles.pillRole} v8-only`}>{roleLabel}</span>
+                <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+              </span>
+            ) : (
+              <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+            )}
             <ChevronIcon />
             <select
               className={styles.accountSelect}
@@ -221,24 +241,35 @@ export default function TopBar({
           <span className={styles.separator} aria-hidden="true" />
         </> : null}
 
+        {/*
+          ★V8 殻合わせ（絵 `V8-B/JKjsE`）：名前を太字・役割を下の小さい行に
+          積む。v7 は中箱を素通し（display: contents）にするので並びは不変。
+        */}
         <div className={styles.identity}>
           {/* ★V8: 自分（36px の顔）。名まえの頭1文字を丸いタイルで出す。 */}
           <span className={`${styles.avatar} v8-only`} aria-hidden="true">
             {userName.trim().slice(0, 1)}
           </span>
-          {onRoleClick
-            ? <button type="button" className={styles.roleButton} onClick={onRoleClick}>{roleLabel}</button>
-            : <span className={styles.role}>{roleLabel}</span>}
-          <span className={styles.user} title={userName}>{userName}</span>
+          <span className={styles.identityText}>
+            <span className={styles.user} title={userName}>{userName}</span>
+            {onRoleClick
+              ? <button type="button" className={styles.roleButton} onClick={onRoleClick}>{roleLabel}</button>
+              : <span className={styles.role}>{roleLabel}</span>}
+          </span>
         </div>
 
-        <span className={styles.separator} aria-hidden="true" />
-
+        {/*
+          ★V8 殻合わせ：『前の見た目に戻す』は名前の横に小さく残す。
+          v7 には出さない（onRevertTheme は V8 のときだけ渡る）。
+        */}
         {onRevertTheme ? (
           <button type="button" className={styles.revert} onClick={onRevertTheme}>
             前の見た目に戻す
           </button>
         ) : null}
+
+        {/* v7 の区切り線は残す（V8 では消す決まり）。 */}
+        <span className={`${styles.separator} v7-only`} aria-hidden="true" />
 
         <button type="button" className={styles.logout} onClick={onLogout} aria-label="ログアウト">
           <LogOutIcon /><span aria-hidden="true">ログアウト</span>
@@ -272,6 +303,18 @@ function ChevronIcon() {
   return (
     <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}
+
+/* ★V8 殻合わせ：ホームの格子印（lucide `layout-grid`） */
+function HomeGridIcon() {
+  return (
+    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect width="7" height="7" x="3" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="14" rx="1" />
+      <rect width="7" height="7" x="3" y="14" rx="1" />
     </svg>
   )
 }

@@ -7,12 +7,11 @@ import ProjectFormDialog from './project-form-dialog'
  * プロジェクトを作る V8（板 W7Z57）。
  * - 外枠に W7Z57 を付ける
  * - 名前が空のまま作らせない（作るボタンが押せない）
- * v7 の下の帯は変えない。
+ * 完全切り替えのため v7 の分岐は持たない。
  */
-const fixture = vi.hoisted(() => ({ theme: 'v8' as 'v7' | 'v8', submit: vi.fn() }))
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => fixture.theme }))
+const fixture = vi.hoisted(() => ({ submit: vi.fn() }))
 
-beforeEach(() => { vi.clearAllMocks(); fixture.theme = 'v8' })
+beforeEach(() => { vi.clearAllMocks() })
 afterEach(cleanup)
 
 function openCreate() {
@@ -29,12 +28,5 @@ describe('プロジェクトを作る V8（W7Z57）', () => {
     expect(create.disabled).toBe(false)
     fireEvent.click(create)
     expect(fixture.submit).toHaveBeenCalledWith({ name: '秋の企画', description: '' })
-  })
-
-  it('v7 の下の帯は変えない', () => {
-    fixture.theme = 'v7'
-    openCreate()
-    expect(screen.getByRole('button', { name: 'プロジェクトを作る' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '＋ 作って開く' })).toBeNull()
   })
 })
