@@ -282,7 +282,7 @@
   font-size: 12px;
   font-weight: 500;
   text-align: left;
-  padding: 13px 20px;
+  padding: 12px 20px;
   white-space: nowrap;
   border-bottom: 1px solid var(--color-hairline);
 }
@@ -491,7 +491,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 17px 20px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--color-hairline);
 }
 

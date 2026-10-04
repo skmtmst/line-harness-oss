@@ -184,7 +184,7 @@
 .dayBadge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 2px 8px;
   border: none;
   border-radius: var(--radius-pill);
@@ -337,7 +337,7 @@
 .connectedBadge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   flex-shrink: 0;
   padding: 3px 10px;
   border-radius: var(--radius-pill);

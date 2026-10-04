@@ -878,11 +878,11 @@ export default function AutoRepliesListV8() {
           よく届く質問や営業時間外の連絡に、自動で返せます。ひな形からも作れます。
         </p>
         {canEdit ? (
-          <Button type="button" variant="primary" onClick={() => router.push('/auto-replies/edit')}>
+          <Button type="button" variant="secondary" onClick={() => router.push('/auto-replies/edit')}>
             ＋ ルールを作る
           </Button>
         ) : (
-          <Button type="button" variant="primary" disabled title={NO_MANAGE_NOTE}>
+          <Button type="button" variant="secondary" disabled title={NO_MANAGE_NOTE}>
             ＋ ルールを作る
           </Button>
         )}

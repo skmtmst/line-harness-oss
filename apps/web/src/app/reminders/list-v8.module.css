@@ -321,7 +321,7 @@
 .miniBadgeDanger {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 2px 8px;
   border: 0;
   border-radius: var(--radius-pill);
@@ -366,8 +366,8 @@
 .statePill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
+  gap: 4px;
+  padding: 3px 10px;
   border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 600;

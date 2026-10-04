@@ -664,7 +664,7 @@ export default function RemindersListV8() {
             日付を決めておくと、その前と後に自動で送れます。ひな形からも作れます。
           </p>
           {canEdit ? (
-            <Button type="button" variant="primary" href="/reminders/new">
+            <Button type="button" variant="secondary" href="/reminders/new">
               ＋ リマインダを作る
             </Button>
           ) : null}

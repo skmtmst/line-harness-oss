@@ -1296,7 +1296,7 @@ function CommonVarsListV8Inner() {
                       ? '会社名や営業時間を1か所で持つと、変えるときに1回直すだけで済みます。'
                       : '「空のまま」「期限つき」「使われていない」「下書き・止めた」や検索を外すと、すべて出ます'}
                     action={items.length === 0
-                      ? (canWrite ? <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button> : undefined)
+                      ? (canWrite ? <Button href="/contents/vars/new" variant="secondary">共通情報を作る</Button> : undefined)
                       : <Button type="button" onClick={clearVarFilters}>条件を外す</Button>}
                   />
                 </div>

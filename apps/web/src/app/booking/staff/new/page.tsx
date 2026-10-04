@@ -264,7 +264,7 @@ function NewBookingStaffV7() {
                     .map((m) => (
                       <span
                         key={m.id}
-                        className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[10px]"
+                        className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-nano"
                       >
                         {m.name}
                       </span>

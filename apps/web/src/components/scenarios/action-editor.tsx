@@ -802,7 +802,7 @@ export default function ActionEditor({
                           onClick={() => void add(kind)}
                           className={`${styles.kindButton} border-hairline text-ink hover:bg-canvas-sunken flex flex-col items-center justify-center gap-1 border text-caption font-medium transition-colors`}
                         >
-                          <Icon aria-hidden size={18} strokeWidth={1.75} />
+                          <Icon aria-hidden size={18} strokeWidth={1.8} />
                           {kind.label}
                         </button>
                       )

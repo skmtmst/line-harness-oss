@@ -570,7 +570,7 @@ export default function ScenarioList({
                           名前が長くても、この札だけは縮めない。 */}
                       {s.lineAccountId === null && (
                         <span
-                          className="bg-warning-bg text-warning rounded-pill shrink-0 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap"
+                          className="bg-warning-bg text-warning rounded-pill shrink-0 px-2 py-0.5 text-nano font-medium whitespace-nowrap"
                           title="全アカウントに適用されるシナリオです"
                         >
                           全アカウント共通

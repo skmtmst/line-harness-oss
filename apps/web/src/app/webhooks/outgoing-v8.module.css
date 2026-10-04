@@ -176,7 +176,7 @@
 .table thead th {
   background: var(--color-table-head);
   border-bottom: 1px solid var(--color-hairline);
-  padding: 13px 16px;
+  padding: 12px 20px;
   font-size: 12px;
   font-weight: 500;
   color: var(--color-ink-secondary);

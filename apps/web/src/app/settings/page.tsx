@@ -70,7 +70,7 @@ function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: 
   if (created === null || inUse === null) {
     return (
       <span
-        className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold text-ink-faint"
+        className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-nano font-bold text-ink-faint"
         title={category.inUse.reason ?? category.created.reason ?? '利用状況を取得できません'}
       >
         利用数は未取得
@@ -89,7 +89,7 @@ function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: 
   }
   return (
     <span
-      className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold"
+      className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-nano font-bold"
       title={`${category.label}：作成 ${formatNumber(created)}、利用中 ${formatNumber(inUse)}`}
     >
       利用中 {formatNumber(inUse)} / 作成 {formatNumber(created)}
@@ -119,7 +119,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: {
   if (activity.state === 'failed') {
     return (
       <span
-        className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold text-ink-faint"
+        className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-nano font-bold text-ink-faint"
         title={title}
       >
         利用状況は取得失敗
@@ -141,12 +141,12 @@ function FeatureUsageBadge({ usage, label, onRetry }: {
     return (
       <>
         <span
-          className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold text-ink-faint"
+          className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-nano font-bold text-ink-faint"
           title={title}
         >
           利用状況は未計測
         </span>
-        <span className="min-w-0 truncate text-[10px] text-ink-faint" title={reason}>
+        <span className="min-w-0 truncate text-nano text-ink-faint" title={reason}>
           {reason}
         </span>
       </>
@@ -156,7 +156,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: {
   if (activityBasis === 'current') {
     return (
       <span
-        className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold"
+        className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-nano font-bold"
         title={title}
       >
         {activityUnit} {count}
@@ -166,7 +166,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: {
   if (activity.value === 0 && lastUsed) {
     return (
       <span
-        className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold text-ink-faint"
+        className="rounded-pill border-hairline bg-canvas-sunken whitespace-nowrap border px-2 py-0.5 text-nano font-bold text-ink-faint"
         title={`${label}：直近90日の${activityUnit}は0・最終利用 ${lastUsed}`}
       >
         最終利用 {lastUsed}
@@ -175,7 +175,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: {
   }
   return (
     <span
-      className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold"
+      className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-nano font-bold"
       title={title}
     >
       90日で {count}{activityUnit}
@@ -211,14 +211,14 @@ function FeatureRow({ item, features, ordering, usage, featureUsage, usageRetry,
               </span>
             )}
             {item.badge && (
-              <span className="rounded-pill bg-accent-soft px-2 py-0.5 text-[10px] font-bold text-accent-deep">
+              <span className="rounded-pill bg-accent-soft px-2 py-0.5 text-nano font-bold text-accent-deep">
                 {item.badge}
               </span>
             )}
             {featureUsage && <FeatureUsageBadge usage={featureUsage} label={item.label} onRetry={usageRetry} />}
             {!featureUsage && usage && <UsageBadge category={usage} onRetry={usageRetry} />}
           </div>
-          <p className="mt-0.5 truncate text-[11px] leading-relaxed text-ink-faint" title={item.note}>{item.note}</p>
+          <p className="mt-0.5 truncate text-micro leading-relaxed text-ink-faint" title={item.note}>{item.note}</p>
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -288,14 +288,14 @@ function FeatureSection({ group, features, ordering, usageByItemId, usageByFeatu
       <div className="border-hairline bg-canvas-sunken flex min-h-12 items-center justify-between gap-3 border-b px-3 py-2.5">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <h2 className="text-sm font-bold text-ink">{group.label}</h2>
-          <p className="text-[10px] text-ink-faint">{groupSummary(group, features)}</p>
+          <p className="text-nano text-ink-faint">{groupSummary(group, features)}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             aria-disabled={total === 0}
             onClick={() => total > 0 && onGroupToggle(group, !allEnabled)}
-            className={`text-action focus-visible:outline-info whitespace-nowrap text-[11px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 ${total === 0 ? 'cursor-default' : 'cursor-pointer'}`}
+            className={`text-action focus-visible:outline-info whitespace-nowrap text-micro font-bold focus-visible:outline-2 focus-visible:outline-offset-2 ${total === 0 ? 'cursor-default' : 'cursor-pointer'}`}
           >
             まとめて切替
           </button>
@@ -350,7 +350,7 @@ function SidebarPreview({ groups, features }: {
                   return (
                     <div
                       key={item.id}
-                      className={`flex min-h-7 items-center gap-2 text-[13px] font-medium ${
+                      className={`flex min-h-7 items-center gap-2 text-label font-medium ${
                         enabled ? 'text-ink' : 'text-ink-faint'
                       }`}
                     >

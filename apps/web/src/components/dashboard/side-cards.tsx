@@ -56,7 +56,7 @@ export function SideCard({
             <h2 className="text-ink min-w-0 text-base leading-normal font-bold">{title}</h2>
             {helpTip ? <HelpTip label={`${title}の説明`}>{helpTip}</HelpTip> : null}
             {/* 期間は常に1行にする（DASH-23）。折り返すとカード間で見出しの高さがずれる。 */}
-            {period ? <span className="text-ink-faint shrink-0 text-[11px] font-normal whitespace-nowrap">{period}</span> : null}
+            {period ? <span className="text-ink-faint shrink-0 text-micro font-normal whitespace-nowrap">{period}</span> : null}
           </div>
           {/*
             行き先リンクは CardHeader の action（actionTone="info"）と
@@ -353,11 +353,11 @@ export function UpcomingCard({
             <div key={booking.id} className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-ink truncate text-xs font-medium" title={booking.menu_name}>{booking.menu_name}</p>
-                <p className="text-ink-faint mt-0.5 truncate text-[11px]" title={booking.friend_name ?? undefined}>
+                <p className="text-ink-faint mt-0.5 truncate text-micro" title={booking.friend_name ?? undefined}>
                   {booking.friend_name ?? '名前未設定'}
                 </p>
               </div>
-              <span className="text-ink-secondary shrink-0 text-[11px] tabular-nums">{formatUpcomingDate(booking.starts_at)}</span>
+              <span className="text-ink-secondary shrink-0 text-micro tabular-nums">{formatUpcomingDate(booking.starts_at)}</span>
             </div>
           ))}
         </div>
@@ -460,7 +460,7 @@ export function FriendStatusCard({ friends, freshness }: { friends: DashboardOve
           </dd>
         </div>
       </dl>
-      <p className="text-ink-faint mt-3 text-[11px] leading-relaxed">
+      <p className="text-ink-faint mt-3 text-micro leading-relaxed">
         内訳 相手から{formatNumber(friends.blockedByThem)}人
         ・自分から{formatNumber(friends.hiddenByUs)}人
         ・相互に{formatNumber(friends.blockedBoth)}人

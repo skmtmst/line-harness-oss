@@ -205,7 +205,7 @@ function StickerThumb({ stickerId, label }: { stickerId: string; label: string }
 
   if (failed) {
     return (
-      <span className="text-ink-secondary flex h-12 w-12 items-center justify-center text-center text-[10px] leading-tight">
+      <span className="text-ink-secondary flex h-12 w-12 items-center justify-center text-center text-nano leading-tight">
         {label}
       </span>
     )

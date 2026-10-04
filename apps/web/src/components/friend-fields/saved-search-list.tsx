@@ -366,7 +366,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
             それ未満は縦に重ねたカード（ATTR-14）。
           */}
           <table className="hidden w-full table-fixed text-sm md:table">
-            <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
+            <thead className="border-b border-hairline bg-canvas-sunken text-micro text-ink-faint">
               <TableHeadRow>
                 <Th className="w-[16%] px-3 py-3">条件名 ／ 所有・範囲・参照・版</Th>
                 <Th className="w-1/4 px-3 py-3">条件の要約</Th>
@@ -417,12 +417,12 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                     <span className="truncate font-bold text-ink" title={search.name}>{search.name}</span>
                   )}
                   {!search.lineAccountId && (
-                    <span className="rounded-pill bg-warning-bg px-2 py-0.5 text-[10px] text-warning">
+                    <span className="rounded-pill bg-warning-bg px-2 py-0.5 text-nano text-warning">
                       対象アカウント未割り当て
                     </span>
                   )}
                   </div>
-                  <p className="mt-1 truncate text-[11px] text-ink-faint" title={`${search.isShared ? '全員' : '自分だけ'}・${selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・ライブ参照・v${search.revision ?? 1}`}>
+                  <p className="mt-1 truncate text-micro text-ink-faint" title={`${search.isShared ? '全員' : '自分だけ'}・${selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・ライブ参照・v${search.revision ?? 1}`}>
                     {search.isShared ? '全員' : '自分だけ'}・{selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・ライブ参照・v{search.revision ?? 1}
                   </p>
                 </td>
@@ -436,7 +436,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   {search.matchCount === null || search.matchCount === undefined ? '—' : `${formatNumber(search.matchCount)}人`}
                 </td>
                 <td className="px-3 py-3 align-top">
-                  <span className={`rounded-pill px-2 py-0.5 text-[11px] ${search.isShared ? 'bg-action-soft text-action' : 'bg-canvas-sunken text-ink-secondary'}`}>
+                  <span className={`rounded-pill px-2 py-0.5 text-micro ${search.isShared ? 'bg-action-soft text-action' : 'bg-canvas-sunken text-ink-secondary'}`}>
                     {search.isShared ? '全員' : '自分だけ'}
                   </span>
                 </td>
@@ -499,7 +499,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                       ) : (
                         <span className="block truncate font-bold text-ink" title={search.name}>{search.name}</span>
                       )}
-                      <p className="mt-0.5 text-[11px] text-ink-faint">
+                      <p className="mt-0.5 text-micro text-ink-faint">
                         {search.isShared ? '全員' : '自分だけ'}・{selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・v{search.revision ?? 1}
                       </p>
                       <p className="mt-1 text-xs leading-5 text-ink-secondary">

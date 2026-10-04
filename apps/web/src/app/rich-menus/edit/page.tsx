@@ -1294,7 +1294,7 @@ function Editor({
                 onChange={(e) => setName(e.target.value)}
                 className="mt-1 block w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <p className="mt-1 text-[11px] text-ink-faint">管理画面でだけ使う名前 (友だちには見えない)</p>
+              <p className="mt-1 text-micro text-ink-faint">管理画面でだけ使う名前 (友だちには見えない)</p>
             </label>
             <label className="block">
               <span className="text-ink-secondary text-xs font-medium">フォルダ</span>
@@ -1313,7 +1313,7 @@ function Editor({
                 maxLength={14}
                 className="mt-1 block w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <p className="mt-1 text-[11px] text-ink-faint">14 文字以内 (友だちのトーク画面でメニューを開く前に表示)</p>
+              <p className="mt-1 text-micro text-ink-faint">14 文字以内 (友だちのトーク画面でメニューを開く前に表示)</p>
             </label>
           </section>
 
@@ -1368,16 +1368,16 @@ function Editor({
                     登録メディアから選ぶ
                   </Button>
                 </div>
-                <p className="mt-1.5 text-[11px] text-ink-faint">
+                <p className="mt-1.5 text-micro text-ink-faint">
                   PNG / JPEG, {SIZE_LABEL[group.size]}, 1MB 以下
                 </p>
                 {activePage.id.startsWith('tmp-') && (
-                  <p className="mt-1 text-[11px] text-status-warn-deep">
+                  <p className="mt-1 text-micro text-status-warn-deep">
                     新規ページは「下書き保存」してから画像をアップロードしてください
                   </p>
                 )}
               </div>
-              <p className="text-[11px] text-ink-faint pt-3 border-t border-divider-soft">
+              <p className="text-micro text-ink-faint pt-3 border-t border-divider-soft">
                 中央のキャンバスでドラッグして tap 領域 (areas) を追加・編集できます。
               </p>
             </section>
@@ -1404,7 +1404,7 @@ function Editor({
             {targetingEnabled && (
               <>
                 {group.status !== 'published' && (
-                  <p className="rounded-control bg-warning-bg p-2 text-[11px] text-warning">
+                  <p className="rounded-control bg-warning-bg p-2 text-micro text-warning">
                     このメニューはまだ LINE に登録されていません。登録するまで、条件に
                     当てはまっても出せません。
                   </p>
@@ -1412,7 +1412,7 @@ function Editor({
 
                 <label className="block">
                   <span className="text-ink-secondary text-xs font-medium">出す順番</span>
-                  <span className="text-ink-faint block text-[11px]">
+                  <span className="text-ink-faint block text-micro">
                     一覧で上にあるメニューが優先されます。現在は
                     {targetingPriority + 1}番目です。
                   </span>
@@ -1434,7 +1434,7 @@ function Editor({
                 />
 
                 {!targetingCondition && (
-                  <p className="text-[11px] text-status-warn-deep">
+                  <p className="text-micro text-status-warn-deep">
                     条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。
                   </p>
                 )}
@@ -1915,7 +1915,7 @@ function TargetingStep({
               <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
               <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} step={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
               {/* R205: 小数はサーバで弾かれる。欄の近くに制限を書く。 */}
-              <p className="text-ink-faint mt-1 text-[11px]">1以上の整数（小数は使えません）</p>
+              <p className="text-ink-faint mt-1 text-micro">1以上の整数（小数は使えません）</p>
             </div>
             <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-ink mt-1 text-2xl font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
           </div>

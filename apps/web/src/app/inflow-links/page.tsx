@@ -1359,7 +1359,7 @@ function InflowLinksPageInner({
                     <td className="px-5 py-[9px] text-ink-secondary">
                       {tag ? (
                         <span
-                          className="block truncate whitespace-nowrap rounded-pill px-2 py-0.5 text-center text-[11px] font-medium"
+                          className="block truncate whitespace-nowrap rounded-pill px-2 py-0.5 text-center text-micro font-medium"
                           style={{
                             backgroundColor: `${tag.color}22`,
                             color: tagTextColor(tag.color),
@@ -1397,7 +1397,7 @@ function InflowLinksPageInner({
                       <div className="flex items-center gap-2 whitespace-nowrap">
                         <button
                           onClick={() => onCopy(r.refCode, r.refCode)}
-                          className="text-[11px] font-medium text-action hover:underline"
+                          className="text-micro font-medium text-action hover:underline"
                           aria-label={`${r.name}のURLをコピー`}
                           title={r.isActive === false ? '停止中のため、このURLを開いても友だち追加できません' : undefined}
                         >
@@ -1409,13 +1409,13 @@ function InflowLinksPageInner({
                           理由（停止中）だけを同じ場所に出す。
                         */}
                         {r.isActive === false ? (
-                          <span className="text-[11px] text-ink-faint" title="停止中のためQRコードは表示できません">
+                          <span className="text-micro text-ink-faint" title="停止中のためQRコードは表示できません">
                             停止中
                           </span>
                         ) : (
                           <button
                             onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre, isActive: r.isActive })}
-                            className="text-[11px] font-medium text-action hover:underline"
+                            className="text-micro font-medium text-action hover:underline"
                             aria-label={`${r.name}のQRコードを表示`}
                           >
                             QR

@@ -214,7 +214,7 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
       </button>
       <div className="min-w-0 flex-1">
         <p className="text-ink truncate text-sm font-medium" title={definition.label}>{definition.label}</p>
-        <p className="text-ink-faint truncate text-[11px]" title={definition.description}>{definition.description}</p>
+        <p className="text-ink-faint truncate text-micro" title={definition.description}>{definition.description}</p>
       </div>
       {/*
         R116: ドラッグが難しいときの上下ボタン。タッチやマウスだけでも
@@ -251,7 +251,7 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
 }
 
 function PreviewCard({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
-  return <div className={`rounded-control border px-2 py-2 text-[10px] font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-card'}`}>{children}</div>
+  return <div className={`rounded-control border px-2 py-2 text-nano font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-card'}`}>{children}</div>
 }
 
 /*
@@ -271,10 +271,10 @@ function DashboardPreview({ draft }: { draft: DashboardPreferences }) {
   return (
     <div className="border-hairline bg-canvas-sunken rounded-card border p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-ink-faint text-[11px]">実際のダッシュボードと同じ順番で表示します。</p>
+        <p className="text-ink-faint text-micro">実際のダッシュボードと同じ順番で表示します。</p>
         <div className="flex gap-1" role="tablist" aria-label="プレビューの画面幅">
           {([['pc', 'PC'], ['mobile', 'スマホ']] as const).map(([key, text]) => (
-            <Button variant="primary" className={(`rounded-pill border px-2.5 py-1 text-[10px] font-medium ${device === key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={key} type="button" role="tab" aria-selected={device === key} onClick={() => setDevice(key)}>{text}</Button>
+            <Button variant="primary" className={(`rounded-pill border px-2.5 py-1 text-nano font-medium ${device === key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={key} type="button" role="tab" aria-selected={device === key} onClick={() => setDevice(key)}>{text}</Button>
           ))}
         </div>
       </div>
@@ -506,7 +506,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
                       設計 `ZN0ov` は「「今日やること」は4枠までです」を独立した1行で出す。
                       繋げると、上限の文と操作の案内が1つの札に見える。
                     */}
-                    <span className="text-ink-faint text-[11px]">上下ボタン・ドラッグで順番変更</span>
+                    <span className="text-ink-faint text-micro">上下ボタン・ドラッグで順番変更</span>
                   </div>
                   <DndContext
                     sensors={sensors}

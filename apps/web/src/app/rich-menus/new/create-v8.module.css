@@ -524,8 +524,8 @@
 .previewMenuTab {
   flex: 1;
   padding: 3px 4px;
-  border-radius: 4px 4px 0 0;
-  font-size: 8px;
+  border-radius: var(--radius-mini) var(--radius-mini) 0 0;
+  font-size: var(--text-nano);
   line-height: 1.4;
   text-align: center;
   color: var(--color-ink-faint);
@@ -582,7 +582,7 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 7px 8px;
+  padding: 8px;
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: 11px;
