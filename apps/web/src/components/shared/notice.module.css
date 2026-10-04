@@ -120,3 +120,6 @@
 .infoIconV8 { display: none; }
 [data-theme='v8'] .infoIconV8 { display: block; }
 [data-theme='v8'] .infoIconV7 { display: none; }
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .notice { -webkit-font-smoothing: auto; }
