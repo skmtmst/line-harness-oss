@@ -23,7 +23,8 @@ describe('V6オートメーションの発生元配線', () => {
   it('予約は確定経路だけが予約IDで発火する', () => {
     const salon = source('routes/booking.ts');
     const event = source('routes/events.ts');
-    expect(salon.match(/eventType: 'calendar_booked'/g)).toHaveLength(2);
+    // 確定経路は3つ：承認・代理作成の承認・承認なし確定のその場確定。
+    expect(salon.match(/eventType: 'calendar_booked'/g)).toHaveLength(3);
     expect(event.match(/eventType: 'calendar_booked'/g)).toHaveLength(3);
     expect(salon).toContain(`sourceEventId: bookingId`);
     expect(salon).toContain(`sourceEventId: id`);

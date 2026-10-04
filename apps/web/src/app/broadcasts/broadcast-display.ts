@@ -39,11 +39,11 @@ export function rateText(rate: number | null | undefined): string {
   return `${((rate <= 1 ? rate * 100 : rate)).toFixed(1)}%`
 }
 
-/** 作成の5つの手順（`draft_step` と同じ並び）。詳細・予約完了の進みの帯で使う。 */
+/** 作成の5つの手順（`draft_step` と同じ並び）。詳細・予約完了の進みの帯で使う。名前は ★V8 板 `FU2aU` どおり。 */
 export const CREATION_STEPS: ReadonlyArray<{ key: string; order: number; label: string }> = [
   { key: 'basic', order: 1, label: '基本設定' },
-  { key: 'audience', order: 2, label: '対象者' },
-  { key: 'message', order: 3, label: 'メッセージ' },
+  { key: 'audience', order: 2, label: '配信対象' },
+  { key: 'message', order: 3, label: 'メッセージを作成' },
   { key: 'schedule', order: 4, label: '送信設定' },
-  { key: 'confirm', order: 5, label: '確認' },
+  { key: 'confirm', order: 5, label: '最終確認' },
 ]

@@ -1,0 +1,365 @@
+/* 流入と計測の一覧（板 xbHxg）。色・丸み・影は globals.css の名前だけ。 */
+
+.board {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-board);
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 数の帯。4枚を縦の線で割る。 */
+.band {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+.tile {
+  padding: 12px 16px;
+  min-width: 0;
+  border-left: 1px solid var(--color-board-line);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  cursor: default;
+}
+
+.tile:first-child {
+  border-left: none;
+}
+
+button.tile {
+  cursor: pointer;
+}
+
+button.tile:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.tileTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tileIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  flex-shrink: 0;
+}
+
+.tileTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tileValue {
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.tileUnit {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-ink-secondary);
+  margin-left: 2px;
+}
+
+.tileSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 本文の2列（フォルダの列＋一覧）。 */
+.columns {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: var(--folder-rail-width) minmax(0, 1fr);
+  }
+}
+
+.folderNote {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  line-height: 1.6;
+}
+
+.createRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 道具の1段。 */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolsSearch {
+  flex: 1 1 240px;
+  min-width: 200px;
+  max-width: 360px;
+}
+
+.toolsRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.presetWrap {
+  position: relative;
+}
+
+.presetPanel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  width: 260px;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-float);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.presetLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.presetChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 表の殻。狭い幅では中だけ横に送る（列は消さない）。 */
+.tableShell {
+  overflow-x: auto;
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.tableShell table {
+  width: 100%;
+  min-width: 1060px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.nameCell {
+  min-width: 0;
+}
+
+.nameLink {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-accent-deep);
+  font-weight: 600;
+}
+
+.nameLink:hover {
+  text-decoration: underline;
+}
+
+.refCode {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--color-action);
+  font-family: var(--font-mono, monospace);
+}
+
+.statusChip {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.statusMeasured {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  border-color: var(--color-accent-border);
+}
+
+.statusUnregistered {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+  border-color: var(--color-status-warn-soft);
+}
+
+.statusStopped {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  border-color: var(--color-board-line);
+}
+
+.twoLine {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.twoLineSub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.numCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.urlCell {
+  white-space: nowrap;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-action);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.linkButton:disabled {
+  color: var(--color-ink-faint);
+  cursor: default;
+  text-decoration: none;
+}
+
+.moreCell {
+  position: relative;
+  white-space: nowrap;
+}
+
+.moreButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-board-line);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.moreButton:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.stoppedLabel {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-board-line);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 表の下の注とページ送り。 */
+.tableFoot {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  line-height: 1.7;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+@media (max-width: 900px) {
+  .band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tile:nth-child(3) {
+    border-left: none;
+  }
+
+  .tile:nth-child(n + 3) {
+    border-top: 1px solid var(--color-board-line);
+  }
+
+  .board {
+    padding: 16px;
+  }
+}

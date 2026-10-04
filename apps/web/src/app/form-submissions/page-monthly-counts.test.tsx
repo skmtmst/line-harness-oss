@@ -32,7 +32,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
-import FormSubmissionsPage from './page'
+import FormSubmissionsPage from './list-v8'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -109,15 +109,10 @@ describe('一覧の今月の数（P・実マウント）', () => {
       root.render(<FormSubmissionsPage />)
     })
     await act(async () => {})
-    expect(host.textContent).toContain('今月 12件')
-    expect(host.textContent).toContain('完了率 50%')
-    expect(host.textContent).toContain('今月 —')
-    expect(host.textContent).toContain('完了率 —')
-    // 「？」は見出しに1つだけ。行には置かない（7行に7個並ぶ騒がしさを避ける）。
-    const helps = host.querySelectorAll('button[aria-label="今月の完了率の説明"]')
-    expect(helps.length).toBe(1)
-    expect(helps[0].closest('thead')).toBeTruthy()
-    expect(host.querySelectorAll('tbody button[aria-label="今月の完了率の説明"]').length).toBe(0)
+    expect(host.textContent).toContain('今月 12・完了 50%')
+    expect(host.textContent).toContain('今月 —・完了 —')
+    // 板に「？」は無い。見出しにも行にも置かない。
+    expect(host.querySelectorAll('button[aria-label="今月の完了率の説明"]').length).toBe(0)
   })
 
   it('死んでいた今週表示は出さない', async () => {

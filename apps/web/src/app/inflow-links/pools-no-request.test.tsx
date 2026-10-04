@@ -16,6 +16,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/inflow-links',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {} }),
   useSearchParams: () => new URLSearchParams(currentParams),
 }))

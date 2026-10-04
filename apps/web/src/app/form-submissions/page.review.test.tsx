@@ -39,7 +39,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
-import FormSubmissionsPage from './page'
+import FormSubmissionsPage from './list-v8'
 import { ApiError } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -133,16 +133,16 @@ describe('回答フォーム一覧の管理者確認(#724)', () => {
     expect(fetchApi.mock.calls.some(([path]) => String(path).startsWith('/api/forms/unassigned'))).toBe(false)
   })
 
-  it('専用ビューで未割当だけが出てバッジと#771説明が出る', async () => {
+  it('専用ビューで未割当だけが出てバッジと説明が出る', async () => {
     await render()
     await click(byExactText('button', '管理者確認（担当未割り当て）'))
     expect(fetchApi.mock.calls.some(([path]) => String(path).startsWith('/api/forms/unassigned?account_id=account-a'))).toBe(true)
     expect(host.textContent).toContain('旧フォーム要確認')
     expect(host.textContent).toContain('管理者確認')
-    expect(host.textContent).toContain('#771')
-    // 割り当て操作は置かない（「？」の説明は操作ではないため除く）
+    expect(host.textContent).toContain('管理者確認中のフォーム')
+    // 割り当て操作は置かない（生きている公開URLの写しは操作ではないため除く）
     const rowActions = [...host.querySelectorAll('td button')].filter(
-      (button) => !(button.getAttribute('aria-label') ?? '').endsWith('の説明'),
+      (button) => !(button.getAttribute('aria-label') ?? '').endsWith('のURLをコピー'),
     )
     expect(rowActions).toEqual([])
   })

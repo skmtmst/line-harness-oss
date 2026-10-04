@@ -25,6 +25,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/line-notifications',
 }))
 
 vi.mock('@/contexts/account-context', () => ({

@@ -9,7 +9,7 @@ const TARGETS = [
   'affiliates/tabs.tsx',
   'booking/menus/page.tsx',
   'broadcasts/page.tsx',
-  'form-submissions/page.tsx',
+  'form-submissions/list-v8.tsx',
   'friend-add-settings/publish/page.tsx',
   'friends/page.tsx',
   'line-notifications/page.tsx',
@@ -71,7 +71,12 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
     // V7 TargetMissing: 追加設定の公開・つながり・シナリオ結果の本体の
     //        失敗表示を TargetMissing の error へ寄せた（ListState 23＋
     //        TargetMissing 3で合計は変わらない）。
-    expect(errorCount).toBe(26)
+    // V8のフォームは共通の失敗文言と再試行可否で専用の面を描く。
+    const form = readFileSync(join(HERE, 'form-submissions/list-v8.tsx'), 'utf8')
+    expect(form).toContain("loadFailureCopy(loadFailure, '回答フォーム')")
+    expect(form).toContain('{failure.retryable ? (')
+    expect(form).toContain('onClick={() => void loadForms()}>もう一度読み込む')
+    expect(errorCount).toBe(25)
   })
 
   it('URLだけでは対象を特定できない状態に、直らない再読み込みを出さない', () => {

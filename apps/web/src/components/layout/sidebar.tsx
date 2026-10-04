@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { SIDEBAR_TOGGLE_EVENT, UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
+import { adminSessionHeaders } from '@/lib/admin-session'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { HQ_MENU_SECTIONS, menuOwnerForScreen, orderedMenuSections, type MenuItem, type MenuSection } from '@/lib/menu'
 import { HQ_TEMPLATE_DISTRIBUTION_ENABLED } from '@/lib/hq-template-availability'
@@ -209,6 +210,22 @@ export default function Sidebar({
 
   const [staffName, setStaffName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<string | null>(null)
+  /*
+   * ★V8 殻合わせ：脇の頭の会社名。契約先の名前は /api/tenants/me が返す。
+   * 統括の殻のときだけ取る（ふだんの殻は選んだ店の看板で変わらない）。
+   * 取れなければ null のまま「統括」で出す。
+   */
+  const [tenantName, setTenantName] = useState<string | null>(null)
+  useEffect(() => {
+    if (!isHq) return
+    let cancelled = false
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    fetch(`${apiUrl}/api/tenants/me`, { credentials: 'include', headers: adminSessionHeaders() })
+      .then((res) => res.json() as Promise<{ data?: { name?: string } } | null>)
+      .then((tenant) => { if (!cancelled) setTenantName(tenant?.data?.name ?? null) })
+      .catch(() => { if (!cancelled) setTenantName(null) })
+    return () => { cancelled = true }
+  }, [isHq])
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
   const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
 
@@ -643,12 +660,31 @@ export default function Sidebar({
       )}
 
       {isHq ? (
-        <div className={`px-3 pb-3 pt-4 ${styles.collapseHide}`}>
-          <div className="rounded-card border border-hairline bg-canvas px-4 py-3">
-            <p className="text-xs font-semibold text-accent-deep">musubo</p>
-            <p className="mt-1 text-sm font-bold text-ink">統括コンソール</p>
+        <>
+          {/* v7 の札は残す。V8 では下のロゴの段に替わる。 */}
+          <div className={`px-3 pb-3 pt-4 ${styles.collapseHide} v7-only`}>
+            <div className="rounded-card border border-hairline bg-canvas px-4 py-3">
+              <p className="text-xs font-semibold text-accent-deep">musubo</p>
+              <p className="mt-1 text-sm font-bold text-ink">統括コンソール</p>
+            </div>
           </div>
-        </div>
+          {/*
+            ★V8 殻合わせ（絵 `V8-B/JKjsE`）：脇の頭は会社のロゴ（緑の四角に
+            頭1字）＋会社名＋小さく musubo。会社名は契約先（/api/tenants/me）。
+            取れなければ「統括」で出す。v7 は上の札のまま。
+          */}
+          <div className={`v8-only px-3 pb-3 pt-4 ${styles.collapseHide}`}>
+            <div className="flex items-center gap-3 px-1">
+              <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-accent-deep text-lg font-bold text-canvas">
+                {(tenantName ?? '統').slice(0, 1)}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-lead font-bold text-ink" title={tenantName ?? undefined}>{tenantName ?? '統括'}</span>
+                <span className="mt-0.5 block text-micro font-medium text-ink-faint">musubo</span>
+              </span>
+            </div>
+          </div>
+        </>
       ) : preview ? (
         <div className={`px-[13px] pb-[9px] pt-[18px] ${styles.collapseHide}`}>
           <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
@@ -737,6 +773,8 @@ export default function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
+                  // V8は多数の別画面を先読みせず、選んだ画面だけ読み込む。
+                  prefetch={isV8 ? false : undefined}
                   onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={visibleLabel}
                   /*
@@ -788,11 +826,29 @@ export default function Sidebar({
         <div className={styles.settingsEntry}>
           <Link
             href="/settings"
+            prefetch={false}
             title="設定"
             className={`${styles.item} ${settingsActive ? styles.active : ''}`}
           >
             <span className="shrink-0"><NavIcon d={SETTINGS_GEAR_ICON} /></span>
             <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>設定</span>
+          </Link>
+        </div>
+      )}
+      {/*
+        ★V8 殻合わせ（絵 `V8-B/JKjsE`）：統括の脇の下にも「統括の設定」
+        （歯車）を出す。行き先は統括の設定（/hq/settings）。
+        オーナー・管理者にだけ出す。v7 の統括には出さない。
+      */}
+      {isV8 && isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
+        <div className={`${styles.settingsEntry} v8-only`}>
+          <Link
+            href="/hq/settings"
+            title="統括の設定"
+            className={styles.item}
+          >
+            <span className="shrink-0"><NavIcon d={SETTINGS_GEAR_ICON} /></span>
+            <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>統括の設定</span>
           </Link>
         </div>
       )}

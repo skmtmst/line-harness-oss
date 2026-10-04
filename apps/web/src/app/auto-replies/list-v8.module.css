@@ -154,6 +154,26 @@
   min-width: 0;
 }
 
+/* 一覧の上の案内（`uE9gf` の青い帯）。 */
+.ruleBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ruleBanner svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-status-info);
+}
+
 /* 道具の段：検索・札・並び・よく使う絞り込み・件数。 */
 .toolbar {
   display: flex;
