@@ -421,9 +421,11 @@ export default function AutoRepliesListV8() {
   /* ===== 操作 ===== */
 
   /*
-   * 停止・再開は確認窓の決定で窓を閉じて即反映し、裏で保存する
-   * （★V8 サクサク感 B）。止める理由（任意）は窓で受け取り、そのまま
-   * 記録へ送る。5秒のあいだ知らせの「元に戻す」で送らずに戻せる。
+   * 停止・再開は確認窓の決定で窓を閉じて即反映し、すぐ裏で送る
+   * （裁定 C：5秒待たない）。止める理由（任意）は窓で受け取り、そのまま
+   * 記録へ送る。知らせの「元に戻す」は逆の操作を送る（止めたなら再開・
+   * 再開したなら止める。止め直すときは変える前の理由を使う）。
+   * 送れなかったら戻して「もう一度」の知らせを出す。
    */
   const runToggle = () => {
     if (!pendingToggle) return
@@ -435,35 +437,47 @@ export default function AutoRepliesListV8() {
     const ids = pendingToggle.ids
     const kind = pendingToggle.kind
     const reason = toggleReason.trim() === '' ? null : toggleReason.trim()
-    const next = kind === 'resume'
     const key = listContextKey
-    setOptimisticRows({
-      key,
-      rows: rules.map((r) =>
-        ids.includes(r.id)
-          ? { ...r, isActive: next, stopReason: kind === 'stop' ? reason : r.stopReason }
-          : r,
-      ),
-    })
-    setPendingToggle(null)
-    setToggleReason('')
-    setToggleError('')
-    runUndoable({
-      message:
-        ids.length === 1
-          ? next
-            ? '自動応答を再開しました'
-            : '自動応答を止めました'
-          : next
-            ? `${ids.length}件の自動応答を再開しました`
-            : `${ids.length}件の自動応答を止めました`,
-      commit: async () => {
+    // 逆操作のために、変える前の止めた理由を覚えておく。
+    const beforeStopReason = new Map(
+      rules.filter((r) => ids.includes(r.id)).map((r) => [r.id, r.stopReason ?? null] as const),
+    )
+    const applyOptimistic = (active: boolean, stopReasonOf: (id: string) => string | null) => {
+      setOptimisticRows({
+        key,
+        rows: rules.map((r) =>
+          ids.includes(r.id)
+            ? { ...r, isActive: active, stopReason: active ? r.stopReason : stopReasonOf(r.id) }
+            : r,
+        ),
+      })
+    }
+    const doneMessage = (targetKind: 'stop' | 'resume') =>
+      ids.length === 1
+        ? targetKind === 'resume'
+          ? '自動応答を再開しました'
+          : '自動応答を停止しました'
+        : targetKind === 'resume'
+          ? `${ids.length}件の自動応答を再開しました`
+          : `${ids.length}件の自動応答を停止しました`
+    const failedMessage = (targetKind: 'stop' | 'resume', forbidden: boolean) =>
+      forbidden
+        ? `${NO_WRITE_PERMISSION.label}。自動応答を止めたり動かしたりするには権限が要ります。`
+        : targetKind === 'stop'
+          ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
+          : '自動応答を再開できませんでした。状態を読み直してからお試しください。'
+    const reloadIfSameAccount = () => {
+      if (selectedAccountIdRef.current === requestAccountId) void load()
+    }
+    const sendToggle = (targetKind: 'stop' | 'resume', targetReasonOf: (id: string) => string | null) => {
+      applyOptimistic(targetKind === 'resume', targetReasonOf)
+      void (async () => {
         let failed = 0
         let forbidden = false
         for (const id of ids) {
           try {
-            const result = kind === 'stop'
-              ? await api.autoReplies.stop(id, { reason }, crypto.randomUUID())
+            const result = targetKind === 'stop'
+              ? await api.autoReplies.stop(id, { reason: targetReasonOf(id) }, crypto.randomUUID())
               : await api.autoReplies.update(id, { isActive: true })
             if (!result.success) failed += 1
           } catch (error) {
@@ -472,26 +486,32 @@ export default function AutoRepliesListV8() {
           }
         }
         if (failed > 0) {
-          throw new Error(
-            forbidden
-              ? `${NO_WRITE_PERMISSION.label}。自動応答を止めたり動かしたりするには権限が要ります。`
-              : kind === 'stop'
-                ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
-                : '自動応答を再開できませんでした。状態を読み直してからお試しください。',
-          )
+          setOptimisticRows(null)
+          reloadIfSameAccount()
+          notifyToast(failedMessage(targetKind, forbidden), {
+            tone: 'error',
+            actionLabel: 'もう一度',
+            onAction: () => sendToggle(targetKind, targetReasonOf),
+          })
+          return
         }
-      },
-      undo: () => setOptimisticRows(null),
-      failureMessage:
-        kind === 'stop'
-          ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
-          : '自動応答を再開できませんでした。状態を読み直してからお試しください。',
-      onCommitted: () => {
         setOptimisticRows(null)
         setSelectedIds(new Set())
-        if (selectedAccountIdRef.current === requestAccountId) void load()
-      },
-    })
+        reloadIfSameAccount()
+        const reverseKind = targetKind === 'stop' ? 'resume' : 'stop'
+        notifyToast(doneMessage(targetKind), {
+          actionLabel: '元に戻す',
+          onAction: () =>
+            sendToggle(reverseKind, (id) =>
+              reverseKind === 'stop' ? (beforeStopReason.get(id) ?? null) : null,
+            ),
+        })
+      })()
+    }
+    setPendingToggle(null)
+    setToggleReason('')
+    setToggleError('')
+    sendToggle(kind, () => reason)
   }
 
   const runDelete = async () => {

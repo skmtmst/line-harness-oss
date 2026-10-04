@@ -107,7 +107,24 @@ function renderPage() {
   })
 }
 
-test('まとめて再開は窓を閉じた瞬間に有効の札になり、元に戻すで送らずに戻る', async () => {
+test('まとめて再開は窓を閉じた瞬間に有効の札になり、すぐ送る。元に戻すは止め直しを送る', async () => {
+  // 裁定 C：5秒待たない。通った変更は口にも残る想定で、読み直しも新しい札を返す。
+  const active = new Map([['ar-1', false], ['ar-2', true]])
+  listReplies.mockImplementation(async () => ({
+    success: true,
+    data: [
+      rule('ar-1', '止まっている方', active.get('ar-1')!, 'stopped'),
+      rule('ar-2', '動いている方', active.get('ar-2')!, 'published'),
+    ],
+  }))
+  updateReply.mockImplementation(async (id: string) => {
+    active.set(id, true)
+    return { success: true, data: {} }
+  })
+  stopReply.mockImplementation(async (id: string) => {
+    active.set(id, false)
+    return { success: true, data: {} }
+  })
   renderPage()
   await eventually(() => {
     if (!host.textContent?.includes('止まっている方')) throw new Error('no rows yet')
@@ -130,13 +147,19 @@ test('まとめて再開は窓を閉じた瞬間に有効の札になり、元�
     const pills = [...host.querySelectorAll('span')].filter((s) => s.textContent === '有効')
     if (pills.length < 2) throw new Error('not yet optimistic')
   })
-  // 知らせの「元に戻す」で送らずに戻せる。
+  // 待たずに送られている（取り消し線ではなく送信）。
+  await eventually(() => {
+    if (updateReply.mock.calls.length < 1) throw new Error('not yet sent')
+  })
+  expect(updateReply.mock.calls[0][0]).toBe('ar-1')
+  // 知らせの「元に戻す」は逆の操作（止め直し）を送る。
   const undo = [...host.querySelectorAll('button')].find((b) => b.textContent === '元に戻す') as HTMLElement
   expect(undo).toBeTruthy()
   await act(async () => { undo.click() })
-  await act(async () => { await Promise.resolve(); await Promise.resolve() })
-  expect(updateReply).not.toHaveBeenCalled()
-  expect(stopReply).not.toHaveBeenCalled()
+  await eventually(() => {
+    if (stopReply.mock.calls.length < 1) throw new Error('reverse not yet sent')
+  })
+  expect(stopReply.mock.calls[0][0]).toBe('ar-1')
   await eventually(() => {
     const stopped = [...host.querySelectorAll('span')].filter((s) => s.textContent === '停止中')
     if (stopped.length < 1) throw new Error('not yet reverted')
