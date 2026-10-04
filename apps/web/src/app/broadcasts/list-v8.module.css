@@ -302,9 +302,9 @@
 }
 
 .chip[data-selected='true'] {
-  border-color: transparent;
-  background: var(--color-ink);
-  color: var(--color-canvas);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
 }
 
 .chip[data-selected='true'] svg,

@@ -193,3 +193,15 @@ describe('V8 サクサク感 A・B', () => {
     expect(swapOrderCalls.length).toBe(0)
   })
 })
+
+describe('回答の補足の行のはみ出し', () => {
+  it('1行のまま全文を title にも持つ（狭い列で省略表示）', async () => {
+    await act(async () => { root.render(<FormSubmissionsListV8 />) })
+    await flush()
+    const sub = [...host.querySelectorAll('tbody p')]
+      .find((p) => (p.textContent ?? '').startsWith('今月'))
+    expect(sub).toBeTruthy()
+    expect(sub!.textContent).toBe('今月 5・完了 60%')
+    expect(sub!.getAttribute('title')).toBe(sub!.textContent)
+  })
+})

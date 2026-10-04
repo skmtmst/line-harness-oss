@@ -43,7 +43,7 @@ import {
   type StaffMenuMatrix,
 } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
-import { bookingMenuError } from '../menu-validation'
+import { bookingMenuBufferError, bookingMenuDurationError, bookingMenuError, bookingMenuNameError } from '../menu-validation'
 import MenuVersionHistory from '../menu-version-history'
 import { LiffPhoneMenuStep } from '../liff-phone-v8'
 import shell from '../settings-v8.module.css'
@@ -131,6 +131,8 @@ export default function MenuFormV8() {
   /* ---- 保存・競合 ---- */
   const [saving, setSaving] = useState<null | 'draft' | 'publish' | 'conflict'>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  /* 欄を離れたときに出す1欄ずつの直し方（文は保存時と同じ）。 */
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; duration?: string; buffer?: string }>({})
   const [conflict, setConflict] = useState<{ name: string; author: string | null; at: string | null; version: number } | null>(null)
   const [comparing, setComparing] = useState(false)
   /** 作成済みなのに後工程が残っている（DEEP-16）。再押しても作り直さない。 */
@@ -546,8 +548,17 @@ export default function MenuFormV8() {
     const validationError = validate()
     if (validationError) {
       setSaveError(validationError)
+      const nameError = bookingMenuNameError(name)
+      const durationError = bookingMenuDurationError(durationMinutes)
+      const bufferError = bookingMenuBufferError(bufferAfterMinutes)
+      setFieldErrors({
+        ...(nameError !== null ? { name: nameError } : {}),
+        ...(durationError !== null ? { duration: durationError } : {}),
+        ...(bufferError !== null ? { buffer: bufferError } : {}),
+      })
       return
     }
+    setFieldErrors({})
     setSaving(conflict ? 'conflict' : publish ? 'publish' : 'draft')
     try {
       let menuId: string | null = editTarget?.id ?? createdMenuNeedingFollowUp?.menuId ?? null
@@ -742,9 +753,21 @@ export default function MenuFormV8() {
                   className={styles.input}
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value)
+                    if (fieldErrors.name !== undefined) {
+                      setFieldErrors((previous) => ({ ...previous, name: bookingMenuNameError(e.target.value) ?? undefined }))
+                    }
+                  }}
+                  onBlur={() => {
+                    setFieldErrors((previous) => ({ ...previous, name: bookingMenuNameError(name) ?? undefined }))
+                  }}
                   placeholder="例: トリミング（小型犬）"
+                  aria-invalid={fieldErrors.name !== undefined}
                 />
+                {fieldErrors.name !== undefined ? (
+                  <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.name}</span>
+                ) : null}
               </label>
               <span className={styles.field}>
                 <span className={styles.label}>分類</span>
@@ -793,11 +816,23 @@ export default function MenuFormV8() {
                     type="number"
                     min={1}
                     value={durationMinutes}
-                    onChange={(e) => setDurationMinutes(e.target.value)}
+                    onChange={(e) => {
+                      setDurationMinutes(e.target.value)
+                      if (fieldErrors.duration !== undefined) {
+                        setFieldErrors((previous) => ({ ...previous, duration: bookingMenuDurationError(e.target.value) ?? undefined }))
+                      }
+                    }}
+                    onBlur={() => {
+                      setFieldErrors((previous) => ({ ...previous, duration: bookingMenuDurationError(durationMinutes) ?? undefined }))
+                    }}
                     aria-label="かかる時間（分）"
+                    aria-invalid={fieldErrors.duration !== undefined}
                   />
                   <span className={styles.unitSuffix}>分</span>
                 </span>
+                {fieldErrors.duration !== undefined ? (
+                  <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.duration}</span>
+                ) : null}
               </label>
               <label className={styles.field}>
                 <span className={styles.label}>金額（空なら「お問い合わせ」）</span>
@@ -975,11 +1010,23 @@ export default function MenuFormV8() {
                     type="number"
                     min={0}
                     value={bufferAfterMinutes}
-                    onChange={(e) => setBufferAfterMinutes(e.target.value)}
+                    onChange={(e) => {
+                      setBufferAfterMinutes(e.target.value)
+                      if (fieldErrors.buffer !== undefined) {
+                        setFieldErrors((previous) => ({ ...previous, buffer: bookingMenuBufferError(e.target.value) ?? undefined }))
+                      }
+                    }}
+                    onBlur={() => {
+                      setFieldErrors((previous) => ({ ...previous, buffer: bookingMenuBufferError(bufferAfterMinutes) ?? undefined }))
+                    }}
                     aria-label="後の空き時間（分）"
+                    aria-invalid={fieldErrors.buffer !== undefined}
                   />
                   <span className={styles.unitSuffix}>分</span>
                 </span>
+                {fieldErrors.buffer !== undefined ? (
+                  <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.buffer}</span>
+                ) : null}
               </label>
             </div>
           </section>

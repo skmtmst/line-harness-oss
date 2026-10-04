@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
+  applyJsBaselineAllowance,
   expandFriends,
   judge,
   median,
@@ -129,6 +130,31 @@ describe('3回測って真ん中', () => {
     expect(median([null, 50, null])).toBe(50)
     expect(median([null, null])).toBeNull()
     expect(median([])).toBeNull()
+  })
+})
+
+describe('同じPRで基準更新があればJS超過は通す', () => {
+  const over = [row({ jsBytes: 900000 + 2048 })]
+  const mixed = [row({ jsBytes: 900000 + 2048 }), row({ name: 'slow', route: '/slow', showMs: 9999, lcpMs: 1, pressMs: 1, longTaskMs: 0, jsBytes: 1 })]
+
+  it('基準更新なしではJS超過で落ちる', () => {
+    const { failures, notices } = applyJsBaselineAllowance(judge(over, { friends: base() }), false)
+    expect(failures.length).toBeGreaterThan(0)
+    expect(notices).toEqual([])
+  })
+
+  it('基準更新ありではJS超過を通し、時間の悪化は通さない', () => {
+    const judged = judge(mixed, { friends: base(), slow: base({ showMs: 100 }) })
+    const { failures, notices } = applyJsBaselineAllowance(judged, true)
+    expect(notices.length).toBe(1)
+    expect(failures.length).toBe(1)
+    expect(failures[0]).toContain('slow')
+  })
+
+  it('JS超過の文に理由の書き方（同じPRで基準更新・PRに理由）が出る', () => {
+    const [line] = judge(over, { friends: base() })
+    expect(line).toContain('同じPRで基準を更新')
+    expect(line).toContain('理由をPRに書く')
   })
 })
 
