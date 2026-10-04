@@ -35,6 +35,7 @@ import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -147,6 +148,9 @@ export default function RemindersListV8() {
   const role = useStaffRole()
   const canEdit = canManageRole(role)
   const readonlyReason = 'この操作にはオーナーか管理者の権限が要ります'
+  // 1152の板（`Iffil`）。折り畳みはCSSのコンテナ問い合わせが担い、
+  // ここでは板IDだけを切り替える。
+  const narrow = useNarrowViewport()
 
   const [folders, setFolders] = useState<Folder[]>([])
   /** 「未分類」の件数。`null` は数えていない。 */
@@ -607,7 +611,7 @@ export default function RemindersListV8() {
 
   const table =
     reminderList.loading && reminders.length === 0 ? (
-      <div className={styles.skeletonRows} role="status">
+      <div className={styles.skeletonRows} role="status" data-design-node="RrYYJ">
         <span className="sr-only">読み込んでいます</span>
         {[0, 1, 2, 3, 4].map((n) => (
           <div key={n} className={styles.skeletonRow}>
@@ -618,7 +622,7 @@ export default function RemindersListV8() {
         ))}
       </div>
     ) : reminderList.error ? (
-      <div className={styles.stateCard}>
+      <div className={styles.stateCard} data-design-node="RrYYJ">
         <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
           <AlertCircle size={18} aria-hidden="true" />
         </span>
@@ -630,7 +634,7 @@ export default function RemindersListV8() {
       </div>
     ) : reminders.length === 0 ? (
       filterActive ? (
-        <div className={styles.stateCard}>
+        <div className={styles.stateCard} data-design-node="RrYYJ">
           <span className={styles.stateIcon}>
             <SearchIcon size={18} aria-hidden="true" />
           </span>
@@ -651,7 +655,7 @@ export default function RemindersListV8() {
           </Button>
         </div>
       ) : (
-        <div className={styles.stateCard}>
+        <div className={styles.stateCard} data-design-node="RrYYJ">
           <span className={styles.stateIcon}>
             <Bell size={18} aria-hidden="true" />
           </span>
@@ -888,7 +892,7 @@ export default function RemindersListV8() {
     )
 
   return (
-    <div className={styles.board} data-design-node="apLqS">
+    <div className={styles.board} data-design-node={narrow ? 'Iffil' : 'apLqS'}>
       <div data-design="Head">
         <div className={styles.head}>
           <div className={styles.headText}>
@@ -899,6 +903,13 @@ export default function RemindersListV8() {
           </div>
         </div>
       </div>
+
+      {/* 見るだけの人への帯（`a5C1p`）。操作は押せない形のまま置く。 */}
+      {role !== null && !canEdit && (
+        <p className="border-info bg-info-bg text-ink rounded-control border px-3 py-2 text-sm" data-design-node="a5C1p">
+          閲覧のみで見ています。変える操作は管理者に頼んでください。
+        </p>
+      )}
 
       {/* 数の帯 4つ。 */}
       <div data-design="KPIs" className={styles.kpis}>

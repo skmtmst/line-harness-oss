@@ -34,6 +34,7 @@ import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
@@ -185,6 +186,9 @@ export default function AutoRepliesListV8() {
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
   const canEdit = staffRole === null || canManageRole(staffRole)
+  // 1152の板（`WPrd5`）。折り畳みはCSSのコンテナ問い合わせが担い、
+  // ここでは板IDだけを切り替える。
+  const narrow = useNarrowViewport()
 
   const [items, setItems] = useState<AutoReply[]>([])
   const [query, setQuery] = useState('')
@@ -819,7 +823,7 @@ export default function AutoRepliesListV8() {
     pendingToggle !== null && pendingToggle.accountId !== selectedAccountId
 
   const listBody = visibleLoadState === 'loading' ? (
-    <div className={styles.skeletonRows} aria-label="読み込み中">
+    <div className={styles.skeletonRows} aria-label="読み込み中" data-design-node="G8i4xP">
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className={styles.skeletonRow}>
           <span className={styles.skeletonDot} />
@@ -830,7 +834,7 @@ export default function AutoRepliesListV8() {
       ))}
     </div>
   ) : visibleLoadState === 'error' || visibleLoadState === 'forbidden' ? (
-    <div className={styles.stateCard}>
+    <div className={styles.stateCard} data-design-node="G8i4xP">
       <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
         <TriangleAlert size={18} aria-hidden="true" />
       </span>
@@ -850,7 +854,7 @@ export default function AutoRepliesListV8() {
     </div>
   ) : sortedItems.length === 0 ? (
     filterActive ? (
-      <div className={styles.stateCard}>
+      <div className={styles.stateCard} data-design-node="G8i4xP">
         <span className={styles.stateIcon}>
           <SearchIcon size={18} aria-hidden="true" />
         </span>
@@ -861,7 +865,7 @@ export default function AutoRepliesListV8() {
         <Button type="button" variant="secondary" onClick={clearFilters}>✕ 条件を外す</Button>
       </div>
     ) : (
-      <div className={styles.stateCard}>
+      <div className={styles.stateCard} data-design-node="G8i4xP">
         <span className={styles.stateIcon}>
           <MessageSquare size={18} aria-hidden="true" />
         </span>
@@ -1140,7 +1144,7 @@ export default function AutoRepliesListV8() {
   )
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node={narrow ? 'WPrd5' : undefined}>
       {/*
         骨格の印（data-design）は v7 の page.tsx 側が担う。ここへ別の節名を
         足すと、設計と画面の対を調べる design-structure の検査が
@@ -1163,6 +1167,17 @@ export default function AutoRepliesListV8() {
         </div>
       </div>
 
+      {/* 見るだけの人への帯（`Q5lOCc`）。操作は押せない形のまま置く。 */}
+      {!canEdit && (
+        <p className="border-info bg-info-bg text-ink rounded-control border px-3 py-2 text-sm" data-design-node="Q5lOCc">
+          閲覧のみで見ています。変える操作は管理者に頼んでください。
+        </p>
+      )}
+
+      {/*
+        一覧の上の案内の帯は土台側で見出し横の「？」(HelpTip) へ移動済みのため置かない。
+        文面は上の HelpTip と同じ。
+      */}
       {/* 数の帯 4つ。 */}
       <div data-design="KPIs" className={styles.kpis}>
         {kpis.map((kpi) => (
