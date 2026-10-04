@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyLayout } from '@line-crm/shared'
 
@@ -102,6 +102,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
   usePageCrumbs: () => {},
+  usePageChrome: () => ({ title: '' }),
 }))
 
 import FormSubmissionsPage from './page'
@@ -238,8 +239,11 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
     await waitFor(() => expect(formsUpdate).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getAllByText('下書きを保存しました')).toHaveLength(2))
 
-    // この版を公開する（画面の知らせとトーストの両方に出る）。
+    // この版を公開する（公開の確かめ Z9wXm が出るので窓の中でもう一度押す。
+    // 画面の知らせとトーストの両方に出る）。
     fireEvent.click(screen.getByRole('button', { name: 'この版を公開' }))
+    const publishDialog = await screen.findByRole('dialog', { name: 'この版を公開する' })
+    fireEvent.click(within(publishDialog).getByRole('button', { name: 'この版を公開' }))
     await waitFor(() => expect(formsPublish).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getAllByText('この版を公開しました')).toHaveLength(2))
 
