@@ -11,7 +11,7 @@ describe('V6 機能20 分析', () => {
       'クロス分析', 'ファネル', 'URLクリック', '保存した分析',
     ]) expect(PAGE).toContain(`label: '${tab}'`)
 
-    for (const node of ['Zxezb', 'J6Inc', 'YBGtm', 'QQ1SR', 'f5HsX', 'C2I7ry', 'Fh2Qj', 'dfwD4']) {
+    for (const node of ['Zxezb', 'J6Inc', 'YBGtm', 'QQ1SR', 'f5HsX', 'C2I7ry', 'Fh2Qj', 'bglah']) {
       expect(PAGE).toContain(`data-design-node="${node}"`)
     }
   })

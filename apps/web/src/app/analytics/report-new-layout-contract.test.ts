@@ -22,3 +22,10 @@ describe('定期レポート「いつ送りますか」の幅 (R229)', () => {
     expect(PAGE).toContain('md:grid-cols-4')
   })
 })
+
+/* 板 `H5UoIu`「知らせの決めごと」：3つ目の札の名まえは絵どおり「続いた日数」。 */
+describe('定期レポート「知らせの決めごと」の札名', () => {
+  it('成果0件の札は「続いた日数」と出す', () => {
+    expect(PAGE).toContain("thresholdLabel: '続いた日数'")
+  })
+})

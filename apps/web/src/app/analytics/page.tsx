@@ -285,7 +285,7 @@ function SaveAnalysisAction({
         </div>
       ) : (
         <Button onClick={() => setOpen(true)} variant="secondary">
-          この分析結果を保存する
+          この分析を保存
         </Button>
       )}
       {error && <p className="text-danger text-xs">{error}</p>}
@@ -873,8 +873,8 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
           detail="該当者なし"
           loading={loading}
         />
-        {/* その項目に値が入っていない人は、集計のSQLが数えていない。 */}
-        <KpiCard title="未入力" value={null} unit="人" detail={`${fieldName}が未記録`} />
+        {/* その項目に値が入っていない人は、集計のSQLが数えていない。板 `u5CuB8` の書き方。 */}
+        <KpiCard title="未入力" value={null} unit="人" detail="タグがまだ無い人（表に出ない）" />
       </div>
 
       {loading ? (
@@ -2734,7 +2734,7 @@ const SAVED_STATE_TONES: Record<SavedAnalyticsSnapshot['state'], ChipTone> = {
 }
 
 const REPORT_SCHEDULE_STATUS_LABELS: Record<AnalyticsReportSchedule['status'], string> = {
-  active: '送る予定あり',
+  active: '動いている',
   paused: '止めている',
   archived: 'しまった',
 }
@@ -3023,14 +3023,15 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   ])
 
   return (
-    <div data-design-node="dfwD4" className="space-y-4">
+    <div data-design-node="bglah" className="space-y-4">
       {/*
         ★V7 `x63W5x`：取れない KPI は「—」。失敗は「読み込めませんでした」と
         言い分け、0（本当に0件）と混ぜない。
       */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <KpiCard title="保存した分析" value={error ? null : items.length} unit="件" detail={error ? '読み込めませんでした' : 'クロス分析とファネル'} loading={loading} />
-        <KpiCard title="保存した結果" value={error ? null : items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail={error ? '読み込めませんでした' : '時点ごとに固定した結果'} loading={loading} />
+        <KpiCard title="保存結果数" value={error ? null : items.reduce((sum, item) => sum + item.snapshotCount, 0)} unit="件" detail={error ? '読み込めませんでした' : '時点ごとに固定した結果'} loading={loading} />
+        <KpiCard title="定期レポート" value={error || schedulesError ? null : schedules.length} unit="件" detail={error || schedulesError ? '読み込めませんでした' : `動いている ${schedules.filter((schedule) => schedule.status === 'active').length}・止めている ${schedules.filter((schedule) => schedule.status === 'paused').length}`} loading={loading || schedulesLoading} />
         <KpiCard title="定義が古いもの" value={error ? null : staleCount} unit="件" detail={error ? '読み込めませんでした' : 'いまの定義でまだ集計していないもの'} loading={loading} />
         <KpiCard title="選んだ分析の履歴" value={selected ? selected.snapshotCount : null} unit="件" detail={selected?.name ?? (error ? '読み込めませんでした' : '分析を選んでください')} loading={loading} />
       </div>
