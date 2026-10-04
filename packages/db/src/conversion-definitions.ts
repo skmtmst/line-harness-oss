@@ -2107,3 +2107,17 @@ export async function listConversionDefinitionsForExport(
   const items = truncated ? rows.results.slice(0, 10000) : rows.results;
   return { items: items.map((row) => serializeDefinition(row)), truncated };
 }
+
+/** 広告費の分母。確定済みで取り消されていない成果だけを数える。 */
+export async function getConfirmedConversionCount(db: D1Database, input: {lineAccountId: string; from: string; to: string}): Promise<number> {
+  const cancelled = cancelledEventPredicate(await reportLedgerAvailability(db));
+  const row = await db.prepare(`SELECT COUNT(*) AS count FROM conversion_events ce
+    JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+    JOIN friends f ON f.id = ce.friend_id
+    WHERE cp.line_account_id = ? AND f.line_account_id = ?
+      AND (ce.approval_status IS NULL OR ce.approval_status = 'approved')
+      AND julianday(ce.created_at) >= julianday(?) AND julianday(ce.created_at) < julianday(?, '+1 day')
+      AND NOT ${cancelled}`)
+    .bind(input.lineAccountId, input.lineAccountId, `${input.from}T00:00:00+09:00`, `${input.to}T00:00:00+09:00`).first<{count: number}>();
+  return Number(row?.count ?? 0);
+}

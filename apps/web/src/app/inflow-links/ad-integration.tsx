@@ -3,7 +3,8 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import type { AdConversionLog, AdPlatform } from '@/lib/api'
-import type { EntryRoute } from '@line-crm/shared'
+import type { EntryRoute, AdConversionCostSummary } from '@line-crm/shared'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -211,6 +212,8 @@ export default function AdIntegration({
   // #514-13: 失敗理由は口の errorMessage を開いて見せる(「理由を見る」を効かせる)。
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
   // #818: 広告費の台帳。取込分と手入力分を同じ一覧で見せる。
+  const theme = useAdminTheme()
+  const [conversionCost, setConversionCost] = useState<AdConversionCostSummary | null>(null)
   const [costRows, setCostRows] = useState<AdCostRow[]>([])
   const [costPlatforms, setCostPlatforms] = useState<AdCostPlatformStatus[]>([])
   const [costFailed, setCostFailed] = useState(false)
@@ -240,6 +243,7 @@ export default function AdIntegration({
       setLogs([])
       setLogTotal(0)
       setLogSummary(null)
+      setConversionCost(null)
       setCostRows([])
       setCostPlatforms([])
       setFailed(false)
@@ -265,12 +269,14 @@ export default function AdIntegration({
       setLogTotal(logResponse.data.total)
       setLogSummary(logResponse.data.summary ?? null)
       if (costResponse.success) {
+        setConversionCost(costResponse.data.conversionCost ?? null)
         setCostRows(costResponse.data.rows ?? [])
         setCostPlatforms(costResponse.data.platforms ?? [])
         setManualEntries(costResponse.data.manualEntries ?? [])
         setCostFailed(false)
       } else {
-        setCostRows([])
+        setConversionCost(null)
+      setCostRows([])
         setCostPlatforms([])
         setManualEntries([])
         setCostFailed(true)
@@ -694,7 +700,7 @@ export default function AdIntegration({
           detail={totalCostByCurrency.size > 0 ? '取込分と手入力分の合計です' : 'まだ費用の記録がありません'}
         />
         <Metric label="友だち1人あたり" value={avgCostPerFriend} detail="経路がある円の費用だけを合計し、同じ経路の追加人数は1回だけ数えます。経路なし・追加0人・他通貨は計算に含めません" prefix="¥" />
-        <Metric label="成果1件あたり" value={null} detail="認めた成果の件数は未接続のため表示できません" prefix="¥" />
+        <Metric label="成果1件あたり" value={theme === 'v8' ? conversionCost?.costPerConversionMinor ?? null : null} detail={theme === 'v8' ? (conversionCost ? `同じ期間の確定成果 ${conversionCost.confirmedConversionCount}件。取消・承認待ちは除きます。円以外が混ざると計算しません。` : '成果の件数を取得できません') : '認めた成果の件数は未接続のため表示できません'} prefix="¥" />
       </div>
 
       {/*

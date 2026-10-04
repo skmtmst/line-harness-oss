@@ -2570,3 +2570,10 @@ export interface EventApplicationPreview {
 
 /** サイトごとの同意済み最終受信。まだ受け取っていなければnull。 */
 export interface MeasurementSiteReceipt { lastReceivedAt: string | null }
+
+export interface AdConversionCostSummary {
+  from: string; to: string;
+  confirmedConversionCount: number;
+  costPerConversionMinor: number | null;
+  currency: 'JPY' | null;
+}

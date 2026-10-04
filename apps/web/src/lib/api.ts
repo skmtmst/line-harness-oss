@@ -13674,6 +13674,7 @@ export const api = {
       if (params?.to) query.set('to', params.to)
       const suffix = query.size > 0 ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<{
+        conversionCost?: import('@line-crm/shared').AdConversionCostSummary
         rows: Array<{
           sourceLabel: string
           adPlatformId: string | null
