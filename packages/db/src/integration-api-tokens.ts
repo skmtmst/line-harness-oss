@@ -83,10 +83,11 @@ export async function resolveIntegrationApiToken(
 export async function listIntegrationApiTokens(
   db: D1Database,
   lineAccountId: string,
+  opts?: { includeRevoked?: boolean },
 ): Promise<IntegrationApiTokenRow[]> {
   const result = await db.prepare(
     `SELECT * FROM integration_api_tokens
-      WHERE line_account_id = ? AND revoked_at IS NULL
+      WHERE line_account_id = ?${opts?.includeRevoked ? '' : ' AND revoked_at IS NULL'}
       ORDER BY created_at DESC`,
   ).bind(lineAccountId).all<IntegrationApiTokenRow>();
   return result.results ?? [];

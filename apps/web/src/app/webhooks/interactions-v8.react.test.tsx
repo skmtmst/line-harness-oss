@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -77,6 +78,9 @@ beforeEach(() => {
     if (url.includes('/api/webhooks/outgoing')) return json({ success: true, data: [] })
     if (url.includes('/incoming')) return json({ success: true, data: [] })
     if (url.includes('/interactions')) {
+      if (url.includes('/payload')) {
+        return json({ success: true, data: { id: 'whk_20260930_0558_02', body: { event: 'booking_created', friend: 'Masato S.（伏せ字）' }, available: true } })
+      }
       return json({ success: true, data: { items, total: items.length, page: 1, limit: 20, summary } })
     }
     return json({ success: false, error: 'not found' }, 404)
@@ -122,6 +126,21 @@ test('v7 では従来の記録タブが出て Uv9AA は出ない', async () => {
   await renderPage()
   expect(host.querySelector('[data-design-node="Uv9AA"]')).toBeNull()
   expect(host.querySelector('[data-design-node="KNG00"]')).not.toBeNull()
+})
+
+test('v8 で中身を開くと伏せた本文の黒枠が出る', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const openButton = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === '中身を見る')
+  expect(openButton).not.toBeUndefined()
+  await act(async () => {
+    if (openButton) fireEvent.click(openButton)
+  })
+  await act(async () => {})
+  const detail = document.querySelector('[data-design-node="DA0Ag"]')
+  expect(detail).not.toBeNull()
+  expect(detail?.textContent).toContain('送った・届いた中身')
+  expect(detail?.textContent).toContain('booking_created')
 })
 
 test('v8 の読み込み中は記録の表の形の骨組みが出て「読み込み中」の文字は無い', async () => {

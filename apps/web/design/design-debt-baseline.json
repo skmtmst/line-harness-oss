@@ -724,7 +724,7 @@
     "unresolved-classname": 7
   },
   "app/webhooks/apitokens-v8.tsx": {
-    "unresolved-classname": 26,
+    "unresolved-classname": 27,
     "direct-th": 6
   },
   "app/webhooks/edit/page.tsx": {
@@ -735,7 +735,7 @@
     "direct-th": 4
   },
   "app/webhooks/interactions-v8.tsx": {
-    "unresolved-classname": 42,
+    "unresolved-classname": 43,
     "direct-th": 6
   },
   "app/webhooks/new/new-v8.tsx": {

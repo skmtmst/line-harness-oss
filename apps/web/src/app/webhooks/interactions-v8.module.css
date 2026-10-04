@@ -192,6 +192,13 @@
   color: var(--color-danger);
 }
 
+.payloadTitle {
+  margin: 16px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
 .payloadBox {
   margin: 12px 0 0;
   border: 1px solid var(--color-hairline);

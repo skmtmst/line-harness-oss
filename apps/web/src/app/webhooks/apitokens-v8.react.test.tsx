@@ -36,6 +36,19 @@ const token = {
   lastUsedAt: '2026-09-30T10:02:00.000Z',
   rotatedFromId: null,
   createdAt: '2026-06-02T00:00:00.000Z',
+  revokedAt: null,
+}
+
+const revokedToken = {
+  id: 'tok-2',
+  name: '旧ポイント連携',
+  tokenPrefix: 'mhk_old',
+  scopes: ['tags:write'],
+  createdBy: null,
+  lastUsedAt: '2025-08-31T12:00:00.000Z',
+  rotatedFromId: null,
+  createdAt: '2025-11-10T00:00:00.000Z',
+  revokedAt: '2025-09-01T00:00:00.000Z',
 }
 
 const json = (data: unknown, status = 200) => new Response(
@@ -60,7 +73,8 @@ beforeEach(() => {
         failed: 0, resultUnknown: 0, outgoingFailed: 0, retryable: 0, averageDurationMs: null,
       } } })
     }
-    if (url.includes('/api-tokens')) return json({ success: true, data: [token] })
+    if (url.includes('/reactivate')) return json({ success: true, data: { ...revokedToken, revokedAt: null } })
+    if (url.includes('/api-tokens')) return json({ success: true, data: [token, revokedToken] })
     return json({ success: false, error: 'not found' }, 404)
   })
 })
@@ -94,6 +108,16 @@ test('v8 では ralAc の鍵の表（札・入れ替える）が出る', async (
 test('v7 では従来の鍵タブが出て ralAc は出ない', async () => {
   await renderPage()
   expect(host.querySelector('[data-design-node="ralAc"]')).toBeNull()
+})
+
+test('v8 では止めた鍵に止めているの札と動かすが出る', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const board = host.querySelector('[data-design-node="ralAc"]')
+  expect(board).not.toBeNull()
+  expect(board?.textContent).toContain('旧ポイント連携')
+  expect(board?.textContent).toContain('止めている')
+  expect(board?.textContent).toContain('動かす')
 })
 
 test('v8 の読み込み中は鍵の表の形の骨組みが出て「読み込み中」の文字は無い', async () => {
