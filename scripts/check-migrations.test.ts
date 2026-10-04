@@ -47,6 +47,19 @@ describe('440のCASCADE子退避表だけを同一ファイル内で片付ける
   });
 });
 
+describe('556の退避表は消さずに残す(#1269)', () => {
+  const file = '556_f13_folder_kinds.sql';
+  const sql = readFileSync(new URL('../packages/db/migrations/556_f13_folder_kinds.sql', import.meta.url), 'utf8');
+  it('実migration（退避表を残す作り直し）を通す', () => {
+    expect(checkMigration(sql, file)).toEqual({ ok: true });
+  });
+  it('退避表を落とすと止まる（点検は_newの組のDROPだけ許す）', () => {
+    expect(checkMigration(`${sql}\nDROP TABLE _556_folders_backup_tags;`, file).ok).toBe(false);
+    expect(checkMigration(sql.replace('-- migration-policy: table-rebuild', ''), file).ok).toBe(false);
+    expect(checkMigration(`${sql}\nDROP TABLE friends;`, file).ok).toBe(false);
+  });
+});
+
 describe('checkMigration', () => {
   it('allows CREATE TABLE', () => {
     const sql = `CREATE TABLE foo (id INTEGER PRIMARY KEY, name TEXT);`;

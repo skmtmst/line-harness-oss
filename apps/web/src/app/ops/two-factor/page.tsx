@@ -126,7 +126,7 @@ export default function OpsTwoFactorPage() {
       title="2要素認証を設定"
       description={
         <>
-          <span className="mb-1 block text-caption font-medium text-ink-faint">運営コンソール</span>
+          <span className="mb-1 block text-micro text-ink-secondary">運営コンソール</span>
           運営コンソールは2要素認証が必須です。認証アプリ（Google Authenticator など）でQRコードを読み取り、表示された6桁の数字を入れてください。確認が通ると登録が完了します。
         </>
       }
@@ -167,8 +167,8 @@ export default function OpsTwoFactorPage() {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-caption text-ink-faint">読み取れないときは、このキーを手で入力</p>
-                <p className="mt-1 break-all font-mono text-label font-medium tracking-wider text-ink">{manualKey || '—'}</p>
+                <p className="text-micro text-ink-secondary">読み取れないときは、このキーを手で入力</p>
+                <p className="mt-1 break-all font-mono text-caption font-bold text-ink">{manualKey || '—'}</p>
                 <Button onClick={() => setQrAttempt((n) => n + 1)} className="mt-2">QRをもう一度表示する</Button>
               </div>
             </div>
@@ -186,8 +186,8 @@ export default function OpsTwoFactorPage() {
                 <DelayedSkeleton loading skeleton={<Skeleton className="block h-52 w-52 rounded-control" />} />
               )}
               <div className="text-center">
-                <p className="text-caption text-ink-faint">読み取れないときは、このキーを手で入力</p>
-                <p className="mt-1 break-all font-mono text-label font-medium tracking-wider text-ink">{manualKey || '—'}</p>
+                <p className="text-micro text-ink-secondary">読み取れないときは、このキーを手で入力</p>
+                <p className="mt-1 break-all font-mono text-caption font-bold text-ink">{manualKey || '—'}</p>
               </div>
             </>
           )}
