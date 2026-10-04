@@ -458,7 +458,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       </div>
 
       {!canEdit ? <div className={styles.readonly}><NoteBar tone="info">閲覧のみで見ています。変える操作は管理者に頼んでください。</NoteBar></div> : null}
-      <ul className={styles.kpiBand} aria-label="投稿の数の帯">
+      <ul data-design="KPIs" className={styles.kpiBand} aria-label="投稿の数の帯">
         <KpiCellV8 icon="pending" label="審査待ち" help={`まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? '—'}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? '—' : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`} value={countsReady ? reviewMetrics?.pendingCount ?? counts.pending : null} unit="枚" sub={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatWaitRough((Date.now() - Date.parse(reviewMetrics.oldestPendingAt)) / 60000)}` : 'いちばん古いもの —'} />
         <KpiCellV8 icon="help" label="今月採用" help={hasMorePhotos ? '読み込んだ写真の集計です。続きの写真は含みません' : '今月 採用した写真の枚数です'} value={countsReady ? adoptedThisMonth : null} unit={hasMorePhotos ? '枚以上' : '枚'} sub={policyPoints == null ? '1枚ごとに —' : `1枚ごとに ${formatNumber(policyPoints)}マイル`} />
         <KpiCellV8 icon="help" label="今月見送り" help={hasMorePhotos ? '読み込んだ写真の集計です。理由の内訳も続きの写真は含みません' : '今月 見送った写真の枚数です'} value={countsReady ? rejectedThisMonth.length : null} unit={hasMorePhotos ? '枚以上' : '枚'} sub={`理由：${topReason}`} />
