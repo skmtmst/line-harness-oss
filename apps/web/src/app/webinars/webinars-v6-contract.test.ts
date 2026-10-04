@@ -41,7 +41,7 @@ describe('V6 ウェビナー一覧の契約', () => {
   it('選択アカウントのフォルダ件数を表示し、追加・改名・並び替え・削除を保存する', () => {
     expect(PAGE).toContain('className={styles.body}')
     expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
-    expect(PAGE).toContain("onAddFolder={() => { if (!canEdit) return; setFolderError(''); setFolderDialogOpen(true) }}")
+    expect(PAGE).toContain("onAddFolder={() => { if (!canEdit) return; setFolderError(''); closeDetail(); setFolderDialogOpen(true) }}")
     expect(PAGE).toContain("webinarApi.createFolder(selectedAccountId, { name })")
     expect(PAGE).toContain('webinarApi.updateFolder(selectedAccountId, editingFolder.id, { name })')
     expect(PAGE).toContain('webinarApi.deleteFolder(selectedAccountId, deletingFolder.id)')
