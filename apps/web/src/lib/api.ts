@@ -9729,7 +9729,10 @@ export const api = {
           | 'payoutCycle'
           | 'notifyOnConversion'
         >
-      >,
+      > & {
+        /** 同時編集の見分け用。読んだときの更新日時。違えば409になる */
+        expectedUpdatedAt?: string | null
+      },
     ) =>
       fetchApi<ApiResponse<Affiliate>>(`/api/affiliates/${id}`, {
         method: 'PUT',
@@ -13143,7 +13146,13 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<CreateEntryRouteInput>) =>
+    update: (
+      id: string,
+      data: Partial<CreateEntryRouteInput> & {
+        /** 同時編集の見分け用。読んだときの更新日時。違えば409になる */
+        expectedUpdatedAt?: string | null
+      },
+    ) =>
       fetchApi<ApiResponse<EntryRoute>>(`/api/entry-routes/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -13709,6 +13718,8 @@ export interface BookingMenu {
   base_price: number;
   price_mode?: 'fixed' | 'free' | 'inquiry';
   version?: number;
+  /** 同時編集の見分け用。最終更新日時。一覧が返す */
+  updated_at?: string | null;
   sort_order: number;
   is_active: number;
   auto_tag_id: string | null;
@@ -14476,10 +14487,19 @@ export const bookingApi = {
       headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
       body: JSON.stringify(body),
     }),
-  updateMenu: (accountId: string, id: string, expectedVersion: number, body: Partial<BookingMenu>) =>
+  updateMenu: (
+    accountId: string,
+    id: string,
+    expectedVersion: number,
+    body: Partial<BookingMenu>,
+    expectedUpdatedAt?: string | null,
+  ) =>
     fetchApi<{ ok: true; version: number }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {
       method: 'PUT',
-      body: JSON.stringify({ ...body, expectedVersion }),
+      // 同時編集の見分け（v5L19Z・v8f の口）。日時が無い呼び出しは今までどおり版だけで比べる。
+      body: JSON.stringify(typeof expectedUpdatedAt === 'string'
+        ? { ...body, expectedVersion, expectedUpdatedAt }
+        : { ...body, expectedVersion }),
     }),
   /** T: 版の履歴。新しい順。いちばん新しい版だけ status が in_use。 */
   listMenuVersions: (accountId: string, id: string) =>

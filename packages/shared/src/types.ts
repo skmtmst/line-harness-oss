@@ -1378,6 +1378,8 @@ export interface Affiliate {
   notifyOnConversion?: boolean;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
+  /** 同時編集の見分け用。最終更新日時 (ISO 8601)。未書換えは null */
+  updatedAt?: string | null;
 }
 
 // -----------------------------------------------------------------------------

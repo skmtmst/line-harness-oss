@@ -91,6 +91,7 @@ function serializeAffiliate(row: {
   commission_rate: number;
   is_active: number;
   created_at: string;
+  updated_at?: string | null;
   friend_id?: string | null;
   email?: string | null;
   hold_days?: number | null;
@@ -106,6 +107,7 @@ function serializeAffiliate(row: {
     commissionRate: row.commission_rate,
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
+    updatedAt: row.updated_at ?? null,
     friendId: row.friend_id ?? null,
     email: row.email ?? null,
     holdDays: row.hold_days ?? null,
@@ -569,6 +571,26 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
     if (!settlement.ok) return c.json({ success: false, error: settlement.error }, 400);
     const rateError = commissionRateError(body.commissionRate);
     if (rateError) return c.json({ success: false, error: rateError }, 400);
+    /*
+     * 同時編集の見分けは「最後に直した日時で比べる」（v8f と同じ形）。
+     * expectedUpdatedAt が送られてきたときだけ、保存前の値と照合する。
+     * 違えば409で止めて今の中身を返す。送らなければ従来どおり通す。
+     */
+    const expectedUpdatedAt =
+      typeof (body as Record<string, unknown>).expectedUpdatedAt === 'string'
+        ? ((body as Record<string, unknown>).expectedUpdatedAt as string)
+        : null;
+    if (expectedUpdatedAt !== null) {
+      const current = await getAffiliateById(c.env.DB, id, scope);
+      if (current && (current.updated_at ?? null) !== expectedUpdatedAt) {
+        return c.json({
+          success: false,
+          code: 'VERSION_CONFLICT',
+          error: 'アフィリエイターの情報が更新されています。読み直してください',
+          data: { latest: serializeAffiliate(current) },
+        }, 409);
+      }
+    }
 
     const updated = await updateAffiliate(c.env.DB, id, {
       name: body.name,

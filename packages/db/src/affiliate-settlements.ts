@@ -880,16 +880,19 @@ export async function updateAffiliateLifecycle(
     now?: string;
   },
 ): Promise<boolean> {
+  const now = input.now ?? new Date().toISOString();
   const result = await db.prepare(
     `UPDATE affiliates
         SET is_active = 0,
             lifecycle_status = ?,
-            archived_at = CASE WHEN ? = 'archived' THEN ? ELSE archived_at END
+            archived_at = CASE WHEN ? = 'archived' THEN ? ELSE archived_at END,
+            updated_at = ?
       WHERE id = ? AND tenant_id = ? AND line_account_id = ?`,
   ).bind(
     input.lifecycle,
     input.lifecycle,
-    input.now ?? new Date().toISOString(),
+    now,
+    now,
     input.affiliateId,
     input.tenantId,
     input.lineAccountId,

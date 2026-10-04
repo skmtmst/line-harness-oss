@@ -2150,6 +2150,23 @@ booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KE
     if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
     const parsed = readBookingAdminSettings(body);
     if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    /*
+     * 同時編集の見分けは「最後に直した日時で比べる」。
+     * expectedUpdatedAt が送られてきたときだけ、保存前の値と照合する。
+     * 違えば409で止めて今の中身を返す。送らなければ従来どおり通す。
+     */
+    const expectedSettingsUpdatedAt = typeof body.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : null;
+    if (expectedSettingsUpdatedAt !== null) {
+      const currentSettings = await getBookingAdminSettings(c.env.DB, accountId);
+      if (currentSettings && currentSettings.updatedAt !== expectedSettingsUpdatedAt) {
+        return c.json({
+          success: false,
+          code: 'VERSION_CONFLICT',
+          error: '予約の設定が更新されています。読み直してください',
+          data: { latest: currentSettings },
+        }, 409);
+      }
+    }
     const result = await saveBookingAdminSettings(c.env.DB, {
       lineAccountId: accountId,
       ...parsed.value,
@@ -2522,7 +2539,7 @@ booking.get('/api/booking/admin/menus', async (c) => {
       c.env.DB.prepare(
         `SELECT m.id, m.name, m.category_label, m.description,
                 m.duration_minutes, m.buffer_after_minutes,
-                m.base_price, m.price_mode, m.version,
+                m.base_price, m.price_mode, m.version, m.updated_at,
                 m.sort_order, m.is_active, m.auto_tag_id,
                 m.concurrent_capacity, m.booking_window_days, m.cutoff_hours_before,
                 m.cancel_deadline_hours_before, m.intake_question,
@@ -2597,6 +2614,7 @@ booking.get('/api/booking/admin/menus', async (c) => {
         base_price: row.base_price,
         price_mode: row.price_mode,
         version: row.version,
+        updated_at: row.updated_at,
         sort_order: row.sort_order,
         is_active: row.is_active,
         auto_tag_id: row.auto_tag_id,
@@ -2947,6 +2965,7 @@ booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY)
     is_active?: boolean | number;
     auto_tag_id?: string | null;
     expectedVersion?: number;
+    expectedUpdatedAt?: unknown;
   } & MenuBookingRuleBody>();
 
   // 編集窓は一覧が返した version をそのまま送る。版なしの全体上書きは
@@ -3010,6 +3029,24 @@ booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY)
   for (const [column, value] of Object.entries(rules.value)) {
     sets.push(`${column} = ?`);
     values.push(value);
+  }
+
+  // expectedUpdatedAt が送られてきたときだけ、日時でも比べる。
+  // 違えば409で止めて今の版と日時を返す。送らなければ従来どおり版だけで比べる。
+  if (typeof b.expectedUpdatedAt === 'string') {
+    const currentMenu = await c.env.DB
+      .prepare(`SELECT version, updated_at FROM menus
+          WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
+      .bind(id, accountId)
+      .first<{ version: number; updated_at: string }>();
+    if (currentMenu && currentMenu.updated_at !== b.expectedUpdatedAt) {
+      return c.json({
+        success: false,
+        code: 'version_conflict',
+        error: '予約メニューが更新されています。読み直してください',
+        data: { currentVersion: Number(currentMenu.version), currentUpdatedAt: currentMenu.updated_at },
+      }, 409);
+    }
   }
 
   // version を WHERE に入れて読んだ時点の行へだけ書き、成功時だけ 1 進める。
