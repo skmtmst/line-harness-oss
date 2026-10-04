@@ -660,6 +660,27 @@ export async function archiveFormAtRevision(
   return getFormById(db, id, { includeArchived: true });
 }
 
+/**
+ * 保管の取り消し（B 元に戻す）。保管中の行だけ現行へ戻す。
+ * 戻した直後は受付停止のまま（is_active = 0）。戻した瞬間に回答を
+ * 受け付けると、保管中に変わった利用先へ古い項目で送る恐れがあるため。
+ * 公開は画面の公開操作で行う。
+ */
+export async function unarchiveFormAtRevision(
+  db: D1Database,
+  id: string,
+  expectedRevision: number,
+): Promise<Form | null> {
+  const now = jstNow();
+  const result = await db.prepare(
+    `UPDATE forms
+        SET status = 'active', is_active = 0, archived_at = NULL, updated_at = ?, revision = revision + 1
+      WHERE id = ? AND status = 'archived' AND revision = ?`,
+  ).bind(now, id, expectedRevision).run();
+  if ((result.meta?.changes ?? 0) !== 1) return null;
+  return getFormById(db, id);
+}
+
 /** 回答・利用先が無く、非公開で、確認した版のままのときだけ物理削除する。 */
 export async function deleteFormAtRevision(
   db: D1Database,
