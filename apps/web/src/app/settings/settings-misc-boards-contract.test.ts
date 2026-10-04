@@ -21,8 +21,10 @@ const START = readFileSync(join(HERE, '..', 'getting-started', 'page.tsx'), 'utf
  * v7 は変えない。
  */
 describe('設定の細かい板', () => {
-  it('3画面とも0件の状態に板IDを付ける（bR6a1）', () => {
-    expect(FEATURE).toContain('data-design-node="bR6a1"')
+  it('機能設定は共通の絞り込み0件、残り2画面はbR6a1を使う', () => {
+    expect(FEATURE).toContain('filteredGroups.length === 0')
+    expect(FEATURE).toContain('emptyPreset="filtered"')
+    expect(FEATURE).toContain("onClick={() => setQuery('')}")
     expect(MANUAL).toContain('data-design-node="bR6a1"')
     expect(SCAN).toContain('data-design-node="bR6a1"')
   })
@@ -37,14 +39,14 @@ describe('設定の細かい板', () => {
     expect(CSS).toContain('@media (max-width: 1100px)')
   })
 
-  it('はじめの設定の順路に板IDを付ける（BOj1a・V8だけ）', () => {
-    expect(START).toContain("data-design-node={theme === 'v8' ? 'BOj1a' : undefined}")
+  it('はじめの設定の順路に板IDを付ける（BOj1a）', () => {
+    expect(START).toContain('data-design-node="BOj1a"')
   })
 
   it('機能設定の競合は帯・比べる・読み直しを出す（ziYCN）', () => {
     expect(HOOK).toContain('setConflict(true)')
     expect(FEATURE).toContain('data-design-node="ziYCN"')
-    expect(FEATURE).toContain('ほかの人が機能設定を保存しました')
+    expect(FEATURE).toContain('ほかの人が先に機能設定を保存しました')
     expect(FEATURE).toContain('違いを比べる')
     expect(FEATURE).toContain('最新を読み込んで続ける')
     expect(FEATURE).toContain('比べてから保存')
