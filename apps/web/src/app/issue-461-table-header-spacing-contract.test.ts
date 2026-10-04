@@ -17,6 +17,11 @@ describe('Issue #461 表見出しの余白', () => {
     const source = readFileSync(join(APP, path), 'utf8')
     const headers = [...source.matchAll(/<th\b[^>]*className="([^"]*)"/g)]
 
+    if (!/<(?:table|DataTable)\b/.test(source)) {
+      expect(source).not.toMatch(/<(?:th|Th)\b/)
+      return
+    }
+
     if (headers.length === 0) {
       // 共通 Th（shared/table）へ寄せた画面は、余白を部品が持つ。
       // 素の th を書かず、共通 Th を使うことを確かめる。
