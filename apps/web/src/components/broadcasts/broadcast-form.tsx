@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { Folder, Tag } from '@line-crm/shared'
-import { AlertTriangle, ArrowRight, CheckCircle2, Eye, Plus, Save, Send, Trash2, Zap } from 'lucide-react'
+import { AlertTriangle, ArrowUp, ArrowDown, ArrowRight, CheckCircle2, Eye, Plus, Save, Send, Trash2 } from 'lucide-react'
 import {
   ApiError,
   api,
@@ -17,7 +17,8 @@ import {
   type BroadcastPreflight,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import HelpTip from '@/components/shared/help-tip'
+import styles from './broadcast-form-v8.module.css'
 import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
 import {
@@ -353,8 +354,8 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
         })}
         className="min-w-0 flex-1"
       />
-      <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
-      <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
+      <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動"><ArrowUp size={14} aria-hidden /></button>
+      <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動"><ArrowDown size={14} aria-hidden /></button>
       <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除する</button>
     </div>
     <div className="p-4">
@@ -442,26 +443,16 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
 
   return (
     <section className={embedded ? 'border-hairline border-t pt-4' : 'rounded-card border border-hairline bg-canvas p-4'}>
-      {embedded && (
-        <div className="border-hairline mb-4 border-b pb-3">
-          <InsertToolbar
-            targetRef={textRef}
-            value={text}
-            includeAnswerForm
-            onChange={(next) => onChange({ ...bubble, content: { ...bubble.content, text: next.slice(0, MAX_TEXT_LENGTH) } })}
-          />
-        </div>
-      )}
       {/*
         監査 R208: テキストも画像などと同じく削除・上下移動ができる。
         以前はテキストに操作が無く、画像へ切り替えて消す裏技が要った。
       */}
-      <div className="flex flex-wrap items-center gap-3">
+      {!embedded && <div className="flex flex-wrap items-center gap-3">
         <h4 className="min-w-0 flex-1 text-sm font-bold text-ink">{index + 1}通目・テキスト</h4>
-        <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
-        <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
+        <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動"><ArrowUp size={14} aria-hidden /></button>
+        <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動"><ArrowDown size={14} aria-hidden /></button>
         <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除する</button>
-      </div>
+      </div>}
       {!embedded && <div className="mt-3 border-b border-hairline pb-3">
         <InsertToolbar
           targetRef={textRef}
@@ -471,6 +462,7 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
       </div>}
       <textarea
         ref={textRef}
+        aria-label={`${index + 1}通目の本文`}
         rows={6}
         maxLength={MAX_TEXT_LENGTH}
         value={text}
@@ -483,17 +475,18 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
         <span className="font-semibold text-action">1通あたり5,000文字・最大5通まで。4,500文字を超えると自動で分割します。</span>
       </div>
 
-      <section className="rounded-control mt-4 border border-hairline p-3">
-        <h5 className="text-sm font-bold text-ink">URLの扱い</h5>
+      {embedded && <div className={styles.insertToolbar}><InsertToolbar targetRef={textRef} value={text} includeAnswerForm onChange={(next) => onChange({ ...bubble, content: { ...bubble.content, text: next.slice(0, MAX_TEXT_LENGTH) } })} /></div>}
+      <details className={styles.urlDetails}>
+        <summary>URLの扱い・クリックの計測</summary>
         <p className="mt-1 text-xs text-ink-faint">短縮すると、URLごとのクリック数を計測できます。</p>
         <Checkbox checked={!trackLinks} onCheckedChange={(checked) => onTrackLinksChange(!checked)} className="mt-3">このメッセージではURLを短縮しない</Checkbox>
         <div className="mt-3 overflow-hidden rounded-control border border-hairline text-xs">
           <div className="broadcast-url-row bg-canvas-sunken px-3 py-2 font-bold text-ink-faint"><span>サイト名</span><span>URL</span><span>計測</span></div>
-          {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">キャンペーンLP</span><span className="truncate" title={url}>{url}</span><span>短縮して計測</span></div>) : (
+          {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">{(() => { try { return new URL(url).hostname } catch { return 'URL' } })()}</span><span className="truncate" title={url}>{url}</span><span>{trackLinks ? '短縮して計測' : '短縮しない'}</span></div>) : (
             <p className="border-t border-hairline px-3 py-3 text-ink-faint">本文にURLはありません。</p>
           )}
         </div>
-      </section>
+      </details>
     </section>
   )
 }
@@ -616,9 +609,7 @@ export default function BroadcastForm({
   onStepChange,
   visualQaAugustCampaign = false,
 }: BroadcastFormProps) {
-  const theme = useAdminTheme()
-  const v8 = theme === 'v8'
-  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   /*
    * テスト送信と本番予約で同じ下書きを使う。
    * 押すたびにPOSTすると、テストした回数だけ一覧へ下書きが増え、最後の予約は
@@ -686,6 +677,23 @@ export default function BroadcastForm({
   /** PERF-06: シナリオ候補は対象者の節で「シナリオ購読中」を選んでから取る。 */
   const [scenariosStatus, setScenariosStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [tagId, setTagId] = useState('')
+  const [excludeTagId, setExcludeTagId] = useState('')
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const previewToggleRef = useRef<HTMLButtonElement>(null)
+  const previewCloseRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!previewOpen) return
+    previewCloseRef.current?.focus()
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setPreviewOpen(false)
+      previewToggleRef.current?.focus()
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [previewOpen])
+  const [previewDevice, setPreviewDevice] = useState<'phone' | 'pc'>('phone')
+  const [preflightStatus, setPreflightStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   /** 「詳細条件」で組み立てた絞り込み。シナリオと同じ部品で作る。 */
   const [condition, setCondition] = useState<SegmentCondition | null>(initialCondition)
   const [conditionDraft, setConditionDraft] = useState<SegmentCondition | null>(initialCondition)
@@ -734,6 +742,7 @@ export default function BroadcastForm({
   const [scheduledDate, setScheduledDate] = useState(initialScheduledDate)
   const [scheduledTime, setScheduledTime] = useState(initialScheduledTime)
   const [saving, setSaving] = useState(false)
+  const submittingRef = useRef(false)
   /*
     最終確認（設計 `FpgxH`）。**「配信を予約する」で直に送らない。**
     ここまでは、押した瞬間に `save()` が走って 1,000人以上へ予約が入り、
@@ -1087,6 +1096,7 @@ export default function BroadcastForm({
   // 持ち主の分かる吹き出しだけ落とし、手書き・素材は保つ。
   useEffect(() => {
     setSelectedTemplate(null)
+    setExcludeTagId('')
     setBubbles((items) => items.filter((bubble) => {
       const owner = bubble.content.templateAccountId
       return owner == null || owner === selectedAccountId
@@ -1118,8 +1128,12 @@ export default function BroadcastForm({
    * いなかった）。1か所で作って両方に渡す。
    */
   const audience = useMemo(
-    () => buildAudienceCondition(targetMode, { scenarioId, tagId, condition }),
-    [condition, scenarioId, tagId, targetMode],
+    () => {
+      const next = buildAudienceCondition(targetMode, { scenarioId, tagId, condition })
+      if (excludeTagId) return { operator: 'AND' as const, rules: [{ type: 'tag_not_exists', value: excludeTagId }], groups: [next] }
+      return next
+    },
+    [condition, scenarioId, tagId, targetMode, excludeTagId],
   )
 
   /**
@@ -1129,7 +1143,7 @@ export default function BroadcastForm({
    * 送信の経路が別（キューに載せずにその場で送る）で、少人数のときに速い。
    */
   const targetPayload = useCallback(() => {
-    if (targetMode === 'tag' && tagId) {
+    if (targetMode === 'tag' && tagId && !excludeTagId) {
       return { targetType: 'tag' as const, targetTagId: tagId, segmentConditions: undefined }
     }
     return {
@@ -1137,7 +1151,7 @@ export default function BroadcastForm({
       targetTagId: null,
       segmentConditions: audience,
     }
-  }, [audience, tagId, targetMode])
+  }, [audience, tagId, targetMode, excludeTagId])
   /*
    * 宛先か本文が変わったら、少し待ってから自動で確かめる。
    *
@@ -1153,13 +1167,16 @@ export default function BroadcastForm({
     ) {
       setPreflightResult(null)
       setPreflightKey(null)
+      setPreflightStatus('idle')
+      preflightSeq.current += 1
       return
     }
+    setPreflightStatus('loading')
     const timer = setTimeout(() => void runPreflight(true), 600)
     return () => clearTimeout(timer)
     // runPreflight は毎回作り直されるので依存に入れない。見たいのは中身の変化。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bubbles, tagId, condition, scenarioId, targetMode, selectedAccountId, scheduledDate, scheduledTime, sendMode])
+  }, [bubbles, tagId, excludeTagId, condition, scenarioId, targetMode, selectedAccountId, scheduledDate, scheduledTime, sendMode])
 
   /*
    * BC-01: 型を切り替えると `emptyBubble` で中身が空になるが、
@@ -1256,6 +1273,7 @@ export default function BroadcastForm({
     // 何番の何が足りないかを言い、直したら保存できる。
     const buttonProblem = messageButtonsError(messageButtons)
     if (buttonProblem) return buttonProblem
+    if (currentStep && sendMode === 'scheduled' && (!scheduledDate || !scheduledTime)) return '予約する日付と時刻を入力してください'
     return ''
   }
   /**
@@ -1307,18 +1325,27 @@ export default function BroadcastForm({
    */
   const runPreflight = async (silent = false) => {
     if (!silent) setError('')
+    setPreflightStatus('loading')
+    setPreflightResult(null)
+    setPreflightKey(null)
+    const seq = ++preflightSeq.current
     try {
       const requestBody = preflightRequestBody()
       const requestKey = JSON.stringify(requestBody)
-      const seq = ++preflightSeq.current
       const res = await api.broadcasts.preflight(requestBody)
       // 遅れて届いた古い要求の応答で、新しい確認を上書きしない。
       if (seq !== preflightSeq.current) return
       if (res.success) {
         setPreflightResult(res.data)
         setPreflightKey(requestKey)
-      } else if (!silent) setError(res.error)
+        setPreflightStatus('ready')
+      } else {
+        setPreflightStatus('error')
+        if (!silent) setError(res.error)
+      }
     } catch {
+      if (seq !== preflightSeq.current) return
+      setPreflightStatus('error')
       if (!silent) setError('確認できませんでした')
     }
   }
@@ -1777,7 +1804,7 @@ export default function BroadcastForm({
     **0人と書かない。**「除外なし」と「数えられない」は別のこと。
     理由はある分だけ並べる（ブロック・非表示・宛先不明・重複）。
   */
-  const exclusionNote = preflight?.exclusions
+  const countedExclusionNote = preflight?.exclusions
     ? (() => {
         const ex = preflight.exclusions
         const parts = [
@@ -1789,6 +1816,9 @@ export default function BroadcastForm({
         return parts.length > 0 ? `${parts.join('・')}を除外` : '除外なし'
       })()
     : preflight?.warnings?.find((w) => w.message.includes('除いて'))?.message ?? null
+  const exclusionNote = excludeTagId
+    ? `タグ「${tags.find((tag) => tag.id === excludeTagId)?.name ?? '選択したタグ'}」を除く ・ ${countedExclusionNote === '除外なし' ? 'その他の除外なし' : countedExclusionNote ?? '除外人数は未取得'}`
+    : countedExclusionNote
   const quota = preflight?.quota ?? null
   const quotaAvailable = quota?.state === 'available'
   const quotaInsufficient = quota?.state === 'insufficient'
@@ -1812,12 +1842,8 @@ export default function BroadcastForm({
   const scheduledLabel = sendMode === 'scheduled' && scheduledDate
     ? `${scheduledDate.replace(/-/g, '/')} ${scheduledTime}${Number(spreadMinutes) > 0 ? `（${spreadMinutes}分かけて配信）` : ''}`
     : null
-  /*
-   * 「今すぐ配信」はここでは送らない。下書きとして保存し、詳細画面の
-   * 送信ボタンで実行する。**保存と送信をひとつの押下に見せない**ため、
-   * 日時の欄には「今すぐ」と次の操作場所を書く。
-   */
-  const sendWhenLabel = scheduledLabel ?? (sendMode === 'now' ? '今すぐ（保存後に詳細画面で送信）' : null)
+  // 今すぐ送ると予約を分け、確定前に小窓で対象と本文を読み合わせる。
+  const sendWhenLabel = scheduledLabel ?? (sendMode === 'now' ? '今すぐ（確認してから送信）' : null)
   const unconfirmedCount = preflight
     ? (preflight.warnings ?? []).filter((w) => w.level === 'warning').length
       + (testResult?.kind === 'success' ? 0 : 1)
@@ -1908,6 +1934,7 @@ export default function BroadcastForm({
         const needsFix = !filled && currentStep === 'confirm'
         return {
           ...step,
+          label: ({ basic: '基本設定', audience: '配信対象', message: 'メッセージを作成', schedule: '送信設定', confirm: '最終確認' })[step.key],
           state: (needsFix ? 'attention' : filled ? 'done' : 'todo') as 'done' | 'todo' | 'attention',
           // 段ごとの画面にいるときは、済み・要修正の段を押すとその段へ移る。
           onSelect: (filled || needsFix) && onStepChange ? () => goToStep(step.key) : undefined,
@@ -1955,7 +1982,7 @@ export default function BroadcastForm({
 
   /*
    * 二者承認の出し分け（設計 A-1・A-4）。人数は配信前チェックの数だけを使う。
-   * 境目が読めないときは承認なしの従来どおりに進める（送る直前に口が守る）。
+   * 5手順の作成画面では、設定が読めるまで送信の確定を止める。
    */
   const needsApproval = audienceCount !== null
     && approvalConfig !== null
@@ -1966,6 +1993,8 @@ export default function BroadcastForm({
     && Number(approvalCountInput) === audienceCount
 
   const save = async () => {
+    if (saving || submittingRef.current) return
+    if (currentStep && approvalConfigState !== 'ready') { setError('承認の設定を確認できません。確認画面を開き直してください'); return }
     const validationError = validate(); if (validationError) { setError(validationError); return }
     if (needsApproval && !needsApprovalSingle && approverId === '') {
       setError('承認をお願いする人を選んでください')
@@ -1975,6 +2004,7 @@ export default function BroadcastForm({
       setError('人数を入れて一致させてください')
       return
     }
+    submittingRef.current = true
     setSaving(true); setError('')
     const requestAccountId = selectedAccountIdRef.current || null
     try {
@@ -1997,15 +2027,24 @@ export default function BroadcastForm({
           return
         }
       }
+      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
+      if (currentStep && sendMode === 'now' && (!needsApproval || needsApprovalSingle)) {
+        const sent = await api.broadcasts.send(saved.id, needsApprovalSingle ? { confirmedRecipientCount: Number(approvalCountInput) } : undefined)
+        if ((selectedAccountIdRef.current || null) !== requestAccountId) return
+        if (!sent.success) { setError(sent.error); return }
+        setConfirmOpen(false)
+        onSuccess(sent.data)
+        return
+      }
       setConfirmOpen(false)
       // 単頁の保存でも知らせを出す。予約の申込みは遷移先が状態を出すので出さない。
       if (!scheduledAtIso()) notifyToast('下書きを保存しました。')
       onSuccess(saved)
-    } catch {
+    } catch (caught) {
       // R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return
-      setError('下書きを保存できませんでした')
-    } finally { setSaving(false) }
+      setError(describeSaveFailure(caught))
+    } finally { submittingRef.current = false; setSaving(false) }
   }
 
   /*
@@ -2017,7 +2056,7 @@ export default function BroadcastForm({
   if (draftParam) {
     if (draftError) {
       return (
-        <div className="broadcast-form-v6 mb-8">
+        <div className={styles.root}>
           <div className="rounded-card border border-hairline bg-canvas p-8 text-center">
             <p className="text-ink text-sm font-semibold">{draftError}</p>
             <div className="mt-4 flex items-center justify-center gap-3">
@@ -2038,25 +2077,16 @@ export default function BroadcastForm({
     }
   }
 
-  return <div className="broadcast-form-v6 mb-8" data-design-node={v8 ? 'FU2aU' : undefined}>
-    {currentStep ? (
-      <Link href="/broadcasts" className="mb-5 inline-flex text-sm font-semibold text-action hover:underline">
-        ← 一斉配信一覧
-      </Link>
-    ) : (
-      <div data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-ink text-2xl font-bold">一斉配信の作成</h2>
-          <p className="text-ink-faint mt-1 text-sm leading-relaxed">
-            送る相手・送る内容・送る時間を決めます。配信する前に、右側のチェックがすべて緑になっているか確認してください。
-          </p>
-        </div>
-        <Button variant="secondary" className="text-ink-secondary px-4 py-2 h-auto whitespace-normal" onClick={() => guarded(onCancel)}>
-          一覧に戻る
-        </Button>
+  return <div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
+    <header className={styles.header}>
+      <div className={styles.heading}>
+        <Button variant="secondary" className={styles.textButton} size="compact" onClick={() => guarded(onCancel)}>← 一斉配信一覧</Button>
+        <h2>一斉配信を作る</h2>
+        <p aria-live="polite">{draftStatusLabel || '下書き・未保存'}</p>
       </div>
-    )}
-    <BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} />
+      <div className={styles.stepRail}><BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} /></div>
+      <Button ref={previewToggleRef} aria-expanded={previewOpen} aria-controls="broadcast-line-preview" className={styles.previewToggle} onClick={() => setPreviewOpen(true)}><Eye size={14} aria-hidden /> LINEの見え方</Button>
+    </header>
     {/*
       R580: 保存を押した段で理由を示す。失敗の帯は1画面に1つまでなので、
       段ごとに分かれているときはここだけに出し、メッセージの段の中の帯は
@@ -2080,12 +2110,8 @@ export default function BroadcastForm({
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
       </p>
     ) : null}
-    {/* ★V7 sTJsh §5: 下書きの状態を薄い字で常に示す（未保存→保存中→保存済み）。 */}
-    {draftStatusLabel ? (
-      <p className="text-ink-faint mt-1.5 text-xs" aria-live="polite">{draftStatusLabel}</p>
-    ) : null}
-    <div className="mt-2.5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-      <div className={`min-w-0 space-y-5 ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
+    <div className={styles.body}>
+      <div className={`${styles.input} ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
@@ -2107,62 +2133,9 @@ export default function BroadcastForm({
             </section>
           </section>
         ) : null}
-        <section id="broadcast-step-basic" className={`${shows('basic') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-card`}>
-          <div className="mb-4">
-            <h3 className="text-lg font-bold text-ink">基本設定</h3>
-            <p className="mt-1 text-sm text-ink-faint">管理名と保存先を設定します。</p>
-          </div>
-          <div className="broadcast-basic-fields grid gap-4">
-            <label className="block">
-              <span className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-ink text-sm font-bold">配信名<RequiredBadge /></span>
-                {/* 設計 `zZ9fA` の「14 / 60文字」。上限に当たってから気づくと書き直しになる。 */}
-                <span className={`text-xs tabular-nums ${title.trim().length > TITLE_MAX ? 'text-danger' : 'text-ink-faint'}`}>
-                  {title.trim().length} / {TITLE_MAX}文字
-                </span>
-              </span>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className="border-hairline rounded-control mt-2 w-full border px-3 py-2.5 text-sm" />
-            </label>
-            <label className="block">
-              <span className="text-ink block text-sm font-bold">フォルダ</span>
-              <Select
-                aria-label="フォルダ"
-                value={folderId}
-                onChange={setFolderId}
-                options={[
-                  { value: '', label: '未分類' },
-                  ...folders.map((f) => ({ value: f.id, label: f.name })),
-                ]}
-                size="full"
-              />
-            </label>
-          </div>
-          <label className="mt-4 block">
-            <span className="flex items-center justify-between gap-2 text-sm font-bold text-ink">
-              <span>社内メモ <span className="ml-1 rounded-mini bg-canvas-sunken px-1.5 py-0.5 text-xs font-normal text-ink-faint">任意</span></span>
-              <span className="text-xs font-normal text-ink-faint">友だちには表示されません</span>
-            </span>
-            <textarea
-              aria-label="社内メモ"
-              value={internalMemo}
-              onChange={(event) => setInternalMemo(event.target.value)}
-              rows={3}
-              className="border-hairline rounded-control mt-2 w-full resize-none border px-3 py-2.5 text-sm"
-              placeholder="配信の目的や運用メモ"
-            />
-          </label>
-        </section>
-        {shows('basic') && (
-          <>
-            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
-              <h3 className="text-lg font-bold text-ink">配信方法</h3>
-              <p className="mt-1 text-xs text-ink-faint">新規作成・テンプレート・過去の配信の複製から選べます。</p>
-              {/*
-                #999 DEEP-02: 配信方法は1つだけ選ぶ群。●・○の文字を置いた
-                button ではなく、共通 RadioCard（本物の input[type=radio]）を
-                使う。群名は見出しと同じ「配信方法」を legend へ渡す。
-              */}
-              <RadioCardGroup legend="配信方法" className="mt-4 grid gap-3 md:grid-cols-3">
+        <section id="broadcast-step-basic" className={shows('basic') ? styles.section : 'hidden'}>
+          <h3>配信方法</h3>
+              <RadioCardGroup legend="配信方法" className={styles.methodCards}>
                 {([
                   ['new', '新しいメッセージを作成', 'テキスト・画像・ボタンを組み合わせて一から作ります。'],
                   ['template', 'テンプレートを選択', '保存済みテンプレートを呼び出して手直しします。'],
@@ -2190,57 +2163,29 @@ export default function BroadcastForm({
                   />
                 ))}
               </RadioCardGroup>
-            </section>
-
-            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h3 className="text-lg font-bold text-ink">最近の配信</h3>
-                  <p className="mt-1 text-xs text-ink-faint">「過去の配信を複製」を選ぶと、ここから元にする配信を選べます。</p>
-                </div>
-                <Link href="/broadcasts" className="text-xs font-semibold text-action hover:underline">一斉配信の一覧を見る</Link>
-              </div>
-              <div className="mt-4 overflow-hidden rounded-control border border-hairline">
-                {recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
-                  <div key={broadcast.id} className="broadcast-recent-row grid items-center gap-3 border-b border-hairline px-3 py-2.5 text-xs last:border-b-0">
-                    <div className="min-w-0"><p className="truncate font-bold text-action" title={broadcast.title}>{broadcast.title}</p><p className="truncate text-ink-faint">{typeLabel(broadcast.messageType)} 1通</p></div>
-                    <span className="text-ink-secondary">{broadcast.status === 'sent' ? '送信済み' : broadcast.status === 'scheduled' ? '予約済み' : '下書き'}</span>
-                    <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '未設定'}</span>
-                    <button type="button" className="text-left font-semibold text-action hover:underline" onClick={() => duplicateRecent(broadcast)}>複製する</button>
-                  </div>
-                )) : <p className="p-5 text-sm text-ink-faint">最近の配信はまだありません。</p>}
-              </div>
-            </section>
-          </>
-        )}
-        <section id="broadcast-step-audience" className={`${shows('audience') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-card`}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            {/*
-              番号は上の段（STEP 1〜5）に合わせる。**本文だけ別の番号を振らない。**
-              以前は 1・3・2 と振ってあり、画面には「1. 送る相手 → 3. 送る内容 →
-              2. 送る時間」の順に並んでいた。**番号が飛んで見えるので、
-              間の節を見落としたと読まれる。** 設計 `zZ9fA` の段は
-              基本設定 → 対象者 → メッセージ → 送信設定 → 確認。
-            */}
-            <div>
-              <h3 className="text-lg font-bold text-ink">配信対象</h3>
-              <p className="mt-1 text-sm text-ink-faint">全員または詳細条件から、実際に送れる友だちを確認します。</p>
-            </div>
-            <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
-              <p className="text-xs font-medium text-accent-deep">送信対象</p>
-              <p className="text-hero text-accent-deep">
-                {formatNumber(audienceDisplayCount)}
-                <span className="ml-1 text-sm font-normal">人</span>
-              </p>
-            </div>
+          <label className={styles.nameField}>
+            <span className={styles.labelRow}><span className="text-ink text-sm font-bold">配信名<RequiredBadge /></span><span className="text-xs text-ink-faint">{title.trim().length} / {TITLE_MAX}文字</span></span>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={styles.textInput} />
+            <small>友だちには表示されません。一覧で見分けるための名前です</small>
+          </label>
+          <div className={styles.basicFields}>
+            <label><span className={styles.labelRow}>フォルダ</span><Select aria-label="フォルダ" value={folderId} onChange={setFolderId} options={[{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.id, label: f.name }))]} size="full" /></label>
+            <label><span className={styles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません</HelpTip></span><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} className={styles.textInput} placeholder="配信の目的や運用メモ" /></label>
           </div>
-          {/*
-            3つのうち1つを選ぶ。丸ボタンを横に並べていた頃は、選んでいない側に
-            何が入るのか読めなかった。シナリオの「いつ開始する？」と同じ形に
-            そろえて、それぞれに説明を付ける。
-          */}
-          {/* 4つある。3列だと3+1で折り返して最後の1つだけ浮くので、2列と4列で切り替える。 */}
-          <RadioCardGroup legend="配信対象" className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={styles.recentHeader}><h3>最近の配信</h3><Link href="/broadcasts">一斉配信の一覧を見る →</Link></div>
+          <div className={styles.recentList}>
+            {recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
+              <div key={broadcast.id} className={styles.recentRow}>
+                <Send size={14} aria-hidden /><span className={styles.recentName} title={broadcast.title}>{broadcast.title}</span>
+                <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '下書き'} ・ {broadcast.totalCount == null ? '—' : `${formatNumber(broadcast.totalCount)}人`}</span>
+                <Button size="compact" onClick={() => duplicateRecent(broadcast)}>複製する</Button>
+              </div>
+            )) : <p className="text-xs text-ink-faint">最近の配信はまだありません。</p>}
+          </div>
+        </section>
+        <section id="broadcast-step-audience" className={shows('audience') ? styles.section : 'hidden'}>
+          <h3>配信対象</h3>
+          <RadioCardGroup legend="配信対象" className={styles.audienceCards}>
             {TARGET_MODES.map((mode) => (
               <RadioCard
                 key={mode.value}
@@ -2361,41 +2306,22 @@ export default function BroadcastForm({
               <Button type="button" onClick={openConditionDialog}>条件を編集</Button>
             </div>
           </div>}
-          {preflight?.audience && (
-            <>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                {[
-                  ['条件一致', preflight.audience.matched, 'text-success'],
-                  ['送信可能', preflight.audience.sendable, 'text-action'],
-                  ['除外', preflight.exclusions?.total ?? 0, 'text-warning'],
-                ].map(([label, value]) => (
-                  <div key={String(label)} className="rounded-control border border-hairline bg-canvas-sunken p-3">
-                    <p className="text-xs font-medium text-ink-faint">{label}</p>
-                    <p className="text-ink mt-1 text-hero tabular-nums">{formatNumber(Number(value))}人</p>
-                  </div>
-                ))}
-              </div>
-              <Notice tone="info" className="mt-3">重複アカウントは1人として数え、配信直前に再計算します。</Notice>
-              <section className="mt-4 border-t border-hairline pt-4">
-                <h4 className="text-sm font-bold text-ink">対象プレビュー</h4>
-                <p className="mt-1 text-xs text-ink-faint">代表的な友だちを確認できます。</p>
-                <div className="mt-2 divide-y divide-hairline">
-                  {preflight.audience.representatives.map((friend) => (
-                    <div key={friend.friendId} className="flex items-center gap-3 py-3">
-                      {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="size-8 rounded-pill object-cover" /> : (
-                        <span className="flex size-8 items-center justify-center rounded-pill bg-accent-soft text-xs font-medium text-accent-deep">{friend.displayName?.slice(0, 1) ?? '—'}</span>
-                      )}
-                      <div><p className="text-sm font-semibold text-ink">{friend.displayName ?? '名前未登録'}</p><p className="text-xs text-ink-faint">{friend.summary}</p></div>
-                    </div>
-                  ))}
-                  {preflight.audience.representatives.length === 0 && <p className="py-3 text-xs text-ink-faint">表示できる友だちはいません。</p>}
-                </div>
-              </section>
-            </>
-          )}
+          <div className={styles.exclusion}>
+            <Checkbox checked onCheckedChange={() => {}} disabled>ブロック中の人を除く</Checkbox>
+            <small>ブロック中・非表示・宛先不明の友だちには送りません</small>
+          </div>
+          <label className={styles.excludeTag}><span className={styles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><Select aria-label="除くタグ" value={excludeTagId} onChange={setExcludeTagId} disabled={tagsStatus !== 'ready'} options={[{ value: '', label: '除外なし' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} size="full" /></label>
+          <div className={styles.exclusion}>
+            <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
+            <small>最近送った人を除く機能は、まだ使えません</small>
+          </div>
+          <div className={styles.audienceCount} aria-live="polite"><span><Send size={14} aria-hidden /> この条件で送る人数</span><strong className={audienceDisplayCount === 0 ? 'text-danger' : preflightStatus === 'error' ? 'text-warning' : ''}>{audienceDisplayCount !== null ? `${formatNumber(audienceDisplayCount)}人` : preflightStatus === 'loading' ? '数えています…' : '—人'}</strong></div>
+          {audienceDisplayCount === 0 ? <Notice tone="danger">この条件に当てはまる友だちがいません。条件を変えてください</Notice> : preflightStatus === 'error' ? <Notice tone="warn" action={<Button size="compact" onClick={() => void runPreflight()}>もう一度数える</Button>}>人数を数えられませんでした。送る前にもう一度数えてください</Notice> : preflightStatus === 'idle' ? <p className="text-xs text-ink-faint">対象とメッセージを入力すると人数を数えます</p> : null}
+          <Notice tone="info"><strong>対象の確認ポイント</strong><br />人数は送る直前にもう一度数え直します。ブロック中の人には送りません</Notice>
+          {preflight?.audience && <details className={styles.details}><summary>対象プレビュー・除外の内訳</summary><p className="text-xs text-ink-secondary">条件一致 {formatNumber(preflight.audience.matched)}人 ・ 送信可能 {formatNumber(preflight.audience.sendable)}人 ・ {exclusionNote ?? '除外 —'}</p>{preflight.audience.representatives.map((friend) => <Link key={friend.friendId} href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`} className="block text-xs text-action">{friend.displayName ?? '名前未登録'}　{friend.summary}</Link>)}</details>}
         </section>
         <div className={shows('message') ? 'contents' : 'hidden'}>
-        <section id="broadcast-step-message" className={`${showTemplatePicker ? 'hidden' : ''} border-hairline mb-3 rounded-card border bg-canvas p-5`}>
+        <section id="broadcast-step-message" className={showTemplatePicker ? 'hidden' : styles.section}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             {/*
               番号は**画面に出てくる順**。前は 1 → 3 → 2 と並んでいて、
@@ -2404,32 +2330,35 @@ export default function BroadcastForm({
               並べ替えではなく番号のほうを直す。
             */}
             <div>
-              <h3 className="text-lg font-bold text-ink">メッセージを作成</h3>
-              <p className="mt-1 text-xs text-ink-faint">外部サービスの配信形式に加え、musuboの拡張形式も選択できます。</p>
+              <h3>メッセージ（{bubbles.length} / {MAX_BUBBLES}）</h3>
+
             </div>
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className={`border-accent text-accent-deep rounded-control border px-3 py-1 text-xs font-medium hover:bg-accent-soft ${currentStep === 'message' ? 'hidden' : ''}`}
+              className={`border-accent text-accent-deep rounded-control border px-3 py-1 text-xs font-medium hover:bg-accent-soft `}
             >
               テンプレートから選ぶ
             </button>
           </div>
+        {!showTemplatePicker && bubbles.map((bubble, index) => (
+          <details key={bubble.id} className={styles.bubbleFrame} data-embedded={currentStep === 'message' || undefined} open={index === 0}>
+            <summary><span className={styles.bubbleNumber}>{index + 1}</span><span>{typeLabel(bubble.type)}</span>{currentStep === 'message' && <span className={styles.bubbleControls} onClick={(event) => { event.preventDefault(); event.stopPropagation() }}><Button size="compact" aria-label="上へ移動" disabled={index === 0} onClick={() => moveBubble(index, -1)}><ArrowUp size={12} aria-hidden /></Button><Button size="compact" aria-label="下へ移動" disabled={index === bubbles.length - 1} onClick={() => moveBubble(index, 1)}><ArrowDown size={12} aria-hidden /></Button><Button size="compact" aria-label="削除する" disabled={bubbles.length === 1} onClick={() => setBubbles((items) => items.filter((_, i) => i !== index))}><Trash2 size={12} aria-hidden /></Button></span>}</summary>
           <div
             className="mt-4 flex flex-wrap gap-2"
             role="tablist"
-            aria-label="メッセージ形式"
+            aria-label={`${index + 1}通目のメッセージ形式`}
             onKeyDown={(event) => moveMessageTypeTabFocus(event, document.activeElement)}
           >
             {MESSAGE_TYPE_TABS.map(([type, label], tabIndex) => {
-              const selected = type !== null && bubbles[0]?.type === type
+              const selected = type !== null && bubble.type === type
               /*
                 ロービング tabindex（WAI-ARIA tabs）: Tab キーで入れるのは
                 選択中のタブだけ。どれも選ばれていない（一覧に無い種類の
                 下書きを開いた等）ときは先頭へ寄せ、キーボードで入れない
                 状態を作らない。
               */
-              const selectedIndex = MESSAGE_TYPE_TABS.findIndex(([t]) => t !== null && t === bubbles[0]?.type)
+              const selectedIndex = MESSAGE_TYPE_TABS.findIndex(([t]) => t !== null && t === bubble.type)
               const focusable = selectedIndex >= 0 ? selected : tabIndex === 0
               return (
                 <button
@@ -2442,53 +2371,29 @@ export default function BroadcastForm({
                   data-active={selected || undefined}
                   aria-disabled={type === null || Boolean(type && UNSENDABLE_TYPES[type])}
                   title={type === null ? '紹介メッセージは現在利用できません' : UNSENDABLE_TYPES[type]}
-                  onClick={() => { if (type && !UNSENDABLE_TYPES[type]) updateBubble(0, emptyBubble(type)) }}
+                  onClick={() => { if (type && !UNSENDABLE_TYPES[type]) updateBubble(index, emptyBubble(type)) }}
                 >
                   {label}
                 </button>
               )
             })}
           </div>
-        {!showTemplatePicker && bubbles.map((bubble, index) => bubble.type === 'text' ? (
-          <TextBubbleEditor
-            key={bubble.id}
-            bubble={bubble}
-            index={index}
-            total={bubbles.length}
-            trackLinks={trackLinks}
-            embedded={currentStep === 'message'}
-            visualReference={visualQaAugustCampaign}
-            onTrackLinksChange={setTrackLinks}
-            onChange={(next) => updateBubble(index, next)}
-            onMove={(direction) => moveBubble(index, direction)}
-            onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))}
-          />
-        ) : (
-          <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
-        ))}
-        {/*
-          ボタンは配信全体で1組なので、編集欄はここに1つだけ置く。
-          各テキストの下に置いていた頃は、2通目を直すと全通に反映され、
-          個別設定に見えるのに共通設定だった（監査 R209）。
-        */}
-        {!showTemplatePicker && (
-          <MessageButtonsSection
+
+            {bubble.type === 'text' ? (
+              <TextBubbleEditor bubble={bubble} index={index} total={bubbles.length} trackLinks={trackLinks} embedded={currentStep === 'message'} visualReference={visualQaAugustCampaign} onTrackLinksChange={setTrackLinks} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />
+            ) : <BubbleEditor bubble={bubble} index={index} total={bubbles.length} assets={assets} assetsStatus={templateCandidatesStatus} accountId={selectedAccountId} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />}
+          {index === 0 && <MessageButtonsSection
             buttons={messageButtons}
             error={messageButtonsError(messageButtons)}
             onChange={setMessageButtons}
-          />
-        )}
+          />}
+          </details>
+        ))}
         {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
           <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加する</Button>
-          <Button type="button" onClick={() => setShowTemplatePicker(true)}>テンプレートから選ぶ</Button>
-          <Button type="button" disabled title="テンプレート保存の契約は未接続です"><Save size={15} aria-hidden /> 保存してテンプレート化する</Button>
+          <span className={styles.unavailable}><Button type="button" disabled><Save size={15} aria-hidden /> 保存してテンプレート化する</Button><small>テンプレートとして保存する機能は、まだ使えません</small></span>
         </div>}
         </section>
-        {/*
-          BC-02: 選択窓はエディタの節の**外側**に置く。内側にあった頃は
-          開くと親の節ごと hidden になり、どの入口からも一度も表示されなかった
-          （DOMには居るため既存テストは通っていた）。監査 #615。
-        */}
         {showTemplatePicker && (
           <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card">
             <div className="flex items-start justify-between gap-3">
@@ -2561,53 +2466,21 @@ export default function BroadcastForm({
             <div><h4 className="text-sm font-bold text-ink">配信後のアクション</h4>{currentStep !== 'message' && <p className="mt-1 text-xs text-ink-faint">配信後にタグ追加などを実行します。</p>}</div>
             <Link href="/common-actions" className="text-xs font-semibold text-action hover:underline">＋ アクションを追加する</Link>
           </div>
-          {currentStep === 'message' ? (
-            <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink-secondary">
-              <Zap size={17} className="text-ink-secondary" aria-hidden />
-              {publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'}
-            </p>
-          ) : <div className="mt-3 block text-xs font-medium text-ink-secondary">実行する公開済みアクション
-            <Combobox
-              aria-label="配信後のアクション"
-              placeholder="実行しない"
-              value={afterActionVersionId}
-              onChange={setAfterActionVersionId}
-              options={publishedActions.map((action) => ({ value: action.versionId, label: `${action.name}（第${action.version}版）` }))}
-              className="mt-2 w-full font-normal"
-            />
-          </div>}
-          {currentStep !== 'message' && afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
+          <div className="mt-3 block text-xs font-medium text-ink-secondary">実行する公開済みアクション
+            <Combobox aria-label="配信後のアクション" placeholder="実行しない" value={afterActionVersionId} onChange={setAfterActionVersionId} options={[{ value: '', label: '実行しない' }, ...publishedActions.map((action) => ({ value: action.versionId, label: `${action.name}（第${action.version}版）` }))]} className="mt-2 w-full font-normal" />
+          </div>
+          {!afterActionVersionId && <p className="mt-2 text-xs text-ink-faint">実行しない</p>}
+          {afterActionVersionId && <p className="mt-2 text-xs text-success">✓ 配信完了後に、選んだ公開版を実行します。</p>}
         </section>}
-        {/*
-          2通目以降はまだ実際には送れない（送信が「複数吹き出しの実配信は
-          次フェーズです」で断る）。押した時点で分かるようにする。保存して
-          予約まで進んでから、配信の時刻に断られるのがいちばん困る。
-        */}
-        {bubbles.length > 1 && (
-          <Notice tone="warn">
-            2通目以降はまだ配信できません。下書きとして残せますが、送信・予約はできません。
-            いまは1通にまとめるか、配信を分けてください。
-          </Notice>
-        )}
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
-        <section id="broadcast-step-schedule" className={`${shows('schedule') ? '' : 'hidden'} border-hairline mb-3 rounded-card border bg-canvas p-5`}>
-          <h3 className="text-lg font-bold text-ink">送信設定</h3>
-          <p className="mb-4 mt-1 text-sm text-ink-faint">配信する日時と、LINEの集計方法を設定します。</p>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <Button variant="secondary" className={(`rounded-card border p-3 text-left text-sm ${
-                sendMode === 'now' ? 'border-accent bg-accent-soft' : 'border-hairline'
-              }`) + ' h-auto whitespace-normal'} type="button" onClick={() => setSendMode('now')} aria-pressed={sendMode === 'now'}>
-              今すぐ配信
-            </Button>
-            <Button variant="secondary" className={(`rounded-card border p-3 text-left text-sm ${
-                sendMode === 'scheduled' ? 'border-accent bg-accent-soft' : 'border-hairline'
-              }`) + ' h-auto whitespace-normal'} type="button" onClick={() => setSendMode('scheduled')} aria-pressed={sendMode === 'scheduled'}>
-              日時を指定して予約
-            </Button>
-            {/* 「友だちごとの最適な時間」は開封の時間帯を持っていないので押し口を出さない。 */}
-          </div>
-
+        <section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
+          <h3>配信日</h3>
+          <RadioCardGroup legend="配信日" className={styles.methodCards}>
+            <RadioCard name="broadcast-send-mode" value="now" checked={sendMode === 'now' && Number(spreadMinutes) === 0} onChange={() => { setSendMode('now'); setSpreadMinutes('0') }} title="今すぐ配信" note="最終確認で送ると、すぐに届きます" />
+            <RadioCard name="broadcast-send-mode" value="scheduled" checked={sendMode === 'scheduled'} onChange={() => setSendMode('scheduled')} title="日時を指定して予約" note="決めた日時に送ります" />
+            <RadioCard name="broadcast-send-mode" value="spread" checked={sendMode === 'now' && Number(spreadMinutes) > 0} onChange={() => { setSendMode('now'); setSpreadMinutes(Number(spreadMinutes) > 0 ? spreadMinutes : '30') }} title="時間を分散して送る" note="少しずつ送り、集中を避けます" />
+          </RadioCardGroup>
           {sendMode === 'scheduled' && (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
@@ -2673,14 +2546,13 @@ export default function BroadcastForm({
         0 なら一気に送ります。途中で止まっても、続きから送り直します（同じ人に二度は届きません）。
       </p>
           </div>
-          <div className="border-hairline mt-4 border-t pt-4">
-            <p className="text-sm font-bold text-ink">開封・クリックの集計</p>
-            <p className="mt-1 text-xs text-ink-faint">
-              {quota?.monthlyUsed !== null && quota?.monthlyUsed !== undefined && quota.monthlyLimit !== null
-                ? `LINEの月間送信枠を使います（今月 ${formatNumber(quota.monthlyUsed)} / ${formatNumber(quota.monthlyLimit)} 通）。`
-                : 'LINEの月間送信枠を確認しています。'}
-            </p>
+          <div className={styles.quota}>
+            <div className={styles.quotaHead}><strong>送信枠</strong><HelpTip label="送信枠の説明">LINE公式アカウントの月間送信枠です。テスト送信も枠を使用します</HelpTip><span>今月 残り {quota?.remaining == null ? '—' : formatNumber(quota.remaining)}通</span></div>
+            <div className={styles.quotaTrack}><div style={{ width: quota?.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div>
+            <p>{quota?.monthlyUsed == null || quota.monthlyLimit == null ? '送信枠は配信前チェックで確認します' : `使った ${formatNumber(quota.monthlyUsed)} + 今回 ${formatNumber(quota.planned)} / 上限 ${formatNumber(quota.monthlyLimit)}通`}</p>
+            {quotaInsufficient && <p className="text-danger">送信枠が不足しています。配信する人数を減らしてください</p>}
           </div>
+          <Checkbox checked={measureOpens} onCheckedChange={setMeasureOpens}>開封数の集計を取る</Checkbox>
           {sendMode === 'scheduled' && (
             <section className="mt-4 rounded-control border border-hairline p-4">
               <h4 className="text-sm font-bold text-ink">配信スケジュール</h4>
@@ -2699,74 +2571,34 @@ export default function BroadcastForm({
           )}
         </section>
 
-    <div id="broadcast-step-confirm" className={shows('confirm') ? 'space-y-3' : 'hidden'}>
-      <section className="rounded-card border border-hairline bg-canvas p-5" data-design-node="vW4Es">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-bold text-ink">配信前チェック</h3>
-            {!visualQaAugustCampaign && <p className="mt-1 text-xs text-ink-faint">警告が残っている場合は、内容を確認してから配信してください。</p>}
-          </div>
-          {!visualQaAugustCampaign && <Button type="button" onClick={() => setPreflightDialogOpen(true)}>配信前チェックを確認</Button>}
-        </div>
-        <ul className="mt-4 space-y-2 text-sm">
-          <li className="flex items-center gap-2"><span className="text-success">✓</span><span>配信対象が設定されています</span></li>
-          {/* 「今すぐ」は日時を持たないので未設定扱いしない。予約と混同しないよう別の文にする。 */}
-          <li className="flex items-center gap-2"><span className={scheduledLabel || sendMode === 'now' ? 'text-success' : 'text-warning'}>{scheduledLabel || sendMode === 'now' ? '✓' : '!'}</span><span>{sendMode === 'now' ? '今すぐ配信を選んでいます' : '配信日時が設定されています'}</span></li>
-          <li className="flex items-center gap-2"><span className={testResult?.kind === 'success' ? 'text-success' : testResult ? 'text-danger' : 'text-warning'}>{testResult?.kind === 'success' ? '✓' : '!'}</span><span>{testResult?.kind === 'success' ? 'テスト送信が完了しています' : testResult ? 'テスト送信で届かなかった宛先があります' : 'テスト送信がまだです'}</span></li>
-          <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${formatNumber(Math.max(0, quota.planned - (quota.remaining ?? 0)))}通不足しています` : quotaAvailable ? `送信枠は残り${formatNumber(quota.remaining)}通です` : '送信枠を確認できません'}</span></li>
-        </ul>
-        {!visualQaAugustCampaign && <Checkbox
-          checked={previewConfirmed}
-          onCheckedChange={setPreviewConfirmed}
-          className="border-hairline mt-4 border-t pt-4"
-        >{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox>}
-      </section>
-
-      {/*
-        最終確認（IDEA-06）。対象数・除外理由・計算時刻・送信枠・把握できる
-        重複配信をここへまとめる。値はどれも配信前チェックが返したものだけ。
-        「今すぐ配信」は予約ではなく下書き保存＋詳細画面での送信なので、
-        説明文と押すボタンの呼び方を分ける（保存・予約・今すぐ配信を混同しない）。
-      */}
-      <section className="rounded-card border border-hairline bg-canvas p-5" data-design-node="FpgxH">
-        <h3 className="text-lg font-bold text-ink">最終確認</h3>
-        <p className="mt-1 text-xs text-ink-faint">
-          {sendMode === 'scheduled'
-            ? '送信対象・日時・内容を確認して予約します。'
-            : '送信対象・内容を確認して保存します。「今すぐ配信」は保存後に詳細画面から送信します。'}
-        </p>
-        <dl className="mt-5 divide-y divide-hairline text-sm">
-          {[
-            ['管理名', title.trim() || '（未入力）'],
-            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
-            ['除外', visualQaAugustCampaign ? 'ブロック 12人を除外' : exclusionNote ?? '—'],
-            ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
-            ['送信枠', visualQaAugustCampaign ? '残り 8,700 / 10,000通' : quotaNote ?? '—'],
-            ['計算時刻', visualQaAugustCampaign ? '8/23 15:42' : evaluatedAtLabel ?? '—'],
-            ['メッセージ', `${typeLabel(bubbles[0]?.type ?? 'text')} ${bubbles.length}通`],
-            ['開封計測', measureOpens ? '有効' : '無効'],
-            ['配信後', visualQaAugustCampaign ? 'タグ「配信済み」を追加' : publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
-          ].map(([label, value]) => (
-            <div key={label} className={`flex items-center justify-between gap-6 ${visualQaAugustCampaign ? 'py-5' : 'py-4'}`}>
-              <dt className="shrink-0 font-semibold text-ink-faint">{label}</dt>
-              <dd className="min-w-0 truncate text-right font-bold text-ink" title={value}>{value}</dd>
-            </div>
-          ))}
-        </dl>
-        {concurrentBroadcasts.length > 0 && (
-          <Notice tone="warn" className="mt-3">
-            <p className="font-semibold">同じ時刻の前後1時間に別の予約配信があります。対象が重なる場合は間隔を空けてください。</p>
-            <ul className="mt-1 list-disc pl-4">
-              {concurrentBroadcasts.map((item) => <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>)}
-            </ul>
-          </Notice>
-        )}
-        <Notice tone="warn" className="mt-3">
-          {sendMode === 'scheduled'
-            ? '予約後も配信開始前までは編集・取消できます。'
-            : '下書きとして保存します。送信は詳細画面で実行し、送信前にもう一度確認できます。'}
-        </Notice>
-      </section>
+    <div id="broadcast-step-confirm" className={shows('confirm') ? styles.section : 'hidden'}>
+      <h3>配信前チェック</h3>
+      <div className={styles.checkList}>
+        {([
+          { key: 'basic', label: '配信名', value: title.trim() || '配信名を入力してください', done: Boolean(title.trim()) && title.trim().length <= TITLE_MAX, move: '基本設定へ戻る' },
+          { key: 'audience', label: '配信対象', value: `${confirmAudienceLabel} ・ ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`} ・ ${exclusionNote ?? '除外の内訳は未取得'}`, done: canConfirm, move: '対象を一覧で見る' },
+          { key: 'message', label: 'メッセージ', value: `${bubbles.length}件 ・ ${bubblesError(bubbles) || (previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です')}`, done: !bubblesError(bubbles) && previewConfirmed, move: 'メッセージへ戻る' },
+          { key: 'schedule', label: '送信設定', value: `${sendWhenLabel ?? '未設定'} ・ ${quotaNote ?? '送信枠は未確認'}`, done: sendMode === 'now' || Boolean(scheduledDate && scheduledTime), move: '送信設定へ戻る' },
+        ] as const).map((row) => <div className={styles.checkRow} key={row.key}>
+          {row.done ? <CheckCircle2 size={18} className="text-success" aria-hidden /> : <AlertTriangle size={18} className="text-warning" aria-hidden />}
+          <div><strong>{row.label}</strong><p>{row.value}</p></div><Button variant="secondary" className={styles.textButton} size="compact" onClick={() => goToStep(row.key)}>{row.move}</Button>
+        </div>)}
+      </div>
+      <Notice tone={unconfirmedCount || !canConfirm ? 'warn' : 'info'} action={<Button variant="secondary" className={styles.textButton} size="compact" onClick={() => setPreflightDialogOpen(true)}>配信前チェックを確認</Button>}>
+        {audienceCount === 0 ? 'この条件に当てはまる友だちがいません。条件を変えてください' : audienceCount === null ? '人数を確認してから送れます' : unconfirmedCount ? `${unconfirmedCount}件の確認が残っています` : '配信する内容を確認してください'}
+      </Notice>
+      <details className={styles.details}>
+        <summary>最終確認の内訳</summary>
+        <dl className={styles.confirmDetails}>{[
+          ['対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
+          ['除外', exclusionNote ?? '—'], ['除くタグ', tags.find((tag) => tag.id === excludeTagId)?.name ?? 'なし'],
+          ['配信日時', sendWhenLabel ?? '未設定'], ['送信枠', quotaNote ?? '—'], ['計算時刻', evaluatedAtLabel ?? '—'],
+          ['メッセージ', `${bubbles.length}通`], ['開封計測', measureOpens ? '有効' : '無効'],
+          ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
+        ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+      </details>
+      {concurrentBroadcasts.length > 0 && <Notice tone="warn">同じ時刻の前後1時間に別の予約配信があります。対象が重なる場合は間隔を空けてください<ul>{concurrentBroadcasts.map((item) => <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>)}</ul></Notice>}
+      <p className="text-xs text-ink-faint">{sendMode === 'scheduled' ? '予約後も配信開始前までは編集・取消できます。' : '「今すぐ送る」で確認の小窓を開き、そこで送ると友だちに届きます。送信は取り消せません。'}</p>
     </div>
     {/*
       **上限を超えたまま保存・送信させない。**
@@ -2786,171 +2618,32 @@ export default function BroadcastForm({
       </Notice>
     )}
       </div>
-      {/*
-        xl で右列を追従させるとき、列の中身（LINEプレビュー + 操作）が
-        表示域より高いと、下端の「テスト送信」「配信イメージを見る」が
-        72px の下部追従バーに常時被って押せなくなる（#642）。列自体を
-        バーに届かない高さへ抑えて中をスクロール可能にし、下端の操作は
-        常にバーの上まで引き出せる形にする。
-      */}
-      <aside className="xl:sticky xl:top-6 xl:h-fit xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto">
-        {showTemplatePicker ? (
-          <div className="space-y-3">
-            <section className="rounded-card border border-hairline bg-canvas p-5">
-              <h3 className="text-lg font-bold text-ink">設定サマリー</h3>
-              <p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p>
-              <dl className="mt-4 divide-y divide-hairline text-sm">
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">選択中</dt><dd className="font-medium text-ink">{selectedTemplate?.name ?? '未選択'}</dd></div>
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">更新日</dt><dd className="font-medium text-ink">{selectedTemplate?.updatedAt ? formatDateTime(selectedTemplate.updatedAt) : '—'}</dd></div>
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">使用回数</dt><dd className="font-medium text-ink">{selectedTemplate?.usageCount === undefined ? '—' : `${selectedTemplate.usageCount}回`}</dd></div>
-              </dl>
-            </section>
-            <section className="rounded-card border border-hairline bg-canvas p-5">
-              <h3 className="text-lg font-bold text-ink">メッセージプレビュー</h3>
-              <p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。差し込みの項目は、配信時に受け取る人ごとの値へ置き換わります。</p>
-              <div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">
-                {selectedTemplate
-                  ? (() => {
-                      // 挿入前に全文を確かめる（IDEA-11）。吹き出しと同じ部品で
-                      // 出すので、改行・写真・カード型も実際の見え方に近い。
-                      const bubble = messageTemplateToBubble(selectedTemplate)
-                      return bubble
-                        ? <BubblePreview bubble={bubble} />
-                        : <p className="whitespace-pre-wrap break-words">{selectedTemplate.messageContent}</p>
-                    })()
-                  : 'テンプレートを選ぶと表示されます'}
-              </div>
-            </section>
-            <div className="grid grid-cols-2 gap-2"><Button type="button" onClick={() => void openTestDialog()}>テストを送る</Button><Button type="button" disabled>配信イメージを見る</Button></div>
-          </div>
-        ) : preflightDialogOpen ? (
-          <div className="space-y-3">
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-medium text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-medium text-ink">{formatNumber(audienceCount)}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-medium text-danger">不足 {quota && quota.remaining !== null ? formatNumber(Math.max(0, quota.planned - quota.remaining)) : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-medium text-danger">要確認</dd></div></dl></section>
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">メッセージプレビュー</h3><p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。</p><div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">8月限定キャンペーンのお知らせです。</div></section>
-            <div className="grid grid-cols-2 gap-2"><Button type="button">テストを送る</Button><Button type="button" disabled>配信イメージを見る</Button></div>
-          </div>
-        ) : currentStep === 'confirm' ? (
-          <div className="space-y-3">
-            {/*
-              * BC-03: 実際に決めた値だけを出す。固定の日時・人数・
-              * タグ名を出すと、対象0人や未設定でも「実行される」
-              * ように見えてしまう。
-              */}
-            <LinePreview
-              caption={visualQaAugustCampaign ? '2026/08/24 10:00 に届きます'
-                : scheduledLabel ? `${scheduledLabel} に届きます`
-                : '保存後、詳細画面から送信します'}
-            >
-              <div className="flex flex-col gap-3 text-ink">
-                {bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}
-              </div>
-            </LinePreview>
-            <section className="rounded-card border border-hairline bg-canvas p-4">
-              <h3 className="font-bold text-ink">設定内容</h3>
-              <dl className="mt-3 divide-y divide-hairline text-xs">
-                {[
-                  ['配信対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
-                  ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
-                  ['送信数', visualQaAugustCampaign ? '1,213通' : audienceCount === null ? '—' : `${formatNumber(audienceCount)}通`],
-                  ['配信後', visualQaAugustCampaign ? 'タグ「配信済み」を追加' : publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'],
-                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-4"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-medium text-ink">{value}</dd></div>)}
-              </dl>
-            </section>
-          </div>
-        ) : currentStep === 'audience' ? (
-          <div className="space-y-4">
-            <section className="rounded-card border border-hairline bg-canvas p-5">
-              <h3 className="text-sm font-bold text-ink">設定内容</h3>
-              <dl className="mt-3 space-y-3 text-sm">
-                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-medium text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${formatNumber(audienceDisplayCount)}人`}</dd></div>
-                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-medium text-ink">未設定</dd></div>
-                <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-medium text-ink">{bubbles.length}通</dd></div>
-              </dl>
-            </section>
-            <section className="rounded-card border border-hairline bg-canvas p-5">
-              <h3 className="text-sm font-bold text-ink">対象の確認ポイント</h3>
-              <p className="mt-2 text-xs text-ink-faint">送信できない友だちを事前に除外します。</p>
-              <ul className="mt-3 space-y-2 text-xs text-ink-secondary"><li>✓ ブロック・非表示を除外</li><li>✓ 同一人物の重複を除外</li><li>✓ 配信停止中を除外</li></ul>
-            </section>
-          </div>
-        ) : (
-        <>
-        {currentStep === 'schedule' ? (
-          <div className="space-y-3">
-            <section className="rounded-card border border-hairline bg-canvas p-5">
-              <h3 className="text-sm font-bold text-ink">設定内容</h3>
-              <dl className="mt-3 divide-y divide-hairline text-xs">
-                {[
-                  ['配信対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
-                  ['配信日時', scheduledLabel ?? '未設定'],
-                  ['送信数', `${bubbles.length}通`],
-                  ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
-                ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-medium text-ink">{value}</dd></div>)}
-              </dl>
-            </section>
-            <section className="rounded-card border border-hairline bg-canvas p-5">
-              <h3 className="text-sm font-bold text-ink">送信枠</h3>
-              <p className="mt-1 text-xs text-ink-faint">現在の枠内で送信できるか確認します。</p>
-              {quota ? <><p className="mt-3 text-sm font-semibold text-ink">使用予定　{formatNumber(quota.planned)} / {formatNumber(quota.monthlyLimit)}通</p><div className="mt-2 h-2 overflow-hidden rounded-pill bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-medium ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${formatNumber(Math.max(0, quota.planned - (quota.remaining ?? 0)))}通` : `残り ${formatNumber(quota.remaining)}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
-            </section>
-            <LinePreview><div className="rounded-control bg-canvas p-4 text-sm text-ink"><BubblePreview bubble={bubbles[0]} buttons={messageButtons} /></div></LinePreview>
-          </div>
-        ) : currentStep === 'basic' ? (
-          <div className="space-y-3">
-            <section className="rounded-card border border-hairline bg-canvas p-5">
-              <h3 className="text-sm font-bold text-ink">設定内容</h3>
-              <dl className="mt-3 divide-y divide-hairline text-xs">
-                {[['配信対象', '未設定'], ['配信日時', '未設定'], ['送信数', '—'], ['配信後', '未設定']].map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between gap-3 py-3"><dt className="text-ink-faint">{label}</dt><dd className="font-medium text-ink">{value}</dd></div>
-                ))}
-              </dl>
-            </section>
-            <LinePreview caption="配信日時は STEP 4 で設定します">
-              <div className="rounded-control bg-canvas p-4 text-sm leading-relaxed text-ink">
-                メッセージは STEP 3 で作成します。テンプレートや過去の配信を選ぶと、ここに内容が入ります。
-              </div>
-            </LinePreview>
-            <div className="grid grid-cols-2 gap-2">
-              <Button type="button" disabled>テストを送る</Button>
-              <Button type="button" disabled>配信イメージを見る</Button>
-            </div>
-          </div>
-        ) : currentStep === 'message' ? (
-          <div className="space-y-3">
-            <LinePreview
-              caption={visualQaAugustCampaign ? '2026/08/24 10:00 に届きます'
-                : scheduledLabel ? `${scheduledLabel} に届きます`
-                : '配信日時は STEP 4 で設定します'}
-            >
-              <div className="flex flex-col gap-3 text-ink">
-                {bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}
-              </div>
-            </LinePreview>
-            <div className="grid grid-cols-2 gap-2">
-              <Button type="button" onClick={() => void openTestDialog()}><Send size={15} aria-hidden /> テストを送る</Button>
-              <Button type="button" disabled><Eye size={15} aria-hidden /> 配信イメージを見る</Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <LinePreview note="実際のLINE表示に近い確認用プレビューです。">
-              <div className="flex flex-col gap-3 text-ink"><p className="text-center text-micro text-ink-faint">今日</p>{bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}</div>
-            </LinePreview>
-          </>
-        )}
-        </>
-        )}
+      <aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label="LINEの見え方">
+        <div className={styles.previewHead}><h3>LINE の見え方</h3><div className={styles.deviceSwitch} role="group" aria-label="プレビューの端末"><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button></div><Button ref={previewCloseRef} className={styles.previewClose} size="compact" onClick={() => { setPreviewOpen(false); previewToggleRef.current?.focus() }}>閉じる</Button></div>
+        <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
+          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={!selectedTemplate && Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
+            <div className="flex flex-col gap-3 text-ink">{selectedTemplate ? (() => { const bubble = messageTemplateToBubble(selectedTemplate); return bubble ? <BubblePreview bubble={bubble} /> : <p className="whitespace-pre-wrap break-words">{selectedTemplate.messageContent}</p> })() : bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}</div>
+          </LinePreview>
+        </div>
+        <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>
+        <div className={styles.previewSummary}><h3>設定内容</h3><dl>{[
+          ['送る相手', `${confirmAudienceLabel}${audienceDisplayCount === null ? '' : `（${formatNumber(audienceDisplayCount)}人）`}`],
+          ['除くタグ', tags.find((tag) => tag.id === excludeTagId)?.name ?? 'なし'],
+          ['送る日時', sendWhenLabel ?? '未設定'],
+          ['配信後のアクション', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'なし'],
+        ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
+        <div className={styles.previewActions}><Button type="button" disabled={Boolean(validate()) || saving} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
+        {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
+        <Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox>
       </aside>
     </div>
 
-    {currentStep === 'message' ? <div className="h-24" aria-hidden="true" /> : null}
-    {currentStep === 'confirm' ? <div className="h-4" aria-hidden="true" /> : null}
-    <StickyBar actions={(
+    <StickyBar className={styles.footer} actions={(
       <>
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          <Button type="button" disabled={saving} onClick={() => void saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
+          <Button variant="secondary" className={styles.textButton} type="button" disabled={saving} onClick={() => void saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
             <Button variant="primary" onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}>
               {currentStep === 'basic' ? '対象設定へ'
@@ -2959,12 +2652,8 @@ export default function BroadcastForm({
                     : '配信前チェックへ'}
             </Button>
           ) : (
-            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void save()} busy={saving}>
-              {/*
-                予約と下書きを混同しない（IDEA-06）。「今すぐ配信」はここでは
-                送らず、下書きを保存して詳細画面の送信ボタンで実行する。
-              */}
-              {sendMode === 'scheduled' ? 'この内容で予約' : '保存して送信画面へ'}
+            <Button variant="primary" disabled={saving || lengthNotice.tone === 'error' || !canConfirm} title={!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={openConfirm} busy={saving}>
+              {sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'}
             </Button>
           )}
         </>
@@ -3076,19 +2765,20 @@ export default function BroadcastForm({
     <div data-design-node="FpgxH">
       <ConfirmDialog
         open={confirmOpen}
-        title={needsApproval && !needsApprovalSingle ? 'この内容で送りますか？' : 'この内容で予約しますか？'}
+        title={sendMode === 'scheduled' ? 'この内容で予約しますか？' : 'この内容で送りますか？'}
         description={
           needsApproval && !needsApprovalSingle
             ? '送る相手・日時・内容を確認し、承認をお願いする人を選んでください。承認されるまで送られません。'
-            : '送信対象・日時・内容を確認して予約します。予約後も配信開始前までは編集・取消できます。'
+            : sendMode === 'scheduled' ? '送信対象・日時・内容を確認して予約します。予約後も配信開始前までは編集・取消できます。' : '送ると友だちに届きます。送信は取り消せません。対象と内容を確認してください。'
         }
-        confirmLabel={needsApproval && !needsApprovalSingle ? '承認を依頼する' : 'この内容で予約'}
+        confirmLabel={needsApproval && !needsApprovalSingle ? '承認を依頼する' : sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'}
         cancelLabel="戻って修正"
         busy={saving}
         error={error || undefined}
         onCancel={() => { if (!saving) setConfirmOpen(false) }}
-        onConfirm={canConfirm ? () => void save() : undefined}
+        onConfirm={canConfirm && (!currentStep || approvalConfigState === 'ready') ? () => void save() : undefined}
       >
+        {currentStep && approvalConfigState === 'loading' ? <p role="status" className="text-xs text-ink-faint">承認の設定を確認しています…</p> : currentStep && approvalConfigState === 'error' ? <Notice tone="danger">承認の設定を確認できません。戻ってから確認画面を開き直してください</Notice> : null}
         <dl className="border-hairline divide-hairline divide-y rounded-control border text-sm">
           <div className="flex justify-between gap-4 px-4 py-3">
             <dt className="text-ink-faint">管理名</dt>
@@ -3183,7 +2873,7 @@ export default function BroadcastForm({
 
         {/*
           二者承認（設計 A-1・A-4）。承認が要る人数のときだけ出す。
-          境目が読めているときだけ判定する（読めないときは従来どおり）。
+          境目が読めているときだけ判定し、取得失敗中は確定させない。
         */}
         {needsApproval && !needsApprovalSingle && audienceCount !== null && approvalConfig !== null ? (
           <ApprovalRequestFields
@@ -3208,7 +2898,7 @@ export default function BroadcastForm({
         {/* 人数が無いなら送らせない。上で確認のボタン自体を出していない。 */}
         {audienceCount === null ? (
           <Notice tone="danger" className="mt-3">
-            対象の人数を数えられていないため、予約できません。
+            対象の人数を数えられていないため、送信・予約できません。
             宛先と本文を確かめてから、もう一度お試しください。
           </Notice>
         ) : audienceCount === 0 ? (
@@ -3300,78 +2990,6 @@ export default function BroadcastForm({
         )}
       </div>
     </ConfirmDialog>
-    <style jsx global>{`
-      .broadcast-form-v6 > nav[aria-label='配信作成の進み'] {
-        margin-bottom: 1.5rem;
-        border: 0;
-        border-radius: 0;
-        background: transparent;
-        padding: 0;
-      }
-      /* #999 DEEP-02: .broadcast-delivery-*（●・○を置いた擬似ラジオカード）は撤去。共通 RadioCard を使う。 */
-      .broadcast-message-type {
-        min-height: 34px;
-        border: 1px solid var(--color-hairline);
-        border-radius: 6px;
-        background: var(--color-canvas);
-        padding: 0 12px;
-        color: var(--color-ink-secondary);
-        font-size: 12px;
-        font-weight: 700;
-      }
-      .broadcast-message-type[data-active='true'] {
-        border-color: var(--color-accent);
-        background: var(--color-accent-soft);
-        color: var(--color-accent);
-      }
-      .broadcast-message-type:disabled { cursor: not-allowed; opacity: .45; }
-      .broadcast-template-row {
-        display: flex;
-        width: 100%;
-        align-items: center;
-        gap: 14px;
-        border: 1px solid var(--color-hairline);
-        border-radius: 8px;
-        background: var(--color-canvas);
-        padding: 16px;
-        text-align: left;
-      }
-      .broadcast-template-row:hover { border-color: var(--color-accent); }
-      .broadcast-template-row strong,
-      .broadcast-template-row small { display: block; }
-      .broadcast-template-row small { margin-top: 3px; color: var(--color-ink-faint); }
-       .broadcast-url-row { display: grid; grid-template-columns: minmax(7rem, .7fr) minmax(0, 1.4fr) 7rem; }
-       .broadcast-preflight-page-open > :not(.broadcast-preflight-page) { display: none; }
-      @media (min-width: 640px) {
-        .broadcast-basic-fields { grid-template-columns: minmax(0, 1fr) 20rem; }
-      }
-      @media (min-width: 768px) {
-        .broadcast-recent-row { grid-template-columns: minmax(0, 1fr) 8rem 10rem 5rem; }
-      }
-       [data-design-node='sqFXf'] [data-design-part='dialog'] {
-        width: min(760px, calc(100vw - 32px));
-        max-width: 760px;
-        max-height: calc(100vh - 40px);
-        overflow-y: auto;
-       }
-       [data-design-node='p97Tf'][role='presentation'],
-       [data-design-node='vW4Es'][role='presentation'] {
-         align-items: flex-start;
-         padding-top: 265px;
-       }
-       [data-design-node='p97Tf'] [data-design-part='dialog'],
-       [data-design-node='vW4Es'] [data-design-part='dialog'] {
-         width: min(590px, calc(100vw - 32px));
-         max-width: 590px;
-       }
-       [data-design-node='h0kahp'] {
-         align-items: flex-start;
-         padding-top: 236px;
-       }
-       [data-design-node='h0kahp'] [data-design-part='dialog'] {
-         width: min(610px, calc(100vw - 32px));
-         max-width: 610px;
-       }
-    `}</style>
+
   </div>
 }

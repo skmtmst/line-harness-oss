@@ -82,7 +82,10 @@ export function buildAudienceCondition(mode: TargetMode, input: AudienceInput): 
   if (mode === 'advanced') {
     // 書きかけの行は落とす。残すと worker が読めない条件として断る。
     const usable = pruneCondition(input.condition)
-    if (usable) {
+    if (usable?.operator === 'OR') {
+      // ORをANDの直下へ平らにすると、どちらか一致が両方一致へ変わってしまう。
+      base.groups = [usable]
+    } else if (usable) {
       base.rules.push(...usable.rules)
       base.groups = [...(usable.groups ?? [])]
     }
