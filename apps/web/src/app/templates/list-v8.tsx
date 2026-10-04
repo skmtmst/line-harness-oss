@@ -1282,7 +1282,7 @@ export default function TemplatesListV8() {
 
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>
-          {filteredTemplates.length === 0 ? 0 : (safePage - 1) * pageSize + 1}〜{Math.min(safePage * pageSize, filteredTemplates.length)} / {formatNumber(filteredTemplates.length)}件
+          {formatNumber(filteredTemplates.length)}件中 {filteredTemplates.length === 0 ? 0 : (safePage - 1) * pageSize + 1}〜{Math.min(safePage * pageSize, filteredTemplates.length)}件
         </span>
         {pageCount > 1 ? (
           <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} />
@@ -1308,6 +1308,11 @@ export default function TemplatesListV8() {
           </p>
         </div>
       </div>
+      {!canMutateTemplates ? (
+        <p className={styles.readonlyBand}>
+          閲覧のみで見ています。変える操作は管理者に頼んでください。
+        </p>
+      ) : null}
 
       {/* 種類のタブ（件数つき）。資産タブはそれぞれの素材一覧を出す。 */}
       <Tabs
