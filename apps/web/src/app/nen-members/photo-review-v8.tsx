@@ -1,27 +1,13 @@
 'use client'
 
-/*
- * ★V8-B 投稿（Pencil「★V8-B 画面の地図」専用機能の組：
- * 写真の審査 `TkA4D`、閲覧のみ `Jn95h`、採用 `cniyw`、
- * 公式サイト掲載 `SyQA1`、見送る確認 `ujcar`、
- * 報酬の決まり 版の履歴 `N1br7`、状態の板 `dzx5D`）。
- *
- * v7（nen-members/page.tsx と photo-review-detail / photo-publications /
- * photo-reward-policy）とは別の部品として持ち、data-theme="v8" のときだけ
- * こちらが出る。データの口（photos・metrics・review・bulk・retry・
- * publications・withdraw・policyVersions）は同じ。違いは置き場と見せ方だけ——
- * ・数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
- * ・審査はカードの並び＋右に決まりの棚。1画面に主ボタンは置かない。
- * ・見送る確認は真ん中の小窓（ujcar）。版の履歴は N1br7 の窓。
- * ・1枚ずつ大きく見る・公式サイト掲載の並び替えは今の作りのまま
- *  （詳細は v7 の部品をそのまま使う）。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
+/* Pencil の6枚のHTMLをもとにした投稿画面。既存の審査APIを接続する。 */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, CircleCheck, Clock3, Globe } from 'lucide-react'
+import { Globe, History, HelpCircle, Undo2, X, Check, Send } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ActionMenu from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Chip from '@/components/shared/chip'
@@ -30,19 +16,21 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
+import SegmentedControl from '@/components/shared/segmented'
 import { notifyToast } from '@/components/shared/toast'
 import { Tabs } from '@/components/shared/tabs'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { TextField } from '@/components/shared/text-field'
 import { formatNumber } from '@/lib/format'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import { safePhotoSrc } from './photo-src'
 import { photoNoticeFor } from './photo-notice'
+import { photoReviewEntryFrom, photoReviewSearch, type PhotoReviewEntry } from './photo-review-query'
+import { formatMinutesRough, formatWaitRough } from '@/lib/format-duration'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { mileStatusLabel, reviewVersionOf, text } from './photo-text'
 import { PhotoReviewDetail } from './photo-review-detail'
-import { PhotoRewardPolicyDrawer } from './photo-reward-policy'
-import type { PhotoRewardPolicyVersion } from '@/lib/api'
+import PhotoPolicyHistoryV8 from './photo-policy-history-v8'
 import styles from './photo-review-v8.module.css'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
@@ -57,6 +45,14 @@ const REVIEW_REASONS: Array<{ value: ReviewReasonCode; label: string; message: s
   { value: 'duplicate', label: '同じ写真をすでにもらっています', message: 'すでにいただいた写真と重複しているようです。別のお写真をお願いできますか。' },
   { value: 'other', label: '自分で書く', message: '文章をそのまま書きます。' },
 ]
+// 送信文の理由名は Worker の photoReviewMessage と同じにする。
+const SENT_REASON_LABELS: Record<ReviewReasonCode, string> = {
+  quality: '写真が暗い・ぼやけている',
+  privacy: '人の顔や個人情報が写っている',
+  unrelated: 'ペットと関係のない内容が写っている',
+  duplicate: '同じ写真がすでに投稿されている',
+  other: 'そのほか',
+}
 
 const PHOTO_PAGE_SIZE = 200
 function photoPagePath(accountId: string, offset: number, q = ''): string {
@@ -78,9 +74,8 @@ function boardNode(view: PhotoView, status: PhotoStatus, canEdit: boolean): stri
 function isThisMonth(value: string): boolean {
   const time = Date.parse(value)
   if (!Number.isFinite(time)) return false
-  const now = new Date()
-  const date = new Date(time)
-  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
+  const month = (date: Date) => new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric' }).format(date)
+  return month(new Date(time)) === month(new Date())
 }
 
 /**
@@ -91,16 +86,17 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   const [reviewMetrics, setReviewMetrics] = useState<PhotoReviewMetrics | null>(null)
   const [policyPoints, setPolicyPoints] = useState<number | null>(null)
   const [publishedCount, setPublishedCount] = useState<number | null>(null)
-  const [status, setStatus] = useState<PhotoStatus>('pending')
-  const [view, setView] = useState<PhotoView>('list')
+  const [entry, setEntry] = useState<PhotoReviewEntry>(() => photoReviewEntryFrom(typeof window === 'undefined' ? '' : window.location.search))
+  const [status, setStatus] = useState<PhotoStatus>(entry.status)
+  const [view, setView] = useState<PhotoView>(entry.view)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [loadForbidden, setLoadForbidden] = useState(false)
   const [hasMorePhotos, setHasMorePhotos] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [notice, setNotice] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchInput, setSearchInput] = useState(entry.q ?? '')
+  const [searchQuery, setSearchQuery] = useState(entry.q ?? '')
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([])
   const [reviewing, setReviewing] = useState<string | null>(null)
   // 審査・見送りの口は owner/admin だけ。staff は見るだけ（Jn95h）。
@@ -109,6 +105,8 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   const loadSequence = useRef(0)
   const accountGeneration = useRef(0)
   const reviewKeys = useRef(new Map<string, string>())
+  const retryKeys = useRef(new Map<string, string>())
+  const [bulkFailed, setBulkFailed] = useState<Array<{ photoId: string; petName: string; error: string }>>([])
 
   useEffect(() => {
     let active = true
@@ -146,14 +144,14 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
     } else {
       setReviewMetrics(null)
     }
-    if (policyResult.status === 'fulfilled' && policyResult.value.success) {
+    if (policyResult.status === 'fulfilled' && policyResult.value.success && Array.isArray(policyResult.value.data)) {
       const current = policyResult.value.data.find((v) => v.status === 'in_use') ?? null
       setPolicyPoints(current ? current.points : null)
     } else {
       setPolicyPoints(null)
     }
     if (publicationsResult.status === 'fulfilled' && publicationsResult.value.success && !Array.isArray(publicationsResult.value.data)) {
-      setPublishedCount(publicationsResult.value.data.summary.publishedCount)
+      setPublishedCount(publicationsResult.value.data?.summary?.publishedCount ?? null)
     } else {
       setPublishedCount(null)
     }
@@ -181,14 +179,38 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
   useEffect(() => {
     accountGeneration.current += 1
-    setNotice('')
-    setStatus('pending')
-    setView('list')
-    setSearchInput('')
-    setSearchQuery('')
-    setSelectedPhotoIds([])
-    setHistoryOpen(false)
+    setNotice(''); setSelectedPhotoIds([]); setHistoryOpen(false)
+    setRejectingPhotoId(null); setBulkApproveOpen(false); setBulkReturnOpen(false); setBulkFailed([])
+    setReviewing(null); setLoadingMore(false)
+    const next = photoReviewEntryFrom(window.location.search)
+    setEntry(next); setStatus(next.status); setView(next.view)
+    setSearchInput(next.q ?? ''); setSearchQuery(next.q ?? '')
+    reviewKeys.current.clear(); retryKeys.current.clear()
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem(`nen-photo-review:selection:${accountId}`) ?? '[]')
+      setSelectedPhotoIds(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : [])
+    } catch { setSelectedPhotoIds([]) }
   }, [accountId])
+
+  const selectionAccount = useRef(accountId)
+  useEffect(() => {
+    if (selectionAccount.current !== accountId) { selectionAccount.current = accountId; return }
+    if (!accountId) return
+    try { window.sessionStorage.setItem(`nen-photo-review:selection:${accountId}`, JSON.stringify(selectedPhotoIds)) } catch { /* 選択操作は続けられる。 */ }
+  }, [accountId, selectedPhotoIds])
+  useEffect(() => {
+    const restore = () => {
+      const next = photoReviewEntryFrom(window.location.search)
+      setEntry(next); setStatus(next.status); setView(next.view)
+      setSearchInput(next.q ?? ''); setSearchQuery(next.q ?? '')
+    }
+    window.addEventListener('popstate', restore)
+    return () => { window.removeEventListener('popstate', restore); loadSequence.current += 1; accountGeneration.current += 1 }
+  }, [])
+  const navigate = (next: PhotoReviewEntry) => {
+    window.history.pushState(null, '', `${window.location.pathname}?${photoReviewSearch(next)}`)
+    setEntry(next); setStatus(next.status); setView(next.view)
+  }
 
   const loadMore = useCallback(async () => {
     if (!accountId || loadingMore || !hasMorePhotos) return
@@ -245,7 +267,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       const response = await api.nenMembers.reviewPhoto(id, {
         accountId,
         status: nextStatus,
-        expectedVersion: reviewVersionOf(photos.find((photo) => text(photo.id) === id)),
+        expectedVersion: reviewVersionOf(photos.find((photo) => text(photo.id) === id) ?? (text(rejectingPhoto?.id) === id ? rejectingPhoto : null)),
         ...(rejection
           ? {
               reasonCode: rejection.reasonCode,
@@ -259,9 +281,26 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       if (!response.success) throw new Error(response.error)
       reviewKeys.current.delete(id)
       setNotice('')
+      const notification = response.data.notificationStatus === 'sent'
+        ? '投稿者へLINEで通知しました。'
+        : '審査結果は保存しましたが、LINE通知は送れませんでした。一覧から再送できます。'
+      /*
+       * マイルの手続きは EC 会員とつながっている採用だけで始まる。
+       * つながっていない採用に「手続きを始めました」と伝えるのは、
+       * できていない約束をすることになる（#931 N-307）。
+       */
+      const adoptedNote = response.data.rewardSkipped === 'duplicate'
+        ? '同じ写真はすでに報酬付きで採用されているため、点数は付けずに採用しました。'
+        : response.data.rewardSkipped === 'requested'
+          ? '報酬なしで採用しました。点数は付けていません。'
+          : response.data.pointSync === 'pending'
+            ? `ECへ${response.data.awardedPoints}マイルを付ける手続きを始めました。`
+            : response.data.pointSync === 'needs_attention'
+              ? 'EC会員とつながっていないため、マイルの手続きはまだ始まっていません。'
+              : ''
       notifyToast(nextStatus === 'adopted'
-        ? '写真を採用しました。公開は本人の同意がある場合だけ行います。'
-        : '見送り理由を保存しました。')
+        ? `写真を採用しました。${adoptedNote}公開は本人の同意がある場合だけ行います。${notification}`
+        : `見送り理由を保存しました。${notification}`)
       setRejectingPhotoId(null)
       await load()
     } catch (error) {
@@ -276,6 +315,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   }
 
   const [rejectingPhotoId, setRejectingPhotoId] = useState<string | null>(null)
+  const [rejectingPhoto, setRejectingPhoto] = useState<Record<string, unknown> | null>(null)
   const [bulkApproveOpen, setBulkApproveOpen] = useState(false)
   const [bulkReturnOpen, setBulkReturnOpen] = useState(false)
   const [bulkReviewing, setBulkReviewing] = useState(false)
@@ -287,6 +327,13 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
   const openRejectDialog = (id: string) => {
     setRejectingPhotoId(id)
+    setRejectingPhoto(photos.find((photo) => text(photo.id) === id) ?? null)
+    if (accountId && !photos.some((photo) => text(photo.id) === id)) {
+      const generation = accountGeneration.current
+      void api.nenMembers.photo(id, accountId).then((response) => {
+        if (generation === accountGeneration.current && response.success && !Array.isArray(response.data)) setRejectingPhoto(response.data)
+      }).catch(() => undefined)
+    }
     setReasonCode('quality')
     setReasonNote('')
     setReasonError('')
@@ -327,7 +374,19 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       if (!response.success) throw new Error(response.error)
       const data = response.data as Partial<PhotoBulkReviewResult>
       const count = typeof data.updatedCount === 'number' ? data.updatedCount : selectedPendingPhotos.length
-      notifyToast(`${count}枚の審査結果を保存し、投稿者へLINEで通知しました。`)
+      const names = new Map(selectedPendingPhotos.map((photo) => [text(photo.id), photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })]))
+      const failed = Array.isArray(data.notificationFailures) ? data.notificationFailures : []
+      const failedPhotos = failed.map((item) => {
+        const photoId = text((item as { photoId?: unknown })?.photoId)
+        const error = text((item as { error?: unknown })?.error) || '通知できませんでした'
+        return { photoId, petName: names.get(photoId) ?? '写真', error }
+      }).filter((item) => item.photoId)
+      setBulkFailed(failedPhotos)
+      if (failedPhotos.length === 0) {
+        notifyToast(`${count}枚の審査結果を保存し、投稿者へLINEで通知しました。`)
+      } else {
+        setNotice(`${count}枚の審査結果は保存済みです。${failedPhotos.length}枚のLINE通知は送れませんでした（通知だけ再送できます）。`)
+      }
       setSelectedPhotoIds([])
       setBulkApproveOpen(false)
       setBulkReturnOpen(false)
@@ -345,13 +404,17 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   }
 
   const retryNotification = async (id: string) => {
-    if (!accountId) return
+    if (!accountId || !canEdit) return
     const generation = accountGeneration.current
+    const idempotencyKey = retryKeys.current.get(id) ?? crypto.randomUUID()
+    retryKeys.current.set(id, idempotencyKey)
     setReviewing(id)
     try {
-      const response = await api.nenMembers.retryPhotoReviewNotification(id, accountId, crypto.randomUUID())
+      const response = await api.nenMembers.retryPhotoReviewNotification(id, accountId, idempotencyKey)
       if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
+      retryKeys.current.delete(id)
+      setBulkFailed((items) => items.filter((item) => item.photoId !== id))
       setNotice('審査結果を投稿者へLINEで再送しました。')
       await load()
     } catch (error) {
@@ -365,11 +428,10 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
   const changeTab = (next: PhotoStatus | 'publications') => {
     if (next === 'publications') {
-      setView('publications')
+      navigate({ view: 'publications', status })
       return
     }
-    setView('list')
-    setStatus(next)
+    navigate({ view: 'list', status: next, q: searchQuery || undefined })
     setSelectedPhotoIds([])
     setBulkApproveOpen(false)
     setBulkReturnOpen(false)
@@ -382,26 +444,28 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           <h1 className={styles.headTitle}>投稿</h1>
           <p className={styles.headDesc}>お客さまが送ってくれたペットの写真を確かめて、公式サイトに載せるかを決めます。</p>
         </div>
-        <Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}>版の履歴を見る</Button>
+        <Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}><History size={15} aria-hidden="true" />版の履歴を見る</Button>
       </div>
       <div data-design-node="photo-tabs-v8">
         <Tabs
           items={[
-            { label: '審査待ち', count: countsReady ? counts.pending : undefined, current: view === 'list' && status === 'pending', onClick: () => changeTab('pending') },
-            { label: '採用', count: countsReady ? counts.adopted : undefined, current: view === 'list' && status === 'adopted', onClick: () => changeTab('adopted') },
-            { label: '見送り', count: countsReady ? counts.rejected : undefined, current: view === 'list' && status === 'rejected', onClick: () => changeTab('rejected') },
+            { label: hasMorePhotos && countsReady ? `審査待ち ${counts.pending}+` : '審査待ち', count: countsReady && !hasMorePhotos ? counts.pending : undefined, current: view === 'list' && status === 'pending', onClick: () => changeTab('pending') },
+            { label: hasMorePhotos && countsReady ? `採用 ${counts.adopted}+` : '採用', count: countsReady && !hasMorePhotos ? counts.adopted : undefined, current: view === 'list' && status === 'adopted', onClick: () => changeTab('adopted') },
+            { label: hasMorePhotos && countsReady ? `見送り ${counts.rejected}+` : '見送り', count: countsReady && !hasMorePhotos ? counts.rejected : undefined, current: view === 'list' && status === 'rejected', onClick: () => changeTab('rejected') },
             { label: '公式サイト掲載', current: view === 'publications', onClick: () => changeTab('publications') },
           ]}
         />
       </div>
 
-      <ul className={styles.kpiBand} aria-label="投稿の数の帯">
-        <KpiCellV8 label="審査待ち" help="まだ決めていない写真の枚数です" value={countsReady ? counts.pending : null} unit="枚" sub={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatPhotoReceivedAt(reviewMetrics.oldestPendingAt)}` : 'いちばん古いもの —'} />
-        <KpiCellV8 label="今月採用" help="今月 採用した写真の枚数です" value={countsReady ? adoptedThisMonth : null} unit="枚" sub={policyPoints == null ? '1枚ごとに —' : `1枚ごとに ${formatNumber(policyPoints)}マイル`} />
-        <KpiCellV8 label="今月見送り" help="今月 見送った写真の枚数です" value={countsReady ? rejectedThisMonth.length : null} unit="枚" sub={`理由：${topReason}`} />
-        <KpiCellV8 label="公式サイト掲載" help="いま載っている写真の枚数です" value={publishedCount} unit="枚" sub="いま載っている写真" />
+      {!canEdit ? <div className={styles.readonly}><NoteBar tone="info">閲覧のみで見ています。変える操作は管理者に頼んでください。</NoteBar></div> : null}
+      <ul data-design="KPIs" className={styles.kpiBand} aria-label="投稿の数の帯">
+        <KpiCellV8 icon="pending" label="審査待ち" help={`まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? '—'}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? '—' : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`} value={countsReady ? reviewMetrics?.pendingCount ?? counts.pending : null} unit="枚" sub={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatWaitRough((Date.now() - Date.parse(reviewMetrics.oldestPendingAt)) / 60000)}` : 'いちばん古いもの —'} />
+        <KpiCellV8 icon="help" label="今月採用" help={hasMorePhotos ? '読み込んだ写真の集計です。続きの写真は含みません' : '今月 採用した写真の枚数です'} value={countsReady ? adoptedThisMonth : null} unit={hasMorePhotos ? '枚以上' : '枚'} sub={policyPoints == null ? '1枚ごとに —' : `1枚ごとに ${formatNumber(policyPoints)}マイル`} />
+        <KpiCellV8 icon="help" label="今月見送り" help={hasMorePhotos ? '読み込んだ写真の集計です。理由の内訳も続きの写真は含みません' : '今月 見送った写真の枚数です'} value={countsReady ? rejectedThisMonth.length : null} unit={hasMorePhotos ? '枚以上' : '枚'} sub={`理由：${topReason}`} />
+        <KpiCellV8 icon="published" label="公式サイト掲載" help="いま載っている写真の枚数です" value={publishedCount} unit="枚" sub="いま載っている写真" />
       </ul>
 
+      {bulkFailed.length > 0 ? <section className={styles.deliveryFailures} aria-label="LINE通知を送れなかった写真"><p>LINE通知を送れなかった写真（{bulkFailed.length}枚）・通知だけ再送できます</p>{bulkFailed.map((item) => <div key={item.photoId}><span>{item.petName}</span><Button variant="secondary" disabled={!canEdit || reviewing !== null} onClick={() => void retryNotification(item.photoId)}>LINE通知を再送</Button></div>)}</section> : null}
       {!accountId ? (
         <ListState
           kind="empty"
@@ -417,9 +481,14 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         />
       ) : view === 'detail' ? (
         <DetailV8
+          key={accountId}
           accountId={accountId}
+          initialPhotoId={entry.photoId}
+          canEdit={canEdit}
+          onPhotoChange={(photoId) => navigate({ view: 'detail', status, photoId, q: searchQuery || undefined })}
+          onReject={(id) => { setView('list'); openRejectDialog(id) }}
           photos={visiblePhotos}
-          onBack={() => setView('list')}
+          onBack={() => navigate({ view: 'list', status, q: searchQuery || undefined })}
           onReload={() => void load()}
         />
       ) : (
@@ -444,13 +513,13 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           selectedPhotosAreLowRisk={selectedPhotosAreLowRisk}
           bulkReviewing={bulkReviewing}
           onSearchInput={setSearchInput}
-          onSearchQuery={(q) => { setSearchQuery(q); }}
+          onSearchQuery={(q) => { setSearchQuery(q); navigate({ view: 'list', status, q: q || undefined }); }}
           onToggleSelect={togglePhotoSelection}
           onApprove={(id) => void review(id, 'adopted')}
           onReject={openRejectDialog}
           onRetryNotification={(id) => void retryNotification(id)}
-          onOpenDetail={() => setView('detail')}
-          onOpenPublications={() => setView('publications')}
+          onOpenDetail={() => navigate({ view: 'detail', status, photoId: text(visiblePhotos[0]?.id), q: searchQuery || undefined })}
+          onOpenPublications={() => navigate({ view: 'publications', status })}
           onLoadMore={() => void loadMore()}
           onRetryLoad={() => void load()}
           onBulkApprove={() => setBulkApproveOpen(true)}
@@ -460,7 +529,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
       {rejectingPhotoId ? (
         <RejectDialogV8
-          photo={photos.find((photo) => text(photo.id) === rejectingPhotoId) ?? null}
+          photo={rejectingPhoto}
           reasonCode={reasonCode}
           reasonNote={reasonNote}
           reasonError={reasonError}
@@ -505,7 +574,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         </label>
       </Dialog>
 
-      <HistoryDrawerV8
+      <PhotoPolicyHistoryV8 canEdit={canEdit}
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         onChanged={() => void load()}
@@ -514,11 +583,11 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   )
 }
 
-function KpiCellV8({ label, help, value, unit, sub }: { label: string; help: string; value: number | null; unit: string; sub: string }) {
+function KpiCellV8({ icon, label, help, value, unit, sub }: { icon: 'pending' | 'help' | 'published'; label: string; help: string; value: number | null; unit: string; sub: string }) {
   return (
     <li className={styles.kpiCell}>
       <div className={styles.kpiHead}>
-        <span className={styles.kpiLabel}>{label}</span>
+        <span className={styles.kpiIcon} aria-hidden="true">{icon === 'pending' ? <History size={13} /> : icon === 'published' ? <Undo2 size={13} /> : <HelpCircle size={13} />}</span><span className={styles.kpiLabel}>{label}</span>
         <button type="button" className={styles.kpiHelp} title={help} aria-label={`${label}：${help}`}>…</button>
       </div>
       <p className={styles.kpiValue}>{value === null ? '—' : <>{formatNumber(value)}<span className={styles.kpiUnit}>{unit}</span></>}</p>
@@ -571,40 +640,6 @@ function ReviewListV8(props: ReviewListV8Props) {
   return (
     <>
       {notice ? <Notice tone="danger" message={notice} /> : null}
-      {!canEdit ? (
-        <NoteBar tone="info">
-          見るだけの権限です。採用・見送りはできません。並べて見る／1枚ずつ大きく見る・探すは使えます。
-        </NoteBar>
-      ) : null}
-      <div className={styles.tools} data-design-node="photo-controls-v8">
-        <form
-          className={styles.searchGrow}
-          onSubmit={(event) => {
-            event.preventDefault()
-            props.onSearchQuery(props.searchInput.trim().slice(0, 100))
-          }}
-        >
-          <SearchField
-            aria-label="写真を探す"
-            value={props.searchInput}
-            onChange={props.onSearchInput}
-            onClear={() => props.onSearchInput('')}
-            placeholder="名前・ペット名・コメントで探す"
-            maxLength={100}
-          />
-        </form>
-        <span className={styles.toolsTail}>
-          {status === 'adopted' ? (
-            <p className={styles.toolsNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載で公開先を選びます。</p>
-          ) : (
-            <>
-              <Button variant="secondary" disabled title="並べて見るは一覧の表示形式の追加口を接続後に使えます">並べて見る</Button>
-              <Button variant="secondary" disabled={photos.length === 0} onClick={props.onOpenDetail}>1枚ずつ大きく見る</Button>
-            </>
-          )}
-        </span>
-      </div>
-
       {props.searchQuery ? (
         <p className={styles.toolsNote}>「{props.searchQuery}」で絞り込んでいます</p>
       ) : null}
@@ -618,23 +653,51 @@ function ReviewListV8(props: ReviewListV8Props) {
       ) : photos.length === 0 ? (
         <ListState kind="empty" emptyPreset="readonly" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" />
       ) : (
-        <div className={showRail ? styles.reviewGrid : undefined}>
-          <ul className={styles.cards} data-design-node="photo-cards-v8">
+        <div className={`${showRail ? styles.reviewGrid : styles.adoptedGrid} ${status === 'adopted' ? styles.adopted : ''}`}>
+      <div className={styles.tools} data-design-node="photo-controls-v8">
+        <form
+          className={styles.searchGrow}
+          onSubmit={(event) => {
+            event.preventDefault()
+            props.onSearchQuery(props.searchInput.trim().slice(0, 100))
+          }}
+        >
+          <SearchField
+            aria-label="写真を探す"
+            value={props.searchInput}
+            onChange={props.onSearchInput}
+            onClear={() => props.onSearchInput('')}
+            placeholder={status === 'pending' ? '飼い主・ペット名で探す' : '名前・ペット名・コメントで探す'}
+            maxLength={100}
+          />
+        </form>
+        <span className={styles.toolsTail}>
+          {status === 'adopted' ? (
+            <p className={styles.toolsNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載で公開先を選びます。</p>
+          ) : (
+            <>
+              <SegmentedControl aria-label="写真の見え方" options={[{ value: 'list', label: '並べて見る' }, { value: 'detail', label: '1枚ずつ大きく見る' }]} value="list" onChange={(next) => { if (next === 'detail' && photos.length > 0) props.onOpenDetail() }} />
+            </>
+          )}
+        </span>
+      </div>
+
+          <div className={styles.cardColumn}><ul className={styles.cards} data-design-node="photo-cards-v8">
             {photos.map((photo) => (
               <PhotoCardV8 key={text(photo.id)} photo={photo} {...props} />
             ))}
-          </ul>
+          </ul>{status === 'pending' ? <p className={styles.listHintV8}>「1枚ずつ大きく見る」にすると、写真を大きくして順に確かめられます（← → で次へ）</p> : null}</div>
           {showRail ? (
             <div className={styles.rail} data-design="Right" data-design-node="photo-rail-v8">
               <section className={styles.railCard} aria-label="報酬の決まり">
                 <h2 className={styles.railTitle}>報酬の決まり</h2>
                 <p className={styles.railRow}>採用したら <strong>{props.policyPoints == null ? '—' : `${formatNumber(props.policyPoints)}マイル`}</strong></p>
-                <p className={styles.railNote}>採用すると、投稿した人にLINEでお知らせします</p>
+                <p className={styles.railRow}>公式サイトに載ったら <strong title="掲載時の追加報酬は未接続です">—</strong></p><p className={styles.railNote}>採用すると、投稿した人にLINEでお知らせします</p>
               </section>
               <section className={styles.railCard} aria-label="確認する順">
                 <h2 className={styles.railTitle}>確認する順</h2>
                 <p className={styles.railRow}>古いものから <strong>いまの順</strong></p>
-                <p className={styles.railRow}>会員ランクが高い人を先に <strong>しない（新着順）</strong></p>
+                <p className={styles.railRow}>会員ランクが高い人を先に <strong>しない</strong></p>
               </section>
               <section className={styles.railCard} aria-label="見送り理由の内訳">
                 <h2 className={styles.railTitle}>見送り理由の内訳（今月）</h2>
@@ -665,7 +728,7 @@ function ReviewListV8(props: ReviewListV8Props) {
       {status === 'pending' && props.selectedPendingCount > 0 ? (
         <BulkBar count={props.selectedPendingCount} unit="枚" hint="審査待ちの写真だけをまとめて処理します">
           <Button
-            variant="secondary"
+            variant="primary"
             disabled={!props.selectedPhotosAreLowRisk || props.bulkReviewing || !canEdit}
             title={!props.selectedPhotosAreLowRisk ? 'まとめて採用できるのは、注意候補がない写真だけです' : !canEdit ? '見るだけの権限ではまとめて採用できません' : undefined}
             onClick={props.onBulkApprove}
@@ -692,7 +755,7 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
   const consented = Boolean(text(photo.publication_consent_at)) && !text(photo.publication_withdrawn_at)
   const notificationFailed = text(photo.review_notification_status) === 'failed'
   return (
-    <li className={`${styles.card}${selected ? ` ${styles.cardSelected}` : ''}`}>
+    <li><article aria-label={`${name}の投稿写真`} className={`${styles.card}${selected ? ` ${styles.cardSelected}` : ''}`}>
       <div className={styles.cardPhoto}>
         {imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element -- お客様が投稿した写真
@@ -708,15 +771,15 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
       </div>
       <div className={styles.cardBody}>
         <div className={styles.cardNameRow}>
-          <p className={styles.cardName}>{name}</p>
-          <span className={styles.cardDate}>{formatPhotoReceivedAt(photo.created_at)}</span>
+          <p className={styles.cardName} title={name}>{name}</p>
+          <span className={styles.cardDate} title={formatPhotoReceivedAt(photo.created_at)}>{Number.isFinite(Date.parse(text(photo.created_at))) ? new Date(text(photo.created_at)).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }) : '日時不明'}</span>
         </div>
-        <p className={styles.cardOwner}>{text(photo.owner_name) || '名前未取得'}{text(photo.customer_id) ? `・EC-${text(photo.customer_id)}` : ''}</p>
+        <p className={styles.cardOwner} title={`${text(photo.owner_name)} ${text(photo.customer_id)}`}>{text(photo.owner_name) || '名前未取得'}{text(photo.customer_id) ? `・EC-${text(photo.customer_id)}` : ''}</p>
         {text(photo.caption) ? <p className={styles.cardCaption} title={text(photo.caption)}>「{text(photo.caption)}」</p> : null}
         {status === 'adopted' ? (
           <div className={styles.cardChips}>
             <Chip tone="ok">採用</Chip>
-            <span className={styles.cardOwner}>{mileStatusLabel(photo.point_sync_status)}</span>
+            <span className={styles.cardOwner}>{Number.isFinite(Number(photo.awarded_points)) && photo.awarded_points != null && text(photo.point_sync_status) === 'synced' ? `${formatNumber(Number(photo.awarded_points))} マイル付与済み` : mileStatusLabel(photo.point_sync_status)}</span>
           </div>
         ) : null}
         {status === 'adopted' ? (
@@ -732,27 +795,27 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
         ) : null}
         {status === 'pending' ? (
           <div className={styles.cardActions}>
-            <Button variant="secondary" disabled={!props.canEdit || busy} title={!props.canEdit ? '見るだけの権限では見送りできません' : undefined} onClick={() => props.onReject(photoId)}>{'× 見送る'}</Button>
-            <Button variant="secondary" disabled={!props.canEdit || busy} title={!props.canEdit ? '見るだけの権限では採用できません' : undefined} onClick={() => props.onApprove(photoId)} busy={busy} busyLabel="処理中...">{'✓ 採用する'}</Button>
+            <Button variant="secondary" disabled={!props.canEdit || busy} aria-label={`${name}の写真を見送る`} title={!props.canEdit ? '見るだけの権限では見送りできません' : undefined} onClick={() => props.onReject(photoId)}><X size={15} aria-hidden="true" />見送る</Button>
+            <Button variant="secondary" disabled={!props.canEdit || busy} aria-label={`${name}の写真を採用する`} title={!props.canEdit ? '見るだけの権限では採用できません' : undefined} onClick={() => props.onApprove(photoId)} busy={busy} busyLabel="処理中..."><Check size={15} aria-hidden="true" />採用する</Button>
           </div>
         ) : null}
         {status === 'adopted' ? (
           <div className={styles.cardActions}>
             {consented ? (
-              <Button variant="secondary" onClick={props.onOpenPublications}>公式サイトに出す</Button>
+              <Button variant="secondary" disabled={!props.canEdit} onClick={() => props.onOpenPublications()}><Globe size={15} aria-hidden="true" />公式サイトに出す</Button>
             ) : null}
             {notificationFailed ? (
-              <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中...">LINE通知を再送</Button>
+              <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中..."><Send size={15} aria-hidden="true" />LINE通知を再送</Button>
             ) : null}
           </div>
         ) : null}
-        {status === 'rejected' && notificationFailed ? (
+        {status !== 'adopted' && notificationFailed ? (
           <div className={styles.cardActionSingle}>
-            <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中...">LINE通知を再送</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中..."><Send size={15} aria-hidden="true" />LINE通知を再送</Button>
           </div>
         ) : null}
       </div>
-    </li>
+    </article></li>
   )
 }
 
@@ -791,21 +854,17 @@ function RejectDialogV8({
   onConfirm: () => void
 }) {
   const name = photo ? photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender }) : '写真'
-  const selectedReason = REVIEW_REASONS.find((reason) => reason.value === reasonCode)
   const preview = photo
-    ? `${name}の写真をありがとうございます。${reasonCode === 'other' ? reasonNote || 'お客様に送る文章を入力してください。' : selectedReason?.message ?? ''}${reasonNote && reasonCode !== 'other' ? `\n${reasonNote}` : ''}\nお手数をおかけします。`
+    ? [
+      'お写真をご投稿いただきありがとうございます。',
+      `今回は「${SENT_REASON_LABELS[reasonCode]}」のため、掲載を見送らせていただきました。`,
+      ...(reasonNote.trim() ? [reasonNote.trim()] : []),
+      ...(resubmitInvite ? ['内容をご確認のうえ、よろしければ別のお写真をご投稿ください。'] : []),
+    ].join('\n')
     : ''
   const imageSrc = photo ? safePhotoSrc(photo.image_url) : null
   return (
-    <div className={styles.dialogOverlay} data-design-node="ujcar">
-      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="この写真を見送りますか？">
-        <div className={styles.dialogHead}>
-          <div>
-            <h2 className={styles.dialogTitle}>この写真を見送りますか？</h2>
-            <p className={styles.dialogDesc}>理由をえらぶと、お客様への文章が自動でつくられます。見送っても、この方のマイルは減りません。</p>
-          </div>
-          <button type="button" className={styles.dialogClose} onClick={onClose} aria-label="閉じる">✕</button>
-        </div>
+    <Dialog open designNode="ujcar" title="この写真を見送りますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。見送っても、この方のマイルは減りません。" confirmation tone="destructive" busy={busy} error={reasonError} onCancel={onClose} onConfirm={onConfirm} confirmLabel="見送る">
         {photo ? (
           <div className={styles.dialogPhoto}>
             {imageSrc ? (
@@ -818,10 +877,10 @@ function RejectDialogV8({
             </div>
           </div>
         ) : null}
-        <fieldset className={styles.pillGroup}>
+        <fieldset className={styles.pillGroup} role="radiogroup" aria-label="見送り理由">
           <legend className={styles.fieldLabel}>見送った理由</legend>
           {REVIEW_REASONS.map((reason) => (
-            <button key={reason.value} type="button" role="radio" aria-checked={reasonCode === reason.value} className={styles.pill} onClick={() => onReasonCode(reason.value)}>
+            <button key={reason.value} type="button" role="radio" aria-checked={reasonCode === reason.value} className={styles.pill} onClick={() => { onReasonCode(reason.value); onReasonNote(reason.value === 'other' ? '' : reason.message) }}>
               <span aria-hidden="true" className={styles.pillDot} />
               {reason.label}
             </button>
@@ -829,67 +888,17 @@ function RejectDialogV8({
         </fieldset>
         <label className={styles.fieldLabel}>
           お客様に届く補足（直せます）
-          <TextField aria-label="お客様に届く補足" value={reasonNote} maxLength={500} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
+          <textarea aria-label="お客様に届く補足" className={styles.reasonTextarea} value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
         </label>
         <label className={styles.checkRow}>
           <Checkbox checked={resubmitInvite} onCheckedChange={onResubmitInvite}>もう一度 送ってもらえるようお願いする</Checkbox>
         </label>
-        <label className={styles.checkRow}>
-          <Checkbox checked={watchSubmitter} onCheckedChange={onWatchSubmitter}>この人の次の投稿は、必ず人が見る</Checkbox>
-        </label>
+        <details className={styles.followup}><summary>次の投稿の確認方法</summary><Checkbox checked={watchSubmitter} onCheckedChange={onWatchSubmitter}>この人の次の投稿は、必ず人が見る</Checkbox></details>
         <div>
           <p className={styles.fieldLabel}>投稿者に届く内容</p>
-          <p className={styles.previewBox}>{preview}</p>
+          <div className={styles.previewBox}><p>{preview}</p></div>
         </div>
-        {reasonError ? <p className={styles.errorText} role="alert">{reasonError}</p> : null}
-        <div className={styles.dialogFoot}>
-          <Button variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button variant="primary" onClick={onConfirm} disabled={busy} busy={busy} busyLabel="送っています…">見送る</Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/**
- * 版の履歴（N1br7）。報酬の決まりの版の一覧・比べる・予約を
- * v7 の窓（PhotoRewardPolicyDrawer）で開く。口は v7 と同じ。
- */
-function HistoryDrawerV8({ open, onClose, onChanged }: { open: boolean; onClose: () => void; onChanged: () => void }) {
-  const [versions, setVersions] = useState<PhotoRewardPolicyVersion[] | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!open) return
-    let active = true
-    setLoading(true)
-    setError('')
-    void api.nenMembers.photoRewardPolicyVersions().then((res) => {
-      if (!active) return
-      if (!res.success) throw new Error(res.error)
-      setVersions(res.data)
-    }).catch((caught) => {
-      if (!active) return
-      setError(caught instanceof Error ? caught.message : '報酬の決まりを読み込めませんでした')
-    }).finally(() => {
-      if (active) setLoading(false)
-    })
-    return () => { active = false }
-  }, [open ])
-
-  return (
-    <div data-design-node={open ? 'N1br7' : undefined}>
-      <PhotoRewardPolicyDrawer
-        open={open}
-        versions={versions}
-        loading={loading}
-        error={error}
-        onReload={() => undefined}
-        onClose={onClose}
-        onChanged={onChanged}
-      />
-    </div>
+    </Dialog>
   )
 }
 
@@ -909,11 +918,12 @@ function viewsText(value: unknown): string {
 /**
  * 公式サイト掲載（SyQA1）。列：写真・ペット・どこで使っているか・
  * この30日に見た・公開の同意・掲載先から外す。右に出すときの決めごと。
- * 「この30日に見た」の30日集計の口はまだ無いので、いまの表示回数をそのまま出す。
+ * 30日集計は未接続なので「—」。掲載先の編集・撤回の整理・外した履歴を保つ。
  */
 function PublicationsV8({
   accountId,
   canEdit,
+  publishedCount,
   onChanged,
 }: {
   accountId: string
@@ -926,17 +936,48 @@ function PublicationsV8({
   const [topPhotoId, setTopPhotoId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   const [busyId, setBusyId] = useState('')
+  const [pendingWithdrawals, setPendingWithdrawals] = useState<PublicationItem[]>([])
+  const [withdrawnItems, setWithdrawnItems] = useState<PublicationItem[]>([])
+  const [editing, setEditing] = useState<PublicationItem | null>(null)
+  const [selectedPlacements, setSelectedPlacements] = useState<string[]>([])
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const generation = useRef(0)
+  const loadSequence = useRef(0)
+  const placementChoices = [{ type: 'site', label: 'サイト' }, { type: 'column', label: 'NENコラム' }, { type: 'rich_menu', label: 'リッチメニュー' }, { type: 'form', label: '回答フォーム' }] as const
+  const openPlacements = (item: PublicationItem) => {
+    setEditing(item); setNotice(''); setMenuId(null)
+    setSelectedPlacements((item.placements ?? []).filter((placement) => Number(placement.active ?? 1) === 1).map((placement) => text(placement.placement_type)))
+  }
+  const savePlacements = async () => {
+    if (!editing || !canEdit || busyId) return
+    const accountGeneration = generation.current
+    setBusyId(text(editing.id)); setNotice('')
+    try {
+      const response = await api.nenMembers.updatePhotoPublicationPlacements(text(editing.id), {
+        accountId, expectedVersion: Number(editing.version), placements: placementChoices.filter((choice) => selectedPlacements.includes(choice.type)),
+      }, crypto.randomUUID())
+      if (accountGeneration !== generation.current) return
+      if (!response.success) throw new Error(response.error)
+      setEditing(null); await load(); onChanged()
+    } catch { if (accountGeneration === generation.current) setNotice('使う場所を保存できませんでした。最新の状態を読み直してください。') }
+    finally { if (accountGeneration === generation.current) setBusyId('') }
+  }
+
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setState('loading')
     try {
       const response = await api.nenMembers.photoPublications(accountId)
+      if (sequence !== loadSequence.current) return
       if (!response.success) throw new Error(response.error)
       if (Array.isArray(response.data)) {
         setItems([])
         setTopPhotoId(null)
       } else {
         setItems(response.data.items ?? [])
+        setPendingWithdrawals(response.data.pendingWithdrawals ?? [])
+        setWithdrawnItems(response.data.withdrawnItems ?? [])
         setTopPhotoId(response.data.summary.topPhoto ? text(response.data.summary.topPhoto.id) : null)
       }
       setState('ready')
@@ -946,15 +987,19 @@ function PublicationsV8({
     }
   }, [accountId])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { void load(); return () => { generation.current += 1; loadSequence.current += 1 } }, [load])
 
   const withdraw = async (item: PublicationItem) => {
+    if (!canEdit || busyId) return
+    const accountGeneration = generation.current
     setBusyId(text(item.id))
     setNotice('')
     try {
-      await api.nenMembers.withdrawPhotoPublication(text(item.id), {
+      const response = await api.nenMembers.withdrawPhotoPublication(text(item.id), {
         accountId, expectedVersion: Number(item.version),
       }, crypto.randomUUID())
+      if (accountGeneration !== generation.current) return
+      if (!response.success) throw new Error(response.error)
       notifyToast('写真をすべての掲載先から外しました。審査と同意の履歴、付与済みのマイルは残ります。')
       await load()
       onChanged()
@@ -974,19 +1019,19 @@ function PublicationsV8({
         <ListState kind="forbidden" />
       ) : state === 'error' ? (
         <ListState kind="error" title="公式サイト掲載中の写真を読み込めませんでした" onRetry={() => void load()} />
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && pendingWithdrawals.length === 0 && withdrawnItems.length === 0 ? (
         <ListState kind="empty" emptyPreset="readonly" title="公式サイト掲載中の写真はありません" description="同意のある写真を掲載すると、使っている場所と表示回数がここに出ます。" />
       ) : (
-        <div className={styles.reviewGrid}>
+        <div className={styles.publicationsGrid}>
           <section data-design-node="photo-pubs-table-v8">
             <div className={styles.tableWrap}>
-              <DataTable className="@container">
+              <DataTable className={styles.publicationsTable}>
                 <thead>
                   <TableHeadRow>
                     <Th>写真</Th>
                     <Th>ペット</Th>
                     <Th>どこで使っているか</Th>
-                    <Th align="right">この30日に見た</Th>
+                    <Th align="right"><span title="30日間の集計は未接続です。累計の回数には置き換えません">この30日に見た</span></Th>
                     <Th>公開の同意</Th>
                     <Th align="right">操作</Th>
                   </TableHeadRow>
@@ -995,7 +1040,7 @@ function PublicationsV8({
                   {items.map((item) => {
                     const imageSrc = safePhotoSrc(item.image_url)
                     const name = photoPetDisplayName(item.pet_name, { fallback: 'ペット名未取得', honorific: false })
-                    const consented = Boolean(text(item.publication_consent_at))
+                    const consented = Boolean(text(item.publication_consent_at)) && !text(item.publication_withdrawn_at)
                     return (
                       <Tr key={text(item.id)}>
                         <Td>
@@ -1011,13 +1056,13 @@ function PublicationsV8({
                             <span className={styles.petNameV8}>{name}</span>
                             {topPhotoId === text(item.id) ? <Chip tone="info">いちばん見られた</Chip> : null}
                           </span>
-                          <span className={styles.petSubV8}>{text(item.owner_name) || '名前は伏せています'}</span>
+                          <span className={styles.petSubV8}>{Number(item.hide_owner_name) === 0 ? '名前を出しています' : '名前は伏せています'}</span>
                         </Td>
                         <Td><span className="block truncate text-label text-ink-secondary" title={placementLabels(item)}>{placementLabels(item)}</span></Td>
-                        <Td align="right"><span className="text-label tabular-nums text-ink">{viewsText(item.view_count)}</span></Td>
+                        <Td align="right"><span className="text-label tabular-nums text-ink">{viewsText(item.view_count_30d)}</span></Td>
                         <Td>{consented ? <Chip tone="ok">同意あり</Chip> : <Chip tone="neutral">未取得</Chip>}</Td>
                         <Td align="right">
-                          <Button
+                          <div className={styles.publicationActions}><Button
                             variant="secondary"
                             disabled={!canEdit || busyId === text(item.id)}
                             title={!canEdit ? '見るだけの権限では掲載先から外せません' : undefined}
@@ -1026,7 +1071,7 @@ function PublicationsV8({
                             busyLabel="外しています..."
                           >
                             掲載先から外す
-                          </Button>
+                          </Button><MoreAction aria-label={`${name}の掲載操作`} onClick={() => setMenuId(menuId === text(item.id) ? null : text(item.id))} /><ActionMenu open={menuId === text(item.id)} onClose={() => setMenuId(null)} items={[{ id: 'placements', label: '使う場所', disabled: !canEdit, disabledReason: !canEdit ? '閲覧のみの権限です' : undefined, onSelect: () => openPlacements(item) }]} /></div>
                         </Td>
                       </Tr>
                     )
@@ -1034,7 +1079,11 @@ function PublicationsV8({
                 </tbody>
               </DataTable>
             </div>
-            <p className={styles.listHintV8}>公式サイト掲載中 {items.length}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）</p>
+            <p className={styles.listHintV8}>公式サイト掲載中 {publishedCount ?? '—'}枚のうち {items.length}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）</p>
+            <details className={styles.publicationHistory}><summary>掲載の整理と外した履歴（{pendingWithdrawals.length + withdrawnItems.length}件）</summary>
+              {pendingWithdrawals.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p><Button variant="secondary" disabled={!canEdit || Boolean(busyId)} onClick={() => void withdraw(item)}>掲載先から外す</Button></div>)}
+              {withdrawnItems.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || '—'}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
+            </details>
           </section>
           <div className={styles.rail} data-design="Right" data-design-node="photo-pubs-rail-v8">
             <section className={styles.railCard} aria-label="出すときの決めごと">
@@ -1046,31 +1095,42 @@ function PublicationsV8({
                 <li>外しても採用時のマイルは戻りません</li>
                 <li>原本は公開しません。選んだ場所へ公開用画像を出します</li>
               </ul>
-              <Button variant="secondary" disabled title="並び順の変更は今の作りのままです">並び順を変える</Button>
+              <Button variant="secondary" disabled title="掲載順を保存するAPIは未接続です">並び順を変える</Button>
             </section>
           </div>
         </div>
       )}
+      <Dialog open={Boolean(editing)} title="使う場所" description="同意のある写真の掲載先を選びます。原本は公開しません。" busy={Boolean(busyId)} error={notice} confirmLabel="保存する" onCancel={() => { if (!busyId) setEditing(null) }} onConfirm={() => void savePlacements()}>
+        {placementChoices.map((choice) => <Checkbox key={choice.type} checked={selectedPlacements.includes(choice.type)} onCheckedChange={(checked) => setSelectedPlacements((current) => checked ? [...current, choice.type] : current.filter((type) => type !== choice.type))}>{choice.label}</Checkbox>)}
+      </Dialog>
     </>
   )
 }
 
 /**
- * 1枚ずつ大きく見る。今の作りのまま v7 の詳細部品を使う
+ * 1枚ずつ大きく見る。審査の詳細部品を使う
  * （V8 の板に無いため。向きの保存・マイルの手続き・原本の取り出しを含む）。
  */
 function DetailV8({
   accountId,
   photos,
+  initialPhotoId,
+  canEdit,
+  onPhotoChange,
+  onReject,
   onBack,
   onReload,
 }: {
   accountId: string
+  initialPhotoId?: string
+  canEdit: boolean
+  onPhotoChange: (id: string) => void
+  onReject: (id: string) => void
   photos: Array<Record<string, unknown>>
   onBack: () => void
   onReload: () => void
 }) {
-  const [photoId, setPhotoId] = useState<string | null>(() => (photos.length > 0 ? text(photos[0].id) : null))
+  const [photoId, setPhotoId] = useState<string | null>(() => initialPhotoId ?? (photos.length > 0 ? text(photos[0].id) : null))
   const [detailPhoto, setDetailPhoto] = useState<Record<string, unknown> | null>(null)
   const [detailState, setDetailState] = useState<'ready' | 'empty' | 'error' | 'forbidden'>('empty')
   const [detailLoading, setDetailLoading] = useState(false)
@@ -1089,10 +1149,12 @@ function DetailV8({
   const position = photoId ? Math.max(0, photos.findIndex((photo) => text(photo.id) === photoId)) : 0
 
   const refreshDetailAssets = useCallback(async (id: string) => {
+    const sequence = sequenceRef.current
     const [statusResult, derivativesResult] = await Promise.allSettled([
       api.nenMembers.photoAssetStatus(id, accountId),
       api.nenMembers.photoDerivatives(id, accountId),
     ])
+    if (sequence !== sequenceRef.current) return
     const loaded = statusResult.status === 'fulfilled' && statusResult.value.success ? statusResult.value.data : null
     const derivatives = derivativesResult.status === 'fulfilled' && derivativesResult.value.success ? derivativesResult.value.data : null
     setDetailAssetStatus(loaded)
@@ -1131,10 +1193,12 @@ function DetailV8({
 
   useEffect(() => {
     if (photoId) void openDetail(photoId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 初回だけ開く
-  }, [])
+    return () => { sequenceRef.current += 1 }
+  }, [photoId, openDetail])
+  useEffect(() => { if (initialPhotoId) setPhotoId(initialPhotoId) }, [initialPhotoId])
 
-  const review = async (id: string, nextStatus: 'adopted' | 'rejected') => {
+  const review = async (id: string, nextStatus: 'adopted' | 'rejected', withoutReward = false) => {
+    if (!canEdit) return
     const idempotencyKey = reviewKeys.current.get(id) ?? crypto.randomUUID()
     reviewKeys.current.set(id, idempotencyKey)
     setReviewing(true)
@@ -1142,6 +1206,7 @@ function DetailV8({
       const response = await api.nenMembers.reviewPhoto(id, {
         accountId,
         status: nextStatus,
+        ...(withoutReward ? { withoutReward: true } : {}),
         expectedVersion: reviewVersionOf(detailPhoto && text(detailPhoto.id) === id ? detailPhoto : photos.find((photo) => text(photo.id) === id)),
       }, idempotencyKey)
       if (!response.success) throw new Error(response.error)
@@ -1155,7 +1220,7 @@ function DetailV8({
   }
 
   const pointAction = async (action: 'retry' | 'reconcile') => {
-    if (!detailPhoto) return
+    if (!detailPhoto || !canEdit) return
     const id = text(detailPhoto.id)
     setPointActionBusy(action)
     try {
@@ -1166,7 +1231,7 @@ function DetailV8({
         setNotice(response.error || 'マイルの手続きに失敗しました。通信を確かめて、もう一度お試しください。')
         return
       }
-      setNotice(response.data.synced ? 'マイルを付けました。' : '手続きはまだ完了していません。')
+      setNotice(response.data.synced ? (response.data.duplicate ? 'EC側ではすでに付与済みでした。' : 'マイルを付けました。') : '手続きはまだ完了していません。')
       void openDetail(id)
     } catch {
       setNotice('マイルの手続きに失敗しました。通信を確かめて、もう一度お試しください。')
@@ -1176,7 +1241,7 @@ function DetailV8({
   }
 
   const saveRotation = async (rotation: 0 | 90 | 180 | 270) => {
-    if (!detailPhoto) return
+    if (!detailPhoto || !canEdit) return
     const id = text(detailPhoto.id)
     const idempotencyKey = rotationKeys.current.get(id) ?? crypto.randomUUID()
     rotationKeys.current.set(id, idempotencyKey)
@@ -1202,7 +1267,14 @@ function DetailV8({
 
   const downloadOriginal = async (code: string) => {
     if (!detailPhoto) throw new Error('写真を読み直してください。')
-    const grant = await api.nenMembers.photoOriginalStepUp({ method: 'totp', value: code })
+    const method = readSessionSnapshot()?.stepUpMethod ?? 'totp'
+    if (method === 'none') throw new Error('原本の保存には再認証が必要です。管理者にご相談ください。')
+    let grant
+    try { grant = await api.nenMembers.photoOriginalStepUp({ method, value: code }) }
+    catch (error) {
+      if (error instanceof ApiError && (error.status === 400 || error.status === 401)) throw new Error('再認証コードを確認してください。')
+      throw error
+    }
     if (!grant.success) throw new Error(grant.error)
     const issued = await api.nenMembers.issuePhotoOriginalDownload(
       text(detailPhoto.id),
@@ -1222,11 +1294,11 @@ function DetailV8({
 
   const move = (direction: 1 | -1) => {
     const next = photos[position + direction]
-    if (next) void openDetail(text(next.id))
+    if (next) { onPhotoChange(text(next.id)); setPhotoId(text(next.id)) }
   }
 
   const processReviewAsset = async () => {
-    if (!detailPhoto) return
+    if (!detailPhoto || !canEdit) return
     const id = text(detailPhoto.id)
     setAssetProcessing(true)
     try {
@@ -1249,6 +1321,7 @@ function DetailV8({
 
   return (
     <PhotoReviewDetail
+      canEdit={canEdit}
       photo={detailPhoto}
       position={position}
       total={photos.length}
@@ -1266,8 +1339,8 @@ function DetailV8({
       onBack={onBack}
       onMove={move}
       onApprove={() => { if (detailPhoto) void review(text(detailPhoto.id), 'adopted') }}
-      onAdoptWithoutReward={() => { if (detailPhoto) void review(text(detailPhoto.id), 'adopted') }}
-      onReturn={onBack}
+      onAdoptWithoutReward={() => { if (detailPhoto) void review(text(detailPhoto.id), 'adopted', true) }}
+      onReturn={() => { if (detailPhoto && canEdit) onReject(text(detailPhoto.id)) }}
       onProcessReviewAsset={() => void processReviewAsset()}
       onSaveRotation={(rotation) => saveRotation(rotation)}
       onDownloadOriginal={downloadOriginal}

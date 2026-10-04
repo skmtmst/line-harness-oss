@@ -17,6 +17,8 @@ const nenMembers = vi.hoisted(() => ({
   bulkReviewPhotos: vi.fn(),
   retryPhotoReviewNotification: vi.fn(),
   withdrawPhotoPublication: vi.fn(),
+  createPhotoRewardPolicyVersion: vi.fn(),
+  revertPhotoRewardPolicyVersion: vi.fn(),
 }))
 const staffMe = vi.hoisted(() => ({ me: vi.fn() }))
 
@@ -91,7 +93,7 @@ function mockAll() {
   })
 }
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); window.history.replaceState(null, '', '/'); vi.clearAllMocks() })
 
 describe('投稿 V8', () => {
   it('審査待ちは TkA4D の印でカードと操作を出す', async () => {
@@ -100,8 +102,8 @@ describe('投稿 V8', () => {
     const { container } = render(<PhotoReviewV8 accountId="account-a" />)
     await screen.findByText('散歩のあと', { exact: false })
     expect(container.querySelector('[data-design-node="TkA4D"]')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '✓ 採用する' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '× 見送る' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'こむぎの写真を採用する' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'こむぎの写真を見送る' })).toBeTruthy()
     expect(screen.getByText('報酬の決まり')).toBeTruthy()
     expect(screen.getByText('見送り理由の内訳（今月）')).toBeTruthy()
   })
@@ -112,7 +114,7 @@ describe('投稿 V8', () => {
     const { container } = render(<PhotoReviewV8 accountId="account-a" />)
     await screen.findByText('散歩のあと', { exact: false })
     expect(container.querySelector('[data-design-node="Jn95h"]')).toBeTruthy()
-    expect((screen.getByRole('button', { name: '✓ 採用する' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'こむぎの写真を採用する' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('見送るを押すと ujcar の窓が開く', async () => {
@@ -120,10 +122,26 @@ describe('投稿 V8', () => {
     mockAll()
     const { container } = render(<PhotoReviewV8 accountId="account-a" />)
     await screen.findByText('散歩のあと', { exact: false })
-    fireEvent.click(screen.getByRole('button', { name: '× 見送る' }))
+    fireEvent.click(screen.getByRole('button', { name: 'こむぎの写真を見送る' }))
     expect(await screen.findByText('この写真を見送りますか？')).toBeTruthy()
-    expect(container.querySelector('[data-design-node="ujcar"]')).toBeTruthy()
+    expect(document.querySelector('[data-design-node="ujcar"]')).toBeTruthy()
     expect(screen.getByText('見送った理由')).toBeTruthy()
+  })
+
+  it('見送りのプレビューは送信される理由・補足・再投稿案内を一度ずつ表示する', async () => {
+    staffMe.me.mockResolvedValue({ success: true, data: { role: 'owner' } })
+    mockAll()
+    render(<PhotoReviewV8 accountId="account-a" />)
+    await screen.findByText('散歩のあと', { exact: false })
+    fireEvent.click(screen.getByRole('button', { name: 'こむぎの写真を見送る' }))
+    fireEvent.click(screen.getByRole('radio', { name: '暗くて見えにくいです' }))
+    const supplement = '明るいところで、もう一度お願いできますか。'
+    const preview = screen.getByText('お写真をご投稿いただきありがとうございます。', { exact: false })
+    expect(preview.textContent?.split(supplement)).toHaveLength(2)
+    expect(preview.textContent).toContain('今回は「写真が暗い・ぼやけている」のため、掲載を見送らせていただきました。')
+    expect(preview.textContent).toContain('内容をご確認のうえ、よろしければ別のお写真をご投稿ください。')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'もう一度 送ってもらえるようお願いする' }))
+    expect(preview.textContent).not.toContain('別のお写真をご投稿ください。')
   })
 
   it('公式サイト掲載は SyQA1 の印で表を出す', async () => {
@@ -137,4 +155,30 @@ describe('投稿 V8', () => {
     expect(screen.getByRole('button', { name: '掲載先から外す' })).toBeTruthy()
     expect(screen.getByText('出すときの決めごと')).toBeTruthy()
   })
+  it('履歴の保存は採用報酬と版を送り、予約日時を日本時間で送る', async () => {
+    staffMe.me.mockResolvedValue({ success: true, data: { role: 'owner' } })
+    mockAll()
+    nenMembers.createPhotoRewardPolicyVersion.mockResolvedValue({ success: true, data: { version: { versionNumber: 4 } } })
+    render(<PhotoReviewV8 accountId="account-a" />)
+    await screen.findByText('散歩のあと', { exact: false })
+    fireEvent.click(screen.getByRole('button', { name: '版の履歴を見る' }))
+    await screen.findByText('引き出し：新しい版を作る')
+    fireEvent.change(screen.getByLabelText('採用したら（マイル）'), { target: { value: '120' } })
+    fireEvent.change(screen.getByLabelText('ひとこと（なぜ変えるか）'), { target: { value: '10月の報酬' } })
+    fireEvent.change(screen.getByLabelText('使い始め（日本時間・空ならすぐ）'), { target: { value: '2026-10-15T00:00' } })
+    fireEvent.click(screen.getByRole('button', { name: '版を予約する' }))
+    await flush()
+    expect(nenMembers.createPhotoRewardPolicyVersion).toHaveBeenCalledWith({ points: 120, summary: '10月の報酬', effectiveFrom: '2026-10-15T00:00:00+09:00', expectedVersion: 3 })
+  })
+
+  it('閲覧のみでは履歴は見られるが新しい版を作れない', async () => {
+    staffMe.me.mockResolvedValue({ success: true, data: { role: 'staff' } })
+    mockAll()
+    render(<PhotoReviewV8 accountId="account-a" />)
+    await screen.findByText('散歩のあと', { exact: false })
+    fireEvent.click(screen.getByRole('button', { name: '版の履歴を見る' }))
+    await screen.findByText('いま使っている版')
+    expect(screen.queryByLabelText('採用したら（マイル）')).toBeNull()
+  })
+
 })
