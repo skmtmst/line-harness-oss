@@ -2,7 +2,7 @@
 
 /* Pencil の6枚のHTMLをもとにした投稿画面。既存の審査APIを接続する。 */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, CircleCheck, Clock3, Globe, History, HelpCircle, Undo2, X, Check, Send } from 'lucide-react'
+import { Globe, History, HelpCircle, Undo2, X, Check, Send } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -20,14 +20,14 @@ import SegmentedControl from '@/components/shared/segmented'
 import { notifyToast } from '@/components/shared/toast'
 import { Tabs } from '@/components/shared/tabs'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { TextField } from '@/components/shared/text-field'
 import { formatNumber } from '@/lib/format'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import { safePhotoSrc } from './photo-src'
 import { photoNoticeFor } from './photo-notice'
 import { photoReviewEntryFrom, photoReviewSearch, type PhotoReviewEntry } from './photo-review-query'
-import { formatMinutesRough } from '@/lib/format-duration'
+import { formatMinutesRough, formatWaitRough } from '@/lib/format-duration'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { mileStatusLabel, reviewVersionOf, text } from './photo-text'
 import { PhotoReviewDetail } from './photo-review-detail'
 import PhotoPolicyHistoryV8 from './photo-policy-history-v8'
@@ -45,6 +45,14 @@ const REVIEW_REASONS: Array<{ value: ReviewReasonCode; label: string; message: s
   { value: 'duplicate', label: '同じ写真をすでにもらっています', message: 'すでにいただいた写真と重複しているようです。別のお写真をお願いできますか。' },
   { value: 'other', label: '自分で書く', message: '文章をそのまま書きます。' },
 ]
+// 送信文の理由名は Worker の photoReviewMessage と同じにする。
+const SENT_REASON_LABELS: Record<ReviewReasonCode, string> = {
+  quality: '写真が暗い・ぼやけている',
+  privacy: '人の顔や個人情報が写っている',
+  unrelated: 'ペットと関係のない内容が写っている',
+  duplicate: '同じ写真がすでに投稿されている',
+  other: 'そのほか',
+}
 
 const PHOTO_PAGE_SIZE = 200
 function photoPagePath(accountId: string, offset: number, q = ''): string {
@@ -66,9 +74,8 @@ function boardNode(view: PhotoView, status: PhotoStatus, canEdit: boolean): stri
 function isThisMonth(value: string): boolean {
   const time = Date.parse(value)
   if (!Number.isFinite(time)) return false
-  const now = new Date()
-  const date = new Date(time)
-  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
+  const month = (date: Date) => new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric' }).format(date)
+  return month(new Date(time)) === month(new Date())
 }
 
 /**
@@ -260,7 +267,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       const response = await api.nenMembers.reviewPhoto(id, {
         accountId,
         status: nextStatus,
-        expectedVersion: reviewVersionOf(photos.find((photo) => text(photo.id) === id)),
+        expectedVersion: reviewVersionOf(photos.find((photo) => text(photo.id) === id) ?? (text(rejectingPhoto?.id) === id ? rejectingPhoto : null)),
         ...(rejection
           ? {
               reasonCode: rejection.reasonCode,
@@ -308,6 +315,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   }
 
   const [rejectingPhotoId, setRejectingPhotoId] = useState<string | null>(null)
+  const [rejectingPhoto, setRejectingPhoto] = useState<Record<string, unknown> | null>(null)
   const [bulkApproveOpen, setBulkApproveOpen] = useState(false)
   const [bulkReturnOpen, setBulkReturnOpen] = useState(false)
   const [bulkReviewing, setBulkReviewing] = useState(false)
@@ -319,6 +327,13 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
   const openRejectDialog = (id: string) => {
     setRejectingPhotoId(id)
+    setRejectingPhoto(photos.find((photo) => text(photo.id) === id) ?? null)
+    if (accountId && !photos.some((photo) => text(photo.id) === id)) {
+      const generation = accountGeneration.current
+      void api.nenMembers.photo(id, accountId).then((response) => {
+        if (generation === accountGeneration.current && response.success && !Array.isArray(response.data)) setRejectingPhoto(response.data)
+      }).catch(() => undefined)
+    }
     setReasonCode('quality')
     setReasonNote('')
     setReasonError('')
@@ -444,9 +459,9 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
       {!canEdit ? <div className={styles.readonly}><NoteBar tone="info">閲覧のみで見ています。変える操作は管理者に頼んでください。</NoteBar></div> : null}
       <ul className={styles.kpiBand} aria-label="投稿の数の帯">
-        <KpiCellV8 icon="pending" label="審査待ち" help={`まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? '—'}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? '—' : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`} value={countsReady ? reviewMetrics?.pendingCount ?? counts.pending : null} unit="枚" sub={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatPhotoReceivedAt(reviewMetrics.oldestPendingAt)}` : 'いちばん古いもの —'} />
-        <KpiCellV8 icon="help" label="今月採用" help="今月 採用した写真の枚数です" value={countsReady ? adoptedThisMonth : null} unit="枚" sub={policyPoints == null ? '1枚ごとに —' : `1枚ごとに ${formatNumber(policyPoints)}マイル`} />
-        <KpiCellV8 icon="help" label="今月見送り" help="今月 見送った写真の枚数です" value={countsReady ? rejectedThisMonth.length : null} unit="枚" sub={`理由：${topReason}`} />
+        <KpiCellV8 icon="pending" label="審査待ち" help={`まだ決めていない写真の枚数です。注意候補 ${reviewMetrics?.attentionCount ?? '—'}件・投稿から審査までの日数：${reviewMetrics?.averageReviewMinutes == null ? '—' : formatMinutesRough(reviewMetrics.averageReviewMinutes)}`} value={countsReady ? reviewMetrics?.pendingCount ?? counts.pending : null} unit="枚" sub={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatWaitRough((Date.now() - Date.parse(reviewMetrics.oldestPendingAt)) / 60000)}` : 'いちばん古いもの —'} />
+        <KpiCellV8 icon="help" label="今月採用" help={hasMorePhotos ? '読み込んだ写真の集計です。続きの写真は含みません' : '今月 採用した写真の枚数です'} value={countsReady ? adoptedThisMonth : null} unit={hasMorePhotos ? '枚以上' : '枚'} sub={policyPoints == null ? '1枚ごとに —' : `1枚ごとに ${formatNumber(policyPoints)}マイル`} />
+        <KpiCellV8 icon="help" label="今月見送り" help={hasMorePhotos ? '読み込んだ写真の集計です。理由の内訳も続きの写真は含みません' : '今月 見送った写真の枚数です'} value={countsReady ? rejectedThisMonth.length : null} unit={hasMorePhotos ? '枚以上' : '枚'} sub={`理由：${topReason}`} />
         <KpiCellV8 icon="published" label="公式サイト掲載" help="いま載っている写真の枚数です" value={publishedCount} unit="枚" sub="いま載っている写真" />
       </ul>
 
@@ -514,7 +529,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
       {rejectingPhotoId ? (
         <RejectDialogV8
-          photo={photos.find((photo) => text(photo.id) === rejectingPhotoId) ?? null}
+          photo={rejectingPhoto}
           reasonCode={reasonCode}
           reasonNote={reasonNote}
           reasonError={reasonError}
@@ -677,7 +692,7 @@ function ReviewListV8(props: ReviewListV8Props) {
               <section className={styles.railCard} aria-label="報酬の決まり">
                 <h2 className={styles.railTitle}>報酬の決まり</h2>
                 <p className={styles.railRow}>採用したら <strong>{props.policyPoints == null ? '—' : `${formatNumber(props.policyPoints)}マイル`}</strong></p>
-                <p className={styles.railNote}>採用すると、投稿した人にLINEでお知らせします</p>
+                <p className={styles.railRow}>公式サイトに載ったら <strong title="掲載時の追加報酬は未接続です">—</strong></p><p className={styles.railNote}>採用すると、投稿した人にLINEでお知らせします</p>
               </section>
               <section className={styles.railCard} aria-label="確認する順">
                 <h2 className={styles.railTitle}>確認する順</h2>
@@ -757,7 +772,7 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
       <div className={styles.cardBody}>
         <div className={styles.cardNameRow}>
           <p className={styles.cardName} title={name}>{name}</p>
-          <span className={styles.cardDate}>{formatPhotoReceivedAt(photo.created_at)}</span>
+          <span className={styles.cardDate} title={formatPhotoReceivedAt(photo.created_at)}>{Number.isFinite(Date.parse(text(photo.created_at))) ? new Date(text(photo.created_at)).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }) : '日時不明'}</span>
         </div>
         <p className={styles.cardOwner} title={`${text(photo.owner_name)} ${text(photo.customer_id)}`}>{text(photo.owner_name) || '名前未取得'}{text(photo.customer_id) ? `・EC-${text(photo.customer_id)}` : ''}</p>
         {text(photo.caption) ? <p className={styles.cardCaption} title={text(photo.caption)}>「{text(photo.caption)}」</p> : null}
@@ -839,9 +854,13 @@ function RejectDialogV8({
   onConfirm: () => void
 }) {
   const name = photo ? photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender }) : '写真'
-  const selectedReason = REVIEW_REASONS.find((reason) => reason.value === reasonCode)
   const preview = photo
-    ? `${name}の写真をありがとうございます。${reasonCode === 'other' ? reasonNote || 'お客様に送る文章を入力してください。' : selectedReason?.message ?? ''}${reasonNote && reasonCode !== 'other' ? `\n${reasonNote}` : ''}\nお手数をおかけします。`
+    ? [
+      'お写真をご投稿いただきありがとうございます。',
+      `今回は「${SENT_REASON_LABELS[reasonCode]}」のため、掲載を見送らせていただきました。`,
+      ...(reasonNote.trim() ? [reasonNote.trim()] : []),
+      ...(resubmitInvite ? ['内容をご確認のうえ、よろしければ別のお写真をご投稿ください。'] : []),
+    ].join('\n')
     : ''
   const imageSrc = photo ? safePhotoSrc(photo.image_url) : null
   return (
@@ -877,7 +896,7 @@ function RejectDialogV8({
         <details className={styles.followup}><summary>次の投稿の確認方法</summary><Checkbox checked={watchSubmitter} onCheckedChange={onWatchSubmitter}>この人の次の投稿は、必ず人が見る</Checkbox></details>
         <div>
           <p className={styles.fieldLabel}>投稿者に届く内容</p>
-          <div className={styles.previewBox}><p>{preview}{resubmitInvite ? '\nまたのお写真をお待ちしています。' : ''}</p></div>
+          <div className={styles.previewBox}><p>{preview}</p></div>
         </div>
     </Dialog>
   )
@@ -1130,10 +1149,12 @@ function DetailV8({
   const position = photoId ? Math.max(0, photos.findIndex((photo) => text(photo.id) === photoId)) : 0
 
   const refreshDetailAssets = useCallback(async (id: string) => {
+    const sequence = sequenceRef.current
     const [statusResult, derivativesResult] = await Promise.allSettled([
       api.nenMembers.photoAssetStatus(id, accountId),
       api.nenMembers.photoDerivatives(id, accountId),
     ])
+    if (sequence !== sequenceRef.current) return
     const loaded = statusResult.status === 'fulfilled' && statusResult.value.success ? statusResult.value.data : null
     const derivatives = derivativesResult.status === 'fulfilled' && derivativesResult.value.success ? derivativesResult.value.data : null
     setDetailAssetStatus(loaded)
@@ -1172,10 +1193,9 @@ function DetailV8({
 
   useEffect(() => {
     if (photoId) void openDetail(photoId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 初回だけ開く
     return () => { sequenceRef.current += 1 }
-  }, [])
-  useEffect(() => { if (initialPhotoId && initialPhotoId !== photoId) void openDetail(initialPhotoId) }, [initialPhotoId, photoId, openDetail])
+  }, [photoId, openDetail])
+  useEffect(() => { if (initialPhotoId) setPhotoId(initialPhotoId) }, [initialPhotoId])
 
   const review = async (id: string, nextStatus: 'adopted' | 'rejected', withoutReward = false) => {
     if (!canEdit) return
@@ -1200,7 +1220,7 @@ function DetailV8({
   }
 
   const pointAction = async (action: 'retry' | 'reconcile') => {
-    if (!detailPhoto) return
+    if (!detailPhoto || !canEdit) return
     const id = text(detailPhoto.id)
     setPointActionBusy(action)
     try {
@@ -1221,7 +1241,7 @@ function DetailV8({
   }
 
   const saveRotation = async (rotation: 0 | 90 | 180 | 270) => {
-    if (!detailPhoto) return
+    if (!detailPhoto || !canEdit) return
     const id = text(detailPhoto.id)
     const idempotencyKey = rotationKeys.current.get(id) ?? crypto.randomUUID()
     rotationKeys.current.set(id, idempotencyKey)
@@ -1247,7 +1267,14 @@ function DetailV8({
 
   const downloadOriginal = async (code: string) => {
     if (!detailPhoto) throw new Error('写真を読み直してください。')
-    const grant = await api.nenMembers.photoOriginalStepUp({ method: 'totp', value: code })
+    const method = readSessionSnapshot()?.stepUpMethod ?? 'totp'
+    if (method === 'none') throw new Error('原本の保存には再認証が必要です。管理者にご相談ください。')
+    let grant
+    try { grant = await api.nenMembers.photoOriginalStepUp({ method, value: code }) }
+    catch (error) {
+      if (error instanceof ApiError && (error.status === 400 || error.status === 401)) throw new Error('再認証コードを確認してください。')
+      throw error
+    }
     if (!grant.success) throw new Error(grant.error)
     const issued = await api.nenMembers.issuePhotoOriginalDownload(
       text(detailPhoto.id),
@@ -1267,11 +1294,11 @@ function DetailV8({
 
   const move = (direction: 1 | -1) => {
     const next = photos[position + direction]
-    if (next) { onPhotoChange(text(next.id)); void openDetail(text(next.id)) }
+    if (next) { onPhotoChange(text(next.id)); setPhotoId(text(next.id)) }
   }
 
   const processReviewAsset = async () => {
-    if (!detailPhoto) return
+    if (!detailPhoto || !canEdit) return
     const id = text(detailPhoto.id)
     setAssetProcessing(true)
     try {
@@ -1294,6 +1321,7 @@ function DetailV8({
 
   return (
     <PhotoReviewDetail
+      canEdit={canEdit}
       photo={detailPhoto}
       position={position}
       total={photos.length}

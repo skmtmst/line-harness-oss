@@ -100,6 +100,8 @@
 
 /* 数の帯の右上の「…」：由来の説明を title で見せるだけの印。 */
 .kpiHelp {
+  min-height: 24px;
+  height: 24px;
   padding: 0 4px;
   border: 0;
   background: transparent;
@@ -111,6 +113,10 @@
 }
 
 .kpiValue {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  height: 26px;
   margin: 0;
   color: var(--color-ink);
   font-size: 22px;
@@ -121,7 +127,7 @@
 }
 
 .kpiUnit {
-  margin-left: 2px;
+  line-height: 18px;
   font-size: 12px;
   font-weight: 600;
 }
@@ -132,7 +138,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 /* 道具の段：探す＋右に見え方の切り替え。 */
@@ -500,24 +507,8 @@
   line-height: 1.8;
 }
 
-/* 板が狭いとき：数の帯は2×2、審査は1列に畳む。 */
+/* 板が狭いとき：写真は2列に畳む。PCでは数の帯は4列を保つ。 */
 @container (max-width: 900px) {
-  .kpiBand {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .kpiCell + .kpiCell {
-    border-left: 0;
-  }
-
-  .kpiCell:nth-child(even) {
-    border-left: 1px solid var(--color-hairline);
-  }
-
-  .kpiCell:nth-child(n + 3) {
-    border-top: 1px solid var(--color-hairline);
-  }
-
   .reviewGrid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -529,6 +520,13 @@
   .toolsTail {
     margin-left: 0;
   }
+}
+
+@container (max-width: 600px) {
+  .kpiBand { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpiCell + .kpiCell { border-left: 0; }
+  .kpiCell:nth-child(even) { border-left: 1px solid var(--color-hairline); }
+  .kpiCell:nth-child(n + 3) { border-top: 1px solid var(--color-hairline); }
 }
 
 @container (max-width: 560px) {
@@ -564,8 +562,8 @@
 .adopted .toolsNote { max-width: 540px; line-height: 1.5; }
 
 /* ujcar：620pxの窓、理由・補足・届く文章・危険ボタン。窓の制御は共通部品。 */
-:global([data-design-node="ujcar"]) > :global([role="alertdialog"]) { width: min(620px, 100%); border-radius: 16px; }
-:global([data-design-node="ujcar"]) :global([role="alertdialog"]) > div:nth-child(2) { display: flex; flex-direction: column; gap: 14px; }
+:global([data-design-node="ujcar"]):has(.reasonTextarea) > :global([role="alertdialog"]) { width: min(620px, 100%); border-radius: 16px; }
+:global([data-design-node="ujcar"]):has(.reasonTextarea) :global([role="alertdialog"]) > div:nth-child(2) { display: flex; flex-direction: column; gap: 14px; }
 .pillDot { width: 18px; height: 18px; border: 1.5px solid var(--color-control-border); }
 .reasonTextarea { min-height: 56px; width: 100%; resize: vertical; border: 1px solid var(--color-control-border); border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 19px; font-weight: 400; }
 .previewBox { background: var(--color-line-preview-bg, #8fa9c4); border: 0; border-radius: 10px; }
@@ -575,8 +573,8 @@
 .followup summary { cursor: pointer; }
 
 /* N1br7.html：640pxの中央の窓、下の2列は予約と新しい版。 */
-:global([data-design-node="N1br7"]) > :global([role="dialog"]) { width: min(640px, 100%); padding: 24px; border-radius: 16px; }
-:global([data-design-node="N1br7"]) > :global([role="dialog"]) > div:nth-child(2) { display: flex; flex-direction: column; gap: 14px; }
+:global([data-design-node="N1br7"]):has(.historyAnchor) > :global([role="dialog"]) { width: min(640px, 100%); padding: 24px; border-radius: 16px; }
+:global([data-design-node="N1br7"]):has(.historyAnchor) > :global([role="dialog"]) > div:nth-child(2) { display: flex; flex-direction: column; gap: 14px; }
 .historyTable { border: 1px solid var(--color-hairline); border-radius: 12px; overflow: hidden; }
 .historyTable table { table-layout: fixed; width: 100%; }
 .historyTable th, .historyTable td { padding: 10px 12px; font-size: 11px; overflow-wrap: anywhere; }
@@ -614,3 +612,5 @@
 .publicationHistory > div { padding: 12px; border-bottom: 1px solid var(--color-hairline); }
 @container (max-width: 1099px) { .publicationsGrid { grid-template-columns: minmax(0, 1fr); } .publicationsGrid .rail { flex-direction: row; } }
 @container (max-width: 650px) { .tableWrap { overflow-x: auto; } .publicationsTable { min-width: 650px; } }
+
+.historyAnchor { display: none; }
