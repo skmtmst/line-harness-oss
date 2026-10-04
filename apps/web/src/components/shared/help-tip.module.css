@@ -219,3 +219,14 @@
 }
 
 }
+
+/* 正本 f6zwfs：影なし、枠なし、上下6、行間18。 */
+[data-theme='v8'] .tip {
+  display: flex; align-items: flex-start; gap: 0; padding: 6px 10px;
+  border: 0; border-radius: 8px; box-shadow: none;
+  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+  font-size: 12px; line-height: 18px; font-weight: 400;
+}
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .tip { -webkit-font-smoothing: auto; }
