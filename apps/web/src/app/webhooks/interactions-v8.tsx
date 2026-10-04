@@ -17,8 +17,6 @@
  * - 返事の札：失敗は相手の返事、受け取りは「受け取った」、送って届いた
  *   ものは相手の返事を出す。
  * - 試した回数のかっこ（1分・5分・30分あけて）：送り直しの間隔の決まり。
- * - 送った・届いた中身の黒い枠：本文の口が無いので、きっかけと返事の
- *   安全な表示だけ出す。URL・鍵・本文はここにも出さない。
  */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/shared'
@@ -530,9 +528,10 @@ function InteractionsV8Inner() {
       </div>
 
       <Dialog open={selected !== null} title="やり取りの中身" description="接続先URL、シークレット、本文は安全のため表示しません。" onCancel={() => setSelected(null)}>
-        {selected ? (
+        {selected && selectedAccountId ? (
           <InteractionDetailV8
             item={selected}
+            accountId={selectedAccountId}
             techOpen={techOpen}
             setTechOpen={setTechOpen}
             canRetry={canRetry}
@@ -560,8 +559,9 @@ function InteractionsV8Inner() {
   )
 }
 
-function InteractionDetailV8({ item, techOpen, setTechOpen, canRetry, retrying, onRetry, onClose }: {
+function InteractionDetailV8({ item, accountId, techOpen, setTechOpen, canRetry, retrying, onRetry, onClose }: {
   item: WebhookInteraction
+  accountId: string
   techOpen: boolean
   setTechOpen: (open: boolean) => void
   canRetry: boolean
@@ -571,6 +571,31 @@ function InteractionDetailV8({ item, techOpen, setTechOpen, canRetry, retrying, 
 }) {
   const retryable = canRetryNow(item, canRetry)
   const failed = item.status === 'failed'
+  const [payloadBody, setPayloadBody] = useState<unknown | undefined>(undefined)
+  const [payloadAvailable, setPayloadAvailable] = useState(true)
+  useEffect(() => {
+    let alive = true
+    setPayloadBody(undefined)
+    setPayloadAvailable(true)
+    api.webhooks.interactions.payload(item.id, accountId).then(
+      (res) => {
+        if (!alive) return
+        if (res.success) {
+          setPayloadBody(res.data.body)
+          setPayloadAvailable(res.data.available)
+        } else {
+          setPayloadAvailable(false)
+        }
+      },
+      () => {
+        if (!alive) return
+        setPayloadAvailable(false)
+      },
+    )
+    return () => {
+      alive = false
+    }
+  }, [item.id, accountId])
   return (
     <div data-design-node="DA0Ag">
       <p>
@@ -589,8 +614,15 @@ function InteractionDetailV8({ item, techOpen, setTechOpen, canRetry, retrying, 
           <span className={`${styles.pill} ${retryable ? styles.pillActive : styles.pillNeutral}`}>● {retryable ? 'やり直せる' : 'やり直せない'}</span>
         </dd></div>
       </dl>
+      <p className={styles.payloadTitle}>送った・届いた中身</p>
       <div className={styles.payloadBox}>
-        {item.triggerSummary}{'\n'}{item.responseLabel}
+        {payloadBody === undefined
+          ? '中身を読み込んでいます'
+          : !payloadAvailable || payloadBody === null
+            ? '本文はありません'
+            : typeof payloadBody === 'string'
+              ? payloadBody
+              : JSON.stringify(payloadBody, null, 2)}
       </div>
       <p className={styles.payloadNote}>接続先URL、シークレット、本文のうち個人が分かる部分は、安全のため伏せています。</p>
       {techOpen ? (
