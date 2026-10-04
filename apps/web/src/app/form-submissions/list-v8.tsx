@@ -28,8 +28,7 @@ import {
 import type { Folder, FormLayout } from '@line-crm/shared'
 import { fetchApi, api, ApiError, type FormDeleteImpact, type ListStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { useRowLeaving } from '@/lib/use-row-leaving'
+import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 import Button from '@/components/shared/button'
@@ -42,6 +41,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
+import Notice from '@/components/shared/notice'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListRange from '@/components/ui/list-range'
@@ -256,9 +256,13 @@ export default function FormSubmissionsListV8() {
    */
   const [canManageFolders] = useState(() =>
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
-  // 1152の板（`GrnO4`）。折り畳みはCSSのコンテナ問い合わせが担い、
-  // ここでは板の印だけを切り替える。
-  const narrow = useNarrowViewport()
+  /*
+   * 板 JV2oR（閲覧のみ）：フォームの管理口は N-170 で owner/admin か
+   * `/form-submissions` 鍵を持つ人だけが通る。鍵が無い人は帯を出して
+   * 作る・変える操作を押せない形にする（箱の操作は従来どおり）。
+   */
+  const [canEditForms] = useState(() =>
+    typeof window === 'undefined' ? true : canEditFeature('/form-submissions'))
   const [forms, setForms] = useState<Form[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
@@ -986,7 +990,16 @@ export default function FormSubmissionsListV8() {
   ]
 
   /* ===== 行の「…」（I3L41O：編集・名前を変更・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除） ===== */
-  const rowMenuItems = (form: Form): ActionMenuItem[] => [
+  const rowMenuItems = (form: Form): ActionMenuItem[] => {
+    const viewItem: ActionMenuItem = {
+      id: 'responses',
+      label: '集まった回答',
+      external: true,
+      onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
+    }
+    // 板 JV2oR（閲覧のみ）：見るだけの人は集まった回答だけ出す。
+    if (!canEditForms) return [viewItem]
+    return [
     {
       id: 'edit',
       label: '編集',
@@ -997,12 +1010,7 @@ export default function FormSubmissionsListV8() {
       label: '名前を変更',
       onSelect: () => void openRename(form),
     },
-    {
-      id: 'responses',
-      label: '集まった回答',
-      external: true,
-      onSelect: () => router.push(`/form-submissions/responses?id=${encodeURIComponent(form.id)}`),
-    },
+    viewItem,
     {
       id: 'duplicate',
       label: '複製する',
@@ -1032,7 +1040,8 @@ export default function FormSubmissionsListV8() {
       tone: 'danger' as const,
       onSelect: () => void openDelete(form),
     },
-  ]
+    ]
+  }
 
   const folderRows: FolderPanelRow[] = [
     { id: 'all', label: 'すべて', count: loading || loadError ? null : folderTotal },
@@ -1063,9 +1072,10 @@ export default function FormSubmissionsListV8() {
       variant="primary"
       className={className}
       onClick={createDraft}
-      disabled={creating}
+      disabled={creating || !canEditForms}
       busy={creating}
       busyLabel="下書きを作成中"
+      title={canEditForms ? undefined : '閲覧のみのため作れません'}
     >
       ＋ フォームを作る
     </Button>
@@ -1253,7 +1263,7 @@ export default function FormSubmissionsListV8() {
   const showPager = !loading && !loadError && visibleForms.length > 0
 
   return (
-    <div data-design-node={narrow ? 'GrnO4' : 'I3L41O'} className={styles.board}>
+    <div data-design-node={canEditForms ? 'I3L41O' : 'JV2oR'} className={styles.board}>
       {/* 見出し：画面名＋一行の説明。右に管理者確認の切り替え（i2ZAS）。 */}
       <div className={styles.head}>
         <div className={styles.headText}>
@@ -1272,12 +1282,10 @@ export default function FormSubmissionsListV8() {
         </div>
       </div>
 
-      {/* 見るだけの人への帯（`JV2oR`）。箱の操作と同じく staff には出さない。 */}
-      {!canManageFolders && (
-        <p className="border-info bg-info-bg text-ink rounded-control border px-3 py-2 text-sm" data-design-node="JV2oR">
-          閲覧のみで見ています。変える操作は管理者に頼んでください。
-        </p>
-      )}
+      {/* 板 JV2oR（閲覧のみ）の帯。 */}
+      {!canEditForms ? (
+        <Notice tone="info" message="閲覧のみで見ています。変える操作は管理者に頼んでください。" />
+      ) : null}
 
       {/* 数の帯。管理者確認モードは別のアカウント群の数なので出さない。 */}
       {!reviewMode ? (

@@ -182,6 +182,21 @@ beforeEach(() => {
   if (!g.crypto) g.crypto = {}
   if (!g.crypto.randomUUID) g.crypto.randomUUID = () => 'test-uuid-1'
   document.documentElement.dataset.theme = 'v8'
+  // 板 JV2oR（閲覧のみ）：作る操作は localStorage の役職で決まる。試験では店長として通す。
+  // このファイルの happy-dom には localStorage が無いので、無ければ小さな置き換えを置く。
+  const w = window as unknown as { localStorage?: Storage }
+  if (!w.localStorage) {
+    const bag = new Map<string, string>()
+    w.localStorage = {
+      getItem: (k: string) => bag.get(k) ?? null,
+      setItem: (k: string, v: string) => { bag.set(k, String(v)) },
+      removeItem: (k: string) => { bag.delete(k) },
+      clear: () => { bag.clear() },
+      key: () => null,
+      get length() { return bag.size },
+    } as Storage
+  }
+  window.localStorage.setItem('lh_staff_role', 'owner')
   store.forms = [formRow('form-1', '流れのフォーム')]
   fetchApiMock.mockImplementation(async (url: string) => {
     if (typeof url === 'string' && url.startsWith('/api/forms')) {
@@ -212,6 +227,7 @@ afterEach(() => {
   host.remove()
   clearToastsForTest()
   delete document.documentElement.dataset.theme
+  window.localStorage.removeItem('lh_staff_role')
   vi.clearAllMocks()
 })
 

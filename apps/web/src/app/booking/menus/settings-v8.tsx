@@ -34,6 +34,9 @@ import Toggle from '@/components/shared/toggle'
 import { Tabs } from '@/components/shared/tabs'
 import { DragHandle, MoreAction } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
+import ListState from '@/components/shared/list-state'
+import StatusBadge from '@/components/shared/status-badge'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ListRange from '@/components/ui/list-range'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -46,6 +49,7 @@ import {
   api,
   ApiError,
   bookingApi,
+  fetchApi,
   type BookingAvailabilitySlot,
   type BookingException,
   type BookingMenu,
@@ -57,6 +61,7 @@ import {
 } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
 import { formatHoursBeforeHint, formatMinutesLengthHint } from '@/lib/format-duration'
+import { formatDateTime, formatNumber } from '@/lib/format'
 import { bookingWindowEnd, minutesBeforeLabel } from '../lib/format-time'
 import { menuPriceLabel } from '../lib/menu-price'
 import { fetchAllPages } from '../bookings/fetch-all-pages'
@@ -684,7 +689,10 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                 onReload={() => void loadCore()}
               />
             ) : (
-              <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} />
+              <ChannelsTabV8
+                accountId={accountId}
+                canEdit={canEditSettings}
+              />
             )}
           </div>
 
@@ -2537,5 +2545,219 @@ function StaffTabV8({ accountId, staff, status, error, matrices, extras, members
       />
 
     </div>
+  )
+}
+
+/* ==================== ⑥ 予約経路（ZyDd6・wJYQb） ==================== */
+
+type BookingChannelStaff = {
+  staffId: string
+  displayName: string
+  status: 'connected' | 'disconnected' | 'expired'
+  externalEventsThisWeek: number | null
+  lastReadAt: string | null
+}
+
+type BookingChannel = {
+  key: string
+  status: string
+  todayCount: number | null
+}
+
+type BookingChannelsData = {
+  timeZone: string
+  staff: BookingChannelStaff[]
+  autoAssign: boolean
+  channels: BookingChannel[]
+}
+
+/** 予約経路の見せ方（板 ZyDd6）。受け取り方は見本どおりの固定文言。 */
+const BOOKING_CHANNEL_META: Record<string, { name: string; sub: string; how: string }> = {
+  line: { name: 'LINE（musubo の予約）', sub: '予約ページ・リッチメニュー', how: 'そのまま予約管理へ' },
+  manual: { name: '電話・店頭', sub: 'スタッフが入れる', how: '予約管理で手入力' },
+  hot_pepper_beauty: { name: 'Hot Pepper Beauty', sub: 'SALON BOARD', how: 'Google カレンダー経由（SALON BOARD が書き出せる場合・確認中）' },
+  google_reserve: { name: 'Google で予約', sub: 'Google ビジネス プロフィール', how: '予約通知メールを読む（未対応）' },
+  epark: { name: 'EPARK', sub: '予約通知メール', how: '予約通知メールを読む（未対応）' },
+}
+
+function channelStatusBadge(status: string): { tone: 'success' | 'warning' | 'danger' | 'neutral'; label: string } {
+  if (status === 'active' || status === 'connected') {
+    return status === 'active' ? { tone: 'success', label: '使っている' } : { tone: 'success', label: 'つながっている' }
+  }
+  if (status === 'expired') return { tone: 'danger', label: '期限切れ' }
+  if (status === 'confirming') return { tone: 'warning', label: '確認中' }
+  if (status === 'disconnected') return { tone: 'neutral', label: 'つないでいない' }
+  return { tone: 'neutral', label: '未確認' }
+}
+
+function ChannelsTabV8({ accountId, canEdit }: { accountId: string; canEdit: boolean }) {
+  const [data, setData] = useState<BookingChannelsData | null>(null)
+  const [status, setStatus] = useState<LoadStatus>('loading')
+  const [autoAssign, setAutoAssign] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const requestRef = useRef(0)
+
+  const load = useCallback(async () => {
+    const requestId = ++requestRef.current
+    setStatus('loading')
+    try {
+      const response = await fetchApi<{ success: boolean; data: BookingChannelsData }>(
+        `/api/booking/admin/channels?account_id=${encodeURIComponent(accountId)}`,
+      )
+      if (requestId !== requestRef.current) return
+      setData(response.data)
+      setAutoAssign(response.data.autoAssign)
+      setStatus('ready')
+    } catch {
+      if (requestId !== requestRef.current) return
+      setData(null)
+      setStatus('error')
+    }
+  }, [accountId])
+
+  useEffect(() => {
+    void load()
+    return () => {
+      requestRef.current += 1
+    }
+  }, [load])
+
+  async function saveAutoAssign(next: boolean) {
+    if (!canEdit || saving) return
+    const previous = autoAssign
+    setAutoAssign(next)
+    setSaving(true)
+    try {
+      await fetchApi<{ success: boolean }>(
+        `/api/booking/admin/channels/settings?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify({ autoAssign: next }) },
+      )
+      notifyToast(next ? '自動割り当てを入れました。' : '自動割り当てを止めました。')
+    } catch {
+      setAutoAssign(previous)
+      notifyToast('自動割り当てを保存できませんでした。')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (status === 'loading' || !data) {
+    return status === 'error'
+      ? (
+        <ListState
+          kind="error"
+          title="予約経路を読み込めませんでした"
+          description="入力内容は変わりません。もう一度お試しください。"
+          action={<Button onClick={() => void load()}>もう一度読む</Button>}
+        />
+        )
+      : (
+        <ListState kind="loading" description="予約経路を読み込んでいます。" />
+        )
+  }
+
+  const staffRows = data.staff
+  const channelRows = data.channels.map((channel) => ({
+    ...channel,
+    meta: BOOKING_CHANNEL_META[channel.key] ?? { name: channel.key, sub: '', how: '' },
+  }))
+
+  return (
+    <>
+      <Band tone="hint">いちばん確かなのは「スタッフの Google カレンダー」です。ほかの予約サービスがスタッフの Google カレンダーへ予約を書き出せれば、その時間は自動で LINE の予約受付から外れます（いまの作りでできます）。</Band>
+
+      <section className={styles.section}>
+        <div className={styles.sectionHead}>
+          <h2 className={styles.sectionTitle}>スタッフの Google カレンダー</h2>
+          <p className={styles.sectionDesc}>カレンダーの予定は「埋まっている時間」として扱います。LINE で入った予約は、そのスタッフのカレンダーに書き込みます。</p>
+        </div>
+        <div data-design="Table">
+          <DataTable>
+            <TableHeadRow>
+              <Th>スタッフ</Th>
+              <Th>状態</Th>
+              <Th>外の予定（今週）</Th>
+              <Th>最後に読んだ</Th>
+              <Th>操作</Th>
+            </TableHeadRow>
+            {staffRows.map((person) => {
+              const badge = channelStatusBadge(person.status)
+              const operation = person.status === 'connected'
+                ? { label: '予定を見る', href: `/booking/staff/shifts?staff_id=${encodeURIComponent(person.staffId)}` }
+                : person.status === 'expired'
+                  ? { label: 'つなぎ直す', href: `/booking/staff/shifts?staff_id=${encodeURIComponent(person.staffId)}` }
+                  : { label: 'つなぐ', href: `/booking/staff/shifts?staff_id=${encodeURIComponent(person.staffId)}` }
+              return (
+                <Tr key={person.staffId}>
+                  <Td>{person.displayName}</Td>
+                  <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
+                  <Td>{person.externalEventsThisWeek == null ? '—' : `${formatNumber(person.externalEventsThisWeek)}件`}</Td>
+                  <Td>{person.lastReadAt ? formatDateTime(person.lastReadAt, '—', undefined, data.timeZone) : '—'}</Td>
+                  <ActionCell>
+                    <Button size="compact" href={operation.href}>{operation.label}</Button>
+                  </ActionCell>
+                </Tr>
+              )
+            })}
+          </DataTable>
+        </div>
+      </section>
+
+      <section className={styles.section}>
+        <div className={styles.sectionHead}>
+          <h2 className={styles.sectionTitle}>予約経路</h2>
+          <p className={styles.sectionDesc}>どこから入った予約も「予約管理」に集めます。入り口ごとの受け取り方と、今日の件数です。</p>
+        </div>
+        <div data-design="Table">
+          <DataTable>
+            <TableHeadRow>
+              <Th>予約経路</Th>
+              <Th>受け取り方</Th>
+              <Th>状態</Th>
+              <Th>今日</Th>
+              <Th>最後に届いた</Th>
+              <Th>操作</Th>
+            </TableHeadRow>
+            {channelRows.map((channel) => {
+              const badge = channelStatusBadge(channel.status)
+              const active = channel.status === 'active'
+              return (
+                <Tr key={channel.key}>
+                  <Td>
+                    <span className={styles.cellText}>{channel.meta.name}</span>
+                    {channel.meta.sub ? <span className={styles.cellSub}>{channel.meta.sub}</span> : null}
+                  </Td>
+                  <Td>{channel.meta.how}</Td>
+                  <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
+                  <Td>{channel.todayCount == null ? '—' : `${formatNumber(channel.todayCount)}件`}</Td>
+                  <Td>—</Td>
+                  <ActionCell>
+                    {active ? <Button size="compact" href="/booking/bookings">予約管理へ</Button> : null}
+                  </ActionCell>
+                </Tr>
+              )
+            })}
+          </DataTable>
+        </div>
+        <p className={styles.noteText}>Google カレンダーに書き出せない入り口は、予約通知メールを取り込みアドレスへ転送して読み取ります（見本のメールがそろった媒体から順に）。</p>
+      </section>
+
+      <section className={styles.section} data-design-node="wJYQb" data-design="Rules">
+        <div className={styles.sectionHead}>
+          <h2 className={styles.sectionTitle}>外から予約が入ったとき</h2>
+          <p className={styles.sectionDesc}>どの入り口から入っても、同じ決まりでスタッフの空きを合わせます。</p>
+        </div>
+        <fieldset disabled={!canEdit} className="contents">
+          <div className={styles.toggleRow}>
+            <span className={styles.toggleRowLabel}>指名なしの予約は、その時間に空いているスタッフへ自動で割り当て</span>
+            <Toggle
+              label="指名なしの予約は、その時間に空いているスタッフへ自動で割り当て"
+              checked={autoAssign}
+              onChange={(next) => void saveAutoAssign(next)}
+            />
+          </div>
+        </fieldset>
+      </section>
+    </>
   )
 }

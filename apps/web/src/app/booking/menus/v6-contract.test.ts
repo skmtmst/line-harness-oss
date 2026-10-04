@@ -160,6 +160,18 @@ describe('V6 予約設定', () => {
     expect(SETTINGS_V8).toContain('お客さまに見える画面を確かめる')
     expect(SETTINGS_CSS).toMatch(/\.sidePhoneButton\s*\{[^}]*display:\s*flex/)
   })
+
+  it('ZyDd6: 予約経路タブは経路の口から表を作る', () => {
+    expect(SETTINGS_V8).toContain("{ key: 'channels', label: '予約経路', node: 'ZyDd6' }")
+    expect(SETTINGS_V8).toContain('/api/booking/admin/channels?account_id=')
+    expect(SETTINGS_V8).toContain('スタッフの Google カレンダー')
+    expect(SETTINGS_V8).toContain('data-design-node="wJYQb"')
+  })
+
+  it('wJYQb: 指名なしの自動割り当てだけを保存できる決まりにする', () => {
+    expect(SETTINGS_V8).toContain('/api/booking/admin/channels/settings?account_id=')
+    expect(SETTINGS_V8).toContain('指名なしの予約は、その時間に空いているスタッフへ自動で割り当て')
+  })
 })
 
 describe('画面確認の固定メニューは本番と同じ器を持つ', () => {
