@@ -1051,14 +1051,14 @@ export default function TemplatesListV8() {
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <colgroup>
-            <col style={{ width: 40 }} />
+            <col style={{ width: 64 }} />
             <col />
-            <col style={{ width: 104 }} />
             <col style={{ width: 120 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 84 }} />
-            <col style={{ width: 44 }} />
+            <col style={{ width: 160 }} />
+            <col style={{ width: 144 }} />
+            <col style={{ width: 136 }} />
+            <col style={{ width: 120 }} />
+            <col style={{ width: 76 }} />
           </colgroup>
           <thead>
             <tr>

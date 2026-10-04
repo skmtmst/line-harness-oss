@@ -28,6 +28,8 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { TagRowsSkeleton } from './tag-rows-skeleton'
 import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
 import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
 import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state'
@@ -308,7 +310,13 @@ export default function TagsTabV8({
     const result = await api.tags.reorder(order)
     if (!result.success) {
       setItems(previous)
-      setActionError(`並び順を保存できませんでした（${result.error}）`)
+      const message = `並び順を保存できませんでした（${result.error}）`
+      setActionError(message)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void applyTagOrder(order) },
+      })
     }
   }
 
@@ -336,7 +344,10 @@ export default function TagsTabV8({
     await applyTagOrder(order)
   }
 
-  /** 「一覧に出す」の星（v7 と同じ。押した瞬間に切り替え、失敗は戻す）。 */
+  /*
+   * 「一覧に出す」の星（V8「サクサク感」B：押した瞬間に切り替え、裏で保存。
+   * 失敗は戻して知らせで「もう一度」、成功は知らせの「元に戻す」で戻せる）。
+   */
   const toggleStar = async (tag: Tag) => {
     if (!canEdit) return
     const next = !tag.isStarred
@@ -352,32 +363,65 @@ export default function TagsTabV8({
       if (typeof version === 'number') {
         setItems((current) => current.map((item) => item.id === tag.id ? { ...item, version } : item))
       }
+      notifyToast(next ? `「${tag.name}」を一覧に出します` : `「${tag.name}」を一覧から外します`, {
+        actionLabel: '元に戻す',
+        onAction: () => { void toggleStar({ ...tag, isStarred: next }) },
+      })
     } catch (reason) {
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
-      setActionError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。')
+      const message = reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。'
+      setActionError(message)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void toggleStar(tag) },
+      })
       void load()
     }
   }
 
-  /* 「フォルダへ移す」（v7 は編集画面でやっていた操作を行の「…」から）。 */
+  /*
+   * 「フォルダへ移す」（V8「サクサク感」B：押した瞬間に移して裏で保存。
+   * 失敗は戻して知らせで「もう一度」、成功は知らせの「元に戻す」で戻せる）。
+   */
   const moveTagToGroup = async (tag: Tag, groupId: string | null) => {
     setOpenMenuId(null)
     setMenuMoveFor(null)
     setActionError('')
+    const previous = tag.groupId ?? null
+    if (previous === groupId) return
+    setItems((current) => current.map((item) => item.id === tag.id ? { ...item, groupId } : item))
     try {
       const res = await api.tags.setGroup(tag.id, groupId)
       if (!res.success) throw new Error(res.error)
-      void load()
+      const groupName = groupId === null ? '未分類' : groups.find((group) => group.id === groupId)?.name ?? 'フォルダ'
+      notifyToast(`「${tag.name}」を${groupName}へ移しました`, {
+        actionLabel: '元に戻す',
+        onAction: () => { void moveTagToGroup({ ...tag, groupId }, previous) },
+      })
     } catch (reason) {
-      setActionError(reason instanceof ApiError ? reason.message : 'フォルダへ移せませんでした。')
+      setItems((current) => current.map((item) => item.id === tag.id ? { ...item, groupId: previous } : item))
+      const message = reason instanceof ApiError ? reason.message : 'フォルダへ移せませんでした。'
+      setActionError(message)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void moveTagToGroup(tag, groupId) },
+      })
+      void load()
     }
   }
 
-  /* フォルダの並び順（v7 FolderList と同じ、隣との順位交換）。 */
+  /* フォルダの並び順（V8「サクサク感」B：押した瞬間に並び替え、裏で保存。失敗は戻して知らせで「もう一度」）。 */
   const moveGroupOrder = async (group: TagGroup, direction: -1 | 1) => {
     const index = groups.findIndex((item) => item.id === group.id)
     const other = groups[index + direction]
     if (!other || folderBusy) return
+    const previous = groups
+    const next = [...groups]
+    next[index] = other
+    next[index + direction] = group
+    setGroups(next)
     setFolderBusy(true)
     setFolderError('')
     try {
@@ -389,7 +433,14 @@ export default function TagsTabV8({
       if (!otherResult.success) throw new Error(otherResult.error)
       void load()
     } catch (reason) {
-      setFolderError(reason instanceof Error ? reason.message : '並び順を変更できませんでした')
+      setGroups(previous)
+      const message = reason instanceof Error ? reason.message : '並び順を変更できませんでした'
+      setFolderError(message)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void moveGroupOrder(group, direction) },
+      })
     } finally {
       setFolderBusy(false)
     }
@@ -583,19 +634,7 @@ export default function TagsTabV8({
             </p>
           ) : null}
 
-          {status === 'loading' || staleAccount ? (
-            <div className={styles.skeletonRows} role="status">
-              <span className="sr-only">読み込んでいます</span>
-              {[0, 1, 2, 3, 4].map((row) => (
-                <div key={row} className={styles.skeletonRow}>
-                  <span className={styles.skeletonDot} />
-                  <span className={styles.skeletonBar} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 160 }} />
-                </div>
-              ))}
-            </div>
-          ) : status === 'forbidden' ? (
+          {status === 'forbidden' ? (
             <NoPermissionV8
               featureName="タグ"
               capabilitiesHref="/staff"
@@ -628,7 +667,7 @@ export default function TagsTabV8({
               ) : null}
             </div>
           ) : (
-            <>
+            <DelayedSkeleton loading={status === 'loading' || staleAccount} skeleton={<TagRowsSkeleton rows={5} narrow={[120, 160]} />}>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
@@ -767,7 +806,7 @@ export default function TagsTabV8({
                   />
                 </div>
               </div>
-            </>
+            </DelayedSkeleton>
           )}
         </div>
       </div>

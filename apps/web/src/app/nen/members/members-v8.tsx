@@ -162,8 +162,9 @@ export default function MembersPageV8({
 /**
  * 数の帯。1枚の白い板を区切り線で4つに分ける（★V8 の決まり：
  * 数の帯はカードを離して並べず、白い板の左右いっぱいに置く）。
+ * 数と単位（人）は分け、金額は ¥込みの1つの数に見せる（見本 AOWoJ）。
  */
-function MembersKpiBand({
+export function MembersKpiBand({
   kpis,
   ranks,
   loading,
@@ -183,6 +184,7 @@ function MembersKpiBand({
     icon: React.ReactNode,
     label: string,
     value: string,
+    unit: string | null,
     sub: string,
   ) => (
     <div className={styles.kpiCell} key={label}>
@@ -190,7 +192,7 @@ function MembersKpiBand({
         <span className={styles.kpiIcon} aria-hidden="true">{icon}</span>
         <span className={styles.kpiLabel}>{label}</span>
       </div>
-      <p className={styles.kpiValue}>{value}</p>
+      <p className={styles.kpiValue}>{value}{unit ? <span className={styles.kpiUnit}>{unit}</span> : null}</p>
       <p className={styles.kpiSub}>{sub}</p>
     </div>
   )
@@ -198,10 +200,10 @@ function MembersKpiBand({
   const pending = loading || !kpis
   return (
     <section className={styles.kpiBand} aria-label="会員の数の帯">
-      {cell(<Users size={14} />, '会員', pending ? '—' : `${formatNumber(kpis!.members)}人`, pending ? ' ' : `LINE 連携済み ${formatNumber(kpis!.linkedMembers ?? 0)}`)}
-      {cell(<ShoppingBag size={14} />, topTwoLabel, pending || topTwo.length === 0 ? '—' : `${formatNumber(topTwoCount ?? 0)}人`, topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : ' ')}
-      {cell(<PawPrint size={14} />, 'ペット登録あり', pending ? '—' : `${formatNumber(kpis!.petMembers ?? 0)}人`, pending || petPercent === null ? ' ' : `会員の ${petPercent}%`)}
-      {cell(<Link2 size={14} />, '今月の購入', pending ? '—' : yen(kpis!.monthPurchaseYen ?? 0), pending ? ' ' : `会員 ${formatNumber(kpis!.monthBuyers ?? 0)} 人`)}
+      {cell(<Users size={14} />, '会員', pending ? '—' : formatNumber(kpis!.members), pending ? null : '人', pending ? ' ' : `LINE 連携済み ${formatNumber(kpis!.linkedMembers ?? 0)}`)}
+      {cell(<ShoppingBag size={14} />, topTwoLabel, pending || topTwo.length === 0 ? '—' : formatNumber(topTwoCount ?? 0), pending || topTwo.length === 0 ? null : '人', topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : ' ')}
+      {cell(<PawPrint size={14} />, 'ペット登録あり', pending ? '—' : formatNumber(kpis!.petMembers ?? 0), pending ? null : '人', pending || petPercent === null ? ' ' : `会員の ${petPercent}%`)}
+      {cell(<Link2 size={14} />, '今月の購入', pending ? '—' : yen(kpis!.monthPurchaseYen ?? 0), null, pending ? ' ' : `会員 ${formatNumber(kpis!.monthBuyers ?? 0)} 人`)}
     </section>
   )
 }

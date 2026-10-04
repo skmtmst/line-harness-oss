@@ -140,6 +140,19 @@ describe('下部追従バーの並びを部品で固定する', () => {
 
   it('画面の下に追従する', () => {
     expect(CSS).toMatch(/position:\s*sticky/)
-    expect(CSS).toMatch(/bottom:\s*0/)
+    // v7 の土台は画面の下端に付けるまま。
+    expect(CSS).toMatch(/\.bar \{\s*position:\s*sticky;\s*bottom:\s*0;/s)
+  })
+
+  it('★A の浮かせ（V8 は下から 12px・枠なし・ふんわり影・角丸そのまま）', () => {
+    const v8 = CSS.match(/\[data-theme='v8'\] \.bar \{([^}]*)\}/s)?.[1] ?? ''
+    expect(v8, 'V8 の .bar の規定が無い').not.toBe('')
+    expect(v8).toMatch(/bottom:\s*12px/)
+    expect(v8).toMatch(/border:\s*0/)
+    expect(v8).toMatch(/box-shadow:\s*var\(--shadow-bar-float\)/)
+    // 角丸は変えない（上書きが無い）。
+    expect(v8).not.toMatch(/border-radius/)
+    // 並びは変えない（3列・中央寄せの決まりは別の試験が守る）。
+    expect(v8).not.toMatch(/grid-template-columns/)
   })
 })

@@ -39,6 +39,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
+import { notifyToast } from '@/components/shared/toast'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ImageUploader from '@/components/shared/image-uploader'
@@ -738,6 +739,7 @@ function AutoReplyWizardV8Inner() {
         router.replace(`/auto-replies/edit?${query.toString()}`)
       }
       savedSnapshotRef.current = JSON.stringify(form)
+      notifyToast('下書きを保存しました')
       // 保存で中身が変わったので、以前の試験・チェックは古いものとして捨てる。
       setDryRun(null)
       setValidation(null)
@@ -759,9 +761,12 @@ function AutoReplyWizardV8Inner() {
 
   /* ===== 手順の移動 ===== */
   const goToStep = useCallback(
-    (next: WizardStep) => {
+    (next: WizardStep, ruleId?: string) => {
       const query = new URLSearchParams()
-      if (autoReplyId) query.set('id', autoReplyId)
+      // 保存直後は state が追いつく前なので、渡された id を優先する。
+      // id が落ちると読み直したときに下書きに戻れない。
+      const keepId = ruleId ?? autoReplyId
+      if (keepId) query.set('id', keepId)
       query.set('step', next)
       router.replace(`/auto-replies/edit?${query.toString()}`)
     },
@@ -792,8 +797,10 @@ function AutoReplyWizardV8Inner() {
         void loadValidation(ruleId)
         void loadOrder(ruleId, accountId).catch(() => setPriorityState('error'))
       }
+      goToStep(next, ruleId ?? undefined)
+    } else {
+      goToStep(next)
     }
-    goToStep(next)
   }, [step, dirty, autoReplyId, saveDraftNow, matchedAccountId, selectedAccountId, loadPriorityData, loadValidation, loadOrder, goToStep])
 
   /* ===== 手順4：順番 ===== */
@@ -921,7 +928,9 @@ function AutoReplyWizardV8Inner() {
         void loadValidation(autoReplyId)
         return
       }
-      setPublished({ name: form.ruleName.trim() || form.keywordRules[0]?.keyword.trim() || '自動応答' })
+      const doneName = form.ruleName.trim() || form.keywordRules[0]?.keyword.trim() || '自動応答'
+      setPublished({ name: doneName })
+      notifyToast(`「${doneName}」を有効にしました`)
       disarm()
       publishKeyRef.current = crypto.randomUUID()
     } catch (caught) {

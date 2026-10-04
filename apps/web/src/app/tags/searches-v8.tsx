@@ -32,6 +32,9 @@ import {
   type SavedSearchUsageFilter,
 } from '@/components/friend-fields/saved-search-kpis'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import { notifyToast } from '@/components/shared/toast'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
 
 export default function SearchesTabV8({ accountId, canEdit }: { accountId: string | null; canEdit: boolean }) {
@@ -141,8 +144,14 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
       void load()
     } catch (reason) {
       setItems(previous)
-      setError(reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした')
+      const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
+      setError(message)
       setRetryOrder(next)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void applyOrder(next) },
+      })
     }
   }
 
@@ -291,18 +300,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
           </p>
         ) : null}
 
-        {loading ? (
-          <div className={styles.skeletonRows} role="status">
-            <span className="sr-only">読み込んでいます</span>
-            {[0, 1, 2, 3].map((row) => (
-              <div key={row} className={styles.skeletonRow}>
-                <span className={styles.skeletonDot} />
-                <span className={styles.skeletonBar} />
-                <span className={styles.skeletonBar} style={{ maxWidth: 160 }} />
-              </div>
-            ))}
-          </div>
-        ) : !accountId ? null
+        {!accountId ? null
         : forbidden ? (
           <NoPermissionV8
             featureName="保存した検索"
@@ -335,7 +333,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
             ) : null}
           </div>
         ) : (
-          <>
+          <DelayedSkeleton loading={loading} skeleton={<TagRowsSkeleton rows={4} narrow={[160]} />}>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
@@ -482,7 +480,7 @@ export default function SearchesTabV8({ accountId, canEdit }: { accountId: strin
                 />
               </div>
             </div>
-          </>
+          </DelayedSkeleton>
         )}
       </div>
 

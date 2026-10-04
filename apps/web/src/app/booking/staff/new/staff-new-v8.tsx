@@ -204,15 +204,30 @@ export default function StaffNewV8() {
     return null
   }
 
+  /* 名前欄1欄の直し方。保存時と同じ判定のうち名前欄の分だけ出す。 */
+  function nameFieldError(value: string): string | null {
+    const parsed = parseBookingStaffInput(
+      { ...staffInput(), name: value, display_name: displayName.trim() || value },
+      'create',
+    )
+    if (!parsed.ok && parsed.field === 'name') return parsed.error
+    return null
+  }
+  /* 欄を離れたときに出す1欄ずつの直し方（文は保存時と同じ）。 */
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string }>({})
+
   async function save() {
     if (saving) return
     const validationError = validate()
     if (validationError) {
       setSaveError(validationError)
+      const nameError = nameFieldError(name)
+      setFieldErrors(nameError !== null ? { name: nameError } : {})
       return
     }
     setSaving(true)
     setSaveError(null)
+    setFieldErrors({})
     try {
       // R310: 割当だけ失敗して戻ってきた再試行では、スタッフを作り直さない。
       // 控えたIDを使い回して割当だけ送り直す。
@@ -311,11 +326,23 @@ export default function StaffNewV8() {
                   id="bs-name"
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value)
+                    if (fieldErrors.name !== undefined) {
+                      setFieldErrors({ name: nameFieldError(e.target.value) ?? undefined })
+                    }
+                  }}
+                  onBlur={() => {
+                    setFieldErrors({ name: nameFieldError(name) ?? undefined })
+                  }}
                   maxLength={BOOKING_STAFF_LIMITS.name}
                   placeholder="例: 田中 美咲"
                   className={styles.input}
+                  aria-invalid={fieldErrors.name !== undefined}
                 />
+                {fieldErrors.name !== undefined ? (
+                  <span className={styles.formError} role="alert">{fieldErrors.name}</span>
+                ) : null}
               </label>
               <label className={styles.field}>
                 <span className={styles.label}>お客さま向けの表示名（空欄なら上の名前）</span>

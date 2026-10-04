@@ -92,7 +92,7 @@ const folders = {
   getWebinarFolderCounts: vi.fn(),
   getFolderItemCounts: vi.fn().mockResolvedValue(undefined),
   isFolderKind: (v: unknown) =>
-    typeof v === 'string' && ['tag', 'template', 'media', 'webinar', 'reminder', 'scenario', 'auto_reply', 'broadcast'].includes(v),
+    typeof v === 'string' && ['tag', 'template', 'media', 'webinar', 'reminder', 'scenario', 'auto_reply', 'broadcast', 'automation', 'common_action', 'webhook', 'conversion'].includes(v),
 };
 vi.mock('@line-crm/db', () => ({ ...marks, ...searches, ...folders }));
 vi.mock('../services/account-access.js', () => accountAccess);
@@ -1232,6 +1232,16 @@ describe('フォルダ', () => {
   it('種類で絞れる', async () => {
     await req('/api/folders?kind=template', 'GET');
     expect(folders.getFolders).toHaveBeenCalledWith(env.DB, 'template', undefined, expect.objectContaining({ allowedAccountIds: ['account-1'] }));
+  });
+
+  it('F-13 の新しい種類でも絞れる（件数は数えていない）', async () => {
+    // 中身の folder_id 列が無い3種別。箱の一覧は返り、件数は省かれる（#730）。
+    for (const kind of ['automation', 'common_action', 'webhook', 'conversion']) {
+      folders.getFolders.mockResolvedValue([]);
+      const res = await req(`/api/folders?kind=${kind}`, 'GET');
+      expect(res.status).toBe(200);
+      expect(folders.getFolders).toHaveBeenCalledWith(env.DB, kind, undefined, expect.objectContaining({ allowedAccountIds: ['account-1'] }));
+    }
   });
 
   it('ウェビナーフォルダは閲覧可能なアカウント内の件数を返す', async () => {

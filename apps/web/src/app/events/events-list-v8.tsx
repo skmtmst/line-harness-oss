@@ -25,6 +25,7 @@ import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -65,10 +66,73 @@ function formatShortJpDate(iso: string | null): string {
 
 function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string): string {
   if (!hasAccount) return 'アカウントを選択'
-  if (status === 'loading') return '読み込み中'
+  if (status === 'loading') return '—'
   if (status === 'error') return '読み込めませんでした'
   if (status === 'forbidden') return '見る権限がありません'
   return readyDetail
+}
+
+/**
+ * A. 読み込み中の骨組み（V8だけ）。本物の表と同じ見出し・列幅で5行出し、
+ * 入れ替わってもガタつかない。0.3秒以内に来たら出さない・出したら最低
+ * 0.4秒は `DelayedSkeleton` が面倒を見る。
+ */
+function EventListSkeleton() {
+  return (
+    <div className={styles.tableWrap} aria-busy="true">
+      <span className="sr-only">イベントの一覧を読み込んでいます</span>
+      <DelayedSkeleton
+        loading
+        skeleton={
+          <div className={styles.tableScroll}>
+            <table className="w-full min-w-[760px] table-fixed text-left text-xs" aria-hidden="true" inert>
+              <EventListHead />
+              <tbody className="divide-y divide-hairline">
+                {[0, 1, 2, 3, 4].map((index) => (
+                  <tr key={index}>
+                    <td className="px-4 py-3">
+                      <Skeleton className="block h-3.5 w-3/4" />
+                      <span className="mt-1 block"><Skeleton className="block h-3 w-1/2" /></span>
+                    </td>
+                    <td className="px-2 py-3"><Skeleton className="block h-3.5 w-24" /></td>
+                    <td className="px-2 py-3"><Skeleton className="ml-auto block h-3.5 w-16" /></td>
+                    <td className="px-2 py-3"><Skeleton className="ml-auto block h-3.5 w-8" /></td>
+                    <td className="px-2 py-3"><Skeleton className="block h-5.5 w-16" /></td>
+                    <td className="px-3 py-3"><Skeleton className="ml-auto block h-8 w-8" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        }
+      />
+    </div>
+  )
+}
+
+/**
+ * 表の見出し（本物と骨組みで同じものを出す。2か所に書くとずれる）。
+ */
+function EventListHead() {
+  return (
+    <thead className="bg-canvas-sunken text-ink-faint">
+      <tr>
+        <th className="w-[30%] px-4 py-3 font-medium">イベント名（場所）</th>
+        <th className="w-[18%] px-2 py-3 font-medium">開催日時</th>
+        <th className="w-[12%] px-2 py-3 text-right font-medium">予約 / 定員</th>
+        <th className="w-[10%] px-2 py-3 text-right font-medium">承認待ち</th>
+        <th className="w-[18%] px-2 py-3 font-medium">
+          <span className="inline-flex items-center gap-1">
+            状態
+            <HelpTip label="状態の見方の説明">
+              下書き・公開中・一時停止・終了・中止は保存した状態です。満席と申し込みが少ないは、その都度数えた目印で、状態ではありません。
+            </HelpTip>
+          </span>
+        </th>
+        <th className="w-14 px-3 py-3 text-right font-medium"><span className="sr-only">操作</span></th>
+      </tr>
+    </thead>
+  )
 }
 
 export default function EventsListV8() {
@@ -411,9 +475,7 @@ export default function EventsListV8() {
               <ListState kind="empty" title="LINEアカウントを選択してください" description="サイドバーで運用するLINEアカウントを選んでください。" />
             </div>
           ) : loadStatus === 'loading' ? (
-            <div className={styles.tableWrap}>
-              <ListState kind="loading" />
-            </div>
+            <EventListSkeleton />
           ) : loadStatus === 'forbidden' ? (
             <NoPermissionV8
               featureName="イベント"
@@ -444,23 +506,7 @@ export default function EventsListV8() {
             <div className={styles.tableWrap}>
               <div className={styles.tableScroll}>
                 <table className="w-full min-w-[760px] table-fixed text-left text-xs" data-design="Table">
-                  <thead className="bg-canvas-sunken text-ink-faint">
-                    <tr>
-                      <th className="w-[30%] px-4 py-3 font-medium">イベント名（場所）</th>
-                      <th className="w-[18%] px-2 py-3 font-medium">開催日時</th>
-                      <th className="w-[12%] px-2 py-3 text-right font-medium">予約 / 定員</th>
-                      <th className="w-[10%] px-2 py-3 text-right font-medium">承認待ち</th>
-                      <th className="w-[18%] px-2 py-3 font-medium">
-                        <span className="inline-flex items-center gap-1">
-                          状態
-                          <HelpTip label="状態の見方の説明">
-                            下書き・公開中・一時停止・終了・中止は保存した状態です。満席と申し込みが少ないは、その都度数えた目印で、状態ではありません。
-                          </HelpTip>
-                        </span>
-                      </th>
-                      <th className="w-14 px-3 py-3 text-right font-medium"><span className="sr-only">操作</span></th>
-                    </tr>
-                  </thead>
+                  <EventListHead />
                   <tbody className="divide-y divide-hairline">
                     {items.map((e) => {
                       const state = eventRowState(e)
@@ -582,7 +628,7 @@ export default function EventsListV8() {
               {!selectedAccountId || loadStatus === 'error' || loadStatus === 'forbidden'
                 ? '—'
                 : loadStatus === 'loading'
-                  ? '読み込み中'
+                  ? '—'
                   : listTotal === 0
                     ? '0件'
                     : `${(current - 1) * perPage + 1}〜${Math.min(current * perPage, listTotal)}件 / 全${listTotal}件`}
