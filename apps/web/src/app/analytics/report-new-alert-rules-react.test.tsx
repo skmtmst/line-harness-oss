@@ -334,6 +334,10 @@ describe('定期レポートの作成後(R76)', () => {
     await selectRecipient()
     await act(async () => { button('今すぐ1回だけ送る').click(); await Promise.resolve(); await Promise.resolve() })
 
+    expect(writeCalls('POST')).toHaveLength(0)
+    const confirm = Array.from(document.body.querySelectorAll('button')).find((item) => item.textContent?.trim() === '確認して1回だけ送る')!
+    await act(async () => { confirm.click(); await Promise.resolve(); await Promise.resolve() })
+
     expect(writeCalls('POST')).toHaveLength(1)
     expect((writeCalls('POST').at(-1)?.body as { sendOnce: boolean }).sendOnce).toBe(true)
     expect(fixture.pushes).toEqual(['/analytics/reports/new?id=report-new'])

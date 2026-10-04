@@ -16,6 +16,7 @@ vi.mock('next/link', () => ({
 const fixture = vi.hoisted(() => ({
   editId: null as string | null,
   accountId: 'account-a',
+  role: 'owner',
   pushes: [] as string[],
 }))
 vi.mock('next/navigation', () => ({
@@ -50,6 +51,8 @@ const OPTIONS = {
 }
 
 const net = vi.hoisted(() => ({
+  posts: [] as Array<{ body: { sendOnce: boolean }; key: string | null }>,
+  postMode: 'ok' as 'ok' | 'failure' | 'deferred',
   puts: [] as unknown[],
   putMode: 'ok' as 'ok' | 'conflict-then-ok' | 'deferred' | 'failure',
   deferred: [] as Array<(value: Response) => void>,
@@ -61,11 +64,17 @@ const net = vi.hoisted(() => ({
 }))
 
 function installFetch() {
-  vi.stubGlobal('fetch', async (input: unknown, init?: { method?: string }) => {
+  vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : String(input)
     const url = new URL(raw.startsWith('http') ? raw : `https://worker.example.com${raw}`)
     if (url.pathname === '/api/staff/me') {
-      return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200 })
+      return new Response(JSON.stringify({ success: true, data: { role: fixture.role } }), { status: 200 })
+    }
+    if (url.pathname === '/api/analytics/report-schedules' && init?.method === 'POST') {
+      net.posts.push({ body: JSON.parse(String(init.body)), key: new Headers(init.headers).get('Idempotency-Key') })
+      if (net.postMode === 'failure') return new Response(JSON.stringify({ success: false, error: 'internal failure' }), { status: 500 })
+      if (net.postMode === 'deferred') return new Promise<Response>((resolve) => { net.deferred.push(resolve) })
+      return new Response(JSON.stringify({ success: true, data: { ...SCHEDULE, id: 'report-new', isOneTime: true } }), { status: 201 })
     }
     if (url.pathname.startsWith('/api/analytics/report-schedules/report-1') && (init?.method ?? 'GET') === 'PUT') {
       if (net.putMode === 'failure') {
@@ -151,8 +160,11 @@ beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   fixture.editId = null
   fixture.accountId = 'account-a'
+  fixture.role = 'owner'
   fixture.pushes.length = 0
   net.puts.length = 0
+  net.posts.length = 0
+  net.postMode = 'ok'
   net.putMode = 'ok'
   net.deferred.length = 0
   net.gets = 0
@@ -171,6 +183,90 @@ afterEach(async () => {
 })
 
 describe('V8 レポート作成（H5UoIu）', () => {
+  async function selectRecipient() {
+    const person = [...container.querySelectorAll('input[type="checkbox"]')].find(
+      (item) => item.closest('label')?.textContent?.includes('担当1'),
+    ) as HTMLInputElement
+    await act(async () => { fireEvent.click(person) })
+  }
+
+  it('1回送信は宛先と通知方法を確認してから実行し、取消では送らない', async () => {
+    await mount()
+    await settle()
+    await selectRecipient()
+    await click(buttonByText('今すぐ1回だけ送る'))
+    const dialog = document.querySelector('[role="dialog"]')!
+    expect(dialog.textContent).toContain('宛先：担当1')
+    expect(dialog.textContent).toContain('通知方法：管理画面のお知らせ')
+    expect(dialog.textContent).toContain('集計する期間：前の7日間')
+    expect(net.posts).toHaveLength(0)
+    await click(overlayButtonByText('キャンセル'))
+    expect(net.posts).toHaveLength(0)
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+    expect((container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('週次まとめ')
+
+    await click(buttonByText('今すぐ1回だけ送る'))
+    await click(overlayButtonByText('確認して1回だけ送る'))
+    await settle()
+    expect(net.posts).toHaveLength(1)
+    expect(net.posts[0].body.sendOnce).toBe(true)
+    expect(fixture.pushes).toEqual(['/analytics/reports/new?id=report-new'])
+    const afterSave = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterSave)
+    expect(afterSave.defaultPrevented).toBe(false)
+  })
+
+  it('送信の連続クリックを1回に止め、失敗時は窓と入力と同じ要求キーを残す', async () => {
+    await mount()
+    await settle()
+    await selectRecipient()
+    await click(buttonByText('今すぐ1回だけ送る'))
+    net.postMode = 'deferred'
+    const confirm = overlayButtonByText('確認して1回だけ送る')
+    await act(async () => { fireEvent.click(confirm); fireEvent.click(confirm) })
+    expect(net.posts).toHaveLength(1)
+    expect(net.deferred).toHaveLength(1)
+    await act(async () => { net.deferred.shift()!(new Response(JSON.stringify({ success: false, error: 'internal failure' }), { status: 500 })) })
+    expect(document.querySelector('[role="dialog"]')!.textContent).toContain('保存できませんでした')
+    expect(document.querySelector('[role="dialog"]')!.textContent).not.toContain('internal failure')
+    expect(fixture.pushes).toHaveLength(0)
+    const afterFailure = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterFailure)
+    expect(afterFailure.defaultPrevented).toBe(true)
+    net.postMode = 'ok'
+    await click(overlayButtonByText('確認して1回だけ送る'))
+    expect(net.posts).toHaveLength(2)
+    expect(net.posts[0].key).toBeTruthy()
+    expect(net.posts[1].key).toBe(net.posts[0].key)
+    expect(fixture.pushes).toEqual(['/analytics/reports/new?id=report-new'])
+  })
+
+  it('確認中にアカウントを切り替えると確認窓を閉じ、切替先へ送らない', async () => {
+    await mount()
+    await settle()
+    await selectRecipient()
+    await click(buttonByText('今すぐ1回だけ送る'))
+    fixture.accountId = 'account-b'
+    await act(async () => { root.render(<><AnalyticsReportNewPage /><ToastHost /></>) })
+    await settle()
+    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
+    expect(net.posts).toHaveLength(0)
+  })
+
+  it.each(['staff', 'viewer'])('%s は作成と送信を実行できない', async (role) => {
+    fixture.role = role
+    await mount()
+    await settle()
+    const fields = container.querySelector('fieldset') as HTMLFieldSetElement
+    expect(fields.disabled).toBe(true)
+    expect(buttonByText('今すぐ1回だけ送る').disabled).toBe(true)
+    expect(buttonByText('つくって動かす').disabled).toBe(true)
+    await click(buttonByText('今すぐ1回だけ送る'))
+    await click(buttonByText('つくって動かす'))
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(net.posts).toHaveLength(0)
+  })
+
   it('板ID・題・必須・右欄の見本を出す', async () => {
     await mount()
     await settle()
@@ -435,5 +531,17 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     })
     await settle()
     expect(container.textContent).toContain('定期レポートを更新しました')
+  })
+
+  it('ボタンの表示が変わる前に続けて押しても保存は1回だけ', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'deferred'
+    await mount()
+    await settle()
+    const save = buttonByText('変更を保存する')
+    await act(async () => { fireEvent.click(save); fireEvent.click(save) })
+    expect(net.deferred).toHaveLength(1)
+    await act(async () => { net.deferred.shift()!(new Response(JSON.stringify({ success: true, data: SCHEDULE }), { status: 200 })) })
+    expect(buttonByText('変更を保存する').disabled).toBe(false)
   })
 })

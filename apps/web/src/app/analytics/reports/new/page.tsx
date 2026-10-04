@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TimeField } from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -276,6 +277,8 @@ function AnalyticsReportFormPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const saveBusyRef = useRef(false)
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false)
   // レポート名は変えられるようにする(点検#508軽12)。固定だと複数作ったときに区別できない。
   const [name, setName] = useState('週次まとめ')
   const [sections, setSections] = useState<AnalyticsReportSection[]>(['friends', 'reactions', 'routes', 'usage'])
@@ -311,7 +314,7 @@ function AnalyticsReportFormPage() {
     let active = true
     void api.staff.me().then((response) => {
       if (active && response.success) setCanManage(response.data.role === 'owner' || response.data.role === 'admin')
-    })
+    }).catch(() => { /* 権限を確認できなければ変更操作は許可しない。 */ })
     return () => { active = false }
   }, [])
 
@@ -330,6 +333,7 @@ function AnalyticsReportFormPage() {
     setCompareOpen(false)
     setCompareError('')
     setNameError('')
+    setSendConfirmOpen(false)
     setOptions(null)
     // id が外れた/変わったとき前の編集対象が残ると、新規作成のつもりが旧レポートへ
     // PUT してしまう。取り直すたびに編集状態も初期化する。
@@ -468,6 +472,7 @@ function AnalyticsReportFormPage() {
     saveTargetRef.current = { accountId: selectedAccountId, editId }
     if (prev && (prev.accountId !== selectedAccountId || prev.editId !== editId)) {
       setSaving(false)
+      saveBusyRef.current = false
       /*
        * R526・ABA: 対象を移ったら切替前の保存の応答を永続無効化する。
        * 戻ってきても古い応答は受け付けない。古い作成が成功して古い予約の
@@ -609,7 +614,7 @@ function AnalyticsReportFormPage() {
   }
 
   const submit = async (sendOnce: boolean) => {
-    if (!selectedAccountId || !options || !canManage || !hasRecipient) return
+    if (!selectedAccountId || !options || !canManage || !hasRecipient || saveBusyRef.current || conflictBusyRef.current) return
     const built = buildReportPayload(options)
     if (!built.ok) {
       setError(built.error)
@@ -619,6 +624,8 @@ function AnalyticsReportFormPage() {
     }
     const { payload } = built
     const submittedSignature = signature
+    // React がボタンを押せなくする前の連続クリックも、同じ試行にまとめる。
+    saveBusyRef.current = true
     setSaving(true)
     setError('')
     setNameError('')
@@ -712,6 +719,7 @@ function AnalyticsReportFormPage() {
             const existingId = (caught.data as { existingId?: unknown } | undefined)?.existingId
             if (typeof existingId === 'string' && existingId && isFresh()) {
               setConflictId(existingId)
+              setSendConfirmOpen(false)
               setError('')
               return
             }
@@ -723,6 +731,8 @@ function AnalyticsReportFormPage() {
         // R526: 解決したのはこの保存の試行だけ。別アカウントの試行は残す。
         delete createKeysRef.current[wantAccount]
         setConflictId(null)
+        setSendConfirmOpen(false)
+        setBaseline(submittedSignature)
         /*
           R76。作ったあとも新規のまま残すと、時刻を直してもう一度押したときに
           更新ではなく別の定期配信が増える。作りたての編集画面へ移せば、
@@ -746,7 +756,10 @@ function AnalyticsReportFormPage() {
       if (!isFresh()) return
       setError(describeSaveFailure(caught))
     } finally {
-      if (isFresh()) setSaving(false)
+      if (isFresh()) {
+        saveBusyRef.current = false
+        setSaving(false)
+      }
     }
   }
 
@@ -1002,7 +1015,7 @@ function AnalyticsReportFormPage() {
         </Notice>
       )}
       {!canManage && <Notice tone="info" message="運用担当は内容を確認できます。作成は統括または管理者が行います。" />}
-      {error && <Notice tone="danger" message={error} onClose={() => setError('')} />}
+      {error && !sendConfirmOpen && <Notice tone="danger" message={error} onClose={() => setError('')} />}
       {conflictId && (
         <Notice tone="warn" onClose={() => setConflictId(null)} action={<>
           <Button variant="secondary" href={`/analytics/reports/new?id=${encodeURIComponent(conflictId)}`}>既にある予約を確認</Button>
@@ -1012,7 +1025,7 @@ function AnalyticsReportFormPage() {
         </Notice>
       )}
       <div className="report-v8-columns">
-        <fieldset className="report-v8-fields" disabled={!canManage || saving || compareBusy || latestBusy}>
+        <fieldset className="report-v8-fields" disabled={!canManage || saving || compareBusy || latestBusy || sendConfirmOpen}>
           <legend className="sr-only">レポートの設定</legend>
           <section className="report-v8-card">
             <h2 className="report-v8-cardTitle">名前を付けます</h2>
@@ -1123,9 +1136,27 @@ function AnalyticsReportFormPage() {
       </div>
       <StickyBar status={null} actions={<>
         <Button href="/analytics">キャンセル</Button>
-        {!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
-        <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>
+        {!editing && <Button variant="secondary" disabled={saving || sendConfirmOpen || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => {
+          if (!canManage || saveBusyRef.current) return
+          const built = buildReportPayload(options)
+          if (!built.ok) {
+            setError(built.error)
+            setNameError(built.error === 'レポートの名前を入力してください' ? built.error : '')
+            return
+          }
+          setError('')
+          setSendConfirmOpen(true)
+        }}>今すぐ1回だけ送る</Button>}
+        <Button variant="primary" disabled={saving || sendConfirmOpen || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>
       </>} />
+      <ConfirmDialog open={sendConfirmOpen} title="レポートを今すぐ送りますか" description="宛先と通知方法を確認してください。この送信は取り消せません。定期レポートは作りません。" confirmLabel="確認して1回だけ送る" busy={saving} error={error || undefined} onCancel={() => { if (!saveBusyRef.current) setSendConfirmOpen(false) }} onConfirm={canManage ? () => void submit(true) : undefined}>
+        <div className="grid gap-3 text-sm text-ink">
+          <p>レポート名：{name.trim()}</p>
+          <p>宛先：{[...staffIds.map(staffNameOf), ...emails.map((email) => email.trim()).filter(Boolean)].join('、')}</p>
+          <p>通知方法：{[dashboardEnabled ? CHANNEL_LABEL.dashboard : '', emailEnabled ? CHANNEL_LABEL.email : '', lineEnabled ? CHANNEL_LABEL.line : ''].filter(Boolean).join('・')}</p>
+          <p>集計する期間：前の{periodDays}日間</p>
+        </div>
+      </ConfirmDialog>
       <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy && !latestBusy) setCompareOpen(false) }} footer={<><Button variant="secondary" disabled={compareBusy || latestBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy || latestBusy || !canManage} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></>} error={compareError || undefined} busy={compareBusy || latestBusy}>
         <VersionCompare before={latestSummary} after={draftSummary} />
       </Dialog>
