@@ -8,6 +8,8 @@ import {
   getLineAccountById,
   getLineAccountCredentialHealth,
   createLineAccount,
+  listLineAccountTags,
+  attachLineAccountRegistrationTags,
   updateLineAccount,
   updateLineAccountFields,
   updateLineAccountOrder,
@@ -1153,6 +1155,7 @@ function duplicateAccountError(
 }
 
 type ConnectBody = {
+  tagIds?: unknown;
   name?: unknown;
   channelId?: unknown;
   channelSecret?: unknown;
@@ -1161,7 +1164,7 @@ type ConnectBody = {
 };
 
 function readConnectBody(body: ConnectBody):
-  | { ok: true; value: { name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string } }
+  | { ok: true; value: { name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds: string[] } }
   | { ok: false; error: string } {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const channelId = typeof body.channelId === 'string' ? body.channelId.trim() : '';
@@ -1173,12 +1176,21 @@ function readConnectBody(body: ConnectBody):
   if (!channelSecret) return { ok: false, error: 'Messaging APIのチャネルシークレットを入力してください' };
   if (!/^\d+$/.test(loginChannelId)) return { ok: false, error: 'LINE LoginのチャネルIDは半角数字で入力してください' };
   if (!loginChannelSecret) return { ok: false, error: 'LINE Loginのチャネルシークレットを入力してください' };
-  return { ok: true, value: { name, channelId, channelSecret, loginChannelId, loginChannelSecret } };
+  const tags = body.tagIds ?? [];
+  if (!Array.isArray(tags) || tags.length > 30 || tags.some(id => typeof id !== 'string' || !id || id.length > 100) || new Set(tags).size !== tags.length) {
+    return { ok: false, error: '登録前のタグは重複なく30件以内で指定してください' };
+  }
+  return { ok: true, value: { name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds: tags as string[] } };
 }
 
 async function readConnectRequest(c: Context<Env>) {
   try {
-    return readConnectBody(await c.req.json<ConnectBody>());
+    const parsed = readConnectBody(await c.req.json<ConnectBody>());
+    if (parsed.ok && parsed.value.tagIds.length) {
+      const tags = await listLineAccountTags(c.env.DB, c.get('staff').tenantId ?? DEFAULT_TENANT_ID);
+      if (!parsed.value.tagIds.every(id => tags.some(tag => tag.id === id))) return { ok: false as const, error: '指定した登録前のタグが見つかりません' };
+    }
+    return parsed;
   } catch {
     return { ok: false as const, error: 'request body must be valid JSON' };
   }
@@ -1284,6 +1296,8 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
       lineBasicId: prepared.bot.basicId ?? null,
       lineProfileSyncedAt: jstNow(),
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+
+    if (parsed.value.tagIds.length) await attachLineAccountRegistrationTags(c.env.DB, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, account.id, parsed.value.tagIds);
 
     const followerState = await detectFollowerImportCapability(
       c.env.DB,

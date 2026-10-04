@@ -2577,3 +2577,6 @@ export interface AdConversionCostSummary {
   costPerConversionMinor: number | null;
   currency: 'JPY' | null;
 }
+
+export interface LineAccountRegistrationTags { tagIds?: string[] }
+export interface LineAccountRegistrationTag { id: string; name: string; color: string | null }

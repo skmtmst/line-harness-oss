@@ -982,6 +982,7 @@ export async function deleteUncommittedLineAccount(
 ): Promise<void> {
   await db.batch([
     db.prepare(`DELETE FROM account_settings WHERE line_account_id = ?`).bind(id),
+    db.prepare(`DELETE FROM line_account_tag_links WHERE line_account_id = ?`).bind(id),
     db.prepare(`DELETE FROM line_account_connection_checks WHERE line_account_id = ?`).bind(id),
     db.prepare(`DELETE FROM line_accounts WHERE id = ?`).bind(id),
   ]);

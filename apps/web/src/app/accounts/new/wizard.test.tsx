@@ -7,8 +7,9 @@ const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), stepFollowerImport: vi.fn(),
 }))
 // 登録完了直後の契約者専用LINEの登録案内（★V6 37-7）。既定は「運営側で未設定」なので何も出ない
+const accountTags = vi.hoisted(() => ({ list: vi.fn(async () => ({success:true,data:[{id:'tag-own',name:'店舗',color:null}]})) }))
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { lineAccounts: calls, hqNotices: notices } }))
+vi.mock('@/lib/api', () => ({ api: { lineAccounts: calls, lineAccountTags: accountTags, hqNotices: notices } }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/accounts/new', useRouter: () => ({ push: vi.fn() }) }))
 
@@ -167,3 +168,16 @@ describe('LINEアカウント作成ウィザード', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: '登録したアカウントを見る' })).toBeTruthy())
   })
 })
+
+it('V8の登録前タグを接続確認と登録へ渡す', async () => {
+ document.documentElement.dataset.theme='v8';
+ try {
+  render(<NewLineAccountPage />);
+  fireEvent.click(await screen.findByLabelText('店舗'));
+  next();next();fill('channel-id','123456789');fill('channel-secret','synthetic-secret');fill('login-channel-id','2007123456');fill('login-channel-secret','synthetic-login-secret');next();
+  await checkConnection();
+  expect(calls.connectCheck).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag-own']}));
+  fireEvent.click(screen.getByRole('button',{name:'接続して保存する'}));
+  await waitFor(()=>expect(calls.connect).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag-own']}),undefined));
+ } finally {document.documentElement.dataset.theme='v7';}
+});

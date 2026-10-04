@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import Image from 'next/image'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import type { LineAccountRegistrationTag } from '@line-crm/shared'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
@@ -39,6 +41,16 @@ const emptyForm: FormState = {
 }
 
 export default function NewLineAccountPage() {
+  const theme = useAdminTheme()
+  const [registrationTags, setRegistrationTags] = useState<LineAccountRegistrationTag[]>([])
+  const [tagIds, setTagIds] = useState<string[]>([])
+  const [tagError, setTagError] = useState('')
+  useEffect(() => {
+    if (theme !== 'v8') return
+    let active = true
+    void api.lineAccountTags.list().then(result => { if (!active) return; if (result.success) setRegistrationTags(result.data); else setTagError('登録前のタグを読み込めませんでした') }).catch(() => { if (active) setTagError('登録前のタグを読み込めませんでした') })
+    return () => { active = false }
+  }, [theme])
   const [accountMethod, setAccountMethod] = useState<'existing' | 'new'>('existing')
   const [currentStep, setCurrentStep] = useState<StepNumber>(1)
   const [form, setForm] = useState<FormState>(emptyForm)
@@ -120,6 +132,7 @@ export default function NewLineAccountPage() {
 
   const input = () => ({
     name: form.name.trim() || undefined,
+    ...(theme === 'v8' ? {tagIds} : {}),
     channelId: form.channelId.trim(),
     channelSecret: form.channelSecret,
     loginChannelId: form.loginChannelId.trim(),
@@ -286,6 +299,9 @@ export default function NewLineAccountPage() {
           {currentStep === 1 && <div data-design-node="a8qMXX">
             <SetupSection title="1. 基本情報" description="管理画面で見分ける名前を設定します。未入力でも登録できます。">
               <Field id="account-name" label="表示名（任意）" value={form.name} onChange={(value) => update('name', value)} placeholder="未入力なら LINE公式アカウントの名前をそのまま使います" error={fieldErrors.name} />
+              {theme === 'v8' && <fieldset className="mt-4"><legend className="text-sm">登録前のタグ（任意）</legend>
+                {tagError ? <p role="alert">{tagError}</p> : registrationTags.length === 0 ? <p className="text-xs text-ink-faint">登録できるタグはありません</p> : registrationTags.map(tag => <label key={tag.id} className="mr-4 inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={tagIds.includes(tag.id)} onChange={e => setTagIds(ids => e.target.checked ? [...ids, tag.id] : ids.filter(id => id !== tag.id))} />{tag.name}</label>)}
+              </fieldset>}
             </SetupSection>
           </div>}
 

@@ -9345,6 +9345,9 @@ export const api = {
     ),
     jobs: () => fetchApi<ApiResponse<FriendMigrationJob[]>>('/api/friends/migration-jobs'),
   },
+  lineAccountTags: {
+    list: () => fetchApi<ApiResponse<import('@line-crm/shared').LineAccountRegistrationTag[]>>('/api/line-account-tags'),
+  },
   lineAccounts: {
     list: (live = false) =>
       fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '?live=1' : ''}`),
@@ -9376,6 +9379,7 @@ export const api = {
         body: JSON.stringify(data),
       }),
     connectCheck: (data: {
+      tagIds?: import('@line-crm/shared').LineAccountRegistrationTags['tagIds']
       name?: string
       channelId: string
       channelSecret: string
@@ -9385,6 +9389,7 @@ export const api = {
       method: 'POST', body: JSON.stringify(data),
     }),
     connect: (data: {
+      tagIds?: import('@line-crm/shared').LineAccountRegistrationTags['tagIds']
       name?: string
       channelId: string
       channelSecret: string
