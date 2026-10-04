@@ -211,7 +211,7 @@ export function NewAffiliateV8() {
           const serverMessage = res.error ?? ''
           if (serverMessage.includes('既に使われています')) {
             setCodeConflict(true)
-            throw new Error(`${serverMessage}。ほかの人が先に登録した可能性があります。`)
+            throw new Error('この紹介コードは既に使われています。別のコードを入力してください。')
           }
           throw new Error('create_failed')
         }
@@ -221,7 +221,11 @@ export function NewAffiliateV8() {
           typeof res.data.isActive === 'boolean' ? res.data.isActive : startTracking
         setStartTracking(persistedIsActive)
         setSavedIsActive(persistedIsActive)
-      } catch {
+      } catch (caught) {
+        if (caught instanceof Error && caught.message.includes('既に使われています')) {
+          setCodeConflict(true)
+          throw new Error('この紹介コードは既に使われています。別のコードを入力してください。')
+        }
         throw new Error('アフィリエイターを登録できませんでした。入力を確認して、もう一度お試しください。')
       }
     }
@@ -297,7 +301,7 @@ export function NewAffiliateV8() {
         >
           <p className={styles.cardTitle}>この紹介コードは既に使われています</p>
           <p className={styles.cardNote}>
-            ほかの人が先に登録した可能性があります。このまま保存しても登録できません。コードを変えて続けるか、一覧で確かめてください。
+            入力は残っています。別の紹介コードに変えて保存するか、一覧で登録済みのコードを確かめてください。
           </p>
         </Notice>
       ) : null}

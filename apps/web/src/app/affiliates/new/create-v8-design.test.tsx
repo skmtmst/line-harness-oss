@@ -6,8 +6,10 @@
  * - 報酬の決め方の文言が絵どおり（は、／◯／案件の「報酬額」で）
  * - 誰が・いつ保存したかは API が返さないので出さない（司令塔へ報告）
  */
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+
+const create = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', () => ({
   api: {
@@ -15,7 +17,7 @@ vi.mock('@/lib/api', () => ({
       list: () => Promise.resolve({ success: true, data: { items: [], total: 0 } }),
     },
     affiliates: {
-      create: () => Promise.resolve({ success: false, error: 'このコードは既に使われています' }),
+      create,
       update: () => Promise.resolve({ success: true, data: { id: 'a1' } }),
     },
   },
@@ -47,6 +49,10 @@ vi.mock('@/lib/use-unsaved-guard', () => ({
 
 const { NewAffiliateV8 } = await import('../new-affiliate-v8')
 
+beforeEach(() => {
+  create.mockReset().mockResolvedValue({ success: false, error: 'このコードは既に使われています' })
+})
+
 afterEach(() => {
   cleanup()
 })
@@ -63,10 +69,21 @@ describe('Gqve5 作る画面の競合の絵合わせ', () => {
     await waitFor(() => {
       expect(screen.getByText('この紹介コードは既に使われています')).toBeTruthy()
     })
-    expect(screen.getByText(/ほかの人が先に登録した可能性/)).toBeTruthy()
+    expect(screen.getByText(/入力は残っています/)).toBeTruthy()
     expect(screen.getByRole('link', { name: '一覧で確かめる' })).toBeTruthy()
     // 入力は残る
     expect((screen.getByLabelText(/名前（表示名）/) as HTMLInputElement).value).toBe('ペットライフ編集部')
+  })
+
+  test('HTTPの失敗として返るコードの重複でも入力を残して直し方を示す', async () => {
+    create.mockRejectedValue(new Error('このコードは既に使われています'))
+    render(<NewAffiliateV8 />)
+    fireEvent.change(screen.getByLabelText(/名前（表示名）/), { target: { value: '紹介者' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /紹介コード（/ }), { target: { value: 'usedcode' } })
+    fireEvent.click(screen.getByRole('button', { name: '登録して紹介リンクを発行する' }))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('別のコードを入力'))
+    expect(screen.getByText('この紹介コードは既に使われています')).toBeTruthy()
+    expect((screen.getByRole('textbox', { name: /紹介コード（/ }) as HTMLInputElement).value).toBe('usedcode')
   })
 
   test('足元の3つが絵どおり（発行に ✓）', async () => {
