@@ -644,6 +644,26 @@ jobs:
       - name: No layout breaks at 1152, 1440 and 1920 (v7 and v8)
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
+      # 速さ予算（2026-10-04 オーナー採用「1」、同日司令塔決定で判定を変更）。
+      # 主要10画面を V8 で開き、1画面3回測った真ん中で比べる。
+      # 落とすのは悪化だけ：時間は基準より20%、JS は1KB超の増加。
+      # ただし同じ PR で基準表を更新していれば JS 超過は通す
+      # （機能追加で JS は増える。理由は PR に書くこと）。
+      # 目標（表示1秒・反応100ms・長い作業50ms）の未達は結果に出すだけ。
+      # 道具の対照は speed-budget.mjs の頭に書いた。
+      - name: Speed budget on V8 (10 screens on a real browser)
+        if: steps.scope.outputs.run == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          allow_js=0
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ] \
+            && git diff --name-only "$BASE_SHA...$HEAD_SHA" -- apps/web/scripts/v8-guard/speed-budget.json | grep -q .; then
+            allow_js=1
+            echo "基準表の更新があるため、JS 超過は通す（理由は PR に書くこと）。"
+          fi
+          ALLOW_JS_BASELINE_UPDATE="$allow_js" node apps/web/scripts/v8-guard/speed-budget.mjs http://127.0.0.1:4310 /tmp/v8-guard/speed.json
       - name: v7 screens are pixel-identical to the base
         if: steps.scope.outputs.diff == 'true'
         run: |
