@@ -15,6 +15,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
+import Disclosure from '@/components/shared/disclosure'
+import StickyBar from '@/components/shared/sticky-bar'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -357,12 +359,11 @@ function RewardEditorInner() {
                 {touched && errors.includes('必要マイルは1以上の整数で入力してください') ? <span className={formStyles.required}>必要マイルは1以上の整数で入力してください</span> : null}
               </label>
             </div>
-            <details className={formStyles.details}>
-              <summary>説明を添える（任意）</summary>
+            <Disclosure title="説明を添える（任意）" size="compact">
               <Field label="説明" htmlFor="reward-description-v8" note="一覧と交換の画面に出ます。空でも出せます">
                 <TextArea id="reward-description-v8" rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} />
               </Field>
-            </details>
+            </Disclosure>
           </section>
 
           <section className={formStyles.card} aria-label="渡すもの">
@@ -372,8 +373,7 @@ function RewardEditorInner() {
               <Select aria-label="渡すものの種類" size="full" value={form.rewardKind}
                 onChange={(next) => set('rewardKind', next as MileageRewardKind)}
                 options={KINDS.map((kind) => ({ value: kind.value, label: kind.label }))} />
-              <details className={formStyles.details}>
-                <summary>種類ごとの説明</summary>
+              <Disclosure title="種類ごとの説明" size="compact">
               <RadioCardGroup legend="交換後に渡すもの" className={formStyles.grid2}>
                 {KINDS.map((kind) => (
                   <RadioCard
@@ -387,7 +387,7 @@ function RewardEditorInner() {
                   />
                 ))}
               </RadioCardGroup>
-              </details>
+              </Disclosure>
               <span className={formStyles.hint}>{kindNote}</span>
             </div>
             <div className={formStyles.field}>
@@ -428,12 +428,11 @@ function RewardEditorInner() {
                 />
               </Field>
             </div>
-            <details className={formStyles.details}>
-              <summary>交換したときの案内（任意）</summary>
+            <Disclosure title="交換したときの案内（任意）" size="compact">
               <Field label="交換したときの案内" htmlFor="reward-message-v8" note="お客様に届く文です。空なら既定の文を送ります">
                 <TextArea id="reward-message-v8" rows={2} value={form.customerMessage} onChange={(e) => set('customerMessage', e.target.value)} />
               </Field>
-            </details>
+            </Disclosure>
           </section>
 
           <section className={formStyles.card} aria-label="だれが交換できるか">
@@ -527,7 +526,7 @@ function RewardEditorInner() {
         </aside>
       </div>
 
-      <div className={formStyles.stickyBar}>
+      <StickyBar actions={<>
         <Button variant="secondary" href="/mileage?tab=rewards">キャンセル</Button>
         <Button onClick={() => void save(false)} disabled={saving || testing} busy={saving} busyLabel="保存中">
           下書きを保存
@@ -535,7 +534,7 @@ function RewardEditorInner() {
         <Button variant="primary" onClick={requestPublish} disabled={saving || testing}>
           <Check size={14} aria-hidden="true" /> 保存して出す
         </Button>
-      </div>
+      </>} />
 
       <ConfirmDialog
         open={publishOpen}
