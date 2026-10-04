@@ -380,6 +380,15 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'google business content retention',
+    classification: { kind: 'core', reason: 'Googleから受け取った内容の保存期限（暦日30日）' },
+    enforcement: {
+      mode: 'exempt',
+      reason:
+        'Googleの利用者データポリシーで決まった保存期限の掃除で、機能をoffにした店舗の古いコピーが残り続けるほうが違反になる',
+    },
+  },
+  {
     name: 'automation deliveries',
     dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'automations' },

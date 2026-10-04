@@ -348,11 +348,6 @@ export async function listLocalPosts(options: RequestOptions, locationName: stri
   return posts;
 }
 
-export async function getLocalPost(options: RequestOptions, postName: string): Promise<GooglePost> {
-  const raw = await authorized<RawLocalPost>(options, `${POSTS_URL}/${postName}`);
-  return normalizePost(raw);
-}
-
 export async function deleteLocalPost(options: RequestOptions, postName: string): Promise<void> {
   await authorized<unknown>(options, `${POSTS_URL}/${postName}`, { method: 'DELETE' });
 }
