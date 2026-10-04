@@ -32,7 +32,7 @@
     "direct-th": 20
   },
   "app/affiliates/v8-affiliates-tab.tsx": {
-    "unresolved-classname": 25,
+    "unresolved-classname": 27,
     "direct-th": 7
   },
   "app/affiliates/v8-approvals-tab.tsx": {
@@ -40,8 +40,8 @@
     "direct-th": 8
   },
   "app/affiliates/v8-drawer.tsx": {
-    "unresolved-classname": 48,
-    "direct-th": 8
+    "unresolved-classname": 50,
+    "direct-th": 9
   },
   "app/affiliates/v8-offers-tab.tsx": {
     "unresolved-classname": 33,
@@ -83,18 +83,6 @@
   "app/auto-replies/runs/runs-v8.tsx": {
     "unresolved-classname": 71,
     "direct-th": 7
-  },
-  "app/automations/automations-v8.tsx": {
-    "unresolved-classname": 9
-  },
-  "app/automations/drafts/draft-v8.tsx": {
-    "unresolved-classname": 35
-  },
-  "app/automations/list-v8.tsx": {
-    "unresolved-classname": 24
-  },
-  "app/automations/new/new-v8.tsx": {
-    "unresolved-classname": 140
   },
   "app/automations/new/page.tsx": {
     "unresolved-classname": 55
@@ -181,17 +169,6 @@
     "unresolved-classname": 2,
     "direct-secondary-button": 2
   },
-  "app/common-actions/common-action-new-v8.tsx": {
-    "unresolved-classname": 43
-  },
-  "app/common-actions/common-action-versions-v8.tsx": {
-    "unresolved-classname": 66,
-    "direct-th": 6
-  },
-  "app/common-actions/common-actions-v8.tsx": {
-    "unresolved-classname": 39,
-    "direct-th": 6
-  },
   "app/contents/page.tsx": {
     "arbitrary-value": 5,
     "unresolved-classname": 1
@@ -200,8 +177,8 @@
     "unresolved-classname": 109
   },
   "app/contents/vars/list-v8.tsx": {
-    "direct-th": 6,
-    "unresolved-classname": 108
+    "unresolved-classname": 105,
+    "direct-th": 6
   },
   "app/contents/vars/new/new-v8.tsx": {
     "unresolved-classname": 55
@@ -244,8 +221,8 @@
     "unresolved-classname": 10
   },
   "app/emergency/control-v8.tsx": {
-    "direct-th": 6,
-    "unresolved-classname": 100
+    "unresolved-classname": 81,
+    "direct-th": 6
   },
   "app/emergency/page.tsx": {
     "unresolved-classname": 4,
@@ -556,7 +533,7 @@
     "direct-secondary-button": 1
   },
   "app/rich-menus/list-v8.tsx": {
-    "unresolved-classname": 91,
+    "unresolved-classname": 81,
     "direct-th": 6,
     "arbitrary-value": 1
   },
@@ -698,7 +675,7 @@
     "unresolved-classname": 19
   },
   "app/templates/list-v8.tsx": {
-    "unresolved-classname": 94,
+    "unresolved-classname": 81,
     "direct-th": 8
   },
   "app/templates/page.tsx": {
@@ -711,15 +688,6 @@
   "app/users/users-v8.tsx": {
     "unresolved-classname": 55,
     "direct-th": 5
-  },
-  "app/webhooks/_components/webhooks-v8-api-tokens.tsx": {
-    "unresolved-classname": 20
-  },
-  "app/webhooks/_components/webhooks-v8-incoming.tsx": {
-    "unresolved-classname": 104
-  },
-  "app/webhooks/_components/webhooks-v8-interactions.tsx": {
-    "unresolved-classname": 55
   },
   "app/webhooks/_components/webhooks-v8-outgoing.tsx": {
     "unresolved-classname": 87
@@ -734,7 +702,7 @@
     "unresolved-classname": 7
   },
   "app/webhooks/apitokens-v8.tsx": {
-    "unresolved-classname": 27,
+    "unresolved-classname": 26,
     "direct-th": 6
   },
   "app/webhooks/edit/page.tsx": {
@@ -745,7 +713,7 @@
     "direct-th": 4
   },
   "app/webhooks/interactions-v8.tsx": {
-    "unresolved-classname": 43,
+    "unresolved-classname": 42,
     "direct-th": 6
   },
   "app/webhooks/new/new-v8.tsx": {
@@ -846,8 +814,7 @@
   },
   "components/chats/friend-info-sidebar.tsx": {
     "unresolved-classname": 12,
-    "arbitrary-value": 59,
-    "direct-secondary-button": 1
+    "arbitrary-value": 50
   },
   "components/chats/inbox-dropdown.tsx": {
     "unresolved-classname": 9,

@@ -63,6 +63,8 @@ describe('共通部品の影響範囲', () => {
       // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
       'app/affiliates/tabs.tsx',
       // ★V8-B 成果とアフィリエイト（OylSV 成果承認・h7dmB 案件・aINnz 支払い）。
+      // parity-D: アフィリエイター一覧に表の下のページ送りを足した。
+      'app/affiliates/v8-affiliates-tab.tsx',
       'app/affiliates/v8-approvals-tab.tsx',
       'app/affiliates/v8-offers-tab.tsx',
       'app/affiliates/v8-payment-tab.tsx',
