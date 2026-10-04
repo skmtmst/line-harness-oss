@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 .page { container-type: inline-size; gap: 14px; }
 .metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
-.metrics > div { min-width: 0; padding: 16px 20px; border-radius: 0; box-shadow: none; }
+.metrics > div { min-width: 0; padding: 16px 20px; border-radius: var(--radius-none); box-shadow: none; }
 .page table { table-layout: fixed; width: 100%; }
 .page table col { width: auto; }
 .page table col:first-child { width: 38%; }
