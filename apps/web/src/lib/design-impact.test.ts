@@ -182,7 +182,6 @@ describe('共通部品の影響範囲', () => {
       // なかった。サーバが数えた総数でページ送りを出すため共通へ寄せた。
       // ★V8 ファイルの検査（PfA4o）。表の下にページ送りを置く。
       'app/settings/file-scan/file-scan-v8.tsx',
-      'app/settings/file-scan/page.tsx',
       'app/staff/page.tsx',
       // 友だち属性V8の4タブ（タグ・情報欄・対応マーク・保存した検索）。
       // 表の下にページ送りがあり、1ページごとの件数を選べる。
