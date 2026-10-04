@@ -840,7 +840,7 @@ function EditWebinarInner() {
       {visitedPanes.has('comments') ? <div hidden={pane !== 'comments'}><CommentsV8 webinarId={webinar.id} onDirtyChange={dirtyReporterFor('comments')} registerSave={saveRegistrarFor('comments')} /></div> : null}
       {visitedPanes.has('actions') ? (
         <div hidden={pane !== 'actions'}>
-          <ActionsV8 webinarId={webinar.id} editor={editor} onEditorChange={setEditor} onActionsSaved={handleActionsSaved} onDirtyChange={dirtyReporterFor('actions')} />
+          <ActionsV8 webinarId={webinar.id} editor={editor} onEditorChange={setEditor} onActionsSaved={handleActionsSaved} onDirtyChange={dirtyReporterFor('actions')} registerSave={saveRegistrarFor('actions')} />
         </div>
       ) : null}
       {pane === 'preview' && <PublicPreviewStep webinar={webinar} editor={editor} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} onEditorChange={setEditor} />}

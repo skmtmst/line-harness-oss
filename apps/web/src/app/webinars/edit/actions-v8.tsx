@@ -31,11 +31,12 @@ function referenceOf(type: WebinarAction['actionType']): { key: string; label: s
 }
 
 /** E7iAYs の「視聴後にすること」から開く編集。機能は既存の口へつなぐ。 */
-export default function ActionsV8({ webinarId, editor, onEditorChange, onActionsSaved, onDirtyChange }: {
+export default function ActionsV8({ webinarId, editor, onEditorChange, onActionsSaved, onDirtyChange, registerSave }: {
   webinarId: string; editor: WebinarEditor
   onEditorChange: (next: WebinarEditor) => void
   onActionsSaved: () => void
   onDirtyChange: (dirty: boolean) => void
+  registerSave?: (save: (() => Promise<boolean>) | null) => void
 }) {
   const canEdit = canManageRole(useStaffRole())
   const [actions, setActions] = useState<WebinarAction[]>([])
@@ -75,28 +76,37 @@ export default function ActionsV8({ webinarId, editor, onEditorChange, onActions
   useEffect(() => { onDirtyChange(dirty) }, [dirty, onDirtyChange])
   useEffect(() => () => onDirtyChange(false), [onDirtyChange])
 
-  const save = async () => {
-    if (!canEdit || state !== 'ready' || lock.current || !dirty) return
+  const save = async (): Promise<boolean> => {
+    if (!canEdit || state !== 'ready' || lock.current) return false
+    if (!dirty) return true
     lock.current = true; setSaving(true); setNotice('')
     const request = generation.current
     try {
       // 競合を先に確認する。保存できた部分は再送せず、残った部分だけ再試行する。
       if (policyDirty) {
         const response = await webinarApi.saveEditor(webinarId, { expectedVersion: version.current, actionTemplateBody: templateBody, missingResultPolicy: policy })
-        if (request !== generation.current) return
+        if (request !== generation.current) return false
         version.current = response.data.version
         setSavedPolicy({ templateBody, policy }); onEditorChange(response.data)
       }
       if (actionsDirty) {
         const response = await webinarApi.saveActions(webinarId, actions)
-        if (request !== generation.current) return
+        if (request !== generation.current) return false
         setActions(response.data); setBaseline(JSON.stringify(response.data)); onActionsSaved()
       }
       setNotice('視聴後アクションを保存しました。')
+      return true
     } catch (cause) {
       if (request === generation.current) setNotice(webinarErrorText(cause, '保存できませんでした。入力を残しました。もう一度お試しください。'))
+      return false
     } finally { lock.current = false; if (request === generation.current) setSaving(false) }
   }
+  const saveRef = useRef(save)
+  saveRef.current = save
+  useEffect(() => {
+    registerSave?.(canEdit && state === 'ready' ? () => saveRef.current() : null)
+    return () => registerSave?.(null)
+  }, [registerSave, canEdit, state])
   const update = (index: number, patch: Partial<WebinarAction>) => setActions((current) => current.map((action, i) => i === index ? { ...action, ...patch } : action))
 
   return <div className="min-w-0 space-y-4">
@@ -123,6 +133,6 @@ export default function ActionsV8({ webinarId, editor, onEditorChange, onActions
       </fieldset>
     </>}
     {notice ? <Notice tone="info">{notice}</Notice> : null}
-    <StickyBar status={dirty ? '保存していない変更があります' : undefined} actions={<><Button href="/webinars">キャンセル</Button><Button variant="primary" disabled={!canEdit || state !== 'ready' || saving || !dirty} busy={saving} onClick={() => void save()}>視聴後アクションを保存する</Button></>} />
+    {!registerSave ? <StickyBar status={dirty ? '保存していない変更があります' : undefined} actions={<><Button href="/webinars">キャンセル</Button><Button variant="primary" disabled={!canEdit || state !== 'ready' || saving || !dirty} busy={saving} onClick={() => void save()}>視聴後アクションを保存する</Button></>} /> : null}
   </div>
 }
