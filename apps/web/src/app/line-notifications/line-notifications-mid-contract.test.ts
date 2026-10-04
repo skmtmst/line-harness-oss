@@ -21,7 +21,8 @@ describe('点検・中: LINE通知の画面契約', () => {
     expect(OPERATOR_RULES).not.toContain('うち止めている 2')
     expect(OPERATOR_RULES).not.toContain('3つのチームに')
     expect(OPERATOR_RULES).toContain('summary?.stopped')
-    expect(OPERATOR_RULES).toContain('summary?.missingRecipients')
+    // 板 u8xibp：受け取る人の実数は summary?.recipients。受け取れない人の内訳は出さない。
+    expect(OPERATOR_RULES).toContain('summary?.recipients')
   })
 
   it('中5: 押せないページ送りの飾りを置かない', () => {

@@ -118,7 +118,7 @@ describe('NOTIFY-04 一覧の名前から編集画面へ戻る', () => {
     expect(prevented).toBe(false)
   })
 
-  it('別の行の名前も同じ形のリンクで、絞り込みタブと検索は動いたまま', async () => {
+  it('別の行の名前も同じ形のリンクで、検索は動いたまま', async () => {
     fixture.operatorList.mockResolvedValue({
       success: true,
       data: { items: [rule(), rule({ id: 'rule-2', name: 'レビューが届きました' })], summary: { ...summary, total: 2 } },
@@ -128,9 +128,7 @@ describe('NOTIFY-04 一覧の名前から編集画面へ戻る', () => {
     const second = await screen.findByRole('link', { name: 'レビューが届きました' })
     expect(second.getAttribute('href')).toBe('/line-notifications/operator/new?id=rule-2')
 
-    // 絞り込み（公開中だけ）と検索は行を絞るだけで、リンクの形は変わらない。
-    fireEvent.click(screen.getByRole('radio', { name: /出している/ }))
-    expect(screen.getByRole('link', { name: 'レビューが届きました' })).toBeTruthy()
+    // 板 u8xibp：絞り込みタブは無い。検索は行を絞るだけで、リンクの形は変わらない。
     fireEvent.change(screen.getByPlaceholderText('お知らせ名・きっかけで探す'), { target: { value: 'レビュー' } })
     expect(screen.queryByRole('link', { name: '新しい予約が入りました' })).toBeNull()
     expect(screen.getByRole('link', { name: 'レビューが届きました' }).getAttribute('href'))
