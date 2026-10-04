@@ -50,9 +50,8 @@
   - 新しい種類 `ec.site.publication_viewed` だけ追加で受けます。
   - 保存して返します：`{ success: true, status: 'view_counts_saved', saved, unknownPhotos }`
   - `saved`：写真ごとの保存後の数。`unknownPhotos`：musuboに無い写真ID（無視した分）。
-- 種類の許可リストは `apps/worker/src/routes/ec-integrations.ts` の中にだけ足しました。
-  共通の種類名簿（`@line-crm/shared` の `EC_EVENT_TYPES`）は共有部品なので触らず、
-  本採用時にM側で名簿へ移すことを `node_modules/.cache/muse-manual-report.md` で報告します。
+- 種類は共通名簿（`@line-crm/shared` の `EC_EVENT_TYPES`）へ正式に追加済み
+  （枝 codex/muse-v8f-f20-shared-types、司令塔許可）。受け口はその名簿を参照します。
 - DBの変更は不要です（入れ物は295で済み）。migrationは作っていません。
 
 ## 未確認のこと

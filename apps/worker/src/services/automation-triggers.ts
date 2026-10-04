@@ -9,14 +9,12 @@ import {
 import { createAutomationActionExecutors } from './automation-action-executors.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 
-const EVENT_TRIGGER_TYPES = new Set([
-  'friend_add',
-  'tag_change',
-  'message_received',
-  'form_submitted',
-  'link_clicked',
-  'calendar_booked',
-  // EC受信の全11種。種別の可否は受信口の EC_EVENT_TYPES が正本。
+/**
+ * EC受信のうち自動化のきっかけになる11種。
+ * 受信口の EC_EVENT_TYPES が正本だが、掲載の閲覧数
+ * （ec.site.publication_viewed）はきっかけにしない。
+ */
+export const EC_TRIGGER_EVENT_TYPES: readonly string[] = [
   'ec.order.confirmed',
   'ec.order.payment_received',
   'ec.order.bank_transfer_reminder',
@@ -28,6 +26,16 @@ const EVENT_TRIGGER_TYPES = new Set([
   'ec.subscription.card_updated',
   'ec.subscription.cancelled',
   'ec.customer.profile_updated',
+];
+
+const EVENT_TRIGGER_TYPES = new Set([
+  'friend_add',
+  'tag_change',
+  'message_received',
+  'form_submitted',
+  'link_clicked',
+  'calendar_booked',
+  ...EC_TRIGGER_EVENT_TYPES,
   'score_threshold_crossed',
   'score_band_changed',
   'manual_reply_sent',
