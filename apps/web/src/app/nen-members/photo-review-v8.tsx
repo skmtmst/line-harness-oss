@@ -28,8 +28,7 @@ import { photoReviewEntryFrom, photoReviewSearch, type PhotoReviewEntry } from '
 import { formatMinutesRough } from '@/lib/format-duration'
 import { mileStatusLabel, reviewVersionOf, text } from './photo-text'
 import { PhotoReviewDetail } from './photo-review-detail'
-import { PhotoRewardPolicyDrawer } from './photo-reward-policy'
-import type { PhotoRewardPolicyVersion } from '@/lib/api'
+import PhotoPolicyHistoryV8 from './photo-policy-history-v8'
 import styles from './photo-review-v8.module.css'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
@@ -558,7 +557,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         </label>
       </Dialog>
 
-      <HistoryDrawerV8
+      <PhotoPolicyHistoryV8 canEdit={canEdit}
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         onChanged={() => void load()}
@@ -879,48 +878,6 @@ function RejectDialogV8({
           <div className={styles.previewBox}><p>{preview}{resubmitInvite ? '\nまたのお写真をお待ちしています。' : ''}</p></div>
         </div>
     </Dialog>
-  )
-}
-
-/**
- * 版の履歴（N1br7）。報酬の決まりの版の一覧・比べる・予約を
- * v7 の窓（PhotoRewardPolicyDrawer）で開く。口は v7 と同じ。
- */
-function HistoryDrawerV8({ open, onClose, onChanged }: { open: boolean; onClose: () => void; onChanged: () => void }) {
-  const [versions, setVersions] = useState<PhotoRewardPolicyVersion[] | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!open) return
-    let active = true
-    setLoading(true)
-    setError('')
-    void api.nenMembers.photoRewardPolicyVersions().then((res) => {
-      if (!active) return
-      if (!res.success) throw new Error(res.error)
-      setVersions(res.data)
-    }).catch((caught) => {
-      if (!active) return
-      setError(caught instanceof Error ? caught.message : '報酬の決まりを読み込めませんでした')
-    }).finally(() => {
-      if (active) setLoading(false)
-    })
-    return () => { active = false }
-  }, [open ])
-
-  return (
-    <div data-design-node={open ? 'N1br7' : undefined}>
-      <PhotoRewardPolicyDrawer
-        open={open}
-        versions={versions}
-        loading={loading}
-        error={error}
-        onReload={() => undefined}
-        onClose={onClose}
-        onChanged={onChanged}
-      />
-    </div>
   )
 }
 
