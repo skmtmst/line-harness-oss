@@ -3,7 +3,7 @@
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 import { SettingsNavV8 } from '../settings/settings-nav-v8'
-import styles from './pools-v8.module.css'
+import './pools-v8.css'
 
 import { X, Copy, MoreHorizontal, Plus } from 'lucide-react'
 import IconButton from '@/components/shared/icon-button'
@@ -20,7 +20,6 @@ import HelpTip from '@/components/shared/help-tip'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import StatusBadge from '@/components/shared/status-badge'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 
 type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
@@ -86,12 +85,12 @@ export default function PoolsPage() {
   const isEmpty = !loading && !error && sortedPools.length === 0
 
   return (
-    <div className={styles.page} data-design-node="u3iab3">
+    <div className="pool-fid-page" data-design-node="u3iab3">
       <ReadonlyHeaderV8 title="プール管理" description="来たお客さまを振り分けるLINEアカウントをまとめる入れ物です。公開URLから来た人を、稼働中の所属アカウントからランダムに振り分けます。"
         actions={!isEmpty && !showCreate ? <Button variant="primary" onClick={() => setShowCreate(true)}><Plus size={15} aria-hidden="true" />新規プール</Button> : undefined} />
-      <div className={styles.layout}>
+      <div className="pool-fid-layout">
         <SettingsNavV8 />
-        <div className={styles.main}>
+        <div className="pool-fid-main">
           {loading ? <ListState kind="loading" /> : error ? (
             <ListState kind="error" title="プール一覧を表示できませんでした" description={error} onRetry={() => { void load() }} />
           ) : isEmpty ? (
@@ -99,7 +98,7 @@ export default function PoolsPage() {
               action={<Button variant="primary" onClick={() => setShowCreate(true)}><Plus size={15} aria-hidden="true" />新規プール</Button>} />
           ) : (
             <>
-              <div className={styles.cards}>
+              <div className="pool-fid-cards">
                 {sortedPools.map((pool) => <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />)}
               </div>
               <Notice tone="info" message="「外す」と、これから来たお客さまはそのアカウントへ振り分けられなくなります。アカウント自体と、これまでの流入の記録は残ります。" />
@@ -176,19 +175,19 @@ function PoolCard({
   }
 
   return (
-    <section className={styles.card}>
-      <div className={styles.cardHead}>
+    <section className="pool-fid-card">
+      <div className="pool-fid-cardHead">
         <div className="min-w-0">
-          <h2 className={styles.name} title={pool.name}>{pool.name}</h2>
-          <p className={styles.slug} title={pool.slug}>slug：{pool.slug}{isMain ? '・既定' : ''}</p>
+          <h2 className="pool-fid-name" title={pool.name}>{pool.name}</h2>
+          <p className="pool-fid-slug" title={pool.slug}>slug：{pool.slug}{isMain ? '・既定' : ''}</p>
         </div>
         {!isMain && <div>
           <IconButton aria-label={`${pool.name}の操作`} onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen}><MoreHorizontal size={16} /></IconButton>
           <ActionMenu open={menuOpen} onClose={() => setMenuOpen(false)} items={[{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } }]} />
         </div>}
       </div>
-      <div className={styles.urlRow}>
-        <span className={styles.url} title={publicUrl}>{publicUrl}</span>
+      <div className="pool-fid-urlRow">
+        <span className="pool-fid-url" title={publicUrl}>{publicUrl}</span>
         <Button variant="secondary" onClick={onCopy}><Copy size={15} aria-hidden="true" />{copied ? 'コピー済' : '公開 URL コピー'}</Button>
       </div>
       {copyError && <p role="alert" className="text-xs text-ink-secondary">{copyError}</p>}
@@ -291,15 +290,15 @@ function PoolAccountList({
   }
 
   return (
-    <div className={styles.members}>
-      <div className={styles.membersLabel}>所属アカウント<HelpTip label="所属アカウントの説明">来たお客さまを稼働中の所属先へランダムに振り分けます。</HelpTip></div>
-      <ul className={styles.memberList}>
+    <div className="pool-fid-members">
+      <div className="pool-fid-membersLabel">所属アカウント<HelpTip label="所属アカウントの説明">来たお客さまを稼働中の所属先へランダムに振り分けます。</HelpTip></div>
+      <ul className="pool-fid-memberList">
         {members.map((m) => {
           const acc = accounts.find((a) => a.id === m.lineAccountId)
           return (
             <li
               key={m.id}
-              className={styles.member}
+              className="pool-fid-member"
             >
               <span className="min-w-0 truncate" title={acc?.name ?? m.lineAccountId}>{acc?.name ?? m.lineAccountId}</span>
               <span className="shrink-0 text-xs text-ink-secondary">友だち {acc?.stats?.friendCount == null ? '—' : acc.stats.friendCount.toLocaleString('ja-JP')}</span>
