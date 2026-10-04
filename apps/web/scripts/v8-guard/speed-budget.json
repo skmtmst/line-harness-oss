@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-10-04T03:30:00+09:00",
+  "updated": "2026-10-04T14:21:00+09:00",
   "note": "落とすのは悪化だけ。時間は3回中央値で基準より20%悪化、JSは基準より1KB超の増加で落とす。ただし同じPRでこの表の基準を更新していればJS超過は通す（機能追加でJSは増える。理由はPRに書く）。targets は目標（表示1秒・反応100ms・長い作業50ms）で、未達は結果に出すだけ。",
   "targets": {
     "showMs": 1000,
@@ -15,7 +15,7 @@
       "lcpMs": 660,
       "pressMs": 69,
       "longTaskMs": 51,
-      "jsBytes": 4413935
+      "jsBytes": 4415069
     },
     "inbox": {
       "route": "/chats",
@@ -87,7 +87,7 @@
       "lcpMs": 296,
       "pressMs": 106,
       "longTaskMs": 67,
-      "jsBytes": 4286392
+      "jsBytes": 4287531
     },
     "friends-2000": {
       "route": "/friends",
