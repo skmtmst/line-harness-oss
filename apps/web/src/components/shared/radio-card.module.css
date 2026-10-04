@@ -228,3 +228,6 @@
 [data-theme='v8'] .invalid, [data-theme='v8'] .invalid .radio { outline-color: var(--color-status-danger); }
 
 [data-theme='v8'] .radio { border-radius: 999px; }
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .card { -webkit-font-smoothing: auto; }
