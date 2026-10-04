@@ -161,3 +161,5 @@ export * from './line-account-tags';
 export * from './photo-publication-views.js';
 
 export * from './operator-notification-teams.js';
+
+export * from './ad-event-mappings.js';

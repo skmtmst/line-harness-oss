@@ -2,6 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/lib/api'
+import { AdEventMappings } from './ad-event-mappings'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import type { AdConversionLog, AdPlatform } from '@/lib/api'
 import type { EntryRoute } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
@@ -193,6 +195,7 @@ export default function AdIntegration({
   onPlatformCountsChange?: (counts: { total: number; connected: number } | null) => void
 }) {
   const { selectedAccountId } = useAccount()
+  const theme = useAdminTheme()
   const latestAccountRef = useRef(selectedAccountId)
   const loadGenerationRef = useRef(0)
   latestAccountRef.current = selectedAccountId
@@ -629,11 +632,11 @@ export default function AdIntegration({
             左がうちの成果地点、右が広告側の名前です。対応が付いていないものは返せません。
           </p>
           <div className="mt-3">
-            <ListState
+            {theme === 'v8' ? <AdEventMappings key={selectedAccountId} accountId={selectedAccountId} canWrite={canManage} /> : <ListState
               kind="empty"
               title="対応表はまだ表示できません"
               description="成果地点と広告側の名前の対応を取れていないため、件数は表示しません。対応が取れたらここに並びます。"
-            />
+            />}
           </div>
         </section>
         </div>

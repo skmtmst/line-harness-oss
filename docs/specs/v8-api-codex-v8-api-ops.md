@@ -4,7 +4,7 @@
 
 | 板 | 入力・API | 出力・完了条件 | 権限・失敗時 |
 |---|---|---|---|
-| FDBsG | GET /api/ad-platforms/mappings?account_id、PUT /api/ad-platforms/mappings/:pointId。媒体ごとに mode=auto/manual/off、eventName、expectedVersion | 成果地点ごとの自動対応と手動上書き。自動は購入→Purchase（Google=purchase）、定期→Subscribe（Google=subscribe）、予約→Schedule（Google=schedule）。未対応は送らない。成果発生時に対応を解決し、既存の冪等送信台帳へ渡す | 閲覧はアカウント範囲内、変更はowner/admin。入力不正422、範囲外404、競合409。秘密値・顧客情報を返さない |
+| FDBsG | GET /api/ad-platforms/mappings?account_id、PUT /api/ad-platforms/mappings/:pointId。媒体ごとに mode=auto/manual/off、eventName、googleActionId（Googleの手入力ID）、expectedVersion | 成果地点ごとの自動対応と手動上書き。自動は購入→Purchase（Google=purchase）、定期→Subscribe（Google=subscribe）、予約→Schedule（Google=schedule）。未対応は送らない。成果発生時に所属・対応を固定し、既存の冪等送信台帳へ渡す。Googleの外部名称は取得せず、手入力のaction ID（未指定時は連携設定のID）を使う。準備中断は既存cronで回収し、移行前の成果は送らない | 閲覧はアカウント範囲内、変更はowner/admin。入力不正422、範囲外404、競合409。秘密値・顧客情報を返さない |
 | Q5le3 | GET /api/entry-routes/:id/funnel（既存拡張） | first touchの友だちだけ、残人数・ブロック数・成果金額・1人あたり金額。月別内訳は追加月別の人数とその人たちの現在の状態・成果。全件集計でページに依存しない。分母0の金額はnull | 既存の経路閲覧権限・範囲を維持。取得失敗500、未取得を0表示しない |
 | D0AOyx | POST /api/traffic-pools {slug,name,activeAccountId,accountIds?}。旧1件入力も対応 | 全所属をD1 batchで原子的に登録。受け入れ先は稼働中の所属からランダム | owner限定。全所属の範囲と有効性確認。不正422、権限403、slug重複409。部分作成しない |
 | xuJ7D | GET /api/getting-started?version=v8（既存拡張） | V8用6段：接続→初期セット→分類→追加時配信→シナリオ→実送達。初期セットは選択アカウントの保存済み機能設定があること。送達判定は既存の実送達判定を継続。表示だけで完了にしない | owner/admin/staff、各段の操作権限を確認。範囲外404、失敗500。V7は従来5段を表示 |

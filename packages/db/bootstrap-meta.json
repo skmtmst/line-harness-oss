@@ -505,8 +505,9 @@
     "555_tenant_data_retention.sql",
     "556_f13_folder_kinds.sql",
     "564_form_versions_purge_delete.sql",
+    "573_ad_event_mappings.sql",
     "574_operator_notification_teams.sql",
     "575_photo_publication_daily_views.sql"
   ],
-  "migrationCount": 507
+  "migrationCount": 508
 }

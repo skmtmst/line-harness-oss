@@ -109,6 +109,13 @@
       "parentColumn": "id"
     }
   },
+  "ad_conversion_event_accounts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "ad_conversion_logs": {
     "category": "purge",
     "scope": {
@@ -137,6 +144,20 @@
       "column": "ad_platform_id",
       "parent": "ad_platforms",
       "parentColumn": "id"
+    }
+  },
+  "ad_event_mapping_dispatches": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ad_event_mappings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
     }
   },
   "ad_platforms": {

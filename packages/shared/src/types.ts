@@ -2605,3 +2605,23 @@ export interface OperatorNotificationTeam {
   version: number;
   archivedAt: string | null;
 }
+
+export interface AdEventMapping {
+  pointId: string;
+  pointName: string;
+  eventType: string;
+  provider: 'meta' | 'google';
+  mode: 'auto' | 'manual' | 'off';
+  eventName: string | null;
+  automaticEventName: string | null;
+  googleActionId: string | null;
+  version: number;
+}
+export interface SaveAdEventMappingRequest {
+  account_id: string;
+  provider: 'meta' | 'google';
+  mode: 'auto' | 'manual' | 'off';
+  eventName?: string | null;
+  googleActionId?: string | null;
+  expectedVersion: number;
+}

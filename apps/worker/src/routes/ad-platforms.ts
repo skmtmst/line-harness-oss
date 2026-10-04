@@ -89,7 +89,9 @@ function serializeLog(log: AdConversionLog) {
   };
 }
 
+import { adEventMappings } from './ad-event-mappings.js';
 const adPlatforms = new Hono<Env>();
+adPlatforms.route('/', adEventMappings);
 
 // GET /api/ad-platforms - list visible accounts only
 adPlatforms.get('/api/ad-platforms', requireRole('owner', 'admin', 'staff'), async (c) => {
