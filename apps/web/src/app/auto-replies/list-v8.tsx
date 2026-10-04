@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation'
 import {
   CircleCheck,
   Copy,
+  Eye,
   Folder as FolderIcon,
   MessageSquare,
   MoreHorizontal,
@@ -1162,6 +1163,14 @@ export default function AutoRepliesListV8() {
           </div>
         </div>
       </div>
+
+      {/* 板 `Q5lOCc`：閲覧のみの帯。数の帯の上。 */}
+      {!canEdit ? (
+        <div className={styles.roBand} role="status">
+          <Eye size={16} aria-hidden="true" />
+          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+        </div>
+      ) : null}
 
       {/* 数の帯 4つ。 */}
       <div data-design="KPIs" className={styles.kpis}>
