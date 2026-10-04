@@ -18,6 +18,7 @@ import {
   CalendarDays,
   CalendarClock,
   Copy,
+  Eye,
   FileText,
   Gauge,
   List as ListIcon,
@@ -49,9 +50,8 @@ import SearchField from '@/components/shared/search-field'
 import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
-import { runUndoable } from '@/lib/undoable'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
+import { notifyToast } from '@/components/shared/toast'
+import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { formatDateTime, formatNumber, formatYmd } from '@/lib/format'
 import styles from './list-v8.module.css'
 
@@ -779,6 +779,14 @@ export default function BroadcastListV8() {
         </p>
       </div>
 
+      {/* 板 `NtCE3`：閲覧のみの帯。数の帯の上。 */}
+      {canEdit ? null : (
+        <div className={styles.roBand} role="status">
+          <Eye size={16} aria-hidden="true" />
+          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+        </div>
+      )}
+
       {/* 数の帯：予約中・今月の送信枠・今月の配信・平均開封率（アイコンつき）。 */}
       <div className={styles.kpis} role="group" aria-label="配信の数">
         {kpis.map((kpi) => (
@@ -1092,7 +1100,8 @@ export default function BroadcastListV8() {
                             >
                               {broadcast.title}
                             </Link>
-                            <p className={styles.cellSub}>{rowExcerpt(broadcast.messageType, broadcast.messageContent)}</p>
+                            <p className={styles.cellSub}>{messageTypeLabel(broadcast.messageType)}</p>
+                            {/* 板が狭いとき「配信条件」はここへ移る（狭い板用の畳み方）。 */}
                             <p className={styles.cellAudience} title={audience}>{audience}</p>
                           </td>
                           <td className={styles.statusCell}>

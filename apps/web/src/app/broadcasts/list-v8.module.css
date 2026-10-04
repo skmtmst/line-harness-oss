@@ -12,6 +12,19 @@
   container-type: inline-size;
 }
 
+/* 板 `NtCE3`：閲覧のみの帯。数の帯の上。 */
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 /* 見出しブロック：画面名＋一行の説明。 */
 .head {
   display: flex;

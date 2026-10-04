@@ -2233,7 +2233,7 @@ export default function BroadcastForm({
               <p className="mt-1 text-sm text-ink-faint">全員または詳細条件から、実際に送れる友だちを確認します。</p>
             </div>
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
-              <p className="text-xs font-medium text-accent-deep">送信対象</p>
+              <p className="text-xs font-medium text-accent-deep">この条件で送る人数</p>
               <p className="text-hero text-accent-deep">
                 {formatNumber(audienceDisplayCount)}
                 <span className="ml-1 text-sm font-normal">人</span>
@@ -2274,10 +2274,16 @@ export default function BroadcastForm({
               </p>
             </div>
           )}
+          {/* 板 `FU2aU`：ブロック中の人を除く札。数は口で数えたものだけ出す。 */}
+          <div className="bg-accent-soft rounded-card mt-3 p-3">
+            <p className="text-ink text-sm font-bold">ブロック中の人を除く</p>
+            <p className="text-ink-secondary mt-1 text-xs">
+              {preflight?.exclusions
+                ? `ブロック・非表示の ${formatNumber((preflight.exclusions.blocked ?? 0) + (preflight.exclusions.hidden ?? 0))}人には送りません`
+                : '人数を数えています…'}
+            </p>
+          </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {/* ブロック中の人は countRules の is_following=true で外れている。
-                外していることを書かないと、人数が合わないように見える。 */}
-            <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
             <Button variant="secondary" className="text-ink-secondary px-3 py-1 text-xs h-auto whitespace-normal" href="/friends">
               対象を一覧で見る
             </Button>
@@ -2485,7 +2491,7 @@ export default function BroadcastForm({
           />
         )}
         {!showTemplatePicker && <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加する</Button>
+          <Button type="button" disabled={bubbles.length >= MAX_BUBBLES} onClick={() => setBubbles((items) => [...items, emptyBubble()])}><Plus size={15} aria-hidden /> メッセージを追加する{MAX_BUBBLES - bubbles.length > 0 ? ` あと${MAX_BUBBLES - bubbles.length}つ` : ''}</Button>
           <Button type="button" onClick={() => setShowTemplatePicker(true)}>テンプレートから選ぶ</Button>
           <Button type="button" disabled title="テンプレート保存の契約は未接続です"><Save size={15} aria-hidden /> 保存してテンプレート化する</Button>
         </div>}
@@ -2896,7 +2902,19 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">送信枠</h3>
               <p className="mt-1 text-xs text-ink-faint">現在の枠内で送信できるか確認します。</p>
-              {quota ? <><p className="mt-3 text-sm font-semibold text-ink">使用予定　{formatNumber(quota.planned)} / {formatNumber(quota.monthlyLimit)}通</p><div className="mt-2 h-2 overflow-hidden rounded-pill bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-medium ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${formatNumber(Math.max(0, quota.planned - (quota.remaining ?? 0)))}通` : `残り ${formatNumber(quota.remaining)}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
+              {quota != null && quota.remaining != null && quota.monthlyUsed != null && quota.planned != null && quota.monthlyLimit != null ? (
+                <>
+                  <p className="mt-3 text-sm font-semibold text-ink">
+                    今月 残り {formatNumber(quota.remaining)} 通
+                  </p>
+                  <p className={`mt-1 text-xs font-medium ${quotaInsufficient ? 'text-danger' : 'text-ink-secondary'}`}>
+                    使った {formatNumber(quota.monthlyUsed)} ＋ 今回 {formatNumber(quota.planned)} 通 ／ 上限 {formatNumber(quota.monthlyLimit)} 通。
+                    {quotaInsufficient ? `不足 ${formatNumber(Math.max(0, quota.planned - quota.remaining))}通` : '足りています'}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>
+              )}
             </section>
             <LinePreview><div className="rounded-control bg-canvas p-4 text-sm text-ink"><BubblePreview bubble={bubbles[0]} buttons={messageButtons} /></div></LinePreview>
           </div>
@@ -2977,7 +2995,7 @@ export default function BroadcastForm({
         <>
           <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => guarded(onCancel)}>キャンセル</Button>
           {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => void openTestDialog()}>{testSending ? '送信中…' : 'テストを送る'}</Button>}
-          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
+          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined} onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? 'この内容で予約する' : '下書きを保存する'}</Button>
         </>
       )}
       </>

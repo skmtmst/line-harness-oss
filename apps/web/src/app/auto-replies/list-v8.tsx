@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation'
 import {
   CircleCheck,
   Copy,
+  Eye,
   Folder as FolderIcon,
   ListOrdered,
   MessageSquare,
@@ -1447,17 +1448,14 @@ export default function AutoRepliesListV8() {
         </div>
       </div>
 
-      {/* 見るだけの人への帯（`Q5lOCc`）。操作は押せない形のまま置く。 */}
-      {!canEdit && (
-        <p className="border-info bg-info-bg text-ink rounded-control border px-3 py-2 text-sm" data-design-node="Q5lOCc">
-          閲覧のみで見ています。変える操作は管理者に頼んでください。
-        </p>
-      )}
+      {/* 板 `Q5lOCc`：閲覧のみの帯。数の帯の上。 */}
+      {!canEdit ? (
+        <div className={styles.roBand} role="status">
+          <Eye size={16} aria-hidden="true" />
+          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+        </div>
+      ) : null}
 
-      {/*
-        一覧の上の案内の帯は土台側で見出し横の「？」(HelpTip) へ移動済みのため置かない。
-        文面は上の HelpTip と同じ。
-      */}
       {/* 数の帯 4つ。 */}
       <div data-design="KPIs" className={styles.kpis}>
         {kpis.map((kpi) => (
