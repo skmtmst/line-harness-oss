@@ -1102,7 +1102,7 @@
     "unresolved-classname": 14
   },
   "components/shared/skeleton.tsx": {
-    "unresolved-classname": 1
+    "unresolved-classname": 2
   },
   "components/shared/sticky-bar.tsx": {
     "unresolved-classname": 4
@@ -1165,5 +1165,8 @@
   },
   "app/conversions/page.tsx": {
     "unresolved-classname": 6
+  },
+  "components/shared/radio.tsx": {
+    "unresolved-classname": 1
   }
 }
