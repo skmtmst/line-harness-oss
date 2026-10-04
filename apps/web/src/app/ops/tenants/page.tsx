@@ -10,7 +10,7 @@ import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import HelpTip from '@/components/shared/help-tip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import styles from './tenants-v8.module.css'
+import './tenants-v8.css'
 import '@/app/ops/readonly-v8.css'
 import { formatDate, formatDateTime, planLabel, planStatusChip, tenantDetailHref, tenantUseStatusChip, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
@@ -144,11 +144,11 @@ export default function OpsTenantsPage() {
   }
 
   return (
-    <div data-design-node="XWtYC" className={`${styles.page} flex flex-col gap-4`}>
+    <div data-design-node="XWtYC" className={`ops-tenants-page flex flex-col gap-4`}>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <PageHeader breadcrumb={[]} title="契約先アカウント" description="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。" actions={<Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}><Plus size={16} aria-hidden="true" />契約先を作る</Button>} />
 
-      <div className={styles.metrics}>
+      <div className="ops-tenants-metrics">
         <KpiCard variant="v6" title="契約中" value={summary ? summary.active : null} unit="社" detail="" help="請求が生きている契約先（決済失敗を含む）" loading={loading && !summary} />
         <KpiCard variant="v6" title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail="期限切れ前に案内" loading={loading && !summary} />
         <KpiCard variant="v6" title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail="Stripe で支払いが止まっている" badge={summary?.pastDue ? '要対応' : undefined} badgeTone="danger" loading={loading && !summary} />

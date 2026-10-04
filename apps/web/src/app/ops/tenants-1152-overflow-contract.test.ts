@@ -8,7 +8,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const PAGE = readFileSync(resolve(__dirname, "tenants/page.tsx"), "utf-8");
-const CSS = readFileSync(resolve(__dirname, "tenants/tenants-v8.module.css"), "utf-8");
+const CSS = readFileSync(resolve(__dirname, "tenants/tenants-v8.css"), "utf-8");
 
 describe("tenants 一覧の1152幅", () => {
   it("表の列を減らし、行末のメニューに操作をまとめる", () => {
