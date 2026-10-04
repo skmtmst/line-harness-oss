@@ -2392,7 +2392,7 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
   const adCost = metricSum(overview.routes.map((item) => item.adCost))
   const profit = metricSum(overview.routes.map((item) => item.profitAfterAdCost))
   const stages = [
-    { label: 'リンクを見た', value: clicks },
+    { label: 'リンクを押した', value: clicks },
     { label: '友だちになった', value: friends },
     { label: '1回でも反応した', value: reactions },
     { label: '成果になった', value: conversions },
@@ -2410,19 +2410,17 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
 
     </div>
     <div className="v8-ro-analytics-toolbar"><RangePicker days={days} onChange={setDays} /><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /><Link href={overview.searchConsoleHref} className="text-action">Search Consoleを見る</Link><AnalyticsExportButton onClick={exportRoutes} disabled={overview.routes.length === 0} /></div>
-    <h2 className="text-sm font-semibold">全体の流れ</h2>
-
-    <div className="grid grid-cols-4 overflow-hidden rounded-card border border-hairline bg-canvas">{stages.map((stage, index) => {
+    <div className="v8-ro-analytics-routesBody"><section className="v8-ro-analytics-routesFlow"><h2 className="text-sm font-semibold">全体の流れ</h2><div className="v8-ro-analytics-routesStages">{stages.map((stage, index) => {
       const previous = index > 0 ? stages[index - 1].value : null
       const rate = previous && stage.value !== null ? stage.value / previous * 100 : null
       // 監査6 #674: 段ごとの数は MetricValue で単位小・3状態を揃える
-      return <div key={stage.label} className="border-r border-hairline px-4 py-3 last:border-r-0"><p className="text-xs text-ink-faint">{stage.label}</p><p className="mt-1 text-lg font-semibold text-ink"><MetricValue value={stage.value} unit={index === 0 ? '回' : index === 3 ? '件' : '人'} /></p>{index > 0 && <p className="text-xs text-ink-secondary">前段の {rate === null ? '—' : `${rate.toFixed(1)}%`}</p>}</div>
-    })}</div>
-    <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
+      return <div key={stage.label}><div className="v8-ro-analytics-routeStageHead"><p className="text-xs text-ink-faint">{stage.label}</p><p className="text-sm font-semibold text-ink"><MetricValue value={stage.value} unit={index === 0 ? '回' : index === 3 ? '件' : '人'} /></p></div><div className="v8-ro-analytics-routeBar" aria-hidden="true"><span style={{ width: stage.value !== null && clicks ? `${Math.min(100, stage.value / clicks * 100)}%` : '0%' }} /></div>{index > 0 && <p className="mt-1 text-xs text-ink-secondary">前段の {rate === null ? '—' : `${rate.toFixed(1)}%`}</p>}</div>
+    })}</div></section>
+    <div className="v8-ro-analytics-routesTable"><div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>経路</Th><Th align="right">友だち</Th><Th align="right">反応</Th><Th align="right">成果</Th><Th align="right">売上</Th><Th align="right">かかった費用</Th><Th align="right">差し引き</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.routes.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間に集計できる経路はありません</td></tr> : overview.routes.map((item) => <tr key={item.id} className="text-sm"><td className="px-3 py-3 font-medium"><p className="truncate" title={item.name}>{item.name}</p><p className="mt-1 truncate text-xs font-normal text-ink-faint">{item.refCode ? `流入と計測 ／ ref=${item.refCode}` : '参照コードなし'} ／ クリック <MetricCell metric={item.clicks} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.friendAdds} /><p className="mt-1 text-xs text-ink-faint">現在 <MetricCell metric={item.currentFriends} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.reactionPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.approved} /><p className="mt-1 text-xs text-ink-faint">保留 <MetricCell metric={item.conversions.pending} />・却下 <MetricCell metric={item.conversions.rejected} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.revenue} currency /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.adCost} currency /><p className="mt-1 text-xs text-ink-faint">友だち1人 <MetricCell metric={item.costPerFriend} currency />・成果1件 <MetricCell metric={item.costPerConversion} currency /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.profitAfterAdCost} currency /></td></tr>)}</tbody>
     </table></div>
-    <p className="text-xs text-ink-faint">「—」は費用や成果を取得できない経路です。0として差し引きを計算していません。帰属方式は「{overview.attributionLabel}」です。</p>
+    <p className="mt-2 text-xs text-ink-faint">「—」は費用や成果を取得できない経路です。0として差し引きを計算していません。帰属方式は「{overview.attributionLabel}」です。</p></div></div>
   </div>
 }
 
