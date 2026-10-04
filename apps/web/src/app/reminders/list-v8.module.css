@@ -45,6 +45,19 @@
   line-height: 1.6;
 }
 
+/* 板 `a5C1p`：閲覧のみの帯。頭のすぐ下。 */
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 /* 数の帯：4つのマス。アイコンつき。 */
 /* 数の帯：区切り線で並べる1本の帯（`apLqS`）。カードを離して並べない。 */
 .kpis {
