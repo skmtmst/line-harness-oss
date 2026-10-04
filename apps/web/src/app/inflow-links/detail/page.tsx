@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
+import { X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ApiError, api, fetchApi } from '@/lib/api'
@@ -10,7 +11,9 @@ import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import EditRouteModal from '../_components/edit-route-modal'
 import RefOrdersPanel, { type RefOrdersResult } from '../_components/ref-orders'
+import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import InflowDetailV8 from './inflow-detail-v8'
 import type {
@@ -84,7 +87,18 @@ function InflowLinkDetailBody() {
   const [routeMissing, setRouteMissing] = useState(false)
   const [copied, setCopied] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteChoice, setDeleteChoice] = useState<'stop' | 'redirect' | 'delete'>('stop')
+  const [deleteConfirmationName, setDeleteConfirmationName] = useState('')
   const [canPermanentlyDelete, setCanPermanentlyDelete] = useState(false)
+  // 「別の流入リンクへ送る」の転送先。先頭を自動採用しない（#514 重大4）。
+  const [redirectTargetId, setRedirectTargetId] = useState('')
+  const deleteDialogRef = useOverlayFocus(
+    deleteOpen,
+    () => setDeleteOpen(false),
+    deleting,
+  )
   const selectedId =
     id || routes.find((entryRoute) => entryRoute.refCode === requestedRefCode)?.id || ''
 
@@ -212,6 +226,50 @@ function InflowLinkDetailBody() {
     }
   }
 
+  async function applyDeleteChoice() {
+    if (!route || deleting) return
+    if (deleteChoice === 'delete' && !canPermanentlyDelete) {
+      setDeleteChoice('stop')
+      setDeleteError('完全削除には管理者権限が必要です。受付停止を選んでください。')
+      return
+    }
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      if (deleteChoice === 'redirect') {
+        // 転送先は必ず利用者に選ばせる。選ばずに進ませない。
+        const redirectTarget = routes.find((candidate) => candidate.id === redirectTargetId && candidate.id !== route.id)
+        if (!redirectTarget) {
+          setDeleteError('転送先のリンクを選んでください')
+          return
+        }
+        const result = await api.entryRoutes.update(route.id, {
+          redirectUrl: `${workerBase}/r/${encodeURIComponent(redirectTarget.refCode)}`,
+        })
+        if (!result.success) throw new Error(result.error)
+      } else {
+        const result = deleteChoice === 'delete'
+          ? await fetchApi<{ success: boolean; error?: string }>(`/api/entry-routes/${encodeURIComponent(route.id)}`, {
+              method: 'DELETE',
+              body: JSON.stringify({ confirmationName: deleteConfirmationName }),
+            })
+          : await api.entryRoutes.update(route.id, { isActive: false })
+        if (!result.success) throw new Error(result.error)
+      }
+      setDeleteOpen(false)
+      router.replace('/inflow-links')
+    } catch (cause) {
+      setDeleteError(cause instanceof ApiError && (
+        cause.code === 'ENTRY_ROUTE_IN_USE'
+        || cause.code === 'ENTRY_ROUTE_NAME_CONFIRMATION_MISMATCH'
+      )
+        ? cause.message
+        : '選んだ処理を完了できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const tagName = route?.tagId ? (tags.find((t) => t.id === route.tagId)?.name ?? null) : null
   const scenarioName = route?.scenarioId
     ? (scenarios.find((s) => s.id === route.scenarioId)?.name ?? null)
@@ -280,7 +338,7 @@ function InflowLinkDetailBody() {
       ) : <>
         <div data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div><div className="flex items-center gap-2"><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold"># {route.refCode}</span><span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.genre || '未分類'}</span>{/* R273: 一覧・一括操作と同じ言葉で受付状態を出す。赤は使わない（★V7）。 */}<span className="rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold">{route.isActive ? '受付中' : '停止中'}</span></div><p className="mt-2 text-sm text-ink-faint">{route.createdAt.slice(5, 10).replace('-', '/')} に発行。{url} を通った人の記録です。</p></div>
-          <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の${canPermanentlyDelete ? '削除' : '受付停止'}を確認`} onClick={() => setDeleteOpen(true)}>{canPermanentlyDelete ? 'この経路を削除する' : '受付を止める'}</Button></div>
+          <div className="flex gap-2"><Button onClick={copyUrl}>{copied ? 'コピーしました' : 'URLをコピー'}</Button><Button variant="secondary" onClick={() => setEditingRoute(true)}>この経路を編集</Button><Button variant="secondary" aria-label={`${route.name}の${canPermanentlyDelete ? '削除' : '受付停止'}を確認`} onClick={() => { setDeleteError(''); setDeleteChoice('stop'); setDeleteConfirmationName(''); setRedirectTargetId(''); setDeleteOpen(true) }}>{canPermanentlyDelete ? 'この経路を削除する' : '受付を止める'}</Button></div>
         </div>
         {copyFailed && url && (
           <div role="alert" className="mb-4 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3 text-sm text-ink-secondary">
