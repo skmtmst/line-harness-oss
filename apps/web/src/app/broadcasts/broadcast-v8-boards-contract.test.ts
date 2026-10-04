@@ -28,6 +28,13 @@ describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
     expect(reserved, '予約した後の板が無い').toContain('data-design-node="CRtK8"')
   })
 
+  it('予約の取消の窓は板 BeNtj・取り消す／やめる／残すの3つを出す', () => {
+    const reserved = read('reserved-v8.tsx')
+    expect(reserved, 'BeNtj の板が無い').toContain('designNode="BeNtj"')
+    expect(reserved, 'やめるが無い').toContain('やめる')
+    expect(reserved, '予約のまま残すが無い').toContain('予約のまま残す')
+  })
+
   it('詳細の外枠に dK1aE（下書き）・wfHIE（承認待ち）・tPm3e（送った後）を付ける', () => {
     const detail = read('detail-v8.tsx')
     expect(detail, '詳細の3状態の板が無い').toContain('data-design-node="dK1aE wfHIE tPm3e"')
