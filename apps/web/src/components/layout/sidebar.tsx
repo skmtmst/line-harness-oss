@@ -737,6 +737,8 @@ export default function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
+                  // V8は多数の別画面を先読みせず、選んだ画面だけ読み込む。
+                  prefetch={isV8 ? false : undefined}
                   onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={visibleLabel}
                   /*
@@ -788,6 +790,7 @@ export default function Sidebar({
         <div className={styles.settingsEntry}>
           <Link
             href="/settings"
+            prefetch={false}
             title="設定"
             className={`${styles.item} ${settingsActive ? styles.active : ''}`}
           >

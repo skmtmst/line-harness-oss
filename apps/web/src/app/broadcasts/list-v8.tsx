@@ -785,7 +785,7 @@ export default function BroadcastListV8() {
               <Bookmark size={14} aria-hidden="true" />
               この条件を保存する
             </button>
-            <span className={styles.toolbarSpacer} />
+            <span className="flex-1" />
             <Select
               aria-label="保存した検索"
               value={savedViewId}

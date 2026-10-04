@@ -1242,7 +1242,11 @@ export default function FormSubmissionsListV8() {
   const showPager = !loading && !loadError && visibleForms.length > 0
 
   return (
-    <div data-design-node="I3L41O" className={styles.board}>
+    <div
+      data-design-node="I3L41O"
+      data-list-state={accountLoading || loading ? 'loading' : loadError ? 'error' : visibleForms.length === 0 ? 'empty' : 'ready'}
+      className={styles.board}
+    >
       {/* 見出し：画面名＋一行の説明。右に管理者確認の切り替え（i2ZAS）。 */}
       <div className={styles.head}>
         <div className={styles.headText}>
@@ -1345,7 +1349,7 @@ export default function FormSubmissionsListV8() {
                 onClear={() => updateListState({ query: '', page: 1 })}
               />
             </div>
-            <span className={styles.toolbarSpacer} />
+            <span className="flex-1" />
             <label className="flex min-w-0 items-center gap-2">
               <Select
                 aria-label="表示件数"
@@ -1384,7 +1388,7 @@ export default function FormSubmissionsListV8() {
                 後処理未完
               </FilterChip>
             ) : null}
-            <span className={styles.toolbarSpacer} />
+            <span className="flex-1" />
             <label className="flex min-w-0 items-center gap-2">
               <span className="text-ink-faint text-xs whitespace-nowrap">並び：</span>
               <Select
@@ -1579,7 +1583,7 @@ export default function FormSubmissionsListV8() {
             >
               削除する
             </Button>
-            <span className={styles.dialogFooterSpacer} />
+            <span className="flex-1" />
             <Button
               type="button"
               variant="secondary"

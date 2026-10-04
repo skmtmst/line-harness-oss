@@ -463,7 +463,7 @@ export default function AutoReplyRunsV8() {
                   const label = failed && item.detail ? item.detail : actionLabel(item)
                   return (
                     <tr key={item.id} className={failed ? styles.rowFailed : ''}>
-                      <td className={styles.cellQuiet} style={{ whiteSpace: 'nowrap' }}>
+                      <td className="text-ink-faint" style={{ whiteSpace: 'nowrap' }}>
                         <time dateTime={item.occurredAt}>{formatDateTime(item.occurredAt)}</time>
                       </td>
                       <td className={styles.cellMain}>
@@ -487,7 +487,7 @@ export default function AutoReplyRunsV8() {
                       </td>
                       <td><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></td>
                       <td><span title={label}>{label}</span></td>
-                      <td className={styles.cellQuiet} style={{ whiteSpace: 'nowrap' }}>
+                      <td className="text-ink-faint" style={{ whiteSpace: 'nowrap' }}>
                         {item.durationMs === null ? '—' : `${(item.durationMs / 1000).toFixed(1)}秒`}
                       </td>
                       {canManage && (

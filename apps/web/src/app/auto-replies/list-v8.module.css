@@ -161,7 +161,7 @@
   gap: 8px;
   margin: 0;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--color-status-info-soft);
   color: var(--color-ink-secondary);
   font-size: 12px;
