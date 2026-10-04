@@ -37,6 +37,7 @@ import type {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { listResponse } from '../lib/list-etag.js';
 import {
   CommonActionValidationError,
   validateActionShape,
@@ -707,7 +708,8 @@ tags.get('/api/tags', async (c) => {
     const visibleItems = items.filter((item) => item.line_account_id == null
       ? !requestedAccountId && scope.canSeeUnassigned
       : allowedIds.includes(item.line_account_id));
-    return c.json({ success: true, data: visibleItems.map(serializeTag) });
+    // 同じ中身なら304（list-etag）。
+    return listResponse(c, { success: true, data: visibleItems.map(serializeTag) });
   } catch (err) {
     console.error('GET /api/tags error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
