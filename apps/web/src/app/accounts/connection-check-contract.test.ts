@@ -11,7 +11,7 @@ const result = (failedAt?: number): VerifyResult => ({
 })
 
 describe('V6 33-2 保存する前の5段接続確認', () => {
-  it('確かめる前は5段とも「確かめていません」', () => {
+  it('確かめる前は5段とも「まだ」', () => {
     const steps = toSteps(null)
     expect(steps).toHaveLength(5)
     expect(steps.every((item) => item.state === 'skipped')).toBe(true)
