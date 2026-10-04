@@ -63,6 +63,7 @@ import { slotReasonLabel } from '../staff/shifts/slot-reason'
 import { bookingErrorMessage, bookingRulesErrorMessage } from './menu-validation'
 
 import MenuVersionHistory from './menu-version-history'
+import PhotosTabV8 from './photos-v8'
 import { EMPTY_STAFF, StaffEditModal } from '../staff/staff-edit-dialog'
 import { LiffPhoneDatetimeStep, LiffPhoneMenuStep, LiffPhoneStaffStep } from './liff-phone-v8'
 import styles from './settings-v8.module.css'
@@ -75,6 +76,8 @@ const V8_TABS = [
   { key: 'holidays', label: '休業日', node: 'KRgTQ' },
   { key: 'rules', label: '予約のルール', node: 'x1OZS6' },
   { key: 'staff', label: '担当スタッフ', node: 'VLEaj' },
+  // B-1『店の写真』。Pencil の節IDは絵合わせで司令塔が入れる。それまでは仮の名。
+  { key: 'photos', label: '写真', node: 'photos' },
 ] as const
 type V8TabKey = (typeof V8_TABS)[number]['key']
 const V8_TAB_KEYS = new Set<string>(V8_TABS.map((tab) => tab.key))
@@ -84,6 +87,7 @@ const V8_TAB_NODE: Record<V8TabKey, string> = {
   holidays: 'KRgTQ',
   rules: 'x1OZS6',
   staff: 'VLEaj',
+  photos: 'photos',
 }
 
 const MENU_PAGE_SIZE = 6
@@ -661,7 +665,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                 onSaved={(next) => setSettings(next)}
                 onReload={() => void loadCore()}
               />
-            ) : (
+            ) : tab === 'staff' ? (
               <StaffTabV8
                 accountId={accountId}
                 staff={staff}
@@ -671,6 +675,22 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                 extras={staffExtras}
                 members={members}
                 canEdit={canEditSettings}
+                onReload={() => void loadCore()}
+              />
+            ) : (
+              <PhotosTabV8
+                accountId={accountId}
+                menus={menus}
+                menusStatus={menusStatus}
+                menusError={menusError}
+                staff={staff}
+                staffStatus={staffStatus}
+                staffError={staffError}
+                settings={settings}
+                settingsStatus={settingsStatus}
+                settingsError={settingsError}
+                canEditMenus={canEditMenus}
+                canEditSettings={canEditSettings}
                 onReload={() => void loadCore()}
               />
             )}

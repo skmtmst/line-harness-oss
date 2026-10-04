@@ -647,14 +647,19 @@ booking.get('/api/liff/booking/menus', async (c) => {
       `SELECT id, name, category_label, description,
               duration_minutes, buffer_after_minutes,
               base_price, price_mode, sort_order,
-              cancel_deadline_hours_before, intake_question
+              cancel_deadline_hours_before, intake_question, photo_media_id
          FROM menus
         WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL
         ORDER BY sort_order ASC, id ASC`,
     )
     .bind(accountId)
-    .all();
-  return c.json({ menus: rows.results });
+    .all<Record<string, unknown>>();
+  return c.json({
+    menus: (rows.results ?? []).map((row) => ({
+      ...row,
+      photo_url: bookingPhotoUrl(c, row.photo_media_id as string | null),
+    })),
+  });
 });
 
 booking.get('/api/liff/booking/menus/:id/staff', async (c) => {
@@ -664,7 +669,7 @@ booking.get('/api/liff/booking/menus/:id/staff', async (c) => {
   const rows = await c.env.DB
     .prepare(
       `SELECT s.id, s.display_name, s.role, s.profile_image_url, s.bio,
-              s.is_designation_optional,
+              s.is_designation_optional, s.photo_media_id,
               COALESCE(sm.override_price, m.base_price) AS price,
               m.price_mode,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS duration_minutes
@@ -675,8 +680,13 @@ booking.get('/api/liff/booking/menus/:id/staff', async (c) => {
         ORDER BY s.is_designation_optional DESC, s.sort_order ASC, s.id ASC`,
     )
     .bind(accountId, menuId)
-    .all();
-  return c.json({ staff: rows.results });
+    .all<Record<string, unknown>>();
+  return c.json({
+    staff: (rows.results ?? []).map((row) => ({
+      ...row,
+      photo_url: bookingPhotoUrl(c, row.photo_media_id as string | null),
+    })),
+  });
 });
 
 booking.get('/api/liff/booking/availability', async (c) => {
@@ -1856,6 +1866,9 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       reminderDayBeforeTime: string | null;
       reminderHoursBefore: number | null;
       liffDateView?: LiffDateView;
+      storePhotoMediaId?: string | null;
+      storePhotoInteriorMediaId?: string | null;
+      storePhotoWaitingMediaId?: string | null;
       businessHours?: BookingBusinessHours;
     };
   }
@@ -1889,6 +1902,19 @@ function readBookingAdminSettings(input: Record<string, unknown>):
     : input.liffDateView === 'list' || input.liffDateView === 'calendar'
       ? input.liffDateView
       : 'invalid';
+  // お店の写真（外観・店内・待合）。省いたら今の値を保つ。
+  // null・空文字は外す。形が違えば拒否する。
+  const readStorePhoto = (field: string): string | null | undefined | 'invalid' => {
+    if (!Object.hasOwn(input, field)) return undefined;
+    const raw = input[field];
+    if (raw === null || raw === '') return null;
+    return typeof raw === 'string' && raw.trim() !== '' && raw.trim().length <= 200
+      ? raw.trim()
+      : 'invalid';
+  };
+  const storePhotoMediaId = readStorePhoto('store_photo_media_id');
+  const storePhotoInteriorMediaId = readStorePhoto('store_photo_interior_media_id');
+  const storePhotoWaitingMediaId = readStorePhoto('store_photo_waiting_media_id');
 
   if (expectedVersion === null) return { ok: false, error: 'expectedVersionが正しくありません' };
   if (!isValidTimeZone(timeZone)) return { ok: false, error: 'タイムゾーンが正しくありません' };
@@ -1913,6 +1939,11 @@ function readBookingAdminSettings(input: Record<string, unknown>):
   if (liffDateView === 'invalid') {
     return { ok: false, error: '日時を選ぶ画面の最初の形が正しくありません' };
   }
+  if (storePhotoMediaId === 'invalid'
+    || storePhotoInteriorMediaId === 'invalid'
+    || storePhotoWaitingMediaId === 'invalid') {
+    return { ok: false, error: '写真は登録メディアから選んでください' };
+  }
   if (businessHours && !businessHours.ok) return businessHours;
   return {
     ok: true,
@@ -1929,6 +1960,9 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       reminderDayBeforeTime: reminderDayBeforeTime === 'invalid' ? null : reminderDayBeforeTime,
       reminderHoursBefore,
       ...(liffDateView !== undefined ? { liffDateView } : {}),
+      ...(storePhotoMediaId !== undefined ? { storePhotoMediaId } : {}),
+      ...(storePhotoInteriorMediaId !== undefined ? { storePhotoInteriorMediaId } : {}),
+      ...(storePhotoWaitingMediaId !== undefined ? { storePhotoWaitingMediaId } : {}),
       ...(businessHours ? { businessHours: businessHours.value } : {}),
     },
   };
@@ -2135,7 +2169,15 @@ booking.get('/api/booking/admin/settings', async (c) => {
   try {
     const settings = await getBookingAdminSettings(c.env.DB, accountId);
     if (!settings) return c.json({ success: false, error: 'not_found' }, 404);
-    return c.json({ success: true, data: settings });
+    return c.json({
+      success: true,
+      data: {
+        ...settings,
+        store_photo_url: bookingPhotoUrl(c, settings.storePhotoMediaId),
+        store_photo_interior_url: bookingPhotoUrl(c, settings.storePhotoInteriorMediaId),
+        store_photo_waiting_url: bookingPhotoUrl(c, settings.storePhotoWaitingMediaId),
+      },
+    });
   } catch {
     console.error(JSON.stringify({ event: 'booking_settings_read_failed' }));
     return c.json({ success: false, error: 'booking_settings_unavailable' }, 503);
@@ -2150,6 +2192,17 @@ booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KE
     if (!body) return c.json({ success: false, error: 'invalid_json' }, 400);
     const parsed = readBookingAdminSettings(body);
     if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+    // お店の写真（外観・店内・待合）は、同じアカウントの画像の登録メディアだけ受け付ける。
+    for (const photoMediaId of [
+      parsed.value.storePhotoMediaId,
+      parsed.value.storePhotoInteriorMediaId,
+      parsed.value.storePhotoWaitingMediaId,
+    ]) {
+      if (photoMediaId) {
+        const photoError = await checkBookingPhotoMedia(c.env.DB, accountId, photoMediaId);
+        if (photoError) return c.json({ success: false, error: photoError }, 400);
+      }
+    }
     const result = await saveBookingAdminSettings(c.env.DB, {
       lineAccountId: accountId,
       ...parsed.value,
@@ -2165,8 +2218,28 @@ booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KE
         data: { currentVersion: result.currentVersion },
       }, 409);
     }
+    // お店の写真を1枠でも送られたときだけ、3枠ぜんぶの今の顔ぶれで台帳を書き直す。
+    // 同じ写真を何枠にも使えるので、枠ごとではなく写真ごとに1行へまとめる。
+    if ((parsed.value.storePhotoMediaId !== undefined
+      || parsed.value.storePhotoInteriorMediaId !== undefined
+      || parsed.value.storePhotoWaitingMediaId !== undefined)
+      && result.item.id) {
+      await syncBookingPhotoUsages(c.env.DB, 'booking_settings', result.item.id, [
+        result.item.storePhotoMediaId,
+        result.item.storePhotoInteriorMediaId,
+        result.item.storePhotoWaitingMediaId,
+      ]);
+    }
     return c.json(
-      { success: true, data: result.item },
+      {
+        success: true,
+        data: {
+          ...result.item,
+          store_photo_url: bookingPhotoUrl(c, result.item.storePhotoMediaId),
+          store_photo_interior_url: bookingPhotoUrl(c, result.item.storePhotoInteriorMediaId),
+          store_photo_waiting_url: bookingPhotoUrl(c, result.item.storePhotoWaitingMediaId),
+        },
+      },
       result.status === 'created' ? 201 : 200,
     );
   } catch {
@@ -2523,7 +2596,7 @@ booking.get('/api/booking/admin/menus', async (c) => {
         `SELECT m.id, m.name, m.category_label, m.description,
                 m.duration_minutes, m.buffer_after_minutes,
                 m.base_price, m.price_mode, m.version,
-                m.sort_order, m.is_active, m.auto_tag_id,
+                m.sort_order, m.is_active, m.auto_tag_id, m.photo_media_id,
                 m.concurrent_capacity, m.booking_window_days, m.cutoff_hours_before,
                 m.cancel_deadline_hours_before, m.intake_question,
                 COALESCE((
@@ -2600,6 +2673,8 @@ booking.get('/api/booking/admin/menus', async (c) => {
         sort_order: row.sort_order,
         is_active: row.is_active,
         auto_tag_id: row.auto_tag_id,
+        photo_media_id: row.photo_media_id ?? null,
+        photo_url: bookingPhotoUrl(c, row.photo_media_id as string | null),
         concurrent_capacity: row.concurrent_capacity,
         booking_window_days: row.booking_window_days,
         cutoff_hours_before: row.cutoff_hours_before,
@@ -2819,6 +2894,89 @@ function readAutoTagId(body: Record<string, unknown>): AutoTagIdRead {
 }
 
 /**
+ * 予約の写真（メニュー・スタッフ・お店に1枚ずつ）。登録メディアのIDで受け、
+ * どの登録メディアを使っているかを台帳（media_usages）へ残す。
+ * 使っている写真は登録メディアから消せない（消そうとすると使っている所が出る）。
+ */
+type BookingPhotoRefKind = 'booking_menu' | 'booking_staff' | 'booking_settings';
+
+type BookingPhotoInput =
+  | { present: false }
+  | { present: true; mediaId: string | null };
+
+function readBookingPhotoMediaId(
+  body: Record<string, unknown>,
+  field: string,
+): BookingPhotoInput | { error: string } {
+  if (!Object.prototype.hasOwnProperty.call(body, field)) return { present: false };
+  const raw = body[field];
+  if (raw === null || raw === '') return { present: true, mediaId: null };
+  if (typeof raw !== 'string' || raw.trim() === '' || raw.trim().length > 200) {
+    return { error: '写真は登録メディアから選んでください' };
+  }
+  return { present: true, mediaId: raw.trim() };
+}
+
+/**
+ * 写真に選べるのは、同じLINEアカウントの画像の登録メディアだけ。
+ * 別アカウントの写真の有無が分からないよう、無いときと同じ文で返す。
+ */
+async function checkBookingPhotoMedia(
+  db: D1Database,
+  lineAccountId: string,
+  mediaId: string,
+): Promise<string | null> {
+  const row = await db.prepare(
+    `SELECT kind, line_account_id FROM media WHERE id = ?`,
+  ).bind(mediaId).first<{ kind: string; line_account_id: string | null }>();
+  if (!row || row.line_account_id !== lineAccountId) return '選択した写真が見つかりません';
+  if (row.kind !== 'image') return '写真には画像の登録メディアを選んでください';
+  return null;
+}
+
+/**
+ * 写真の付け替え・取り外しを台帳へ残す。写真を送らなかったときは呼ばない。
+ *
+ * お店の写真は3枠（外観・店内・待合）で、同じ写真を何か所にも使える。
+ * 台帳の主キーは（写真・種類・相手）なので、同じ写真は1行にまとめる。
+ * どの枠にも使わなくなった写真だけ台帳から消える。
+ */
+async function syncBookingPhotoUsages(
+  db: D1Database,
+  refKind: BookingPhotoRefKind,
+  refId: string,
+  mediaIds: Array<string | null>,
+): Promise<void> {
+  const statements = [
+    db.prepare(`DELETE FROM media_usages WHERE ref_kind = ? AND ref_id = ?`)
+      .bind(refKind, refId),
+  ];
+  for (const mediaId of new Set(mediaIds.filter((id): id is string => !!id))) {
+    statements.push(db.prepare(
+      `INSERT INTO media_usages (media_id, ref_kind, ref_id) VALUES (?,?,?)`,
+    ).bind(mediaId, refKind, refId));
+  }
+  await db.batch(statements);
+}
+
+/** 写真の付け替え・取り外しを台帳へ残す。写真を送らなかったときは呼ばない。 */
+async function syncBookingPhotoUsage(
+  db: D1Database,
+  refKind: BookingPhotoRefKind,
+  refId: string,
+  mediaId: string | null,
+): Promise<void> {
+  await syncBookingPhotoUsages(db, refKind, refId, [mediaId]);
+}
+
+/** お客さまの画面・管理画面へ返す写真の宛先。無いときは null。 */
+function bookingPhotoUrl(c: Context<Env>, mediaId: string | null | undefined): string | null {
+  if (!mediaId) return null;
+  const origin = c.env.WORKER_URL || new URL(c.req.url).origin;
+  return `${origin}/media/${mediaId}/content`;
+}
+
+/**
  * 自動タグとして結び付けてよいタグかを、対象アカウント内かつ status='active' で確かめる。
  *
  * 整理済み(archived)のタグを受け付けると、二度と使わないタグへメニューが繋がったままになり、
@@ -2871,6 +3029,7 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), a
     price_mode?: BookingPriceMode;
     sort_order?: number;
     auto_tag_id?: string | null;
+    photo_media_id?: string | null;
     is_active?: boolean | number;
   } & MenuBookingRuleBody>();
   const base = readMenuBase(b);
@@ -2888,8 +3047,17 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), a
   if (autoTagId && !(await isAssignableAutoTag(c.env.DB, autoTagId, accountId))) {
     return c.json({ error: 'tag_not_found' }, 400);
   }
+  // 写真は送られたときだけ付ける。送らなければ今までどおり写真なし。
+  const photo = readBookingPhotoMediaId(b as unknown as Record<string, unknown>, 'photo_media_id');
+  if ('error' in photo) return c.json({ error: photo.error }, 400);
+  if (photo.present && photo.mediaId) {
+    const photoError = await checkBookingPhotoMedia(c.env.DB, accountId, photo.mediaId);
+    if (photoError) return c.json({ error: photoError }, 400);
+  }
   const id = crypto.randomUUID();
   const ruleColumns = Object.keys(rules.value);
+  // 写真の列は送られたときだけ足す。送らなければ従来と同じ文になる。
+  const photoColumns = photo.present ? ['photo_media_id'] : [];
   await c.env.DB
     .prepare(
       // 受付条件は送られたものだけを列に足す。送られなければ既定値
@@ -2898,8 +3066,8 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), a
         (id, line_account_id, name, category_label, description,
          duration_minutes, buffer_after_minutes, base_price, price_mode, sort_order, auto_tag_id, is_active${
            ruleColumns.map((col) => `, ${col}`).join('')
-         })
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?${ruleColumns.map(() => ',?').join('')})`,
+         }${photoColumns.map((col) => `, ${col}`).join('')})
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?${ruleColumns.map(() => ',?').join('')}${photoColumns.map(() => ',?').join('')})`,
     )
     .bind(
       id,
@@ -2915,6 +3083,7 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), a
       autoTagId,
       toMenuActiveFlag(b.is_active),
       ...ruleColumns.map((col) => rules.value[col]),
+      ...(photo.present ? [photo.mediaId] : []),
     )
     .run();
   // R535: 同じキーの再送には作り直さずこの応答を返す。24時間の窓。
@@ -2928,6 +3097,10 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), a
   }
   // 作った時点の中身を最初の版として残す（T）。
   await recordMenuVersion(c.env.DB, { menuId: id, staffId: c.get('staff')?.id ?? null });
+  // 写真を付けたときだけ、どの登録メディアを使っているかを台帳へ残す。
+  if (photo.present) {
+    await syncBookingPhotoUsage(c.env.DB, 'booking_menu', id, photo.mediaId);
+  }
   return c.json({ id, version: 1 }, 201);
 });
 
@@ -2946,6 +3119,7 @@ booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY)
     sort_order?: number;
     is_active?: boolean | number;
     auto_tag_id?: string | null;
+    photo_media_id?: string | null;
     expectedVersion?: number;
   } & MenuBookingRuleBody>();
 
@@ -3007,6 +3181,17 @@ booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY)
     sets.push('auto_tag_id = ?');
     values.push(autoTagId);
   }
+  // 写真は送られたときだけ書き換える。送らなければ今の写真を保つ。
+  const photo = readBookingPhotoMediaId(b as unknown as Record<string, unknown>, 'photo_media_id');
+  if ('error' in photo) return c.json({ error: photo.error }, 400);
+  if (photo.present && photo.mediaId) {
+    const photoError = await checkBookingPhotoMedia(c.env.DB, accountId, photo.mediaId);
+    if (photoError) return c.json({ error: photoError }, 400);
+  }
+  if (photo.present) {
+    sets.push('photo_media_id = ?');
+    values.push(photo.mediaId);
+  }
   for (const [column, value] of Object.entries(rules.value)) {
     sets.push(`${column} = ?`);
     values.push(value);
@@ -3027,6 +3212,9 @@ booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY)
   if ((result.meta.changes ?? 0) > 0) {
     // 保存するたびに版を1つ足す（T）。前の版は変えない。
     await recordMenuVersion(c.env.DB, { menuId: id, staffId: c.get('staff')?.id ?? null });
+    if (photo.present) {
+      await syncBookingPhotoUsage(c.env.DB, 'booking_menu', id, photo.mediaId);
+    }
     return c.json({ ok: true, version: expectedVersion + 1 });
   }
   const current = await c.env.DB
@@ -3127,6 +3315,9 @@ booking.delete('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_K
     )
     .bind(id, accountId)
     .run();
+  // 取り下げたメニューの写真はもう使っていないので、台帳から外す。
+  // 外した写真は登録メディアから消せるようになる。
+  await syncBookingPhotoUsage(c.env.DB, 'booking_menu', id, null);
   return c.json({ ok: true });
 });
 
@@ -3141,7 +3332,7 @@ booking.get('/api/booking/admin/menus/:id/staff', async (c) => {
   const rows = await c.env.DB
     .prepare(
       `SELECT s.id, s.display_name, s.role, s.profile_image_url, s.bio,
-              s.is_designation_optional,
+              s.is_designation_optional, s.photo_media_id,
               COALESCE(sm.override_price, m.base_price) AS price,
               m.price_mode,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS duration_minutes
@@ -3152,8 +3343,13 @@ booking.get('/api/booking/admin/menus/:id/staff', async (c) => {
         ORDER BY s.is_designation_optional DESC, s.sort_order ASC, s.id ASC`,
     )
     .bind(accountId, menuId)
-    .all();
-  return c.json({ staff: rows.results });
+    .all<Record<string, unknown>>();
+  return c.json({
+    staff: (rows.results ?? []).map((row) => ({
+      ...row,
+      photo_url: bookingPhotoUrl(c, row.photo_media_id as string | null),
+    })),
+  });
 });
 
 // Admin mirror of the LIFF availability lookup. minLeadTimeMinutes is 0:
@@ -4860,14 +5056,20 @@ booking.get('/api/booking/admin/staff', async (c) => {
   const rows = await c.env.DB
     .prepare(
       `SELECT id, name, display_name, role, profile_image_url, bio,
-              sort_order, is_designation_optional, is_active, staff_member_id
+              sort_order, is_designation_optional, is_active, staff_member_id,
+              photo_media_id
          FROM staff
         WHERE line_account_id = ? AND deleted_at IS NULL
         ORDER BY sort_order ASC, id ASC`,
     )
     .bind(accountId)
-    .all();
-  return c.json({ staff: rows.results });
+    .all<Record<string, unknown>>();
+  return c.json({
+    staff: (rows.results ?? []).map((row) => ({
+      ...row,
+      photo_url: bookingPhotoUrl(c, row.photo_media_id as string | null),
+    })),
+  });
 });
 
 // N-411 本人勤務: ログイン中のスタッフに紐づく予約スタッフを返す。
@@ -4880,24 +5082,29 @@ booking.get('/api/booking/admin/staff/me', async (c) => {
     ? await c.env.DB
         .prepare(
           `SELECT id, name, display_name, role, profile_image_url, bio,
-                  sort_order, is_designation_optional, is_active
+                  sort_order, is_designation_optional, is_active, photo_media_id
              FROM staff
             WHERE line_account_id = ? AND staff_member_id = ? AND deleted_at IS NULL
             ORDER BY sort_order ASC, id ASC`,
         )
         .bind(accountId, me.id)
-        .all()
+        .all<Record<string, unknown>>()
     : await c.env.DB
         .prepare(
           `SELECT id, line_account_id, name, display_name, role, profile_image_url, bio,
-                  sort_order, is_designation_optional, is_active
+                  sort_order, is_designation_optional, is_active, photo_media_id
              FROM staff
             WHERE staff_member_id = ? AND deleted_at IS NULL
             ORDER BY sort_order ASC, id ASC`,
         )
         .bind(me.id)
-        .all();
-  return c.json({ staff: rows.results });
+        .all<Record<string, unknown>>();
+  return c.json({
+    staff: (rows.results ?? []).map((row) => ({
+      ...row,
+      photo_url: bookingPhotoUrl(c, row.photo_media_id as string | null),
+    })),
+  });
 });
 
 booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
@@ -4927,13 +5134,28 @@ booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY)
       }, 422);
     }
   }
+  // 写真は形の検査を通ったものだけ、登録メディアとして残っているか確かめる。
+  const hasPhoto = Object.prototype.hasOwnProperty.call(b, 'photo_media_id');
+  if (hasPhoto && b.photo_media_id) {
+    const photoError = await checkBookingPhotoMedia(c.env.DB, accountId, b.photo_media_id);
+    if (photoError) {
+      return c.json({
+        code: 'booking_staff_validation_failed',
+        error: photoError,
+        field: 'photo_media_id',
+      }, 422);
+    }
+  }
   const id = crypto.randomUUID();
+  // 写真の列は送られたときだけ足す。送らなければ従来と同じ文になる。
+  const photoColumns = hasPhoto ? ', photo_media_id' : '';
+  const photoValues = hasPhoto ? [b.photo_media_id ?? null] : [];
   await c.env.DB
     .prepare(
       `INSERT INTO staff
         (id, line_account_id, name, display_name, role, profile_image_url, bio,
-         sort_order, is_designation_optional, is_active, staff_member_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+         sort_order, is_designation_optional, is_active, staff_member_id${photoColumns})
+       VALUES (?,?,?,?,?,?,?,?,?,?,?${photoColumns ? ',?' : ''})`,
     )
     .bind(
       id,
@@ -4947,8 +5169,12 @@ booking.post('/api/booking/admin/staff', requirePermission(BOOKING_SETTINGS_KEY)
       b.is_designation_optional!,
       b.is_active!,
       b.staff_member_id ?? null,
+      ...photoValues,
     )
     .run();
+  if (hasPhoto) {
+    await syncBookingPhotoUsage(c.env.DB, 'booking_staff', id, b.photo_media_id ?? null);
+  }
   return c.json({ id }, 201);
 });
 
@@ -4978,6 +5204,8 @@ booking.put('/api/booking/admin/staff/:id', requirePermission(BOOKING_SETTINGS_K
     ['is_designation_optional', 'is_designation_optional'],
     ['is_active', 'is_active'],
     ['staff_member_id', 'staff_member_id'],
+    // 写真は送られたときだけ書き換える。送らなければ今の写真を保つ。
+    ['photo_media_id', 'photo_media_id'],
   ] as const) {
     if (Object.prototype.hasOwnProperty.call(parsed.value, field)) {
       updates.push(`${column} = ?`);
@@ -4997,6 +5225,17 @@ booking.put('/api/booking/admin/staff/:id', requirePermission(BOOKING_SETTINGS_K
       }, 422);
     }
   }
+  if (Object.prototype.hasOwnProperty.call(parsed.value, 'photo_media_id')
+    && parsed.value.photo_media_id) {
+    const photoError = await checkBookingPhotoMedia(c.env.DB, accountId, parsed.value.photo_media_id);
+    if (photoError) {
+      return c.json({
+        code: 'booking_staff_validation_failed',
+        error: photoError,
+        field: 'photo_media_id',
+      }, 422);
+    }
+  }
   const result = await c.env.DB.prepare(
     `UPDATE staff
         SET ${updates.join(', ')},
@@ -5004,6 +5243,9 @@ booking.put('/api/booking/admin/staff/:id', requirePermission(BOOKING_SETTINGS_K
       WHERE id = ? AND line_account_id = ?`,
   ).bind(...values, id, accountId).run();
   if (result.meta.changes === 0) return c.json({ error: 'staff_not_found' }, 404);
+  if (Object.prototype.hasOwnProperty.call(parsed.value, 'photo_media_id')) {
+    await syncBookingPhotoUsage(c.env.DB, 'booking_staff', id, parsed.value.photo_media_id ?? null);
+  }
   return c.json({ ok: true });
 });
 
@@ -5019,6 +5261,8 @@ booking.delete('/api/booking/admin/staff/:id', requirePermission(BOOKING_SETTING
     )
     .bind(id, accountId)
     .run();
+  // 外れたスタッフの写真はもう使っていないので、台帳から外す。
+  await syncBookingPhotoUsage(c.env.DB, 'booking_staff', id, null);
   return c.json({ ok: true });
 });
 

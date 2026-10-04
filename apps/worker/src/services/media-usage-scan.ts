@@ -22,8 +22,16 @@ import { createFeatureJobGate } from './feature-enforcement.js';
  * はるかにましだ、という判断で入れている。画面にもその旨を書いてある。
  */
 
-/** どのテーブルの、どの列を見るか。 */
-const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; columns: string[] }> = [
+/**
+ * どのテーブルの、どの列を見るか。
+ *
+ * like: 本文の中に埋まった実体のキー・公開パスを探す（従来の7種類）。
+ * exact: 列そのものが登録メディアのID（予約の写真3種類）。IDの完全一致で見る。
+ */
+const SOURCES: Array<{
+  refKind: MediaRefKind; table: string; idColumn: string; columns: string[];
+  match?: 'like' | 'exact';
+}> = [
   {
     refKind: 'template',
     table: 'templates',
@@ -47,6 +55,16 @@ const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; c
   { refKind: 'nen_column', table: 'nen_columns', idColumn: 'id', columns: ['image_url'] },
   { refKind: 'event', table: 'events', idColumn: 'id', columns: ['image_url', 'og_image_url'] },
   { refKind: 'webinar', table: 'webinars', idColumn: 'id', columns: ['video_prefix'] },
+  // 予約の写真はメニュー・スタッフ・お店に1枚ずつ。561より前のDBには列が無い。
+  { refKind: 'booking_menu', table: 'menus', idColumn: 'id', columns: ['photo_media_id'], match: 'exact' },
+  { refKind: 'booking_staff', table: 'staff', idColumn: 'id', columns: ['photo_media_id'], match: 'exact' },
+  {
+    refKind: 'booking_settings',
+    table: 'booking_settings',
+    idColumn: 'id',
+    columns: ['store_photo_media_id', 'store_photo_interior_media_id', 'store_photo_waiting_media_id'],
+    match: 'exact',
+  },
 ];
 
 export interface ScanResult {
@@ -56,7 +74,7 @@ export interface ScanResult {
   source?: MediaRefKind;
   sourceRows?: number;
   cycleCompleted?: boolean;
-  /** 表そのものが無くて読めなかった読み口（R34）。空なら7種類すべて読めた。 */
+  /** 表そのものが無くて読めなかった読み口（R34）。空なら10種類すべて読めた。 */
   skippedTables?: string[];
 }
 
@@ -65,7 +83,7 @@ type MediaToScan = { id: string; r2_key: string };
 const MAX_SOURCE_ROWS = 4_000;
 const MAX_USAGE_WRITES = 4_000;
 const MAX_PRUNE_ROWS = 1_000;
-/** LIKEのbind数が上限を超えないよう、1問い合わせのトークン数を絞る。 */
+/** 含有判定のbind数が上限を超えないよう、1問い合わせのトークン数を絞る。 */
 const MATCH_TOKEN_CHUNK = 24;
 
 function isMissingSourceTable(error: unknown, table: string): boolean {
@@ -74,11 +92,22 @@ function isMissingSourceTable(error: unknown, table: string): boolean {
 }
 
 /**
+ * 561より前のDBには予約の写真の列が無い（SQLiteの文は「no such column: 列名」で
+ * 表名を含まない）。列が無い読み口だけ飛ばし、全体を例外にしない。
+ */
+function isMissingPhotoColumn(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('no such column');
+}
+
+/**
  * メディアを指す本文中の文字列。
  *
  * 固定参照は版ごとのr2_key（旧版を指すものも使用中）、ライブ参照は
- * メディアIDの公開パス `/media/<id>/content`。どちらもr2_key基準の
- * 走査と同じ LIKE 照合で拾えるよう、トークンとしてまとめて渡す。
+ * メディアIDの公開パス `/media/<id>/content`。どちらも走査と同じ
+ * 含有判定（instr、ワイルドカードなし）で拾えるよう、トークンとして
+ * まとめて渡す。写真の列は登録メディアのIDそのものなので、そちらは
+ * トークンではなくIDの完全一致で引く。
  */
 function usageMatchTokens(item: MediaToScan, versionTokens: string[]): string[] {
   return [...new Set([item.r2_key, ...versionTokens])].filter((token) => token.length > 0);
@@ -87,6 +116,7 @@ function usageMatchTokens(item: MediaToScan, versionTokens: string[]): string[] 
 async function findMatches(
   db: D1Database,
   tokens: string[],
+  mediaId: string,
 ): Promise<{
   matches: Array<{ refKind: MediaRefKind; refId: string }>;
   /** 表そのものが無くて読めなかった読み口（R34）。 */
@@ -97,6 +127,23 @@ async function findMatches(
   const seen = new Set<string>();
   for (const source of SOURCES) {
     try {
+      if (source.match === 'exact') {
+        // 写真の列は登録メディアのIDそのもの。IDの完全一致で引く。
+        const conditions = source.columns.map((col) => `${col} = ?`).join(' OR ');
+        const rows = await db
+          .prepare(
+            `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions}`,
+          )
+          .bind(...source.columns.map(() => mediaId))
+          .all<{ ref_id: string }>();
+        for (const row of rows.results) {
+          const key = `${source.refKind}:${row.ref_id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          matches.push({ refKind: source.refKind, refId: row.ref_id });
+        }
+        continue;
+      }
       for (let index = 0; index < tokens.length; index += MATCH_TOKEN_CHUNK) {
         const chunk = tokens.slice(index, index + MATCH_TOKEN_CHUNK);
         // LIKE '%...%' だと、R2キーやライブURLのような長いトークンでD1が
@@ -126,7 +173,10 @@ async function findMatches(
       // 表そのものが無い読み口だけ飛ばす。全部を例外にすると、どの画像でも
       // 取得が失敗し、読み直しても直らない（R34）。一時的なD1障害は
       // 例外のままにして、0件と偽らない。
-      if (!isMissingSourceTable(err, source.table)) throw err;
+      if (!isMissingSourceTable(err, source.table)) {
+        // 561より前のDBには写真の列が無い。列が無い読み口も飛ばす。
+        if (!(source.match === 'exact' && isMissingPhotoColumn(err))) throw err;
+      }
       console.error(`media usage single scan skipped ${source.table}:`, err);
       skippedTables.push(source.table);
     }
@@ -156,7 +206,7 @@ export async function scanSingleMediaUsage(
     console.error('media usage single scan skipped media_versions:', err);
     skippedTables.push('media_versions');
   }
-  const found = await findMatches(db, usageMatchTokens(item, versionTokens));
+  const found = await findMatches(db, usageMatchTokens(item, versionTokens), item.id);
   skippedTables.push(...found.skippedTables);
   for (const match of found.matches) {
     await recordMediaUsage(db, {
@@ -212,7 +262,7 @@ export async function scanMediaUsage(
   const lastRefId = stateIsValid ? state.lastRefId : '';
 
   // 参照走査と古い記録の整理を同じcronへ載せると、整理件数分だけ上限を超える。
-  // 7種類を読み終えた次のcronから、整理だけを上限付きで続ける。
+  // 10種類を読み終えた次のcronから、整理だけを上限付きで続ける。
   if (sourceIndex === SOURCES.length) {
     const pruned = await pruneStaleMediaUsagesBatch(
       db,
@@ -264,7 +314,10 @@ export async function scanMediaUsage(
   } catch (err) {
     // 古い検証環境などで機能の表がまだ無ければ、その読み口だけ次へ送る。
     // 一時的なD1障害まで「走査済み」にすると、1周後の整理で使用先を消してしまう。
-    if (!isMissingSourceTable(err, source.table)) throw err;
+    if (!isMissingSourceTable(err, source.table)) {
+      // 561より前のDBには写真の列が無い。列が無い読み口も次へ送る。
+      if (!(source.match === 'exact' && isMissingPhotoColumn(err))) throw err;
+    }
     console.error(`media usage scan skipped ${source.table}:`, err);
     sourceMissing = true;
   }
@@ -272,13 +325,22 @@ export async function scanMediaUsage(
   const usages: Array<{ mediaId: string; refKind: MediaRefKind; refId: string }> = [];
   let processedRows = 0;
   let writeBudgetExhausted = false;
+  const mediaIds = new Set(media.results.map((item) => item.id));
   for (const row of rows) {
     const searchable = source.columns
       .map((column) => row[column])
       .filter((value): value is string => typeof value === 'string')
       .join('\n');
     const rowUsages: typeof usages = [];
-    for (const item of media.results) {
+    if (source.match === 'exact') {
+      // 写真の列は登録メディアのIDそのもの。今回見ている500件の中にあれば記録する。
+      for (const column of source.columns) {
+        const photoId = row[column];
+        if (typeof photoId === 'string' && photoId && mediaIds.has(photoId)) {
+          rowUsages.push({ mediaId: photoId, refKind: source.refKind, refId: String(row.ref_id) });
+        }
+      }
+    } else for (const item of media.results) {
       const tokens = usageMatchTokens(item, tokenMap.get(item.id) ?? []);
       if (tokens.some((token) => searchable.includes(token))) {
         rowUsages.push({ mediaId: item.id, refKind: source.refKind, refId: String(row.ref_id) });
