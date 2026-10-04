@@ -382,8 +382,10 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
           </>
         )}
         preview={(
-          <LinePreview
-            note={messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
+          <>
+            <h2 className={styles.previewTitle}>届き方</h2>
+            <LinePreview
+              note={messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
             accountName={accountName(editorAccountId) ?? undefined}
             caption="配信日 10:00"
           >
@@ -400,7 +402,8 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
             ) : (
               <TemplatePreviewMessage preview={preview} />
             )}
-          </LinePreview>
+            </LinePreview>
+          </>
         )}
       >
         {loading ? (

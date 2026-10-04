@@ -348,7 +348,9 @@ function CarouselEditorV8Inner() {
           </section>
         )}
         preview={(
-          <LinePreview note="カルーセルの見え方（横にスワイプして見えます）" caption="配信日 10:00">
+          <>
+            <h2 className={styles.previewTitle}>届き方</h2>
+            <LinePreview note="カルーセルの見え方（横にスワイプして見えます）" caption="配信日 10:00">
             <div className="rounded-card overflow-hidden bg-canvas text-ink">
               {panel?.thumbnailImageUrl && /^https?:\/\//.test(panel.thumbnailImageUrl) ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -367,7 +369,8 @@ function CarouselEditorV8Inner() {
               </div>
             </div>
             {panels.length > 1 ? <p className="text-ink-faint mt-2 text-xs">あと {panels.length - 1} 枚・横にスワイプして見えます</p> : null}
-          </LinePreview>
+            </LinePreview>
+          </>
         )}
       >
         {loading ? (
@@ -400,7 +403,7 @@ function CarouselEditorV8Inner() {
               </div>
             </EditorCard>
 
-            <EditorCard title="カード" note="左から順に出ます。選ぶと下に中身が出ます。">
+            <EditorCard title="カード" note="左から順に出ます。← → で並べ替えられます。">
               <ol className={styles.panelStrip}>
                 {panels.map((p, i) => (
                   <li key={i}>

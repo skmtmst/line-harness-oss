@@ -172,3 +172,15 @@ describe('R621: 本文の上限案内は画像・タイトルの有無と食い�
     expect(bodyCounter()?.className).toContain('text-danger')
   })
 })
+
+describe('J60utH: 右の欄に届き方の見出しが出る', () => {
+  it('スマホの見本の上に「届き方」', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    await mountNew()
+    delete document.documentElement.dataset.theme
+    const heading = Array.from(container.querySelectorAll('h2')).find(
+      (element) => element.textContent === '届き方',
+    )
+    expect(heading).toBeTruthy()
+  })
+})
