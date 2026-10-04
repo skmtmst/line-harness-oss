@@ -53,6 +53,15 @@ function expiringText(member: MileageFriendV6): string {
   return `${formatMileageNumber(member.expiringMiles30d)}`
 }
 
+/* 申請の日時（絵は「10/2 15:20」）。日本時間に直して出す。 */
+function formatApprovalAt(iso: string | null): string {
+  if (!iso) return ''
+  const time = new Date(iso).getTime()
+  if (Number.isNaN(time)) return ''
+  const jst = new Date(time + 9 * 60 * 60 * 1000)
+  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.getUTCHours()}:${String(jst.getUTCMinutes()).padStart(2, '0')}`
+}
+
 function rankLabel(rank: string | null) {
   if (rank === 'gold') return 'ゴールド'
   if (rank === 'silver') return 'シルバー'
@@ -292,7 +301,7 @@ export default function V8BalancesTab({
           <RefreshCw size={14} aria-hidden="true" /> 残高を再読み込み
         </Button>
         <Button onClick={exportCsv} disabled={members.length === 0}>
-          <Download size={14} aria-hidden="true" /> この頁の残高をCSV
+          <Download size={14} aria-hidden="true" /> この頁の残高を CSV
         </Button>
       </>,
     )
@@ -348,7 +357,7 @@ export default function V8BalancesTab({
         <div className={styles.kpi}>
           <div className={styles.kpiTop}>
             <span className={styles.kpiIcon}><TrendingUp size={14} aria-hidden="true" /></span>
-            <span className={styles.kpiLabel}>今月増えた</span>
+            <span className={styles.kpiLabel}>今月 増えた</span>
           </div>
           <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(grantedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>この30日に付いた分</p>
@@ -356,7 +365,7 @@ export default function V8BalancesTab({
         <div className={styles.kpi}>
           <div className={styles.kpiTop}>
             <span className={styles.kpiIcon}><TrendingDown size={14} aria-hidden="true" /></span>
-            <span className={styles.kpiLabel}>今月減った</span>
+            <span className={styles.kpiLabel}>今月 減った</span>
           </div>
           <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(decreasedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>交換・取り消し</p>
@@ -382,6 +391,7 @@ export default function V8BalancesTab({
                   {formatNumber(request.amount)} マイル</strong>
                 </p>
                 <p className={styles.cellSub} title={request.reason}>{request.reason}</p>
+                <p className={styles.cellSub}>申請 {request.requested_by_staff_name}（{formatApprovalAt(request.created_at)}）</p>
               </div>
               {isOwner && !readonly ? (
                 <>
@@ -405,7 +415,7 @@ export default function V8BalancesTab({
               )}
             </div>
           ))}
-          <p className={styles.approvalNote}>5,000 マイル以上の変更は、申し込んだ人とは別のオーナーが承認するまで付きません。</p>
+          <p className={styles.approvalNote}>5,000 マイル以上の変更は、申請した人とは別のオーナーが承認するまで付きません。</p>
         </section>
       ) : approvalFailed ? (
         <section className={styles.approval} aria-label="承認待ちのマイル変更">
@@ -572,7 +582,7 @@ export default function V8BalancesTab({
       ) : null}
 
       {!loading && !loadError ? (
-        <p className={styles.footnote}>行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSVはこのページの残高を書き出します。</p>
+        <p className={styles.footnote}>行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSV はこのページの残高を書き出します。</p>
       ) : null}
 
       <Dialog
