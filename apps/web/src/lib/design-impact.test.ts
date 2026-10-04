@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする62ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする63ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -63,6 +63,8 @@ describe('共通部品の影響範囲', () => {
       // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
       'app/affiliates/tabs.tsx',
       // ★V8-B 成果とアフィリエイト（OylSV 成果承認・h7dmB 案件・aINnz 支払い）。
+      // parity-D: アフィリエイター一覧に表の下のページ送りを足した。
+      'app/affiliates/v8-affiliates-tab.tsx',
       'app/affiliates/v8-approvals-tab.tsx',
       'app/affiliates/v8-offers-tab.tsx',
       'app/affiliates/v8-payment-tab.tsx',
