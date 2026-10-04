@@ -69,7 +69,7 @@ describe('統括 バナー生成', () => {
   it('保存・実行は下部追従バーにしか置かない', () => {
     expect(projectPage).toContain('<StickyBar')
     expect(projectPage).toContain('生成する（{input.count}枚）')
-    expect(projectPage).toContain('残りをやめる')
+    expect(projectPage).toContain('生成をやめる')
     expect(projectPage).toContain('条件をクリア')
     expect(panel).not.toMatch(/生成する/)
   })
