@@ -2,7 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import type { EntryRoute, NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -26,12 +28,13 @@ import {
   activeUpcomingBookings,
   inactiveBookingStatuses,
 } from '@/components/dashboard/side-cards'
-import DashboardEditor, {
+import DashboardEditor from '@/components/dashboard/dashboard-editor'
+import {
   defaultDashboardPreferences,
   normalizeDashboardPreferences,
   type DashboardCardId,
   type DashboardPreferences,
-} from '@/components/dashboard/dashboard-editor'
+} from '@/components/dashboard/dashboard-preference-defaults'
 import Card, { CardHeader } from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
@@ -635,6 +638,42 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
   </Card>
 }
 
+/*
+ * V8 だけ：編集パネル（dnd-kit を含む重い部品）は開くまで読まない。
+ * v7 は今までどおり静的に読む（動きを変えない）。
+ * v7 も遅延化を試したが、開いてすぐ出る既存の試験が赤になるため戻した。
+ */
+const DashboardEditorDynamic = dynamic(() => import('@/components/dashboard/dashboard-editor').then((module) => module.default), {
+  loading: () => <p className="text-ink-faint text-sm">編集パネルを読み込んでいます</p>,
+})
+
+/*
+ * V8 だけ：下の段が見えてから補足の口を叩く。
+ * 右の列は最初の画面に入らないため、起動時の口を減らす。
+ * v7・IO非対応では今までどおりすぐ叩く。
+ */
+function useSeenOnce(enabled: boolean): { ref: React.RefObject<HTMLElement | null>; ready: boolean } {
+  const ref = useRef<HTMLElement | null>(null)
+  const [seen, setSeen] = useState(false)
+  useEffect(() => {
+    if (!enabled || seen) return
+    const node = ref.current
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setSeen(true)
+      return
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setSeen(true)
+        observer.disconnect()
+      }
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [enabled, seen])
+  return { ref, ready: !enabled || seen }
+}
+
 function DashboardPageInner() {
   const router = useRouter()
   const params = useSearchParams()
@@ -782,6 +821,23 @@ function DashboardPageInner() {
   const needsHealth = visibleRight.some((item) => item.id === 'operational-alerts' || item.id === 'connection-status')
   const needsTwoFactor = visibleRight.some((item) => item.id === 'operational-alerts')
   const needsSupportMarks = visibleRight.some((item) => item.id === 'support-mark-status')
+  const adminTheme = useAdminTheme()
+  const isV8 = adminTheme === 'v8'
+  /*
+   * V8 だけ：下の段（右の列）が見えてから補足の口を叩く。
+   * 起動時は概要・配置だけを先に取り、予約・写真・稼働などの補足は
+   * 右の列が見えてから取る。v7 は今までどおりすぐ叩く。
+   */
+  const { ref: asideRef, ready: asideReady } = useSeenOnce(isV8)
+  /*
+   * テーマは最初の描画では 'v7' の初期値で、直後に本当の値へ揃う。
+   * その初回だけ門が開いたと誤認して補足をすぐ叩かないよう、
+   * 載ったあとに門を開ける。描き分け自体は門に依存しないため、
+   * 出来上がりの見た目は v7・V8 とも変わらない。
+   */
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  const supplementGate = mounted && (!isV8 || asideReady)
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -1051,6 +1107,8 @@ function DashboardPageInner() {
   }, [selectedAccountId])
 
   useEffect(() => {
+    // V8 だけ：右の列が見えるまで待つ（起動時の口を減らす）。
+    if (!supplementGate) return
     setPendingPhotos(null)
     setPendingPhotosState('loading')
     if (!selectedAccountId) return
@@ -1080,9 +1138,11 @@ function DashboardPageInner() {
       },
     )
     return () => { cancelled = true }
-  }, [markSupplementLoaded, needsPhotos, selectedAccountId])
+  }, [markSupplementLoaded, needsPhotos, selectedAccountId, supplementGate])
 
   useEffect(() => {
+    // V8 だけ：右の列が見えるまで待つ（起動時の口を減らす）。
+    if (!supplementGate) return
     setBookings(null)
     setTodayActiveBookings(null)
     setBookingsFailed(false)
@@ -1160,9 +1220,11 @@ function DashboardPageInner() {
       if (!cancelled) setSupplementLoading(false)
     })
     return () => { cancelled = true }
-  }, [markSupplementLoaded, needsBookings, selectedAccountId])
+  }, [markSupplementLoaded, needsBookings, selectedAccountId, supplementGate])
 
   useEffect(() => {
+    // V8 だけ：右の列が見えるまで待つ（起動時の口を減らす）。
+    if (!supplementGate) return
     setHealthRisk(null)
     setHealthIssueCount(null)
     setHealthFailed(false)
@@ -1191,9 +1253,11 @@ function DashboardPageInner() {
       },
     )
     return () => { cancelled = true }
-  }, [markSupplementLoaded, needsHealth, selectedAccountId])
+  }, [markSupplementLoaded, needsHealth, selectedAccountId, supplementGate])
 
   useEffect(() => {
+    // V8 だけ：右の列が見えるまで待つ（起動時の口を減らす）。
+    if (!supplementGate) return
     setTwoFactorSummary(null)
     if (!selectedAccountId || !needsTwoFactor) return
     let cancelled = false
@@ -1211,9 +1275,11 @@ function DashboardPageInner() {
       },
     )
     return () => { cancelled = true }
-  }, [markSupplementLoaded, needsTwoFactor, selectedAccountId])
+  }, [markSupplementLoaded, needsTwoFactor, selectedAccountId, supplementGate])
 
   useEffect(() => {
+    // V8 だけ：右の列が見えるまで待つ（起動時の口を減らす）。
+    if (!supplementGate) return
     setSupportMarkAutoOnInbound(null)
     if (!selectedAccountId || !needsSupportMarks) return
     let cancelled = false
@@ -1231,7 +1297,7 @@ function DashboardPageInner() {
       },
     )
     return () => { cancelled = true }
-  }, [markSupplementLoaded, needsSupportMarks, selectedAccountId])
+  }, [markSupplementLoaded, needsSupportMarks, selectedAccountId, supplementGate])
 
   const activeBookings = useMemo(
     () => bookings?.filter((booking) => !inactiveBookingStatuses.has(booking.status)) ?? [],
@@ -1407,8 +1473,8 @@ function DashboardPageInner() {
     />
     if (id === 'operational-alerts') return <OperationalAlertsCard risk={displayedHealthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={pendingOldest} twoFactor={displayedTwoFactor} referenceCount={reference?.operationalAlerts} failed={healthFailed} updatedAt={supplementLoadedAt} />
     if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={displayedHealthRisk} activeFriends={activeFriends} healthFailed={healthFailed} updatedAt={supplementLoadedAt} />
-    if (id === 'upcoming') return <UpcomingCard accountId={selectedAccountId} bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} />
-    if (id === 'delivery-failures') return <DeliveryFailuresCard accountId={selectedAccountId} />
+    if (id === 'upcoming') return <UpcomingCard accountId={selectedAccountId} bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} startLoad={supplementGate} />
+    if (id === 'delivery-failures') return <DeliveryFailuresCard accountId={selectedAccountId} startLoad={supplementGate} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
       ? <UnavailableDataCard title="今月の配信" section={data.sections?.delivery} onRetry={() => void load()} />
       : data ? <MonthlyDeliveryCard delivery={data.delivery} freshness={<DashboardFreshness freshness={data.sections?.delivery?.freshness} asOf={data.sections?.delivery?.asOf} reason={data.sections?.delivery?.reason} />} />
@@ -1608,22 +1674,38 @@ function DashboardPageInner() {
             return <div key={item.id}>{renderMainCard(item.id)}</div>
           })}
         </div>
-        <aside className="min-w-0 space-y-3.5">
+        <aside ref={asideRef} className="min-w-0 space-y-3.5">
           {visibleRight.map((item) => <div key={item.id}>{renderRightCard(item.id)}</div>)}
         </aside>
       </div>
 
-      <DashboardEditor
-        open={editorOpen}
-        preferences={preferences}
-        saving={preferenceSaving}
-        saveError={preferenceSaveError?.message ?? null}
-        saveConflict={preferenceSaveError?.conflict ?? false}
-        onReloadPreferences={reloadPreferences}
-        onCancel={closeEditor}
-        onApply={applyPreferences}
-        onReset={resetPreferences}
-      />
+      {/*
+        V8 だけ：編集パネル（dnd-kit を含む）は開くまで読まない。
+        v7 は今までどおり静的に読む（動きを変えない）。
+      */}
+      {isV8
+        ? (editorOpen ? <DashboardEditorDynamic
+          open={editorOpen}
+          preferences={preferences}
+          saving={preferenceSaving}
+          saveError={preferenceSaveError?.message ?? null}
+          saveConflict={preferenceSaveError?.conflict ?? false}
+          onReloadPreferences={reloadPreferences}
+          onCancel={closeEditor}
+          onApply={applyPreferences}
+          onReset={resetPreferences}
+        /> : null)
+        : <DashboardEditor
+          open={editorOpen}
+          preferences={preferences}
+          saving={preferenceSaving}
+          saveError={preferenceSaveError?.message ?? null}
+          saveConflict={preferenceSaveError?.conflict ?? false}
+          onReloadPreferences={reloadPreferences}
+          onCancel={closeEditor}
+          onApply={applyPreferences}
+          onReset={resetPreferences}
+        />}
     </div>
   )
 }
