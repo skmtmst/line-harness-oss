@@ -13,8 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useRouter } from 'next/navigation'
-import { AlertCircle, ArrowLeftRight, Download, Gift, Info, MoreHorizontal, Plus, Star } from 'lucide-react'
+import { AlertCircle, ArrowLeftRight, Download, Gift, Info, Plus, Star } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
@@ -41,6 +40,7 @@ import { csvCell } from '@/lib/presentation'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
 import type { MileageV8TabKey } from './mileage-v8'
 import { formatNumber } from '@/lib/format'
+import { csvCell } from '@/lib/presentation'
 import { V8CreateButton } from './mileage-v8'
 import styles from './mileage-v8.module.css'
 
@@ -143,6 +143,7 @@ export default function V8RewardsTab({
   const [popularName, setPopularName] = useState<string | null>(null)
   const [popularCount, setPopularCount] = useState<number | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [failed, setFailed] = useState<FailedRedemption[]>([])
@@ -194,6 +195,7 @@ export default function V8RewardsTab({
       setPopularName(redeemedCount ? (overviewSummary?.mostRedeemedRewardName ?? null) : null)
       setPopularCount(redeemedCount)
       setReachMetrics(Array.isArray(response.data.reachMetrics) ? response.data.reachMetrics : [])
+      setLoadedAccountId(accountId)
       setStatus('ready')
     } catch (reason) {
       if (request !== requestRef.current) return
@@ -318,71 +320,44 @@ export default function V8RewardsTab({
     }
   }
 
-  /* 行の「…」の「自分で交換をテスト」。残高・在庫は動かさない。 */
-  const runTest = async (reward: MileageRewardSummary) => {
-    if (!accountId || testBusyId) return
-    setTestBusyId(reward.id)
-    setMenuNotice('')
+  const canExport = !accountLoading && !!accountId && loadedAccountId === accountId
+    && status === 'ready' && rewards.length > 0
+  const exportCsv = useCallback(() => {
+    if (!canExport) return
     setActionError('')
     try {
-      const response = await api.mileage.testReward(reward.id, accountId)
-      if (!response.success) throw new Error(response.error)
-      const warning = typeof response.data?.warning === 'string' ? response.data.warning.trim() : ''
-      setMenuNotice(response.data?.canDeliver
-        ? 'この内容で交換できます。残高・在庫は動いていません。'
-        : (warning || 'この内容では交換できません。内容を確認してください。'))
+      const rows = rewards.map((reward) => [
+        reward.name,
+        KIND_LABEL[reward.rewardKind],
+        reward.currentVersion?.requiredMiles,
+        reward.benefitName,
+        reward.exchangedThisMonth,
+        statusPill(reward.status).text,
+        reward.currentVersion?.startsAt,
+        reward.currentVersion?.endsAt,
+      ])
+      const csv = [['使い道', '種類', '必要なマイル', '交換すると渡るもの', '今月 交換された', '状態', '開始日時', '終了日時'], ...rows]
+        .map((row) => row.map((value) => csvCell(value)).join(','))
+        .join('\n')
+      const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `mileage-rewards-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.click()
+      URL.revokeObjectURL(url)
     } catch {
-      setActionError('交換のテストができませんでした。もう一度お試しください。')
-    } finally {
-      setTestBusyId(null)
+      setActionError('CSVを書き出せませんでした。もう一度お試しください。')
     }
-  }
+  }, [canExport, rewards])
 
-  /*
-   * 行の「…」の「複製」。複製の専用口は無いので、今の内容で
-   * 下書きを1つ作る（公開はしない）。版が取れないときは作らない。
-   */
-  const duplicateReward = async (reward: MileageRewardSummary) => {
-    if (readonly || !accountId || duplicateId) return
-    const version = reward.currentVersion
-    if (!version) {
-      setActionError('複製する内容が取れませんでした。開き直してもう一度お試しください。')
-      return
-    }
-    setDuplicateId(reward.id)
-    setMenuNotice('')
-    setActionError('')
-    try {
-      const response = await api.mileage.createReward(accountId, {
-        name: `${reward.name} のコピー`,
-        description: reward.description,
-        imageUrl: reward.imageUrl,
-        rewardKind: reward.rewardKind,
-        requiredMiles: version.requiredMiles,
-        stockLimit: version.stockLimit,
-        perFriendLimit: version.perFriendLimit,
-        startsAt: version.startsAt,
-        endsAt: version.endsAt,
-        benefitExpiresDays: version.benefitExpiresDays,
-        commonActionVersionId: version.commonActionVersionId,
-        targetConditions: version.targetConditions,
-        failurePolicy: version.failurePolicy,
-        customerMessage: version.customerMessage,
-      })
-      if (!response.success) throw new Error(response.error)
-      setMenuNotice(`「${reward.name} のコピー」を下書きで作りました。`)
-      await load()
-    } catch {
-      setActionError('複製できませんでした。もう一度お試しください。')
-    } finally {
-      setDuplicateId(null)
-    }
-  }
-
-  /* タブの名の横の件数。読み直し中・失敗時は消す。 */
   useEffect(() => {
-    registerTabCount('rewards', status !== 'ready' ? null : formatMileageNumber(rewards.length))
-  }, [registerTabCount, rewards.length, status])
+    registerHeaderActions(
+      <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
+        <Download size={14} aria-hidden="true" /> CSV で書き出す
+      </Button>,
+    )
+    return () => registerHeaderActions(null)
+  }, [canExport, exportCsv, registerHeaderActions])
 
   const publishedCount = rewards.filter((r) => r.status === 'published').length
   const draftCount = rewards.filter((r) => r.status === 'draft').length
