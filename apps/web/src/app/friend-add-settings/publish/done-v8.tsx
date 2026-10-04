@@ -6,7 +6,7 @@
  * ときの数（設定名・順番・知らせのつながり）をそのまま出す。
  */
 import Link from 'next/link'
-import { Check, History, Link2, List } from 'lucide-react'
+import { Activity, Check, Link2, List } from 'lucide-react'
 import Button from '@/components/shared/button'
 import styles from './done-v8.module.css'
 
@@ -65,7 +65,7 @@ export default function FriendAddDoneV8({ ruleName, routeNames, priority, slackC
               流入リンクを見る
             </Button>
             <Button href="/friend-add-settings/runs" variant="primary">
-              <History size={14} aria-hidden="true" />
+              <Activity size={14} aria-hidden="true" />
               実行結果を見る
             </Button>
           </div>

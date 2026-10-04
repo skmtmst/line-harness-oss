@@ -103,7 +103,7 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-test('並び順は固定表示で、LINEとメールを未読が先・新しい順に統合する', async () => {
+test('並び順は固定表示で、LINEとメールを未対応が先・新しい順に統合する', async () => {
   await act(async () => root.render(<ChatsPage />))
 
   await eventually(() => {
@@ -115,7 +115,7 @@ test('並び順は固定表示で、LINEとメールを未読が先・新しい�
 
   const list = host.querySelector<HTMLElement>('[data-inbox-v4="conversation-list"]')!
   const sortDescription = list.querySelector<HTMLElement>('[data-inbox-sort="fixed"]')
-  expect(sortDescription?.textContent?.trim()).toBe('並び順：未読が先・新しい順')
+  expect(sortDescription?.textContent?.trim()).toBe('並び順：未対応が先・新しい順')
 
   const interactiveSortControls = [...list.querySelectorAll('select, button, [role="combobox"]')]
     .filter((element) => /並び順|新しい順/.test(
