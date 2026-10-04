@@ -58,6 +58,10 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import InlineEdit from '@/components/shared/inline-edit'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import { Tabs } from '@/components/shared/tabs'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import StaffAssetList from './staff-asset-list'
@@ -355,6 +359,12 @@ export default function TemplatesListV8() {
   const [moveDraft, setMoveDraft] = useState('')
   const [moving, setMoving] = useState(false)
   const [moveError, setMoveError] = useState('')
+  /* 右から出る詳細パネル（C①）。URL に今の行を残す。 */
+  const [activeId, setActiveId] = useDetailPanelUrl('row')
+  /* パネルを開いている1件の移動は、窓ではなくパネルの中で選ぶ。 */
+  const [panelMove, setPanelMove] = useState(false)
+  /* 右クリックされた行（「…」と同じ項目を出す）。 */
+  const [contextId, setContextId] = useState<string | null>(null)
 
   const [duplicateTarget, setDuplicateTarget] = useState<Template | null>(null)
   const [duplicating, setDuplicating] = useState(false)
@@ -736,6 +746,7 @@ export default function TemplatesListV8() {
 
   /** フォルダへ移す（1件でもまとめてでも同じ窓）。 */
   const openMove = (ids: string[]) => {
+    setPanelMove(ids.length === 1 && ids[0] === activeId)
     setMoveIds(ids)
     setMoveDraft('')
     setMoveError('')
@@ -756,6 +767,7 @@ export default function TemplatesListV8() {
         return
       }
       setMoveIds(null)
+      setPanelMove(false)
       setSelectedIds(new Set())
       notifyToast('フォルダへ移しました', { tone: 'success' })
       await Promise.all([load(), loadFolders()])
@@ -849,13 +861,13 @@ export default function TemplatesListV8() {
         label: '編集する',
         disabled: readonly,
         disabledReason: readonly ? NO_MANAGE_NOTE : undefined,
-        onSelect: () => router.push(editHref(t)),
+        onSelect: () => withViewTransition(() => router.push(editHref(t))),
       },
       {
         id: 'usage',
         label: '使っている所を見る',
         external: true,
-        onSelect: () => router.push(detailHref(t)),
+        onSelect: () => withViewTransition(() => router.push(detailHref(t))),
       },
       {
         id: 'broadcast',
@@ -894,6 +906,37 @@ export default function TemplatesListV8() {
     })
     return items
   }
+
+  /* 右から出る詳細パネルの今の行（C①）。一覧に無ければ閉じる。 */
+  const activeTemplate = activeId ? (templates.find((t) => t.id === activeId) ?? null) : null
+  const navItems = activeTemplate && shownItems.some((t) => t.id === activeTemplate.id) ? shownItems : templates
+  const activeIndex = activeTemplate ? navItems.findIndex((t) => t.id === activeTemplate.id) : -1
+  const activeFolderName = activeTemplate
+    ? (activeTemplate.folderId === null
+      ? '未分類'
+      : (folders.find((f) => f.id === activeTemplate.folderId)?.name ?? null))
+    : null
+
+  /* 名前のその場の書き換え（C②）。Enter で保存・Esc でやめる。 */
+  const renameTemplate = async (t: Template, next: string) => {
+    const name = next.trim()
+    if (!name || name === t.name) return
+    const res = await api.templates.update(t.id, { name })
+    if (!res.success) throw new Error(res.error ?? 'rename_failed')
+    setTemplates((rows) => rows.map((row) => (row.id === t.id ? { ...row, name } : row)))
+  }
+
+  /* 右クリックは「…」と同じ項目（D）。 */
+  const contextTemplate = contextId ? (templates.find((t) => t.id === contextId) ?? null) : null
+  const contextMenuItems: ContextMenuItem[] = contextTemplate
+    ? rowMenuItems(contextTemplate).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
+    : []
 
   /* ===== フォルダの列 ===== */
   const folderRows: FolderPanelRow[] = [
@@ -1046,6 +1089,13 @@ export default function TemplatesListV8() {
     )
   ) : (
     <>
+      <ContextMenu
+        label={contextTemplate ? `テンプレート「${contextTemplate.name}」の操作` : 'テンプレートの操作'}
+        items={contextMenuItems}
+        shouldOpen={(event) =>
+          Boolean((event.target as HTMLElement | null)?.closest?.('tr[data-row-id]'))
+        }
+      >
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <colgroup>
@@ -1084,15 +1134,17 @@ export default function TemplatesListV8() {
               return (
                 <tr
                   key={t.id}
+                  data-row-id={t.id}
                   className={styles.rowClick}
                   tabIndex={0}
-                  onClick={() => router.push(detailHref(t))}
+                  onClick={() => setActiveId(t.id)}
+                  onContextMenuCapture={() => setContextId(t.id)}
                   onKeyDown={(event) => {
                     // 行内のリンク・ボタンにフォーカスがあるときは行を開かない。
                     if (event.target !== event.currentTarget) return
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault()
-                      router.push(detailHref(t))
+                      setActiveId(t.id)
                     }
                   }}
                 >
@@ -1183,6 +1235,7 @@ export default function TemplatesListV8() {
           </tbody>
         </table>
       </div>
+      </ContextMenu>
 
       {/* まとめての帯（選ぶと表の下に出る）：フォルダへ移す・削除。 */}
       {selectedCount > 0 ? (
@@ -1316,7 +1369,7 @@ export default function TemplatesListV8() {
             ))}
           </div>
 
-          <div className={styles.split}>
+          <div className={activeTemplate ? `${styles.split} ${styles.splitWithPanel}` : styles.split}>
             {/* 左のフォルダの列。いちばん上は「テンプレートを作る」。 */}
             <div className={styles.folderCol}>
               {createButton('v8-folder-create')}
@@ -1402,6 +1455,125 @@ export default function TemplatesListV8() {
 
               {listBody}
             </div>
+            {activeTemplate ? (
+              <DetailPanel
+                open
+                title={activeTemplate.name}
+                description={activeFolderName ?? undefined}
+                onClose={() => {
+                  setActiveId(null)
+                  setPanelMove(false)
+                }}
+                hasPrev={activeIndex > 0}
+                hasNext={activeIndex >= 0 && activeIndex < navItems.length - 1}
+                onPrev={() => setActiveId(navItems[activeIndex - 1]?.id ?? null)}
+                onNext={() => setActiveId(navItems[activeIndex + 1]?.id ?? null)}
+                footer={
+                  <div className={styles.panelActions}>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={() => withViewTransition(() => router.push(detailHref(activeTemplate)))}
+                    >
+                      詳細を見る
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={!canMutateTemplates}
+                      onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))}
+                    >
+                      編集する
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={!canMutateTemplates}
+                      onClick={() => {
+                        setDuplicateError('')
+                        setDuplicateTarget(activeTemplate)
+                      }}
+                    >
+                      複製する
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={!canMutateTemplates}
+                      onClick={() => openMove([activeTemplate.id])}
+                    >
+                      フォルダへ移す
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      disabled={!canMutateTemplates}
+                      onClick={() => handleDelete(activeTemplate)}
+                    >
+                      削除する
+                    </Button>
+                  </div>
+                }
+              >
+                <div className={styles.panelBody}>
+                  <p className={styles.panelLabel}>名前</p>
+                  <InlineEdit
+                    value={activeTemplate.name}
+                    label="テンプレートの名前"
+                    disabled={!canMutateTemplates}
+                    maxLength={100}
+                    onSave={(next) => renameTemplate(activeTemplate, next)}
+                  />
+                  <p className={styles.panelLabel}>中身の抜粋</p>
+                  <p className={styles.panelText}>
+                    {latestContentOf(activeTemplate).slice(0, 120)}
+                    {latestContentOf(activeTemplate).length > 120 ? '…' : ''}
+                  </p>
+                  <p className={styles.panelLabel}>公開</p>
+                  <p className={styles.panelText}>
+                    <span className={`${styles.publishPill} ${publishStateOf(activeTemplate).className}`}>
+                      {publishStateOf(activeTemplate).label}
+                    </span>
+                  </p>
+                  <p className={styles.panelLabel}>使っている所</p>
+                  <p className={styles.panelText}>
+                    {typeof activeTemplate.usageCount !== 'number'
+                      ? '使っている所を確認できません'
+                      : activeTemplate.usageCount === 0
+                        ? 'なし'
+                        : `${activeTemplate.usageCount}か所`}
+                  </p>
+                  {panelMove ? (
+                    <>
+                      <p className={styles.panelLabel}>移動先のフォルダ</p>
+                      <div className={styles.moveBody}>
+                        <Select
+                          aria-label="移動先のフォルダ"
+                          size="full"
+                          value={moveDraft}
+                          onChange={(value) => setMoveDraft(value)}
+                          disabled={moving}
+                          options={[
+                            { value: '', label: '未分類' },
+                            ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+                          ]}
+                        />
+                        <Button
+                          type="button"
+                          variant="primary"
+                          disabled={moving}
+                          busy={moving}
+                          onClick={() => void runMove()}
+                        >
+                          {moving ? '移動中…' : '移動する'}
+                        </Button>
+                      </div>
+                      {moveError ? <p className={styles.panelError} role="alert">{moveError}</p> : null}
+                    </>
+                  ) : null}
+                </div>
+              </DetailPanel>
+            ) : null}
           </div>
         </>
       ) : canMutateTemplates ? (
@@ -1557,9 +1729,9 @@ export default function TemplatesListV8() {
         ) : null}
       </Dialog>
 
-      {/* フォルダへ移すの窓。1件でもまとめてでも同じ形。 */}
+      {/* フォルダへ移すの窓。パネルで選ぶ1件のときは出さない。 */}
       <ConfirmDialog
-        open={moveIds !== null}
+        open={moveIds !== null && !panelMove}
         title={
           moveIds && moveIds.length === 1
             ? `「${templates.find((t) => t.id === moveIds[0])?.name ?? ''}」のフォルダを移す`

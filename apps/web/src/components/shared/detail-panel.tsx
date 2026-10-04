@@ -80,6 +80,7 @@ export default function DetailPanel({
     <aside
       ref={panelRef}
       className={styles.panel}
+      role="dialog"
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
       aria-busy={busy || undefined}
