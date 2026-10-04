@@ -1,9 +1,10 @@
 'use client'
 
-import { Plus } from 'lucide-react'
+import { Plus, Send } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsMember, type OpsMemberSummary } from '@/lib/api'
 import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import '@/app/ops/readonly-v8.css'
 import { formatDateTime, opsCall } from '@/components/ops/ops-ui'
 import NoticeLineAccountCard from '@/components/ops/notice-line-account-card'
@@ -19,6 +20,15 @@ import { TextField } from '@/components/shared/text-field'
 
 /** メンバー管理。★V6 37-10 `POteo`。左下のアカウントメニューから入る。 */
 
+/** 板 `FvbHW` の短い日時（10/2 07:10 の形）。 */
+function v8ShortDateTime(value: string | null): string {
+  if (!value) return '—'
+  const full = formatDateTime(value)
+  const m = full.match(/^(\d+)-(\d+)-(\d+) (\d+:\d+)$/)
+  if (!m) return full
+  return `${Number(m[2])}/${Number(m[3])} ${m[4]}`
+}
+
 /** 状態の札。停止 → 招待中 → 2要素認証待ち → 有効 の順に見る。 */
 function memberStateChip(m: OpsMember) {
   if (!m.isActive) return <Chip tone="neutral">停止</Chip>
@@ -28,6 +38,8 @@ function memberStateChip(m: OpsMember) {
 }
 
 export default function OpsMembersPage() {
+  const theme = useAdminTheme()
+  const isV8 = theme === 'v8'
   const [members, setMembers] = useState<OpsMember[]>([])
   const [summary, setSummary] = useState<OpsMemberSummary | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -69,7 +81,7 @@ export default function OpsMembersPage() {
       ? '最初の運営メンバーとして登録しました'
       : `${email.trim()} に招待メールを送りました。相手が2要素認証の登録を終えると運営メンバーになります`)
     setEmail('')
-    setInviting(false)
+    if (theme !== 'v8') setInviting(false)
     void load()
   }
 
@@ -99,25 +111,33 @@ export default function OpsMembersPage() {
   return (
     <ReadonlyDesignNode node="FvbHW"><div data-design-node="POteo" className="v8-ro-ops-page flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <OpsPageHeader title="メンバー管理" />
+      <OpsPageHeader
+        title="メンバー管理"
+        description={isV8 ? '運営メンバーはメールで招待します。招待された人はパスワードを設定し、2要素認証の登録が終わるまで運営コンソールに入れません。自分自身は変えられません。' : undefined}
+      />
       <div>
         <Tabs
-          items={[
+          items={isV8 ? [
+            { label: '運営メンバー', count: summary?.members, current: tab === 'members', onClick: () => setTab('members') },
+            { label: '運営の情報', current: tab === 'info', onClick: () => setTab('info') },
+          ] : [
             { label: '権限者', current: tab === 'members', onClick: () => setTab('members') },
             { label: '運営の情報', current: tab === 'info', onClick: () => setTab('info') },
           ]}
         />
       </div>
 
-      <div className="v8-ro-ops-metrics grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard variant="v6" title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `招待中 ${summary.invited}・2要素認証待ち ${summary.awaitingTotp}` : '—'} loading={!loaded} />
-        <KpiCard variant="v6" title="2要素認証" value={summary ? summary.totpEnabled : null} unit={summary ? `/ ${summary.members}人` : '人'} detail={totpMissing > 0 ? `未設定 ${totpMissing}人` : '全員設定済み'} badge={totpMissing > 0 ? '要対応' : undefined} badgeTone="danger" loading={!loaded} />
-        <KpiCard variant="v6" title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail={summary ? `書き込み ${summary.writeImpersonationsThisMonth}回` : '—'} loading={!loaded} />
-        <KpiCard variant="v6" title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="理由の記録あり" loading={!loaded} />
+      <div className={`v8-ro-ops-metrics grid gap-4 md:grid-cols-2 ${isV8 ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}`}>
+        <KpiCard variant="v6" title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `有効 ${summary.members - summary.invited}・招待中 ${summary.invited}` : '—'} loading={!loaded} />
+        {isV8 ? null : (
+          <KpiCard variant="v6" title="2要素認証" value={summary ? summary.totpEnabled : null} unit={summary ? `/ ${summary.members}人` : '人'} detail={totpMissing > 0 ? `未設定 ${totpMissing}人` : '全員設定済み'} badge={totpMissing > 0 ? '要対応' : undefined} badgeTone="danger" loading={!loaded} />
+        )}
+        <KpiCard variant="v6" title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
+        <KpiCard variant="v6" title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
       </div>
 
       {/* 作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。 */}
-      {tab === 'members' ? (
+      {tab === 'members' && !isV8 ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="primary" onClick={() => setInviting((v) => !v)}>
             <Plus aria-hidden="true" className="h-4 w-4" />
@@ -126,7 +146,7 @@ export default function OpsMembersPage() {
         </div>
       ) : null}
 
-      {inviting ? (
+      {tab === 'members' && (isV8 || inviting) ? (
         <form onSubmit={(event) => void invite(event)} className="flex items-center gap-2 rounded-card border border-hairline bg-canvas px-4 py-3">
           <div className="flex-1">
             <TextField
@@ -138,14 +158,19 @@ export default function OpsMembersPage() {
               required
             />
           </div>
-          <Button onClick={() => setInviting(false)}>キャンセル</Button>
-          <Button type="submit" variant="primary" disabled={busy}>招待メールを送る</Button>
+          {isV8 ? null : <Button onClick={() => setInviting(false)}>キャンセル</Button>}
+          <Button type="submit" variant="primary" disabled={busy}>
+            {isV8 ? <Send aria-hidden="true" className="h-4 w-4" /> : null}
+            招待メールを送る
+          </Button>
         </form>
       ) : null}
 
-      <div>
-        <NoteBar tone="warn">運営メンバーはメールで招待します。招待された人はパスワードを設定し、2要素認証の登録が終わるまで運営コンソールに入れません。自分自身は変えられません。</NoteBar>
-      </div>
+      {isV8 ? null : (
+        <div>
+          <NoteBar tone="warn">運営メンバーはメールで招待します。招待された人はパスワードを設定し、2要素認証の登録が終わるまで運営コンソールに入れません。自分自身は変えられません。</NoteBar>
+        </div>
+      )}
 
       {notice ? <p role="status" className="text-caption text-accent-deep">{notice}</p> : null}
       {/*
@@ -185,11 +210,11 @@ export default function OpsMembersPage() {
             <tbody>
               {members.map((m) => (
                 <Tr key={m.staffId}>
-                  <Td><span className="block truncate text-label font-medium text-ink" title={m.name}>{m.name}{m.staffId === me ? '（あなた）' : ''}</span></Td>
+                  <Td><span className="block truncate text-label font-medium text-ink" title={m.name}>{m.name}{m.staffId === me ? (isV8 ? '（自分）' : '（あなた）') : ''}</span></Td>
                   <Td><span className="block truncate text-caption text-ink-secondary" title={m.email ?? ''}>{m.email ?? '—'}</span></Td>
-                  <Td>{m.totpEnabled ? <Chip tone="ok">設定済み</Chip> : <Chip tone="danger">未設定</Chip>}</Td>
+                  <Td>{m.totpEnabled ? <Chip tone="ok">設定済み</Chip> : isV8 && m.activationState === 'awaiting_totp' ? <Chip tone="info">2要素認証待ち</Chip> : <Chip tone="danger">未設定</Chip>}</Td>
                   <Td>{memberStateChip(m)}</Td>
-                  <Td><span className="text-caption text-ink-secondary">{formatDateTime(m.lastLoginAt)}</span></Td>
+                  <Td><span className="text-caption text-ink-secondary">{isV8 ? v8ShortDateTime(m.lastLoginAt) : formatDateTime(m.lastLoginAt)}</span></Td>
                   <Td align="right">
                     {m.staffId === me ? (
                       /* 自分自身への操作は無い。空のままにすると右端の余白が0に見えるため「—」を置く。 */
