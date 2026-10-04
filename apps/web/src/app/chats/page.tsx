@@ -79,13 +79,6 @@ interface EmailInboxItem {
 /** 受信箱一覧の続きを読む位置。口の並び（未読が先・新しい順）と同じ3点。 */
 type ListCursor = { at: string; id: string; unread: 0 | 1 }
 
-const statusConfig: Record<Chat['status'], { label: string; className: string }> = {
-  unread: { label: '未対応', className: 'bg-danger-bg text-danger' },
-  in_progress: { label: '対応中', className: 'bg-warning-bg text-warning' },
-  on_hold: { label: '保留', className: 'bg-info-bg text-info' },
-  resolved: { label: '対応済み', className: 'bg-success-bg text-success' },
-}
-
 const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: 'すべて' },
   { key: 'unread', label: '未対応' },
@@ -287,17 +280,6 @@ const MESSAGE_MAX_LENGTH = 5000
 
 /** 入力欄の自動拡張の上限。text-sm(行の高さ約20px)の8行＋上下余白。 */
 const TEXTAREA_MAX_HEIGHT_PX = 168
-
-/**
- * 設計 `xGLVe` の一覧は日付だけの `08/18`。年まで出すと桁が伸びて、
- * 同じ行の右に並ぶ対応状況の札を押し出す。年は見出し側で出す。
- */
-function formatInboxListDate(iso: string | null): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
-}
 
 /**
  * 設計 `xGLVe` は、返信を待たせている行だけ日付ではなく待ち時間を出す
@@ -2810,20 +2792,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="text-ink truncate text-sm font-medium">{item.customerName}</p>
+                            {/* 板 `M0393`：未対応は顔の赤い点＋名前の太字。行の地は塗らない。 */}
+                            <p className={`text-ink truncate text-sm ${item.isUnread ? 'font-semibold' : 'font-medium'}`}>{item.customerName}</p>
                             <span className="text-ink-faint shrink-0 text-xs tabular-nums">
-                              {formatInboxListDate(item.lastIncomingAt)}
+                              {formatRelative(item.lastIncomingAt)}
                             </span>
                           </div>
                           <div className="mt-1 flex items-start justify-between gap-2">
                             <p className="text-ink-faint line-clamp-2 min-w-0 flex-1 text-xs leading-4">
                               {item.subject || item.preview}
                             </p>
-                            <span
-                              className={`rounded-pill shrink-0 px-2 py-0.5 text-micro font-semibold ${statusConfig[item.status].className}`}
-                            >
-                              {statusConfig[item.status].label}
-                            </span>
                           </div>
                           <div className="mt-1 flex items-center gap-2">
                             <ChannelBadge channel="email" />
@@ -2889,13 +2867,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       className={`w-full px-3 py-3 text-left transition-colors ${
                         isSelected
                           ? 'bg-accent-soft'
-                          : chat.isUnread
-                            /*
-                              設計 `f0zn6` は、自分あての未読だけ行の地を薄い赤に
-                              する。丸い点だけだと、行を目で追うときに見落とす。
-                            */
-                            ? 'bg-status-danger-soft hover:bg-status-danger-selected'
-                            : 'hover:bg-shell'
+                          /* 板 `M0393`：未対応は顔の赤い点＋太字で、行の地は塗らない。 */
+                          : 'hover:bg-shell'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -2909,18 +2882,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              <p className="text-sm font-medium text-ink truncate">{chat.friendName}</p>
+                              {/* 板 `M0393`：未対応は名前の太字。行の地は塗らない。 */}
+                              <p className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
                             </div>
                             {waitingLabel ? (
                               <span className="text-status-warn-deep shrink-0 text-nano font-semibold">{waitingLabel}</span>
                             ) : (
-                              <span className="text-ink-faint shrink-0 text-xs tabular-nums">{formatInboxListDate(chat.lastMessageAt)}</span>
+                              <span className="text-ink-faint shrink-0 text-xs tabular-nums">{formatRelative(chat.lastMessageAt)}</span>
                             )}
                           </div>
-                          {/*
-                            設計は行ごとに状態を出す。色だけだと、赤い点が
-                            「未読」なのか「未対応」なのか区別が付かない。
-                          */}
+                          {/* 板 `M0393`：行ごとの状態の札は置かない（赤い点＋太字と上の切り替えで足りる）。 */}
                           <div className="mt-1 flex items-start justify-between gap-2">
                             <p
                               className={`line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${
@@ -2933,11 +2904,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               )}
                               {preview || <span className="text-ink-faint italic">(まだメッセージなし)</span>}
                             </p>
-                            <span
-                              className={`rounded-pill shrink-0 px-2 py-0.5 text-micro font-semibold ${statusConfig[chat.status].className}`}
-                            >
-                              {statusConfig[chat.status].label}
-                            </span>
                           </div>
                           <div className="mt-1 flex items-center gap-2">
                             <ChannelBadge channel="line" />
