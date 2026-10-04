@@ -52,6 +52,7 @@ beforeEach(() => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
     calls.push({ url: url.pathname, method: init?.method ?? 'GET', body: typeof init?.body === 'string' ? init.body : '' })
     if (url.pathname === '/api/auth/step-up') return response({ success: true, data: { token: 'step-up-token', purpose: 'line_account.archive', expiresAt: '2026-10-03T00:00:00' } })
+    if (url.pathname === '/api/line-account-tags') return response({ success: true, data: [{ id: 't1', name: '渋谷エリア', color: '#2563eb' }] })
     return response({ success: true, data: { id: 'account-a' } })
   }))
   host = document.createElement('div')
@@ -117,6 +118,36 @@ test('保存の窓は板 D6ljr・理由と6桁で保存の口へ送る', async (
   await settle()
   expect(calls.some((call) => call.url === '/api/auth/step-up')).toBe(true)
   expect(calls.some((call) => call.url === '/api/line-accounts/account-a/archive')).toBe(true)
+  expect(done).toBe(true)
+})
+
+test('設定の窓はタグの付け外しを付け替えの口へ送る', async () => {
+  let done = false
+  await act(async () => root.render(
+    <AccountSettingsDialog
+      account={account}
+      accounts={[account, parent]}
+      archived={false}
+      accountTags={[{ id: 't1', name: '渋谷エリア', color: '#2563eb' }]}
+      onClose={() => {}}
+      onSaved={() => { done = true }}
+      onArchive={() => {}}
+      onShowDetails={() => {}}
+    />,
+  ))
+  await settle()
+  const box = document.body.querySelector('input[type="checkbox"]') as HTMLInputElement
+  expect(box).toBeTruthy()
+  expect(box.checked).toBe(true)
+  await act(async () => { box.click() })
+  const save = Array.from(document.body.querySelectorAll('button'))
+    .find((button) => (button.textContent ?? '').includes('保存'))
+  expect(save).toBeTruthy()
+  await act(async () => { save!.click() })
+  await settle()
+  const put = calls.find((call) => call.url === '/api/line-accounts/account-a/tags' && call.method === 'PUT')
+  expect(put).toBeTruthy()
+  expect(JSON.parse(put!.body)).toEqual({ tagIds: [] })
   expect(done).toBe(true)
 })
 
