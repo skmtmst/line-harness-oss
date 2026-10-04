@@ -594,6 +594,13 @@ function BookingDetailInner() {
       await bookingApi.decideRequest(selectedAccountId, id, action)
       // R322: 承認中に別の予約へ移っていたら、今の画面を触らない。
       if (!isCurrentTarget(actionTarget)) return
+      notifyToast(
+        action === 'approve' ? '予約を確定しました'
+          : action === 'reject' ? '予約をお断りしました'
+          : action === 'cancel' ? '予約をキャンセルしました'
+          : action === 'complete' ? '予約を完了にしました'
+          : '来店なしにしました',
+      )
       void load()
     } catch (e) {
       // R322: 前の予約の失敗で今の画面を汚さない。
