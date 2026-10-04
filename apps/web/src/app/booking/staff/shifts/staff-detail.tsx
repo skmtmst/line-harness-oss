@@ -1180,7 +1180,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
       <ConfirmDialog
         open={removeTarget !== null}
         title={`「${removeTarget ? formatDay(removeTarget.work_date) : ''}」のシフトを消しますか？`}
-        description="この日のシフトを消すと、いつもの勤務時間どおりに枠が出ます。この操作は取り消せません。"
+        description="この日のシフトを削除すると、いつもの勤務時間どおりに枠が出ます。この操作は取り消せません。"
         confirmLabel="削除する"
         destructive
         busy={deleting}

@@ -8,10 +8,12 @@ import PageHeader from '@/components/shared/page-header'
 import { Tabs } from '@/components/shared/tabs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { nenPetsApi, petAnimalTypeLabel, type NenPetRow } from '@/lib/nen-pets-api'
 import { csvCell } from '@/lib/presentation'
 import FeedingTab from './feeding-tab'
 import PetsTab, { type PetsQuery } from './pets-tab'
+import PetsPageV8 from './pets-v8'
 
 export type PetTab = 'pets' | 'feeding'
 
@@ -60,6 +62,15 @@ function PetsInner() {
   const [exportError, setExportError] = useState(false)
 
   const changeTab = (next: PetTab) => router.replace(next === 'pets' ? '/nen/pets' : `/nen/pets?tab=${next}`)
+
+  /*
+   * ★V8-B：data-theme="v8" のときだけ新しいマイペット画面
+   * （wTIej・h7A2F・eLjeQ）へ切り替える。v7 の見た目はそのまま。
+   */
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return <PetsPageV8 accountId={selectedAccountId} tab={tab} onChangeTab={changeTab} />
+  }
 
   const exportCsv = async () => {
     if (!selectedAccountId || exporting) return
