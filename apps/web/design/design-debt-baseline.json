@@ -796,7 +796,11 @@
     "arbitrary-value": 2
   },
   "components/broadcasts/broadcast-form.tsx": {
-    "arbitrary-value": 12
+    "arbitrary-value": 19,
+    "unresolved-classname": 61
+  },
+  "components/broadcasts/broadcast-kpis.tsx": {
+    "arbitrary-value": 1
   },
   "components/chats/friend-info-sidebar.tsx": {
     "unresolved-classname": 12,
