@@ -828,7 +828,7 @@ function CommonVarsListV8Inner() {
   const firstEmpty = stats.emptyInUse[0] ?? null
 
   return (
-    <div data-design-node="FM94M" className={styles.board}>
+    <div data-design-node="FM94M XIzkJ" className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
           <h1 className={styles.headTitle}>共通情報</h1>
