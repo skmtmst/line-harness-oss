@@ -14250,7 +14250,41 @@ function withAccount(path: string, accountId: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}account_id=${encodeURIComponent(accountId)}`;
 }
 
+export interface BookingPaymentAdminConfig {
+  mode: 'none' | 'onsite' | 'online';
+  provider: string;
+  holdMinutes: number;
+  keyConfigured: boolean;
+  testMode: boolean;
+}
+
 export const bookingApi = {
+  getPaymentConfig: (accountId: string) =>
+    fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
+      withAccount('/api/booking/admin/payment-config', accountId),
+    ),
+  savePaymentConfig: (
+    accountId: string,
+    body: { mode: 'none' | 'onsite' | 'online'; provider: 'none' | 'onsite' | 'stripe'; holdMinutes: number },
+  ) =>
+    fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
+      withAccount('/api/booking/admin/payment-config', accountId),
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+  saveMenuPayment: (
+    accountId: string,
+    menuId: string,
+    body: { mode: 'none' | 'onsite' | 'online'; provider: 'none' | 'onsite' | 'stripe' },
+  ) =>
+    fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
+      withAccount(`/api/booking/admin/menus/${menuId}/payment`, accountId),
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+  clearMenuPayment: (accountId: string, menuId: string) =>
+    fetchApi<{ success: true; data: { cleared: boolean } }>(
+      withAccount(`/api/booking/admin/menus/${menuId}/payment`, accountId),
+      { method: 'DELETE' },
+    ),
   previewReminders: (accountId: string, startsAt: string) => {
     const params = new URLSearchParams({ account_id: accountId, starts_at: startsAt });
     return fetchApi<{ reminders: Array<{ kind: 'day_before' | 'hours_before'; scheduledAt: string }> }>(

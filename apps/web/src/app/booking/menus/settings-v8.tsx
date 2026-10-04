@@ -63,6 +63,7 @@ import { slotReasonLabel } from '../staff/shifts/slot-reason'
 import { bookingErrorMessage, bookingRulesErrorMessage } from './menu-validation'
 
 import MenuVersionHistory from './menu-version-history'
+import PaymentTabV8 from './payment-tab-v8'
 import { EMPTY_STAFF, StaffEditModal } from '../staff/staff-edit-dialog'
 import { LiffPhoneDatetimeStep, LiffPhoneMenuStep, LiffPhoneStaffStep } from './liff-phone-v8'
 import styles from './settings-v8.module.css'
@@ -75,6 +76,7 @@ const V8_TABS = [
   { key: 'holidays', label: '休業日', node: 'KRgTQ' },
   { key: 'rules', label: '予約のルール', node: 'x1OZS6' },
   { key: 'staff', label: '担当スタッフ', node: 'VLEaj' },
+  { key: 'payment', label: 'お支払い', node: 'i7Zkz' },
 ] as const
 type V8TabKey = (typeof V8_TABS)[number]['key']
 const V8_TAB_KEYS = new Set<string>(V8_TABS.map((tab) => tab.key))
@@ -84,6 +86,7 @@ const V8_TAB_NODE: Record<V8TabKey, string> = {
   holidays: 'KRgTQ',
   rules: 'x1OZS6',
   staff: 'VLEaj',
+  payment: 'i7Zkz',
 }
 
 const MENU_PAGE_SIZE = 6
@@ -660,6 +663,12 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                 canEdit={canEditSettings}
                 onSaved={(next) => setSettings(next)}
                 onReload={() => void loadCore()}
+              />
+            ) : tab === 'payment' ? (
+              <PaymentTabV8
+                accountId={accountId}
+                menus={menus}
+                canEdit={canEditSettings}
               />
             ) : (
               <StaffTabV8
