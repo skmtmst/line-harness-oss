@@ -1,7 +1,7 @@
 {
   "dashboard": {
     "over4px": 0,
-    "compared": 259,
+    "compared": 260,
     "status": "PASS",
     "unmatchedRegions": [],
     "maxEdgeDelta": 0,
@@ -9,33 +9,33 @@
   },
   "list": {
     "over4px": 0,
-    "compared": 252,
+    "compared": 253,
     "status": "PASS",
     "unmatchedRegions": [],
     "maxEdgeDelta": 4.0,
     "pixelDifferenceOver24": 3296
   },
   "list-folders": {
-    "over4px": 174,
-    "compared": 247,
+    "over4px": 175,
+    "compared": 248,
     "status": "CONTINUE",
     "unmatchedRegions": [],
     "maxEdgeDelta": 72,
     "pixelDifferenceOver24": 162175
   },
   "create": {
-    "over4px": 69,
-    "compared": 180,
+    "over4px": 44,
+    "compared": 181,
     "status": "CONTINUE",
     "unmatchedRegions": [
-      "作成型の下の追従帯が正本HTMLに存在しない"
+      "段がありません: create/footer/下の追従帯"
     ],
     "maxEdgeDelta": 344,
-    "pixelDifferenceOver24": 50282
+    "pixelDifferenceOver24": 41558
   },
   "detail": {
     "over4px": 0,
-    "compared": 193,
+    "compared": 194,
     "status": "PASS",
     "unmatchedRegions": [],
     "maxEdgeDelta": 0,
@@ -43,23 +43,23 @@
   },
   "inbox": {
     "over4px": 0,
-    "compared": 195,
+    "compared": 196,
     "status": "PASS",
     "unmatchedRegions": [],
     "maxEdgeDelta": 0,
     "pixelDifferenceOver24": 0
   },
   "settings": {
-    "over4px": 39,
-    "compared": 129,
+    "over4px": 40,
+    "compared": 130,
     "status": "CONTINUE",
     "unmatchedRegions": [],
     "maxEdgeDelta": 236,
     "pixelDifferenceOver24": 29165
   },
   "analytics": {
-    "over4px": 30,
-    "compared": 172,
+    "over4px": 31,
+    "compared": 173,
     "status": "CONTINUE",
     "unmatchedRegions": [],
     "maxEdgeDelta": 40,

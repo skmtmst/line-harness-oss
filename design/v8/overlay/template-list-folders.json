@@ -1,11 +1,41 @@
 {
-  "over4px": 174,
-  "compared": 247,
+  "over4px": 175,
+  "compared": 248,
   "status": "CONTINUE",
   "unmatchedRegions": [],
   "maxEdgeDelta": 72,
   "pixelDifferenceOver24": 162175,
   "measurements": [
+    {
+      "name": "shell-board/白い板",
+      "implementation": {
+        "bottom": 988,
+        "height": 928,
+        "left": 240,
+        "right": 1428,
+        "top": 60,
+        "width": 1188,
+        "x": 240,
+        "y": 60
+      },
+      "reference": {
+        "bottom": 988,
+        "height": 928,
+        "left": 240,
+        "right": 1500,
+        "top": 60,
+        "width": 1260,
+        "x": 240,
+        "y": 60
+      },
+      "delta": {
+        "left": 0,
+        "top": 0,
+        "right": -72,
+        "bottom": 0
+      },
+      "over4px": true
+    },
     {
       "name": "heading/板の頭",
       "implementation": {

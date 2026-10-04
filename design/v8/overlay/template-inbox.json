@@ -1,11 +1,41 @@
 {
   "over4px": 0,
-  "compared": 195,
+  "compared": 196,
   "status": "PASS",
   "unmatchedRegions": [],
   "maxEdgeDelta": 0,
   "pixelDifferenceOver24": 0,
   "measurements": [
+    {
+      "name": "shell-board/白い板",
+      "implementation": {
+        "bottom": 888,
+        "height": 828,
+        "left": 240,
+        "right": 1428,
+        "top": 60,
+        "width": 1188,
+        "x": 240,
+        "y": 60
+      },
+      "reference": {
+        "bottom": 888,
+        "height": 828,
+        "left": 240,
+        "right": 1428,
+        "top": 60,
+        "width": 1188,
+        "x": 240,
+        "y": 60
+      },
+      "delta": {
+        "left": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0
+      },
+      "over4px": false
+    },
     {
       "name": "list/一覧",
       "implementation": {

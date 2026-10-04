@@ -31,9 +31,12 @@ import { ListPage } from '@/components/templates'
 - 取得処理を持つ一覧の子は `ListPageBody` を使う。ページ送りの表示条件をその子が持つ場合は `ListPagePagination`。頭や白い板を重ねない。
 - フォルダの列・右の欄は**白い板の幅1100px未満**で畳む。`collapsedFolders` と右欄を開く操作を必ず渡す。権限なし・閲覧のみは、広い／狭い両方の操作へ同じ条件を渡す。
 - 作成の保存操作は下の `StickyBar` に一本化。設定の `saveActions` は変更がある間だけ渡す。状態管理・離脱確認・競合の再取得は画面が持つ。
+- 作成の入力と見え方はそれぞれ縦に送る。型全体を横送りにしたり、子の画面で保存帯の高さを予約し直したりしない。
 - 未取得の数を0にしない。空・読込・失敗・権限なしのときの本文とページ送りは画面が決める。
 - V7 の画面は既存の描画を使う。V8 の型をV7へ適用しない。ログイン・LIFF・小窓・部品の説明板は7型の外側を直接適用する対象ではない。
 
 正本：`design/v8/html/components-NbomF.html`・`components-x6BDY.html`・代表 d8X09／I1E7Bt。全板の割り当ては `design/v8/TEMPLATE-MAP.md`。確認ページは `/v8-templates?type=dashboard`（list・list-folders・create・detail・inbox・settings・analytics）。`source=reference` で正本、`capture=1` で確認メニューを隠す。中身は正本から抽出した固定値で、実データを保存・送信しない。圧縮した確認用HTMLは通常の画面では読み込まない。
 
 画像比較を再現するには、`python3 scripts/v8-templates/generate-fixtures.py /abs/design/v8/html` → 本番ビルド（ローカルの画面確認用API）→ Browserスキルの `viewport.set({width:1440,height:900})` → 通常の店舗選択 → `capture.mjs` の `captureTemplates` → `python3 scripts/v8-templates/compare.py /tmp/v8-capture design/v8/overlay`。文字は灰色の塗りへ変え、段の矩形と同じ識別子を持つ容器の四辺も測る。正本HTMLの幅や余白を比較側で補正しない。型別の画像は `template-<型>.png`、差は `template-<型>-diff.png`、数値は同名のJSON。数値の合格だけで、共通部品の見た目や操作まで合格にしない。詳しい結果は `design/v8/overlay/templates-report.md`。
+
+幅の点検は同じBrowserで `responsive.mjs` の `probeTemplates(tab, viewport, fs, base, output)` を実行する。1152・1280・1440・1920pxで板と型の幅、1100px未満の列の折り畳み、保存帯、設定欄720pxを測る。`template-responsive.json` は32例とも合格。正本HTMLの中身のレスポンシブ対応と、各実画面の操作は各レーンで確認する。
