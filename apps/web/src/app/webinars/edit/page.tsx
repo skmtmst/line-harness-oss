@@ -70,6 +70,7 @@ import {
   type WebinarParticipantClassification,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
@@ -2348,6 +2349,8 @@ function EditWebinarInner() {
   }
   usePageTitle(paneTitle[pane])
 
+  const theme = useAdminTheme()
+
   useEffect(() => {
     if (!id) return
     const requestId = ++loadRequestId.current
@@ -2411,6 +2414,10 @@ function EditWebinarInner() {
     return () => { cancelled = true }
   }, [id, pane, analyticsId, analyticsState])
 
+  /*
+    ★V8 の編集②〜⑤と参加者・分析・コメント演出はこの画面で直接描く。
+    基本設定だけは V8 の対象外なので v7 のまま出す（v7 の見た目は変えない）。
+  */
   if (!id) {
     /*
       U097: 「一覧から選び直すと表示できます」と言うだけでは戻れない。
@@ -2482,6 +2489,7 @@ function EditWebinarInner() {
           ? '公開すると、友だちが見るページを確認できます。'
           : ''
   const registrations = analytics?.summary.reservations ?? null
+
   const railPane: StepKey = pane === 'actions'
     ? 'notifications'
     : pane === 'preview'

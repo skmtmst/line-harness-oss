@@ -156,6 +156,7 @@ class FakeText extends FakeNode {
 
 class FakeElement extends FakeNode {
   tagName: string
+  dataset: Record<string, string> = {}
   namespaceURI = 'http://www.w3.org/1999/xhtml'
   style: Record<string, string> & { setProperty: (name: string, value: string) => void }
   attributes = new Map<string, string>()
@@ -232,6 +233,8 @@ beforeAll(async () => {
     HTMLElement: FakeElement,
     HTMLIFrameElement: class extends FakeElement {},
     getSelection: () => null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
   })
   Object.assign(globalThis, {
     window: windowStub,
