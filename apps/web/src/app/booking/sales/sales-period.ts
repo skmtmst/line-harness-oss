@@ -46,9 +46,9 @@ export const SALES_PERIOD_COMPARE_LABEL: Record<SalesPeriodKey, string> = {
 export function formatRevenueDelta(current: number, previous: number): string | null {
   if (previous <= 0 || current < 0) return null
   const percent = ((current - previous) / previous) * 100
-  const rounded = Math.round(percent * 10) / 10
-  const sign = rounded > 0 ? '+' : ''
-  return `${sign}${rounded}%`
+  const roundedPct = Math.round(percent * 10) / 10
+  const sign = roundedPct > 0 ? '+' : ''
+  return `${sign}${roundedPct}%`
 }
 
 /** 件数の増減（必ず出る）。 */

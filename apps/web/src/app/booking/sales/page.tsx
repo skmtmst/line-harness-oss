@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import SegmentedControl from '@/components/shared/segmented'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import PageHeader from '@/components/shared/page-header'
 import {
   bookingApi,
   type BookingSalesSummary,
@@ -89,9 +90,11 @@ export default function BookingSalesPage() {
   if (status === 'loading' || !summary) {
     return (
       <div>
-        <div className={styles.head}>
-          <h1 className={styles.title}>予約からの売上</h1>
-        </div>
+        <PageHeader
+          breadcrumb={[{ label: '予約管理', href: '/booking/bookings' }, { label: '売上' }]}
+          title="予約からの売上"
+          description="予約の売上と件数、来なかった数の具合を見る。"
+        />
         <p className={styles.center}>{status === 'error' ? '売上を読み込めませんでした。通信状態を確認してください。' : '読み込んでいます…'}</p>
       </div>
     )
@@ -162,18 +165,22 @@ export default function BookingSalesPage() {
 
   return (
     <div>
-      <div className={styles.head}>
-        <h1 className={styles.title}>予約からの売上</h1>
-        <SegmentedControl
-          aria-label="集計する期間"
-          options={PERIOD_OPTIONS}
-          value={period}
-          onChange={(next) => {
-            setPeriod(next)
-            setOpenTile(null)
-          }}
-        />
-      </div>
+      <PageHeader
+        breadcrumb={[{ label: '予約管理', href: '/booking/bookings' }, { label: '売上' }]}
+        title="予約からの売上"
+        description="予約の売上と件数、来なかった数の具合を見る。"
+        actions={
+          <SegmentedControl
+            aria-label="集計する期間"
+            options={PERIOD_OPTIONS}
+            value={period}
+            onChange={(next) => {
+              setPeriod(next)
+              setOpenTile(null)
+            }}
+          />
+        }
+      />
 
       <div className={styles.tiles}>
         {tiles.map((tile) => (
