@@ -224,6 +224,7 @@ export default function HqPage() {
               onShowDetails={setEditingAccount}
               onRestore={(account) => setArchiveTarget({ account, mode: 'restore' })}
               onRefresh={refreshSingleAccount}
+              onTagsChanged={reloadAfterSave}
             />
           )
           : <HqAccountList accounts={accounts} onSelect={login} onSettings={setSettingsAccount} />

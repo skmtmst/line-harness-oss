@@ -1091,7 +1091,17 @@ export interface User {
 // LINE アカウント (LineAccount) — マルチアカウント管理
 // -----------------------------------------------------------------------------
 
+export interface LineAccountTagSummary {
+  id: string; name: string; color: string | null; displayOrder?: number
+}
+
+export interface LineAccountTagInput {
+  name: string; color?: string | null; displayOrder?: number
+}
+
 export interface LineAccount {
+  /** 統括内での分類。友だちタグとは別。 */
+  tags?: LineAccountTagSummary[];
   /** 主キー (UUIDv4) */
   id: string;
   /** LINE Channel ID (Messaging API) */

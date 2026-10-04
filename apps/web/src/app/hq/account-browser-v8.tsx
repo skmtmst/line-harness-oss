@@ -17,7 +17,7 @@ import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { DataTable, TableHeadRow, Th, Td, Tr } from '@/components/shared/table'
-import { fetchApi } from '@/lib/api'
+import { api } from '@/lib/api'
 import type { ApiResponse } from '@line-crm/shared'
 import { formatNumber } from '@/lib/format'
 import { Folder, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings } from 'lucide-react'
@@ -130,10 +130,7 @@ function TagDialog({ tags, onClose, onChanged }: {
       if (color && !/^#[0-9a-f]{6}$/i.test(resolvedColor ?? '')) {
         throw new Error('タグの色を読み取れませんでした。')
       }
-      const res = await fetchApi<ApiResponse<{ id: string }>>('/api/line-account-tags', {
-        method: 'POST',
-        body: JSON.stringify({ name: name.trim(), color: resolvedColor }),
-      })
+      const res = await api.lineAccountTags.create({ name: name.trim(), color: resolvedColor })
       if (!res.success) {
         setError(res.error)
         return
@@ -152,9 +149,7 @@ function TagDialog({ tags, onClose, onChanged }: {
     setError('')
     try {
       /* タグを消してもアカウントは消えない（紐づけだけ消える）。 */
-      const res = await fetchApi<ApiResponse<{ id: string }>>(`/api/line-account-tags/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      })
+      const res = await api.lineAccountTags.remove(id)
       if (!res.success) {
         setError(res.error)
         return
@@ -244,8 +239,9 @@ function TagDialog({ tags, onClose, onChanged }: {
   )
 }
 
-export default function AccountBrowser({ accounts, onSelect, onSettings, onShowDetails, onRestore, onRefresh }: {
+export default function AccountBrowser({ accounts, onSelect, onSettings, onShowDetails, onRestore, onRefresh, onTagsChanged }: {
   accounts: HqBrowserAccount[]
+  onTagsChanged?: () => Promise<void>
   onSelect: (id: string) => void
   onSettings: (account: HqBrowserAccount) => void
   onShowDetails: (account: HqBrowserAccount) => void
@@ -266,7 +262,7 @@ export default function AccountBrowser({ accounts, onSelect, onSettings, onShowD
 
   useEffect(() => {
     let cancelled = false
-    void fetchApi<ApiResponse<HqAccountTag[]>>('/api/line-account-tags')
+    void api.lineAccountTags.list()
       .then((res) => {
         if (!cancelled && res.success) setAllTags(res.data)
       })
@@ -395,8 +391,8 @@ export default function AccountBrowser({ accounts, onSelect, onSettings, onShowD
 
   const reloadTags = async () => {
     try {
-      const res = await fetchApi<ApiResponse<HqAccountTag[]>>('/api/line-account-tags')
-      if (res.success) setAllTags(res.data)
+      const res = await api.lineAccountTags.list()
+      if (res.success) { setAllTags(res.data); await onTagsChanged?.() }
     } catch {
       /* 読めなければ今のフォルダのまま。 */
     }

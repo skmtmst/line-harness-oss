@@ -100,7 +100,7 @@ export function AccountSettingsDialog({ account, accounts, archived, accountTags
   )
   useEffect(() => {
     let cancelled = false
-    void fetchApi<ApiResponse<AccountTagOption[]>>('/api/line-account-tags')
+    void api.lineAccountTags.list()
       .then((res) => {
         if (!cancelled && res.success) setAllTags(res.data)
       })
@@ -143,10 +143,7 @@ export function AccountSettingsDialog({ account, accounts, archived, accountTags
         }
       }
       if (tagsChanged) {
-        const res = await fetchApi<ApiResponse<{ id: string }>>(`/api/line-accounts/${encodeURIComponent(account.id)}/tags`, {
-          method: 'PUT',
-          body: JSON.stringify({ tagIds }),
-        })
+        const res = await api.lineAccountTags.replace(account.id, tagIds)
         if (!res.success) {
           setError(res.error)
           return

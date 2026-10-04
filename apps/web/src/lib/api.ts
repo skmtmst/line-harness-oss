@@ -9338,6 +9338,13 @@ export const api = {
     ),
     jobs: () => fetchApi<ApiResponse<FriendMigrationJob[]>>('/api/friends/migration-jobs'),
   },
+  lineAccountTags: {
+    list: () => fetchApi<ApiResponse<import("@line-crm/shared").LineAccountTagSummary[]>>("/api/line-account-tags"),
+    create: (input: import("@line-crm/shared").LineAccountTagInput) => fetchApi<ApiResponse<import("@line-crm/shared").LineAccountTagSummary>>("/api/line-account-tags", { method: "POST", body: JSON.stringify(input) }),
+    update: (id: string, input: Partial<import("@line-crm/shared").LineAccountTagInput>) => fetchApi<ApiResponse<import("@line-crm/shared").LineAccountTagSummary>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
+    remove: (id: string) => fetchApi<ApiResponse<{ id: string }>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    replace: (accountId: string, tagIds: string[]) => fetchApi<ApiResponse<{ id: string; tags: import("@line-crm/shared").LineAccountTagSummary[] }>>(`/api/line-accounts/${encodeURIComponent(accountId)}/tags`, { method: "PUT", body: JSON.stringify({ tagIds }) }),
+  },
   lineAccounts: {
     list: (live = false) =>
       fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '?live=1' : ''}`),
