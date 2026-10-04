@@ -55,6 +55,7 @@ import { describeConflictDiff, type ConflictSide } from './form-conflict-diff'
 import { formSavedContentMatches, type FormSavedContent } from './form-save-reconcile'
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -109,6 +110,8 @@ function FormEditInner() {
   /* 保存前に欄を離れたとき出す直し方（文は保存時と同じ）。 */
   const [nameError, setNameError] = useState<string | null>(null)
   usePageTitle(name || '回答フォーム編集')
+  // 1152の板（`ITBAB`）。折り畳みはCSSが担い、ここでは板の印だけを切り替える。
+  const narrow = useNarrowViewport()
   const [description, setDescription] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [submitCount, setSubmitCount] = useState(0)
@@ -1219,7 +1222,7 @@ function FormEditInner() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-design-node={narrow ? 'ITBAB' : undefined}>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <nav className="text-ink-faint text-xs" data-design="Crumb">
         <Link href="/form-submissions" className="hover:underline">
