@@ -778,7 +778,7 @@ export default function RichMenusListV8() {
             <tr key={i}>
               <td><Skeleton width={32} height={20} /></td>
               <td>
-                <span className="flex items-center gap-2.5">
+                <span className="flex items-center gap-2">
                   <Skeleton width={52} height={36} />
                   <span className="min-w-0 flex-1">
                     <Skeleton width="100%" height={14} />

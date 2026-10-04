@@ -48,6 +48,7 @@ import Select from '@/components/shared/select'
 import SortSelect from '@/components/ui/sort-select'
 import StatusBadge from '@/components/shared/status-badge'
 import BulkBar from '@/components/shared/bulk-bar'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars'
 import { formatNumber } from '@/lib/format'
@@ -1126,10 +1127,9 @@ function CommonVarsListV8Inner() {
               ) : error ? (
                 <div className={styles.stateCard}>
                   {isForbidden(listFailure) ? (
-                    <ListState
-                      kind="forbidden"
-                      title="共通情報を見る権限がありません"
-                      description={error}
+                    <NoPermissionV8
+                      featureName="共通情報"
+                      capabilitiesHref="/staff"
                     />
                   ) : (
                     <ListState
@@ -1372,7 +1372,7 @@ function CommonVarsListV8Inner() {
                 busy={deleteBusy}
                 busyLabel="差し替え中…"
               >
-                差し替えて消す
+                差し替えて削除
               </Button>
             ) : null}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete && deleteChoice === 'stop' ? (
@@ -1396,7 +1396,7 @@ function CommonVarsListV8Inner() {
                   busy={deleteBusy}
                   busyLabel="処理中…"
                 >
-                  このまま消す
+                  このまま削除
                 </Button>
               ) : null}
           </div>
@@ -1463,7 +1463,7 @@ function CommonVarsListV8Inner() {
                         }
                       }}
                     >
-                      <p className={styles.choiceTitle}>別の共通情報に差し替えて消す（おすすめ）</p>
+                      <p className={styles.choiceTitle}>別の共通情報に差し替えて削除（おすすめ）</p>
                       <p className={styles.choiceNote}>
                         {formatNumber(deleteImpact.blockingTotal)}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
                       </p>
