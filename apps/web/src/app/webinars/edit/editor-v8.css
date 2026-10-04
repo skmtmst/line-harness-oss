@@ -15,5 +15,6 @@
 [data-webinar-tabs] { display: flex; flex-wrap: wrap; gap: 24px; border-bottom: 1px solid var(--color-hairline); margin: 0 -24px; padding: 0 24px; }
 [data-webinar-tabs] button { padding: 8px 0; color: var(--color-ink-secondary); font-size: 13px; white-space: nowrap; border-bottom: 2px solid transparent; }
 [data-webinar-tabs] button[aria-current="page"] { border-bottom-color: var(--color-ink); color: var(--color-ink); font-weight: 600; }
+@media (max-width: 767px) { [data-webinar-editor="v8"] [data-design-node="Omqd4"] table { min-width: 560px; } }
 @container (max-width: 1052px) { [data-webinar-editor="v8"] [data-webinar-pane] { grid-template-columns: minmax(0, 1fr); } [data-webinar-editor="v8"] [data-webinar-pane] > aside { display: none; } }
 }

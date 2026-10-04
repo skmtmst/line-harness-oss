@@ -25,10 +25,13 @@ vi.mock('@/lib/api', async (importOriginal) => {
 
 import CommentsV8 from './comments-v8'
 
+let mounted: Root[] = []
+
 function render(): HTMLElement {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
+  mounted.push(root)
   act(() => {
     root.render(<CommentsV8 webinarId="webinar-1" />)
   })
@@ -44,6 +47,7 @@ describe('コメント演出のV8（Omqd4）', () => {
   })
 
   afterEach(() => {
+    act(() => { mounted.forEach((root) => root.unmount()); mounted = [] })
     document.body.innerHTML = ''
     vi.clearAllMocks()
   })
@@ -60,7 +64,7 @@ describe('コメント演出のV8（Omqd4）', () => {
     expect(host.textContent).toContain('保存する')
   })
 
-  it('追加して保存すると2件で送る', async () => {
+  it('空の名前・本文の追加行は送信せず、入力を残して直せる', async () => {
     const host = render()
     await act(async () => undefined)
     const add = [...host.querySelectorAll('button')].find((el) => el.textContent === '＋ 追加')
@@ -71,8 +75,38 @@ describe('コメント演出のV8（Omqd4）', () => {
     await act(async () => {
       save!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    expect(apiMocks.saveComments).toHaveBeenCalledTimes(1)
-    const rows = apiMocks.saveComments.mock.calls[0][1] as Array<{ atSeconds: number }>
-    expect(rows).toHaveLength(2)
+    expect(apiMocks.saveComments).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('2行目を確認してください')
+    expect(host.querySelector('input[aria-label="2行目の名前"]')).not.toBeNull()
   })
+
+  it('読み込み失敗は空や保存可能にせず、読み直して復帰する', async () => {
+    apiMocks.comments.mockRejectedValueOnce(new Error('通信切れ'))
+    const host = render()
+    await act(async () => undefined)
+    expect(host.textContent).toContain('コメントを読み込めませんでした')
+    const buttons = () => [...host.querySelectorAll('button')]
+    expect((buttons().find((element) => element.textContent === '保存する') as HTMLButtonElement).disabled).toBe(true)
+    expect(host.textContent).not.toContain('まだコメントがありません')
+    await act(async () => { buttons().find((element) => element.textContent === 'もう一度読み込む')!.click() })
+    expect((host.querySelector('input[aria-label="1行目の名前"]') as HTMLInputElement).value).toBe('田中')
+  })
+
+  it('保存失敗は入力を残し、二重クリックを一回にしてやり直せる', async () => {
+    let reject!: (error: Error) => void
+    apiMocks.saveComments.mockReturnValueOnce(new Promise((_resolve, rejectPromise) => { reject = rejectPromise }))
+    const host = render()
+    await act(async () => undefined)
+    const save = () => [...host.querySelectorAll('button')].find((element) => element.textContent === '保存する')!
+    await act(async () => { save().click(); save().click() })
+    expect(apiMocks.saveComments).toHaveBeenCalledTimes(1)
+    await act(async () => { reject(new Error('通信切れ')) })
+    expect(host.textContent).toContain('入力を残しました')
+    expect((host.querySelector('input[aria-label="1行目のコメント"]') as HTMLInputElement).value).toBe('こんばんは')
+    await act(async () => { save().click() })
+    expect(apiMocks.saveComments).toHaveBeenCalledTimes(2)
+    expect(apiMocks.saveComments.mock.calls[1][1]).toEqual([{ atSeconds: 10, authorName: '田中', body: 'こんばんは' }])
+    expect(host.textContent).toContain('1件保存しました')
+  })
+
 })

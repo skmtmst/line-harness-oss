@@ -8,19 +8,8 @@ import ReviewV8 from './review-v8'
 import NotificationsV8 from './notifications-v8'
 import VideoV8 from './video-v8'
 import './editor-v8.css'
-import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
-import {
-  fmtSec,
-  joinKindLabel,
-  ParticipantAvatar,
-  PARTICIPANT_FILTER_OPTIONS,
-  PARTICIPANTS_PAGE_SIZE,
-  participantStateLabel,
-  percent,
-} from './participants-shared'
+import { fmtSec } from './participants-shared'
 import AnalyticsV8 from './analytics-v8'
-import SessionCapacityCell from './session-capacity-cell'
-import VideoStages from './video-stages'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -34,62 +23,37 @@ import {
   STEPS,
   nextLabelOf,
   nextStepOf,
-  publishBlockers,
   stepStateOf,
   type StepKey,
 } from './edit-steps'
 import WebinarForm from '@/components/webinars/webinar-form'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import TargetMissing from '@/components/shared/target-missing'
 import { CheckCircle2, Circle, LoaderCircle, TriangleAlert } from 'lucide-react'
 import type { MediaItem } from '@line-crm/shared'
 import {
   ApiError,
   api,
-  downloadApiFile,
   fetchApi,
   webinarApi,
   type WebinarCtaCard,
   type Webinar,
-  type WebinarSakuraComment,
   type WebinarAnalytics,
-  type WebinarUserComment,
   type WebinarAction,
   type WebinarEditor,
   type WebinarNotificationOverview,
   type WebinarNotificationSettings,
-  type WebinarPublishValidation,
-  type WebinarParticipantPage,
-  type WebinarParticipantClassification,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { webinarLoadFailure, type WebinarLoadFailure } from '../webinar-load-failure'
-import {
-  reviewActionSummaryText,
-  reviewMonitoringText,
-  reviewTestSummaryBody,
-} from './review-text'
-import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
-
-function largestDropoffAt(segments: NonNullable<WebinarAnalytics['viewSegments']>): number | null {
-  if (segments.length < 2) return null
-  let largest = { at: segments[1].startSeconds, lost: -Infinity }
-  for (let index = 1; index < segments.length; index += 1) {
-    const lost = segments[index - 1].viewers - segments[index].viewers
-    if (lost > largest.lost) largest = { at: segments[index].startSeconds, lost }
-  }
-  return largest.at
-}
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 function fmtSession(epoch: number): string {
   return formatDateTime(epoch * 1000)
@@ -102,12 +66,6 @@ function webinarStatusLabel(status: Webinar['status']): string {
   if (status === 'active') return '公開中'
   if (status === 'draft') return '下書き'
   return 'アーカイブ'
-}
-
-function durationLabel(seconds: number): string {
-  const minutes = Math.floor(seconds / 60)
-  const rest = seconds % 60
-  return `${minutes}分${String(rest).padStart(2, '0')}秒`
 }
 
 type WebinarWithPublication = Webinar & {
@@ -171,189 +129,6 @@ function SummaryAside({
 
 function EditorDetails({ label, children }: { label: string; children: ReactNode }) {
   return <Disclosure title={label}>{children}</Disclosure>
-}
-
-function CommentsTab({ webinarId }: { webinarId: string }) {
-  const [comments, setComments] = useState<WebinarSakuraComment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [importJson, setImportJson] = useState('')
-  const [message, setMessage] = useState<string | null>(null)
-  const [isErrorMessage, setIsErrorMessage] = useState(false)
-
-  useEffect(() => {
-    webinarApi
-      .comments(webinarId)
-      .then((res) => setComments(res.data))
-      .finally(() => setLoading(false))
-  }, [webinarId])
-
-  const update = (i: number, patch: Partial<WebinarSakuraComment>) =>
-    setComments((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c)))
-
-  const save = async () => {
-    setMessage(null)
-    /* 上限を超えたまま送るとサーバーの 400 で初めて気づく。手前で止める。 */
-    if (comments.length > WEBINAR_SAKURA_COMMENTS_MAX) {
-      setIsErrorMessage(true)
-      setMessage(`コメントは${WEBINAR_SAKURA_COMMENTS_MAX}件までです（いま${comments.length}件）。減らしてから保存してください。`)
-      return
-    }
-    try {
-      const sorted = [...comments].sort((a, b) => a.atSeconds - b.atSeconds)
-      const res = await webinarApi.saveComments(webinarId, sorted)
-      setComments(sorted)
-      setIsErrorMessage(false)
-      setMessage(`${res.data.count}件保存しました`)
-    } catch (err) {
-      setIsErrorMessage(true)
-      setMessage(`保存に失敗しました: ${webinarErrorText(err, '保存できませんでした。入力を見直してください。')}`)
-    }
-  }
-
-  // サーバー側 (PUT /api/webinars/:id/comments) と同じ検証条件を事前に適用する。
-  // ここで弾いておかないと、不正な行が NaN / "undefined" のまま
-  // 「◯件読み込みました」と成功表示されてしまい、保存時のサーバー 400 で
-  // 初めて気づく上にどの行が悪いか分からない。
-  function validateImportRow(raw: unknown): WebinarSakuraComment | string {
-    if (typeof raw !== 'object' || raw === null) return 'オブジェクトではありません'
-    const rec = raw as Record<string, unknown>
-    const atSeconds = Math.floor(Number(rec.atSeconds))
-    // 負の atSeconds = 開始前 (待機ルーム) コメント。サーバーと同じく -3600 まで許容
-    if (!Number.isFinite(atSeconds) || atSeconds < -3600) return 'atSeconds が不正です (-3600〜)'
-    const authorName = typeof rec.authorName === 'string' ? rec.authorName.trim() : ''
-    if (!authorName) return 'authorName が空です'
-    if (authorName.length > 50) return 'authorName が50字を超えています'
-    const body = typeof rec.body === 'string' ? rec.body.trim() : ''
-    if (!body) return 'body が空です'
-    if (body.length > 500) return 'body が500字を超えています'
-    return { atSeconds, authorName, body }
-  }
-
-  const doImport = () => {
-    try {
-      const parsed = JSON.parse(importJson) as unknown
-      if (!Array.isArray(parsed)) throw new Error('配列ではありません')
-      const rows: WebinarSakuraComment[] = []
-      for (let i = 0; i < parsed.length; i++) {
-        const result = validateImportRow(parsed[i])
-        if (typeof result === 'string') {
-          throw new Error(`${i + 1}行目が不正です: ${result}`)
-        }
-        rows.push(result)
-      }
-      setComments(rows)
-      setImportJson('')
-      setIsErrorMessage(false)
-      setMessage(`${rows.length}件読み込みました（保存ボタンで確定）`)
-    } catch (err) {
-      setIsErrorMessage(true)
-      setMessage(`JSON が不正です: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }
-
-  if (loading) {
-    return <div className="text-ink-faint text-sm">読み込み中...</div>
-  }
-
-  return (
-    <div className="space-y-4">
-      {message && (
-        <Notice tone={isErrorMessage ? 'danger' : 'info'}>
-          {message}
-        </Notice>
-      )}
-      <div>
-        <p className="mb-1 text-sm text-ink-secondary">
-          JSON 一括インポート（形式: {'[{"atSeconds":10,"authorName":"田中","body":"こんばんは"}]'}、{WEBINAR_SAKURA_COMMENTS_MAX}件まで）
-        </p>
-        <textarea
-          value={importJson}
-          onChange={(e) => setImportJson(e.target.value)}
-          rows={4}
-          className="w-full rounded-control border border-hairline p-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-action"
-        />
-        <Button onClick={doImport} className="mt-1">
-          読み込む
-        </Button>
-      </div>
-      <DataTable>
-        <thead>
-          <TableHeadRow>
-            <Th style={{ width: 96 }}>秒数</Th>
-            <Th style={{ width: 160 }}>名前</Th>
-            <Th>本文</Th>
-            <Th style={{ width: 48 }}><span className="sr-only">削除</span></Th>
-          </TableHeadRow>
-        </thead>
-        <tbody>
-          {comments.map((c, i) => (
-            <Tr key={i}>
-              <Td>
-                <input
-                  type="number"
-                  value={c.atSeconds}
-                  onChange={(e) => update(i, { atSeconds: Number(e.target.value) })}
-                  className={`${inputClass} w-20`}
-                />
-              </Td>
-              <Td>
-                <input
-                  value={c.authorName}
-                  onChange={(e) => update(i, { authorName: e.target.value })}
-                  className={inputClass}
-                />
-              </Td>
-              <Td>
-                <input
-                  value={c.body}
-                  onChange={(e) => update(i, { body: e.target.value })}
-                  className={inputClass}
-                />
-              </Td>
-              <Td>
-                <button
-                  onClick={() => setComments((prev) => prev.filter((_, j) => j !== i))}
-                  className="text-danger hover:text-danger"
-                  aria-label={`${c.authorName || '名前未入力'}のコメントを削除`}
-                >
-                  ×
-                </button>
-              </Td>
-            </Tr>
-          ))}
-        </tbody>
-      </DataTable>
-      <StickyBar actions={(
-        <>
-        <Button onClick={() => setComments((prev) => [...prev, { atSeconds: 0, authorName: '', body: '' }])}>
-          ＋ 追加する
-        </Button>
-        <button
-          onClick={() => void save()}
-          className="px-4 py-1.5 text-sm font-medium bg-action text-on-action rounded-control hover:bg-action-hover"
-        >
-          保存する
-        </button>
-        </>
-      )} />
-    </div>
-  )
-}
-
-/**
- * 視聴者コメントは分析の概要でだけ使う。**参加者管理では取らない。**
- * 取得・読込・失敗をここに閉じ込めるので、コメントの失敗で
- * 参加者一覧や集計が消えることはない。
- */
-function fmtMinSec(sec: number): string {
-  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
-}
-
-function parseMinSec(v: string): number | null {
-  const m = /^(\d+):([0-5]?\d)$/.exec(v.trim())
-  if (m) return Number(m[1]) * 60 + Number(m[2])
-  const n = Number(v.trim())
-  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
 }
 
 const MEDIA_KIND_LABEL: Record<MediaItem['kind'], string> = {
@@ -765,25 +540,6 @@ function EditWebinarInner() {
     ? requestedPane as PaneKey
     : 'basic'
   const [pane, setPane] = useState<PaneKey>(initialPane)
-  /*
-    ★V8 切替用。共通の useAdminTheme は使わない（node 実行の試験で
-    document が無いときに落ちるため）。ここでは document が読める
-    ときだけ読み、読めなければ v7 のままにする。
-  */
-  const readAdminTheme = (): 'v7' | 'v8' =>
-    typeof document === 'undefined'
-      ? 'v7'
-      : document.documentElement?.dataset?.theme === 'v8'
-        ? 'v8'
-        : 'v7'
-  const [adminTheme, setAdminTheme] = useState<'v7' | 'v8'>(readAdminTheme)
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return
-    const update = () => setAdminTheme(readAdminTheme())
-    update()
-    window.addEventListener(ADMIN_THEME_CHANGED_EVENT, update)
-    return () => window.removeEventListener(ADMIN_THEME_CHANGED_EVENT, update)
-  }, [])
   /*
     CTAの印と最終確認が見るカード件数。初期値はエディタ応答の ctaCount、
     CTAの段を開いた後は子タブが保存・再取得した結果を正本にする。
@@ -1205,10 +961,7 @@ function EditWebinarInner() {
       ) : null}
       {visitedPanes.has('video') ? (
         <div hidden={pane !== 'video'}>
-          {/*
-            ★V8 切替（動画 `VWNaA`・開催回 `LPOe7`）。v7 の見た目は
-            data-theme="v8" が付くまで 1画素も変えない。
-          */}
+
 <VideoV8
               webinar={webinar}
               editor={editor}
@@ -1225,10 +978,7 @@ function EditWebinarInner() {
       ) : null}
       {visitedPanes.has('cta') ? (
         <div hidden={pane !== 'cta'}>
-          {/*
-            ★V8 切替（CTA・フォーム `Q0Jrk`）。v7 の見た目は
-            data-theme="v8" が付くまで 1画素も変えない。
-          */}
+
 <CtaV8 webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} onEditorChange={setEditor} onCtasReport={handleCtasReport} onDirtyChange={dirtyReporterFor('cta')} registerSave={saveRegistrarFor('cta')} />
         </div>
       ) : null}
@@ -1238,19 +988,7 @@ function EditWebinarInner() {
         </div>
       ) : null}
       {pane === 'review' && <ReviewV8 webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onPublished={disarm} onEditorChange={setEditor} onBack={() => goStep('notifications')} onTestNotifications={() => goStep('notifications')} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} />}
-      {visitedPanes.has('comments') ? (
-        <div hidden={pane !== 'comments'}>
-          {/*
-            ★V8 切替（コメント演出 `Omqd4`）。v7 の見た目は
-            data-theme="v8" が付くまで 1画素も変えない。
-          */}
-          {adminTheme === 'v8' ? (
-            <CommentsV8 webinarId={webinar.id} />
-          ) : (
-            <CommentsTab webinarId={webinar.id} />
-          )}
-        </div>
-      ) : null}
+      {visitedPanes.has('comments') ? <div hidden={pane !== 'comments'}><CommentsV8 webinarId={webinar.id} onDirtyChange={dirtyReporterFor('comments')} registerSave={saveRegistrarFor('comments')} /></div> : null}
       {visitedPanes.has('actions') ? (
         <div hidden={pane !== 'actions'}>
           <WebinarActionsTab webinarId={webinar.id} editor={editor} onEditorChange={setEditor} />

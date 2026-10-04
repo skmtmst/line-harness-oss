@@ -2177,21 +2177,41 @@
       ]
     },
     "/webinars/edit": {
-      "node": "PV1Vh",
-      "name": "V6 10-1-B〜J ウェビナー編集",
+      "node": "j7PP04",
+      "name": "V8 ウェビナー編集",
       "sections": [
         "Crumb",
         "Steps"
       ],
       "parts": [
-        "ウェビナー一覧",
         "基本設定",
         "動画",
         "CTA・フォーム",
         "通知",
         "確認",
-        "下書き保存"
-      ]
+        "下書きを保存"
+      ],
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": [
+          "j7PP04",
+          "VWNaA",
+          "LPOe7",
+          "Q0Jrk",
+          "E7iAYs",
+          "XCUNf",
+          "Omqd4",
+          "uNsEy",
+          "z2dgw"
+        ],
+        "requiredViewports": [
+          1152,
+          1280,
+          1440,
+          1920
+        ],
+        "reason": "実データをつなぎ直した。画像の比較と幅の確認は司令塔が行う。"
+      }
     },
     "/staff": {
       "node": "e3jz3",
