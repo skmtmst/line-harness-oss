@@ -20,7 +20,8 @@ describe('ダッシュボードの数のタイルはV8だけ広げられる', ()
   it('V8 のときだけ数を押せる（v7 は押せない p のまま）', () => {
     expect(source).toContain("theme === 'v8'")
     // onToggle が無いときは従来どおりの p（h-[116px] の高さも保つ）。
-    expect(source).toContain('<p className="text-ink text-[28px] leading-none font-bold tabular-nums" aria-busy={loading || undefined}>')
+    expect(source).toContain('<p className="text-ink text-hero leading-none font-bold tabular-nums" aria-busy={loading || undefined}>')
+    expect(source).toContain(': { expanded: false as const, onToggle: undefined, detailId: undefined }')
   })
 
   it('数のボタンは開閉の読み上げ（aria-expanded・内訳の region）を持つ', () => {
