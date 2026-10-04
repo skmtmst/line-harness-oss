@@ -26,3 +26,13 @@ python3 apps/web/src/app/v8-parts/serve-reference.py --port 3116
 
 結果は `design/v8/parts-check/badges.md`、実測値は同じ場所のJSON、左右の画像は `<ID>.png` です。
 スクリーンショットの切り出し座標は `getBoundingClientRect()` に `scrollX` / `scrollY` を足したページ座標を使います。
+
+保存済みの実測値と撮影元から、内部位置の比較と重ね合わせを再生成できます（Python + Pillow）。
+
+```sh
+python3 apps/web/src/app/v8-parts/compare-positions.py --column-offset 7.5
+```
+
+数値判定は本体基準のDOM位置・文字のRange矩形とCSS値から行います。
+`--column-offset` は今回の全体撮影で生じた右列の共通ずれを切り出し時に合わせる値で、実測値は変更しません。
+撮影元はJPEGなので、生成画像の画素完全一致を検査するツールではありません。
