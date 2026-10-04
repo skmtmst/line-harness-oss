@@ -14,6 +14,8 @@ import RefOrdersPanel, { type RefOrdersResult } from '../_components/ref-orders'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import InflowDetailV8 from './inflow-detail-v8'
 import type {
   ApiResponse,
   EntryRoute,
@@ -46,6 +48,16 @@ interface AttributedFriend {
 }
 
 function InflowLinkDetailPageContent() {
+  /*
+   * ★V8-B 流入と計測の詳細（板 `Q5le3`）。
+   * v8 のときだけ新しい見せ方。v7 の描画は下のまま残す。
+   */
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <InflowDetailV8 />
+  return <InflowLinkDetailBody />
+}
+
+function InflowLinkDetailBody() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''

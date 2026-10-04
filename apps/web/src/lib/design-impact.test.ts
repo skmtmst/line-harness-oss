@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする62ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする63ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -93,6 +93,8 @@ describe('共通部品の影響範囲', () => {
       // ★V8 共通情報の一覧（FM94M）。表の下にページ送りを置く。
       'app/contents/vars/list-v8.tsx',
       'app/contents/vars/page.tsx',
+      // ★V8-B コンバージョンの一覧（r6dJFy）。表の下にページ送りを置く。
+      'app/conversions/conversion-points-v8.tsx',
       'app/conversions/page.tsx',
       // #1011 FRIEND-11: 重複候補が50件を超えると後ろの候補へ辿れなかった。
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
@@ -121,8 +123,14 @@ describe('共通部品の影響範囲', () => {
       // IDEA-18 (#1036): 経路別の注文明細が増えても画面を重くしないよう
       // サーバが数えた総数でページ送りを出すため共通へ寄せた。
       'app/inflow-links/_components/ref-orders.tsx',
+      // ★V8-B 広告への送信履歴（p0kA3）。表の下にページ送りを置く。
+      'app/inflow-links/ad-integration-v8.tsx',
       // #565: 送信履歴が増えても描画を際限なく重くしないよう、20件ずつのページ送りに寄せた。
       'app/inflow-links/ad-integration.tsx',
+      // ★V8-B 流入と計測の詳細（Q5le3）。友だちの表の下にページ送りを置く。
+      'app/inflow-links/detail/inflow-detail-v8.tsx',
+      // ★V8-B 流入と計測の一覧（xbHxg）。表の下にページ送りを置く。
+      'app/inflow-links/inflow-list-v8.tsx',
       'app/inflow-links/page.tsx',
       // #291: 顧客へのお知らせ9種類を、設計どおり1ページ6件に区切る。
       'app/line-notifications/page.tsx',

@@ -75,6 +75,9 @@ shared-button-importer app/contents/vars/export-panel.tsx
 shared-button-importer app/contents/vars/impact-review.tsx
 shared-button-importer app/contents/vars/new/page.tsx
 shared-button-importer app/contents/vars/page.tsx
+shared-button-importer app/conversions/_components/conversion-dialogs.tsx
+shared-button-importer app/conversions/conversion-points-v8.tsx
+shared-button-importer app/conversions/new/conversion-create-v8.tsx
 shared-button-importer app/conversions/new/page.tsx
 shared-button-importer app/conversions/page.tsx
 shared-button-importer app/duplicates/duplicates-v8.tsx
@@ -128,9 +131,15 @@ shared-button-importer app/hq/page.tsx
 shared-button-importer app/hq/support/detail/page.tsx
 shared-button-importer app/hq/support/page.tsx
 shared-button-importer app/hq/templates/template-console.tsx
+shared-button-importer app/inflow-links/_components/bulk-routes-dialog.tsx
 shared-button-importer app/inflow-links/_components/edit-route-modal.tsx
+shared-button-importer app/inflow-links/ad-integration-v8.tsx
 shared-button-importer app/inflow-links/ad-integration.tsx
+shared-button-importer app/inflow-links/_components/inflow-delete-dialog.tsx
+shared-button-importer app/inflow-links/detail/inflow-detail-v8.tsx
 shared-button-importer app/inflow-links/detail/page.tsx
+shared-button-importer app/inflow-links/inflow-list-v8.tsx
+shared-button-importer app/inflow-links/new/inflow-create-v8.tsx
 shared-button-importer app/inflow-links/page.tsx
 shared-button-importer app/inflow-links/referral-qr-modal.tsx
 shared-button-importer app/line-notifications/operator-notification-rules.tsx
@@ -374,6 +383,7 @@ shared-button-importer components/hq/banners/upload-target-dialog.tsx
 shared-button-importer components/hq/notice-line-register-dialog.tsx
 shared-button-importer components/hq/platform-notices.tsx
 shared-button-importer components/identity/identity-decision-dialog.tsx
+shared-button-importer components/inflow-links/site-script-v8.tsx
 shared-button-importer components/inflow-links/site-script.tsx
 shared-button-importer components/layout/scrollable-tabs.tsx
 shared-button-importer components/line-notifications/notification-run-list.tsx

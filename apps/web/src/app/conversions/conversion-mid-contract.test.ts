@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+/* 止める窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
+const DIALOGS = readFileSync(new URL('./_components/conversion-dialogs.tsx', import.meta.url), 'utf8')
 
 /**
  * #513「中」M2〜M6 の契約(成果地点一覧)。
@@ -34,7 +36,7 @@ describe('成果地点一覧の点検契約(#513 中)', () => {
     expect(PAGE).toContain('if (!stopTarget || stopping) return')
     expect(PAGE).toContain('if (stopImpactLoading) return')
     expect(PAGE).toContain('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
-    expect(PAGE).toContain('busy={stopping || stopImpactLoading}')
+    expect(DIALOGS).toContain('busy={stopping || stopImpactLoading}')
   })
 
   it('M5: レポートのCSVボタンは一覧の中身を名乗る', () => {
