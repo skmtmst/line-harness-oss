@@ -52,7 +52,13 @@ const DAILY_CAPS = [
 ]
 
 export default function V8EarningRuleNew() {
+  const [formNumber, setFormNumber] = useState(0)
+  return <EarningRuleForm key={formNumber} focusName={formNumber > 0} onContinue={() => setFormNumber((number) => number + 1)} />
+}
+
+function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onContinue: () => void }) {
   const router = useRouter()
+  const nameRef = useRef<HTMLInputElement>(null)
   const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
   const [eventType, setEventType] = useState<string>('booking_created')
@@ -81,6 +87,10 @@ export default function V8EarningRuleNew() {
   const [trialError, setTrialError] = useState('')
   const [trial, setTrial] = useState<{ matchedFriends: number; estimatedTotalMiles: number } | null>(null)
   const createKeyRef = useRef<{ fingerprint: string; key: string } | null>(null)
+
+  useEffect(() => {
+    if (focusName) nameRef.current?.focus()
+  }, [focusName])
 
   useEffect(() => {
     let cancelled = false
@@ -194,7 +204,7 @@ export default function V8EarningRuleNew() {
         throw new Error(draftResponse.error)
       }
       if (continueAfter) {
-        router.push('/mileage/earning-rules/new')
+        onContinue()
       } else {
         router.push('/mileage?tab=earning-rules')
       }
@@ -280,6 +290,7 @@ export default function V8EarningRuleNew() {
             <label className={formStyles.field}>
               <span className={formStyles.label}>名前 <span className={formStyles.required}>必須</span></span>
               <TextInput
+                ref={nameRef}
                 id="sc-name"
                 aria-label="名前"
                 type="text"
