@@ -1317,3 +1317,142 @@ describe('W: 運用状態の確認項目の追加（v6-32）', () => {
     expect(checked.run.results.find((r) => r.checkKey === 'friend_change')).toMatchObject({ status: 'danger' });
   });
 });
+
+describe('繰り返し通知の止め方（同じ知らせが5分ごとに鳴らない）', () => {
+  function unlimitedQuota(): void {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/quota/consumption')) return Response.json({ totalUsage: 0 });
+      return Response.json({ type: 'unlimited' });
+    }));
+  }
+
+  it('Webhookは受信ゼロだけでは知らせず、普段あるのに24時間止まったときだけ注意にする', async () => {
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    unlimitedQuota();
+
+    // 誰も送ってこなかっただけの状態。静かな時間帯ごとに鳴らさない。
+    const quiet = await runOperationHealthChecks(testDb.db, {
+      lineAccountId: 'account-1', source: 'scheduled', now: '2026-09-15T00:00:00.000Z',
+    });
+    expect(quiet.run.results.find((r) => r.checkKey === 'webhook')).toMatchObject({
+      status: 'normal',
+      value: { eventCount: 0, received24h: 0, received7d: 0, lastReceivedAt: null },
+    });
+
+    // 3日前までは受信があるのに、直近24時間は1件も無い → 本当に止まっている疑い。
+    testDb.raw.prepare(
+      `INSERT INTO line_webhook_events
+         (webhook_event_id, line_account_id, event_type, status, received_at, updated_at)
+       VALUES ('wh-old', 'account-1', 'message', 'succeeded', '2026-09-12T00:00:00.000Z', '2026-09-12T00:00:00.000Z')`,
+    ).run();
+    const silent = await runOperationHealthChecks(testDb.db, {
+      lineAccountId: 'account-1', source: 'scheduled', now: '2026-09-15T00:05:00.000Z',
+    });
+    expect(silent.run.results.find((r) => r.checkKey === 'webhook')).toMatchObject({
+      status: 'warning',
+      value: { eventCount: 0, received24h: 0, received7d: 1, lastReceivedAt: '2026-09-12T00:00:00.000Z' },
+    });
+  });
+
+  it('配信枠は使用率の高い側で判定し、残数の小さい側が入れ替わっても正常↔注意を往復しない', async () => {
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    testDb.raw.prepare(
+      `INSERT INTO tenants (id, name, plan_key, plan_status) VALUES ('tenant-1', '統括', 'light', 'active')`,
+    ).run();
+    testDb.raw.prepare("UPDATE line_accounts SET tenant_id = 'tenant-1' WHERE id = 'account-1'").run();
+    testDb.raw.prepare("INSERT INTO friends (id, line_account_id, line_user_id, display_name) VALUES ('f-1', 'account-1', 'U-f1', '友人1')").run();
+    // light は月5,000通。4,150通送信済みで使用率83%（注意の域）、残り850通。
+    const insertMessage = testDb.raw.prepare(
+      `INSERT INTO messages_log (id, friend_id, direction, message_type, content, line_account_id, created_at)
+       VALUES (?, 'f-1', 'outgoing', 'text', '{}', 'account-1', '2026-09-10T10:00:00')`,
+    );
+    for (let i = 0; i < 4_150; i += 1) insertMessage.run(`msg-${i}`);
+
+    let lineUsed = 100;
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/quota/consumption')) return Response.json({ totalUsage: lineUsed });
+      return Response.json({ type: 'limited', value: 1_000 });
+    }));
+
+    // 1回目: LINE残900 > Harness残850。小さい側はHarness（使用率83%）。
+    const first = await runOperationHealthChecks(testDb.db, {
+      lineAccountId: 'account-1', source: 'scheduled', now: '2026-09-15T05:00:00.000Z',
+    });
+    expect(first.run.results.find((r) => r.checkKey === 'message_quota')).toMatchObject({
+      status: 'warning', value: { sendable: 850 },
+    });
+
+    // 2回目: LINEを100通使って残800。小さい側がLINE（使用率20%）へ入れ替わるが、
+    // Harnessの使用率83%は変わっていないので注意のまま（ここで正常に戻ると鳴り続ける）。
+    lineUsed = 200;
+    const second = await runOperationHealthChecks(testDb.db, {
+      lineAccountId: 'account-1', source: 'scheduled', now: '2026-09-15T05:05:00.000Z',
+    });
+    expect(second.run.results.find((r) => r.checkKey === 'message_quota')).toMatchObject({
+      status: 'warning', value: { sendable: 800 },
+    });
+  });
+
+  it('データの置き場は、遅いだけなら注意にし、失敗はエラーにする', async () => {
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    unlimitedQuota();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-15T00:00:00.000Z'));
+    // つながるが4秒かかるR2。失敗ではないので「注意」側。
+    const slowR2 = {
+      put: async () => { vi.advanceTimersByTime(4_000); },
+      get: async () => ({ key: 'probe' }),
+      delete: async () => undefined,
+    } as unknown as R2Bucket;
+
+    const runAt = async (at: string) =>
+      (await runOperationHealthChecks(testDb.db, {
+        lineAccountId: 'account-1', source: 'scheduled', now: at, deps: { r2: slowR2 },
+      })).run.results.find((result) => result.checkKey === 'infra_canary');
+
+    expect(await runAt('2026-09-15T00:00:00.000Z')).toMatchObject({ status: 'normal', value: { consecutive: 1 } });
+    expect(await runAt('2026-09-15T00:05:00.000Z')).toMatchObject({ status: 'normal', value: { consecutive: 2 } });
+    const third = await runAt('2026-09-15T00:10:00.000Z');
+    expect(third).toMatchObject({ status: 'warning', value: { consecutive: 3 } });
+    expect(String(third?.summary)).toContain('遅く');
+  });
+
+  it('データの置き場の異常は、3回続けて成功するまで解消にしない', async () => {
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    unlimitedQuota();
+    let broken = true;
+    const flakyR2 = {
+      put: async () => { if (broken) throw new Error('r2 down'); },
+      get: async () => ({ key: 'probe' }),
+      delete: async () => undefined,
+    } as unknown as R2Bucket;
+
+    const runAt = async (at: string) =>
+      (await runOperationHealthChecks(testDb.db, {
+        lineAccountId: 'account-1', source: 'scheduled', now: at, deps: { r2: flakyR2 },
+      })).run.results.find((result) => result.checkKey === 'infra_canary');
+
+    await runAt('2026-09-15T00:00:00.000Z');
+    await runAt('2026-09-15T00:05:00.000Z');
+    expect(await runAt('2026-09-15T00:10:00.000Z')).toMatchObject({ status: 'danger' });
+
+    // 1回・2回の成功では解消にしない（ここで解消にすると「解消→再発」が繰り返される）。
+    broken = false;
+    expect(await runAt('2026-09-15T00:15:00.000Z')).toMatchObject({
+      status: 'danger', value: { failed: false, cleanStreak: 1 },
+    });
+    expect(await runAt('2026-09-15T00:20:00.000Z')).toMatchObject({
+      status: 'danger', value: { failed: false, cleanStreak: 2 },
+    });
+    // 3回続けて成功したら正常へ戻す。
+    expect(await runAt('2026-09-15T00:25:00.000Z')).toMatchObject({
+      status: 'normal', value: { failed: false, cleanStreak: 3 },
+    });
+
+    // 途中で1回失敗しても、3回に届かないうちは異常のまま保つ（正常へ往復させない）。
+    broken = true;
+    expect(await runAt('2026-09-15T00:30:00.000Z')).toMatchObject({ status: 'normal', value: { consecutive: 1 } });
+  });
+});

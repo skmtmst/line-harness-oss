@@ -445,6 +445,18 @@ export async function reconcileOperationHealthAlerts(
 
     if (!nextSeverity) {
       if (!current || current.status === 'resolved') continue;
+      // 1回正常になっただけで解消にすると、たまに失敗する不調で「解消→再発」を
+      // 5分ごとに繰り返してしまう。前回の確認も正常だったときに解消を確定する
+      // （前回の記録が無いときは、そのまま解消にする）。
+      const previous = await db.prepare(
+        `SELECT r.status
+           FROM operation_health_results r
+           JOIN operation_health_runs h ON h.id = r.run_id
+          WHERE h.scope_key = ? AND r.check_key = ? AND r.run_id != ?
+          ORDER BY r.observed_at DESC, r.id DESC
+          LIMIT 1`,
+      ).bind(input.lineAccountId, result.checkKey, input.runId).first<{ status: string }>();
+      if (previous && previous.status !== 'normal') continue;
       const changed = await db.prepare(
         `UPDATE operation_alerts
             SET status = 'resolved', source_run_id = ?, last_detected_at = ?, resolved_at = ?,
@@ -716,6 +728,18 @@ async function operationAlertResolvedRecently(
   return hit !== null;
 }
 
+/** この異常について、過去にLINE・メールの通知行を積んだことがあるか。 */
+async function operationAlertEverNotified(db: D1Database, alertId: string): Promise<boolean> {
+  const hit = await db.prepare(
+    `SELECT 1
+       FROM operation_alert_notification_outbox o
+       JOIN operation_alert_events e ON e.id = o.event_id
+      WHERE e.alert_id = ?
+      LIMIT 1`,
+  ).bind(alertId).first();
+  return hit !== null;
+}
+
 /** 未enqueueのeventだけに、同一tenant・対象accountを見られるowner/adminの通知行を積む。 */
 export async function enqueuePendingOperationAlertNotifications(
   db: D1Database,
@@ -724,13 +748,14 @@ export async function enqueuePendingOperationAlertNotifications(
   const now = input.now ?? new Date().toISOString();
   const since = new Date(Date.parse(now) - OPERATION_ALERT_NOTIFICATION_DEDUP_MS).toISOString();
   const events = await db.prepare(
-    `SELECT e.id, e.line_account_id, e.alert_id, e.action, e.created_at
+    `SELECT e.id, e.line_account_id, e.alert_id, e.action, e.severity, e.created_at
        FROM operation_alert_events e
       WHERE e.notification_enqueued_at IS NULL
         AND (? IS NULL OR e.line_account_id = ?)
       ORDER BY e.created_at, e.id LIMIT 100`,
   ).bind(input.lineAccountId ?? null, input.lineAccountId ?? null).all<{
-    id: string; line_account_id: string; alert_id: string; action: string; created_at: string;
+    id: string; line_account_id: string; alert_id: string; action: string;
+    severity: string; created_at: string;
   }>();
   for (const event of events.results ?? []) {
     const recipients = await db.prepare(
@@ -755,11 +780,19 @@ export async function enqueuePendingOperationAlertNotifications(
       && await operationAlertResolvedRecently(db, {
         alertId: event.alert_id, eventId: event.id, createdAt: event.created_at, since,
       });
+    // 「未確認」は、こちらの確認そのものができなかった状態。画面には残すが、
+    // LINE・メールでは知らせない（確認できないたびに知らせが鳴ってしまう）。
+    const unknownOnly = event.severity === 'unknown';
+    // 知らせていない異常の「解消」「受領」は知らせない。鳴っていない物が止まった
+    // お知らせだけが届くのを防ぐ。
+    const unnotifiedFollowUp = (event.action === 'resolved' || event.action === 'acknowledged')
+      && !(await operationAlertEverNotified(db, event.alert_id));
+    const suppressed = flapSuppressed || unknownOnly || unnotifiedFollowUp;
     const statements: D1PreparedStatement[] = [];
     let missingContactCount = 0;
     for (const recipient of recipients.results ?? []) {
       if (!recipient.line_user_id && !recipient.email) missingContactCount += 1;
-      if (recipient.line_user_id && !flapSuppressed
+      if (recipient.line_user_id && !suppressed
         && !(await operationAlertNotifiedRecently(db, {
           alertId: event.alert_id, action: event.action, staffId: recipient.id, channel: 'line', since,
         }))) statements.push(db.prepare(
@@ -768,7 +801,7 @@ export async function enqueuePendingOperationAlertNotifications(
             next_attempt_at, created_at, updated_at)
          VALUES (?, ?, ?, ?, 'line', 'queued', 0, ?, ?, ?)`,
       ).bind(crypto.randomUUID(), event.id, event.line_account_id, recipient.id, now, now, now));
-      if (recipient.email && !flapSuppressed
+      if (recipient.email && !suppressed
         && !(await operationAlertNotifiedRecently(db, {
           alertId: event.alert_id, action: event.action, staffId: recipient.id, channel: 'email', since,
         }))) statements.push(db.prepare(
