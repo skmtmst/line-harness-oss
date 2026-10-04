@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import ReadonlyHeaderV8 from '../analytics/readonly-header-v8'
 import '../analytics/readonly-v8.css'
 import Button from '@/components/shared/button'
+import { Download } from 'lucide-react'
 import KpiCard from '@/components/shared/kpi-card'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
@@ -197,7 +198,7 @@ export default function SearchConsolePage() {
   const periodControl = <SegmentedControl aria-label="集計期間" value={String(days)} options={ranges.map((range) => ({ value: String(range), label: `${range}日` }))} onChange={(value) => setDays(Number(value) as RangeDays)} />
   return (
     <div className={`${styles.board} v8-ro-analytics-page`} data-design-node="h1G4d">
-      <ReadonlyHeaderV8 title="Search Console" description="Googleの検索から、どのキーワード・どのページで人が来たかを見ます。検索から友だち追加への突合は未取得です。" actions={<Button variant="secondary" onClick={exportCsv} disabled={!data || loading}>CSV で書き出す</Button>} />
+      <ReadonlyHeaderV8 titleDisplay="always" title="Search Console" description="Googleの検索から、どのキーワード・どのページで人が来たかを見ます。検索から友だち追加への突合は未取得です。" actions={<Button variant="secondary" onClick={exportCsv} disabled={!data || loading}><Download size={14} aria-hidden="true" />CSV で書き出す</Button>} />
       {!data && <div className={styles.toolbar}>{periodControl}{settingsHref && <Button variant="secondary" href={settingsHref} target="_blank" rel="noreferrer">連携を設定</Button>}</div>}
       {loading ? (
         <DelayedSkeleton
