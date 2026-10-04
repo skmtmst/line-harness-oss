@@ -5,6 +5,7 @@ import {
   deploymentPaths,
   expectedApexFiles,
   expectedRootNames,
+  payloadTarEnvironment,
   publicFiles,
   relativeTarget,
   remoteInstall,
@@ -110,4 +111,10 @@ test("invalid users, release IDs and checksum lists fail closed", () => {
     () => remoteInstall("20261005083000-123456789abc", "fixtureuser", "bad"),
     /ハッシュ/,
   );
+});
+
+test("payload tar disables macOS AppleDouble metadata", () => {
+  const env = payloadTarEnvironment({ KEEP: "yes", COPYFILE_DISABLE: "0" });
+  assert.equal(env.KEEP, "yes");
+  assert.equal(env.COPYFILE_DISABLE, "1");
 });

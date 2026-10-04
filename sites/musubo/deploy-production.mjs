@@ -46,6 +46,10 @@ export const expectedApexFiles = [
   "default_page.png",
 ];
 
+export function payloadTarEnvironment(env = process.env) {
+  return { ...env, COPYFILE_DISABLE: "1" };
+}
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -316,7 +320,11 @@ async function main() {
   );
   await writeFile(join(output, "SHA256SUMS"), checksums.join("\n") + "\n");
   const archive = join(work, "payload.tar.gz");
-  run("tar", ["-czf", archive, "-C", output, ...publicFiles, "SHA256SUMS"]);
+  run(
+    "tar",
+    ["-czf", archive, "-C", output, ...publicFiles, "SHA256SUMS"],
+    { env: payloadTarEnvironment() },
+  );
   const id =
     new Date().toISOString().replace(/\D/g, "").slice(0, 14) +
     "-" +
