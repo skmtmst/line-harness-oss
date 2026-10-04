@@ -2975,9 +2975,11 @@
         }
       ]
     },
-    "command-palette": {
-      "name": "V8 どこからでも探す窓",
-      "pencilNodes": [],
+    "detail-panel": {
+      "name": "V8 右から出る詳細パネル",
+      "pencilNodes": [
+        "VJKAT"
+      ],
       "role": "canonical",
       "status": "active",
       "reviewStatus": "confirmed",
@@ -3004,6 +3006,7 @@
       },
       "declarations": []
     },
+
     "slide-panel": {
       "name": "V8 手順・タブの中身の移り変わり",
       "pencilNodes": [],
@@ -3032,6 +3035,74 @@
         "reason": "司令塔が録画で確かめる。"
       },
       "declarations": []
+    },
+
+    "context-menu": {
+      "name": "V8 右クリックメニュー",
+      "pencilNodes": [],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/context-menu.tsx",
+      "cssModule": "src/components/shared/context-menu.module.css",
+      "components": [
+        "ContextMenu"
+      ],
+      "cssPrefix": "context-menu",
+      "pencilUsage": "一覧の行の右クリック操作",
+      "lastCheckedAt": "2026-10-04",
+      "note": "押した位置に ActionMenu（inline）を出す。↑↓・Enter・Esc は ActionMenu の扱い。外にはみ出さない。",
+      "routes": {
+        "active": [],
+        "impact": "一覧のある管理画面"
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1152
+        ],
+        "reason": "司令塔が録画で確かめる。"
+      },
+      "declarations": []
+    },
+
+    "inline-edit": {
+      "name": "V8 その場の書き換え",
+      "pencilNodes": [],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/inline-edit.tsx",
+      "cssModule": "src/components/shared/inline-edit.module.css",
+      "components": [
+        "InlineEdit"
+      ],
+      "cssPrefix": "inline-edit",
+      "pencilUsage": "表・詳細の文言のその場編集",
+      "lastCheckedAt": "2026-10-04",
+      "note": "押すと入力欄・Enter 保存・Esc やめる。保存中は押せず、失敗は元の値に戻して理由を出す。",
+      "routes": {
+        "active": [],
+        "impact": "文言をその場で直す管理画面"
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1152
+        ],
+        "reason": "司令塔が録画で確かめる。"
+      },
+      "declarations": [
+        {
+          "pencil": "input height 36",
+          "class": "input",
+          "prop": "height",
+          "source": "36px",
+          "resolved": "36px"
+        }
+      ]
     },
     "notice": {
       "name": "★V7 共通の帯（Notice）",
