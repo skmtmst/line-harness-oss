@@ -38,7 +38,7 @@ export const STEP_STATE_LABEL: Record<StepState, string> = {
   unknown: '確かめられません',
 }
 
-export type StepKey = 'accounts' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
+export type StepKey = GettingStartedStep['key']
 
 export interface StepResult {
   key: StepKey
@@ -239,12 +239,22 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
     role: null,
   })
 
+  if (byKey.has('featureSet')) {
+    display.splice(1, 0, {
+      key: 'featureSet', ordinal: '2', title: '使う機能の初期セット', state: 'unknown',
+      condition: 'このアカウントの機能設定が保存されている',
+      next: '業種に合わせて使う機能を選びます。',
+      action: null, blockedReason: null,
+    });
+    display.forEach((step, index) => { step.ordinal = String(index + 1); });
+  }
   return display.map((base) => {
     const server = byKey.get(base.key)
     if (!server) return { ...base, state: 'unknown', action: null, blockedReason: '状態を取得できませんでした' }
 
     const state = server.state
     const nextByState: Record<StepKey, Partial<Record<StepState, string>>> = {
+      featureSet: { done: '終わっています。機能設定で見直せます。', todo: '業種に合わせて使う機能を選び、保存してください。' },
       accounts: {
         done: '終わっています。つなぎ先を見直したいときはこちらから。',
         stalled: server.reason ?? 'Webhookかシークレットがまだ確かめられていません。',
@@ -272,6 +282,7 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
       },
     }
     const labels: Record<StepKey, string> = {
+      featureSet: '機能設定を開く',
       accounts: state === 'done' ? '接続の確認を見る' : 'LINEアカウントを開く',
       attributes: 'タグを見る',
       friendAdd: '友だち追加時の配信を開く',

@@ -2555,3 +2555,11 @@ export interface CreateTrafficPoolRequest {
   activeAccountId: string;
   accountIds?: string[];
 }
+
+export interface GettingStartedStep {
+  key: 'accounts' | 'featureSet' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage';
+  state: 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown';
+  href: string | null;
+  reason: string | null;
+  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'; active?: boolean | null }>;
+}

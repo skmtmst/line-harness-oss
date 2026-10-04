@@ -5487,14 +5487,7 @@ function rangeQuery(params?: { from?: string; to?: string; accountId?: string })
 
 
 /** はじめの設定の段。設計 ★V6 34-1（`RAW35`）。 */
-export interface GettingStartedStep {
-  key: 'accounts' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
-  state: 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown'
-  href: string | null
-  reason: string | null
-  /** 段1だけ。Webhook をアカウントごとに確かめた結果。 */
-  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'; active?: boolean | null }>
-}
+export type GettingStartedStep = import('@line-crm/shared').GettingStartedStep
 
 /** レシピ。設計 ★V6 34-2（`y0P0Qx`）。 */
 export interface Recipe {
@@ -9111,7 +9104,7 @@ export const api = {
   },
   /** はじめの設定の順路。台帳 #134。**毎回いまの中身を数える（キャッシュしない）。** */
   gettingStarted: {
-    get: (accountId?: string) =>
+    get: (accountId?: string, version?: 'v8') =>
       fetchApi<ApiResponse<{
         steps: GettingStartedStep[]
         doneCount: number
@@ -9119,7 +9112,7 @@ export const api = {
         allDone: boolean
         /** 進捗帯を閉じたか（本人単位）。**完了判定には使わない。** */
         dismissed: boolean
-      }>>(`/api/getting-started${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`),
+      }>>(`/api/getting-started?${new URLSearchParams({ ...(accountId ? { account_id: accountId } : {}), ...(version ? { version } : {}) })}`),
     /** 進捗帯を閉じる。**閉じた日時は帯を出さないためだけの記憶。** */
     dismiss: () =>
       fetchApi<ApiResponse<{ dismissed: boolean }>>('/api/getting-started/dismiss', {

@@ -22,6 +22,7 @@ import {
   stoppedReasons,
 } from './getting-started-view'
 import { FeatureSetCard } from './feature-set-card'
+import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
 import styles from './getting-started.module.css'
 
 /** 段の状態の見え方。**色だけに頼らず、必ず文字で言う。** */
@@ -52,7 +53,7 @@ export default function GettingStartedPage() {
     setStatus('loading')
     setLoadError(null)
     try {
-      const res = await api.gettingStarted.get(accountId ?? undefined)
+      const res = await api.gettingStarted.get(accountId ?? undefined, theme === 'v8' ? 'v8' : undefined)
       if (!res.success) throw new Error(res.error)
       setSteps(buildStepsFromApi(res.data.steps))
       setStatus('ready')
@@ -60,10 +61,16 @@ export default function GettingStartedPage() {
       setLoadError(caught)
       setStatus('error')
     }
-  }, [accountLoading, selectedAccountId])
+  }, [accountLoading, selectedAccountId, theme])
 
   useEffect(() => {
     void load()
+  }, [load])
+
+  useEffect(() => {
+    const refresh = () => { void load() }
+    window.addEventListener(FEATURE_SETTINGS_UPDATED_EVENT, refresh)
+    return () => window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, refresh)
   }, [load])
 
   const reasons = stoppedReasons(steps)
@@ -72,7 +79,7 @@ export default function GettingStartedPage() {
 
   return (
     <div className={`${styles.page} v8-ro-notifications-page`} data-design-node={theme === 'v8' ? 'xuJ7D' : undefined}>
-      {theme === 'v8' && <ReadonlyHeaderV8 title="はじめの設定" description="いまの進み具合と、次に設定することを確認します。順路は実際の5段に合わせています。" />}
+      {theme === 'v8' && <ReadonlyHeaderV8 title="はじめの設定" description="使いはじめるまでの6つの手順です。上から順に進めると、最初の1通が届くまでたどり着けます。" />}
       {/*
         読込面（loading）では共通部品が onRetry を見ない。
         失敗面にだけ再試行口が出る。
@@ -99,12 +106,14 @@ export default function GettingStartedPage() {
             順路の段には含めない（段はサーバ判定の5段で固定）。保存済みの設定や
             メニューの並びをここからリセットしないのは FeatureSetCard が守る。
           */}
-          <FeatureSetCard accountId={selectedAccountId} />
+          {theme === 'v7' && <FeatureSetCard accountId={selectedAccountId} />}
 
           <div className={styles.columns}>
             <ol className={styles.steps} aria-label="はじめの設定の順路">
               {steps.map((step) => (
-                <StepRow key={step.key} step={step} current={step.key === currentKey} />
+                <StepRow key={step.key} step={step} current={step.key === currentKey}>
+                  {step.key === 'featureSet' && <FeatureSetCard accountId={selectedAccountId} />}
+                </StepRow>
               ))}
             </ol>
 
@@ -129,7 +138,7 @@ export default function GettingStartedPage() {
   )
 }
 
-function StepRow({ step, current }: { step: StepResult; current: boolean }) {
+function StepRow({ step, current, children }: { step: StepResult; current: boolean; children?: React.ReactNode }) {
   const done = step.state === 'done'
   return (
     <li className={styles.step} data-step-state={step.state} data-current={current ? 'true' : 'false'}>
@@ -151,6 +160,7 @@ function StepRow({ step, current }: { step: StepResult; current: boolean }) {
           <span className={styles.stepLabel}>次にすること：</span>
           {step.next}
         </p>
+        {children}
         {step.action ? (
           <Link href={step.action.href} className={styles.stepAction}>
             {step.action.label}
