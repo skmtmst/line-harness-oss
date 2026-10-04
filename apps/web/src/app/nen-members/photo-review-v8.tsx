@@ -1,24 +1,8 @@
 'use client'
 
-/*
- * ★V8-B 投稿（Pencil「★V8-B 画面の地図」専用機能の組：
- * 写真の審査 `TkA4D`、閲覧のみ `Jn95h`、採用 `cniyw`、
- * 公式サイト掲載 `SyQA1`、見送る確認 `ujcar`、
- * 報酬の決まり 版の履歴 `N1br7`、状態の板 `dzx5D`）。
- *
- * v7（nen-members/page.tsx と photo-review-detail / photo-publications /
- * photo-reward-policy）とは別の部品として持ち、data-theme="v8" のときだけ
- * こちらが出る。データの口（photos・metrics・review・bulk・retry・
- * publications・withdraw・policyVersions）は同じ。違いは置き場と見せ方だけ——
- * ・数の帯は1枚の白い板に区切り線で4つ（離したカードにしない）。
- * ・審査はカードの並び＋右に決まりの棚。1画面に主ボタンは置かない。
- * ・見送る確認は真ん中の小窓（ujcar）。版の履歴は N1br7 の窓。
- * ・1枚ずつ大きく見る・公式サイト掲載の並び替えは今の作りのまま
- *  （詳細は v7 の部品をそのまま使う）。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
+/* Pencil の6枚のHTMLをもとにした投稿画面。既存の審査APIを接続する。 */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, CircleCheck, Clock3, Globe } from 'lucide-react'
+import { Camera, CircleCheck, Clock3, Globe, History, HelpCircle, Undo2, X, Check, Send } from 'lucide-react'
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -30,6 +14,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
+import SegmentedControl from '@/components/shared/segmented'
 import { notifyToast } from '@/components/shared/toast'
 import { Tabs } from '@/components/shared/tabs'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -382,7 +367,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           <h1 className={styles.headTitle}>投稿</h1>
           <p className={styles.headDesc}>お客さまが送ってくれたペットの写真を確かめて、公式サイトに載せるかを決めます。</p>
         </div>
-        <Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}>版の履歴を見る</Button>
+        <Button type="button" variant="secondary" onClick={() => setHistoryOpen(true)}><History size={15} aria-hidden="true" />版の履歴を見る</Button>
       </div>
       <div data-design-node="photo-tabs-v8">
         <Tabs
@@ -396,10 +381,10 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
       </div>
 
       <ul className={styles.kpiBand} aria-label="投稿の数の帯">
-        <KpiCellV8 label="審査待ち" help="まだ決めていない写真の枚数です" value={countsReady ? counts.pending : null} unit="枚" sub={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatPhotoReceivedAt(reviewMetrics.oldestPendingAt)}` : 'いちばん古いもの —'} />
-        <KpiCellV8 label="今月採用" help="今月 採用した写真の枚数です" value={countsReady ? adoptedThisMonth : null} unit="枚" sub={policyPoints == null ? '1枚ごとに —' : `1枚ごとに ${formatNumber(policyPoints)}マイル`} />
-        <KpiCellV8 label="今月見送り" help="今月 見送った写真の枚数です" value={countsReady ? rejectedThisMonth.length : null} unit="枚" sub={`理由：${topReason}`} />
-        <KpiCellV8 label="公式サイト掲載" help="いま載っている写真の枚数です" value={publishedCount} unit="枚" sub="いま載っている写真" />
+        <KpiCellV8 icon="pending" label="審査待ち" help="まだ決めていない写真の枚数です" value={countsReady ? counts.pending : null} unit="枚" sub={reviewMetrics?.oldestPendingAt ? `いちばん古いもの ${formatPhotoReceivedAt(reviewMetrics.oldestPendingAt)}` : 'いちばん古いもの —'} />
+        <KpiCellV8 icon="help" label="今月採用" help="今月 採用した写真の枚数です" value={countsReady ? adoptedThisMonth : null} unit="枚" sub={policyPoints == null ? '1枚ごとに —' : `1枚ごとに ${formatNumber(policyPoints)}マイル`} />
+        <KpiCellV8 icon="help" label="今月見送り" help="今月 見送った写真の枚数です" value={countsReady ? rejectedThisMonth.length : null} unit="枚" sub={`理由：${topReason}`} />
+        <KpiCellV8 icon="published" label="公式サイト掲載" help="いま載っている写真の枚数です" value={publishedCount} unit="枚" sub="いま載っている写真" />
       </ul>
 
       {!accountId ? (
@@ -514,11 +499,11 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   )
 }
 
-function KpiCellV8({ label, help, value, unit, sub }: { label: string; help: string; value: number | null; unit: string; sub: string }) {
+function KpiCellV8({ icon, label, help, value, unit, sub }: { icon: 'pending' | 'help' | 'published'; label: string; help: string; value: number | null; unit: string; sub: string }) {
   return (
     <li className={styles.kpiCell}>
       <div className={styles.kpiHead}>
-        <span className={styles.kpiLabel}>{label}</span>
+        <span className={styles.kpiIcon} aria-hidden="true">{icon === 'pending' ? <History size={13} /> : icon === 'published' ? <Undo2 size={13} /> : <HelpCircle size={13} />}</span><span className={styles.kpiLabel}>{label}</span>
         <button type="button" className={styles.kpiHelp} title={help} aria-label={`${label}：${help}`}>…</button>
       </div>
       <p className={styles.kpiValue}>{value === null ? '—' : <>{formatNumber(value)}<span className={styles.kpiUnit}>{unit}</span></>}</p>
@@ -576,35 +561,6 @@ function ReviewListV8(props: ReviewListV8Props) {
           見るだけの権限です。採用・見送りはできません。並べて見る／1枚ずつ大きく見る・探すは使えます。
         </NoteBar>
       ) : null}
-      <div className={styles.tools} data-design-node="photo-controls-v8">
-        <form
-          className={styles.searchGrow}
-          onSubmit={(event) => {
-            event.preventDefault()
-            props.onSearchQuery(props.searchInput.trim().slice(0, 100))
-          }}
-        >
-          <SearchField
-            aria-label="写真を探す"
-            value={props.searchInput}
-            onChange={props.onSearchInput}
-            onClear={() => props.onSearchInput('')}
-            placeholder="名前・ペット名・コメントで探す"
-            maxLength={100}
-          />
-        </form>
-        <span className={styles.toolsTail}>
-          {status === 'adopted' ? (
-            <p className={styles.toolsNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載で公開先を選びます。</p>
-          ) : (
-            <>
-              <Button variant="secondary" disabled title="並べて見るは一覧の表示形式の追加口を接続後に使えます">並べて見る</Button>
-              <Button variant="secondary" disabled={photos.length === 0} onClick={props.onOpenDetail}>1枚ずつ大きく見る</Button>
-            </>
-          )}
-        </span>
-      </div>
-
       {props.searchQuery ? (
         <p className={styles.toolsNote}>「{props.searchQuery}」で絞り込んでいます</p>
       ) : null}
@@ -618,12 +574,40 @@ function ReviewListV8(props: ReviewListV8Props) {
       ) : photos.length === 0 ? (
         <ListState kind="empty" emptyPreset="readonly" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" />
       ) : (
-        <div className={showRail ? styles.reviewGrid : undefined}>
-          <ul className={styles.cards} data-design-node="photo-cards-v8">
+        <div className={`${showRail ? styles.reviewGrid : styles.adoptedGrid} ${status === 'adopted' ? styles.adopted : ''}`}>
+      <div className={styles.tools} data-design-node="photo-controls-v8">
+        <form
+          className={styles.searchGrow}
+          onSubmit={(event) => {
+            event.preventDefault()
+            props.onSearchQuery(props.searchInput.trim().slice(0, 100))
+          }}
+        >
+          <SearchField
+            aria-label="写真を探す"
+            value={props.searchInput}
+            onChange={props.onSearchInput}
+            onClear={() => props.onSearchInput('')}
+            placeholder={status === 'pending' ? '飼い主・ペット名で探す' : '名前・ペット名・コメントで探す'}
+            maxLength={100}
+          />
+        </form>
+        <span className={styles.toolsTail}>
+          {status === 'adopted' ? (
+            <p className={styles.toolsNote}>写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載で公開先を選びます。</p>
+          ) : (
+            <>
+              <SegmentedControl aria-label="写真の見え方" options={[{ value: 'list', label: '並べて見る' }, { value: 'detail', label: '1枚ずつ大きく見る' }]} value="list" onChange={(next) => { if (next === 'detail' && photos.length > 0) props.onOpenDetail() }} />
+            </>
+          )}
+        </span>
+      </div>
+
+          <div className={styles.cardColumn}><ul className={styles.cards} data-design-node="photo-cards-v8">
             {photos.map((photo) => (
               <PhotoCardV8 key={text(photo.id)} photo={photo} {...props} />
             ))}
-          </ul>
+          </ul>{status === 'pending' ? <p className={styles.listHintV8}>「1枚ずつ大きく見る」にすると、写真を大きくして順に確かめられます（← → で次へ）</p> : null}</div>
           {showRail ? (
             <div className={styles.rail} data-design="Right" data-design-node="photo-rail-v8">
               <section className={styles.railCard} aria-label="報酬の決まり">
@@ -634,7 +618,7 @@ function ReviewListV8(props: ReviewListV8Props) {
               <section className={styles.railCard} aria-label="確認する順">
                 <h2 className={styles.railTitle}>確認する順</h2>
                 <p className={styles.railRow}>古いものから <strong>いまの順</strong></p>
-                <p className={styles.railRow}>会員ランクが高い人を先に <strong>しない（新着順）</strong></p>
+                <p className={styles.railRow}>会員ランクが高い人を先に <strong>しない</strong></p>
               </section>
               <section className={styles.railCard} aria-label="見送り理由の内訳">
                 <h2 className={styles.railTitle}>見送り理由の内訳（今月）</h2>
@@ -665,7 +649,7 @@ function ReviewListV8(props: ReviewListV8Props) {
       {status === 'pending' && props.selectedPendingCount > 0 ? (
         <BulkBar count={props.selectedPendingCount} unit="枚" hint="審査待ちの写真だけをまとめて処理します">
           <Button
-            variant="secondary"
+            variant="primary"
             disabled={!props.selectedPhotosAreLowRisk || props.bulkReviewing || !canEdit}
             title={!props.selectedPhotosAreLowRisk ? 'まとめて採用できるのは、注意候補がない写真だけです' : !canEdit ? '見るだけの権限ではまとめて採用できません' : undefined}
             onClick={props.onBulkApprove}
@@ -708,10 +692,10 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
       </div>
       <div className={styles.cardBody}>
         <div className={styles.cardNameRow}>
-          <p className={styles.cardName}>{name}</p>
+          <p className={styles.cardName} title={name}>{name}</p>
           <span className={styles.cardDate}>{formatPhotoReceivedAt(photo.created_at)}</span>
         </div>
-        <p className={styles.cardOwner}>{text(photo.owner_name) || '名前未取得'}{text(photo.customer_id) ? `・EC-${text(photo.customer_id)}` : ''}</p>
+        <p className={styles.cardOwner} title={`${text(photo.owner_name)} ${text(photo.customer_id)}`}>{text(photo.owner_name) || '名前未取得'}{text(photo.customer_id) ? `・EC-${text(photo.customer_id)}` : ''}</p>
         {text(photo.caption) ? <p className={styles.cardCaption} title={text(photo.caption)}>「{text(photo.caption)}」</p> : null}
         {status === 'adopted' ? (
           <div className={styles.cardChips}>
@@ -732,8 +716,8 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
         ) : null}
         {status === 'pending' ? (
           <div className={styles.cardActions}>
-            <Button variant="secondary" disabled={!props.canEdit || busy} title={!props.canEdit ? '見るだけの権限では見送りできません' : undefined} onClick={() => props.onReject(photoId)}>{'× 見送る'}</Button>
-            <Button variant="secondary" disabled={!props.canEdit || busy} title={!props.canEdit ? '見るだけの権限では採用できません' : undefined} onClick={() => props.onApprove(photoId)} busy={busy} busyLabel="処理中...">{'✓ 採用する'}</Button>
+            <Button variant="secondary" disabled={!props.canEdit || busy} aria-label="× 見送る" title={!props.canEdit ? '見るだけの権限では見送りできません' : undefined} onClick={() => props.onReject(photoId)}><X size={15} aria-hidden="true" />見送る</Button>
+            <Button variant="secondary" disabled={!props.canEdit || busy} aria-label="✓ 採用する" title={!props.canEdit ? '見るだけの権限では採用できません' : undefined} onClick={() => props.onApprove(photoId)} busy={busy} busyLabel="処理中..."><Check size={15} aria-hidden="true" />採用する</Button>
           </div>
         ) : null}
         {status === 'adopted' ? (
