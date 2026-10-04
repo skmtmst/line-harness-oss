@@ -17,7 +17,7 @@ const FIRST_CSS = readFileSync(join(HERE, 'first-step-v8.module.css'), 'utf8')
  */
 describe('シナリオ配信の細かい板', () => {
   it('一覧の閲覧のみに板IDを付ける（X0QrW0）', () => {
-    expect(LIST).toContain("data-design-node={canEdit ? undefined : 'X0QrW0'}")
+    expect(LIST).toContain("data-design-node={canEdit ? 'axFrW' : 'X0QrW0'}")
   })
 
   it('一覧1152（wjfLe）は板1100px未満で畳む', () => {
