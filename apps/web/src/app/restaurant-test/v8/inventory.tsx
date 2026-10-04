@@ -84,7 +84,7 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
     if (!selectedAccountId || !storeId) return
     void restaurantTestApi.inventoryDay(selectedAccountId, storeId, date).then(res => {
       if (current) setDayRows(res.data)
-    }).catch(() => { if (current) setLoadError('在庫を取得できませんでした。再読込してください。') })
+    }).catch(() => { if (current) setLoadError('在庫を読み込めませんでした。再読込してください。') })
     return () => { current = false }
   }, [selectedAccountId, storeId, date, data.inventory, refresh])
   useEffect(() => {
@@ -93,7 +93,7 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
     if (!selectedAccountId || !storeId) return
     void restaurantTestApi.openingHours(selectedAccountId, storeId).then(res => {
       if (current) { setOpening(res.data); setHoursVersion(res.data.version); setHoursDraft(res.data.hours || Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: [] }))) }
-    }).catch(() => { if (current) setHoursError('営業時間を取得できませんでした。再読込してください。') })
+    }).catch(() => { if (current) setHoursError('営業時間を読み込めませんでした。再読込してください。') })
     return () => { current = false }
   }, [selectedAccountId, storeId])
   const rows = useMemo(() => dayRows.slice().sort((a,b) => a.starts_at.localeCompare(b.starts_at)), [dayRows])
@@ -355,7 +355,7 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
               }}>営業時間を保存</Button>
               <Button disabled={busy || !opening} onClick={() => {
                 if(!selectedAccountId || !store) return
-                void restaurantTestApi.openingHours(selectedAccountId,store.id).then(res=>{setOpening(res.data);setHoursVersion(res.data.version);setHoursDraft(res.data.hours || Array.from({length:7},(_,weekday)=>({weekday,periods:[]})));setHoursError('')}).catch(()=>setHoursError('営業時間を取得できませんでした。'))
+                void restaurantTestApi.openingHours(selectedAccountId,store.id).then(res=>{setOpening(res.data);setHoursVersion(res.data.version);setHoursDraft(res.data.hours || Array.from({length:7},(_,weekday)=>({weekday,periods:[]})));setHoursError('')}).catch(()=>setHoursError('営業時間を読み込めませんでした。'))
               }}>最新の営業時間を読み込む</Button>
               <Button variant="primary" disabled={busy || !opening?.version || allocInvalid} onClick={() => {
                 if(!selectedAccountId || !store || !opening) return

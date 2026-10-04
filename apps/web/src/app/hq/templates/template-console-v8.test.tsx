@@ -76,7 +76,7 @@ describe('配布の V8（meBRB）', () => {
     calls.preflight.mockResolvedValue({...checked(),stores:[{...checked().stores[0],textOverride:'本店の案内'}]})
     render(<TemplateConsole type="template" useCanonicalEditors={false}/>)
     fireEvent.click(await screen.findByLabelText('ご案内の操作'))
-    fireEvent.click(screen.getByRole('button',{name:'ご案内を配布'}))
+    fireEvent.click(screen.getByRole('button',{name:'ご案内をアカウントへ配る'}))
     const input=await screen.findByLabelText('銀座本店に配る本文'); expect((input as HTMLTextAreaElement).value).toBe('原本の案内')
     fireEvent.change(input,{target:{value:'本店の案内'}})
     fireEvent.click(screen.getByRole('checkbox',{name:'銀座本店'}))

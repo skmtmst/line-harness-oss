@@ -629,7 +629,7 @@ function AccountDetail() {
       />
       {editSection !== null && (
         <AccountEditModal
-          initialTimezone={theme === 'v8' && canEditTimezone ? account.timezone ?? 'Asia/Tokyo' : undefined}
+          initialTimezone={canEditTimezone ? account.timezone ?? 'Asia/Tokyo' : undefined}
           accountId={account.id}
           initialName={account.name}
           initialChannelId={account.channelId}

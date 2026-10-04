@@ -573,7 +573,7 @@ function OverviewStep({
               className={inputClass}
             />
           </Field>
-          {theme === 'v8' && <Field label="会場の住所" htmlFor="ev-address"><input id="ev-address" className={inputClass} value={draft.venue_address ?? ''} maxLength={1000} onChange={(e) => update('venue_address', e.target.value || null)} /></Field>}
+          {theme === 'v8' && <Field label="会場の住所" htmlFor="ev-address"><input id="ev-address" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink" value={draft.venue_address ?? ''} maxLength={1000} onChange={(e) => update('venue_address', e.target.value || null)} /></Field>}
           <Field label="会場URL" htmlFor="ev-venue-url" note="オンライン開催の場合に入力します。">
             <input
               id="ev-venue-url"

@@ -3,6 +3,7 @@ import React from 'react';
 import {render,screen,fireEvent,waitFor,cleanup} from '@testing-library/react';
 import {afterEach,expect,it,vi} from 'vitest';
 vi.hoisted(()=>{process.env.NEXT_PUBLIC_API_URL='http://worker.test'});
+vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn()})}));
 import {AdEventMappings} from './ad-event-mappings';
 const items=[{pointId:'p',pointName:'購入',eventType:'purchase',provider:'meta',mode:'auto',eventName:'Purchase',automaticEventName:'Purchase',googleActionId:null,version:0},{pointId:'p',pointName:'購入',eventType:'purchase',provider:'google',mode:'auto',eventName:'purchase',automaticEventName:'purchase',googleActionId:null,version:0}];
 afterEach(()=>{cleanup();vi.unstubAllGlobals()});

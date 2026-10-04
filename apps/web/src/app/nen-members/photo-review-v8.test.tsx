@@ -172,7 +172,7 @@ describe('投稿 V8', () => {
     fireEvent.change(screen.getByLabelText('使い始め（日本時間・空ならすぐ）'), { target: { value: '2026-10-15T00:00' } })
     fireEvent.click(screen.getByRole('button', { name: '版を予約する' }))
     await flush()
-    expect(nenMembers.createPhotoRewardPolicyVersion).toHaveBeenCalledWith({ points: 120, summary: '10月の報酬', effectiveFrom: '2026-10-15T00:00:00+09:00', expectedVersion: 3 })
+    expect(nenMembers.createPhotoRewardPolicyVersion).toHaveBeenCalledWith({ points: 120, publicationPoints: 0, summary: '10月の報酬', effectiveFrom: '2026-10-15T00:00:00+09:00', expectedVersion: 3 })
   })
 
   it('閲覧のみでは履歴は見られるが新しい版を作れない', async () => {

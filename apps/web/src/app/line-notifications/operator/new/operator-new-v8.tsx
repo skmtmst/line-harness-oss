@@ -540,7 +540,7 @@ function NewOperatorNotificationV8Inner() {
             </div>
             <div className={styles.fieldGrid}>
               <label className={styles.fieldLabel}>チーム名
-                <input aria-label="チーム名" value={teamName} maxLength={100} disabled={!canWrite || teamBusy} onChange={event => setTeamName(event.target.value)} className="w-full rounded border border-[var(--border)] px-3 py-2" />
+                <input aria-label="チーム名" value={teamName} maxLength={100} disabled={!canWrite || teamBusy} onChange={event => setTeamName(event.target.value)} className="w-full rounded-control border border-hairline px-3 py-2" />
               </label>
               <Button variant="secondary" disabled={!canWrite || teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
             </div>

@@ -291,7 +291,6 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
         stalled: server.reason ?? 'Webhookかシークレットがまだ確かめられていません。',
         todo: 'LINEアカウントを1つ登録して、Webhookをつなぎます。',
       },
-      featureSet: {},
       attributes: {
         done: '終わっています。タグを増やすときはこちらから。',
         todo: 'タグを1つ作ると、友だちを分けて配信できるようになります。',

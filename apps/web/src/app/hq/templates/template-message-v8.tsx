@@ -9,14 +9,13 @@ import {
 } from '@/components/templates/message-template-editor'
 import type { MessageTemplateDefinition } from '@/lib/hq-templates-api'
 import { withUploadedImage } from '@/lib/hq-template-authoring'
-import { ImageUpload } from './template-definition-editor'
+import { CardEditor, ImageUpload } from './template-definition-editor'
 import styles from './template-console.module.css'
 
 /*
  * 板 X4JcOf：メッセージのひな形を作る（V8だけ）。
  * 絵の「ひな形の中身＋右に LINE の見え方＋一段のひな形を保存」。
- * 保存する中身は今の口のまま（名前・分類・形式・画像・本文）。
- * 口に無い欄（タイトル・ボタン）は見た目だけ置かず、報告に残す。
+ * タイトル・ボタンも保存口へ送り、右の見え方と一段の保存を保つ。
  */
 
 const MESSAGE_TYPE_OPTIONS = [
@@ -57,7 +56,9 @@ export default function TemplateMessageFormV8({
   onSave: () => void
 }) {
   const [targetDate, setTargetDate] = useState('')
+  const [advanced, setAdvanced] = useState(false)
   const current = value.template
+  const useCardEditor = Boolean(value.card) || (!advanced && current.id === 'hq-authored-message' && current.messageType === 'text' && !current.carouselActionsJson && !current.questionJson)
   return (
     <>
       {catalogFailed ? (
@@ -104,6 +105,10 @@ export default function TemplateMessageFormV8({
               </label>
             </>
           )}
+          editorContent={useCardEditor ? <>
+            <CardEditor value={value} disabled={disabled} onChange={onChange} onBusyChange={onBusyChange} onReceipt={onReceipt} />
+            {!value.card && <Button disabled={disabled} onClick={() => setAdvanced(true)}>画像・カルーセルの詳細編集を使う</Button>}
+          </> : undefined}
           afterType={(
             <>
               {value.media.map((media) => <p key={media.id} className={styles.muted}>{media.filename}（{Math.ceil(media.sizeBytes / 1024)} KB）<br /><span className={styles.name}>{media.publicUrl ?? media.r2Key}</span></p>)}

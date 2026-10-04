@@ -114,13 +114,13 @@ export function ImageUpload({ purpose, disabled, expectedSize, onUploaded, onBus
   return <div className={styles.field}><span>画像を登録</span><input aria-label={purpose === 'message' ? 'メッセージ画像を選ぶ' : 'リッチメニュー画像を選ぶ'} type="file" accept="image/png,image/jpeg" disabled={disabled || uploading} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; void upload(file) }} /><small className={styles.muted}>{purpose === 'message' ? 'PNG・JPEG、1件8 MiB以下。画像形式では本文に自動設定します。' : 'PNG・JPEG、1 MiB以下。幅2500px、高さ1686pxまたは843px。'}</small>{uploading && <p role="status">画像を登録しています…</p>}{error && <p role="alert">{error}</p>}</div>
 }
 
-function CardEditor({ value, disabled, onChange, onBusyChange, onReceipt }: { value: MessageTemplateDefinition; disabled: boolean; onChange: (next: MessageTemplateDefinition) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: MessageTemplateDefinition['media'][number]) => void }) {
+export function CardEditor({ value, disabled, onChange, onBusyChange, onReceipt }: { value: MessageTemplateDefinition; disabled: boolean; onChange: (next: MessageTemplateDefinition) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: MessageTemplateDefinition['media'][number]) => void }) {
   const card: HqMessageCard = value.card ?? { format: 'text', title: '', body: value.template.messageContent, buttons: [] }
   const [references, setReferences] = useState<HqMessageReference[]>([]), [referenceError, setReferenceError] = useState('')
-  const load = () => hqTemplatesApi.messageReferences().then(rows => { setReferences(rows); setReferenceError('') }).catch(() => setReferenceError('ボタンの参照先を取得できませんでした。入力を残したまま再読み込みできます。'))
+  const load = () => hqTemplatesApi.messageReferences().then(rows => { setReferences(rows); setReferenceError('') }).catch(() => setReferenceError('ボタンの参照先を読み込めませんでした。入力を残したまま再読み込みできます。'))
   useEffect(() => {
     let alive = true
-    void hqTemplatesApi.messageReferences().then(rows => { if (alive) setReferences(rows) }).catch(() => { if (alive) setReferenceError('ボタンの参照先を取得できませんでした。入力を残したまま再読み込みできます。') })
+    void hqTemplatesApi.messageReferences().then(rows => { if (alive) setReferences(rows) }).catch(() => { if (alive) setReferenceError('ボタンの参照先を読み込めませんでした。入力を残したまま再読み込みできます。') })
     return () => { alive = false }
   }, [])
   const update = (next: HqMessageCard) => onChange(withMessageCard(value, next))

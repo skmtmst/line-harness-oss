@@ -316,7 +316,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
   const checkStores = (ids: string[]) => void perform(async () => {
     if (!detail || !ids.length) return
     const overrides = theme==='v8' && type==='template' && 'template' in definition && definition.template.messageType==='text' ? ids.filter(id=>textOverrides[id] !== undefined).map(accountId=>({accountId,text:textOverrides[accountId]})) : undefined
-    const checked = await hqTemplatesApi.preflight(detail.template.id, ids, overrides?.length ? overrides : undefined)
+    const checked = await (overrides?.length ? hqTemplatesApi.preflight(detail.template.id, ids, overrides) : hqTemplatesApi.preflight(detail.template.id, ids))
     // Never execute a preflight that does not match the selected destination set.
     if (checked.stores.length !== ids.length || new Set(checked.stores.map(s => s.accountId)).size !== ids.length || checked.stores.some(s => !ids.includes(s.accountId))) throw new Error('配布先を確認できませんでした。もう一度アカウントを選択してください。')
     if (!alive.current) return

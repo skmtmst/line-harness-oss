@@ -67,7 +67,7 @@ export default function GettingStartedPage() {
       setLoadError(caught)
       setStatus('error')
     }
-  }, [accountLoading, selectedAccountId, theme])
+  }, [accountLoading, selectedAccountId])
 
   useEffect(() => {
     void load()

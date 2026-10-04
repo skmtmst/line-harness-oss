@@ -147,7 +147,7 @@ describe('R73 編集・差替えの入口', () => {
 })
 
  it('V8 saves timezone through PUT and reloads the account', async () => {
-    await renderPage(); clickButton('編集する');
+    await renderPage(); clickButton('編集');
     const input = host.querySelector('input[aria-label="タイムゾーン"]') as HTMLInputElement;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'Europe/Paris');

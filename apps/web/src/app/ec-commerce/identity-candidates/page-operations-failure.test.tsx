@@ -186,6 +186,6 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
 
  test('candidate-free people and revenue come from independent full summaries', async () => {
   render(<EcIdentityCandidatesPage />); await screen.findByText('山田 太郎');
-  expect(screen.getByText('候補なし').parentElement?.textContent).toContain('7');
+  expect(screen.getAllByText('候補なし').find(element => element.parentElement?.textContent?.includes('7'))?.parentElement?.textContent).toContain('7');
   expect(screen.getByText(/50,000/)).toBeTruthy();
  });

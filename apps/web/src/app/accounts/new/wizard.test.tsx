@@ -34,7 +34,7 @@ const checked = {
   },
 }
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); window.localStorage?.clear() })
 beforeEach(() => {
   vi.clearAllMocks()
   calls.connectCheck.mockResolvedValue(checked)
@@ -179,11 +179,12 @@ it('V8の登録前タグを接続確認と登録へ渡す', async () => {
  document.documentElement.dataset.theme='v8';
  try {
   render(<NewLineAccountPage />);
-  fireEvent.click(await screen.findByLabelText('店舗'));
-  next();next();fill('channel-id','123456789');fill('channel-secret','synthetic-secret');fill('login-channel-id','2007123456');fill('login-channel-secret','synthetic-login-secret');next();
-  await checkConnection();
-  expect(calls.connectCheck).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag-own']}));
-  fireEvent.click(screen.getByRole('button',{name:'接続して保存する'}));
+  next();fill('v8-channel-id','123456789');fill('v8-channel-secret','synthetic-secret');fill('v8-login-channel-id','2007123456');fill('v8-login-channel-secret','synthetic-login-secret');next();
+  fireEvent.click(await screen.findByRole('button',{name:'店舗'}));next();
+  fireEvent.click(screen.getByRole('button',{name:'接続して設定する'}));
+  await waitFor(()=>expect(calls.connectCheck).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag-own']})));
+  fireEvent.click(await screen.findByRole('checkbox',{name:/応答メッセージ.*オフ/}));
+  fireEvent.click(screen.getByRole('button',{name:'確認コードを入れて登録する'}));
   await waitFor(()=>expect(calls.connect).toHaveBeenCalledWith(expect.objectContaining({tagIds:['tag-own']}),undefined));
  } finally {document.documentElement.dataset.theme='v7';}
 });

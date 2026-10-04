@@ -250,6 +250,7 @@ export function MessageTemplateEditor({
   carouselHref,
   beforeType,
   afterType,
+  editorContent,
   footer,
 }: {
   value: MessageTemplateEditorValue
@@ -269,6 +270,7 @@ export function MessageTemplateEditor({
   carouselHref?: string
   beforeType?: ReactNode
   afterType?: ReactNode
+  editorContent?: ReactNode
   footer?: ReactNode
 }) {
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
@@ -305,6 +307,7 @@ export function MessageTemplateEditor({
     <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
       <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
         {beforeType}
+        {editorContent ?? <>
         <Field label="種類" htmlFor="tp-type" note={typeNote}>
           <Select id="tp-type" aria-label="メッセージ形式" value={value.messageType} disabled={disabled} onChange={(messageType) => onChange({ ...value, messageType })} options={[...typeOptions]} />
         </Field>
@@ -342,6 +345,7 @@ export function MessageTemplateEditor({
           <p className="text-ink-secondary mb-1 text-sm font-medium">差し込む</p>
           <TemplateInsertControls accountId={referenceAccountId} state={referenceState} accountLabel={referenceAccountLabel} targetDate={targetDate} disabled={disabled} unavailableHint={referenceUnavailableHint} onTargetDateChange={onTargetDateChange} friendFields={references.friendFields} commonVars={references.commonVars} onInsert={insert} />
         </div>
+        </>}
         <section aria-label="本文内のURL" className="border-hairline rounded-card border p-4">
           <div className="flex items-center justify-between gap-3"><p className="text-ink text-sm font-semibold">本文に入れたURLの扱い</p><span className="text-ink-faint text-xs font-semibold">短縮して、クリックを数える</span></div>
           <div className="border-hairline mt-3 overflow-hidden rounded-control border text-xs">

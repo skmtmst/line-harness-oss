@@ -38,6 +38,7 @@ export interface ActionOptions {
  * 選べるものだけでも出すほうがよい。
  */
 export function useActionOptions(): ActionOptions {
+  const theme = useAdminTheme()
   const { selectedAccountId } = useAccount()
   const [options, setOptions] = useState<ActionOptions>({
     tags: [],
@@ -61,7 +62,7 @@ export function useActionOptions(): ActionOptions {
         api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }),
         api.scenarios.list({ accountId: selectedAccountId }),
         api.commonVars.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }),
-        Promise.resolve().then(() => api.notifications.operatorRules.list(selectedAccountId)),
+        theme === 'v8' ? Promise.resolve().then(() => api.notifications.operatorRules.list(selectedAccountId)) : Promise.resolve({success:true as const, data:{items:[]}}),
       ])
       if (cancelled) return
       setOptions({
@@ -91,7 +92,7 @@ export function useActionOptions(): ActionOptions {
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, theme])
 
   return options
 }

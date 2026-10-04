@@ -955,7 +955,7 @@ function viewsText(value: unknown): string {
 /**
  * 公式サイト掲載（SyQA1）。列：写真・ペット・どこで使っているか・
  * この30日に見た・公開の同意・掲載先から外す。右に出すときの決めごと。
- * 30日集計は未接続なので「—」。掲載先の編集・撤回の整理・外した履歴を保つ。
+ * 30日集計は日別の記録から表示し、記録がなければ「—」。掲載先の編集・撤回の整理・外した履歴を保つ。
  */
 function PublicationsV8({
   accountId,
@@ -970,6 +970,7 @@ function PublicationsV8({
 }) {
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [items, setItems] = useState<PublicationItem[]>([])
+  const [orderItems, setOrderItems] = useState<PublicationItem[] | null>(null)
   const [topPhotoId, setTopPhotoId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   const [busyId, setBusyId] = useState('')
@@ -1015,11 +1016,11 @@ function PublicationsV8({
         setItems(response.data.items ?? [])
         setPendingWithdrawals(response.data.pendingWithdrawals ?? [])
         setWithdrawnItems(response.data.withdrawnItems ?? [])
-        setTopPhotoId(response.data.summary.topPhoto ? text(response.data.summary.topPhoto.id) : null)
+        setTopPhotoId(response.data.summary.topPhoto30Days ? text(response.data.summary.topPhoto30Days.id) : null)
       }
       setState('ready')
     } catch (error) {
-      if (token !== generation.current) return
+      if (sequence !== loadSequence.current) return
       setItems([])
       setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
@@ -1146,7 +1147,7 @@ function PublicationsV8({
                           <span className={styles.petSubV8}>{Number(item.hide_owner_name) === 0 ? '名前を出しています' : '名前は伏せています'}</span>
                         </Td>
                         <Td><span className="block truncate text-label text-ink-secondary" title={placementLabels(item)}>{placementLabels(item)}</span></Td>
-                        <Td align="right"><span className="text-label tabular-nums text-ink">{viewsText(item.view_count_30d)}</span></Td>
+                        <Td align="right"><span className="text-label tabular-nums text-ink">{viewsText(item.view_count_30_days)}</span></Td>
                         <Td>{consented ? <Chip tone="ok">同意あり</Chip> : <Chip tone="neutral">未取得</Chip>}</Td>
                         <Td align="right">
                           <div className={styles.publicationActions}><Button
@@ -1182,7 +1183,7 @@ function PublicationsV8({
                 <li>外しても採用時のマイルは戻りません</li>
                 <li>原本は公開しません。選んだ場所へ公開用画像を出します</li>
               </ul>
-              <Button variant="secondary" disabled title="掲載順を保存するAPIは未接続です">並び順を変える</Button>
+              <Button variant="secondary" disabled={!canEdit || Boolean(busyId)} onClick={() => void openOrder()}>並び順を変える</Button>
             </section>
           </div>
         </div>

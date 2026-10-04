@@ -497,3 +497,7 @@ shared-button-importer components/tenant-suspended.tsx
 shared-button-importer components/ui/kpi-collapse.tsx
 shared-button-importer components/webinars/webinar-notifications.tsx
 shared-button-importer lib/unsaved-leave-dialog.tsx
+
+shared-button-importer app/inflow-links/ad-connection-dialog.tsx
+shared-button-importer app/inflow-links/ad-event-mappings.tsx
+shared-button-importer components/events/event-application-preview.tsx

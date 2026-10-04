@@ -164,7 +164,7 @@ export default function AccountBrowser({
     setTagSaving(true)
     setTagError('')
     try {
-      const res = await api.lineAccountTags.create({ name, color: tagColor || null })
+      const res = await api.lineAccountTags.create({ name, color: tagColor ? getComputedStyle(document.querySelector('[data-theme="v8"]') ?? document.documentElement).getPropertyValue(tagColor).trim() : null })
       if (!res.success) throw new Error(res.error)
       setTagName('')
       setTagDialog(false)
@@ -424,7 +424,7 @@ export default function AccountBrowser({
             onChange={(event) => setTagName(event.target.value)}
             className="w-full"
           />
-          <Select aria-label="タグの色" value={tagColor} onChange={setTagColor} disabled={tagSaving} options={[{value:'',label:'なし'},{value:'#4285f4',label:'青'},{value:'#087a3e',label:'緑'},{value:'#b65d08',label:'橙'},{value:'#bf2e2e',label:'赤'},{value:'#8057a8',label:'紫'}]} />
+          <Select aria-label="タグの色" value={tagColor} onChange={setTagColor} disabled={tagSaving} options={[{value:'',label:'なし'},{value:'--color-status-info',label:'青'},{value:'--color-accent-deep',label:'緑'},{value:'--color-status-warn-deep',label:'橙'},{value:'--color-status-danger',label:'赤'},{value:'--color-chip-alt',label:'紫'}]} />
           {tags.map(item => <div key={item.id} className="flex items-center justify-between gap-2 text-label"><span>{item.name}</span>{deleteTagId === item.id ? <div className="flex gap-2"><span>消しますか？</span><Button size="compact" disabled={tagSaving} onClick={() => void removeTag(item.id)}>消す</Button><Button size="compact" onClick={() => setDeleteTagId(null)}>やめる</Button></div> : <Button size="compact" disabled={tagSaving} onClick={() => setDeleteTagId(item.id)}>削除</Button>}</div>)}
           {tagError ? <p className="text-label text-danger" role="alert">{tagError}</p> : null}
         </div>
