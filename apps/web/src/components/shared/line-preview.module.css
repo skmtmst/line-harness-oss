@@ -245,3 +245,6 @@
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .phoneRoot { -webkit-font-smoothing: auto; }
+
+/* LINEの時刻は正本のInterと同じ比例幅。管理画面の等幅数字を継承しない。 */
+[data-theme='v8'] .messageTime { font-variant-numeric: normal; }
