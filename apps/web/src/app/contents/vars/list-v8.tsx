@@ -41,10 +41,8 @@ import ListRange from '@/components/ui/list-range'
 import ListState from '@/components/shared/list-state'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import Pagination from '@/components/shared/pagination'
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
-import InlineEdit from '@/components/shared/inline-edit'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
-import { withViewTransition } from '@/components/shared/view-transition'
+import { notifyToast } from '@/components/shared/toast'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { RowActions } from '@/components/shared/row-actions'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -374,7 +372,6 @@ function CommonVarsListV8Inner() {
   const [statusTarget, setStatusTarget] = useState<CommonVar | null>(null)
   const [statusAction, setStatusAction] = useState<'stop' | 'resume'>('stop')
   const [statusReason, setStatusReason] = useState('')
-  const [statusBusy, setStatusBusy] = useState(false)
   const [statusError, setStatusError] = useState('')
   /* 右から出る詳細パネル（C①）。URL に今の行を残す。 */
   const [activeId, setActiveId] = useDetailPanelUrl('row')
@@ -392,43 +389,63 @@ function CommonVarsListV8Inner() {
   }
 
   const closeStatusDialog = () => {
-    if (statusBusy) return
     setStatusTarget(null)
     setStatusReason('')
     setStatusError('')
   }
 
-  const applyStatus = async () => {
-    if (!statusTarget || !selectedAccountId || statusBusy) return
+  /*
+   * 止める・再開する（理由は版履歴に残すため窓で聞く）。窓を閉じた瞬間に
+   * 画面へ映し、裏で保存する。失敗したら元に戻して、知らせの「もう一度」で
+   * やり直せる。409（別の担当者が先に更新）は読み直しを促す。
+   */
+  const saveStatus = (
+    targetId: string,
+    to: 'stopped' | 'active',
+    reason: string,
+    verb: string,
+  ) => {
+    const accountId = selectedAccountId
+    if (!accountId) return
+    const previous = items
+    setItems((rows) => rows.map((v) => (v.id === targetId ? { ...v, status: to } : v)))
+    void (async () => {
+      try {
+        const res = await api.commonVars.setStatus(targetId, accountId, { to, changeReason: reason })
+        if (!res.success) throw new Error(res.error ?? 'status_failed')
+        void load()
+      } catch (e) {
+        setItems(previous)
+        const conflicted = e instanceof ApiError && e.status === 409
+        notifyToast(
+          conflicted
+            ? '別の担当者が先に更新しました。最新内容を読み直してください。'
+            : `${verb}ませんでした。通信を確かめて、もう一度お試しください。`,
+          {
+            tone: 'error',
+            actionLabel: conflicted ? undefined : 'もう一度',
+            onAction: conflicted ? undefined : () => saveStatus(targetId, to, reason, verb),
+          },
+        )
+        void load()
+      }
+    })()
+  }
+
+  const applyStatus = () => {
+    if (!statusTarget || !selectedAccountId) return
     const reason = statusReason.trim()
     if (!reason) {
       setStatusError(statusAction === 'stop' ? '止める理由を入力してください' : '再開する理由を入力してください')
       return
     }
-    setStatusBusy(true)
+    const target = statusTarget
+    const to = statusAction === 'stop' ? 'stopped' : 'active'
+    const verb = statusAction === 'stop' ? '止められ' : '再開でき'
+    setStatusTarget(null)
+    setStatusReason('')
     setStatusError('')
-    try {
-      const res = await api.commonVars.setStatus(statusTarget.id, selectedAccountId, {
-        to: statusAction === 'stop' ? 'stopped' : 'active',
-        changeReason: reason,
-      })
-      if (!res.success) {
-        setStatusError(res.error)
-        return
-      }
-      setStatusTarget(null)
-      setPanelStatus(false)
-      setStatusReason('')
-      await load()
-    } catch (e) {
-      setStatusError(
-        e instanceof ApiError && e.status === 409
-          ? '別の担当者が先に更新しました。最新内容を読み直してください。'
-          : '状態を変えられませんでした。通信を確かめて、もう一度お試しください。',
-      )
-    } finally {
-      setStatusBusy(false)
-    }
+    saveStatus(target.id, to, reason, verb)
   }
 
   /*
@@ -875,6 +892,40 @@ function CommonVarsListV8Inner() {
 
   const allOnPageSelected = current.length > 0 && current.every((item) => selected.has(item.id))
 
+  /* 見出しは本物と骨組みで同じものを出す（二重に書かない）。 */
+  const varsTableHead = (
+    <thead>
+      <tr>
+        {canWrite ? (
+          <th className={styles.cellCheck} scope="col">
+            <Checkbox
+              checked={allOnPageSelected}
+              onCheckedChange={() =>
+                setSelected((prev) => {
+                  const next = new Set(prev)
+                  for (const item of current) {
+                    if (allOnPageSelected) next.delete(item.id)
+                    else next.add(item.id)
+                  }
+                  return next
+                })
+              }
+              aria-label="このページの共通情報をすべて選ぶ"
+            />
+          </th>
+        ) : null}
+        <th scope="col">共通情報（差し込み名）</th>
+        <th scope="col">中身</th>
+        <th scope="col">状態</th>
+        <th scope="col">使っている所</th>
+        <th scope="col" className={styles.cellMenu}>
+          <span className="sr-only">操作</span>
+        </th>
+      </tr>
+    </thead>
+  )
+  const listLoading = loading && items.length === 0 && !error
+
   const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
   const folderFailureNote = folderFailure ? (
     <div role="alert" className="space-y-1.5">
@@ -1181,10 +1232,41 @@ function CommonVarsListV8Inner() {
                 </span>
               </div>
 
-              {loading ? (
-                <div className={styles.stateCard}>
-                  <ListState kind="loading" title="共通情報を読み込んでいます" />
-                </div>
+              {/*
+                読み込み中でも前のデータを出して裏で取り直す（取り直しでは
+                items を消さない）。初回だけ骨組み（出来上がりの表と同じ形・5行）。
+              */}
+              <div aria-busy={loading || undefined}>
+              {listLoading ? (
+                <DelayedSkeleton
+                  loading
+                  skeleton={
+                    <div className={styles.tableWrap} aria-hidden="true">
+                      <table className={styles.table}>
+                        {varsTableHead}
+                        <tbody>
+                          {[0, 1, 2, 3, 4].map((i) => (
+                            <tr key={i}>
+                              {canWrite ? <td><Skeleton width={18} height={18} /></td> : null}
+                              <td>
+                                <span className="block">
+                                  <Skeleton width="60%" height={14} />
+                                </span>
+                                <span className="mt-1 block">
+                                  <Skeleton width="100%" height={12} />
+                                </span>
+                              </td>
+                              <td><Skeleton width="100%" height={14} /></td>
+                              <td><Skeleton width={64} height={22} /></td>
+                              <td><Skeleton width={56} height={14} /></td>
+                              <td><Skeleton width={20} height={20} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                />
               ) : error ? (
                 <div className={styles.stateCard}>
                   {isForbidden(listFailure) ? (
@@ -1228,36 +1310,7 @@ function CommonVarsListV8Inner() {
                 >
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>
-                    <thead>
-                      <tr>
-                        {canWrite ? (
-                          <th className={styles.cellCheck} scope="col">
-                            <Checkbox
-                              checked={allOnPageSelected}
-                              onCheckedChange={() =>
-                                setSelected((prev) => {
-                                  const next = new Set(prev)
-                                  for (const item of current) {
-                                    if (allOnPageSelected) next.delete(item.id)
-                                    else next.add(item.id)
-                                  }
-                                  return next
-                                })
-                              }
-                              aria-label="このページの共通情報をすべて選ぶ"
-                            />
-                          </th>
-                        ) : null}
-                        <th scope="col">共通情報（差し込み名）</th>
-                        <th scope="col">中身</th>
-                        <th scope="col">状態</th>
-                        <th scope="col">使っている所</th>
-                        <th scope="col">更新・次回</th>
-                        <th scope="col" className={styles.cellMenu}>
-                          <span className="sr-only">操作</span>
-                        </th>
-                      </tr>
-                    </thead>
+                    {varsTableHead}
                     <tbody>
                       {current.map((item) => {
                         const badge = stateBadge(item)
@@ -1342,6 +1395,7 @@ function CommonVarsListV8Inner() {
                 </div>
                 </ContextMenu>
               )}
+              </div>
 
               {listFailed ? null : (
                 <div className={styles.foot}>
@@ -1484,21 +1538,17 @@ function CommonVarsListV8Inner() {
               : `止めているあいだ、この共通情報を差し込んだ配信は送られません（${formatNumber(statusTarget.usageCount)}か所）。あとで再開できます。`
             : 'この共通情報を再び配信で使えるようにします。'
         }
-        busy={statusBusy}
         error={statusError || undefined}
         onCancel={closeStatusDialog}
         footer={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button type="button" onClick={closeStatusDialog} disabled={statusBusy}>
+            <Button type="button" onClick={closeStatusDialog}>
               キャンセル
             </Button>
             <Button
               type="button"
               variant="primary"
-              onClick={() => void applyStatus()}
-              disabled={statusBusy}
-              busy={statusBusy}
-              busyLabel={statusAction === 'stop' ? '止めています…' : '再開しています…'}
+              onClick={() => applyStatus()}
             >
               {statusAction === 'stop' ? '止める' : '再開する'}
             </Button>
@@ -1820,7 +1870,7 @@ function CommonVarsListV8Switch() {
 
 export default function CommonVarsListV8() {
   return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+    <Suspense fallback={null}>
       <CommonVarsListV8Switch />
     </Suspense>
   )

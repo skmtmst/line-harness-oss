@@ -477,44 +477,6 @@
   opacity: 0.5;
 }
 
-/* 読み込み中の骨格の行。 */
-.skeletonRows {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
-}
-
-.skeletonRow {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 12px;
-  border-bottom: 1px solid var(--color-hairline);
-}
-
-.skeletonRow:last-child {
-  border-bottom: 0;
-}
-
-.skeletonDot {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-sunken);
-}
-
-.skeletonBar {
-  height: 12px;
-  flex: 1;
-  border-radius: var(--radius-mini);
-  background: var(--color-canvas-sunken);
-}
-
 /* ページ送りの行。左に件数、右にページ送り。 */
 .pagerRow {
   display: flex;

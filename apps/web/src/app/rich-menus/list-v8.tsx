@@ -46,6 +46,8 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
+import { runOptimistic } from '@/lib/undoable'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import {
@@ -61,7 +63,7 @@ import {
   sameDeleteImpactRequest,
   type DeleteImpactRequest,
 } from './delete-impact'
-import { moveTargetingGroup, orderTargetingGroups } from './targeting-order'
+import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from './targeting-order'
 import { ExternalImportWorkspace, type LineMenu } from './external-import'
 import { richMenuError, richMenuErrorAll } from './rich-menu-errors'
 import styles from './list-v8.module.css'
@@ -408,21 +410,39 @@ export default function RichMenusListV8() {
     return orderTargetingGroups(res.data.items)
   }, [groups, groupTotal, selectedAccount?.id])
 
-  const applyOrderedIds = useCallback(async (orderedIds: string[]) => {
-    if (!selectedAccount?.id) return
+  /*
+   * 並べ替えは押した瞬間に画面を変えて、裏で保存する。
+   * 全件が見えているときだけ先に並べる（ページ送り中は保存後に読み直す）。
+   * 失敗したら元の順番に戻して、知らせの「もう一度」でやり直せる。
+   */
+  const applyOrderedIds = useCallback((orderedIds: string[], notice: string) => {
+    if (!selectedAccount?.id || reorderBusy) return
+    const accountId = selectedAccount.id
+    const fullView = groups.length === groupTotal && orderedIds.length === groups.length
+    const previous = groups
+    const optimistic = fullView ? withNormalizedPriority(groups, orderedIds) : null
+    if (optimistic) setGroups(optimistic)
+    setMoveNotice(notice)
     setReorderBusy(true)
-    try {
-      const res = await api.richMenuGroups.reorderPriorities(selectedAccount.id, orderedIds)
-      if (!res.success) throw new Error(res.error ?? '並び替え失敗')
-      // 並び替えで変わるのは一覧だけ。集計・外部状態は取り直さない（v7 と同じ）。
-      await loadList()
-      setActionError(null)
-    } catch (e) {
-      setActionError(richMenuError(e, 'reorder'))
-    } finally {
-      setReorderBusy(false)
-    }
-  }, [loadList, selectedAccount?.id])
+    runOptimistic({
+      request: async () => {
+        const res = await api.richMenuGroups.reorderPriorities(accountId, orderedIds)
+        if (!res.success) throw new Error(res.error ?? 'reorder_failed')
+      },
+      revert: () => {
+        if (optimistic) setGroups(previous)
+        setReorderBusy(false)
+      },
+      failureMessage: '順番を変えられませんでした。通信を確かめて、もう一度お試しください。',
+      retry: () => applyOrderedIds(orderedIds, notice),
+      onSuccess: () => {
+        setReorderBusy(false)
+        setActionError(null)
+        // 並び替えで変わるのは一覧だけ。集計・外部状態は取り直さない（v7 と同じ）。
+        void loadList()
+      },
+    })
+  }, [groups, groupTotal, loadList, reorderBusy, selectedAccount?.id])
 
   const keyboardMove = useCallback(async (id: string, direction: -1 | 1) => {
     if (reorderDisabledReason) return
@@ -433,8 +453,10 @@ export default function RichMenusListV8() {
     }
     const updates = moveTargetingGroup(ordered, id, direction)
     if (!updates) return
-    setMoveNotice(`「${ordered.find((g) => g.id === id)?.name ?? 'メニュー'}」を${direction === -1 ? '1つ上' : '1つ下'}へ動かしました`)
-    void applyOrderedIds(updates.map((u) => u.id))
+    applyOrderedIds(
+      updates.map((u) => u.id),
+      `「${ordered.find((g) => g.id === id)?.name ?? 'メニュー'}」を${direction === -1 ? '1つ上' : '1つ下'}へ動かしました`,
+    )
   }, [applyOrderedIds, fullOrderedGroups, reorderDisabledReason])
 
   const dropOn = useCallback(async (targetId: string) => {
@@ -452,8 +474,7 @@ export default function RichMenusListV8() {
     const working = [...ordered]
     const [moved] = working.splice(fromIndex, 1)
     working.splice(targetIndex, 0, moved)
-    setMoveNotice(`「${moved.name}」の順番を変えました`)
-    void applyOrderedIds(working.map((g) => g.id))
+    applyOrderedIds(working.map((g) => g.id), `「${moved.name}」の順番を変えました`)
   }, [applyOrderedIds, dragId, fullOrderedGroups, reorderDisabledReason])
 
   function beginImpactRequest(accountId: string, groupId: string): DeleteImpactRequest {
@@ -727,17 +748,64 @@ export default function RichMenusListV8() {
     : null
 
   /* ===== 一覧の中身（設計 `f3SoAm`：空・絞り込み0件・読み込み中・読み込めなかった） ===== */
-  const listBody = loading ? (
-    <div className={styles.skeletonRows} aria-label="読み込み中">
-      {[0, 1, 2, 3].map((i) => (
-        <div key={i} className={styles.skeletonRow}>
-          <span className={styles.skeletonDot} />
-          <span className={styles.skeletonBar} />
-          <span className={styles.skeletonBar} style={{ flex: 0.6 }} />
-          <span className={styles.skeletonBar} style={{ flex: 0.4 }} />
-        </div>
-      ))}
+  /*
+   * 読み込み中でも前のデータを出して裏で取り直す（取り直しでは groups を
+   * 消さない）。初回だけ骨組み（出来上がりの表と同じ形・5行）。
+   */
+  const listLoading = loading && groups.length === 0 && !error
+  /* 見出しは本物と骨組みで同じものを出す（二重に書かない）。 */
+  const menuTableColumns = (
+    <colgroup>
+      <col style={{ width: 72 }} />
+      <col />
+      <col style={{ width: '18%' }} />
+      <col style={{ width: 110 }} />
+      <col style={{ width: 110 }} />
+      <col style={{ width: 44 }} />
+    </colgroup>
+  )
+  const menuTableHead = (
+    <thead>
+      <tr>
+        <th>順</th>
+        <th>メニュー（大きさ・ボタン）</th>
+        <th>誰に出すか</th>
+        <th>状態</th>
+        <th>今月押された</th>
+        <th aria-label="操作" />
+      </tr>
+    </thead>
+  )
+  /* 出来上がりの表と同じ幅・高さの骨組み。入れ替わってもガタつかない。 */
+  const tableSkeleton = (
+    <div className={styles.tableWrap} aria-hidden="true">
+      <table className={styles.table}>
+        {menuTableColumns}
+        {menuTableHead}
+        <tbody>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <tr key={i}>
+              <td><Skeleton width={32} height={20} /></td>
+              <td>
+                <span className="flex items-center gap-2">
+                  <Skeleton width={52} height={36} />
+                  <span className="min-w-0 flex-1">
+                    <Skeleton width="100%" height={14} />
+                  </span>
+                </span>
+              </td>
+              <td><Skeleton width="100%" height={14} /></td>
+              <td><Skeleton width={64} height={22} /></td>
+              <td><Skeleton width={56} height={14} /></td>
+              <td><Skeleton width={20} height={20} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
+  )
+  const listBody = listLoading ? (
+    <DelayedSkeleton loading skeleton={tableSkeleton} />
   ) : error ? (
     <div className={styles.stateCard}>
       <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
@@ -793,26 +861,8 @@ export default function RichMenusListV8() {
       </span>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
-          <colgroup>
-            <col style={{ width: 72 }} />
-            <col />
-            <col style={{ width: '18%' }} />
-            <col style={{ width: 110 }} />
-            <col style={{ width: 110 }} />
-            <col style={{ width: 110 }} />
-            <col style={{ width: 44 }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>順</th>
-              <th>メニュー（大きさ・ボタン）</th>
-              <th>誰に出すか</th>
-              <th>状態</th>
-              <th>今月押された</th>
-              <th>更新日</th>
-              <th aria-label="操作" />
-            </tr>
-          </thead>
+          {menuTableColumns}
+          {menuTableHead}
           <tbody>
             {groups.map((g) => (
               <tr
@@ -1161,7 +1211,9 @@ export default function RichMenusListV8() {
               />
             </div>
 
-            {listBody}
+            <div aria-busy={loading || undefined}>
+              {listBody}
+            </div>
           </div>
         </div>
       )}
