@@ -5940,6 +5940,28 @@ const spec = {
         },
       },
     },
+    '/api/booking/admin/auto-rules': {
+      get: {
+        tags: ['Booking'],
+        summary: '人の予約の自動で合わせるルールを取得',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '7項目のルール（無ければ既定）' },
+          '400': { description: 'account_id 未指定' },
+        },
+      },
+      put: {
+        tags: ['Booking'],
+        summary: '人の予約の自動で合わせるルールを保存',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['excludeCalendarBlock', 'writeBackToCalendar', 'autoAssign', 'mergeDuplicates', 'conflictNotify', 'unconnectedNotify', 'dailyLimitNotify'], properties: { excludeCalendarBlock: { type: 'boolean' }, writeBackToCalendar: { type: 'boolean' }, autoAssign: { type: 'boolean' }, mergeDuplicates: { type: 'boolean' }, conflictNotify: { type: 'boolean' }, unconnectedNotify: { type: 'boolean' }, dailyLimitNotify: { type: 'boolean' } } } } } },
+        responses: {
+          '200': { description: '保存したルール' },
+          '400': { description: 'account_id 未指定または真偽値でない項目がある' },
+          '403': { description: '予約設定の権限がない' },
+        },
+      },
+    },
     '/api/booking/admin/conflicts': {
       get: {
         tags: ['Booking'],

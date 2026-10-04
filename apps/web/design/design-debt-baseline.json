@@ -105,6 +105,9 @@
   "app/booking/menus/new/page.tsx": {
     "unresolved-classname": 11
   },
+  "app/booking/menus/auto-rules-tab-v8.tsx": {
+    "unresolved-classname": 9
+  },
   "app/booking/menus/settings-v8.tsx": {
     "unresolved-classname": 208
   },
@@ -482,6 +485,9 @@
   },
   "app/restaurant-test/v8/organization.tsx": {
     "unresolved-classname": 58
+  },
+  "app/restaurant-test/v8/store-auto-rules-tab.tsx": {
+    "unresolved-classname": 10
   },
   "app/restaurant-test/v8/reservation-phone.tsx": {
     "unresolved-classname": 33
