@@ -9079,16 +9079,19 @@ export const api = {
         }),
     },
     images: {
-      list: (params?: { projectId?: string; favorite?: boolean; preset?: string; q?: string; before?: string; limit?: number }) => {
+      list: (params?: import("@line-crm/shared").HqBannerImageQuery) => {
         const q = new URLSearchParams()
         if (params?.projectId) q.set('projectId', params.projectId)
         if (params?.favorite) q.set('favorite', '1')
+        if (params?.delivered !== undefined) q.set('delivered', params.delivered ? '1' : '0')
+        if (params?.shape) q.set('shape', params.shape)
+        if (params?.withCounts) q.set('withCounts', '1')
         if (params?.preset) q.set('preset', params.preset)
         if (params?.q) q.set('q', params.q)
         if (params?.before) q.set('before', params.before)
         if (params?.limit) q.set('limit', String(params.limit))
         const query = q.toString()
-        return fetchApi<ApiResponse<BannerImage[]> & { nextBefore?: string | null }>(
+        return fetchApi<ApiResponse<BannerImage[]> & { nextBefore?: string | null; counts?: import("@line-crm/shared").HqBannerImageCounts }>(
           `/api/hq/banners/images${query ? `?${query}` : ''}`,
         )
       },

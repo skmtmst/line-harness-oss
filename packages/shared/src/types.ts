@@ -2555,3 +2555,10 @@ export interface AutoReplyRunsResponse {
     offset: number;
   };
 }
+
+export interface HqBannerImageQuery {
+  projectId?: string; favorite?: boolean; delivered?: boolean; preset?: string;
+  shape?: 'square' | 'landscape' | 'portrait' | 'rich_menu';
+  q?: string; before?: string; limit?: number; withCounts?: boolean;
+}
+export interface HqBannerImageCounts { all: number; favorite: number; delivered: number; unused: number }
