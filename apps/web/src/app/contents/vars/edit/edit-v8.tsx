@@ -917,11 +917,11 @@ function EditCommonVarV8Inner() {
                 <h2 id="cv-edit-period-heading" className={styles.cardTitle}>使える期間</h2>
                 <div className={styles.fieldBlock}>
                   <label htmlFor="cv-valid-from" className={styles.fieldLabel}>始まり</label>
-                  <DateTimeField id="cv-valid-from" value={validFrom} onChange={(v) => { setSaved(false); setValidFrom(v) }} />
+                  <DateTimeField id="cv-valid-from" value={validFrom} placeholder="指定なし" onChange={(v) => { setSaved(false); setValidFrom(v) }} />
                 </div>
                 <div className={styles.fieldBlock}>
                   <label htmlFor="cv-valid-until" className={styles.fieldLabel}>終わり</label>
-                  <DateTimeField id="cv-valid-until" value={validUntil} onChange={(v) => { setSaved(false); setValidUntil(v) }} />
+                  <DateTimeField id="cv-valid-until" value={validUntil} placeholder="指定なし" onChange={(v) => { setSaved(false); setValidUntil(v) }} />
                 </div>
                 <div className={styles.fieldBlock}>
                   <label htmlFor="cv-expiry-behavior" className={styles.fieldLabel}>期間外の動き</label>
@@ -948,6 +948,7 @@ function EditCommonVarV8Inner() {
                         type={item.type === 'number' ? 'number' : 'text'}
                         value={fallbackValue}
                         onChange={(e) => { setSaved(false); setFallbackValue(e.target.value) }}
+                        placeholder="お問い合わせください"
                         className={styles.fieldInput}
                       />
                     )}
@@ -966,6 +967,7 @@ function EditCommonVarV8Inner() {
                     value={memo}
                     onChange={(e) => { setSaved(false); setMemo(e.target.value) }}
                     maxLength={1000}
+                    placeholder="店舗ごとに違うときは店舗の共通情報へ"
                     className={styles.fieldInput}
                   />
                 </div>
@@ -1145,7 +1147,7 @@ function EditCommonVarV8Inner() {
                     title={canWrite ? undefined : '閲覧のみのため保存できません'}
                   >
                     {impactState === 'ready' && impact && usageTotal !== null
-                      ? `✓ ${formatNumber(usageTotal)}か所に反映して保存`
+                      ? `${formatNumber(usageTotal)}か所に反映して保存`
                       : '保存する'}
                   </Button>
                 )}
