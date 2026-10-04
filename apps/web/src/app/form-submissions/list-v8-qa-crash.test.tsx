@@ -36,6 +36,9 @@ const FORM_PAGE = {
 
 /* 試験ごとに差し替える未割り当て口の応答 */
 let unassignedData: unknown = []
+const formsDeleteImpact = vi.hoisted(() => vi.fn())
+const formsUpdate = vi.hoisted(() => vi.fn())
+const foldersCreate = vi.hoisted(() => vi.fn())
 /* 読み込み中試験：ここに入れた先頭の口は返さず止める */
 let pendingPrefixes: string[] = []
 /* 並べ替え試験：箱の一覧と入れ替え口の記録 */
@@ -64,8 +67,10 @@ vi.mock('@/lib/api', async importOriginal => {
       folders: {
         ...actual.api.folders,
         list: async () => ({ success: true, data: folderFixtures ?? [] }),
+        create: foldersCreate,
         swapOrder: actual.api.folders.swapOrder,
       },
+      forms: { ...actual.api.forms, deleteImpact: formsDeleteImpact, update: formsUpdate },
       listStats: { get: async () => ({ success: true, data: null }) },
     },
   }
@@ -90,6 +95,12 @@ const flush = async (n = 20) => {
 }
 beforeEach(() => {
   unassignedData = []
+  formsDeleteImpact.mockReset()
+  formsUpdate.mockReset()
+  foldersCreate.mockReset()
+  formsDeleteImpact.mockResolvedValue({ success: true, data: { contentRevision: 7 } })
+  formsUpdate.mockResolvedValue({ success: true, data: {} })
+  foldersCreate.mockResolvedValue({ success: true, data: { id: 'f1', name: '箱' } })
   pendingPrefixes = []
   folderFixtures = null
   swapOrderCalls.length = 0
@@ -154,6 +165,113 @@ describe('管理者確認の切り替え', () => {
     await flush()
     expect(errors.map(String).join('\n')).toBe('')
     expect(host.textContent).toContain('来店アンケート')
+  })
+})
+
+/* V8「サクサク感」C①・D・E：行→詳細パネル・右クリック・つながる移り変わり。 */
+describe('行の詳細パネルと右クリック', () => {
+  const detailButton = () => {
+    const found = [...host.querySelectorAll('button')]
+      .find((b) => b.getAttribute('aria-label') === '「来店アンケート」の詳細を見る')
+    expect(found, '行名のボタンがある').toBeTruthy()
+    return found!
+  }
+
+  it('行を押すと右の詳細パネルが開く', async () => {
+    await act(async () => { root.render(<FormSubmissionsListV8 />) })
+    await flush()
+    await act(async () => { fireEvent.click(detailButton()) })
+    await flush()
+    const panel = host.querySelector('[data-design-part="detail-panel"]')
+    expect(panel, '詳細パネルが開く').toBeTruthy()
+    expect(panel?.textContent).toContain('来店アンケート')
+    expect(panel?.textContent).toContain('友だち情報')
+    expect(errors.map(String).join('\n')).toBe('')
+  })
+
+  it('行を右クリックすると「…」と同じ操作が出る', async () => {
+    await act(async () => { root.render(<FormSubmissionsListV8 />) })
+    await flush()
+    await act(async () => {
+      fireEvent.contextMenu(detailButton(), { clientX: 60, clientY: 120 })
+    })
+    await flush()
+    const menu = document.body.querySelector('[data-context-menu]')
+    expect(menu, '右クリックメニューが出る').toBeTruthy()
+    expect(menu?.textContent).toContain('集まった回答')
+    expect(menu?.textContent).toContain('フォルダへ移す')
+    expect(errors.map(String).join('\n')).toBe('')
+  })
+
+  it('詳細パネルの名前をその場で変えると版付きで更新口へ届く', async () => {
+    await act(async () => { root.render(<FormSubmissionsListV8 />) })
+    await flush()
+    await act(async () => { fireEvent.click(detailButton()) })
+    await flush()
+    const panel = host.querySelector('[data-design-part="detail-panel"]')
+    const edit = [...panel!.querySelectorAll('button')]
+      .find((b) => b.getAttribute('aria-label') === 'フォーム名を変更する')
+    expect(edit, '名前の変更ボタンがある').toBeTruthy()
+    await act(async () => { fireEvent.click(edit!) })
+    await flush()
+    const input = host.querySelector('[data-design-part="detail-panel"] input[aria-label="フォーム名"]') as HTMLInputElement | null
+    expect(input, '入力欄が出る').toBeTruthy()
+    await act(async () => {
+      fireEvent.change(input!, { target: { value: '改名アンケート' } })
+    })
+    await act(async () => {
+      fireEvent.keyDown(input!, { key: 'Enter' })
+    })
+    await flush()
+    expect(formsUpdate, '版付きで更新口へ届く').toHaveBeenCalledWith(
+      'form-1', 'visual-qa-account', { name: '改名アンケート', expectedContentRevision: 7 },
+    )
+    expect(host.textContent).toContain('改名アンケート')
+    expect(errors.map(String).join('\n')).toBe('')
+  })
+})
+
+/* V8「サクサク感」：入力の窓は右のパネルへ（確認の窓は残す）。 */
+describe('入力の右パネル移設', () => {
+  it('フォルダへ移すは右のパネルで選べる', async () => {
+    await act(async () => { root.render(<FormSubmissionsListV8 />) })
+    await flush()
+    const menuButton = [...host.querySelectorAll('button')]
+      .find((b) => (b.getAttribute('aria-label') ?? '').startsWith('「来店アンケート」のその他の操作'))
+    expect(menuButton, '行末の「…」がある').toBeTruthy()
+    await act(async () => { fireEvent.click(menuButton!) })
+    await flush()
+    const moveItem = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((m) => m.textContent?.includes('フォルダへ移す'))
+    expect(moveItem, '移動の項目がある').toBeTruthy()
+    await act(async () => { fireEvent.click(moveItem!) })
+    await flush()
+    const panel = host.querySelector('[data-design-part="detail-panel"]')
+    expect(panel, '右のパネルが開く').toBeTruthy()
+    expect(panel?.textContent).toContain('どのフォルダへ移しますか')
+    expect(panel?.textContent).toContain('未分類')
+    const moveButton = [...panel!.querySelectorAll('button')].find((b) => b.textContent === '移動する')
+    expect(moveButton, '移動するボタンがある').toBeTruthy()
+    expect(errors.map(String).join('\n')).toBe('')
+  })
+
+  it('複製は右のパネルで名前を入れられる', async () => {
+    await act(async () => { root.render(<FormSubmissionsListV8 />) })
+    await flush()
+    const menuButton = [...host.querySelectorAll('button')]
+      .find((b) => (b.getAttribute('aria-label') ?? '').startsWith('「来店アンケート」のその他の操作'))
+    await act(async () => { fireEvent.click(menuButton!) })
+    await flush()
+    const duplicateItem = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((m) => m.textContent === '複製')
+    expect(duplicateItem, '複製の項目がある').toBeTruthy()
+    await act(async () => { fireEvent.click(duplicateItem!) })
+    await flush()
+    const panel = host.querySelector('[data-design-part="detail-panel"]')
+    expect(panel, '右のパネルが開く').toBeTruthy()
+    expect(panel?.textContent).toContain('複製しますか')
+    expect(panel?.textContent).toContain('複製の名前')
+    expect(errors.map(String).join('\n')).toBe('')
   })
 })
 

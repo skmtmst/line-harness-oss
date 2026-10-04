@@ -106,8 +106,8 @@
     "unresolved-classname": 207
   },
   "app/booking/menus/staff/assign-v8.tsx": {
-    "unresolved-classname": 66,
-    "direct-th": 6
+    "unresolved-classname": 61,
+    "direct-th": 3
   },
   "app/booking/menus/staff/page.tsx": {
     "unresolved-classname": 1
@@ -240,7 +240,7 @@
     "arbitrary-value": 1
   },
   "app/form-submissions/list-v8.tsx": {
-    "unresolved-classname": 91,
+    "unresolved-classname": 90,
     "direct-th": 6
   },
   "app/form-submissions/page.tsx": {
@@ -741,7 +741,7 @@
     "unresolved-classname": 49
   },
   "app/webinars/list-v8.tsx": {
-    "unresolved-classname": 43
+    "unresolved-classname": 52
   },
   "app/webinars/new/new-v8.tsx": {
     "unresolved-classname": 43

@@ -87,14 +87,18 @@ const json = (data: unknown, status = 200) => new Response(
   { status, headers: { 'Content-Type': 'application/json' } },
 )
 
+let fetchCalls: string[] = []
+
 beforeEach(() => {
   listItems = [webinar()]
   staffRole = 'admin'
+  fetchCalls = []
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    fetchCalls.push(`${init?.method ?? 'GET'} ${url}`)
     if (url.includes('/overview')) return json({ data: overviewData })
     if (url.includes('/folders')) return json({ success: true, data: [] })
     if (url.includes('/api/webinars')) {
@@ -171,6 +175,79 @@ test('v7 では従来の一覧が出て UyUMw は出ない', async () => {
   await renderPage()
   expect(host.querySelector('[data-design-node="UyUMw"]')).toBeNull()
   expect(host.querySelector('[data-design-node="ZC13r"]')).not.toBeNull()
+})
+
+/* V8「サクサク感」C①・D・E：行→詳細パネル・右クリック・つながる移り変わり。 */
+function detailButton(title: string): HTMLButtonElement {
+  const found = [...host.querySelectorAll('button')].find(
+    (button) => button.getAttribute('aria-label') === `「${title}」の詳細を見る`,
+  )
+  if (!found) throw new Error(`detail button not found: ${title}`)
+  return found as HTMLButtonElement
+}
+
+test('v8 で行を押すと右の詳細パネルが開き↑↓で次の行へ移る', async () => {
+  listItems = [webinar(), webinar({ id: 'webinar-2', title: '2つ目のセミナー', slug: 'second' })]
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  await act(async () => { detailButton('NEN活用スタートセミナー').click() })
+  const panel = host.querySelector('[data-design-part="detail-panel"]')
+  expect(panel).not.toBeNull()
+  expect(panel?.textContent).toContain('NEN活用スタートセミナー')
+  const next = [...panel!.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === '次の行')
+  expect(next).toBeTruthy()
+  await act(async () => { (next as HTMLButtonElement).click() })
+  const moved = host.querySelector('[data-design-part="detail-panel"]')
+  expect(moved?.textContent).toContain('2つ目のセミナー')
+})
+
+test('v8 で行を右クリックすると「…」と同じ操作が出る', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const button = detailButton('NEN活用スタートセミナー')
+  await act(async () => {
+    button.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 60, clientY: 120 }))
+  })
+  const menu = document.body.querySelector('[data-context-menu]')
+  expect(menu).not.toBeNull()
+  expect(menu?.textContent).toContain('参加者を見る')
+  expect(menu?.textContent).toContain('アーカイブする')
+})
+
+/* V8「サクサク感」C②：名前のその場の書き換え。 */
+test('v8 で詳細パネルの名前をその場で変えると保存口へ届く', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  await act(async () => { detailButton('NEN活用スタートセミナー').click() })
+  const panel = host.querySelector('[data-design-part="detail-panel"]')
+  const edit = [...panel!.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'ウェビナー名を変更する')
+  expect(edit).toBeTruthy()
+  await act(async () => { (edit as HTMLButtonElement).click() })
+  const input = host.querySelector('[data-design-part="detail-panel"] input[aria-label="ウェビナー名"]') as HTMLInputElement | null
+  expect(input).not.toBeNull()
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+    setter?.call(input!, '改名したセミナー')
+    input!.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => {
+    input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  })
+  expect(fetchCalls.some((call) => call.startsWith('PUT') && call.includes('/api/webinars/webinar-1'))).toBe(true)
+  expect(host.querySelector('[data-design-node="UyUMw"]')?.textContent).toContain('改名したセミナー')
+})
+
+/* V8「サクサク感」：フォルダの追加は真ん中の窓ではなく右のパネルで。 */
+test('v8 でフォルダの追加を押すと右のパネルで名前を入れられる', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const add = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('フォルダを追加する'))
+  expect(add).toBeTruthy()
+  await act(async () => { (add as HTMLButtonElement).click() })
+  const panel = host.querySelector('[data-design-part="detail-panel"]')
+  expect(panel).not.toBeNull()
+  expect(panel?.textContent).toContain('フォルダを追加')
+  expect(panel?.querySelector('#webinar-v8-folder-name')).not.toBeNull()
 })
 
 test('v8 の読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {
