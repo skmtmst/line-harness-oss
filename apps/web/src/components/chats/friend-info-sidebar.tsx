@@ -578,10 +578,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
   const addTagById = useCallback((tagId: string) => {
     if (!friendId || !tagId) return
     const target = tagOptions.find((t) => t.id === tagId)
+    // 候補に無い ID は付けない（色は店が付けた値だけを使い、直書きしない）。
+    if (!target) return
     const previous = [...(effectiveTags ?? [])]
     if (previous.some((t) => t.id === tagId)) return
     setTagSaving(true)
-    setLocalTags([...previous, { id: tagId, name: target?.name ?? tagId, color: (target as unknown as { color?: string })?.color ?? '#888888' }])
+    setLocalTags([...previous, { id: tagId, name: target.name, color: target.color }])
     runOptimistic({
       request: () => api.friends.addTag(friendId, tagId),
       revert: () => setLocalTags(previous),
