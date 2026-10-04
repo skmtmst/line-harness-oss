@@ -1,4 +1,5 @@
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
+import { readFileSync as readRawSource } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
@@ -22,7 +23,8 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('成果地点を読み込めませんでした')
-    expect(PAGE).toContain('もう一度読み込む')
+    expect(PAGE).toContain('成果地点を再読み込み')
+    expect(PAGE).toContain('onClick={() => void load()}')
     expect(PAGE).toContain('const [loadFailed, setLoadFailed] = useState(false)')
   })
 
@@ -48,7 +50,8 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain("import ListToolbar from '@/components/shared/list-toolbar'")
     expect(PAGE).toContain('<ListToolbar')
     expect(PAGE).toContain('search={{')
-    expect(PAGE).not.toContain("import SearchField from '@/components/shared/search-field'")
+    // V8の独立した一覧はSearchFieldを使う。従来の一覧の入口だけ確認する。
+    expect(readRawSource(new URL('./page.tsx', import.meta.url), 'utf8')).not.toContain("import SearchField from '@/components/shared/search-field'")
     expect(PAGE).toContain("import Select from '@/components/shared/select'")
     expect(PAGE).toContain('const [sort, setSort] = useState<PointSort>')
     expect(PAGE).toContain('CV数が多い順')
