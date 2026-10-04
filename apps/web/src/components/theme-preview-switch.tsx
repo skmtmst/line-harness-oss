@@ -13,7 +13,22 @@ import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
  * 反映する。サーバ側・他の利用者には影響しない。作りかけの見た目なので
  * 見た目の確認専用であり、保存・送信などの動きはどちらのテーマでも同じ。
  */
-const STORAGE_KEY = 'lh-admin-theme'
+export const ADMIN_THEME_STORAGE_KEY = 'lh-admin-theme'
+
+/*
+ * G6 移し替え：上バーの「前の見た目に戻す」も同じ効き方にするため、
+ * 切り替えの本体を外へ出す。localStorage に残すので次回以降も覚える。
+ */
+export function applyAdminTheme(next: 'v7' | 'v8') {
+  document.documentElement.dataset.theme = next
+  try {
+    localStorage.setItem(ADMIN_THEME_STORAGE_KEY, next)
+  } catch {
+    // プライベートモード等で保存できなくても、この画面だけの切り替えは効かせる
+  }
+  // v8 で初めて現れる部品（帯のベルなど）が、その場で値を取りに行けるようにする
+  window.dispatchEvent(new Event(ADMIN_THEME_CHANGED_EVENT))
+}
 
 export default function ThemePreviewSwitch() {
   // null の間は描画しない（SSR と localStorage の差でちらつかないようにする）
@@ -25,15 +40,8 @@ export default function ThemePreviewSwitch() {
 
   const apply = (useV8: boolean) => {
     const next = useV8 ? 'v8' : 'v7'
-    document.documentElement.dataset.theme = next
-    try {
-      localStorage.setItem(STORAGE_KEY, next)
-    } catch {
-      // プライベートモード等で保存できなくても、この画面だけの切り替えは効かせる
-    }
+    applyAdminTheme(next)
     setTheme(next)
-    // v8 で初めて現れる部品（帯のベルなど）が、その場で値を取りに行けるようにする
-    window.dispatchEvent(new Event(ADMIN_THEME_CHANGED_EVENT))
   }
 
   if (theme === null) return null
