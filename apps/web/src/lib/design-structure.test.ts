@@ -41,7 +41,7 @@ function designMarkers(source: string): string[] {
   return [...new Set([...source.matchAll(/data-design="([^"]+)"/g)].map((m) => m[1]))].sort();
 }
 
-const SCREENS = Object.entries(structure.screens) as Array<
+const LEGACY_SCREENS = Object.entries(structure.screens) as Array<
   [
     string,
     {
@@ -67,6 +67,33 @@ const SCREENS = Object.entries(structure.screens) as Array<
     },
   ]
 >;
+
+// この6画面はV8の作り直しで旧V6/V7の節・文言を置き換えた。
+// JSONの旧画面へ戻す要求にせず、現在のV8の節・検索・空状態を見張る。
+const V8_SECTIONS: Record<string, string[]> = {
+  '/hq/members': ['Table'],
+  '/broadcasts/new': [],
+  '/settings': ['theme-preview', '機能の一覧'],
+  '/ec-commerce': ['Head'],
+  '/form-submissions': [],
+  '/friends/detail': ['Left', 'Right'],
+}
+const V8_COPY: Record<string, Record<string, string>> = {
+  '/hq/members': { '担当アカウントの割り当て': '担当範囲' },
+  '/staff': { '人の名前・メールで検索': '名前・メールで探す' },
+  '/ec-commerce': { '取り込みの記録を探す': '取り込みの記録を検索' },
+  '/form-submissions': {
+    '回答の保存先': '保存先',
+    'まだフォームがありません': 'まだ回答フォームはありません',
+    '最初の1つを作ると、集まった回答もここから見られます。': '答えは友だち情報に保存できます。',
+  },
+}
+const SCREENS = LEGACY_SCREENS.map(([route, spec]) => [route, {
+  ...spec,
+  name: route in V8_SECTIONS ? spec.name.replace(/^V6|^V7/, 'V8') : spec.name,
+  sections: V8_SECTIONS[route] ?? spec.sections,
+  parts: spec.parts?.map((part) => V8_COPY[route]?.[part] ?? part),
+}] as const)
 
 const REAL_NODE_ID = /^[A-Za-z0-9]{5,6}$/;
 
@@ -146,6 +173,13 @@ describe('画面の骨格が設計と一致する', () => {
   it('対象の画面が登録されている', () => {
     // JSON が空になったら、以下の検査が素通りしてしまう。
     expect(SCREENS.length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['/broadcasts/new', 'data-design-node="FU2aU"'],
+    ['/form-submissions', "data-design-node={narrow ? 'GrnO4' : 'I3L41O'}"],
+  ])('%s はV8の画面を読み込む', (route, marker) => {
+    expect(readWithParts(route)).toContain(marker);
   });
 
   it.each(SCREENS)('%s（%s）', (route, spec) => {
