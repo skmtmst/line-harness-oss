@@ -7476,6 +7476,19 @@ export const api = {
         }`,
         { method: 'DELETE' },
       ),
+    /*
+     * B 元に戻す: 保管の取り消し。戻した直後は受付停止のまま。
+     * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+     */
+    unarchive: (id: string, accountId: string, expectedRevision: number) =>
+      fetchApi<ApiResponse<{
+        status: 'active'
+        revision: number
+        isActive: boolean
+      }>>(`/api/forms/${id}/unarchive?account_id=${encodeURIComponent(accountId)}`, {
+        method: 'POST',
+        body: JSON.stringify({ expectedRevision }),
+      }),
   },
   /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
   siteTracking: {
@@ -10242,6 +10255,21 @@ export const api = {
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(body),
       }),
+    /*
+     * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。再開は update で行う。
+     * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+     */
+    restore: (id: string) =>
+      fetchApi<ApiResponse<{
+        id: string;
+        isActive: boolean;
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
+      }>>(`/api/auto-replies/${id}/restore`, {
+        method: 'POST',
+      }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?accountId=' + encodeURIComponent(params.accountId) : ''
       return fetchApi<ApiResponse<Array<{
@@ -11784,6 +11812,14 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/reminders/${id}`, { method: 'DELETE' }),
+    /*
+     * B 元に戻す: 削除の取り消し（定義のみ。登録・配信予定は戻さない）。
+     * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+     */
+    restore: (id: string) =>
+      fetchApi<ApiResponse<Reminder>>(`/api/reminders/${id}/restore`, {
+        method: 'POST',
+      }),
     addStep: (
       id: string,
       data: {
@@ -12210,6 +12246,15 @@ export const api = {
           `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
         ),
+      /*
+       * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。
+       * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+       */
+      restore: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<IncomingWebhookDetail>>(
+          `/api/webhooks/incoming/${id}/restore?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST' },
+        ),
       /* 人が見つからなかった届物の箱(#939 N-367)。R401: 50件超えは limit/offset で辿る。 */
       unmatched: (
         id: string,
@@ -12263,6 +12308,15 @@ export const api = {
         fetchApi<ApiResponse<null>>(
           `/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
+        ),
+      /*
+       * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。
+       * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+       */
+      restore: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<OutgoingWebhook>>(
+          `/api/webhooks/outgoing/${id}/restore?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST' },
         ),
       test: (id: string, lineAccountId: string) =>
         fetchApi<ApiResponse<{ delivered: boolean; responseStatus: number | null }>>(

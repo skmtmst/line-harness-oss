@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
+import { resolveLook, type LiffCalendarMode } from '../lib/liff-look.js';
 import { jstToday, addDays, formatJpLong, formatWeekday, addMinutesHm } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
@@ -54,15 +55,27 @@ export type TimeSlot = { start: string; open: boolean };
  * ある（口が期間を広めに返す・同じ枠を二口が返す）。同じ枠（担当＋開始
  * 時刻）は1つにまとめる。埋まった枠（残り0）も時刻の札には出すが
  * 押せない灰色にし、「満」の判定にも使う。
+ * 残りわずか (state 'limited') の枠は押せるままにし、日単位では金の印に
+ * する。日の中にふつうの空きとわずかが混ざったら、空き (緑) を優先する。
  */
 function groupSlots(
   buckets: Array<{ staff_id: string; slots: AvailSlot[] }>,
-): { byDate: Record<string, TimeSlot[]>; fullDates: Record<string, true> } {
+): {
+  byDate: Record<string, TimeSlot[]>;
+  fullDates: Record<string, true>;
+  /** ふつうの空きが無く、残りわずかだけの日。 */
+  limitedDates: Record<string, true>;
+  /** ふつうの空きがある日。 */
+  openDates: Record<string, true>;
+} {
   const seen = new Map<string, TimeSlot>();
   const hasSlot: Record<string, true> = {};
+  const strictOpen = new Set<string>();
+  const limitedOnly = new Set<string>();
   for (const bucket of buckets) {
     for (const s of bucket.slots ?? []) {
       hasSlot[s.date] = true;
+      const limited = s.state === 'limited';
       const open = !((s.remaining ?? 1) <= 0 || s.state === 'full' || s.state === 'closed');
       const key = `${bucket.staff_id}\0${s.date}\0${s.start}`;
       const prev = seen.get(`${s.date}\0${s.start}`);
@@ -71,6 +84,8 @@ function groupSlots(
       } else {
         seen.set(`${s.date}\0${s.start}`, { start: s.start, open });
       }
+      if (open && !limited) strictOpen.add(s.date);
+      if (limited) limitedOnly.add(s.date);
     }
   }
   const byDate: Record<string, TimeSlot[]> = {};
@@ -85,7 +100,13 @@ function groupSlots(
   for (const d of Object.keys(hasSlot)) {
     if (!(byDate[d]?.some((t) => t.open))) fullDates[d] = true;
   }
-  return { byDate, fullDates };
+  const limitedDates: Record<string, true> = {};
+  for (const d of limitedOnly) {
+    if (!strictOpen.has(d)) limitedDates[d] = true;
+  }
+  const openDates: Record<string, true> = {};
+  for (const d of strictOpen) openDates[d] = true;
+  return { byDate, fullDates, limitedDates, openDates };
 }
 
 function addMonths(month: string, count: number): string {
@@ -129,7 +150,7 @@ function splitRange(from: string, to: string): Array<[string, string]> {
   return chunks;
 }
 
-type DayState = 'open' | 'full' | 'closed' | 'past' | 'off' | 'empty';
+type DayState = 'open' | 'few' | 'full' | 'closed' | 'past' | 'off' | 'empty';
 
 /**
  * 読み上げ文。「10月4日 満席」のように日付と状態だけにする。
@@ -141,6 +162,7 @@ export function dayStateLabel(date: string, state: DayState): string {
   const d = new Date(`${date}T00:00:00Z`);
   const base = `${d.getUTCMonth() + 1}月${d.getUTCDate()}日`;
   if (state === 'open') return `${base} 空きあり`;
+  if (state === 'few') return `${base} 残りわずか`;
   if (state === 'full') return `${base} 満席`;
   if (state === 'closed') return `${base} お休み`;
   if (state === 'past') return `${base} 過ぎた日`;
@@ -148,18 +170,20 @@ export function dayStateLabel(date: string, state: DayState): string {
   return `${base} 選択できません`;
 }
 
-function stateOf(date: string, byDate: Record<string, TimeSlot[]>, full: Record<string, true>, closed: Record<string, true>, today: string, windowEnd: string): DayState {
+function stateOf(date: string, open: Record<string, true>, limited: Record<string, true>, full: Record<string, true>, closed: Record<string, true>, today: string, windowEnd: string): DayState {
   if (date < today) return 'past';
   if (date > windowEnd) return 'off';
   if (closed[date]) return 'closed';
-  if (byDate[date]?.some((t) => t.open)) return 'open';
+  if (open[date]) return 'open';
+  if (limited[date]) return 'few';
   if (full[date]) return 'full';
   return 'empty';
 }
 
-/** 週の日セルの短い印。空き・満・休み。枠の無い日は「満」に寄せる。 */
+/** 週の日セルの短い印。空き・わずか・満・休み。枠の無い日は「満」に寄せる。 */
 function weekMark(state: DayState): string {
   if (state === 'open') return '空き';
+  if (state === 'few') return 'わずか';
   if (state === 'closed') return '休み';
   return '満';
 }
@@ -192,9 +216,9 @@ function DaySlots({
                 onClick={() => onSelect({ date: day, start: t.start })}
                 disabled={!t.open}
                 aria-pressed={active}
-                className={`h-11 rounded-[10px] px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                className={`liff-press liff-num h-11 rounded-(--liff-radius) px-1 text-[15px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                   active
-                    ? 'bg-liff-primary font-bold text-white'
+                    ? 'bg-liff-primary font-bold text-(--liff-on-primary)'
                     : t.open
                       ? 'bg-canvas font-medium text-ink outline -outline-offset-1 outline-liff-line-strong'
                       : 'bg-liff-off-bg font-medium text-liff-off-ink'
@@ -211,9 +235,11 @@ function DaySlots({
 }
 
 /**
- * 1-c 日時を選ぶ (★V8)。手順の下に「週で見る｜カレンダー」の切り替えがある。
- * 週は5日の並び（空き・満・休み）＋選んだ日の時刻3列。
- * カレンダーは月の表（●空きあり・灰色は満席か休み）。日を選んで
+ * 1-c 日時を選ぶ (★V8)。出し方は店が4択（週を先に・月を先に・週だけ・
+ * 月だけ）。週だけ・月だけの店では切り替えを出さない。
+ * 週は5日の並び（空き・わずか・満・休み）＋選んだ日の時刻3列。
+ * カレンダーは月の表（●空きあり・金は残りわずか・灰色は満席か休み）。
+ * 空きの点は店が消せる（消しても読み上げは残す）。日を選んで
  * 「この日の時間を選ぶ」で週の表示へ移る。
  * 時刻の札を押すと選ばれるだけで、進むのは下の操作の帯。
  * 空きの無い週は「次の週を見る」「担当を選び直す」の手を出す (ADutg)。
@@ -246,10 +272,14 @@ export default function DateTimePicker({
   const today = jstToday();
   // 414 幅の板（`xvtSz`）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
-  // 予約の設定（最初の形・受付期間）。読めるまで切り替えは出さない。
-  const [settings, setSettings] = useState<{ initialView: DateView; windowDays: number } | null>(
-    null,
-  );
+  // 予約の設定（最初の形・受付期間・カレンダーの出し方・空きの点）。
+  // 読めるまで切り替えは出さない。
+  const [settings, setSettings] = useState<{
+    initialView: DateView;
+    windowDays: number;
+    calendarMode: LiffCalendarMode;
+    vacancyDots: boolean;
+  } | null>(null);
   const [view, setView] = useState<DateView | null>(null);
   const listButtonRef = useRef<HTMLButtonElement | null>(null);
   const calendarButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -261,6 +291,8 @@ export default function DateTimePicker({
   );
   const [weekByDate, setWeekByDate] = useState<Record<string, TimeSlot[]> | null>(null);
   const [weekFull, setWeekFull] = useState<Record<string, true>>({});
+  const [weekLimited, setWeekLimited] = useState<Record<string, true>>({});
+  const [weekOpen, setWeekOpen] = useState<Record<string, true>>({});
   const [weekClosed, setWeekClosed] = useState<Record<string, true>>({});
   const [loadedWins, setLoadedWins] = useState<Set<string>>(new Set());
   const [weekLoading, setWeekLoading] = useState(false);
@@ -273,6 +305,8 @@ export default function DateTimePicker({
   const [calByDate, setCalByDate] = useState<Record<string, TimeSlot[]>>({});
   const [calClosed, setCalClosed] = useState<Record<string, true>>({});
   const [calFull, setCalFull] = useState<Record<string, true>>({});
+  const [calLimited, setCalLimited] = useState<Record<string, true>>({});
+  const [calOpen, setCalOpen] = useState<Record<string, true>>({});
   const [loadedMonths, setLoadedMonths] = useState<string[]>([]);
   const loadingMonthsRef = useRef<Set<string>>(new Set());
   const [month, setMonth] = useState(monthOf(selected?.date ?? today));
@@ -288,28 +322,55 @@ export default function DateTimePicker({
 
   const windowEnd = settings ? addDays(today, settings.windowDays) : addDays(today, 60);
 
-  // 最初の形は「端末の覚え → 管理画面の設定 → 週で見る」の順。設定が読めなくても止めない。
+  // 出し方で選べる見せ方。週だけ・月だけのときは1つに決まる。
+  function allowedViews(mode: LiffCalendarMode): DateView[] {
+    if (mode === 'week-only') return ['list'];
+    if (mode === 'month-only') return ['calendar'];
+    return ['list', 'calendar'];
+  }
+
+  // 最初の形は「端末の覚え → 店の出し方 → 週を先に」の順。
+  // 週だけ・月だけの店では、端末の覚えが反対側でも店の出し方に従う。
+  // 設定が読めなくても止めない。
   useEffect(() => {
     api
       .bookingSettings()
       .then((r) => {
+        const look = resolveLook(r);
+        const allowed = allowedViews(look.calendarMode);
+        const stored = storedView();
         const initialView =
-          storedView() ??
-          (r.liff_date_view === 'calendar' ? 'calendar' : 'list');
+          stored && allowed.includes(stored)
+            ? stored
+            : look.calendarMode === 'month-first' || look.calendarMode === 'month-only'
+              ? 'calendar'
+              : 'list';
         const windowDays =
           Number.isInteger(r.booking_window_days) &&
           r.booking_window_days >= 1 &&
           r.booking_window_days <= 365
             ? r.booking_window_days
             : 60;
-        setSettings({ initialView, windowDays });
+        setSettings({
+          initialView,
+          windowDays,
+          calendarMode: look.calendarMode,
+          vacancyDots: look.vacancyDots,
+        });
         setView(initialView);
       })
       .catch((e) => {
         logFailure('booking-settings', e);
-        setSettings({ initialView: storedView() ?? 'list', windowDays: 60 });
-        setView(storedView() ?? 'list');
+        const fallback = storedView() ?? 'list';
+        setSettings({
+          initialView: fallback,
+          windowDays: 60,
+          calendarMode: 'week-first',
+          vacancyDots: true,
+        });
+        setView(fallback);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 週表示: 見ている5日ぶんが未読なら読む。読んだぶんは窓を越えて残す。
@@ -325,11 +386,15 @@ export default function DateTimePicker({
       .availability(menu.id, staff.id, from, to)
       .then((r) => {
         if (cancelled) return;
-        const { byDate, fullDates } = groupSlots(r.by_staff[0] ? [r.by_staff[0]] : []);
+        const { byDate, fullDates, limitedDates, openDates } = groupSlots(
+          r.by_staff[0] ? [r.by_staff[0]] : [],
+        );
         const closed: Record<string, true> = {};
         for (const d of r.closed_dates ?? []) closed[d] = true;
         setWeekByDate((prev) => ({ ...(prev ?? {}), ...byDate }));
         setWeekFull((prev) => ({ ...prev, ...fullDates }));
+        setWeekLimited((prev) => ({ ...prev, ...limitedDates }));
+        setWeekOpen((prev) => ({ ...prev, ...openDates }));
         setWeekClosed((prev) => ({ ...prev, ...closed }));
         setLoadedWins((prev) => new Set(prev).add(winStart));
         setWeekLoading(false);
@@ -383,7 +448,7 @@ export default function DateTimePicker({
       .then((results) => {
         if (cancelled) return;
         const buckets = results.flatMap((r) => (r.by_staff[0] ? [r.by_staff[0]] : []));
-        const { byDate: grouped, fullDates } = groupSlots(buckets);
+        const { byDate: grouped, fullDates, limitedDates, openDates } = groupSlots(buckets);
         const closed: Record<string, true> = {};
         for (const r of results) {
           for (const d of r.closed_dates ?? []) closed[d] = true;
@@ -391,6 +456,8 @@ export default function DateTimePicker({
         setCalByDate((prev) => ({ ...prev, ...grouped }));
         setCalClosed((prev) => ({ ...prev, ...closed }));
         setCalFull((prev) => ({ ...prev, ...fullDates }));
+        setCalLimited((prev) => ({ ...prev, ...limitedDates }));
+        setCalOpen((prev) => ({ ...prev, ...openDates }));
         setLoadedMonths((prev) => (prev.includes(month) ? prev : [...prev, month]));
       })
       .catch((e) => {
@@ -453,6 +520,8 @@ export default function DateTimePicker({
   }, [listDay, weekByDate]);
 
   function switchView(next: DateView) {
+    // 週だけ・月だけの店では反対側へ移れない。
+    if (settings && !allowedViews(settings.calendarMode).includes(next)) return;
     // 選んだ日は持って反対側へ移る（切り替えで選択が消えて見えないように）。
     if (next === 'list' && view === 'calendar' && calDay) {
       jumpToWeekDay(calDay);
@@ -498,6 +567,8 @@ export default function DateTimePicker({
     setWeekFailed(false);
     setWeekByDate(null);
     setWeekFull({});
+    setWeekLimited({});
+    setWeekOpen({});
     setWeekClosed({});
     setLoadedWins(new Set());
     if (!userPickedDayRef.current) setListDay(null);
@@ -586,15 +657,18 @@ export default function DateTimePicker({
         </p>
       </div>
       {hint && <p className="text-xs leading-5 text-liff-sub">{hint}</p>}
-      <div
-        role="radiogroup"
-        aria-label="表示の切り替え"
-        onKeyDown={moveViewKey}
-        className="flex gap-1 rounded-[10px] bg-liff-chip p-[3px]"
-      >
-        {toggleButton('list', '週で見る')}
-        {toggleButton('calendar', 'カレンダー')}
-      </div>
+      {/* 週だけ・月だけの店では切り替えを出さない (見せ方が1つに決まる)。 */}
+      {allowedViews(settings.calendarMode).length > 1 && (
+        <div
+          role="radiogroup"
+          aria-label="表示の切り替え"
+          onKeyDown={moveViewKey}
+          className="flex gap-1 rounded-(--liff-radius) bg-liff-chip p-[3px]"
+        >
+          {toggleButton('list', '週で見る')}
+          {toggleButton('calendar', 'カレンダー')}
+        </div>
+      )}
 
       {view === 'list' ? (
         weekFailed ? (
@@ -637,8 +711,18 @@ export default function DateTimePicker({
               </button>
               <div ref={stripRef} className="grid flex-1 grid-cols-5 gap-[5px]" role="group" aria-label="日付">
                 {weekDays.map((d) => {
-                  const state = stateOf(d, weekByDate, weekFull, weekClosed, today, windowEnd);
+                  const state = stateOf(
+                    d,
+                    weekOpen,
+                    weekLimited,
+                    weekFull,
+                    weekClosed,
+                    today,
+                    windowEnd,
+                  );
                   const open = state === 'open';
+                  // 残りわずかの日も押せる (金の印だけ付ける)。
+                  const selectable = open || state === 'few';
                   const active = d === listDay;
                   return (
                     <button
@@ -648,11 +732,11 @@ export default function DateTimePicker({
                         userPickedDayRef.current = true;
                         setListDay(d);
                       }}
-                      disabled={!open}
+                      disabled={!selectable}
                       aria-pressed={active}
                       aria-label={dayStateLabel(d, state)}
                       title={dayStateLabel(d, state)}
-                      className={`flex flex-col items-center gap-0.5 rounded-[10px] py-2 outline -outline-offset-1 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                      className={`liff-press flex flex-col items-center gap-0.5 rounded-(--liff-radius) py-2 outline -outline-offset-1 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                         active
                           ? 'bg-liff-soft outline-2 outline-liff-primary'
                           : state === 'closed' || state === 'empty'
@@ -662,17 +746,26 @@ export default function DateTimePicker({
                     >
                       <span className="text-[10px] text-liff-sub">{formatWeekday(d)}</span>
                       <span
-                        className={`text-base font-bold ${active ? 'text-liff-primary' : open || state === 'full' ? 'text-ink' : 'text-liff-off-ink'}`}
+                        className={`liff-num text-base font-bold ${active ? 'text-liff-primary' : selectable || state === 'full' ? 'text-ink' : 'text-liff-off-ink'}`}
                       >
                         {Number(d.slice(8, 10))}
                       </span>
-                      <span
-                        className={`text-[9px] ${
-                          active || open ? 'text-liff-primary' : 'text-liff-off-ink'
-                        }`}
-                      >
-                        {weekMark(state)}
-                      </span>
+                      {/* 空きの点。消す設定のときは印を出さない (読み上げは残す)。 */}
+                      {settings.vacancyDots && (
+                        <span
+                          className={`text-[9px] ${
+                            active || open
+                              ? 'text-liff-primary'
+                              : state === 'few'
+                                ? 'text-liff-dot-few'
+                                : state === 'full'
+                                  ? 'text-liff-full'
+                                  : 'text-liff-off-ink'
+                          }`}
+                        >
+                          {weekMark(state)}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -701,6 +794,8 @@ export default function DateTimePicker({
           setCalByDate({});
           setCalClosed({});
           setCalFull({});
+          setCalLimited({});
+          setCalOpen({});
           setLoadedMonths([]);
           setCalDay(null);
           // 読み直しは今月から探し直す。
@@ -753,9 +848,18 @@ export default function DateTimePicker({
                     <span key={`pad-${i}`} aria-hidden="true" />
                   ))}
                   {monthDays.map((d) => {
-                    const state = stateOf(d, calByDate, calFull, calClosed, today, windowEnd);
+                    const state = stateOf(
+                      d,
+                      calOpen,
+                      calLimited,
+                      calFull,
+                      calClosed,
+                      today,
+                      windowEnd,
+                    );
                     const dayNum = Number(d.slice(8, 10));
-                    const selectable = state === 'open';
+                    // 残りわずかの日も押せる (金の点だけ付ける)。
+                    const selectable = state === 'open' || state === 'few';
                     const active = d === calDay;
                     return (
                       <button
@@ -768,19 +872,22 @@ export default function DateTimePicker({
                         disabled={!selectable}
                         aria-pressed={active}
                         aria-label={dayStateLabel(d, state)}
-                        className={`flex h-11 flex-col items-center justify-center gap-0.5 rounded-[10px] focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                        className={`liff-press flex h-11 flex-col items-center justify-center gap-0.5 rounded-(--liff-radius) focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                           active
-                            ? 'bg-liff-primary font-semibold text-white'
+                            ? 'bg-liff-primary font-semibold text-(--liff-on-primary)'
                             : selectable
                               ? 'font-semibold text-ink'
-                              : 'font-semibold text-liff-off-ink'
+                              : state === 'full'
+                                ? 'font-semibold text-liff-full'
+                                : 'font-semibold text-liff-off-ink'
                         }`}
                       >
-                        <span className="text-sm leading-tight">{dayNum}</span>
+                        <span className="liff-num text-sm leading-tight">{dayNum}</span>
                         <span className="flex h-1.5 items-center leading-none">
-                          {state === 'open' && (
+                          {/* 空きの点 (緑＝空き・金＝残りわずか)。消す設定では点を出さない。 */}
+                          {settings.vacancyDots && (state === 'open' || state === 'few') && (
                             <span
-                              className={`block h-[5px] w-[5px] rounded-full ${active ? 'bg-transparent' : 'bg-liff-primary'}`}
+                              className={`block h-[5px] w-[5px] rounded-full ${active ? 'bg-transparent' : state === 'few' ? 'bg-liff-dot-few' : 'bg-liff-primary'}`}
                               aria-hidden="true"
                             />
                           )}
@@ -789,12 +896,17 @@ export default function DateTimePicker({
                     );
                   })}
                 </div>
-                <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-liff-sub">
-                  <span>
-                    <span className="text-liff-primary">●</span> 空きあり
-                  </span>
-                  <span>灰色：満席・休み</span>
-                </p>
+                {settings.vacancyDots && (
+                  <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-liff-sub">
+                    <span>
+                      <span className="text-liff-primary">●</span> 空きあり
+                    </span>
+                    <span>
+                      <span className="text-liff-dot-few">●</span> 残りわずか
+                    </span>
+                    <span>灰色：満席・休み</span>
+                  </p>
+                )}
                 {!calDay && (
                   <p className="mt-2 text-[13px] leading-6 text-liff-sub">
                     {monthHasOpen ? '日を選んでください。' : 'この月は空きがありません。'}
