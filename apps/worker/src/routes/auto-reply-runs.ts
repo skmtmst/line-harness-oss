@@ -1,3 +1,4 @@
+import { parseExecutionDateRange } from '@line-crm/shared';
 import { Hono } from 'hono';
 import {
   getAutoReplies,
@@ -227,6 +228,9 @@ autoReplyRuns.get(
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
     try {
+      let range;
+      try { range = parseExecutionDateRange({ from: c.req.query('from'), to: c.req.query('to') }); }
+      catch (error) { return c.json({ success: false, error: (error as Error).message }, 400); }
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       const requestedRuleId = c.req.query('rule_id') || c.req.query('ruleId') || undefined;
       const allRules = await getAutoReplies(c.env.DB);
@@ -252,6 +256,7 @@ autoReplyRuns.get(
       const staff = c.get('staff');
       const canViewInput = staff.role !== 'staff' || staff.permissionKeys?.includes('/chats') === true;
       const shared = {
+        ...range,
         ruleId: selectedRule?.id,
         lineAccountIds: scope.allowedAccountIds,
         includeUnassigned: scope.canSeeUnassigned,

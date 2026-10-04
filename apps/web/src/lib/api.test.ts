@@ -1822,3 +1822,17 @@ describe('通信断の日本語化（R506系）', () => {
     await expect(fetchApi('/api/folders?kind=template')).rejects.toBe(aborted)
   })
 })
+
+describe('実行結果の期間指定', () => {
+  it('一覧のページ送りでも期間をAPIへ送る', async () => {
+    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ success: true, data: [] }), { headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchSpy);
+    await api.broadcasts.list({ accountId: 'a', from: '2026-09-30', to: '2026-10-01', cursor: 20 });
+    await api.autoReplies.runs({ ruleId: 'r', from: '2026-09-30', to: '2026-10-01', offset: 20 });
+    for (const [url] of fetchSpy.mock.calls) {
+      const query = new URL(String(url)).searchParams;
+      expect(query.get('from')).toBe('2026-09-30');
+      expect(query.get('to')).toBe('2026-10-01');
+    }
+  });
+});

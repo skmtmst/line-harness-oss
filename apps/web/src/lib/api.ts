@@ -8381,6 +8381,8 @@ export const api = {
       }),
     list: (params?: {
       accountId?: string
+      from?: string
+      to?: string
       limit?: number
       cursor?: string | number
       status?: string
@@ -8394,6 +8396,8 @@ export const api = {
       sort?: 'newest' | 'oldest'
     }) => {
       const query = new URLSearchParams()
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.cursor !== undefined && params.cursor !== '') query.set('cursor', String(params.cursor))
@@ -10202,8 +10206,10 @@ export const api = {
      * **どのルールが、いつ、誰へ、どう返したか。** 設定だけ見ても、
      * 実際に返したのかは分からない。
      */
-    runs: (params?: { ruleId?: string; limit?: number; offset?: number }) => {
+    runs: (params?: { ruleId?: string; limit?: number; offset?: number; from?: string; to?: string }) => {
       const query = new URLSearchParams()
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       if (params?.ruleId) query.set('rule_id', params.ruleId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.offset !== undefined) query.set('offset', String(params.offset))
