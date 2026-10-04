@@ -664,6 +664,8 @@ jobs:
           fi
           ALLOW_JS_BASELINE_UPDATE="$allow_js" node apps/web/scripts/v8-guard/speed-budget.mjs http://127.0.0.1:4310 /tmp/v8-guard/speed.json
       - name: v7 screens are pixel-identical to the base
+        # オーナー決定（V8 へ完全切替）：共通部品が V8 になったので v7 の画素は変わる。比べた結果は残すが止めない。
+        continue-on-error: true
         if: steps.scope.outputs.diff == 'true'
         run: |
           node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4311 /tmp/v8-guard/base v7
