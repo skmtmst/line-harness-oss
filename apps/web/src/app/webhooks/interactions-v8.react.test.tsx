@@ -124,6 +124,50 @@ test('v7 では従来の記録タブが出て Uv9AA は出ない', async () => {
   expect(host.querySelector('[data-design-node="KNG00"]')).not.toBeNull()
 })
 
+test('v8 で中身を見ると一覧の右に詳細パネルが出て前後の行へ移れる', async () => {
+  items = [
+    interaction(),
+    interaction({ id: 'whk_20260930_0601_01', webhookName: '顧客台帳', triggerSummary: '友だちが追加された' }),
+  ]
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const board = host.querySelector('[data-design-node="Uv9AA"]')!
+  const panelOf = () => board.querySelector('[data-design-part="detail-panel"]')
+  // まだ閉じているときはパネルは無い。
+  expect(panelOf()).toBeNull()
+  const openButtons = [...board.querySelectorAll('button')].filter((button) => button.textContent === '中身を見る')
+  await act(async () => { openButtons[0]!.click() })
+  // 一覧は左に見えたまま、右に詳細が出る。
+  expect(board.querySelector('tbody tr')).not.toBeNull()
+  const panel = panelOf() as HTMLElement
+  expect(panel).not.toBeNull()
+  expect(panel.textContent).toContain('やり取りの中身')
+  expect(panel.textContent).toContain('予約台帳')
+  // 次の行へ移る。
+  const nextButton = panel.querySelector('button[aria-label="次の行"]') as HTMLElement
+  await act(async () => { nextButton.click() })
+  expect(panelOf()?.textContent).toContain('顧客台帳')
+  // 前の行へ戻る。
+  const prevButton = board.querySelector('button[aria-label="前の行"]') as HTMLElement
+  await act(async () => { prevButton.click() })
+  expect(panelOf()?.textContent).toContain('予約台帳')
+})
+
+test('v8 の詳細パネルはEscで閉じて一覧だけに戻る', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const board = host.querySelector('[data-design-node="Uv9AA"]')!
+  const panelOf = () => board.querySelector('[data-design-part="detail-panel"]')
+  const openButton = [...board.querySelectorAll('button')].find((button) => button.textContent === '中身を見る') as unknown as HTMLElement
+  await act(async () => { openButton.click() })
+  expect(panelOf()).not.toBeNull()
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  })
+  expect(panelOf()).toBeNull()
+  expect(board.querySelector('tbody tr')).not.toBeNull()
+})
+
 test('v8 の読み込み中は記録の表の形の骨組みが出て「読み込み中」の文字は無い', async () => {
   document.documentElement.dataset.theme = 'v8'
   vi.useFakeTimers()

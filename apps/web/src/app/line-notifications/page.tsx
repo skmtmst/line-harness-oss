@@ -15,6 +15,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { withViewTransition } from '@/components/shared/view-transition'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -978,7 +979,7 @@ function LineNotificationsPage() {
       <p className="text-ink-faint mt-0.5 text-xs">{note}</p>
       {/* 0件のときは押し口を出さない。押しても何も無い。 */}
       {canOpenCustomerNotificationKpi(kpi) && href
-        ? <Button onClick={() => router.replace(href)} className="mt-2">送れなかったものを見る</Button>
+        ? <Button onClick={() => withViewTransition(() => { router.replace(href) })} className="mt-2">送れなかったものを見る</Button>
         : null}
     </div>
   }
@@ -1342,7 +1343,7 @@ function LineNotificationsPage() {
               if (!displayed || displayed.value === null) return displayed?.state === 'pending' ? '集計待ち' : '— 未取得'
               return `${displayed.value}人`
             })()}</span>
-            <div className="flex items-center justify-end gap-2"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : '止めている'}</span><button type="button" onClick={() => setExpanded(expanded === setting.eventType ? null : setting.eventType)} className="line-notification-v6-row-action">{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button></div>
+            <div className="flex items-center justify-end gap-2"><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : '止めている'}</span><button type="button" onClick={() => withViewTransition(() => { setExpanded(expanded === setting.eventType ? null : setting.eventType) })} className="line-notification-v6-row-action">{expanded === setting.eventType ? '編集を閉じる' : '内容を編集'}</button></div>
           </div>
         </article>)}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-4 py-3">

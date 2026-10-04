@@ -1,6 +1,7 @@
 'use client'
 
-import ActionMenu from '@/components/shared/action-menu'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import IconButton from '@/components/shared/icon-button'
 import { MoreHorizontal } from 'lucide-react'
 
@@ -146,6 +147,56 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
     } finally { setBusy(null) }
   }
 
+  // D. 行の操作（V8）と同じ中身（右クリックでも出す。V8 のときだけ）。
+  const ruleMenuItemsFor = (rule: OperatorNotificationRule): ActionMenuItem[] => [
+    { id: 'test', label: '自分にテスト', disabled: busy === rule.id, onSelect: () => { setOpenMenuId(null); void testSend(rule) } },
+    rule.status === 'draft'
+      ? { id: 'publish', label: '公開', disabled: busy === rule.id || rule.recipientCount === 0, disabledReason: rule.recipientCount === 0 ? '受け取る人を決めてください' : undefined, onSelect: () => { setOpenMenuId(null); void publish(rule) } }
+      : { id: 'stop', label: '止める', disabled: busy === rule.id, onSelect: () => { setOpenMenuId(null); void stop(rule) } },
+  ]
+  // 右クリックされた行。まだ無ければ先頭の行（Shift+F10 の押し口）。
+  const [ctxId, setCtxId] = useState<string | null>(null)
+  const ctxRule = visible.find((rule) => rule.id === ctxId) ?? visible[0] ?? null
+  const ctxMenuItems: ContextMenuItem[] = ctxRule
+    ? ruleMenuItemsFor(ctxRule).map((menuItem) => ({
+      id: menuItem.id,
+      label: menuItem.label,
+      disabled: menuItem.disabled,
+      onSelect: () => menuItem.onSelect(),
+    }))
+    : []
+
+  const rows = visible.map((rule) => (
+    <Tr key={rule.id} data-ctx-row={rule.id}>
+      {/* NOTIFY-04: 名前から編集画面へ戻れる。保存したお知らせを開き直して
+          直せないと、直すたびに作り直しになる。 */}
+      <NameCell name={<Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className="text-action hover:underline" title={rule.name}>{rule.name}</Link>} sub={channelLabel(rule.channels)} />
+      <Td>{operatorEventLabel(rule.eventType)}</Td>
+      <Td><span className={rule.recipientCount > 0 ? 'text-ink-secondary' : 'font-semibold text-warning'}>{rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし'}</span></Td>
+      <Td>{conditionsOf(rule).scheduleLabel ?? 'いつでも'}</Td>
+      <Td>{rule.occurredToday > 0 ? `${rule.occurredToday}件` : '—'}</Td>
+      <Td>{theme === 'v8' ? <><IconButton aria-label={`${rule.name}の操作`} aria-haspopup="menu" aria-expanded={openMenuId === rule.id} onClick={() => setOpenMenuId(openMenuId === rule.id ? null : rule.id)}><MoreHorizontal aria-hidden="true" size={16} /></IconButton><ActionMenu open={openMenuId === rule.id} onClose={() => setOpenMenuId(null)} ariaLabel={`${rule.name}の操作`} items={ruleMenuItemsFor(rule)} /></> : <div className="flex flex-wrap items-center gap-2"><Button onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>{rule.status === 'draft' ? <Button variant="secondary" onClick={() => void publish(rule)} disabled={busy === rule.id || rule.recipientCount === 0}>{rule.recipientCount === 0 ? '受け取る人を決める' : '公開'}</Button> : <Button onClick={() => void stop(rule)} disabled={busy === rule.id}>止める</Button>}</div>}</Td>
+    </Tr>
+  ))
+  const table = (
+    <DataTable><thead><tr><Th>お知らせ</Th><Th>きっかけ</Th><Th>受け取る人</Th><Th>送る時間</Th><Th>今日</Th><Th>操作</Th></tr></thead><tbody>{rows}</tbody></DataTable>
+  )
+  // D. V8 のときだけ表を右クリックの包みに入れる（v7 の描画は変えない）。
+  const tableBody = theme === 'v8' ? (
+    <ContextMenu
+      label="運用者へのお知らせの操作"
+      items={ctxMenuItems}
+      shouldOpen={(event) => {
+        const row = (event.target as HTMLElement).closest('tr[data-ctx-row]')
+        if (!row) return false
+        setCtxId(row.getAttribute('data-ctx-row'))
+        return true
+      }}
+    >
+      {table}
+    </ContextMenu>
+  ) : table
+
   const listState = !lineAccountId ? 'account-required' : state === 'ready' && rules.length === 0 ? 'empty' : state === 'ready' && visible.length === 0 ? 'filtered-empty' : state
 
   return <ReadonlyDesignNode node="u8xibp"><section data-design-node="DpxOK" data-list-state={listState} className="space-y-4">
@@ -178,16 +229,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       : state === 'forbidden' ? <ListState kind="forbidden" />
       : rules.length === 0 ? <ListState kind="empty" title="運用者へのお知らせがまだありません" action={<Button href="/line-notifications/operator/new" variant="primary">運用者へのお知らせを作る</Button>} />
       : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="検索語か絞り込みを変えてください。" />
-      : <DataTable><thead><tr><Th>お知らせ</Th><Th>きっかけ</Th><Th>受け取る人</Th><Th>送る時間</Th><Th>今日</Th><Th>操作</Th></tr></thead><tbody>{visible.map((rule) => <Tr key={rule.id}>
-        {/* NOTIFY-04: 名前から編集画面へ戻れる。保存したお知らせを開き直して
-            直せないと、直すたびに作り直しになる。 */}
-        <NameCell name={<Link href={`/line-notifications/operator/new?id=${encodeURIComponent(rule.id)}`} className="text-action hover:underline" title={rule.name}>{rule.name}</Link>} sub={channelLabel(rule.channels)} />
-        <Td>{operatorEventLabel(rule.eventType)}</Td>
-        <Td><span className={rule.recipientCount > 0 ? 'text-ink-secondary' : 'font-semibold text-warning'}>{rule.recipientCount > 0 ? `${rule.recipientCount}人` : '受け取れる人なし'}</span></Td>
-        <Td>{conditionsOf(rule).scheduleLabel ?? 'いつでも'}</Td>
-        <Td>{rule.occurredToday > 0 ? `${rule.occurredToday}件` : '—'}</Td>
-        <Td>{theme === 'v8' ? <><IconButton aria-label={`${rule.name}の操作`} aria-haspopup="menu" aria-expanded={openMenuId === rule.id} onClick={() => setOpenMenuId(openMenuId === rule.id ? null : rule.id)}><MoreHorizontal aria-hidden="true" size={16} /></IconButton><ActionMenu open={openMenuId === rule.id} onClose={() => setOpenMenuId(null)} ariaLabel={`${rule.name}の操作`} items={[{ id: 'test', label: '自分にテスト', disabled: busy === rule.id, onSelect: () => { setOpenMenuId(null); void testSend(rule) } }, rule.status === 'draft' ? { id: 'publish', label: '公開', disabled: busy === rule.id || rule.recipientCount === 0, disabledReason: rule.recipientCount === 0 ? '受け取る人を決めてください' : undefined, onSelect: () => { setOpenMenuId(null); void publish(rule) } } : { id: 'stop', label: '止める', disabled: busy === rule.id, onSelect: () => { setOpenMenuId(null); void stop(rule) } }]} /></> : <div className="flex flex-wrap items-center gap-2"><Button onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>{rule.status === 'draft' ? <Button variant="secondary" onClick={() => void publish(rule)} disabled={busy === rule.id || rule.recipientCount === 0}>{rule.recipientCount === 0 ? '受け取る人を決める' : '公開'}</Button> : <Button onClick={() => void stop(rule)} disabled={busy === rule.id}>止める</Button>}</div>}</Td>
-      </Tr>)}</tbody></DataTable>}
+      : tableBody}
     {state === 'ready' && rules.length > 0 ? <div className="flex items-center justify-between"><ListRange total={summary?.total ?? rules.length} first={1} last={rules.length} /></div> : null}
     {showExport ? <div role="dialog" aria-modal="true" aria-label="CSVを書き出す理由" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4"><div ref={exportPanelRef} className="w-full max-w-md rounded-card border border-hairline bg-canvas p-5 shadow-float"><div className="flex items-start justify-between gap-3"><h2 className="font-bold text-ink">CSVを書き出す理由</h2><button type="button" onClick={() => setShowExport(false)} disabled={busy === 'csv'} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div><p className="mt-2 text-sm text-ink-secondary">個人情報を含むため、確認した目的を記録します。</p><input autoFocus value={exportReason} onChange={(event) => setExportReason(event.target.value)} className="mt-4 w-full rounded-control border border-hairline px-3 py-2 text-sm" placeholder="例：月次の運用確認" /><div className="mt-4 flex justify-end gap-2"><Button onClick={() => setShowExport(false)}>キャンセル</Button><Button variant="primary" onClick={() => void exportCsv()} disabled={!exportReason.trim() || busy === 'csv'}>書き出す</Button></div></div></div> : null}
   </section></ReadonlyDesignNode>
