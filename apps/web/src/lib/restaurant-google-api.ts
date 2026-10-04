@@ -251,8 +251,13 @@ export const restaurantGoogleApi = {
   connection: (accountId: string) => fetchApi<GoogleConnectionData>(withAccount(`${base}/connection`, accountId)),
   connectStart: (accountId: string) =>
     fetchApi<{ success: true; mode: 'connect' | 'reconnect'; authorizeUrl: string }>(withAccount(`${base}/connect/start`, accountId), { method: 'POST', body: '{}' }),
-  selectLocation: (accountId: string, locationName: string) =>
-    fetchApi<{ success: true; connection: GoogleConnection }>(withAccount(`${base}/connect/select-location`, accountId), { method: 'POST', body: JSON.stringify({ locationName }) }),
+  // confirmSwitch は「前につないでいた店舗とは別の店舗に切り替える」確認を取れたときだけ true。
+  // 付けずに別店舗を送ると、サーバーが code: 'switch_confirmation_required' で止める。
+  selectLocation: (accountId: string, locationName: string, confirmSwitch?: boolean) =>
+    fetchApi<{ success: true; connection: GoogleConnection }>(withAccount(`${base}/connect/select-location`, accountId), {
+      method: 'POST',
+      body: JSON.stringify(confirmSwitch ? { locationName, confirmSwitch: true } : { locationName }),
+    }),
   disconnect: (accountId: string) =>
     fetchApi<{ success: true; revoked: boolean; connection: GoogleConnection }>(withAccount(`${base}/disconnect`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
   syncReviews: (accountId: string) =>

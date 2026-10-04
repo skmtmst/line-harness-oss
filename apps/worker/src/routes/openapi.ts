@@ -2390,6 +2390,13 @@ const spec = {
         },
       },
     },
+    '/api/reminders/{id}/restore': {
+      post: {
+        tags: ['Reminders'], summary: '削除したリマインダの定義を元に戻す（戻した直後は停止のまま。登録・配信予定は戻さない）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Reminder definition restored as stopped' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Reminder not found or not deleted' } },
+      },
+    },
     '/api/reminders/{id}/steps/{stepId}': {
       delete: {
         tags: ['Reminders'], summary: '指定したリマインダに属する通を削除',
@@ -2419,6 +2426,13 @@ const spec = {
         tags: ['Auto replies'], summary: 'LINEアカウント範囲内の自動応答一覧を取得',
         parameters: [{ name: 'accountId', in: 'query', schema: { type: 'string' } }],
         responses: { '200': { description: 'Visible auto replies' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+      },
+    },
+    '/api/auto-replies/{id}/restore': {
+      post: {
+        tags: ['Auto replies'], summary: '削除した自動応答を元に戻す（戻した直後は停止のまま）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Auto reply restored as stopped' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Auto reply not found or not deleted' } },
       },
     },
     '/api/auto-replies/{id}/stop': {
@@ -4067,6 +4081,28 @@ const spec = {
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
         ],
         responses: { '200': { description: '詳細' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/webhooks/incoming/{id}/restore': {
+      post: {
+        tags: ['Webhook'],
+        summary: '削除した受信Webhookを元に戻す（戻した直後は停止のまま）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Incoming webhook restored as stopped' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner role required' }, '404': { description: 'Webhook not found or not deleted' } },
+      },
+    },
+    '/api/webhooks/outgoing/{id}/restore': {
+      post: {
+        tags: ['Webhook'],
+        summary: '削除した送信Webhookを元に戻す（戻した直後は停止のまま）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Outgoing webhook restored as stopped' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner role required' }, '404': { description: 'Webhook not found or not deleted' } },
       },
     },
     '/api/webhooks/incoming/{id}/test': {
@@ -6529,6 +6565,25 @@ const spec = {
           '201': { description: '複製した下書き（受付停止）' },
           '403': { description: 'フォームの編集権限が無い' },
           '404': { description: 'フォームが無い、または権限範囲外' },
+        },
+      },
+    },
+    '/api/forms/{id}/unarchive': {
+      post: {
+        tags: ['Forms'],
+        summary: '保管した回答フォームを元に戻す（戻した直後は受付停止のまま）',
+        description: '保管中の行だけ現行へ戻す。確認した版（expectedRevision）がずれたら409で読み直しを促す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision'], properties: { expectedRevision: { type: 'number' } } } } } },
+        responses: {
+          '200': { description: '現行へ戻した（status, revision, isActive）' },
+          '400': { description: '確認した版が必要' },
+          '403': { description: 'フォームの編集権限が無い' },
+          '404': { description: 'フォームが無い、または権限範囲外' },
+          '409': { description: '保管されていない、または版が変わった' },
         },
       },
     },
