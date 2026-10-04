@@ -697,13 +697,17 @@ function FriendAddListV8Inner() {
                 <td className={`${styles.countCell} ${styles.recentCol}`}>
                   <span className={styles.countMain}>{countText(sinkRule.matchedLast7Days, '人')}</span>
                 </td>
-                <td className={styles.menuCell}>
+                <td
+                  className={styles.menuCell}
+                  data-design-node={openMenuId === sinkRule.id ? 'C0lfUP' : undefined}
+                >
                   <button
                     type="button"
                     className={styles.menuButton}
                     title={`設定「${sinkRule.name}」の操作`}
                     aria-label={`設定「${sinkRule.name}」の操作`}
                     aria-haspopup="menu"
+                    aria-expanded={openMenuId === sinkRule.id}
                     onClick={() =>
                       setOpenMenuId((current) => (current === sinkRule.id ? null : sinkRule.id))
                     }
