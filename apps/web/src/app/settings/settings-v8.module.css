@@ -222,8 +222,8 @@
   border: none;
   background: none;
   cursor: pointer;
-  color: var(--color-action);
-  font-size: 11px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -236,10 +236,11 @@
 
 .row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 9px 12px;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 14px;
 }
 
 .row + .row {
@@ -247,7 +248,7 @@
 }
 
 .rowMain {
-  min-width: 0;
+  min-width: 0; display: flex; align-items: center; gap: 6px;
 }
 
 .rowLabel {
@@ -257,7 +258,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .rowNote {
@@ -694,3 +695,6 @@
 .formSubmit {
   margin-top: 12px;
 }
+
+.urlCell { max-width: 100%; }
+.cardHeadAction:focus-visible, .chevron:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }

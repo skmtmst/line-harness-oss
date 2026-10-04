@@ -9,7 +9,6 @@ import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import Toggle from '@/components/shared/toggle'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import {
   groupEnabledCount,
   groupFeatureCount,
@@ -18,7 +17,9 @@ import {
   type FeatureItem,
   type MenuItemOrder,
 } from '@/lib/feature-settings'
-import { applyItemOrder } from './feature-settings-view'
+import { applyItemOrder, FEATURE_SETTINGS_CONFLICT_MESSAGE } from './feature-settings-view'
+import SearchField from '@/components/shared/search-field'
+import HelpTip from '@/components/shared/help-tip'
 import { SettingsShellV8 } from './settings-nav-v8'
 import {
   groupSummary,
@@ -35,7 +36,6 @@ import styles from './settings-v8.module.css'
  * 動き（保存・競合・影響確認・離脱の番兵）は useFeatureSettings に寄せ、V7 と同じ。
  */
 
-const THEME_STORAGE_KEY = 'lh-admin-theme'
 
 function LockIcon() {
   return (
@@ -147,14 +147,14 @@ function FeatureRowV8({ item, features, usage, featureUsage, usageRetry, sharedS
   return (
     <li className={styles.row}>
       <div className={styles.rowMain}>
-        <p className={styles.rowLabel}>
+        <p className={styles.rowLabel} title={item.label}>
           {item.label}
           {sharedSwitch && <span className={styles.sameSwitch}>同じスイッチ</span>}
           {item.badge && <span className={styles.itemBadge}>{item.badge}</span>}
           {featureUsage && <FeatureUsageBadge usage={featureUsage} label={item.label} onRetry={usageRetry} />}
           {!featureUsage && usage && <UsageBadge category={usage} onRetry={usageRetry} />}
         </p>
-        <p className={styles.rowNote}>{item.note}</p>
+        <HelpTip label={`${item.label}の説明`}>{item.note}</HelpTip>
       </div>
       <div className={styles.rowSide}>
         {item.required ? (
@@ -216,7 +216,7 @@ function FeatureCardV8({ group, features, usageByItemId, usageByFeatureId, usage
             className={styles.cardHeadAction}
             onClick={() => onGroupToggle(group, !allEnabled)}
           >
-            {allEnabled ? '全部オフ' : 'まとめてオン'}
+            まとめて切替
           </button>
         )}
       </div>
@@ -318,45 +318,14 @@ export function ReorderDialog({ groups, initialOrder, onCancel, onApply, moveIte
   )
 }
 
-/** 画面の見た目（試作）。このブラウザだけに効く切り替え。 */
-function ThemeChoiceCard() {
-  const [theme, setTheme] = useState<'v7' | 'v8' | null>(null)
-  useEffect(() => {
-    setTheme(document.documentElement.dataset.theme === 'v8' ? 'v8' : 'v7')
-  }, [])
-  const apply = (next: 'v7' | 'v8') => {
-    document.documentElement.dataset.theme = next
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, next)
-    } catch {
-      // 保存できなくても、この画面だけの切り替えは効かせる
-    }
-    setTheme(next)
-    window.dispatchEvent(new Event(ADMIN_THEME_CHANGED_EVENT))
-  }
-  return (
-    <div className={styles.themeCard}>
-      <p className={styles.themeTitle}>画面の見た目（試作）</p>
-      <p className={styles.themeDesc}>
-        新しい画面の見た目をこのブラウザだけで試せます。保存や送信の動きはどちらでも同じです。
-      </p>
-      <div className={styles.themeSegment} role="group" aria-label="画面の見た目">
-        <button type="button" aria-pressed={theme === 'v7'} onClick={() => apply('v7')}>
-          いまの見た目
-        </button>
-        <button type="button" aria-pressed={theme === 'v8'} onClick={() => apply('v8')}>
-          新しい見た目（試す）
-        </button>
-      </div>
-    </div>
-  )
-}
+
 
 export function FeatureSettingsV8() {
   const settings = useFeatureSettings()
   const {
     selectedAccountId,
     features,
+    savedFeatures,
     groups,
     dirty,
     loading,
@@ -398,6 +367,9 @@ export function FeatureSettingsV8() {
   } = settings
 
   const [query, setQuery] = useState('')
+  const [compareOpen, setCompareOpen] = useState(false)
+  const conflicted = error === FEATURE_SETTINGS_CONFLICT_MESSAGE
+  useEffect(() => { setCompareOpen(false); setReorderOpen(false) }, [selectedAccountId])
   const [reorderOpen, setReorderOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<Set<string> | null>(null)
   /*
@@ -444,22 +416,22 @@ export function FeatureSettingsV8() {
     })
   }
 
-  /** 3列へ流し込む（列ごとにカードの塊）。 */
-  const columns = useMemo(() => {
-    const cols: FeatureGroup[][] = [[], [], []]
-    filteredGroups.forEach((group, index) => {
-      cols[index % 3].push(group)
-    })
-    return cols.filter((col) => col.length > 0)
-  }, [filteredGroups])
 
   return (
     <SettingsShellV8
       title="機能設定"
-      description="左のメニューに出す機能と、その並びを決めます。"
+      description="使わない機能をオフにすると、左のメニューから消えます。作ったデータは消えません。"
     >
+      {conflicted && <div className={`${styles.band} ${styles.bandWarn}`} data-design-node="ziYCN" role="status">
+        <strong>ほかの人が先に機能設定を保存しました。</strong>
+        <p>あなたが直した所はまだ保存されていません。違いを確認してから続けてください。</p>
+        <div className={styles.toolbar}>
+          <Button variant="secondary" onClick={() => setCompareOpen(true)}>違いを比べる</Button>
+          <Button variant="secondary" onClick={() => void load()}>最新を読み込んで続ける</Button>
+        </div>
+      </div>}
       <p className={`${styles.band} ${styles.bandInfo}`}>
-        使わない機能をオフにすると、左のメニューから消えます。消しても中のデータは残ります。
+        公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。
         並び順は「並びを変える」から入れ替えてください。
       </p>
 
@@ -497,19 +469,11 @@ export function FeatureSettingsV8() {
       ) : (
         <>
           <div aria-live="polite">
-            {error && <p role="alert" className={`${styles.band} ${styles.bandDanger}`}>{error}</p>}
+            {error && !conflicted && <p role="alert" className={`${styles.band} ${styles.bandDanger}`}>{error}</p>}
           </div>
 
           <div className={styles.toolbar}>
-            <span className={styles.toolbarSearch}>
-              <input
-                type="search"
-                aria-label="機能の名前で探す"
-                placeholder="機能の名前で探す"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </span>
+            <SearchField aria-label="機能の名前で探す" placeholder="機能の名前で探す" value={query} onChange={setQuery} className={styles.toolbarSearch} />
             <Button variant="secondary" onClick={() => setReorderOpen(true)} disabled={saving}>
               並びを変える
             </Button>
@@ -531,29 +495,17 @@ export function FeatureSettingsV8() {
               description="探す言葉を変えてください。"
             />
           ) : (
-            <div className={styles.cards}>
-              {columns.map((column, columnIndex) => (
-                <div key={columnIndex} className={styles.cardCol}>
-                  {column.map((group) => (
-                    <FeatureCardV8
-                      key={group.id}
-                      group={group}
-                      features={features}
-                      usageByItemId={usageByItemId}
-                      usageByFeatureId={usageByFeatureId}
-                      usageRetry={() => void loadUsage()}
-                      open={isOpen(group)}
-                      onOpenChange={(next) => toggleOpen(group.id, next)}
-                      onItemToggle={toggleItem}
-                      onGroupToggle={toggleGroup}
-                    />
-                  ))}
-                </div>
+            <div className={styles.cardCol} data-design="機能の一覧">
+              {filteredGroups.map((group) => (
+                <FeatureCardV8 key={group.id} group={group} features={features}
+                  usageByItemId={usageByItemId} usageByFeatureId={usageByFeatureId} usageRetry={() => void loadUsage()}
+                  open={isOpen(group)} onOpenChange={(next) => toggleOpen(group.id, next)}
+                  onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
               ))}
             </div>
           )}
 
-          <div className={styles.reasonBand}>
+          {dirty && <div className={styles.reasonBand}>
             <label htmlFor="feature-settings-reason">
               変更理由（必須）
             </label>
@@ -561,14 +513,13 @@ export function FeatureSettingsV8() {
               id="feature-settings-reason"
               value={reason}
               onChange={(event) => setReason(event.target.value)}
-              placeholder="例: 使っていない配信機能を止めるため"
+              placeholder="例: マイルを使わないのでオフにする"
               maxLength={300}
               disabled={saving}
             />
             <p className={styles.reasonHint}>保存の記録に残ります。空のままでは保存できません。</p>
-          </div>
+          </div>}
 
-          <ThemeChoiceCard />
         </>
       )}
 
@@ -576,7 +527,7 @@ export function FeatureSettingsV8() {
         <StickyBar
           destructive={(
             <Button
-              variant="danger"
+              variant="secondary"
               onClick={() => setResetToDefaultsOpen(true)}
               disabled={saving}
             >
@@ -596,20 +547,27 @@ export function FeatureSettingsV8() {
               </Button>
               <Button
                 variant="primary"
-                onClick={() => void save()}
+                onClick={() => conflicted ? setCompareOpen(true) : void save()}
                 disabled={saving || !dirty}
                 busy={saving}
                 done={savedTick}
                 doneLabel="保存しました"
                 title={!dirty ? '変更すると保存できます' : undefined}
               >
-                機能設定を保存
+                {conflicted ? '比べてから保存' : '機能設定を保存'}
               </Button>
             </>
           )}
         />
       )}
 
+      <ConfirmDialog open={compareOpen} title="最新の設定と編集中の違い" description="保存済みの値と編集中の値を確認してください。" confirmLabel="比べてから保存" busy={saving} error={reason.trim() ? undefined : '保存するには変更理由を入力してください。'}
+        onCancel={() => setCompareOpen(false)} onConfirm={() => { if (!reason.trim()) return; setCompareOpen(false); void save() }}>
+        <ul className="space-y-2 text-sm text-ink-secondary">
+          {Object.keys(features).filter((key) => features[key] !== savedFeatures[key]).map((key) => <li key={key}>{featureLabelByKey.get(key) ?? '追加機能'}：保存済み {savedFeatures[key] ? 'オン' : 'オフ'} → 編集中 {features[key] ? 'オン' : 'オフ'}</li>)}
+        </ul>
+        <p className="mt-3 text-xs text-ink-secondary">並び順も、いま編集中の順番で保存します。</p>
+      </ConfirmDialog>
       {reorderOpen && (
         <ReorderDialog
           groups={groups}
