@@ -24,6 +24,8 @@ import { jstMonthKey, type ConfirmedState } from './offer-kpi'
 import { listAllConversionApprovals, type AffiliateItem, type AffiliateListRow } from './tabs'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
 import AffiliateDrawerV8 from './v8-drawer'
+import { reportMonthKey as monthKeyShifted, reportPeriodLabel as monthLabel, type ReportPeriod } from './report-period'
+import Notice from '@/components/shared/notice'
 import './list-v8.css'
 
 function formatYen(n: number): string {
@@ -31,7 +33,7 @@ function formatYen(n: number): string {
 }
 
 type ViewKey = 'affiliate' | 'offer'
-type PeriodKey = 'this_month' | 'last_month' | 'all'
+type PeriodKey = ReportPeriod
 
 interface AffiliateAgg {
   id: string
@@ -39,6 +41,7 @@ interface AffiliateAgg {
   conversions: number
   revenue: number
   reward: number
+  missingReward: boolean
   prevReward: number | null
   topOfferName: string | null
 }
@@ -49,30 +52,8 @@ interface OfferAgg {
   conversions: number
   revenue: number
   reward: number
+  missingReward: boolean
   prevReward: number | null
-}
-
-function monthLabel(key: PeriodKey): string {
-  const now = new Date()
-  const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`
-  if (key === 'this_month') {
-    const first = new Date(now.getFullYear(), now.getMonth(), 1)
-    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    return `今月（${fmt(first)}〜${fmt(last)}）`
-  }
-  if (key === 'last_month') {
-    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const last = new Date(now.getFullYear(), now.getMonth(), 0)
-    return `先月（${fmt(first)}〜${fmt(last)}）`
-  }
-  return 'すべての期間'
-}
-
-/** JST の `YYYY-MM` を、今から n ヶ月前に動かす。 */
-function monthKeyShifted(shift: number): string {
-  const now = new Date()
-  const jst = new Date(now.getTime() + 9 * 3600_000)
-  return jstMonthKey(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth() + shift, 1))
 }
 
 export default function ReportTabV8({
@@ -92,27 +73,40 @@ export default function ReportTabV8({
   const [period, setPeriod] = useState<PeriodKey>('this_month')
   const [drawerRow, setDrawerRow] = useState<AffiliateListRow | null>(null)
   const [rowMenuId, setRowMenuId] = useState<string | null>(null)
-  const cancelledRef = useRef(false)
-  useEffect(() => () => { cancelledRef.current = true }, [])
+  const requestSeq = useRef(0)
+  const [loadError, setLoadError] = useState('')
 
   const load = useCallback(async () => {
+    const seq = ++requestSeq.current
     setState('loading')
+    setItems([])
+    setAffiliates([])
+    setDrawerRow(null)
+    setLoadError('')
     try {
       const [approved, affiliatesRes] = await Promise.all([
         listAllConversionApprovals('approved'),
         api.affiliates.list(),
       ])
-      if (!cancelledRef.current) {
+      if (!affiliatesRes.success) throw new Error('紹介者を読み込めませんでした。集計は表示していません。')
+      if (approved.truncated) throw new Error('成果が取得上限を超えています。全件を集計できないため、合計とCSVは表示していません。')
+      if (seq === requestSeq.current) {
         setItems(approved.items)
-        setAffiliates(affiliatesRes.success ? (affiliatesRes.data as unknown as AffiliateItem[]) : [])
+        setAffiliates(affiliatesRes.data as unknown as AffiliateItem[])
         setState('ready')
       }
-    } catch {
-      if (!cancelledRef.current) setState('error')
+    } catch (caught) {
+      if (seq === requestSeq.current) {
+        setState('error')
+        setLoadError(caught instanceof Error ? caught.message : 'レポートを読み込めませんでした。')
+      }
     }
-  }, [])
+  }, [accountId])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    return () => { ++requestSeq.current }
+  }, [load])
 
   // 期間で絞った「認めた成果」
   const monthKey = period === 'this_month' ? monthKeyShifted(0) : period === 'last_month' ? monthKeyShifted(-1) : null
@@ -127,7 +121,10 @@ export default function ReportTabV8({
     [items, prevMonthKey],
   )
 
-  const rewardOf = (item: ConversionApprovalItem) => item.rewardAmount ?? item.value ?? 0
+  const rewardOf = (item: ConversionApprovalItem) => item.rewardAmount ?? 0
+
+  const hasMissingReward = inPeriod.some((item) => item.rewardAmount == null)
+  const hasMissingPreviousReward = inPrevPeriod.some((item) => item.rewardAmount == null)
 
   // KPI：成果・売上・報酬・1件あたりの報酬（板 Eo56k）
   const totalRevenue = inPeriod.reduce((sum, item) => sum + (item.value ?? 0), 0)
@@ -139,12 +136,13 @@ export default function ReportTabV8({
 
   // アフィリエイターごと
   const affiliateRows = useMemo<AffiliateAgg[]>(() => {
-    const map = new Map<string, { conversions: number; revenue: number; reward: number; offers: Map<string, number> }>()
+    const map = new Map<string, { conversions: number; revenue: number; reward: number; missingReward: boolean; offers: Map<string, number> }>()
     for (const item of inPeriod) {
-      const current = map.get(item.affiliateId) ?? { conversions: 0, revenue: 0, reward: 0, offers: new Map<string, number>() }
+      const current = map.get(item.affiliateId) ?? { conversions: 0, revenue: 0, reward: 0, missingReward: false, offers: new Map<string, number>() }
       current.conversions += 1
       current.revenue += item.value ?? 0
       current.reward += rewardOf(item)
+      current.missingReward ||= item.rewardAmount == null
       if (item.offerName) current.offers.set(item.offerName, (current.offers.get(item.offerName) ?? 0) + 1)
       map.set(item.affiliateId, current)
     }
@@ -155,7 +153,7 @@ export default function ReportTabV8({
     // 期間に成果が無い人も「0件」で並べる（見本の0件行）。
     for (const affiliate of affiliates) {
       if (!map.has(affiliate.id)) {
-        map.set(affiliate.id, { conversions: 0, revenue: 0, reward: 0, offers: new Map() })
+        map.set(affiliate.id, { conversions: 0, revenue: 0, reward: 0, missingReward: false, offers: new Map() })
       }
     }
     return [...map].map(([id, value]) => {
@@ -169,7 +167,8 @@ export default function ReportTabV8({
         conversions: value.conversions,
         revenue: value.revenue,
         reward: value.reward,
-        prevReward: prevMonthKey == null ? null : (prev ?? 0),
+        missingReward: value.missingReward,
+        prevReward: prevMonthKey == null || inPrevPeriod.some((item) => item.affiliateId === id && item.rewardAmount == null) ? null : (prev ?? 0),
         topOfferName: top?.[0] ?? null,
       }
     }).sort((a, b) => b.conversions - a.conversions || b.reward - a.reward)
@@ -177,13 +176,14 @@ export default function ReportTabV8({
 
   // 案件ごと
   const offerRows = useMemo<OfferAgg[]>(() => {
-    const map = new Map<string, { name: string; conversions: number; revenue: number; reward: number }>()
+    const map = new Map<string, { name: string; conversions: number; revenue: number; reward: number; missingReward: boolean }>()
     for (const item of inPeriod) {
       const id = item.offerId ?? 'none'
-      const current = map.get(id) ?? { name: item.offerName ?? '案件未設定', conversions: 0, revenue: 0, reward: 0 }
+      const current = map.get(id) ?? { name: item.offerName ?? '案件未設定', conversions: 0, revenue: 0, reward: 0, missingReward: false }
       current.conversions += 1
       current.revenue += item.value ?? 0
       current.reward += rewardOf(item)
+      current.missingReward ||= item.rewardAmount == null
       map.set(id, current)
     }
     const prevMap = new Map<string, number>()
@@ -197,7 +197,8 @@ export default function ReportTabV8({
       conversions: value.conversions,
       revenue: value.revenue,
       reward: value.reward,
-      prevReward: prevMonthKey == null ? null : (prevMap.get(id) ?? 0),
+      missingReward: value.missingReward,
+      prevReward: prevMonthKey == null || inPrevPeriod.some((item) => (item.offerId ?? 'none') === id && item.rewardAmount == null) ? null : (prevMap.get(id) ?? 0),
     })).sort((a, b) => b.conversions - a.conversions || b.reward - a.reward)
   }, [inPeriod, inPrevPeriod, prevMonthKey])
 
@@ -216,8 +217,8 @@ export default function ReportTabV8({
       ? ['アフィリエイター', 'いちばん多い案件', '成果', '売上', '報酬', '前の期間の報酬']
       : ['案件', '成果', '売上', '報酬', '前の期間の報酬']
     const rows = view === 'affiliate'
-      ? shownAffiliates.map((row) => [row.name, row.topOfferName ?? '', row.conversions, row.revenue, row.reward, row.prevReward ?? ''])
-      : shownOffers.map((row) => [row.name, row.conversions, row.revenue, row.reward, row.prevReward ?? ''])
+      ? shownAffiliates.map((row) => [row.name, row.topOfferName ?? '', row.conversions, row.revenue, row.missingReward ? '' : row.reward, row.prevReward ?? ''])
+      : shownOffers.map((row) => [row.name, row.conversions, row.revenue, row.missingReward ? '' : row.reward, row.prevReward ?? ''])
     const csv = [header, ...rows].map((line) => line.map(csvCell).join(',')).join('\r\n')
     const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
@@ -227,7 +228,7 @@ export default function ReportTabV8({
     URL.revokeObjectURL(url)
   }, [view, shownAffiliates, shownOffers])
 
-  const csvDisabled = (view === 'affiliate' ? shownAffiliates : shownOffers).length === 0
+  const csvDisabled = state !== 'ready' || (view === 'affiliate' ? shownAffiliates : shownOffers).length === 0
 
   useEffect(() => {
     registerHeaderActions(
@@ -281,20 +282,20 @@ export default function ReportTabV8({
         <KpiCell
           icon={<BarChart3 size={14} aria-hidden="true" />}
           label="報酬"
-          value={state === 'ready' ? formatYen(totalReward) : null}
-          sub={state === 'ready' ? (totalRevenue > 0 ? `売上の ${(totalReward / totalRevenue * 100).toFixed(1)}%` : '売上なし') : state === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
+          value={state === 'ready' && !hasMissingReward ? formatYen(totalReward) : null}
+          sub={state === 'ready' ? (hasMissingReward ? '未確定の報酬があります' : totalRevenue > 0 ? `売上の ${(totalReward / totalRevenue * 100).toFixed(1)}%` : '売上なし') : state === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
           info="認めた成果に確定した報酬の合計です。"
         />
         <KpiCell
           label="1件あたりの報酬"
-          value={state === 'ready' ? formatYen(perItem) : null}
-          sub={state === 'ready' ? (period === 'all' ? '成果1件あたりの平均' : `先月 ${formatYen(prevPerItem)}`) : state === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
+          value={state === 'ready' && !hasMissingReward ? formatYen(perItem) : null}
+          sub={state === 'ready' ? (hasMissingReward ? '未確定の報酬があります' : period === 'all' ? '成果1件あたりの平均' : hasMissingPreviousReward ? '先月の報酬は未確定です' : `先月 ${formatYen(prevPerItem)}`) : state === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
           info="報酬の合計 ÷ 認めた成果の数です。"
         />
       </KpiStrip>
 
       <NoticeBar>
-        期間は{monthLabel(period)}。数は「認めた成果」だけ。成果地点ごとのレポートは「分析 › レポート」で見られます。
+        期間は{monthLabel(period)}。数は「認めた成果」だけ。{hasMissingReward ? "未確定の報酬は金額を表示せず、CSVも空欄にしています。" : null}成果地点ごとのレポートは「分析 › レポート」で見られます。
       </NoticeBar>
 
       <div className="af-list-tools">
@@ -339,7 +340,7 @@ export default function ReportTabV8({
       </div>
 
       {listState === 'error' ? (
-        <LoadError name="レポート" onRetry={() => { void load() }} />
+        <><LoadError name="レポート" onRetry={() => { void load() }} /><Notice tone="danger" message={loadError} /></>
       ) : listState === 'loading' ? (
         <LoadingRows />
       ) : listState === 'empty' ? (
@@ -376,8 +377,8 @@ export default function ReportTabV8({
                       <span className="af-list-cellSub">{row.conversions > 0 ? formatYen(row.revenue) : '—'}</span>
                     </td>
                     <td className="af-list-numRight">
-                      {row.conversions === 0 ? '—' : row.reward === 0 ? '計測のみ' : (
-                        <strong>{formatYen(row.reward)} <span style={{ fontWeight: 400, color: 'var(--color-ink-faint)', fontSize: 11 }}>{diffText(row.reward, row.prevReward, row.conversions)}</span></strong>
+                      {row.conversions === 0 || row.missingReward ? '—' : row.reward === 0 ? '計測のみ' : (
+                        <strong>{row.missingReward ? '—' : formatYen(row.reward)} <span style={{ fontWeight: 400, color: 'var(--color-ink-faint)', fontSize: 11 }}>{row.missingReward ? null : diffText(row.reward, row.prevReward, row.conversions)}</span></strong>
                       )}
                     </td>
                     <td>
@@ -425,7 +426,7 @@ export default function ReportTabV8({
                       <span className="af-list-cellSub">{formatYen(row.revenue)}</span>
                     </td>
                     <td className="af-list-numRight">
-                      <strong>{formatYen(row.reward)} <span style={{ fontWeight: 400, color: 'var(--color-ink-faint)', fontSize: 11 }}>{diffText(row.reward, row.prevReward, row.conversions)}</span></strong>
+                      <strong>{row.missingReward ? '—' : formatYen(row.reward)} <span style={{ fontWeight: 400, color: 'var(--color-ink-faint)', fontSize: 11 }}>{row.missingReward ? null : diffText(row.reward, row.prevReward, row.conversions)}</span></strong>
                     </td>
                   </tr>
                 ))}
