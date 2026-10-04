@@ -1,4 +1,12 @@
-/* 色を選ぶ（Pencil ★V8 `KVkPg` / ★BG-2 `P8ZUj`・`d6PU4a`） */
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * 色を選ぶ（Pencil ★V8 `KVkPg` / ★BG-2 `P8ZUj`・`d6PU4a`）。
+ *
+ * 丸み 8 は `--radius-segment`。`--radius-control` は V8 で 10 になり、
+ * h28 の小さな欄（HEX・スポイト）には丸すぎるので使わない。
+ * 動きは `--motion-*` だけを使う（ポップは fast=120ms のまま）。
+ */
 
 .root {
   position: relative;
@@ -88,7 +96,7 @@
   border-radius: var(--radius-panel);
   background: var(--color-canvas);
   box-shadow: var(--shadow-float);
-  animation: color-well-pop 120ms ease-out;
+  animation: color-well-pop var(--motion-fast) var(--motion-ease-out);
 }
 
 @keyframes color-well-pop {
@@ -114,7 +122,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-segment);
   background: transparent;
   color: var(--color-ink-secondary);
   font-size: 13px;
@@ -124,7 +132,8 @@
 .tabOn {
   border-color: var(--color-board-line);
   background: var(--color-canvas);
-  box-shadow: 0 1px 2px #1d1d1f1a;
+  /* V8 は切り替えのつまみと同じ影。V7 は近い値の既存トークンで代える。 */
+  box-shadow: var(--shadow-segment-thumb, var(--shadow-nav-active));
   color: var(--color-ink);
   font-weight: 600;
 }
@@ -134,7 +143,7 @@
   position: relative;
   height: 168px;
   border: 1px solid var(--color-hairline);
-  border-radius: 8px;
+  border-radius: var(--radius-segment);
   cursor: crosshair;
   touch-action: none;
 }
@@ -143,8 +152,8 @@
   position: absolute;
   width: 20px;
   height: 20px;
-  border: 3px solid #ffffff;
-  border-radius: 9999px;
+  border: 3px solid var(--color-canvas);
+  border-radius: var(--radius-pill);
   box-shadow: 0 0 0 1px var(--color-board-line);
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -161,7 +170,7 @@
   width: 38px;
   height: 38px;
   flex-shrink: 0;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   box-shadow: inset 0 0 0 1px var(--color-board-line);
 }
 
@@ -175,7 +184,7 @@
 .bar {
   position: relative;
   height: 12px;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   box-shadow: inset 0 0 0 1px var(--color-board-line);
   cursor: pointer;
   touch-action: none;
@@ -186,8 +195,8 @@
   top: 50%;
   width: 18px;
   height: 18px;
-  border: 3px solid #ffffff;
-  border-radius: 9999px;
+  border: 3px solid var(--color-canvas);
+  border-radius: var(--radius-pill);
   box-shadow: 0 0 0 1px var(--color-board-line);
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -207,7 +216,7 @@
   height: 28px;
   padding: 0 8px;
   border: 1px solid var(--color-hairline);
-  border-radius: 8px;
+  border-radius: var(--radius-segment);
   background: var(--color-canvas);
 }
 
@@ -240,11 +249,28 @@
   color: var(--color-ink);
   font-size: 12px;
   font-weight: 600;
-  outline: none;
 }
 
 .hexInput {
   text-transform: uppercase;
+}
+
+/*
+ * キーボードで来たときだけ輪郭を出す（:focus だと指やマウスでも光り、
+ * 「選ばれている」と読み違える）。色は --color-action（＝普通の操作）。
+ */
+.well:focus-visible,
+.tab:focus-visible,
+.dropper:focus-visible,
+.hexInput:focus-visible,
+.alphaInput:focus-visible,
+.save:focus-visible,
+.cell:focus-visible,
+.saved:focus-visible,
+.clear:focus-visible,
+.apply:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
 }
 
 .alphaInput {
@@ -259,7 +285,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--color-hairline);
-  border-radius: 8px;
+  border-radius: var(--radius-segment);
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
   cursor: pointer;
@@ -312,7 +338,7 @@
   border-radius: var(--radius-mini);
   box-shadow: inset 0 0 0 1px var(--color-board-line);
   cursor: pointer;
-  transition: transform 120ms ease-out;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
 }
 
 .cell:hover {
@@ -365,7 +391,7 @@
 .apply {
   border: 0;
   background: var(--color-accent-deep);
-  color: #ffffff;
+  color: var(--color-on-accent);
 }
 
 /* V8 ではコントロールの枠を濃くする */
@@ -376,4 +402,5 @@
 [data-theme='v8'] .plane,
 [data-theme='v8'] .clear {
   border-color: var(--color-control-border);
+}
 }

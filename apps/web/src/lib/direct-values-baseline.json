@@ -14,11 +14,6 @@
     "radius": 0,
     "shadow": 0
   },
-  "app/form-submissions/page.tsx": {
-    "color": 1,
-    "radius": 0,
-    "shadow": 0
-  },
   "app/global-error.tsx": {
     "color": 3,
     "radius": 2,
@@ -70,7 +65,7 @@
     "shadow": 0
   },
   "app/visual-qa/v8-parts/page.tsx": {
-    "color": 1,
+    "color": 2,
     "radius": 0,
     "shadow": 0
   },
@@ -137,10 +132,10 @@
   "components/shared/color-well.module.css": {
     "color": 0,
     "radius": 0,
-    "shadow": 2
+    "shadow": 7
   },
   "components/shared/color-well.tsx": {
-    "color": 24,
+    "color": 41,
     "radius": 0,
     "shadow": 0
   },
@@ -205,7 +200,7 @@
     "shadow": 0
   },
   "lib/hq-banners.ts": {
-    "color": 10,
+    "color": 4,
     "radius": 0,
     "shadow": 0
   },
