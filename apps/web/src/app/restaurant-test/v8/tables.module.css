@@ -37,7 +37,8 @@
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: 13px;
-  cursor: pointer;
+  cursor: grab;
+  width: 100%;
 }
 
 .mapCard[aria-pressed="true"] {
@@ -173,3 +174,6 @@
   line-height: 1.8;
   color: var(--color-ink-secondary);
 }
+
+.mapCard:active { cursor: grabbing; }
+.mapCard:disabled { cursor: wait; }

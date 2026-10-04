@@ -1514,3 +1514,34 @@ describe('V8 店の名簿とログイン権限',()=>{
   expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-2','PUT',{},'operator-key')).status).toBe(403);
  });
 });
+
+describe('V8 フロア配置と結合グループ',()=>{
+ it('追加と変更で座標・結合を保存し、再取得しても同じ配置を返す',async()=>{
+  seedRestaurantFixture();
+  const added=await request('/api/restaurant-test/tables?account_id=account-1',{storeId:'store-ginza',code:'T2',label:'試験卓',seatType:'table',minCapacity:1,maxCapacity:2,floorX:2,floorY:1,joinGroup:' A '});
+  expect(added.status).toBe(201);const id=(await added.json() as any).data.id;
+  const updated=await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{floorX:0,floorY:2,joinGroup:'B'});
+  expect(updated.status).toBe(200);
+  const snapshot=await request('/api/restaurant-test/snapshot?account_id=account-1');
+  expect((await snapshot.json() as any).data.tables.find((t:any)=>t.id===id)).toMatchObject({floor_x:0,floor_y:2,join_group:'B'});
+  await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{joinGroup:null});
+  expect(testDb.raw.prepare('SELECT join_group FROM rt_tables WHERE id=?').get(id)).toEqual({join_group:null});
+ });
+ it('一括の配置に別店舗の卓が混ざると一件も更新しない',async()=>{
+  seedRestaurantFixture();testDb.raw.exec("INSERT INTO rt_tables(id,store_id,code,label,seat_type,min_capacity,max_capacity) VALUES('other-table','store-yokohama','T2','試験','table',1,2)");
+  const url='/api/restaurant-test/tables/layout?account_id=account-1';
+  const table={id:'table-ginza',floorX:2,floorY:1,joinGroup:'A'};
+  expect((await requestWithMethod(url,'PUT',{storeId:'store-ginza',tables:[table,{...table,id:'other-table'}]})).status).toBe(404);
+  expect(testDb.raw.prepare("SELECT floor_x,join_group FROM rt_tables WHERE id='table-ginza'").get()).toEqual({floor_x:0,join_group:null});
+  expect((await requestWithMethod(url,'PUT',{storeId:'store-ginza',tables:[table]})).status).toBe(200);
+  expect(testDb.raw.prepare("SELECT floor_x,floor_y,join_group FROM rt_tables WHERE id='table-ginza'").get()).toEqual({floor_x:2,floor_y:1,join_group:'A'});
+ });
+ it('不正な座標・重複・スタッフによる配置変更を拒む',async()=>{
+  seedRestaurantFixture();
+  for(const floorX of [-1,10001,0.5,null]) expect((await requestWithMethod('/api/restaurant-test/tables/table-ginza?account_id=account-1','PATCH',{floorX})).status).toBe(400);
+  const table={id:'table-ginza',floorX:0,floorY:0,joinGroup:null};
+  expect((await requestWithMethod('/api/restaurant-test/tables/layout?account_id=account-1','PUT',{storeId:'store-ginza',tables:[table,table]})).status).toBe(400);
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'operator',name:'担当者',role:'staff',access_level:'full',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:0});
+  expect((await requestWithMethod('/api/restaurant-test/tables/layout?account_id=account-1','PUT',{storeId:'store-ginza',tables:[table]},'operator-key')).status).toBe(403);
+ });
+});

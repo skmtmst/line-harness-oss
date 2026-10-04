@@ -14,7 +14,7 @@
 | Y8SjT2 / qf3ky 在庫 | GET `/inventory/day?storeId&date`、PUT `/inventory/:id`（既存）：otaCapacity/lineCapacity/walkInCapacity、expectedVersion。PUT `/inventory/allocation`：storeId、slots[{id,expectedVersion}]、媒体別配分 | 版・更新者・更新日時・予約人数・占有席・占有卓・空き席。全枠配分は一括・原子的に保存。古い版は409で最新情報を返す。画面は編集開始時の版を保持して比較する。 |
 | MJoJR 価格承認 | PATCH `/menu/:id`（既存）：price、effectiveAt（開始日時）。PATCH `/approvals/:id`（既存） | approvalId/requestId/pendingPrice。申請中は現行価格維持。承認後かつ開始日時到来で適用。二重申請・基準価格の変更409。申請中/承認済み開始待ちを画面表示。 |
 | bSp4h ログイン連携 | PUT `/memberships/:id/login`：staffId（既存ログインメンバーid、nullで解除） | 同統括のログインメンバーとの対応を保存。名簿に実際の役割・状態・範囲・版を返す。権限変更は既存 `/api/staff/:id` の再認証・最終管理者保護・版検査を必ず通す。ownerの昇格は行わない。対応した名簿は実際のログイン役割・店舗範囲に同期。未連携の名簿は従来どおり。 |
-| BERxg 卓配置 | PATCH `/tables/:id`（既存）：floorX/floorY（0〜10000整数）、joinGroup（nullで解除）、POST `/tables`も同じ項目 | 保存して再取得した座標・結合グループを使う。範囲外400。ドラッグと数値入力で保存。 |
+| BERxg 卓配置 | PATCH `/tables/:id`（既存）：floorX/floorY（0〜10000整数）、joinGroup（nullで解除）、POST `/tables`も同じ項目。PUT `/tables/layout`：storeId、tables[{id,floorX,floorY,joinGroup}]（1〜200件） | 保存して再取得した座標・結合グループを使う。範囲外400。ドラッグと数値入力で保存。座標は配置順の列・行として描画し、狭い画面では折り返す。一括配置は全件の店舗所属を照合して原子的に更新し、別店舗混在404では一件も更新しない。 |
 
 DB：567=仮押さえ期限・予約整合、568=在庫占有集計、569=価格の開始日時・ログインメンバー対応。既存546/547の仕組みは再利用する。新規表が必要になれば保存期限台帳も同時更新する。実環境適用は各番号のオーナー承認待ち。
 

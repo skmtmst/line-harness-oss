@@ -1,3 +1,4 @@
+import type { RestaurantTableLayoutInput } from '@line-crm/shared';
 import { updateStaffPolicy } from './staff.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -1439,18 +1440,47 @@ restaurantTest.post('/api/restaurant-test/inbound/reservations', requireRole('ow
   }
 });
 
+function validFloorCoordinate(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= 10000;
+}
+function validJoinGroup(value: unknown): value is string | null {
+  return value === null || (typeof value === 'string' && value.length <= 100);
+}
+
+restaurantTest.put('/api/restaurant-test/tables/layout', requireRole('owner', 'admin'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const body = await c.req.json<RestaurantTableLayoutInput>().catch(() => null);
+  if (!body || typeof body.storeId !== 'string' || !await storeBelongsTo(c, organization.id, body.storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  if (!Array.isArray(body.tables) || !body.tables.length || body.tables.length > 200
+      || body.tables.some(t => !t || typeof t.id !== 'string' || !t.id || !validFloorCoordinate(t.floorX) || !validFloorCoordinate(t.floorY) || !validJoinGroup(t.joinGroup))
+      || new Set(body.tables.map(t => t.id)).size !== body.tables.length) return c.json({ success: false, error: '卓の配置が正しくありません' }, 400);
+  const rows = body.tables.map(t => ({ ...t, joinGroup: t.joinGroup?.trim() || null }));
+  const result = await dbFor(c.env).prepare(`WITH positions AS MATERIALIZED (
+    SELECT json_extract(value,'$.id') AS id,json_extract(value,'$.floorX') AS x,json_extract(value,'$.floorY') AS y,json_extract(value,'$.joinGroup') AS join_group FROM json_each(?)
+  ), eligible AS MATERIALIZED (SELECT t.id FROM rt_tables t JOIN positions p ON p.id=t.id WHERE t.store_id=?)
+  UPDATE rt_tables SET floor_x=(SELECT x FROM positions WHERE id=rt_tables.id),floor_y=(SELECT y FROM positions WHERE id=rt_tables.id),
+    join_group=(SELECT join_group FROM positions WHERE id=rt_tables.id),updated_at=datetime('now')
+    WHERE id IN (SELECT id FROM eligible) AND (SELECT COUNT(*) FROM eligible)=?`)
+    .bind(JSON.stringify(rows), body.storeId, rows.length).run();
+  if (result.meta.changes !== rows.length) return c.json({ success: false, error: '卓が見つかりません。配置を読み直してください' }, 404);
+  return c.json({ success: true, data: { tables: rows } });
+});
+
 restaurantTest.post('/api/restaurant-test/tables', requireRole('owner', 'admin'), async (c) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
-  const body = await c.req.json<{ storeId?: string; code?: string; label?: string; seatType?: string; minCapacity?: number; maxCapacity?: number }>();
+  const body = await c.req.json<{ storeId?: string; code?: string; label?: string; seatType?: string; minCapacity?: number; maxCapacity?: number; floorX?: number; floorY?: number; joinGroup?: string | null }>();
   if (!body.storeId || !await storeBelongsTo(c, organization.id, body.storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
   const seatTypes = ['counter', 'table', 'private_room', 'terrace'];
   const min = Number(body.minCapacity);
   const max = Number(body.maxCapacity);
   if (!body.code?.trim() || !body.label?.trim() || !seatTypes.includes(body.seatType || '') || !Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max < min) return c.json({ success: false, error: '卓の入力内容が正しくありません' }, 400);
+  if (!validFloorCoordinate(body.floorX === undefined ? 0 : body.floorX) || !validFloorCoordinate(body.floorY === undefined ? 0 : body.floorY) || !validJoinGroup(body.joinGroup ?? null)) return c.json({ success: false, error: '卓の配置が正しくありません' }, 400);
   const id = crypto.randomUUID();
-  await dbFor(c.env, body.storeId).prepare('INSERT INTO rt_tables (id, store_id, code, label, seat_type, min_capacity, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(id, body.storeId, body.code.trim(), body.label.trim(), body.seatType, min, max).run();
+  await dbFor(c.env, body.storeId).prepare('INSERT INTO rt_tables (id, store_id, code, label, seat_type, min_capacity, max_capacity, floor_x, floor_y, join_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, body.storeId, body.code.trim(), body.label.trim(), body.seatType, min, max, body.floorX ?? 0, body.floorY ?? 0, body.joinGroup?.trim() || null).run();
   return c.json({ success: true, data: { id } }, 201);
 });
 
@@ -1480,7 +1510,7 @@ restaurantTest.patch('/api/restaurant-test/tables/:id', requireRole('owner', 'ad
     WHERE t.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
     .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
     .first<{ store_id: string; code: string; label: string; seat_type: string; min_capacity: number; max_capacity: number; is_active: number; floor_x: number; floor_y: number; join_group: string | null }>();
-  if (!current) return c.json({ success: false, error: '卓が見つかりません' }, 404);
+  if (!current || !await storeBelongsTo(c, organization.id, current.store_id)) return c.json({ success: false, error: '卓が見つかりません' }, 404);
   const body = await c.req.json<{ code?: string; label?: string; seatType?: string; minCapacity?: number; maxCapacity?: number; isActive?: boolean; floorX?: number; floorY?: number; joinGroup?: string | null }>();
   const code = body.code === undefined ? current.code : body.code;
   const label = body.label === undefined ? current.label : body.label;
@@ -1491,8 +1521,8 @@ restaurantTest.patch('/api/restaurant-test/tables/:id', requireRole('owner', 'ad
     || !['counter', 'table', 'private_room', 'terrace'].includes(seatType)
     || !Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max < min
     || (body.isActive !== undefined && typeof body.isActive !== 'boolean')
-    || (body.floorX !== undefined && !Number.isSafeInteger(body.floorX))
-    || (body.floorY !== undefined && !Number.isSafeInteger(body.floorY))
+    || (body.floorX !== undefined && !validFloorCoordinate(body.floorX))
+    || (body.floorY !== undefined && !validFloorCoordinate(body.floorY))
     || (body.joinGroup !== undefined && body.joinGroup !== null && (typeof body.joinGroup !== 'string' || body.joinGroup.length > 100))) {
     return c.json({ success: false, error: '卓の入力内容が正しくありません' }, 400);
   }
