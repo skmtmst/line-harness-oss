@@ -311,11 +311,11 @@ describe('V8 シナリオの通し：配信を始める→止める', () => {
     renderNode(<ScenarioDetailPage />)
     await flush()
 
-    fireEvent.click(await screen.findByRole('button', { name: '一時停止する' }))
+    fireEvent.click(await screen.findByRole('button', { name: '止める' }))
     // 止める窓は destructive のため role は alertdialog。
     const dialog = await screen.findByRole('alertdialog')
-    expect(dialog.textContent).toContain('一時停止しますか')
-    fireEvent.click(within(dialog).getByRole('button', { name: '一時停止する' }))
+    expect(dialog.textContent).toContain('止めますか')
+    fireEvent.click(within(dialog).getByRole('button', { name: '止める' }))
     await waitFor(() => expect(updateScenario).toHaveBeenCalledWith('sc-new', { isActive: false }))
     await screen.findByText('配信を一時停止しました')
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())

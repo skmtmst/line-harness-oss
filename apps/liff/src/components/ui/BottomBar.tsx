@@ -12,7 +12,7 @@ export default function BottomBar({ children }: { children: ReactNode }) {
       className="fixed inset-x-0 bottom-0 px-4"
       style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
     >
-      <div className="mx-auto flex w-full max-w-md flex-col items-stretch gap-2 rounded-[14px] bg-canvas p-3 shadow-lg">
+      <div className="mx-auto flex w-full max-w-md flex-col items-stretch gap-2 rounded-(--liff-radius-lg) bg-canvas p-3 shadow-lg">
         {children}
       </div>
     </div>

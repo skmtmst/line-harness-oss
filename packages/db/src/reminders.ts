@@ -401,6 +401,32 @@ export async function deleteReminder(db: D1Database, id: string): Promise<void> 
   ]);
 }
 
+/*
+ * 削除の取り消し（B 元に戻す）。定義の deleted_at を空に戻すだけ。
+ * 戻した直後は止めたまま（is_active = 0、lifecycle は stopped のまま）。
+ * 削除時に取り消した登録・配信予定は戻さない。消えている間に日時が
+ * 過ぎた相手へいきなり送らないため。送り直しは画面で登録し直す。
+ */
+export async function restoreReminder(
+  db: D1Database,
+  id: string,
+): Promise<ReminderRow | null> {
+  const now = jstNow();
+  const result = await db
+    .prepare(
+      `UPDATE reminders
+          SET deleted_at = NULL, is_active = 0, updated_at = ?
+        WHERE id = ? AND deleted_at IS NOT NULL`,
+    )
+    .bind(now, id)
+    .run();
+  if ((result.meta.changes ?? 0) !== 1) return null;
+  return db
+    .prepare(`SELECT * FROM reminders WHERE id = ?`)
+    .bind(id)
+    .first<ReminderRow>();
+}
+
 // =============================================================================
 // V6 公開版・下書き（274）
 // =============================================================================

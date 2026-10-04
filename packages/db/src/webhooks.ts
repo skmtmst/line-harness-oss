@@ -1292,6 +1292,22 @@ export async function deleteIncomingWebhook(
   return (result.meta.changes ?? 0) > 0;
 }
 
+/*
+ * 受信Webhookの削除の取り消し（B 元に戻す）。deleted_at を空に戻すだけ。
+ * 戻した直後は止めたまま（is_active = 0）。戻した瞬間に外へ送り出さない。
+ */
+export async function restoreIncomingWebhook(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<boolean> {
+  const result = await db.prepare(`UPDATE incoming_webhooks
+    SET deleted_at = NULL, deleted_by_staff_id = NULL, is_active = 0, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NOT NULL`)
+    .bind(jstNow(), id, lineAccountId).run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
 // --- 送信Webhook ---
 export async function getOutgoingWebhooks(
   db: D1Database,
@@ -1386,6 +1402,22 @@ export async function deleteOutgoingWebhook(
     SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0, updated_at = ?
     WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
     .bind(jstNow(), deletedByStaffId ?? null, jstNow(), id, lineAccountId).run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/*
+ * 送信Webhookの削除の取り消し（B 元に戻す）。deleted_at を空に戻すだけ。
+ * 戻した直後は止めたまま（is_active = 0）。戻した瞬間に外へ送り出さない。
+ */
+export async function restoreOutgoingWebhook(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<boolean> {
+  const result = await db.prepare(`UPDATE outgoing_webhooks
+    SET deleted_at = NULL, deleted_by_staff_id = NULL, is_active = 0, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NOT NULL`)
+    .bind(jstNow(), id, lineAccountId).run();
   return (result.meta.changes ?? 0) > 0;
 }
 

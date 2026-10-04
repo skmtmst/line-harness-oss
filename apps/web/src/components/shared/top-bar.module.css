@@ -461,6 +461,23 @@
   max-width: 104px;
 }
 
+/*
+ * ★V8 1152 の帯（M3 報告・parity 1003-2106：1152 の 29/31 板で札が
+ * 20px に潰れて見えなくなっていた）。札は縮めない（長い名前は
+ * 128px の「…」で受ける）。代わりにパンくずと自分の名前が縮む
+ * （どちらも「…」持ち）。v7 は今までどおり。
+ */
+[data-theme='v8'] .accountPill {
+  flex-shrink: 0;
+}
+
+[data-theme='v8'] .crumbCurrent,
+[data-theme='v8'] .crumbFrom,
+[data-theme='v8'] .crumbFromLink,
+[data-theme='v8'] .user {
+  min-width: 0;
+}
+
 /* 1152 未満ではログアウトを印だけにする（板 NF3uI「1152 の帯」）。
    字を消しても aria-label が残るので読み上げは変わらない。 */
 @media (max-width: 1151px) {
