@@ -90,6 +90,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'owner' } }) },
       tags: { ...actual.api.tags, list: mocks.tagsList },
       scenarios: { ...actual.api.scenarios, list: mocks.scenariosList },
       folders: { ...actual.api.folders, list: mocks.foldersList },
@@ -133,6 +134,12 @@ function unmount() {
 }
 
 beforeEach(() => {
+  // 予約を取り消せるオーナーとして操作する。実APIや他の試験の役割に依存させない。
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => key === 'lh_staff_role' ? 'owner' : null,
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+  })
   mocks.query = ''
   mocks.listRows = [draftRow('b-1', 'はじめの配信')]
   mocks.push.mockClear()
@@ -143,6 +150,7 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount()
+  vi.unstubAllGlobals()
 })
 
 describe('V8 一斉配信の通し', () => {

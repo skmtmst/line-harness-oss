@@ -62,6 +62,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         ...actual.api.richMenuGroups,
         list: async () => ({ success: true, data: [] }),
         listSchedules: async () => ({ success: true, data: [] }),
+        // 公開の進みも通信の差し替えに含める。冪等キーの試験で実APIを呼ばない。
+        publishProgress: async () => ({ success: true, data: { steps: [], message: null, run: null } }),
         schedule: async (
           _groupId: string,
           input: Record<string, unknown>,
