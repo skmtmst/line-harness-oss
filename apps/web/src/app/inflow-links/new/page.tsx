@@ -3,9 +3,9 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import type { ApiResponse, EntryRouteGenre, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
+import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
 import { groupTagsByFolder } from '../tag-options'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
@@ -71,8 +71,17 @@ export default function NewInflowLinkPage() {
   const [showScenarioPick, setShowScenarioPick] = useState(false)
   // R23横展開: アカウントを切り替えたら、前の候補にしかない選択を外して知らせる。
   const [pruneNotice, setPruneNotice] = useState<string | null>(null)
+  /*
+   * vWJEm（作る・競合）: 発行が 409（見分けるための文字が使用中）で返り、
+   * 同じ文字の発行済みリンクが見つかったときだけ立つ。誰が保存したかは
+   * 口が持っていないので出さない。保存日時と名前は実データを出す。
+   */
+  const [conflict, setConflict] = useState<EntryRoute | null>(null)
+  const [showCompare, setShowCompare] = useState(false)
 
   useEffect(() => {
+    // vWJEm: アカウントが変わったら前の競合は古いので閉じる。
+    clearConflict()
     let cancelled = false
     // プールは補助データ。機能がオフでもリンク発行画面そのものは止めない。
     // 403 の応答自体が console error になるため、有効と分からない限り
@@ -111,6 +120,7 @@ export default function NewInflowLinkPage() {
     }
     // R39: 候補（タグ・シナリオ・プール・テンプレート）はアカウントごとに
     // 違う。切替後に古い候補のまま保存しないよう、取り直す。入力は残す。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
 
   /*
@@ -195,6 +205,17 @@ export default function NewInflowLinkPage() {
       if (!res.success) throw new Error(res.error)
       router.push(`/inflow-links/detail?id=${res.data.id}`)
     } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        // vWJEm: 見分けるための文字が使用中。同じ文字の発行済みリンクを
+        // 探して比べられるようにする。見つからなければ通常の失敗文のまま。
+        const existing = await findRouteByRef(refCode.trim(), selectedAccountId)
+        if (existing) {
+          setConflict(existing)
+          setShowCompare(false)
+          setSaveError(null)
+          return
+        }
+      }
       setSaveError(describeApiFailure(error, '発行', {
         forbidden: '発行するには権限が要ります。オーナーか管理者に依頼してください。',
       }))
@@ -203,11 +224,127 @@ export default function NewInflowLinkPage() {
     }
   }
 
+  /*
+   * vWJEm: ref は全体で一意（entry-routes.ts の UNIQUE 制約）のため、
+   * まず今のアカウント、無ければ見える範囲の全部から同じ文字を探す。
+   */
+  async function findRouteByRef(ref: string, accountId: string): Promise<EntryRoute | null> {
+    const pick = (routes: EntryRoute[]): EntryRoute | null =>
+      routes.find((route) => route.refCode === ref) ?? null
+    try {
+      const scoped = await api.entryRoutes.list(accountId)
+      if (scoped.success) {
+        const hit = pick(scoped.data)
+        if (hit) return hit
+      }
+      const all = await api.entryRoutes.list()
+      if (all.success) return pick(all.data)
+    } catch {
+      // 探せないときは競合にしない。通常の失敗文を出す。
+    }
+    return null
+  }
+
+  /** vWJEm: 文字を変えたら競合は解けたものとして帯と比べを閉じる。 */
+  function clearConflict(): void {
+    if (conflict) {
+      setConflict(null)
+      setShowCompare(false)
+    }
+  }
+
+  /*
+   * vWJEm「最新を読み込んで続ける」: 保存されている値（実データ）を
+   * 入力へ写す。文字は競合のままなので変えてから発行する。
+   * 今のアカウントに無い候補は選べないため空ける。
+   */
+  function loadLatestAndContinue(): void {
+    if (!conflict) return
+    setName(conflict.name)
+    if (conflict.genre && genres.some((item) => item.name === conflict.genre)) {
+      setGenre(conflict.genre)
+      setNewGenre('')
+    } else if (conflict.genre) {
+      setGenre('__new')
+      setNewGenre(conflict.genre)
+    } else {
+      setGenre('')
+      setNewGenre('')
+    }
+    setTagId(conflict.tagId && tags.some((tag) => tag.id === conflict.tagId) ? conflict.tagId : '')
+    setScenarioId(conflict.scenarioId && scenarios.some((scenario) => scenario.id === conflict.scenarioId) ? conflict.scenarioId : '')
+    setIntroTemplateId(conflict.introTemplateId && templates.some((template) => template.id === conflict.introTemplateId) ? conflict.introTemplateId : '')
+    setPoolId(conflict.poolId && pools.some((pool) => pool.id === conflict.poolId) ? conflict.poolId : '')
+    setRedirectUrl(conflict.redirectUrl ?? '')
+    setIsActive(conflict.isActive)
+    setShowCompare(false)
+    setSaveError(null)
+  }
+
+  /** vWJEm: 保存日時（実データ）を「M月d日 H:mm」にする。壊れていたら出さない。 */
+  function formatSavedAt(value: string): string {
+    const time = new Date(value).getTime()
+    if (Number.isNaN(time)) return ''
+    const date = new Date(time)
+    const hour = String(date.getHours()).padStart(2, '0')
+    const minute = String(date.getMinutes()).padStart(2, '0')
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${hour}:${minute}`
+  }
+
   const tagName = tags.find((tag) => tag.id === tagId)?.name ?? null
   const scenarioName = scenarios.find((scenario) => scenario.id === scenarioId)?.name ?? null
   const introTemplate = templates.find((template) => template.id === introTemplateId) ?? null
   const previewMessage = introTemplate?.messageContent
     || 'はじめまして。友だち追加ありがとうございます。'
+
+  /*
+   * vWJEm「違いを比べる」の行。左は今の入力、右は保存されている値
+   * （どちらも実データ）。候補に無いIDは、その旨を正直に出す。
+   */
+  const resolveCandidate = (id: string | null, names: Map<string, string>, empty: string): string => {
+    if (!id) return empty
+    return names.get(id) ?? '（このアカウントにありません）'
+  }
+  const tagNames = new Map(tags.flatMap((tag) => [[tag.id, tag.name] as const]))
+  const scenarioNames = new Map(scenarios.map((scenario) => [scenario.id, scenario.name] as const))
+  const templateNames = new Map(templates.map((template) => [template.id, template.name] as const))
+  const poolNames = new Map(pools.map((pool) => [pool.id, pool.name] as const))
+  const poolName = poolId ? poolNames.get(poolId) ?? '（このアカウントにありません）' : 'メインプールで自動振り分け'
+  const conflictRows = conflict ? [
+    { label: '名前', mine: name.trim() || '（未設定）', saved: conflict.name },
+    {
+      label: 'フォルダ',
+      mine: genre === '__new' ? newGenre.trim() || '（未設定）' : genre || '（未設定）',
+      saved: conflict.genre ?? '（未設定）',
+    },
+    { label: '転送先', mine: redirectUrl.trim() || '（未設定）', saved: conflict.redirectUrl ?? '（未設定）' },
+    {
+      label: 'タグ',
+      mine: tagName ?? '（未設定）',
+      saved: resolveCandidate(conflict.tagId, tagNames, '（未設定）'),
+    },
+    {
+      label: 'メッセージ',
+      mine: introTemplate ? `テンプレート「${introTemplate.name}」` : '送らない',
+      saved: conflict.introTemplateId && templateNames.has(conflict.introTemplateId)
+        ? `テンプレート「${templateNames.get(conflict.introTemplateId)}」`
+        : resolveCandidate(conflict.introTemplateId, templateNames, '送らない'),
+    },
+    {
+      label: 'シナリオ',
+      mine: scenarioName ?? '（始めない）',
+      saved: resolveCandidate(conflict.scenarioId, scenarioNames, '（始めない）'),
+    },
+    {
+      label: '追加先',
+      mine: poolName,
+      saved: conflict.poolId
+        ? poolNames.get(conflict.poolId) ?? '（このアカウントにありません）'
+        : 'メインプールで自動振り分け',
+    },
+    { label: '公開', mine: isActive ? '公開する' : '公開しない', saved: conflict.isActive ? '公開する' : '公開しない' },
+  ] : []
+  const conflictSavedAt = conflict ? formatSavedAt(conflict.updatedAt) : ''
 
   return (
     <>
@@ -224,6 +361,48 @@ export default function NewInflowLinkPage() {
 
       {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} /> : null}
       {saveError ? <Notice tone="error" message={saveError} onClose={() => setSaveError(null)} /> : null}
+      {conflict ? (
+        <section className={styles.conflictBand} data-design-node="vWJEm" aria-label="文字が重複しています">
+          <div className={styles.conflictText}>
+            <div className={styles.conflictTitle}>「{conflict.refCode}」は既に使われています</div>
+            <div className={styles.conflictSub}>
+              {conflictSavedAt ? `${conflictSavedAt} 保存の` : ''}「{conflict.name}」があります。同じ文字のまま発行はできません。文字を変えるか、違いを比べてください。
+            </div>
+          </div>
+          <div className={styles.conflictActions}>
+            <Button variant="secondary" onClick={() => setShowCompare((current) => !current)} aria-expanded={showCompare}>
+              違いを比べる
+            </Button>
+            <Button variant="secondary" onClick={loadLatestAndContinue}>
+              最新を読み込んで続ける
+            </Button>
+          </div>
+        </section>
+      ) : null}
+      {conflict && showCompare ? (
+        <section className={styles.card} aria-label="いまの入力と保存されている値の違い">
+          <h3 className={styles.cardTitle}>いまの入力と保存されている値の違い</h3>
+          <p className={styles.cardSub}>左が今の入力、右が保存されている値です。どちらも実際の設定です</p>
+          <table className={styles.compareTable}>
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">いまの入力</th>
+                <th scope="col">保存されている値</th>
+              </tr>
+            </thead>
+            <tbody>
+              {conflictRows.map((row) => (
+                <tr key={row.label}>
+                  <th scope="row">{row.label}</th>
+                  <td>{row.mine}</td>
+                  <td>{row.saved}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
 
       <div className={styles.columns}>
         <div className={styles.mainCol}>
@@ -292,7 +471,7 @@ export default function NewInflowLinkPage() {
                   id="ir-ref"
                   type="text"
                   value={refCode}
-                  onChange={(e) => { setRefTouched(true); setRefCode(e.target.value); if (saveError) setSaveError(null) }}
+                  onChange={(e) => { setRefTouched(true); setRefCode(e.target.value); if (saveError) setSaveError(null); clearConflict() }}
                   placeholder="summer-ig"
                   aria-invalid={refCode !== '' && !validRef}
                   className={`${inputClass} font-mono`}
@@ -541,9 +720,15 @@ export default function NewInflowLinkPage() {
 
       <div className={styles.footer}>
         <Button variant="secondary" href="/inflow-links">キャンセル</Button>
-        <Button variant="primary" onClick={() => void doSave()} disabled={saving} aria-busy={saving}>
-          {saving ? '発行しています…' : '発行してURLを受け取る'}
-        </Button>
+        {conflict ? (
+          <Button variant="primary" onClick={() => setShowCompare(true)} disabled={saving}>
+            比べてから保存
+          </Button>
+        ) : (
+          <Button variant="primary" onClick={() => void doSave()} disabled={saving} aria-busy={saving}>
+            {saving ? '発行しています…' : '発行してURLを受け取る'}
+          </Button>
+        )}
       </div>
     </div>
 
