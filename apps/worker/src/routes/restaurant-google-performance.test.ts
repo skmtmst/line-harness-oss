@@ -12,11 +12,37 @@ type MockStaff = {
   can_access_descendant_accounts: number;
 };
 
-const authMocks = vi.hoisted(() => ({
-  getStaffByApiKey: vi.fn(async (): Promise<MockStaff | null> => null),
-  getStaffByAdminSession: vi.fn(async (): Promise<MockStaff | null> => null),
-  lineAccounts: [] as Array<Record<string, unknown>>,
-}));
+/*
+ * Googleのルートは長期APIキーでは通さない（restaurant-google.ts の googleAccessGuard）。
+ * Google Business Profile APIのポリシーが「End users of your Business Profile APIs need
+ * to manually sign in to use it.」と定めているため、このファイルのテストも本番と同じ
+ * 「管理画面に人がログインした状態」＝管理セッションで呼ぶ。
+ *
+ * 管理セッションは生のトークンではなくハッシュで引き当てるので、登録したトークンを
+ * 順に照合して返す。
+ */
+const authMocks = vi.hoisted(() => {
+  const sessions = new Map<string, unknown>();
+  async function sha256Hex(value: string): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  return {
+    sessions,
+    getStaffByApiKey: vi.fn(async (): Promise<unknown> => null),
+    getStaffByAdminSession: vi.fn(async (_db: unknown, tokenHash: string): Promise<unknown> => {
+      for (const [token, staff] of sessions) if ((await sha256Hex(token)) === tokenHash) return staff;
+      return null;
+    }),
+    lineAccounts: [] as Array<Record<string, unknown>>,
+  };
+});
+
+/** 管理画面にログインしたオーナー。既定のテスト利用者。 */
+const OWNER_SESSION: MockStaff = {
+  id: 'owner-1', name: 'オーナー', role: 'owner', access_level: 'full',
+  permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1,
+};
 
 vi.mock('@line-crm/db', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
@@ -29,7 +55,7 @@ vi.mock('@line-crm/db', async () => {
   };
 });
 
-const { authMiddleware } = await import('../middleware/auth.js');
+const { authMiddleware, ADMIN_SESSION_BEARER_PREFIX } = await import('../middleware/auth.js');
 const { restaurantGooglePerformance } = await import('./restaurant-google-performance.js');
 const { encryptCredential } = await import('@line-crm/db');
 type Env = import('../index.js').Env;
@@ -95,8 +121,17 @@ function app() {
   return instance;
 }
 
-function call(path: string, token = 'owner-key', init: { method?: string } = {}) {
-  return app().request(`${path}${path.includes('?') ? '&' : '?'}account_id=account-2`, { method: init.method, headers: { Authorization: `Bearer ${token}` } }, env);
+/** 管理セッションで呼ぶ。token は useStaffSession / OWNER_SESSION で登録したセッショントークン。 */
+function call(path: string, token = 'owner-session', init: { method?: string } = {}) {
+  return app().request(`${path}${path.includes('?') ? '&' : '?'}account_id=account-2`, { method: init.method, headers: { Authorization: `Bearer ${ADMIN_SESSION_BEARER_PREFIX}${token}` } }, env);
+}
+
+/** 担当者（staff）が管理画面にログインした状態を作る。 */
+function useStaffSession(): void {
+  testDb.raw
+    .prepare(`INSERT OR REPLACE INTO staff_members (id, name, role, api_key, tenant_id, account_scope, can_access_descendant_accounts, is_active) VALUES ('staff-1', '担当', 'staff', 'staff-key', ?, 'all', 1, 1)`)
+    .run(TENANT);
+  authMocks.sessions.set('staff-session', { id: 'staff-1', name: '担当', role: 'staff', access_level: 'full', permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1 });
 }
 
 beforeEach(() => {
@@ -104,6 +139,8 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   authMocks.getStaffByApiKey.mockReset();
   authMocks.getStaffByApiKey.mockResolvedValue(null);
+  authMocks.sessions.clear();
+  authMocks.sessions.set('owner-session', OWNER_SESSION);
   authMocks.lineAccounts = [
     { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
     { id: 'account-2', name: '渋谷店', is_active: 1, channel_access_token: 'token-2' },
@@ -170,11 +207,8 @@ describe('GET /api/restaurant-test/google/performance', () => {
   });
 
   it('担当者（staff）も読み取れる', async () => {
-    testDb.raw
-      .prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope, can_access_descendant_accounts, is_active) VALUES ('staff-1', '担当', 'staff', 'staff-key', ?, 'all', 1, 1)`)
-      .run(TENANT);
-    authMocks.getStaffByApiKey.mockResolvedValue({ id: 'staff-1', name: '担当', role: 'staff', access_level: 'full', permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1 });
-    const res = await call('/api/restaurant-test/google/performance?days=7', 'staff-key');
+    useStaffSession();
+    const res = await call('/api/restaurant-test/google/performance?days=7', 'staff-session');
     expect(res.status).toBe(200);
   });
 
@@ -209,7 +243,7 @@ describe('POST /api/restaurant-test/google/performance/sync（検証環境向け
   it('接続済み店舗のこの店舗だけをJST当日ゲート無視で取り直し、数値がGET側に反映される', async () => {
     await seedConnection();
     stubMetricsFetch();
-    const res = await call('/api/restaurant-test/google/performance/sync', 'owner-key', { method: 'POST' });
+    const res = await call('/api/restaurant-test/google/performance/sync', 'owner-session', { method: 'POST' });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { success: boolean; synced: number; skipped: number; failed: number };
     expect(body).toMatchObject({ success: true, synced: 1, skipped: 0, failed: 0 });
@@ -223,18 +257,15 @@ describe('POST /api/restaurant-test/google/performance/sync（検証環境向け
   });
 
   it('接続が無い店舗は409', async () => {
-    const res = await call('/api/restaurant-test/google/performance/sync', 'owner-key', { method: 'POST' });
+    const res = await call('/api/restaurant-test/google/performance/sync', 'owner-session', { method: 'POST' });
     expect(res.status).toBe(409);
   });
 
   it('担当者（staff）も手動同期を実行できる', async () => {
     await seedConnection();
     stubMetricsFetch();
-    testDb.raw
-      .prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope, can_access_descendant_accounts, is_active) VALUES ('staff-1', '担当', 'staff', 'staff-key', ?, 'all', 1, 1)`)
-      .run(TENANT);
-    authMocks.getStaffByApiKey.mockResolvedValue({ id: 'staff-1', name: '担当', role: 'staff', access_level: 'full', permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1 });
-    const res = await call('/api/restaurant-test/google/performance/sync', 'staff-key', { method: 'POST' });
+    useStaffSession();
+    const res = await call('/api/restaurant-test/google/performance/sync', 'staff-session', { method: 'POST' });
     expect(res.status).toBe(200);
   });
 });

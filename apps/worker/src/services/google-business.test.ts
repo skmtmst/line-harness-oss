@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GOOGLE_BUSINESS_REQUIRED_SCOPES,
   GoogleBusinessError,
   buildAuthorizeUrl,
   buildReplyDraftPrompt,
@@ -63,6 +64,40 @@ describe('Google Business OAuth', () => {
     const tokens = await refreshAccessToken({ client, refreshToken: 'rt-keep', fetch, nowMs: 0 });
     expect(tokens.refreshToken).toBe('rt-keep');
     expect(tokens.expiresAtMs).toBe(100_000);
+  });
+
+  it('認可URLに include_granted_scopes を付けない（別用途のスコープを混ぜない）', async () => {
+    const challenge = await codeChallengeFor('verifier-value');
+    const url = new URL(buildAuthorizeUrl({ clientId: 'cid', redirectUri: client.redirectUri, state: 'st', codeChallenge: challenge }));
+    expect(url.searchParams.get('include_granted_scopes')).toBeNull();
+    expect(url.searchParams.get('scope')?.split(' ').sort()).toEqual(['email', 'https://www.googleapis.com/auth/business.manage', 'openid']);
+  });
+
+  it('同意画面で business.manage を外されたままの接続は no_permission で止める', async () => {
+    const { fetch } = fetchFrom(() => jsonResponse({ access_token: 'at', refresh_token: 'rt', expires_in: 3600, scope: 'openid email' }));
+    await expect(
+      exchangeAuthorizationCode({ client, code: 'code1', codeVerifier: 'ver', fetch, requiredScopes: GOOGLE_BUSINESS_REQUIRED_SCOPES }),
+    ).rejects.toMatchObject({ kind: 'no_permission' });
+  });
+
+  it('business.manage が許可されていれば接続できる', async () => {
+    const granted = 'openid email https://www.googleapis.com/auth/business.manage';
+    const { fetch } = fetchFrom(() => jsonResponse({ access_token: 'at', refresh_token: 'rt', expires_in: 3600, scope: granted }));
+    const tokens = await exchangeAuthorizationCode({ client, code: 'code1', codeVerifier: 'ver', fetch, nowMs: 0, requiredScopes: GOOGLE_BUSINESS_REQUIRED_SCOPES });
+    expect(tokens.accessToken).toBe('at');
+  });
+
+  it('Googleが scope を返さない応答は検証しない（必須の応答項目ではない）', async () => {
+    const { fetch } = fetchFrom(() => jsonResponse({ access_token: 'at', refresh_token: 'rt', expires_in: 3600 }));
+    const tokens = await exchangeAuthorizationCode({ client, code: 'code1', codeVerifier: 'ver', fetch, nowMs: 0, requiredScopes: GOOGLE_BUSINESS_REQUIRED_SCOPES });
+    expect(tokens.accessToken).toBe('at');
+  });
+
+  it('連携後に business.manage だけ取り消されたら更新時に no_permission にする', async () => {
+    const { fetch } = fetchFrom(() => jsonResponse({ access_token: 'at2', expires_in: 3600, scope: 'openid email' }));
+    await expect(
+      refreshAccessToken({ client, refreshToken: 'rt', fetch, requiredScopes: GOOGLE_BUSINESS_REQUIRED_SCOPES }),
+    ).rejects.toMatchObject({ kind: 'no_permission' });
   });
 });
 

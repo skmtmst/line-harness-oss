@@ -1646,8 +1646,9 @@ async function runFrequentHeavyJobs(
 
   if (restaurantTestEnabled(env)) {
     jobs.push({
-      // Googleビジネス第4段: 口コミ・投稿の再同期。5分レーンだが接続ごとの
-      // 55分ゲートで実質1時間ごと。書き込み経路は手動syncと同じ関数を使う。
+      // Googleビジネス第4段: 口コミ・投稿の再同期。重い処理用レーン（`1-56/5`。
+      // 通知レーンと1分ずらした5分間隔）で動くが、接続ごとの55分ゲートで実質1時間ごと。
+      // 読み取りAPIだけを呼び、書き込みAPIは呼ばない（手動syncと同じ関数を使う）。
       name: 'google business resync',
       run: async () => {
         const { processGoogleBusinessHourlyResync } = await import('./services/google-business-resync.js');
@@ -1849,6 +1850,23 @@ async function runSixHourlyHeavyJobs(
         });
         if (result.createdSheets + result.importedOrders + result.wroteRows + result.failed > 0) {
           console.log(JSON.stringify({ event: 'tiktok_pnl_tick', ...result }));
+        }
+      },
+    },
+    {
+      // Googleビジネス: Googleから受け取った内容の保存期限（暦日30日）を守る掃除。
+      // 機能スイッチでゲートしない。機能をoffにした店舗の古いコピーが残り続けるほうが
+      // ポリシー違反になるため、スイッチと関係なく毎回走らせる。
+      name: 'google business content retention',
+      run: async () => {
+        const { purgeExpiredGoogleContent, totalRetentionActions } = await import(
+          './services/google-business-retention.js'
+        );
+        const result = await purgeExpiredGoogleContent(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (totalRetentionActions(result) > 0) {
+          console.log(JSON.stringify({ event: 'google_business_content_retention', ...result }));
         }
       },
     },

@@ -22,6 +22,10 @@ export default {
     refunds: "",
   },
   legal: {
+    // 法務文面の承認・保存期間の日数・国外処理の案内は、この枝では触らない。
+    // 日数は packages/shared/src/data-retention.json を読む仕組みが前提で、
+    // その読み込み処理（DATA_RETENTION_DAYS）はまだ main に無い。
+    // 公開サイトの承認済み文面を main へ上げるのは別の作業として分ける。
     approved: false,
     effectiveDate: "",
     retention: "",

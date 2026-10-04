@@ -13,7 +13,7 @@ tags: [memory, core]
 ## 事業・活動の概要
 
 - LINE 公式アカウントの CRM「LINE Harness」を、Lステップ / Liny の無料代替として作っている。Cloudflare Workers + D1 + Next.js 管理画面 + LIFF。MIT。
-- 最初の顧客は 然-NEN(ペットフード EC)。飲食店向けは本番では無効のテスト機能。
+- 最初の顧客は 然-NEN(ペットフード EC)。飲食店向け(restaurant-test)は2026-10-04から実運用でも有効。Googleの機密スコープ審査（デモ動画と提出）のため。API側 `RESTAURANT_TEST_ENABLED` と管理画面ビルド `NEXT_PUBLIC_RESTAURANT_TEST_ENABLED` は常に同じ値にする。
 - ゴール: Pencil(Pen.dev)の ★V6 260 画面と要件書どおりに仕上げ、機能・安全性・使い勝手で Lステップを超える。
 
 ## 体制・役割(2026-09-04 14:30 オーナー決定で改訂)

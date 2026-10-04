@@ -13,11 +13,37 @@ type MockStaff = {
   tenant_id?: string | null;
 };
 
-const authMocks = vi.hoisted(() => ({
-  getStaffByApiKey: vi.fn(async (): Promise<MockStaff | null> => null),
-  getStaffByAdminSession: vi.fn(async (): Promise<MockStaff | null> => null),
-  lineAccounts: [] as Array<Record<string, unknown>>,
-}));
+/*
+ * Googleのルートは長期APIキーでは通さない（restaurant-google.ts の googleAccessGuard）。
+ * Google Business Profile APIのポリシーが「End users of your Business Profile APIs need
+ * to manually sign in to use it.」と定めているため、このファイルのテストも本番と同じ
+ * 「管理画面に人がログインした状態」＝管理セッションで呼ぶ。
+ *
+ * 管理セッションは生のトークンではなくハッシュで引き当てるので、登録したトークンを
+ * 順に照合して返す。
+ */
+const authMocks = vi.hoisted(() => {
+  const sessions = new Map<string, unknown>();
+  async function sha256Hex(value: string): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  return {
+    sessions,
+    getStaffByApiKey: vi.fn(async (): Promise<unknown> => null),
+    getStaffByAdminSession: vi.fn(async (_db: unknown, tokenHash: string): Promise<unknown> => {
+      for (const [token, staff] of sessions) if ((await sha256Hex(token)) === tokenHash) return staff;
+      return null;
+    }),
+    lineAccounts: [] as Array<Record<string, unknown>>,
+  };
+});
+
+/** 管理画面にログインしたオーナー。既定のテスト利用者。 */
+const OWNER_SESSION: MockStaff = {
+  id: 'owner-1', name: 'オーナー', role: 'owner', access_level: 'full',
+  permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1,
+};
 
 vi.mock('@line-crm/db', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
@@ -30,7 +56,7 @@ vi.mock('@line-crm/db', async () => {
   };
 });
 
-const { authMiddleware } = await import('../middleware/auth.js');
+const { authMiddleware, ADMIN_SESSION_BEARER_PREFIX } = await import('../middleware/auth.js');
 const { restaurantGooglePosts } = await import('./restaurant-google-posts.js');
 const { encryptCredential } = await import('@line-crm/db');
 type Env = import('../index.js').Env;
@@ -88,8 +114,9 @@ function app() {
   return instance;
 }
 
+/** 管理セッションで呼ぶ。token は useStaffRole / OWNER_SESSION で登録したセッショントークン。 */
 function call(path: string, init: { method?: string; body?: unknown; token?: string } = {}) {
-  const headers: Record<string, string> = { Authorization: `Bearer ${init.token ?? 'owner-key'}` };
+  const headers: Record<string, string> = { Authorization: `Bearer ${ADMIN_SESSION_BEARER_PREFIX}${init.token ?? 'owner-session'}` };
   if (init.body !== undefined) headers['Content-Type'] = 'application/json';
   return app().request(`${path}${path.includes('?') ? '&' : '?'}account_id=account-2`, { method: init.method ?? (init.body === undefined ? 'GET' : 'POST'), headers, body: init.body === undefined ? undefined : JSON.stringify(init.body) }, env);
 }
@@ -98,7 +125,7 @@ function useStaffRole(role: 'admin' | 'staff'): void {
   testDb.raw
     .prepare(`INSERT OR REPLACE INTO staff_members (id, name, role, api_key, tenant_id, account_scope, can_access_descendant_accounts, is_active) VALUES (?, ?, ?, ?, ?, 'all', 1, 1)`)
     .run(`${role}-1`, role, role, `${role}-key`, TENANT);
-  authMocks.getStaffByApiKey.mockResolvedValue({ id: `${role}-1`, name: role, role, access_level: 'full', permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1 });
+  authMocks.sessions.set(`${role}-session`, { id: `${role}-1`, name: role, role, access_level: 'full', permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1 });
 }
 
 function createCalls() {
@@ -123,7 +150,8 @@ beforeEach(async () => {
   logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   authMocks.getStaffByApiKey.mockReset();
   authMocks.getStaffByApiKey.mockResolvedValue(null);
-  authMocks.getStaffByAdminSession.mockReset();
+  authMocks.sessions.clear();
+  authMocks.sessions.set('owner-session', OWNER_SESSION);
   authMocks.lineAccounts = [
     { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
     { id: 'account-2', name: '渋谷店', is_active: 1, channel_access_token: 'token-2' },
@@ -207,13 +235,13 @@ describe('下書き（GB-4/5/6/7）', () => {
 describe('権限', () => {
   it('担当者は下書きを作れるが公開はできない。店舗管理者以上は公開できる', async () => {
     useStaffRole('staff');
-    const draft = await createDraft(standardBody, 'staff-key');
+    const draft = await createDraft(standardBody, 'staff-session');
     expect(draft.status).toBe(200);
-    const staffPublish = await publish(draft.json.post!.id, 'staff-key');
+    const staffPublish = await publish(draft.json.post!.id, 'staff-session');
     expect(staffPublish.status).toBe(403);
 
     useStaffRole('admin');
-    const p = await publish(draft.json.post!.id, 'admin-key');
+    const p = await publish(draft.json.post!.id, 'admin-session');
     expect(p.status).toBe(200);
   });
 });
