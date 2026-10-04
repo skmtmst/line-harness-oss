@@ -23,6 +23,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import LinePreview from '@/components/shared/line-preview'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { notifyToast } from '@/components/shared/toast'
 import { Field } from '@/components/shared/form-controls'
 import FlexPreviewComponent from '@/components/flex-preview'
 import { useAccount } from '@/contexts/account-context'
@@ -64,8 +65,28 @@ function draftSnapshot(draft: TemplateEditorState['draft']): string {
   return JSON.stringify(draft)
 }
 
+/*
+ * 1152 幅の板の印（V8.pen の地図）。板が 1100px を切ったら（画面幅で約 1352px
+ * 未満）、作る画面の外枠に 1152 の板 ID を付ける。数える側は印で数える。
+ */
+function useNarrowBoard() {
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const query = window.matchMedia('(max-width: 1351px)')
+    const update = () => setNarrow(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  return narrow
+}
+
 function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean }) {
   const router = useRouter()
+  /* 作る画面だけ：1152 幅なら板 `a1k3d`。変える画面は `u5YC6` のまま。 */
+  const narrowBoard = useNarrowBoard()
+  const designNode = id ? 'u5YC6' : narrowBoard ? 'a1k3d' : 'u5YC6'
   const { accounts, selectedAccountId } = useAccount()
   const [canMutateTemplates] = useState(() =>
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
@@ -257,7 +278,10 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
         return
       }
       const ok = await publishNow(templateId, detail.data)
-      if (ok) router.push('/templates')
+      if (ok) {
+        notifyToast('公開しました')
+        router.push('/templates')
+      }
     } finally {
       setPublishing(false)
     }
@@ -296,7 +320,10 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
 
   const onSaveDraft = async () => {
     const savedId = await saveNow()
-    if (savedId) router.push('/templates')
+    if (savedId) {
+      notifyToast('下書きを保存しました')
+      router.push('/templates')
+    }
   }
 
   const onPublish = async () => {
@@ -331,7 +358,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
         lead={id
           ? '保存は下書きの保存です。使っている場所へ届けるには「保存して公開」'
           : '保存しただけでは、どこにも送られません'}
-        designNode="u5YC6"
+        designNode={designNode}
         dirty={dirty}
         dirtySubject="テンプレートの変更"
         saving={saving}
@@ -501,6 +528,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
             const ok = await publishNow(publishCheck.id)
             if (ok) {
               setPublishCheck(null)
+              notifyToast('公開しました')
               router.push('/templates')
             }
           } finally {

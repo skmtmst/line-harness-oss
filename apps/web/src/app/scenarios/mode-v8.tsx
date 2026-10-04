@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
+import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -198,6 +199,7 @@ export default function ScenarioModeV8() {
       setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
       return null
     }
+    notifyToast('シナリオを作りました')
     return res.data.id
   }
 
