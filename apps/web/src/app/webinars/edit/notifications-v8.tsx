@@ -10,6 +10,7 @@ import LinePreview from '@/components/shared/line-preview'
 import WebinarNotifications from '@/components/webinars/webinar-notifications'
 import { webinarApi, type WebinarAction, type WebinarEditor, type WebinarNotificationOverview, type WebinarNotificationSettings } from '@/lib/api'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 
 const TRIGGER_LABEL: Record<WebinarAction['trigger'], string> = { completed: '視聴完了', cta_clicked: 'CTAクリック', unviewed: '未視聴' }
 const ACTION_LABEL: Record<WebinarAction['actionType'], string> = { add_tag: 'タグを付ける', remove_tag: 'タグを外す', start_scenario: 'シナリオを始める', stop_scenario: 'シナリオを止める', resume_scenario: 'シナリオを再開する', send_message: 'メッセージを送る', send_webhook: 'Webhookを送る', switch_rich_menu: 'リッチメニューを変える', remove_rich_menu: 'リッチメニューを外す' }
@@ -21,6 +22,7 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
   registerSave?: (save: (() => Promise<boolean>) | null) => void
   publicUrl?: string | null; canOpenPublicPage?: boolean; publicPageReason?: string
 }) {
+  const canEdit = canManageRole(useStaffRole())
   const [settingsReady, setSettingsReady] = useState(false)
   const [notificationDirty, setNotificationDirty] = useState(false)
   const notificationSave = useRef<(() => Promise<boolean>) | null>(null)
@@ -41,6 +43,7 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
   const [testing, setTesting] = useState(false)
   const testLock = useRef(false)
   const [testResult, setTestResult] = useState('')
+  const [testRefreshError, setTestRefreshError] = useState(false)
 
   useEffect(() => {
     let current = true
@@ -57,7 +60,7 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
 
   const save = async (): Promise<boolean> => {
-    if (saveLock.current || (!settingsReady && !dirty)) return false
+    if (!canEdit || saveLock.current || (!settingsReady && !dirty)) return false
     saveLock.current = true; setSaving(true); setError('')
     try {
       let version = editor.version
@@ -84,31 +87,44 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
     return () => registerSave?.(null)
   }, [registerSave])
 
-  const runTest = async () => {
+  const refreshTestResult = async () => {
+    try {
+      const refreshed = await webinarApi.editor(webinarId)
+      onEditorChange?.(refreshed.data)
+      setTestRefreshError(false)
+    } catch { setTestRefreshError(true) }
+  }
+  const retryTestResult = async () => {
     if (testLock.current) return
+    testLock.current = true; setTesting(true)
+    try { await refreshTestResult() }
+    finally { testLock.current = false; setTesting(false) }
+  }
+  const runTest = async () => {
+    if (!canEdit || !settingsReady || testRefreshError || testLock.current) return
     testLock.current = true; setTesting(true); setTestResult('')
     try {
       if (dirty && !await saveRef.current()) return
       setTestConfirmOpen(false)
       const res = await webinarApi.testNotifications(webinarId)
       setTestResult(`テスト送信しました。成功 ${res.data.sent}件・失敗 ${res.data.failed}件`)
-      const refreshed = await webinarApi.editor(webinarId)
-      onEditorChange?.(refreshed.data)
+      // 送信後の読み直しだけが失敗しても、届いた結果を消して再送へ誘導しない。
+      await refreshTestResult()
     } catch (cause) { setTestResult(webinarErrorText(cause, 'テスト送信できませんでした。時間をおいてもう一度お試しください。')) }
     finally { testLock.current = false; setTesting(false) }
   }
   const testDone = !dirty && editor.notificationTest?.status === 'passed'
   const preview = editor.notificationMessages?.registration || editor.notificationMessages?.start || ''
-  const testButton = (label: string) => <Button onClick={() => setTestConfirmOpen(true)} disabled={testing || saving || testDone || !settingsReady} title={testDone ? 'テスト済みです' : !settingsReady ? '通知の設定を読み込んでから実行できます' : undefined} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : label}</Button>
+  const testButton = (label: string) => <Button onClick={() => setTestConfirmOpen(true)} disabled={!canEdit || testing || saving || testDone || !settingsReady || testRefreshError} title={!canEdit ? 'テスト送信はオーナーか管理者に依頼してください' : testRefreshError ? '送信済みの結果を読み直してください' : testDone ? 'テスト済みです' : !settingsReady ? '通知の設定を読み込んでから実行できます' : undefined} busy={testing} busyLabel={testRefreshError ? '読み込んでいます…' : '送信中…'}>{testDone ? 'テスト送信済み' : label}</Button>
 
   return (
     <div data-design-node="E7iAYs" data-webinar-pane="notifications">
       <div className="min-w-0 space-y-4">
-        <section className="border-hairline bg-canvas rounded-card border p-5">
+        <fieldset disabled={!canEdit || saving || testing} className="border-hairline bg-canvas min-w-0 rounded-card border p-5">
           <WebinarNotifications webinarId={webinarId} onLoaded={handleLoaded} onDirtyChange={setNotificationDirty} registerSave={registerNotificationSave} />
           <div className="mt-3">{testButton('テストを送る（全部）')}</div>
-        </section>
-        <fieldset disabled={saving} className="border-hairline bg-canvas min-w-0 rounded-card border p-5">
+        </fieldset>
+        <fieldset disabled={!canEdit || saving || testing} className="border-hairline bg-canvas min-w-0 rounded-card border p-5">
           <h2 className="text-ink text-base font-semibold">視聴後にすること <HelpTip label="視聴後にすることの説明">見たかどうかで、タグを付けたりシナリオを始めたりします。</HelpTip></h2>
           {actionError ? <Notice tone="info" action={<Button onClick={() => setActionAttempt((value) => value + 1)}>もう一度読み込む</Button>}>視聴後の設定を読み込めませんでした。</Notice> : <ul className="divide-hairline my-3 divide-y">
             {(['completed', 'cta_clicked', 'unviewed'] as const).map((trigger) => <li key={trigger} className="flex items-center gap-4 py-3"><span className="text-ink w-24 shrink-0 text-sm font-semibold">{TRIGGER_LABEL[trigger]}</span><span className="text-ink-secondary min-w-0 flex-1 truncate text-sm" title={actions?.filter((a) => a.trigger === trigger).map((a) => ACTION_LABEL[a.actionType]).join('・')}>{actions === null ? '読み込んでいます' : actions.filter((a) => a.trigger === trigger).map((a) => ACTION_LABEL[a.actionType]).join('・') || 'まだ何もしない'}</span><Button size="compact" onClick={onOpenActions} aria-label={`${TRIGGER_LABEL[trigger]}の動きを変える`}>…</Button></li>)}
@@ -121,6 +137,7 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
         </fieldset>
         {error ? <Notice tone="info">{error}</Notice> : null}
         {testResult ? <p role="status" className="text-ink-secondary text-xs">{testResult}</p> : null}
+        {testRefreshError ? <Notice tone="info" action={<Button onClick={() => void retryTestResult()} disabled={testing} busy={testing}>送信結果を読み直す</Button>}>テスト送信の結果を受け取りましたが、確認状態を読み込めませんでした。再送せずに結果を読み直してください。</Notice> : null}
       </div>
       <aside aria-label="LINEでの見え方">
         <h2 className="text-ink mb-3 text-base font-semibold">LINEでの見え方</h2>
