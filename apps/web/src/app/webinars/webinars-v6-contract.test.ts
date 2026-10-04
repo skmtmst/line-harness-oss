@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'list-v8.tsx'), 'utf8')
 const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
+const PARTICIPANTS = fs.readFileSync(path.join(__dirname, 'edit/participants-v8.tsx'), 'utf8')
+const ANALYTICS = fs.readFileSync(path.join(__dirname, 'edit/analytics-v8.tsx'), 'utf8')
 const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 const FORM = fs.readFileSync(path.join(__dirname, '../../components/webinars/webinar-form.tsx'), 'utf8')
@@ -135,10 +137,9 @@ describe('V6 ウェビナー一覧の契約', () => {
     }
     expect(EDIT).toContain('webinarApi.saveActions(webinarId, actions)')
     // #1053: 直リンクは Bearer 補完経路で401になるため、認証付き取得へ。
-    expect(EDIT).toContain('downloadApiFile(webinarApi.participantsCsvUrl(webinarId')
+    expect(ANALYTICS).toContain('downloadApiFile(webinarApi.participantsCsvUrl(webinarId')
     expect(EDIT).toContain('data-design-node="Xjk8q"')
-    expect(EDIT).toContain('data-design-node="Q8sHa"')
-    expect(EDIT).toContain('data-design-node="yxyzQ"')
+    expect(ANALYTICS).toContain('data-design-node="z2dgw"')
   })
 
   it('アーカイブの失敗は対象を失わず同じ窓で伝える（#985 CHK-02）', () => {
@@ -153,8 +154,6 @@ describe('V6 ウェビナー一覧の契約', () => {
     for (const call of [
       'webinarApi.editor(id)',
       'webinarApi.publishValidation(webinar.id)',
-      'webinarApi.participants(webinarId, undefined, PARTICIPANTS_PAGE_SIZE, participantFilter || undefined)',
-      'webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE, participantFilter || undefined)',
       'webinarApi.testPublicPage(webinar.id, editor.version)',
     ]) expect(EDIT).toContain(call)
     for (const call of [
@@ -162,7 +161,8 @@ describe('V6 ウェビナー一覧の契約', () => {
       'webinarApi.testNotifications(id)',
       'webinarApi.duplicate(id, editor.version)',
     ]) expect(PUBLISHED).toContain(call)
-    expect(EDIT).toContain('analytics.viewSegments')
+    expect(PARTICIPANTS).toContain('webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE, filter || undefined)')
+    expect(ANALYTICS).toContain('retention={analytics.retention')
     expect(PUBLISHED).toContain('editor.monitoring.notificationFailures')
   })
 })

@@ -630,21 +630,11 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(false)
   })
 
-  it('R98 分析の見出し移動は表示中の節だけを指し、指し先が実在する', async () => {
+  it('分析は実際に表示している集計とグラフだけを案内する', async () => {
     navigationMocks.query = 'id=webinar-1&pane=analytics'
     const view = await mount(<EditWebinarPage />)
-    const nav = elements(view.container).find((element) => element.tagName === 'NAV' && element.getAttribute('aria-label') === 'この段の見出しへ移動')
-    expect(nav, '見出し移動の nav がありません').toBeTruthy()
-    const links = elements(nav!).filter((element) => element.tagName === 'A')
-    expect(links.length, '表示中の節への移動がありません').toBeGreaterThan(0)
-    const ids = new Set(elements(view.container).map((element) => element.getAttribute('id')).filter((id) => id))
-    for (const link of links) {
-      const href = link.getAttribute('href') ?? ''
-      expect(href.startsWith('#'), `節への移動ではありません: ${href}`).toBe(true)
-      expect(ids.has(href.slice(1)), `指し先の節がありません: ${href}`).toBe(true)
-    }
-    /* 出ない節（旧5節の離脱・CTA・申込）への入口は置かない。 */
-    const labels = links.map((link) => link.textContent)
-    expect(labels).not.toContain('離脱')
-  })
-})
+    const ids = new Set(elements(view.container).map((element) => element.getAttribute('id')))
+    for (const id of ['webinar-analytics-tiles', 'webinar-analytics-funnel', 'webinar-analytics-retention']) expect(ids.has(id)).toBe(true)
+    expect(elements(view.container).some((element) => element.getAttribute('aria-label') === 'この段の見出しへ移動')).toBe(false)
+    expect(view.container.textContent).not.toContain('設定サマリー')
+  })})

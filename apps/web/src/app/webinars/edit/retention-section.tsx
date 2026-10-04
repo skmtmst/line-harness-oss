@@ -1,5 +1,6 @@
 'use client'
 
+import Disclosure from '@/components/shared/disclosure'
 import HelpTip from '@/components/shared/help-tip'
 import { Th } from '@/components/shared/table'
 import type { WebinarAnalytics } from '@/lib/api'
@@ -63,7 +64,6 @@ export default function RetentionSection({
     const hit = points.find((point) => point.atSeconds >= atSeconds)
     return hit ? hit.viewers : null
   }
-  const lastViewers = points.length > 0 ? points[points.length - 1].viewers : null
   const halfViewers = durationSeconds > 0 ? viewersAtOrAfter(durationSeconds / 2) : null
   const ctaViewers = ctaAtSeconds !== null ? viewersAtOrAfter(ctaAtSeconds) : null
 
@@ -181,34 +181,13 @@ export default function RetentionSection({
           </div>
 
           <p className="text-ink-secondary mt-3 text-xs">
-            最後まで見た人{rateOf(lastViewers)}（{lastViewers !== null ? `${formatNumber(lastViewers)}人` : '—'}）・半分まで{rateOf(halfViewers)}・申込ボタンを出したとき{rateOf(ctaViewers)}
+            最後まで見た人{completedRate}（{formatNumber(completed)}人）・半分まで{rateOf(halfViewers)}・申込ボタンを出したとき{rateOf(ctaViewers)}
           </p>
 
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            <div className="border-hairline bg-surface-pearl rounded-control border p-3">
-              <p className="text-ink-secondary text-xs">始まりに見ていた</p>
-              <p className="text-ink mt-1 text-lg font-bold tabular-nums">
-                {formatNumber(started)}人
-              </p>
-            </div>
-            <div className="border-hairline bg-surface-pearl rounded-control border p-3">
-              <p className="text-ink-secondary text-xs">
-                最後まで見た
-                <HelpTip label="最後まで見たの説明">
-                  動画の9割以上を実際に見た人です。始まりに見ていた人を分母にしています。
-                </HelpTip>
-              </p>
-              <p className="text-ink mt-1 text-lg font-bold tabular-nums">
-                {formatNumber(completed)}人（{completedRate}）
-              </p>
-            </div>
-            <div className="border-hairline bg-surface-pearl rounded-control border p-3">
-              <p className="text-ink-secondary text-xs">いちばん離れた所</p>
-              <p className="text-ink mt-1 truncate text-lg font-bold tabular-nums" title={dropAt !== null ? fmtBucketRange(dropAt - bucketSeconds, bucketSeconds) : undefined}>
-                {dropAt !== null ? fmtBucketRange(dropAt - bucketSeconds, bucketSeconds) : '—'}
-              </p>
-            </div>
-          </div>
+          <Disclosure title="視聴の集計の詳しい内容" size="compact">
+            <p className="text-ink-secondary text-xs">始まりに見ていた{formatNumber(started)}人・最後まで見た{formatNumber(completed)}人（{completedRate}）・いちばん離れた所{dropAt !== null ? fmtBucketRange(dropAt - bucketSeconds, bucketSeconds) : '—'}</p>
+            <p className="text-ink-faint mt-2 text-xs">最後まで見た人は動画の9割以上を実際に見た人です。割合は始まりに見ていた人を分母にしています。</p>
+          </Disclosure>
 
           {heartbeatRejects > 0 && (
             <p className="text-warning mt-3 text-xs">
