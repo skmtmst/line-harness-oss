@@ -144,6 +144,11 @@ describe('統括 バナー生成', () => {
     expect(panel).not.toContain('用途を選んでください')
   })
 
+  it('追加の指示（★BG-B `dT1xq`）: 任意であることと文字数の上限を添える', () => {
+    expect(panel).toContain('note={`任意・${CUSTOM_PROMPT_MAX}文字まで`}')
+    expect(panel).toContain('例: 桜の花びらと餃子・生ビールの写真風。和風で温かみのある雰囲気')
+  })
+
   it('参照画像（★BG-B `L1ax1Y`）: 最大 3 枚、1 枚ずつ使い方を決められる', () => {
     expect(panel).toContain('ライブラリから選ぶ')
     expect(panel).toContain('ファイルを選ぶ')

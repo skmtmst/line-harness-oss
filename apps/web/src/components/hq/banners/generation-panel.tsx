@@ -297,7 +297,8 @@ export default function GenerationPanel({
               </fieldset>
             </Field>
 
-            <Field label="追加の指示" note="任意" htmlFor={`${uid}-custom`}>
+            {/* ★BG-B `dT1xq`: 任意であることと上限を同じ行に出す */}
+            <Field label="追加の指示" note={`任意・${CUSTOM_PROMPT_MAX}文字まで`} htmlFor={`${uid}-custom`}>
               <TextArea
                 id={`${uid}-custom`}
                 rows={2}
@@ -443,7 +444,7 @@ function OutputSize({
   const showOthers = opened || others.some((p) => p.key === value)
 
   return (
-    <div data-design-node="xy4EW" className="flex flex-col gap-2.5">
+    <div data-design-node="xy4EW" className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-label font-medium text-ink">出力サイズ</span>
         <span className="text-micro text-ink-faint">LINEの規格から選ぶ</span>
@@ -510,7 +511,7 @@ export function ColorRoles({
   // いま使っている色を「このデザインの色」として見せ、役割どうしで使い回せるようにする。
   const used = Array.from(new Set(COLOR_ROLES.map((role) => value[role.key]).filter((c): c is string => Boolean(c))))
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-label font-medium text-ink">カラー</span>
         <span className="text-micro text-ink-faint">4つの役割で指定します</span>
