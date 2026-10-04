@@ -156,7 +156,8 @@ export default function RemindersListV8() {
   const [folderFilter, setFolderFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [perPage, setPerPage] = useState(20)
-  const [sort, setSort] = useState('order')
+  /* 板 `apLqS`：初めは「次の送信が近い順」。 */
+  const [sort, setSort] = useState('next')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -1164,8 +1165,8 @@ export default function RemindersListV8() {
               </FilterChip>
             ))}
             <span className={styles.toolbarSpacer} />
-            <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} />
-            <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} />
+            <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} label="並び：" />
+            <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} label={null} />
           </div>
 
           {filterActive && reminderList.loaded && (

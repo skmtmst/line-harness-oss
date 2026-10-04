@@ -125,7 +125,7 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   expect(host.textContent).toContain('今月送った')
   expect(host.textContent).toContain('送れなかった')
   expect(host.textContent).toContain('次に送る')
-  expect(host.textContent).toContain('並び順')
+  expect(host.textContent).toContain('並び：')
   expect(host.textContent).toContain('20件表示')
   // KPI は API の実値
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('2')
@@ -178,13 +178,4 @@ test('v8 の行の操作は見本の並びを持つ', async () => {
       '編集する', '複製する', '一時停止する', 'フォルダへ移す', '削除',
     ])
   })
-})
-
-test('v7 の下では従来の一覧が出る（新しい一覧には切り替わらない）', async () => {
-  await act(async () => root.render(<RemindersPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.textContent).toContain('契約終了の前に知らせる')
-  })
-  expect(host.querySelector('[data-design-node="apLqS"]')).toBeNull()
 })

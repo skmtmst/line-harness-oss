@@ -35,6 +35,7 @@ vi.mock('@/contexts/account-context', () => ({
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
+  usePageCrumbs: () => {},
 }))
 
 /*
@@ -129,9 +130,9 @@ describe('一覧の操作が実クエリへつながる (N-072)', () => {
   it('並び順を変えると sort を変えて取り直す', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
-    expect(listCalls().at(-1)).toContain('sort=order')
+    expect(listCalls().at(-1)).toContain('sort=next')
 
-    changeSelect('並び順', 'created')
+    changeSelect('並び', 'created')
     await flush()
 
     const latest = listCalls().at(-1) ?? ''
@@ -145,11 +146,11 @@ describe('一覧の操作が実クエリへつながる (N-072)', () => {
     expect(host.querySelectorAll('input[type="date"]').length).toBe(0)
   })
 
-  it('検索語は q パラメータで送る（「名前・内容で検索」の約束どおり）', async () => {
+  it('検索語は q パラメータで送る（「名前・内容で探す」の約束どおり）', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
 
-    const input = host.querySelector('input[aria-label="名前・内容で検索"]') as HTMLInputElement
+    const input = host.querySelector('input[aria-label="名前・内容で探す"]') as HTMLInputElement
     expect(input).toBeTruthy()
     // 制御コンポーネントは React の値トラッカーを迂回して入れないと
     // onChange が走らない。prototype の setter 経由で入れる。
@@ -168,7 +169,7 @@ describe('一覧の操作が実クエリへつながる (N-072)', () => {
   })
 })
 
-describe('一覧もフォルダも失敗したら読み直しは1枚だけ (★V7 x63W5x)', () => {
+describe('一覧もフォルダも失敗したら読み直しは1枚だけ', () => {
   it('フォルダ欄の小さい読み直しは出さず、一覧の失敗の1枚だけ出す', async () => {
     fetchApi.mockImplementation(async (url: string) => {
       calls.push(url)
@@ -179,13 +180,13 @@ describe('一覧もフォルダも失敗したら読み直しは1枚だけ (★V
     await act(async () => { root.render(<RemindersPage />) })
     for (let i = 0; i < 30; i++) {
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
-      if (host.textContent?.includes('表示できませんでした')) break
+      if (host.textContent?.includes('読み込めませんでした')) break
     }
-    expect(host.textContent ?? '').toContain('表示できませんでした')
+    expect(host.textContent ?? '').toContain('リマインダを読み込めませんでした')
     // 一覧本体も失敗しているときは一覧の1枚へまとめ、フォルダ欄は出さない。
     expect(host.textContent ?? '').not.toContain('フォルダを読み込めませんでした')
     const fullRetries = Array.from(host.querySelectorAll('button'))
-      .filter((button) => button.textContent?.trim() === 'もう一度読み込む')
+      .filter((button) => button.textContent?.trim() === 'もう一度試す')
     expect(fullRetries).toHaveLength(1)
   })
 })
