@@ -10,7 +10,7 @@ import LiffLookScope from '../components/LiffLookScope.js';
 import Stepper from '../components/ui/Stepper.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
-import type { MenuItem, StaffItem } from '../lib/api.js';
+import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 
 type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'done';
 
@@ -30,6 +30,23 @@ export default function Booking() {
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
   const [slot, setSlot] = useState<SlotPick | null>(null);
+  const [doneStatus, setDoneStatus] = useState('requested');
+  // 予約のルール「お店が承認してから確定する」。読めなければ承認あり扱い。
+  const [autoConfirm, setAutoConfirm] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api
+      .bookingSettings()
+      .then((r) => {
+        if (alive) setAutoConfirm(r.approval_mode === 'automatic');
+      })
+      .catch(() => {
+        if (alive) setAutoConfirm(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
   // 読み込み中・失敗の間は下の帯を出さない (押せないボタンの飾りを置かない)。
   const [stepReady, setStepReady] = useState(false);
   useEffect(() => {
@@ -102,12 +119,21 @@ export default function Booking() {
             menu={menu}
             staff={staff}
             slot={slot}
+            autoConfirm={autoConfirm}
             onBack={() => setStep('datetime')}
-            onSubmitted={() => setStep('done')}
+            onSubmitted={(status) => {
+              setDoneStatus(status);
+              setStep('done');
+            }}
           />
         )}
         {step === 'done' && menu && staff && slot && (
-          <Done menuName={menu.name} slot={slot} durationMinutes={staff.duration_minutes} />
+          <Done
+            menuName={menu.name}
+            slot={slot}
+            durationMinutes={staff.duration_minutes}
+            status={doneStatus}
+          />
         )}
         </div>
       </div>
