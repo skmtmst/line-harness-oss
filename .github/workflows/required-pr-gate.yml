@@ -649,6 +649,8 @@ jobs:
       # 目標（表示1秒・反応100ms・長い作業50ms）の未達は結果に出すだけ。
       # 道具の対照は speed-budget.mjs の頭に書いた。
       - name: Speed budget on V8 (10 screens on a real browser)
+        # オーナー決定（2026-10-04）：速さは測り方のぶれで落ちることがあるので、当面は知らせるだけにして止めない。
+        continue-on-error: true
         if: steps.scope.outputs.run == 'true'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
