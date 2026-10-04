@@ -1478,7 +1478,7 @@ CREATE TABLE booking_settings (
              AND substr(reminder_day_before_time, 1, 2) <= '23')), reminder_hours_before INTEGER
   CHECK (reminder_hours_before IS NULL
          OR reminder_hours_before BETWEEN 1 AND 72), liff_date_view TEXT NOT NULL DEFAULT 'list'
-  CHECK (liff_date_view IN ('list', 'calendar')));
+  CHECK (liff_date_view IN ('list', 'calendar')), store_photo_media_id TEXT, store_photo_interior_media_id TEXT, store_photo_waiting_media_id TEXT);
 
 CREATE TABLE "bookings" (
   id                           TEXT PRIMARY KEY,
@@ -3879,11 +3879,12 @@ CREATE TABLE media_usage_scan_state (
   updated_at       TEXT NOT NULL
 );
 
-CREATE TABLE media_usages (
+CREATE TABLE "media_usages" (
   media_id   TEXT NOT NULL REFERENCES media(id) ON DELETE CASCADE,
   ref_kind   TEXT NOT NULL CHECK (ref_kind IN (
                'template','broadcast','rich_menu','scenario_step',
-               'nen_column','event','webinar')),
+               'nen_column','event','webinar',
+               'booking_menu','booking_staff','booking_settings')),
   ref_id     TEXT NOT NULL,
   scanned_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   PRIMARY KEY (media_id, ref_kind, ref_id)
@@ -3988,7 +3989,7 @@ CREATE TABLE menus (
   auto_tag_id           TEXT,                  -- 予約申込時に friend に自動付与するタグ
   created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), concurrent_capacity INTEGER NOT NULL DEFAULT 1, booking_window_days INTEGER, cutoff_hours_before INTEGER, cancel_deadline_hours_before INTEGER, intake_question TEXT, price_mode TEXT NOT NULL DEFAULT 'fixed'
-  CHECK (price_mode IN ('fixed', 'free', 'inquiry') AND (price_mode = 'fixed' OR base_price = 0)), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+  CHECK (price_mode IN ('fixed', 'free', 'inquiry') AND (price_mode = 'fixed' OR base_price = 0)), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0), photo_media_id TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (auto_tag_id) REFERENCES tags(id) ON DELETE SET NULL
 );
@@ -6584,7 +6585,7 @@ CREATE TABLE staff (
   is_active                INTEGER NOT NULL DEFAULT 1,
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), staff_member_id TEXT,
+  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), staff_member_id TEXT, photo_media_id TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 

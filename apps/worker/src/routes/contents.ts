@@ -1473,7 +1473,7 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
   }
 });
 
-// 差し替える前に、現在の使用先を7種類すべて読み直す。内部IDは返さない。
+// 差し替える前に、現在の使用先を10種類すべて読み直す。内部IDは返さない。
 contents.get('/api/media/:id/replacement-impact', requireRole('owner', 'admin'), async (c) => {
   try {
     const accountId = c.req.query('accountId')?.trim();
@@ -1496,7 +1496,7 @@ contents.get('/api/media/:id/replacement-impact', requireRole('owner', 'admin'),
   }
 });
 
-// 画面で読んだ影響は信用せず、同じ7種類を実行直前にも読み直す。
+// 画面で読んだ影響は信用せず、同じ10種類を実行直前にも読み直す。
 // scope=replaceable は「置換可能な使用先だけ」を明示選択した部分実行。
 // 置き忘れ防止に、scope の省略・不正値は全件実行として扱わず 400/409 で止める。
 contents.post('/api/media/:id/replace-usages', requireRole('owner', 'admin'), async (c) => {

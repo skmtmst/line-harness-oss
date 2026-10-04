@@ -200,6 +200,14 @@ export default function MediaPickerDialog({
                         {item.filename}
                       </span>
                       <span className="text-ink-faint block text-micro">{KIND_LABEL[item.kind]}</span>
+                      {item.usageCount !== undefined && item.usageCount > 0 ? (
+                        <span
+                          className="text-success block text-micro"
+                          title="ほかの画面で使っているため、登録メディアからは消せません"
+                        >
+                          {item.usageCount}か所で使用中・削除不可
+                        </span>
+                      ) : null}
                     </span>
                   </button>
                 </li>

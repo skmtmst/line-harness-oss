@@ -134,7 +134,7 @@ describe('定期走査', () => {
     expect(dbMocks.pruneStaleMediaUsages).not.toHaveBeenCalled();
   });
 
-  it('7種類目を終えたら整理専用の次回へ進む', async () => {
+  it('ウェビナーを終えたら次の種類（予約の写真）へ進む', async () => {
     dbMocks.getMediaUsageScanState.mockResolvedValue({
       sourceIndex: 6,
       lastRefId: '',
@@ -158,7 +158,8 @@ describe('定期走査', () => {
 
   it('整理を1,000件ずつ続け、残りが無い回だけ1周を完了する', async () => {
     dbMocks.getMediaUsageScanState.mockResolvedValue({
-      sourceIndex: 7,
+      // 10種類を読み終えた次が整理専用フェーズ。
+      sourceIndex: 10,
       lastRefId: '',
       cycleStartedAt: '2026-08-15T00:00:00.000',
     });
