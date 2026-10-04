@@ -5146,6 +5146,17 @@ CREATE TABLE operation_request_receipts (
   PRIMARY KEY (action, actor_id, idempotency_key)
 );
 
+CREATE TABLE operator_notification_teams (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  name TEXT NOT NULL CHECK(length(name) BETWEEN 1 AND 100),
+  staff_ids TEXT NOT NULL CHECK(json_valid(staff_ids) AND json_type(staff_ids) = 'array'),
+  version INTEGER NOT NULL DEFAULT 1,
+  archived_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE operators (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -8888,6 +8899,8 @@ CREATE UNIQUE INDEX idx_operator_notification_instance_source
     source_event_id
   )
   WHERE audience_type = 'operator';
+
+CREATE INDEX idx_operator_notification_teams_account ON operator_notification_teams(line_account_id, archived_at);
 
 CREATE INDEX idx_outbound_send_requests_account_failure
   ON outbound_send_requests(line_account_id, status, next_retry_at, updated_at DESC);

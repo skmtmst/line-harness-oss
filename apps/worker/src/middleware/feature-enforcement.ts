@@ -133,6 +133,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/ec-operations', 'ec_commerce'),
   feature('/api/line-notifications', 'line_notifications'),
   feature('/api/notifications/rules', 'line_notifications'),
+  feature('/api/notifications/teams', 'line_notifications'),
   feature('/api/nen-campaigns', 'nen_campaigns'),
   feature('/api/nen-members', 'photo_review'),
   // 然の会員（ランク・マイル）はECとの連携が前提。EC連携と同じ機能で止める。

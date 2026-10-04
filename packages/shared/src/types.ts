@@ -2596,3 +2596,12 @@ export interface PublicationViewSample {
   view_date?: string;
 }
 export interface PublicationThirtyDayCount { view_count_30_days?: number | null }
+
+export interface OperatorNotificationTeam {
+  id: string;
+  lineAccountId: string;
+  name: string;
+  staffIds: string[];
+  version: number;
+  archivedAt: string | null;
+}

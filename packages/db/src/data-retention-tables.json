@@ -2449,6 +2449,13 @@
   "operation_request_receipts": {
     "category": "global"
   },
+  "operator_notification_teams": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "operators": {
     "category": "global"
   },

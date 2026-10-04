@@ -12451,6 +12451,12 @@ export const api = {
     },
   },
   notifications: {
+    teams: {
+      list: (lineAccountId: string) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam[]>>(`/api/notifications/teams?lineAccountId=${encodeURIComponent(lineAccountId)}`),
+      create: (data: { lineAccountId: string; name: string; staffIds: string[] }) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam>>('/api/notifications/teams', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: { lineAccountId: string; name: string; staffIds: string[]; expectedVersion: number }) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam>>(`/api/notifications/teams/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+      archive: (id: string, lineAccountId: string, expectedVersion: number) => fetchApi<ApiResponse<null>>(`/api/notifications/teams/${encodeURIComponent(id)}`, { method: 'DELETE', body: JSON.stringify({ lineAccountId, expectedVersion }) }),
+    },
     operatorRules: {
       list: (lineAccountId: string) =>
         fetchApi<ApiResponse<{
