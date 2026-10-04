@@ -72,7 +72,7 @@ export default function ReferralQrModal({
               {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}
               <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-card border border-hairline bg-canvas p-2" />
               <Button variant="primary" href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 w-full">
-                QRコードをダウンロード
+                PNGを保存
               </Button>
             </div>
           </>
