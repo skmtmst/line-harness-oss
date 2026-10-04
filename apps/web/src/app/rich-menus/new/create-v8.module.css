@@ -50,10 +50,10 @@
   line-height: 1.6;
 }
 
-/* 左=白カードの縦積み、右=説明カード＋スマホ。 */
+/* 左=白カードの縦積み、右=説明カード＋スマホ（見本は380）。 */
 .grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   gap: 16px;
   align-items: start;
 }
