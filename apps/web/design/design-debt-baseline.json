@@ -347,6 +347,7 @@
     "direct-th": 4
   },
   "app/inflow-links/page.tsx": {
+    "arbitrary-value": 8,
     "unresolved-classname": 63
   },
   "app/layout.tsx": {

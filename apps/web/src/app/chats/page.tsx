@@ -2676,7 +2676,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
           </div>
 
-          <p data-inbox-sort="fixed" className="border-b border-hairline px-3 pb-3 text-micro text-ink-secondary">並び順：未読が先・新しい順</p>
+          <p data-inbox-sort="fixed" className="border-b border-hairline px-3 pb-3 text-micro text-ink-secondary">並び順：未対応が先・新しい順</p>
           {/* Chat List */}
           <div className="flex-1 overflow-y-auto">
             <>

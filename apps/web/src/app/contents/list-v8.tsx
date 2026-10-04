@@ -1992,4 +1992,3 @@ function MediaThumbV8({ src, alt }: { src: string; alt: string }) {
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} alt={alt} loading="lazy" decoding="async" onError={() => setFailed(true)} className="h-full w-full object-contain" />
 }
-
