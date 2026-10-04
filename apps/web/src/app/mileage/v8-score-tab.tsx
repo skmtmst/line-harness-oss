@@ -23,7 +23,11 @@ import {
   Star,
   TrendingDown,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -34,8 +38,10 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
+import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ActionMenu from '@/components/shared/action-menu'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import {
   ApiError,
   api,
@@ -115,8 +121,47 @@ export default function V8ScoreTab({
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
 }) {
+  const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountId = selectedAccountId ?? ''
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている友だちのID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
+
+  /** 一覧→友だちはつながる移り変わりで開く（V8「サクサク感」E）。 */
+  const goFriend = (friendId: string) => {
+    withViewTransition(() => {
+      router.push(`/friends/detail?id=${encodeURIComponent(friendId)}`)
+    })
+  }
+
+  /* 行の「…」の中身。パネル・右クリックと共用する（V8「サクサク感」D）。 */
+  const rowMenuItems = (item: FriendsItem): ActionMenuItem[] => [
+    {
+      id: 'history',
+      label: '点数の変化',
+      onSelect: () => setHistoryTarget(item),
+    },
+    ...(!readonly ? [{
+      id: 'adjust',
+      label: '点数を直す',
+      onSelect: () => setAdjustTarget(item),
+    }] : []),
+    {
+      id: 'friend',
+      label: 'この人を見る',
+      external: true,
+      onSelect: () => goFriend(item.friendId),
+    },
+  ]
+
+  /** 右クリックは「…」と同じ項目をマウスの位置に出す。 */
+  const rowContextItems = (item: FriendsItem): ContextMenuItem[] =>
+    rowMenuItems(item).map((menuItem) => ({
+      id: menuItem.id,
+      label: menuItem.label,
+      disabled: menuItem.disabled,
+      onSelect: () => menuItem.onSelect(),
+    }))
   const latestAccountRef = useRef(accountId)
   useEffect(() => {
     latestAccountRef.current = accountId
@@ -133,10 +178,18 @@ export default function V8ScoreTab({
   const [loadError, setLoadError] = useState(false)
   const [adjustTarget, setAdjustTarget] = useState<FriendsItem | null>(null)
   const [historyTarget, setHistoryTarget] = useState<FriendsItem | null>(null)
+
+  /* 行の詳細パネル（V8「サクサク感」C①②）。↑↓で次の行へ移る。 */
+  const panelItems = overview?.items ?? []
+  const panelIndex = panelId === null ? -1 : panelItems.findIndex((item) => item.friendId === panelId)
+  const panelItem = panelIndex >= 0 ? panelItems[panelIndex] : null
   /* できごとの決めごと。 */
   const [config, setConfig] = useState<ActionScoreRuleConfiguration | null>(null)
   const [rulesLoading, setRulesLoading] = useState(true)
   const [rulesError, setRulesError] = useState(false)
+  /* 骨組み判定（0.3秒以内なら出さない・出したら最低0.4秒）。表と数の帯で使う。 */
+  const showKpiSkel = useDelayedSkeleton(loading)
+  const showRulesSkel = useDelayedSkeleton(rulesLoading)
   const [ruleSearchInput, setRuleSearchInput] = useState('')
   const [ruleSearch, setRuleSearch] = useState('')
   const [gainOnly, setGainOnly] = useState(false)
@@ -394,8 +447,7 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>点が高い（{formatMileageNumber(highMin)}点〜）</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError ? '—' : formatMileageNumber(summary?.high ?? 0)}
-            <span className={styles.kpiUnit}> 人</span>
+            {showKpiSkel ? <Skeleton width="5ch" height={24} /> : loading || loadError ? '—' : (<>{formatMileageNumber(summary?.high ?? 0)}<span className={styles.kpiUnit}> 人</span></>)}
           </p>
           <p className={styles.kpiSub}>よく動く</p>
         </div>
@@ -405,8 +457,7 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>中くらい（{formatMileageNumber(normalMin)}〜{formatMileageNumber(highMin - 1)}点）</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError ? '—' : formatMileageNumber(summary?.normal ?? 0)}
-            <span className={styles.kpiUnit}> 人</span>
+            {showKpiSkel ? <Skeleton width="5ch" height={24} /> : loading || loadError ? '—' : (<>{formatMileageNumber(summary?.normal ?? 0)}<span className={styles.kpiUnit}> 人</span></>)}
           </p>
           <p className={styles.kpiSub}>ふつう</p>
         </div>
@@ -416,8 +467,7 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>低い（〜{formatMileageNumber(normalMin - 1)}点）</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError ? '—' : formatMileageNumber(summary?.low ?? 0)}
-            <span className={styles.kpiUnit}> 人</span>
+            {showKpiSkel ? <Skeleton width="5ch" height={24} /> : loading || loadError ? '—' : (<>{formatMileageNumber(summary?.low ?? 0)}<span className={styles.kpiUnit}> 人</span></>)}
           </p>
           <p className={styles.kpiSub}>しばらく動いていない</p>
         </div>
@@ -427,10 +477,10 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>公開中のルール</span>
           </div>
           <p className={styles.kpiValue}>
-            {rulesLoading ? '—' : publishedVersionNo === null ? 'なし' : `版 ${formatMileageNumber(publishedVersionNo)}`}
+            {showRulesSkel ? <Skeleton width="5ch" height={24} /> : rulesLoading ? '—' : publishedVersionNo === null ? 'なし' : `版 ${formatMileageNumber(publishedVersionNo)}`}
           </p>
           <p className={styles.kpiSub}>
-            {rulesLoading ? '—' : hasDraftChanges ? '下書きに変更あり' : '下書きとの差はありません'}
+            {showRulesSkel ? <Skeleton width="10ch" height={12} /> : rulesLoading ? '—' : hasDraftChanges ? '下書きに変更あり' : '下書きとの差はありません'}
           </p>
         </div>
       </div>
@@ -492,19 +542,23 @@ export default function V8ScoreTab({
         </span>
       </div>
 
-      {loading ? (
-        <div className={styles.stateWrap} role="status" aria-label="読み込み中">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className={styles.skelRow} aria-hidden="true">
-              <span className={styles.skelDot} />
-              <span className={styles.skelBar} style={{ width: '22%' }} />
-              <span className={styles.skelBar} style={{ width: '14%' }} />
-              <span className={styles.skelBar} style={{ width: '18%' }} />
-              <span className={styles.skelBar} style={{ width: '10%', marginLeft: 'auto' }} />
-            </div>
-          ))}
-        </div>
-      ) : loadError ? (
+      <div aria-busy={loading}>
+        <DelayedSkeleton
+          loading={loading}
+          skeleton={(
+            <MileageTableSkeleton
+              columns={[
+                { header: '友だち', bar: '40%' },
+                { header: 'いまの点数', bar: '50%' },
+                { header: '帯', bar: '55%' },
+                { header: '30日間の変化', bar: '60%' },
+                { header: '最後の反応', bar: '60%' },
+                { header: '操作', bar: '80%' },
+              ]}
+            />
+          )}
+        >
+          {loadError ? (
         <div className={styles.stateWrap}>
           <div className={styles.errorBand} role="alert">
             行動スコアを読み込めませんでした
@@ -539,7 +593,19 @@ export default function V8ScoreTab({
             </thead>
             <tbody>
               {overview.items.map((item) => (
-                <tr key={item.friendId}>
+                <tr
+                  key={item.friendId}
+                  tabIndex={0}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setPanelId(item.friendId)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      setPanelId(item.friendId)
+                    }
+                  }}
+                >
                   <td>
                     <p className={styles.cellMain} title={item.displayName}>{item.displayName}</p>
                   </td>
@@ -558,45 +624,76 @@ export default function V8ScoreTab({
                     </p>
                     <p className={styles.cellSub}>{formatMileageDate(item.lastChangedAt)}</p>
                   </td>
-                  <td>
-                    <span className={styles.rowActions}>
-                      <Button onClick={() => setHistoryTarget(item)}>点数の変化</Button>
-                      {!readonly ? (
-                        <>
-                          <IconButton
-                            aria-label={`${item.displayName}のその他操作`}
-                            title="その他の操作"
-                            onClick={() => setMenuId((current) => (current === item.friendId ? null : item.friendId))}
-                          >
-                            <MoreHorizontal size={14} aria-hidden="true" />
-                          </IconButton>
-                          <ActionMenu
-                            open={menuId === item.friendId}
-                            ariaLabel={`${item.displayName}の操作`}
-                            onClose={() => setMenuId(null)}
-                            items={[
-                              {
-                                id: 'adjust',
-                                label: '点数を直す',
-                                onSelect: () => setAdjustTarget(item),
-                              },
-                              {
-                                id: 'friend',
-                                label: 'この人を見る',
-                                external: true,
-                                onSelect: () => { window.location.href = `/friends/detail?id=${encodeURIComponent(item.friendId)}` },
-                              },
-                            ]}
-                          />
-                        </>
-                      ) : null}
-                    </span>
+                  <td onClick={(event) => event.stopPropagation()}>
+                    <ContextMenu label={`${item.displayName}の操作`} items={rowContextItems(item)}>
+                      <span className={styles.rowActions}>
+                        <Button onClick={() => setHistoryTarget(item)}>点数の変化</Button>
+                        {!readonly ? (
+                          <>
+                            <IconButton
+                              aria-label={`${item.displayName}のその他操作`}
+                              title="その他の操作"
+                              onClick={() => setMenuId((current) => (current === item.friendId ? null : item.friendId))}
+                            >
+                              <MoreHorizontal size={14} aria-hidden="true" />
+                            </IconButton>
+                            <ActionMenu
+                              open={menuId === item.friendId}
+                              ariaLabel={`${item.displayName}の操作`}
+                              onClose={() => setMenuId(null)}
+                              items={rowMenuItems(item).filter((menuItem) => menuItem.id !== 'history')}
+                            />
+                          </>
+                        ) : null}
+                      </span>
+                    </ContextMenu>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+        </DelayedSkeleton>
+      </div>
+
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelItem && (
+        <DetailPanel
+          open
+          title={panelItem.displayName}
+          description={[
+            `${formatMileageNumber(panelItem.currentScore)}点`,
+            BAND_LABELS[panelItem.band],
+          ].join('・')}
+          onClose={() => setPanelId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelId(panelItems[panelIndex - 1].friendId) : undefined}
+          onNext={
+            panelIndex < panelItems.length - 1 ? () => setPanelId(panelItems[panelIndex + 1].friendId) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < panelItems.length - 1}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => setHistoryTarget(panelItem)}>
+                点数の変化
+              </Button>
+              {!readonly ? (
+                <Button variant="secondary" onClick={() => setAdjustTarget(panelItem)}>
+                  点数を直す
+                </Button>
+              ) : null}
+              <Button variant="secondary" onClick={() => goFriend(panelItem.friendId)}>
+                この人を見る
+              </Button>
+            </>
+          }
+        >
+          <p>
+            いまの点数 {formatMileageNumber(panelItem.currentScore)}点（{BAND_LABELS[panelItem.band]}）
+          </p>
+          <p>{actionScoreReasonLabel(panelItem.lastReason)}</p>
+        </DetailPanel>
       )}
 
       {!loading && !loadError && total > 0 ? (
@@ -681,17 +778,21 @@ export default function V8ScoreTab({
           </span>
         </div>
 
-        {rulesLoading ? (
-          <div className={styles.stateWrap} role="status" aria-label="読み込み中">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className={styles.skelRow} aria-hidden="true">
-                <span className={styles.skelDot} />
-                <span className={styles.skelBar} style={{ width: '30%' }} />
-                <span className={styles.skelBar} style={{ width: '12%', marginLeft: 'auto' }} />
-              </div>
-            ))}
-          </div>
-        ) : rulesError || !editable ? (
+        <div aria-busy={rulesLoading}>
+          <DelayedSkeleton
+            loading={rulesLoading}
+            skeleton={(
+              <MileageTableSkeleton
+                columns={[
+                  { header: 'できごと（数え方）', bar: '45%' },
+                  { header: '点・今月当てはまった人', bar: '55%' },
+                  { header: '状態', bar: '70%' },
+                  { header: '操作', bar: '80%' },
+                ]}
+              />
+            )}
+          >
+            {rulesError || !editable ? (
           <div className={styles.stateWrap}>
             <div className={styles.errorBand} role="alert">
               できごとの決めごとを読み込めませんでした
@@ -785,6 +886,8 @@ export default function V8ScoreTab({
             </table>
           </div>
         )}
+          </DelayedSkeleton>
+        </div>
 
         {!readonly ? (
           <div className={styles.toolbar}>

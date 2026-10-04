@@ -27,6 +27,7 @@ const net = vi.hoisted(() => ({
 
 vi.mock('next/link', () => ({ default: ({ children }: { children?: unknown }) => children }))
 vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/components/layout/merged-tabs', () => ({

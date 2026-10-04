@@ -15,6 +15,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import AccountOrdering from '@/components/accounts/account-ordering'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
   ACCOUNT_FILTERS,
@@ -164,7 +165,41 @@ export default function AccountsPage() {
       </div>
 
       {status === 'loading' ? (
-        <ListState kind="loading" />
+        theme === 'v8' ? (
+          <div className="bg-canvas rounded-card border-hairline border" aria-busy="true" aria-label="LINEアカウントを読み込んでいます">
+            <DelayedSkeleton
+              loading
+              skeleton={(
+                <div className="hidden overflow-x-auto md:block" aria-hidden="true">
+                  <table className="w-full min-w-[56rem]">
+                    <thead>
+                      <TableHeadRow>
+                        <Th>アカウント</Th>
+                        <Th>接続</Th>
+                        <Th>Webhook</Th>
+                        <Th>友だち</Th>
+                        <Th>操作</Th>
+                      </TableHeadRow>
+                    </thead>
+                    <tbody>
+                      {[0, 1, 2, 3, 4].map((row) => (
+                        <tr key={row}>
+                          <td className="px-5 py-3"><Skeleton width="14ch" height="1em" /></td>
+                          <td className="px-5 py-3"><Skeleton width="8ch" height="1em" /></td>
+                          <td className="px-5 py-3"><Skeleton width="8ch" height="1em" /></td>
+                          <td className="px-5 py-3"><Skeleton width="6ch" height="1em" /></td>
+                          <td className="px-5 py-3"><Skeleton width="6ch" height="1em" /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            />
+          </div>
+        ) : (
+          <ListState kind="loading" />
+        )
       ) : status === 'error' ? (
         <ListState
           kind="error"

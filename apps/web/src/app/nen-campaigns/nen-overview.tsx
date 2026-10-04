@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Gift, MessageSquare, Newspaper, Package, RotateCw, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -14,6 +15,9 @@ import PageHeaderH2 from '@/components/layout/page-header-h2'
 import Pagination from '@/components/shared/pagination'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { RowActions } from '@/components/shared/row-actions'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -461,10 +465,20 @@ function AutoPanel({
   /** 自動配信の取り直し。 */
   onRetryTab?: () => void
 }) {
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [trigger, setTrigger] = useState('')
   const [status, setStatus] = useState('')
   const [sort, setSort] = useState<AutoSort>('sent_desc')
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている配信のキー。 */
+  const [panelKey, setPanelKey] = useState<string | null>(null)
+
+  /** 一覧→編集はつながる移り変わりで開く（V8「サクサク感」E）。 */
+  const goEdit = (campaignKey: string) => {
+    withViewTransition(() => {
+      router.push(`/nen-campaigns/edit?key=${encodeURIComponent(campaignKey)}`)
+    })
+  }
 
   const metricFor = (setting: NenCampaignSetting) => metrics?.flows.find((flow) => flow.campaignKey === setting.campaignKey)
   const shown = settings
@@ -475,6 +489,10 @@ function AutoPanel({
       ? a.label.localeCompare(b.label, 'ja')
       : (metricFor(b)?.sent ?? 0) - (metricFor(a)?.sent ?? 0))
   const triggers = [...new Set(settings.map((setting) => setting.category))]
+
+  /* 行の詳細パネル（V8「サクサク感」C①②）。↑↓で次の行へ移る。 */
+  const panelIndex = panelKey === null ? -1 : shown.findIndex((setting) => setting.campaignKey === panelKey)
+  const panelSetting = panelIndex >= 0 ? shown[panelIndex] : null
 
   return (
     <>
@@ -578,8 +596,30 @@ function AutoPanel({
                   ...(setting.category === 'birthday' ? [{ id: 'coupon', label: 'クーポンの決めごと', onSelect: onEditCoupon }] : []),
                   { id: 'toggle', label: setting.isEnabled ? '止める' : '動かす', disabled: busy, dividerBefore: true, onSelect: () => onToggle(setting) },
                 ]
+                /** 右クリックは「編集する」＋「…」と同じ項目をマウスの位置に出す（V8「サクサク感」D）。 */
+                const contextItems: ContextMenuItem[] = [
+                  { id: 'edit', label: '編集する', onSelect: () => goEdit(setting.campaignKey) },
+                  ...menuItems.map((item) => ({
+                    id: item.id,
+                    label: item.label,
+                    disabled: item.disabled,
+                    onSelect: () => item.onSelect(),
+                  })),
+                ]
                 return (
-                  <Tr key={setting.campaignKey}>
+                  <Tr
+                    key={setting.campaignKey}
+                    interactive
+                    tabIndex={0}
+                    onClick={() => setPanelKey(setting.campaignKey)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        setPanelKey(setting.campaignKey)
+                      }
+                    }}
+                  >
                     <Td>
                       <span className="flex items-center gap-3">
                         <CampaignIcon campaignKey={setting.campaignKey} />
@@ -608,17 +648,20 @@ function AutoPanel({
                           ? <StatusBadge tone="success" size="compact">配信中</StatusBadge>
                           : <StatusBadge tone="warning" size="compact">停止中</StatusBadge>}
                     </Td>
-                    <Td align="right" className="sticky right-0 bg-canvas">
+                    <Td align="right" className="sticky right-0 bg-canvas" onClick={(event) => event.stopPropagation()}>
                       {/*
                         #985 LAY-18: 行の操作は共用の RowActions。
                         「編集」＋「⋯」（中身を見る・テスト送信・止める/動かす）の
                         並びを部品へ委ね、画面ごとの手組みへは戻さない。
+                        右クリックでも同じ品ぞろえ（V8「サクサク感」D）。
                       */}
-                      <RowActions
-                        subjectName={setting.label}
-                        edit={{ href: `/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}` }}
-                        menuItems={menuItems}
-                      />
+                      <ContextMenu label={`配信「${setting.label}」の操作`} items={contextItems}>
+                        <RowActions
+                          subjectName={setting.label}
+                          edit={{ href: `/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}` }}
+                          menuItems={menuItems}
+                        />
+                      </ContextMenu>
                     </Td>
                   </Tr>
                 )
@@ -627,6 +670,50 @@ function AutoPanel({
           </DataTable>
         )}
       </section>
+
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelSetting && (
+        <DetailPanel
+          open
+          title={panelSetting.label}
+          description={[
+            panelSetting.isEnabled ? '配信中' : '停止中',
+            `${monthLabel} ${num(metrics?.flows.find((flow) => flow.campaignKey === panelSetting.campaignKey)?.sent ?? null)}通`,
+          ].join('・')}
+          onClose={() => setPanelKey(null)}
+          onPrev={panelIndex > 0 ? () => setPanelKey(shown[panelIndex - 1].campaignKey) : undefined}
+          onNext={
+            panelIndex < shown.length - 1 ? () => setPanelKey(shown[panelIndex + 1].campaignKey) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < shown.length - 1}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => goEdit(panelSetting.campaignKey)}>
+                編集する
+              </Button>
+              <Button variant="secondary" onClick={() => onPreview(panelSetting.campaignKey)}>
+                中身を見る
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!testFriendId}
+                onClick={() => onTestSend(panelSetting)}
+              >
+                自分にテスト送信
+              </Button>
+              <Button variant="secondary" onClick={() => onToggle(panelSetting)}>
+                {panelSetting.isEnabled ? '止める' : '動かす'}
+              </Button>
+            </>
+          }
+        >
+          <p>
+            {formatCampaignTiming(panelSetting)}に、{formatCampaignAudience(panelSetting)}へ届きます。
+          </p>
+          {panelSetting.title && <p>{panelSetting.title}</p>}
+        </DetailPanel>
+      )}
     </>
   )
 }

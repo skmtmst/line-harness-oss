@@ -15,7 +15,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Check, Download, RefreshCw, TrendingDown, TrendingUp, Undo2, Users } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -24,6 +28,8 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
+import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import {
   api,
@@ -66,7 +72,17 @@ export default function V8BalancesTab({
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
 }) {
+  const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている友だちのID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
+
+  /** 一覧→明細はつながる移り変わりで開く（V8「サクサク感」E）。 */
+  const goDetail = (friendId: string, adjust: boolean) => {
+    withViewTransition(() => {
+      router.push(`/mileage/friends/detail?id=${encodeURIComponent(friendId)}${adjust ? '&adjust=1' : ''}`)
+    })
+  }
   const latestAccountRef = useRef(selectedAccountId)
   useEffect(() => {
     latestAccountRef.current = selectedAccountId
@@ -76,6 +92,8 @@ export default function V8BalancesTab({
   const [grantedMiles, setGrantedMiles] = useState<number | null>(null)
   const [decreasedMiles, setDecreasedMiles] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
+  /* 数の帯の骨組み判定（0.3秒以内なら出さない・出したら最低0.4秒）。 */
+  const showKpiSkel = useDelayedSkeleton(loading)
   const [loadError, setLoadError] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -249,6 +267,16 @@ export default function V8BalancesTab({
     () => pageMembers.slice(offset, offset + pageSize),
     [offset, pageMembers, pageSize],
   )
+
+  /* 行の詳細パネル（V8「サクサク感」C①②）。↑↓で次の行へ移る。 */
+  const panelIndex = panelId === null ? -1 : members.findIndex((member) => member.friendId === panelId)
+  const panelMember = panelIndex >= 0 ? members[panelIndex] : null
+
+  /** 右クリックは行の操作と同じ品ぞろえ（V8「サクサク感」D）。 */
+  const rowContextItems = (friendId: string): ContextMenuItem[] => [
+    { id: 'detail', label: '明細を見る', onSelect: () => goDetail(friendId, false) },
+    ...(!readonly ? [{ id: 'adjust', label: '増減', onSelect: () => goDetail(friendId, true) }] : []),
+  ]
   const exportCsv = useCallback(() => {
     if (members.length === 0) return
     setExportError('')
@@ -313,11 +341,10 @@ export default function V8BalancesTab({
             <span className={styles.kpiLabel}>友だち</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError || summary === null ? '—' : formatMileageNumber(summary.totalMembers)}
-            <span className={styles.kpiUnit}> 人</span>
+            {showKpiSkel ? <Skeleton width="5ch" height={24} /> : loading || loadError || summary === null ? '—' : (<>{formatMileageNumber(summary.totalMembers)}<span className={styles.kpiUnit}> 人</span></>)}
           </p>
           <p className={styles.kpiSub}>
-            {loading || loadError || summary === null
+            {showKpiSkel ? <Skeleton width="12ch" height={12} /> : loading || loadError || summary === null
               ? '—'
               : `マイルを持っている ${formatMileageNumber(summary.withBalanceCount)}人`}
           </p>
@@ -327,9 +354,9 @@ export default function V8BalancesTab({
             <span className={styles.kpiIcon}><Users size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>残高の合計</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError || summary === null ? '—' : formatMileageNumber(summary.available)}</p>
+          <p className={styles.kpiValue}>{showKpiSkel ? <Skeleton width="7ch" height={24} /> : loading || loadError || summary === null ? '—' : formatMileageNumber(summary.available)}</p>
           <p className={styles.kpiSub}>
-            {loading || loadError || summary === null
+            {showKpiSkel ? <Skeleton width="8ch" height={12} /> : loading || loadError || summary === null
               ? '—'
               : `1人あたり ${formatMileageNumber(summary.totalMembers > 0 ? Math.round(summary.available / summary.totalMembers) : 0)}`}
           </p>
@@ -339,7 +366,7 @@ export default function V8BalancesTab({
             <span className={styles.kpiIcon}><TrendingUp size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>今月増えた</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(grantedMiles ?? 0)}</p>
+          <p className={styles.kpiValue}>{showKpiSkel ? <Skeleton width="7ch" height={24} /> : loading || loadError ? '—' : formatMileageNumber(grantedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>この30日に付いた分</p>
         </div>
         <div className={styles.kpi}>
@@ -347,7 +374,7 @@ export default function V8BalancesTab({
             <span className={styles.kpiIcon}><TrendingDown size={14} aria-hidden="true" /></span>
             <span className={styles.kpiLabel}>今月減った</span>
           </div>
-          <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(decreasedMiles ?? 0)}</p>
+          <p className={styles.kpiValue}>{showKpiSkel ? <Skeleton width="7ch" height={24} /> : loading || loadError ? '—' : formatMileageNumber(decreasedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>交換・取り消し</p>
         </div>
       </div>
@@ -452,19 +479,24 @@ export default function V8BalancesTab({
         </span>
       </div>
 
-      {loading ? (
-        <div className={styles.stateWrap} role="status" aria-label="読み込み中">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className={styles.skelRow} aria-hidden="true">
-              <span className={styles.skelDot} />
-              <span className={styles.skelBar} style={{ width: '22%' }} />
-              <span className={styles.skelBar} style={{ width: '14%' }} />
-              <span className={styles.skelBar} style={{ width: '18%' }} />
-              <span className={styles.skelBar} style={{ width: '10%', marginLeft: 'auto' }} />
-            </div>
-          ))}
-        </div>
-      ) : loadError ? (
+      <div aria-busy={loading}>
+        <DelayedSkeleton
+          loading={loading}
+          skeleton={(
+            <MileageTableSkeleton
+              columns={[
+                { header: '友だち', bar: '40%' },
+                { header: 'ランク', bar: '60%' },
+                { header: 'いまの残高', bar: '50%' },
+                { header: '今月の増減', bar: '50%' },
+                { header: '消える予定', bar: '60%' },
+                { header: '最終行動', bar: '60%' },
+                { header: '操作', bar: '80%' },
+              ]}
+            />
+          )}
+        >
+          {loadError ? (
         <div className={styles.stateWrap}>
           <div className={styles.errorBand} role="alert">
             マイルの残高を読み込めませんでした
@@ -508,7 +540,19 @@ export default function V8BalancesTab({
             </thead>
             <tbody>
               {members.map((member) => (
-                <tr key={member.friendId}>
+                <tr
+                  key={member.friendId}
+                  tabIndex={0}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setPanelId(member.friendId)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      setPanelId(member.friendId)
+                    }
+                  }}
+                >
                   <td>
                     <p className={styles.cellMain} title={member.displayName}>{member.displayName}</p>
                     <p className={styles.cellSub} title={member.lineAccount.name}>{member.lineAccount.name}</p>
@@ -525,17 +569,36 @@ export default function V8BalancesTab({
                   </td>
                   <td><span className={styles.cellSubDark}>{expiringText(member)}</span></td>
                   <td><span className={styles.cellSubDark}>{formatMileageDate(member.lastChangedAt)}</span></td>
-                  <td>
-                    <span className={styles.rowActions}>
-                      <Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.friendId)}`}>
-                        明細を見る
-                      </Button>
-                      {!readonly ? (
-                        <Button href={`/mileage/friends/detail?id=${encodeURIComponent(member.friendId)}&adjust=1`}>
-                          増減
+                  <td onClick={(event) => event.stopPropagation()}>
+                    <ContextMenu
+                      label={`${member.displayName}の操作`}
+                      items={rowContextItems(member.friendId)}
+                    >
+                      <span className={styles.rowActions}>
+                        <Button
+                          href={`/mileage/friends/detail?id=${encodeURIComponent(member.friendId)}`}
+                          onClick={(event) => {
+                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                            event.preventDefault()
+                            goDetail(member.friendId, false)
+                          }}
+                        >
+                          明細を見る
                         </Button>
-                      ) : null}
-                    </span>
+                        {!readonly ? (
+                          <Button
+                            href={`/mileage/friends/detail?id=${encodeURIComponent(member.friendId)}&adjust=1`}
+                            onClick={(event) => {
+                              if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                              event.preventDefault()
+                              goDetail(member.friendId, true)
+                            }}
+                          >
+                            増減
+                          </Button>
+                        ) : null}
+                      </span>
+                    </ContextMenu>
                   </td>
                 </tr>
               ))}
@@ -543,6 +606,8 @@ export default function V8BalancesTab({
           </table>
         </div>
       )}
+        </DelayedSkeleton>
+      </div>
 
       {!loading && !loadError && members.length > 0 ? (
         <div className={styles.footer}>
@@ -560,8 +625,45 @@ export default function V8BalancesTab({
         </div>
       ) : null}
 
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelMember && (
+        <DetailPanel
+          open
+          title={panelMember.displayName}
+          description={[
+            rankLabel(panelMember.rank) ?? '—',
+            `残高 ${formatMileageNumber(panelMember.available)}`,
+          ].join('・')}
+          onClose={() => setPanelId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelId(members[panelIndex - 1].friendId) : undefined}
+          onNext={
+            panelIndex < members.length - 1 ? () => setPanelId(members[panelIndex + 1].friendId) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < members.length - 1}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => goDetail(panelMember.friendId, false)}>
+                明細を見る
+              </Button>
+              {!readonly ? (
+                <Button variant="secondary" onClick={() => goDetail(panelMember.friendId, true)}>
+                  増減
+                </Button>
+              ) : null}
+            </>
+          }
+        >
+          <p>
+            いまの残高 {formatMileageNumber(panelMember.available)}
+            {panelMember.pending > 0 ? ` ／ 保留 ${formatMileageNumber(panelMember.pending)}` : ''}
+          </p>
+          <p>{expiringText(panelMember)}</p>
+        </DetailPanel>
+      )}
+
       {!loading && !loadError ? (
-        <p className={styles.footnote}>行を押すと、その人のマイルの詳細（明細・増やす／減らす）を開きます。CSVはこのページの残高を書き出します。</p>
+        <p className={styles.footnote}>行を押すと右に詳しい内容。行の「明細を見る」から明細・増やす／減らすへ進めます。CSVはこのページの残高を書き出します。</p>
       ) : null}
 
       <Dialog

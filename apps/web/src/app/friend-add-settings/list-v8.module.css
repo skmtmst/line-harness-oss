@@ -258,6 +258,15 @@
   background: var(--color-canvas-sunken);
 }
 
+/* 行を押すと右に詳細パネル（V8「サクサク感」C）。 */
+.rowClick {
+  cursor: pointer;
+}
+
+.rowClick:hover td {
+  background: var(--color-canvas-sunken);
+}
+
 .sinkLock {
   display: inline-flex;
   align-items: center;

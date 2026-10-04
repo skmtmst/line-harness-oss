@@ -12,6 +12,7 @@ import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import TargetMissing from '@/components/shared/target-missing'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StatusBadge from '@/components/shared/status-badge'
@@ -240,7 +241,27 @@ function AccountDetail() {
       />
     )
   }
-  if (status === 'loading') return <ListState kind="loading" />
+  if (status === 'loading') {
+    return theme === 'v8' ? (
+      <div aria-busy="true" aria-label="アカウントの内容を読み込んでいます">
+        <DelayedSkeleton
+          loading
+          skeleton={(
+            <div aria-hidden="true">
+              <Skeleton width="18ch" height="1.5em" />
+              <Skeleton width="100%" height="0.9em" />
+              <Skeleton width="100%" height="0.9em" />
+              <Skeleton width="100%" height="0.9em" />
+              <Skeleton width="100%" height="0.9em" />
+              <Skeleton width="100%" height="0.9em" />
+            </div>
+          )}
+        />
+      </div>
+    ) : (
+      <ListState kind="loading" />
+    )
+  }
   if (missing || (status === 'ready' && !account)) {
     return (
       <TargetMissing

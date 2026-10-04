@@ -38,12 +38,18 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
+import { notifyToast } from '@/components/shared/toast'
 import FolderPanel from '@/components/shared/folder-panel'
 import Select from '@/components/shared/select'
+import { Th } from '@/components/shared/table'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import { Tabs } from '@/components/shared/tabs'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { describeFriendAddFailure } from './friend-add-failure'
@@ -119,10 +125,58 @@ function statusTone(rule: FriendAddRule) {
   return rule.status === 'published' ? styles.statePillActive : styles.statePillDraft
 }
 
+/*
+ * 初回案内の一覧の骨組み（サクサク感 A）。見出しは本物、行は5行・
+ * 高さと列幅は本物の表と同じ。光は共通 `Skeleton`。
+ */
+function FriendAddListSkeleton() {
+  return (
+    <div className={styles.tableWrap} aria-hidden="true">
+      <table className={styles.table}>
+        <colgroup>
+          <col style={{ width: 72 }} />
+          <col />
+          <col style={{ width: 200 }} />
+          <col style={{ width: 96 }} />
+          <col style={{ width: 80 }} className={styles.recentCol} />
+          <col style={{ width: 44 }} />
+        </colgroup>
+        <thead>
+          <tr>
+            <Th>順</Th>
+            <Th>設定（対象の流入リンク）</Th>
+            <Th>最初に送るもの</Th>
+            <Th>状態</Th>
+            <Th className={styles.recentCol}>直近7日</Th>
+            <Th aria-label="操作" />
+          </tr>
+        </thead>
+        <tbody>
+          {[0, 1, 2, 3, 4].map((n) => (
+            <tr key={n}>
+              <td><Skeleton width={20} height={14} /></td>
+              <td>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <Skeleton width="45%" height={14} />
+                  <Skeleton width="60%" height={12} />
+                </span>
+              </td>
+              <td><Skeleton width="70%" height={13} /></td>
+              <td><Skeleton width="80%" height={13} /></td>
+              <td><Skeleton width="70%" height={13} /></td>
+              <td><Skeleton width={20} height={14} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default function FriendAddListV8() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<ListState kind="loading" />}>
+    <Suspense fallback={<FriendAddListSkeleton />}>
       <FriendAddListV8Inner />
     </Suspense>
   )
@@ -142,6 +196,10 @@ function FriendAddListV8Inner() {
 
   const [data, setData] = useState<FriendAddRuleListData | null>(null)
   const [loading, setLoading] = useState(true)
+  /* 数の帯の骨組み判定（0.3秒以内なら出さない・出したら最低0.4秒）。 */
+  const showKpiSkel = useDelayedSkeleton(loading)
+  /* 並べ替えの楽観表示（サーバの順に追いつくまでこっちを出す）。 */
+  const [orderOverride, setOrderOverride] = useState<string[] | null>(null)
   const [error, setError] = useState('')
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [search, setSearch] = useState('')
@@ -157,6 +215,8 @@ function FriendAddListV8Inner() {
   const requestSequence = useRef(0)
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている設定のID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [moveNotice, setMoveNotice] = useState('')
   const [dragId, setDragId] = useState<string | null>(null)
@@ -277,7 +337,12 @@ function FriendAddListV8Inner() {
   }
 
   const items = useMemo(() => data?.items ?? [], [data])
-  const regularItems = useMemo(() => items.filter((rule) => !rule.isFallback), [items])
+  const regularItems = useMemo(() => {
+    const list = items.filter((rule) => !rule.isFallback)
+    if (!orderOverride) return list
+    const rank = new Map(orderOverride.map((id, index) => [id, index]))
+    return [...list].sort((a, b) => (rank.get(a.id) ?? 9999) - (rank.get(b.id) ?? 9999))
+  }, [items, orderOverride])
   const sinkRule = useMemo(() => items.find((rule) => rule.isFallback) ?? null, [items])
   const filterActive = Boolean(appliedSearch.trim() || folder || statusFilter)
 
@@ -296,20 +361,34 @@ function FriendAddListV8Inner() {
         : undefined
   const canReorder = canEdit && listComplete
 
-  const runReorder = async (order: string[]) => {
+  /*
+   * 並べ替えは先に画面を変えて裏で保存する（サクサク感 B）。
+   * 成功したら Toast の「元に戻す」（前の順で同じ口を叩く）で戻せる。
+   * 失敗したら順を戻して Toast で理由と「もう一度」。
+   */
+  const runReorder = async (order: string[], previous: string[]) => {
     if (!selectedAccountId) return
+    setOrderOverride(order)
     setActionError('')
     try {
       const res = await api.friendAddRules.reorder(selectedAccountId, kind, order)
       if (!res.success) throw new Error(res.error)
+      await load().catch(() => {})
+      /* 保存した順と違えば上書きしない（連打の取りこぼし防止）。 */
+      setOrderOverride((current) => (current === order ? null : current))
+      notifyToast('並び替えました', {
+        actionLabel: '元に戻す',
+        onAction: () => void runReorder(previous, order),
+      })
     } catch (caught) {
-      setActionError(
+      setOrderOverride(null)
+      await load().catch(() => {})
+      notifyToast(
         caught instanceof Error && caught.message
           ? `並び替えを保存できませんでした。${caught.message}`
-          : '並び替えを保存できませんでした。状態を読み直してから、もう一度お試しください。',
+          : '並び替えを保存できませんでした。',
+        { tone: 'error', actionLabel: 'もう一度試す', onAction: () => void runReorder(order, previous) },
       )
-    } finally {
-      void load()
     }
   }
 
@@ -321,8 +400,9 @@ function FriendAddListV8Inner() {
     const fromIdx = order.indexOf(from)
     const toIdx = order.indexOf(targetId)
     if (fromIdx < 0 || toIdx < 0) return
+    const previous = [...order]
     order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
-    void runReorder(order)
+    void runReorder(order, previous)
   }
 
   const keyboardMove = (id: string, direction: -1 | 1) => {
@@ -336,9 +416,10 @@ function FriendAddListV8Inner() {
       setMoveNotice(`「${name}」は${direction < 0 ? '先頭' : '末尾'}にあるため、これ以上動かせません`)
       return
     }
+    const previous = [...order]
     order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
     setMoveNotice(`「${name}」を${direction < 0 ? '上' : '下'}へ移動しました。${toIdx + 1}番目です`)
-    void runReorder(order)
+    void runReorder(order, previous)
   }
 
   /* ===== 一時停止 ===== */
@@ -390,6 +471,28 @@ function FriendAddListV8Inner() {
   const runsHref = (id: string) => `/friend-add-settings/runs?rule_id=${encodeURIComponent(id)}`
   const testHref = (id: string) => `/friend-add-settings?view=edit&id=${encodeURIComponent(id)}&step=preview`
 
+  /** 一覧→詳細・編集はつながる移り変わりで進む（V8「サクサク感」E）。 */
+  const goEdit = (id: string) => {
+    withViewTransition(() => {
+      router.push(editHref(id))
+    })
+  }
+  const goRuns = (id: string) => {
+    withViewTransition(() => {
+      router.push(runsHref(id))
+    })
+  }
+  const goTest = (id: string) => {
+    withViewTransition(() => {
+      router.push(testHref(id))
+    })
+  }
+  const goPublish = (id: string) => {
+    withViewTransition(() => {
+      router.push(`/friend-add-settings/publish?id=${encodeURIComponent(id)}`)
+    })
+  }
+
   const rowMenuItems = (rule: FriendAddRule): ActionMenuItem[] => [
     {
       id: 'edit',
@@ -397,13 +500,13 @@ function FriendAddListV8Inner() {
       icon: <Pencil size={15} />,
       disabled: !canEdit,
       disabledReason: canEdit ? undefined : readonlyReason,
-      onSelect: () => router.push(editHref(rule.id)),
+      onSelect: () => goEdit(rule.id),
     },
     {
       id: 'runs',
       label: '実行結果を見る',
       icon: <History size={15} />,
-      onSelect: () => router.push(runsHref(rule.id)),
+      onSelect: () => goRuns(rule.id),
     },
     {
       id: 'test',
@@ -411,7 +514,7 @@ function FriendAddListV8Inner() {
       icon: <Send size={15} />,
       disabled: !canEdit,
       disabledReason: canEdit ? undefined : readonlyReason,
-      onSelect: () => router.push(testHref(rule.id)),
+      onSelect: () => goTest(rule.id),
     },
     ...(rule.isFallback
       ? [{
@@ -439,7 +542,7 @@ function FriendAddListV8Inner() {
                   label: '最終確認・有効化へ進む',
                   disabled: !canEdit,
                   disabledReason: canEdit ? undefined : readonlyReason,
-                  onSelect: () => router.push(`/friend-add-settings/publish?id=${encodeURIComponent(rule.id)}`),
+                  onSelect: () => goPublish(rule.id),
                 }]
               : []),
           {
@@ -456,6 +559,23 @@ function FriendAddListV8Inner() {
           },
         ]),
   ]
+
+  /* ===== 行の詳細パネル（V8「サクサク感」C①②・D・E） ===== */
+
+  /** 右クリックは「…」と同じ項目をマウスの位置に出す。 */
+  const rowContextItems = (rule: FriendAddRule): ContextMenuItem[] =>
+    rowMenuItems(rule).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
+
+  /** 受け皿も行の1つとして、↑↓で移れる。 */
+  const panelRows = sinkRule ? [...regularItems, sinkRule] : regularItems
+  const panelIndex = panelId === null ? -1 : panelRows.findIndex((rule) => rule.id === panelId)
+  const panelRow = panelIndex >= 0 ? panelRows[panelIndex] : null
 
   /* ===== 数の帯（板 MRhef の4つ） ===== */
 
@@ -501,18 +621,10 @@ function FriendAddListV8Inner() {
 
   /* ===== 表の中身（kFz4b の状態ごとの見え方） ===== */
 
-  const tableBody = loading && items.length === 0 ? (
-    <div className={styles.skeletonRows} role="status">
-      <span className="sr-only">読み込んでいます</span>
-      {[0, 1, 2, 3, 4].map((n) => (
-        <div key={n} className={styles.skeletonRow}>
-          <span className={styles.skeletonDot} />
-          <span className={styles.skeletonBar} />
-          <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-        </div>
-      ))}
-    </div>
-  ) : error ? (
+  const tableBody = (
+    <div aria-busy={loading}>
+      <DelayedSkeleton loading={loading && items.length === 0} skeleton={<FriendAddListSkeleton />}>
+        {error ? (
     <div className={styles.stateCard}>
       <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
         <AlertCircle size={18} aria-hidden="true" />
@@ -587,17 +699,29 @@ function FriendAddListV8Inner() {
           </colgroup>
           <thead>
             <tr>
-              <th>順</th>
-              <th>設定（対象の流入リンク）</th>
-              <th>最初に送るもの</th>
-              <th>状態</th>
-              <th className={styles.recentCol}>直近7日</th>
-              <th aria-label="操作" />
+              <Th>順</Th>
+              <Th>設定（対象の流入リンク）</Th>
+              <Th>最初に送るもの</Th>
+              <Th>状態</Th>
+              <Th className={styles.recentCol}>直近7日</Th>
+              <Th aria-label="操作" />
             </tr>
           </thead>
           <tbody>
             {regularItems.map((rule, index) => (
-              <tr key={rule.id}>
+              <tr
+                key={rule.id}
+                className={styles.rowClick}
+                tabIndex={0}
+                onClick={() => setPanelId(rule.id)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    setPanelId(rule.id)
+                  }
+                }}
+              >
                 <td
                   className={styles.orderCell}
                   draggable={canReorder}
@@ -619,7 +743,17 @@ function FriendAddListV8Inner() {
                   </span>
                 </td>
                 <td>
-                  <Link href={editHref(rule.id)} title={rule.name} className={styles.cellTitle}>
+                  <Link
+                    href={editHref(rule.id)}
+                    title={rule.name}
+                    className={styles.cellTitle}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                      event.preventDefault()
+                      goEdit(rule.id)
+                    }}
+                  >
                     {rule.name}
                   </Link>
                   <p className={styles.cellSub} title={rule.routeNames.join('、') || '未選択'}>
@@ -644,19 +778,24 @@ function FriendAddListV8Inner() {
                     {rule.status === 'draft' ? '—' : countText(rule.matchedLast7Days, '人')}
                   </span>
                 </td>
-                <td className={styles.menuCell}>
-                  <button
-                    type="button"
-                    className={styles.menuButton}
-                    title={`設定「${rule.name}」の操作`}
-                    aria-label={`設定「${rule.name}」の操作`}
-                    aria-haspopup="menu"
-                    onClick={() =>
-                      setOpenMenuId((current) => (current === rule.id ? null : rule.id))
-                    }
+                <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                  <ContextMenu
+                    label={`設定「${rule.name}」の操作`}
+                    items={rowContextItems(rule)}
                   >
-                    <MoreHorizontal size={16} aria-hidden="true" />
-                  </button>
+                    <button
+                      type="button"
+                      className={styles.menuButton}
+                      title={`設定「${rule.name}」の操作`}
+                      aria-label={`設定「${rule.name}」の操作`}
+                      aria-haspopup="menu"
+                      onClick={() =>
+                        setOpenMenuId((current) => (current === rule.id ? null : rule.id))
+                      }
+                    >
+                      <MoreHorizontal size={16} aria-hidden="true" />
+                    </button>
+                  </ContextMenu>
                   <ActionMenu
                     open={openMenuId === rule.id}
                     onClose={() => setOpenMenuId(null)}
@@ -667,14 +806,36 @@ function FriendAddListV8Inner() {
               </tr>
             ))}
             {sinkRule ? (
-              <tr key={sinkRule.id} className={styles.sinkRow}>
+              <tr
+                key={sinkRule.id}
+                className={`${styles.sinkRow} ${styles.rowClick}`}
+                tabIndex={0}
+                onClick={() => setPanelId(sinkRule.id)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    setPanelId(sinkRule.id)
+                  }
+                }}
+              >
                 <td className={styles.orderCell}>
                   <span className={styles.sinkLock} title="いちばん最後に動く・動かせない">
                     <Lock size={14} aria-hidden="true" />
                   </span>
                 </td>
                 <td>
-                  <Link href={editHref(sinkRule.id)} title={sinkRule.name} className={styles.cellTitle}>
+                  <Link
+                    href={editHref(sinkRule.id)}
+                    title={sinkRule.name}
+                    className={styles.cellTitle}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                      event.preventDefault()
+                      goEdit(sinkRule.id)
+                    }}
+                  >
                     {sinkRule.name}
                   </Link>
                   <p className={styles.cellSub}>
@@ -697,19 +858,24 @@ function FriendAddListV8Inner() {
                 <td className={`${styles.countCell} ${styles.recentCol}`}>
                   <span className={styles.countMain}>{countText(sinkRule.matchedLast7Days, '人')}</span>
                 </td>
-                <td className={styles.menuCell}>
-                  <button
-                    type="button"
-                    className={styles.menuButton}
-                    title={`設定「${sinkRule.name}」の操作`}
-                    aria-label={`設定「${sinkRule.name}」の操作`}
-                    aria-haspopup="menu"
-                    onClick={() =>
-                      setOpenMenuId((current) => (current === sinkRule.id ? null : sinkRule.id))
-                    }
+                <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                  <ContextMenu
+                    label={`設定「${sinkRule.name}」の操作`}
+                    items={rowContextItems(sinkRule)}
                   >
-                    <MoreHorizontal size={16} aria-hidden="true" />
-                  </button>
+                    <button
+                      type="button"
+                      className={styles.menuButton}
+                      title={`設定「${sinkRule.name}」の操作`}
+                      aria-label={`設定「${sinkRule.name}」の操作`}
+                      aria-haspopup="menu"
+                      onClick={() =>
+                        setOpenMenuId((current) => (current === sinkRule.id ? null : sinkRule.id))
+                      }
+                    >
+                      <MoreHorizontal size={16} aria-hidden="true" />
+                    </button>
+                  </ContextMenu>
                   <ActionMenu
                     open={openMenuId === sinkRule.id}
                     onClose={() => setOpenMenuId(null)}
@@ -735,7 +901,10 @@ function FriendAddListV8Inner() {
           </div>
         </div>
       ) : null}
-    </>
+        </>
+      )}
+      </DelayedSkeleton>
+    </div>
   )
 
   return (
@@ -784,10 +953,9 @@ function FriendAddListV8Inner() {
               {kpi.title}
             </span>
             <p className={styles.kpiValue}>
-              {kpi.value === null ? '—' : formatNumber(kpi.value)}
-              <span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span>
+              {showKpiSkel && kpi.value === null ? <Skeleton width="6ch" height={22} /> : kpi.value === null ? '—' : (<>{formatNumber(kpi.value)}<span className={styles.kpiUnit}>{kpi.unit}</span></>)}
             </p>
-            <p className={styles.kpiDetail}>{kpi.detail}</p>
+            <p className={styles.kpiDetail}>{showKpiSkel && kpi.detail === '—' ? <Skeleton width="10ch" height={11} /> : kpi.detail}</p>
             {kpi.href ? (
               <a href={kpi.href} className={styles.kpiLink}>
                 流入リンクを見る →
@@ -884,6 +1052,57 @@ function FriendAddListV8Inner() {
           {tableBody}
         </div>
       </div>
+
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelRow && (
+        <DetailPanel
+          open
+          title={panelRow.name}
+          description={[statusLabel(panelRow), firstSendLabel(panelRow)].join('・')}
+          onClose={() => setPanelId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelId(panelRows[panelIndex - 1].id) : undefined}
+          onNext={
+            panelIndex < panelRows.length - 1 ? () => setPanelId(panelRows[panelIndex + 1].id) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < panelRows.length - 1}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => goEdit(panelRow.id)}>
+                編集する
+              </Button>
+              <Button variant="secondary" onClick={() => goRuns(panelRow.id)}>
+                実行結果を見る
+              </Button>
+              <Button variant="secondary" disabled={!canEdit} onClick={() => goTest(panelRow.id)}>
+                テストを送る
+              </Button>
+              {!panelRow.isFallback && (
+                <Button
+                  variant="secondary"
+                  disabled={!canEdit}
+                  onClick={() => {
+                    setDeleteError('')
+                    setDeleteTarget(panelRow)
+                    setPanelId(null)
+                  }}
+                >
+                  削除する
+                </Button>
+              )}
+            </>
+          }
+        >
+          <p>
+            {statusLabel(panelRow)} ／ 直近7日{' '}
+            {panelRow.status === 'draft' ? '—' : countText(panelRow.matchedLast7Days, '人')}
+          </p>
+          <p>{panelRow.routeNames.join('、') || '未選択'}</p>
+          {actionLines(panelRow).map((line) => (
+            <p key={line}>{line}</p>
+          ))}
+        </DetailPanel>
+      )}
 
       {/* 受け皿を止められない確かめ（板 `cFo2p`）。 */}
       <ConfirmDialog

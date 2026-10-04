@@ -24,8 +24,12 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Chip from '@/components/shared/chip'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import NoteBar from '@/components/shared/note-bar'
 import { RowActions, DeleteAction } from '@/components/shared/row-actions'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
@@ -288,7 +292,21 @@ function MembersTabV8({
   const [rank, setRank] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている会員の友だちID。 */
+  const [panelFriendId, setPanelFriendId] = useState<string | null>(null)
   const requestRef = useRef(0)
+
+  /** 一覧→詳細はつながる移り変わりで開く（V8「サクサク感」E）。 */
+  const goOpen = (href: string) => {
+    withViewTransition(() => {
+      router.push(href)
+    })
+  }
+
+  /* 行の詳細パネル（V8「サクサク感」C①②）。↑↓で次の行へ移る。 */
+  const panelItems = data?.items ?? []
+  const panelIndex = panelFriendId === null ? -1 : panelItems.findIndex((member) => member.friendId === panelFriendId)
+  const panelRow = panelIndex >= 0 ? panelItems[panelIndex] : null
 
   /*
    * `?? []` をそのまま書くと、読み込み中に毎回新しい配列が生えて
@@ -407,7 +425,45 @@ function MembersTabV8({
 
       <section>
         {status === 'loading' && !data ? (
-          <ListState kind="loading" title="会員を読み込んでいます" />
+          <div aria-busy="true" aria-label="会員を読み込んでいます">
+            <DelayedSkeleton
+              loading
+              skeleton={(
+                <div aria-hidden="true">
+                  <DataTable className="@container">
+                    <thead>
+                      <TableHeadRow>
+                        <Th className="w-64">会員</Th>
+                        <Th className="w-24">ランク</Th>
+                        <Th className="w-24" align="right">通年</Th>
+                        <Th className="w-28" align="right">ライフタイム</Th>
+                        <Th className="w-24" align="right">マイル残高</Th>
+                        <Th>ペット</Th>
+                        <Th className="w-20">最終購入</Th>
+                        <Th className="w-20" align="right">マイル還元</Th>
+                        <Th className="w-14" align="right">操作</Th>
+                      </TableHeadRow>
+                    </thead>
+                    <tbody>
+                      {[0, 1, 2, 3, 4].map((row) => (
+                        <Tr key={row}>
+                          <Td><Skeleton width="12ch" height="1em" /></Td>
+                          <Td><Skeleton width="6ch" height="1em" /></Td>
+                          <Td><Skeleton width="8ch" height="1em" /></Td>
+                          <Td><Skeleton width="8ch" height="1em" /></Td>
+                          <Td><Skeleton width="6ch" height="1em" /></Td>
+                          <Td><Skeleton width="8ch" height="1em" /></Td>
+                          <Td><Skeleton width="8ch" height="1em" /></Td>
+                          <Td><Skeleton width="6ch" height="1em" /></Td>
+                          <Td><Skeleton width="3ch" height="1em" /></Td>
+                        </Tr>
+                      ))}
+                    </tbody>
+                  </DataTable>
+                </div>
+              )}
+            />
+          </div>
         ) : status === 'forbidden' ? (
           <ListState kind="forbidden" />
         ) : status === 'error' ? (
@@ -447,7 +503,13 @@ function MembersTabV8({
                 </thead>
                 <tbody>
                   {data.items.map((member) => (
-                    <MemberRowV8 key={member.friendId} member={member} rankOrder={rankOrder} onOpen={(href) => router.push(href)} />
+                    <MemberRowV8
+                      key={member.friendId}
+                      member={member}
+                      rankOrder={rankOrder}
+                      onOpen={goOpen}
+                      onSelect={(friendId) => setPanelFriendId(friendId)}
+                    />
                   ))}
                 </tbody>
               </DataTable>
@@ -466,10 +528,58 @@ function MembersTabV8({
                 />
               ) : null}
             </div>
-            <p className={styles.listHint}>行の「…」から 会員の詳細・友だちを開く・ECで開く。</p>
+            <p className={styles.listHint}>行を押すと右に詳しい内容。行の「…」から 会員の詳細・友だちを開く・ECで開く。</p>
           </>
         ) : null}
       </section>
+
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelRow && (
+        <DetailPanel
+          open
+          title={panelRow.name || '（名前なし）'}
+          description={[panelRow.rankName, `通年 ${yen(panelRow.annualMilesYen)}`].join('・')}
+          onClose={() => setPanelFriendId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelFriendId(panelItems[panelIndex - 1].friendId) : undefined}
+          onNext={
+            panelIndex < panelItems.length - 1 ? () => setPanelFriendId(panelItems[panelIndex + 1].friendId) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < panelItems.length - 1}
+          footer={
+            <>
+              <Button
+                variant="primary"
+                onClick={() => goOpen(`/friends/detail?id=${encodeURIComponent(panelRow.friendId)}`)}
+              >
+                会員の詳細
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => goOpen(`/friends/detail?id=${encodeURIComponent(panelRow.friendId)}&tab=info`)}
+              >
+                友だちを開く
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!panelRow.customerId}
+                title={panelRow.customerId ? undefined : 'ECと結びついていません'}
+                onClick={() => goOpen('/ec-commerce')}
+              >
+                ECで開く
+              </Button>
+            </>
+          }
+        >
+          <p>
+            {panelRow.rankName} ／ マイル残高 {formatNumber(panelRow.mileBalance)}
+          </p>
+          <p>
+            通年 {yen(panelRow.annualMilesYen)} ／ ライフタイム {yen(panelRow.lifetimeMilesYen)}
+          </p>
+          <p>{panelRow.petNames ? `ペット：${panelRow.petNames}` : 'ペット：—'}</p>
+        </DetailPanel>
+      )}
     </>
   )
 }
@@ -478,15 +588,38 @@ function MemberRowV8({
   member,
   rankOrder,
   onOpen,
+  onSelect,
 }: {
   member: NenMemberRow
   rankOrder: string[]
   onOpen: (href: string) => void
+  onSelect: (friendId: string) => void
 }) {
   const initial = (member.name || '?').slice(0, 1)
   const friendDetail = `/friends/detail?id=${encodeURIComponent(member.friendId)}`
+  const contextItems: ContextMenuItem[] = [
+    { id: 'detail', label: '会員の詳細', onSelect: () => onOpen(friendDetail) },
+    { id: 'friend', label: '友だちを開く', onSelect: () => onOpen(`${friendDetail}&tab=info`) },
+    {
+      id: 'ec',
+      label: 'ECで開く',
+      disabled: !member.customerId,
+      onSelect: () => onOpen('/ec-commerce'),
+    },
+  ]
   return (
-    <Tr>
+    <Tr
+      interactive
+      tabIndex={0}
+      onClick={() => onSelect(member.friendId)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          onSelect(member.friendId)
+        }
+      }}
+    >
       <Td className="w-64">
         <span className="flex items-center gap-3">
           {member.pictureUrl ? (
@@ -512,26 +645,29 @@ function MemberRowV8({
       </Td>
       <Td className="cq-hide-below-1010 w-20"><span className="text-label text-ink-secondary">{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span></Td>
       <Td className="cq-hide-below-1010 w-20" align="right"><span className="text-label font-semibold tabular-nums text-ink">{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></Td>
-      <Td align="right" className="w-14">
+      <Td align="right" className="w-14" onClick={(event) => event.stopPropagation()}>
         {/*
           板の行の「…」：会員の詳細（＝友だち詳細の会員の区画）・友だちを開く・ECで開く。
           EC 側に会員の管理ページの住所は無いので、「ECで開く」はECのつなぎの画面へ。
+          右クリックでも同じ品ぞろえ（V8「サクサク感」D）。
         */}
-        <RowActions
-          subjectName={member.name || 'この会員'}
-          menuItems={[
-            { id: 'detail', label: '会員の詳細', external: true, onSelect: () => onOpen(friendDetail) },
-            { id: 'friend', label: '友だちを開く', external: true, onSelect: () => onOpen(`${friendDetail}&tab=info`) },
-            {
-              id: 'ec',
-              label: 'ECで開く',
-              external: true,
-              disabled: !member.customerId,
-              disabledReason: 'ECと結びついていません',
-              onSelect: () => onOpen('/ec-commerce'),
-            },
-          ]}
-        />
+        <ContextMenu label={`会員「${member.name || 'この会員'}」の操作`} items={contextItems}>
+          <RowActions
+            subjectName={member.name || 'この会員'}
+            menuItems={[
+              { id: 'detail', label: '会員の詳細', external: true, onSelect: () => onOpen(friendDetail) },
+              { id: 'friend', label: '友だちを開く', external: true, onSelect: () => onOpen(`${friendDetail}&tab=info`) },
+              {
+                id: 'ec',
+                label: 'ECで開く',
+                external: true,
+                disabled: !member.customerId,
+                disabledReason: 'ECと結びついていません',
+                onSelect: () => onOpen('/ec-commerce'),
+              },
+            ]}
+          />
+        </ContextMenu>
       </Td>
     </Tr>
   )
@@ -561,6 +697,7 @@ function RankSettingsTabV8({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [justSaved, setJustSaved] = useState(false)
   /**
    * 競合（e5yBLx）：読み込んだあとにほかの人が保存した形。
    * latest はその時点で取り直した新しい設定。「違いを比べる」で見せる。
@@ -649,6 +786,8 @@ function RankSettingsTabV8({
       setNotice(res.data.sync?.status === 'synced'
         ? 'ランク設定を保存し、ECへ同期しました。友だち属性のタグも付け替えています。'
         : 'ランク設定を保存しました。ECへの同期は失敗したので、右の「もう一度同期」で送り直せます。')
+      setJustSaved(true)
+      window.setTimeout(() => setJustSaved(false), 3000)
     } catch (caught) {
       setError(describeApiFailure(caught, 'ランク設定の保存', {
         forbidden: 'ランク設定を保存する権限がありません。権限を確認してください。',
@@ -724,10 +863,10 @@ function RankSettingsTabV8({
   }
 
   const noticeEl = notice ? <p className={styles.notice} role="status">{notice}</p> : null
-  if (status === 'loading' && !settings) return <>{noticeEl}<ListState kind="loading" title="ランク設定を読み込んでいます" /></>
+  if (status === 'loading' && !settings) return <>{noticeEl}<div aria-busy="true" aria-label="ランク設定を読み込んでいます"><DelayedSkeleton loading skeleton={(<div className={styles.card} aria-hidden="true"><Skeleton width="14ch" height="1.4em" /><Skeleton width="60%" height="0.9em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /></div>)} /></div></>
   if (status === 'forbidden') return <ListState kind="forbidden" />
   if (status === 'error') return <ListState kind="error" title="ランク設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
-  if (!settings) return <>{noticeEl}<ListState kind="loading" title="ランク設定を読み込んでいます" /></>
+  if (!settings) return <>{noticeEl}<div aria-busy="true" aria-label="ランク設定を読み込んでいます"><DelayedSkeleton loading skeleton={(<div className={styles.card} aria-hidden="true"><Skeleton width="14ch" height="1.4em" /><Skeleton width="60%" height="0.9em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /></div>)} /></div></>
 
   const rules = settings.rules
   const removeRow = removeTarget !== null ? drafts[removeTarget] : null
@@ -854,7 +993,7 @@ function RankSettingsTabV8({
         actions={(
           <>
             <Button variant="secondary" onClick={cancel} disabled={busy || !dirty}>キャンセル</Button>
-            <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || !dirty || readonly}>
+            <Button variant="primary" onClick={() => (conflict ? setComparing(true) : void save())} disabled={busy || !dirty || readonly} busy={busy} busyLabel="保存中" done={justSaved}>
               {conflict ? '比べてから保存' : '保存して EC へ同期'}
             </Button>
           </>
@@ -959,6 +1098,7 @@ function LifetimeTabV8({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [justSaved, setJustSaved] = useState(false)
   const [draftAccountId, setDraftAccountId] = useState(accountId)
 
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
@@ -1000,6 +1140,8 @@ function LifetimeTabV8({
       setDirty(false)
       onSaved(accountId, res.data)
       setNotice(res.data.sync?.status === 'synced' ? '節目を保存し、ECへ同期しました。' : '節目を保存しました。ECへの同期は失敗したので、ランク設定の「もう一度同期」で送り直せます。')
+      setJustSaved(true)
+      window.setTimeout(() => setJustSaved(false), 3000)
     } catch (caught) {
       setError(describeApiFailure(caught, '節目の保存', {
         forbidden: '節目を保存する権限がありません。権限を確認してください。',
@@ -1010,10 +1152,10 @@ function LifetimeTabV8({
   }
 
   const noticeEl = notice ? <p className={styles.notice} role="status">{notice}</p> : null
-  if (status === 'loading' && !settings) return <>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></>
+  if (status === 'loading' && !settings) return <>{noticeEl}<div aria-busy="true" aria-label="ライフタイムを読み込んでいます"><DelayedSkeleton loading skeleton={(<div className={styles.card} aria-hidden="true"><Skeleton width="16ch" height="1.4em" /><Skeleton width="100%" height="0.9em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /></div>)} /></div></>
   if (status === 'forbidden') return <ListState kind="forbidden" />
   if (status === 'error') return <ListState kind="error" title="ライフタイムを読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
-  if (!settings) return <>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></>
+  if (!settings) return <>{noticeEl}<div aria-busy="true" aria-label="ライフタイムを読み込んでいます"><DelayedSkeleton loading skeleton={(<div className={styles.card} aria-hidden="true"><Skeleton width="16ch" height="1.4em" /><Skeleton width="100%" height="0.9em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /><Skeleton width="100%" height="2.5em" /></div>)} /></div></>
 
   return (
     <>
@@ -1101,7 +1243,7 @@ function LifetimeTabV8({
         actions={(
           <>
             <Button variant="secondary" onClick={() => { setDirty(false); setError(''); if (settings) setDrafts(fromSettings(settings)) }} disabled={busy || !dirty}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty || readonly}>保存して EC へ同期する</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty || readonly} busy={busy} busyLabel="保存中" done={justSaved}>保存して EC へ同期する</Button>
           </>
         )}
       />

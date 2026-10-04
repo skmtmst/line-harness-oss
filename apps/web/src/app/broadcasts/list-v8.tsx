@@ -44,9 +44,10 @@ import DateField from '@/components/shared/date-field'
 import SearchField from '@/components/shared/search-field'
 import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
-import { notifyToast } from '@/components/shared/toast'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
+import { runOptimistic } from '@/lib/undoable'
 import { formatDateTime, formatNumber, formatYmd } from '@/lib/format'
 import styles from './list-v8.module.css'
 
@@ -166,6 +167,11 @@ export default function BroadcastListV8() {
   /* 行の「…」メニュー。フォルダへ移すは同じメニューの2段目で選ぶ。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
+  /*
+   * ActionMenu は項目を選ぶと必ず onClose を呼ぶ。「フォルダへ移す」は
+   * 閉じずに2段目へ切り替えるため、選んだ直後の onClose だけ見送る印。
+   */
+  const keepMenuOpenRef = useRef(false)
   const [moving, setMoving] = useState(false)
   const [savedViews, setSavedViews] = useState<BroadcastSavedView[]>([])
   const [savedViewsSeq, setSavedViewsSeq] = useState(0)
@@ -452,25 +458,33 @@ export default function BroadcastListV8() {
     }
   }
 
-  /* 行の「…」→「フォルダへ移す」。宛先フォルダを同じメニューで選ぶ。 */
-  const moveBroadcastToFolder = async (broadcast: ApiBroadcast, folderId: string | null) => {
+  /*
+   * 行の「…」→「フォルダへ移す」。宛先フォルダを同じメニューで選ぶ。
+   * 軽い整理なので、押した瞬間に移した形を見せて裏で保存する（サクサク感 B）。
+   * 失敗したら元に戻して「もう一度」の知らせを出す。メニューはすぐ閉じる。
+   */
+  const moveBroadcastToFolder = (broadcast: ApiBroadcast, folderId: string | null) => {
     if (moving) return
     setMoving(true)
-    try {
-      const res = await api.broadcasts.update(broadcast.id, {
+    const previous = broadcasts
+    setBroadcasts((current) => current.map((item) => (item.id === broadcast.id ? { ...item, folderId } : item)))
+    setOpenMenuId(null)
+    setMenuMoveFor(null)
+    const retry = () => moveBroadcastToFolder(broadcast, folderId)
+    runOptimistic({
+      request: () => api.broadcasts.update(broadcast.id, {
         folderId,
         expectedVersion: broadcast.version ?? 0,
-      })
-      if (!res.success) throw new Error(res.error)
-      await loadList((page - 1) * pageSize)
-      await loadFolders()
-    } catch {
-      notifyToast('フォルダへ移せませんでした。状態を読み直してから、もう一度お試しください。')
-    } finally {
-      setMoving(false)
-      setOpenMenuId(null)
-      setMenuMoveFor(null)
-    }
+      }),
+      revert: () => { setBroadcasts(previous); setMoving(false) },
+      failureMessage: 'フォルダへ移せませんでした。',
+      retry,
+      onSuccess: () => {
+        setMoving(false)
+        void loadList((page - 1) * pageSize)
+        void loadFolders()
+      },
+    })
   }
 
   const getTagName = (tagId: string | null) => {
@@ -580,7 +594,7 @@ export default function BroadcastListV8() {
   const rowMenuItems = (broadcast: ApiBroadcast): ActionMenuItem[] => {
     if (menuMoveFor === broadcast.id) {
       return [
-        { id: 'move-back', label: '← 操作にもどる', onSelect: () => setMenuMoveFor(null) },
+        { id: 'move-back', label: '← 操作にもどる', onSelect: () => { keepMenuOpenRef.current = true; setMenuMoveFor(null) } },
         { id: 'move-unfiled', label: '未分類', onSelect: () => void moveBroadcastToFolder(broadcast, null) },
         ...folders.map((f) => ({
           id: `move-${f.id}`,
@@ -617,7 +631,10 @@ export default function BroadcastListV8() {
       label: 'フォルダへ移す',
       disabled: readonly || folders.length === 0,
       disabledReason: readonly ? readonlyReason : '移せるフォルダがありません',
-      onSelect: () => setMenuMoveFor(broadcast.id),
+      onSelect: () => {
+        keepMenuOpenRef.current = true
+        setMenuMoveFor(broadcast.id)
+      },
     })
     items.push({
       id: 'delete',
@@ -798,7 +815,7 @@ export default function BroadcastListV8() {
                 onChange={(event) => setSavedViewName(event.target.value)}
                 className={styles.saveInput}
               />
-              <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()} busy={savedViewBusy}>保存する</Button>
+              <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()} busy={savedViewBusy} busyLabel="保存中">保存する</Button>
               <Button type="button" onClick={() => setSavedViewOpen(false)}>閉じる</Button>
             </div>
           )}
@@ -878,16 +895,40 @@ export default function BroadcastListV8() {
           )}
 
           {loading ? (
-            <div className={styles.skeletonRows} role="status">
-              <span className="sr-only">読み込んでいます</span>
-              {[0, 1, 2, 3, 4].map((row) => (
-                <div key={row} className={styles.skeletonRow}>
-                  <span className={styles.skeletonDot} />
-                  <span className={styles.skeletonBar} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 160 }} />
-                </div>
-              ))}
+            <div aria-busy="true" aria-label="一斉配信を読み込んでいます">
+              <DelayedSkeleton
+                loading
+                skeleton={(
+                  <div aria-hidden="true">
+                    <div className={styles.tableWrap}>
+                      <table className={styles.table}>
+                        <thead>
+                          <TableHeadRow>
+                            <Th>タイトル・内容</Th>
+                            <Th>状態</Th>
+                            <Th className={styles.audienceCol}>配信条件</Th>
+                            <Th>配信日時</Th>
+                            <Th>結果</Th>
+                            <Th className={styles.menuCell}><span className="sr-only">操作</span></Th>
+                          </TableHeadRow>
+                        </thead>
+                        <tbody>
+                          {[0, 1, 2, 3, 4].map((row) => (
+                            <tr key={row}>
+                              <td><Skeleton width="18ch" height="1em" /><Skeleton width="28ch" height="0.85em" /></td>
+                              <td><Skeleton width="6ch" height="1em" /></td>
+                              <td><Skeleton width="12ch" height="1em" /></td>
+                              <td><Skeleton width="12ch" height="1em" /></td>
+                              <td><Skeleton width="10ch" height="1em" /></td>
+                              <td><Skeleton width="3ch" height="1em" /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              />
             </div>
           ) : forbidden ? (
             <div className={styles.stateCard}>
@@ -1028,7 +1069,18 @@ export default function BroadcastListV8() {
                             </button>
                             <ActionMenu
                               open={openMenuId === broadcast.id}
-                              onClose={() => { setOpenMenuId(null); setMenuMoveFor(null) }}
+                              /*
+                               * 「フォルダへ移す」を選んだ直後の onClose は2段目への
+                               * 切り替えなので閉じない。外側・Esc の onClose は閉じる。
+                               * 2段目の印は開き直しと移動の確定で消す。
+                               */
+                              onClose={() => {
+                                if (keepMenuOpenRef.current) {
+                                  keepMenuOpenRef.current = false
+                                  return
+                                }
+                                setOpenMenuId(null)
+                              }}
                               ariaLabel={`配信「${broadcast.title}」の操作`}
                               items={rowMenuItems(broadcast)}
                             />

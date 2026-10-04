@@ -14,16 +14,23 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AlertCircle, ArrowLeftRight, Gift, Info, Plus, Star } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Button from '@/components/shared/button'
 import FolderPanel from '@/components/shared/folder-panel'
 import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
+import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import {
   ApiError,
@@ -123,8 +130,18 @@ export default function V8RewardsTab({
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
 }) {
+  const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountId = selectedAccountId
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている使い道のID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
+
+  /** 一覧→詳細はつながる移り変わりで開く（V8「サクサク感」E）。 */
+  const goDetail = (id: string) => {
+    withViewTransition(() => {
+      router.push(`/mileage/rewards/edit?id=${encodeURIComponent(id)}`)
+    })
+  }
   const [rewards, setRewards] = useState<MileageRewardSummary[]>([])
   const [reachMetrics, setReachMetrics] = useState<Array<{ rewardId: string; reachableFriendCount: number }>>([])
   const [redeemedMiles, setRedeemedMiles] = useState<number | null>(null)
@@ -132,6 +149,8 @@ export default function V8RewardsTab({
   const [popularName, setPopularName] = useState<string | null>(null)
   const [popularCount, setPopularCount] = useState<number | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
+  /* 数の帯の骨組み判定（0.3秒以内なら出さない・出したら最低0.4秒）。 */
+  const showKpiSkel = useDelayedSkeleton(status === 'loading')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [failed, setFailed] = useState<FailedRedemption[]>([])
@@ -272,9 +291,22 @@ export default function V8RewardsTab({
     }
   }
 
-  const changeState = async (reward: MileageRewardSummary) => {
+  /*
+   * 止める・また出すは先に画面を変えて裏で保存する（サクサク感 B）。
+   * 失敗したら戻して Toast で理由と「もう一度」、成功したら Toast の
+   * 「元に戻す」（同じ口で戻せる）で取り消せる。下書きの公開は重い操作の
+   * まま（元に戻すと止めた状態になり下書きに戻らないため対象外）。
+   */
+  const changeState = async (reward: MileageRewardSummary, options?: { silent?: boolean }) => {
     if (readonly || !accountId
       || (reward.status !== 'published' && reward.status !== 'draft' && reward.status !== 'stopped')) return
+    const optimistic = reward.status === 'published' || reward.status === 'stopped'
+    const toStatus = reward.status === 'published' ? 'stopped' : reward.status === 'stopped' ? 'published' : reward.status
+    if (optimistic) {
+      setRewards((current) => current.map((item) => (
+        item.id === reward.id ? { ...item, status: toStatus } : item
+      )))
+    }
     setBusyId(reward.id)
     setActionError('')
     try {
@@ -290,12 +322,28 @@ export default function V8RewardsTab({
         )
       if (!response.success) throw new Error(response.error)
       await load()
+      if (optimistic && !options?.silent) {
+        const flipped: MileageRewardSummary = { ...reward, status: toStatus }
+        notifyToast(reward.status === 'published' ? '止めています' : 'また出しています', {
+          actionLabel: '元に戻す',
+          onAction: () => void changeState(flipped, { silent: true }),
+        })
+      }
     } catch {
-      setActionError(reward.status === 'published'
-        ? '使い道を止められませんでした。もう一度お試しください。'
-        : reward.status === 'stopped'
-          ? '使い道をまた出せませんでした。もう一度お試しください。'
-          : '使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+      if (optimistic) {
+        setRewards((current) => current.map((item) => (
+          item.id === reward.id ? { ...item, status: reward.status } : item
+        )))
+        notifyToast(reward.status === 'published'
+          ? '使い道を止められませんでした'
+          : '使い道をまた出せませんでした', {
+          tone: 'error',
+          actionLabel: 'もう一度試す',
+          onAction: () => void changeState(reward),
+        })
+      } else {
+        setActionError('使い道を公開できませんでした。内容を確認してもう一度お試しください。')
+      }
     } finally {
       setBusyId(null)
     }
@@ -344,6 +392,20 @@ export default function V8RewardsTab({
 
   const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
   const visible = shown.slice((page - 1) * pageSize, page * pageSize)
+
+  /* 行の詳細パネル（V8「サクサク感」C①②）。↑↓で次の行へ移る。 */
+  const panelIndex = panelId === null ? -1 : visible.findIndex((reward) => reward.id === panelId)
+  const panelReward = panelIndex >= 0 ? visible[panelIndex] : null
+
+  /** 右クリックは行の操作と同じ品ぞろえ（V8「サクサク感」D）。 */
+  const rowContextItems = (reward: MileageRewardSummary, operable: boolean): ContextMenuItem[] => [
+    { id: 'detail', label: '中身を見る', onSelect: () => goDetail(reward.id) },
+    ...(operable ? [{
+      id: 'toggle',
+      label: reward.status === 'published' ? '止める' : reward.status === 'stopped' ? 'また出す' : '出す',
+      onSelect: () => void changeState(reward),
+    }] : []),
+  ]
   const resetAll = () => {
     setSearchInput('')
     setSearch('')
@@ -364,11 +426,10 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>使い道</span>
           </div>
           <p className={styles.kpiValue}>
-            {status !== 'ready' ? '—' : formatMileageNumber(rewards.length)}
-            <span className={styles.kpiUnit}> 件</span>
+            {showKpiSkel ? <Skeleton width="4ch" height={24} /> : status !== 'ready' ? '—' : (<>{formatMileageNumber(rewards.length)}<span className={styles.kpiUnit}> 件</span></>)}
           </p>
           <p className={styles.kpiSub}>
-            {status !== 'ready'
+            {showKpiSkel ? <Skeleton width="12ch" height={12} /> : status !== 'ready'
               ? '—'
               : `出している ${formatMileageNumber(publishedCount)}・下書き ${formatMileageNumber(draftCount)}`}
           </p>
@@ -379,11 +440,10 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>今月交換</span>
           </div>
           <p className={styles.kpiValue}>
-            {status !== 'ready' ? '—' : formatMileageNumber(exchangedCount ?? 0)}
-            <span className={styles.kpiUnit}> 件</span>
+            {showKpiSkel ? <Skeleton width="4ch" height={24} /> : status !== 'ready' ? '—' : (<>{formatMileageNumber(exchangedCount ?? 0)}<span className={styles.kpiUnit}> 件</span></>)}
           </p>
           <p className={styles.kpiSub}>
-            {status !== 'ready' ? '—' : `${formatMileageNumber(redeemedMiles ?? 0)} マイル`}
+            {showKpiSkel ? <Skeleton width="7ch" height={12} /> : status !== 'ready' ? '—' : `${formatMileageNumber(redeemedMiles ?? 0)} マイル`}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -392,10 +452,10 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>いちばん人気</span>
           </div>
           <p className={styles.kpiValue} style={{ fontSize: 20 }} title={popularName ?? undefined}>
-            {status !== 'ready' ? '—' : (popularName ?? '—')}
+            {showKpiSkel ? <Skeleton width="10ch" height={20} /> : status !== 'ready' ? '—' : (popularName ?? '—')}
           </p>
           <p className={styles.kpiSub}>
-            {status !== 'ready' ? '—' : popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません'}
+            {showKpiSkel ? <Skeleton width="8ch" height={12} /> : status !== 'ready' ? '—' : popularName ? `今月 ${formatMileageNumber(popularCount ?? 0)}件` : 'まだ交換されていません'}
           </p>
         </div>
         <div className={styles.kpi}>
@@ -404,8 +464,7 @@ export default function V8RewardsTab({
             <span className={styles.kpiLabel}>渡せなかった</span>
           </div>
           <p className={styles.kpiValue}>
-            {redemptionsLoad === 'loading' ? '—' : formatMileageNumber(failedTotal)}
-            <span className={styles.kpiUnit}> 件</span>
+            {showKpiSkel || redemptionsLoad === 'loading' ? <Skeleton width="4ch" height={24} /> : (<>{formatMileageNumber(failedTotal)}<span className={styles.kpiUnit}> 件</span></>)}
           </p>
           <p className={styles.kpiSub}>
             {failed.length > 0 ? failed[0].rewardName : '要対応の交換はありません'}
@@ -511,19 +570,23 @@ export default function V8RewardsTab({
             </span>
           </div>
 
-          {status === 'loading' ? (
-            <div className={styles.stateWrap} role="status" aria-label="読み込み中">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className={styles.skelRow} aria-hidden="true">
-                  <span className={styles.skelDot} />
-                  <span className={styles.skelBar} style={{ width: '22%' }} />
-                  <span className={styles.skelBar} style={{ width: '14%' }} />
-                  <span className={styles.skelBar} style={{ width: '18%' }} />
-                  <span className={styles.skelBar} style={{ width: '10%', marginLeft: 'auto' }} />
-                </div>
-              ))}
-            </div>
-          ) : status === 'forbidden' ? (
+          <div aria-busy={status === 'loading'}>
+            <DelayedSkeleton
+              loading={status === 'loading'}
+              skeleton={(
+                <MileageTableSkeleton
+                  columns={[
+                    { header: '使い道', bar: '40%' },
+                    { header: '必要なマイル', bar: '50%' },
+                    { header: '交換すると渡るもの', bar: '70%' },
+                    { header: '今月交換された', bar: '50%' },
+                    { header: '状態', bar: '70%' },
+                    { header: '操作', bar: '85%' },
+                  ]}
+                />
+              )}
+            >
+              {status === 'forbidden' ? (
             <div className={styles.stateWrap}>
               <div className={styles.stateCard}>
                 <p className={styles.stateTitle}>使い道を見る権限がありません</p>
@@ -584,7 +647,19 @@ export default function V8RewardsTab({
                       && (reward.status === 'published' || reward.status === 'draft' || reward.status === 'stopped')
                     const reach = reachMetrics.find((metric) => metric.rewardId === reward.id)
                     return (
-                      <tr key={reward.id}>
+                      <tr
+                        key={reward.id}
+                        tabIndex={0}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setPanelId(reward.id)}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) return
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            setPanelId(reward.id)
+                          }
+                        }}
+                      >
                         <td>
                           <p className={styles.cellMain} title={reward.name}>{reward.name}</p>
                           <p className={styles.cellSub}>
@@ -602,22 +677,34 @@ export default function V8RewardsTab({
                         </td>
                         <td><span className={styles.num}>{formatMileageNumber(reward.exchangedThisMonth)}件</span></td>
                         <td><span className={pill.className}>{pill.text}</span></td>
-                        <td>
-                          <span className={styles.rowActions}>
-                            <Button href={`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`}>
-                              中身を見る
-                            </Button>
-                            {operable ? (
+                        <td onClick={(event) => event.stopPropagation()}>
+                          <ContextMenu
+                            label={`使い道「${reward.name}」の操作`}
+                            items={rowContextItems(reward, operable)}
+                          >
+                            <span className={styles.rowActions}>
                               <Button
-                                disabled={busyId === reward.id}
-                                onClick={() => void changeState(reward)}
-                                busy={busyId === reward.id}
-                                busyLabel="反映しています"
+                                href={`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`}
+                                onClick={(event) => {
+                                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                                  event.preventDefault()
+                                  goDetail(reward.id)
+                                }}
                               >
-                                {reward.status === 'published' ? '止める' : reward.status === 'stopped' ? 'また出す' : '出す'}
+                                中身を見る
                               </Button>
-                            ) : null}
-                          </span>
+                              {operable ? (
+                                <Button
+                                  disabled={busyId === reward.id}
+                                  onClick={() => void changeState(reward)}
+                                  busy={busyId === reward.id}
+                                  busyLabel="反映しています"
+                                >
+                                  {reward.status === 'published' ? '止める' : reward.status === 'stopped' ? 'また出す' : '出す'}
+                                </Button>
+                              ) : null}
+                            </span>
+                          </ContextMenu>
                         </td>
                       </tr>
                     )
@@ -626,6 +713,8 @@ export default function V8RewardsTab({
               </table>
             </div>
           )}
+            </DelayedSkeleton>
+          </div>
 
           {status === 'ready' && visible.length > 0 ? (
             <div className={styles.footer}>
@@ -636,8 +725,46 @@ export default function V8RewardsTab({
             </div>
           ) : null}
 
+          {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+          {panelReward && (
+            <DetailPanel
+              open
+              title={panelReward.name}
+              description={[
+                statusPill(panelReward.status).text,
+                `必要 ${formatMileageNumber(panelReward.currentVersion?.requiredMiles)}`,
+              ].join('・')}
+              onClose={() => setPanelId(null)}
+              onPrev={panelIndex > 0 ? () => setPanelId(visible[panelIndex - 1].id) : undefined}
+              onNext={
+                panelIndex < visible.length - 1 ? () => setPanelId(visible[panelIndex + 1].id) : undefined
+              }
+              hasPrev={panelIndex > 0}
+              hasNext={panelIndex < visible.length - 1}
+              footer={
+                <>
+                  <Button variant="primary" onClick={() => goDetail(panelReward.id)}>
+                    中身を見る
+                  </Button>
+                  {!readonly && (panelReward.status === 'published' || panelReward.status === 'draft' || panelReward.status === 'stopped') ? (
+                    <Button variant="secondary" onClick={() => void changeState(panelReward)}>
+                      {panelReward.status === 'published' ? '止める' : panelReward.status === 'stopped' ? 'また出す' : '出す'}
+                    </Button>
+                  ) : null}
+                </>
+              }
+            >
+              <p>
+                {panelReward.benefitName
+                  ? `${KIND_LABEL[panelReward.rewardKind]}「${panelReward.benefitName}」`
+                  : KIND_LABEL[panelReward.rewardKind]}
+              </p>
+              <p>今月交換 {formatMileageNumber(panelReward.exchangedThisMonth)}件</p>
+            </DetailPanel>
+          )}
+
           {status === 'ready' && rewards.length > 0 ? (
-            <p className={styles.footnote}>行の「中身を見る」から編集・自分で交換をテスト・出すのを止める・複製。</p>
+            <p className={styles.footnote}>行を押すと右に詳しい内容。行の「中身を見る」から編集・自分で交換をテスト・出すのを止める・複製。</p>
           ) : null}
 
           {retryNotice ? <Notice tone="success" message={retryNotice} /> : null}

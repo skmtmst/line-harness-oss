@@ -40,7 +40,10 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import MetricValue from '@/components/ui/metric-value'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
@@ -2842,6 +2845,28 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   const [savedReload, setSavedReload] = useState(0)
   const [snapshotReload, setSnapshotReload] = useState(0)
   const [archiveTarget, setArchiveTarget] = useState<AnalyticsReportSchedule | null>(null)
+  const router = useRouter()
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている定期レポートのID。 */
+  const [panelScheduleId, setPanelScheduleId] = useState<string | null>(null)
+
+  /** 一覧→編集はつながる移り変わりで開く（V8「サクサク感」E）。 */
+  const goScheduleEdit = (id: string) => {
+    withViewTransition(() => {
+      router.push(`/analytics/reports/new?id=${id}`)
+    })
+  }
+
+  /* 行の詳細パネル（V8「サクサク感」C①②）。↑↓で次の行へ移る。 */
+  const panelScheduleIndex = panelScheduleId === null ? -1 : schedules.findIndex((schedule) => schedule.id === panelScheduleId)
+  const panelSchedule = panelScheduleIndex >= 0 ? schedules[panelScheduleIndex] : null
+
+  /** 右クリックは行の操作と同じ品ぞろえ（V8「サクサク感」D）。 */
+  const scheduleContextItems = (schedule: AnalyticsReportSchedule): ContextMenuItem[] => [
+    ...(!schedule.isOneTime ? [{ id: 'edit', label: '内容を変える', onSelect: () => goScheduleEdit(schedule.id) }] : []),
+    ...(schedule.status === 'active' && !schedule.isOneTime ? [{ id: 'pause', label: '止める', onSelect: () => void changeScheduleStatus(schedule, 'paused') }] : []),
+    ...(schedule.status === 'paused' ? [{ id: 'resume', label: 'また送る', onSelect: () => void changeScheduleStatus(schedule, 'active') }] : []),
+    ...(!schedule.isOneTime ? [{ id: 'archive', label: 'しまう', onSelect: () => setArchiveTarget(schedule) }] : []),
+  ]
 
   useEffect(() => {
     let active = true
@@ -3082,7 +3107,20 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
             </thead>
             <tbody className="divide-hairline divide-y">
               {schedules.map((schedule) => (
-                <tr key={schedule.id} className="text-sm">
+                <tr
+                  key={schedule.id}
+                  className="text-sm"
+                  tabIndex={0}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setPanelScheduleId(schedule.id)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      setPanelScheduleId(schedule.id)
+                    }
+                  }}
+                >
                   <td className="text-ink truncate px-4 py-3 font-medium" title={schedule.name}>{schedule.name}</td>
                   <td className="text-ink-secondary px-3 py-3 text-sm whitespace-nowrap">
                     {schedule.isOneTime ? '1回だけ' : reportScheduleCadenceLabel(schedule)}
@@ -3095,11 +3133,23 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                       {REPORT_SCHEDULE_STATUS_LABELS[schedule.status]}
                     </Chip>
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2" onClick={(event) => event.stopPropagation()}>
                     {canManage && (
+                      <ContextMenu label={`定期レポート「${schedule.name}」の操作`} items={scheduleContextItems(schedule)}>
                       <div className="flex justify-end gap-2 whitespace-nowrap">
                         {!schedule.isOneTime && (
-                          <Button key="edit" href={`/analytics/reports/new?id=${schedule.id}`} variant="secondary">内容を変える</Button>
+                          <Button
+                            key="edit"
+                            href={`/analytics/reports/new?id=${schedule.id}`}
+                            variant="secondary"
+                            onClick={(event) => {
+                              if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                              event.preventDefault()
+                              goScheduleEdit(schedule.id)
+                            }}
+                          >
+                            内容を変える
+                          </Button>
                         )}
                         {schedule.status === 'active' && !schedule.isOneTime && (
                           <Button
@@ -3127,6 +3177,7 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                           >しまう</Button>
                         )}
                       </div>
+                      </ContextMenu>
                     )}
                   </td>
                 </tr>
@@ -3135,6 +3186,55 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
           </table>
         )}
       </section>
+
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelSchedule && (
+        <DetailPanel
+          open
+          title={panelSchedule.name}
+          description={[
+            REPORT_SCHEDULE_STATUS_LABELS[panelSchedule.status],
+            reportScheduleCadenceLabel(panelSchedule),
+          ].join('・')}
+          onClose={() => setPanelScheduleId(null)}
+          onPrev={panelScheduleIndex > 0 ? () => setPanelScheduleId(schedules[panelScheduleIndex - 1].id) : undefined}
+          onNext={
+            panelScheduleIndex < schedules.length - 1 ? () => setPanelScheduleId(schedules[panelScheduleIndex + 1].id) : undefined
+          }
+          hasPrev={panelScheduleIndex > 0}
+          hasNext={panelScheduleIndex < schedules.length - 1}
+          footer={
+            canManage ? (
+              <>
+                {!panelSchedule.isOneTime && (
+                  <Button variant="primary" onClick={() => goScheduleEdit(panelSchedule.id)}>
+                    内容を変える
+                  </Button>
+                )}
+                {panelSchedule.status === 'active' && !panelSchedule.isOneTime && (
+                  <Button variant="secondary" onClick={() => void changeScheduleStatus(panelSchedule, 'paused')}>
+                    止める
+                  </Button>
+                )}
+                {panelSchedule.status === 'paused' && (
+                  <Button variant="secondary" onClick={() => void changeScheduleStatus(panelSchedule, 'active')}>
+                    また送る
+                  </Button>
+                )}
+                {!panelSchedule.isOneTime && (
+                  <Button variant="secondary" onClick={() => setArchiveTarget(panelSchedule)}>
+                    しまう
+                  </Button>
+                )}
+              </>
+            ) : undefined
+          }
+        >
+          <p>
+            次に届く予定 {panelSchedule.status === 'paused' ? '—' : formatAnalyticsDateTime(panelSchedule.nextRunAt)}
+          </p>
+        </DetailPanel>
+      )}
 
       {/*
         R454: 1回だけ送った直近の結果。一覧からは消えるため、
