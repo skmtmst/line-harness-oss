@@ -144,3 +144,6 @@
 
 [data-theme='v8'] .body { align-items: flex-start; }
 [data-theme='v8'] .note { width: 100%; }
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .card { -webkit-font-smoothing: auto; }
