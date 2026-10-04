@@ -20,6 +20,8 @@ import {
 } from '@/lib/api'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { NenOverview, type ColumnDeliveryPlan, type FriendOption, type NenCoupon, type NenKpis, type NenTab } from './nen-overview'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import NenCampaignsV8 from './nen-campaigns-v8'
 import { defaultScheduleLocal, jstMonthRange } from './nen-period'
 
 type Notice = { tone: 'success' | 'error'; text: string }
@@ -415,6 +417,12 @@ export default function NenCampaignsPage() {
     if (!loadedTabs.current.has(next)) void loadTab(next)
   }
 
+  /*
+   * フックは早期 return より前で全部呼ぶ。読み込み中の早期 return の
+   * あとに置くと、読み込み完了でフックの数が変わり React が落ちる。
+   */
+  const theme = useAdminTheme()
+
   if (loading && loadedTabs.current.size === 0) return <div className="p-6"><ListState kind="loading" /></div>
 
   /*
@@ -431,6 +439,37 @@ export default function NenCampaignsPage() {
   )
     : tab === 'history' ? <Button type="button" disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
       : null
+
+  /*
+   * ★V8-B：data-theme="v8" のときだけ新しいNEN配信画面
+   * （MuhWR・Jxmqh・Tj7n4・oqSJP）へ切り替える。v7 の見た目はそのまま。
+   * 取得・保存の持ち方は変えない（page.tsx が持ったまま）。
+   */
+  if (theme === 'v8') {
+    return (
+      <NenCampaignsV8
+        topAction={headerAction}
+        tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
+        tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
+        kpisFailed={kpis === null && (tabErrors.auto !== '' || tabErrors.columns !== '' || tabErrors.paused !== '')}
+        flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
+        friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId}
+        loading={loading} notice={notice}
+        saving={saving} testing={testing}
+        previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}
+        onToggleSetting={(setting) => void toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
+        coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
+        selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
+        columnsTotal={columnsTotal}
+        plan={plan} onPlanChange={setPlan}
+        introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
+        onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
+        onDuplicateColumn={(column) => void duplicateColumn(column)} duplicatingColumnId={duplicatingColumnId} onTestColumn={(column) => void testColumn(column)}
+        onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
+        onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
+      />
+    )
+  }
 
   return (
     <>
