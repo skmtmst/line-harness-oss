@@ -220,13 +220,16 @@ export default function NewRestaurantStorePage() {
           {step === STEP.TERMS && <TermsConsent onAgree={agreeToCurrentTerms} />}
 
           {step === STEP.BASICS && <div className="mt-7 space-y-6">
-            <Field label="店舗名" required help="お客様にも伝わる正式な店舗名を入力してください。" error={errors.name}>
+            <Field label="店舗名" required help="お客様にも伝わる正式な店舗名を入力してください。あとから店舗設定で変更できます。" error={errors.name}>
               <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="organization" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent" />
             </Field>
             <Field label="店舗の略称" required={false} help="管理画面で店舗を見分ける短い名前です。空欄の場合は店舗名を使います。">
               <input value={alias} onChange={(event) => setAlias(event.target.value)} className="w-full rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm text-ink outline-none focus:border-accent" />
             </Field>
-            <StickyBar actions={<Button variant="primary" className="px-5 py-2.5 border-0 h-auto whitespace-normal" type="button" onClick={nextFromBasics}>次へ</Button>} />
+            {/* faGn4: 店舗ごとのプロバイダーの注意は基本情報の時点で伝える。 */}
+            <div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs font-semibold leading-5 text-ink">店舗ごとに、新しいプロバイダーを作ってください。</p><p className="mt-2 text-xs leading-5 text-ink-secondary">LINEのユーザーIDはプロバイダーごとに発行されます。複数の店舗を同じプロバイダーにまとめると、同じお客様を店舗ごとに別々に管理できなくなります。</p></div>
+            {termsAgreedAt && <p className="text-xs leading-5 text-ink-secondary">利用規約に同意済み{agreementDate ? `（${agreementDate}）` : ''}</p>}
+            <StickyBar actions={<><Link href="/hq" className="inline-flex items-center rounded-control border border-hairline bg-canvas px-4 py-2.5 text-sm font-semibold text-ink">キャンセル</Link><Button variant="primary" className="px-5 py-2.5 border-0 h-auto whitespace-normal" type="button" onClick={nextFromBasics}>次へ</Button></>} />
           </div>}
 
           {step === STEP.OFFICIAL_ACCOUNT && <div className="mt-7 space-y-5">
@@ -268,7 +271,7 @@ export default function NewRestaurantStorePage() {
           <h2 className="font-bold text-ink">わからないときは</h2>
           <p className="mt-2 text-xs leading-5 text-ink-secondary">今の手順に対応するマニュアルを確認できます。</p>
           <div className="mt-4 space-y-3">{step === STEP.TERMS ? <><p className="text-xs leading-5 text-ink-secondary">同意する前に、利用規約と個人情報の取扱いを最後まで確認してください。</p><Link href="/restaurant-test/terms" className="inline-flex rounded-control border border-action px-3 py-2 text-xs font-semibold text-action">利用規約を別画面で読む</Link></>
-            : step === STEP.BASICS ? <p className="text-xs leading-5 text-ink-secondary">店舗名はあとから店舗設定で変更できます。</p>
+            : step === STEP.BASICS ? <><p className="text-xs leading-5 text-ink-secondary">店舗名はあとから店舗設定で変更できます。</p><div className="mt-3 border-t border-hairline pt-3"><p className="text-xs font-semibold text-ink">よくある質問</p><p className="mt-2 text-xs leading-5 text-ink-secondary">「Messaging APIを利用する」ボタンが表示されません</p><p className="mt-2 text-xs leading-5 text-ink-secondary">チャネルシークレットが正しくないと表示されます</p></div></>
             : step === STEP.OFFICIAL_ACCOUNT ? <><div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs font-semibold leading-5 text-ink">店舗ごとに、新しいプロバイダーを作ってください。</p><p className="mt-2 text-xs leading-5 text-ink-secondary">LINEのユーザーIDはプロバイダーごとに発行されます。複数の店舗を同じプロバイダーにまとめると、同じお客様を店舗ごとに別々に管理できなくなります。</p></div><ManualLink href={MANUAL_LINKS.createOfficialAccount}>LINE公式アカウントを作る</ManualLink></>
             : step === STEP.CREDENTIALS ? <><p className="text-xs font-semibold text-ink">アカウント作成方法・連携ガイド</p><ManualLink href={MANUAL_LINKS.enableMessagingApi}>Messaging APIを有効にする</ManualLink><ManualLink href={MANUAL_LINKS.findChannelCredentials}>2つの値の場所を見る</ManualLink><div className="border-t border-hairline pt-3"><p className="text-xs font-semibold text-ink">よくある質問</p><p className="mt-2 text-xs leading-5 text-ink-secondary">「Messaging APIを利用する」ボタンが表示されません</p><p className="mt-2 text-xs leading-5 text-ink-secondary">チャネルシークレットが正しくないと表示されます</p></div></>
             : <div><p className="text-xs font-semibold text-ink">よくある質問</p><p className="mt-2 text-xs leading-5 text-ink-secondary">接続できない場合は、1つ前の手順へ戻り、LINE Developersから値をコピーし直してください。</p></div>}</div>
