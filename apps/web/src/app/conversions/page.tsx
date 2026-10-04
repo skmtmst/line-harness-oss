@@ -1179,7 +1179,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   className={`${point.id === highlightId ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'} cursor-pointer`}
                   onClick={() => setDetailTarget(point)}
                 >
-                  <td className="text-ink w-1/6 px-4 py-3 text-sm font-medium">
+                  <td className="text-ink w-1/6 px-5 py-[9px] text-sm font-medium">
                     <span className="line-clamp-2" title={point.name}>{point.name}</span>
                     {/* 辞書に無い種別は中身のない印を出さない。具体的な種別だけ添える。 */}
                     {EVENT_TYPE_LABELS[point.sourceType] ? (
@@ -1199,26 +1199,26 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       </p>
                     ) : null}
                   </td>
-                  <td className="text-ink-secondary w-1/4 px-4 py-3 text-sm">
+                  <td className="text-ink-secondary w-1/4 px-5 py-[9px] text-sm">
                     <span className="line-clamp-2 break-all" title={sourceTriggerLabel(point)}>{sourceTriggerLabel(point)}</span>
                     <p className="text-ink-faint mt-0.5 truncate text-xs" title={`${measureLabel(point.measureMethod)}・${deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}`}>
                       {measureLabel(point.measureMethod)}・{deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}
                     </p>
                   </td>
-                  <td className="text-ink whitespace-nowrap px-4 py-3 text-right text-sm tabular-nums">
+                  <td className="text-ink whitespace-nowrap px-5 py-[9px] text-right text-sm tabular-nums">
                     {formatNumber(point.metrics.netCount)}件
                   </td>
-                  <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                  <td className="text-ink-secondary px-5 py-[9px] text-right text-sm tabular-nums">
                     {point.value === null
                       ? '金額なし'
                       : `¥${formatNumber(point.metrics.netValue)}`}
                   </td>
                   <td className={point.usageCount === 0
-                    ? 'text-warning w-1/4 px-4 py-3 text-sm'
-                    : 'text-ink-secondary w-1/4 px-4 py-3 text-sm'}>
+                    ? 'text-warning w-1/4 px-5 py-[9px] text-sm'
+                    : 'text-ink-secondary w-1/4 px-5 py-[9px] text-sm'}>
                     <span className="line-clamp-2 break-all" title={usageLabel(point)}>{usageLabel(point)}</span>
                   </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
+                  <td className="px-5 py-[9px] text-right whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                     {/*
                       幅の決まっていない列へ2つのボタンを右詰めで入れると、
                       狭い幅で内容が左の「使われている場所」へはみ出して
