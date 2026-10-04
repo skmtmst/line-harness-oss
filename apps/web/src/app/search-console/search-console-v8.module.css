@@ -12,7 +12,7 @@
 .trend { margin-top: 18px; }
 .bars { height: 110px; display: flex; align-items: flex-end; gap: 5px; }
 .bars > div { height: 100%; flex: 1; min-width: 0; display: flex; align-items: flex-end; }
-.bars span { display: block; width: 100%; background: var(--color-accent); border-radius: 2px 2px 0 0; }
+.bars span { display: block; width: 100%; background: var(--color-accent); border-radius: var(--radius-chart-dot) var(--radius-chart-dot) var(--radius-none) var(--radius-none); }
 .axis { display: flex; justify-content: space-between; gap: 8px; color: var(--color-ink-secondary); font-size: 10px; margin-top: 12px; }
 .results { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 200px; align-items: start; gap: 12px; }
 .sectionHead { margin-bottom: 12px; }

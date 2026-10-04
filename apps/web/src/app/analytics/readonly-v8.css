@@ -130,9 +130,9 @@
 [data-theme='v8'] .v8-ro-analytics-funnelStep { display: grid; grid-template-columns: 24px minmax(90px, .7fr) minmax(0, 2fr) 64px 48px; align-items: center; gap: 10px; min-height: 40px; padding: 8px; border-radius: var(--radius-control); }
 [data-theme='v8'] .v8-ro-analytics-funnelStep[data-selected] { background: var(--color-accent-subtle); }
 [data-theme='v8'] .v8-ro-analytics-funnelStep p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-[data-theme='v8'] .v8-ro-analytics-funnelNumber { display: grid; place-items: center; width: 24px; height: 24px; background: var(--color-surface-pearl); border-radius: 50%; font-size: 11px; }
-[data-theme='v8'] .v8-ro-analytics-funnelBar { height: 22px; overflow: hidden; border-radius: 3px; background: var(--color-surface-pearl); }
-[data-theme='v8'] .v8-ro-analytics-funnelBar span { display: block; height: 100%; border-radius: 3px; background: var(--color-accent); }
+[data-theme='v8'] .v8-ro-analytics-funnelNumber { display: grid; place-items: center; width: 24px; height: 24px; background: var(--color-surface-pearl); border-radius: var(--radius-pill); font-size: 11px; }
+[data-theme='v8'] .v8-ro-analytics-funnelBar { height: 22px; overflow: hidden; border-radius: var(--radius-icon); background: var(--color-surface-pearl); }
+[data-theme='v8'] .v8-ro-analytics-funnelBar span { display: block; height: 100%; border-radius: var(--radius-icon); background: var(--color-accent); }
 [data-theme='v8'] .v8-ro-analytics-funnelStep[data-selected] .v8-ro-analytics-funnelBar span { background: var(--color-accent-deep); }
 @container analytics-board (max-width: 1099px) { [data-theme='v8'] .v8-ro-analytics-funnelBody { grid-template-columns: minmax(0, 1fr); } }
 @container analytics-board (max-width: 650px) { [data-theme='v8'] .v8-ro-analytics-funnelSelectRow { grid-template-columns: minmax(0, 1fr); } [data-theme='v8'] .v8-ro-analytics-funnelStep { grid-template-columns: 24px minmax(80px, 1fr) minmax(40px, 1fr) 48px; } [data-theme='v8'] .v8-ro-analytics-funnelStep > span:last-child { display: none; } }
