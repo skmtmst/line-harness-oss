@@ -13246,7 +13246,7 @@ export const api = {
         options,
       ),
     get: (id: string) => fetchApi<ApiResponse<TrafficPool>>(`/api/traffic-pools/${id}`),
-    create: (data: { slug: string; name: string; activeAccountId: string }) =>
+    create: (data: import('@line-crm/shared').CreateTrafficPoolRequest) =>
       fetchApi<ApiResponse<TrafficPool>>('/api/traffic-pools', {
         method: 'POST',
         body: JSON.stringify(data),

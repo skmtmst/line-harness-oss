@@ -122,7 +122,7 @@ describe('V8-B プールを作る（D0AOyx）', () => {
     await flush()
   }
 
-  it('複数の受け入れ先で作り、残りを1件ずつ足す', async () => {
+  it('複数の受け入れ先を一度に保存する', async () => {
     poolsCreate.mockResolvedValue({ success: true, data: { id: 'p1' } })
     poolsAccountsAdd.mockResolvedValue({ success: true, data: {} })
     await renderV8()
@@ -135,13 +135,13 @@ describe('V8-B プールを作る（D0AOyx）', () => {
     expect(save, '保存の帯がある').toBeTruthy()
     await act(async () => { save!.click() })
     await flush()
-    expect(poolsCreate).toHaveBeenCalledWith({ name: '渋谷エリア', slug: 'shibuya', activeAccountId: 'a1' })
-    expect(poolsAccountsAdd, '2件目を1件ずつ足す').toHaveBeenCalledWith('p1', 'a2')
+    expect(poolsCreate).toHaveBeenCalledWith({ name: '渋谷エリア', slug: 'shibuya', activeAccountId: 'a1', accountIds: ['a1', 'a2'] })
+    expect(poolsAccountsAdd).not.toHaveBeenCalled()
     expect(routerPush, '保存できたら一覧へ進む').toHaveBeenCalled()
   })
 
-  it('2件目の追加に落ちたら名前を挙げて伝える', async () => {
-    poolsCreate.mockResolvedValue({ success: true, data: { id: 'p1' } })
+  it('保存失敗時は入力を残して再試行できる', async () => {
+    poolsCreate.mockResolvedValue({ success: false, error: '保存できませんでした' })
     poolsAccountsAdd.mockResolvedValue({ success: false, error: 'down' })
     await renderV8()
     await setInput('#pl-name', '渋谷エリア')
@@ -150,7 +150,9 @@ describe('V8-B プールを作る（D0AOyx）', () => {
     const save = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('保存してURLを発行'))
     await act(async () => { save!.click() })
     await flush()
-    expect(document.body.textContent).toContain('然-NEN-中目黒店の追加に失敗しました')
+    expect(document.body.textContent).toContain('保存できませんでした')
+    expect(document.body.textContent).toContain('然-NEN-中目黒店')
+    expect(poolsAccountsAdd).not.toHaveBeenCalled()
     expect(routerPush, '落ちた分があるときは進まない').not.toHaveBeenCalled()
   })
 

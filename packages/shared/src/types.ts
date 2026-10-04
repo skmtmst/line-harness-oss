@@ -2547,3 +2547,11 @@ export interface AutoReplyRunsResponse {
     offset: number;
   };
 }
+
+/** プールを1回の保存で全所属とともに作る。旧1所属の入力も有効。 */
+export interface CreateTrafficPoolRequest {
+  slug: string;
+  name: string;
+  activeAccountId: string;
+  accountIds?: string[];
+}
