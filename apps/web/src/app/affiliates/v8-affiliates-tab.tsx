@@ -64,6 +64,18 @@ function planText(row: AffiliateItem): string {
   return '報酬なし（計測のみ）'
 }
 
+/** 締めの月の1つ前の集計期間（日本時間の月初〜月末）。 */
+export function previousAffiliateSettlementPeriod(periodFrom: string): { periodFrom: string; periodTo: string } {
+  const JST_MS = 9 * 60 * 60 * 1000
+  const wall = new Date(new Date(periodFrom).getTime() + JST_MS)
+  const year = wall.getUTCFullYear()
+  const month = wall.getUTCMonth()
+  return {
+    periodFrom: new Date(Date.UTC(year, month - 1, 1) - JST_MS).toISOString(),
+    periodTo: new Date(Date.UTC(year, month, 1) - JST_MS - 1).toISOString(),
+  }
+}
+
 export default function AffiliatesTabV8({
   accountId,
   canEdit,
@@ -92,6 +104,7 @@ export default function AffiliatesTabV8({
   const [paymentTotal, setPaymentTotal] = useState<number | null>(null)
   const [paymentState, setPaymentState] = useState<ConfirmedState>('loading')
   const [monthlyConversions, setMonthlyConversions] = useState<number | null>(null)
+  const [monthlyDelta, setMonthlyDelta] = useState<number | null>(null)
   const [monthlyState, setMonthlyState] = useState<ConfirmedState>('loading')
 
   // ── 見せ方 ────────────────────────────────────────────────────────────────
@@ -221,19 +234,28 @@ export default function AffiliatesTabV8({
   const loadMonthly = useCallback(async () => {
     setMonthlyState('loading')
     try {
-      const res = await api.affiliates.allReport({
-        startDate: settlementPeriod.periodFrom,
-        endDate: settlementPeriod.periodTo,
-      })
+      const prev = previousAffiliateSettlementPeriod(settlementPeriod.periodFrom)
+      const [res, prevRes] = await Promise.all([
+        api.affiliates.allReport({
+          startDate: settlementPeriod.periodFrom,
+          endDate: settlementPeriod.periodTo,
+        }),
+        api.affiliates.allReport({
+          startDate: prev.periodFrom,
+          endDate: prev.periodTo,
+        }),
+      ])
       if (!res.success) throw new Error('monthly report failed')
-      setMonthlyConversions(
-        (res.data as unknown as Array<{ totalConversions: number }>)
-          .reduce((sum, row) => sum + row.totalConversions, 0),
-      )
+      const total = (arr: unknown) => (arr as Array<{ totalConversions: number }>)
+        .reduce((sum, row) => sum + row.totalConversions, 0)
+      const current = total(res.data)
+      setMonthlyConversions(current)
+      setMonthlyDelta(prevRes.success ? current - total(prevRes.data) : null)
       setMonthlyState('ready')
     } catch {
       if (!cancelledRef.current) {
         setMonthlyConversions(null)
+        setMonthlyDelta(null)
         setMonthlyState('error')
       }
     }
@@ -392,13 +414,16 @@ export default function AffiliatesTabV8({
           label="今月の成果"
           value={monthlyState === 'ready' ? monthlyConversions : null}
           unit="件"
-          sub={monthlyState === 'ready' ? '今月に起きた成果' : monthlyState === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
+          sub={monthlyState === 'ready'
+            ? (monthlyDelta == null
+              ? '今月に起きた成果'
+              : monthlyDelta === 0 ? '先月と同じ' : `先月より${monthlyDelta > 0 ? '+' : '−'}${formatNumber(Math.abs(monthlyDelta))}`)
+            : monthlyState === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
           info="今月（日本時間）に記録された成果の数です。認める・認めないに関わらず記録された分を数えます。"
         />
         <KpiCell
           label="今月の報酬"
-          value={paymentState === 'ready' ? paymentTotal : null}
-          unit="円"
+          value={paymentState === 'ready' && paymentTotal != null ? formatYen(paymentTotal) : null}
           sub={paymentState === 'ready' ? `承認待ち ${formatNumber(pendingCount)}件は入っていない` : paymentState === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
           info="今回の締めで払う見込みの合計です。承認待ちの成果は確定していないので含みません。"
         />
