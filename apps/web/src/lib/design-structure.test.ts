@@ -96,6 +96,11 @@ function importedFiles(file: string, source: string): string[] {
   for (const m of source.matchAll(/from '(\.\/|\.\.\/)([^']+)'/g)) {
     push(join(dirname(file), m[1], m[2]));
   }
+  // 速さのためタブの中身を後読みにしている画面がある（予約設定の
+  // settings-tabs）。動的 import は静的 import と同じく中身を読む。
+  for (const m of source.matchAll(/import\(\s*['`](\.\/|\.\.\/)([^'`]+)['`]/g)) {
+    push(join(dirname(file), m[1], m[2]));
+  }
   return files;
 }
 

@@ -105,8 +105,26 @@
   "app/booking/menus/new/page.tsx": {
     "unresolved-classname": 11
   },
+  "app/booking/menus/settings-tabs/holidays-tab.tsx": {
+    "unresolved-classname": 23
+  },
+  "app/booking/menus/settings-tabs/hours-tab.tsx": {
+    "unresolved-classname": 47
+  },
+  "app/booking/menus/settings-tabs/menus-tab.tsx": {
+    "unresolved-classname": 39
+  },
+  "app/booking/menus/settings-tabs/rules-tab.tsx": {
+    "unresolved-classname": 36
+  },
+  "app/booking/menus/settings-tabs/shared.tsx": {
+    "unresolved-classname": 11
+  },
+  "app/booking/menus/settings-tabs/staff-tab.tsx": {
+    "unresolved-classname": 36
+  },
   "app/booking/menus/settings-v8.tsx": {
-    "unresolved-classname": 207
+    "unresolved-classname": 16
   },
   "app/booking/menus/staff/assign-v8.tsx": {
     "unresolved-classname": 61,

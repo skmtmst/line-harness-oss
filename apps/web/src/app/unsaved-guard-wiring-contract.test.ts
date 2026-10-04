@@ -126,6 +126,12 @@ const COVERED_BY_PARENT: Record<string, string> = {
   // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
   'app/settings/feature-settings-v8.tsx': 'app/settings/page.tsx',
   'app/settings/file-scan/file-scan-v8.tsx': 'app/settings/file-scan/page.tsx',
+  // 予約設定V8のタブ分割。書きかけは V8TabEditContext で親へ報告し、
+  // 番兵（useUnsavedGuard＋離脱確認）は殻の settings-v8.tsx が持つ。
+  'app/booking/menus/settings-tabs/shared.tsx': 'app/booking/menus/settings-v8.tsx',
+  'app/booking/menus/settings-tabs/hours-tab.tsx': 'app/booking/menus/settings-v8.tsx',
+  'app/booking/menus/settings-tabs/holidays-tab.tsx': 'app/booking/menus/settings-v8.tsx',
+  'app/booking/menus/settings-tabs/rules-tab.tsx': 'app/booking/menus/settings-v8.tsx',
 }
 
 /*
