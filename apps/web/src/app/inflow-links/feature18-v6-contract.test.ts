@@ -42,7 +42,7 @@ describe('V6 機能18の画面契約', () => {
   })
 
   it('各画面をPencilの実ノードと結び、未接続値を作らない', () => {
-    expect(SITE).toContain('data-design-node="IhSBB"')
+    expect(SITE).toContain('data-design-node="XjOte"')
     expect(ADS).toContain('data-design-node="v0HaI"')
     expect(ADS).toContain('data-design-node="BuVDB"')
     expect(ADS).toContain('data-design-node="Im2b1"')
