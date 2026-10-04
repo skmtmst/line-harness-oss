@@ -242,3 +242,6 @@
 [data-theme='v8'] .island, [data-theme='v8'] .dateChip > span { border-radius: 999px; }
 [data-theme='v8'] .bubbleText { flex: 1; word-break: normal; }
 [data-theme='v8'] .clock { font-variant-numeric: normal; }
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .phoneRoot { -webkit-font-smoothing: auto; }
