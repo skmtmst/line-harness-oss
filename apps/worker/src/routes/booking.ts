@@ -103,6 +103,7 @@ import {
   recordConversionSourceEvent,
 } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { listResponse } from '../lib/list-etag.js';
 import {
   claimBookingOperationForRetry,
   finishBookingOperation,
@@ -728,6 +729,8 @@ booking.get('/api/liff/booking/settings', async (c) => {
     liff_date_view: normalizeLiffDateView(row?.liff_date_view),
     booking_window_days:
       Number.isInteger(windowDays) && windowDays >= 1 && windowDays <= 365 ? windowDays : 60,
+    // 予約のルール「お店が承認してから確定する」。automatic だけ承認なし確定。
+    approval_mode: row?.approval_mode === 'automatic' ? 'automatic' : 'manual',
   });
 });
 
@@ -752,6 +755,99 @@ async function autoAssignBookingStaff(c: Context<Env>, accountId: string, menuId
   const rows = await c.env.DB.prepare('SELECT id FROM staff WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL AND is_designation_optional = 0').bind(accountId).all<{ id: string }>();
   const actualStaff = new Set(rows.results.map((staff) => staff.id));
   return latest.by_staff.find((staff) => actualStaff.has(staff.staff_id) && findLatestSlotForInstant(staff.slots,startsAt) !== null)?.staff_id ?? null;
+}
+
+/**
+ * 承認なしで確定した予約の確定後の始末。承認で確定したときと同じ中身
+ * （前日・当日のお知らせ・成果数え・カレンダー同期・確定の知らせ・自動化）を
+ * そろえる。「予約が入ったとき」の webhook は作った側が既に送るので
+ * ここでは送らない（二重送り防止）。
+ */
+async function runAutoConfirmedSideEffects(
+  db: D1Database,
+  schedule: (task: Promise<unknown>) => void,
+  args: {
+    bookingId: string;
+    lineAccountId: string;
+    friendId: string;
+    staffId: string;
+    menuId: string;
+    startsAt: Date;
+    googleCreds: ReturnType<typeof googleCredentials>;
+  },
+): Promise<void> {
+  const { bookingId, lineAccountId } = args;
+  const snapshot = await db
+    .prepare(`SELECT notification_policy_snapshot FROM bookings WHERE id = ?`)
+    .bind(bookingId)
+    .first<{ notification_policy_snapshot: string | null }>()
+    .then((found) => readNotificationPolicySnapshot(found?.notification_policy_snapshot ?? null));
+  const timing = await getReminderTiming(db, lineAccountId);
+  if (snapshot.day_before || snapshot.hours_before) {
+    await insertConfirmationReminders(db, {
+      bookingId,
+      startsAt: args.startsAt,
+      now: new Date(),
+      reminderHoursBefore: timing.reminderHoursBefore,
+      dayBeforeTime: timing.dayBeforeTime,
+      timeZone: timing.timeZone,
+      kinds: { dayBefore: snapshot.day_before, hoursBefore: snapshot.hours_before },
+    });
+  }
+  try {
+    await recordConversionSourceEvent(db, {
+      sourceType: 'reservation_confirmed',
+      lineAccountId,
+      friendId: args.friendId,
+      sourceEventId: bookingId,
+      metadata: { bookingId, bookingType: 'salon', via: 'automatic' },
+    });
+  } catch (error) {
+    console.error('booking conversion record failed (automatic):', error);
+  }
+  const googleOpId = await queueBookingOperation(db, {
+    bookingId,
+    lineAccountId,
+    kind: 'google_calendar',
+    idempotencyKey: `${bookingId}:google-calendar:create`,
+  });
+  try {
+    const synced = await syncConfirmedBookingToGoogle(db, args.googleCreds, bookingId);
+    await finishBookingOperation(db, {
+      id: googleOpId,
+      status: synced.synced ? 'succeeded' : 'skipped',
+      completedAt: new Date().toISOString(),
+      result: { calendarSync: synced.synced ? 'synced' : 'not_configured' },
+    });
+  } catch (error) {
+    await finishBookingOperation(db, {
+      id: googleOpId,
+      status: 'retry_wait',
+      completedAt: new Date().toISOString(),
+      errorCode: error instanceof Error ? error.name : 'calendar_sync_failed',
+      result: { calendarSync: 'failed' },
+    });
+    console.error('Google Calendar sync (automatic) failed:', error);
+  }
+  if (snapshot.send_line_confirmation) {
+    schedule(
+      notifyForBooking(db, bookingId, 'approved').catch((err) =>
+        console.error('booking notify (approved) failed:', err),
+      ),
+    );
+  }
+  schedule(
+    dispatchAutomationEventWithLogging(db, {
+      lineAccountId,
+      eventType: 'calendar_booked',
+      sourceEventId: bookingId,
+      friendId: args.friendId,
+      eventData: {
+        bookingType: 'salon', bookingId, menuId: args.menuId, staffId: args.staffId,
+      },
+    })
+      .catch((error) => console.error('booking automation event failed:', error)),
+  );
 }
 
 booking.post('/api/liff/booking/requests', async (c) => {
@@ -856,6 +952,12 @@ booking.post('/api/liff/booking/requests', async (c) => {
 
   const bookingId = crypto.randomUUID();
   const nowIso = new Date().toISOString();
+  // 予約のルール「お店が承認してから確定する」が automatic の店は、
+  // 未承認を通さずその場で確定にする。設定が読めないときは承認ありに倒す。
+  const adminSettings = await getBookingAdminSettings(c.env.DB, accountId);
+  const autoConfirm = adminSettings?.approvalMode === 'automatic';
+  const initialStatus = (autoConfirm ? 'confirmed' : 'requested') satisfies BookingStatus;
+  const decidedAt = autoConfirm ? nowIso : null;
   // 競合チェックと INSERT を 1 ステートメントで原子化する。
   // INSERT ... SELECT WHERE NOT EXISTS パターンで、同一スタッフの overlap 行がある場合は
   // 0 行 INSERT に落とす。changes=0 を 409 として扱う。
@@ -865,9 +967,9 @@ booking.post('/api/liff/booking/requests', async (c) => {
       `INSERT INTO bookings
         (id, line_account_id, friend_id, staff_id, menu_id,
          starts_at, ends_at, block_ends_at, status,
-         customer_note, price_at_booking, requested_at,
+         customer_note, price_at_booking, requested_at, decided_at,
          menu_version_number, menu_snapshot_json)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
         WHERE NOT EXISTS (
           -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
           -- 1対1の施術とグループを同じ時間に入れることはできない。
@@ -900,10 +1002,11 @@ booking.post('/api/liff/booking/requests', async (c) => {
       startsAt.toISOString(),
       endsAt.toISOString(),
       blockEndsAt.toISOString(),
-      'requested' satisfies BookingStatus,
+      initialStatus,
       body.customer_note ?? null,
       menuRow.price,
       nowIso,
+      decidedAt,
       menuSnapshot.version,
       menuSnapshot.json,
       // 別メニューの重なりを見る副問い合わせ
@@ -952,7 +1055,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
     lineAccountId: accountId,
     action: 'created',
     after: {
-      status: 'requested',
+      status: initialStatus,
       staff_id: body.staff_id,
       menu_id: body.menu_id,
       starts_at: startsAt.toISOString(),
@@ -999,12 +1102,30 @@ booking.post('/api/liff/booking/requests', async (c) => {
     }).catch((err) => console.error('reminder enroll (booking) failed:', err)),
   );
 
-  // Fire-and-forget notification — failures must not roll back the booking.
-  c.executionCtx.waitUntil(
-    notifyForBooking(c.env.DB, bookingId, 'requested').catch((err) =>
-      console.error('booking notify (requested) failed:', err),
-    ),
-  );
+  if (autoConfirm) {
+    // 承認なし確定: 承認で確定したときと同じ始末をその場でそろえる。
+    // 失敗しても予約は成立させる（承認の動きと同じ扱い）。
+    try {
+      await runAutoConfirmedSideEffects(c.env.DB, (task) => c.executionCtx.waitUntil(task), {
+        bookingId,
+        lineAccountId: accountId,
+        friendId,
+        staffId: body.staff_id,
+        menuId: body.menu_id,
+        startsAt,
+        googleCreds: googleCredentials(c.env),
+      });
+    } catch (error) {
+      console.error('booking auto-confirm side effects failed:', error);
+    }
+  } else {
+    // Fire-and-forget notification — failures must not roll back the booking.
+    c.executionCtx.waitUntil(
+      notifyForBooking(c.env.DB, bookingId, 'requested').catch((err) =>
+        console.error('booking notify (requested) failed:', err),
+      ),
+    );
+  }
 
   // 予約が入ったことを運用者へ知らせる。これも他の副作用と同じ扱いで、
   // 通知が落ちても予約は成立させる。発生元に予約IDを使うので、同じ予約から
@@ -1068,7 +1189,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
     );
   }
 
-  const responseBody = { booking_id: bookingId, status: 'requested' };
+  const responseBody = { booking_id: bookingId, status: initialStatus };
   await saveIdempotencyResponse(c.env.DB, {
     key: idemKey,
     lineAccountId: accountId,
@@ -6010,7 +6131,8 @@ booking.get('/api/booking/admin/requests', async (c) => {
     c.env.DB.prepare(`SELECT COUNT(*) AS total ${BOOKING_LEDGER_JOINS} ${where}`)
       .bind(...values).first<{ total: number }>(),
   ]);
-  return c.json({ requests: rows.results, total: Number(count?.total ?? 0), limit, offset });
+  // 同じ中身なら304（list-etag）。
+  return listResponse(c, { requests: rows.results, total: Number(count?.total ?? 0), limit, offset });
 });
 
 // CSV の行上限。台帳は日々増えるので、上限を越える分は次の期間へ分けて

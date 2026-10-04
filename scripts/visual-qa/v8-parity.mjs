@@ -224,11 +224,38 @@ export function isNoStateBoard(entry) {
 export const MEASURE_CALL = `(${MEASURE_SCRIPT})()`
 
 /**
+ * 撮影前の合言葉（V8 テーマ＋偽ログイン）。
+ * `context.addInitScript` で全ページの最初の描画の前に置く。
+ * 中身は V8 の見張り（browser-env.mjs）と同じ。
+ */
+export const PARITY_INIT = {
+  'lh-admin-theme': 'v8',
+  lh_csrf: 'visual-qa-csrf',
+  lh_staff_role: 'owner',
+  lh_staff_name: 'K',
+  lh_staff_permissions: '[]',
+  lh_staff_view_permissions: '[]',
+  lh_selected_account: 'visual-qa-account',
+  lh_auth_selection_cleared: '1',
+}
+
+/** 撮った絵が V8 でなければ落とす（V7 を撮って比べない）。 */
+export function assertV8Theme(theme) {
+  if (theme !== 'v8') {
+    throw new Error(`V8 で撮れていない（theme=${theme ?? 'なし'}）。比べずに止める`)
+  }
+}
+
+/**
  * 1つの URL を開いて数え、撮る（ブラウザは呼び出し元が使い回す）。
  * 戻りは { measured, shotBuffer }。開けないときは throw。
  */
 export async function shootUrl(browser, base, route, width) {
-  const page = await browser.newPage({ viewport: { width, height: 900 } })
+  const context = await browser.newContext({ viewport: { width, height: 900 } })
+  await context.addInitScript(([entries]) => {
+    for (const [key, value] of entries) localStorage.setItem(key, value)
+  }, [Object.entries(PARITY_INIT)])
+  const page = await context.newPage()
   const url = `${base}${route.startsWith('/') ? route : `/${route}`}`
   try {
     const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 })
@@ -239,9 +266,11 @@ export async function shootUrl(browser, base, route, width) {
     await page.waitForTimeout(1500)
     const measured = await page.evaluate(MEASURE_CALL)
     const shotBuffer = await page.screenshot({ fullPage: true })
+    assertV8Theme(await page.evaluate(() => document.documentElement.dataset.theme))
     return { measured, shotBuffer, url }
   } finally {
     await page.close()
+    await context.close()
   }
 }
 
