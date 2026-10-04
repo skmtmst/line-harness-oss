@@ -38,6 +38,8 @@ import { mileStatusLabel, reviewVersionOf, text } from './photo-text'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import MetricValue from '@/components/ui/metric-value'
 import styles from './photo-review.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import PhotoReviewV8 from './photo-review-v8'
 
 type PhotoStatus = 'pending' | 'adopted' | 'rejected'
 /*
@@ -707,6 +709,16 @@ export default function PhotoReviewsPage() {
     anchor.download = `photo-${text(detailPhoto.id)}-original`
     anchor.click()
     URL.revokeObjectURL(url)
+  }
+
+  /*
+   * ★V8-B：data-theme="v8" のときだけ新しい投稿画面
+   * （TkA4D・Jn95h・cniyw・SyQA1・ujcar・N1br7）へ切り替える。
+   * v7 の見た目はそのまま。
+   */
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return <PhotoReviewV8 accountId={selectedAccountId} />
   }
 
   if (view === 'publications' && selectedAccountId) {

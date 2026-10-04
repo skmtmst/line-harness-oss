@@ -99,4 +99,9 @@ describe('お問い合わせ（36-3）', () => {
     expect(support).not.toContain('<h1')
     expect(members).not.toContain('<h1')
   })
+
+  it('アカウントメニューは矢印キーで項目を移動できる', () => {
+    expect(menu).toContain('role="menu"')
+    expect(menu).toContain('onKeyDown={(event: ReactKeyboardEvent<HTMLElement>)')
+  })
 })

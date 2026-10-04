@@ -53,6 +53,20 @@ export default function RetentionSection({
     ? `${Math.round((completed / started) * 100)}%`
     : '—'
 
+  /*
+   * V8-B `z2dgw` の線の下の1行。最後・半分・申込ボタンのときの残りを
+   * 始まりに見ていた人を分母に出す。数が無い所は「—」。
+   */
+  const rateOf = (viewers: number | null): string =>
+    viewers === null || started <= 0 ? '—' : `${Math.round((viewers / started) * 100)}%`
+  const viewersAtOrAfter = (atSeconds: number): number | null => {
+    const hit = points.find((point) => point.atSeconds >= atSeconds)
+    return hit ? hit.viewers : null
+  }
+  const lastViewers = points.length > 0 ? points[points.length - 1].viewers : null
+  const halfViewers = durationSeconds > 0 ? viewersAtOrAfter(durationSeconds / 2) : null
+  const ctaViewers = ctaAtSeconds !== null ? viewersAtOrAfter(ctaAtSeconds) : null
+
   const maxX = Math.max(
     bucketSeconds,
     durationSeconds,
@@ -165,6 +179,10 @@ export default function RetentionSection({
               </tbody>
             </table>
           </div>
+
+          <p className="text-ink-secondary mt-3 text-xs">
+            最後まで見た人{rateOf(lastViewers)}（{lastViewers !== null ? `${formatNumber(lastViewers)}人` : '—'}）・半分まで{rateOf(halfViewers)}・申込ボタンを出したとき{rateOf(ctaViewers)}
+          </p>
 
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             <div className="border-hairline bg-surface-pearl rounded-control border p-3">

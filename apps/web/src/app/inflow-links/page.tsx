@@ -1172,14 +1172,14 @@ function InflowLinksPageInner({
                 合計は変えない（86%）。名前は省略＋title で確認する。
               */}
               <col className="w-14" />
-              <col className="w-[13%]" />
+              <col className="w-[13%] inflow-name-col" />
               <col className="w-[8%]" />
               <col className="w-[12%]" />
               <col className="w-[8%]" />
               <col className="w-[8%]" />
               <col className="w-[11%]" />
               <col className="w-[9%]" />
-              <col className="w-[8%]" />
+              <col className="w-[8%] inflow-date-col" />
               <col className="w-[9%]" />
               <col className="w-32" />
             </colgroup>
