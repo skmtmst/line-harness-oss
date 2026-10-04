@@ -47,6 +47,19 @@
   background: var(--color-canvas);
 }
 
+/* C①. 一覧は左に見えたまま、右に詳細パネルを出す。 */
+.listDetail {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.listPane {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

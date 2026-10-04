@@ -110,14 +110,23 @@ test('v7 では従来の鍵タブが出て ralAc は出ない', async () => {
   expect(host.querySelector('[data-design-node="ralAc"]')).toBeNull()
 })
 
-test('v8 では止めた鍵に止めているの札と動かすが出る', async () => {
+test('v8 で行を右クリックすると「…」と同じ止めるが出る', async () => {
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
-  const board = host.querySelector('[data-design-node="ralAc"]')
-  expect(board).not.toBeNull()
-  expect(board?.textContent).toContain('旧ポイント連携')
-  expect(board?.textContent).toContain('止めている')
-  expect(board?.textContent).toContain('動かす')
+  const board = host.querySelector('[data-design-node="ralAc"]')!
+  const row = board.querySelector('tbody tr') as HTMLElement
+  await act(async () => {
+    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 320, clientY: 180 }))
+  })
+  const menu = document.querySelector('[role="menu"]')
+  expect(menu?.getAttribute('aria-label')).toBe('鍵の操作')
+  expect(document.querySelector('[data-context-menu]')?.getAttribute('style')).toContain('left: 320px')
+  expect(menu?.textContent).toContain('止める')
+  // 右クリックから「止める」を押すと止める確認の窓が開く。
+  const stopItem = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === '止める') as HTMLElement
+  await act(async () => { stopItem.click() })
+  expect(document.querySelector('[role="menu"]')).toBeNull()
+  expect(document.body.textContent).toContain('鍵を止めますか')
 })
 
 test('v8 の読み込み中は鍵の表の形の骨組みが出て「読み込み中」の文字は無い', async () => {

@@ -177,7 +177,7 @@
     "unresolved-classname": 109
   },
   "app/contents/vars/list-v8.tsx": {
-    "unresolved-classname": 106,
+    "unresolved-classname": 105,
     "direct-th": 6
   },
   "app/contents/vars/new/new-v8.tsx": {
@@ -533,8 +533,8 @@
     "direct-secondary-button": 1
   },
   "app/rich-menus/list-v8.tsx": {
-    "unresolved-classname": 83,
-    "direct-th": 7,
+    "unresolved-classname": 81,
+    "direct-th": 6,
     "arbitrary-value": 1
   },
   "app/rich-menus/new/create-v8.tsx": {
@@ -615,7 +615,7 @@
     "unresolved-classname": 72
   },
   "app/tags/fields-tab-v8.tsx": {
-    "unresolved-classname": 69
+    "unresolved-classname": 53
   },
   "app/tags/fields/migrate/page.tsx": {
     "arbitrary-value": 1
@@ -630,13 +630,13 @@
     "unresolved-classname": 48
   },
   "app/tags/marks-v8.tsx": {
-    "unresolved-classname": 60
+    "unresolved-classname": 46
   },
   "app/tags/search-editor-v8.tsx": {
     "unresolved-classname": 53
   },
   "app/tags/searches-v8.tsx": {
-    "unresolved-classname": 69
+    "unresolved-classname": 54
   },
   "app/tags/tag-editor-v8.tsx": {
     "unresolved-classname": 113
@@ -645,7 +645,7 @@
     "unresolved-classname": 5
   },
   "app/tags/tags-tab-v8.tsx": {
-    "unresolved-classname": 79
+    "unresolved-classname": 61
   },
   "app/templates/asset-editor-v8.tsx": {
     "unresolved-classname": 63
@@ -701,7 +701,7 @@
     "direct-th": 4
   },
   "app/webhooks/interactions-v8.tsx": {
-    "unresolved-classname": 42,
+    "unresolved-classname": 44,
     "direct-th": 6
   },
   "app/webhooks/new/new-v8.tsx": {

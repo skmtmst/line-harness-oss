@@ -199,6 +199,50 @@ test('v8 の動かす・止めるは押した瞬間に札が変わり、失敗�
   expect(board.textContent).toContain('動いている')
 })
 
+test('v8 で行を右クリックすると「設定」と同じ操作が押した位置に出る', async () => {
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/api/staff/me') || url.includes('/staff/me')) {
+      return json({ success: true, data: { role: staffRole } })
+    }
+    if (url.includes('/incoming')) return json({ success: true, data: [] })
+    if (url.includes('/api/webhooks/outgoing') && init?.method === 'PUT') {
+      return json({ success: true, data: outgoing() })
+    }
+    if (url.includes('/api/webhooks/outgoing')) {
+      return json({ success: true, data: outgoingItems })
+    }
+    if (url.includes('/interactions')) {
+      return json({ success: true, data: { summary: {
+        total: 2146, outgoing: 1734, incoming: 412, succeeded: 2144,
+        failed: 2, resultUnknown: 0, outgoingFailed: 2, retryable: 2, averageDurationMs: 400,
+      } } })
+    }
+    return json({ success: false, error: 'not found' }, 404)
+  })
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const board = host.querySelector('[data-design-node="ZSbFY"]')!
+  const row = board.querySelector('tbody tr') as HTMLElement
+  await act(async () => {
+    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 300, clientY: 200 }))
+  })
+  const menu = document.querySelector('[role="menu"]')
+  expect(menu?.getAttribute('aria-label')).toBe('送り先の操作')
+  const layer = document.querySelector('[data-context-menu]')
+  expect(layer?.getAttribute('style')).toContain('left: 300px')
+  expect(layer?.getAttribute('style')).toContain('top: 200px')
+  // 「設定」と同じ中身が出る。
+  for (const label of ['止める', '直す', '合言葉を作り直す', '削除する', '試しに送る']) {
+    expect(menu?.textContent).toContain(label)
+  }
+  // 右クリックから「止める」を押すと「設定」と同じく札が変わる。
+  const stopItem = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === '止める') as HTMLElement
+  await act(async () => { stopItem.click() })
+  expect(board.textContent).toContain('止めている')
+  expect(document.querySelector('[role="menu"]')).toBeNull()
+})
+
 test('v8 の読み込み中は表の形の骨組みが出て「読み込み中」の文字は無い', async () => {
   document.documentElement.dataset.theme = 'v8'
   vi.useFakeTimers()

@@ -27,6 +27,7 @@ import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Notice from '@/components/shared/notice'
 import ActionMenu from '@/components/shared/action-menu'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { formatDateTime } from '@/lib/format'
@@ -81,6 +82,20 @@ function ApiTokensV8Inner() {
   const [menuId, setMenuId] = useState<string | null>(null)
 
   const band = useV8BandData()
+
+  // D. 行の「…」と同じ中身（右クリックでも出す）。
+  const revokeMenuItemsFor = (token: IntegrationApiTokenInfo): ContextMenuItem[] => [{
+    id: 'revoke',
+    label: '止める',
+    danger: true,
+    onSelect: () => {
+      setDialogError('')
+      setRevokeTarget(token)
+    },
+  }]
+  // 右クリックされた行。まだ無ければ先頭の行（Shift+F10 の押し口）。
+  const [ctxId, setCtxId] = useState<string | null>(null)
+  const ctxToken = tokens.find((token) => token.id === ctxId) ?? tokens[0] ?? null
 
   const load = useCallback(async () => {
     const requestGeneration = ++loadGenerationRef.current
@@ -431,6 +446,16 @@ function ApiTokensV8Inner() {
             />
           ) : (
             <>
+              <ContextMenu
+                label="鍵の操作"
+                items={ctxToken ? revokeMenuItemsFor(ctxToken) : []}
+                shouldOpen={(event) => {
+                  const row = (event.target as HTMLElement).closest('tr[data-ctx-row]')
+                  if (!row) return false
+                  setCtxId(row.getAttribute('data-ctx-row'))
+                  return true
+                }}
+              >
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
@@ -444,10 +469,8 @@ function ApiTokensV8Inner() {
                     </tr>
                   </thead>
                   <tbody>
-                    {tokens.map((token) => {
-                      const revoked = token.revokedAt != null
-                      return (
-                      <tr key={token.id}>
+                    {tokens.map((token) => (
+                      <tr key={token.id} data-ctx-row={token.id}>
                         <td className={styles.nameCell} title={token.name}>{token.name}</td>
                         <td><span className={styles.nameCell} title={token.scopes.map(scopeLabel).join('・')}>{token.scopes.map(scopeLabel).join('・')}</span></td>
                         <td className={styles.dimCell}>{formatDateTime(token.createdAt)}</td>
@@ -508,7 +531,8 @@ function ApiTokensV8Inner() {
                   </tbody>
                 </table>
               </div>
-              <p className={styles.footNote}>行の「…」から止める。止めても、すでに付けたタグは残ります。止めた鍵は「動かす」で使えるように戻せます。</p>
+              </ContextMenu>
+              <p className={styles.footNote}>行の「…」から 止める。止めても、すでに付けたタグは残ります。</p>
             </>
           )
         ) : null}
