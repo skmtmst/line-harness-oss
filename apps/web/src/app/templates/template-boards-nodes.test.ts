@@ -21,7 +21,7 @@ describe('テンプレートの残りの板ID', () => {
   it('見るだけの人に hEDTK の帯が出る', () => {
     expect(LIST).toContain('data-design-node="hEDTK"')
     expect(LIST).toContain('閲覧のみで見ています')
-    expect(LIST).toContain('{!canMutateTemplates && (')
+    expect(LIST).toMatch(/\{!canMutateTemplates\s*\?\s*\(\s*<p[^>]*data-design-node="hEDTK"/)
   })
 
   it('狭い幅で一覧が L7zA7C になる', () => {
