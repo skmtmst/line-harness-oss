@@ -128,8 +128,9 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     // 判定入口（1行ごとの操作）は候補と一緒に見える。
     expect(screen.getByRole('button', { name: '決める' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '候補を見る' })).toBeTruthy()
-    // 集計の数はサーバが数えた値を出す。
-    expect(screen.getByText('5件')).toBeTruthy()
+    // 集計の数はサーバが数えた値を出す（w1W8h：絵の言葉）。
+    expect(screen.getByText('人が決める（つき合わせ 5 のうち）')).toBeTruthy()
+    expect(screen.getByText('¥50,000')).toBeTruthy()
   })
 
   test('運用集計だけ503：候補と判定入口は残し、集計欄に取得失敗と再試行を出す', async () => {
@@ -164,7 +165,7 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     mocks.operations.mockResolvedValue(OPERATIONS_OK)
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     // 集計の数が戻り、失敗の文言は消える。
-    await waitFor(() => expect(screen.getByText('5件')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('人が決める（つき合わせ 5 のうち）')).toBeTruthy())
     expect(screen.queryByText('読み込めませんでした')).toBeNull()
   })
 
