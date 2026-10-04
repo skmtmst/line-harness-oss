@@ -171,3 +171,16 @@ describe('読み上げ用の表は箱を作らない', () => {
     expect(css).toMatch(/\.srOnly\s*\{[^}]*overflow:\s*hidden/s)
   })
 })
+
+/*
+ * 黒をなくす（#2・オーナー「黒がいや」）：指を乗せた日の吹き出しは
+ * 白地＋細い線＋浮く影＋ink字。黒（ink地）に戻さないための歯止め。
+ */
+describe('グラフの吹き出しは白（黒をなくす #2）', () => {
+  it('.tooltip は白地＋ink字（ink地にしない）', () => {
+    const tooltip = css.match(/\.tooltip \{[^}]*\}/s)?.[0] ?? ''
+    expect(tooltip).toMatch(/background:\s*var\(--color-canvas\)/)
+    expect(tooltip).toMatch(/color:\s*var\(--color-ink\)/)
+    expect(tooltip).not.toMatch(/background:\s*var\(--color-ink\)/)
+  })
+})
