@@ -33,7 +33,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>詳細フォーム</div> }))
+vi.mock('@/components/webinars/webinar-form', () => ({ default: function MockWebinarForm({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) {
+  const [value, setValue] = React.useState('')
+  return <label>詳細フォーム<input aria-label="動画詳細の入力" value={value} onChange={(event) => { setValue(event.target.value); onDirtyChange(true) }} /></label>
+} }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: () => true }))
 
 import VideoV8 from './video-v8'
@@ -69,19 +72,21 @@ function render(editor = EDITOR): HTMLElement {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
-  act(() => {
-    root.render(
+  function Harness() {
+    const [webinar, setWebinar] = React.useState(WEBINAR)
+    return (
       <VideoV8
-        webinar={WEBINAR}
+        webinar={webinar}
         editor={editor}
         publicUrl={null}
         canOpenPublicPage={false}
         publicPageReason="公開すると見られます"
         completionLabel="最大視聴位置が動画の90%（12:00）以上"
-        onWebinarSaved={() => undefined}
-      />,
+        onWebinarSaved={setWebinar}
+      />
     )
-  })
+  }
+  act(() => root.render(<Harness />))
   return host
 }
 
@@ -170,5 +175,19 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     const replace = [...host.querySelectorAll('button')].find((button) => button.textContent === '差し替える')!
     await act(async () => replace.click())
     expect(host.querySelector('details')?.open).toBe(true)
+  })
+
+  it('公開期間だけを保存して更新日時が変わっても詳細の未保存入力を消さない', async () => {
+    apiMocks.update.mockResolvedValueOnce({ data: { ...WEBINAR, updatedAt: '2026-10-04T18:37:00+09:00' } })
+    let host!: HTMLElement
+    await act(async () => { host = render() })
+    const input = host.querySelector<HTMLInputElement>('[aria-label="動画詳細の入力"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '未保存の動画設定')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const save = [...host.querySelectorAll('button')].find((button) => button.textContent === '公開期間を保存する')!
+    await act(async () => save.click())
+    expect(host.querySelector<HTMLInputElement>('[aria-label="動画詳細の入力"]')?.value).toBe('未保存の動画設定')
   })
 })

@@ -123,6 +123,9 @@ export default function VideoV8({
   const [noEnd, setNoEnd] = useState(!webinar.publicationEndsAt)
   const savedPeriod = useRef(JSON.stringify([startsAt, endsAt, noEnd]))
   const [detailsDirty, setDetailsDirty] = useState(false)
+  const detailsKey = useRef(`${webinar.id}-${webinar.updatedAt}`)
+  // 公開期間などの保存で更新日時が変わっても、詳細の未保存入力を捨てない。
+  if (!detailsDirty) detailsKey.current = `${webinar.id}-${webinar.updatedAt}`
   const detailsSave = useRef<(() => Promise<boolean>) | null>(null)
   const periodDirty = JSON.stringify([startsAt, endsAt, noEnd]) !== savedPeriod.current
   const [periodBusy, setPeriodBusy] = useState(false)
@@ -533,7 +536,7 @@ export default function VideoV8({
         <div ref={detailsRoot}>
         <Disclosure title="動画・公開の詳細を編集する" defaultOpen={detailsOpen}>
           <WebinarForm
-            key={`${webinar.id}-${webinar.updatedAt}`}
+            key={detailsKey.current}
             initial={webinar}
             hideBar
             onSaved={onWebinarSaved}
