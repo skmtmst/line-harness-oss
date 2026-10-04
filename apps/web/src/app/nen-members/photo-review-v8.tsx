@@ -6,6 +6,8 @@ import { Camera, CircleCheck, Clock3, Globe, History, HelpCircle, Undo2, X, Chec
 import type { ApiResponse } from '@line-crm/shared'
 import { ApiError, api, fetchApi, type PhotoBulkReviewResult, type PhotoReviewMetrics } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ActionMenu from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Chip from '@/components/shared/chip'
@@ -897,11 +899,12 @@ function viewsText(value: unknown): string {
 /**
  * 公式サイト掲載（SyQA1）。列：写真・ペット・どこで使っているか・
  * この30日に見た・公開の同意・掲載先から外す。右に出すときの決めごと。
- * 「この30日に見た」の30日集計の口はまだ無いので、いまの表示回数をそのまま出す。
+ * 30日集計は未接続なので「—」。掲載先の編集・撤回の整理・外した履歴を保つ。
  */
 function PublicationsV8({
   accountId,
   canEdit,
+  publishedCount,
   onChanged,
 }: {
   accountId: string
@@ -914,17 +917,48 @@ function PublicationsV8({
   const [topPhotoId, setTopPhotoId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   const [busyId, setBusyId] = useState('')
+  const [pendingWithdrawals, setPendingWithdrawals] = useState<PublicationItem[]>([])
+  const [withdrawnItems, setWithdrawnItems] = useState<PublicationItem[]>([])
+  const [editing, setEditing] = useState<PublicationItem | null>(null)
+  const [selectedPlacements, setSelectedPlacements] = useState<string[]>([])
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const generation = useRef(0)
+  const loadSequence = useRef(0)
+  const placementChoices = [{ type: 'site', label: 'サイト' }, { type: 'column', label: 'NENコラム' }, { type: 'rich_menu', label: 'リッチメニュー' }, { type: 'form', label: '回答フォーム' }] as const
+  const openPlacements = (item: PublicationItem) => {
+    setEditing(item); setNotice(''); setMenuId(null)
+    setSelectedPlacements((item.placements ?? []).filter((placement) => Number(placement.active ?? 1) === 1).map((placement) => text(placement.placement_type)))
+  }
+  const savePlacements = async () => {
+    if (!editing || !canEdit || busyId) return
+    const accountGeneration = generation.current
+    setBusyId(text(editing.id)); setNotice('')
+    try {
+      const response = await api.nenMembers.updatePhotoPublicationPlacements(text(editing.id), {
+        accountId, expectedVersion: Number(editing.version), placements: placementChoices.filter((choice) => selectedPlacements.includes(choice.type)),
+      }, crypto.randomUUID())
+      if (accountGeneration !== generation.current) return
+      if (!response.success) throw new Error(response.error)
+      setEditing(null); await load(); onChanged()
+    } catch { if (accountGeneration === generation.current) setNotice('使う場所を保存できませんでした。最新の状態を読み直してください。') }
+    finally { if (accountGeneration === generation.current) setBusyId('') }
+  }
+
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setState('loading')
     try {
       const response = await api.nenMembers.photoPublications(accountId)
+      if (sequence !== loadSequence.current) return
       if (!response.success) throw new Error(response.error)
       if (Array.isArray(response.data)) {
         setItems([])
         setTopPhotoId(null)
       } else {
         setItems(response.data.items ?? [])
+        setPendingWithdrawals(response.data.pendingWithdrawals ?? [])
+        setWithdrawnItems(response.data.withdrawnItems ?? [])
         setTopPhotoId(response.data.summary.topPhoto ? text(response.data.summary.topPhoto.id) : null)
       }
       setState('ready')
@@ -934,15 +968,19 @@ function PublicationsV8({
     }
   }, [accountId])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { void load(); return () => { generation.current += 1; loadSequence.current += 1 } }, [load])
 
   const withdraw = async (item: PublicationItem) => {
+    if (!canEdit || busyId) return
+    const accountGeneration = generation.current
     setBusyId(text(item.id))
     setNotice('')
     try {
-      await api.nenMembers.withdrawPhotoPublication(text(item.id), {
+      const response = await api.nenMembers.withdrawPhotoPublication(text(item.id), {
         accountId, expectedVersion: Number(item.version),
       }, crypto.randomUUID())
+      if (accountGeneration !== generation.current) return
+      if (!response.success) throw new Error(response.error)
       notifyToast('写真をすべての掲載先から外しました。審査と同意の履歴、付与済みのマイルは残ります。')
       await load()
       onChanged()
@@ -962,19 +1000,19 @@ function PublicationsV8({
         <ListState kind="forbidden" />
       ) : state === 'error' ? (
         <ListState kind="error" title="公式サイト掲載中の写真を読み込めませんでした" onRetry={() => void load()} />
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && pendingWithdrawals.length === 0 && withdrawnItems.length === 0 ? (
         <ListState kind="empty" emptyPreset="readonly" title="公式サイト掲載中の写真はありません" description="同意のある写真を掲載すると、使っている場所と表示回数がここに出ます。" />
       ) : (
-        <div className={styles.reviewGrid}>
+        <div className={styles.publicationsGrid}>
           <section data-design-node="photo-pubs-table-v8">
             <div className={styles.tableWrap}>
-              <DataTable className="@container">
+              <DataTable className={styles.publicationsTable}>
                 <thead>
                   <TableHeadRow>
                     <Th>写真</Th>
                     <Th>ペット</Th>
                     <Th>どこで使っているか</Th>
-                    <Th align="right">この30日に見た</Th>
+                    <Th align="right"><span title="30日間の集計は未接続です。累計の回数には置き換えません">この30日に見た</span></Th>
                     <Th>公開の同意</Th>
                     <Th align="right">操作</Th>
                   </TableHeadRow>
@@ -983,7 +1021,7 @@ function PublicationsV8({
                   {items.map((item) => {
                     const imageSrc = safePhotoSrc(item.image_url)
                     const name = photoPetDisplayName(item.pet_name, { fallback: 'ペット名未取得', honorific: false })
-                    const consented = Boolean(text(item.publication_consent_at))
+                    const consented = Boolean(text(item.publication_consent_at)) && !text(item.publication_withdrawn_at)
                     return (
                       <Tr key={text(item.id)}>
                         <Td>
@@ -999,13 +1037,13 @@ function PublicationsV8({
                             <span className={styles.petNameV8}>{name}</span>
                             {topPhotoId === text(item.id) ? <Chip tone="info">いちばん見られた</Chip> : null}
                           </span>
-                          <span className={styles.petSubV8}>{text(item.owner_name) || '名前は伏せています'}</span>
+                          <span className={styles.petSubV8}>{Number(item.hide_owner_name) === 0 ? '名前を出しています' : '名前は伏せています'}</span>
                         </Td>
                         <Td><span className="block truncate text-label text-ink-secondary" title={placementLabels(item)}>{placementLabels(item)}</span></Td>
-                        <Td align="right"><span className="text-label tabular-nums text-ink">{viewsText(item.view_count)}</span></Td>
+                        <Td align="right"><span className="text-label tabular-nums text-ink">{viewsText(item.view_count_30d)}</span></Td>
                         <Td>{consented ? <Chip tone="ok">同意あり</Chip> : <Chip tone="neutral">未取得</Chip>}</Td>
                         <Td align="right">
-                          <Button
+                          <div className={styles.publicationActions}><Button
                             variant="secondary"
                             disabled={!canEdit || busyId === text(item.id)}
                             title={!canEdit ? '見るだけの権限では掲載先から外せません' : undefined}
@@ -1014,7 +1052,7 @@ function PublicationsV8({
                             busyLabel="外しています..."
                           >
                             掲載先から外す
-                          </Button>
+                          </Button><MoreAction aria-label={`${name}の掲載操作`} onClick={() => setMenuId(menuId === text(item.id) ? null : text(item.id))} /><ActionMenu open={menuId === text(item.id)} onClose={() => setMenuId(null)} items={[{ id: 'placements', label: '使う場所', disabled: !canEdit, disabledReason: !canEdit ? '閲覧のみの権限です' : undefined, onSelect: () => openPlacements(item) }]} /></div>
                         </Td>
                       </Tr>
                     )
@@ -1022,7 +1060,11 @@ function PublicationsV8({
                 </tbody>
               </DataTable>
             </div>
-            <p className={styles.listHintV8}>公式サイト掲載中 {items.length}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）</p>
+            <p className={styles.listHintV8}>公式サイト掲載中 {publishedCount ?? '—'}枚のうち {items.length}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）</p>
+            <details className={styles.publicationHistory}><summary>掲載の整理と外した履歴（{pendingWithdrawals.length + withdrawnItems.length}件）</summary>
+              {pendingWithdrawals.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p><Button variant="secondary" disabled={!canEdit || Boolean(busyId)} onClick={() => void withdraw(item)}>掲載先から外す</Button></div>)}
+              {withdrawnItems.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || '—'}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
+            </details>
           </section>
           <div className={styles.rail} data-design="Right" data-design-node="photo-pubs-rail-v8">
             <section className={styles.railCard} aria-label="出すときの決めごと">
@@ -1034,11 +1076,14 @@ function PublicationsV8({
                 <li>外しても採用時のマイルは戻りません</li>
                 <li>原本は公開しません。選んだ場所へ公開用画像を出します</li>
               </ul>
-              <Button variant="secondary" disabled title="並び順の変更は今の作りのままです">並び順を変える</Button>
+              <Button variant="secondary" disabled title="掲載順を保存するAPIは未接続です">並び順を変える</Button>
             </section>
           </div>
         </div>
       )}
+      <Dialog open={Boolean(editing)} title="使う場所" description="同意のある写真の掲載先を選びます。原本は公開しません。" busy={Boolean(busyId)} error={notice} confirmLabel="保存する" onCancel={() => { if (!busyId) setEditing(null) }} onConfirm={() => void savePlacements()}>
+        {placementChoices.map((choice) => <Checkbox key={choice.type} checked={selectedPlacements.includes(choice.type)} onCheckedChange={(checked) => setSelectedPlacements((current) => checked ? [...current, choice.type] : current.filter((type) => type !== choice.type))}>{choice.label}</Checkbox>)}
+      </Dialog>
     </>
   )
 }

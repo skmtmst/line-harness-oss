@@ -593,3 +593,24 @@
 .errorText { color: var(--color-danger); font-size: 12px; }
 .historyCompare { font-size: 13px; }
 @media (max-width: 560px) { .historyColumns { grid-template-columns: 1fr; } }
+
+/* SyQA1.html：写真一覧の表＋幅190pxの掲載ルール。 */
+.publicationsGrid { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 12px; padding-block: 12px; }
+.tableWrap { border: 1px solid var(--color-hairline); border-radius: 12px; overflow: hidden; }
+.publicationsTable { width: 100%; table-layout: fixed; }
+.publicationsTable th, .publicationsTable td { padding: 10px 12px; font-size: 12px; }
+.publicationsTable th:first-child { width: 68px; }
+.publicationsTable th:nth-child(2) { width: 34%; }
+.publicationsTable th:nth-child(4) { width: 12%; }
+.publicationsTable th:nth-child(5) { width: 11%; }
+.publicationsTable th:nth-child(6) { width: 160px; }
+.publicationsTable td { overflow: hidden; }
+.pubThumb { display: block; width: 56px; height: 56px; }
+.petNameV8 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.publicationActions { display: flex; justify-content: flex-end; gap: 4px; }
+.publicationActions > button { flex-shrink: 0; padding-inline: 10px; }
+.publicationHistory { margin-top: 12px; font-size: 12px; color: var(--color-ink-secondary); }
+.publicationHistory summary { cursor: pointer; }
+.publicationHistory > div { padding: 12px; border-bottom: 1px solid var(--color-hairline); }
+@container (max-width: 1099px) { .publicationsGrid { grid-template-columns: minmax(0, 1fr); } .publicationsGrid .rail { flex-direction: row; } }
+@container (max-width: 650px) { .tableWrap { overflow-x: auto; } .publicationsTable { min-width: 650px; } }
