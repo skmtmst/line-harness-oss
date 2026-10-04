@@ -47,6 +47,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { notifyToast } from '@/components/shared/toast'
+import { useRowLeaving } from '@/components/shared/row-leaving'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
@@ -700,6 +701,8 @@ export default function TemplatesListV8() {
     }
   }
 
+  const { isLeaving, fadeOut } = useRowLeaving()
+
   // 押しただけでは消さない。窓を開くだけ。使用中なら「使っている所」の窓へ。
   const handleDelete = (t: Template) => {
     setDeleteError('')
@@ -725,7 +728,8 @@ export default function TemplatesListV8() {
       if (!res.success) throw new Error(res.error)
       setPendingDelete(null)
       // R195: 件数（未分類・フォルダ別）はフォルダ側の集計が持つので両方読み直す。
-      await Promise.all([load(), loadFolders()])
+      // 消えた行は 150ms 薄くしてから読み直す（V8 の動き §8）。
+      await fadeOut([target.id], () => Promise.all([load(), loadFolders()]))
     } catch {
       // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
       setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -828,7 +832,11 @@ export default function TemplatesListV8() {
       setPendingBulkDelete(null)
       setSelectedIds(new Set())
       notifyToast(`${pendingBulkDelete.length}件のテンプレートを削除しました`, { tone: 'success' })
-      await Promise.all([load(), loadFolders()])
+      // 消えた行は 150ms 薄くしてから読み直す（V8 の動き §8）。
+      await fadeOut(
+        pendingBulkDelete.map((t) => t.id),
+        () => Promise.all([load(), loadFolders()]),
+      )
     } catch (reason) {
       setBulkDeleteError(
         reason instanceof ApiError && reason.status === 403
@@ -1085,6 +1093,7 @@ export default function TemplatesListV8() {
                 <tr
                   key={t.id}
                   className={styles.rowClick}
+                  data-leaving={isLeaving(t.id) || undefined}
                   tabIndex={0}
                   onClick={() => router.push(detailHref(t))}
                   onKeyDown={(event) => {
