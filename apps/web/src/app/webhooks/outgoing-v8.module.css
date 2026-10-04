@@ -169,7 +169,7 @@
 .table thead th {
   background: var(--color-canvas-sunken);
   border-bottom: 1px solid var(--color-hairline);
-  padding: 13px 20px;
+  padding: 13px 16px;
   font-size: 12px;
   font-weight: 500;
   color: var(--color-ink-secondary);
@@ -179,7 +179,7 @@
 
 .table tbody td {
   border-bottom: 1px solid var(--color-hairline);
-  padding: 9px 20px;
+  padding: 9px 16px;
   vertical-align: middle;
 }
 
