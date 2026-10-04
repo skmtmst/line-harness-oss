@@ -172,3 +172,21 @@ test('v7 では従来の一覧が出て UyUMw は出ない', async () => {
   expect(host.querySelector('[data-design-node="UyUMw"]')).toBeNull()
   expect(host.querySelector('[data-design-node="ZC13r"]')).not.toBeNull()
 })
+
+test('v8 の読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {
+  vi.stubGlobal('fetch', () => new Promise<Response>(() => {}))
+  document.documentElement.dataset.theme = 'v8'
+  await act(async () => {
+    root.render(<WebinarsPage />)
+  })
+  // 場所取り：読み上げは1回だけ、骨組みに読み上げは付けない。
+  expect(host.querySelector('[aria-busy="true"]')).not.toBeNull()
+  expect(host.textContent).toContain('ウェビナーの一覧を読み込んでいます')
+  expect(host.textContent).not.toContain('読み込み中')
+  // 0.3秒たつと骨組みの5行が出る（見出し＋行の高さは本物と同じ）。
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 350))
+  })
+  const skeletons = host.querySelectorAll('[data-skeleton]')
+  expect(skeletons.length).toBeGreaterThanOrEqual(5)
+})
