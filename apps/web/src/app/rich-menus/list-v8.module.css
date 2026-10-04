@@ -250,6 +250,17 @@
   cursor: pointer;
 }
 
+/* 消える行は薄くなってから外す（150ms。動きを減らす設定では一瞬）。 */
+@media (prefers-reduced-motion: no-preference) {
+  .rowClick {
+    transition: opacity var(--motion-exit) var(--motion-ease-out);
+  }
+
+  .rowClick[data-leaving='true'] {
+    opacity: 0;
+  }
+}
+
 .rowClick:hover td {
   background: var(--color-canvas-sunken);
 }

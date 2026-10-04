@@ -27,6 +27,7 @@ import {
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useRowLeaving } from '@/lib/use-row-leaving'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -414,6 +415,7 @@ function CommonVarsListV8Inner() {
    * 差し替え・削除・止めるのどれにも理由が要る（版履歴に残すため）。
    */
   const [deleteTarget, setDeleteTarget] = useState<CommonVar | null>(null)
+  const { isLeaving, leave, leaveMany } = useRowLeaving()
   const [deleteImpact, setDeleteImpact] = useState<CommonVarDeleteImpact | null>(null)
   const [deletePhase, setDeletePhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [deleteBusy, setDeleteBusy] = useState(false)
@@ -574,8 +576,9 @@ function CommonVarsListV8Inner() {
       })
       if (deleteRequestRef.current.generation !== request.generation) return
       if (!res.success) throw new Error('replace_failed')
+      const goneId = deleteTarget.id
       resetDeleteState()
-      await load()
+      leave(goneId, () => load())
     } catch (error) {
       if (deleteRequestRef.current.generation !== request.generation) return
       if (error instanceof ApiError && error.status === 409) {
@@ -607,8 +610,9 @@ function CommonVarsListV8Inner() {
       const res = await api.commonVars.delete(request.itemId, request.accountId, deleteReason.trim())
       if (!isCurrentRequest()) return
       if (!res.success) throw new Error('delete_failed')
+      const goneId = deleteTarget.id
       resetDeleteState()
-      await load()
+      leave(goneId, () => load())
     } catch (e) {
       if (!isCurrentRequest()) return
       if (e instanceof ApiError && e.status === 409) {
@@ -754,10 +758,13 @@ function CommonVarsListV8Inner() {
         return
       }
 
+      const goneIds = targets.map((item) => item.id)
       setDeleteTargets([])
       setBatchReason('')
-      setSelected(new Set())
-      await load()
+      leaveMany(goneIds, () => {
+        setSelected(new Set())
+        void load()
+      })
     } finally {
       if (isCurrentRequest()) setDeleting(false)
     }
@@ -1108,7 +1115,7 @@ function CommonVarsListV8Inner() {
                         const valueText = formatVarValue(item.type, item.value)
                         const stopped = (item.status ?? 'active') === 'stopped'
                         return (
-                          <tr key={item.id}>
+                          <tr key={item.id} data-leaving={isLeaving(item.id) || undefined}>
                             {canWrite ? (
                               <td className={styles.cellCheck}>
                                 <Checkbox

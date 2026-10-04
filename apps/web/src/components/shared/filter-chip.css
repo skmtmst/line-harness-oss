@@ -116,3 +116,11 @@
     border-color var(--motion-fast) var(--motion-ease-out),
     color var(--motion-fast) var(--motion-ease-out);
 }
+
+/* ★V8 仕上げ3回目（M10）②：切替の速さ・感じを --motion-* にそろえる（120ms）。v7 は今までどおり。 */
+[data-theme='v8'] .v6-filter-chip {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+}

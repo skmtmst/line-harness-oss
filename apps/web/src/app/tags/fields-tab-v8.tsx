@@ -19,6 +19,7 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useRowLeaving } from '@/lib/use-row-leaving'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
@@ -61,6 +62,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
   const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<FriendField | null>(null)
+  const { leavingId, leave } = useRowLeaving()
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderDialog, setFolderDialog] = useState<'new' | Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
@@ -206,7 +208,10 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
       return
     }
     setActionError('')
-    try { await api.friendFields.delete(field.id, accountId); await load() }
+    try {
+      await api.friendFields.delete(field.id, accountId)
+      leave(field.id, () => load())
+    }
     catch (reason) { setActionError(reason instanceof ApiError ? reason.message : '削除できませんでした') }
   }
 
@@ -465,6 +470,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                         <tr
                           key={field.id}
                           className={styles.rowClick}
+                          data-leaving={leavingId === field.id || undefined}
                           tabIndex={0}
                           onClick={() => router.push(editHref)}
                           onKeyDown={(event) => {
