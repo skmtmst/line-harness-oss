@@ -56,7 +56,7 @@ export function SendPathCoveragePanel({ accountId, revision }: { accountId: stri
 
   if (failed) {
     return <Notice tone="warn">
-      送信経路の台帳を取得できませんでした。停止の届く範囲が確認できないため、経路の網羅は保証できません。時間をおいて読み直してください。
+      送信経路の台帳を読み込めませんでした。停止の届く範囲が確認できないため、経路の網羅は保証できません。時間をおいて読み直してください。
     </Notice>
   }
   if (!data) {

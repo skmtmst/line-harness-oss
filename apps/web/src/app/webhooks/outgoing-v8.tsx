@@ -30,6 +30,7 @@ import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
 import type { WebhookInteractionSummary } from '@line-crm/shared'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
@@ -407,26 +408,46 @@ function OutgoingV8Inner() {
       return
     }
     beginToggle(key)
+    // 先に札を変える。裏の保存が終わるまでこの値を出し続ける。
+    const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
+    setOptimisticActive((current) => ({ ...current, [id]: !currentActive }))
+    const clearOptimistic = () => {
+      setOptimisticActive((current) => {
+        if (current[id] === undefined) return current
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
+    }
+    const failMessage = (reason: string) => {
+      clearOptimistic()
+      setToggleFailures((current) => ({ ...current, [key]: reason }))
+      notifyToast(reason, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void handleToggle(id, currentActive) },
+      })
+    }
     try {
       const res = await api.webhooks.outgoing.update(id, requestAccountId, { isActive: !currentActive })
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
-        const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
-        setToggleFailures((current) => ({ ...current, [key]: `「${name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。` }))
+        failMessage(`「${name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。`)
         return
       }
       if (selectedAccountIdRef.current === requestAccountId) await load()
+      clearOptimistic()
+      notifyToast(`「${name}」を${!currentActive ? '動かしました' : '止めました'}。`, {
+        actionLabel: '元に戻す',
+        onAction: () => { void handleToggle(id, !currentActive) },
+      })
     } catch (caught) {
       if (selectedAccountIdRef.current !== requestAccountId) return
       const forbidden = caught instanceof ApiError && caught.status === 403
-      const name = outgoing.find((item) => item.id === id)?.name ?? 'この送り先'
       if (!forbidden) await load().catch(() => {})
-      setToggleFailures((current) => ({
-        ...current,
-        [key]: forbidden
-          ? `「${name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
-          : `「${name}」は切り替えの応答を受け取れませんでした。一覧の表示を確かめてください。変わっている可能性があります。`,
-      }))
+      failMessage(forbidden
+        ? `「${name}」は統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。`
+        : `「${name}」は切り替えの応答を受け取れませんでした。一覧の表示を確かめてください。変わっている可能性があります。`)
     } finally {
       endToggle(key)
     }
@@ -535,8 +556,19 @@ function OutgoingV8Inner() {
     }
   }
 
+  /*
+   * B. 押した瞬間に札を変えて裏で保存する。`optimisticActive` がある行は
+   * その値を先に見せ、保存に失敗したら消して元へ戻す。
+   */
+  const [optimisticActive, setOptimisticActive] = useState<Record<string, boolean>>({})
+  const displayed = useMemo(() => (
+    outgoing.map((item) => (
+      optimisticActive[item.id] === undefined ? item : { ...item, isActive: optimisticActive[item.id] }
+    ))
+  ), [outgoing, optimisticActive])
+
   const filtered = useMemo(() => {
-    const rows = outgoing.filter((item) => matchesOutgoing(item, filter, query))
+    const rows = displayed.filter((item) => matchesOutgoing(item, filter, query))
     return [...rows].sort((a, b) => (sort === 'name'
       ? a.name.localeCompare(b.name, 'ja-JP')
       : b.deliverySummary.total - a.deliverySummary.total))
@@ -561,11 +593,45 @@ function OutgoingV8Inner() {
   }
 
   const readyCounts = outgoingStatus === 'ready'
-  const activeCount = outgoing.filter((item) => item.isActive).length
-  const pausedCount = outgoing.length - activeCount
+  const activeCount = displayed.filter((item) => item.isActive).length
+  const pausedCount = displayed.length - activeCount
 
   const listBody = (() => {
-    if (outgoingStatus === 'loading') return <ListState kind="loading" title="送り先を読み込んでいます" />
+    if (outgoingStatus === 'loading') {
+      return (
+        <div
+          className="overflow-x-auto rounded-card border border-hairline bg-canvas"
+          aria-busy="true"
+          aria-label="送り先を読み込んでいます"
+        >
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true">
+                <div style={{ display: 'flex', gap: 40, padding: '13px 20px' }}>
+                  <Skeleton height={12} width={60} />
+                  <Skeleton height={12} width={90} />
+                  <Skeleton height={12} width={70} />
+                  <Skeleton height={12} width={60} />
+                  <Skeleton height={12} width={50} />
+                  <Skeleton height={12} width={40} />
+                </div>
+                {[0, 1, 2, 3, 4].map((row) => (
+                  <div key={row} style={{ display: 'flex', gap: 20, padding: '9px 20px', borderTop: '1px solid var(--color-hairline)' }}>
+                    <span style={{ flex: 1 }}><Skeleton height={14} width="60%" /><Skeleton className="mt-1" height={11} width="80%" /></span>
+                    <Skeleton height={14} width="7rem" />
+                    <Skeleton height={14} width="10rem" />
+                    <Skeleton height={14} width="6rem" />
+                    <Skeleton height={14} width="10rem" />
+                    <Skeleton height={30} width="12rem" />
+                  </div>
+                ))}
+              </div>
+            )}
+          />
+        </div>
+      )
+    }
     if (!selectedAccountId) {
       return (
         <ListState

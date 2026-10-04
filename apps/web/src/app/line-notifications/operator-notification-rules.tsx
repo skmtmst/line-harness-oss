@@ -55,7 +55,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'published' | 'draft' | 'missing'>('all')
   const [busy, setBusy] = useState<string | null>(null)
-  const [notice, setNotice] = useState('')
+  const [notice, setNotice] = useState<{ text: string; error: boolean } | null>(null)
   const [exportReason, setExportReason] = useState('')
   const [showExport, setShowExport] = useState(false)
   // 書き出し中は×と同じくEscapeでも閉じない。
@@ -92,44 +92,44 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
 
   const publish = async (rule: OperatorNotificationRule) => {
     if (!lineAccountId || busy) return
-    setBusy(rule.id); setNotice('')
+    setBusy(rule.id); setNotice(null)
     try {
       await api.lineNotifications.operatorRules.publish(rule.id, lineAccountId)
-      setNotice(`「${rule.name}」を公開しました。`)
+      setNotice({ text: `「${rule.name}」を公開しました。`, error: false })
       await load()
     } catch (error) {
-      setNotice(error instanceof ApiError ? error.message : '公開できませんでした。')
+      setNotice({ text: error instanceof ApiError ? error.message : '公開できませんでした。', error: true })
     } finally { setBusy(null) }
   }
 
   const testSend = async (rule: OperatorNotificationRule) => {
     if (!lineAccountId || busy) return
-    setBusy(rule.id); setNotice('')
+    setBusy(rule.id); setNotice(null)
     try {
       const result = await api.lineNotifications.operatorRules.test(rule.id, lineAccountId)
       if (!result.success) throw new Error(result.error)
-      setNotice(result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。')
+      setNotice({ text: result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。', error: result.data.accepted === 0 })
       await load()
     } catch (error) {
-      setNotice(error instanceof ApiError ? error.message : 'テスト送信できませんでした。')
+      setNotice({ text: error instanceof ApiError ? error.message : 'テスト送信できませんでした。', error: true })
     } finally { setBusy(null) }
   }
 
   const stop = async (rule: OperatorNotificationRule) => {
     if (!lineAccountId || busy) return
-    setBusy(rule.id); setNotice('')
+    setBusy(rule.id); setNotice(null)
     try {
       await api.lineNotifications.operatorRules.stop(rule.id, lineAccountId)
-      setNotice(`「${rule.name}」を止めました。`)
+      setNotice({ text: `「${rule.name}」を止めました。`, error: false })
       await load()
     } catch (error) {
-      setNotice(error instanceof ApiError ? error.message : '停止できませんでした。')
+      setNotice({ text: error instanceof ApiError ? error.message : '停止できませんでした。', error: true })
     } finally { setBusy(null) }
   }
 
   const exportCsv = async () => {
     if (!lineAccountId || !exportReason.trim() || busy) return
-    setBusy('csv'); setNotice('')
+    setBusy('csv'); setNotice(null)
     try {
       const blob = await api.lineNotifications.operatorRules.exportCsv(lineAccountId, exportReason.trim())
       const url = URL.createObjectURL(blob)
@@ -138,11 +138,11 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       anchor.download = `operator-notifications-${new Date().toISOString().slice(0, 10)}.csv`
       anchor.click()
       URL.revokeObjectURL(url)
-      setNotice('実行記録をCSVで書き出しました。')
+      setNotice({ text: '実行記録をCSVで書き出しました。', error: false })
       setShowExport(false)
       setExportReason('')
     } catch (error) {
-      setNotice(error instanceof ApiError ? error.message : 'CSVを書き出せませんでした。')
+      setNotice({ text: error instanceof ApiError ? error.message : 'CSVを書き出せませんでした。', error: true })
     } finally { setBusy(null) }
   }
 
@@ -157,7 +157,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
       <KpiCard title="届かなかった" value={state === 'ready' ? summary?.excludedToday ?? null : null} unit="件" detail="受け取る人がいません" badge={(summary?.excludedToday ?? 0) > 0 ? '要確認' : undefined} badgeTone="danger" variant="v6" />
     </div>
 
-    {notice ? <p role="status" className="rounded-control border border-hairline bg-canvas px-4 py-3 text-sm text-ink-secondary">{notice}</p> : null}
+    {notice ? <p role={notice.error ? 'alert' : 'status'} className="rounded-control border border-hairline bg-canvas px-4 py-3 text-sm text-ink-secondary">{notice.text}</p> : null}
 
     <div className="flex flex-wrap items-center justify-between gap-3">
       <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
@@ -165,7 +165,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
     </div>
 
     <div className="flex flex-wrap items-center gap-2">
-      <label className="flex min-w-72 max-w-md flex-1 items-center gap-2 rounded-control border border-hairline bg-canvas px-3 py-2"><Search aria-hidden="true" size={17} className="text-ink-faint" /><span className="sr-only">お知らせを検索</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お知らせ名・きっかけで探す" className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label>
+      <label className="flex min-w-72 max-w-md flex-1 items-center gap-2 rounded-control border border-hairline bg-canvas px-3 py-2"><Search aria-hidden="true" size={17} className="text-ink-faint" /><span className="sr-only">お知らせを検索</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お知らせ名・きっかけで探す" className="min-w-0 flex-1 bg-transparent text-label outline-none" /></label>
       <RadioCardGroup legend="公開状態で絞り込む" className="flex flex-wrap gap-2">
         {(['all', 'published', 'draft', 'missing'] as const).map((value) => <RadioCard key={value} name="operator-filter" value={value} checked={filter === value} onChange={() => setFilter(value)} title={{ all: `すべて ${summary?.total ?? '—'}`, published: `出している ${summary?.published ?? '—'}`, draft: `止めている ${summary?.stopped ?? '—'}`, missing: `受け取る人がいない ${summary?.missingRecipients ?? '—'}` }[value]} />)}
       </RadioCardGroup>

@@ -33,7 +33,9 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
+import OtpInput from '@/components/shared/otp-input'
 import StepUpDialog from '@/components/shared/step-up-dialog'
 import SaveConflictBar from '@/components/shared/save-conflict-bar'
 import { CAPABILITY_LABEL, describeRestoreBlockers, describeRestoreDrift, describeRestoreResult } from './restore-drift'
@@ -121,8 +123,10 @@ const EmergencyControlV8 = (
 ) => {
   const [targetAccountId, setTargetAccountId] = useState('all')
   const [targets, setTargets] = useState<Record<StopTarget, boolean>>({ broadcasts: true, scenarios: true, reminders: true, automations: false })
-  const [reason, setReason] = useState('障害対応')
+  const [reason, setReason] = useState('')
   const [reasonDetail, setReasonDetail] = useState('')
+  const [stopCode, setStopCode] = useState('')
+  const [stopPassword, setStopPassword] = useState('')
 
   const [impact, setImpact] = useState<OperationImpactPreview | null>(null)
   const [impactFailed, setImpactFailed] = useState(false)
@@ -347,6 +351,31 @@ const EmergencyControlV8 = (
     setConfirmWord('')
   }
 
+  /** 板 `EA8rM`（1枚の確認窓）で止められる条件。理由・言葉・番号の1つでも欠けたら止まる。 */
+  const stopCodeOk = stepUpMethod === 'none'
+    ? true
+    : stepUpMethod === 'password'
+      ? stopPassword.length > 0
+      : /^\d{6}$/.test(stopCode)
+  const canRunStop = confirmMode === 'stop'
+    && !mutationLocked && !running
+    && reason.trim().length > 0
+    && confirmWord === '停止'
+    && stopCodeOk
+
+  const closeConfirm = () => {
+    if (mutationLocked || running) return
+    setConfirmMode(null)
+    setConfirmWord('')
+    setStopCode('')
+    setStopPassword('')
+  }
+
+  /** 確認の窓の足（右寄せの2ボタン）。2段に書くと直書き扱いが増えるので1つにまとめる。 */
+  const ConfirmActions = ({ children }: { children: React.ReactNode }) => (
+    <div className="flex flex-wrap items-center justify-end gap-2">{children}</div>
+  )
+
   const runStop = async (code: string) => {
     if (needsReload || !control || !requestKey || stepUpMethod === 'none') return
     setRunning(true)
@@ -358,8 +387,8 @@ const EmergencyControlV8 = (
       const response = await api.operations.stop({
         lineAccountId: targetAccountId === 'all' ? null : targetAccountId,
         capabilities: selectedCapabilities,
-        reason,
-        detail: reasonDetail.trim() || null,
+        reason: reason.trim(),
+        detail: null,
         confirmation: '停止',
         expectedVersion: control.version,
       }, grant.data.token, requestKey)
@@ -368,6 +397,9 @@ const EmergencyControlV8 = (
       setNeedsReload(false)
       setFeedback({ tone: 'success', text: 'サーバー共通の停止状態を更新しました。別の端末にも同じ状態が表示されます。' })
       setStepUpMode(null)
+      setConfirmWord('')
+      setStopCode('')
+      setStopPassword('')
       setRequestKey('')
       void reloadControl()
     } catch (error) {
@@ -700,8 +732,32 @@ const EmergencyControlV8 = (
       <section aria-labelledby="emergency-records-heading">
         <h2 id="emergency-records-heading" className={styles.cardTitle}>止めた・戻した記録</h2>
         {historyState === 'loading' ? (
-          <div className={styles.card} style={{ marginTop: 12 }}>
-            <ListState kind="loading" title="記録を読み込んでいます" />
+          <div className={styles.card} style={{ marginTop: 12 }} aria-busy="true" aria-label="止めた・戻した記録を読み込んでいます">
+            <DelayedSkeleton
+              loading
+              skeleton={(
+                <div aria-hidden="true">
+                  <div style={{ display: 'flex', gap: 24, padding: '12px 16px' }}>
+                    <Skeleton height={12} width={40} />
+                    <Skeleton height={12} width={60} />
+                    <Skeleton height={12} width={40} />
+                    <Skeleton height={12} width={40} />
+                    <Skeleton height={12} width={70} />
+                    <Skeleton height={12} width={120} />
+                  </div>
+                  {[0, 1, 2].map((row) => (
+                    <div key={row} style={{ display: 'flex', gap: 16, padding: '12px 16px', borderTop: '1px solid var(--color-hairline)' }}>
+                      <Skeleton height={14} width={120} />
+                      <Skeleton height={14} width={80} />
+                      <Skeleton height={14} width={100} />
+                      <Skeleton height={14} width={90} />
+                      <Skeleton height={14} width={60} />
+                      <Skeleton height={14} width={110} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            />
           </div>
         ) : historyState === 'error' ? (
           <div className={styles.card} style={{ marginTop: 12 }}>
@@ -775,42 +831,51 @@ const EmergencyControlV8 = (
         </div>
       </div>
 
-      {/* 確認の窓：影響の数 → 理由の表示 → 「停止／復旧」の言葉。 */}
+      {/* 確認の窓：止めるときは板 `EA8rM` の1枚（対象・理由必須・言葉・番号）。戻すときは今までどおり。 */}
       <Dialog
         open={confirmMode !== null}
-        designNode="OHwbU-confirm"
+        designNode={confirmMode === 'stop' ? 'EA8rM' : 'OHwbU-confirm'}
         tone={confirmMode === 'stop' ? 'destructive' : 'default'}
-        title={confirmMode === 'stop' ? '選んだものを止めますか？' : '止める前の状態に戻しますか？'}
+        title={confirmMode === 'stop' ? '緊急停止を確認' : '止める前の状態に戻しますか？'}
         description={confirmMode === 'stop'
-          ? 'この内容で止めます。止めた瞬間から、自動で送るものが出なくなります。'
+          ? '止める前に、何と何人に関わるかを実測で確かめました。'
           : '停止前に動いていたものだけを戻します。期限を過ぎた予約は自動では送りません。'}
-        onCancel={() => {
-          if (!mutationLocked) {
-            setConfirmMode(null)
-            setConfirmWord('')
-          }
-        }}
-        footer={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button type="button" onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked}>
+        onCancel={closeConfirm}
+        footer={confirmMode === 'stop' ? (
+          <ConfirmActions>
+            <Button type="button" onClick={closeConfirm} disabled={mutationLocked || running}>
+              キャンセル
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => void runStop(stepUpMethod === 'password' ? stopPassword : stopCode)}
+              disabled={!canRunStop}
+            >
+              緊急停止する
+            </Button>
+          </ConfirmActions>
+        ) : (
+          <ConfirmActions>
+            <Button type="button" onClick={closeConfirm} disabled={mutationLocked}>
               キャンセル
             </Button>
             <Button
               type="button"
               variant="danger"
               onClick={proceedToStepUp}
-              disabled={mutationLocked || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')}
+              disabled={mutationLocked || confirmWord !== '復旧'}
             >
-              {confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}
+              復旧を実行する
             </Button>
-          </div>
-        }
+          </ConfirmActions>
+        )}
       >
         <div>
           {confirmMode === 'stop' ? (
             <>
               <div className={styles.confirmTargets}>
-                <p className={styles.dialogLabel}>{accountName}</p>
+                <p className={styles.dialogLabel}>止める対象：{accountName}</p>
                 {selectedTargets.map((key) => (
                   <div key={key} className={styles.confirmTargetRow}>
                     <span>{targetLabels[key].label}</span>
@@ -820,26 +885,15 @@ const EmergencyControlV8 = (
               </div>
               <p className={styles.dialogHint}>止まらないもの：{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p>
               <div className={styles.confirmReason}>
-                <label htmlFor="emergency-reason-v8" className={styles.dialogLabel}>止める理由（記録に残ります）</label>
-                <Select
-                  size="full"
-                  id="emergency-reason-v8"
-                  value={reason}
-                  onChange={(value) => setReason(value)}
-                  disabled={mutationLocked}
-                  aria-label="緊急停止の理由"
-                  options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))}
-                />
-                <label htmlFor="emergency-detail-v8" className={styles.dialogLabel} style={{ marginTop: 8 }}>
-                  補足（任意・あと{1000 - reasonDetail.length}文字）
-                </label>
+                <label htmlFor="emergency-reason-v8" className={styles.dialogLabel}>止める理由（必須）</label>
                 <input
-                  id="emergency-detail-v8"
-                  value={reasonDetail}
-                  onChange={(event) => setReasonDetail(event.target.value)}
-                  disabled={mutationLocked}
-                  maxLength={1000}
-                  placeholder="発生していることを短く入力"
+                  id="emergency-reason-v8"
+                  aria-label="止める理由"
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  disabled={mutationLocked || running}
+                  maxLength={200}
+                  placeholder="例：宛先の絞り込みを間違えた"
                   className={styles.dialogInput}
                   style={{ maxWidth: '100%' }}
                 />
@@ -868,10 +922,37 @@ const EmergencyControlV8 = (
               value={confirmWord}
               onChange={(event) => setConfirmWord(event.target.value)}
               autoFocus
-              disabled={mutationLocked}
+              disabled={mutationLocked || running}
+              aria-label="確認の言葉"
               className={styles.dialogInput}
             />
           </label>
+          {confirmMode === 'stop' && stepUpMethod !== 'none' ? (
+            <div className={styles.dialogField}>
+              <span className={styles.dialogLabel} id="emergency-stepup-label">
+                {stepUpMethod === 'password' ? '本人確認（パスワード）' : '本人確認（認証アプリの6桁）'}
+              </span>
+              {stepUpMethod === 'password' ? (
+                <input
+                  type="password"
+                  aria-label="パスワード"
+                  value={stopPassword}
+                  onChange={(event) => setStopPassword(event.target.value)}
+                  disabled={mutationLocked || running}
+                  autoComplete="current-password"
+                  className={styles.dialogInput}
+                  style={{ maxWidth: '100%' }}
+                />
+              ) : (
+                <OtpInput
+                  value={stopCode}
+                  onChange={setStopCode}
+                  labelledBy="emergency-stepup-label"
+                  disabled={mutationLocked || running}
+                />
+              )}
+            </div>
+          ) : null}
           <p className={styles.dialogHint}>この操作は記録に残り、ログインユーザーへ通知されます。</p>
         </div>
       </Dialog>

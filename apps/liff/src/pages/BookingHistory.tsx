@@ -6,6 +6,7 @@ import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import HistoryCard from '../components/HistoryCard.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
@@ -38,7 +39,7 @@ export default function BookingHistory() {
   }, [reloadKey]);
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="予約の履歴" />
       <div
         data-design-node="YvTJ3"
@@ -52,7 +53,7 @@ export default function BookingHistory() {
         ) : (
           <>
             <div
-              className="flex rounded-[10px] bg-liff-chip p-[3px]"
+              className="flex rounded-(--liff-radius) bg-liff-chip p-[3px]"
               role="tablist"
               aria-label="予約の期間"
             >
@@ -112,6 +113,6 @@ export default function BookingHistory() {
           </Button>
         </BottomBar>
       )}
-    </div>
+    </LiffLookScope>
   );
 }
