@@ -2,40 +2,33 @@
 
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
-import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { loadFeatureSettings } from '@/lib/feature-settings-cache'
+import { featureSetEntry } from './feature-presets'
+import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
-import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'
 import {
   CARE_ITEMS,
-  FEATURE_LINKS,
-  STEP_STATE_LABEL,
   type StepResult,
-  type StepState,
   buildStepsFromApi,
+  doneCount,
+  insertFeatureSet,
   progressHeadline,
   stoppedReasons,
 } from './getting-started-view'
-import { FeatureSetCard } from './feature-set-card'
 import styles from './getting-started.module.css'
 
-/** 段の状態の見え方。**色だけに頼らず、必ず文字で言う。** */
-const STATE_TONE: Record<StepState, 'success' | 'warning' | 'neutral' | 'danger'> = {
-  done: 'success',
-  stalled: 'warning',
-  todo: 'neutral',
-  forbidden: 'danger',
-  unknown: 'neutral',
-}
-
-/** 設計 ★V6 34-1（`RAW35`）。順路 4 段と最終確認。 */
+/**
+ * 設計板 xuJ7D「はじめの設定」。6段の順路。
+ *
+ * 板の骨組み（進み具合の帯・6行・下の2枚）だけを出す。段の状態・権限・
+ * 行き先は口を正本にし、初期セット（段2）は機能設定の実物で確かめる。
+ */
 export default function GettingStartedPage() {
-  const theme = useAdminTheme()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [steps, setSteps] = useState<StepResult[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -54,7 +47,18 @@ export default function GettingStartedPage() {
     try {
       const res = await api.gettingStarted.get(accountId ?? undefined)
       if (!res.success) throw new Error(res.error)
-      setSteps(buildStepsFromApi(res.data.steps))
+      // 初期セット（段2）は機能設定の実物で確かめる。取れなければ未確認のまま。
+      let entry = null
+      if (accountId) {
+        try {
+          const features = await loadFeatureSettings(accountId)
+          if (!features.success) throw new Error(features.error)
+          entry = featureSetEntry({ forbidden: false, version: features.data.version ?? 0 })
+        } catch (caught) {
+          entry = caught instanceof ApiError && caught.status === 403 ? { kind: 'forbidden' } as const : null
+        }
+      }
+      setSteps(insertFeatureSet(buildStepsFromApi(res.data.steps), entry))
       setStatus('ready')
     } catch (caught) {
       setLoadError(caught)
@@ -67,12 +71,11 @@ export default function GettingStartedPage() {
   }, [load])
 
   const reasons = stoppedReasons(steps)
-  // 主役は「いまの手順」（終わっていない最初の段）だけ。他の段の行き先は枠にする。
-  const currentKey = steps.find((step) => step.state !== 'done')?.key ?? null
+  const done = doneCount(steps)
 
   return (
-    <div className={`${styles.page} v8-ro-notifications-page`} data-design-node={theme === 'v8' ? 'xuJ7D' : undefined}>
-      {theme === 'v8' && <ReadonlyHeaderV8 title="はじめの設定" description="いまの進み具合と、次に設定することを確認します。順路は実際の5段に合わせています。" />}
+    <div className={`${styles.page} v8-ro-notifications-page`} data-design-node="xuJ7D">
+      <ReadonlyHeaderV8 title="はじめの設定" description="musubo を使いはじめるまでの6つの手順です。上から順に進めると、最初の1通が届くまでたどり着けます。" />
       {/*
         読込面（loading）では共通部品が onRetry を見ない。
         失敗面にだけ再試行口が出る。
@@ -85,43 +88,42 @@ export default function GettingStartedPage() {
         />
       ) : (
         <>
-          {/*
-            帯は進み具合の1行だけ。順番の飛ばし方・終わりの判断基準・
-            ダッシュボードの帯の扱いは右の「気をつけること」が持つため、
-            ここでは繰り返さない（★V7 帯は1本）。
-          */}
+          {/* 板の進み具合の帯。数は実測だけ。 */}
           <div className={styles.progress} role="note">
             <strong>{progressHeadline(steps)}</strong>
+            <div className={styles.bar} aria-hidden="true">
+              <div
+                className={styles.barFill}
+                style={{ width: steps.length > 0 ? `${(done / steps.length) * 100}%` : '0%' }}
+              />
+            </div>
           </div>
 
-          {/*
-            IDEA-31: 初回案内で業種・担当業務に合う初期セットを選べるようにする。
-            順路の段には含めない（段はサーバ判定の5段で固定）。保存済みの設定や
-            メニューの並びをここからリセットしないのは FeatureSetCard が守る。
-          */}
-          <FeatureSetCard accountId={selectedAccountId} />
+          <ol className={styles.steps} aria-label="はじめの設定の順路">
+            {steps.map((step) => (
+              <StepRow key={step.key} step={step} />
+            ))}
+          </ol>
 
-          <div className={styles.columns}>
-            <ol className={styles.steps} aria-label="はじめの設定の順路">
-              {steps.map((step) => (
-                <StepRow key={step.key} step={step} current={step.key === currentKey} />
-              ))}
-            </ol>
-
-            <aside className={styles.side} aria-label="この画面の案内">
-              {reasons.length > 0 ? (
-                <section className={styles.reason}>
-                  <h2 className={styles.reasonTitle}>いま止まっている理由</h2>
-                  {reasons.map((line) => (
-                    <p key={line} className={styles.reasonLine}>
-                      {line}
-                    </p>
-                  ))}
-                </section>
-              ) : null}
-              <FeatureLinkCard items={[...FEATURE_LINKS]} />
-              <CareCard items={[...CARE_ITEMS]} />
-            </aside>
+          <div className={styles.bottom}>
+            {reasons.length > 0 ? (
+              <section className={styles.card} aria-label="いま止まっている理由">
+                <h2 className={styles.cardTitle}>いま止まっている理由</h2>
+                {reasons.map((line) => (
+                  <p key={line} className={styles.cardLine}>
+                    {line}
+                  </p>
+                ))}
+              </section>
+            ) : null}
+            <section className={styles.card} aria-label="気をつけること">
+              <h2 className={styles.cardTitle}>気をつけること</h2>
+              <ul className={styles.careList}>
+                {CARE_ITEMS.map((item) => (
+                  <li key={item.head}>{item.head}</li>
+                ))}
+              </ul>
+            </section>
           </div>
         </>
       )}
@@ -129,32 +131,26 @@ export default function GettingStartedPage() {
   )
 }
 
-function StepRow({ step, current }: { step: StepResult; current: boolean }) {
+/**
+ * 板の1行。終わりは緑の丸と「済み」の札、まだは番号の丸と行き先のボタン。
+ * 押せない段は理由の文字だけ出す。
+ */
+function StepRow({ step }: { step: StepResult }) {
   const done = step.state === 'done'
   return (
-    <li className={styles.step} data-step-state={step.state} data-current={current ? 'true' : 'false'}>
+    <li className={styles.step} data-step-state={step.state}>
       <span className={done ? [styles.mark, styles.markDone].join(' ') : styles.mark} aria-hidden>
         {done ? '✓' : step.ordinal}
       </span>
       <div className={styles.stepBody}>
-        <div className={styles.stepHead}>
-          <h2 className={styles.stepTitle}>{step.title}</h2>
-          <StatusBadge tone={STATE_TONE[step.state]} size="compact">
-            {STEP_STATE_LABEL[step.state]}
-          </StatusBadge>
-        </div>
-        <p className={styles.stepLine}>
-          <span className={styles.stepLabel}>終わったと見なす条件：</span>
-          {step.condition}
-        </p>
-        <p className={styles.stepLine}>
-          <span className={styles.stepLabel}>次にすること：</span>
-          {step.next}
-        </p>
-        {step.action ? (
-          <Link href={step.action.href} className={styles.stepAction}>
-            {step.action.label}
-          </Link>
+        <p className={styles.stepTitle}>{step.title}</p>
+        <p className={styles.stepSub}>{step.sub}</p>
+      </div>
+      <div className={styles.stepSide}>
+        {done ? (
+          <StatusBadge tone="success" size="compact">済み</StatusBadge>
+        ) : step.action ? (
+          <Button href={step.action.href} variant="secondary">{step.action.label}</Button>
         ) : (
           <span className={styles.stepBlocked}>{step.blockedReason}</span>
         )}
