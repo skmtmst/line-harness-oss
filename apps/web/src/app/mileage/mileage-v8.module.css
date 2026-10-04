@@ -712,7 +712,7 @@
 }
 
 /* 点数の変化の明細（R8NNi）: 4列と600pxの板。 */
-:global([data-theme='v8'] [data-design-node='R8NNi'] [role='dialog']) { width: min(600px, 100%); }
+:global([data-theme='v8'] [data-design-node='R8NNi'] [role='dialog']):has(.dlgPerson) { width: min(600px, 100%); }
 .scoreHistoryTable { margin-top: 16px; table-layout: fixed; }
 .scoreHistoryTable th:first-child { width: 29%; }
 .scoreHistoryTable th:nth-child(2) { width: 45%; }

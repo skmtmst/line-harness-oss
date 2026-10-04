@@ -1445,7 +1445,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
             />
             {/* 段ごとの到達日時を持っていない。ファネルの集計は「通ったか」
                 だけを見ていて、いつ通ったかを残していない。 */}
-            <KpiCard title="平均の到達日数" value={null} unit="日" detail="未取得" description="段に到達した日時が集計結果にないため、平均の日数を取得できません" />
+            <KpiCard title="平均の到達日数" value={null} unit="日" detail="未取得" description="段に到達した日時が集計結果にないため、平均の日数は未取得です" />
 
           </div>
       )}
