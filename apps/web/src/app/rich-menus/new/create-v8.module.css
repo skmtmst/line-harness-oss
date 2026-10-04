@@ -378,13 +378,13 @@
 }
 
 .pageChipOn {
-  background: var(--color-ink);
-  border-color: var(--color-ink);
-  color: #ffffff;
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-deep);
+  color: var(--color-accent-deep);
 }
 
 .pageChipOn:hover {
-  background: var(--color-ink);
+  background: var(--color-accent-soft);
 }
 
 .pageChipDefault {
