@@ -185,8 +185,8 @@
     "unresolved-classname": 109
   },
   "app/contents/vars/list-v8.tsx": {
-    "unresolved-classname": 105,
-    "direct-th": 6
+    "direct-th": 6,
+    "unresolved-classname": 106
   },
   "app/contents/vars/new/new-v8.tsx": {
     "unresolved-classname": 55

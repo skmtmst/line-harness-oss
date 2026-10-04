@@ -517,7 +517,7 @@ function FriendAddEditorV8Inner({ ruleId }: { ruleId?: string }) {
       <div className={styles.bottomBar}>
         <div className={styles.bottomActions}>
           <Button href="/friend-add-settings" variant="secondary">キャンセル</Button>
-          <Button type="button" variant="secondary" disabled={!canEdit || saving || enabling} title={!canEdit ? readonlyReason : undefined} onClick={() => void save()}>下書きを保存</Button>
+          <Button type="button" variant="secondary" disabled={!canEdit || saving || enabling} title={!canEdit ? readonlyReason : undefined} onClick={() => void save()}>下書きのまま保存</Button>
           {step === 'preview' ? (
             <Button
               type="button"

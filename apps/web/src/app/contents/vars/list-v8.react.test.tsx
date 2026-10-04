@@ -98,6 +98,35 @@ beforeEach(() => {
   root = createRoot(host)
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input)
+    if (url.includes('/api/common-vars/var-company/delete-impact')) {
+      return response({
+        success: true,
+        data: {
+          variable: { id: 'var-company', name: '会社名', varKey: 'company_name' },
+          total: 1,
+          blockingTotal: 1,
+          historicalTotal: 0,
+          sendingFixedTotal: 0,
+          unscopedFormTotal: 0,
+          canDelete: true,
+          byKind: {},
+          items: [
+            {
+              kind: 'broadcast',
+              kindLabel: '一斉配信',
+              name: '10月のお知らせ',
+              status: '配信予約中',
+              href: '/broadcasts/1',
+              blocksDeletion: true,
+              currentPreview: '',
+            },
+          ],
+          unavailableReferences: [],
+          checkedAt: '2026-10-04T00:00:00.000Z',
+          recommendedAction: 'review_references',
+        },
+      })
+    }
     if (url.includes('/api/common-vars')) {
       return response({ success: true, data: listData, meta: {} })
     }
@@ -156,4 +185,20 @@ test('v7 では従来の一覧が出て、新しい一覧は出ない', async ()
   await renderPage()
   expect(host?.querySelector('[data-design-node="WuKzU"]')).not.toBeNull()
   expect(host?.querySelector('[data-design-node~="FM94M"]')).toBeNull()
+})
+
+test('止める窓は予約中の配信の帯を出す（Hhl9M）', async () => {
+  window.localStorage.setItem('lh_staff_role', 'admin')
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const trigger = Array.from(host?.querySelectorAll('button') ?? [])
+    .find((button) => button.getAttribute('aria-label') === '会社名のその他操作')
+  expect(trigger).toBeTruthy()
+  await act(async () => { trigger!.click() })
+  const stopItem = Array.from(document.body.querySelectorAll('[role="menuitem"],[role="menuitemradio"]'))
+    .find((el) => (el.textContent ?? '').trim() === '止める')
+  expect(stopItem).toBeTruthy()
+  await act(async () => { (stopItem as HTMLElement).click() })
+  await act(async () => { await Promise.resolve() })
+  expect(document.body.textContent).toContain('予約中の一斉配信「10月のお知らせ」が送られなくなります。')
 })
