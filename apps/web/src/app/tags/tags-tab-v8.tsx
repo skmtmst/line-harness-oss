@@ -796,6 +796,8 @@ export default function TagsTabV8({
                     onChange={(value) => setPageSize(Number(value) || 20)}
                     options={[
                       { value: '20', label: '20件表示' },
+                      { value: '30', label: '30件表示' },
+                      { value: '40', label: '40件表示' },
                       { value: '50', label: '50件表示' },
                       { value: '100', label: '100件表示' },
                     ]}

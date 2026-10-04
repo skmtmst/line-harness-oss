@@ -252,6 +252,11 @@
   min-width: 160px;
 }
 
+/* 板が狭いときだけ出すフォルダの追加・名前変更・削除（v7 と同じ口）。 */
+.folderNarrowActions {
+  display: none;
+}
+
 .searchWrap {
   flex: 1 1 220px;
   min-width: 0;
@@ -367,6 +372,16 @@
 .usageNone {
   color: var(--color-ink-faint);
   font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 更新・次回の列：v7 と同じ情報。狭いときは省略し、全文は title で読む。 */
+.updateCell {
+  overflow: hidden;
+  max-width: 220px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -546,6 +561,13 @@
 
   .folderSelectWrap {
     display: block;
+  }
+
+  .folderNarrowActions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
   }
 
   .pageSizeWrap {

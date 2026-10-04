@@ -49,7 +49,17 @@ import BulkBar from '@/components/shared/bulk-bar'
 import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars'
-import { formatNumber } from '@/lib/format'
+import { formatDay, formatNumber } from '@/lib/format'
+
+/*
+ * 一覧の更新日は、次回変更と同じセルに収まる短い形で出す（v7 と同じ）。
+ * 更新日は UTC の ISO で来るので JST 固定で出す。
+ */
+function formatListDate(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return formatDay(date)
+}
 import {
   blockedReason,
   canDelete as canDeleteVar,
@@ -82,10 +92,10 @@ const MAX_BATCH_DELETE_COUNT = 20
 const EXPIRING_SOON_MS = 7 * 24 * 3600_000
 
 /*
- * 道具の段の絞り込み。期限切れは「期限つき」にまとめ、状態の札で見分ける。
+ * 道具の段の絞り込み。v7 と同じ7枚（期限切れは単独の札に戻す）。
  * 「下書き・止めた」は1枚の札にまとめる（板 `FM94M`）。
  */
-type VarsChip = 'all' | 'empty' | 'scheduled' | 'unused' | 'draftStopped'
+type VarsChip = 'all' | 'empty' | 'scheduled' | 'unused' | 'draftStopped' | 'expired'
 
 const CHIPS: Array<{ value: VarsChip; label: string; filter: CommonVarFilter }> = [
   { value: 'all', label: 'すべて', filter: 'all' },
@@ -93,6 +103,7 @@ const CHIPS: Array<{ value: VarsChip; label: string; filter: CommonVarFilter }> 
   { value: 'scheduled', label: '期限つき', filter: 'scheduled' },
   { value: 'unused', label: '使われていない', filter: 'unused' },
   { value: 'draftStopped', label: '下書き・止めた', filter: 'all' },
+  { value: 'expired', label: '期限切れ', filter: 'expired' },
 ]
 
 /** 「10/7まで」の札の日付。年月は要らず、月日だけ出す。 */
@@ -986,6 +997,52 @@ function CommonVarsListV8Inner() {
                     options={folderOptions}
                   />
                 </span>
+                {/*
+                  板が狭いときは縦パネルが出ないため、選んでいるフォルダの
+                  追加・名前変更・削除を選べる口をここに置く（v7 と同じ）。
+                  PCの「…」と同じ窓へ届く。
+                */}
+                {canWrite ? (
+                  <span className={styles.folderNarrowActions}>
+                    {addingFolder ? (
+                      <>
+                        <input
+                          type="text"
+                          value={folderName}
+                          onChange={(e) => setFolderName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') void addFolder()
+                            if (e.key === 'Escape') setAddingFolder(false)
+                          }}
+                          placeholder="フォルダ名を入力"
+                          aria-label="フォルダ名"
+                          className="border-hairline rounded-control focus:ring-accent w-40 border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
+                        />
+                        <Button type="button" variant="primary" onClick={() => void addFolder()} disabled={!folderName.trim() || savingFolder}>
+                          決定
+                        </Button>
+                        <Button type="button" onClick={() => { setAddingFolder(false); setFolderName('') }}>
+                          キャンセル
+                        </Button>
+                      </>
+                    ) : (
+                      <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加する</Button>
+                    )}
+                    {(() => {
+                      const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
+                      return selectedUserFolder && !addingFolder ? (
+                        <>
+                          <Button type="button" onClick={() => setEditingFolder(selectedUserFolder)}>
+                            フォルダ名を変える
+                          </Button>
+                          <Button type="button" onClick={() => { setFolderError(''); setDeletingFolder(selectedUserFolder) }}>
+                            フォルダを削除する
+                          </Button>
+                        </>
+                      ) : null
+                    })()}
+                  </span>
+                ) : null}
                 <span className={styles.searchWrap}>
                   <SearchField
                     value={query}
@@ -1097,6 +1154,7 @@ function CommonVarsListV8Inner() {
                         <th scope="col">中身</th>
                         <th scope="col">状態</th>
                         <th scope="col">使っている所</th>
+                        <th scope="col">更新・次回</th>
                         <th scope="col" className={styles.cellMenu}>
                           <span className="sr-only">操作</span>
                         </th>
@@ -1157,6 +1215,18 @@ function CommonVarsListV8Inner() {
                                 </Link>
                               )}
                             </td>
+                            {(() => {
+                              const pending = item.nextSchedule ?? null
+                              const short = pending
+                                ? `${formatListDate(item.updatedAt)} ／ ${formatStamp(pending.effectiveFrom)}に変更`
+                                : `${formatListDate(item.updatedAt)} ／ 予定なし`
+                              const full = `最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`
+                              return (
+                                <td className={styles.updateCell} title={full}>
+                                  {short}
+                                </td>
+                              )
+                            })()}
                             <td className={styles.cellMenu}>
                               <RowActions
                                 subjectName={item.name}
@@ -1203,7 +1273,12 @@ function CommonVarsListV8Inner() {
 
               {listFailed ? null : (
                 <div className={styles.foot}>
-                  <span className={styles.footCount}>{formatNumber(filtered.length)}件</span>
+                  <ListRange
+                    className={styles.footCount}
+                    total={filtered.length}
+                    first={filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}
+                    last={Math.min(page * pageSize, filtered.length)}
+                  />
                   <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
                 </div>
               )}
