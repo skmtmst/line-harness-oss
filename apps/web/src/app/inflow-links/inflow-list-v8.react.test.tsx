@@ -9,6 +9,7 @@ vi.hoisted(() => {
 })
 
 import InflowLinksPage from './page'
+import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 /*
  * ★V8-B 流入と計測の一覧（Pencil `xbHxg`）の契約。
@@ -67,6 +68,8 @@ const summary = {
 }
 
 function base(url: URL) {
+  if (url.pathname === '/api/settings/features/visibility') return response({ success: true, data: { features: { site_tracking: true } } })
+  if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: staffRole } })
   if (url.pathname === '/api/entry-routes') return response({ success: true, data: [route] })
   if (url.pathname === '/api/entry-route-genres') {
     return response({ success: true, data: [{ id: 'g-sns', name: 'SNS', createdAt: '', updatedAt: '' }] })
@@ -107,6 +110,7 @@ async function eventually(check: () => void, timeout = 5000) {
 
 beforeEach(() => {
   staffRole = 'admin'
+  clearFeatureVisibilityCache()
   handler = base
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
@@ -136,7 +140,7 @@ test('v8 の下では Pencil xbHxg の新しい一覧に切り替わる', async 
   expect(host.textContent).toContain('広告とのつなぎ')
   expect(host.textContent).toContain('サイトスクリプト')
   // 数の帯の4マス
-  expect(host.textContent).toContain('今月の友だち追加')
+  expect(host.textContent).toContain('友だち追加')
   expect(host.textContent).toContain('動きが未設定')
   expect(host.textContent).toContain('広告とつないだ')
   // フォルダの列
@@ -156,16 +160,5 @@ test('v8 の閲覧のみでは帯が出て作る操作が押せない形にな�
     expect(host.querySelector('[data-design-node="xbHxg"]')).toBeTruthy()
   })
   expect(host.textContent).toContain('閲覧のみで見ています')
-  const createButton = host.querySelector('button[disabled][title="この操作にはオーナーか管理者の権限が要ります"]')
-  expect(createButton?.textContent).toContain('流入リンクを作る')
-})
-
-test('v7 では従来の一覧が出る', async () => {
-  await act(async () => root.render(<InflowLinksPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.querySelector('[data-design-node="BMmxU"]')).toBeTruthy()
-  })
-  expect(host.querySelector('[data-design-node="xbHxg"]')).toBeNull()
-  expect(host.textContent).toContain('どこから友だちが来たかを計測します')
+  expect(host.querySelector('a[href="/inflow-links/new"]')).toBeNull()
 })

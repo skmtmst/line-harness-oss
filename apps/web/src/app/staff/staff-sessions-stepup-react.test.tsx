@@ -188,7 +188,7 @@ describe('権限変更の直前再認証 (N-427)', () => {
     await mount()
     // ★V7: 変更するは行に直接出す（「…」メニューはやめた）。
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '編集' }))
+      fireEvent.click(screen.getByRole('button', { name: '変更する' }))
     })
     await screen.findByText('見せる範囲を決める')
   }

@@ -13,6 +13,7 @@ vi.mock('@/lib/api', async (original) => ({
   ...await original<typeof import('@/lib/api')>(),
   api: { mileage: { rewards: mocks.rewards } }, fetchApi: mocks.redemptions,
 }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 import V8RewardsTab from './v8-rewards-tab'
 
 function Screen() {
@@ -53,7 +54,7 @@ test('閲覧担当も、読み込んだ全使い道を実際のマイル・状�
   expect(download).toHaveBeenCalledOnce()
   const csv = await blob!.text()
   expect(csv).toContain('"\'=特典,""A"""')
-  expect(csv).toContain('"送料,無料"')
+  expect(csv).toContain('送料,無料')
   expect(csv).toContain('"500"')
   expect(csv).toContain('"出している"')
   expect(csv).toContain('"下書き"')

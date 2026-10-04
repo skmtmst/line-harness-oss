@@ -163,12 +163,3 @@ test('v8 の下では Pencil Q5le3 の詳細に切り替わる', async () => {
   // 青い帯の操作
   expect(host.textContent).toContain('することを変える')
 })
-
-test('v7 では従来の詳細が出る', async () => {
-  await act(async () => root.render(<InflowLinkDetailPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.querySelector('[data-design-node="JupxW"]')).toBeTruthy()
-  })
-  expect(host.querySelector('[data-design-node="Q5le3"]')).toBeNull()
-})

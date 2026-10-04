@@ -10,7 +10,7 @@
  * 本物の部品・本物のページを描いて確かめる。モックだけの形骸にしない。
  */
 import React, { act } from 'react'
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRoot, type Root } from 'react-dom/client'

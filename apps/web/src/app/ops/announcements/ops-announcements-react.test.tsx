@@ -288,7 +288,7 @@ describe('二重押しと同時保存（M512/M513）', () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     // 下書きの「編集」を押して編集に入る。
-    await act(async () => { button('編集')!.click() })
+    await act(async () => { button('直す')!.click() })
     await flush()
     expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!.value).toContain('料金改定のご案内')
     await act(async () => {

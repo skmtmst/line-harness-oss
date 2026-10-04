@@ -214,13 +214,3 @@ test('v8 の送信履歴では Pencil p0kA3 に切り替わる', async () => {
     expect(host.textContent).toContain('目印の期限が切れていました')
   })
 })
-
-test('v7 の広告連携タブでは従来の画面が出る', async () => {
-  search = 'tab=ads'
-  await act(async () => root.render(<InflowLinksPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.querySelector('[data-design-node="v0HaI"]')).toBeTruthy()
-  })
-  expect(host.querySelector('[data-design-node="qSTVR"]')).toBeNull()
-})

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 /* 完全切り替え：v7 の page.tsx は捨て、V8 の list-v8.tsx を見る。 */

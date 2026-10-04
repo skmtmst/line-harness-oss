@@ -13,7 +13,7 @@
  * 6. 残件: 28の並び替えは操作列の「…」の中の上へ・下へで行い、注意書きに導線を書く。
  *    専用APIが無いため既存updateMenu（版つきPUT）でsort_orderを交換する。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'

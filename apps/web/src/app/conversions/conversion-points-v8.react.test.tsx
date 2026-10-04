@@ -259,13 +259,3 @@ test('v8 の閲覧のみでは帯が出て作る操作が押せない形にな�
   const createButton = host.querySelector('button[disabled][title="この操作にはオーナーか管理者の権限が要ります"]')
   expect(createButton?.textContent).toContain('成果地点を作る')
 })
-
-test('v7 では従来の一覧が出る', async () => {
-  await act(async () => root.render(<ConversionsPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.querySelector('[data-conversion-points-design="v6"]')).toBeTruthy()
-  })
-  expect(host.querySelector('[data-design-node="r6dJFy"]')).toBeNull()
-  expect(host.textContent).toContain('決めてある成果地点')
-})

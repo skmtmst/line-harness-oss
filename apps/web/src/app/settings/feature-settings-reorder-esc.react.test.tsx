@@ -58,30 +58,4 @@ describe('並びを変えるの窓', () => {
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     expect(onCancel).toHaveBeenCalledTimes(1)
   })
-
-  it('下書きの並びでのメニューの見え方を出す（v7の右の欄と同じ）', () => {
-    const keyed = [
-      {
-        id: 'g1',
-        label: 'まとめる',
-        items: [
-          { id: 'a', label: 'あ', note: '', keys: [] },
-          { id: 'b', label: 'い', note: '', keys: ['feat-b'] },
-        ],
-      },
-    ]
-    render(
-      <ReorderDialog
-        groups={keyed}
-        initialOrder={{ g1: ['a', 'b'] }}
-        onCancel={vi.fn()}
-        onApply={vi.fn()}
-        moveItemInOrder={move}
-        features={{ 'feat-b': false }}
-      />,
-    )
-    expect(screen.getByText('サイドメニューの見え方')).toBeTruthy()
-    expect(screen.getByText('非表示')).toBeTruthy()
-    expect(screen.getByText('1 項目が非表示になります')).toBeTruthy()
-  })
 })

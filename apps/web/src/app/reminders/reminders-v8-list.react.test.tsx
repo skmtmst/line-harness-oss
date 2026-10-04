@@ -125,7 +125,7 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   expect(host.textContent).toContain('今月送った')
   expect(host.textContent).toContain('送れなかった')
   expect(host.textContent).toContain('次に送る')
-  expect(host.textContent).toContain('並び：')
+  expect(host.textContent).toContain('並び順')
   expect(host.textContent).toContain('20件表示')
   // KPI は API の実値
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('2')
@@ -174,8 +174,8 @@ test('v8 の行の操作は見本の並びを持つ', async () => {
     const labels = [...menu!.querySelectorAll('[role="menuitem"]')]
       .map((item) => item.textContent?.trim())
     expect(labels).toEqual([
-      '開く', '登録者を管理', '配信予定を見る', '実行結果を見る',
-      '編集', '複製する', '一時停止する', 'フォルダへ移す', '削除',
+      '詳細を見る', '登録者を管理', '配信予定を見る', '実行結果を見る',
+      '編集する', '複製する', '一時停止する', 'フォルダへ移す', '削除',
     ])
     // 板 SkY9V：行の「…」を開いた印
     expect(host.querySelector('[data-design-node="SkY9V"]')).toBeTruthy()

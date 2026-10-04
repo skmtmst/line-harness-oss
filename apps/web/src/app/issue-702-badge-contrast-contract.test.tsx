@@ -5,7 +5,7 @@
  * すべて WCAG AA の 4.5:1 以上にする。色の実値は globals.css の正本から
  * 読み、WCAG の式で割り直す（決め打ちの比は書かない）。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -109,9 +109,9 @@ describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
   it('リッチメニュー編集のページ札も同じ規則（明るい緑の上書き・生の黄は使わない）', () => {
     const page = read('rich-menus/edit/page.tsx')
     expect(page).toContain('bg-accent-deep text-on-accent')
-    expect(page).toContain('bg-warning-bg p-2 text-[11px] text-warning')
+    expect(page).toContain('bg-warning-bg p-2 text-micro text-warning')
     expect(page).not.toContain("backgroundColor: 'var(--color-accent)'")
-    expect(page).not.toContain('bg-amber-50 p-2 text-[11px] text-amber-700')
+    expect(page).not.toContain('bg-amber-50 p-2 text-micro text-amber-700')
   })
 })
 

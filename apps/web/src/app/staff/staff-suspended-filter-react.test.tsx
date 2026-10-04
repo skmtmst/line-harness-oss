@@ -146,10 +146,10 @@ describe('R500 無効にした人の再有効化', () => {
     await renderList()
     await chooseStatusFilter('無効のみ')
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '編集' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: '変更する' })).toBeTruthy()
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '編集' }))
+      fireEvent.click(screen.getByRole('button', { name: '変更する' }))
     })
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'このユーザーを有効にする' })).toBeTruthy()

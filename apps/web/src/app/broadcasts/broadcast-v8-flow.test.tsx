@@ -203,7 +203,7 @@ describe('V8 一斉配信の通し', () => {
     })
     await screen.findByText('「予約ずみ配信」の予約を取り消しますか？')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+      fireEvent.click(screen.getByRole('button', { name: '予約のまま残す' }))
     })
     await waitFor(() => expect(screen.queryByText('「予約ずみ配信」の予約を取り消しますか？')).toBeNull())
     expect(mocks.cancelReservation).not.toHaveBeenCalled()

@@ -93,7 +93,7 @@ describe('開催回の定員と申込状況', () => {
     api.load.mockRejectedValueOnce(new Error('offline'))
     const host = await render()
     expect(host.textContent).not.toContain('無制限')
-    expect(host.textContent).toContain('取得できません')
+    expect(host.textContent).toContain('読み込めません')
     await click(host, 'もう一度読み込む')
     expect(host.textContent).toContain('50人')
     expect(api.load).toHaveBeenCalledTimes(2)

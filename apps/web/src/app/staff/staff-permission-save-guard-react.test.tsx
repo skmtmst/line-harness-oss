@@ -121,10 +121,10 @@ describe('R497/R498 権限保存の画面', () => {
   test('保存ボタンの二度押しは1回だけ送り、版と要求キーを付ける', async () => {
     await act(async () => { render(<StaffPage />) })
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '編集' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: '変更する' })).toBeTruthy()
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '編集' }))
+      fireEvent.click(screen.getByRole('button', { name: '変更する' }))
     })
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '✓ 保存する' })).toBeTruthy()

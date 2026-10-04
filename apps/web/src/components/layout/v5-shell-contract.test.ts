@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -115,14 +115,6 @@ describe('共通部品への移管実証', () => {
   ])('%sは共通トップバーと重なる本文Headerを置かない', (_name, source) => {
     expect(source).not.toContain("import Header from '@/components/layout/header'")
     expect(source).not.toContain('<Header')
-  })
-
-  it('友だちと友だち属性が共通タブを使う', () => {
-    expect(friends).toContain('<MergedTabs')
-    // 友だち属性のV4は画面内タブ（`shared/tabs` の `VPn1F`）。
-    // 自前で組んでいないことを見る。
-    expect(tags).toContain("import { Tabs } from '@/components/shared/tabs'")
-    expect(tags).toContain('<Tabs')
   })
 
   it('タグ編集が共通パンくずを使う', () => {

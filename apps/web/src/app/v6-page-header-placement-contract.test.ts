@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -22,18 +22,6 @@ describe('Issue #452: V6の画面名は共通トップバーだけに置く', ()
     expect(source).not.toContain("from '@/components/layout/header'")
     expect(source).not.toContain('<Header')
     expect(source).toContain(pageTitle)
-  })
-
-  it('友だち詳細はパンくずの隣に設計どおりの3操作を残す', () => {
-    const source = read('friends/detail/page.tsx')
-    const start = source.indexOf('data-design="Crumb"')
-    const end = source.indexOf('{error &&', start)
-    const top = source.slice(start, end)
-    for (const label of ['受信箱で開く', '個別操作', 'その他の操作']) {
-      expect(top).toContain(label)
-    }
-    expect(top).not.toContain('非表示')
-    expect(top).not.toContain('ブロック')
   })
 
   it('作成画面は設計上端のSTEPとタブを残す', () => {

@@ -55,7 +55,7 @@ describe('「？」の正円', () => {
     expect(TSX).not.toContain('CircleHelp')
     expect(TSX).toContain('className={styles.mark}>?</span>')
     expect(CSS).not.toContain('.button svg')
-    expect(CSS).not.toContain('background: transparent;')
+    expect(CSS.match(/\.button\s*\{[^}]*\}/)?.[0]).not.toContain('background: transparent;')
     expect(CSS).not.toMatch(/\.button\s*\{[^}]*border:\s*0;/)
   })
 

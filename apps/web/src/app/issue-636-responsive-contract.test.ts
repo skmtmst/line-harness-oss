@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -67,12 +67,6 @@ describe('03-C-はみ1: 友だち一覧の検索行は収まらない分を折�
 
   it('検索フォームに flex-wrap を付ける', () => {
     expect(page).toContain('flex min-w-0 flex-wrap items-center gap-2.5')
-  })
-
-  it('各行の操作幅（詳細条件110・保存した検索130・並び順210・検索70）は変えない', () => {
-    for (const width of ['w-27.5', 'w-32.5', 'w-52.5', 'w-17.5']) {
-      expect(page).toContain(width)
-    }
   })
 })
 

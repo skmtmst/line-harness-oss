@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs'
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -19,7 +20,8 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
-  'app/affiliate-offers/new/page.tsx',
+  'app/settings/feature-settings-v8.tsx',
+  'components/ops/knowledge-editor.tsx',
   'app/affiliate-offers/new-offer-v8.tsx',
   'app/affiliates/new-affiliate-v8.tsx',
   'app/analytics/reports/new/page.tsx',
@@ -79,7 +81,6 @@ const GUARDED = [
   'app/rich-menus/edit/page.tsx',
   'app/rich-menus/new/create-v8.tsx',
   'app/rich-menus/new/page.tsx',
-  'app/settings/page.tsx',
   'app/settings/file-scan/page.tsx',
   'app/staff/new/page.tsx',
   'app/tags/field-editor-v8.tsx',
@@ -110,6 +111,7 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string> = {
+  'app/webinars/edit/basic-v8.tsx': 'app/webinars/edit/page.tsx',
   'app/templates/edit-v8.tsx': 'app/templates/editor-v8.tsx',
   'app/templates/asset-editor-v8.tsx': 'app/templates/editor-v8.tsx',
   'app/templates/carousel/carousel-v8.tsx': 'app/templates/editor-v8.tsx',
@@ -124,7 +126,8 @@ const COVERED_BY_PARENT: Record<string, string> = {
   'app/webinars/edit/review-v8.tsx': 'app/webinars/edit/page.tsx',
   // ★V8 版の描画。番兵（useUnsavedGuard）は同じ画面の page.tsx が
   // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
-  'app/settings/feature-settings-v8.tsx': 'app/settings/page.tsx',
+  'app/affiliate-offers/new/page.tsx': 'app/affiliate-offers/new-offer-v8.tsx',
+  'app/settings/page.tsx': 'app/settings/feature-settings-v8.tsx',
   'app/settings/file-scan/file-scan-v8.tsx': 'app/settings/file-scan/page.tsx',
   // 予約設定V8のタブ分割。書きかけは V8TabEditContext で親へ報告し、
   // 番兵（useUnsavedGuard＋離脱確認）は殻の settings-v8.tsx が持つ。
@@ -139,6 +142,8 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'app/hq/account-browser-v8.tsx': 'タグ名だけの小さな窓。保存の口は窓内だけにあり、閉じると入力を破棄する。',
+  'app/nen-members/photo-policy-history-v8.tsx': '報酬版を追加する小さな窓。親の設定画面から開き、閉じれば保存前の値を破棄する。',
   'app/affiliates/payment-tab.tsx':
     '支払いCSV出力の確認窓（Vの本人確認入力を含む）。保存する編集画面ではなく番兵の対象外',
   'app/affiliates/new/page.tsx':
@@ -353,8 +358,6 @@ const UNTRIAGED: Record<string, string> = {
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/friends/single-friend-actions.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'components/ops/knowledge-editor.tsx':
-    'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/scenarios/action-editor.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
 }
@@ -416,7 +419,7 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
     const hooks = readdirSync(dir)
       .filter((name) => /^use-[^/]+\.ts$/.test(name) && !name.includes('.test.'))
       .map((name) => readFileSync(join(dir, name), 'utf8'))
-    return [readFileSync(join(SRC, file), 'utf8'), ...hooks].join('\n')
+    return [readUiSource(join(SRC, file), 'utf8'), ...hooks].join('\n')
   }
 
   it('番兵を持つ画面は共通フックと離脱確認ダイアログを配線している', () => {

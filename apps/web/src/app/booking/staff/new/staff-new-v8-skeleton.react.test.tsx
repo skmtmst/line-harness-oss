@@ -148,7 +148,7 @@ describe('スタッフ登録（V8）の読み込みと登録ボタン', () => {
 
     fireEvent.change(screen.getByPlaceholderText('例: 田中 美咲'), { target: { value: '田中' } })
     fireEvent.click(screen.getByRole('button', { name: /カット/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'スタッフを追加する' }))
 
     // ボタンの内側だけ登録中に変わり、入力欄は触れるまま。
     expect(await screen.findByRole('button', { name: '登録しています…' })).toBeTruthy()

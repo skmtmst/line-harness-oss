@@ -130,9 +130,9 @@ describe('一覧の操作が実クエリへつながる (N-072)', () => {
   it('並び順を変えると sort を変えて取り直す', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
-    expect(listCalls().at(-1)).toContain('sort=next')
+    expect(listCalls().at(-1)).toContain('sort=order')
 
-    changeSelect('並び', 'created')
+    changeSelect('並び順', 'created')
     await flush()
 
     const latest = listCalls().at(-1) ?? ''

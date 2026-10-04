@@ -138,12 +138,3 @@ test('v8 のサイトスクリプトでは Pencil XjOte に切り替わる', asy
   expect(host.textContent).toContain('どうやって友だちと結びつくか')
   expect(host.textContent).toContain('つながる先')
 })
-
-test('v7 のサイトスクリプトでは従来の画面が出る', async () => {
-  await act(async () => root.render(<InflowLinksPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.querySelector('[data-design-node="IhSBB"]')).toBeTruthy()
-  })
-  expect(host.querySelector('[data-design-node="XjOte"]')).toBeNull()
-})

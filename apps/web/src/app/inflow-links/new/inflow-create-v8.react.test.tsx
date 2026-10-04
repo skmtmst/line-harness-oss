@@ -93,7 +93,7 @@ test('v8 の下では Pencil KMaMk の作る画面に切り替わる', async () 
   expect(host.textContent).toContain('友だちになったときにすること')
   expect(host.textContent).toContain('発行される URL')
   expect(host.textContent).toContain('お客さまはこの順に進みます')
-  expect(host.textContent).toContain('発行して URL を受け取る')
+  expect(host.textContent).toContain('発行してURLを受け取る')
 })
 
 test('v8 で空のまま発行すると入力の直し方が出る', async () => {
@@ -104,7 +104,7 @@ test('v8 で空のまま発行すると入力の直し方が出る', async () =>
     expect(host.querySelector('[data-design-node="KMaMk"]')).toBeTruthy()
   })
   const saveButton = [...host.querySelectorAll('button')].find((button) =>
-    button.textContent?.includes('発行して URL を受け取る'),
+    button.textContent?.includes('発行してURLを受け取る'),
   )
   expect(saveButton).toBeTruthy()
   await act(async () => {
@@ -114,13 +114,4 @@ test('v8 で空のまま発行すると入力の直し方が出る', async () =>
   await eventually(() => {
     expect(host.textContent).toContain('リンク名を入力してください')
   })
-})
-
-test('v7 では従来の作る画面が出る', async () => {
-  await act(async () => root.render(<NewInflowLinkPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.textContent).toContain('流入リンクをつくる')
-  })
-  expect(host.querySelector('[data-design-node="KMaMk"]')).toBeNull()
 })

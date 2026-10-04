@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * 板 `Td4TN` 案件を作るの絵合わせ（API待ちのため見た目だけ）。
- * - 「何を成果として数えるか」の札があり、成果地点は準備中のまま選べない
+ * - 「何を成果として数えるか」の札があり、成果地点はこの画面では選べませんのまま選べない
  * - 頭・右の見え方・気をつけること・足元の3つのボタンが絵どおり
  * - 保存して公開には ✓ が付く
  */
@@ -62,7 +62,7 @@ describe('Td4TN 作る画面の絵合わせ', () => {
     expect(screen.getByText('コンバージョンで作った成果地点から選びます')).toBeTruthy()
     const point = screen.getByLabelText('成果地点')
     expect((point as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.getByText(/成果地点の選び方は準備中です/)).toBeTruthy()
+    expect(screen.getByText(/成果地点と案件をつなぐ操作にはまだ対応していません/)).toBeTruthy()
   })
 
   test('頭・見え方・気をつけること・足元が絵どおり', async () => {

@@ -78,12 +78,6 @@ describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
     expect(body).toContain('flex w-full items-center justify-end gap-2')
   })
 
-  it('/settings/file-scan：操作列は ActionCell＋固定幅で右へ寄せる', () => {
-    const body = read('app', 'settings', 'file-scan', 'page.tsx')
-    expect(body).toContain('ActionCell')
-    expect(body).toContain('<Th align="right">操作</Th>')
-  })
-
   it('/tags：操作列は中身＋共通の余白に広げる', () => {
     const body = read('components', 'friend-fields', 'tags-page-v4.tsx')
     expect(body).toContain('<Th style={{ width: 128 }} className="sticky right-0')

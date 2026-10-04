@@ -77,7 +77,6 @@ const KNOWN_FILES: string[] = [
   'app/scenarios/results/page.tsx',
   // ★V8 版も同じ持ち越し文言を使う（直すときは page.tsx と一緒に直す）
   'app/settings/feature-settings-v8.tsx',
-  'app/settings/page.tsx',
   'app/staff/page.tsx',
   'app/tags/fields/edit/page.tsx',
   'app/tags/searches/edit/page.tsx',

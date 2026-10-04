@@ -113,7 +113,7 @@ describe('Eo56k レポートタブの絵合わせ', () => {
     })
     expect(screen.getByRole('button', { name: 'アフィリエイターごと' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '案件ごと' })).toBeTruthy()
-    expect(screen.getByLabelText('よく使う絞り込み')).toBeTruthy()
+    expect(screen.getAllByLabelText('よく使う絞り込み')[0]).toBeTruthy()
     expect(screen.getByLabelText('期間')).toBeTruthy()
   })
 

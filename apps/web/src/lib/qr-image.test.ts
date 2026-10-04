@@ -1,3 +1,4 @@
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -21,7 +22,7 @@ const QR_PAGES = [
 describe('QRライブラリの表示時読み込み(PERF-09)', () => {
   it('QRを出す画面が qrcode を静的に import していない', () => {
     for (const rel of QR_PAGES) {
-      const source = fs.readFileSync(path.join(SRC, rel), 'utf8')
+      const source = readUiSource(path.join(SRC, rel), 'utf8')
       expect(source, rel).not.toMatch(/import\s+QRCode\s+from\s+['"]qrcode['"]/)
       expect(source, rel).not.toMatch(/from\s+['"]qrcode['"]/)
       expect(source, rel).toContain('qr-image')

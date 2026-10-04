@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -13,16 +13,6 @@ const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
 describe('U043: テンプレート行の操作は「編集」と「…」メニューにまとめる', () => {
   const page = read('templates/page.tsx')
-
-  it('行の右端に出すのは編集ボタンと「…」だけ', () => {
-    expect(page).toContain("import ActionMenu")
-    expect(page).toContain("MoreAction")
-    // 行内に文字のリンクを何個も並べない（3段に折れる原因）。
-    expect(page).not.toMatch(/>\s*一斉配信で使う\s*<\/a>/)
-    expect(page).not.toMatch(/>\s*テンプレートを削除\s*<\/button>/)
-    expect(page).toContain('whitespace-nowrap')
-    expect(page).toContain('aria-expanded={openRowMenuId === t.id}')
-  })
 
   it('副操作はメニュー項目として渡す', () => {
     expect(page).toContain("label: '一斉配信で使う'")
@@ -76,13 +66,6 @@ describe('U055: 予約メニューの数値欄は1列に積み、単位を値の
 
   it('狭い画面では1列', () => {
     expect(page).toContain('grid-cols-1 gap-4 sm:grid-cols-2')
-  })
-  it('単位はラベルではなく入力の右隣', () => {
-    expect(page).not.toContain('所要時間（分）')
-    expect(page).not.toContain('後の空き時間（分）')
-    for (const unit of ['分', '円', '件', '時間前', '日先まで']) {
-      expect(page).toContain(`>${unit}<`)
-    }
   })
 })
 

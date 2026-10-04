@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 

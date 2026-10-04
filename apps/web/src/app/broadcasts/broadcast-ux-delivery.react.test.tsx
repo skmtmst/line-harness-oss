@@ -134,7 +134,9 @@ function buttonsIn(scope: ParentNode, text: string) {
   )
 }
 
-test('フォルダへ移すは押した瞬間に行が消え、元に戻すで送らずに戻る', async () => {
+test('フォルダへ移すは保存を待たず行が消え、保存失敗なら元の行へ戻る', async () => {
+  let failSave!: (error: Error) => void
+  fixture.broadcastsUpdate.mockImplementation(() => new Promise((_resolve, reject) => { failSave = reject }))
   renderList()
   await eventually(() => {
     if (!host.textContent?.includes('朝の挨拶')) throw new Error('no rows yet')
@@ -156,9 +158,6 @@ test('フォルダへ移すは押した瞬間に行が消え、元に戻すで�
     if (buttonsIn(document, 'フォルダへ移す').length === 0) throw new Error('no move menu yet')
   })
   await act(async () => { buttonsIn(document, 'フォルダへ移す')[0].click() })
-  // 行き先の段は「…」を開き直すと出る。
-  const reopenButton = host.querySelector('[aria-label="配信「朝の挨拶」の操作"]') as HTMLElement
-  await act(async () => { reopenButton.click() })
   await eventually(() => {
     if (buttonsIn(document, '未分類').length === 0) throw new Error('no folder menu yet')
   })
@@ -167,12 +166,8 @@ test('フォルダへ移すは押した瞬間に行が消え、元に戻すで�
   await eventually(() => {
     if (host.textContent?.includes('朝の挨拶')) throw new Error('still shown')
   })
-  // 知らせの「元に戻す」で送らずに戻せる。
-  const undo = buttonsIn(host, '元に戻す')[0] as HTMLElement
-  expect(undo).toBeTruthy()
-  await act(async () => { undo.click() })
-  await act(async () => { await Promise.resolve(); await Promise.resolve() })
-  expect(fixture.broadcastsUpdate).not.toHaveBeenCalled()
+  expect(fixture.broadcastsUpdate).toHaveBeenCalledWith('broadcast-1', expect.objectContaining({ folderId: null }))
+  await act(async () => { failSave(new Error('save failed')); await Promise.resolve() })
   await eventually(() => {
     if (!host.textContent?.includes('朝の挨拶')) throw new Error('not yet reverted')
   })

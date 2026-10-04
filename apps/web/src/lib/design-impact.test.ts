@@ -54,7 +54,7 @@ describe('共通部品の影響範囲', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
-    expect(directImporters(files, pagination, importIndex).map((file) => relative(SRC, file))).toEqual([
+    expect(directImporters(files, pagination, importIndex).map((file) => relative(SRC, file)).sort()).toEqual([
       // m15c: 手書きのページ送りを共通 Pagination へ置き換えた10画面を足す。
       'app/accounts/migration.tsx',
       // ★V8 LINEユーザーIDの移行（Z0jHp）。判断一覧は50件ずつのページ送り。
@@ -140,12 +140,11 @@ describe('共通部品の影響範囲', () => {
       // #565: 送信履歴が増えても描画を際限なく重くしないよう、20件ずつのページ送りに寄せた。
       'app/inflow-links/ad-integration.tsx',
       // ★V8-B 流入と計測の詳細（Q5le3）。友だちの表の下にページ送りを置く。
-      'app/inflow-links/detail/inflow-detail-v8.tsx',
       // ★V8-B 流入と計測の一覧（xbHxg）。表の下にページ送りを置く。
+      'app/inflow-links/detail/page.tsx',
       'app/inflow-links/inflow-list-v8.tsx',
       'app/inflow-links/page.tsx',
       // #291: 顧客へのお知らせ9種類を、設計どおり1ページ6件に区切る。
-      'app/line-notifications/page.tsx',
       'app/mileage/action-score-tab.tsx',
       // ★V8-B マイルの友だち詳細（R6kIG）。表の下にページ送りを置く。
       'app/mileage/friends/detail/v8-friend-detail.tsx',
@@ -234,7 +233,7 @@ describe('共通部品の影響範囲', () => {
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
-    ])
+    ].sort())
   })
 
   it('全画面共通枠はpageだけでなく親layoutからの到達も調べる', () => {

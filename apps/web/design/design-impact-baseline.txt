@@ -29,6 +29,8 @@ native-table-header-exception app/affiliates/tabs.tsx
 # ★V8-B 緊急コントロール（OHwbU）。確認の窓・本人確認・記録の操作に共通Buttonを使う。
 # ★V8-B 運用者へのお知らせを作る（gjUz3）。届き方の見本・公開前の確認の操作に共通Buttonを使う。
 # ★V8 共通情報の一覧（FM94M）。表の下にページ送りは共通Pagination、操作は共通Button。
+# ★V8 登録メディア一覧（O7hUt7）。札の操作・窓の確定・ページ送りの操作に共通Button。
+button-migration-target app/reminders/list-v8.tsx
 shared-button-importer app/accounts/detail/page.tsx
 shared-button-importer app/accounts/handover/handover-v8.tsx
 shared-button-importer app/accounts/handover/page.tsx
@@ -41,7 +43,6 @@ shared-button-importer app/affiliate-offers/new-offer-v8.tsx
 shared-button-importer app/affiliates/action-dialogs.tsx
 shared-button-importer app/affiliates/bulk-op-wizard.tsx
 shared-button-importer app/affiliates/new-affiliate-v8.tsx
-shared-button-importer app/affiliates/new/page.tsx
 shared-button-importer app/affiliates/payment-tab.tsx
 shared-button-importer app/affiliates/tabs.tsx
 shared-button-importer app/affiliates/v8-affiliates-tab.tsx
@@ -57,15 +58,15 @@ shared-button-importer app/analytics/reports/new/page.tsx
 shared-button-importer app/auto-replies/edit/wizard-v8.tsx
 shared-button-importer app/auto-replies/list-v8.tsx
 shared-button-importer app/auto-replies/page.tsx
-shared-button-importer app/auto-replies/quick-create-v8.tsx
 shared-button-importer app/auto-replies/publish/page.tsx
+shared-button-importer app/auto-replies/quick-create-v8.tsx
 shared-button-importer app/auto-replies/runs/page.tsx
 shared-button-importer app/auto-replies/runs/runs-v8.tsx
 shared-button-importer app/automations/automations-v8.tsx
-shared-button-importer app/automations/new/new-v8.tsx
 shared-button-importer app/automations/drafts/draft-v8.tsx
 shared-button-importer app/automations/list-v8.tsx
 shared-button-importer app/automations/new/friend-multi-select.tsx
+shared-button-importer app/automations/new/new-v8.tsx
 shared-button-importer app/automations/new/page.tsx
 shared-button-importer app/automations/page.tsx
 shared-button-importer app/automations/runs-v8.tsx
@@ -77,7 +78,6 @@ shared-button-importer app/booking/bookings/detail/page.tsx
 shared-button-importer app/booking/bookings/new/page.tsx
 shared-button-importer app/booking/bookings/page.tsx
 shared-button-importer app/booking/menus/channels-tab-v8.tsx
-shared-button-importer app/booking/menus/edit-menu-dialog.tsx
 shared-button-importer app/booking/menus/new/menu-form-v8.tsx
 shared-button-importer app/booking/menus/new/page.tsx
 shared-button-importer app/booking/menus/page.tsx
@@ -115,7 +115,6 @@ shared-button-importer app/common-actions/edit/page.tsx
 shared-button-importer app/common-actions/new/page.tsx
 shared-button-importer app/common-actions/page.tsx
 shared-button-importer app/common-actions/versions/page.tsx
-# ★V8 登録メディア一覧（O7hUt7）。札の操作・窓の確定・ページ送りの操作に共通Button。
 shared-button-importer app/contents/list-v8.tsx
 shared-button-importer app/contents/media-detail-dialog.tsx
 shared-button-importer app/contents/media-picker-dialog.tsx
@@ -184,23 +183,24 @@ shared-button-importer app/hq/billing/page.tsx
 shared-button-importer app/hq/members/page.tsx
 shared-button-importer app/hq/open/page.tsx
 shared-button-importer app/hq/page.tsx
+shared-button-importer app/hq/settings/page.tsx
 shared-button-importer app/hq/support/detail/page.tsx
 shared-button-importer app/hq/support/page.tsx
 shared-button-importer app/hq/templates/template-console.tsx
+shared-button-importer app/hq/templates/template-message-v8.tsx
 shared-button-importer app/inflow-links/_components/bulk-routes-dialog.tsx
 shared-button-importer app/inflow-links/_components/edit-route-modal.tsx
+shared-button-importer app/inflow-links/_components/inflow-delete-dialog.tsx
 shared-button-importer app/inflow-links/ad-integration-v8.tsx
 shared-button-importer app/inflow-links/ad-integration.tsx
-shared-button-importer app/inflow-links/_components/inflow-delete-dialog.tsx
-shared-button-importer app/inflow-links/detail/inflow-detail-v8.tsx
 shared-button-importer app/inflow-links/detail/page.tsx
 shared-button-importer app/inflow-links/inflow-list-v8.tsx
 shared-button-importer app/inflow-links/new/inflow-create-v8.tsx
+shared-button-importer app/inflow-links/new/page.tsx
 shared-button-importer app/inflow-links/page.tsx
 shared-button-importer app/inflow-links/referral-qr-modal.tsx
 shared-button-importer app/line-notifications/operator-notification-rules.tsx
 shared-button-importer app/line-notifications/operator/new/operator-new-v8.tsx
-shared-button-importer app/line-notifications/operator/new/page.tsx
 shared-button-importer app/line-notifications/page.tsx
 shared-button-importer app/login/page.tsx
 shared-button-importer app/login/two-factor/page.tsx
@@ -217,7 +217,6 @@ shared-button-importer app/mileage/mileage-history-tab.tsx
 shared-button-importer app/mileage/mileage-rewards-tab.tsx
 shared-button-importer app/mileage/mileage-v8.tsx
 shared-button-importer app/mileage/page.tsx
-shared-button-importer app/mileage/rewards/edit/page.tsx
 shared-button-importer app/mileage/rewards/edit/v8-reward-edit.tsx
 shared-button-importer app/mileage/score-rules/page.tsx
 shared-button-importer app/mileage/v8-balances-tab.tsx
@@ -342,8 +341,8 @@ shared-button-importer app/templates/asset-editor-v8.tsx
 shared-button-importer app/templates/carousel/page.tsx
 shared-button-importer app/templates/detail/detail-v8.tsx
 shared-button-importer app/templates/detail/page.tsx
-shared-button-importer app/templates/edit/page.tsx
 shared-button-importer app/templates/edit-v8.tsx
+shared-button-importer app/templates/edit/page.tsx
 shared-button-importer app/templates/editor-v8.tsx
 shared-button-importer app/templates/list-v8.tsx
 shared-button-importer app/templates/page.tsx
@@ -352,22 +351,17 @@ shared-button-importer app/templates/template-asset-editor.tsx
 shared-button-importer app/updates/page.tsx
 shared-button-importer app/users/page.tsx
 shared-button-importer app/users/users-v8.tsx
-shared-button-importer app/webhooks/_components/webhooks-v8-outgoing.tsx
-shared-button-importer app/webhooks/_components/webhooks-v8-shell.tsx
-shared-button-importer app/webhooks/_components/webhooks-v8-samples.tsx
 shared-button-importer app/webhooks/_components/webhooks-v8-api-tokens.tsx
-shared-button-importer app/webhooks/_components/webhooks-v8-sheets.tsx
 shared-button-importer app/webhooks/_components/webhooks-v8-incoming.tsx
 shared-button-importer app/webhooks/_components/webhooks-v8-interactions.tsx
+shared-button-importer app/webhooks/_components/webhooks-v8-outgoing.tsx
+shared-button-importer app/webhooks/_components/webhooks-v8-samples.tsx
+shared-button-importer app/webhooks/_components/webhooks-v8-sheets.tsx
+shared-button-importer app/webhooks/_components/webhooks-v8-shell.tsx
 shared-button-importer app/webhooks/api-tokens-panel.tsx
 shared-button-importer app/webhooks/apitokens-v8.tsx
 shared-button-importer app/webhooks/edit/page.tsx
 shared-button-importer app/webhooks/google-sheets-panel.tsx
-shared-button-importer app/webhooks/new/new-v8.tsx
-shared-button-importer app/webhooks/new/page.tsx
-shared-button-importer app/webhooks/apitokens-v8.tsx
-shared-button-importer app/webhooks/incoming-v8.tsx
-shared-button-importer app/webhooks/interactions-v8.tsx
 shared-button-importer app/webhooks/incoming-v8.tsx
 shared-button-importer app/webhooks/interactions-v8.tsx
 shared-button-importer app/webhooks/new/new-v8.tsx
@@ -378,20 +372,21 @@ shared-button-importer app/webhooks/samples-v8.tsx
 shared-button-importer app/webhooks/sheets-v8.tsx
 shared-button-importer app/webhooks/webhook-interactions.tsx
 shared-button-importer app/webhooks/webhook-overviews.tsx
-shared-button-importer app/webinars/edit/page.tsx
-shared-button-importer app/webinars/edit/session-capacity-cell.tsx
 shared-button-importer app/webinars/edit/analytics-v8.tsx
+shared-button-importer app/webinars/edit/basic-v8.tsx
 shared-button-importer app/webinars/edit/comments-v8.tsx
 shared-button-importer app/webinars/edit/cta-v8.tsx
 shared-button-importer app/webinars/edit/notifications-v8.tsx
 shared-button-importer app/webinars/edit/page.tsx
 shared-button-importer app/webinars/edit/participants-v8.tsx
 shared-button-importer app/webinars/edit/review-v8.tsx
+shared-button-importer app/webinars/edit/scheduled-session-row.tsx
 shared-button-importer app/webinars/edit/session-capacity-cell.tsx
 shared-button-importer app/webinars/edit/video-stages.tsx
 shared-button-importer app/webinars/edit/video-v8.tsx
-shared-button-importer app/webinars/edit/webinar-edit-conflict-band.tsx
+shared-button-importer app/webinars/edit/viewer-comments.tsx
 shared-button-importer app/webinars/edit/webinar-edit-compare-dialog.tsx
+shared-button-importer app/webinars/edit/webinar-edit-conflict-band.tsx
 shared-button-importer app/webinars/list-v8.tsx
 shared-button-importer app/webinars/new/new-v8.tsx
 shared-button-importer app/webinars/published/page.tsx
@@ -435,6 +430,7 @@ shared-button-importer components/friend-fields/tag-editor-v4.tsx
 shared-button-importer components/friend-fields/tags-page-v4.tsx
 shared-button-importer components/friends/advanced-search-dialog.tsx
 shared-button-importer components/friends/bulk-run-dialog.tsx
+shared-button-importer components/friends/friend-row-menu.tsx
 shared-button-importer components/friends/friend-timeline.tsx
 shared-button-importer components/friends/notice-dialog.tsx
 shared-button-importer components/friends/saved-search-dialog.tsx
@@ -501,40 +497,3 @@ shared-button-importer components/tenant-suspended.tsx
 shared-button-importer components/ui/kpi-collapse.tsx
 shared-button-importer components/webinars/webinar-notifications.tsx
 shared-button-importer lib/unsaved-leave-dialog.tsx
-# #356 (board #898-#904): 公開履歴の再試行・照合、テスト適用の操作に共通Buttonを使う。
-# K-1・O-1 (#822): 公開の進み・公開前の確認の操作にも共通Buttonを使う。
-# #973: 狭い幅向けの簡略手順表示で「前へ／次へ」に共通ボタンを使う。
-# #985 LAY-18: 一覧の行の操作（詳細・編集）が共通Buttonを使う。
-# 標準Buttonへ移行済みとして、見た目と主要導線を監視する画面本体。
-button-migration-target app/affiliates/tabs.tsx
-button-migration-target app/analytics/page.tsx
-button-migration-target app/conversions/page.tsx
-button-migration-target app/inflow-links/page.tsx
-button-migration-target app/reminders/list-v8.tsx
-button-migration-target app/templates/page.tsx
-button-migration-target app/webhooks/webhook-interactions.tsx
-button-migration-target components/friend-fields/tags-page-v4.tsx
-# 標準の表見出しへ移行済みとして監視する画面本体。
-# #984 LAY-14: UID移行の判断表も共通見出しを通しているので監視へ入れる。
-table-header-migration-target app/accounts/migration.tsx
-table-header-migration-target app/affiliates/tabs.tsx
-table-header-migration-target app/conversions/page.tsx
-# #984 LAY-12: 重複検出の3表すべてを共通見出しへ。直書き th は残さない。
-table-header-migration-target app/duplicates/page.tsx
-table-header-migration-target app/inflow-links/page.tsx
-table-header-migration-target app/templates/page.tsx
-table-header-migration-target app/webhooks/webhook-interactions.tsx
-# 詳細内テーブルのため、直書きthを残す既知の例外。
-native-table-header-exception app/affiliates/tabs.tsx
-shared-button-importer app/analytics/conversion-report-v8.tsx
-# ★V8-B 緊急コントロール（OHwbU）。確認の窓・本人確認・記録の操作に共通Buttonを使う。
-shared-button-importer app/emergency/control-v8.tsx
-# ★V8-B 運用者へのお知らせを作る（gjUz3）。届き方の見本・公開前の確認の操作に共通Buttonを使う。
-shared-button-importer app/line-notifications/operator/new/operator-new-v8.tsx
-# ★V8 共通情報の一覧（FM94M）。表の下にページ送りは共通Pagination、操作は共通Button。
-shared-button-importer app/contents/vars/list-v8.tsx
-shared-button-importer app/contents/vars/new/new-v8.tsx
-shared-button-importer app/contents/vars/edit/edit-v8.tsx
-shared-button-importer app/webinars/edit/basic-v8.tsx
-shared-button-importer app/webinars/edit/scheduled-session-row.tsx
-shared-button-importer app/webinars/edit/viewer-comments.tsx

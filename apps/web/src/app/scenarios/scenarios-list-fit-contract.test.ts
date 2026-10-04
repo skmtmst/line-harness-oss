@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -31,10 +31,10 @@ describe('シナリオ一覧の絵どおり（m21p・V8）', () => {
   })
 
   it('表の見出しは絵どおり（シナリオ・購読中・読み終えた・状態）', () => {
-    expect(LIST).toContain('<th>シナリオ</th>')
-    expect(LIST).toContain('<th>購読中・読み終えた</th>')
-    expect(LIST).toContain('<th>状態</th>')
-    expect(LIST).not.toContain('<th>シナリオ名</th>')
+    expect(LIST).toContain('<Th>シナリオ</Th>')
+    expect(LIST).toContain('<Th>購読中・読み終えた</Th>')
+    expect(LIST).toContain('<Th>状態</Th>')
+    expect(LIST).not.toContain('<Th>シナリオ名</Th>')
     expect(LIST).not.toContain('購読 / 読了')
   })
 })

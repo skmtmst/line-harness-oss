@@ -177,12 +177,4 @@ describe('★V8-B 成果地点を作る（j8p3yj・競合cXqlS）', () => {
     const primary = screen.getByRole('button', { name: '保存して数えはじめる' }) as HTMLButtonElement
     expect(primary.disabled).toBe(true)
   })
-
-  it('v7 では従来の作る画面が出る', async () => {
-    await renderPage()
-    await eventually(() => {
-      expect(host.textContent).toContain('つくって数えはじめる')
-    })
-    expect(host.querySelector('[data-design-node="j8p3yj"]')).toBeNull()
-  })
 })

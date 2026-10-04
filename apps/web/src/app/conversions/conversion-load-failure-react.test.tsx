@@ -202,7 +202,7 @@ describe('R595 一覧だけ失敗しても0件と誤らない', () => {
     await mount()
     expect(container.querySelector('table')).toBeNull()
     mode.list = 'ok'
-    await clickByText('もう一度試す')
+    await clickByText('もう一度読み込む')
     const text = container.textContent ?? ''
     expect(container.querySelector('table')).not.toBeNull()
     expect(text).toContain('購入A')
