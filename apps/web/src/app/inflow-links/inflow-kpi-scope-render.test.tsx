@@ -1,13 +1,11 @@
 // @vitest-environment happy-dom
 /*
- * J1-KPI-SCOPE: 帯（流入元・友だち・クリック・平均の追加率）は画面全体の
- * 要約なので、フォルダ選択・検索文字・友だち有無の絞り込みで変わらない。
- * 実 Worker の ref-summary は routeTotal / totalClicks / averageAddRate を
- * 返さない（任意項目の省略形）ので、通常は選択アカウント範囲
- * （絞り込みの前）から数える。本物の React で動かして見る。
+ * J1-KPI-SCOPE: 帯（経路・友だち追加・動きが未設定・広告とつないだ）は
+ * 画面全体の要約なので、フォルダ選択・検索文字・友だち有無の絞り込みで
+ * 変わらない。本物の React で動かして見る。
  *
- * 6行の内訳: 友だち 10+5+2=17人、クリック 20+15+10=45回、率 38%。
- * 友だち追加なしは3行（店頭QR・DM・旧URL）。
+ * 6行の内訳: 友だち 10+5+2=17人。友だち追加なしは3行（店頭QR・DM・旧URL）。
+ * 動きが未設定は6行（種にシナリオもタグも付けていない）。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -20,6 +18,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/inflow-links',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
@@ -156,13 +155,25 @@ function kpiText(): string {
   return host.querySelector('[data-design="KPIs"]')?.textContent ?? ''
 }
 
-/* 帯の4枚を意味で特定する（順序: 流入元・友だちになった・クリック・平均の追加率）。 */
+/*
+ * 帯の4枚を意味で特定する（順序: 経路・友だち追加・動きが未設定・広告とつないだ）。
+ * 板 xbHxg の帯は絵どおりの4枚。クリックと平均の追加率の枚は無い。
+ */
 function kpiCards(): string[] {
-  return Array.from(host.querySelectorAll('[data-design="KPIs"] > div')).map((el) => el.textContent ?? '')
+  const band = host.querySelector('[data-design="KPIs"]')
+  if (!band) return []
+  return Array.from(band.children).map((el) => el.textContent ?? '')
+}
+
+async function openPreset(): Promise<ParentNode> {
+  await clickButton(host, 'よく使う絞り込み')
+  const panel = host.querySelector('[role="dialog"][aria-label="よく使う絞り込み"]')
+  expect(panel, 'よく使う絞り込みが開かない').not.toBeNull()
+  return panel as unknown as ParentNode
 }
 
 async function setSearch(value: string) {
-  const input = host.querySelector('input[placeholder="流入元の名前・REFで検索"]') as HTMLInputElement | null
+  const input = host.querySelector('input[placeholder="経路の名前・URLで探す"]') as HTMLInputElement | null
   expect(input, '検索欄が見つからない').not.toBeNull()
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
@@ -206,11 +217,13 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     })
     await settle()
 
-    // 全体: 流入元6件・友だち17人・クリック45回・平均38%。
-    expect(kpiText()).toContain('6件')
-    expect(kpiText()).toContain('17人')
-    expect(kpiText()).toContain('45回')
-    expect(kpiText()).toContain('38%')
+    // 全体: 経路6件・友だち17人・動きが未設定6件・広告とつないだ0件。
+    const cards = kpiCards()
+    expect(cards).toHaveLength(4)
+    expect(cards[0]).toContain('6件')
+    expect(cards[1]).toContain('17人')
+    expect(cards[2]).toContain('6件')
+    expect(cards[3]).toContain('0件')
     expect(host.textContent).toContain('春キャンペーン')
 
     // 検索で0件になっても帯は全体のまま。
@@ -218,28 +231,24 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     expect(host.textContent).toContain('条件に合う流入経路がありません')
     expect(kpiText()).toContain('6件')
     expect(kpiText()).toContain('17人')
-    expect(kpiText()).toContain('45回')
-    expect(kpiText()).toContain('38%')
 
     // 検索を消すと一覧が戻り、帯は変わらない。
     await setSearch('')
     expect(host.textContent).toContain('春キャンペーン')
-    expect(kpiText()).toContain('45回')
-    expect(kpiText()).toContain('38%')
 
     // 友だち追加なし（3行）でも帯は全体のまま。
-    await clickButton(host, '友だち追加なし')
+    const preset = await openPreset()
+    await clickButton(preset, '友だち追加なし')
     expect(host.textContent).toContain('店頭QR')
     expect(host.textContent).not.toContain('春キャンペーン')
     expect(kpiText()).toContain('6件')
     expect(kpiText()).toContain('17人')
-    expect(kpiText()).toContain('45回')
-    expect(kpiText()).toContain('38%')
 
     // フォルダ「SNS」を選んでも帯は全体のまま。
-    const chips = host.querySelector('[aria-label="流入経路の絞り込み"]')
-    expect(chips, '絞り込み欄が見つからない').not.toBeNull()
-    await clickButton(chips!, 'すべて')
+    await clickButton(host, 'よく使う絞り込み')
+    const preset2 = host.querySelector('[role="dialog"][aria-label="よく使う絞り込み"]')
+    expect(preset2, 'よく使う絞り込みが開かない').not.toBeNull()
+    await clickButton(preset2 as unknown as ParentNode, 'すべて')
     const folder = host.querySelector('aside[aria-label="フォルダ"]')
     expect(folder, 'フォルダ欄が見つからない').not.toBeNull()
     await clickButton(folder!, 'SNS')
@@ -247,44 +256,34 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     expect(host.textContent).not.toContain('チラシ')
     expect(kpiText()).toContain('6件')
     expect(kpiText()).toContain('17人')
-    expect(kpiText()).toContain('45回')
-    expect(kpiText()).toContain('38%')
   })
 
-  it('合法の混在形（totalClicksだけ供給）でも検索0で率は全体のまま', async () => {
+  it('合法の混在形（totalClicksだけ供給）でも検索0で友だち数は全体のまま', async () => {
     summaryMode = 'mixed'
     await act(async () => {
       root.render(<InflowLinksPage />)
     })
     await settle()
 
-    expect(kpiText()).toContain('45回')
-    expect(kpiText()).toContain('38%')
+    expect(kpiText()).toContain('17人')
 
-    // 検索0でもクリックは45回のまま、率は0%にならない。
     await setSearch('そんざいしないさーち')
     expect(host.textContent).toContain('条件に合う流入経路がありません')
-    expect(kpiText()).toContain('45回')
-    expect(kpiText()).toContain('38%')
+    expect(kpiText()).toContain('17人')
   })
 
-  it('供給値が行合計と違う合法形でもsummary優先・分子は全体（90回・19%）', async () => {
-    // 行合計45と同値の45だけでは、summary優先が壊れても試験が通ってしまう。
-    // 行合計と違う90を供給し、summaryの分母優先と全体範囲の分子を両方見る。
+  it('供給値が行合計と違う合法形でも友だち数は全体のまま', async () => {
     summaryMode = 'mixed90'
     await act(async () => {
       root.render(<InflowLinksPage />)
     })
     await settle()
 
-    expect(kpiText()).toContain('90回')
-    expect(kpiText()).toContain('19%')
+    expect(kpiText()).toContain('17人')
 
-    // 検索0でも供給値90のまま、率は行合計で割り直した値にならない。
     await setSearch('そんざいしないさーち')
     expect(host.textContent).toContain('条件に合う流入経路がありません')
-    expect(kpiText()).toContain('90回')
-    expect(kpiText()).toContain('19%')
+    expect(kpiText()).toContain('17人')
   })
 
   it('アカウントを変えると帯は別の集計になる', async () => {
@@ -293,7 +292,6 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     })
     await settle()
     expect(kpiText()).toContain('17人')
-    expect(kpiText()).toContain('45回')
 
     accountState.id = 'acc-2'
     await act(async () => {
@@ -301,16 +299,15 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     })
     await settle()
 
-    expect(kpiText()).toContain('2件')
-    expect(kpiText()).toContain('5人')
-    expect(kpiText()).toContain('12回')
-    expect(kpiText()).toContain('42%')
+    const cards = kpiCards()
+    expect(cards[0]).toContain('2件')
+    expect(cards[1]).toContain('5人')
+    expect(cards[2]).toContain('2件')
     expect(host.textContent).toContain('B春')
   })
 
-  it('実績3行の通常形でも検索・フォルダで全体17/45/38を保持する', async () => {
+  it('実績3行の通常形でも検索・フォルダで全体を保持する', async () => {
     // 実 Worker 形（summary.routes 3行・entry-routes 6行）。
-    // 6行版の試験は合法補足として別に残している。
     summaryMode = 'real3'
     await act(async () => {
       root.render(<InflowLinksPage />)
@@ -319,15 +316,11 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
 
     expect(kpiText()).toContain('6件')
     expect(kpiText()).toContain('17人')
-    expect(kpiText()).toContain('45回')
-    expect(kpiText()).toContain('38%')
 
     await setSearch('そんざいしないさーち')
     expect(host.textContent).toContain('条件に合う流入経路がありません')
     expect(kpiText()).toContain('6件')
     expect(kpiText()).toContain('17人')
-    expect(kpiText()).toContain('45回')
-    expect(kpiText()).toContain('38%')
 
     await setSearch('')
     const folder = host.querySelector('aside[aria-label="フォルダ"]')
@@ -336,27 +329,6 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     expect(host.textContent).toContain('チラシ')
     expect(kpiText()).toContain('6件')
     expect(kpiText()).toContain('17人')
-    expect(kpiText()).toContain('45回')
-    expect(kpiText()).toContain('38%')
-  })
-
-  it('明示のaverageAddRateはfallbackと違ってもsummary優先', async () => {
-    // 行から割り直すと38%だが、summary が50と返すときは50を出す。
-    summaryMode = 'explicit-rate'
-    await act(async () => {
-      root.render(<InflowLinksPage />)
-    })
-    await settle()
-
-    const cards = kpiCards()
-    expect(cards).toHaveLength(4)
-    expect(cards[2]).toContain('45回')
-    expect(cards[3]).toContain('50%')
-
-    await setSearch('そんざいしないさーち')
-    const after = kpiCards()
-    expect(after[2]).toContain('45回')
-    expect(after[3]).toContain('50%')
   })
 
   it('集計の取得失敗は0にせず「—」のまま', async () => {
@@ -366,20 +338,18 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
     })
     await settle()
 
-    // 一覧は読めているので流入元は6件。読めていない3枚は各カードで「—」。
+    // 一覧は読めているので経路は6件。動きが未設定も行だけ見れば数えられる。
+    // 友だち追加は集計が要るので「—」。
     const cards = kpiCards()
     expect(cards).toHaveLength(4)
     expect(cards[0]).toContain('6件')
     expect(cards[1]).toContain('—')
     expect(cards[1]).not.toContain('17人')
-    expect(cards[2]).toContain('—')
-    expect(cards[2]).not.toContain('45回')
-    expect(cards[2]).not.toContain('0回')
-    expect(cards[3]).toContain('—')
+    expect(cards[2]).toContain('6件')
     expect(host.textContent).toContain('春キャンペーン')
   })
 
-  it('本物の0クリックは0回と出し、率は「—」', async () => {
+  it('本物の0人は0人と出す', async () => {
     summaryMode = 'zero'
     await act(async () => {
       root.render(<InflowLinksPage />)
@@ -388,8 +358,6 @@ describe('J1 帯はフォルダ・検索・絞り込みで変わらない（実 
 
     const cards = kpiCards()
     expect(cards).toHaveLength(4)
-    expect(cards[2]).toContain('0回')
-    expect(cards[3]).toContain('—')
-    expect(cards[3]).not.toContain('0%')
+    expect(cards[1]).toContain('0人')
   })
 })

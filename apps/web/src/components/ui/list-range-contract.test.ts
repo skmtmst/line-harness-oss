@@ -24,7 +24,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['../../app/friends/page.tsx を使う友だち一覧', '../friends/friend-list-table.tsx'],
   ['友だち追加時の配信 実行結果', '../../app/friend-add-settings/runs/page.tsx'],
   ['リッチメニュー', '../../app/rich-menus/page.tsx'],
-  ['回答フォーム 一覧', '../../app/form-submissions/page.tsx'],
+  ['回答フォーム 一覧', '../../app/form-submissions/list-v8.tsx'],
   ['回答フォーム 回答一覧', '../../app/form-submissions/responses/page.tsx'],
   ['コンテンツ管理', '../../app/contents/page.tsx'],
   ['運営へのお知らせ', '../../app/line-notifications/operator-notification-rules.tsx'],

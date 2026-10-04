@@ -42,7 +42,6 @@ const GUARDED = [
   'app/friend-add-settings/editor-v8.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',
   'app/inflow-links/new/page.tsx',
-  'app/line-notifications/operator/new/page.tsx',
   'app/line-notifications/operator/new/operator-new-v8.tsx',
   'app/mileage/earning-rules/edit/page.tsx',
   'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx',
@@ -107,6 +106,8 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string> = {
+  // V8へ完全切替した入口。描画先の本体が編集状態と番兵を持つ。
+  'app/line-notifications/operator/new/page.tsx': 'app/line-notifications/operator/new/operator-new-v8.tsx',
   'app/templates/edit-v8.tsx': 'app/templates/editor-v8.tsx',
   'app/templates/asset-editor-v8.tsx': 'app/templates/editor-v8.tsx',
   'app/templates/carousel/carousel-v8.tsx': 'app/templates/editor-v8.tsx',
@@ -228,6 +229,8 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 のイベント予約者（gHmNK）。承認・キャンセル・待ち順の操作は確認窓で確定して即時保存し、お知らせ送信も「送る」で即時送信する。窓内の理由欄は閉じると戻るダイアログ内の入力で、画面に残る下書きを持たない',
   'app/webinars/list-v8.tsx':
     '★V8-B のウェビナー一覧（UyUMw）。一覧と絞り込みが中心で、フォルダの追加・変更・削除とアーカイブは押した直後に確認窓か即時保存で確定する。フォルダ名の入力は閉じると戻る窓の中だけなので、この画面に残る下書きを持たない',
+  'app/rich-menus/list-v8.tsx':
+    '★V8 のリッチメニュー一覧（rZEGN）。一覧上の操作（並び替え・複製・削除・表示先変更）は押した直後に確認窓か即時保存で確定し、この画面に残る下書きを持たない。名前のその場編集は Enter で即時保存し Esc・ぶれでやめるため離脱で失う下書きを持たない',
 }
 
 /*

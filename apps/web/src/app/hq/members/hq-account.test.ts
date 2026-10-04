@@ -47,14 +47,10 @@ describe('統括の左下アカウントメニュー', () => {
 })
 
 describe('メンバー管理（36-5）', () => {
-  it('旧「統括設定」はメンバー管理へ転送する', () => {
-    expect(settings).toContain("router.replace('/hq/members?tab=tenant')")
-  })
-
-  it('タブは ?tab= で切り替え、権限者と統括の情報を1画面に置く', () => {
-    expect(members).toContain("params.get('tab') === 'tenant'")
-    expect(members).toContain("router.replace(next === 'tenant' ? '/hq/members?tab=tenant' : '/hq/members')")
-    expect(members).toContain('api.tenants.updateName(trimmed)')
+  it('統括の情報は /hq/settings で見せる（板 yLKwV・BHEl9 にタブは無いため。旧「統括設定」の転送はやめた）', () => {
+    expect(settings).toContain('api.tenants.updateName(trimmed)')
+    expect(settings).toContain("usePageTitle('統括の情報')")
+    expect(members).not.toContain('?tab=')
   })
 
   it('招待は管理者と閲覧のみだけを選べる（担当者は統括の権限者にしない）', () => {
@@ -72,9 +68,9 @@ describe('メンバー管理（36-5）', () => {
     expect(members).toContain('（あなた）')
   })
 
-  it('保存は下部追従バーにしか置かない', () => {
-    expect(members).toContain('<StickyBar')
-    expect(members).toContain('統括名を保存する')
+  it('保存は下部追従バーにしか置かない（統括名の保存は /hq/settings）', () => {
+    expect(settings).toContain('<StickyBar')
+    expect(settings).toContain('統括名を保存する')
   })
 })
 

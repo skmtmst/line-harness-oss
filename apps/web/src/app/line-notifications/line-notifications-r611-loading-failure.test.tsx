@@ -27,6 +27,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/line-notifications',
 }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -129,7 +130,8 @@ describe('R611 一覧の取得失敗後は上部も「取得中」のままに�
     await waitFor(() => expect(screen.getByText('顧客へのお知らせを表示できませんでした')).toBeTruthy())
     // 上部の件数・送信枠は「取得中」のままではなく、取れなかったことを示す。
     await waitFor(() => expect(screen.getByText(/お知らせの件数は取得失敗です/)).toBeTruthy())
-    expect(screen.getAllByText('取得失敗').length).toBeGreaterThanOrEqual(5)
+    // 板 g3iDs の4枚のうち3枚（今日送った・この30日・今月の送信枠）が取得失敗を示す。
+    expect(screen.getAllByText('取得失敗').length).toBeGreaterThanOrEqual(3)
     expect(screen.queryByText(/取得中/)).toBeNull()
     // 一覧の再読み込みへ案内する（読み直しの口は一覧が持つのでボタンは足さない）。
     expect(screen.getByText(/下の一覧の「もう一度読み込む」から読み直してください/)).toBeTruthy()
@@ -145,7 +147,8 @@ describe('R611 一覧の取得失敗後は上部も「取得中」のままに�
 
     await waitFor(() => expect(fixture.settings).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByText('ご注文ありがとうございます')).toBeTruthy())
-    expect(screen.getByText('全1種類のうち')).toBeTruthy()
+    // 板 g3iDs の4枚が戻る（数カードと表の見出し）。
+    expect(screen.getAllByText('この30日')).toHaveLength(2)
     expect(screen.queryByText(/から読み直してください/)).toBeNull()
     expect(screen.queryByText('取得失敗')).toBeNull()
   })
@@ -153,23 +156,22 @@ describe('R611 一覧の取得失敗後は上部も「取得中」のままに�
 
 describe('R611 customer-kpis の失敗注記（器の試験）', () => {
   const base = {
-    ready: false, settingsCount: 0, enabledCount: 0, sentToday: null,
+    ready: false, sentToday: null, sentLast30d: null,
     sentBreakdown: '', failed: null, quota: null,
   } as const
 
   it('loadFailed のときは値を「—」のまま注記だけ失敗の言葉へ変える', () => {
     const kpis = customerNotificationKpis({ ...base, loadFailed: true })
     expect(kpis.every((kpi) => kpi.value === null)).toBe(true)
-    expect(kpis.find((kpi) => kpi.label === '出しているお知らせ')?.note).toBe('取得失敗')
-    expect(kpis.find((kpi) => kpi.label === '今日 送った')?.note).toBe('取得失敗')
-    expect(kpis.filter((kpi) => kpi.group === 'quota').map((kpi) => kpi.note))
-      .toEqual(['取得失敗', '取得失敗', '取得失敗'])
+    // 板 g3iDs の4枚。
+    expect(kpis.find((kpi) => kpi.label === '今日送った')?.note).toBe('取得失敗')
+    expect(kpis.find((kpi) => kpi.label === 'この30日')?.note).toBe('取得失敗')
+    expect(kpis.find((kpi) => kpi.label === '今月の送信枠')?.note).toBe('取得失敗')
   })
 
   it('loadFailed がなければ今までどおり「取得中」', () => {
     const kpis = customerNotificationKpis({ ...base })
-    expect(kpis.find((kpi) => kpi.label === '出しているお知らせ')?.note).toBe('件数を取得中')
-    expect(kpis.find((kpi) => kpi.label === '今日 送った')?.note).toBe('種類別の件数は未取得')
-    expect(kpis.filter((kpi) => kpi.group === 'quota').every((kpi) => kpi.note === '送信枠を取得中')).toBe(true)
+    expect(kpis.find((kpi) => kpi.label === '今日送った')?.note).toBe('種類別の件数は未取得')
+    expect(kpis.find((kpi) => kpi.label === '今月の送信枠')?.note).toBe('送信枠を取得中')
   })
 })

@@ -10,7 +10,7 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertCircle, Check, MessageCircle, Settings2, XCircle } from 'lucide-react'
+import { AlertCircle, Check, MessageCircle, RotateCcw, Settings2, XCircle } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
@@ -244,6 +244,7 @@ function FriendAddRunDetailV8Inner() {
                 </span>
               </span>
               <Button variant="primary" disabled={retrying} busy={retrying} busyLabel="再試行中…" onClick={() => void retry()}>
+                <RotateCcw size={14} aria-hidden="true" />
                 失敗した処理をもう一度
               </Button>
             </div>
@@ -263,7 +264,7 @@ function FriendAddRunDetailV8Inner() {
                 <span className={styles.stepIndex}>1</span>
                 <span className={styles.stepText}>
                   <strong>案内（{messageLabel}）を送った</strong>
-                  <small>{shortTime(detail.processedAt ?? detail.receivedAt)}・LINE受信済み</small>
+                  <small>{shortTime(detail.processedAt ?? detail.receivedAt)}・LINE受付済み</small>
                 </span>
               </li>
               {actionRuns.map((action, index) => {

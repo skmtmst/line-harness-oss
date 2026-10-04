@@ -7,6 +7,7 @@ import Dialog from '@/components/shared/dialog'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
+import { memberStatus } from '@/lib/hq-members'
 
 export type MemberDialogValue = {
   name: string
@@ -86,11 +87,21 @@ export default function MemberDialog({
     onSubmit({ ...value, name: value.name.trim(), email: value.email.trim() })
   }
 
+  const invited = member ? memberStatus(member) === 'invited' : false
+  const notes = [
+    isSelf ? '自分の役割と状態は変えられません。' : '',
+    invited ? '招待中の人には「招待メールを再送」が出ます。' : '',
+  ].filter(Boolean)
+
   return (
     <Dialog
       open={open}
-      title={member ? `${member.name}さんの権限を変える` : '権限者を招待'}
-      description={member ? undefined : `招待メールは送った日から7日（${inviteExpiryLabel()}まで）有効です。メールの確認とLINEの連携が済むとログインできます。`}
+      title={member ? 'メンバーの権限を変更する' : '権限者を招待'}
+      description={
+        member
+          ? member.email ? `${member.name}（${member.email}）` : member.name
+          : `招待メールは送った日から7日（${inviteExpiryLabel()}まで）有効です。メールの確認とLINEの連携が済むとログインできます。`
+      }
       /* 板 `ukPgd`：招待の入力の間違いは同じ窓の状態として印を付ける。 */
       designNode={member ? 'BHEl9' : localError ? 'ukPgd' : 'yLKwV'}
       confirmLabel={member ? '変更を保存' : '招待メールを送る'}
@@ -117,52 +128,21 @@ export default function MemberDialog({
           </div>
         ) : null}
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="役割" htmlFor={`${uid}-role`} note={isSelf ? '自分の役割は変えられません' : undefined}>
-            <Select
-              aria-label="役割"
-              size="full"
-              id={`${uid}-role`}
-              className="w-full"
-              value={value.role}
-              disabled={busy || isSelf}
-              onChange={(value) => set('role', value as 'admin' | 'viewer')}
-              options={[
-                { value: 'admin', label: '管理者（すべて操作できる）' },
-                { value: 'viewer', label: '閲覧のみ（見るだけ）' },
-              ]}
-            />
-          </Field>
-          <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
-            <Select
-              aria-label="最初に表示するアカウント"
-              size="full"
-              id={`${uid}-assigned`}
-              className="w-full"
-              value={value.assignedLineAccountId}
-              disabled={busy}
-              onChange={(value) => set('assignedLineAccountId', value)}
-              options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-            />
-          </Field>
-          {member ? (
-            <Field label="状態" htmlFor={`${uid}-active`} note={isSelf ? '自分の状態は変えられません' : undefined}>
-              <Select
-                aria-label="状態"
-                size="full"
-                id={`${uid}-active`}
-                className="w-full"
-                value={value.isActive ? 'active' : 'inactive'}
-                disabled={busy || isSelf}
-                onChange={(value) => set('isActive', value === 'active')}
-                options={[
-                  { value: 'active', label: '有効（ログインできる）' },
-                  { value: 'inactive', label: '無効（ログインできない）' },
-                ]}
-              />
-            </Field>
-          ) : null}
-        </div>
+        <Field label="役割" htmlFor={`${uid}-role`} note={isSelf ? '自分の役割は変えられません' : undefined}>
+          <Select
+            aria-label="役割"
+            size="full"
+            id={`${uid}-role`}
+            className="w-full"
+            value={value.role}
+            disabled={busy || isSelf}
+            onChange={(value) => set('role', value as 'admin' | 'viewer')}
+            options={[
+              { value: 'admin', label: '管理者（すべて操作できる）' },
+              { value: 'viewer', label: '閲覧のみ（見るだけ）' },
+            ]}
+          />
+        </Field>
 
         <fieldset className="flex flex-col gap-2" disabled={busy}>
           <legend className="text-label font-medium text-ink">担当範囲</legend>
@@ -181,6 +161,39 @@ export default function MemberDialog({
             <p className="text-micro text-ink-faint">統括のすべてのアカウントを見て操作できます。</p>
           )}
         </fieldset>
+
+        <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
+          <Select
+            aria-label="最初に表示するアカウント"
+            size="full"
+            id={`${uid}-assigned`}
+            className="w-full"
+            value={value.assignedLineAccountId}
+            disabled={busy}
+            onChange={(value) => set('assignedLineAccountId', value)}
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+          />
+        </Field>
+        {member ? (
+          <Field label="状態" htmlFor={`${uid}-active`} note={isSelf ? '自分の状態は変えられません' : undefined}>
+            <Select
+              aria-label="状態"
+              size="full"
+              id={`${uid}-active`}
+              className="w-full"
+              value={value.isActive ? 'active' : 'inactive'}
+              disabled={busy || isSelf}
+              onChange={(value) => set('isActive', value === 'active')}
+              options={[
+                { value: 'active', label: '有効（ログインできる）' },
+                { value: 'inactive', label: '無効（ログインできない）' },
+              ]}
+            />
+          </Field>
+        ) : null}
+        {notes.length > 0 ? (
+          <p className="rounded-control bg-surface-pearl px-3 py-2 text-caption text-ink-secondary">{notes.join('')}</p>
+        ) : null}
       </form>
     </Dialog>
   )

@@ -137,7 +137,8 @@
  * ------------------------------------------------------------------- */
 @media (min-width: 1024px) {
   [data-theme="v8"] .main {
-    margin: 0 12px 12px 0;
+    /* 左メニューとの間も 12（zUg8S）。右12・下12・左12。 */
+    margin: 0 12px 12px 12px;
     border: 1px solid var(--color-board-line);
     border-radius: var(--radius-panel);
     background: var(--color-canvas);

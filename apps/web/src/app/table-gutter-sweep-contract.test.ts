@@ -157,10 +157,9 @@ describe('表の外側の余白の洗い出し', () => {
 
   it('/inflow-links：外側は見出しの余白（20px）にそろえる', () => {
     const body = code(read('app', 'inflow-links', 'page.tsx'))
-    expect(body).toContain('<col className="w-14" />')
-    expect(body).toContain('<col className="w-32" />')
+    // V8は関連情報をまとめた10列。外側の左右20pxは引き続き守る。
     expect(body).toContain('<Th className="pl-5">')
-    expect(body).toContain('<Th align="right" className="pr-5">編集</Th>')
+    expect(body).toContain('<Th align="right" className="pr-5">操作</Th>')
     expect(body).toContain('py-3 pr-2 pl-5')
     expect(body).toContain('py-3 pr-5 pl-2 text-right')
   })

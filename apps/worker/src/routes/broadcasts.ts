@@ -28,6 +28,7 @@ import {
 import type { BroadcastDisplayStatus } from '@line-crm/db';
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
+import { listResponse } from '../lib/list-etag.js';
 import { getSendPermissionForAccount } from '../services/send-entitlements.js';
 import { processBroadcastSend, buildMessage, processQueuedBroadcasts, guardScheduledBroadcastQuota } from '../services/broadcast.js';
 import {
@@ -669,7 +670,8 @@ broadcasts.get('/api/broadcasts', async (c) => {
         displayStatusLabel: BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
       };
     });
-    return c.json({
+    // 同じ中身なら304（list-etag）。
+    return listResponse(c, {
       success: true,
       data,
       kpis: {
