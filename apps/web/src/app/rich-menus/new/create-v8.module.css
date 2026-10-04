@@ -85,7 +85,7 @@
 /* 左=白カードの縦積み、右=説明カード＋スマホ。 */
 .grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   gap: 16px;
   align-items: start;
 }
