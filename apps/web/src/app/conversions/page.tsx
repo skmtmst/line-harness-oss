@@ -1206,7 +1206,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     ) : null}
                   </td>
                   <td className="text-ink-secondary w-1/4 px-4 py-3 text-sm">
-                    <span className="line-clamp-2" title={sourceTriggerLabel(point)}>{sourceTriggerLabel(point)}</span>
+                    <span className="line-clamp-2 break-all" title={sourceTriggerLabel(point)}>{sourceTriggerLabel(point)}</span>
                     <p className="text-ink-faint mt-0.5 truncate text-xs" title={`${measureLabel(point.measureMethod)}・${deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}`}>
                       {measureLabel(point.measureMethod)}・{deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}
                     </p>
@@ -1222,7 +1222,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   <td className={point.usageCount === 0
                     ? 'text-warning w-1/4 px-4 py-3 text-sm'
                     : 'text-ink-secondary w-1/4 px-4 py-3 text-sm'}>
-                    <span className="line-clamp-2" title={usageLabel(point)}>{usageLabel(point)}</span>
+                    <span className="line-clamp-2 break-all" title={usageLabel(point)}>{usageLabel(point)}</span>
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                     {/*

@@ -1,0 +1,333 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B 成果とアフィリエイトの作る画面（`RaMf3`・`Td4TN`）。
+ * 左に本文、右に rails。下で作る画面の足元操作は共通の StickyBar。
+ * 色・角丸・影は直接書かず、名前（トークン）だけを使う。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.backLink {
+  color: var(--color-info);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.columns {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 300px;
+  flex: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  padding: 20px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.grid2 {
+  display: grid;
+  gap: 12px;
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fieldNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+/* 報酬の決め方の札（3択）。選んだ札だけ縁を変える。 */
+.choiceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.choiceCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  cursor: pointer;
+  text-align: left;
+}
+
+.choiceCardSelected {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+}
+
+.choiceName {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.choiceNote {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 入力が無い札（金額は案件で決まる、など）。押せない印なので button にしない。 */
+.staticBox {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  padding: 10px 12px;
+}
+
+.staticLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.staticValue {
+  margin: 2px 0 0;
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.staticReason {
+  margin: 2px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 入り切り段（成果が出たとき・認めたとき）。札の中の1行。 */
+.switchRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  padding: 12px;
+}
+
+.switchBody {
+  min-width: 0;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.switchName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.switchNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* rails の決まり文の表。 */
+.kvList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.kvRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.kvRow + .kvRow {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.kvKey {
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  flex: none;
+}
+
+.kvValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.noteList {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.previewBox {
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.previewName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.previewReward {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.urlRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.urlText {
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+.footnote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@container (max-width: 1100px) {
+  .columns {
+    flex-direction: column;
+  }
+
+  .rail {
+    width: 100%;
+  }
+
+  .choiceGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
