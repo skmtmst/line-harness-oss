@@ -1405,7 +1405,7 @@ function MediaLibraryInner() {
         designNode="YfTfJ"
         tone="destructive"
         title={deleting ? dialogTitle(impact, deleting.filename) : ''}
-        description="消すと、この画像・動画・ファイルそのものが無くなります。元に戻せません。"
+        description="削除すると、この画像・動画・ファイルそのものが無くなります。元に戻せません。"
         busy={deleteBusy}
         error={deleteError || undefined}
         onCancel={() => {
