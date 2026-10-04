@@ -28,9 +28,7 @@ export default function ActivityItem({
   return (
     <div className={styles.row}>
       <div className={styles.rail} aria-hidden="true">
-        <span className={styles.marker}>
-          <Icon size={12} />
-        </span>
+        <ActivityMarker icon={Icon} />
         {!last && <span className={styles.line} />}
       </div>
       <div className={styles.body}>
@@ -40,4 +38,9 @@ export default function ActivityItem({
       <span className={styles.time}>{time}</span>
     </div>
   )
+}
+
+/** V8 x4FeKG. Also usable without a timeline row. */
+export function ActivityMarker({ icon: Icon }: { icon: LucideIcon }) {
+  return <span className={styles.marker} aria-hidden="true"><Icon size={12} /></span>
 }

@@ -75,4 +75,8 @@
 [data-theme='v8'] .time {
   line-height: var(--text-lh);
 }
+
+[data-theme='v8'] .marker { gap: 0; border-radius: 999px; }
+[data-theme='v8'] .marker svg { flex-shrink: 0; }
+
 }
