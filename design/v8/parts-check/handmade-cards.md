@@ -781,4 +781,3 @@
 | `apps/web/src/components/broadcasts/broadcast-form.tsx:2580` | …r(bubbles) \|\| (previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です')}\`, done: !bubblesError(bubbles) && previewConfirmed, move: 'メッセージへ戻る' }, |
 | `apps/web/src/components/broadcasts/broadcast-form.tsx:2637` | …iewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox> |
 | `apps/web/src/components/broadcasts/broadcast-form.tsx:2869` | …{previewConfirmed ? null : <li>LINEプレビューが未確認です</li>} |
-
