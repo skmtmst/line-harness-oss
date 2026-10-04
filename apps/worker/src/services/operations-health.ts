@@ -36,6 +36,17 @@ const FRIEND_DECREASE_WARNING_RATIO = -0.05;
 const FRIEND_DECREASE_DANGER_RATIO = -0.1;
 const FRIEND_DECREASE_MIN_ABSOLUTE = 10;
 
+/**
+ * 台帳の JST 壁時計（オフセット無し）と比べるための境界を、保存と同じ書式で返す。
+ * line_webhook_events.received_at は strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours') の
+ * JST 文字列で入る。observedAt は UTC の ISO なので datetime() のまま比べると
+ * 9時間ぶん受信が新しく見え（区切りが T と空白で違うため大小も狂う）、
+ * 26時間前の受信を「直近24時間にあった」と数えてしまう。
+ */
+function jstCutoff(nowIso: string, backMs: number): string {
+  return new Date(Date.parse(nowIso) + JST_OFFSET_MS - backMs).toISOString().replace('Z', '');
+}
+
 /** JST の月初・翌月初を、台帳の JST 壁時計（オフセット無し）と同じ形で返す。 */
 function jstMonthBounds(nowIso: string): { monthStart: string; monthEnd: string; resetAt: string } {
   const jst = new Date(Date.parse(nowIso) + JST_OFFSET_MS);
@@ -255,8 +266,8 @@ async function collectChecks(
                 COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0) AS failed_count,
                 COUNT(*) AS event_count
            FROM line_webhook_events
-          WHERE line_account_id = ? AND received_at >= datetime(?, '-1 hour')`,
-      ).bind(account.id, observedAt).first<{
+          WHERE line_account_id = ? AND received_at >= ?`,
+      ).bind(account.id, jstCutoff(observedAt, 60 * 60_000)).first<{
         last_received_at: string | null; failed_count: number; event_count: number;
       }>();
       if (!row?.last_received_at) {
@@ -264,11 +275,15 @@ async function collectChecks(
         // 静かな時間帯ごとに知らせが鳴る。普段は受信があるのに1日止まった時だけ注意にする。
         const span = await db.prepare(
           `SELECT MAX(received_at) AS last_received_at,
-                  COALESCE(SUM(CASE WHEN received_at >= datetime(?, '-24 hour') THEN 1 ELSE 0 END), 0) AS day_count,
+                  COALESCE(SUM(CASE WHEN received_at >= ? THEN 1 ELSE 0 END), 0) AS day_count,
                   COUNT(*) AS week_count
              FROM line_webhook_events
-            WHERE line_account_id = ? AND received_at >= datetime(?, '-7 day')`,
-        ).bind(observedAt, account.id, observedAt).first<{
+            WHERE line_account_id = ? AND received_at >= ?`,
+        ).bind(
+          jstCutoff(observedAt, 24 * 60 * 60_000),
+          account.id,
+          jstCutoff(observedAt, 7 * 24 * 60 * 60_000),
+        ).first<{
           last_received_at: string | null; day_count: number; week_count: number;
         }>();
         const silent = Number(span?.day_count ?? 0) === 0 && Number(span?.week_count ?? 0) > 0;
@@ -377,8 +392,10 @@ async function collectChecks(
             .bind(probeId, 'd1', probeId.slice(0, 8), observedAt),
           db.prepare('SELECT payload FROM operation_infra_probes WHERE id = ?').bind(probeId),
           db.prepare('DELETE FROM operation_infra_probes WHERE id = ?').bind(probeId),
-          db.prepare("DELETE FROM operation_infra_probes WHERE created_at < datetime(?, '-1 day')")
-            .bind(observedAt),
+          // created_at は observedAt（UTCのISO・Z付き）で入れている。datetime() は
+          // 'YYYY-MM-DD HH:MM:SS' を返して書式が違うため、同じ書式のまま引き算して比べる。
+          db.prepare('DELETE FROM operation_infra_probes WHERE created_at < ?')
+            .bind(new Date(Date.parse(observedAt) - 24 * 60 * 60_000).toISOString()),
         ]);
       });
       if (deps.r2) {

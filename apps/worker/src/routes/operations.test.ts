@@ -1341,17 +1341,62 @@ describe('繰り返し通知の止め方（同じ知らせが5分ごとに鳴ら
     });
 
     // 3日前までは受信があるのに、直近24時間は1件も無い → 本当に止まっている疑い。
+    // received_at は本番と同じ JST の壁時計（Z無し）で入れる。
     testDb.raw.prepare(
       `INSERT INTO line_webhook_events
          (webhook_event_id, line_account_id, event_type, status, received_at, updated_at)
-       VALUES ('wh-old', 'account-1', 'message', 'succeeded', '2026-09-12T00:00:00.000Z', '2026-09-12T00:00:00.000Z')`,
+       VALUES ('wh-old', 'account-1', 'message', 'succeeded', '2026-09-12T09:00:00.000', '2026-09-12T09:00:00.000')`,
     ).run();
     const silent = await runOperationHealthChecks(testDb.db, {
       lineAccountId: 'account-1', source: 'scheduled', now: '2026-09-15T00:05:00.000Z',
     });
     expect(silent.run.results.find((r) => r.checkKey === 'webhook')).toMatchObject({
       status: 'warning',
-      value: { eventCount: 0, received24h: 0, received7d: 1, lastReceivedAt: '2026-09-12T00:00:00.000Z' },
+      value: { eventCount: 0, received24h: 0, received7d: 1, lastReceivedAt: '2026-09-12T09:00:00.000' },
+    });
+  });
+
+  it('受信時刻はJSTで保存されるので、26時間前の受信を「直近24時間にあった」と数えない', async () => {
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    unlimitedQuota();
+
+    // 本番の received_at は strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours') の JST。
+    // 判定時刻(observedAt)は UTC なので、そのまま datetime() で引き算すると
+    // 9時間ぶん受信が新しく見え、26時間前の受信が24時間以内に入ってしまっていた。
+    // UTC 2026-09-15T12:00:00Z = JST 21:00 の26時間前 = JST 2026-09-14T19:00。
+    testDb.raw.prepare(
+      `INSERT INTO line_webhook_events
+         (webhook_event_id, line_account_id, event_type, status, received_at, updated_at)
+       VALUES ('wh-26h', 'account-1', 'message', 'succeeded', '2026-09-14T19:00:00.000', '2026-09-14T19:00:00.000')`,
+    ).run();
+    const checked = await runOperationHealthChecks(testDb.db, {
+      lineAccountId: 'account-1', source: 'scheduled', now: '2026-09-15T12:00:00.000Z',
+    });
+    expect(checked.run.results.find((r) => r.checkKey === 'webhook')).toMatchObject({
+      status: 'warning',
+      value: { eventCount: 0, received24h: 0, received7d: 1, lastReceivedAt: '2026-09-14T19:00:00.000' },
+    });
+  });
+
+  it('直近1時間の窓も9時間ずれない（5時間前の受信を「直近1時間」に数えない）', async () => {
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    unlimitedQuota();
+
+    // UTC 2026-09-15T12:00:00Z = JST 21:00 の5時間前 = JST 2026-09-15T16:00。
+    // 1時間窓がずれていると、これが「直近1時間の受信」として数えられ、
+    // last_received_at が入るので「24時間止まっている」判定にも進めなくなっていた。
+    testDb.raw.prepare(
+      `INSERT INTO line_webhook_events
+         (webhook_event_id, line_account_id, event_type, status, received_at, updated_at)
+       VALUES ('wh-5h', 'account-1', 'message', 'succeeded', '2026-09-15T16:00:00.000', '2026-09-15T16:00:00.000')`,
+    ).run();
+    const checked = await runOperationHealthChecks(testDb.db, {
+      lineAccountId: 'account-1', source: 'scheduled', now: '2026-09-15T12:00:00.000Z',
+    });
+    expect(checked.run.results.find((r) => r.checkKey === 'webhook')).toMatchObject({
+      status: 'normal',
+      summary: '直近1時間のWebhook受信はありません（普段どおりの範囲です）',
+      value: { eventCount: 0, received24h: 1, received7d: 1, lastReceivedAt: '2026-09-15T16:00:00.000' },
     });
   });
 
