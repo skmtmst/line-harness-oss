@@ -84,11 +84,21 @@
     "unresolved-classname": 71,
     "direct-th": 7
   },
+  "app/automations/automations-v8.tsx": {
+    "unresolved-classname": 9
+  },
+  "app/automations/new/new-v8.tsx": {
+    "unresolved-classname": 140
+  },
   "app/automations/new/page.tsx": {
     "unresolved-classname": 55
   },
   "app/automations/page.tsx": {
     "arbitrary-value": 1
+  },
+  "app/automations/runs-v8.tsx": {
+    "unresolved-classname": 90,
+    "direct-th": 6
   },
   "app/booking/bookings/detail/page.tsx": {
     "unresolved-classname": 1
@@ -161,6 +171,17 @@
     "arbitrary-value": 37,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
+  },
+  "app/common-actions/common-action-new-v8.tsx": {
+    "unresolved-classname": 43
+  },
+  "app/common-actions/common-action-versions-v8.tsx": {
+    "unresolved-classname": 66,
+    "direct-th": 6
+  },
+  "app/common-actions/common-actions-v8.tsx": {
+    "unresolved-classname": 39,
+    "direct-th": 6
   },
   "app/contents/page.tsx": {
     "arbitrary-value": 5
@@ -676,6 +697,27 @@
   "app/users/users-v8.tsx": {
     "unresolved-classname": 55,
     "direct-th": 5
+  },
+  "app/webhooks/_components/webhooks-v8-api-tokens.tsx": {
+    "unresolved-classname": 20
+  },
+  "app/webhooks/_components/webhooks-v8-incoming.tsx": {
+    "unresolved-classname": 104
+  },
+  "app/webhooks/_components/webhooks-v8-interactions.tsx": {
+    "unresolved-classname": 55
+  },
+  "app/webhooks/_components/webhooks-v8-outgoing.tsx": {
+    "unresolved-classname": 87
+  },
+  "app/webhooks/_components/webhooks-v8-samples.tsx": {
+    "unresolved-classname": 23
+  },
+  "app/webhooks/_components/webhooks-v8-sheets.tsx": {
+    "unresolved-classname": 58
+  },
+  "app/webhooks/_components/webhooks-v8-shell.tsx": {
+    "unresolved-classname": 7
   },
   "app/webhooks/apitokens-v8.tsx": {
     "unresolved-classname": 26,

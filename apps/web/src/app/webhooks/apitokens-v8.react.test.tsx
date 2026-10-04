@@ -87,7 +87,8 @@ test('v8 では ralAc の鍵の表（札・入れ替える）が出る', async (
   expect(board?.textContent).toContain('予約システム連携')
   expect(board?.textContent).toContain('使っている')
   expect(board?.textContent).toContain('入れ替える')
-  expect(board?.textContent).toContain('API接続の鍵を発行する')
+  // 板 `ralAc` の作るボタンの文言（本人確認の用途名ではなく表のボタンの文言で見る）。
+  expect(board?.textContent).toContain('鍵を発行する')
 })
 
 test('v7 では従来の鍵タブが出て ralAc は出ない', async () => {

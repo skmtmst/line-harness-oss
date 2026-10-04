@@ -73,6 +73,9 @@ describe('共通部品の影響範囲', () => {
       // ★V8 自動応答の実行結果（nWmLg）。表の下にページ送りを置く。
       'app/auto-replies/runs/runs-v8.tsx',
       'app/automations/page.tsx',
+      // ★V8-B オートメーション（g98F9 動いた記録）。一覧は #1297 が正本。
+      // 札・表の下にページ送りを置く。
+      'app/automations/runs-v8.tsx',
       // 2026-09-27 R24: 実行記録が先頭20件に固定で21件目以降へ届かなかった。
       // 20件ずつのページ送りに寄せた。
       'app/automations/runs/page.tsx',
@@ -83,6 +86,8 @@ describe('共通部品の影響範囲', () => {
       'app/booking/menus/settings-v8.tsx',
       // #1145(★V8): 一斉配信の一覧。20件ずつのページ送りを共通へ寄せた。
       'app/broadcasts/list-v8.tsx',
+      // ★V8-B 共通アクション（LnGNw）。表の下にページ送りを置く。
+      'app/common-actions/common-actions-v8.tsx',
       'app/common-actions/page.tsx',
       // N-193/N-205: 登録メディア選択窓。20件ずつのページ送りを共通へ寄せた。
       'app/contents/media-picker-dialog.tsx',
@@ -203,6 +208,10 @@ describe('共通部品の影響範囲', () => {
       'app/templates/list-v8.tsx',
       // ★V8 統合ユーザーの一覧（ADjK8）。20件ずつのページ送り。
       'app/users/users-v8.tsx',
+      // ★V8-B 外部連携・やり取りの記録（Uv9AA）。表の下にページ送りを置く。
+      'app/webhooks/_components/webhooks-v8-interactions.tsx',
+      // ★V8-B 外部連携・こちらから送る（ZSbFY）。表の下にページ送りを置く。
+      'app/webhooks/_components/webhooks-v8-outgoing.tsx',
       // ★V8-B 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りがある。
       'app/webhooks/interactions-v8.tsx',
       // ★V8-B 外部連携の一覧（ZSbFY）。表の下にページ送りがある。
