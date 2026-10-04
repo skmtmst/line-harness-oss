@@ -1391,3 +1391,47 @@ describe('V8 仮押さえ・日付・来店履歴', () => {
     for (const body of [{ ...hold, holdMinutes: 0 }, { ...hold, storeId: 'other' }]) expect((await request('/api/restaurant-test/reservations/holds?account_id=account-1', body)).status).toBe(400);
   });
 });
+
+describe('V8 枠の自動生成と全枠の競合', () => {
+  const hours = Array.from({length:7}, (_,weekday)=>({weekday,periods:[{opensAt:'17:00',closesAt:'19:00'}]}));
+  const alloc={otaCapacity:1,lineCapacity:1,walkInCapacity:1};
+  it('店舗時間の営業時間から30分枠を作り、再送で既存枠を上書きしない', async () => {
+    seedRestaurantFixture();
+    await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-1','PUT',{storeId:'store-ginza',hours,expectedVersion:0});
+    const body={storeId:'store-ginza',date:'2099-10-10',expectedHoursVersion:1,...alloc};
+    const res=await request('/api/restaurant-test/inventory/generate?account_id=account-1',body);
+    expect(res.status).toBe(200);
+    expect((await res.json() as any).data.generated).toBe(4);
+    const rows=testDb.raw.prepare('SELECT starts_at FROM rt_inventory_slots ORDER BY starts_at').all();
+    expect(rows[0]).toEqual({starts_at:'2099-10-10T08:00:00.000Z'});
+    expect((await (await request('/api/restaurant-test/inventory/generate?account_id=account-1',body)).json() as any).data.generated).toBe(0);
+    expect((await request('/api/restaurant-test/inventory/generate?account_id=account-1',{...body,expectedHoursVersion:0})).status).toBe(409);
+  });
+  it('全枠のどれか一つが古いと一件も変更せず、正しい版なら全部更新する', async () => {
+    seedRestaurantFixture();
+    for(const id of ['s1','s2']) testDb.raw.prepare(`INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity) VALUES(?,'store-ginza',?,4)`).run(id, id==='s1'?'2099-10-10T08:00:00Z':'2099-10-10T08:30:00Z');
+    const url='/api/restaurant-test/inventory/allocation?account_id=account-1';
+    expect((await requestWithMethod(url,'PUT',{storeId:'store-ginza',slots:[{id:'s1',expectedVersion:1},{id:'s2',expectedVersion:0}],...alloc})).status).toBe(400);
+    testDb.raw.exec("UPDATE rt_inventory_slots SET version=2 WHERE id='s2'");
+    expect((await requestWithMethod(url,'PUT',{storeId:'store-ginza',slots:[{id:'s1',expectedVersion:1},{id:'s2',expectedVersion:1}],...alloc})).status).toBe(409);
+    expect(testDb.raw.prepare("SELECT ota_capacity FROM rt_inventory_slots WHERE id='s1'").get()).toEqual({ota_capacity:0});
+    expect((await requestWithMethod(url,'PUT',{storeId:'store-ginza',slots:[{id:'s1',expectedVersion:1},{id:'s2',expectedVersion:2}],...alloc})).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT version FROM rt_inventory_slots ORDER BY id').all()).toEqual([{version:2},{version:3}]);
+  });
+  it('人数ではなく卓の占有席数で空きを返し、枠をまたぐ予約も集計する', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec(`INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity) VALUES('slot','store-ginza','2099-10-10T08:30:00Z',4);
+      INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,table_id) VALUES('occupy','store-ginza','phone','試験',2,'2099-10-10T08:00:00Z','2099-10-10T10:00:00Z','table-ginza');`);
+    const res=await request('/api/restaurant-test/inventory/day?account_id=account-1&storeId=store-ginza&date=2099-10-10');
+    expect(res.status).toBe(200);
+    const slot=(await res.json() as any).data[0];
+    expect(slot).toMatchObject({reserved_count:2,occupied_seats:4,occupiedTableIds:['table-ginza'],freeSeats:0});
+  });
+  it('夜をまたぐ営業時間も30分枠を作る', async () => {
+    seedRestaurantFixture();
+    const weekday=new Date('2099-10-10').getUTCDay();
+    await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-1','PUT',{storeId:'store-ginza',hours:Array.from({length:7},(_,w)=>({weekday:w,periods:w===weekday?[{opensAt:'23:00',closesAt:'01:00'}]:[]})),expectedVersion:0});
+    const res=await request('/api/restaurant-test/inventory/generate?account_id=account-1',{storeId:'store-ginza',date:'2099-10-10',expectedHoursVersion:1,...alloc});
+    expect((await res.json() as any).data.generated).toBe(4);
+  });
+});

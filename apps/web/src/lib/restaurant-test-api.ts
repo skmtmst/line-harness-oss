@@ -33,7 +33,8 @@ export type RestaurantTable = {
 }
 export type RestaurantInventory = {
   id: string; store_id: string; starts_at: string; slot_minutes: 15 | 30; total_capacity: number;
-  ota_capacity: number; line_capacity: number; walk_in_capacity: number; reserved_count: number
+  ota_capacity: number; line_capacity: number; walk_in_capacity: number; reserved_count: number; version?: number; updated_by?: string | null; updated_by_name?: string | null; updated_at?: string;
+  guest_count?: number; occupied_seats?: number; occupiedTableIds?: string[]; freeSeats?: number
 }
 export type RestaurantMenuItem = {
   id: string; store_id: string; kind: 'course' | 'a_la_carte'; name: string; price: number;
@@ -81,6 +82,11 @@ const withOptionalAccount = (path: string, accountId: string | null) =>
   accountId ? withAccount(path, accountId) : path
 
 export const restaurantTestApi = {
+  openingHours: (accountId: string, storeId: string) => fetchApi<{ success: true; data: RestaurantOpeningHours }>(withAccount(`/api/restaurant-test/opening-hours?storeId=${encodeURIComponent(storeId)}`, accountId)),
+  saveOpeningHours: (accountId: string, body: { storeId: string; hours: NonNullable<RestaurantOpeningHours['hours']>; expectedVersion: number }) => fetchApi<{ success: true; data: { version: number } }>(withAccount('/api/restaurant-test/opening-hours', accountId), { method: 'PUT', body: JSON.stringify(body) }),
+  inventoryDay: (accountId: string, storeId: string, date: string) => fetchApi<{ success: true; data: RestaurantInventory[] }>(withAccount(`/api/restaurant-test/inventory/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`, accountId)),
+  generateInventory: (accountId: string, body: RestaurantAllocation & { storeId: string; date: string; expectedHoursVersion: number }) => fetchApi<{ success: true; data: { generated: number } }>(withAccount('/api/restaurant-test/inventory/generate', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  saveInventoryAllocation: (accountId: string, body: RestaurantAllocation & { storeId: string; slots: Array<{ id: string; expectedVersion: number }> }) => fetchApi<{ success: true; data: { updated: number } }>(withAccount('/api/restaurant-test/inventory/allocation', accountId), { method: 'PUT', body: JSON.stringify(body) }),
   holdReservation: (accountId: string, body: RestaurantHoldInput) => fetchApi<{ success: true; data: RestaurantHoldResult }>(withAccount('/api/restaurant-test/reservations/holds', accountId), { method: 'POST', body: JSON.stringify(body) }),
   reservationsDay: (accountId: string, storeId: string, date: string) => fetchApi<{ success: true; data: { date: string; reservations: RestaurantReservation[] } }>(withAccount(`/api/restaurant-test/reservations/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`, accountId)),
   customerSearch: (accountId: string, storeId: string, q: string) => fetchApi<{ success: true; data: RestaurantCustomer[] }>(withAccount(`/api/restaurant-test/customers/search?storeId=${encodeURIComponent(storeId)}&q=${encodeURIComponent(q)}`, accountId)),

@@ -505,7 +505,8 @@
     "555_tenant_data_retention.sql",
     "556_f13_folder_kinds.sql",
     "564_form_versions_purge_delete.sql",
-    "567_restaurant_reservation_holds.sql"
+    "567_restaurant_reservation_holds.sql",
+    "568_restaurant_inventory_occupancy.sql"
   ],
-  "migrationCount": 506
+  "migrationCount": 507
 }
