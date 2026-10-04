@@ -2483,6 +2483,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   const detail = pathname.match(/^\/api\/friends\/([^/]+)$/)
   if (detail && FRIEND_DETAILS[detail[1]]) return { success: true, data: FRIEND_DETAILS[detail[1]] }
+  /*
+   * 受信箱の会話の相手（friend-0 など）は FRIEND_DETAILS に無く、下の一覧の形
+   * （items・total）が返っていた。受信箱で「顧客情報を表示」を押すと、1人分の
+   * つもりで読んだ右の列が tags.length で落ち、受信箱の画面全体が「画面を表示
+   * できませんでした」になっていた（2026-10-01、操作したあとの記録で発覚）。
+   * friend- で始まる id は friend-1 の中身を土台に、1人分の形で返す。
+   */
+  if (detail && detail[1].startsWith('friend-') && !detail[1].includes('/')) {
+    return { success: true, data: { ...FRIEND_DETAILS['friend-1'], id: detail[1] } }
+  }
   if (/^\/api\/friends\/[^/]+\/mileage$/.test(pathname)) return { success: true, data: FRIEND_MILEAGE }
   if (pathname === '/api/friends/friend-1/fields') {
     const values = ['1988-04-12', '2026-12-31', '2026-09-15', 'プレミアム']
