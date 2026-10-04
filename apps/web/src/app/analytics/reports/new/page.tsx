@@ -86,7 +86,7 @@ const ALERT_RULE_DEFS: Array<{
     lead: '成果が0件の日が ', tail: ' 日つづいたら、レポートに含めて知らせる',
     detail: '計測が壊れていることに気づけます。',
     threshold: '3', minimumSample: '20', step: '1',
-    thresholdLabel: '成果0件がつづく日数のしきい値', sampleLabel: '成果0件条件の判定に必要な最低件数',
+    thresholdLabel: '続いた日数', sampleLabel: '成果0件条件の判定に必要な最低件数',
   },
 ]
 
