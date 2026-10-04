@@ -22,7 +22,7 @@
 .heading p { margin-top: var(--space-2); font-size: 12px; color: var(--color-ink-faint); }
 .heading > button { height: auto; padding: 0; font-size: 12px; color: var(--color-action); }
 .stepRail { min-width: 0; flex: 1; }
-.header :global([data-part='stepper']) { margin: 0; border: 0; border-radius: 0; background: transparent; padding: 0; }
+.header :global([data-part='stepper']) { margin: 0; border: 0; border-radius: var(--radius-none); background: transparent; padding: 0; }
 .header :global([data-part='stepper'] li) { flex: 0 1 auto; gap: var(--space-14); }
 .header :global([data-part='stepper'] ol) { gap: var(--space-14); }
 .header :global([data-part='stepper'] li > span[aria-hidden]) { width: 10px; }
@@ -35,7 +35,7 @@
 .section { display: flex; flex-direction: column; gap: var(--space-14); min-width: 0; }
 .root h3 { font-size: 13px; font-weight: 600; line-height: 20px; }
 .section > :global(fieldset) { margin: 0; }
-.input > section:not(:global(.hidden)), .input > div:global(.contents) > section { border: 0; border-radius: 0; box-shadow: none; padding: 0; margin: 0; }
+.input > section:not(:global(.hidden)), .input > div:global(.contents) > section { border: 0; border-radius: var(--radius-none); box-shadow: none; padding: 0; margin: 0; }
 .input:global(.broadcast-preflight-page-open) > :not(:global(.broadcast-preflight-page)) { display: none; }
 .methodCards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-12); }
 .audienceCards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-10); }
@@ -84,7 +84,7 @@
 .previewActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-8); }
 .previewActions button { font-size: 12px; }
 .previewToggle, .previewClose { display: none; }
-.root .footer { position: sticky; bottom: 0; min-height: 60px; border: 0; border-top: 1px solid var(--color-hairline); border-radius: 0; box-shadow: none; padding: var(--space-12) var(--space-24); }
+.root .footer { position: sticky; bottom: 0; min-height: 60px; border: 0; border-top: 1px solid var(--color-hairline); border-radius: var(--radius-none); box-shadow: none; padding: var(--space-12) var(--space-24); }
 .footer > :nth-child(2) { justify-content: center; }
 .root input:focus-visible, .root textarea:focus-visible, .root summary:focus-visible, .root a:focus-visible { outline: 2px solid var(--color-accent-deep); outline-offset: 2px; }
 .root input, .root textarea { caret-color: var(--color-accent-deep); }
@@ -127,7 +127,7 @@
 .bubbleFrame[open] { border-color: var(--color-accent-deep); }
 .bubbleFrame > summary { display: flex; align-items: center; gap: var(--space-8); cursor: pointer; padding: var(--space-10) var(--space-12); font-size: 13px; font-weight: 500; background: var(--color-surface-pearl); border-radius: var(--radius-control); }
 .bubbleNumber { display: inline-flex; justify-content: center; align-items: center; width: 20px; height: 20px; border-radius: var(--radius-pill); background: var(--color-ink); color: var(--color-canvas); font-size: 11px; }
-.bubbleFrame > section { border: 0; border-radius: 0; margin: 0; padding: var(--space-12); }
+.bubbleFrame > section { border: 0; border-radius: var(--radius-none); margin: 0; padding: var(--space-12); }
 .bubbleFrame > :global([role='tablist']) { margin: 0; padding: var(--space-6) var(--space-10); border-bottom: 1px solid var(--color-hairline); }
 
 .methodCards small { white-space: normal; text-overflow: clip; overflow: visible; }
