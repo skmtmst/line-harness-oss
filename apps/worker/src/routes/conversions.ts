@@ -45,6 +45,8 @@ import {
   getReversedEventIds,
   listConversionReversals,
   getAttributionDecisionView,
+  getAdEventMapping,
+  upsertAdEventMapping,
   ConversionDefinitionError,
   CONVERSION_DEFINITION_USAGE_KINDS,
   isExclusionSavable,
@@ -1317,6 +1319,59 @@ conversions.delete('/api/conversions/points/:id', requireRole('owner', 'admin'),
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/conversions/points/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// F-21 成果と広告イベントの対応表：どの成果をどの広告イベント名で送るか。
+// 対応が無い地点は今までどおり固定名で送る（送信側が対応表を引く）。
+// GET /api/conversions/points/:id/ad-event-mapping - 対応表の読み
+conversions.get('/api/conversions/points/:id/ad-event-mapping', conversionPermission('view'), requireVisibleConversionPoint, async (c) => {
+  try {
+    const id = c.req.param('id');
+    const mapping = await getAdEventMapping(c.env.DB, id);
+    return c.json({
+      success: true,
+      data: mapping
+        ? {
+          conversionPointId: mapping.conversion_point_id,
+          eventName: mapping.event_name,
+          updatedAt: mapping.updated_at,
+        }
+        : null,
+    });
+  } catch (err) {
+    console.error('GET /api/conversions/points/:id/ad-event-mapping error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// PUT /api/conversions/points/:id/ad-event-mapping - 対応表の保存
+conversions.put('/api/conversions/points/:id/ad-event-mapping', requireRole('owner', 'admin'), requireVisibleConversionPoint, async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json<{ eventName?: unknown }>().catch((): { eventName?: unknown } => ({}));
+    if (typeof body.eventName !== 'string' || !body.eventName.trim()) {
+      return c.json({ success: false, error: 'eventNameを指定してください' }, 400);
+    }
+    try {
+      const mapping = await upsertAdEventMapping(c.env.DB, id, body.eventName);
+      return c.json({
+        success: true,
+        data: {
+          conversionPointId: mapping.conversion_point_id,
+          eventName: mapping.event_name,
+          updatedAt: mapping.updated_at,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'ad_event_mapping_name_invalid') {
+        return c.json({ success: false, error: 'eventNameは1〜100文字で指定してください' }, 400);
+      }
+      throw error;
+    }
+  } catch (err) {
+    console.error('PUT /api/conversions/points/:id/ad-event-mapping error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

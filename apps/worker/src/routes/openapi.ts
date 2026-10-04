@@ -4726,6 +4726,43 @@ const spec = {
         },
       },
     },
+    '/api/conversions/points/{id}/ad-event-mapping': {
+      get: {
+        tags: ['Conversions'],
+        summary: '成果と広告イベントの対応表の読み(F-21)',
+        description: 'どの成果をどの広告イベント名で送るか。対応が無いとき data は null。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '対応表 { conversionPointId・eventName・updatedAt } または null' },
+          '404': { description: '成果地点が見つからない・権限外' },
+        },
+      },
+      put: {
+        tags: ['Conversions'],
+        summary: '成果と広告イベントの対応表の保存(F-21)',
+        description: '地点ごとの広告イベント名を保存する。送信時にこの名前を優先する。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { eventName: { type: 'string', maxLength: 100 } }, required: ['eventName'] } } } },
+        responses: {
+          '200': { description: '保存した対応表' },
+          '400': { description: 'eventName が無い・長すぎる' },
+          '404': { description: '成果地点が見つからない・権限外' },
+        },
+      },
+    },
+    '/api/ad-platforms/outbox/{id}/retry': {
+      post: {
+        tags: ['AdPlatforms'],
+        summary: '失敗した広告送信のやり直し(F-22)',
+        description: '行の冪等キーは変えない。失敗でない行と、元の成果から90日を過ぎた行は拒む。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '送り直しの列に戻した { id・status }' },
+          '404': { description: '送信行が見つからない・権限外' },
+          '422': { description: '失敗でない・90日を過ぎた' },
+        },
+      },
+    },
     '/api/measurement-sites': {
       get: {
         tags: ['Conversions'],
