@@ -258,6 +258,15 @@
   border-collapse: collapse;
 }
 
+/*
+ * 表の器に収める固定割付。自動割付だと改行しない中身（見出し・札・操作）が
+ * 表を器より広げ、行末の操作が見切れる。先頭列だけ伸び縮みし、残りは列幅の
+ * 合計が 100 になるよう `colgroup` で渡す。
+ */
+.tableFit {
+  table-layout: fixed;
+}
+
 /* 1列目は伸び縮み（余った幅を取る・狭いときは中の省略で縮む）。ほかは中身の幅。 */
 .table thead th:first-child,
 .table tbody td:first-child {
