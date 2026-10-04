@@ -1,549 +1,365 @@
-@layer properties, theme, base, components, utilities;
+/* 流入と計測の一覧（板 xbHxg）。色・丸み・影は globals.css の名前だけ。 */
 
-/*
- * ★V8-B 流入と計測の一覧（板 `xbHxg`、状態 `URzvC`、1152 `y1ztx`、
- * 閲覧のみ `EMUl9`）。
- *
- * v7 の一覧（`page.tsx` 内の `InflowLinksPageInner`）とは別の見せ方。
- * 数の帯は白い板の左右いっぱいに区切り線で並べる（FINAL-HANDOFF §3）。
- * 板が 1100px を切ったらフォルダの列を道具の段へ畳む（`y1ztx`）。
- */
 .board {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-board);
+  padding: 20px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  container-type: inline-size;
-}
-
-/* 見出し：左に題＋説明1行、右に副ボタン2つ。 */
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px 12px;
-}
-
-.headText {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   min-width: 0;
 }
 
-.headTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.headBack {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-action);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.headBack:hover {
-  text-decoration: underline;
-}
-
-.headDescription {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.headActions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 閲覧のみの帯：板の頭の下（EMUl9）。 */
-.readonlyBand {
-  margin: 0;
-}
-
-/* 数の帯：4マスを縦線で区切る（xbHxg）。 */
-.kpis {
+/* 数の帯。4枚を縦の線で割る。 */
+.band {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
   background: var(--color-canvas);
-  list-style: none;
-}
-
-.kpi {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  padding: 12px 16px;
-}
-
-.kpi + .kpi {
-  border-left: 1px solid var(--color-hairline);
-}
-
-.kpiLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.kpiLabel svg {
-  flex-shrink: 0;
-  color: var(--color-ink-faint);
-}
-
-.kpiValue {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1.3;
-  font-variant-numeric: tabular-nums;
-}
-
-.kpiUnit {
-  margin-left: 2px;
-  color: var(--color-ink-faint);
-  font-size: 12px;
-  font-weight: 400;
-}
-
-.kpiDetail {
-  margin: 0;
   overflow: hidden;
-  color: var(--color-ink-faint);
-  font-size: 11px;
-  line-height: 1.6;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-/* 本体：左に作るボタンとフォルダの列、右に一覧。 */
-.split {
-  display: grid;
-  grid-template-columns: 208px minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
-}
-
-.folderCol {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.tile {
+  padding: 12px 16px;
   min-width: 0;
+  border-left: 1px solid var(--color-board-line);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  cursor: default;
 }
 
-.createButton {
-  width: 100%;
+.tile:first-child {
+  border-left: none;
 }
 
-.folderTitle {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.folderList {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.folderRow {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.folderRow .folderItem {
-  flex: 1 1 auto;
-}
-
-.folderEdit {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-control, 8px);
-  background: transparent;
-  color: var(--color-ink-faint);
+button.tile {
   cursor: pointer;
 }
 
-.folderEdit:hover {
+button.tile:hover {
   background: var(--color-canvas-sunken);
 }
 
-.folderItem {
+.tileTop {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: var(--radius-control, 8px);
-  background: transparent;
+}
+
+.tileIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.folderItem:hover {
-  background: var(--color-canvas-sunken);
-}
-
-.folderItemActive {
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink);
-  font-weight: 600;
-}
-
-.folderItemIcon {
   flex-shrink: 0;
-  color: var(--color-ink-faint);
 }
 
-.folderItemLabel {
-  flex: 1 1 auto;
-  min-width: 0;
+.tileTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.folderItemCount {
-  flex-shrink: 0;
-  color: var(--color-ink-faint);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.folderAdd {
-  align-self: flex-start;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-action);
-  font-size: 13px;
+.tileValue {
+  margin-top: 4px;
+  font-size: 24px;
   font-weight: 600;
-  cursor: pointer;
+  letter-spacing: -0.4px;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
-.folderAdd:hover {
-  text-decoration: underline;
+.tileUnit {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-ink-secondary);
+  margin-left: 2px;
+}
+
+.tileSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 本文の2列（フォルダの列＋一覧）。 */
+.columns {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: var(--folder-rail-width) minmax(0, 1fr);
+  }
 }
 
 .folderNote {
-  margin: 0;
+  margin-top: 8px;
+  font-size: 12px;
   color: var(--color-ink-faint);
-  font-size: 11px;
   line-height: 1.6;
 }
 
-.listCol {
+.createRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 道具の1段。 */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolsSearch {
+  flex: 1 1 240px;
+  min-width: 200px;
+  max-width: 360px;
+}
+
+.toolsRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.presetWrap {
+  position: relative;
+}
+
+.presetPanel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  width: 260px;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-float);
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-}
-
-/* 道具の段：検索・札・右によく使う絞り込みと件数。 */
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: 8px;
 }
 
-/* 広い板では「作る」とフォルダ選びはフォルダの列にいる。道具の段には出さない。 */
-.toolbarCreate,
-.folderSelectWrap {
-  display: none;
+.presetLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
 }
 
-.toolbarSpacer {
-  flex: 1 1 auto;
-}
-
-.searchWrap {
-  width: 240px;
-  min-width: 160px;
-}
-
-.chipRow {
+.presetChips {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 8px;
 }
 
-/* 表：1列目（流入元名）が伸び縮み、ほかは中身に合わせた幅。 */
-.tableWrap {
+/* 表の殻。狭い幅では中だけ横に送る（列は消さない）。 */
+.tableShell {
   overflow-x: auto;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-control);
   background: var(--color-canvas);
 }
 
-.table {
+.tableShell table {
   width: 100%;
-  min-width: 960px;
-  table-layout: fixed;
+  min-width: 1060px;
   border-collapse: collapse;
   font-size: 13px;
 }
 
-.table th {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-faint);
-  font-size: 11px;
-  font-weight: 600;
-  text-align: left;
-  white-space: nowrap;
+.nameCell {
+  min-width: 0;
 }
 
-.table th.numeric,
-.table td.numeric {
-  text-align: right;
-}
-
-.table td {
-  padding: 12px;
-  border-bottom: 1px solid var(--color-hairline);
-  vertical-align: middle;
-}
-
-.table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.cellName {
+.nameLink {
   display: block;
-  max-width: 100%;
   overflow: hidden;
-  color: var(--color-action);
-  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--color-accent-deep);
+  font-weight: 600;
 }
 
-.cellName:hover {
+.nameLink:hover {
   text-decoration: underline;
 }
 
-.cellNamePlain {
+.refCode {
   display: block;
-  max-width: 100%;
   overflow: hidden;
-  color: var(--color-ink);
-  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 12px;
+  color: var(--color-action);
+  font-family: var(--font-mono, monospace);
 }
 
-.cellSub {
-  display: block;
-  margin: 2px 0 0;
-  overflow: hidden;
-  color: var(--color-ink-faint);
-  font-family: var(--font-num);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cellEllipsis {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--color-ink-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cellMuted {
-  color: var(--color-ink-faint);
-}
-
-.cellValue {
-  color: var(--color-ink);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.cellSubValue {
-  display: block;
-  color: var(--color-ink-faint);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-/* 状態の札（計測済・未登録・停止中）。 */
-.statePill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.statusChip {
+  display: inline-block;
   margin-top: 4px;
-  padding: 3px 10px;
+  padding: 1px 8px;
   border-radius: var(--radius-pill);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  border: 1px solid transparent;
   white-space: nowrap;
 }
 
-.statePillDot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: currentColor;
+.statusMeasured {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  border-color: var(--color-accent-border);
 }
 
-.statePillActive {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.statePillOrphan {
+.statusUnregistered {
   background: var(--color-status-warn-soft);
   color: var(--color-status-warn-deep);
+  border-color: var(--color-status-warn-soft);
 }
 
-.statePillStopped {
+.statusStopped {
   background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  border-color: var(--color-board-line);
+}
+
+.twoLine {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.twoLineSub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
   color: var(--color-ink-secondary);
 }
 
-.urlButton {
+.numCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.urlCell {
+  white-space: nowrap;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-action);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.linkButton:disabled {
+  color: var(--color-ink-faint);
+  cursor: default;
+  text-decoration: none;
+}
+
+.moreCell {
+  position: relative;
+  white-space: nowrap;
+}
+
+.moreButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 64px;
-  padding: 6px 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control, 8px);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-board-line);
   background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
+  color: var(--color-ink-secondary);
   cursor: pointer;
 }
 
-.urlButton:hover {
+.moreButton:hover {
   background: var(--color-canvas-sunken);
 }
 
-.urlButtonStopped {
-  cursor: default;
+.stoppedLabel {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-board-line);
+  background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
-.rowActions {
+/* 表の下の注とページ送り。 */
+.tableFoot {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  line-height: 1.7;
+}
+
+.pager {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-}
-
-/* 表の下の案内。 */
-.tableNote {
-  margin: 0;
-  color: var(--color-ink-faint);
-  font-size: 11px;
-  line-height: 1.6;
-}
-
-/* ページ送りの行。左に件数、右にページ送り。 */
-.pagerRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.pagerCount {
-  color: var(--color-ink-secondary);
   font-size: 12px;
-  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-faint);
 }
 
-/* ===== 板が 1100px を切ったら（`y1ztx`：フォルダの列を道具の段へ畳む） ===== */
-@container (max-width: 1099px) {
-  .kpis {
+@media (max-width: 900px) {
+  .band {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .kpi:nth-child(3) {
-    border-left: 0;
+  .tile:nth-child(3) {
+    border-left: none;
   }
 
-  .kpi:nth-child(n + 3) {
-    border-top: 1px solid var(--color-hairline);
+  .tile:nth-child(n + 3) {
+    border-top: 1px solid var(--color-board-line);
   }
 
-  .split {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* フォルダの列は道具の段の選ぶ欄へ畳む。「作る」は道具の段の左端。 */
-  .folderCol {
-    display: none;
-  }
-
-  .toolbarCreate {
-    display: inline-flex;
-  }
-
-  .folderSelectWrap {
-    display: block;
-    min-width: 160px;
-  }
-}
-
-/* さらに狭い板では数の帯も1列に。 */
-@container (max-width: 560px) {
-  .kpis {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .kpi + .kpi {
-    border-top: 1px solid var(--color-hairline);
-    border-left: 0;
-  }
-
-  .searchWrap {
-    width: 100%;
+  .board {
+    padding: 16px;
   }
 }

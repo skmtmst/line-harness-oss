@@ -1,237 +1,223 @@
-@layer properties, theme, base, components, utilities;
+/* 流入リンクを作る（板 KMaMk）。色・丸み・影は globals.css の名前だけ。 */
 
-/*
- * ★V8-B 流入リンクを作る（板 `KMaMk`、競合 `vWJEm`）。
- *
- * v7 の作る画面（`new/page.tsx`）とは別の見せ方。入力の項目・順番・
- * 保存の動きは v7 と同じ（REF の形・未入力の扱い・409 の重複の扱い）。
- * 右の列（幅 380・薄い地・左に細い線）に「お客さまの進む順」と
- * スマホの見本を固定する。下の帯は追従（sticky）。
- */
 .board {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  container-type: inline-size;
-}
-
-.head {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.headBackWrap {
-  margin: 0;
-}
-
-.headBack {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-action);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.headBack:hover {
-  text-decoration: underline;
-}
-
-.headTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.headDescription {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-/* 競合の帯：板の頭の下（`vWJEm`）。 */
-.conflictBand {
-  margin: 0;
-}
-
-.split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 0;
-  align-items: start;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
-}
-
-.main {
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-board);
+  padding: 20px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  padding: 20px 24px;
 }
 
-.section {
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+.backLink {
+  font-size: 13px;
+  color: var(--color-action);
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+.mainCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
   background: var(--color-canvas);
   padding: 16px;
 }
 
-.sectionTitle {
+.cardTitle {
   margin: 0;
-  color: var(--color-ink);
   font-size: 15px;
   font-weight: 600;
-  line-height: 1.4;
-}
-
-.sectionNote {
-  margin: 4px 0 0;
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.fieldGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.fieldFull {
-  grid-column: 1 / -1;
-}
-
-.fieldGrid label {
-  display: block;
-  margin-bottom: 4px;
   color: var(--color-ink);
+}
+
+.cardSub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.fields {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.twoCol {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .twoCol {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.fieldLabel {
+  display: block;
   font-size: 13px;
   font-weight: 600;
+  color: var(--color-ink);
+  margin-bottom: 4px;
 }
 
-.urlPreview {
+.optional {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-ink-faint);
+}
+
+.fieldError {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+.urlBox {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control, 8px);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-control);
   background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
+  padding: 10px 12px;
   font-size: 13px;
+  color: var(--color-ink-secondary);
+  overflow: hidden;
 }
 
-.urlPreviewCode {
+.urlText {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-num);
 }
 
-.urlPreviewNote {
-  flex-shrink: 0;
+.urlNote {
+  font-size: 12px;
   color: var(--color-ink-faint);
-  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-/* 動きの行：スイッチ＋説明＋右に変えるボタン。 */
-.actionRow {
+.toggleRow {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
 }
 
-.actionRowText {
+.toggleText {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.actionRowTitle {
-  margin: 0;
-  color: var(--color-ink);
+.toggleTitle {
   font-size: 13px;
   font-weight: 600;
+  color: var(--color-ink);
 }
 
-.actionRowSub {
-  margin: 2px 0 0;
-  overflow: hidden;
-  color: var(--color-ink-secondary);
+.toggleValue {
   font-size: 12px;
+  color: var(--color-ink-secondary);
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.actionPicker {
+.togglePick {
   margin-top: 8px;
 }
 
-/* 右の列：進む順＋スマホの見本。 */
-.rail {
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sideCol {
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  padding: 20px 24px;
-  border-left: 1px solid var(--color-hairline);
-  background: var(--color-canvas-sunken);
-  border-top-right-radius: var(--radius-card, 12px);
-  border-bottom-right-radius: var(--radius-card, 12px);
 }
 
-.railTitle {
-  margin: 0;
-  color: var(--color-ink);
+.stepsCard {
+  border-left: 1px solid var(--color-board-line);
+  padding-left: 16px;
+}
+
+.stepsTitle {
+  margin: 0 0 8px;
   font-size: 14px;
   font-weight: 600;
+  color: var(--color-ink);
 }
 
-.flowList {
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0;
-  margin: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
-  list-style: none;
+  gap: 10px;
 }
 
-.flowItem {
+.step {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 8px 0;
+  gap: 8px;
+  font-size: 13px;
   color: var(--color-ink-secondary);
-  font-size: 12px;
   line-height: 1.6;
 }
 
-.flowItem + .flowItem {
-  border-top: 1px solid var(--color-hairline);
-}
-
-.flowNum {
+.stepNum {
   display: inline-flex;
-  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   width: 20px;
@@ -239,138 +225,124 @@
   border-radius: var(--radius-pill);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.flowNumLast {
-  background: var(--color-accent-deep);
-  color: var(--color-canvas);
-}
-
-/* スマホの見本：黒い縁・LINE の青い地・白い吹き出し。丸みはトークンで同心円（外側＝内側＋縁の10px）。 */
-.phone {
-  overflow: hidden;
-  border: 10px solid var(--color-ink);
-  border-radius: var(--radius-large);
-  background: var(--color-ink);
-}
-
-.phoneScreen {
-  display: flex;
-  flex-direction: column;
-  min-height: 420px;
-  border-radius: var(--radius-control);
-  background: var(--color-canvas-sunken);
-}
-
-.phoneStatus {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px 4px;
-  color: var(--color-ink);
   font-size: 12px;
   font-weight: 600;
-}
-
-.phoneAccount {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.phoneBody {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: var(--v8-line-screen, var(--color-line-talk));
-}
-
-.phoneDay {
-  align-self: center;
-  padding: 2px 10px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-canvas) 60%, transparent);
-  color: var(--color-ink-secondary);
-  font-size: 10px;
-}
-
-.phoneRow {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-.phoneAvatar {
-  display: inline-flex;
   flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-pill);
+}
+
+.stepNumNow {
   background: var(--color-accent-deep);
   color: var(--color-canvas);
-  font-size: 11px;
-  font-weight: 600;
 }
 
-.phoneBubble {
-  max-width: 75%;
+/* スマホの見本。右の列に置く飾りではなく、選んだメッセージの中身を見る場所。 */
+.phone {
+  width: 240px;
+  max-width: 100%;
+  margin: 4px auto 0;
+  border: 8px solid var(--color-ink);
+  border-radius: 36px;
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+.phoneHead {
   padding: 8px 12px;
-  border-radius: var(--radius-none) var(--radius-card, 12px) var(--radius-card, 12px) var(--radius-card, 12px);
-  background: var(--color-canvas);
+  border-bottom: 1px solid var(--color-board-line);
+  font-size: 12px;
+  font-weight: 600;
   color: var(--color-ink);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.phoneMenu {
-  padding: 10px;
-  border-top: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  font-size: 12px;
   text-align: center;
 }
 
-/* 下の帯：画面の下に追従（sticky）。 */
-.footerBar {
-  position: sticky;
-  bottom: 0;
+.phoneBody {
+  background: var(--color-chat-background, var(--color-canvas-sunken));
+  padding: 12px;
+  min-height: 220px;
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  flex-direction: column;
   gap: 8px;
-  padding: 12px 24px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
 }
 
-/* ===== 板が 1100px を切ったら右の列を下へ ===== */
-@container (max-width: 1099px) {
-  .split {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.bubble {
+  align-self: flex-start;
+  max-width: 90%;
+  background: var(--color-canvas);
+  border-radius: 0 var(--radius-control) var(--radius-control) var(--radius-control);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
 
-  .rail {
-    border-top: 1px solid var(--color-hairline);
-    border-left: 0;
-    border-top-right-radius: 0;
-    border-bottom-left-radius: var(--radius-card, 12px);
-  }
+.bubbleTime {
+  font-size: 10px;
+  color: var(--color-ink-faint);
+  text-align: right;
+}
 
-  .fieldGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
+/* vWJEm（作る・競合）の帯。注意の色だけ使い、形は板に合わせる。 */
+.conflictBand {
+  border: 1px solid var(--color-status-warn);
+  border-radius: var(--radius-panel);
+  background: var(--color-status-warn-soft);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.conflictText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.conflictTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.conflictSub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.conflictActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* vWJEm「違いを比べる」の表。線と文字の色だけ使う。 */
+.compareTable {
+  margin-top: 12px;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.compareTable th,
+.compareTable td {
+  border-bottom: 1px solid var(--color-board-line);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+
+.compareTable thead th {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.compareTable tbody th {
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Plug } from 'lucide-react'
 import { api, type MeasurementSite } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -39,8 +40,10 @@ export default function SiteScript() {
   const [summary, setSummary] = useState<TrackingSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copiedTarget, setCopiedTarget] = useState<'code' | 'vendor' | null>(null)
   const [copyFailed, setCopyFailed] = useState(false)
+  // 行の「…」で開いているサイト。staff には出さない（見るだけ）。
+  const [openSiteMenu, setOpenSiteMenu] = useState<string | null>(null)
   // アカウント別の計測鍵。取れるまで・取れないときはコードを出さない
   // (固定の鍵を出すと他アカウントの計測が混ざる)。
   const [trackingKey, setTrackingKey] = useState<string | null>(null)
@@ -210,17 +213,25 @@ export default function SiteScript() {
     }
   }, [selectedAccountId, keyAttempt])
 
-  const copy = async () => {
-    if (!snippet) return
+  const copyText = async (text: string | null, target: 'code' | 'vendor') => {
+    if (!text) return
     try {
-      await navigator.clipboard.writeText(snippet)
-      setCopied(true)
+      await navigator.clipboard.writeText(text)
+      setCopiedTarget(target)
       setCopyFailed(false)
-      setTimeout(() => setCopied(false), 2000)
+      setTimeout(() => setCopiedTarget(null), 2000)
     } catch {
       setCopyFailed(true)
     }
   }
+
+  /*
+   * 制作会社へ送る文（実データのコードつき）。書き換えずにそのまま
+   * 送れるよう、貼り場所の案内とコードを1つにまとめる。
+   */
+  const vendorMessage = snippet
+    ? `サイトの計測をお願いします。ホームページの </head> の直前に、下の1行をそのまま貼ってください。ページごとに書き換える必要はありません。\n${snippet}`
+    : null
 
   const receiving = summary?.lastEventAt != null
   const lastSeen = formatLastReceived(summary?.lastEventAt)
@@ -234,9 +245,41 @@ export default function SiteScript() {
     }
   }
 
+  // 行の「…」。絵の注にある操作（編集・止める／再開する）だけ出す。
+  const siteMenuItems = (site: MeasurementSite): ActionMenuItem[] => {
+    const stopped = site.stoppedAt != null
+    return [
+      {
+        id: 'edit',
+        label: '編集',
+        onSelect: () => {
+          setOpenSiteMenu(null)
+          setSiteDialog({ mode: 'edit', site, label: site.label, domainsText: site.domains.join('\n'), error: null })
+        },
+      },
+      stopped
+        ? {
+          id: 'resume',
+          label: '再開する',
+          onSelect: () => {
+            setOpenSiteMenu(null)
+            setResumeTarget(site)
+          },
+        }
+        : {
+          id: 'stop',
+          label: '止める',
+          tone: 'danger' as const,
+          onSelect: () => {
+            setOpenSiteMenu(null)
+            setStopDialog({ site, reason: '', error: null })
+          },
+        },
+    ]
+  }
+
   return (
-    <div data-design-node="XjOte">
-    <div className="space-y-4" data-design-node="IhSBB">
+    <div className="space-y-4" data-design-node="XjOte">
       <Notice tone="info">
         見ているページを数えるためのコードです。サイトに貼ると、どのページを見た人が友だちになったかが分かります。入力フォームの中身など、個人が特定できる情報は送りません。
       </Notice>
@@ -264,11 +307,12 @@ export default function SiteScript() {
           </Disclosure>
         </section>
       ) : receiving ? (
-        <section className="rounded-card border border-success-bg bg-success-bg p-4">
+        <section className="rounded-card border border-success-bg bg-success-bg p-4" aria-label="いま届いているか">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-success">
-                {`動いています。最後にデータが届いたのは ${lastSeen} です。`}
+              <h2 className="text-base font-bold text-ink">いま届いているか</h2>
+              <p className="mt-1 text-sm font-semibold text-success">
+                {`最後に届いたのは ${lastSeen}`}
               </p>
               <p className="mt-1 text-xs text-ink-faint">
                 {`今日は ${formatNumber(summary?.todayEvents)}件、${formatNumber(summary?.pathCount)}種類のページから届いています。`}
@@ -308,8 +352,13 @@ export default function SiteScript() {
                   <p className="text-xs text-on-accent">あなたのアカウントで使うコード</p>
                   <div className="mt-2 flex items-center gap-3">
                     <code className="min-w-0 flex-1 overflow-x-auto text-xs">{snippet}</code>
-                    <Button onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</Button>
+                    <Button onClick={() => void copyText(snippet, 'code')}>{copiedTarget === 'code' ? 'コピーしました' : 'コードをコピー'}</Button>
                   </div>
+                </div>
+                <div className="mt-2">
+                  <Button variant="secondary" onClick={() => void copyText(vendorMessage, 'vendor')}>
+                    {copiedTarget === 'vendor' ? 'コピーしました' : '制作会社へ送る文をコピー'}
+                  </Button>
                 </div>
                 {copyFailed && <p className="mt-2 text-xs text-danger">コピーできませんでした。上のコードを選んでコピーしてください。</p>}
               </>
@@ -328,9 +377,11 @@ export default function SiteScript() {
           <section className="rounded-card border border-hairline bg-canvas p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-ink">成果を数えるサイト</h2>
+                <h2 className="text-base font-bold text-ink">
+                  成果を数えるサイト{loading || sitesFailed ? '' : ` ${formatNumber(sites.length)}`}
+                </h2>
                 <p className="mt-1 text-xs leading-relaxed text-ink-faint">
-                  サイトごとに「ここから届いた成果だけ数える」範囲を決めます。ここに無いドメインから届いた分は成果に数えず、届いた件数と最後の場所だけを残します。
+                  サイトごとにコードを分けます。止めたサイトの成果は数えません。ここに無いドメインから届いた分は成果に数えず、届いた件数と最後の場所だけを残します。
                 </p>
               </div>
               {canManage ? (
@@ -368,7 +419,7 @@ export default function SiteScript() {
                           <p className="truncate text-sm font-semibold text-ink" title={site.label}>
                             {site.label}
                             {stopped ? (
-                              <Chip tone="warn" className="ml-2">停止中</Chip>
+                              <Chip tone="warn" className="ml-2">止めている</Chip>
                             ) : null}
                           </p>
                           <p className="mt-0.5 text-xs text-ink-faint">
@@ -379,30 +430,18 @@ export default function SiteScript() {
                           <div className="flex gap-2">
                             <Button
                               variant="secondary"
-                              onClick={() =>
-                                setSiteDialog({
-                                  mode: 'edit',
-                                  site,
-                                  label: site.label,
-                                  domainsText: site.domains.join('\n'),
-                                  error: null,
-                                })
-                              }
+                              aria-label={`「${site.label}」の操作`}
+                              aria-expanded={openSiteMenu === site.id}
+                              onClick={() => setOpenSiteMenu((current) => (current === site.id ? null : site.id))}
                             >
-                              編集
+                              …
                             </Button>
-                            {stopped ? (
-                              <Button variant="secondary" onClick={() => setResumeTarget(site)}>
-                                計測を再開する
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="secondary"
-                                onClick={() => setStopDialog({ site, reason: '', error: null })}
-                              >
-                                計測を止める
-                              </Button>
-                            )}
+                            <ActionMenu
+                              open={openSiteMenu === site.id}
+                              onClose={() => setOpenSiteMenu(null)}
+                              ariaLabel={`「${site.label}」の操作`}
+                              items={siteMenuItems(site)}
+                            />
                           </div>
                         ) : null}
                       </div>
@@ -499,6 +538,14 @@ export default function SiteScript() {
                       <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{formatNumber(page.visitors)}人</td>
                     </tr>
                   })}
+                  {summary?.consent ? (
+                    <tr key="consent-suppressed">
+                      <td className="px-4 py-3 tabular-nums text-ink-secondary">—</td>
+                      <td className="truncate px-4 py-3 font-semibold text-ink" title="同意なし">同意なし</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{formatNumber(summary.consent.suppressed)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">—</td>
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             )}
@@ -516,14 +563,14 @@ export default function SiteScript() {
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-5">
             <h2 className="text-sm font-bold text-ink">つながる先</h2>
-            <ul className="mt-3 space-y-3 text-xs"><li className="text-action">→ 流入と計測</li><li className="text-action">→ コンバージョン</li><li className="text-action">→ 友だち</li><li className="text-action">→ 分析</li></ul>
+            <ul className="mt-3 space-y-3 text-xs"><li className="text-action">→ コンバージョン</li><li className="text-action">→ 分析</li><li className="text-action">→ 友だち</li><li className="text-action">→ 流入と計測</li></ul>
           </section>
           <section className="rounded-card border border-hairline bg-canvas p-5">
             <h2 className="text-sm font-bold text-ink">どうやって友だちと結びつくか</h2>
             <ol className="mt-3 space-y-2 text-xs text-ink-secondary">
-              <li><strong>1. LINEから開いた場合</strong> その場で経路を記録します。</li>
-              <li><strong>2. あとからLINEを追加した場合</strong> 同じブラウザの記録と結びつけます。</li>
-              <li><strong>3. 結びつかない場合</strong> 個人を推測せず経路不明として数えます。</li>
+              <li><strong>1. LINE から開いた場合：</strong>その場で経路を記録します。</li>
+              <li><strong>2. あとから LINE を追加した場合：</strong>同じブラウザの記録と結びつけます。</li>
+              <li><strong>3. 結びつかない場合：</strong>個人を推測せず経路不明として数えます。</li>
             </ol>
           </section>
           <section className="rounded-card border border-status-warn bg-status-warn-soft p-5">

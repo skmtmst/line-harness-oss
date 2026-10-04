@@ -29,9 +29,9 @@
     "radius": 2,
     "shadow": 0
   },
-  "app/inflow-links/new/page.tsx": {
-    "color": 2,
-    "radius": 0,
+  "app/inflow-links/new/inflow-create-v8.module.css": {
+    "color": 0,
+    "radius": 2,
     "shadow": 0
   },
   "app/nen-members/page.tsx": {

@@ -1,434 +1,440 @@
-@layer properties, theme, base, components, utilities;
+/* 流入と計測の詳細（板 Q5le3）。色・丸み・影は globals.css の名前だけ。 */
 
-/*
- * ★V8-B 流入と計測の詳細（板 `Q5le3`）。
- *
- * v7 の詳細画面（`detail/page.tsx`）とは別の見せ方。取ってくる口・
- * 友だちの表・注文の明細・編集と削除の窓は v7 と同じものを使う。
- * 取れない数（ブロック・1人あたり金額）は「—」にする。
- */
 .board {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-board);
+  padding: 20px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  container-type: inline-size;
+  min-width: 0;
+}
+
+.backLink {
+  font-size: 13px;
+  color: var(--color-action);
+}
+
+.backLink:hover {
+  text-decoration: underline;
 }
 
 .head {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px 12px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.headText {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.headBack {
+.title {
   margin: 0;
-}
-
-.headBackLink {
-  color: var(--color-action);
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.headBackLink:hover {
-  text-decoration: underline;
-}
-
-.headTitle {
-  margin: 0;
-  color: var(--color-ink);
   font-size: 20px;
   font-weight: 600;
-  line-height: 1.4;
+  color: var(--color-ink);
 }
 
-.headSub {
-  margin: 0;
-  overflow: hidden;
+.sub {
+  margin: 4px 0 0;
+  font-size: 13px;
   color: var(--color-ink-secondary);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .headActions {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-/* 数の帯：4マスを縦線で区切る（Q5le3）。 */
-.kpis {
+/* 数の帯。 */
+.band {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
   background: var(--color-canvas);
-  list-style: none;
+  overflow: hidden;
 }
 
-.kpi {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+.tile {
   padding: 12px 16px;
+  min-width: 0;
+  border-left: 1px solid var(--color-board-line);
 }
 
-.kpi + .kpi {
-  border-left: 1px solid var(--color-hairline);
+.tile:first-child {
+  border-left: none;
 }
 
-.kpiLabel {
+.tileTitle {
+  font-size: 13px;
   color: var(--color-ink-secondary);
-  font-size: 12px;
-  font-weight: 600;
 }
 
-.kpiValue {
-  margin: 0;
+.tileValue {
+  margin-top: 2px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
   color: var(--color-ink);
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1.3;
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
-.kpiUnit {
-  margin-left: 2px;
-  color: var(--color-ink-faint);
+.tileUnit {
   font-size: 12px;
   font-weight: 400;
+  color: var(--color-ink-secondary);
+  margin-left: 2px;
 }
 
-.kpiDetail {
-  margin: 0;
-  overflow: hidden;
+.tileSub {
+  margin-top: 2px;
+  font-size: 12px;
   color: var(--color-ink-faint);
-  font-size: 11px;
-  line-height: 1.6;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* 段のカード。 */
-.card {
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+/* その後のカード。 */
+.afterCard {
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
   background: var(--color-canvas);
   padding: 16px;
 }
 
-.cardTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.cardNote {
-  margin: 4px 0 0;
-  color: var(--color-ink-faint);
-  font-size: 11px;
-  line-height: 1.6;
-}
-
-/* その後の5マス。 */
-.miniStats {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.miniStat {
-  min-width: 0;
-  padding: 10px 12px;
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-canvas-sunken);
-}
-
-.miniStatLabel {
-  display: block;
-  color: var(--color-ink-secondary);
-  font-size: 11px;
-}
-
-.miniStatValue {
-  display: block;
-  margin-top: 2px;
-  color: var(--color-ink);
-  font-size: 16px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.miniStatSub {
-  display: block;
-  color: var(--color-ink-faint);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-}
-
-.orderLine {
+.afterHead {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 12px;
 }
 
-.orderLineTitle {
+.moreCell {
+  position: relative;
+  white-space: nowrap;
+}
+
+.moreButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-board-line);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.moreButton:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.afterTitle {
   margin: 0;
-  color: var(--color-ink);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
+  color: var(--color-ink);
 }
 
-/* 友だちの道具の段。 */
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+.miniGrid {
   margin-top: 12px;
-}
-
-.searchWrap {
-  width: 240px;
-  min-width: 160px;
-}
-
-.chipRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 
-.toolbarSpacer {
-  flex: 1 1 auto;
+.mini {
+  background: var(--color-canvas-sunken);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  min-width: 0;
 }
 
-/* 友だちの表。 */
-.tableWrap {
+.miniTitle {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.miniValue {
+  margin-top: 2px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.miniSub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ordersRow {
   margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ordersTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.ordersPanel {
+  margin-top: 12px;
+}
+
+/* 動きの青い帯。 */
+.happenBand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-panel);
+  padding: 14px 16px;
+  flex-wrap: wrap;
+}
+
+.happenIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-accent-deep);
+  flex-shrink: 0;
+}
+
+.happenText {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.happenTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.happenSub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.happenActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* 友だちの表まわり。 */
+.friendTools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.friendSearch {
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 340px;
+}
+
+.friendRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tableShell {
   overflow-x: auto;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-control);
   background: var(--color-canvas);
 }
 
-.table {
+.tableShell table {
   width: 100%;
-  min-width: 860px;
-  table-layout: fixed;
+  min-width: 900px;
   border-collapse: collapse;
   font-size: 13px;
 }
 
-.table th {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-faint);
-  font-size: 11px;
-  font-weight: 600;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.table td {
-  padding: 12px;
-  border-bottom: 1px solid var(--color-hairline);
-  vertical-align: middle;
-}
-
-.table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.cellMain {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--color-ink);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cellSub {
-  display: block;
-  margin-top: 2px;
-  overflow: hidden;
-  color: var(--color-ink-faint);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cellEllipsis {
-  display: block;
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--color-ink-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cellMuted {
-  color: var(--color-ink-faint);
-}
-
-/* 状態の札。 */
-.statePill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: var(--radius-pill);
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.statePillDot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-
-.statePillActive {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.statePillMuted {
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-}
-
-/* 下の2枚：つながる先・QRコード。 */
-.bottomCards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.defList {
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.defRow {
+.friendCell {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  padding: 8px 0;
+  min-width: 0;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
-  font-size: 13px;
-}
-
-.defRow + .defRow {
-  border-top: 1px solid var(--color-hairline);
-}
-
-.defValue {
-  color: var(--color-ink);
+  font-size: 12px;
   font-weight: 600;
-  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.defValueAccent {
-  color: var(--color-accent-deep);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.cardLink {
-  display: inline-block;
-  margin-top: 12px;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  text-decoration: none;
-}
-
-.cardLink:hover {
+.friendName {
   color: var(--color-action);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friendName:hover {
   text-decoration: underline;
 }
 
-/* ページ送りの行。 */
-.pagerRow {
+.stateChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.stateFriend {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  border-color: var(--color-accent-border);
+}
+
+.stateBlocked {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  border-color: var(--color-board-line);
+}
+
+.stateDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: currentcolor;
+}
+
+.pager {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 12px;
-}
-
-.pagerCount {
-  color: var(--color-ink-secondary);
+  flex-wrap: wrap;
   font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+/* 下の2枚。 */
+.bottomGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .bottomGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.linkCard {
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.linkCardTitle {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.linkRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--color-board-line);
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.linkRow:first-of-type {
+  border-top: none;
+}
+
+.linkRowValue {
+  color: var(--color-ink);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-/* ===== 板が 1100px を切ったら ===== */
-@container (max-width: 1099px) {
-  .kpis {
+.qrSave {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.qrSave:hover {
+  color: var(--color-action);
+}
+
+@media (max-width: 900px) {
+  .band {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .kpi:nth-child(3) {
-    border-left: 0;
+  .tile:nth-child(3) {
+    border-left: none;
   }
 
-  .kpi:nth-child(n + 3) {
-    border-top: 1px solid var(--color-hairline);
+  .tile:nth-child(n + 3) {
+    border-top: 1px solid var(--color-board-line);
   }
 
-  .miniStats {
+  .miniGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .bottomCards {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .searchWrap {
-    width: 100%;
-  }
-}
-
-@container (max-width: 560px) {
-  .kpis {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .kpi + .kpi {
-    border-top: 1px solid var(--color-hairline);
-    border-left: 0;
+  .board {
+    padding: 16px;
   }
 }

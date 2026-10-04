@@ -1,17 +1,16 @@
 // @vitest-environment happy-dom
 /*
- * 流入リンクの新規作成画面を本物のReactで動かす試験（R39・R18）。
- *
- * R39: ヘッダーで選んだアカウントを、作成の送りへ付けて渡す。
- * 選んでいないときは送らず、理由を出す。
- * R18: 入力の途中でキャンセルへ出るときは、消える前に確認を出す。
+ * vWJEm（作る・競合）: 発行が 409 で返り、同じ文字の発行済みリンクが
+ * あるときは、帯で知らせて比べ・取り込みができる。本物のReactで動かす。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '@/lib/api'
 
 const api = vi.hoisted(() => ({
   create: vi.fn(),
+  routesList: vi.fn(),
   tagsList: vi.fn(),
   scenariosList: vi.fn(),
   poolsList: vi.fn(),
@@ -25,7 +24,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      entryRoutes: { ...actual.api.entryRoutes, create: api.create },
+      entryRoutes: { ...actual.api.entryRoutes, create: api.create, list: api.routesList },
       tags: { ...actual.api.tags, list: api.tagsList },
       scenarios: { ...actual.api.scenarios, list: api.scenariosList },
       pools: { ...actual.api.pools, list: api.poolsList },
@@ -53,7 +52,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
 
-/** アカウント選択を外から変えられるよう、module変数で持つ。 */
 const fixture = vi.hoisted(() => ({ accountId: 'account-1' as string | null }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -71,8 +69,35 @@ import NewInflowLinkPage from './page'
 let host: HTMLDivElement
 let root: Root
 
+/** 保存済みの相手（実データの形）。誰が保存したかは口が持たない。 */
+const EXISTING = {
+  id: 'route-9',
+  refCode: 'summer-ig',
+  genre: 'SNS',
+  name: '夏のInstagram投稿',
+  tagId: null,
+  scenarioId: null,
+  redirectUrl: 'https://nen.example/summer',
+  poolId: null,
+  introTemplateId: null,
+  runAccountFriendAddScenarios: false,
+  isActive: true,
+  stoppedAt: null,
+  stoppedReason: null,
+  lineAccountId: 'account-1',
+  createdAt: '2026-10-03T10:00:00+09:00',
+  updatedAt: '2026-10-04T14:02:00+09:00',
+}
+
+async function settle(milliseconds = 100) {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, milliseconds))
+  })
+}
+
 async function render() {
   await act(async () => { root.render(React.createElement(NewInflowLinkPage)) })
+  await settle()
 }
 
 function byId(id: string): HTMLInputElement {
@@ -87,28 +112,25 @@ function byExactText(tag: string, text: string): HTMLElement {
   return found as HTMLElement
 }
 
-function byExactTextInBody(tag: string, text: string): HTMLElement {
-  const found = Array.from(document.body.querySelectorAll(tag)).find((el) => el.textContent?.trim() === text)
-  if (!found) throw new Error(`見つかりません: <${tag}> "${text}"`)
-  return found as HTMLElement
-}
-
 async function setValue(element: HTMLInputElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
   await act(async () => {
     setter.call(element, value)
     element.dispatchEvent(new Event('input', { bubbles: true }))
   })
+  await settle(20)
 }
 
 async function click(element: HTMLElement) {
   await act(async () => { element.click() })
+  await settle()
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   fixture.accountId = 'account-1'
-  api.create.mockResolvedValue({ success: true, data: { id: 'route-1' } })
+  api.create.mockRejectedValue(new ApiError(409, 'この ref_code は既に使われています'))
+  api.routesList.mockResolvedValue({ success: true, data: [EXISTING] })
   api.tagsList.mockResolvedValue({ success: true, data: [] })
   api.scenariosList.mockResolvedValue({ success: true, data: [] })
   api.poolsList.mockResolvedValue({ success: true, data: [] })
@@ -122,78 +144,58 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
-  vi.restoreAllMocks()
 })
 
-describe('流入リンクの新規作成(実React)', () => {
-  it('R39: 選んだアカウントを付けて作り、詳細へ進む', async () => {
+describe('流入リンクの作成・競合(実React)', () => {
+  it('vWJEm: 文字が重なると帯が出て、フッターは比べの案内になる', async () => {
     await render()
-    await setValue(byId('ir-name'), '夏の投稿')
-    await setValue(byId('ir-ref'), 'r39-summer')
+    await setValue(byId('ir-name'), '別の名前')
+    await setValue(byId('ir-ref'), 'summer-ig')
     await click(byExactText('button', '発行してURLを受け取る'))
 
-    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({
-      name: '夏の投稿',
-      refCode: 'r39-summer',
-      lineAccountId: 'account-1',
-    }))
-    expect(routerPush).toHaveBeenCalledWith('/inflow-links/detail?id=route-1')
-  })
-
-  it('R39: アカウント未選択では送らず理由を出す', async () => {
-    fixture.accountId = null
-    await render()
-    await setValue(byId('ir-name'), '夏の投稿')
-    await setValue(byId('ir-ref'), 'r39-summer')
-    await click(byExactText('button', '発行してURLを受け取る'))
-
-    expect(api.create).not.toHaveBeenCalled()
+    expect(api.create).toHaveBeenCalledTimes(1)
     expect(routerPush).not.toHaveBeenCalled()
-    // 理由は共通部品の帯（Notice）で出す。要素の種類ではなく文で見る。
-    expect(host.textContent).toContain('LINEアカウントを選んでください（画面上部で選べます）')
+    expect(host.textContent).toContain('「summer-ig」は既に使われています')
+    // 保存日時と名前は実データ。誰が保存したかは口が持たないので出さない。
+    expect(host.textContent).toContain('保存の「夏のInstagram投稿」があります')
+    expect(host.textContent).not.toContain('坂本さん')
+    byExactText('button', '比べてから保存')
   })
 
-  it('R39: 所属するアカウントが画面で分かる', async () => {
+  it('vWJEm: 違いを比べると今の入力と保存値が並ぶ', async () => {
     await render()
-    expect(host.textContent).toContain('所属するLINEアカウント')
-    expect(host.textContent).toContain('然-NEN- TEST')
-  })
-
-  it('R18: 入力の途中でキャンセルすると確認が出て、移動を選ぶと一覧へ戻る', async () => {
-    await render()
-    await setValue(byId('ir-name'), '消えたら困る入力')
-    await click(byExactText('a', 'キャンセル'))
-
-    byExactTextInBody('h2', '保存していない変更があります')
-    await click(byExactTextInBody('button', '保存せずに移る'))
-    expect(routerPush).toHaveBeenCalledWith('/inflow-links')
-    expect(api.create).not.toHaveBeenCalled()
-  })
-
-  it('R18: 何も入力していなければ確認なしで一覧へ戻る', async () => {
-    await render()
-    await click(byExactText('a', 'キャンセル'))
-
-    expect(document.body.textContent ?? '').not.toContain('保存していない変更があります')
-  })
-
-  /*
-   * R610: 不正REFで発行を押した後、有効なREFへ直したら古い検証文は消え、
-   * 未発行の見本は新しいREFのURLになる。保存は送らない。
-   */
-  it('R610: 有効なREFへ直すと古い入力エラーが消え、見本は新しいREFになる', async () => {
-    await render()
-    await setValue(byId('ir-name'), '夏の投稿')
-    await setValue(byId('ir-ref'), 'bad ref!')
+    await setValue(byId('ir-name'), '別の名前')
+    await setValue(byId('ir-ref'), 'summer-ig')
     await click(byExactText('button', '発行してURLを受け取る'))
+    await click(byExactText('button', '違いを比べる'))
 
-    expect(api.create).not.toHaveBeenCalled()
-    expect(host.textContent).toContain('refコードは、半角英数字・_・ハイフンで1〜64文字にしてください')
+    expect(host.textContent).toContain('いまの入力と保存されている値の違い')
+    expect(host.textContent).toContain('別の名前')
+    expect(host.textContent).toContain('夏のInstagram投稿')
+    expect(host.textContent).toContain('https://nen.example/summer')
+  })
 
-    await setValue(byId('ir-ref'), 'audit-sample')
+  it('vWJEm: 最新を読み込むと保存値が入力へ写る', async () => {
+    await render()
+    await setValue(byId('ir-name'), '別の名前')
+    await setValue(byId('ir-ref'), 'summer-ig')
+    await click(byExactText('button', '発行してURLを受け取る'))
+    await click(byExactText('button', '最新を読み込んで続ける'))
 
-    expect(host.textContent).not.toContain('refコードは、半角英数字')
-    expect(host.textContent).toContain('/r/audit-sample')
-    expect(api.create).not.toHaveBeenCalled()
+    expect(byId('ir-name').value).toBe('夏のInstagram投稿')
+    // 文字は競合のままなので、帯は残って文字の変更を促す。
+    expect(host.textContent).toContain('「summer-ig」は既に使われています')
+  })
+
+  it('vWJEm: 文字を変えると競合が閉じて発行に戻る', async () => {
+    await render()
+    await setValue(byId('ir-name'), '別の名前')
+    await setValue(byId('ir-ref'), 'summer-ig')
+    await click(byExactText('button', '発行してURLを受け取る'))
+    expect(host.textContent).toContain('「summer-ig」は既に使われています')
+
+    await setValue(byId('ir-ref'), 'summer-ig-2')
+    expect(host.textContent).not.toContain('既に使われています')
+    byExactText('button', '発行してURLを受け取る')
   })
 })
