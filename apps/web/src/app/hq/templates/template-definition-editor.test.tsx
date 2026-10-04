@@ -109,7 +109,7 @@ describe('TemplateDefinitionEditor', () => {
     const onCanonicalSave = vi.fn()
     render(<TemplateDefinitionEditor type="form" value={value} disabled={false} onChange={vi.fn()} onCanonicalSave={onCanonicalSave} />)
     expect((screen.getByLabelText(/フォーム名/) as HTMLInputElement).value).toBe('分岐フォーム')
-    expect(screen.getByRole('button', { name: '＋ ブロックを追加する（14種）' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '＋ ブロックを追加する（15種）' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'フォームを保存する' }))
     await waitFor(() => expect(onCanonicalSave).toHaveBeenCalledOnce())
     expect(onCanonicalSave.mock.calls[0][0].form.layout).toEqual(value.form.layout)

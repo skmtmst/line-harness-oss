@@ -14,6 +14,10 @@ export interface FormRefs {
   scenarios: { id: string; name: string }[]
   reminders: { id: string; name: string }[]
   templates: { id: string; name: string; type: string }[]
+  /** 「予約を入れる」欄のメニュー選び。HQなど持たない画面では空のまま */
+  bookingMenus?: { id: string; name: string; durationMinutes: number }[]
+  /** メニューごとの担当選び。読んでいないメニューは不在＝まだ読んでいない */
+  bookingMenuStaff?: Record<string, { id: string; name: string }[]>
 }
 
 export const EMPTY_REFS: FormRefs = {

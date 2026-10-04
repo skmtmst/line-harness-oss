@@ -39,9 +39,9 @@ export const BLOCK_MENU: { kind: string; type?: FormInputType; label: string; gr
   { kind: 'input', type: 'file', label: 'ファイル', group: '入力' },
   { kind: 'input', type: 'date', label: '日付', group: '入力' },
   { kind: 'input', type: 'prefecture', label: '都道府県', group: '入力' },
-  // F-11：5段階評価（★で答える）・住所（郵便番号から自動で）。
-  { kind: 'input', type: 'rating', label: '5段階の評価', group: '入力' },
+  { kind: 'input', type: 'rating', label: '5段階評価', group: '入力' },
   { kind: 'input', type: 'address', label: '住所', group: '入力' },
+  { kind: 'input', type: 'booking', label: '予約を入れる', group: '入力' },
 ]
 
 const INPUT_TYPE_LABEL: Record<FormInputType, string> = {
@@ -56,6 +56,7 @@ const INPUT_TYPE_LABEL: Record<FormInputType, string> = {
   // F11で shared の FormInputType に足された種類。名称は shared の型注釈に合わせる。
   address: '住所',
   rating: '5段階評価',
+  booking: '予約を入れる',
 }
 
 const FORMATS: { value: FormInputFormat; label: string }[] = [
@@ -333,6 +334,88 @@ export default function BlockEditor({
                   </label>
                 )}
 
+                {block.type === 'booking' && (
+                  <div className="flex-1 space-y-3" data-design-node="ijxur">
+                    <label className="block">
+                      <span className="text-ink-secondary mb-1 block text-xs font-medium">
+                        予約メニュー
+                      </span>
+                      <Select
+                        aria-label="予約メニュー"
+                        value={block.booking?.menuId ?? ''}
+                        onChange={(value) =>
+                          patchInput({
+                            booking: {
+                              menuId: value,
+                              staffId: null,
+                              daysAhead: block.booking?.daysAhead ?? 14,
+                            },
+                          })
+                        }
+                        options={[
+                          { value: '', label: '選んでください' },
+                          ...(refs.bookingMenus ?? []).map((menu) => ({
+                            value: menu.id,
+                            label: `${menu.name}・${menu.durationMinutes}分`,
+                          })),
+                        ]}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-ink-secondary mb-1 block text-xs font-medium">
+                        担当
+                      </span>
+                      <Select
+                        aria-label="担当"
+                        value={block.booking?.staffId ?? ''}
+                        disabled={!block.booking?.menuId}
+                        onChange={(value) =>
+                          patchInput({
+                            booking: {
+                              menuId: block.booking?.menuId ?? '',
+                              staffId: value === '' ? null : value,
+                              daysAhead: block.booking?.daysAhead ?? 14,
+                            },
+                          })
+                        }
+                        options={[
+                          { value: '', label: 'だれでも' },
+                          ...(block.booking?.menuId
+                            ? (refs.bookingMenuStaff?.[block.booking.menuId] ?? [])
+                            : []
+                          ).map((staff) => ({ value: staff.id, label: staff.name })),
+                        ]}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-ink-secondary mb-1 block text-xs font-medium">
+                        選べる期間（今日から）
+                      </span>
+                      <Select
+                        aria-label="選べる期間"
+                        value={String(block.booking?.daysAhead ?? 14)}
+                        onChange={(value) =>
+                          patchInput({
+                            booking: {
+                              menuId: block.booking?.menuId ?? '',
+                              staffId: block.booking?.staffId ?? null,
+                              daysAhead: Number(value),
+                            },
+                          })
+                        }
+                        options={[
+                          { value: '7', label: '7日' },
+                          { value: '14', label: '14日' },
+                          { value: '30', label: '30日' },
+                          { value: '60', label: '60日' },
+                        ]}
+                      />
+                    </label>
+                    <p className="text-ink-faint text-xs">
+                      予約は「未承認」で入り、店が承認します。公開にはメニューが必要です。
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* 回答の登録先 */}
