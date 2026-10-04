@@ -71,8 +71,7 @@ jobs:
           fi
 
           changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
-          if printf '%s\n' "$changed" \
-            | grep -qE '^packages/db/(src/|test/|migrations/)'; then
+          if grep -qE '^packages/db/(src/|test/|migrations/)' <<< "$changed"; then
             echo "db_tests=true" >> "$GITHUB_OUTPUT"
             echo "DBの実装・テスト・マイグレーション変更があるため、DBテストを行います。"
           else
@@ -80,8 +79,7 @@ jobs:
           fi
 
           full_suite=false
-          if [ -n "$changed" ] && printf '%s\n' "$changed" \
-            | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
+          if [ -n "$changed" ] && grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)' <<< "$changed"; then
             full_suite=true
             echo "コードまたは設定の変更があるため、全検査を行います。"
           else
@@ -94,8 +92,7 @@ jobs:
           # 秘密の扱い（値を出さない・main へ配らない）を見張っている(#704)。
           # ワークフローだけを変えたPRは full_suite=false になり、いちばん効く場面で
           # 外れてしまうので、そこだけ別に見る。
-          if [ "$full_suite" = "true" ] || printf '%s\n' "$changed" \
-            | grep -qE '^\.github/workflows/'; then
+          if [ "$full_suite" = "true" ] || grep -qE '^\.github/workflows/' <<< "$changed"; then
             echo "docs_tests=true" >> "$GITHUB_OUTPUT"
             echo "docs の試験を行います。"
           else
