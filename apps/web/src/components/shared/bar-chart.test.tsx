@@ -173,21 +173,14 @@ describe('読み上げ用の表は箱を作らない', () => {
 })
 
 /*
- * G3 はみ出し直し（parity 1004-0513：目盛り 58＞24 など 104 件）。
- * 狭い列で中央寄せの字が隣の列へはみ出すと、隣の列の棒の下に隠れる。
- * V8 では字を前に出して曜日まで読めるようにする（位置・大きさ不変）。
- * v7 の .axisLabel は触らない。
+ * 黒をなくす（#2・オーナー「黒がいや」）：指を乗せた日の吹き出しは
+ * 白地＋細い線＋浮く影＋ink字。黒（ink地）に戻さないための歯止め。
  */
-describe('横軸の日付は棒の下に隠れない（G3）', () => {
-  it("V8 の .axisLabel は relative＋手前＋地あり", () => {
-    expect(css).toMatch(/\[data-theme='v8'\] \.axisLabel \{[^}]*position:\s*relative/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.axisLabel \{[^}]*z-index:\s*1/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.axisLabel \{[^}]*background:\s*var\(--color-canvas\)/s)
-  })
-
-  it('v7 の .axisLabel は位置も地も付けない', () => {
-    const base = css.match(/\.axisLabel \{[^}]*\}/s)?.[0] ?? ''
-    expect(base).not.toMatch(/position:/)
-    expect(base).not.toMatch(/background:/)
+describe('グラフの吹き出しは白（黒をなくす #2）', () => {
+  it('.tooltip は白地＋ink字（ink地にしない）', () => {
+    const tooltip = css.match(/\.tooltip \{[^}]*\}/s)?.[0] ?? ''
+    expect(tooltip).toMatch(/background:\s*var\(--color-canvas\)/)
+    expect(tooltip).toMatch(/color:\s*var\(--color-ink\)/)
+    expect(tooltip).not.toMatch(/background:\s*var\(--color-ink\)/)
   })
 })
