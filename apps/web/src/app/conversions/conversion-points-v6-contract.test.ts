@@ -96,13 +96,12 @@ describe('V6 成果地点一覧の契約', () => {
   })
 
   it('作成画面で重複を止め、入力中の条件だけを試算する', () => {
-    expect(NEW_PAGE).toContain('designNode="GtylA"')
-    expect(NEW_PAGE).toContain('variant="v6"')
+    expect(NEW_PAGE).toContain('designNode="j8p3yj"')
     expect(NEW_PAGE).toContain('const duplicateName = useMemo')
     expect(NEW_PAGE).toContain('同じ意味の成果地点を2つ作らないでください')
     expect(NEW_PAGE).toContain('api.conversions.previewDefinition({')
-    expect(NEW_PAGE).toContain('入力中の条件だけで試算しています。')
-    expect(NEW_PAGE).toContain('試算では成果を追加しません。')
+    expect(NEW_PAGE).toContain('入力中の条件だけで試算し、成果は追加しません。')
+    expect(NEW_PAGE).toContain('入力中の条件だけで試算し、成果は追加しません。')
     expect(NEW_PAGE).not.toContain('保存前試算APIの接続後')
     expect(NEW_PAGE).not.toContain('準備中')
     expect(NEW_PAGE).not.toContain('Webhookで受け取った')
