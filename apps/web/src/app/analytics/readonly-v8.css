@@ -15,13 +15,6 @@
 [data-theme='v8'] .v8-ro-analytics-tabs a[aria-current] { color: var(--color-ink); border-color: var(--color-ink); }
 [data-theme='v8'] .v8-ro-analytics-readOnly { margin: 12px 24px; padding: 10px 12px; background: var(--color-surface-pearl); border-radius: var(--radius-control); font-size: 13px; color: var(--color-ink-secondary); }
 [data-theme='v8'] .v8-ro-analytics-content > div { min-width: 0; }
-[data-theme='v8'] .v8-ro-analytics-routesBody { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 12px; align-items: start; }
-[data-theme='v8'] .v8-ro-analytics-routesBody > * { min-width: 0; }
-[data-theme='v8'] .v8-ro-analytics-routesFlow { padding: 16px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); }
-[data-theme='v8'] .v8-ro-analytics-routesStages { display: grid; gap: 14px; margin-top: 16px; }
-[data-theme='v8'] .v8-ro-analytics-routeStageHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-@container analytics-board (max-width: 1099px) { [data-theme='v8'] .v8-ro-analytics-routesBody { grid-template-columns: minmax(0, 1fr); } [data-theme='v8'] .v8-ro-analytics-routesStages { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@container analytics-board (max-width: 650px) { [data-theme='v8'] .v8-ro-analytics-routesStages { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 [data-theme='v8'] .v8-ro-analytics-content > div:not(.v8-ro-analytics-friends) { padding: 16px 24px; }
 [data-theme='v8'] .v8-ro-analytics-content .grid:has(> [data-design-version]) { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0 -24px 14px; border-bottom: 1px solid var(--color-hairline); }
 [data-theme='v8'] .v8-ro-analytics-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--color-hairline); }
@@ -90,7 +83,7 @@
 
 /* ws9wt: HTMLの余白をグラフと右欄に配る。 */
 [data-theme='v8'] .v8-ro-analytics-page { container-type: inline-size; container-name: analytics-board; }
-[data-theme='v8'] .v8-ro-analytics-friendsBody { grid-template-columns: minmax(0, 1fr) 320px; padding: 0; gap: 0; }
+[data-theme='v8'] .v8-ro-analytics-friendsBody { grid-template-columns: minmax(0, 1fr) 320px; padding: 16px 24px; gap: 16px; align-items: start; }
 [data-theme='v8'] .v8-ro-analytics-trend { border: 1px solid var(--color-hairline); border-radius: var(--radius-card); padding: 20px; }
 [data-theme='v8'] .v8-ro-analytics-friendsAside { padding: 0; border: 0; background: transparent; }
 [data-theme='v8'] .v8-ro-analytics-breakdown { padding: 20px; background: var(--color-canvas); }
@@ -105,6 +98,13 @@
 
 [data-theme='v8'] .v8-ro-analytics-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 12px; }
 [data-theme='v8'] .v8-ro-analytics-toolbar > button:last-child { margin-left: auto; }
+[data-theme='v8'] .v8-ro-analytics-routesBody { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 12px; align-items: start; }
+[data-theme='v8'] .v8-ro-analytics-routesBody > * { min-width: 0; }
+[data-theme='v8'] .v8-ro-analytics-routesFlow { padding: 16px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); }
+[data-theme='v8'] .v8-ro-analytics-routesStages { display: grid; gap: 14px; margin-top: 16px; }
+[data-theme='v8'] .v8-ro-analytics-routeStageHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+@container analytics-board (max-width: 1099px) { [data-theme='v8'] .v8-ro-analytics-routesBody { grid-template-columns: minmax(0, 1fr); } [data-theme='v8'] .v8-ro-analytics-routesStages { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container analytics-board (max-width: 650px) { [data-theme='v8'] .v8-ro-analytics-routesStages { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 [data-theme='v8'] .v8-ro-analytics-content > div:not(.v8-ro-analytics-friends) { padding-top: 0; }
 
 [data-theme='v8'] .v8-ro-analytics-observations { padding: 20px; background: var(--color-surface-pearl); border-radius: var(--radius-card); }
@@ -113,7 +113,6 @@
 [data-theme='v8'] #usage-items th:nth-child(5) { width: 24%; }
 [data-theme='v8'] #usage-items th:last-child { width: 170px; }
 [data-theme='v8'] #usage-items td:last-child { overflow: visible; }
-
 [data-theme='v8'] .v8-ro-analytics-usageBody { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; align-items: start; }
 [data-theme='v8'] .v8-ro-analytics-usageBody > * { min-width: 0; }
 [data-theme='v8'] .v8-ro-analytics-usageBody .v8-ro-analytics-observations { border: 1px solid var(--color-hairline); padding: 16px; background: var(--color-canvas); }
