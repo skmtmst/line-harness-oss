@@ -11,7 +11,7 @@
  * 横に収まらない表は中で横送りにする（画面幅およそ 1352px 未満に相当）。
  */
 
-.board {
+.af-list-board {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -20,7 +20,7 @@
 }
 
 /* ---- 板の頭（題・説明・右上の操作） ---- */
-.head {
+.af-list-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -28,7 +28,7 @@
   padding: 20px 24px 12px;
 }
 
-.headTitle {
+.af-list-headTitle {
   margin: 0;
   color: var(--color-ink);
   font-size: 22px;
@@ -36,14 +36,14 @@
   line-height: 1.4;
 }
 
-.headDesc {
+.af-list-headDesc {
   margin: 4px 0 0;
   color: var(--color-ink-secondary);
   font-size: 13px;
   line-height: 1.6;
 }
 
-.headActions {
+.af-list-headActions {
   display: flex;
   flex-shrink: 0;
   align-items: center;
@@ -51,18 +51,18 @@
 }
 
 /* ---- タブの段 ---- */
-.tabsRow {
+.af-list-tabsRow {
   padding: 0 24px;
   border-bottom: 1px solid var(--color-hairline);
 }
 
-.tabs {
+.af-list-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 24px;
 }
 
-.tab {
+.af-list-tab {
   padding: 0 0 10px;
   margin-bottom: -1px;
   border: 0;
@@ -77,18 +77,18 @@
   cursor: pointer;
 }
 
-.tab:hover {
+.af-list-tab:hover {
   color: var(--color-ink);
 }
 
-.tabActive {
+.af-list-tabActive {
   border-bottom-color: var(--color-ink);
   color: var(--color-ink);
   font-weight: 600;
 }
 
 /* ---- 閲覧のみの帯（タブの下、上に12のすき間） ---- */
-.roBand {
+.af-list-roBand {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -101,19 +101,19 @@
   line-height: 1.5;
 }
 
-.roBand svg {
+.af-list-roBand svg {
   flex-shrink: 0;
   color: var(--color-info);
 }
 
 /* ---- 数の帯（KPIの細切れ） ---- */
-.kpiStrip {
+.af-list-kpiStrip {
   display: flex;
   align-items: stretch;
   border-bottom: 1px solid var(--color-hairline);
 }
 
-.kpiCell {
+.af-list-kpiCell {
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
@@ -125,18 +125,18 @@
   background: var(--color-canvas);
 }
 
-.kpiCell:last-child {
+.af-list-kpiCell:last-child {
   border-right: 0;
 }
 
-.kpiHead {
+.af-list-kpiHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.kpiLabel {
+.af-list-kpiLabel {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -146,18 +146,18 @@
   font-weight: 600;
 }
 
-.kpiLabel svg {
+.af-list-kpiLabel svg {
   flex-shrink: 0;
   color: var(--color-ink-faint);
 }
 
 /* KPI の右上の「…」。押すと数え方の説明が出る（情報の入口）。 */
-.kpiInfo {
+.af-list-kpiInfo {
   position: relative;
   flex-shrink: 0;
 }
 
-.kpiInfoButton {
+.af-list-kpiInfoButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -171,12 +171,12 @@
   cursor: pointer;
 }
 
-.kpiInfoButton:hover {
+.af-list-kpiInfoButton:hover {
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
 }
 
-.kpiInfoPopover {
+.af-list-kpiInfoPopover {
   position: absolute;
   top: 24px;
   right: 0;
@@ -194,7 +194,7 @@
   text-align: left;
 }
 
-.kpiValue {
+.af-list-kpiValue {
   display: flex;
   align-items: baseline;
   gap: 3px;
@@ -206,13 +206,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.kpiUnit {
+.af-list-kpiUnit {
   color: var(--color-ink-faint);
   font-size: 12px;
   font-weight: 400;
 }
 
-.kpiSub {
+.af-list-kpiSub {
   margin: 0;
   color: var(--color-ink-faint);
   font-size: 12px;
@@ -220,7 +220,7 @@
 }
 
 /* ---- お知らせの帯 ---- */
-.notice {
+.af-list-notice {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -233,22 +233,22 @@
   line-height: 1.6;
 }
 
-.notice svg {
+.af-list-notice svg {
   flex-shrink: 0;
   margin-top: 2px;
   color: var(--color-info);
 }
 
-.noticeWarn {
+.af-list-noticeWarn {
   background: var(--color-status-warn-soft);
 }
 
-.noticeWarn svg {
+.af-list-noticeWarn svg {
   color: var(--color-warning);
 }
 
 /* ---- 道具の段 ---- */
-.tools {
+.af-list-tools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -256,17 +256,17 @@
   padding: 14px 24px;
 }
 
-.toolsSearch {
+.af-list-toolsSearch {
   flex: 0 1 300px;
   min-width: 180px;
 }
 
-.toolsSpacer {
+.af-list-toolsSpacer {
   flex: 1;
 }
 
 /* ---- 表 ---- */
-.tableWrap {
+.af-list-tableWrap {
   margin: 0 24px;
   border: 1px solid var(--color-divider);
   border-radius: var(--radius-card);
@@ -274,17 +274,17 @@
   overflow: hidden;
 }
 
-.tableScroll {
+.af-list-tableScroll {
   overflow-x: auto;
 }
 
-.table {
+.af-list-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
 
-.table thead th {
+.af-list-table thead th {
   padding: 10px 16px;
   border-bottom: 1px solid var(--color-divider);
   background: var(--color-table-head);
@@ -295,46 +295,46 @@
   white-space: nowrap;
 }
 
-.table tbody td {
+.af-list-table tbody td {
   padding: 12px 16px;
   border-bottom: 1px solid var(--color-divider);
   color: var(--color-ink);
   vertical-align: middle;
 }
 
-.table tbody tr:last-child td {
+.af-list-table tbody tr:last-child td {
   border-bottom: 0;
 }
 
-.table tbody tr:hover td {
+.af-list-table tbody tr:hover td {
   background: var(--color-canvas-sunken);
 }
 
-.cellCheck {
+.af-list-cellCheck {
   width: 36px;
   padding-right: 0 !important;
 }
 
-.numRight {
+.af-list-numRight {
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.numCenter {
+.af-list-numCenter {
   text-align: center;
   white-space: nowrap;
 }
 
 /* 名前の欄：名前（濃い緑）・コード（青）・約束・状態の札。 */
-.personCell {
+.af-list-personCell {
   display: flex;
   flex-direction: column;
   gap: 3px;
   min-width: 0;
 }
 
-.personName {
+.af-list-personName {
   padding: 0;
   border: 0;
   background: transparent;
@@ -350,11 +350,11 @@
   max-width: 240px;
 }
 
-.personName:hover {
+.af-list-personName:hover {
   text-decoration: underline;
 }
 
-.personCode {
+.af-list-personCode {
   color: var(--color-action);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -364,7 +364,7 @@
   max-width: 240px;
 }
 
-.personPlan {
+.af-list-personPlan {
   color: var(--color-ink-faint);
   font-size: 11px;
   overflow: hidden;
@@ -373,7 +373,7 @@
   max-width: 240px;
 }
 
-.cellSub {
+.af-list-cellSub {
   display: block;
   margin-top: 2px;
   color: var(--color-ink-faint);
@@ -384,7 +384,7 @@
   white-space: nowrap;
 }
 
-.cellMain {
+.af-list-cellMain {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -392,7 +392,7 @@
 }
 
 /* ---- 状態の札（ドットつきの小さな丸札） ---- */
-.statusBadge {
+.af-list-statusBadge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -404,40 +404,40 @@
   width: fit-content;
 }
 
-.statusDot {
+.af-list-statusDot {
   width: 6px;
   height: 6px;
   border-radius: var(--radius-pill);
   background: currentcolor;
 }
 
-.statusOk {
+.af-list-statusOk {
   background: var(--color-success-bg);
   color: var(--color-success);
 }
 
-.statusNeutral {
+.af-list-statusNeutral {
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
 }
 
-.statusWarn {
+.af-list-statusWarn {
   background: var(--color-status-warn-soft);
   color: var(--color-warning);
 }
 
-.statusDanger {
+.af-list-statusDanger {
   background: var(--color-danger-bg);
   color: var(--color-danger);
 }
 
-.statusInfo {
+.af-list-statusInfo {
   background: var(--color-status-info-soft);
   color: var(--color-info);
 }
 
 /* ---- 行末の操作 ---- */
-.rowActions {
+.af-list-rowActions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -446,14 +446,14 @@
 }
 
 /* ---- 状態カード（まだ無い・0件・読み込み中・失敗） ---- */
-.stateWrap {
+.af-list-stateWrap {
   margin: 0 24px;
   border: 1px solid var(--color-divider);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
 
-.stateCard {
+.af-list-stateCard {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -464,7 +464,7 @@
   text-align: center;
 }
 
-.stateIcon {
+.af-list-stateIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -476,14 +476,14 @@
   color: var(--color-ink-faint);
 }
 
-.stateTitle {
+.af-list-stateTitle {
   margin: 0;
   color: var(--color-ink);
   font-size: 15px;
   font-weight: 700;
 }
 
-.stateDesc {
+.af-list-stateDesc {
   margin: 0;
   max-width: 440px;
   color: var(--color-ink-secondary);
@@ -491,7 +491,7 @@
   line-height: 1.7;
 }
 
-.stateActions {
+.af-list-stateActions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -500,7 +500,7 @@
 }
 
 /* 読み込み中の骨組み（表の形のまま） */
-.skelRow {
+.af-list-skelRow {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -508,11 +508,11 @@
   border-bottom: 1px solid var(--color-divider);
 }
 
-.skelRow:last-child {
+.af-list-skelRow:last-child {
   border-bottom: 0;
 }
 
-.skelDot {
+.af-list-skelDot {
   flex-shrink: 0;
   width: 32px;
   height: 32px;
@@ -520,14 +520,14 @@
   background: var(--color-track, var(--color-canvas-sunken));
 }
 
-.skelBar {
+.af-list-skelBar {
   height: 10px;
   border-radius: var(--radius-mini);
   background: var(--color-track, var(--color-canvas-sunken));
 }
 
 /* 読み込めなかった：カードの頭に赤い帯＋もう一度 */
-.errorBand {
+.af-list-errorBand {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -538,15 +538,15 @@
   font-weight: 600;
 }
 
-.errorBand svg {
+.af-list-errorBand svg {
   flex-shrink: 0;
 }
 
-.errorRetry {
+.af-list-errorRetry {
   margin-left: auto;
 }
 
-.errorNote {
+.af-list-errorNote {
   padding: 16px;
   color: var(--color-ink-faint);
   font-size: 12px;
@@ -554,7 +554,7 @@
 }
 
 /* ---- 表の下の注記 ---- */
-.footNote {
+.af-list-footNote {
   margin: 0;
   padding: 12px 24px 20px;
   color: var(--color-ink-faint);
@@ -563,7 +563,7 @@
 }
 
 /* ---- まとめ操作の浮き帯 ---- */
-.bulkBar {
+.af-list-bulkBar {
   position: sticky;
   bottom: 16px;
   z-index: 40;
@@ -581,7 +581,7 @@
   box-shadow: var(--v8-popover-shadow, var(--shadow-float));
 }
 
-.bulkCount {
+.af-list-bulkCount {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -596,13 +596,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.bulkHint {
+.af-list-bulkHint {
   color: var(--color-ink-secondary);
   font-size: 12px;
   white-space: nowrap;
 }
 
-.bulkActions {
+.af-list-bulkActions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -610,14 +610,14 @@
 }
 
 /* ---- フォルダの列（案件・板 `h7dmB`） ---- */
-.listBody {
+.af-list-listBody {
   display: flex;
   align-items: flex-start;
   gap: 16px;
   padding: 16px 24px 0;
 }
 
-.folderCol {
+.af-list-folderCol {
   flex-shrink: 0;
   width: 188px;
   display: flex;
@@ -625,7 +625,7 @@
   gap: 2px;
 }
 
-.folderColTitle {
+.af-list-folderColTitle {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -636,7 +636,7 @@
   font-weight: 700;
 }
 
-.folderItem {
+.af-list-folderItem {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -653,21 +653,21 @@
   cursor: pointer;
 }
 
-.folderItem:hover {
+.af-list-folderItem:hover {
   background: var(--color-canvas-sunken);
 }
 
-.folderItemActive {
+.af-list-folderItemActive {
   background: var(--color-canvas-sunken);
   font-weight: 600;
 }
 
-.folderItemIcon {
+.af-list-folderItemIcon {
   flex-shrink: 0;
   color: var(--color-ink-faint);
 }
 
-.folderItemLabel {
+.af-list-folderItemLabel {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -675,30 +675,30 @@
   white-space: nowrap;
 }
 
-.folderItemCount {
+.af-list-folderItemCount {
   color: var(--color-ink-faint);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
 /* 狭いときに出るフォルダの選び器・作るボタン（1152 板 `KdFRI` の1段目）。 */
-.folderSelect {
+.af-list-folderSelect {
   display: none;
 }
 
-.toolsCreate {
+.af-list-toolsCreate {
   display: none;
 }
 
 /* ---- 明細の引き出し（右から出る） ---- */
-.drawerBackdrop {
+.af-list-drawerBackdrop {
   position: fixed;
   inset: 0;
   z-index: 60;
   background: var(--color-scrim);
 }
 
-.drawer {
+.af-list-drawer {
   position: fixed;
   top: 0;
   right: 0;
@@ -712,7 +712,7 @@
   box-shadow: var(--shadow-float);
 }
 
-.drawerHead {
+.af-list-drawerHead {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -721,20 +721,20 @@
   border-bottom: 1px solid var(--color-hairline);
 }
 
-.drawerTitle {
+.af-list-drawerTitle {
   margin: 0;
   color: var(--color-ink);
   font-size: 17px;
   font-weight: 700;
 }
 
-.drawerSub {
+.af-list-drawerSub {
   margin: 4px 0 0;
   color: var(--color-ink-faint);
   font-size: 12px;
 }
 
-.drawerBody {
+.af-list-drawerBody {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -744,26 +744,26 @@
   gap: 16px;
 }
 
-.drawerKpis {
+.af-list-drawerKpis {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
-.drawerKpi {
+.af-list-drawerKpi {
   padding: 10px 12px;
   border: 1px solid var(--color-divider);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
 }
 
-.drawerKpi p:first-child {
+.af-list-drawerKpi p:first-child {
   margin: 0;
   color: var(--color-ink-faint);
   font-size: 11px;
 }
 
-.drawerKpi p:last-child {
+.af-list-drawerKpi p:last-child {
   margin: 4px 0 0;
   color: var(--color-ink);
   font-size: 16px;
@@ -771,25 +771,25 @@
   font-variant-numeric: tabular-nums;
 }
 
-.drawerSection {
+.af-list-drawerSection {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.drawerTable {
+.af-list-drawerTable {
   border: 1px solid var(--color-divider);
   border-radius: var(--radius-control);
 }
 
-.drawerSectionTitle {
+.af-list-drawerSectionTitle {
   margin: 0;
   color: var(--color-ink);
   font-size: 13px;
   font-weight: 700;
 }
 
-.drawerFoot {
+.af-list-drawerFoot {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -798,7 +798,7 @@
   border-top: 1px solid var(--color-hairline);
 }
 
-.linkRow {
+.af-list-linkRow {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -808,7 +808,7 @@
   border-radius: var(--radius-control);
 }
 
-.linkUrl {
+.af-list-linkUrl {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -821,45 +821,45 @@
 
 /* ---- 1152px 相当：板が狭くなったら ---- */
 @container (max-width: 1099px) {
-  .kpiCell {
+  .af-list-kpiCell {
     min-height: 104px;
     padding: 14px 16px;
   }
 
-  .personName,
-  .personCode,
-  .personPlan {
+  .af-list-personName,
+  .af-list-personCode,
+  .af-list-personPlan {
     max-width: 180px;
   }
 
   /* 1152：フォルダの列を畳み、選び器を道具の1段目へ（板 `KdFRI`）。 */
-  .folderCol {
+  .af-list-folderCol {
     display: none;
   }
 
-  .folderSelect {
+  .af-list-folderSelect {
     display: block;
     width: 160px;
   }
 
-  .toolsCreate {
+  .af-list-toolsCreate {
     display: inline-flex;
   }
 }
 
 /* KdFRI: PCでも主要な列と操作を板の幅に収める。 */
-.affiliateTable { table-layout: fixed; }
-.checkColumn { width: 44px; }
-.metricColumn { width: 88px; }
-.rewardColumn { width: 100px; }
-.actionsColumn { width: 156px; }
-.affiliateTable .personName, .affiliateTable .personCode, .affiliateTable .personPlan { max-width: 100%; }
+.af-list-affiliateTable { table-layout: fixed; }
+.af-list-checkColumn { width: 44px; }
+.af-list-metricColumn { width: 88px; }
+.af-list-rewardColumn { width: 100px; }
+.af-list-actionsColumn { width: 156px; }
+.af-list-affiliateTable .af-list-personName, .af-list-affiliateTable .af-list-personCode, .af-list-affiliateTable .af-list-personPlan { max-width: 100%; }
 @container (max-width: 900px) {
-  .affiliateTable thead th, .affiliateTable tbody td { padding-left: 10px; padding-right: 10px; }
-  .metricColumn { width: 72px; }
-  .rewardColumn { width: 84px; }
-  .actionsColumn { width: 140px; }
+  .af-list-affiliateTable thead th, .af-list-affiliateTable tbody td { padding-left: 10px; padding-right: 10px; }
+  .af-list-metricColumn { width: 72px; }
+  .af-list-rewardColumn { width: 84px; }
+  .af-list-actionsColumn { width: 140px; }
 }
 @container (max-width: 600px) {
-  .affiliateTable { min-width: 760px; }
+  .af-list-affiliateTable { min-width: 760px; }
 }

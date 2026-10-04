@@ -24,7 +24,7 @@ import { jstMonthKey, type ConfirmedState } from './offer-kpi'
 import { listAllConversionApprovals, type AffiliateItem, type AffiliateListRow } from './tabs'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
 import AffiliateDrawerV8 from './v8-drawer'
-import styles from './list-v8.module.css'
+import './list-v8.css'
 
 function formatYen(n: number): string {
   return `¥${formatNumber(Math.round(n))}`
@@ -297,18 +297,18 @@ export default function ReportTabV8({
         期間は{monthLabel(period)}。数は「認めた成果」だけ。成果地点ごとのレポートは「分析 › レポート」で見られます。
       </NoticeBar>
 
-      <div className={styles.tools}>
+      <div className="af-list-tools">
         <SearchField
           placeholder="名前で探す"
           aria-label="名前で探す"
           value={query}
           onChange={setQuery}
           onClear={() => setQuery('')}
-          className={styles.toolsSearch}
+          className="af-list-toolsSearch"
         />
         <FilterChip selected={view === 'affiliate'} onChange={() => setView('affiliate')}>アフィリエイターごと</FilterChip>
         <FilterChip selected={view === 'offer'} onChange={() => setView('offer')}>案件ごと</FilterChip>
-        <span className={styles.toolsSpacer} />
+        <span className="af-list-toolsSpacer" />
         <Select
           aria-label="よく使う絞り込み"
           value=""
@@ -351,37 +351,37 @@ export default function ReportTabV8({
       ) : listState === 'zero' ? (
         <ZeroResultState onReset={() => { setQuery(''); setPeriod('all') }} />
       ) : view === 'affiliate' ? (
-        <div className={styles.tableWrap}>
-          <div className={styles.tableScroll}>
-            <table className={styles.table}>
+        <div className="af-list-tableWrap">
+          <div className="af-list-tableScroll">
+            <table className="af-list-table">
               <thead>
                 <tr>
                   <th>アフィリエイター（いちばん多い案件）</th>
-                  <th className={styles.numRight}>成果・売上</th>
-                  <th className={styles.numRight}>報酬{period !== 'all' ? '（先月より）' : ''}</th>
-                  <th aria-label="操作" className={styles.numRight} />
+                  <th className="af-list-numRight">成果・売上</th>
+                  <th className="af-list-numRight">報酬{period !== 'all' ? '（先月より）' : ''}</th>
+                  <th aria-label="操作" className="af-list-numRight" />
                 </tr>
               </thead>
               <tbody>
                 {shownAffiliates.map((row) => (
                   <tr key={row.id}>
                     <td>
-                      <button type="button" className={styles.personName} title={row.name} onClick={() => openDrawer(row.id)}>
+                      <button type="button" className="af-list-personName" title={row.name} onClick={() => openDrawer(row.id)}>
                         {row.name}
                       </button>
-                      <span className={styles.cellSub}>{row.topOfferName ?? '—'}</span>
+                      <span className="af-list-cellSub">{row.topOfferName ?? '—'}</span>
                     </td>
-                    <td className={styles.numRight}>
+                    <td className="af-list-numRight">
                       <strong>{formatNumber(row.conversions)}件</strong>
-                      <span className={styles.cellSub}>{row.conversions > 0 ? formatYen(row.revenue) : '—'}</span>
+                      <span className="af-list-cellSub">{row.conversions > 0 ? formatYen(row.revenue) : '—'}</span>
                     </td>
-                    <td className={styles.numRight}>
+                    <td className="af-list-numRight">
                       {row.conversions === 0 ? '—' : row.reward === 0 ? '計測のみ' : (
                         <strong>{formatYen(row.reward)} <span style={{ fontWeight: 400, color: 'var(--color-ink-faint)', fontSize: 11 }}>{diffText(row.reward, row.prevReward, row.conversions)}</span></strong>
                       )}
                     </td>
                     <td>
-                      <div className={styles.rowActions}>
+                      <div className="af-list-rowActions">
                         <span style={{ position: 'relative', display: 'inline-flex' }}>
                           <MoreAction
                             label={`${row.name}のその他操作`}
@@ -406,25 +406,25 @@ export default function ReportTabV8({
           </div>
         </div>
       ) : (
-        <div className={styles.tableWrap}>
-          <div className={styles.tableScroll}>
-            <table className={styles.table}>
+        <div className="af-list-tableWrap">
+          <div className="af-list-tableScroll">
+            <table className="af-list-table">
               <thead>
                 <tr>
                   <th>案件</th>
-                  <th className={styles.numRight}>成果・売上</th>
-                  <th className={styles.numRight}>報酬{period !== 'all' ? '（先月より）' : ''}</th>
+                  <th className="af-list-numRight">成果・売上</th>
+                  <th className="af-list-numRight">報酬{period !== 'all' ? '（先月より）' : ''}</th>
                 </tr>
               </thead>
               <tbody>
                 {shownOffers.map((row) => (
                   <tr key={row.id}>
-                    <td><span className={styles.cellMain} style={{ fontWeight: 600, color: 'var(--color-accent-deep)' }}>{row.name}</span></td>
-                    <td className={styles.numRight}>
+                    <td><span className="af-list-cellMain" style={{ fontWeight: 600, color: 'var(--color-accent-deep)' }}>{row.name}</span></td>
+                    <td className="af-list-numRight">
                       <strong>{formatNumber(row.conversions)}件</strong>
-                      <span className={styles.cellSub}>{formatYen(row.revenue)}</span>
+                      <span className="af-list-cellSub">{formatYen(row.revenue)}</span>
                     </td>
-                    <td className={styles.numRight}>
+                    <td className="af-list-numRight">
                       <strong>{formatYen(row.reward)} <span style={{ fontWeight: 400, color: 'var(--color-ink-faint)', fontSize: 11 }}>{diffText(row.reward, row.prevReward, row.conversions)}</span></strong>
                     </td>
                   </tr>
@@ -435,7 +435,7 @@ export default function ReportTabV8({
         </div>
       )}
 
-      <p className={styles.footNote}>
+      <p className="af-list-footNote">
         行を押すと、その人の成果の明細（いつ・どの案件・いくら）を開きます。CSVは今の期間・今の並びで書き出します。
       </p>
 

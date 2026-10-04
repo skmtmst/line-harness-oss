@@ -28,7 +28,7 @@ import ApprovalsTabV8 from './v8-approvals-tab'
 import PaymentTabV8 from './v8-payment-tab'
 import ReportTabV8 from './v8-report-tab'
 import { ReadOnlyBand } from './v8-shared'
-import styles from './list-v8.module.css'
+import './list-v8.css'
 
 const TABS = [
   { key: 'affiliates', label: 'アフィリエイター', node: 'nJlxX' },
@@ -119,18 +119,18 @@ export default function AffiliatesV8() {
   )
 
   return (
-    <div className={styles.board} data-design-node={TABS.find((t) => t.key === tab)?.node}>
-      <div className={styles.head}>
+    <div className="af-list-board" data-design-node={TABS.find((t) => t.key === tab)?.node}>
+      <div className="af-list-head">
         <div>
-          <h2 className={styles.headTitle}>成果とアフィリエイト</h2>
-          <p className={styles.headDesc}>
+          <h2 className="af-list-headTitle">成果とアフィリエイト</h2>
+          <p className="af-list-headDesc">
             紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。
           </p>
         </div>
-        <div className={styles.headActions}>{headerActions}</div>
+        <div className="af-list-headActions">{headerActions}</div>
       </div>
 
-      <div className={styles.tabsRow}>
+      <div className="af-list-tabsRow">
         <Tabs items={items} label="成果とアフィリエイトの画面" />
       </div>
 
@@ -159,7 +159,7 @@ export default function AffiliatesV8() {
             registerHeaderActions={registerHeaderActions}
           />
         ) : (
-          <p className={styles.footNote}>上のバーからLINEアカウントを選んでください。</p>
+          <p className="af-list-footNote">上のバーからLINEアカウントを選んでください。</p>
         )
       ) : (
         <ReportTabV8
