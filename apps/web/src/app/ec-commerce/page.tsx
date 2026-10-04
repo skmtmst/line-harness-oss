@@ -2,11 +2,6 @@
 
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { SettingsNavV8 } from '../settings/settings-nav-v8'
-import SearchField from '@/components/shared/search-field'
-import HelpTip from '@/components/shared/help-tip'
-import './ec-fidelity-v8.css'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
@@ -537,24 +532,29 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 }
 
 function EcCommercePageInner() {
-  usePageTitle('EC連携')
   const tab = useMergedTab(EC_TABS, 'tab', 'events')
   const { selectedAccountId } = useAccount()
   if (tab === 'connector') return <EcConnectorV8 />
   return (
-    <div className="ec-fid-page" data-design-node={tab === 'subscriptions' ? 'wqC8x' : 'GmVR5'}>
-      <div className="ec-fid-head">
-        <ReadonlyHeaderV8 title="EC連携" description="ネットショップから注文・発送・定期便の出来事を取り込み、LINEの友だちと結びつけます。" />
-        {tab === 'events' ? <Button href="/ec-commerce?tab=connector" variant="secondary">つなぎ先の設定</Button> : <Button href="/broadcasts/new" variant="primary">対象を選んで送る</Button>}
-      </div>
-      <div className="ec-fid-layout">
-        <SettingsNavV8 />
-        <div className="ec-fid-main">
-          <EcTabs accountId={selectedAccountId} active={tab as typeof EC_TABS[number]['key']} />
-          {tab === 'events' ? <EventsPanel accountId={selectedAccountId} /> : null}
-          {tab === 'subscriptions' ? <SubscriptionsPanel accountId={selectedAccountId} /> : null}
-        </div>
-      </div>
+    <div className={`${styles.root} ${tab === 'connector' ? '' : 'v8-ro-notifications-page'}`} data-design="Head" data-design-node={tab !== 'connector' ? (tab === 'subscriptions' ? 'wqC8x' : 'GmVR5') : undefined}>
+      {tab !== 'connector' && <ReadonlyHeaderV8 title="EC連携" description="取り込みの記録・会員のつき合わせ・定期便の状況を確認できます。" />}
+      {/* マニュアルは共通トップバーに置く。本文に「ECの注文・定期便を取り込み、LINEの配信や成果へつなげます。」という重複説明は置かない。 */}
+      <PageHeaderH2
+        /* 1段だけのパンくずは上の帯の画面名と重複するので出さない。 */
+        breadcrumb={[]}
+        title="EC連携"
+        description=""
+        actions={tab === 'events'
+          ? <Button href="/ec-commerce?tab=connector" variant="secondary">つなぎ先の設定</Button>
+          : tab === 'subscriptions'
+            ? <Button href="/broadcasts/new" variant="primary">対象を選んで送る</Button>
+            : undefined}
+      />
+      <EcTabs accountId={selectedAccountId} active={tab as typeof EC_TABS[number]['key']} />
+      {tab === 'events' ? <EventsPanel accountId={selectedAccountId} /> : null}
+      {tab === 'subscriptions' ? <SubscriptionsPanel accountId={selectedAccountId} /> : null}
+      {/* ★V8-B（板 `iLJmw`）：つなぎ先だけ v8 の枠に切り替える。 */}
+      {tab === 'connector' ? <EcConnectorV8 /> : null}
     </div>
   )
 }
