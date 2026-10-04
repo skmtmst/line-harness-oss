@@ -211,4 +211,78 @@ describe('tenant data retention purge', () => {
     expect(count('friends', 'line_account_id = ?', 'acc-t1')).toBe(0);
     expect(count('friends', 'line_account_id = ?', 'acc-t2')).toBe(2);
   });
+
+  /*
+   * 回答フォームの消し残し直し。
+   *
+   * 以前はタグ経由で探していたので、タグを付けていないフォーム（付けないのが
+   * 普通）は条件に一致せず残り続けていた。今は利用アカウント経由で探す。
+   * フォームは複数の店で使い回すことがあるので、統括をまたいで使われている
+   * 物はどちらの統括の削除でも消さない。所属の無い物も消さない。
+   */
+  function seedTag(id: string, accountId: string): void {
+    sqlite.raw
+      .prepare(`INSERT INTO tags (id, name, line_account_id) VALUES (?, ?, ?)`)
+      .run(id, `タグ ${id}`, accountId);
+  }
+
+  function seedForm(id: string, tagId: string | null, accountIds: string[]): void {
+    // 公開版は INSERT のトリガが作る（手で足すと版番号が重なる）。
+    sqlite.raw
+      .prepare(`INSERT INTO forms (id, name, on_submit_tag_id) VALUES (?, ?, ?)`)
+      .run(id, `フォーム ${id}`, tagId);
+    const link = sqlite.raw.prepare(`INSERT INTO form_accounts (form_id, line_account_id) VALUES (?, ?)`);
+    for (const accountId of accountIds) link.run(id, accountId);
+  }
+
+  function formCount(where: string, ...args: unknown[]): number {
+    return count('forms', where, ...args);
+  }
+
+  test('タグを付けていないフォームも消える（子の版も一緒に）', async () => {
+    seedTenant('t1', { anchor: jst(-91) });
+    seedForm('f1', null, ['acc-t1']);
+
+    await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+
+    expect(formCount('id = ?', 'f1')).toBe(0);
+    expect(count('form_versions', 'form_id = ?', 'f1')).toBe(0);
+    expect(count('form_accounts', 'form_id = ?', 'f1')).toBe(0);
+  });
+
+  test('タグを付けているフォームも今までどおり消える', async () => {
+    seedTenant('t1', { anchor: jst(-91) });
+    seedTag('tag-1', 'acc-t1');
+    seedForm('f1', 'tag-1', ['acc-t1']);
+
+    await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+
+    expect(formCount('id = ?', 'f1')).toBe(0);
+  });
+
+  test('ほかの店のフォームは消えない', async () => {
+    seedTenant('t1', { anchor: jst(-91) });
+    seedTenant('t2', { anchor: null, planStatus: 'active' });
+    seedForm('f1', null, ['acc-t1']);
+    seedForm('f2', null, ['acc-t2']);
+
+    await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+
+    expect(formCount('id = ?', 'f1')).toBe(0);
+    expect(formCount('id = ?', 'f2')).toBe(1);
+  });
+
+  test('統括をまたいで使うフォームはどちらの削除でも消さない', async () => {
+    seedTenant('t1', { anchor: jst(-91) });
+    seedTenant('t2', { anchor: null, planStatus: 'active' });
+    // 両方の統括の店で使う1つのフォーム。
+    seedForm('shared', null, ['acc-t1', 'acc-t2']);
+
+    await processTenantDataPurge({ DB: sqlite.db, IMAGES: createR2() }, { now: NOW });
+
+    // 本体は残る。t1 側の利用だけ外れ、t2 側の利用は残る。
+    expect(formCount('id = ?', 'shared')).toBe(1);
+    expect(count('form_accounts', 'form_id = ? AND line_account_id = ?', 'shared', 'acc-t1')).toBe(0);
+    expect(count('form_accounts', 'form_id = ? AND line_account_id = ?', 'shared', 'acc-t2')).toBe(1);
+  });
 });

@@ -65,4 +65,15 @@
   outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
+
+/* ★V8 仕上げ3回目（M10）②：つまみの滑り・文字の色を --motion-* にそろえる（120ms）。V8 にだけ生えた部品のため v7 の規定は持たない。 */
+[data-theme='v8'] .thumb {
+  transition:
+    transform var(--motion-fast) var(--motion-ease-out),
+    width var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .item {
+  transition: color var(--motion-fast) var(--motion-ease-out);
+}
 }

@@ -10,6 +10,7 @@ import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   EMPTY_BASICS,
@@ -124,6 +125,7 @@ export default function NewReminderV8() {
         const res = await api.reminders.saveDraft(savedId, basicsToDraft(current.data.settings, value))
         if (!res.success) throw new Error(res.error)
         setSaving('saved')
+        notifyToast('下書きを保存しました')
         return savedId
       }
       /*
@@ -162,6 +164,7 @@ export default function NewReminderV8() {
       if (!res.success) throw new Error(res.error)
       setSavedId(res.data.reminderId)
       setSaving('saved')
+      notifyToast('下書きを保存しました')
       return res.data.reminderId
     } catch (caught) {
       setSaving('failed')
