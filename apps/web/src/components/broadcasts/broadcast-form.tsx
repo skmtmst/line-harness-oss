@@ -646,6 +646,8 @@ export default function BroadcastForm({
   const [internalMemo, setInternalMemo] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'new' | 'template' | 'duplicate'>('new')
   const [recentBroadcasts, setRecentBroadcasts] = useState<ApiBroadcast[]>([])
+  const [recentBroadcastsStatus, setRecentBroadcastsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('loading')
+  const [recentBroadcastsRetry, setRecentBroadcastsRetry] = useState(0)
   const [bubbles, setBubbles] = useState<BroadcastBubble[]>(visualQaAugustCampaign ? [{
     id: 'visual-qa-august-campaign',
     type: 'text',
@@ -968,12 +970,29 @@ export default function BroadcastForm({
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+    setRecentBroadcasts([])
+    if (accountLoading || !selectedAccountId) {
+      setRecentBroadcastsStatus(accountLoading ? 'loading' : 'idle')
+      return
+    }
+    setRecentBroadcastsStatus('loading')
     // PERF-06: 複製候補は画面に出る3件ぶんだけAPIへ頼む。
     // 以前は一覧を全件取って先頭3件に絞っていた。
-    api.broadcasts.list({ accountId: selectedAccountId || undefined, limit: 3 })
-      .then((res) => { if (res.success) setRecentBroadcasts(res.data.slice(0, 3)) })
-      .catch(() => undefined)
-  }, [selectedAccountId])
+    api.broadcasts.list({ accountId: selectedAccountId, limit: 3 })
+      .then((res) => {
+        if (cancelled) return
+        if (res.success) {
+          setRecentBroadcasts(res.data.slice(0, 3))
+          setRecentBroadcastsStatus('ready')
+        } else {
+          setRecentBroadcastsStatus('error')
+        }
+      })
+      .catch(() => { if (!cancelled) setRecentBroadcastsStatus('error') })
+    // アカウント切替前の応答を、今のアカウントの複製候補として出さない。
+    return () => { cancelled = true }
+  }, [accountLoading, selectedAccountId, recentBroadcastsRetry])
 
   /*
    * 「シナリオ購読中の全員」で選ぶ相手。名前だけ使う。
@@ -2174,7 +2193,10 @@ export default function BroadcastForm({
           </div>
           <div className={styles.recentHeader}><h3>最近の配信</h3><Link href="/broadcasts">一斉配信の一覧を見る →</Link></div>
           <div className={styles.recentList}>
-            {recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
+            {recentBroadcastsStatus === 'loading' ? <p role="status" className="text-xs text-ink-faint">最近の配信を読み込んでいます…</p>
+              : recentBroadcastsStatus === 'error' ? <Notice tone="info" action={<Button size="compact" onClick={() => setRecentBroadcastsRetry((retry) => retry + 1)}>もう一度読み込む</Button>}>最近の配信を読み込めませんでした</Notice>
+              : recentBroadcastsStatus === 'idle' ? <p className="text-xs text-ink-faint">LINE公式アカウントを選ぶと最近の配信を確認できます。</p>
+              : recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
               <div key={broadcast.id} className={styles.recentRow}>
                 <Send size={14} aria-hidden /><span className={styles.recentName} title={broadcast.title}>{broadcast.title}</span>
                 <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '下書き'} ・ {broadcast.totalCount == null ? '—' : `${formatNumber(broadcast.totalCount)}人`}</span>
