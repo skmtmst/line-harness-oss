@@ -8,8 +8,8 @@ import HqBillingPage from './page'
 
 const calls = vi.hoisted(() => ({ summary: vi.fn(), invoices: vi.fn(), checkout: vi.fn(), portal: vi.fn() }))
 vi.mock('@/lib/api', () => ({ api: { hqBilling: calls }, ApiError: class extends Error {} }))
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/billing' }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
 
 const plans: BillingPlanView[] = [
   { key: 'light', name: 'ライト', monthlyYen: 9800, yearlyYen: 99000 },
@@ -49,7 +49,14 @@ afterEach(cleanup)
 
 async function openPage() {
   render(createElement(HqBillingPage))
-  return screen.findByRole('switch', { name: '年払い' })
+  return screen.findByRole('button', { name: /年払い/ })
+}
+
+async function openInterval() {
+  render(createElement(HqBillingPage))
+  const year = await screen.findByRole('button', { name: /年払い/ })
+  const month = await screen.findByRole('button', { name: '月払い' })
+  return { year, month }
 }
 
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8')
@@ -80,9 +87,10 @@ describe('課金プラン（36-2）', () => {
     expect(page).toContain('税込')
   })
 
-  it('プロもCheckoutへ、契約中のプランは「変更する」でポータルへ', () => {
+  it('プロもCheckoutへ、契約中のプランは「いまのプラン」で、変更は「支払い方法を管理」からポータルへ', () => {
     expect(page).not.toContain('相談する')
-    expect(page).toContain('変更する')
+    expect(page).toContain('いまのプラン')
+    expect(page).toContain('支払い方法を管理')
     expect(page).toContain('利用中')
   })
 
@@ -103,50 +111,51 @@ describe('課金プラン（36-2）', () => {
   })
 
   it('既定は月払い。年払いで3つの札・月あたり・年額に切り替わり、戻すと月額になる', async () => {
-    const toggle = await openPage()
-    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    const { year, month } = await openInterval()
+    expect(year.getAttribute('aria-pressed')).toBe('false')
     for (const amount of ['¥9,800', '¥29,800', '¥59,800']) expect(screen.getByText(amount)).toBeTruthy()
     expect(screen.queryAllByText('約15% OFF')).toHaveLength(0)
-    fireEvent.click(toggle)
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(year)
+    expect(year.getAttribute('aria-pressed')).toBe('true')
     expect(screen.getAllByText('約15% OFF')).toHaveLength(3)
     for (const amount of ['¥8,250', '¥25,250', '¥50,750']) expect(screen.getByText(amount)).toBeTruthy()
     for (const amount of ['¥99,000', '¥303,000', '¥609,000']) expect(screen.getByText(`年額 ${amount}（税込）`)).toBeTruthy()
-    fireEvent.click(toggle)
+    fireEvent.click(month)
     expect(screen.getByText('¥9,800')).toBeTruthy()
     expect(screen.queryByText('年額 ¥99,000（税込）')).toBeNull()
-    fireEvent.click(toggle)
+    fireEvent.click(year)
     cleanup()
-    expect((await openPage()).getAttribute('aria-checked')).toBe('false')
+    expect((await openPage()).getAttribute('aria-pressed')).toBe('false')
   })
 
   it.each([['light', 0], ['standard', 1], ['pro', 2]] as const)('%s の年払いボタンはyearで申込み、月払いに戻すとmonthで申し込む', async (key, index) => {
-    const toggle = await openPage()
-    fireEvent.click(toggle)
+    const { year, month } = await openInterval()
+    fireEvent.click(year)
     fireEvent.click(screen.getAllByRole('button', { name: 'このプランにする' })[index])
     await waitFor(() => expect(calls.checkout).toHaveBeenLastCalledWith(key, 'year'))
     await screen.findByRole('alert')
-    fireEvent.click(toggle)
+    fireEvent.click(month)
     fireEvent.click(screen.getAllByRole('button', { name: 'このプランにする' })[index])
     await waitFor(() => expect(calls.checkout).toHaveBeenLastCalledWith(key, 'month'))
   })
 
   it('年のPrice未設定は該当ボタンだけ無効にし、月払いは止めない', async () => {
     calls.summary.mockResolvedValue({ success: true, data: { ...summary, plans: plans.map((p) => ({ ...p, yearlyAvailable: p.key !== 'light' })) } })
-    const toggle = await openPage()
-    fireEvent.click(toggle)
+    const { year, month } = await openInterval()
+    fireEvent.click(year)
     const buttons = screen.getAllByRole('button', { name: 'このプランにする' }) as HTMLButtonElement[]
     expect(buttons.map((b) => b.disabled)).toEqual([true, false, false])
     expect(screen.getByText('価格がまだ設定されていません')).toBeTruthy()
     fireEvent.click(buttons[0])
     expect(calls.checkout).not.toHaveBeenCalled()
-    fireEvent.click(toggle)
+    fireEvent.click(month)
     expect(buttons[0].disabled).toBe(false)
   })
 
   it('Stripe由来の年額を12で割り、端数を切り捨てる', async () => {
     calls.summary.mockResolvedValue({ success: true, data: { ...summary, plans: [{ ...plans[0], yearlyYen: 100001, yearlyPriceFromStripe: true }] } })
-    fireEvent.click(await openPage())
+    const { year } = await openInterval()
+    fireEvent.click(year)
     expect(screen.getByText('¥8,333')).toBeTruthy()
     expect(screen.getByText('年額 ¥100,001（税込）')).toBeTruthy()
     expect(document.querySelector('[data-price-source="stripe"]')).toBeTruthy()
@@ -187,19 +196,19 @@ describe('Stripe価格の出所と仮表示の区別（R607）', () => {
 
   it('注記は選んだ周期に追随する（月はStripe取得・年は代替）', async () => {
     calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: true, year: false })) })
-    const toggle = await openPage()
+    const { year } = await openInterval()
     expect(screen.queryByText('仮の料金です')).toBeNull()
     expect(screen.getByText(/料金は Stripe の価格です/)).toBeTruthy()
-    fireEvent.click(toggle)
+    fireEvent.click(year)
     expect(screen.getAllByText('仮の料金です')).toHaveLength(3)
     expect(screen.getByText(/料金と内容は仮置きです/)).toBeTruthy()
   })
 
   it('注記は選んだ周期に追随する（月は代替・年はStripe取得）', async () => {
     calls.summary.mockResolvedValue({ success: true, data: summaryWith(plansWith({ month: false, year: true })) })
-    const toggle = await openPage()
+    const { year } = await openInterval()
     expect(screen.getAllByText('仮の料金です')).toHaveLength(3)
-    fireEvent.click(toggle)
+    fireEvent.click(year)
     expect(screen.queryByText('仮の料金です')).toBeNull()
     expect(screen.getByText(/料金は Stripe の価格です/)).toBeTruthy()
   })
