@@ -322,14 +322,14 @@
  * 版は下端に固定される（nav が flex:1 なので追加の指定は要らない）。
  * ------------------------------------------------------------------- */
 [data-theme="v8"] .item {
-  height: auto;
-  min-height: 0;
-  padding-top: 5px;
-  padding-bottom: 5px;
+  height: 36px;
+  min-height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 [data-theme="v8"] .section {
-  gap: 1px;
+  gap: 2px;
 }
 
 /* 組の見出し（押すと開閉）。右の矢印で今の開き方を示す。v7 には出ない。 */
