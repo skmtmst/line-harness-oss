@@ -278,6 +278,23 @@ entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), async 
     delete body.refCode;
     if (typeof body.genre === 'string') body.genre = body.genre.trim();
     if (body.name !== undefined) body.name = body.name.trim();
+    /*
+     * 同時編集の見分けは「最後に直した日時で比べる」（v8f と同じ形）。
+     * expectedUpdatedAt が送られてきたときだけ、保存前の値と照合する。
+     * 違えば409で止めて今の中身を返す。送らなければ従来どおり通す。
+     */
+    const expectedUpdatedAt =
+      typeof (body as Record<string, unknown>).expectedUpdatedAt === 'string'
+        ? ((body as Record<string, unknown>).expectedUpdatedAt as string)
+        : null;
+    if (expectedUpdatedAt !== null && (existing.updated_at ?? null) !== expectedUpdatedAt) {
+      return c.json({
+        success: false,
+        code: 'VERSION_CONFLICT',
+        error: '流入リンクの内容が更新されています。読み直してください',
+        data: { latest: serialize(existing) },
+      }, 409);
+    }
     const row = await updateEntryRoute(c.env.DB, id, body);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serialize(row) });

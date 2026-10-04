@@ -32,7 +32,7 @@ describe('リファラルリンク編集窓の保存 (#1058)', () => {
   })
 
   it('400系の理由はAPIの言葉、403・5xxは運用の言葉で出す（WRITE-01）', () => {
-    expect(MODAL).toContain("import { api, describeSaveFailure } from '@/lib/api'")
+    expect(MODAL).toContain("import { ApiError, api, describeSaveFailure } from '@/lib/api'")
     const body = fnBody(MODAL, 'const doSave = async ()')
     expect(body, '生の例外文をそのまま出している')
       .not.toMatch(/setError\(\s*(err\.message|String\(err\)|err\s*\))/s)
@@ -42,8 +42,9 @@ describe('リファラルリンク編集窓の保存 (#1058)', () => {
     const body = fnBody(MODAL, 'const doSave = async ()')
     // R39: 新規は選択中アカウントの所属を付けて作る。
     expect(body).toContain('api.entryRoutes.create({ ...form, lineAccountId: accountId ?? null })')
-    expect(body).toContain('api.entryRoutes.update(route!.id, form)')
-    expect(body).toContain('if (res.success) onSaved(res.data, isNew)')
+    // 同時編集の見分け（E14GFm）：更新は開いたときの更新日時を付けて送る。
+    expect(body).toContain('api.entryRoutes.update(route!.id, { ...form, expectedUpdatedAt: baseline ?? undefined })')
+    expect(body).toContain('onSaved(res.data, isNew)')
     expect(body).toContain("else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')")
   })
 

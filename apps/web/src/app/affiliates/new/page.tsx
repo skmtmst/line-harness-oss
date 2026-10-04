@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { Friend } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import type { Affiliate, Friend } from '@line-crm/shared'
+import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
@@ -97,6 +97,79 @@ const PAYOUT_KINDS: Array<{ value: PayoutKind; label: string; note: string }> = 
 ]
 
 /*
+ * 同時編集の比べ（板 Gqve5）。違う項目だけを「自分の変更（下書き）」と
+ * 「今の保存内容」で並べる。差がなければ日時だけ進めて保存し直せる。
+ * この画面だけの部品（共通部品は変えない）。
+ */
+function ConflictCompare({
+  latest,
+  draft,
+  onAdoptLatest,
+}: {
+  latest: Affiliate
+  draft: Record<string, string>
+  onAdoptLatest: () => void
+}) {
+  const text = (value: string | number | boolean | null | undefined, empty: string): string => {
+    if (value === null || value === undefined || value === '') return empty
+    if (typeof value === 'boolean') return value ? 'する' : 'しない'
+    return String(value)
+  }
+  const rows: Array<{ label: string; mine: string; theirs: string }> = [
+    { label: '名前', mine: draft.name, theirs: text(latest.name, '—') },
+    {
+      label: '報酬率',
+      mine: draft.commissionRate,
+      theirs: latest.commissionRate != null ? `${latest.commissionRate}%` : '—',
+    },
+    { label: '連絡先メール', mine: draft.email, theirs: text(latest.email, '未登録') },
+    {
+      label: '保留期間',
+      mine: draft.holdDays,
+      theirs: latest.holdDays != null ? `${latest.holdDays}日` : '即確定',
+    },
+    { label: '支払いサイクル', mine: draft.payoutCycle, theirs: text(latest.payoutCycle, '未登録') },
+    { label: '本人への通知', mine: draft.notifyOnConversion, theirs: text(latest.notifyOnConversion, '—') },
+    { label: '計測', mine: draft.isActive, theirs: text(latest.isActive, '—') },
+  ].filter((row) => row.mine !== row.theirs)
+  if (rows.length === 0) {
+    return (
+      <div className="mt-2">
+        <p>内容に違いはありません。最新の日時で保存し直せます。</p>
+        <div className="mt-2">
+          <Button type="button" onClick={onAdoptLatest}>
+            最新の日時で保存し直す
+          </Button>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <table className="mt-2 w-full table-fixed text-xs" data-design-part="edit-conflict-compare">
+      <caption className="py-1 text-left font-semibold">
+        同じアフィリエイターの、違う項目だけ並べています。
+      </caption>
+      <thead>
+        <tr className="text-left text-ink-secondary">
+          <th className="w-28 py-1 pr-2 font-medium">項目</th>
+          <th className="py-1 pr-2 font-medium">自分の変更（下書き）</th>
+          <th className="py-1 font-medium">今の保存内容</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-hairline">
+        {rows.map((row) => (
+          <tr key={row.label}>
+            <th scope="row" className="py-1 pr-2 text-left font-medium text-ink-secondary">{row.label}</th>
+            <td className="truncate py-1 pr-2" title={row.mine}>{row.mine}</td>
+            <td className="truncate py-1" title={row.theirs}>{row.theirs}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+/*
  * ★V8-B の切り替え。v8 の器は別ファイル（new-affiliate-v8.tsx）に置き、
  * v7 の器・動きはこの下の V7 のまま残す。
  */
@@ -144,6 +217,54 @@ function NewAffiliatePageV7() {
   // UUID（Issue #686）。押し直しても同じ値のままにするため onSave では
   // 作らず、ここと onReset だけで作り直す。
   const [operationId, setOperationId] = useState(() => crypto.randomUUID())
+  /*
+   * 同時編集の見分け（板 Gqve5）。追加情報の PUT は、作った・読んだときの
+   * 更新日時を送る。ほかの人が先に保存していたら409になり、今の中身で
+   * 帯を出して比べ直す。送らなければ今までどおり通す。
+   */
+  const [savedUpdatedAt, setSavedUpdatedAt] = useState<string | null>(null)
+  const [conflictLatest, setConflictLatest] = useState<Affiliate | null>(null)
+  const [comparing, setComparing] = useState(false)
+  const [reloading, setReloading] = useState(false)
+  const [reloadFailed, setReloadFailed] = useState(false)
+
+  /** 409 の data.latest を取り出す。形が違えば null（従来の失敗扱い）。 */
+  function readConflictLatest(err: unknown): Affiliate | null {
+    if (!(err instanceof ApiError) || err.status !== 409) return null
+    const data = err.data as { latest?: unknown } | null | undefined
+    const latest = data?.latest as Record<string, unknown> | null | undefined
+    if (!latest || typeof latest !== 'object' || typeof latest.name !== 'string') return null
+    return latest as unknown as Affiliate
+  }
+
+  /*
+   * 日時を「10/2 14:02」の形にする。口が返すのは JST の壁時計なので、
+   * 文字列から直接抜く（Date に通すと実行環境の時差でずれる）。
+   * 読めなければ空文字。
+   */
+  function formatSavedAt(value: string | null | undefined): string {
+    const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(value ?? '')
+    if (!m) return ''
+    return `${Number(m[2])}/${Number(m[3])} ${m[4]}:${m[5]}`
+  }
+
+  /** 最新を読み直して見分けの基準にする。入力（下書き）は残す。 */
+  async function reloadLatest() {
+    if (!createdId || reloading) return
+    setReloading(true)
+    setReloadFailed(false)
+    try {
+      const res = await api.affiliates.get(createdId)
+      if (!res.success) throw new Error('reload_failed')
+      setSavedUpdatedAt(typeof res.data.updatedAt === 'string' ? res.data.updatedAt : null)
+      setConflictLatest(null)
+      setComparing(false)
+    } catch {
+      setReloadFailed(true)
+    } finally {
+      setReloading(false)
+    }
+  }
 
   /*
    * 途中保存の続きは、保存したときのLINEアカウントの中でだけ有効（#686）。
@@ -161,6 +282,10 @@ function NewAffiliatePageV7() {
     setCreatedId(null)
     setPartialSave(false)
     setSavedIsActive(null)
+    setSavedUpdatedAt(null)
+    setConflictLatest(null)
+    setComparing(false)
+    setReloadFailed(false)
     setOperationId(crypto.randomUUID())
     setFriendId('')
     setSelectedFriend(null)
@@ -251,6 +376,10 @@ function NewAffiliatePageV7() {
         setCreatedId(null)
         setPartialSave(false)
         setSavedIsActive(null)
+        setSavedUpdatedAt(null)
+        setConflictLatest(null)
+        setComparing(false)
+        setReloadFailed(false)
         setOperationId(crypto.randomUUID())
       }}
       onSave={async () => {
@@ -258,6 +387,9 @@ function NewAffiliatePageV7() {
           throw new Error('LINEアカウントを選んでください（画面上部で選べます）')
         }
         let affiliateId = createdId
+        // 同じ保存操作の中で作って直ぐ直すとき、state の反映は間に合わない。
+        // 送る基準は手元の変数で持ち、state へは次回のために残す。
+        let baseline = savedUpdatedAt
         if (!affiliateId) {
           try {
             const res = await api.affiliates.create({
@@ -276,6 +408,8 @@ function NewAffiliatePageV7() {
             if (!res.success) throw new Error('create_failed')
             affiliateId = res.data.id
             setCreatedId(affiliateId)
+            baseline = typeof res.data.updatedAt === 'string' ? res.data.updatedAt : null
+            setSavedUpdatedAt(baseline)
             // 保存された行の稼働状態へ寄せる。応答消失後の再送が古い行を
             // 回収したときも、画面の表示と再試行の送り先がずれない。
             // 応答に稼働状態が無いときは送った指定のままにする。
@@ -304,9 +438,19 @@ function NewAffiliatePageV7() {
             payoutCycle: payoutCycle.trim() || null,
             notifyOnConversion,
             isActive: startTracking,
+            expectedUpdatedAt: baseline ?? undefined,
           })
           if (!update.success) throw new Error('update_failed')
-        } catch {
+          if (typeof update.data.updatedAt === 'string') setSavedUpdatedAt(update.data.updatedAt)
+        } catch (err) {
+          // 409 は同時編集。帯で今の中身を見せ、入力（下書き）は残す。
+          const latest = readConflictLatest(err)
+          if (latest) {
+            setConflictLatest(latest)
+            setComparing(false)
+            setPartialSave(true)
+            throw new Error('ほかの人が先に保存しました。上の帯から内容を比べて続けてください。')
+          }
           setPartialSave(true)
           throw new Error('基本情報は登録済みですが、追加情報を保存できませんでした。もう一度押すと、追加情報だけを保存します。')
         }
@@ -351,6 +495,54 @@ function NewAffiliatePageV7() {
         </>
       }
     >
+      {conflictLatest ? (
+        <div data-design-node="Gqve5">
+        <Notice tone="warn" data-design-part="edit-conflict-band">
+          <p className="font-semibold">
+            {formatSavedAt(conflictLatest.updatedAt)
+              ? `ほかの人が${formatSavedAt(conflictLatest.updatedAt)}にこのアフィリエイターを保存しました。`
+              : 'ほかの人がこのアフィリエイターを保存しました。'}
+            このまま保存すると、その人の変更が消えます。
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={() => setComparing((v) => !v)}
+              aria-expanded={comparing}
+            >
+              {comparing ? '比べを閉じる' : '違いを比べる'}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void reloadLatest()}
+              disabled={reloading}
+            >
+              {reloading ? '読み込んでいます…' : '最新を読み込んで続ける'}
+            </Button>
+          </div>
+          {reloadFailed ? (
+            <p className="mt-2">最新の内容を読み込めませんでした。通信を確かめて、もう一度押してください。</p>
+          ) : null}
+          {comparing ? <ConflictCompare latest={conflictLatest} draft={{
+            name: name.trim(),
+            commissionRate: payoutKind === 'rate' && commissionRate.trim() ? `${commissionRate.trim()}%` : '—',
+            email: email.trim() || '未登録',
+            holdDays: holdDays.trim() ? `${holdDays.trim()}日` : '即確定',
+            payoutCycle: payoutCycle.trim() || '未登録',
+            notifyOnConversion: notifyOnConversion ? 'する' : 'しない',
+            isActive: startTracking ? 'する' : 'しない',
+          }}
+            onAdoptLatest={() => {
+              if (typeof conflictLatest?.updatedAt === 'string') {
+                setSavedUpdatedAt(conflictLatest.updatedAt)
+              }
+              setConflictLatest(null)
+              setComparing(false)
+            }}
+          /> : null}
+        </Notice>
+        </div>
+      ) : null}
       <FormSection step={1} label="だれを登録するか">
         {partialSave && createdId ? (
           <Notice
