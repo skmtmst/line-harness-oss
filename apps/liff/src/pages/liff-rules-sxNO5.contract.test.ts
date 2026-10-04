@@ -50,7 +50,10 @@ describe('LIFF の決まり (sxNO5)', () => {
 
   it('読み込み中は骨格、失敗は「もう一度読み込む」、空きがないときは次の手', () => {
     const loading = src('components', 'LoadingView.tsx');
-    expect(loading).toContain('animate-pulse');
+    // ★A (オーナー決定)：明滅ではなく左から右へ流れる光。0.3秒以内なら出さない。
+    expect(loading).toContain('liff-shimmer-bone');
+    expect(loading).toContain('300');
+    expect(loading).not.toContain('animate-pulse');
     const error = src('components', 'LoadErrorView.tsx');
     expect(error).toContain('data-design-node="zz9R3"');
     expect(error).toContain('RETRY_LABEL');

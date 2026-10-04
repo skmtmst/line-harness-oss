@@ -1,4 +1,7 @@
 {
+  "app/accounts/handover/handover-v8.tsx": {
+    "unresolved-classname": 48
+  },
   "app/accounts/new/page.tsx": {
     "arbitrary-value": 1
   },
@@ -9,11 +12,17 @@
     "unresolved-classname": 99,
     "direct-th": 8
   },
+  "app/affiliate-offers/new-offer-v8.tsx": {
+    "unresolved-classname": 53
+  },
   "app/affiliate-offers/new/page.tsx": {
     "unresolved-classname": 4
   },
   "app/affiliates/affiliates-v8.tsx": {
     "unresolved-classname": 7
+  },
+  "app/affiliates/new-affiliate-v8.tsx": {
+    "unresolved-classname": 82
   },
   "app/affiliates/new/page.tsx": {
     "unresolved-classname": 6
@@ -62,7 +71,7 @@
     "unresolved-classname": 249
   },
   "app/auto-replies/list-v8.tsx": {
-    "unresolved-classname": 76,
+    "unresolved-classname": 75,
     "direct-th": 7
   },
   "app/auto-replies/page.tsx": {
@@ -112,7 +121,7 @@
     "unresolved-classname": 5
   },
   "app/booking/staff/new/staff-new-v8.tsx": {
-    "unresolved-classname": 68
+    "unresolved-classname": 69
   },
   "app/booking/staff/shifts/liff-preview.tsx": {
     "direct-primary-button": 2,
@@ -176,6 +185,9 @@
   "app/ec-commerce/connector-panel.tsx": {
     "unresolved-classname": 30
   },
+  "app/ec-commerce/ec-connector-v8.tsx": {
+    "unresolved-classname": 6
+  },
   "app/ec-commerce/identity-candidates/page.tsx": {
     "unresolved-classname": 11
   },
@@ -189,7 +201,7 @@
     "unresolved-classname": 10
   },
   "app/emergency/control-v8.tsx": {
-    "unresolved-classname": 79,
+    "unresolved-classname": 81,
     "direct-th": 6
   },
   "app/emergency/page.tsx": {
@@ -206,8 +218,8 @@
     "unresolved-classname": 31
   },
   "app/events/events-list-v8.tsx": {
-    "unresolved-classname": 48,
-    "arbitrary-value": 6,
+    "unresolved-classname": 49,
+    "arbitrary-value": 7,
     "direct-th": 6
   },
   "app/events/new/events-new-v8.tsx": {
@@ -221,27 +233,27 @@
     "arbitrary-value": 1
   },
   "app/form-submissions/list-v8.tsx": {
-    "unresolved-classname": 93,
+    "unresolved-classname": 91,
     "direct-th": 6
   },
   "app/form-submissions/page.tsx": {
     "arbitrary-value": 4
   },
+  "app/friend-add-settings/editor-v8.tsx": {
+    "unresolved-classname": 189
+  },
   "app/friend-add-settings/list-v8.tsx": {
     "unresolved-classname": 80,
     "direct-th": 6
   },
-  "app/friend-add-settings/editor-v8.tsx": {
-    "unresolved-classname": 189
-  },
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
   },
-  "app/friend-add-settings/publish/page.tsx": {
-    "unresolved-classname": 38
-  },
   "app/friend-add-settings/publish/done-v8.tsx": {
     "unresolved-classname": 18
+  },
+  "app/friend-add-settings/publish/page.tsx": {
+    "unresolved-classname": 38
   },
   "app/friend-add-settings/runs/detail/detail-v8.tsx": {
     "unresolved-classname": 39
@@ -347,7 +359,7 @@
     "direct-th": 7
   },
   "app/mileage/v8-earning-rules-tab.tsx": {
-    "unresolved-classname": 73,
+    "unresolved-classname": 72,
     "direct-th": 7
   },
   "app/mileage/v8-history-tab.tsx": {
@@ -355,31 +367,56 @@
     "direct-th": 6
   },
   "app/mileage/v8-rewards-tab.tsx": {
-    "unresolved-classname": 87,
+    "unresolved-classname": 86,
     "direct-th": 12
   },
   "app/mileage/v8-score-tab.tsx": {
     "unresolved-classname": 131,
     "direct-th": 14
   },
+  "app/nen-campaigns/columns/new/column-new-v8.tsx": {
+    "unresolved-classname": 47
+  },
   "app/nen-campaigns/columns/new/page.tsx": {
     "unresolved-classname": 36
   },
+  "app/nen-campaigns/edit/campaign-editor-v8.tsx": {
+    "unresolved-classname": 65
+  },
   "app/nen-campaigns/edit/campaign-editor.tsx": {
     "unresolved-classname": 5
+  },
+  "app/nen-campaigns/nen-campaigns-v8.tsx": {
+    "unresolved-classname": 58
   },
   "app/nen-members/page.tsx": {
     "unresolved-classname": 13,
     "arbitrary-value": 1
   },
+  "app/nen-members/photo-review-v8.tsx": {
+    "unresolved-classname": 85
+  },
+  "app/nen/health/health-v8.tsx": {
+    "unresolved-classname": 56
+  },
   "app/nen/members/members-v8.tsx": {
-    "unresolved-classname": 61
+    "unresolved-classname": 62
+  },
+  "app/nen/pets/pets-v8.tsx": {
+    "unresolved-classname": 89,
+    "direct-th": 3
+  },
+  "app/no-permission/no-permission-v8.tsx": {
+    "unresolved-classname": 10
   },
   "app/page.tsx": {
     "arbitrary-value": 8,
     "unresolved-classname": 1
   },
   "app/pools/new/page.tsx": {
+    "unresolved-classname": 2
+  },
+  "app/pools/new/pool-new-v8.tsx": {
     "unresolved-classname": 2
   },
   "app/recipes/clone/page.tsx": {
@@ -438,7 +475,7 @@
     "unresolved-classname": 23
   },
   "app/restaurant-test/v8/inventory.tsx": {
-    "unresolved-classname": 46
+    "unresolved-classname": 45
   },
   "app/restaurant-test/v8/menu.tsx": {
     "unresolved-classname": 24
@@ -452,11 +489,11 @@
   "app/restaurant-test/v8/reservations.tsx": {
     "unresolved-classname": 46
   },
-  "app/restaurant-test/v8/tables.tsx": {
-    "unresolved-classname": 37
-  },
   "app/restaurant-test/v8/shell.tsx": {
     "unresolved-classname": 26
+  },
+  "app/restaurant-test/v8/tables.tsx": {
+    "unresolved-classname": 37
   },
   "app/rich-menus/edit/page.tsx": {
     "arbitrary-value": 10
@@ -548,7 +585,7 @@
     "unresolved-classname": 72
   },
   "app/tags/fields-tab-v8.tsx": {
-    "unresolved-classname": 58
+    "unresolved-classname": 53
   },
   "app/tags/fields/migrate/page.tsx": {
     "arbitrary-value": 1
@@ -563,19 +600,22 @@
     "unresolved-classname": 48
   },
   "app/tags/marks-v8.tsx": {
-    "unresolved-classname": 51
+    "unresolved-classname": 46
   },
   "app/tags/search-editor-v8.tsx": {
     "unresolved-classname": 53
   },
   "app/tags/searches-v8.tsx": {
-    "unresolved-classname": 59
+    "unresolved-classname": 54
   },
   "app/tags/tag-editor-v8.tsx": {
     "unresolved-classname": 113
   },
+  "app/tags/tag-rows-skeleton.tsx": {
+    "unresolved-classname": 5
+  },
   "app/tags/tags-tab-v8.tsx": {
-    "unresolved-classname": 67
+    "unresolved-classname": 61
   },
   "app/templates/asset-editor-v8.tsx": {
     "unresolved-classname": 63
@@ -619,23 +659,23 @@
     "unresolved-classname": 55,
     "direct-th": 5
   },
+  "app/webhooks/apitokens-v8.tsx": {
+    "unresolved-classname": 26,
+    "direct-th": 6
+  },
   "app/webhooks/edit/page.tsx": {
     "unresolved-classname": 4
   },
-  "app/webhooks/apitokens-v8.tsx": {
-    "direct-th": 6,
-    "unresolved-classname": 26
-  },
   "app/webhooks/incoming-v8.tsx": {
-    "direct-th": 4,
-    "unresolved-classname": 84
+    "unresolved-classname": 84,
+    "direct-th": 4
   },
   "app/webhooks/interactions-v8.tsx": {
     "unresolved-classname": 42,
     "direct-th": 6
   },
   "app/webhooks/new/new-v8.tsx": {
-    "unresolved-classname": 59
+    "unresolved-classname": 57
   },
   "app/webhooks/new/page.tsx": {
     "unresolved-classname": 5
@@ -648,8 +688,8 @@
     "unresolved-classname": 23
   },
   "app/webhooks/sheets-v8.tsx": {
-    "direct-th": 4,
-    "unresolved-classname": 48
+    "unresolved-classname": 48,
+    "direct-th": 4
   },
   "app/webhooks/webhook-interactions.tsx": {
     "unresolved-classname": 35
@@ -665,10 +705,10 @@
     "unresolved-classname": 1
   },
   "app/webinars/list-v8.tsx": {
-    "unresolved-classname": 38
+    "unresolved-classname": 43
   },
   "app/webinars/new/new-v8.tsx": {
-    "unresolved-classname": 41
+    "unresolved-classname": 43
   },
   "app/webinars/page.tsx": {
     "arbitrary-value": 4,
@@ -1067,14 +1107,5 @@
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
     "arbitrary-value": 2
-  },
-  "app/accounts/handover/handover-v8.tsx": {
-    "unresolved-classname": 48
-  },
-  "app/ec-commerce/ec-connector-v8.tsx": {
-    "unresolved-classname": 6
-  },
-  "app/pools/new/pool-new-v8.tsx": {
-    "unresolved-classname": 2
   }
 }

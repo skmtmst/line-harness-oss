@@ -12,6 +12,7 @@ import type { FriendField, Folder } from '@line-crm/shared'
 import { api, describeSaveFailure } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ListState from '@/components/shared/list-state'
+import { notifyToast } from '@/components/shared/toast'
 import FieldEditorV8, { type FieldEditorValues } from './field-editor-v8'
 
 export default function NewFieldPageV8() {
@@ -86,6 +87,7 @@ export default function NewFieldPageV8() {
         // R515: 同じ作成のやり直しは同じ要求キーで送り、二重に作らない。
       }, requestKey)
       if (!res.success) throw new Error(res.error)
+      notifyToast(`「${values.name.trim()}」を作りました`)
       router.push(back ?? `/tags?tab=fields&highlight=${res.data.id}`)
     } catch (reason) {
       setError(describeSaveFailure(reason))
