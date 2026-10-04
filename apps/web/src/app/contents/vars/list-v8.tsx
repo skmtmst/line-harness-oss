@@ -940,7 +940,7 @@ function CommonVarsListV8Inner() {
   const firstEmpty = stats.emptyInUse[0] ?? null
 
   return (
-    <div data-design-node="FM94M" className={styles.board}>
+    <div data-design-node="FM94M XIzkJ" className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
           <h1 className={styles.headTitle}>共通情報</h1>
@@ -1259,9 +1259,9 @@ function CommonVarsListV8Inner() {
                           </Th>
                         ) : null}
                         <Th scope="col">共通情報（差し込み名）</Th>
-                        <Th scope="col">中身</Th>
-                        <Th scope="col">状態</Th>
-                        <Th scope="col">使っている所</Th>
+                        <Th scope="col" className={styles.cellValue}>中身</Th>
+                        <Th scope="col" className={styles.cellStatus}>状態</Th>
+                        <Th scope="col" className={styles.cellUsage}>使っている所</Th>
                         <Th scope="col">更新・次回</Th>
                         <Th scope="col" className={styles.cellMenu}>
                           <span className="sr-only">操作</span>
