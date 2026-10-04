@@ -262,8 +262,9 @@
   width: 88px;
 }
 
+/* 2行目（今月・完了率）が1152幅で器からはみ出すため広げる。 */
 .colAnswers {
-  width: 124px;
+  width: 140px;
 }
 
 .colUrl {
