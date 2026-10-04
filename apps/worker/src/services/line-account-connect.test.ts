@@ -78,6 +78,15 @@ describe('LINEアカウント自動接続', () => {
     expect(update?.body).toContain('https://nen-line-stg.skmtmst.workers.dev?liffId=2007123456-auto');
   });
 
+  it('指定LIFFがチャネル内にある場合だけ流用し、別チャネルのIDを拒否する',async()=>{
+    const calls=installFetch(null,'2007123456-existing')
+    const found=await prepareLineConnection({...input,liffId:'2007123456-existing'})
+    expect(found.success).toBe(true);expect(found.liffId).toBe('2007123456-existing')
+    expect(calls.some(call=>call.url.endsWith('/liff/v1/apps')&&call.method==='POST')).toBe(false)
+    const missing=await prepareLineConnection({...input,liffId:'2007123456-missing'})
+    expect(missing.success).toBe(false);expect(missing.steps.find(s=>s.state==='failed')?.order).toBe(4)
+  })
+
   it('descriptionがmusuboの既存LIFFを流用する', async () => {
     const calls = installFetch(null, '2007123456-existing');
     const result = await prepareLineConnection(input);

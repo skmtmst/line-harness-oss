@@ -1,3 +1,4 @@
+import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import {
@@ -1153,6 +1154,7 @@ function duplicateAccountError(
 }
 
 type ConnectBody = {
+  tagIds?: unknown; staffIds?: unknown; parentLineAccountId?: unknown; liffId?: unknown;
   name?: unknown;
   channelId?: unknown;
   channelSecret?: unknown;
@@ -1161,7 +1163,7 @@ type ConnectBody = {
 };
 
 function readConnectBody(body: ConnectBody):
-  | { ok: true; value: { name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string } }
+  | { ok: true; value: { name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds?: string[]; staffIds?: string[]; parentLineAccountId?: string | null; liffId?: string } }
   | { ok: false; error: string } {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const channelId = typeof body.channelId === 'string' ? body.channelId.trim() : '';
@@ -1173,7 +1175,11 @@ function readConnectBody(body: ConnectBody):
   if (!channelSecret) return { ok: false, error: 'Messaging APIのチャネルシークレットを入力してください' };
   if (!/^\d+$/.test(loginChannelId)) return { ok: false, error: 'LINE LoginのチャネルIDは半角数字で入力してください' };
   if (!loginChannelSecret) return { ok: false, error: 'LINE Loginのチャネルシークレットを入力してください' };
-  return { ok: true, value: { name, channelId, channelSecret, loginChannelId, loginChannelSecret } };
+  const id=(v:unknown):v is string=>typeof v==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(v);
+  for(const value of [body.tagIds,body.staffIds]) if(value!==undefined && (!Array.isArray(value)||value.length>50||value.some(v=>!id(v))||new Set(value).size!==value.length)) return {ok:false,error:'タグ・担当者の指定を確認してください'};
+  if(body.parentLineAccountId!==undefined && body.parentLineAccountId!==null && !id(body.parentLineAccountId)) return {ok:false,error:'親アカウントを確認してください'};
+  if(body.liffId!==undefined && (typeof body.liffId!=='string'||!/^\d+-[A-Za-z0-9_-]+$/.test(body.liffId))) return {ok:false,error:'LIFF IDを確認してください'};
+  return { ok: true, value: { name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds:body.tagIds as string[]|undefined,staffIds:body.staffIds as string[]|undefined,parentLineAccountId:body.parentLineAccountId as string|null|undefined,liffId:body.liffId as string|undefined } };
 }
 
 async function readConnectRequest(c: Context<Env>) {
@@ -1221,6 +1227,9 @@ function publicConnectData(
 lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner'), async (c) => {
   const parsed = await readConnectRequest(c);
   if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
+  let registration;
+  try { registration=await validateRegistrationOptions(c.env.DB,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,parsed.value,c.get('staff').id); }
+  catch(error) { if(error instanceof RegistrationOptionsError) return c.json({success:false,error:'タグ・親・担当者の指定を確認してください',code:error.code},error.status); throw error; }
   const baseUrl = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
   const prepared = await prepareLineConnection({ ...parsed.value, baseUrl });
   if (!prepared.success || !prepared.channelAccessToken) {
@@ -1251,6 +1260,9 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
   }
   const parsed = await readConnectRequest(c);
   if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
+  let registration;
+  try { registration=await validateRegistrationOptions(c.env.DB,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,parsed.value,c.get('staff').id); }
+  catch(error) { if(error instanceof RegistrationOptionsError) return c.json({success:false,error:'タグ・親・担当者の指定を確認してください',code:error.code},error.status); throw error; }
   const baseUrl = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
   const prepared = await prepareLineConnection({ ...parsed.value, baseUrl });
   if (!prepared.success || !prepared.channelAccessToken || !prepared.bot || !prepared.liffId) {
@@ -1278,6 +1290,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
       loginChannelSecret: parsed.value.loginChannelSecret,
       liffId: prepared.liffId,
       timezone: 'Asia/Tokyo',
+      parentLineAccountId: parsed.value.parentLineAccountId ?? null,
       tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID,
       lineDisplayName: prepared.bot.displayName ?? null,
       linePictureUrl: prepared.bot.pictureUrl ?? null,
@@ -1293,9 +1306,6 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
     if (followerState.capability === 'unknown') {
       throw new Error('FOLLOWER_CAPABILITY_UNKNOWN');
     }
-    const started = followerState.capability === 'available'
-      ? await startFollowerImport(c.env.DB, account.id)
-      : followerState;
 
     await saveLineAccountConnectionChecks(c.env.DB, {
       lineAccountId: account.id,
@@ -1325,6 +1335,8 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
       ],
     });
 
+    await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
+    const started = followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
     const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed')];
     return c.json({
       success: true,
@@ -1335,6 +1347,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
     }, 201);
   } catch (error) {
     if (account) await deleteUncommittedLineAccount(c.env.DB, account.id);
+    if (error instanceof RegistrationOptionsError) return c.json({success:false,error:'登録中にタグ・親・担当範囲が変わりました。選び直してください',code:error.code},error.status);
     if (error instanceof CredentialEncryptionKeyError) {
       return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
     }

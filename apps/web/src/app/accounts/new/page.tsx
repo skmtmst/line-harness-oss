@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import type { LineAccountTagSummary, StaffMember } from '@line-crm/shared'
 import Image from 'next/image'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
@@ -39,6 +41,20 @@ const emptyForm: FormState = {
 }
 
 export default function NewLineAccountPage() {
+  const theme=useAdminTheme()
+  const [tagIds,setTagIds]=useState<string[]>([]), [staffIds,setStaffIds]=useState<string[]>([])
+  const [parentId,setParentId]=useState(''), [liffId,setLiffId]=useState('')
+  const [options,setOptions]=useState<{tags:LineAccountTagSummary[];parents:{id:string;name:string}[];staff:StaffMember[]}>({tags:[],parents:[],staff:[]})
+  const [optionsState,setOptionsState]=useState<'loading'|'ready'|'failed'>('loading')
+  useEffect(()=>{
+    if(theme!=='v8') return
+    let active=true
+    void Promise.all([api.lineAccountTags.list(),api.lineAccounts.list(),api.staff.list()]).then(([tags,accounts,staff])=>{
+      if(!tags.success || !accounts.success || !staff.success) throw new Error('候補取得失敗')
+      if(active){setOptions({tags:tags.data,parents:accounts.data.filter(a=>a.isActive&&!a.archivedAt).map(a=>({id:a.id,name:a.name})),staff:staff.data.filter(s=>s.isActive&&s.accountScope==='accounts'&&s.inviteStatus==='active')});setOptionsState('ready')}
+    }).catch(()=>{if(active)setOptionsState('failed')})
+    return ()=>{active=false}
+  },[theme])
   const [accountMethod, setAccountMethod] = useState<'existing' | 'new'>('existing')
   const [currentStep, setCurrentStep] = useState<StepNumber>(1)
   const [form, setForm] = useState<FormState>(emptyForm)
@@ -110,6 +126,7 @@ export default function NewLineAccountPage() {
   }
 
   const moveNext = () => {
+    if(theme==='v8' && currentStep===1 && optionsState!=='ready') {setError('タグ・親・担当者の候補を読み込んでから進めてください。');return}
     if (currentStep <= 3 && !validateStep(currentStep)) {
       setError('入力内容を確認してください。')
       return
@@ -124,6 +141,7 @@ export default function NewLineAccountPage() {
     channelSecret: form.channelSecret,
     loginChannelId: form.loginChannelId.trim(),
     loginChannelSecret: form.loginChannelSecret,
+    ...(theme==='v8'?{tagIds,staffIds,parentLineAccountId:parentId||null,...(liffId.trim()?{liffId:liffId.trim()}: {})}: {}),
   })
 
   const checkConnection = async () => {
@@ -283,9 +301,17 @@ export default function NewLineAccountPage() {
 
       <form onSubmit={submit} noValidate aria-busy={busyAction ? true : undefined}>
         <div data-design="Body" ref={stepPanelRef} tabIndex={-1} className="outline-none">
-          {currentStep === 1 && <div data-design-node="a8qMXX">
+          {currentStep === 1 && <div data-design-node={theme==='v8'?'GwKE2':'a8qMXX'}>
             <SetupSection title="1. 基本情報" description="管理画面で見分ける名前を設定します。未入力でも登録できます。">
               <Field id="account-name" label="表示名（任意）" value={form.name} onChange={(value) => update('name', value)} placeholder="未入力なら LINE公式アカウントの名前をそのまま使います" error={fieldErrors.name} />
+              {theme==='v8' && <div className="space-y-4">
+                {optionsState==='failed' && <p role="alert">タグ・親・担当者を読み込めませんでした。再読み込みしてください。</p>}
+                {optionsState==='loading' && <p role="status">登録の候補を読み込んでいます…</p>}
+                <fieldset disabled={optionsState!=='ready'}><legend>アカウントタグ</legend><div className="flex flex-wrap gap-3">{options.tags.map(tag=><label key={tag.id}><input type="checkbox" checked={tagIds.includes(tag.id)} onChange={e=>setTagIds(current=>e.target.checked?[...current,tag.id]:current.filter(id=>id!==tag.id))}/>{tag.name}</label>)}</div>{!options.tags.length && optionsState==='ready' && <p>タグは統括のアカウント一覧から作成できます。</p>}</fieldset>
+                <label className="block">親アカウント<select aria-label="親アカウント" className="mt-1 block w-full rounded-control border border-hairline p-2" disabled={optionsState!=='ready'} value={parentId} onChange={e=>setParentId(e.target.value)}><option value="">親なし</option>{options.parents.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+                <fieldset disabled={optionsState!=='ready'}><legend>このアカウントを担当範囲に追加する人</legend><div className="flex flex-wrap gap-3">{options.staff.map(member=><label key={member.id}><input type="checkbox" checked={staffIds.includes(member.id)} onChange={e=>setStaffIds(current=>e.target.checked?[...current,member.id]:current.filter(id=>id!==member.id))}/>{member.name}</label>)}</div><p className="text-xs text-ink-secondary">全アカウント担当者は追加操作なしで閲覧できます。</p></fieldset>
+                <Field id="existing-liff-id" label="既存のLIFF ID（任意）" value={liffId} onChange={setLiffId} placeholder="未入力なら自動で用意します"/>
+              </div>}
             </SetupSection>
           </div>}
 

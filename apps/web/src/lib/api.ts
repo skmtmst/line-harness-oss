@@ -9378,22 +9378,10 @@ export const api = {
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
       }),
-    connectCheck: (data: {
-      name?: string
-      channelId: string
-      channelSecret: string
-      loginChannelId: string
-      loginChannelSecret: string
-    }) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect/check', {
+    connectCheck: (data: import('@line-crm/shared').LineAccountConnectInput) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect/check', {
       method: 'POST', body: JSON.stringify(data),
     }),
-    connect: (data: {
-      name?: string
-      channelId: string
-      channelSecret: string
-      loginChannelId: string
-      loginChannelSecret: string
-    }, stepUpToken?: string) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
+    connect: (data: import('@line-crm/shared').LineAccountConnectInput, stepUpToken?: string) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
       method: 'POST',
       headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
       body: JSON.stringify(data),

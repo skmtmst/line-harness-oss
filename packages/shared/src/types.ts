@@ -2572,3 +2572,8 @@ export interface HqScenarioDefinition {
 }
 
 export interface HqTemplateTextOverride { accountId: string; text: string }
+
+export interface LineAccountConnectInput {
+ name?: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string
+ tagIds?: string[]; parentLineAccountId?: string | null; staffIds?: string[]; liffId?: string
+}
