@@ -43,8 +43,8 @@ import {
 } from '@/lib/api'
 import {
   formatMileageChange,
-  formatMileageDate,
   formatMileageNumber,
+  formatMileageShortDateTime,
   friendHistoryItem,
   mileageDetailHasSourceEvent,
   mileageEntryTypeLabel,
@@ -534,7 +534,7 @@ function FriendDetailInner() {
                 return (
                   <tr key={item.id}>
                     <td style={{ whiteSpace: 'nowrap' }}>
-                      <time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time>
+                      <time dateTime={item.occurredAt}>{formatMileageShortDateTime(item.occurredAt)}</time>
                     </td>
                     <td>
                       {item.restricted || item.reason == null ? (

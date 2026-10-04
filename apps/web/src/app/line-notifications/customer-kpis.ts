@@ -1,11 +1,11 @@
 export type CustomerNotificationKpi = {
   label: string
   value: number | '上限なし' | null
-  unit: '種類' | '通' | null
+  /** 「1,041 / 5,000」のように数2つをそのまま出すときだけ使う。 */
+  valueText?: string
+  unit: '通' | null
   note: string
   href: string | null
-  /** お知らせそのものの数と、LINEの月間送信枠は別のまとまりとして並べる。 */
-  group: 'notice' | 'quota'
 }
 
 export type LineNotificationQuota =
@@ -13,11 +13,11 @@ export type LineNotificationQuota =
   | { state: 'unlimited'; total: null; used: number; remaining: null; asOf: string }
   | { state: 'unavailable'; total: null; used: null; remaining: null; asOf: null; reason: string }
 
+/** 板 g3iDs の4枚。数は実データだけ。見本の数字は書かない。 */
 export function customerNotificationKpis(input: {
   ready: boolean
-  settingsCount: number
-  enabledCount: number
   sentToday: number | null
+  sentLast30d: number | null
   sentBreakdown: string
   failed: number | null
   quota: LineNotificationQuota | null
@@ -29,47 +29,32 @@ export function customerNotificationKpis(input: {
 }): CustomerNotificationKpi[] {
   const value = (count: number | null): number | null => input.ready ? count : null
   const failed = input.loadFailed === true
-  const stoppedCount = Math.max(0, input.settingsCount - input.enabledCount)
   const quotaUnavailable = input.quota?.state === 'unavailable'
     ? input.quota.reason
     : input.quota === null ? (failed ? '取得失敗' : '送信枠を取得中') : 'LINEの今月分'
   const unlimited = input.quota?.state === 'unlimited'
 
   return [
-    { label: '出しているお知らせ', value: value(input.enabledCount), unit: '種類', note: input.ready ? `全${input.settingsCount}種類のうち` : (failed ? '取得失敗' : '件数を取得中'), href: null, group: 'notice' },
-    { label: '止めているもの', value: value(stoppedCount), unit: '種類', note: '履歴はそのまま残ります', href: null, group: 'notice' },
-    { label: '今日 送った', value: value(input.sentToday), unit: '通', note: input.sentBreakdown || (failed ? '取得失敗' : '種類別の件数は未取得'), href: null, group: 'notice' },
+    { label: '今日送った', value: value(input.sentToday), unit: '通', note: input.sentBreakdown || (failed ? '取得失敗' : '種類別の件数は未取得'), href: null },
+    { label: 'この30日', value: value(input.sentLast30d), unit: '通', note: failed ? '取得失敗' : '', href: null },
+    unlimited
+      ? { label: '今月の送信枠', value: '上限なし', unit: null, note: 'LINEの今月分', href: null }
+      : input.quota?.state === 'available'
+        ? {
+          label: '今月の送信枠',
+          value: input.ready ? input.quota.used : null,
+          valueText: input.ready ? `${input.quota.used.toLocaleString('ja-JP')} / ${input.quota.total.toLocaleString('ja-JP')}通` : undefined,
+          unit: '通',
+          note: quotaUnavailable,
+          href: null,
+        }
+        : { label: '今月の送信枠', value: null, unit: '通', note: quotaUnavailable, href: null },
     {
       label: '送れなかった',
       value: value(input.failed),
       unit: '通',
       note: '確認と別の連絡が必要',
       href: '/line-notifications?tab=failures',
-      group: 'notice',
-    },
-    {
-      label: '今月の送信枠',
-      value: unlimited ? '上限なし' : input.quota?.state === 'available' ? input.quota.total : null,
-      unit: unlimited ? null : '通',
-      note: quotaUnavailable,
-      href: null,
-      group: 'quota',
-    },
-    {
-      label: '今月使った',
-      value: input.quota?.state === 'available' || input.quota?.state === 'unlimited' ? input.quota.used : null,
-      unit: '通',
-      note: quotaUnavailable,
-      href: null,
-      group: 'quota',
-    },
-    {
-      label: '今月残り',
-      value: unlimited ? '上限なし' : input.quota?.state === 'available' ? input.quota.remaining : null,
-      unit: unlimited ? null : '通',
-      note: quotaUnavailable,
-      href: null,
-      group: 'quota',
     },
   ]
 }

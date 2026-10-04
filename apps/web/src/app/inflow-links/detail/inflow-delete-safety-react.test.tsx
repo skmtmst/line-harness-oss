@@ -36,6 +36,11 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('id=route-1'),
 }))
 
+vi.mock('@/contexts/account-context', () => ({
+  // 詳細の「入ったLINEアカウント」欄だけに使う。試験では空のまま。
+  useAccount: () => ({ accounts: [], selectedAccountId: 'acc-1' }),
+}))
+
 vi.mock('@/lib/api', () => ({
   ApiError: fixture.ApiError,
   fetchApi: fixture.fetchApi,
@@ -63,7 +68,8 @@ const { default: InflowLinkDetailPage } = await import('./page')
 
 async function mountAndOpen() {
   render(<InflowLinkDetailPage />)
-  const opener = await screen.findByRole('button', { name: '店頭QRの削除を確認' })
+  // 板 Q5le3 では青い帯の「止める」から削除の窓を開く。
+  const opener = await screen.findByRole('button', { name: '止める' })
   opener.focus()
   await act(async () => { fireEvent.click(opener) })
   const dialog = await screen.findByRole('dialog')
@@ -177,8 +183,9 @@ describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
     })
     render(<InflowLinkDetailPage />)
 
-    expect(await screen.findByRole('button', { name: 'この経路を編集' })).toBeTruthy()
-    const opener = await screen.findByRole('button', { name: '店頭QRの受付停止を確認' })
+    expect(await screen.findByRole('button', { name: 'リンクを編集' })).toBeTruthy()
+    // 板 Q5le3 では青い帯の「止める」から削除の窓を開く。
+    const opener = await screen.findByRole('button', { name: '止める' })
     await act(async () => { fireEvent.click(opener) })
     const dialog = await screen.findByRole('dialog')
 

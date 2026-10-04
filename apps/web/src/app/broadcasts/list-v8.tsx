@@ -18,6 +18,7 @@ import {
   CalendarDays,
   CalendarClock,
   Copy,
+  Eye,
   FileText,
   Gauge,
   List as ListIcon,
@@ -46,7 +47,7 @@ import Pagination from '@/components/shared/pagination'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
 import { notifyToast } from '@/components/shared/toast'
-import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
+import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { formatDateTime, formatNumber, formatYmd } from '@/lib/format'
 import styles from './list-v8.module.css'
 
@@ -518,7 +519,7 @@ export default function BroadcastListV8() {
       label: '予約中',
       icon: CalendarClock,
       value: listKpis === undefined ? null : (listKpis?.scheduled ?? null),
-      unit: '件',
+      unit: ' 件',
       detail: '今日 —（未取得）',
     },
     {
@@ -526,7 +527,7 @@ export default function BroadcastListV8() {
       label: '今月の送信枠',
       icon: Gauge,
       value: quotaRemaining,
-      unit: '通残り',
+      unit: ' 通 残り',
       detail: quota?.limit != null && quota?.used != null
         ? `${formatNumber(quota.limit)}通のうち ${formatNumber(quota.used)}通使用`
         : '送信枠を確認できません',
@@ -536,15 +537,15 @@ export default function BroadcastListV8() {
       label: '今月の配信',
       icon: Send,
       value: listKpis === undefined ? null : (listKpis?.thisMonth ?? null),
-      unit: '件',
+      unit: ' 件',
       detail: `${listKpis?.delivered == null ? '—' : `${formatNumber(listKpis.delivered)}人`}に届いた`,
     },
     {
       key: 'openRate',
-      label: '平均開封率',
+      label: '平均の開封率',
       icon: MailOpen,
       value: listKpis === undefined ? null : (listKpis?.openRate ?? null),
-      unit: '%',
+      unit: ' %',
       detail: '過去28日',
     },
   ]
@@ -659,6 +660,14 @@ export default function BroadcastListV8() {
           友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。
         </p>
       </div>
+
+      {/* 板 `NtCE3`：閲覧のみの帯。数の帯の上。 */}
+      {canEdit ? null : (
+        <div className={styles.roBand} role="status">
+          <Eye size={16} aria-hidden="true" />
+          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+        </div>
+      )}
 
       {/* 数の帯：予約中・今月の送信枠・今月の配信・平均開封率（アイコンつき）。 */}
       <div className={styles.kpis} role="group" aria-label="配信の数">
@@ -776,7 +785,7 @@ export default function BroadcastListV8() {
               <Bookmark size={14} aria-hidden="true" />
               この条件を保存する
             </button>
-            <span className={styles.toolbarSpacer} />
+            <span className="flex-1" />
             <Select
               aria-label="保存した検索"
               value={savedViewId}
@@ -969,7 +978,8 @@ export default function BroadcastListV8() {
                             >
                               {broadcast.title}
                             </Link>
-                            <p className={styles.cellSub}>{rowExcerpt(broadcast.messageType, broadcast.messageContent)}</p>
+                            <p className={styles.cellSub}>{messageTypeLabel(broadcast.messageType)}</p>
+                            {/* 板が狭いとき「配信条件」はここへ移る（狭い板用の畳み方）。 */}
                             <p className={styles.cellAudience} title={audience}>{audience}</p>
                           </td>
                           <td className={styles.statusCell}>

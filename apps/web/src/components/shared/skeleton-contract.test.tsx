@@ -28,7 +28,7 @@ const FRIENDS_TABLE = readFileSync(join(HERE, '../friends/friend-list-table.tsx'
 const SCENARIOS_PAGE = readFileSync(join(HERE, '../../app/scenarios/page.tsx'), 'utf8')
 const SERVER_LIST = readFileSync(join(HERE, '../../lib/use-server-list.ts'), 'utf8')
 
-import { DelayedSkeleton, Skeleton } from './skeleton'
+import { CardsSkeleton, DelayedSkeleton, Skeleton, StatTilesSkeleton, TableSkeleton } from './skeleton'
 import { RefreshCover } from './refresh-cover'
 
 let host: HTMLDivElement
@@ -157,5 +157,29 @@ describe('前の表示を残したまま読む（★V7 `sTJsh` §2）', () => {
     expect(SERVER_LIST).not.toMatch(/items:\s*\[\],\s*loaded:\s*false,\s*loading:\s*true/)
     // シナリオ一覧も薄め＋線を出す。
     expect(SCENARIOS_PAGE).toContain('refreshing={scenarioList.refreshing}')
+  })
+})
+
+describe('形の決まった骨組みの組み合わせ（V8「サクサク感」⑤）', () => {
+  it('表の骨組み：5行・行の高さと列の幅を保つ・読み上げに出さない', () => {
+    const host = document.createElement('div')
+    host.innerHTML = renderToStaticMarkup(
+      <table>
+        <TableSkeleton columns={[56, '20%', 120]} rows={5} rowHeight={52} />
+      </table>,
+    )
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(5)
+    expect(host.querySelector('tbody tr')?.getAttribute('style')).toContain('52')
+    expect(host.querySelectorAll('[data-skeleton]')).toHaveLength(15)
+    expect(host.querySelector('tbody')?.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('カードの骨組み4枚・数のタイルの骨組みは題＋数字の幅', () => {
+    const cards = document.createElement('div')
+    cards.innerHTML = renderToStaticMarkup(<CardsSkeleton count={4} height={112} />)
+    expect(cards.querySelectorAll('[data-skeleton]')).toHaveLength(4)
+    const tiles = document.createElement('div')
+    tiles.innerHTML = renderToStaticMarkup(<StatTilesSkeleton count={4} />)
+    expect(tiles.querySelectorAll('[data-skeleton]')).toHaveLength(8)
   })
 })
