@@ -178,6 +178,12 @@
   "app/contents/vars/page.tsx": {
     "arbitrary-value": 3
   },
+  "app/conversions/conversion-points-v8.tsx": {
+    "unresolved-classname": 101
+  },
+  "app/conversions/new/conversion-create-v8.tsx": {
+    "unresolved-classname": 90
+  },
   "app/conversions/new/page.tsx": {
     "unresolved-classname": 5
   },
@@ -301,11 +307,20 @@
   "app/inflow-links/_components/create-genre-modal.tsx": {
     "arbitrary-value": 1
   },
+  "app/inflow-links/ad-integration-v8.tsx": {
+    "unresolved-classname": 141
+  },
   "app/inflow-links/ad-integration.tsx": {
     "arbitrary-value": 1
   },
   "app/inflow-links/detail/page.tsx": {
     "direct-secondary-button": 1
+  },
+  "app/inflow-links/inflow-list-v8.tsx": {
+    "unresolved-classname": 75
+  },
+  "app/inflow-links/new/inflow-create-v8.tsx": {
+    "unresolved-classname": 75
   },
   "app/inflow-links/new/page.tsx": {
     "unresolved-classname": 4
@@ -878,6 +893,9 @@
   },
   "components/inbox/inbox-row.tsx": {
     "arbitrary-value": 2
+  },
+  "components/inflow-links/site-script-v8.tsx": {
+    "unresolved-classname": 104
   },
   "components/inflow-links/site-script.tsx": {
     "arbitrary-value": 1

@@ -10,6 +10,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { useAccount } from '@/contexts/account-context'
 import type { ApiResponse, EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
 import EditRouteModal from './_components/edit-route-modal'
+import BulkRoutesDialog from './_components/bulk-routes-dialog'
 import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
 import { exportFileName, jstTodayString, toCsv } from './inflow-export'
@@ -23,11 +24,10 @@ import AdIntegration from './ad-integration'
 import RefOrdersPanel from './_components/ref-orders'
 import ReferralQrModal, { type ReferralQrRoute } from './referral-qr-modal'
 import SiteScript from '@/components/inflow-links/site-script'
+import SiteScriptV8 from '@/components/inflow-links/site-script-v8'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Dialog from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -37,6 +37,9 @@ import Pagination from '@/components/shared/pagination'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Select from '@/components/shared/select'
 import { formatDay, formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import InflowListV8 from './inflow-list-v8'
+import { AdConnectionsV8, AdHistoryV8, AdMetricsV8 } from './ad-integration-v8'
 
 interface MessageTemplate {
   id: string
@@ -161,12 +164,18 @@ const TAB_FEATURE: Partial<Record<string, FeatureKey>> = {
 
 function InflowLinksPageInner({
   onRouteCountChange,
+  v8,
 }: {
   /**
    * #980: タブの件数をホストへ渡す。一覧が描くのと同じ集合
    * （accountFilteredRows）の件数で、読み込み前・失敗時は null。
    */
   onRouteCountChange?: (count: number | null) => void
+  /**
+   * ★V8-B 流入と計測の一覧（板 `xbHxg`）。`true` のときだけ
+   * `InflowListV8` で描く。データの持ち方は v7 と同じ。
+   */
+  v8?: boolean
 }) {
   const { selectedAccountId } = useAccount()
   // PERF-03: 編集・作成窓の候補が属する機能（シナリオ/テンプレート/プール）の
@@ -765,6 +774,166 @@ function InflowLinksPageInner({
     link.download = exportFileName(sortedRows.length, jstTodayString())
     link.click()
     URL.revokeObjectURL(url)
+  }
+
+  /*
+   * ★V8-B 流入と計測の一覧（板 `xbHxg`）。置き場と見せ方だけが v7 と違い、
+   * 取ってくる口・絞り込み・ページ送りは上のまま。v7 の描画は下のまま残す。
+   */
+  if (v8) {
+    const v8UnconfiguredCount = accountFilteredRows.filter(
+      (row) => !row.scenarioId && !row.tagId && row.source === 'entry_route',
+    ).length
+    return (
+      <InflowListV8
+        model={{
+          accountId: selectedAccountId,
+          loading,
+          loadFailed,
+          loadError,
+          reload: () => {
+            void load()
+          },
+          routeCountAvailable,
+          accountRouteCount,
+          activeRouteCount,
+          stoppedRouteCount,
+          genreNames: availableGenres.map((genre) => genre.name),
+          totalFriends: summary?.totalFriends ?? null,
+          summaryAvailable,
+          unconfiguredCount: v8UnconfiguredCount,
+          hasFriendsCount: accountFilteredRows.filter((row) => (row.stats?.friendCount ?? 0) > 0)
+            .length,
+          sortedTotal: sortedRows.length,
+          uncategorizedId: UNCATEGORIZED,
+          folders: [
+            { id: '', label: 'すべて', count: accountFilteredRows.length, editable: false },
+            ...availableGenres.map((genre) => ({
+              id: genre.name,
+              label: genre.name,
+              count: accountFilteredRows.filter((row) => row.genre === genre.name).length,
+              editable: !genre.id.startsWith('legacy-'),
+            })),
+            ...(hasUncategorized
+              ? [
+                  {
+                    id: UNCATEGORIZED,
+                    label: '未分類',
+                    count: accountFilteredRows.filter((row) => !row.genre).length,
+                    editable: false,
+                  },
+                ]
+              : []),
+          ],
+          selectedGenre,
+          selectedGenreLabel,
+          onSelectGenre: (id) => {
+            setSelectedGenre(id)
+            setPage(1)
+          },
+          onAddFolder: () => setEditingGenre('new'),
+          onEditFolder: (name) => {
+            const target = availableGenres.find(
+              (genre) => genre.name === name && !genre.id.startsWith('legacy-'),
+            )
+            if (target) setEditingGenre(target)
+          },
+          search,
+          onSearchChange: (value) => {
+            setSearch(value)
+            setPage(1)
+          },
+          filter,
+          onFilterChange: (value) => {
+            setFilter(value)
+            setPage(1)
+          },
+          unconfiguredFilterCount: v8UnconfiguredCount,
+          sort,
+          onSortChange: (value) => {
+            setSort(value)
+            setPage(1)
+          },
+          page,
+          pageCount,
+          pageSize,
+          onPageChange: setPage,
+          onPageSizeChange: (size) => {
+            setPageSize(size)
+            setPage(1)
+          },
+          rows: currentRows,
+          routes,
+          pools,
+          scenarios,
+          tags,
+          templates,
+          poolMemberNames,
+          existingGenres: genreOptions,
+          selectedRouteIds,
+          selectableIds,
+          allShownSelected,
+          onToggleSelect: (id, checked) => {
+            setSelectedRouteIds((current) => {
+              const next = new Set(current)
+              if (checked) next.add(id)
+              else next.delete(id)
+              return next
+            })
+          },
+          onSelectAll: (checked) => {
+            setSelectedRouteIds(checked ? new Set(selectableIds) : new Set())
+          },
+          onCopy,
+          copiedId,
+          copyFailedId,
+          editing,
+          onEditingChange: setEditing,
+          editingGenre,
+          onEditingGenreChange: setEditingGenre,
+          qrRoute,
+          onQrRouteChange: setQrRoute,
+          bulkOpen,
+          onBulkOpenChange: setBulkOpen,
+          selectedRoutes,
+          onBulkApplied: (remainingIds) => {
+            setSelectedRouteIds(new Set(remainingIds))
+            void load()
+          },
+          onGenreSaved: (savedGenre, previousName) => {
+            setGenres((current) =>
+              previousName
+                ? current.map((genre) => (genre.id === savedGenre.id ? savedGenre : genre))
+                : [...current, savedGenre],
+            )
+            if (previousName) {
+              setRoutes((current) =>
+                current.map((route) =>
+                  route.genre === previousName ? { ...route, genre: savedGenre.name } : route,
+                ),
+              )
+            }
+            setSelectedGenre(savedGenre.name)
+            setEditingGenre(null)
+          },
+          onRouteSaved: (savedRoute, created) => {
+            setEditing(null)
+            void load()
+            if (created) {
+              setQrRoute({
+                refCode: savedRoute.refCode,
+                name: savedRoute.name,
+                genre: savedRoute.genre,
+                isActive: savedRoute.isActive,
+                id: savedRoute.id,
+              })
+            }
+          },
+          formatDate,
+          normalizedSearch,
+        }}
+      />
+    )
   }
 
   return (
@@ -1419,206 +1588,14 @@ function FragmentRow({
   )
 }
 
-type BulkRouteAction = 'pause' | 'resume' | 'move'
-
-/**
- * 「まとめて操作」の窓（NEXT-21）。
- *
- * 対象（表のチェックで選んだ登録済み経路）→ できる操作 → 何件に効くか、
- * の順に見せてから実行する。実行は1件ずつ既存の更新口へ投げ、結果を
- * 成功・失敗に分けて出す。失敗分だけを残して閉じると、一覧では
- * 失敗分だけが選ばれた状態に戻る。
- */
-function BulkRoutesDialog({
-  targets,
-  genreOptions,
-  onApplied,
-  onClose,
-}: {
-  /** entry_routes に登録済みの経路だけが対象。 */
-  targets: EntryRoute[]
-  genreOptions: string[]
-  /** 実行が1回でも終わったら呼ぶ。残った対象のIDを渡す。 */
-  onApplied: (remainingIds: string[]) => void
-  onClose: () => void
-}) {
-  // 失敗した分だけ残して試し直せるよう、対象は窓の中で持ち直す。
-  const [remaining, setRemaining] = useState<EntryRoute[]>(targets)
-  const [action, setAction] = useState<BulkRouteAction | null>(null)
-  const [genre, setGenre] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<{
-    succeeded: EntryRoute[]
-    failed: Array<{ route: EntryRoute; error: string }>
-  } | null>(null)
-
-  const pauseTargets = remaining.filter((route) => route.isActive)
-  const resumeTargets = remaining.filter((route) => !route.isActive)
-  const moveTargets = remaining.filter((route) => (route.genre ?? '') !== genre)
-  const affected = action === 'pause' ? pauseTargets
-    : action === 'resume' ? resumeTargets
-    : action === 'move' ? moveTargets
-    : []
-
-  const run = async () => {
-    if (!action || busy || affected.length === 0) return
-    setBusy(true)
-    const succeeded: EntryRoute[] = []
-    const failed: Array<{ route: EntryRoute; error: string }> = []
-    for (const route of affected) {
-      try {
-        const res = action === 'move'
-          ? await api.entryRoutes.update(route.id, { genre: genre === '' ? null : genre })
-          : await api.entryRoutes.update(route.id, { isActive: action === 'resume' })
-        if (res.success) succeeded.push(route)
-        else failed.push({ route, error: res.error || '更新できませんでした' })
-      } catch (cause) {
-        failed.push({
-          route,
-          error: cause instanceof ApiError && cause.status === 403
-            ? 'この操作を行う権限がありません'
-            : '通信できませんでした',
-        })
-      }
-    }
-    setResult({ succeeded, failed })
-    setRemaining(failed.map((entry) => entry.route))
-    setAction(null)
-    setBusy(false)
-    onApplied(failed.map((entry) => entry.route.id))
-  }
-
-  const close = () => {
-    if (busy) return
-    onClose()
-  }
-
-  return (
-    <Dialog
-      open
-      title="流入経路をまとめて操作"
-      description="選んだ経路に同じ操作をまとめて行います。実行前に、実際に変わる件数を確認できます。"
-      busy={busy}
-      onCancel={close}
-      footer={result ? undefined : (
-        <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
-          <Button type="button" onClick={close} disabled={busy}>
-            キャンセル
-          </Button>
-          {action && affected.length > 0 ? (
-            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }} busy={busy} busyLabel="実行中…">
-              {`${formatNumber(affected.length)}件に実行する`}
-            </Button>
-          ) : null}
-        </div>
-      )}
-    >
-      {result ? (
-        <div className="space-y-3">
-          <p className="text-ink text-sm">
-            {formatNumber(result.succeeded.length)}件に反映しました。
-          </p>
-          {result.failed.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-danger text-sm font-semibold">
-                {formatNumber(result.failed.length)}件は実行できませんでした。
-              </p>
-              <ul className="divide-hairline divide-y rounded-control border border-hairline text-sm">
-                {result.failed.map(({ route, error }) => (
-                  <li key={route.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                    <span className="text-ink min-w-0 truncate">{route.name}</span>
-                    <span className="text-danger shrink-0 text-xs">{error}</span>
-                  </li>
-                ))}
-              </ul>
-              {result.failed.every((entry) => entry.error === 'この操作を行う権限がありません') ? (
-                <p className="text-ink-faint text-xs leading-5">
-                  すべて権限で止められました。統括または管理者に依頼してください。
-                </p>
-              ) : null}
-              <p className="text-ink-faint text-xs leading-5">
-                閉じると、実行できなかった分だけが選ばれた状態に戻ります。
-              </p>
-            </div>
-          ) : null}
-        </div>
-      ) : remaining.length === 0 ? (
-        <p className="text-ink-secondary text-sm leading-6">
-          まとめて操作する流入経路が選ばれていません。
-          一覧の左はしにあるチェックで対象を選んでから、もう一度開いてください。
-          まとめて操作できるのは登録済みの経路だけです（「計測済」「未登録」の行は対象外）。
-        </p>
-      ) : (
-        <div className="space-y-4">
-          <div>
-            <p className="text-ink text-sm font-semibold">
-              対象 {formatNumber(remaining.length)}件
-            </p>
-            <p className="text-ink-faint mt-1 text-xs leading-5">
-              {remaining.slice(0, 8).map((route) => route.name).join('、')}
-              {remaining.length > 8 ? ` ほか${formatNumber((remaining.length - 8))}件` : ''}
-            </p>
-          </div>
-          <RadioCardGroup legend="どの操作をしますか？">
-            {([
-              {
-                value: 'pause' as const,
-                label: 'まとめて停止する',
-                note: `選んだ中の受付中 ${formatNumber(pauseTargets.length)}件が対象です。`,
-                count: pauseTargets.length,
-              },
-              {
-                value: 'resume' as const,
-                label: 'まとめて再開する',
-                note: `選んだ中の停止中 ${formatNumber(resumeTargets.length)}件が対象です。`,
-                count: resumeTargets.length,
-              },
-              {
-                value: 'move' as const,
-                label: 'フォルダをまとめて移動する',
-                note: `選んだ中の ${formatNumber(moveTargets.length)}件が変わります。`,
-                count: -1,
-              },
-            ]).map((option) => {
-              const unavailable = option.count === 0
-              return (
-                <RadioCard
-                  key={option.value}
-                  name="inflow-bulk-action"
-                  value={option.value}
-                  checked={action === option.value}
-                  disabled={unavailable}
-                  disabledReason="今の選択には効きません"
-                  onChange={() => setAction(option.value)}
-                  title={option.label}
-                  note={option.note}
-                />
-              )
-            })}
-          </RadioCardGroup>
-          {action === 'move' ? (
-            <Select
-              aria-label="移動先のフォルダ"
-              value={genre}
-              size="full"
-              onChange={setGenre}
-              options={[
-                { value: '', label: '未分類' },
-                ...genreOptions.map((name) => ({ value: name, label: name })),
-              ]}
-              className="mt-2"
-            />
-          ) : null}
-        </div>
-      )}
-    </Dialog>
-  )
-}
-
 function InflowLinksPageHost() {
   const { selectedAccountId } = useAccount()
   const visibility = useFeatureVisibility(selectedAccountId)
   const tab = useMergedTab(MERGED_TABS)
+  // ★V8-B：一覧・広告連携・つなぎ・送信履歴・サイトスクリプトを積み替える
+  // （板 `xbHxg`・`qSTVR`・`FDBsG`・`p0kA3`・`XjOte`）。
+  const theme = useAdminTheme()
+  const v8NoTabs = theme === 'v8'
   const params = useSearchParams()
   const adView = params.get('view') === 'history' ? 'history' : 'connections'
   /*
@@ -1664,18 +1641,26 @@ function InflowLinksPageHost() {
     !!tabFeature && visibility.status === 'ready' && !visibility.enabled(tabFeature)
   return (
     <div>
-      <MergedTabs basePath="/inflow-links" tabs={visibleTabs} active={tab} />
+      {v8NoTabs ? null : (
+        <MergedTabs basePath="/inflow-links" tabs={visibleTabs} active={tab} />
+      )}
       {tabBlocked ? (
         <FeatureDisabledScreen featureId={tabFeature} />
       ) : (
         <>
-          {tab === 'links' && <InflowLinksPageInner onRouteCountChange={setLinksCount} />}
+          {tab === 'links' && (
+            <InflowLinksPageInner onRouteCountChange={setLinksCount} v8={theme === 'v8'} />
+          )}
           {/* 機能状態が確定するまで SiteScript を載せない。読み込み中の
               一瞬に計測APIを呼ぶと、offのaccountで403が画面全体のゲートを
               起こしてしまう。 */}
-          {tab === 'script' && visibility.status === 'ready' && <SiteScript />}
-          {tab === 'ads' && <AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />}
-          {tab === 'connections' && <AdIntegration view={adView} onPlatformCountsChange={handleAdCounts} />}
+          {tab === 'script' && visibility.status === 'ready' && theme === 'v8' && <SiteScriptV8 />}
+          {tab === 'script' && visibility.status === 'ready' && theme !== 'v8' && <SiteScript />}
+          {tab === 'ads' && theme === 'v8' && <AdMetricsV8 />}
+          {tab === 'ads' && theme !== 'v8' && <AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />}
+          {tab === 'connections' && theme === 'v8' && adView === 'history' && <AdHistoryV8 />}
+          {tab === 'connections' && theme === 'v8' && adView !== 'history' && <AdConnectionsV8 />}
+          {tab === 'connections' && theme !== 'v8' && <AdIntegration view={adView} onPlatformCountsChange={handleAdCounts} />}
         </>
       )}
     </div>

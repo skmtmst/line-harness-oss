@@ -7,6 +7,8 @@ const PAGE = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
 const ADS = readFileSync(join(ROOT, 'ad-integration.tsx'), 'utf8')
 const CREATE = readFileSync(join(ROOT, 'new', 'page.tsx'), 'utf8')
 const DETAIL = readFileSync(join(ROOT, 'detail', 'page.tsx'), 'utf8')
+// 削除の窓は v7・V8 の両方で使う共用部品へ移した（中身は同じ）。
+const DELETE_DIALOG = readFileSync(join(ROOT, '_components', 'inflow-delete-dialog.tsx'), 'utf8')
 const MODAL = readFileSync(join(ROOT, '_components', 'edit-route-modal.tsx'), 'utf8')
 const SITE = readFileSync(join(ROOT, '..', '..', 'components', 'inflow-links', 'site-script.tsx'), 'utf8')
 const LIFF = readFileSync(join(ROOT, '..', '..', '..', '..', 'worker', 'src', 'routes', 'liff.ts'), 'utf8')
@@ -64,8 +66,8 @@ describe('点検・中: 機能18 流入と計測(#514 の中 10 件、#565)', ()
 
   it('#514-11: 転送先の自動採用はしない(#1366 で対応済みの確認)', () => {
     // 削除フローは転送先の選択を必須にする。先頭の自動採用は無い。
-    expect(DETAIL).toContain('転送先のリンクを選んでください')
-    expect(DETAIL).not.toContain('routes.find((candidate) => candidate.id !== route.id)')
+    expect(DELETE_DIALOG).toContain('転送先のリンクを選んでください')
+    expect(DELETE_DIALOG).not.toContain('routes.find((candidate) => candidate.id !== route.id)')
   })
 
   it('#514-12: 段階の失敗は文と再読み込みで返し、読み込み中のままにしない', () => {
