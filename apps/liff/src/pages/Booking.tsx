@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MenuList from '../components/MenuList.js';
+import RepeatCard from '../components/RepeatCard.js';
 import StaffList from '../components/StaffList.js';
 import DateTimePicker, { type SlotPick } from '../components/DateTimePicker.js';
 import Confirm from '../components/Confirm.js';
+import BookingPayment from '../components/BookingPayment.js';
 import Done from '../components/Done.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
@@ -12,7 +14,7 @@ import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
 import type { MenuItem, StaffItem } from '../lib/api.js';
 
-type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'done';
+type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'payment' | 'done';
 
 const STEPS = ['メニュー', '担当', '日時', '確認'];
 
@@ -30,6 +32,9 @@ export default function Booking() {
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
   const [slot, setSlot] = useState<SlotPick | null>(null);
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [paymentDue, setPaymentDue] = useState(false);
+  const [prepayNotice, setPrepayNotice] = useState<string | null>(null);
   // 読み込み中・失敗の間は下の帯を出さない (押せないボタンの飾りを置かない)。
   const [stepReady, setStepReady] = useState(false);
   useEffect(() => {
@@ -69,7 +74,14 @@ export default function Booking() {
         {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
         <div key={step} className="liff-step">
         {step === 'menu' && (
-          <div data-design-node="IruGD">
+          <div data-design-node="IruGD" className="space-y-3.5">
+            <RepeatCard
+              onRepeat={(m, s) => {
+                pickMenu(m);
+                pickStaff(s);
+                setStep('datetime');
+              }}
+            />
             <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
           </div>
         )}
@@ -103,11 +115,33 @@ export default function Booking() {
             staff={staff}
             slot={slot}
             onBack={() => setStep('datetime')}
-            onSubmitted={() => setStep('done')}
+            onSubmitted={(result) => {
+              setBookingId(result.bookingId);
+              // お支払いありのときだけ支払いの段へ。なしの店では今までどおり完了へ。
+              // 前払いのみの案内があるときは完了の段で案内と支払いへのボタンを出す。
+              setPaymentDue(Boolean(result.payment));
+              setPrepayNotice(result.prepayNotice);
+              setStep(result.payment ? 'payment' : 'done');
+            }}
+          />
+        )}
+        {step === 'payment' && menu && staff && slot && bookingId && paymentDue && (
+          <BookingPayment
+            bookingId={bookingId}
+            menuName={menu.name}
+            initialAmount={staff.price}
+            slot={slot}
+            durationMinutes={staff.duration_minutes}
           />
         )}
         {step === 'done' && menu && staff && slot && (
-          <Done menuName={menu.name} slot={slot} durationMinutes={staff.duration_minutes} />
+          <Done
+            menuName={menu.name}
+            slot={slot}
+            durationMinutes={staff.duration_minutes}
+            bookingId={bookingId}
+            prepayNotice={prepayNotice}
+          />
         )}
         </div>
       </div>

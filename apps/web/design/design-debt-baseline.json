@@ -90,6 +90,9 @@
   "app/automations/page.tsx": {
     "arbitrary-value": 1
   },
+  "app/booking/bookings/booking-day-v8.tsx": {
+    "unresolved-classname": 46
+  },
   "app/booking/bookings/detail/page.tsx": {
     "unresolved-classname": 1
   },

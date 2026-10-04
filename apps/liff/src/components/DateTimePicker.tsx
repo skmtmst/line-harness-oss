@@ -6,6 +6,7 @@ import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
 import LoadErrorView from './LoadErrorView.js';
 import LoadingView from './LoadingView.js';
+import WaitlistSheet from './WaitlistSheet.js';
 import Icon from './ui/Icon.js';
 import BottomBar from './ui/BottomBar.js';
 import Button from './ui/Button.js';
@@ -188,17 +189,24 @@ function weekMark(state: DayState): string {
   return '満';
 }
 
-/** 選んだ日の時刻3列 (★V8・M2p63S)。埋まった時刻は灰色で押せない。 */
+/**
+ * 選んだ日の時刻3列 (★V8・M2p63S)。埋まった時刻は灰色で押せない。
+ * 埋まった時刻には鈴の印を付ける (booking-plus 2)。鈴を押すと
+ * 「空いたら知らせる」の小さなシートが開く（時刻の札名は「10:00」のまま）。
+ */
 function DaySlots({
   day,
   times,
   selected,
   onSelect,
+  onWaitlist,
 }: {
   day: string;
   times: TimeSlot[];
   selected: SlotPick | null;
   onSelect: (s: SlotPick) => void;
+  /** 満席の時刻の鈴を押したとき。枠（日・時刻）を渡す。 */
+  onWaitlist?: (s: SlotPick) => void;
 }) {
   return (
     <section aria-label={`${formatJpLong(day)}の空き`}>
@@ -209,7 +217,7 @@ function DaySlots({
         <div className="grid grid-cols-3 gap-2">
           {times.map((t) => {
             const active = selected?.date === day && selected?.start === t.start;
-            return (
+            const timeButton = (
               <button
                 key={t.start}
                 type="button"
@@ -226,6 +234,20 @@ function DaySlots({
               >
                 {t.start}
               </button>
+            );
+            if (t.open || !onWaitlist) return timeButton;
+            return (
+              <span key={t.start} className="relative block">
+                {timeButton}
+                <button
+                  type="button"
+                  onClick={() => onWaitlist({ date: day, start: t.start })}
+                  aria-label={`${t.start}に空いたら知らせる`}
+                  className="liff-press absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-canvas text-liff-primary shadow outline-1 -outline-offset-1 outline-liff-line-strong focus-visible:outline-2 focus-visible:outline-ink"
+                >
+                  <Icon name="bell" className="h-[14px] w-[14px]" />
+                </button>
+              </span>
             );
           })}
         </div>
@@ -281,6 +303,8 @@ export default function DateTimePicker({
     vacancyDots: boolean;
   } | null>(null);
   const [view, setView] = useState<DateView | null>(null);
+  /** 空いたら知らせるシートを開いている満席の枠。 */
+  const [waitSlot, setWaitSlot] = useState<SlotPick | null>(null);
   const listButtonRef = useRef<HTMLButtonElement | null>(null);
   const calendarButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -781,7 +805,24 @@ export default function DateTimePicker({
               </button>
             </div>
             {listDay && (
-              <DaySlots day={listDay} times={listTimes} selected={selected} onSelect={onSelect} />
+              <>
+                <DaySlots
+                  day={listDay}
+                  times={listTimes}
+                  selected={selected}
+                  onSelect={onSelect}
+                  onWaitlist={setWaitSlot}
+                />
+                {waitSlot && (
+                  <WaitlistSheet
+                    menu={menu}
+                    staff={staff}
+                    date={waitSlot.date}
+                    start={waitSlot.start}
+                    onClose={() => setWaitSlot(null)}
+                  />
+                )}
+              </>
             )}
           </>
         )

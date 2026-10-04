@@ -1400,6 +1400,36 @@ CREATE TABLE "booking_menu_resources" (
   PRIMARY KEY (menu_id, resource_id)
 );
 
+CREATE TABLE booking_noshow_flags (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL DEFAULT 'auto' CHECK (mode IN ('auto', 'manual_on', 'manual_off')),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (line_account_id, friend_id)
+);
+
+CREATE TABLE booking_noshow_thresholds (
+  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  threshold INTEGER NOT NULL DEFAULT 3 CHECK (threshold BETWEEN 1 AND 100),
+  enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+  window_months INTEGER NOT NULL DEFAULT 6 CHECK (window_months BETWEEN 1 AND 120),
+  no_payment_mode TEXT NOT NULL DEFAULT 'notice_call'
+    CHECK (no_payment_mode IN ('notice', 'notice_call')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_noshow_flag_events (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  action TEXT NOT NULL CHECK (action IN ('manual_on', 'manual_off')),
+  reason TEXT,
+  staff_id TEXT,
+  staff_name TEXT,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE booking_operation_runs (
   id              TEXT PRIMARY KEY,
   booking_id      TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -1420,6 +1450,44 @@ CREATE TABLE booking_operation_runs (
   idempotency_key TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now')),
+  UNIQUE (line_account_id, idempotency_key)
+);
+
+CREATE TABLE booking_payment_configs (
+  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL DEFAULT 'none'
+    CHECK (mode IN ('none', 'onsite', 'online')),
+  -- プロバイダ名は差し替えのために絞らない。新しいサービスは登録表へ足すだけ。
+  provider TEXT NOT NULL DEFAULT 'none',
+  hold_minutes INTEGER NOT NULL DEFAULT 30 CHECK (hold_minutes BETWEEN 5 AND 1440),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_payment_menu_settings (
+  menu_id TEXT PRIMARY KEY REFERENCES menus(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL CHECK (mode IN ('none', 'onsite', 'online')),
+  provider TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE booking_payments (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  booking_id TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL CHECK (amount >= 0),
+  currency TEXT NOT NULL DEFAULT 'JPY',
+  status TEXT NOT NULL DEFAULT 'unpaid'
+    CHECK (status IN ('unpaid', 'pending', 'paid', 'failed', 'refunded', 'expired')),
+  provider TEXT NOT NULL,
+  provider_payment_id TEXT,
+  idempotency_key TEXT NOT NULL,
+  hold_until TEXT,
+  paid_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
   UNIQUE (line_account_id, idempotency_key)
 );
 
@@ -1478,7 +1546,52 @@ CREATE TABLE booking_settings (
              AND substr(reminder_day_before_time, 1, 2) <= '23')), reminder_hours_before INTEGER
   CHECK (reminder_hours_before IS NULL
          OR reminder_hours_before BETWEEN 1 AND 72), liff_date_view TEXT NOT NULL DEFAULT 'list'
-  CHECK (liff_date_view IN ('list', 'calendar')));
+  CHECK (liff_date_view IN ('list', 'calendar')), waitlist_hold_minutes INTEGER NOT NULL DEFAULT 30
+  CHECK (waitlist_hold_minutes BETWEEN 1 AND 1440));
+
+CREATE TABLE booking_visit_marks (
+  id                    TEXT PRIMARY KEY,
+  booking_id            TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  -- visited: 来店した / late: 遅れる / no_show: 来なかった
+  kind                  TEXT NOT NULL CHECK (kind IN ('visited', 'late', 'no_show')),
+  -- late のときだけ必須の遅れ分数。
+  late_minutes          INTEGER CHECK (late_minutes IS NULL OR (late_minutes BETWEEN 1 AND 1440)),
+  -- 付けた人（ログイン利用者）。予約の担当表とは別物なので外部キーは付けない
+  -- （監査の actor と同じ考え方）。表示名も一緒に残す。
+  marked_by_staff_id    TEXT,
+  marked_by_name        TEXT,
+  -- UTC ISO8601。付けた時刻。
+  marked_at             TEXT NOT NULL,
+  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  CHECK ((kind = 'late' AND late_minutes IS NOT NULL)
+      OR (kind != 'late' AND late_minutes IS NULL))
+);
+
+CREATE TABLE booking_waitlist (
+  id                    TEXT PRIMARY KEY,
+  line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  staff_id              TEXT NOT NULL REFERENCES staff(id),
+  menu_id               TEXT NOT NULL REFERENCES menus(id),
+  starts_at             TEXT NOT NULL,
+  friend_id             TEXT REFERENCES friends(id) ON DELETE SET NULL,
+  booking_customer_id   TEXT REFERENCES booking_customers(id) ON DELETE SET NULL,
+  -- 枠の中の本人確認。friend_id / booking_customer_id のどちらか。
+  -- 同じ枠に同じ人が二度並べないための鍵。
+  identity_key          TEXT NOT NULL,
+  -- waiting: 待っている / invited: 空きを知らせた（仮押さえ中）
+  -- / converted: 予約になった / cancelled: 本人が取り消した
+  status                TEXT NOT NULL DEFAULT 'waiting'
+                          CHECK (status IN ('waiting', 'invited', 'converted', 'cancelled')),
+  hold_minutes          INTEGER NOT NULL DEFAULT 30 CHECK (hold_minutes BETWEEN 1 AND 1440),
+  invited_at            TEXT,
+  hold_expires_at       TEXT,
+  -- LINE を送った時刻。LINE 未連携の電話客は店が電話するため NULL のまま。
+  notified_at           TEXT,
+  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  CHECK (friend_id IS NOT NULL OR booking_customer_id IS NOT NULL)
+);
 
 CREATE TABLE "bookings" (
   id                           TEXT PRIMARY KEY,
@@ -6276,6 +6389,49 @@ CREATE TABLE rt_resource_locks (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE rt_seat_visit_marks (
+  id                    TEXT PRIMARY KEY,
+  reservation_id        TEXT NOT NULL REFERENCES rt_reservations(id) ON DELETE CASCADE,
+  store_id              TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  -- visited: 来店した / late: 遅れる / no_show: 来なかった
+  kind                  TEXT NOT NULL CHECK (kind IN ('visited', 'late', 'no_show')),
+  -- late のときだけ必須の遅れ分数。
+  late_minutes          INTEGER CHECK (late_minutes IS NULL OR (late_minutes BETWEEN 1 AND 1440)),
+  -- 付けた人（ログイン利用者）。監査の actor と同じ考え方で外部キーは付けない。
+  marked_by_staff_id    TEXT,
+  marked_by_name        TEXT,
+  -- UTC ISO8601。付けた時刻。
+  marked_at             TEXT NOT NULL,
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  CHECK ((kind = 'late' AND late_minutes IS NOT NULL)
+      OR (kind != 'late' AND late_minutes IS NULL))
+);
+
+CREATE TABLE rt_seat_waitlist (
+  id                    TEXT PRIMARY KEY,
+  store_id              TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  starts_at             TEXT NOT NULL,
+  guest_count           INTEGER NOT NULL CHECK (guest_count BETWEEN 1 AND 100),
+  customer_name         TEXT NOT NULL,
+  customer_phone        TEXT,
+  line_uid              TEXT,
+  -- 同じ開始時刻に同じ組が二度並べないための鍵（電話番号かLINE IDか名前）。
+  identity_key          TEXT NOT NULL,
+  -- waiting: 待っている / invited: 空きを知らせた（仮押さえ中）
+  -- / converted: 予約になった / cancelled: 本人が取り消した
+  status                TEXT NOT NULL DEFAULT 'waiting'
+                          CHECK (status IN ('waiting', 'invited', 'converted', 'cancelled')),
+  hold_minutes          INTEGER NOT NULL DEFAULT 30 CHECK (hold_minutes BETWEEN 1 AND 1440),
+  -- 招待したときに空いた席。組の人数が入る席だけを候補にする。
+  table_id              TEXT REFERENCES rt_tables(id) ON DELETE SET NULL,
+  invited_at            TEXT,
+  hold_expires_at       TEXT,
+  -- LINE を送った時刻。LINE 未連携の組は店が電話するため NULL のまま。
+  notified_at           TEXT,
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE rt_stores (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES rt_organizations(id) ON DELETE CASCADE,
@@ -7846,11 +8002,22 @@ CREATE INDEX idx_booking_exceptions_account_dates
 CREATE INDEX idx_booking_menu_resources_resource
   ON booking_menu_resources(resource_id, menu_id);
 
+CREATE INDEX idx_booking_noshow_flags_friend
+  ON booking_noshow_flags(friend_id, line_account_id);
+CREATE INDEX idx_booking_noshow_flag_events_friend
+  ON booking_noshow_flag_events(line_account_id, friend_id, created_at DESC);
+
 CREATE INDEX idx_booking_operation_runs_booking
   ON booking_operation_runs(line_account_id, booking_id, created_at DESC);
 
 CREATE INDEX idx_booking_operation_runs_status
   ON booking_operation_runs(status, scheduled_at);
+
+CREATE INDEX idx_booking_payments_booking
+  ON booking_payments(booking_id, created_at DESC);
+
+CREATE INDEX idx_booking_payments_status_hold
+  ON booking_payments(line_account_id, status, hold_until);
 
 CREATE INDEX idx_booking_reminders_v298_status_scheduled
   ON booking_reminders(status, scheduled_at);
@@ -7860,6 +8027,19 @@ CREATE INDEX idx_booking_resource_consumptions_resource
 
 CREATE INDEX idx_booking_resources_account_active
   ON booking_resources(line_account_id, is_active, id);
+
+CREATE INDEX idx_booking_visit_marks_account
+  ON booking_visit_marks(line_account_id, marked_at DESC);
+
+CREATE INDEX idx_booking_visit_marks_booking
+  ON booking_visit_marks(booking_id, marked_at DESC);
+
+CREATE INDEX idx_booking_waitlist_slot_created
+  ON booking_waitlist(line_account_id, staff_id, starts_at, status, created_at);
+
+CREATE UNIQUE INDEX idx_booking_waitlist_slot_identity
+  ON booking_waitlist(line_account_id, staff_id, starts_at, identity_key)
+  WHERE status IN ('waiting', 'invited');
 
 CREATE INDEX idx_bookings_menu_version
   ON bookings (menu_id, menu_version_number);
@@ -9121,6 +9301,19 @@ CREATE UNIQUE INDEX idx_rt_reservations_external
   ON rt_reservations(store_id, source, external_id);
 
 CREATE INDEX idx_rt_reservations_timeline ON rt_reservations(store_id, starts_at, status);
+
+CREATE INDEX idx_rt_seat_visit_marks_reservation
+  ON rt_seat_visit_marks(reservation_id, marked_at DESC);
+
+CREATE INDEX idx_rt_seat_visit_marks_store
+  ON rt_seat_visit_marks(store_id, marked_at DESC);
+
+CREATE INDEX idx_rt_seat_waitlist_slot_created
+  ON rt_seat_waitlist(store_id, starts_at, status, created_at);
+
+CREATE UNIQUE INDEX idx_rt_seat_waitlist_slot_identity
+  ON rt_seat_waitlist(store_id, starts_at, identity_key)
+  WHERE status IN ('waiting', 'invited');
 
 CREATE UNIQUE INDEX idx_rt_stores_line_account
   ON rt_stores (line_account_id) WHERE line_account_id IS NOT NULL;

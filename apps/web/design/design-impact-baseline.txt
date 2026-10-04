@@ -33,6 +33,7 @@ shared-button-importer app/automations/new/page.tsx
 shared-button-importer app/automations/page.tsx
 shared-button-importer app/automations/runs/page.tsx
 shared-button-importer app/booking/bookings/booking-calendar.tsx
+shared-button-importer app/booking/bookings/booking-day-v8.tsx
 shared-button-importer app/booking/bookings/booking-detail-v8.tsx
 shared-button-importer app/booking/bookings/detail/page.tsx
 shared-button-importer app/booking/bookings/new/page.tsx
@@ -41,9 +42,11 @@ shared-button-importer app/booking/menus/edit-menu-dialog.tsx
 shared-button-importer app/booking/menus/new/menu-form-v8.tsx
 shared-button-importer app/booking/menus/new/page.tsx
 shared-button-importer app/booking/menus/page.tsx
+shared-button-importer app/booking/menus/payment-tab-v8.tsx
 shared-button-importer app/booking/menus/settings-v8.tsx
 shared-button-importer app/booking/menus/staff/assign-v8.tsx
 shared-button-importer app/booking/menus/staff/page.tsx
+shared-button-importer app/booking/prepay-badge-v8.tsx
 shared-button-importer app/booking/staff/new/staff-new-v8.tsx
 shared-button-importer app/booking/staff/page.tsx
 shared-button-importer app/booking/staff/shifts/liff-preview.tsx
