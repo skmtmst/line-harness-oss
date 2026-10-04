@@ -358,6 +358,8 @@ function NewOperatorNotificationInner() {
 
   return (
     <div data-design-node="N2gAza" data-selects-wide className="space-y-4 pb-24">
+      {/* 板 hiBO8（運用者へのお知らせを編集する）。作るときは N2gAza。なおすときは中の印が hiBO8。 */}
+      <div data-design-node={editId ? 'hiBO8' : undefined} className="contents">
       <div className="flex items-center justify-between gap-3"><nav className="text-ink-faint text-xs" aria-label="パンくず">
         <Link href="/line-notifications" className="text-action hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-action hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>{editId ? 'なおす' : 'つくる'}</span>
       </nav><Button onClick={() => void testSend()} disabled={saving || ruleLoading}>自分にテストを送る</Button></div>
@@ -523,6 +525,7 @@ function NewOperatorNotificationInner() {
       </Dialog>
       {/* U063: 選び欄は欄いっぱいに広げる（部品の size="full" を使う）。 */}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したお知らせ" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      </div>
     </div>
   )
 }
