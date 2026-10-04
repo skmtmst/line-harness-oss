@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, type MenuItem, type StaffItem } from '../lib/api.js';
+import { api, type CreateBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
 import { addMinutesHm, formatJpLong, jstStartsAtIso } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
@@ -25,7 +25,8 @@ export default function Confirm({
   slot: SlotPick;
   /** 「← 日時を選び直す」。日時の段へ戻る。 */
   onBack: () => void;
-  onSubmitted: () => void;
+  /** 予約ができたら予約IDと支払い(お支払いありのときだけ付く)を渡す。 */
+  onSubmitted: (result: { bookingId: string; payment: CreateBookingResponse['payment'] }) => void;
 }) {
   // 414 幅の板（`uZqMA`）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
@@ -38,7 +39,7 @@ export default function Confirm({
     setSubmitting(true);
     setError(null);
     try {
-      await api.createRequest(
+      const created = await api.createRequest(
         {
           menu_id: menu.id,
           staff_id: staff.id,
@@ -47,7 +48,7 @@ export default function Confirm({
         },
         idemKey,
       );
-      onSubmitted();
+      onSubmitted({ bookingId: created.booking_id, payment: created.payment ?? null });
     } catch (e) {
       logFailure('create-request', e);
       const err = e as { status?: number; body?: { error?: string } };

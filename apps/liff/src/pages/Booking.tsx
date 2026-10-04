@@ -4,6 +4,7 @@ import MenuList from '../components/MenuList.js';
 import StaffList from '../components/StaffList.js';
 import DateTimePicker, { type SlotPick } from '../components/DateTimePicker.js';
 import Confirm from '../components/Confirm.js';
+import BookingPayment from '../components/BookingPayment.js';
 import Done from '../components/Done.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
@@ -12,7 +13,7 @@ import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
 import type { MenuItem, StaffItem } from '../lib/api.js';
 
-type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'done';
+type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'payment' | 'done';
 
 const STEPS = ['メニュー', '担当', '日時', '確認'];
 
@@ -30,6 +31,8 @@ export default function Booking() {
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
   const [slot, setSlot] = useState<SlotPick | null>(null);
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [paymentDue, setPaymentDue] = useState(false);
   // 読み込み中・失敗の間は下の帯を出さない (押せないボタンの飾りを置かない)。
   const [stepReady, setStepReady] = useState(false);
   useEffect(() => {
@@ -103,7 +106,21 @@ export default function Booking() {
             staff={staff}
             slot={slot}
             onBack={() => setStep('datetime')}
-            onSubmitted={() => setStep('done')}
+            onSubmitted={(result) => {
+              setBookingId(result.bookingId);
+              // お支払いありのときだけ支払いの段へ。なしの店では今までどおり完了へ。
+              setPaymentDue(Boolean(result.payment));
+              setStep(result.payment ? 'payment' : 'done');
+            }}
+          />
+        )}
+        {step === 'payment' && menu && staff && slot && bookingId && paymentDue && (
+          <BookingPayment
+            bookingId={bookingId}
+            menuName={menu.name}
+            initialAmount={staff.price}
+            slot={slot}
+            durationMinutes={staff.duration_minutes}
           />
         )}
         {step === 'done' && menu && staff && slot && (
