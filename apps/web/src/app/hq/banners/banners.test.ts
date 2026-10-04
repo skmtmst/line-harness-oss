@@ -41,8 +41,8 @@ describe('統括 バナー生成', () => {
     expect(projectPage).not.toContain('<Header')
   })
 
-  it('L 一覧型の帯の順: タブ行 → 数値カード帯 → 案内帯 → 一覧本体', () => {
-    const order = ['<BannerTabs', '<BannerKpis', '<BannerNote', '<ProjectsSection']
+  it('V8（板 B9ZAr・W5Wxr）の帯の順: 数値カード帯 → 案内帯 → タブ行 → 一覧本体（操作と見るは左列）', () => {
+    const order = ['<BannerKpis', '<BannerNote', '<BannerTabs', '<ProjectsSection']
     const positions = order.map((needle) => listPage.indexOf(needle))
     expect(positions.every((p) => p >= 0)).toBe(true)
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)

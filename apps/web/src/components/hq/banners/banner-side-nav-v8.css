@@ -1,0 +1,63 @@
+/* バナー生成の「見る」案内（hq バナー内だけ。共通部品ではない）。 */
+.banner-side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.banner-side-nav__label {
+  margin: 0;
+  padding: 0 10px 4px;
+  font-size: var(--text-nano);
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+
+.banner-side-nav__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.banner-side-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: var(--text-label);
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.banner-side-nav__item:hover {
+  background: var(--color-surface-pearl);
+}
+
+.banner-side-nav__item--active {
+  background: var(--color-surface-pearl);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.banner-side-nav__name {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.banner-side-nav__count {
+  font-size: var(--text-caption);
+  color: var(--color-ink-faint);
+  tabular-nums: true;
+}
