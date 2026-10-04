@@ -1,6 +1,7 @@
 import type { FormLayout } from '@line-crm/shared';
 import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
 import { getIdToken, getLiffId } from './liff-auth.js';
+import type { LiffLookApiSettings } from './liff-look.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -46,8 +47,12 @@ export interface AvailabilityResponse {
   closed_dates?: string[];
 }
 
-/** LIFF 予約の設定（日時を選ぶ段の最初の形と受付期間）。 */
-export interface LiffBookingSettings {
+/**
+ * LIFF 予約の設定（日時を選ぶ段の最初の形と受付期間＋見た目）。
+ * 見た目の欄（型・店の色・カレンダーの出し方・空きの点）は M3 が足す。
+ * 来ない欄は呼び側が既定に倒す。
+ */
+export interface LiffBookingSettings extends LiffLookApiSettings {
   liff_date_view: 'list' | 'calendar';
   booking_window_days: number;
   /** 予約のルール「お店が承認してから確定する」。無いときは承認あり扱い。 */

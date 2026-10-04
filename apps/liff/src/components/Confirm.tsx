@@ -68,7 +68,7 @@ export default function Confirm({
   return (
     <div className="space-y-3.5" data-design-node={wide ? 'uZqMA' : 'gLReL'}>
       <h2 className="text-xl font-bold text-ink">内容を確かめてください</h2>
-      <dl className="divide-y divide-liff-divider rounded-[14px] bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
+      <dl className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
         <Row label="メニュー" value={menu.name} />
         <Row
           label="日時"
@@ -87,7 +87,7 @@ export default function Confirm({
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="mt-1.5 min-h-18 w-full rounded-[10px] bg-canvas px-3.5 py-3 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
+          className="mt-1.5 min-h-18 w-full rounded-(--liff-radius) bg-canvas px-3.5 py-3 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
           rows={3}
           placeholder="例：前髪は短めにしたい"
         />
@@ -97,7 +97,7 @@ export default function Confirm({
           {error}
         </p>
       )}
-      <div className="flex gap-2 rounded-[10px] bg-liff-note p-3 text-xs leading-5 text-ink">
+      <div className="flex gap-2 rounded-(--liff-radius) bg-liff-note p-3 text-xs leading-5 text-ink">
         <Icon name="info" className="h-4 w-4 shrink-0 text-liff-sub" />
         <p>
           {autoConfirm

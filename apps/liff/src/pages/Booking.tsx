@@ -6,6 +6,7 @@ import DateTimePicker, { type SlotPick } from '../components/DateTimePicker.js';
 import Confirm from '../components/Confirm.js';
 import Done from '../components/Done.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 import Stepper from '../components/ui/Stepper.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
@@ -78,10 +79,12 @@ export default function Booking() {
     step === 'menu' ? 0 : step === 'staff' ? 1 : step === 'datetime' ? 2 : STEPS.length - 1;
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="ご予約" />
       {step !== 'done' && <Stepper steps={STEPS} current={stepIndex} />}
       <div className="mx-auto w-full max-w-md px-4 pt-3 pb-40">
+        {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
+        <div key={step} className="liff-step">
         {step === 'menu' && (
           <div data-design-node="IruGD">
             <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
@@ -132,6 +135,7 @@ export default function Booking() {
             status={doneStatus}
           />
         )}
+        </div>
       </div>
       {step === 'menu' && stepReady && (
         <BottomBar>
@@ -154,6 +158,6 @@ export default function Booking() {
           </button>
         </BottomBar>
       )}
-    </div>
+    </LiffLookScope>
   );
 }
