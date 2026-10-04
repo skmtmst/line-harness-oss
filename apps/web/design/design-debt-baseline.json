@@ -12,11 +12,17 @@
     "unresolved-classname": 99,
     "direct-th": 8
   },
+  "app/affiliate-offers/new-offer-v8.tsx": {
+    "unresolved-classname": 53
+  },
   "app/affiliate-offers/new/page.tsx": {
     "unresolved-classname": 4
   },
   "app/affiliates/affiliates-v8.tsx": {
     "unresolved-classname": 7
+  },
+  "app/affiliates/new-affiliate-v8.tsx": {
+    "unresolved-classname": 82
   },
   "app/affiliates/new/page.tsx": {
     "unresolved-classname": 6
@@ -110,7 +116,7 @@
     "unresolved-classname": 5
   },
   "app/booking/staff/new/staff-new-v8.tsx": {
-    "unresolved-classname": 68
+    "unresolved-classname": 69
   },
   "app/booking/staff/shifts/liff-preview.tsx": {
     "direct-primary-button": 2,
@@ -189,7 +195,7 @@
     "unresolved-classname": 10
   },
   "app/emergency/control-v8.tsx": {
-    "unresolved-classname": 79,
+    "unresolved-classname": 81,
     "direct-th": 6
   },
   "app/emergency/page.tsx": {
@@ -221,7 +227,7 @@
     "arbitrary-value": 1
   },
   "app/form-submissions/list-v8.tsx": {
-    "unresolved-classname": 93,
+    "unresolved-classname": 91,
     "direct-th": 6
   },
   "app/form-submissions/page.tsx": {
@@ -347,7 +353,7 @@
     "direct-th": 7
   },
   "app/mileage/v8-earning-rules-tab.tsx": {
-    "unresolved-classname": 73,
+    "unresolved-classname": 72,
     "direct-th": 7
   },
   "app/mileage/v8-history-tab.tsx": {
@@ -355,7 +361,7 @@
     "direct-th": 6
   },
   "app/mileage/v8-rewards-tab.tsx": {
-    "unresolved-classname": 87,
+    "unresolved-classname": 86,
     "direct-th": 12
   },
   "app/mileage/v8-score-tab.tsx": {
@@ -381,18 +387,21 @@
     "unresolved-classname": 13,
     "arbitrary-value": 1
   },
+  "app/nen-members/photo-review-v8.tsx": {
+    "unresolved-classname": 85
+  },
+  "app/nen/health/health-v8.tsx": {
+    "unresolved-classname": 56
+  },
   "app/nen/members/members-v8.tsx": {
-    "unresolved-classname": 61
+    "unresolved-classname": 62
   },
   "app/nen/pets/pets-v8.tsx": {
     "unresolved-classname": 89,
     "direct-th": 3
   },
-  "app/nen/health/health-v8.tsx": {
-    "unresolved-classname": 56
-  },
-  "app/nen-members/photo-review-v8.tsx": {
-    "unresolved-classname": 85
+  "app/no-permission/no-permission-v8.tsx": {
+    "unresolved-classname": 10
   },
   "app/page.tsx": {
     "arbitrary-value": 4,
@@ -570,7 +579,7 @@
     "unresolved-classname": 72
   },
   "app/tags/fields-tab-v8.tsx": {
-    "unresolved-classname": 58
+    "unresolved-classname": 53
   },
   "app/tags/fields/migrate/page.tsx": {
     "arbitrary-value": 1
@@ -585,13 +594,13 @@
     "unresolved-classname": 48
   },
   "app/tags/marks-v8.tsx": {
-    "unresolved-classname": 51
+    "unresolved-classname": 46
   },
   "app/tags/search-editor-v8.tsx": {
     "unresolved-classname": 53
   },
   "app/tags/searches-v8.tsx": {
-    "unresolved-classname": 59
+    "unresolved-classname": 54
   },
   "app/tags/tag-editor-v8.tsx": {
     "unresolved-classname": 113
@@ -600,7 +609,7 @@
     "unresolved-classname": 5
   },
   "app/tags/tags-tab-v8.tsx": {
-    "unresolved-classname": 67
+    "unresolved-classname": 61
   },
   "app/templates/asset-editor-v8.tsx": {
     "unresolved-classname": 63
@@ -691,7 +700,7 @@
     "unresolved-classname": 43
   },
   "app/webinars/new/new-v8.tsx": {
-    "unresolved-classname": 41
+    "unresolved-classname": 43
   },
   "app/webinars/page.tsx": {
     "unresolved-classname": 1,
@@ -1066,34 +1075,5 @@
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
     "arbitrary-value": 1
-  },
-  "app/reminders/basics-form-v8.tsx": {
-    "unresolved-classname": 39
-  },
-  "app/reminders/detail/detail-v8.tsx": {
-    "unresolved-classname": 69,
-    "direct-th": 23
-  },
-  "app/reminders/edit/edit-v8.tsx": {
-    "unresolved-classname": 168,
-    "direct-th": 4
-  },
-  "app/reminders/new/new-v8.tsx": {
-    "unresolved-classname": 6
-  },
-  "app/reminders/wizard-v8-ui.tsx": {
-    "unresolved-classname": 33
-  },
-  "app/accounts/handover/handover-v8.tsx": {
-    "unresolved-classname": 48
-  },
-  "app/ec-commerce/ec-connector-v8.tsx": {
-    "unresolved-classname": 6
-  },
-  "app/pools/new/pool-new-v8.tsx": {
-    "unresolved-classname": 2
-  },
-  "app/no-permission/no-permission-v8.tsx": {
-    "unresolved-classname": 10
   }
 }

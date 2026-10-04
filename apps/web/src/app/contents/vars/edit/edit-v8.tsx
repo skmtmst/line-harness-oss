@@ -996,7 +996,7 @@ function EditCommonVarV8Inner() {
                           {formatStamp(schedule.effectiveFrom)}から {schedule.value || '（空）'}
                         </span>
                         {canWrite ? (
-                          <Button type="button" onClick={() => void removeSchedule(schedule.id)}>予定を消す</Button>
+                          <Button type="button" onClick={() => void removeSchedule(schedule.id)}>予定を削除</Button>
                         ) : null}
                       </div>
                     ))}

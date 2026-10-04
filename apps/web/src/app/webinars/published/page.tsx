@@ -147,7 +147,7 @@ function PublishedWebinarContent() {
     try {
       if (action === 'pause') {
         await webinarApi.pause(id, editor.version)
-        setNotice('公開を一時停止しました。')
+        setNotice('公開を止めました。')
       } else if (action === 'test') {
         const response = await webinarApi.testNotifications(id)
         setNotice(`通知テスト: 成功 ${response.data.sent}件・失敗 ${response.data.failed}件`)
