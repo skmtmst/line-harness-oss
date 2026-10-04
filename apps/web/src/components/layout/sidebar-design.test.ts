@@ -251,3 +251,27 @@ describe('レスポンシブのメニュー名を維持する', () => {
     expect(source).not.toContain('PCの先頭はアカウント切替ではなく');
   });
 });
+
+/*
+ * V8 殻合わせ（絵 zUg8S・Yw24X）：左メニューの1行は 36px（上下の余白
+ * なし・真ん中寄せ）で押しやすくする。組の中の間は 2px。
+ * 畳んだ形は別の指定（40px）のまま。低い画面は nav だけ縦に送る。
+ */
+describe('V8 左メニューの1行は36px（殻合わせ）', () => {
+  const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'sidebar.module.css'), 'utf8');
+
+  it('.item は高さ36・上下余白0（V8）', () => {
+    expect(css).toMatch(/\[data-theme="v8"\] \.item \{[^}]*height:\s*36px/s);
+    expect(css).toMatch(/\[data-theme="v8"\] \.item \{[^}]*padding-top:\s*0/s);
+    expect(css).toMatch(/\[data-theme="v8"\] \.item \{[^}]*padding-bottom:\s*0/s);
+  });
+
+  it('.section の間は 2px（V8）', () => {
+    expect(css).toMatch(/\[data-theme="v8"\] \.section \{[^}]*gap:\s*2px/s);
+  });
+
+  it('畳んだ形は40pxのまま・低い画面は nav だけ縦に送る', () => {
+    expect(css).toMatch(/\[data-theme="v8"\] \.desktop\[data-collapsed\] \.item \{[^}]*height:\s*40px/s);
+    expect(css).toMatch(/\.nav \{[^}]*overflow-y:\s*auto/s);
+  });
+});
