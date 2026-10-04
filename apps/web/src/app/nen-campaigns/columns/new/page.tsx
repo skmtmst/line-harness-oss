@@ -32,6 +32,8 @@ import {
   type Failure,
 } from './column-form'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ColumnNewV8 from './column-new-v8'
 import styles from './column.module.css'
 import { formatNumber } from '@/lib/format'
 
@@ -87,6 +89,15 @@ function NewNenColumnInner() {
       .then((response) => setAudienceCount(response.success ? response.data.count : null))
       .catch(() => setAudienceCount(null))
   }, [draft.targetMode, draft.targetTagId, selectedAccountId])
+
+  /*
+   * ★V8-B：data-theme="v8" のときだけ新しいコラム作成画面（yRDwW）へ切り替える。
+   * v7 の見た目はそのまま。下書きの決めごとは変えない。
+   */
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return <ColumnNewV8 />
+  }
 
   if (!selectedAccountId) {
     return (

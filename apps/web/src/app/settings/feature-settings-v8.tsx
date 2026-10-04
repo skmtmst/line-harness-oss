@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -417,6 +418,23 @@ export function FeatureSettingsV8() {
   const currentSummary = describeFeatureSummary(features)
   const latestSummary = describeFeatureSummary(savedFeatures)
   const [openGroups, setOpenGroups] = useState<Set<string> | null>(null)
+  /*
+   * B. 保存ボタンは「保存中 → ✓ 保存しました」でボタンの中だけ変わる。
+   * 保存が終わって未保存が無くなったら完了を出し、触ったら消す。
+   */
+  const [savedTick, setSavedTick] = useState(false)
+  const wasSavingRef = useRef(false)
+  useEffect(() => {
+    if (saving) {
+      wasSavingRef.current = true
+      return
+    }
+    if (wasSavingRef.current && !dirty) setSavedTick(true)
+    wasSavingRef.current = false
+  }, [saving, dirty])
+  useEffect(() => {
+    if (dirty) setSavedTick(false)
+  }, [dirty])
 
   const filteredGroups = useMemo(() => {
     const q = query.trim()
@@ -491,8 +509,25 @@ export function FeatureSettingsV8() {
           先に上部でLINEアカウントを選んでください。
         </p>
       ) : loading ? (
-        <div className={`${styles.card} ${styles.stateBox}`}>
-          読み込み中…
+        <div className={`${styles.card} ${styles.stateBox}`} aria-busy="true" aria-label="機能設定を読み込んでいます">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true">
+                {[0, 1].map((card) => (
+                  <div key={card} style={{ padding: '16px 0', borderTop: card > 0 ? '1px solid var(--color-hairline)' : undefined }}>
+                    <Skeleton height={16} width="30%" />
+                    {[0, 1, 2].map((row) => (
+                      <div key={row} style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+                        <span style={{ flex: 1 }}><Skeleton height={14} width="45%" /></span>
+                        <Skeleton height={20} width={36} />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          />
         </div>
       ) : loadFailed ? (
         <ListState
@@ -612,6 +647,8 @@ export function FeatureSettingsV8() {
                 onClick={() => { if (conflict) { setCompareOpen(true) } else { void save() } }}
                 disabled={saving || (!dirty && !conflict)}
                 busy={saving}
+                done={savedTick}
+                doneLabel="保存しました"
                 title={!dirty && !conflict ? '変更すると保存できます' : undefined}
               >
                 {conflict ? '比べてから保存' : '機能設定を保存'}

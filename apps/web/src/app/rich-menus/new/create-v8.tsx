@@ -36,6 +36,7 @@ import Stepper from '@/components/shared/stepper'
 import StickyBar from '@/components/shared/sticky-bar'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import SegmentedControl from '@/components/shared/segmented'
 import Toggle from '@/components/shared/toggle'
@@ -760,6 +761,7 @@ export default function RichMenuCreateV8() {
         await reloadGroup(group.id)
       }
       setNotice('下書きを保存しました。')
+      notifyToast('下書きを保存しました')
       return true
     } catch (e) {
       const raw = e instanceof Error ? e.message : ''
@@ -1165,6 +1167,11 @@ export default function RichMenuCreateV8() {
         audience === 'all'
           ? 'LINEへの登録が終わり、すべての友だちの既定メニューになりました。'
           : 'LINEへの登録が終わりました。条件に当てはまる人の画面には、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。',
+      )
+      notifyToast(
+        audience === 'all'
+          ? 'すべての友だちの既定メニューになりました'
+          : 'LINEへの登録が終わりました',
       )
       clearPublishPlanDraft(group.id)
       await reloadGroup(group.id)
