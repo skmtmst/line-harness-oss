@@ -59,6 +59,9 @@ const notoSansJp = Noto_Sans_JP({
 export const metadata: Metadata = {
   title: DEFAULT_TITLE,
   description: DEFAULT_TITLE,
+  icons: {
+    icon: '/icon.svg',
+  },
   openGraph: {
     title: DEFAULT_TITLE,
     description: DEFAULT_TITLE,
