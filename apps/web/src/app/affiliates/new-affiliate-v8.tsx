@@ -54,8 +54,8 @@ type PayoutKind = 'per_conversion' | 'rate' | 'none'
 
 const PAYOUT_KINDS: Array<{ value: PayoutKind; label: string; note: string }> = [
   { value: 'none', label: '報酬なし（計測のみ）', note: '成果の件数だけを記録' },
-  { value: 'rate', label: '売上に対する割合', note: '注文金額の◯%を報酬にします' },
-  { value: 'per_conversion', label: '成果1件ごとに定額', note: '金額は案件の「報酬額」で決めます' },
+  { value: 'rate', label: '売上に対する割合', note: '注文金額の ◯% を報酬に' },
+  { value: 'per_conversion', label: '成果1件ごとに定額', note: '金額は案件の「報酬額」で' },
 ]
 
 export function NewAffiliateV8() {
@@ -89,6 +89,12 @@ export function NewAffiliateV8() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saveNote, setSaveNote] = useState('')
+  /**
+   * Gqve5 の競合の帯。紹介コードの重なり（409）は、ほかの人が先に
+   * 同じコードで登録したときに起きる。入力は残し、帯から一覧を
+   * 確かめられる。誰が・いつ保存したかは API が返さないので出さない。
+   */
+  const [codeConflict, setCodeConflict] = useState(false)
 
   const draftAccountRef = useRef(selectedAccountId)
   useEffect(() => {
@@ -162,6 +168,7 @@ export function NewAffiliateV8() {
     setName('')
     setEmail('')
     setCode('')
+    setCodeConflict(false)
     setPayoutKind('per_conversion')
     setCommissionRate('')
     setHoldDays('30')
@@ -195,7 +202,14 @@ export function NewAffiliateV8() {
           operationId,
           isActive: startTracking,
         })
-        if (!res.success) throw new Error('create_failed')
+        if (!res.success) {
+          const serverMessage = res.error ?? ''
+          if (serverMessage.includes('既に使われています')) {
+            setCodeConflict(true)
+            throw new Error(`${serverMessage}。ほかの人が先に登録した可能性があります。`)
+          }
+          throw new Error('create_failed')
+        }
         affiliateId = res.data.id
         setCreatedId(affiliateId)
         const persistedIsActive =
@@ -237,6 +251,7 @@ export function NewAffiliateV8() {
     setSaving(true)
     setSaveError('')
     setSaveNote('')
+    setCodeConflict(false)
     try {
       const affiliateId = await save()
       if (after === 'finish') {
@@ -265,6 +280,22 @@ export function NewAffiliateV8() {
         <h1 className={styles.headTitle}>アフィリエイターを作る</h1>
         <p className={styles.headDescription}>登録すると紹介リンクができます。成果はその人の紹介リンクから来た人で数えます。</p>
       </div>
+
+      {codeConflict ? (
+        <Notice
+          tone="warn"
+          action={(
+            <a href={AFFILIATE_LIST_PATH}>
+              一覧で確かめる
+            </a>
+          )}
+        >
+          <p className={styles.cardTitle}>この紹介コードは既に使われています</p>
+          <p className={styles.cardNote}>
+            ほかの人が先に登録した可能性があります。このまま保存しても登録できません。コードを変えて続けるか、一覧で確かめてください。
+          </p>
+        </Notice>
+      ) : null}
 
       {partialSave && createdId ? (
         <Notice
@@ -422,7 +453,7 @@ export function NewAffiliateV8() {
 
           <section className={styles.card} aria-label="いくら払い、いつ締めるか">
             <h2 className={styles.cardTitle}>いくら払い、いつ締めるか</h2>
-            <p className={styles.cardNote}>報酬の決め方と、案件ごとの額より先にこの人の決まりが使われます</p>
+            <p className={styles.cardNote}>報酬の決め方は、案件ごとの額より先にこの人の決まりが使われます</p>
             <div className={styles.choiceGrid} role="group" aria-label="報酬の決め方">
               {PAYOUT_KINDS.map((kind) => (
                 <button
