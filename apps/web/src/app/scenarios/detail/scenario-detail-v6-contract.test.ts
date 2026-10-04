@@ -80,14 +80,17 @@ describe('V6 シナリオ編集の契約', () => {
       行の「その他→フォルダを移動」と複数選択の一括操作へ集約した。
       移動先を選ぶ窓の select は `v6-select` のまま。
     */
-    expect(LIST).toContain("api.scenarios.update(id, { folderId: folderId || null })")
+    expect(LIST).toContain('const folderId = moveDraft || null')
+    expect(LIST).toContain('api.scenarios.update(id, { folderId })')
+    expect(LIST).toContain("failureMessage: 'フォルダを移動できませんでした。'")
     expect(LIST).toContain('フォルダへ移す')
     expect(LIST_TABLE).toContain('フォルダ')
     // 移動先の選び欄は共通 Select（素の select・v6-select は置かない）。
     expect(LIST_TABLE).toContain('<Select')
     expect(LIST_TABLE).toContain('aria-label="移動先のフォルダ"')
     expect(LIST_TABLE).toContain('フォルダへ移す')
-    expect(LIST_TABLE).toContain('handleMoveFolders(moveIds, moveDraft)')
+    expect(LIST_TABLE).toContain('onConfirm={() => runMove()}')
+    expect(LIST_TABLE).toContain('undo: () => setOptimisticRows(null)')
   })
 
   it('「今月作成」は日本時間の月初を共通一覧APIへ渡して絞り込む', () => {
