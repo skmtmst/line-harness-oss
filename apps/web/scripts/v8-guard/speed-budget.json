@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated": "2026-10-04T03:30:00+09:00",
+  "updated": "2026-10-04T14:21:00+09:00",
   "note": "落とすのは悪化だけ。時間は3回中央値で基準より20%悪化、JSは基準より1KB超の増加で落とす。ただし同じPRでこの表の基準を更新していればJS超過は通す（機能追加でJSは増える。理由はPRに書く）。targets は目標（表示1秒・反応100ms・長い作業50ms）で、未達は結果に出すだけ。",
   "targets": {
     "showMs": 1000,
@@ -15,7 +15,7 @@
       "lcpMs": 660,
       "pressMs": 69,
       "longTaskMs": 51,
-      "jsBytes": 4413935
+      "jsBytes": 4423009
     },
     "inbox": {
       "route": "/chats",
@@ -23,7 +23,7 @@
       "lcpMs": 324,
       "pressMs": 67,
       "longTaskMs": 0,
-      "jsBytes": 3555021
+      "jsBytes": 3563422
     },
     "friends": {
       "route": "/friends",
@@ -31,7 +31,7 @@
       "lcpMs": 368,
       "pressMs": 67,
       "longTaskMs": 51,
-      "jsBytes": 3680432
+      "jsBytes": 3692152
     },
     "broadcasts": {
       "route": "/broadcasts",
@@ -39,7 +39,7 @@
       "lcpMs": 388,
       "pressMs": 187,
       "longTaskMs": 68,
-      "jsBytes": 3665355
+      "jsBytes": 3673755
     },
     "broadcast-new": {
       "route": "/broadcasts/new",
@@ -47,7 +47,7 @@
       "lcpMs": 440,
       "pressMs": null,
       "longTaskMs": 58,
-      "jsBytes": 3568201
+      "jsBytes": 3576601
     },
     "templates": {
       "route": "/templates",
@@ -55,7 +55,7 @@
       "lcpMs": 364,
       "pressMs": 66,
       "longTaskMs": 52,
-      "jsBytes": 3624284
+      "jsBytes": 3632684
     },
     "booking": {
       "route": "/booking/bookings",
@@ -63,7 +63,7 @@
       "lcpMs": 388,
       "pressMs": 66,
       "longTaskMs": 0,
-      "jsBytes": 3609329
+      "jsBytes": 3617729
     },
     "answers": {
       "route": "/form-submissions",
@@ -71,7 +71,7 @@
       "lcpMs": 348,
       "pressMs": 84,
       "longTaskMs": 51,
-      "jsBytes": 3704874
+      "jsBytes": 3713559
     },
     "tags": {
       "route": "/tags",
@@ -79,7 +79,7 @@
       "lcpMs": 376,
       "pressMs": 67,
       "longTaskMs": 56,
-      "jsBytes": 3700223
+      "jsBytes": 3708628
     },
     "settings": {
       "route": "/settings",
@@ -87,7 +87,7 @@
       "lcpMs": 296,
       "pressMs": 106,
       "longTaskMs": 67,
-      "jsBytes": 4286392
+      "jsBytes": 4295466
     },
     "friends-2000": {
       "route": "/friends",
@@ -95,7 +95,7 @@
       "lcpMs": 380,
       "pressMs": null,
       "longTaskMs": 905,
-      "jsBytes": 3680432,
+      "jsBytes": 3692152,
       "rows": 2000
     }
   }
