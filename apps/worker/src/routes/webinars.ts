@@ -1088,6 +1088,8 @@ async function getEditorPayload(c: Context<Env>, row: Webinar) {
     : null;
   return {
     version: settings.version,
+    /* 同時編集の帯（pvimJ）が読んだ版を見分ける更新日時。 */
+    updatedAt: settings.updated_at ?? null,
     deliveryKind: settings.delivery_kind,
     viewingCondition: parseJson(settings.viewing_condition_json, { kind: 'registered', label: '申込者向け' }),
     publicDescription: settings.public_description,

@@ -312,6 +312,8 @@ shared-button-importer app/webinars/edit/participants-v8.tsx
 shared-button-importer app/webinars/edit/review-v8.tsx
 shared-button-importer app/webinars/edit/video-stages.tsx
 shared-button-importer app/webinars/edit/video-v8.tsx
+shared-button-importer app/webinars/edit/webinar-edit-conflict-band.tsx
+shared-button-importer app/webinars/edit/webinar-edit-compare-dialog.tsx
 shared-button-importer app/webinars/list-v8.tsx
 shared-button-importer app/webinars/new/new-v8.tsx
 shared-button-importer app/webinars/new/page.tsx
