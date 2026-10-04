@@ -13,9 +13,15 @@ const WIZARD = readFileSync(join(HERE, 'edit', 'wizard-v8.tsx'), 'utf8')
  * ここでは板IDの結び付けだけを見る。
  */
 describe('自動応答の残りの板ID', () => {
-  it('状態の4場面に G8i4xP が付く', () => {
-    const count = LIST.split('data-design-node="G8i4xP"').length - 1
-    expect(count).toBe(4)
+  it('失敗・条件に合わない・未登録は状態の板、読込は遅延スケルトンを使う', () => {
+    expect(LIST).toContain('data-design-node="G8i4xP"')
+    expect(LIST).toContain('自動応答を読み込めませんでした')
+    expect(LIST).toContain('条件に合うルールはありません')
+    expect(LIST).toContain('まだ自動応答のルールはありません')
+    expect(LIST).toContain('aria-busy="true" aria-label="読み込んでいます"')
+    expect(LIST).toContain('<DelayedSkeleton loading skeleton={loadingSkeleton} />')
+    expect(LIST).toContain("visibleLoadState === 'forbidden'")
+    expect(LIST).toContain("visibleLoadState === 'error' && (")
   })
 
   it('見るだけの人に Q5lOCc の帯が出る', () => {
