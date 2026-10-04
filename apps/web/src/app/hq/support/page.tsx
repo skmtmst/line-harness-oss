@@ -2,17 +2,15 @@
 
 import ReadonlyHeader from '@/app/hq/readonly-header-v8'
 import '@/app/hq/readonly-v8.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import { CheckCircle2, ImagePlus, Send, X } from 'lucide-react'
+import { Building2, CheckCircle2, CreditCard, ImagePlus, LifeBuoy, Plus, Users, X } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import Dialog from '@/components/shared/dialog'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
-import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
-import StickyBar from '@/components/shared/sticky-bar'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -36,13 +34,13 @@ import {
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
 
 /**
- * お問い合わせ。★V6 36-3（`X6LZP`）。統括から運営（musubo 提供元）へ送る。
+ * お問い合わせ。板 `b8xBtZ`（運営LINEの登録ダイアログを開いた状態が `D6fh3`）。
+ * 統括から運営（musubo 提供元）へ送る。
  *
- * E 作成型: 案内帯 → 本体（左フォーム＋右390：送信者・これまでの問い合わせ）→ 下部追従バー。
+ * E 作成型: 板の頭 → 左に統括の設定メニュー → 右に問い合わせカード＋履歴の表。
  * 送るとこの統括の記録に残り、運営へメールで知らせ、送信者には控えが届く。
  */
 export default function HqSupportPage() {
-  const theme = useAdminTheme()
   usePageTitle('お問い合わせ')
   const tenantStatus = useTenantStatus()
   const tenantUnavailable = tenantStatus === 'suspended' || tenantStatus === 'archived'
@@ -174,22 +172,10 @@ export default function HqSupportPage() {
   }
 
   return (
-    <div data-design-node={theme === 'v8' ? 'b8xBtZ' : 'X6LZP'} className={`flex flex-col gap-4 ${tenantUnavailable ? 'min-h-full flex-1' : ''}`}>
-      {theme === 'v8' && <ReadonlyHeader title="お問い合わせ" description="問い合わせの履歴と対応の状況を確認します。" />}
-      <div data-design-node="kcTeV">
-        {tenantUnavailable ? (
-          <NoteBar tone="success">使い方の質問、不具合、料金の相談はここから送れます。返信は登録メールアドレスに届きます（平日 2営業日以内）。</NoteBar>
-        ) : (
-          <NoteBar tone="info">
-            使い方の質問、不具合、料金の相談はここから送れます。返信は登録メールアドレスに届きます（平日 2営業日以内）。
-            <button type="button" onClick={() => setLineGuide(true)} className="ml-2 text-action underline-offset-2 hover:underline">
-              運営からの大事なお知らせを LINE で受け取る（契約者専用LINEの登録案内）
-            </button>
-          </NoteBar>
-        )}
-      </div>
+    <div data-design-node="b8xBtZ" className="flex flex-col gap-4">
+      <ReadonlyHeader title="お問い合わせ" description="使い方の質問・不具合・料金の相談を運営へ送れます。返信は登録メールアドレスと、下の「これまでの問い合わせ」に届きます（平日 2営業日以内）。" />
 
-      {/* 契約者専用LINEの登録案内（2026-09-18 決定: 登録直後の案内を、ここからもいつでも開ける） */}
+      {/* 契約者専用LINEの登録案内（2026-09-18 決定: 登録直後の案内を、ここからもいつでも開ける。開いた状態が板 D6fh3） */}
       {!tenantUnavailable ? <NoticeLineRegisterDialog open={lineGuide} onClose={() => setLineGuide(false)} quietWhenUnavailable={false} /> : null}
 
       {/* 送信完了の知らせ（2026-09-18 決定: 帯だけでは気づきにくいので、窓で止めて伝える） */}
@@ -201,143 +187,152 @@ export default function HqSupportPage() {
           : '運営に届きました。控えメールは送れませんでしたが、内容は運営に届いています。返信はこの画面の「これまでの問い合わせ」に届きます。'}
         titleIcon={<CheckCircle2 aria-hidden="true" className="h-5 w-5 text-accent-deep" />}
         onCancel={() => setSent(null)}
-        designNode="X6LZP"
+        designNode="b8xBtZ"
       >
         {sent?.ticketLabel ? <p className="text-label text-ink">受付番号：<span className="font-semibold">{sent.ticketLabel}</span>　件名：{sent.subject}</p> : null}
       </Dialog>
 
-      <div data-design-node="VKxoO" className="flex flex-col gap-4 xl:flex-row xl:items-start">
-        <form
-          data-design-node="hAh52"
-          className="flex min-w-0 flex-1 flex-col gap-4 rounded-card border border-hairline bg-canvas p-5"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void send()
-          }}
-        >
-          <h2 className="text-body font-bold text-ink">問い合わせ内容</h2>
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+        <nav aria-label="統括の設定" className="flex shrink-0 flex-col gap-0.5 xl:w-48">
+          <p className="px-2 py-1 text-micro font-semibold text-ink-faint">統括の設定</p>
+          <SettingsNavLink href="/hq/members" icon={<Users aria-hidden="true" className="h-4 w-4" />}>メンバー</SettingsNavLink>
+          <SettingsNavLink href="/hq/settings" icon={<Building2 aria-hidden="true" className="h-4 w-4" />}>統括の情報</SettingsNavLink>
+          <SettingsNavLink href="/hq/billing" icon={<CreditCard aria-hidden="true" className="h-4 w-4" />}>請求</SettingsNavLink>
+          <SettingsNavLink href="/hq/support" current icon={<LifeBuoy aria-hidden="true" className="h-4 w-4" />}>お問い合わせ</SettingsNavLink>
+        </nav>
 
-          <Field label="種類" required htmlFor={`${uid}-kind`}>
-            <Select
-              aria-label="種類"
-              id={`${uid}-kind`}
-              size="full"
-              value={input.kind}
-              disabled={sending}
-              onChange={(value) => set('kind', value as HqSupportKind | '')}
-              options={[{ value: '', label: '種類を選んでください' }, ...kinds.map((k) => ({ value: k.key, label: k.label }))]}
-            />
-          </Field>
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <form
+            className="flex min-w-0 flex-col gap-4 rounded-card border border-hairline bg-canvas p-5"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void send()
+            }}
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="種類" required htmlFor={`${uid}-kind`}>
+                <Select
+                  aria-label="種類"
+                  id={`${uid}-kind`}
+                  size="full"
+                  value={input.kind}
+                  disabled={sending}
+                  onChange={(value) => set('kind', value as HqSupportKind | '')}
+                  options={[{ value: '', label: '種類を選んでください' }, ...kinds.map((k) => ({ value: k.key, label: k.label }))]}
+                />
+              </Field>
 
-          <Field label="件名" required htmlFor={`${uid}-subject`}>
-            <TextField
-              id={`${uid}-subject`}
-              value={input.subject}
-              maxLength={SUPPORT_SUBJECT_MAX}
-              disabled={sending}
-              placeholder="例: バナー生成で日本語の文字が崩れることがある"
-              onChange={(e) => set('subject', e.target.value)}
-              className="w-full"
-            />
-          </Field>
+              <Field label="関係する店舗" note="任意" htmlFor={`${uid}-account`}>
+                <Select
+                  aria-label="関係する店舗"
+                  id={`${uid}-account`}
+                  size="full"
+                  value={input.lineAccountId}
+                  disabled={sending}
+                  onChange={(value) => set('lineAccountId', value)}
+                  options={[{ value: '', label: '指定しない' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+                />
+              </Field>
+            </div>
 
-          <Field label="本文" required note="困っていること・期待する動き・起きた日時" htmlFor={`${uid}-body`}>
-            <TextArea
-              id={`${uid}-body`}
-              rows={tenantUnavailable ? 6 : 8}
-              value={input.body}
-              maxLength={SUPPORT_BODY_MAX}
-              disabled={sending}
-              placeholder="例: 「2周年 春の感謝祭」と入れて生成すると、2枚に1枚は「感謝際」のように誤字になります。再現するプロジェクト名は「春の感謝祭 2周年」です。"
-              onChange={(e) => set('body', e.target.value)}
-              className="w-full"
-            />
-          </Field>
-
-          <Field label="関係する店舗" note="任意" htmlFor={`${uid}-account`}>
-            <Select
-              aria-label="関係する店舗"
-              id={`${uid}-account`}
-              size="full"
-              value={input.lineAccountId}
-              disabled={sending}
-              onChange={(value) => set('lineAccountId', value)}
-              options={[{ value: '', label: '指定しない' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
-            />
-          </Field>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-label font-medium text-ink">画面の画像（任意・{SUPPORT_ATTACHMENT_MAX}枚まで）</span>
-            {/*
-              本物の file input は出さない（display:none）。
-              開くのは下の「クリックして画像を選ぶ」ボタンから。
-            */}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/png,image/jpeg"
-              className="hidden"
-              tabIndex={-1}
-              aria-hidden="true"
-              onChange={(event) => void addFile(event.target.files?.[0])}
-            />
-            {attachments.length > 0 ? (
-              <ul className="flex flex-wrap gap-2">
-                {attachments.map((a, i) => (
-                  <li key={`${a.name}-${i}`} className="relative overflow-hidden rounded-control border border-hairline bg-shell">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={a.previewUrl} alt={a.name} className="h-20 w-28 object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removeAttachment(i)}
-                      aria-label={`${a.name} を外す`}
-                      className="absolute top-1 right-1 rounded-mini bg-canvas/80 p-0.5 text-ink-secondary"
-                    >
-                      <X aria-hidden="true" className="h-3.5 w-3.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
-              <button
-                type="button"
+            <Field label="件名" required htmlFor={`${uid}-subject`}>
+              <TextField
+                id={`${uid}-subject`}
+                value={input.subject}
+                maxLength={SUPPORT_SUBJECT_MAX}
                 disabled={sending}
-                onClick={() => fileRef.current?.click()}
-                className="flex h-18 w-full items-center justify-center gap-2 rounded-control bg-surface-pearl text-caption text-ink-faint hover:bg-canvas-sunken disabled:opacity-50"
-              >
-                <ImagePlus aria-hidden="true" className="h-4.5 w-4.5" />
-                クリックして画像を選ぶ（PNG・JPEG、1枚 5MB まで）
-              </button>
-            ) : null}
-          </div>
+                placeholder="例: バナー生成で日本語の文字が崩れることがある"
+                onChange={(e) => set('subject', e.target.value)}
+                className="w-full"
+              />
+            </Field>
 
-          {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
-        </form>
+            <Field label="本文" required note="困っていること・期待する動き・起きた日時" htmlFor={`${uid}-body`}>
+              <TextArea
+                id={`${uid}-body`}
+                rows={8}
+                value={input.body}
+                maxLength={SUPPORT_BODY_MAX}
+                disabled={sending}
+                placeholder="例: 「2周年 春の感謝祭」と入れて生成すると、2枚に1枚は「感謝際」のように誤字になります。再現するプロジェクト名は「春の感謝祭 2周年」です。"
+                onChange={(e) => set('body', e.target.value)}
+                className="w-full"
+              />
+            </Field>
 
-        <div className="flex w-full shrink-0 flex-col gap-4 xl:w-auto" style={{ maxWidth: 390 }}>
-          <section data-design-node="a1kbdf" className="flex flex-col gap-2.5 rounded-card border border-hairline bg-canvas p-4">
-            <h2 className="text-body font-bold text-ink">送信者</h2>
-            <dl className="flex flex-col gap-2">
-              <Row label="統括" value={sender.tenantName || '—'} />
-              <Row label="名前" value={sender.name || '—'} />
-              <Row label="メール" value={sender.email ?? '—'} />
-              <Row label="プラン" value={sender.planLabel} />
-            </dl>
-            <p className="text-micro text-ink-faint">
-              {tenantUnavailable
-                ? 'この内容が問い合わせに添えられます。変えるにはプロフィールを編集してください。'
-                : 'この内容が問い合わせに添えられます。返信はこのメールアドレスに届きます。'}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-label font-medium text-ink">画像を添える（任意・{SUPPORT_ATTACHMENT_MAX}枚まで）</span>
+              {/*
+                本物の file input は出さない（display:none）。
+                開くのは下の「クリックして画像を選ぶ」ボタンから。
+              */}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg"
+                className="hidden"
+                tabIndex={-1}
+                aria-hidden="true"
+                onChange={(event) => void addFile(event.target.files?.[0])}
+              />
+              {attachments.length > 0 ? (
+                <ul className="flex flex-wrap gap-2">
+                  {attachments.map((a, i) => (
+                    <li key={`${a.name}-${i}`} className="relative overflow-hidden rounded-control border border-hairline bg-shell">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={a.previewUrl} alt={a.name} className="h-20 w-28 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(i)}
+                        aria-label={`${a.name} を外す`}
+                        className="absolute top-1 right-1 rounded-mini bg-canvas/80 p-0.5 text-ink-secondary"
+                      >
+                        <X aria-hidden="true" className="h-3.5 w-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
+                <button
+                  type="button"
+                  disabled={sending}
+                  onClick={() => fileRef.current?.click()}
+                  className="flex h-18 w-full items-center justify-center gap-2 rounded-control border border-hairline bg-canvas px-3 text-caption text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
+                >
+                  <ImagePlus aria-hidden="true" className="h-4.5 w-4.5" />
+                  クリックして画像を選ぶ（PNG・JPEG、1枚 5MB まで）
+                </button>
+              ) : null}
+            </div>
+
+            <p className="rounded-control bg-shell px-3 py-2 text-micro text-ink-secondary">
+              送信者：{sender.name || '—'}{sender.email ? `（${sender.email}）` : ''}・統括：{sender.tenantName || '—'}・プラン：{sender.planLabel}
+              {tenantUnavailable ? 'この内容が問い合わせに添えられます。' : 'この内容が問い合わせに添えられます。返信はこのメールアドレスに届きます。'}
+              {!tenantUnavailable ? (
+                <button type="button" onClick={() => setLineGuide(true)} className="ml-2 text-action underline-offset-2 hover:underline">
+                  運営からの大事なお知らせを LINE で受け取る
+                </button>
+              ) : null}
             </p>
-          </section>
 
-          <section data-design-node="Srh5W" className="v8-ro-hq-history flex flex-col rounded-card border border-hairline bg-canvas">
-            <h2 className="px-4 py-3 text-body font-bold text-ink">これまでの問い合わせ</h2>
-            <div className="border-t border-hairline" />
+            {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
+            {blocked && (input.subject || input.body || input.kind) ? <p className="text-label text-status-warn-deep" role="alert">{blocked}</p> : null}
+
+            <div className="flex items-center justify-end gap-2">
+              <Button onClick={clear} disabled={sending}>内容をクリア</Button>
+              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked)} busy={sending} busyLabel="送信中…">
+                <Plus aria-hidden="true" className="h-4 w-4" />送信
+              </Button>
+            </div>
+          </form>
+
+          <section aria-label="これまでの問い合わせ" className="flex flex-col gap-2">
+            <h2 className="text-body font-bold text-ink">これまでの問い合わせ</h2>
             {history === null ? (
-              <p className="px-4 py-4 text-caption text-ink-faint">読み込んでいます…</p>
+              <p className="text-caption text-ink-faint">読み込んでいます…</p>
             ) : historyError ? (
-              <div className="flex items-center gap-3 px-4 py-4">
+              <div className="flex items-center gap-3 rounded-card border border-hairline bg-canvas px-4 py-4">
                 {/*
                   M027：履歴の読込失敗に再試行口を付ける。
                   読み込めなかった表示に赤は使わない（★V7）。
@@ -352,53 +347,66 @@ export default function HqSupportPage() {
                 </button>
               </div>
             ) : history.length === 0 ? (
-              <p className="px-4 py-4 text-caption text-ink-faint">まだ問い合わせはありません。</p>
+              <p className="rounded-card border border-hairline bg-canvas px-4 py-4 text-caption text-ink-faint">まだ問い合わせはありません。</p>
             ) : (
-              <ul className="flex flex-col">
+              <DataTable>
+                <TableHeadRow>
+                  <Th>受付番号</Th>
+                  <Th>件名</Th>
+                  <Th>種類</Th>
+                  <Th>状態</Th>
+                  <Th>更新</Th>
+                </TableHeadRow>
                 {history.slice(0, 10).map((item) => (
-                  <li key={item.id} className="border-b border-divider-soft last:border-b-0">
-                    <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} className="flex flex-col gap-1 px-4 py-3 hover:bg-canvas-sunken">
-                      <span className="truncate text-label font-semibold text-ink">{item.subject}</span>
-                      <span className="flex items-center gap-2 text-micro text-ink-faint">
-                        {item.ticketLabel ? <span>{item.ticketLabel}・</span> : null}
-                        {shortDateTime(item.createdAt)}
-                        <span className="text-ink-faint">・{item.kindLabel}</span>
-                        <span
-                          className={
-                            item.status === 'open'
-                              ? 'inline-flex h-4.5 items-center rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
-                              : 'inline-flex h-4.5 items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
-                          }
-                        >
-                          {SUPPORT_STATUS_LABELS[item.status]}
-                        </span>
-                      </span>
+                  <Tr key={item.id}>
+                    <Td><span className="text-label text-ink-secondary">{item.ticketLabel ?? '—'}</span></Td>
+                    <Td>
+                      <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`} className="text-label font-semibold text-action hover:underline">
+                        {item.subject}
+                      </Link>
                       {!tenantUnavailable && item.replies && item.replies.length > 0 ? (
-                        <span className="text-micro text-ink-secondary">運営からの返信 {item.replies.length}件・開いて続きを送れます</span>
+                        <span className="block text-micro text-ink-secondary">運営からの返信 {item.replies.length}件・開いて続きを送れます</span>
                       ) : null}
-                    </Link>
-                  </li>
+                    </Td>
+                    <Td><span className="text-label text-ink">{item.kindLabel}</span></Td>
+                    <Td>
+                      <span
+                        className={
+                          item.status === 'open'
+                            ? 'inline-flex h-4.5 items-center gap-1 rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info'
+                            : 'inline-flex h-4.5 items-center gap-1 rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
+                        }
+                      >
+                        <span aria-hidden="true" className="h-1 w-1 rounded-full bg-current" />
+                        {SUPPORT_STATUS_LABELS[item.status]}
+                      </span>
+                    </Td>
+                    <Td><span className="text-label text-ink-secondary">{shortDateTime(item.createdAt)}</span></Td>
+                  </Tr>
                 ))}
-              </ul>
+              </DataTable>
             )}
           </section>
         </div>
       </div>
-
-      <div data-design-node="kgFxH" className="sticky bottom-0 z-10 mt-auto">
-        <StickyBar
-          status={blocked && (input.subject || input.body || input.kind) ? <span className="text-status-warn-deep">{blocked}</span> : '送信すると、控えが登録メールアドレスにも届きます'}
-          actions={
-            <>
-              <Button onClick={clear} disabled={sending}>内容をクリア</Button>
-              <Button variant="primary" onClick={() => void send()} disabled={sending || Boolean(blocked)} busy={sending} busyLabel="送信中…">
-                <Send aria-hidden="true" className="h-4 w-4" />送る
-              </Button>
-            </>
-          }
-        />
-      </div>
     </div>
+  )
+}
+
+function SettingsNavLink({ href, icon, current, children }: { href: string; icon: ReactNode; current?: boolean; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      aria-current={current ? 'page' : undefined}
+      className={
+        current
+          ? 'flex items-center gap-2 rounded-control bg-surface-pearl px-2 py-1.5 text-label font-semibold text-ink'
+          : 'flex items-center gap-2 rounded-control px-2 py-1.5 text-label text-ink-secondary hover:bg-canvas-sunken hover:text-ink'
+      }
+    >
+      {icon}
+      {children}
+    </Link>
   )
 }
 
@@ -412,15 +420,6 @@ function Field({ label, required, note, htmlFor, children }: { label: string; re
         {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
       </div>
       {children}
-    </div>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex gap-3">
-      <dt className="w-16 shrink-0 text-caption font-semibold text-ink-faint">{label}</dt>
-      <dd className="min-w-0 flex-1 truncate text-label text-ink">{value}</dd>
     </div>
   )
 }

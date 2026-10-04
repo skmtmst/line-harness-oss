@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import Image from 'next/image'
+import { ArrowLeft, ArrowRight, Check, CircleHelp, Lock } from 'lucide-react'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import RadioCard from '@/components/shared/radio-card'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import PageHeader from '@/components/shared/page-header'
-import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
@@ -246,11 +246,20 @@ export default function NewLineAccountPage() {
     <div data-design-node="b2NGxk" className="flex w-full flex-col gap-4 pb-24">
       {/* ★V7: 登録専用の枠の幅いっぱいに広げる。中央寄せの狭い列にしない。 */}
       <div data-design="Head">
-        <div className="flex justify-end"><Button href="/hq">統括コンソールへ戻る</Button></div>
+        <div className="flex justify-end gap-2">
+          {!createdId ? <Button href="/accounts">キャンセル</Button> : null}
+          <Button href="/hq">統括コンソールへ戻る</Button>
+        </div>
         <PageHeader
-          breadcrumb={[{ label: 'LINEアカウント', href: '/accounts' }, { label: '登録' }]}
+          breadcrumb={[{ label: 'アカウント', href: '/hq' }, { label: 'LINEアカウントを登録' }]}
           title="LINEアカウントを登録"
-          description="4つのチャネル情報を入力すると、接続設定と既存友だちの取り込みを自動で行います。"
+          description={
+            currentStep === 1
+              ? '画面に出る名前と、だれがこのアカウントを扱うかを決めます。'
+              : currentStep === 3
+                ? 'LINE Developers の画面からコピーして貼り付けます。秘密値は保存後に画面へ表示されません。'
+                : '4つのチャネル情報を入力すると、接続設定と既存友だちの取り込みを自動で行います。'
+          }
         />
       </div>
 
@@ -264,10 +273,25 @@ export default function NewLineAccountPage() {
           {WIZARD_STEPS.map((step) => {
             const active = currentStep === step.number
             const complete = currentStep > step.number || Boolean(createdId)
-            return <li key={step.number} aria-current={active ? 'step' : undefined} className={`rounded-control border px-3 py-2 ${active ? 'border-action bg-action-soft' : 'border-hairline'}`}>
-              <span className="text-ink-faint block text-xs">手順 {step.number} / 5</span>
-              <span className="text-ink mt-0.5 block text-xs font-medium">{step.label}{complete ? '（完了）' : ''}</span>
-            </li>
+            return (
+              <li
+                key={step.number}
+                aria-current={active ? 'step' : undefined}
+                className={`flex items-center gap-2 rounded-control border px-3 py-2 ${active ? 'border-accent-deep' : complete ? 'border-hairline bg-accent-soft' : 'border-hairline'}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={
+                    complete || active
+                      ? 'grid h-5 w-5 shrink-0 place-items-center rounded-full bg-accent-deep text-nano font-bold text-white'
+                      : 'grid h-5 w-5 shrink-0 place-items-center rounded-full bg-canvas-sunken text-nano font-bold text-ink-faint'
+                  }
+                >
+                  {complete ? <Check aria-hidden="true" className="h-3 w-3" /> : step.number}
+                </span>
+                <span className="text-ink block text-xs font-medium">{step.label}</span>
+              </li>
+            )
           })}
         </ol>
         <details className="sm:hidden">
@@ -316,15 +340,42 @@ export default function NewLineAccountPage() {
             </SetupSection>
           </div>}
 
-          {currentStep === 3 && <div data-design-node="YEHCR" className="grid gap-4 lg:grid-cols-2">
-            <SetupSection title="Messaging API" description="アクセストークンはmusuboが自動で発行します。" action={<ManualLink anchor="m1" label="取得方法を見る" />}>
-              <Field id="channel-id" label="チャネルID" value={form.channelId} onChange={(value) => update('channelId', value)} inputMode="numeric" required error={fieldErrors.channelId} />
-              <Field id="channel-secret" label="チャネルシークレット" value={form.channelSecret} onChange={(value) => update('channelSecret', value)} type="password" required error={fieldErrors.channelSecret} />
-            </SetupSection>
-            <SetupSection title="LINE Login" description="LIFFは自動で作成します。Messaging APIと同じプロバイダーのチャネルを入力してください。" action={<ManualLink anchor="m2" label="取得方法を見る" />}>
-              <Field id="login-channel-id" label="LoginチャネルID" value={form.loginChannelId} onChange={(value) => update('loginChannelId', value)} inputMode="numeric" required error={fieldErrors.loginChannelId} />
-              <Field id="login-channel-secret" label="Loginチャネルシークレット" value={form.loginChannelSecret} onChange={(value) => update('loginChannelSecret', value)} type="password" required error={fieldErrors.loginChannelSecret} />
-            </SetupSection>
+          {currentStep === 3 && <div data-design-node="JYfda" className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <h2 className="text-ink text-base font-bold">接続に必要な4項目</h2>
+              <div className="mt-4 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <h3 className="text-ink-secondary text-xs font-bold">Messaging API</h3>
+                    <div className="mt-2 space-y-4">
+                      <Field id="channel-id" label="チャネルID" value={form.channelId} onChange={(value) => update('channelId', value)} inputMode="numeric" required error={fieldErrors.channelId} />
+                      <Field id="channel-secret" label="チャネルシークレット" value={form.channelSecret} onChange={(value) => update('channelSecret', value)} type="password" required error={fieldErrors.channelSecret} />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-ink-secondary text-xs font-bold">LINE Login</h3>
+                    <div className="mt-2 space-y-4">
+                      <Field id="login-channel-id" label="LoginチャネルID" value={form.loginChannelId} onChange={(value) => update('loginChannelId', value)} inputMode="numeric" required error={fieldErrors.loginChannelId} />
+                      <Field id="login-channel-secret" label="Loginチャネルシークレット" value={form.loginChannelSecret} onChange={(value) => update('loginChannelSecret', value)} type="password" required error={fieldErrors.loginChannelSecret} />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-ink-faint flex items-center gap-1.5 text-xs">
+                    <Lock aria-hidden="true" className="h-3.5 w-3.5" />秘密値は保存後に画面へ表示されません。
+                  </p>
+                  <span className="flex shrink-0 gap-3">
+                    <ManualLink anchor="m1" label="取得方法を見る" />
+                    <ManualLink anchor="m2" label="取得方法を見る" />
+                  </span>
+                </div>
+              </div>
+            </section>
+            <aside className="bg-canvas rounded-card border-hairline border space-y-3 p-5" aria-label="チャネル情報の探し方">
+              <h3 className="text-ink text-sm font-bold">どこにある？</h3>
+              <p className="text-ink-secondary text-xs leading-relaxed">チャネル ID とシークレットは、LINE Developers → プロバイダー → チャネル → 「チャネル基本設定」にあります。</p>
+              <p className="text-ink-secondary text-xs leading-relaxed">登録済みのチャネル ID を入れると「このチャネルIDは登録済みです」と出て先へ進めません。</p>
+            </aside>
           </div>}
 
           {currentStep === 4 && <div data-design-node="K1zHyx" className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -385,17 +436,22 @@ export default function NewLineAccountPage() {
         ) : null}
         <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
         {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-        <div data-design="Actions">
-          <StickyBar
-            status={createdId ? (importingIds ? '既存の友だちを取り込んでいます' : '登録が完了しました') : busyAction === 'save' ? '接続して保存しています' : `手順 ${currentStep} / 5`}
-            actions={createdId ? <>
-              {importingIds ? <><Button type="button" disabled>登録したアカウントを見る</Button><Button type="button" variant="primary" disabled>統括コンソールへ</Button></> : <><Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button><Button href="/hq" variant="primary">統括コンソールへ</Button></>}
+        <div data-design="Actions" className="mt-4 border-t border-hairline pt-4">
+          {createdId ? (
+            <p role="status" className="mb-2 text-center text-caption text-ink-secondary">
+              {importingIds ? '既存の友だちを取り込んでいます' : '登録が完了しました'}
+            </p>
+          ) : null}
+          <div className="flex items-center justify-center gap-2">
+            {createdId ? <>
+              {importingIds
+                ? <><Button type="button" disabled>登録したアカウントを見る</Button><Button type="button" variant="primary" disabled>統括コンソールへ</Button></>
+                : <><Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button><Button href="/hq" variant="primary">統括コンソールへ</Button></>}
             </> : <>
-              <Button href="/accounts">キャンセル</Button>
-              {currentStep > 1 && <Button type="button" disabled={Boolean(busyAction)} onClick={() => { setError(''); setCurrentStep((currentStep - 1) as StepNumber) }}>戻る</Button>}
-              <Button type="submit" variant="primary" disabled={Boolean(busyAction) || (currentStep === 4 && !connectionPassed)} busy={currentStep === 4 && busyAction === 'save'} busyLabel="接続して保存しています…">{currentStep === 4 ? '接続して保存する' : '次へ'}</Button>
+              {currentStep > 1 && <Button type="button" disabled={Boolean(busyAction)} onClick={() => { setError(''); setCurrentStep((currentStep - 1) as StepNumber) }}><ArrowLeft aria-hidden="true" className="h-4 w-4" />戻る</Button>}
+              <Button type="submit" variant="primary" disabled={Boolean(busyAction) || (currentStep === 4 && !connectionPassed)} busy={currentStep === 4 && busyAction === 'save'} busyLabel="接続して保存しています…"><ArrowRight aria-hidden="true" className="h-4 w-4" />{currentStep === 4 ? '接続して保存する' : '次へ'}</Button>
             </>}
-          />
+          </div>
         </div>
       </form>
     </div>
@@ -425,7 +481,7 @@ function InfoSection({ title, children }: { title: string; children: ReactNode }
 }
 
 function ManualLink({ anchor, label }: { anchor: 'm1' | 'm2' | 'm3'; label: string }) {
-  return <a href={`/manuals/line-connect/index.html#${anchor}`} target="_blank" rel="noreferrer" className="text-action shrink-0 text-xs font-semibold hover:underline">{label}</a>
+  return <a href={`/manuals/line-connect/index.html#${anchor}`} target="_blank" rel="noreferrer" className="text-ink inline-flex shrink-0 items-center gap-1.5 rounded-control border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold hover:bg-canvas-sunken"><CircleHelp aria-hidden="true" className="h-3.5 w-3.5" />{label}</a>
 }
 
 function Choice({ checked, onChange, label, value }: { checked: boolean; onChange: () => void; label: string; value: string }) {

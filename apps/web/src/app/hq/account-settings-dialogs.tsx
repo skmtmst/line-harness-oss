@@ -12,10 +12,11 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import { api, fetchApi } from '@/lib/api'
-import type { ApiResponse } from '@line-crm/shared'
+import Select from '@/components/shared/select'
+import { TextField } from '@/components/shared/text-field'
+import { api, type LineAccountTag } from '@/lib/api'
 import type { AccountWithStats } from '@/contexts/account-context'
+import { Plus, TrendingUp, Users } from 'lucide-react'
 
 export interface AccountTagOption {
   id: string
@@ -92,31 +93,47 @@ export function AccountSettingsDialog({ account, accounts, archived, accountTags
 }) {
   const [name, setName] = useState(account.name)
   const [parent, setParent] = useState('')
+  const [tags, setTags] = useState<LineAccountTag[]>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => (account.tags ?? []).map((tag) => tag.id))
+  const [addingTag, setAddingTag] = useState(false)
+  const [newTagName, setNewTagName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [allTags, setAllTags] = useState<AccountTagOption[] | null>(null)
-  const [tagIds, setTagIds] = useState<string[]>(
-    (accountTags ?? []).map((tag) => tag.id),
-  )
+
   useEffect(() => {
     let cancelled = false
-    void fetchApi<ApiResponse<AccountTagOption[]>>('/api/line-account-tags')
-      .then((res) => {
-        if (!cancelled && res.success) setAllTags(res.data)
-      })
-      .catch(() => {
-        /* 読めないときは付け外しを出さない。 */
-      })
+    void api.lineAccountTags.list().then((res) => {
+      if (!cancelled && res.success && Array.isArray(res.data)) setTags(res.data)
+    }).catch(() => {})
     return () => { cancelled = true }
   }, [])
+
   const toggleTag = (id: string) => {
-    setTagIds((prev) => (prev.includes(id) ? prev.filter((tagId) => tagId !== id) : [...prev, id]))
+    setSelectedTags((prev) => (prev.includes(id) ? prev.filter((tagId) => tagId !== id) : [...prev, id]))
   }
-  const tagsChanged = (() => {
-    const before = new Set((accountTags ?? []).map((tag) => tag.id))
-    const after = new Set(tagIds)
-    return before.size !== after.size || [...after].some((id) => !before.has(id))
-  })()
+
+  const createTag = async () => {
+    const tagName = newTagName.trim()
+    if (!tagName || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      const res = await api.lineAccountTags.create(tagName)
+      if (!res.success) {
+        setError(res.error)
+        return
+      }
+      setTags((prev) => [...prev, res.data])
+      setSelectedTags((prev) => (prev.includes(res.data.id) ? prev : [...prev, res.data.id]))
+      setNewTagName('')
+      setAddingTag(false)
+    } catch {
+      setError('タグを追加できませんでした。通信を確認して、もう一度お試しください。')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const save = async () => {
     if (busy) return
     if (!name.trim()) {
@@ -142,13 +159,13 @@ export function AccountSettingsDialog({ account, accounts, archived, accountTags
           return
         }
       }
-      if (tagsChanged) {
-        const res = await fetchApi<ApiResponse<{ id: string }>>(`/api/line-accounts/${encodeURIComponent(account.id)}/tags`, {
-          method: 'PUT',
-          body: JSON.stringify({ tagIds }),
-        })
+      const before = new Set((account.tags ?? []).map((tag) => tag.id))
+      const after = new Set(selectedTags)
+      const changed = before.size !== after.size || [...after].some((id) => !before.has(id))
+      if (changed) {
+        const res = await api.lineAccountTags.replace(account.id, selectedTags)
         if (!res.success) {
-          setError(res.error)
+          setError(res.error === 'ACCOUNT_ARCHIVED' ? 'アーカイブ済みのためタグを変えられません。' : res.error)
           return
         }
       }
@@ -159,80 +176,118 @@ export function AccountSettingsDialog({ account, accounts, archived, accountTags
       setBusy(false)
     }
   }
+  const handle = account.basicId || account.channelId
   return (
     <Dialog
       open
       title="アカウントの設定"
-      description={`${account.name}`}
+      description={`${account.displayName || account.name}（@${handle}）`}
       designNode="HMpVx"
-      confirmLabel="保存"
       busy={busy}
       error={error || undefined}
-      onConfirm={() => void save()}
       onCancel={onClose}
       footer={
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button type="button" variant={archived ? 'secondary' : 'danger'} onClick={onArchive} disabled={busy}>
+        <div className="flex w-full items-center justify-between gap-2">
+          <Button type="button" variant={archived ? 'secondary' : 'danger'} onClick={onArchive}>
             {archived ? '戻す' : 'アーカイブ'}
           </Button>
-          <Button type="button" variant="primary" onClick={() => void save()} disabled={busy} busy={busy} busyLabel="保存中…">
-            保存
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" onClick={onClose} disabled={busy}>
+              キャンセル
+            </Button>
+            <Button type="button" variant="primary" onClick={() => void save()} disabled={busy} busy={busy} busyLabel="保存中…">
+              保存
+            </Button>
+          </div>
         </div>
       }
     >
       <div className="flex flex-col gap-4">
-        <label className="grid gap-1 text-sm">
-          <span className="font-bold text-ink">名前</span>
-          <input
-            className="rounded-control border border-hairline bg-canvas px-3 py-2 text-ink"
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="hq-account-settings-name" className="text-label font-medium text-ink">名前</label>
+          <TextField
+            id="hq-account-settings-name"
             value={name}
             maxLength={100}
             disabled={busy}
             onChange={(event) => setName(event.target.value)}
+            className="w-full"
           />
-        </label>
-        <label className="grid gap-1 text-sm">
-          <span className="font-bold text-ink">親アカウント</span>
-          <select
-            className="rounded-control border border-hairline bg-canvas px-3 py-2 text-ink"
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="hq-account-settings-parent" className="text-label font-medium text-ink">親アカウント</label>
+          <Select
+            id="hq-account-settings-parent"
+            aria-label="親アカウント"
             value={parent}
             disabled={busy}
-            onChange={(event) => setParent(event.target.value)}
-          >
-            <option value="">変えない</option>
-            <option value="none">なしにする</option>
-            {accounts.filter((item) => item.id !== account.id).map((item) => (
-              <option key={item.id} value={item.id}>{item.name}</option>
-            ))}
-          </select>
-        </label>
-        {allTags && allTags.length > 0 ? (
-          <fieldset className="grid gap-2 text-sm">
-            <legend className="font-bold text-ink">タグの付け外し</legend>
-            <div className="flex flex-wrap gap-2">
-              {allTags.map((tag) => (
-                <Checkbox
+            onChange={setParent}
+            options={[
+              { value: '', label: '変えない' },
+              { value: 'none', label: 'なしにする' },
+              ...accounts.filter((item) => item.id !== account.id).map((item) => ({ value: item.id, label: item.displayName || item.name })),
+            ]}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-label font-medium text-ink">タグ <span className="font-normal text-micro text-ink-faint">複数付けられます</span></span>
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map((tag) => {
+              const selected = selectedTags.includes(tag.id)
+              return (
+                <button
                   key={tag.id}
-                  className="v8-ro-hq-tagcheck"
-                  checked={tagIds.includes(tag.id)}
+                  type="button"
+                  aria-pressed={selected}
                   disabled={busy}
-                  onCheckedChange={() => toggleTag(tag.id)}
+                  onClick={() => toggleTag(tag.id)}
+                  className={
+                    selected
+                      ? 'inline-flex items-center gap-1 rounded-pill bg-ink px-2.5 py-1 text-caption font-semibold text-white disabled:opacity-50'
+                      : 'inline-flex items-center gap-1 rounded-pill border border-hairline bg-white px-2.5 py-1 text-caption text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50'
+                  }
                 >
                   {tag.name}
-                </Checkbox>
-              ))}
+                </button>
+              )
+            })}
+            {!addingTag ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => { setNewTagName(''); setAddingTag(true) }}
+                className="inline-flex items-center gap-1 rounded-pill border border-dashed border-hairline px-2.5 py-1 text-caption text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
+              >
+                <Plus aria-hidden="true" className="h-3.5 w-3.5" />タグを追加
+              </button>
+            ) : null}
+          </div>
+          {addingTag ? (
+            <div className="flex items-center gap-2">
+              <TextField
+                aria-label="新しいタグの名前"
+                value={newTagName}
+                maxLength={100}
+                disabled={busy}
+                placeholder="例: 渋谷エリア"
+                onChange={(event) => setNewTagName(event.target.value)}
+                className="w-full"
+              />
+              <Button type="button" variant="secondary" onClick={() => void createTag()} disabled={!newTagName.trim() || busy}>
+                追加
+              </Button>
             </div>
-          </fieldset>
-        ) : null}
+          ) : null}
+          <p className="text-micro text-ink-faint">タグはアカウント一覧の左の列で絞り込みに使います</p>
+        </div>
         <div className="grid gap-2 text-sm">
           <span className="font-bold text-ink">ほかの設定</span>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="secondary" onClick={onShowDetails}>
-              詳しい数値を見る
+              <TrendingUp aria-hidden="true" className="h-4 w-4" />詳しい数値を見る
             </Button>
             <Button href="/hq/members" variant="secondary">
-              メンバー・担当範囲
+              <Users aria-hidden="true" className="h-4 w-4" />メンバー・担当範囲
             </Button>
           </div>
         </div>

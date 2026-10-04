@@ -6266,6 +6266,9 @@ export type StepUpPurpose =
   | 'webhook.api_token'
   | 'webhook.secret'
 
+/** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。 */
+export type LineAccountTag = { id: string; name: string; color: string | null; displayOrder: number }
+
 export const api = {
   system: {
     health: () =>
@@ -9365,6 +9368,22 @@ export const api = {
       `/api/friends/imports/${id}/execute`, { method: 'POST' },
     ),
     jobs: () => fetchApi<ApiResponse<FriendMigrationJob[]>>('/api/friends/migration-jobs'),
+  },
+  /** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。形は `apps/worker/src/routes/line-account-tags.ts`。 */
+  lineAccountTags: {
+    list: () => fetchApi<ApiResponse<LineAccountTag[]>>('/api/line-account-tags'),
+    create: (name: string) =>
+      fetchApi<ApiResponse<LineAccountTag>>('/api/line-account-tags', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
+    remove: (id: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    replace: (accountId: string, tagIds: string[]) =>
+      fetchApi<ApiResponse<{ id: string; tags: LineAccountTag[] }>>(`/api/line-accounts/${encodeURIComponent(accountId)}/tags`, {
+        method: 'PUT',
+        body: JSON.stringify({ tagIds }),
+      }),
   },
   lineAccounts: {
     list: (live = false) =>

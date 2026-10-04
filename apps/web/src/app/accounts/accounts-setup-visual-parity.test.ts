@@ -33,7 +33,7 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
       'api.lineAccounts.stepFollowerImport',
       'data-design-node="a8qMXX"',
       'data-design-node="oeVQQ"',
-      'data-design-node="YEHCR"',
+      'data-design-node="JYfda"',
       'data-design-node="K1zHyx"',
       "'VPh1U'",
       "'t3Mlu'",
