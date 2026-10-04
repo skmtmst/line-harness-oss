@@ -5887,6 +5887,49 @@ const spec = {
         },
       },
     },
+    '/api/liff/booking/waitlist': {
+      post: {
+        tags: ['Booking'], summary: 'キャンセル待ちを登録（本人）',
+        description: 'LIFF の本人確認で友だちを決め、担当・メニュー・開始時刻で待ち行を作る。同じ枠・同じ人の二重登録は409。',
+        security: [],
+        parameters: [
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['staff_id', 'menu_id', 'starts_at'],
+          properties: {
+            staff_id: { type: 'string' },
+            menu_id: { type: 'string' },
+            starts_at: { type: 'string', description: 'ISO日時' },
+          },
+        } } } },
+        responses: {
+          '201': { description: '作った待ち行のID' },
+          '400': { description: 'JSON不正・枠の不備・過去の時刻' },
+          '401': { description: 'idToken 検証失敗' },
+          '403': { description: '予約できない友だち' },
+          '404': { description: 'Unknown LIFF ID・友だちなし' },
+          '409': { description: '同じ枠・同じ人で待ちずみ' },
+        },
+      },
+    },
+    '/api/liff/booking/waitlist/{id}': {
+      delete: {
+        tags: ['Booking'], summary: 'キャンセル待ちを取り消し（本人）',
+        description: '自分の待ち・招待ずみの行だけ取り消せる。',
+        security: [],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '取り消し成立' },
+          '401': { description: 'idToken 検証失敗' },
+          '403': { description: '予約できない友だち' },
+          '404': { description: 'Unknown LIFF ID・友だち・待ち行なし' },
+        },
+      },
+    },
     // ── Booking channels (V8-B) ──────────────────────────────────────────────
     '/api/booking/admin/channels': {
       get: {
@@ -6395,6 +6438,136 @@ const spec = {
           '404': { description: '予約または台帳行が対象アカウントに存在しない' },
           '409': { description: '成功済み・取消済み・実行中' },
           '422': { description: 'LINE未連携の予約' },
+        },
+      },
+    },
+    // ── Booking waitlist / visit marks (#1347) ────────────────────────────────
+    '/api/booking/admin/last-booking': {
+      get: {
+        tags: ['Booking'], summary: 'お客さまの直近の予約を取得',
+        description: 'friend_id か booking_customer_id のどちらか一方で、その人の最新の有効な予約を返す。メニュー・担当が無効なら理由付きで利用不可。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'friend_id', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'booking_customer_id', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '直近の予約（利用可否つき）。履歴が無ければ available: false' },
+          '400': { description: 'account_id 未指定、または客の指定が両方・どちらもなし' },
+        },
+      },
+    },
+    '/api/booking/admin/waitlist': {
+      post: {
+        tags: ['Booking'], summary: 'キャンセル待ちを登録（管理画面）',
+        description: '担当・メニュー・開始時刻・客（友だちか登録客のどちらか）で待ち行を作る。同じ枠・同じ人の二重登録は409。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['staff_id', 'menu_id', 'starts_at'],
+          properties: {
+            staff_id: { type: 'string' },
+            menu_id: { type: 'string' },
+            starts_at: { type: 'string', description: 'ISO日時' },
+            friend_id: { type: 'string' },
+            booking_customer_id: { type: 'string' },
+          },
+        } } } },
+        responses: {
+          '201': { description: '作った待ち行' },
+          '400': { description: 'account_id 未指定・JSON不正・枠や客の不備・過去の時刻' },
+          '404': { description: '客が存在しない' },
+          '409': { description: '同じ枠・同じ人で待ちずみ' },
+        },
+      },
+      get: {
+        tags: ['Booking'], summary: 'キャンセル待ちの一覧（最大100件）',
+        description: '担当・開始時刻・状態で絞り、開始時刻の古い順に返す。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'staff_id', in: 'query', required: false, schema: { type: 'string' } },
+          { name: 'starts_at', in: 'query', required: false, schema: { type: 'string', description: 'ISO日時（完全一致）' } },
+          { name: 'status', in: 'query', required: false, schema: { type: 'string', enum: ['waiting', 'invited', 'converted', 'cancelled'] } },
+        ],
+        responses: {
+          '200': { description: '待ち行の一覧（メニュー名・担当名・客名つき）' },
+          '400': { description: 'account_id 未指定・日時の形が不正' },
+        },
+      },
+    },
+    '/api/booking/admin/waitlist/{id}': {
+      delete: {
+        tags: ['Booking'], summary: 'キャンセル待ちを取り消し',
+        description: '待ち・招待ずみの行だけ取り消せる。終わった行は409。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '取り消し成立' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '待ち行が対象アカウントに存在しない' },
+          '409': { description: '既に終わっている' },
+        },
+      },
+    },
+    '/api/booking/admin/waitlist/{id}/convert': {
+      post: {
+        tags: ['Booking'], summary: 'キャンセル待ちを予約にひも付け',
+        description: '招待ずみの待ち行と、同じ枠・同じ人の予約を突き合わせて「予約になった」へ進める。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['booking_id'],
+          properties: { booking_id: { type: 'string' } },
+        } } } },
+        responses: {
+          '200': { description: 'ひも付け成立' },
+          '400': { description: 'account_id 未指定・booking_id 未指定' },
+          '404': { description: '待ち行が対象アカウントに存在しない' },
+          '409': { description: '終わっている行・枠や人の不一致' },
+        },
+      },
+    },
+    '/api/booking/admin/today': {
+      get: {
+        tags: ['Booking'], summary: '指定日の予約を時刻順に取得',
+        description: '店の暦日（YYYY-MM-DD、省いたら今日）の予約を200件まで時刻順に返す。1件ずつ最新の来店印をつける。',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'date', in: 'query', required: false, schema: { type: 'string', description: 'YYYY-MM-DD' } },
+          { name: 'status', in: 'query', required: false, schema: { type: 'string', enum: ['requested', 'confirmed', 'completed', 'no_show', 'cancelled'] } },
+          { name: 'staff_id', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '日付と予約の一覧（来店印つき）' },
+          '400': { description: 'account_id 未指定・日付の形が不正' },
+        },
+      },
+    },
+    '/api/booking/admin/bookings/{id}/visit': {
+      post: {
+        tags: ['Booking'], summary: '予約に来店印を付ける',
+        description: '「来店した」→完了、「来なかった」→無断、「遅れる」→状態は変えず遅れ分数だけ残す。だれがいつ付けたか残す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['kind'],
+          properties: {
+            kind: { type: 'string', enum: ['visited', 'late', 'no_show'] },
+            late_minutes: { type: 'integer', minimum: 1, maximum: 1440, description: 'late のとき必須' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '更新後の状態と付けた印' },
+          '400': { description: 'account_id 未指定・印の種類や遅れ分数の不備' },
+          '404': { description: '予約が対象アカウントに存在しない' },
+          '409': { description: '終わっている予約・版競合' },
         },
       },
     },
