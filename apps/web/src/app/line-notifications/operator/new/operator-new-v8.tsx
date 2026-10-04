@@ -1,15 +1,8 @@
 'use client'
 
 /*
- * ★V8-B 運用者へのお知らせを作る（板 `gjUz3`、公開前の確認 `sDXNy`）。
- *
- * v7 の作成画面（`page.tsx` 内の NewOperatorNotificationInner）とは別の部品
- * として持つ。データの口・下書き保存・公開・テスト送信・版の守りは同じ。
- * 違いは置き場と見せ方だけ——左に3枚のカード（どんなときに知らせるか・
- * だれが受け取るか・いつ送るか・重ならないか）、右に届き方の見本・
- * 気をつけること・つながる先、下の帯にキャンセル・下書きを保存・公開。
- * 公開の前には `sDXNy` の確認の窓で宛先と LINE の届く人数を確かめる。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8-B 完成までの二重管理）。
+ * 運用者へのお知らせを作る（板 `gjUz3`、公開前の確認 `sDXNy`）。
+ * V8だけで作る（v7の作成画面は捨てた）。
  */
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -18,7 +11,6 @@ import { ArrowRight, Eye, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
-import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -632,7 +624,7 @@ function NewOperatorNotificationV8Inner() {
           <>
             <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
             <Button onClick={() => void saveDraft()} disabled={saveDisabled} busy={saving} title={canWrite ? undefined : '閲覧のみのため保存できません'}>
-              {savedRuleId ? '保存し直す' : '下書きを保存'}
+              下書きを保存
             </Button>
             <Button
               onClick={() => void openPublishConfirm()}

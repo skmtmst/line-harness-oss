@@ -8,7 +8,7 @@ const OPERATOR_RULES = fs.readFileSync(
   'utf8',
 )
 const OPERATOR_NEW = fs.readFileSync(
-  path.join(__dirname, 'operator/new/page.tsx'),
+  path.join(__dirname, 'operator/new/operator-new-v8.tsx'),
   'utf8',
 )
 const RUN_LIST = fs.readFileSync(
@@ -32,7 +32,8 @@ describe('点検・中: LINE通知の画面契約', () => {
   })
 
   it('中6: 新規作成は保存し直せて、公開前に最新を保存する', () => {
-    expect(OPERATOR_NEW).toContain('保存し直す')
+    // 板 gjUz3：下書きボタンは「下書きを保存」の1つ。
+    expect(OPERATOR_NEW).toContain('下書きを保存')
     // N-342 (#943): 正本APIの下書き口。作り直さず書き換える。
     expect(OPERATOR_NEW).toContain('operatorRules.updateDraft(savedRuleId')
     expect(OPERATOR_NEW).not.toContain('savedRuleId ?? await saveDraft()')
