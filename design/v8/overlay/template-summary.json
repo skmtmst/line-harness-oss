@@ -24,14 +24,14 @@
     "pixelDifferenceOver24": 162175
   },
   "create": {
-    "over4px": 44,
+    "over4px": 2,
     "compared": 181,
     "status": "CONTINUE",
     "unmatchedRegions": [
       "段がありません: create/footer/下の追従帯"
     ],
     "maxEdgeDelta": 344,
-    "pixelDifferenceOver24": 41558
+    "pixelDifferenceOver24": 36073
   },
   "detail": {
     "over4px": 0,
