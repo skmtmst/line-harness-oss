@@ -52,9 +52,22 @@ describe('08-C-狭1 / 10-C-狭1: 狭幅で検索欄を実用幅に保つ', () =>
   ] as const
 
   for (const [path, name] of cases) {
-    it(`${name}の検索帯は折り返し前提で、検索欄は min-w-45 を下限にする`, () => {
+    it(`${name}の検索欄は共通部品を使い、狭い幅でも押し潰さない`, () => {
       const page = read(path)
-      expect(page).toContain('<ListToolbar')
+      if (path === 'webinars/page.tsx') {
+        // V8は画面専用の道具段。SearchFieldとCSSで縮み方を守る。
+        const css = read('webinars/list-v8.module.css')
+        expect(page).toContain('<SearchField')
+        expect(page).toContain('className={styles.searchWrap}')
+        const toolbar = css.match(/\.toolbar\s*\{[^}]*\}/)?.[0]
+        const search = css.match(/\.searchWrap\s*\{[^}]*\}/)?.[0]
+        expect(toolbar).toContain('flex-wrap: wrap;')
+        expect(search).toContain('flex: 0 0 auto;')
+        expect(search).toContain('width: 240px;')
+        expect(search).toContain('max-width: 100%;')
+      } else {
+        expect(page).toContain('<ListToolbar')
+      }
       expect(page).not.toContain('type="search"')
       expect(page).not.toContain('data-search-row')
       expect(page).not.toContain('min-w-0 flex-1 border px-3 py-2 text-sm')
