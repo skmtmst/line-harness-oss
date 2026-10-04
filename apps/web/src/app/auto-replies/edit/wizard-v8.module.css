@@ -31,10 +31,11 @@
   flex-direction: column;
   gap: 4px;
 }
+/* 板の頭の題は `A0pDt` どおり 22px。 */
 .headTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.4;
 }

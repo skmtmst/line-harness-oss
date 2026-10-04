@@ -1095,7 +1095,7 @@ function AutoReplyWizardV8Inner() {
             <span>
               ルール名：<span className={styles.sublineName}>{thisRuleName}</span>
             </span>
-            <span className={styles.sublineBadge}>{statusBadge}として編集中</span>
+            <span className={styles.sublineBadge}>{statusBadge}として作っています</span>
           </>
         )}
       </p>
@@ -1737,6 +1737,7 @@ function AutoReplyWizardV8Inner() {
 
               <section className={styles.card}>
                 <h2 className={styles.cardTitle}>動く順番</h2>
+                <p className={styles.cardNote}>黄色は、このルールと同じ受信に当たるルールです（過去28日の受信で確かめました）。</p>
                 {priorityState === 'error' ? (
                   <p className={styles.hint}>
                     ルールの並びを読み込めませんでした。
