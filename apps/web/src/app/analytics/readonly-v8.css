@@ -84,12 +84,12 @@
 /* ws9wt: HTMLの余白をグラフと右欄に配る。 */
 [data-theme='v8'] .v8-ro-analytics-page { container-type: inline-size; container-name: analytics-board; }
 [data-theme='v8'] .v8-ro-analytics-friendsBody { grid-template-columns: minmax(0, 1fr) 320px; padding: 0; gap: 0; }
-[data-theme='v8'] .v8-ro-analytics-trend { border: 0; border-radius: 0; padding: 24px 28px; }
-[data-theme='v8'] .v8-ro-analytics-friendsAside { padding: 24px; border-left: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
+[data-theme='v8'] .v8-ro-analytics-trend { border: 1px solid var(--color-hairline); border-radius: var(--radius-card); padding: 20px; }
+[data-theme='v8'] .v8-ro-analytics-friendsAside { padding: 0; border: 0; background: transparent; }
 [data-theme='v8'] .v8-ro-analytics-breakdown { padding: 20px; background: var(--color-canvas); }
 @container analytics-board (max-width: 1099px) {
   [data-theme='v8'] .v8-ro-analytics-friendsBody { grid-template-columns: minmax(0, 1fr); }
-  [data-theme='v8'] .v8-ro-analytics-friendsAside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-left: 0; border-top: 1px solid var(--color-hairline); }
+  [data-theme='v8'] .v8-ro-analytics-friendsAside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container analytics-board (max-width: 650px) {
   [data-theme='v8'] .v8-ro-analytics-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
