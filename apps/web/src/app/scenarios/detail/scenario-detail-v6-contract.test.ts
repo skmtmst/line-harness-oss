@@ -7,11 +7,9 @@ const PAGE = fs.readFileSync(
   path.join(__dirname, 'scenario-detail-client.tsx'),
   'utf8',
 )
-const LIST = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
-const LIST_TABLE = fs.readFileSync(
-  path.join(__dirname, '..', '..', '..', 'components', 'scenarios', 'scenario-list.tsx'),
-  'utf8',
-)
+/* 完全切り替え：v7 の一覧 page.tsx・scenario-list.tsx は捨て、V8 の list-v8.tsx を見る。 */
+const LIST = fs.readFileSync(path.join(__dirname, '..', 'list-v8.tsx'), 'utf8')
+const LIST_TABLE = fs.readFileSync(path.join(__dirname, '..', 'list-v8.tsx'), 'utf8')
 const DIALOGS = fs.readFileSync(
   path.join(__dirname, '..', '..', '..', 'components', 'scenarios', 'scenario-dialogs.tsx'),
   'utf8',
@@ -60,7 +58,7 @@ describe('V6 シナリオ編集の契約', () => {
 
   it('一覧のフォルダ追加を既存の共通ダイアログへ接続する', () => {
     expect(LIST).toContain("import FolderAddDialog from '@/components/shared/folder-add-dialog'")
-    expect(LIST).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
+    expect(LIST).toContain('() => setFolderDialogOpen(true)')
     expect(LIST).toContain('kind="scenario"')
     expect(LIST).not.toContain('title="準備中です"\n          className="border-hairline text-ink-faint rounded-control border px-4')
   })
@@ -69,10 +67,10 @@ describe('V6 シナリオ編集の契約', () => {
     expect(LIST).not.toContain("import Header from '@/components/layout/header'")
     expect(LIST).not.toContain('<Header')
     expect(LIST).not.toContain('配信のタイミングを指定して複数のメッセージを順に送ります。')
-    expect(LIST).toContain('作成しただけでは配信されません。開始条件を設定すると配信が始まります。')
-    expect(LIST).toContain('配信を始める方法')
-    expect(LIST.indexOf('作成しただけでは配信されません。')).toBeLessThan(
-      LIST.indexOf('<ListKpis'),
+    expect(LIST).toContain('作っただけでは送れません')
+    expect(LIST).toContain('配信を始める方法・3手順')
+    expect(LIST.indexOf('作っただけでは送れません')).toBeLessThan(
+      LIST.indexOf('data-design="KPIs"'),
     )
   })
 
@@ -83,18 +81,18 @@ describe('V6 シナリオ編集の契約', () => {
       移動先を選ぶ窓の select は `v6-select` のまま。
     */
     expect(LIST).toContain("api.scenarios.update(id, { folderId: folderId || null })")
-    expect(LIST).toContain('onMoveFolders={handleMoveFolders}')
+    expect(LIST).toContain('フォルダへ移す')
     expect(LIST_TABLE).toContain('フォルダ')
     // 移動先の選び欄は共通 Select（素の select・v6-select は置かない）。
     expect(LIST_TABLE).toContain('<Select')
     expect(LIST_TABLE).toContain('aria-label="移動先のフォルダ"')
-    expect(LIST_TABLE).toContain("label: 'フォルダを移動'")
-    expect(LIST_TABLE).toContain('onMoveFolders(moveIds, moveDraft)')
+    expect(LIST_TABLE).toContain('フォルダへ移す')
+    expect(LIST_TABLE).toContain('handleMoveFolders(moveIds, moveDraft)')
   })
 
   it('「今月作成」は日本時間の月初を共通一覧APIへ渡して絞り込む', () => {
     expect(LIST).toContain("timeZone: 'Asia/Tokyo'")
-    expect(LIST).toContain('active: createdThisMonthOnly')
+    expect(LIST).toContain('active: stoppedOnly ? 0 : undefined')
     // m13i: 札は共通 FilterChip になった（選択表示は部品が持つ）。絞りの動きは同じ。
     expect(LIST).toContain('今月作成')
     expect(LIST).toContain('createdFrom: createdThisMonthOnly ? currentMonthStart() : undefined')

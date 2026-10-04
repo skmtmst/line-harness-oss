@@ -212,7 +212,6 @@ shared-button-importer app/reminders/list-v8.tsx
 shared-button-importer app/reminders/basics-form-v8.tsx
 shared-button-importer app/reminders/edit/edit-v8.tsx
 shared-button-importer app/reminders/new/page.tsx
-shared-button-importer app/reminders/page.tsx
 shared-button-importer app/reminders/wizard-v8-ui.tsx
 shared-button-importer app/restaurant-test/google/google-business.tsx
 shared-button-importer app/restaurant-test/google/google-posts.tsx
@@ -247,7 +246,6 @@ shared-button-importer app/scenarios/list-v8.tsx
 shared-button-importer app/scenarios/first-step/page.tsx
 shared-button-importer app/scenarios/mode-v8.tsx
 shared-button-importer app/scenarios/mode/page.tsx
-shared-button-importer app/scenarios/page.tsx
 shared-button-importer app/scenarios/results/page.tsx
 shared-button-importer app/scenarios/results/results-v8.tsx
 shared-button-importer app/search-console/page.tsx
@@ -400,7 +398,6 @@ shared-button-importer components/scenarios/message-kind-fields.tsx
 shared-button-importer components/scenarios/message-type-tabs.tsx
 shared-button-importer components/scenarios/question-editor.tsx
 shared-button-importer components/scenarios/scenario-dialogs.tsx
-shared-button-importer components/scenarios/scenario-list.tsx
 shared-button-importer components/scenarios/trigger-editor.tsx
 shared-button-importer components/session-lost-notice.tsx
 shared-button-importer components/shared/condition-builder.tsx
@@ -432,7 +429,7 @@ button-migration-target app/affiliates/tabs.tsx
 button-migration-target app/analytics/page.tsx
 button-migration-target app/conversions/page.tsx
 button-migration-target app/inflow-links/page.tsx
-button-migration-target app/reminders/page.tsx
+button-migration-target app/reminders/list-v8.tsx
 button-migration-target app/templates/page.tsx
 button-migration-target app/webhooks/webhook-interactions.tsx
 button-migration-target components/friend-fields/tags-page-v4.tsx
@@ -444,7 +441,6 @@ table-header-migration-target app/conversions/page.tsx
 # #984 LAY-12: 重複検出の3表すべてを共通見出しへ。直書き th は残さない。
 table-header-migration-target app/duplicates/page.tsx
 table-header-migration-target app/inflow-links/page.tsx
-table-header-migration-target app/reminders/page.tsx
 table-header-migration-target app/templates/page.tsx
 table-header-migration-target app/webhooks/webhook-interactions.tsx
 # 詳細内テーブルのため、直書きthを残す既知の例外。

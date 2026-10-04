@@ -25,7 +25,8 @@ const GLOBALS = readFileSync(join(HERE, '../../app/globals.css'), 'utf8')
 const GLOBALS_CODE = GLOBALS.replace(/\/\*[\s\S]*?\*\//g, '')
 const FRIENDS_PAGE = readFileSync(join(HERE, '../../app/friends/page.tsx'), 'utf8')
 const FRIENDS_TABLE = readFileSync(join(HERE, '../friends/friend-list-table.tsx'), 'utf8')
-const SCENARIOS_PAGE = readFileSync(join(HERE, '../../app/scenarios/page.tsx'), 'utf8')
+/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+const SCENARIOS_PAGE = readFileSync(join(HERE, '../../app/scenarios/list-v8.tsx'), 'utf8')
 const SERVER_LIST = readFileSync(join(HERE, '../../lib/use-server-list.ts'), 'utf8')
 
 import { DelayedSkeleton, Skeleton } from './skeleton'
@@ -155,7 +156,7 @@ describe('前の表示を残したまま読む（★V7 `sTJsh` §2）', () => {
     // 共有の一覧 hook: 読み直しで items を消さず refreshing を返す。
     expect(SERVER_LIST).toContain('refreshing: state.loading && state.items.length > 0')
     expect(SERVER_LIST).not.toMatch(/items:\s*\[\],\s*loaded:\s*false,\s*loading:\s*true/)
-    // シナリオ一覧も薄め＋線を出す。
-    expect(SCENARIOS_PAGE).toContain('refreshing={scenarioList.refreshing}')
+    // シナリオ一覧も読み直し中は行を残す（骨組みは行が無いときだけ）。
+    expect(SCENARIOS_PAGE).toContain('scenarioList.loading && scenarios.length === 0')
   })
 })

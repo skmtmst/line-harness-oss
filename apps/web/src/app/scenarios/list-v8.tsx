@@ -2,15 +2,12 @@
 
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
- * 一覧 `axFrW`、状態の板は `BxGhV`、複製の窓は `Al4Ek`）。
+ * 一覧 `axFrW`・狭い板 `wjfLe`、状態の板は `BxGhV`、複製の窓は `Al4Ek`）。
  *
- * v7 の一覧（app/scenarios/page.tsx 内の ScenariosPageV7 ＋
- * components/scenarios/scenario-list.tsx）とは別の部品として持つ。
- * データの口は同じ。違いは置き場と見せ方だけ——「シナリオを作る」は
- * 左のフォルダの列の上、行の右端は「…」（複製・配信結果・削除）、
- * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
- * v7 を直す必要が出たら page.tsx / scenario-list.tsx 側も同じ判断を入れる
- * （V8 完成までの二重管理）。
+ * 完全切り替え（2026-10-04 オーナー決定）：V8 だけで出す。v7 は捨てた。
+ * 「シナリオを作る」は左のフォルダの列の上、行の右端は「…」
+ * （複製・配信結果・削除）、行の左の □ を選ぶと表の下にまとめての帯
+ * （止める・再開・フォルダへ移す）。
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
@@ -50,10 +47,12 @@ import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
 import Pagination from '@/components/shared/pagination'
+import PageSizeSelect from '@/components/ui/page-size-select'
 import styles from './list-v8.module.css'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
+const PER_PAGE_OPTIONS = [20, 50, 100]
 
 type ScenarioRow = Scenario & {
   stepCount?: number
@@ -65,18 +64,19 @@ type ScenarioRow = Scenario & {
  * 配信方式。一覧は名前の下の補足行に短く出す（列としては持たない）。
  * relative は 028 以前の作り方で、いまは新しく作れない。
  */
+/* 板 `axFrW` の行の補足に出る送り方の言い方。 */
 const deliveryModeLabels: Record<DeliveryMode, string> = {
-  relative: '経過時間（旧）',
-  elapsed: '経過時間',
-  absolute_time: '時刻',
+  relative: 'Legacy',
+  elapsed: '経過時間で指定',
+  absolute_time: '時刻で指定',
 }
 
-/** 読了の補足行（v7 page.tsx の scenarioCompletionDetail と同じ式）。 */
+/** 読み終えた人の補足行（板 `axFrW`：「登録した 1,756人 の 41%」）。 */
 function scenarioCompletionDetail(active: number, completed: number): string {
   const enrolled = active + completed
   if (enrolled === 0) return '—'
   const rate = Math.round((completed / enrolled) * 100)
-  return `登録合計 ${formatNumber(enrolled)}人のうち ${rate}%`
+  return `登録した ${formatNumber(enrolled)} 人の ${rate}%`
 }
 
 /** 運用画面の基準である日本時間の今月初日（v7 page.tsx と同じ）。 */
@@ -254,6 +254,8 @@ export default function ScenariosListV8() {
     return res.data
   }, [accountLoading, createdThisMonthOnly, folderFilter, selectedAccountId, serverQuery, stoppedOnly])
 
+  /* 板 `axFrW`：右端は「20件表示」。 */
+  const [perPage, setPerPage] = useState(20)
   const scenarioList = useOffsetServerList<ScenarioRow>({
     requestKey: JSON.stringify({
       ready: !accountLoading,
@@ -262,8 +264,10 @@ export default function ScenariosListV8() {
       stoppedOnly,
       createdThisMonthOnly,
       folderFilter,
+      perPage,
     }),
     load: loadScenarioPage,
+    initialLimit: perPage,
   })
   const scenarios = scenarioList.items
   const loadScenarios = scenarioList.retry
@@ -313,8 +317,8 @@ export default function ScenariosListV8() {
   }
 
   /**
-   * フォルダを付け替える（行の「…→フォルダを移動」とまとめての帯、どちらも
-   * ここへ来る）。1件でも失敗があれば例外を投げ、呼び出し元の窓に残す。
+   * フォルダを付け替える（まとめての帯と移動の窓、どちらもここへ来る）。
+   * 1件でも失敗があれば例外を投げ、呼び出し元の窓に残す。
    */
   const handleMoveFolders = async (ids: string[], folderId: string) => {
     setActionError('')
@@ -559,30 +563,32 @@ export default function ScenariosListV8() {
 
   /* ===== KPI の帯（4枚） ===== */
 
+  /* 板 `axFrW`：1つ目の補足は「稼働中 3・停止中 2」。止めた数は合計から出す。 */
+  const scenarioStopped = stats ? Math.max(0, stats.scenarios.total - stats.scenarios.active) : null
   const kpis = [
     {
       title: 'シナリオ',
       icon: ListVideo,
       value: overallTotal,
       unit: '件',
-      detail: `稼働中 ${stats ? stats.scenarios.active : '—'}${sharedScenarioCount > 0 ? `・共通 ${sharedScenarioCount}件を含む` : ''}`,
+      detail: `稼働中 ${stats ? stats.scenarios.active : '—'}・停止中 ${scenarioStopped ?? '—'}`,
     },
     {
       title: '購読中',
       icon: Users,
       value: statsFailed ? null : stats?.scenarios.subscribers ?? null,
       unit: '人',
-      detail: '現在稼働中・重複を含む',
+      detail: 'いま途中にいる人（重複を含む）',
     },
     {
-      title: '読了済',
+      title: '読み終えた人',
       icon: UserCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
       detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : '—',
     },
     {
-      title: '今週の配信',
+      title: '今週送った数',
       icon: Send,
       value: statsFailed ? null : stats?.scenarios.sentThisWeek ?? null,
       unit: '通',
@@ -693,8 +699,8 @@ export default function ScenariosListV8() {
                   </th>
                 )}
                 <th aria-label="並び替え" />
-                <th>シナリオ名</th>
-                <th>購読 / 読了</th>
+                <th>シナリオ</th>
+                <th>購読中・読み終えた</th>
                 <th>状態</th>
                 <th aria-label="操作" />
               </tr>
@@ -771,19 +777,16 @@ export default function ScenariosListV8() {
                         )}
                       </div>
                       <p className={styles.cellSub} title={meta}>{meta}</p>
-                      {s.description && (
-                        <p className={styles.cellSub} title={s.description}>{s.description}</p>
-                      )}
                     </td>
                     <td
                       className={styles.countCell}
-                      title={`購読 ${s.subscriberCount === undefined ? '—' : formatNumber(s.subscriberCount)}人 ／ 読了 ${formatNumber(s.completedCount ?? 0)}人`}
+                      title={`購読中 ${s.subscriberCount === undefined ? '—' : formatNumber(s.subscriberCount)}人 ／ 読み終えた ${formatNumber(s.completedCount ?? 0)}人`}
                     >
                       <div className={styles.countMain}>
                         {s.subscriberCount === undefined ? '—' : formatNumber(s.subscriberCount)}
                         <span className={styles.countSub} style={{ display: 'inline', marginTop: 0, marginLeft: 2 }}>人</span>
                       </div>
-                      <div className={styles.countSub}>読了 {formatNumber(s.completedCount ?? 0)}人</div>
+                      <div className={styles.countSub}>読み終えた {formatNumber(s.completedCount ?? 0)}人</div>
                     </td>
                     <td>
                       <span className={`${styles.statePill} ${s.isActive ? styles.statePillActive : styles.statePillStopped}`}>
@@ -856,6 +859,11 @@ export default function ScenariosListV8() {
           </div>
         ) : null}
 
+        {/* 板 `axFrW` の表の下の使い方の文。 */}
+        <p className={styles.folderNote}>
+          左の□で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除
+        </p>
+
         {scenarioList.pageCount > 1 ? (
           <div className={styles.pagerRow}>
             <span className={styles.pagerCount}>
@@ -868,30 +876,23 @@ export default function ScenariosListV8() {
     )
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node="axFrW">
       <div data-design="Head">
         <div className={styles.head}>
           <div className={styles.headText}>
             <h2 className={styles.headTitle}>シナリオ配信</h2>
             <p className={styles.headDescription}>
-              条件に合った友だちへ、順番に届く配信をここで管理します。
+              きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。
             </p>
           </div>
         </div>
       </div>
 
-      {/* 一覧の上の案内の帯（作っただけでは配信されない＋始め方の3手順）。 */}
-      <details className={styles.noteBand}>
-        <summary>
-          作成しただけでは配信されません。開始条件を設定すると配信が始まります。
-          <span className={styles.toolbarLabel}>（配信を始める方法・3手順）</span>
-        </summary>
-        <ol>
-          <li>一覧からシナリオを開き、「開始のきっかけ」（友だち追加時・タグが付いたときなど）を設定します。</li>
-          <li>詳細画面の「テスト送信」で、実際の届き方を確認します。</li>
-          <li>この一覧に戻り、行を選んで「再開」から配信を開始します。</li>
-        </ol>
-      </details>
+      {/* 一覧の上の案内の帯（板 `axFrW`：作っただけでは送れない＋始め方への口）。 */}
+      <p className={styles.noteBand}>
+        <span aria-hidden="true">💡</span>
+        作っただけでは送れません。「開始のきっかけ」を決めて、テストを送ってから配信を始めます（配信を始める方法・3手順）。
+      </p>
 
       {/* 数の帯 4つ。 */}
       <div data-design="KPIs" className={styles.kpis}>
@@ -1098,13 +1099,14 @@ export default function ScenariosListV8() {
                 onClear={() => setNameQuery('')}
               />
             </div>
-            <span className={styles.toolbarLabel}>よく使う絞り込み</span>
             <FilterChip selected={stoppedOnly} onChange={(next) => setStoppedOnly(next)}>
               停止中のみ
             </FilterChip>
             <FilterChip selected={createdThisMonthOnly} onChange={() => setCreatedThisMonthOnly((current) => !current)}>
               今月作成
             </FilterChip>
+            <span className={styles.toolbarSpacer} />
+            <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} label={null} />
           </div>
 
           {(serverQuery || stoppedOnly || createdThisMonthOnly || folderFilter) && scenarioList.loaded && (
