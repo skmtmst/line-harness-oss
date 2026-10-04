@@ -6,6 +6,8 @@ import { useSearchParams } from 'next/navigation'
 import AutomationDraftEditor from '@/components/automations/automation-draft-editor'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import AutomationDraftV8 from './draft-v8'
 
 /*
   見本から作った下書きの編集面。
@@ -26,6 +28,13 @@ function AutomationDraftPageInner() {
    * 古い入力・版・保存先がBへ混ざらない。
    */
   const draftId = useSearchParams().get('id')
+  const theme = useAdminTheme()
+
+  /*
+   * ★V8 切替（`J1VA8`）。v8 のときだけ V8 の枝へ。
+   * v7 の見た目は1画素も変えない。
+   */
+  if (theme === 'v8' && draftId) return <AutomationDraftV8 key={draftId} draftId={draftId} />
 
   if (!draftId) {
     return (

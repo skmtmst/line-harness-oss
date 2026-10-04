@@ -84,8 +84,17 @@
     "direct-th": 7,
     "unresolved-classname": 71
   },
+  "app/automations/drafts/draft-v8.tsx": {
+    "unresolved-classname": 35
+  },
+  "app/automations/list-v8.tsx": {
+    "unresolved-classname": 24
+  },
   "app/automations/new/page.tsx": {
     "unresolved-classname": 55
+  },
+  "app/automations/templates-v8.tsx": {
+    "unresolved-classname": 14
   },
   "app/automations/page.tsx": {
     "arbitrary-value": 1
