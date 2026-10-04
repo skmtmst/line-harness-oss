@@ -7,9 +7,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import FilterChip from '@/components/shared/filter-chip'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import type { AccountWithStats } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, ApiError } from '@/lib/api'
 import {
   SHAPE_FILTERS,
@@ -50,7 +52,10 @@ export default function LibrarySection({
   /** 板の左列（操作＋見る）に置く中身を、親へ渡す。 */
   onChrome?: (chrome: BannerChrome) => void
 }) {
-  const [pageSize, setPageSize] = useState(10)
+  // v7 の取得は30枚を保つ。件数選択は V8 だけ（v7 を変えない）。
+  const theme = useAdminTheme()
+  const [v8PageSize, setV8PageSize] = useState(10)
+  const pageSize = theme === 'v8' ? v8PageSize : PAGE_SIZE
   const [uploadOpen, setUploadOpen] = useState(false)
   const router = useRouter()
   const [images, setImages] = useState<BannerImage[]>([])
@@ -238,7 +243,23 @@ export default function LibrarySection({
             </span>
           ) : null}
         </div>
-        <div className="flex items-center justify-between gap-3 px-4 pb-4"><p className="text-micro text-ink-faint">検索と用途・渡し済みの条件は、読み込んだ画像に適用します。</p><Select aria-label="画像の取得件数" value={String(pageSize)} size="page-size" onChange={value => setPageSize(Number(value))} options={[10,20,50].map(value => ({value:String(value),label:`${value}枚`}))} /></div>
+        {theme === 'v8' && (
+          <div className="flex flex-wrap items-center justify-end gap-3 px-4 pb-4">
+            <span className="inline-flex items-center gap-1 whitespace-nowrap text-caption text-ink-secondary">
+              取得件数
+              <HelpTip label="画像の取得件数の説明">
+                一度に読み込む画像の枚数です。検索と用途・渡し済みの条件は、読み込んだ画像に適用します。
+              </HelpTip>
+            </span>
+            <Select
+              aria-label="画像の取得件数"
+              value={String(v8PageSize)}
+              size="page-size"
+              onChange={(value) => setV8PageSize(Number(value))}
+              options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}枚` }))}
+            />
+          </div>
+        )}
         <div className="border-t border-hairline" />
 
         {actionError ? <p className="px-4 pt-4 text-label text-danger" role="alert">{actionError}</p> : null}
