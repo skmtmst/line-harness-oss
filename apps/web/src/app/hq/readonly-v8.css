@@ -54,7 +54,7 @@
 /* 板 `JKjsE`：数のタイルは角丸の4枚のカード（この画面だけ。ほかの統括画面の帯は変えない）。 */
 [data-theme='v8'] .v8-ro-hq-page .v8-ro-hq-tiles[data-ro-kpis] { margin-inline: 0; border-block: 0; }
 [data-theme='v8'] .v8-ro-hq-page .v8-ro-hq-tiles[data-ro-kpis] > [data-kpi-collapse] > .grid { gap: 16px; }
-[data-theme='v8'] .v8-ro-hq-page .v8-ro-hq-tiles[data-ro-kpis] [data-design-version] { background: var(--color-canvas); border: 1px solid var(--color-hairline); border-radius: 12px; box-shadow: 0 1px 2px rgb(29 29 31 / 0.04); padding: 16px 20px; min-height: 0; }
+[data-theme='v8'] .v8-ro-hq-page .v8-ro-hq-tiles[data-ro-kpis] [data-design-version] { background: var(--color-canvas); border: 1px solid var(--color-hairline); border-radius: var(--radius-card); box-shadow: var(--shadow-board); padding: 16px 20px; min-height: 0; }
 [data-theme='v8'] .v8-ro-hq-page .v8-ro-hq-tiles[data-ro-kpis] > [data-kpi-collapse] > .grid > div:not(:last-child) { border-right: 0; }
 
 /* 板 `JKjsE`：左のタグのフォルダ。 */
@@ -80,20 +80,20 @@
 [data-theme='v8'] .v8-ro-hq-pill[aria-pressed='true'] .v8-ro-hq-pill-count { color: inherit; opacity: 0.75; }
 [data-theme='v8'] .v8-ro-hq-viewbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 [data-theme='v8'] .v8-ro-hq-viewswitch { display: inline-flex; padding: 2px; gap: 2px; border-radius: var(--radius-control); background: var(--color-shell-gray); }
-[data-theme='v8'] .v8-ro-hq-viewswitch button { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 6px; color: var(--color-ink-secondary); }
-[data-theme='v8'] .v8-ro-hq-viewswitch button[aria-pressed='true'] { background: var(--color-canvas); color: var(--color-ink); box-shadow: 0 1px 2px rgb(29 29 31 / 0.08); }
+[data-theme='v8'] .v8-ro-hq-viewswitch button { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-mini); color: var(--color-ink-secondary); }
+[data-theme='v8'] .v8-ro-hq-viewswitch button[aria-pressed='true'] { background: var(--color-canvas); color: var(--color-ink); box-shadow: var(--shadow-nav-active); }
 
 /* 板 `JKjsE`：アカウントのカード。 */
 [data-theme='v8'] .v8-ro-hq-card { background: var(--color-canvas); }
 [data-theme='v8'] .v8-ro-hq-card[data-warn='true'] { border-color: var(--color-status-warn); }
 [data-theme='v8'] .v8-ro-hq-cardhead { display: flex; align-items: flex-start; gap: 10px; }
-[data-theme='v8'] .v8-ro-hq-face { width: 40px; height: 40px; flex-shrink: 0; border-radius: 10px; object-fit: cover; }
-[data-theme='v8'] .v8-ro-hq-face-fallback { display: grid; place-items: center; background: var(--color-accent-deep); color: #fff; font-size: 18px; font-weight: 600; }
+[data-theme='v8'] .v8-ro-hq-face { width: 40px; height: 40px; flex-shrink: 0; border-radius: var(--radius-control); object-fit: cover; }
+[data-theme='v8'] .v8-ro-hq-face-fallback { display: grid; place-items: center; background: var(--color-accent-deep); color: var(--color-canvas); font-size: 18px; font-weight: 600; }
 [data-theme='v8'] .v8-ro-hq-cardtitle { min-width: 0; flex: 1; }
 [data-theme='v8'] .v8-ro-hq-cardtitle p { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14px; font-weight: 600; }
 [data-theme='v8'] .v8-ro-hq-cardtitle small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--color-ink-faint); margin-top: 2px; }
 [data-theme='v8'] .v8-ro-hq-cardtags { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
-[data-theme='v8'] .v8-ro-hq-cardtags li { font-size: 12px; padding: 2px 8px; border: 1px solid var(--color-hairline); border-radius: 6px; background: var(--color-canvas); color: var(--color-ink-secondary); }
+[data-theme='v8'] .v8-ro-hq-cardtags li { font-size: 12px; padding: 2px 8px; border: 1px solid var(--color-hairline); border-radius: var(--radius-mini); background: var(--color-canvas); color: var(--color-ink-secondary); }
 [data-theme='v8'] .v8-ro-hq-cardstats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
 [data-theme='v8'] .v8-ro-hq-cardstats dt { font-size: 12px; color: var(--color-ink-faint); }
 [data-theme='v8'] .v8-ro-hq-cardstats dd { margin: 2px 0 0; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -104,7 +104,7 @@
 [data-theme='v8'] .v8-ro-hq-rangenote { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--color-ink-faint); margin: 0; flex: 1 1 280px; }
 
 /* タグの窓・設定の付け外し。 */
-[data-theme='v8'] .v8-ro-hq-swatch { width: 28px; height: 28px; border-radius: 9999px; border: 1px solid var(--color-hairline); }
+[data-theme='v8'] .v8-ro-hq-swatch { width: 28px; height: 28px; border-radius: var(--radius-pill); border: 1px solid var(--color-hairline); }
 [data-theme='v8'] .v8-ro-hq-swatch[data-empty='true'] { background: transparent; border-style: dashed; }
 [data-theme='v8'] .v8-ro-hq-swatch[aria-pressed='true'] { outline: 2px solid var(--color-action); outline-offset: 2px; }
 [data-theme='v8'] .v8-ro-hq-taglist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -112,4 +112,4 @@
 [data-theme='v8'] .v8-ro-hq-tagname { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 [data-theme='v8'] .v8-ro-hq-taglist button { font-size: 12px; color: var(--color-action); white-space: nowrap; }
 [data-theme='v8'] .v8-ro-hq-tagconfirm { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-ink-secondary); }
-[data-theme='v8'] .v8-ro-hq-tagcheck { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 10px; border: 1px solid var(--color-hairline); border-radius: 6px; cursor: pointer; }
+[data-theme='v8'] .v8-ro-hq-tagcheck { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 10px; border: 1px solid var(--color-hairline); border-radius: var(--radius-mini); cursor: pointer; }

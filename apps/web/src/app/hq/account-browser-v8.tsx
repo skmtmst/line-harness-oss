@@ -97,13 +97,13 @@ function AccountFace({ account }: { account: HqBrowserAccount }) {
   )
 }
 
-/* タグの色の見本。タグ自体の色はデータ（DBの color）で、ここは選ぶ色だけ。 */
+/* 色の見本は共通トークン。保存時だけ実際の色に解決してAPIへ渡す。 */
 const tagColorChoices = [
-  { value: '#2563eb', label: '青' },
-  { value: '#16a34a', label: '緑' },
-  { value: '#ea580c', label: '橙' },
-  { value: '#dc2626', label: '赤' },
-  { value: '#9333ea', label: '紫' },
+  { value: '--color-status-info', label: '青' },
+  { value: '--color-avatar-green', label: '緑' },
+  { value: '--color-status-warn-deep', label: '橙' },
+  { value: '--color-status-danger', label: '赤' },
+  { value: '--color-chip-alt', label: '紫' },
   { value: '', label: 'なし' },
 ]
 
@@ -126,9 +126,13 @@ function TagDialog({ tags, onClose, onChanged }: {
     setBusy(true)
     setError('')
     try {
+      const resolvedColor = color ? getComputedStyle(document.documentElement).getPropertyValue(color).trim() : null
+      if (color && !/^#[0-9a-f]{6}$/i.test(resolvedColor ?? '')) {
+        throw new Error('タグの色を読み取れませんでした。')
+      }
       const res = await fetchApi<ApiResponse<{ id: string }>>('/api/line-account-tags', {
         method: 'POST',
-        body: JSON.stringify({ name: name.trim(), color: color || null }),
+        body: JSON.stringify({ name: name.trim(), color: resolvedColor }),
       })
       if (!res.success) {
         setError(res.error)
@@ -199,7 +203,7 @@ function TagDialog({ tags, onClose, onChanged }: {
                 disabled={busy}
                 onClick={() => setColor(choice.value)}
                 className="v8-ro-hq-swatch"
-                style={choice.value ? { backgroundColor: choice.value } : undefined}
+                style={choice.value ? { backgroundColor: `var(${choice.value})` } : undefined}
                 data-empty={choice.value ? undefined : 'true'}
               />
             ))}

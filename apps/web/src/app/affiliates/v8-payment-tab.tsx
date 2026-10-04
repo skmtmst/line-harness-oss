@@ -24,6 +24,7 @@ import {
 } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import StatusBadge from '@/components/shared/status-badge'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -352,10 +353,9 @@ export default function PaymentTabV8({
         <div className={styles.closeRow}>
           <div className={styles.closeCell}>
             <span className={styles.closeTitle}>今回の締め</span>
-            <span className={`${styles.statusBadge} ${closed ? styles.statusOk : styles.statusWarn}`}>
-              <span className={styles.statusDot} aria-hidden="true" />
+            <StatusBadge tone={closed ? 'success' : 'warning'}>
               {closed ? '締め済み' : 'まだ締めていません'}
-            </span>
+            </StatusBadge>
           </div>
           <div className={styles.closeCell}>
             <span className={styles.closeLabel}>期間</span>

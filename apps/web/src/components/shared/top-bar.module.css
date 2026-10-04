@@ -568,7 +568,7 @@
 [data-theme='v8'] .identityText .role,
 [data-theme='v8'] .identityText .roleButton {
   height: auto;
-  border-radius: 0;
+  border-radius: var(--radius-none);
   background: none;
   color: var(--color-ink-faint);
   font-size: var(--text-nano);

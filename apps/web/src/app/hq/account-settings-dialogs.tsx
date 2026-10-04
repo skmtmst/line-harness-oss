@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { api, fetchApi } from '@/lib/api'
 import type { ApiResponse } from '@line-crm/shared'
 import type { AccountWithStats } from '@/contexts/account-context'
@@ -211,15 +212,15 @@ export function AccountSettingsDialog({ account, accounts, archived, accountTags
             <legend className="font-bold text-ink">タグの付け外し</legend>
             <div className="flex flex-wrap gap-2">
               {allTags.map((tag) => (
-                <label key={tag.id} className="v8-ro-hq-tagcheck">
-                  <input
-                    type="checkbox"
-                    checked={tagIds.includes(tag.id)}
-                    disabled={busy}
-                    onChange={() => toggleTag(tag.id)}
-                  />
+                <Checkbox
+                  key={tag.id}
+                  className="v8-ro-hq-tagcheck"
+                  checked={tagIds.includes(tag.id)}
+                  disabled={busy}
+                  onCheckedChange={() => toggleTag(tag.id)}
+                >
                   {tag.name}
-                </label>
+                </Checkbox>
               ))}
             </div>
           </fieldset>

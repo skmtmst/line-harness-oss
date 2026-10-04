@@ -1,11 +1,15 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import type { HqBrowserAccount } from './account-browser-v8'
 import AccountBrowser from './account-browser-v8'
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+  document.documentElement.style.removeProperty('--color-status-info')
+})
 const tagA = { id: 't1', name: '渋谷エリア', color: '#2563eb' }
 const tagB = { id: 't2', name: 'イベント', color: '#16a34a' }
 const base = (part: Partial<HqBrowserAccount> & { id: string; name: string }): HqBrowserAccount => ({
@@ -36,6 +40,29 @@ const props = (over: Partial<Parameters<typeof AccountBrowser>[0]> = {}) => ({
   ...over,
 })
 describe('V8 統括のアカウント（板 JKjsE）', () => {
+  it.each([
+    { choice: '青', expected: '#175cd3' },
+    { choice: 'なし', expected: null },
+  ])('タグの色「$choice」をAPIで保存できる値にする', async ({ choice, expected }) => {
+    document.documentElement.style.setProperty('--color-status-info', '#175cd3')
+    const fetch = vi.fn(async (_url: string, init?: RequestInit) => new Response(
+      JSON.stringify({ success: true, data: init?.method === 'POST' ? { id: 'new' } : [] }),
+      { headers: { 'Content-Type': 'application/json' } },
+    ))
+    vi.stubGlobal('fetch', fetch)
+    render(<AccountBrowser {...props()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'タグを追加' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'タグを追加' }))
+    fireEvent.change(dialog.getByRole('textbox', { name: '名前' }), { target: { value: '新しいタグ' } })
+    fireEvent.click(dialog.getByRole('button', { name: `色：${choice}` }))
+    fireEvent.click(dialog.getByRole('button', { name: '追加' }))
+    await waitFor(() => {
+      const post = fetch.mock.calls.find(([, init]) => init?.method === 'POST')
+      expect(post).toBeTruthy()
+      expect(JSON.parse(post![1]!.body as string)).toEqual({ name: '新しいタグ', color: expected })
+    })
+  })
+
   it('状態の札に数を出し、要確認だけに絞れる', () => {
     render(<AccountBrowser {...props()} />)
     const pills = within(screen.getByRole('group', { name: '状態で絞り込み' }))

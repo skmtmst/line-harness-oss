@@ -675,7 +675,7 @@ export default function Sidebar({
           */}
           <div className={`v8-only px-3 pb-3 pt-4 ${styles.collapseHide}`}>
             <div className="flex items-center gap-3 px-1">
-              <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-accent-deep text-lg font-bold text-white">
+              <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-accent-deep text-lg font-bold text-canvas">
                 {(tenantName ?? '統').slice(0, 1)}
               </span>
               <span className="min-w-0">
