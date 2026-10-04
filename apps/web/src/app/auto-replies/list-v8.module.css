@@ -182,6 +182,7 @@
   min-width: 160px;
 }
 
+/* 見るだけの人への帯（`Q5lOCc`）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
 /* 操作の失敗の帯。 */
 .errorBand {
   display: flex;

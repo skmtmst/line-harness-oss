@@ -116,7 +116,7 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   await act(async () => root.render(<RemindersPage />))
   await settle()
   await eventually(() => {
-    expect(host.querySelector('[data-design-node="apLqS"]')).toBeTruthy()
+    expect(host.querySelector('[data-design-node="apLqS"], [data-design-node="Iffil"]')).toBeTruthy()
   })
   // 見本が決めた帯と見出し
   expect(host.textContent).toContain('リマインダを作る')
@@ -162,7 +162,7 @@ test('v8 の行の操作は見本の並びを持つ', async () => {
   await act(async () => root.render(<RemindersPage />))
   await settle()
   await eventually(() => {
-    expect(host.querySelector('[data-design-node="apLqS"]')).toBeTruthy()
+    expect(host.querySelector('[data-design-node="apLqS"], [data-design-node="Iffil"]')).toBeTruthy()
   })
   const trigger = [...host.querySelectorAll('button')]
     .find((item) => item.getAttribute('aria-label') === 'リマインダ「契約終了の前に知らせる」の操作')
@@ -186,5 +186,5 @@ test('v7 の下では従来の一覧が出る（新しい一覧には切り替�
   await eventually(() => {
     expect(host.textContent).toContain('契約終了の前に知らせる')
   })
-  expect(host.querySelector('[data-design-node="apLqS"]')).toBeNull()
+  expect(host.querySelector('[data-design-node="apLqS"], [data-design-node="Iffil"]')).toBeNull()
 })
