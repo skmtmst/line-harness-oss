@@ -31,6 +31,7 @@ import type {
   Tag,
   TrafficPool,
 } from '@line-crm/shared'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatNumber } from '@/lib/format'
 
 /** 選んだ流入元の人数、成果、友だち、追加時の動きをまとめて表示する。 */
@@ -55,6 +56,7 @@ interface AttributedFriend {
 }
 
 function InflowLinkDetailPageContent() {
+  const theme = useAdminTheme()
   const router = useRouter()
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
@@ -301,17 +303,20 @@ function InflowLinkDetailPageContent() {
     if (Number.isNaN(d.getTime())) return null
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   }
-  const nowDate = new Date()
-  const thisMonthKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}`
-  const lastMonthDate = new Date(nowDate.getFullYear(), nowDate.getMonth() - 1, 1)
-  const lastMonthKey = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`
+  const nowDate = new Date(Date.now() + 9 * 60 * 60_000)
+  const thisMonthKey = nowDate.toISOString().slice(0, 7)
+  const lastMonthDate = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth() - 1, 1))
+  const lastMonthKey = lastMonthDate.toISOString().slice(0, 7)
   const isBlockedFriend = (friend: AttributedFriend) => (friend.currentStatus ?? '').includes('ブロック')
   const monthFriends = friends.filter((friend) => monthKeyOf(friend.trackedAt) === thisMonthKey)
   const lastMonthFriends = friends.filter((friend) => monthKeyOf(friend.trackedAt) === lastMonthKey)
   const blockedFriends = friends.filter(isBlockedFriend)
   const convertedFriends = friends.filter((friend) => !!friend.conversion)
-  const blockRate = funnel && funnel.friend_add_count > 0
-    ? Math.round((blockedFriends.length / funnel.friend_add_count) * 100)
+  const monthTotal = funnel?.monthly?.find((m) => m.month === thisMonthKey)?.friendAddCount ?? (funnel?.monthly ? 0 : null)
+  const previousMonthTotal = funnel?.monthly?.find((m) => m.month === lastMonthKey)?.friendAddCount ?? (funnel?.monthly ? 0 : null)
+  const monthDelta = monthTotal != null && previousMonthTotal != null ? monthTotal - previousMonthTotal : null
+  const blockRate = funnel && funnel.friend_add_count > 0 && funnel.blockedCount != null
+    ? Math.round((funnel.blockedCount / funnel.friend_add_count) * 100)
     : null
 
   const accountName = route?.lineAccountId
@@ -471,11 +476,11 @@ function InflowLinkDetailPageContent() {
           <div className={styles.tile}>
             <div className={styles.tileTitle}>今月友だちになった</div>
             <div className={styles.tileValue}>
-              {formatNumber(monthFriends.length)}
+              {monthTotal == null ? '—' : formatNumber(monthTotal)}
               <span className={styles.tileUnit}>人</span>
             </div>
             <div className={styles.tileSub}>
-              先月より {monthFriends.length - lastMonthFriends.length >= 0 ? '+' : ''}{formatNumber(monthFriends.length - lastMonthFriends.length)}
+              先月より {monthDelta == null ? '—' : `${monthDelta >= 0 ? '+' : ''}${formatNumber(monthDelta)}`}
             </div>
           </div>
           <div className={styles.tile}>
@@ -484,12 +489,12 @@ function InflowLinkDetailPageContent() {
               {funnel ? formatNumber(funnel.friend_add_count) : '—'}
               <span className={styles.tileUnit}>人</span>
             </div>
-            <div className={styles.tileSub}>{createdDate}から</div>
+            <div className={styles.tileSub}>{createdDate}から{theme === 'v8' && <>・いま残っている {funnel?.remainingCount == null ? '—' : formatNumber(funnel.remainingCount)}人</>}</div>
           </div>
           <div className={styles.tile}>
             <div className={styles.tileTitle}>ブロック</div>
             <div className={styles.tileValue}>
-              {formatNumber(blockedFriends.length)}
+              {funnel?.blockedCount == null ? '—' : formatNumber(funnel.blockedCount)}
               <span className={styles.tileUnit}>人</span>
             </div>
             <div className={styles.tileSub}>
@@ -502,7 +507,7 @@ function InflowLinkDetailPageContent() {
               {funnel ? formatNumber(funnel.cv_count) : '—'}
               <span className={styles.tileUnit}>件</span>
             </div>
-            <div className={styles.tileSub}>累計</div>
+            <div className={styles.tileSub}>累計{theme === 'v8' && <>・1人あたり {funnel?.valuePerFriend == null ? '—' : yen(Math.round(funnel.valuePerFriend))}</>}</div>
           </div>
         </div>
 
@@ -570,6 +575,19 @@ function InflowLinkDetailPageContent() {
               </div>
             ) : (
               <p className="mt-3 text-xs text-ink-faint">読み込み中…</p>
+            )}
+            {theme === 'v8' && funnel?.monthly && (
+              <section aria-label="月別内訳">
+                <h3 className={styles.ordersTitle}>月別内訳（友だちになった月）</h3>
+                <table className="w-full text-sm">
+                  <thead><TableHeadRow><Th>月</Th><Th>友だち追加</Th><Th>いま残っている</Th><Th>ブロック</Th><Th>成果</Th><Th>金額</Th></TableHeadRow></thead>
+                  <tbody>{funnel.monthly.map((month) => <tr key={month.month}>
+                    <td>{month.month}</td><td>{formatNumber(month.friendAddCount)}人</td>
+                    <td>{formatNumber(month.remainingCount)}人</td><td>{formatNumber(month.blockedCount)}人</td>
+                    <td>{formatNumber(month.conversionCount)}件</td><td>{yen(month.conversionValueSum)}</td>
+                  </tr>)}</tbody>
+                </table>
+              </section>
             )}
             <div className={styles.ordersRow}>
               <h3 className={styles.ordersTitle}>

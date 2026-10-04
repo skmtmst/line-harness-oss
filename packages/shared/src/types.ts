@@ -1266,7 +1266,20 @@ export interface CreateEntryRouteInput {
   lineAccountId?: string | null;
 }
 
+export interface EntryRouteMonth {
+  month: string;
+  friendAddCount: number;
+  remainingCount: number;
+  blockedCount: number;
+  conversionCount: number;
+  conversionValueSum: number;
+}
 export interface EntryRouteFunnel {
+  remainingCount?: number;
+  blockedCount?: number;
+  conversionValueSum?: number;
+  valuePerFriend?: number | null;
+  monthly?: EntryRouteMonth[];
   click_count: number;
   friend_add_count: number;
   form_submission_count: number;

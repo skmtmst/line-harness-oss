@@ -35,6 +35,8 @@ const route: EntryRoute = {
   updatedAt: '2026-09-01T09:00:00.000+09:00',
 }
 
+vi.mock('@/lib/use-admin-theme',()=>({useAdminTheme:()=> 'v8'}))
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: fixture.replace }),
   useSearchParams: () => new URLSearchParams('id=route-1'),
@@ -54,7 +56,7 @@ vi.mock('@/lib/api', () => ({
       get: async () => ({ success: true, data: route }),
       funnel: async () => ({
         success: true,
-        data: { click_count: 0, friend_add_count: 0, form_submission_count: 0, cv_count: 0 },
+        data: { click_count: 200, friend_add_count: 100, form_submission_count: 0, cv_count: 0, remainingCount: 98, blockedCount: 2, valuePerFriend: 1200, monthly:[{month:'2026-10',friendAddCount:100,remainingCount:98,blockedCount:2,conversionCount:2,conversionValueSum:120000}] },
       }),
       update: fixture.update,
     },
@@ -114,3 +116,10 @@ describe('流入経路のURLコピーに失敗したとき（V6R-S3-f）', () =>
     expect(screen.queryByLabelText('流入経路のURL')).toBeNull()
   })
 })
+
+ it('shows server totals and monthly detail even when the friend page is empty',async()=>{
+  render(<InflowLinkDetailPage />); await screen.findByRole('button',{name:'URLをコピー'});
+  expect(await screen.findByText(/いま残っている 98人/)).toBeTruthy();
+  expect(screen.getByRole('region',{name:'月別内訳'}).textContent).toContain('100人');
+  expect(screen.getByText(/1人あたり.*1,200/)).toBeTruthy();
+ });
