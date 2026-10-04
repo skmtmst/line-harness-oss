@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
@@ -182,6 +183,34 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
   const [conflicts, setConflicts] = useState<BookingConflict[]>([])
   const [connectTarget, setConnectTarget] = useState<BookingChannelStaff | null>(null)
   const [conflictOpen, setConflictOpen] = useState(false)
+  const [savingAssign, setSavingAssign] = useState(false)
+  const [assignError, setAssignError] = useState('')
+  const assignBusy = useRef(false)
+  const latestAccountId = useRef(accountId)
+  latestAccountId.current = accountId
+
+  async function saveAutoAssign(next: boolean) {
+    if (!canEdit || assignBusy.current || !data) return
+    assignBusy.current = true
+    setSavingAssign(true)
+    setAssignError('')
+    try {
+      await fetchApi(
+        `/api/booking/admin/channels/settings?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify({ autoAssign: next }) },
+      )
+      if (latestAccountId.current !== accountId) return
+      setData((current) => current ? { ...current, autoAssign: next } : current)
+      notifyToast(next ? '自動割り当てを入れました。' : '自動割り当てを止めました。')
+    } catch (e) {
+      if (latestAccountId.current === accountId) {
+        setAssignError(describeApiFailure(e, '自動割り当てを保存できませんでした。'))
+      }
+    } finally {
+      assignBusy.current = false
+      setSavingAssign(false)
+    }
+  }
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -308,6 +337,19 @@ export default function ChannelsTabV8({ accountId, canEdit }: { accountId: strin
             })}
           </tbody>
         </DataTable>
+      </section>
+
+      <section data-design-node="wJYQb" aria-label="外から予約が入ったとき">
+        <h2 className="text-base font-bold text-ink">外から予約が入ったとき</h2>
+        <fieldset disabled={!canEdit || savingAssign}>
+          <span>指名なしの予約は、その時間に空いているスタッフへ自動で割り当て</span>
+          <Toggle
+            label="指名なしの予約は、その時間に空いているスタッフへ自動で割り当て"
+            checked={data.autoAssign}
+            onChange={(next) => void saveAutoAssign(next)}
+          />
+        </fieldset>
+        {assignError ? <p role="alert" className="text-sm text-ink-secondary">{assignError}</p> : null}
       </section>
 
       {connectTarget ? (
