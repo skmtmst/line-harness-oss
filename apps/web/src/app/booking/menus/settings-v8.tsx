@@ -29,6 +29,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { canEditFeature } from '@/lib/staff-capability'
 import {
   api,
@@ -158,6 +159,8 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
     ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
     : null
 
+  const narrow = useNarrowViewport()
+  const tabNode = narrow && tab === 'menus' ? 'P6EdLW' : narrow && tab === 'hours' ? 'VFxWU' : V8_TAB_NODE[tab]
   const canEditMenus = canEditFeature('/booking/menus')
   const canEditSettings = canEditFeature('booking.settings')
 
@@ -518,7 +521,7 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
         </header>
 
         <div className={styles.body} data-design="Body">
-          <div className={styles.main} data-design-node={tab === 'menus' && !canEditMenus ? 'C9fv7A' : V8_TAB_NODE[tab]}>
+          <div className={styles.main} data-design-node={tab === 'menus' && !canEditMenus ? 'C9fv7A' : tabNode}>
             {!accountId ? (
               <StateCard
                 icon={<AccountIcon />}
