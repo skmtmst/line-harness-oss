@@ -187,8 +187,8 @@ const MESSAGE_TYPE_TABS = [
  */
 const VALIDATION_STEP_LABEL: Record<'basic' | 'audience' | 'message', string> = {
   basic: '基本設定',
-  audience: '対象者',
-  message: 'メッセージ',
+  audience: '配信対象',
+  message: 'メッセージを作成',
 }
 
 export function moveMessageTypeTabFocus(
