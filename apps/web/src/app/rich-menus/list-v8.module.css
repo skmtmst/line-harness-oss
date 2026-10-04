@@ -108,6 +108,43 @@
   align-items: start;
 }
 
+/* パネルが開くときは右に 360px の列を足す（一覧は左に見えたまま）。 */
+.splitWithPanel {
+  grid-template-columns: 200px minmax(0, 1fr) 360px;
+}
+
+/* 詳細パネルの中の段。 */
+.panelActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.panelBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panelLabel {
+  margin: 12px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.panelLabel:first-child {
+  margin-top: 0;
+}
+
+.panelText {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
 .folderCol {
   display: flex;
   flex-direction: column;
