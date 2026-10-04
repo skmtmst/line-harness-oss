@@ -103,7 +103,7 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-test('並び順は固定表示で、LINEとメールを未読が先・新しい順に統合する', async () => {
+test('並び順は固定表示で、LINEとメールを未対応が先・新しい順に統合する', async () => {
   await act(async () => root.render(<ChatsPage />))
 
   await eventually(() => {
