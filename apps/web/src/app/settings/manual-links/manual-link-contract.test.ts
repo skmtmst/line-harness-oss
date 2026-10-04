@@ -2,6 +2,16 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+
+const V8 = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'manual-links-v8.tsx'), 'utf8')
+
+describe('板 cIdA2 開けないの札', () => {
+  it('すべてと開けない（件数つき）の札を出す', () => {
+    expect(V8).toContain('すべて')
+    expect(V8).toContain('開けない')
+    expect(V8).toContain("row.status === 'broken'")
+  })
+})
 import {
   LINK_STATUS_LABEL,
   MISSING_SCREENS_NOTE,

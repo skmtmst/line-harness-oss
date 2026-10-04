@@ -2,7 +2,7 @@
 
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
+import FilterChip from '@/components/shared/filter-chip'
 import {
   LINK_STATUS_LABEL,
   VERIFY_SCHEDULE_NOTE,
@@ -40,7 +40,6 @@ export function ManualLinksV8() {
     startEdit,
     cancelEdit,
     saveEdit,
-    statusFilters,
   } = useManualLinks()
 
   if (status !== 'ready') {
@@ -94,12 +93,16 @@ export function ManualLinksV8() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </span>
-        <Select
-          aria-label="リンクの状態"
-          value={filter}
-          onChange={(value) => setFilter(value as typeof filter)}
-          options={statusFilters.map((f) => ({ value: f.value, label: `状態：${f.label}` }))}
-        />
+        <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>
+          すべて
+        </FilterChip>
+        <FilterChip
+          selected={filter === 'broken'}
+          onChange={(next) => setFilter(next ? 'broken' : 'all')}
+          count={rows.filter((row) => row.status === 'broken').length}
+        >
+          開けない
+        </FilterChip>
         <Button variant="secondary" disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…">
           いま全部を確かめる
         </Button>
