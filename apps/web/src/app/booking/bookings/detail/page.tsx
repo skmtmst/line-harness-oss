@@ -889,7 +889,7 @@ function BookingDetailInner() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-design-node="If9Mh">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <nav className="text-ink-faint text-xs" aria-label="パンくず">
         <Link href="/booking/bookings" className="hover:underline">

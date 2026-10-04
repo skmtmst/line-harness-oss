@@ -1463,7 +1463,7 @@ function DashboardPageInner() {
      * ★V7 仕上げ `z97zZN` §1: 最初に開いたときだけ、段ごとに下から8px・
      * 200ms・40ms ずつずらして出す。`.v7-stagger` は globals.css の共通規定。
      */
-    <div className="v7-stagger flex flex-col gap-4">
+    <div className="v7-stagger flex flex-col gap-4" data-design-node="d8X09">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/* V6 `vUXKb/vwcM6`: 画面名は共通トップバーだけ。本文には操作だけを置く。 */}
       {/*
