@@ -1098,6 +1098,9 @@
   "components/shared/top-bar.tsx": {
     "unresolved-classname": 43
   },
+  "components/shared/virtual-rows.tsx": {
+    "unresolved-classname": 2
+  },
   "components/support/email-thread.tsx": {
     "arbitrary-value": 5
   },

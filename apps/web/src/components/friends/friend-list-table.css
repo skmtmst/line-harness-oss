@@ -22,3 +22,19 @@
     display: none;
   }
 }
+
+/*
+ * ★V8：多い行の描画の省略（M10・2,000行対策）。
+ * 画面の外の行・札は描画を飛ばす（中身のDOMは残るので指・読み上げ・
+ * 選びは崩れない）。行は78pxでそろっているので寸法の推測も78px。
+ * 札は高さがばらばらのため、描いた実績が無ければ220pxと推測する。
+ */
+[data-theme='v8'] [data-friend-row] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 78px;
+}
+
+[data-theme='v8'] [data-friend-card] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 220px;
+}

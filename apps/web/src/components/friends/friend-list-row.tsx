@@ -68,6 +68,7 @@ export default function FriendListRow({
       role="link"
       tabIndex={0}
       aria-label={`${friend.displayName}の詳細を開く`}
+      data-friend-row
       onClick={openDetail}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return
@@ -279,7 +280,7 @@ export function FriendListCard({
   }
 
   return (
-    <div className="border-b border-divider-soft px-3 py-3">
+    <div data-friend-card className="border-b border-divider-soft px-3 py-3">
       <div className="flex items-start gap-3">
         <div className="pt-1" onClick={(event) => event.stopPropagation()}>
           {/* ★V7 共通 チェックボックス（gvjpx）。 */}
