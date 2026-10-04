@@ -69,7 +69,7 @@ describe('Y8SjT2 予約枠・在庫のV8', () => {
   it('行を押すとその時間帯の箱が出て保存が今の口へ届く', async () => {
     render(<InventoryV8 />)
     await screen.findByText('席と枠の配分（卓とつながる）')
-    fireEvent.click(screen.getByRole('button', { name: '17:00' }))
+    fireEvent.click(await screen.findByRole('button', { name: '17:00' }))
     expect(screen.getByText('行を押したときと：17:00の配分だけ直す')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'この時間帯だけ保存' }))
     await waitFor(() => expect(fixture.updateInventory).toHaveBeenCalledWith('account-1', 's1', expect.objectContaining({ otaCapacity: 3 })))
@@ -87,7 +87,7 @@ describe('Y8SjT2 予約枠・在庫のV8', () => {
     })
     render(<InventoryV8 />)
     await screen.findByText('席と枠の配分（卓とつながる）')
-    fireEvent.click(screen.getByRole('button', { name: '閉じる知らせを確認する' }))
+    fireEvent.click(await screen.findByRole('button', { name: '閉じる知らせを確認する' }))
     expect(document.querySelector('[data-design-node="Yyw6i"]')).not.toBeNull()
     fireEvent.click(screen.getByRole('checkbox', { name: 'Hot Pepperを閉じた' }))
     fireEvent.click(screen.getByRole('button', { name: '閉じたものを記録する' }))
