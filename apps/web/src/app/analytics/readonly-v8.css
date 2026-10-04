@@ -104,7 +104,7 @@
 [data-theme='v8'] .v8-ro-analytics-observations ul { display: grid; gap: 8px; margin-top: 12px; font-size: 13px; }
 [data-theme='v8'] #usage-items th:first-child { width: 25%; }
 [data-theme='v8'] #usage-items th:nth-child(5) { width: 24%; }
-[data-theme='v8'] #usage-items th:last-child { width: 16%; }
+[data-theme='v8'] #usage-items th:last-child { width: 170px; }
 [data-theme='v8'] #usage-items td:last-child { overflow: visible; }
 
 [data-theme='v8'] .v8-ro-analytics-search { flex: 1 1 260px; min-width: 200px; }
@@ -127,3 +127,15 @@
 
 [data-theme='v8'] .v8-ro-analytics-funnelControls > details { order: 3; }
 [data-theme='v8'] .v8-ro-analytics-funnelControls > p, [data-theme='v8'] .v8-ro-analytics-funnelControls > div:not([class*='funnel']) { order: 4; }
+
+[data-theme='v8'] .v8-ro-analytics-legend span::before { display: none; }
+[data-theme='v8'] .v8-ro-analytics-trend [aria-label='凡例'] { justify-content: flex-start; }
+
+[data-theme='v8'] .v8-ro-analytics-funnelControls { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+[data-theme='v8'] .v8-ro-analytics-funnelControlActions { grid-column: 2; grid-row: 1; }
+[data-theme='v8'] .v8-ro-analytics-funnelSelectRow { grid-column: 1; grid-row: 1; grid-template-columns: minmax(160px, 1fr) 180px minmax(160px, 1fr); align-items: end; }
+[data-theme='v8'] .v8-ro-analytics-funnelSelectRow > div { margin: 0; }
+[data-theme='v8'] .v8-ro-analytics-funnelControls > details, [data-theme='v8'] .v8-ro-analytics-funnelControls > p, [data-theme='v8'] .v8-ro-analytics-funnelControls > div:not([class*='funnel']) { grid-column: 1 / -1; }
+[data-theme='v8'] .v8-ro-analytics-funnelStep[data-worst] > span:last-child { color: var(--color-warning); }
+@container analytics-board (max-width: 1099px) { [data-theme='v8'] .v8-ro-analytics-funnelControls { grid-template-columns: minmax(0, 1fr); } [data-theme='v8'] .v8-ro-analytics-funnelControlActions { grid-column: 1; grid-row: 2; } }
+@container analytics-board (max-width: 650px) { [data-theme='v8'] .v8-ro-analytics-funnelSelectRow { grid-template-columns: minmax(0, 1fr); } }

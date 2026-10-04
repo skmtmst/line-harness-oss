@@ -12,6 +12,7 @@ import { RowActions } from '@/components/shared/row-actions'
 import SearchField from '@/components/shared/search-field'
 import { Suspense, createContext, useContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { Download, Plus } from 'lucide-react'
 import type { FriendField } from '@line-crm/shared'
 import {
   api,
@@ -139,7 +140,7 @@ function AnalyticsExportButton({ onClick, disabled, label, headerOnly = false }:
     return () => register?.(null)
   }, [register, disabled])
   if (headerOnly) return null
-  return <Button onClick={onClick} disabled={disabled} variant="secondary">{label ?? 'CSV で書き出す'}</Button>
+  return <Button onClick={onClick} disabled={disabled} variant="secondary"><Download size={14} aria-hidden="true" />{label ?? 'CSV で書き出す'}</Button>
 }
 
 function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
@@ -1512,7 +1513,6 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                 value={selected}
                 onChange={(value) => setSelected(value)}
                 aria-label="ファネル"
-                className="border-hairline rounded-control w-full border px-3 py-2 text-sm sm:w-72"
                 size="full"
                 options={
                   funnels.some((funnel) => funnel.status === 'active' || funnel.id === selected)
@@ -1668,7 +1668,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
               <div className="v8-ro-analytics-funnelSteps">{result.map((step, i) => {
                 const previous = i > 0 ? result[i - 1] : null
                 const dropRate = previous && previous.reached > 0 ? previous.droppedAfter / previous.reached * 100 : null
-                return <div key={step.stepOrder} className="v8-ro-analytics-funnelStep" data-selected={picked === i || undefined}>
+                return <div key={step.stepOrder} className="v8-ro-analytics-funnelStep" data-worst={worst?.index === i || undefined} data-selected={picked === i || undefined}>
                   <span className="v8-ro-analytics-funnelNumber">{i + 1}</span><p className="text-ink text-caption font-medium" title={step.label}>{step.label}</p>
                   <button onClick={() => { if (!measurable) return; setFunnelAudience(null); setPicked(i) }} className="v8-ro-analytics-funnelBar" aria-label={`${step.label}の段`} aria-describedby={`funnel-step-${step.stepOrder}-value`} disabled={!measurable}><span style={{ width: top > 0 && measurable ? `${step.reached / top * 100}%` : '0%' }} /></button>
                   <p className="text-ink-secondary text-caption tabular-nums" id={`funnel-step-${step.stepOrder}-value`}>{measurable ? `${formatNumber(step.reached)} 人` : '—'}</p><span className="text-xs text-ink-faint" title={previous ? `止まった ${previous.droppedAfter}人・進行中 ${previous.inProgressAfter}人` : undefined}>{measurable && dropRate !== null ? `−${dropRate.toFixed(0)}%` : '—'}</span>
@@ -2289,8 +2289,8 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
     <div className="v8-ro-analytics-friendsBody">
       <section className="v8-ro-analytics-trend">
         <div className="v8-ro-analytics-sectionHead"><h2>日ごとの増減（この{days}日）</h2><RangePicker days={days} onChange={setDays} /></div>
-        <div className="v8-ro-analytics-legend"><span>増えた</span><span>減った</span><span>配信・シナリオの日は棒を選ぶと確認できます</span></div>
-        {daysShown ? <BarChart items={toBarChartItems(overview.days, { campaigns: overview.campaigns, formatTitle: (date) => `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日（${analyticsWeekday(date)}）` }).map((item) => ({ ...item, axisLabel: `${item.axisLabel}（${analyticsWeekday(item.key)}）` }))} selectedKey={selectedDate} onSelect={setSelectedDate} /> : <div className="v8-ro-analytics-state" role="status"><p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] || '未取得') : pendingReason}</p>{overview.state === 'pending' && <p>日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p>}</div>}
+        <div className="v8-ro-analytics-legend"><span>配信・シナリオの日は棒を選ぶと確認できます</span></div>
+        {daysShown ? <BarChart items={toBarChartItems(overview.days, { campaigns: overview.campaigns, formatTitle: (date) => `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日（${analyticsWeekday(date)}）` })} selectedKey={selectedDate} onSelect={setSelectedDate} /> : <div className="v8-ro-analytics-state" role="status"><p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] || '未取得') : pendingReason}</p>{overview.state === 'pending' && <p>日ごとの集計は数分ごとに自動で更新されます。しばらくしても変わらないときは、時間をおいて開き直してください。</p>}</div>}
         {daysShown && selectedDay && <p className="v8-ro-analytics-selection">{selectedDay.date}（{analyticsWeekday(selectedDay.date)}）　増加 {selectedDay.added}人・減少 {selectedDay.removed}人・差し引き {selectedDay.net}人　{selectedCampaigns.map((item) => item.name).join('、') || '施策なし'}</p>}
         {daysShown && overview.campaigns.length > 0 && <div className="v8-ro-analytics-campaigns">{overview.campaigns.map((item) => <p key={item.id}>{formatAnalyticsDate(item.date)} {item.name}</p>)}</div>}
         <div className="v8-ro-analytics-chartFooter"><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /><AnalyticsExportButton headerOnly disabled={!daysShown} onClick={() => downloadCsv('analytics-friends.csv', [['日付', '増えた', '減った', '差し引き'], ...overview.days.map((day) => [day.date, day.added, day.removed, day.net])])} /></div>
@@ -2368,7 +2368,7 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
         {Array.from({ length: 24 }, (_, hour) => {
           const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
           // 高さだけの棒は読み上げに届かない。1本ごとに時間と回数を名前にする。
-          return <div key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t-mini bg-accent" style={{ height: `${Math.max(2, clicks / maxHourly * 96)}px` }} />{hour % 3 === 0 && <span className="whitespace-nowrap text-[10px] text-ink-faint">{hour}時</span>}</div>
+          return <div key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t-mini bg-accent" style={{ height: `${clicks / maxHourly * 96}px` }} /><span aria-hidden="true" className="h-3 whitespace-nowrap text-[10px] leading-3 text-ink-faint">{hour % 3 === 0 ? `${hour}時` : ''}</span></div>
         })}
       </div>
     </section>
@@ -2503,7 +2503,7 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
     <div id="usage-items" className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>最終利用</Th><Th align="right">操作</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.categories.map((item) => {
-        return <tr key={item.key} className="text-sm"><td className="px-4 py-3"><p className="font-semibold">{item.label}</p></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3"><DateTimeMetricCell metric={item.lastUsedAt} /></td><td className="px-3 py-2"><RowActions subjectName={item.label} detail={{ label: '中身を見る', href: item.href }} menuItems={canTidyUsage(item) ? [{ id: 'tidy', label: '片づける', onSelect: () => window.location.assign(item.href) }] : []} /></td></tr>
+        return <tr key={item.key} className="text-sm"><td className="px-4 py-3"><p className="font-semibold" title={item.label}>{item.label}</p></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3"><DateTimeMetricCell metric={item.lastUsedAt} /></td><td className="px-3 py-2"><RowActions subjectName={item.label} detail={{ label: '中身を見る', href: item.href }} menuItems={canTidyUsage(item) ? [{ id: 'tidy', label: '片づける', onSelect: () => window.location.assign(item.href) }] : []} /></td></tr>
       })}</tbody>
     </table></div>
     <section className="v8-ro-analytics-observations"><div className="v8-ro-analytics-sectionHead"><h2>気づいたこと</h2><Button variant="secondary" onClick={() => { state.retry(); setMenuReload((value) => value + 1) }}>もう一度確認</Button></div><p className="mt-2 text-xs">確認できた参照切れ <MetricCell metric={overview.summary.brokenReferences} />件</p><ul>{overview.categories.map((item) => {
@@ -3270,7 +3270,7 @@ function AnalyticsInner() {
   }
   return (
     <div data-analytics-design="v6" className="v8-ro-analytics-page" data-design-node={tab === 'friends' ? (canManage ? (narrow ? 'eEhYU' : 'ws9wt') : 'L4Uov') : ({ reactions: 'yvOtn', routes: 'PFe9c', usage: 'N8ZrUl', cross: 'u5CuB8', funnel: 'DkRDE', 'url-clicks': 'iK4cQ', saved: 'bglah', 'conversion-report': 'AzrZq' } as Record<string, string>)[tab]}>
-      <ReadonlyHeaderV8 title="分析" description="友だちの増減・配信の反応・経路と成果を、期間を決めて見ます。気になる見かたは保存して、レポートで毎週届けられます。" actions={<><Button variant="secondary" disabled={!exportAction || exportAction.scope !== scope || exportAction.disabled} onClick={() => exportAction?.scope === scope && exportAction.onClick()}>CSV で書き出す</Button>{canManage ? <Button href="/analytics/reports/new">レポートを作る</Button> : <Button disabled title="閲覧のみのため、レポートは作れません">レポートを作る</Button>}</>} /><AnalyticsNavigationV8 active={tab} savedCount={savedCount} />{!canManage && <div className="v8-ro-analytics-readOnly" role="status">閲覧のみです。分析・CSVの書き出しはできます。作成や変更はできません。</div>}
+      <ReadonlyHeaderV8 titleDisplay={['cross', 'saved', 'conversion-report'].includes(tab) ? 'auto' : 'always'} title="分析" description="友だちの増減・配信の反応・経路と成果を、期間を決めて見ます。気になる見かたは保存して、レポートで毎週届けられます。" actions={<><Button variant="secondary" disabled={!exportAction || exportAction.scope !== scope || exportAction.disabled} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={14} aria-hidden="true" />CSV で書き出す</Button>{canManage ? <Button variant="primary" href="/analytics/reports/new"><Plus size={14} aria-hidden="true" />レポートを作る</Button> : <Button disabled title="閲覧のみのため、レポートは作れません">レポートを作る</Button>}</>} /><AnalyticsNavigationV8 active={tab} savedCount={savedCount} />{!canManage && <div className="v8-ro-analytics-readOnly" role="status">閲覧のみです。分析・CSVの書き出しはできます。作成や変更はできません。</div>}
       <AnalyticsExportContext.Provider value={registerExport}><div className="v8-ro-analytics-content">
       {tab === 'conversion-report' && <ConversionReportV8 accountId={selectedAccountId} />}
       {tab === 'friends' && <FriendsOverviewTab key={selectedAccountId} accountId={selectedAccountId} />}
