@@ -200,8 +200,9 @@ describe('受信箱の右の列のエラー境界', () => {
     expect(list()?.textContent).toContain('一覧の行')
   })
 
-  it('タグ・フォーム回答・マイル履歴が null でも、右の列は落ちず空として出す', async () => {
-    fixture.friendData = { ...goodFriend, tags: null, formSubmissions: null, formSubmissionTotal: 3 }
+  it('タグ・フォーム回答・マイル履歴が配列でなくても（null・一覧の形）、右の列は落ちず空として出す', async () => {
+    // タグは null ではなく一覧の形（{ items }）。`?? []` では防げない形も確かめる。
+    fixture.friendData = { ...goodFriend, tags: { items: [] }, formSubmissions: null, formSubmissionTotal: 3 }
     fixture.mileageData = { ...goodMileage, history: null }
     await openChatAndCustomerInfo(root)
 

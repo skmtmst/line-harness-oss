@@ -651,7 +651,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
         setPurchase({ kind: 'empty', reason: 'unavailable' })
         return
       }
-      const list = asArray((res.data as unknown as { orders?: Array<{ id: string; orderNumber?: string; total?: number; createdAt?: string }> }).orders)
+      const list = (res.data as unknown as { orders?: Array<{ id: string; orderNumber?: string; total?: number; createdAt?: string }> }).orders ?? []
       if (list.length === 0) {
         setPurchase({ kind: 'empty', reason: 'none' })
         return
