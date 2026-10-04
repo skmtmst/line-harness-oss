@@ -114,7 +114,7 @@ export default function CommentsV8({ webinarId }: { webinarId: string }) {
                       <Th className="w-36">名前</Th>
                       <Th>コメント</Th>
                       <Th>
-                        <span className="sr-only">消す</span>
+                        <span className="sr-only">削除</span>
                       </Th>
                     </tr>
                   </thead>
@@ -150,7 +150,7 @@ export default function CommentsV8({ webinarId }: { webinarId: string }) {
                           <button
                             type="button"
                             onClick={() => setComments((prev) => prev.filter((_, j) => j !== i))}
-                            aria-label={`${c.authorName || '名前未入力'}のコメントを消す`}
+                            aria-label={`${c.authorName || '名前未入力'}のコメントを削除`}
                             className="text-danger px-1 text-base leading-none"
                           >
                             ×
