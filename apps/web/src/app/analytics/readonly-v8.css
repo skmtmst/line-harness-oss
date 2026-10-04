@@ -69,7 +69,7 @@
 [data-theme='v8'] .v8-ro-analytics-routeBar span { display: block; height: 100%; border-radius: var(--radius-chart-bar); background: var(--color-accent-deep); }
 [data-theme='v8'] .v8-ro-analytics-reactions { display: flex; flex-direction: column; gap: 12px; }
 [data-theme='v8'] .v8-ro-analytics-reactions > * { margin-top: 0; }
-[data-theme='v8'] .v8-ro-analytics-reactions .v8-ro-analytics-hours { order: 2; border: 0; padding: 16px 0; }
+[data-theme='v8'] .v8-ro-analytics-reactions .v8-ro-analytics-hours { border: 1px solid var(--color-hairline); padding: 16px; }
 [data-theme='v8'] .v8-ro-analytics-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; font-size: 12px; color: var(--color-ink-secondary); }
 [data-theme='v8'] .v8-ro-analytics-pagination > span { margin-right: auto; }
 
@@ -80,3 +80,74 @@
 [data-theme='v8'] .v8-ro-analytics-page > [data-design='Head'],
 [data-theme='v8'] .v8-ro-analytics-page > .v8-ro-analytics-space-y-5 { margin-inline: 24px; }
 [data-theme='v8'] .v8-ro-analytics-content .grid:has(> [data-design-version]:nth-child(5)) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+/* ws9wt: HTMLの余白をグラフと右欄に配る。 */
+[data-theme='v8'] .v8-ro-analytics-page { container-type: inline-size; container-name: analytics-board; }
+[data-theme='v8'] .v8-ro-analytics-friendsBody { grid-template-columns: minmax(0, 1fr) 320px; padding: 16px 24px; gap: 16px; align-items: start; }
+[data-theme='v8'] .v8-ro-analytics-trend { border: 1px solid var(--color-hairline); border-radius: var(--radius-card); padding: 20px; }
+[data-theme='v8'] .v8-ro-analytics-friendsAside { padding: 0; border: 0; background: transparent; }
+[data-theme='v8'] .v8-ro-analytics-breakdown { padding: 20px; background: var(--color-canvas); }
+@container analytics-board (max-width: 1099px) {
+  [data-theme='v8'] .v8-ro-analytics-friendsBody { grid-template-columns: minmax(0, 1fr); }
+  [data-theme='v8'] .v8-ro-analytics-friendsAside { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container analytics-board (max-width: 650px) {
+  [data-theme='v8'] .v8-ro-analytics-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-theme='v8'] .v8-ro-analytics-friendsAside { grid-template-columns: minmax(0, 1fr); }
+}
+
+[data-theme='v8'] .v8-ro-analytics-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 12px; }
+[data-theme='v8'] .v8-ro-analytics-toolbar > button:last-child { margin-left: auto; }
+[data-theme='v8'] .v8-ro-analytics-routesBody { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 12px; align-items: start; }
+[data-theme='v8'] .v8-ro-analytics-routesBody > * { min-width: 0; }
+[data-theme='v8'] .v8-ro-analytics-routesFlow { padding: 16px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); }
+[data-theme='v8'] .v8-ro-analytics-routesStages { display: grid; gap: 14px; margin-top: 16px; }
+[data-theme='v8'] .v8-ro-analytics-routeStageHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+@container analytics-board (max-width: 1099px) { [data-theme='v8'] .v8-ro-analytics-routesBody { grid-template-columns: minmax(0, 1fr); } [data-theme='v8'] .v8-ro-analytics-routesStages { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@container analytics-board (max-width: 650px) { [data-theme='v8'] .v8-ro-analytics-routesStages { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+[data-theme='v8'] .v8-ro-analytics-content > div:not(.v8-ro-analytics-friends) { padding-top: 0; }
+
+[data-theme='v8'] .v8-ro-analytics-observations { padding: 20px; background: var(--color-surface-pearl); border-radius: var(--radius-card); }
+[data-theme='v8'] .v8-ro-analytics-observations ul { display: grid; gap: 8px; margin-top: 12px; font-size: 13px; }
+[data-theme='v8'] #usage-items th:first-child { width: 25%; }
+[data-theme='v8'] #usage-items th:nth-child(5) { width: 24%; }
+[data-theme='v8'] #usage-items th:last-child { width: 170px; }
+[data-theme='v8'] #usage-items td:last-child { overflow: visible; }
+[data-theme='v8'] .v8-ro-analytics-usageBody { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; align-items: start; }
+[data-theme='v8'] .v8-ro-analytics-usageBody > * { min-width: 0; }
+[data-theme='v8'] .v8-ro-analytics-usageBody .v8-ro-analytics-observations { border: 1px solid var(--color-hairline); padding: 16px; background: var(--color-canvas); }
+[data-theme='v8'] .v8-ro-analytics-usageBody .v8-ro-analytics-observations > button { margin-block: 12px; }
+@container analytics-board (max-width: 1099px) { [data-theme='v8'] .v8-ro-analytics-usageBody { grid-template-columns: minmax(0, 1fr); } }
+
+[data-theme='v8'] .v8-ro-analytics-search { flex: 1 1 260px; min-width: 200px; }
+
+[data-theme='v8'] .v8-ro-analytics-funnelControls { display: flex; flex-direction: column; gap: 12px; }
+[data-theme='v8'] .v8-ro-analytics-funnelControlActions { order: 2; }
+[data-theme='v8'] .v8-ro-analytics-funnelSelectRow { display: grid; grid-template-columns: minmax(0, 1fr) 180px minmax(0, 1fr); gap: 12px; order: 1; }
+[data-theme='v8'] .v8-ro-analytics-funnelBody { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; }
+[data-theme='v8'] .v8-ro-analytics-funnelFlow, [data-theme='v8'] .v8-ro-analytics-funnelSelected { min-width: 0; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); padding: 16px; }
+[data-theme='v8'] .v8-ro-analytics-funnelSteps { display: flex; flex-direction: column; gap: 8px; }
+[data-theme='v8'] .v8-ro-analytics-funnelStep { display: grid; grid-template-columns: 24px minmax(90px, .7fr) minmax(0, 2fr) 64px 48px; align-items: center; gap: 10px; min-height: 40px; padding: 8px; border-radius: var(--radius-control); }
+[data-theme='v8'] .v8-ro-analytics-funnelStep[data-selected] { background: var(--color-accent-subtle); }
+[data-theme='v8'] .v8-ro-analytics-funnelStep p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-theme='v8'] .v8-ro-analytics-funnelNumber { display: grid; place-items: center; width: 24px; height: 24px; background: var(--color-surface-pearl); border-radius: var(--radius-pill); font-size: 11px; }
+[data-theme='v8'] .v8-ro-analytics-funnelBar { height: 22px; overflow: hidden; border-radius: var(--radius-icon); background: var(--color-surface-pearl); }
+[data-theme='v8'] .v8-ro-analytics-funnelBar span { display: block; height: 100%; border-radius: var(--radius-icon); background: var(--color-accent); }
+[data-theme='v8'] .v8-ro-analytics-funnelStep[data-selected] .v8-ro-analytics-funnelBar span { background: var(--color-accent-deep); }
+@container analytics-board (max-width: 1099px) { [data-theme='v8'] .v8-ro-analytics-funnelBody { grid-template-columns: minmax(0, 1fr); } }
+@container analytics-board (max-width: 650px) { [data-theme='v8'] .v8-ro-analytics-funnelSelectRow { grid-template-columns: minmax(0, 1fr); } [data-theme='v8'] .v8-ro-analytics-funnelStep { grid-template-columns: 24px minmax(80px, 1fr) minmax(40px, 1fr) 48px; } [data-theme='v8'] .v8-ro-analytics-funnelStep > span:last-child { display: none; } }
+
+[data-theme='v8'] .v8-ro-analytics-funnelControls > details { order: 3; }
+[data-theme='v8'] .v8-ro-analytics-funnelControls > p, [data-theme='v8'] .v8-ro-analytics-funnelControls > div:not([class*='funnel']) { order: 4; }
+
+[data-theme='v8'] .v8-ro-analytics-legend span::before { display: none; }
+[data-theme='v8'] .v8-ro-analytics-trend [aria-label='凡例'] { justify-content: flex-start; }
+
+[data-theme='v8'] .v8-ro-analytics-funnelControls { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+[data-theme='v8'] .v8-ro-analytics-funnelControlActions { grid-column: 2; grid-row: 1; }
+[data-theme='v8'] .v8-ro-analytics-funnelSelectRow { grid-column: 1; grid-row: 1; grid-template-columns: minmax(160px, 1fr) 180px minmax(160px, 1fr); align-items: end; }
+[data-theme='v8'] .v8-ro-analytics-funnelSelectRow > div { margin: 0; }
+[data-theme='v8'] .v8-ro-analytics-funnelControls > details, [data-theme='v8'] .v8-ro-analytics-funnelControls > p, [data-theme='v8'] .v8-ro-analytics-funnelControls > div:not([class*='funnel']) { grid-column: 1 / -1; }
+[data-theme='v8'] .v8-ro-analytics-funnelStep[data-worst] > span:last-child { color: var(--color-warning); }
+@container analytics-board (max-width: 1099px) { [data-theme='v8'] .v8-ro-analytics-funnelControls { grid-template-columns: minmax(0, 1fr); } [data-theme='v8'] .v8-ro-analytics-funnelControlActions { grid-column: 1; grid-row: 2; } }
+@container analytics-board (max-width: 650px) { [data-theme='v8'] .v8-ro-analytics-funnelSelectRow { grid-template-columns: minmax(0, 1fr); } }

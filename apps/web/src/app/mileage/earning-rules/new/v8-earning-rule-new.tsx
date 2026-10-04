@@ -14,12 +14,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check } from 'lucide-react'
+import Link from 'next/link'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import type { Tag } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Button from '@/components/shared/button'
+import Disclosure from '@/components/shared/disclosure'
+import StickyBar from '@/components/shared/sticky-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import DateField from '@/components/shared/date-field'
@@ -40,20 +44,26 @@ import formStyles from './v8-create-form.module.css'
 
 const DAILY_CAPS = [
   ['', '制限なし'],
-  ['1', '1回まで'],
-  ['2', '2回まで'],
-  ['3', '3回まで'],
-  ['5', '5回まで'],
-  ['10', '10回まで'],
+  ['1', '1日1回まで'],
+  ['2', '1日2回まで'],
+  ['3', '1日3回まで'],
+  ['5', '1日5回まで'],
+  ['10', '1日10回まで'],
 ]
 
 export default function V8EarningRuleNew() {
+  const [formNumber, setFormNumber] = useState(0)
+  return <EarningRuleForm key={formNumber} focusName={formNumber > 0} onContinue={() => setFormNumber((number) => number + 1)} />
+}
+
+function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onContinue: () => void }) {
   const router = useRouter()
+  const nameRef = useRef<HTMLInputElement>(null)
   const { selectedAccountId } = useAccount()
-  const [name, setName] = useState('予約してくれたら 300 マイル')
+  const [name, setName] = useState('')
   const [eventType, setEventType] = useState<string>('booking_created')
   const [source, setSource] = useState('')
-  const [amount, setAmount] = useState('300')
+  const [amount, setAmount] = useState('')
   const [grantStyle] = useState('決まった数')
   const [initialStatus, setInitialStatus] = useState<'available' | 'pending'>('available')
   const [ignoreMultiplier, setIgnoreMultiplier] = useState(false)
@@ -77,6 +87,10 @@ export default function V8EarningRuleNew() {
   const [trialError, setTrialError] = useState('')
   const [trial, setTrial] = useState<{ matchedFriends: number; estimatedTotalMiles: number } | null>(null)
   const createKeyRef = useRef<{ fingerprint: string; key: string } | null>(null)
+
+  useEffect(() => {
+    if (focusName) nameRef.current?.focus()
+  }, [focusName])
 
   useEffect(() => {
     let cancelled = false
@@ -103,8 +117,8 @@ export default function V8EarningRuleNew() {
   )
 
   const dirty = Boolean(
-    name !== '予約してくれたら 300 マイル' || eventType !== 'booking_created' || source ||
-    amount !== '300' || initialStatus !== 'available' || ignoreMultiplier || dailyCap ||
+    name || eventType !== 'booking_created' || source ||
+    amount || initialStatus !== 'available' || ignoreMultiplier || dailyCap ||
     uniqueMode || beneficiary !== 'actor' || validFrom || validUntil ||
     expiresAfterDays !== '365' || !reverseOnCancellation || targetConditions !== null ||
     !isActive || !notifyFriend,
@@ -190,7 +204,7 @@ export default function V8EarningRuleNew() {
         throw new Error(draftResponse.error)
       }
       if (continueAfter) {
-        router.push('/mileage/earning-rules/new')
+        onContinue()
       } else {
         router.push('/mileage?tab=earning-rules')
       }
@@ -244,9 +258,9 @@ export default function V8EarningRuleNew() {
   }
 
   return (
-    <div data-design-node="ctLwT" className={formStyles.page}>
-      <Button variant="secondary" href="/mileage?tab=earning-rules">← マイルへ</Button>
+    <div data-design-node={conflict ? "BnrQp" : "ctLwT"} className={formStyles.page}>
       <div className={formStyles.head}>
+        <Link className={formStyles.back} href="/mileage?tab=earning-rules">← マイルへ</Link>
         <h1 className={formStyles.title}>たまる決めごとを作る</h1>
         <p className={formStyles.description}>どの行動で・何マイル・だれに付けるかを決めます。作った日からの行動に付きます（さかのぼらない）。</p>
       </div>
@@ -275,14 +289,15 @@ export default function V8EarningRuleNew() {
             <p className={formStyles.cardNote}>きっかけになる行動を選びます</p>
             <label className={formStyles.field}>
               <span className={formStyles.label}>名前 <span className={formStyles.required}>必須</span></span>
-              <input
-                className={formStyles.input}
+              <TextInput
+                ref={nameRef}
+                id="sc-name"
+                aria-label="名前"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="例：リンクをクリック"
               />
-              <span className={formStyles.hint}>一覧に表示される名前です。お客様には見えません。</span>
             </label>
             <div className={formStyles.grid2}>
               <label className={formStyles.field}>
@@ -308,7 +323,6 @@ export default function V8EarningRuleNew() {
                   size="full"
                   options={selected.sources.map(([optionValue, label]) => ({ value: optionValue, label }))}
                 />
-                <span className={formStyles.hint}>同じ行動でも、経由した場所ごとに分けられます。</span>
               </label>
             </div>
             <button type="button" className={formStyles.linkButton} onClick={() => setShowConditions((v) => !v)} aria-expanded={showConditions}>
@@ -327,14 +341,12 @@ export default function V8EarningRuleNew() {
             <div className={formStyles.grid2}>
               <label className={formStyles.field}>
                 <span className={formStyles.label}>マイル <span className={formStyles.required}>必須</span></span>
-                <input
-                  className={formStyles.input}
+                <TextInput
                   type="number"
                   min={1}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />
-                <span className={formStyles.hint}>1以上で入力してください。</span>
               </label>
               <label className={formStyles.field}>
                 <span className={formStyles.label}>付け方</span>
@@ -346,48 +358,33 @@ export default function V8EarningRuleNew() {
                   options={[{ value: '決まった数', label: '決まった数' }]}
                   disabled
                 />
-                <span className={formStyles.hint}>いまは決まった数だけ付けられます。</span>
               </label>
             </div>
           </section>
 
           <section className={formStyles.card} aria-label="受け取る人・使えるまで">
             <h2 className={formStyles.cardTitle}>受け取る人・使えるまで</h2>
-            <div className={formStyles.grid2} role="group" aria-label="受け取る人">
+            <RadioCardGroup legend="受け取る人" className={formStyles.grid2}>
               {([
                 { value: 'actor' as const, title: '行動した本人', note: 'そのまま本人の残高に' },
                 { value: 'referrer' as const, title: '紹介した人', note: 'この人を紹介した相手に' },
               ]).map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={formStyles.choice}
-                  aria-pressed={beneficiary === option.value}
-                  data-selected={beneficiary === option.value}
-                  onClick={() => setBeneficiary(option.value)}
-                >
-                  <span className={formStyles.choiceTitle}>{option.title}</span>
-                  <span className={formStyles.choiceNote}>{option.note}</span>
-                </button>
+                <RadioCard key={option.value} name="beneficiary" value={option.value}
+                  checked={beneficiary === option.value} onChange={() => setBeneficiary(option.value)}
+                  title={option.title} note={option.note} />
               ))}
-            </div>
-            <div className={formStyles.grid2} role="group" aria-label="使えるまで" style={{ marginTop: 12 }}>
+            </RadioCardGroup>
+            <div className={formStyles.choiceGroup}>
+            <RadioCardGroup legend="使えるまで" className={formStyles.grid2}>
               {([
                 { value: 'available' as const, title: 'すぐ使える', note: 'その場で残高に入る' },
                 { value: 'pending' as const, title: '確定待ち', note: '確定するまで使えない' },
               ]).map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={formStyles.choice}
-                  aria-pressed={initialStatus === option.value}
-                  data-selected={initialStatus === option.value}
-                  onClick={() => setInitialStatus(option.value)}
-                >
-                  <span className={formStyles.choiceTitle}>{option.title}</span>
-                  <span className={formStyles.choiceNote}>{option.note}</span>
-                </button>
+                <RadioCard key={option.value} name="initial-status" value={option.value}
+                  checked={initialStatus === option.value} onChange={() => setInitialStatus(option.value)}
+                  title={option.title} note={option.note} />
               ))}
+            </RadioCardGroup>
             </div>
           </section>
 
@@ -403,7 +400,6 @@ export default function V8EarningRuleNew() {
                   size="full"
                   options={DAILY_CAPS.map(([optionValue, label]) => ({ value: optionValue, label }))}
                 />
-                <span className={formStyles.hint}>同じ人が1日に何回まで対象になるかです。</span>
               </label>
               <label className={formStyles.field}>
                 <span className={formStyles.label}>同じ対象の数えかた</span>
@@ -430,8 +426,7 @@ export default function V8EarningRuleNew() {
                 <DateField value={validUntil} onChange={setValidUntil} aria-label="終了日" />
               </label>
             </div>
-            <details className={formStyles.details}>
-              <summary>詳しい設定（倍率・通知・取り消し・公開）</summary>
+            <Disclosure title="詳しい設定（倍率・通知・取り消し・公開）" size="compact">
               <div className={formStyles.detailsBody}>
                 <label className={formStyles.field}>
                   <span className={formStyles.label}>付いたマイルの有効期限</span>
@@ -470,7 +465,7 @@ export default function V8EarningRuleNew() {
                   作成したらすぐ動かす
                 </Checkbox>
               </div>
-            </details>
+            </Disclosure>
           </section>
         </div>
 
@@ -516,7 +511,7 @@ export default function V8EarningRuleNew() {
         </aside>
       </div>
 
-      <div className={formStyles.stickyBar}>
+      <StickyBar actions={<>
         <Button variant="secondary" href="/mileage?tab=earning-rules">キャンセル</Button>
         <Button variant="secondary" onClick={() => void save(true)} disabled={saving} busy={saving} busyLabel="保存しています">
           保存して続けて作る
@@ -524,7 +519,7 @@ export default function V8EarningRuleNew() {
         <Button variant="primary" onClick={() => void save(false)} disabled={saving} busy={saving} busyLabel="保存しています">
           <Check size={14} aria-hidden="true" /> 保存して動かす
         </Button>
-      </div>
+      </>} />
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した決めごと" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>

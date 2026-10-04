@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const OVERVIEW = fs.readFileSync(path.join(__dirname, 'nen-overview.tsx'), 'utf8')
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const PREVIEW = fs.readFileSync(path.join(__dirname, 'line-preview.tsx'), 'utf8')
-const NEW_COLUMN = fs.readFileSync(path.join(__dirname, 'columns/new/page.tsx'), 'utf8')
+const NEW_COLUMN = fs.readFileSync(path.join(__dirname, 'columns/new/column-new-v8.tsx'), 'utf8')
 const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
 
 /*
@@ -122,7 +122,7 @@ describe('V6 37-6 NEN配信の画面契約', () => {
   })
 
   it('コラム作成で対象・予約・読了後の操作を実APIへ接続する', () => {
-    expect(NEW_COLUMN).toContain('data-design-node="ymXJK"')
+    expect(NEW_COLUMN).toContain('data-design-node="yRDwW"')
     expect(NEW_COLUMN).toContain('前のコラムを下敷きにする')
     expect(NEW_COLUMN).toContain('columnAudience')
     expect(NEW_COLUMN).toContain('配信日時（日本時間）')
