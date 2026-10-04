@@ -23,7 +23,8 @@ describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の�
     // N-342 (#943): 運用者通知の正本APIは /api/line-notifications 配下。
     expect(list).toContain('api.lineNotifications.operatorRules.list(lineAccountId)')
     expect(list).toContain("state === 'ready' ? summary?.published ?? null : null")
-    expect(list).toContain("summary?.total ?? '—'")
+    // 板 u8xibp：受け取る人の実数。未取得のとき0件にしない。
+    expect(list).toContain("state === 'ready' ? summary?.recipients ?? null : null")
     expect(list).toContain('kind="error"')
     expect(list).toContain('kind="forbidden"')
     expect(list).toContain('data-list-state={listState}')
