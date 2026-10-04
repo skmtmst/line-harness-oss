@@ -42,6 +42,7 @@ import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shar
 import { notifyToast } from '@/components/shared/toast'
 import FolderPanel from '@/components/shared/folder-panel'
 import Select from '@/components/shared/select'
+import { Th } from '@/components/shared/table'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import { Tabs } from '@/components/shared/tabs'
@@ -142,12 +143,12 @@ function FriendAddListSkeleton() {
         </colgroup>
         <thead>
           <tr>
-            <th>順</th>
-            <th>設定（対象の流入リンク）</th>
-            <th>最初に送るもの</th>
-            <th>状態</th>
-            <th className={styles.recentCol}>直近7日</th>
-            <th aria-label="操作" />
+            <Th>順</Th>
+            <Th>設定（対象の流入リンク）</Th>
+            <Th>最初に送るもの</Th>
+            <Th>状態</Th>
+            <Th className={styles.recentCol}>直近7日</Th>
+            <Th aria-label="操作" />
           </tr>
         </thead>
         <tbody>
@@ -518,7 +519,7 @@ function FriendAddListV8Inner() {
     ...(rule.isFallback
       ? [{
           id: 'stop-fallback',
-          label: '一時停止する',
+          label: '止める',
           disabled: !canEdit,
           disabledReason: canEdit ? undefined : readonlyReason,
           onSelect: () => setFallbackStop(true),
@@ -527,7 +528,7 @@ function FriendAddListV8Inner() {
           ...(rule.status === 'published'
             ? [{
                 id: 'stop',
-                label: '一時停止する',
+                label: '止める',
                 disabled: !canEdit,
                 disabledReason: canEdit ? undefined : readonlyReason,
                 onSelect: () => {
@@ -698,12 +699,12 @@ function FriendAddListV8Inner() {
           </colgroup>
           <thead>
             <tr>
-              <th>順</th>
-              <th>設定（対象の流入リンク）</th>
-              <th>最初に送るもの</th>
-              <th>状態</th>
-              <th className={styles.recentCol}>直近7日</th>
-              <th aria-label="操作" />
+              <Th>順</Th>
+              <Th>設定（対象の流入リンク）</Th>
+              <Th>最初に送るもの</Th>
+              <Th>状態</Th>
+              <Th className={styles.recentCol}>直近7日</Th>
+              <Th aria-label="操作" />
             </tr>
           </thead>
           <tbody>
@@ -880,7 +881,7 @@ function FriendAddListV8Inner() {
                     onClose={() => setOpenMenuId(null)}
                     ariaLabel={`設定「${sinkRule.name}」の操作`}
                     items={rowMenuItems(sinkRule)}
-                    note="この設定は消せません（いちばん最後の受け皿）"
+                    note="この設定は削除できません（いちばん最後の受け皿）"
                   />
                 </td>
               </tr>
@@ -1124,9 +1125,9 @@ function FriendAddListV8Inner() {
       {/* 通常の設定の一時停止の確かめ。 */}
       <ConfirmDialog
         open={stopTarget !== null}
-        title={stopTarget ? `「${stopTarget.name}」を一時停止する` : ''}
+        title={stopTarget ? `「${stopTarget.name}」を止める` : ''}
         description="止めると、この流入リンクから来た人にはいちばん下の「経路が分からなかった人」の案内が動きます。"
-        confirmLabel="一時停止する"
+        confirmLabel="止める"
         busy={stopBusy}
         error={stopError}
         onConfirm={() => void runStop()}

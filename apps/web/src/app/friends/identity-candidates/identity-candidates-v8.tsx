@@ -17,6 +17,7 @@ import type { IdentityCandidateDecision } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import StickyBar from '@/components/shared/sticky-bar'
+import { Th } from '@/components/shared/table'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
 import {
@@ -139,10 +140,10 @@ function FriendIdentityCandidatesV8Inner() {
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>項目</th>
-                      <th>候補A</th>
-                      <th>候補B</th>
-                      <th>使う値</th>
+                      <Th>項目</Th>
+                      <Th>候補A</Th>
+                      <Th>候補B</Th>
+                      <Th>使う値</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -252,10 +253,10 @@ function CandidatesSuspenseFallback() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>項目</th>
-                    <th>候補A</th>
-                    <th>候補B</th>
-                    <th>使う値</th>
+                    <Th>項目</Th>
+                    <Th>候補A</Th>
+                    <Th>候補B</Th>
+                    <Th>使う値</Th>
                   </tr>
                 </thead>
                 <tbody>

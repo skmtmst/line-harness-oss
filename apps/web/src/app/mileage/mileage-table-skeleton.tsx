@@ -8,6 +8,7 @@
  * 出す・消すの判定は呼ぶ側の `DelayedSkeleton` が持つ。
  */
 import { Skeleton } from '@/components/shared/skeleton'
+import { Th } from '@/components/shared/table'
 import styles from './mileage-v8.module.css'
 
 /** 列ごとの棒の幅。先頭列は2段（題＋補足）、ほかは1段。 */
@@ -23,7 +24,7 @@ export default function MileageTableSkeleton({ columns }: { columns: MileageSkel
         <thead>
           <tr>
             {columns.map((column) => (
-              <th scope="col" key={column.header}>{column.header}</th>
+              <Th key={column.header}>{column.header}</Th>
             ))}
           </tr>
         </thead>

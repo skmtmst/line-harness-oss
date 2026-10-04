@@ -20,6 +20,7 @@ import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Button from '@/components/shared/button'
+import FolderPanel from '@/components/shared/folder-panel'
 import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
@@ -478,19 +479,16 @@ export default function V8RewardsTab({
           <V8CreateButton href="/mileage/rewards/edit" readonly={readonly}>
             <Plus size={14} aria-hidden="true" /> 使い道を作る
           </V8CreateButton>
-          <p className={styles.railTitle}>フォルダ</p>
-          <div role="group" aria-label="フォルダ">
-            {FOLDERS.map((key) => (
-              <Button
-                key={key}
-                variant={folder === key ? 'primary' : 'secondary'}
-                onClick={() => { setPage(1); setFolder(key) }}
-                aria-pressed={folder === key}
-              >
-                {key} {formatMileageNumber(folderCounts.get(key) ?? 0)}
-              </Button>
-            ))}
-          </div>
+          <FolderPanel
+            heading="フォルダ"
+            rows={FOLDERS.map((key) => ({
+              id: key,
+              label: key,
+              count: folderCounts.get(key) ?? 0,
+            }))}
+            activeId={folder}
+            onSelect={(id) => { setPage(1); setFolder(id as Folder) }}
+          />
         </div>
 
         <div className={styles.main}>
@@ -508,7 +506,7 @@ export default function V8RewardsTab({
               value={folder}
               options={FOLDERS.map((key) => ({
                 value: key,
-                label: `フォルダ：${key}（${formatMileageNumber(folderCounts.get(key) ?? 0)}）`,
+                label: `フォルダ：${key}`,
               }))}
               onChange={(value) => { setPage(1); setFolder(value as Folder) }}
             />

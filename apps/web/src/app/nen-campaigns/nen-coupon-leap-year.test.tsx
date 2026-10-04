@@ -5,6 +5,12 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NenOverview, type NenCoupon, type NenTab } from './nen-overview'
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}))
+
 /*
  * 419: 誕生日クーポン設定の「2月29日生まれの子」3択が
  * 保存値を表示し、変更がそのまま onCouponChange へ流れること。
