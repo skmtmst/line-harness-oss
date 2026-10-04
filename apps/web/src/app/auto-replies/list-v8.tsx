@@ -1251,10 +1251,17 @@ export default function AutoRepliesListV8() {
                       </p>
                     )}
                   </td>
-                  <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
-                    <ContextMenu
-                      label={`自動応答「${name}」の操作`}
-                      items={rowContextItems(r)}
+                  <td
+                    className={styles.menuCell}
+                    onClick={(event) => event.stopPropagation()}
+                    data-design-node={openMenuId === r.id ? 'IIesG' : undefined}
+                  >
+                    <button
+                      type="button"
+                      className={styles.menuButton}
+                      title={`自動応答「${name}」の操作`}
+                      aria-expanded={openMenuId === r.id}
+                      onClick={() => setOpenMenuId((current) => (current === r.id ? null : r.id))}
                     >
                       <button
                         type="button"

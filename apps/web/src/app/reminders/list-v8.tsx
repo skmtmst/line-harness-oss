@@ -942,10 +942,21 @@ export default function RemindersListV8() {
                     <td className={styles.countCell}>
                       <div className={styles.countMain}>{nextSend}</div>
                     </td>
-                    <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
-                      <ContextMenu
-                        label={`リマインダ「${row.name}」の操作`}
-                        items={rowContextItems(row)}
+                    <td
+                      className={styles.menuCell}
+                      onClick={(event) => event.stopPropagation()}
+                      data-design-node={openMenuId === row.id ? 'SkY9V' : undefined}
+                    >
+                      <button
+                        type="button"
+                        className={styles.menuButton}
+                        title={`リマインダ「${row.name}」の操作`}
+                        aria-label={`リマインダ「${row.name}」の操作`}
+                        aria-haspopup="menu"
+                        aria-expanded={openMenuId === row.id}
+                        onClick={() =>
+                          setOpenMenuId((current) => (current === row.id ? null : row.id))
+                        }
                       >
                         <button
                           type="button"

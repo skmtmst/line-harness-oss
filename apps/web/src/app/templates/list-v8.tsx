@@ -167,7 +167,7 @@ const KIND_CARDS: Array<{
     icon: GalleryHorizontalEnd,
     desc: '横にめくるカードを最大10枚',
     useFor: '商品の紹介に',
-    cannot: 'できない：1枚の画像を面に分ける（→ リッチメッセージ）',
+    cannot: 'できない：1枚の画像を面に分ける（→ リッチ）',
     href: '/templates/carousel',
   },
   {
@@ -203,7 +203,7 @@ const KIND_CARDS: Array<{
     icon: ClipboardList,
     desc: 'いくつかの質問にまとめて答えてもらう',
     useFor: '満足度調査に',
-    cannot: 'できない：答えごとにタグを付ける（→ 質問）',
+    cannot: 'できない：答えですぐタグを付ける（→ 質問）',
     href: '/templates/edit?kind=research',
   },
 ]

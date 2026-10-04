@@ -229,6 +229,8 @@ test('v8 の受け皿は一番下・操作に「削除する」がなく消せ�
     expect(labels).toContain('止める')
     expect(labels).not.toContain('削除する')
     expect(menu!.textContent).toContain('この設定は削除できません')
+    // 板 C0lfUP：受け皿の「…」を開いた印
+    expect(host.querySelector('[data-design-node="C0lfUP"]')).toBeTruthy()
   })
 })
 

@@ -161,6 +161,8 @@ function openRowMenu() {
   act(() => { menuButton.click() })
   const menu = document.querySelector('[role="menu"]')
   expect(menu, '操作メニューが開きません').toBeTruthy()
+  // 板 IIesG：行の「…」を開いた印
+  expect(host.querySelector('[data-design-node="IIesG"]'), 'IIesG の印がありません').toBeTruthy()
   return menu as HTMLElement
 }
 
