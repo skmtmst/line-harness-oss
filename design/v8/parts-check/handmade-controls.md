@@ -891,4 +891,3 @@
 | `apps/web/src/app/webinars/new/new-v8.module.css` | 5, 36, 122, 124, 129, 136 | `* 5段の手順の帯・左の設定カード・右の見え方・下の帯。` |
 | `apps/web/src/app/webinars/new/new-v8.tsx` | 8, 19, 26, 81, 82, 84, 89, 93, 96, 98, 99, 100, 103, 104, 106, 107, 108, 109, 110, 111, 113, 114, 115, 120, 121, 122, 134, 135, 164, 195, 196, 247, 249, 250, 251, 252, 253, 256, 259, 261, 262, 281, 282, 283, 284, 285, 293, 301, 304, 305, 339, 343, 344, 351, 355, 356 | `import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'` |
 | `apps/web/src/app/webinars/published/page.tsx` | 170, 179, 180 | `<section className="border-hairline bg-canvas min-h-[720px] rounded-card border p-8 shadow-card">` |
-
