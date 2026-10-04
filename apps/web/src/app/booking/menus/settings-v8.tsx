@@ -1175,7 +1175,7 @@ function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resour
                     <button
                       type="button"
                       className={styles.iconRemove}
-                      aria-label={`${label}の${index + 1}区間目を消す`}
+                      aria-label={`${label}の${index + 1}区間目を削除`}
                       onClick={() => updateDay(weekday, (list) => list.filter((_, i) => i !== index))}
                     >
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" strokeLinecap="round" /></svg>
@@ -1864,7 +1864,7 @@ function HolidaysTabV8({ accountId, settings, status, error, exceptions, closedW
       <ConfirmDialog
         open={deleteTarget !== null}
         title="この休業日を消しますか？"
-        description="消すと、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
+        description="削除すると、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
         confirmLabel="休業日を削除する"
         destructive
         busy={busy}

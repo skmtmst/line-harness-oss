@@ -111,4 +111,8 @@ describe('V6 23-1 EC連携の再試行とアカウント切替の順序', () => 
       'setRetryingSlot((prev) => (prev.accountId === retryAccountId && prev.id === action.id ? { accountId: retryAccountId, id: null } : prev))',
     )
   })
+
+  it('読み上げ: 知らせの失敗は alert・成功は status で出す', () => {
+    expect(source).toContain("role={notice.tone === 'success' ? 'status' : 'alert'}")
+  })
 })
