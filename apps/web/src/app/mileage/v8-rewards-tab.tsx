@@ -5,20 +5,23 @@
  *
  * データの口は v7（mileage-rewards-tab.tsx）と同じ口へ取りに行く。
  * 表は「使い道・必要なマイル・交換すると渡るもの・今月交換された・
- * 状態・操作（中身を見る・止める／出す）」。要対応の交換（届かなかった
- * 分のやり直し）は表の下に残す。
+ * 状態・操作（中身を見る・止める／出す・…）」。頭の CSV は見えている
+ * 表の中身を出す。要対応の交換（届かなかった分のやり直し）は表の下に残す。
  *
  * フォルダの列に割り当てる API は無いので、渡すものの種類で分けた
  * 見え方の切り替えとして Djb で持つ（保存はしない）。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { AlertCircle, ArrowLeftRight, Gift, Info, Plus, Star } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { AlertCircle, ArrowLeftRight, Download, Gift, Info, MoreHorizontal, Plus, Star } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
+import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
+import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -34,7 +37,9 @@ import {
   type MileageRewardSummary,
 } from '@/lib/api'
 import type { ApiResponse } from '@line-crm/shared'
+import { csvCell } from '@/lib/presentation'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
+import type { MileageV8TabKey } from './mileage-v8'
 import { formatNumber } from '@/lib/format'
 import { V8CreateButton } from './mileage-v8'
 import styles from './mileage-v8.module.css'
@@ -81,11 +86,14 @@ function benefitSub(reward: MileageRewardSummary): string | null {
   } else if (version.stockLimit !== null) {
     parts.push('残り数は取れていません')
   } else {
-    parts.push('残り制限なし')
+    parts.push('残り 制限なし')
   }
   if (version.endsAt) {
-    const short = formatMileageDate(version.endsAt).replace(/^\d+\//, '')
-    parts.push(`${short}まで`)
+    /* 絵は「10/31 まで」。年月日の頭だけ取り、時刻・時差に振られない。 */
+    const day = version.endsAt.slice(0, 10).split('-')
+    if (day.length === 3) {
+      parts.push(`${Number(day[1])}/${Number(day[2])} まで`)
+    }
   }
   return parts.join('・')
 }
@@ -119,12 +127,15 @@ const PRESETS: Array<{ value: string; label: string }> = [
 export default function V8RewardsTab({
   readonly,
   registerHeaderActions,
+  registerTabCount,
 }: {
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
+  registerTabCount: (key: MileageV8TabKey, text: string | null) => void
 }) {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountId = selectedAccountId
+  const router = useRouter()
   const [rewards, setRewards] = useState<MileageRewardSummary[]>([])
   const [reachMetrics, setReachMetrics] = useState<Array<{ rewardId: string; reachableFriendCount: number }>>([])
   const [redeemedMiles, setRedeemedMiles] = useState<number | null>(null)
@@ -142,12 +153,10 @@ export default function V8RewardsTab({
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryError, setRetryError] = useState('')
   const [retryNotice, setRetryNotice] = useState('')
-  /*
-   * 出す・止める・届け直しは押した直後に動かさない。確認の窓で
-   * 中身を読み合わせてから動かす（間違えない・怖くない）。
-   */
-  const [stateTarget, setStateTarget] = useState<MileageRewardSummary | null>(null)
-  const [retryTarget, setRetryTarget] = useState<FailedRedemption | null>(null)
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const [testBusyId, setTestBusyId] = useState<string | null>(null)
+  const [duplicateId, setDuplicateId] = useState<string | null>(null)
+  const [menuNotice, setMenuNotice] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [folder, setFolder] = useState<Folder>('すべて')
@@ -309,10 +318,71 @@ export default function V8RewardsTab({
     }
   }
 
+  /* 行の「…」の「自分で交換をテスト」。残高・在庫は動かさない。 */
+  const runTest = async (reward: MileageRewardSummary) => {
+    if (!accountId || testBusyId) return
+    setTestBusyId(reward.id)
+    setMenuNotice('')
+    setActionError('')
+    try {
+      const response = await api.mileage.testReward(reward.id, accountId)
+      if (!response.success) throw new Error(response.error)
+      const warning = typeof response.data?.warning === 'string' ? response.data.warning.trim() : ''
+      setMenuNotice(response.data?.canDeliver
+        ? 'この内容で交換できます。残高・在庫は動いていません。'
+        : (warning || 'この内容では交換できません。内容を確認してください。'))
+    } catch {
+      setActionError('交換のテストができませんでした。もう一度お試しください。')
+    } finally {
+      setTestBusyId(null)
+    }
+  }
+
+  /*
+   * 行の「…」の「複製」。複製の専用口は無いので、今の内容で
+   * 下書きを1つ作る（公開はしない）。版が取れないときは作らない。
+   */
+  const duplicateReward = async (reward: MileageRewardSummary) => {
+    if (readonly || !accountId || duplicateId) return
+    const version = reward.currentVersion
+    if (!version) {
+      setActionError('複製する内容が取れませんでした。開き直してもう一度お試しください。')
+      return
+    }
+    setDuplicateId(reward.id)
+    setMenuNotice('')
+    setActionError('')
+    try {
+      const response = await api.mileage.createReward(accountId, {
+        name: `${reward.name} のコピー`,
+        description: reward.description,
+        imageUrl: reward.imageUrl,
+        rewardKind: reward.rewardKind,
+        requiredMiles: version.requiredMiles,
+        stockLimit: version.stockLimit,
+        perFriendLimit: version.perFriendLimit,
+        startsAt: version.startsAt,
+        endsAt: version.endsAt,
+        benefitExpiresDays: version.benefitExpiresDays,
+        commonActionVersionId: version.commonActionVersionId,
+        targetConditions: version.targetConditions,
+        failurePolicy: version.failurePolicy,
+        customerMessage: version.customerMessage,
+      })
+      if (!response.success) throw new Error(response.error)
+      setMenuNotice(`「${reward.name} のコピー」を下書きで作りました。`)
+      await load()
+    } catch {
+      setActionError('複製できませんでした。もう一度お試しください。')
+    } finally {
+      setDuplicateId(null)
+    }
+  }
+
+  /* タブの名の横の件数。読み直し中・失敗時は消す。 */
   useEffect(() => {
-    registerHeaderActions(null)
-    return () => registerHeaderActions(null)
-  }, [registerHeaderActions])
+    registerTabCount('rewards', status !== 'ready' ? null : formatMileageNumber(rewards.length))
+  }, [registerTabCount, rewards.length, status])
 
   const publishedCount = rewards.filter((r) => r.status === 'published').length
   const draftCount = rewards.filter((r) => r.status === 'draft').length
@@ -363,6 +433,47 @@ export default function V8RewardsTab({
   }
   const failedTotal = redemptionsTotal
 
+  /*
+   * 頭の「CSV で書き出す」。使い道の書き出し口は無いので、
+   * 今見えている表の中身をそのまま出す（本物の読み物）。
+   */
+  const exportCsv = useCallback(() => {
+    if (shown.length === 0) return
+    setActionError('')
+    try {
+      const rows = shown.map((reward) => [
+        reward.name,
+        String(reward.currentVersion?.requiredMiles ?? ''),
+        reward.benefitName
+          ? `${KIND_LABEL[reward.rewardKind]}「${reward.benefitName}」`
+          : KIND_LABEL[reward.rewardKind],
+        benefitSub(reward) ?? '',
+        `${reward.exchangedThisMonth}件`,
+        statusPill(reward.status).text,
+      ])
+      const csv = [['使い道', '必要なマイル', '交換すると渡るもの', '残り・期限', '今月交換された', '状態'], ...rows]
+        .map((row) => row.map((value) => csvCell(value)).join(','))
+        .join('\n')
+      const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `mileage-rewards-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setActionError('CSVを書き出せませんでした。もう一度お試しください。')
+    }
+  }, [shown])
+
+  useEffect(() => {
+    registerHeaderActions(
+      <Button onClick={exportCsv} disabled={status !== 'ready' || rewards.length === 0}>
+        <Download size={14} aria-hidden="true" /> CSV で書き出す
+      </Button>,
+    )
+    return () => registerHeaderActions(null)
+  }, [exportCsv, registerHeaderActions, rewards.length, status])
+
   return (
     <>
       <div className={styles.kpis} role="group" aria-label="今の数">
@@ -384,7 +495,7 @@ export default function V8RewardsTab({
         <div className={styles.kpi}>
           <div className={styles.kpiTop}>
             <span className={styles.kpiIcon}><ArrowLeftRight size={14} aria-hidden="true" /></span>
-            <span className={styles.kpiLabel}>今月交換</span>
+            <span className={styles.kpiLabel}>今月 交換</span>
           </div>
           <p className={styles.kpiValue}>
             {status !== 'ready' ? '—' : formatMileageNumber(exchangedCount ?? 0)}
@@ -422,6 +533,7 @@ export default function V8RewardsTab({
       </div>
 
       {actionError ? <Notice tone="danger" message={actionError} /> : null}
+      {menuNotice ? <Notice tone="success" message={menuNotice} /> : null}
 
       <div className={styles.columns}>
         <div className={styles.rail}>
@@ -437,6 +549,7 @@ export default function V8RewardsTab({
             }))}
             activeId={folder}
             onSelect={(id) => { setPage(1); setFolder(id as Folder) }}
+            addFolderNote="フォルダを消しても、中の経路は未分類に残ります"
           />
         </div>
 
@@ -625,6 +738,52 @@ export default function V8RewardsTab({
                                 {reward.status === 'published' ? '止める' : reward.status === 'stopped' ? 'また出す' : '出す'}
                               </Button>
                             ) : null}
+                            <IconButton
+                              aria-label={`${reward.name}のその他操作`}
+                              title="その他操作"
+                              disabled={readonly}
+                              onClick={() => setMenuId((current) => (current === reward.id ? null : reward.id))}
+                            >
+                              <MoreHorizontal size={14} aria-hidden="true" />
+                            </IconButton>
+                            <ActionMenu
+                              open={menuId === reward.id}
+                              ariaLabel={`${reward.name}の操作`}
+                              onClose={() => setMenuId(null)}
+                              items={[
+                                {
+                                  id: 'edit',
+                                  label: '編集',
+                                  external: true,
+                                  onSelect: () => router.push(`/mileage/rewards/edit?id=${encodeURIComponent(reward.id)}`),
+                                },
+                                {
+                                  id: 'test',
+                                  label: '自分で交換をテスト',
+                                  disabled: testBusyId === reward.id,
+                                  disabledReason: 'テストを実行しています',
+                                  onSelect: () => void runTest(reward),
+                                },
+                                {
+                                  id: 'toggle',
+                                  label: reward.status === 'published'
+                                    ? '出すのを止める'
+                                    : reward.status === 'stopped'
+                                      ? 'また出す'
+                                      : '出す',
+                                  disabled: busyId === reward.id,
+                                  disabledReason: '反映しています',
+                                  onSelect: () => void changeState(reward),
+                                },
+                                {
+                                  id: 'duplicate',
+                                  label: '複製',
+                                  disabled: duplicateId === reward.id || !reward.currentVersion,
+                                  disabledReason: duplicateId === reward.id ? '複製しています' : '複製する内容が取れていません',
+                                  onSelect: () => void duplicateReward(reward),
+                                },
+                              ]}
+                            />
                           </span>
                         </td>
                       </tr>
@@ -645,7 +804,7 @@ export default function V8RewardsTab({
           ) : null}
 
           {status === 'ready' && rewards.length > 0 ? (
-            <p className={styles.footnote}>行の「中身を見る」から編集・自分で交換をテスト・出すのを止める・複製。</p>
+            <p className={styles.footnote}>行の「…」から 編集・自分で交換をテスト・出すのを止める・複製。</p>
           ) : null}
 
           {retryNotice ? <Notice tone="success" message={retryNotice} /> : null}
