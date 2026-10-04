@@ -1241,11 +1241,12 @@ export default function TemplatesListV8() {
   const isTemplateSection = activeSection === 'message' || activeSection === 'question'
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node="L7zA7C">
       {/*
         骨格の印（data-design）は v7 の page.tsx 側が担う。ここへ別の節名を
         足すと、設計と画面の対を調べる design-structure の検査が
         V7＋V8 の和集合で見えてしまい、どちらの設計とも一致しなくなる。
+        板の印（data-design-node）は同じ面への追記なので足せる。
       */}
       <div className={styles.head}>
         <div className={styles.headText}>
