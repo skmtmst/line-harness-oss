@@ -15,7 +15,8 @@ import styles from './knowledge.module.css'
 import Notice from '@/components/shared/notice'
 
 /** ★V6 37-11-A DHdsw / 37-11-B ZAOc7. Mount with key={article.id}. */
-export default function KnowledgeEditor({ article: initial, ticket, onClose, onSaved }: {
+export default function KnowledgeEditor({ article: initial, ticket, onClose, onSaved, fullPage = false }: {
+  fullPage?: boolean
   article: OpsKnowledgeArticle
   /** 板 `eSXxA` の2つ目の確認と赤帯に使う元の問い合わせ。ないときは出さない。 */
   ticket?: { label: string; resolved: boolean; stageLabel: string } | null

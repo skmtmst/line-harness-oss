@@ -11,6 +11,7 @@ import type { OpsSupportDetail } from '@/lib/api'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const mocks = vi.hoisted(() => ({ list: vi.fn(), article: vi.fn(), update: vi.fn(), review: vi.fn(), feedback: vi.fn(), retry: vi.fn() }))
 vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { ops: { knowledge: mocks } } }))
+vi.mock('next/navigation', () => ({ usePathname: () => '/ops/knowledge' }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
 const article: OpsKnowledgeArticle = {
@@ -91,14 +92,15 @@ describe('V6 knowledge UI', () => {
   })
   it('shows ops-only columns and review actions without FAQ publishing controls', async () => {
     await act(async () => root.render(<OpsKnowledgePage />)); await flush()
-    expect(host.querySelector('[data-design-node="csVox"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="h114s"]')).not.toBeNull()
     expect(host.textContent).toContain('承認待ち')
-    expect(host.textContent).toContain('内容を確認')
+    expect(host.textContent).toContain('開く')
     expect(host.textContent).not.toContain('FAQ')
     expect(host.textContent).not.toContain('公開範囲')
-    expect(host.textContent).toContain('解決確認済み')
+    expect(host.querySelector('button[aria-label$="記事の種類"]')).not.toBeNull()
+    await act(async () => host.querySelector('summary')!.click())
     expect(host.querySelector('[data-design-node="aeKindFilter"]')).not.toBeNull()
-    expect(host.querySelectorAll('th')).toHaveLength(8)
+    expect(host.querySelectorAll('th')).toHaveLength(7)
   })
   it('requires evidence confirmation and saves the edited version before approval', async () => {
     // 板 `eSXxA`「記事を承認する前に」：2つ確かめてから保存して承認する。
@@ -197,9 +199,9 @@ describe('V8 ナレッジの集計範囲', () => {
       mocks.list.mockResolvedValue({ success: true, data: [{ ...article, usedCount: 7 }], total: 104 })
       await act(async () => root.render(<OpsKnowledgePage />)); await flush()
       expect(host.querySelector('[data-design-node="h114s"]')).not.toBeNull()
-      expect(host.textContent).toContain('条件に合う記事104')
-      expect(host.textContent).toContain('このページの承認待ち1')
-      expect(host.textContent).toContain('このページの利用回数7')
+      expect(host.textContent).toContain('104件中')
+      expect(host.textContent).toContain('承認待ち?1')
+      expect(host.textContent).toContain('使われた回数?7')
       expect(host.textContent).toContain('104件中 1〜1件')
       expect(mocks.review).not.toHaveBeenCalled()
     } finally { delete document.documentElement.dataset.theme }
