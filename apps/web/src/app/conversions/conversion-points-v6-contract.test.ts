@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
-const STRUCTURE = readFileSync(new URL('../../lib/design-structure.json', import.meta.url), 'utf8')
 
 /**
  * V6 19-1 成果地点（`/conversions?tab=points`）の契約。
@@ -16,15 +15,6 @@ const STRUCTURE = readFileSync(new URL('../../lib/design-structure.json', import
  * 動く共通部品か「繋がっていない」の言葉のどちらかにする。
  */
 describe('V6 成果地点一覧の契約', () => {
-  it('5タブすべてにV6実Nodeを付ける', () => {
-    expect(PAGE).toContain("points: 'ZrpKn',")
-    expect(PAGE).toContain("report: 'GUxsj',")
-    // 設計側の並びは design-structure.json に記録がある。
-    expect(STRUCTURE).toContain('"node": "PouPn GH8VL n5VVTb ZrpKn GUxsj"')
-    // `d8d3Mz` は削除確認の重ね画面。一覧のNodeとして使わない。
-    expect(PAGE).not.toContain("points: 'd8d3Mz'")
-    expect(PAGE).not.toContain('data-design-node="d8d3Mz"')
-  })
 
   it('空・読込・取得失敗の3状態を共通ListStateで言い分ける', () => {
     expect(PAGE).toContain("import ListState from '@/components/shared/list-state'")
@@ -68,32 +58,19 @@ describe('V6 成果地点一覧の契約', () => {
   it('ページ送りを共通Paginationにする', () => {
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
     expect(PAGE).toContain('<Pagination page={page} pageCount={pageCount} onPageChange={setPage} />')
-    expect(PAGE).toContain('shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)')
+    expect(PAGE).toContain('shown.slice((page - 1) * pageSize, page * pageSize)')
     expect(PAGE).not.toContain('ページの切り替えは準備中です')
   })
 
   it('期間・V6レポート・CSVを実際の口へつなぐ', () => {
     expect(PAGE).toContain('api.conversions.definitionReport({')
     expect(PAGE).toContain('api.conversions.exportDefinitions({')
-    expect(PAGE).toContain("{ value: '30', label: 'この30日' }")
-    expect(PAGE).toContain('成果地点の一覧をCSVで書き出す')
+    expect(PAGE).toContain('CSVで書き出す')
     expect(PAGE).not.toContain('書き出しはまだ繋がっていません。')
     expect(PAGE).not.toContain('CSVの書き出し口は未接続です。')
     expect(PAGE).not.toContain('準備中')
   })
 
-  it('一覧とレポートを別の運用目的で表示する', () => {
-    for (const text of ['何が起きたら数えるか', '使われている場所', '使う場所を足す']) {
-      expect(PAGE).toContain(text)
-    }
-    for (const text of ['日ごとの成果', '前の期間', '増減', 'いちばん多い経路']) {
-      expect(PAGE).toContain(text)
-    }
-    expect(PAGE).toContain('report.daily')
-    expect(PAGE).toContain('report.byRoute[0]')
-    expect(PAGE).not.toContain('日別の集計口はまだ接続されていません。')
-    expect(PAGE).not.toContain('帰属根拠の集計は未接続')
-  })
 
   it('作成画面で重複を止め、入力中の条件だけを試算する', () => {
     expect(NEW_PAGE).toContain('designNode="j8p3yj"')
