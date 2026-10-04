@@ -133,6 +133,12 @@ function unmount() {
 }
 
 beforeEach(() => {
+  // 予約を取り消せるオーナーとして操作する。実APIや他の試験の役割に依存させない。
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => key === 'lh_staff_role' ? 'owner' : null,
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+  })
   mocks.query = ''
   window.localStorage.setItem('lh_staff_role', 'admin')
   mocks.listRows = [draftRow('b-1', 'はじめの配信')]
@@ -145,6 +151,7 @@ beforeEach(() => {
 afterEach(() => {
   unmount()
   window.localStorage.removeItem('lh_staff_role')
+  vi.unstubAllGlobals()
 })
 
 describe('V8 一斉配信の通し', () => {

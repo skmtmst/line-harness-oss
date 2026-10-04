@@ -960,7 +960,7 @@ function EditCommonVarV8Inner() {
               <section className={styles.card} aria-labelledby="cv-edit-memo-heading">
                 <h2 id="cv-edit-memo-heading" className={styles.cardTitle}>社内メモ</h2>
                 <div className={styles.fieldBlock}>
-                  <label htmlFor="cv-memo" className={styles.fieldLabel}>メモ（お客さまには出せません）</label>
+                  <label htmlFor="cv-memo" className={styles.fieldLabel}>メモ（お客さまには出ません）</label>
                   <input
                     id="cv-memo"
                     type="text"

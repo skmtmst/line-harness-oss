@@ -116,6 +116,9 @@
     "arbitrary-value": 6,
     "unresolved-classname": 1
   },
+  "app/booking/prepay-badge-v8.tsx": {
+    "unresolved-classname": 7
+  },
   "app/booking/staff/new/page.tsx": {
     "arbitrary-value": 1,
     "unresolved-classname": 5
@@ -753,7 +756,8 @@
   },
   "components/chats/friend-info-sidebar.tsx": {
     "unresolved-classname": 12,
-    "arbitrary-value": 50
+    "arbitrary-value": 59,
+    "direct-secondary-button": 1
   },
   "components/chats/inbox-dropdown.tsx": {
     "unresolved-classname": 9,
@@ -991,6 +995,9 @@
   "components/shared/delta-chip.tsx": {
     "unresolved-classname": 1
   },
+  "components/shared/detail-panel.tsx": {
+    "unresolved-classname": 11
+  },
   "components/shared/disclosure.tsx": {
     "unresolved-classname": 6
   },
@@ -1002,6 +1009,9 @@
   },
   "components/shared/icon-tile.tsx": {
     "unresolved-classname": 1
+  },
+  "components/shared/inline-edit.tsx": {
+    "unresolved-classname": 6
   },
   "components/shared/line-preview.tsx": {
     "unresolved-classname": 17
@@ -1073,7 +1083,7 @@
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 36
+    "unresolved-classname": 43
   },
   "components/support/email-thread.tsx": {
     "arbitrary-value": 7

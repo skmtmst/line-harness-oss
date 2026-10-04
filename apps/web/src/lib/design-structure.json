@@ -242,7 +242,8 @@
       },
       "sections": [
         "Filters",
-        "Panes"
+        "Panes",
+        "PrepayBadge"
       ],
       "parts": [
         "要返信",
