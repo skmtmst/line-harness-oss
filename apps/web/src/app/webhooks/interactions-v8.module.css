@@ -201,9 +201,10 @@
 
 .payloadBox {
   margin: 12px 0 0;
+  border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card, 12px);
-  background: var(--color-ink);
-  color: var(--color-canvas);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink);
   padding: 16px;
   font-size: 12px;
   line-height: 1.8;

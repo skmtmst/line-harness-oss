@@ -27,6 +27,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
@@ -356,7 +357,37 @@ function InteractionsV8Inner() {
         />
       )
     }
-    if (loading && data.items.length === 0) return <ListState kind="loading" title="やり取りの記録を読み込んでいます" />
+    if (loading && data.items.length === 0) {
+      return (
+        <div aria-busy="true" aria-label="やり取りの記録を読み込んでいます">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true">
+                <div style={{ display: 'flex', gap: 24, padding: '12px 16px' }}>
+                  <Skeleton height={12} width={110} />
+                  <Skeleton height={12} width={80} />
+                  <Skeleton height={12} width={130} />
+                  <Skeleton height={12} width={50} />
+                  <Skeleton height={12} width={90} />
+                  <Skeleton height={12} width={40} />
+                </div>
+                {[0, 1, 2, 3, 4].map((row) => (
+                  <div key={row} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderTop: '1px solid var(--color-hairline)' }}>
+                    <Skeleton height={14} width={130} />
+                    <Skeleton height={14} width={110} />
+                    <span style={{ flex: 1 }}><Skeleton height={14} width="70%" /></span>
+                    <Skeleton height={14} width={60} />
+                    <Skeleton height={14} width={70} />
+                    <Skeleton height={30} width={80} />
+                  </div>
+                ))}
+              </div>
+            )}
+          />
+        </div>
+      )
+    }
     if (error) {
       return (
         <ListState

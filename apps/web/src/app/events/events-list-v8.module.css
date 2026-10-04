@@ -20,7 +20,7 @@
 .board {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
   container-type: inline-size;
 }
@@ -37,7 +37,7 @@
 .headTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -49,13 +49,20 @@
   line-height: 1.6;
 }
 
-/* 数の帯：白い板の左右いっぱい・縦線区切り（V8 の決まり）。 */
+/* 数の帯：白い板の左右いっぱい・上下の線だけ（板 `e2ekFu`）。 */
 .kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   background: var(--color-canvas);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  border-top: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-hairline);
+  margin: 0 -24px;
+}
+
+@media (max-width: 1023.98px) {
+  .kpis {
+    margin: 0 -16px;
+  }
 }
 
 .kpi {
@@ -100,17 +107,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
+  color: var(--color-ink);
+  font-size: 12px;
   font-weight: 500;
+  line-height: 1.5;
 }
 
 .kpiValue {
   color: var(--color-ink);
   font-size: 22px;
   font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: -0.4px;
+  line-height: 26px;
+  letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -144,7 +152,7 @@
 .main {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
 }
 

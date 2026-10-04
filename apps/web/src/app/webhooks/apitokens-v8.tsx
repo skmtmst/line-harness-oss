@@ -24,6 +24,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Notice from '@/components/shared/notice'
 import ActionMenu from '@/components/shared/action-menu'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
@@ -370,7 +371,35 @@ function ApiTokensV8Inner() {
           </section>
         ) : null}
 
-        {status === 'loading' ? <ListState kind="loading" title="鍵を読み込んでいます" /> : null}
+        {status === 'loading' ? (
+          <div aria-busy="true" aria-label="鍵を読み込んでいます">
+            <DelayedSkeleton
+              loading
+              skeleton={(
+                <div aria-hidden="true">
+                  <div style={{ display: 'flex', gap: 24, padding: '12px 16px' }}>
+                    <Skeleton height={12} width={50} />
+                    <Skeleton height={12} width={80} />
+                    <Skeleton height={12} width={70} />
+                    <Skeleton height={12} width={90} />
+                    <Skeleton height={12} width={40} />
+                    <Skeleton height={12} width={40} />
+                  </div>
+                  {[0, 1, 2, 3].map((row) => (
+                    <div key={row} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderTop: '1px solid var(--color-hairline)' }}>
+                      <Skeleton height={14} width={120} />
+                      <Skeleton height={14} width={140} />
+                      <Skeleton height={14} width={90} />
+                      <Skeleton height={14} width={110} />
+                      <Skeleton height={20} width={70} />
+                      <Skeleton height={30} width={80} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            />
+          </div>
+        ) : null}
         {status === 'error' ? (
           <ListState
             kind="error"
