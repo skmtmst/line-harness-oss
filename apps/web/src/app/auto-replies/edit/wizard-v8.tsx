@@ -403,6 +403,8 @@ function AutoReplyWizardV8Inner() {
 
   const [saving, setSaving] = useState(false)
   const [saveNotice, setSaveNotice] = useState('')
+  /** 保存が通った直後の「✓保存しました」（共通 Button の done、1.2秒）。 */
+  const [saveDone, setSaveDone] = useState(false)
   const [error, setError] = useState('')
   const [weekdayNotice, setWeekdayNotice] = useState('')
   const actionOptions = useActionOptions()
@@ -412,6 +414,10 @@ function AutoReplyWizardV8Inner() {
 
   const patch = (part: Partial<WizardForm>) => setForm((current) => ({ ...current, ...part }))
   const dirty = JSON.stringify(form) !== savedSnapshotRef.current
+
+  useEffect(() => {
+    if (dirty) setSaveDone(false)
+  }, [dirty])
 
   const { leaveTarget, confirmLeave, cancelLeave, disarm, guarded } = useUnsavedGuard({
     dirty,
@@ -2246,6 +2252,7 @@ function AutoReplyWizardV8Inner() {
               disabled={saving}
               busy={saving}
               busyLabel="保存中…"
+              done={saveDone}
             >
               {step === 'confirm' ? '下書きのまま保存' : '下書きとして保存'}
             </Button>
@@ -2269,6 +2276,7 @@ function AutoReplyWizardV8Inner() {
                 disabled={!publishReady || saving}
                 busy={saving}
                 busyLabel="有効にしています…"
+                done={saveDone}
               >
                 <Power size={14} aria-hidden="true" />
                 {wasPublished || isActive ? 'この内容で更新する' : '有効にする'}
