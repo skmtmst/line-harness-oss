@@ -1,0 +1,8 @@
+@layer properties, theme, base, components, utilities;
+.page { min-width: 0; container-type: inline-size; }
+.metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.metrics > div { min-width: 0; padding: 16px 20px; border-radius: 0; box-shadow: none; }
+.page table { table-layout: fixed; width: 100%; }
+.page th, .page td { padding: 12px 14px; font-size: 12px; }
+.page th { white-space: nowrap; }
+@container (max-width: 1000px) { .page th, .page td { padding-inline: 8px; } .page th:first-child { width: 26%; } }
