@@ -1165,7 +1165,7 @@ function InflowLinksPageInner({
                         )}
                       </td>
                     )}
-                    <td className={`px-2 py-3 font-medium text-ink ${styles.nameCell}`}>
+                    <td className={`px-5 py-[9px] font-medium text-ink ${styles.nameCell}`}>
                       {r.source === 'entry_route' && r.entryRouteId ? (
                         <Link
                           href={`/inflow-links/detail?id=${r.entryRouteId}`}
@@ -1207,7 +1207,7 @@ function InflowLinksPageInner({
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-2 py-3 text-ink-secondary">
+                    <td className="px-5 py-[9px] text-ink-secondary">
                       {pool ? (
                         <span className="block truncate whitespace-nowrap" title={pool.name}>{pool.name}</span>
                       ) : r.source === 'tracked_link' ? (
@@ -1226,11 +1226,11 @@ function InflowLinksPageInner({
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-3 text-ink-secondary">
+                    <td className="px-5 py-[9px] text-ink-secondary">
                       <span className={styles.twoLine} title={becameFirst}>{becameFirst}</span>
                       <span className={styles.twoLineSub} title={becameSecond}>{becameSecond}</span>
                     </td>
-                    <td className={`px-2 py-3 font-semibold text-ink ${styles.numCell}`}>
+                    <td className={`px-5 py-[9px] font-semibold text-ink ${styles.numCell}`}>
                       {summaryAvailable && r.stats ? (
                         <>
                           <span className={styles.twoLine}>{formatNumber(r.stats.friendCount)}人</span>
@@ -1240,13 +1240,13 @@ function InflowLinksPageInner({
                         <span className="text-ink-faint">—</span>
                       )}
                     </td>
-                    <td className={`px-2 py-3 text-ink-secondary ${styles.numCell}`}>
+                    <td className={`px-5 py-[9px] text-ink-secondary ${styles.numCell}`}>
                       {summaryAvailable && r.stats ? formatNumber(r.stats.clickCount) : '—'}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-3 text-ink-faint">
+                    <td className="whitespace-nowrap px-5 py-[9px] text-ink-faint">
                       {summaryAvailable ? formatDate(r.stats?.latestAt ?? null) : '—'}
                     </td>
-                    <td className={`px-2 py-3 ${styles.urlCell}`}>
+                    <td className={`px-5 py-[9px] ${styles.urlCell}`}>
                       {r.isActive === false ? (
                         /*
                           停止中の経路のURLとQRは出さない。開いても友だち追加
@@ -1277,7 +1277,7 @@ function InflowLinksPageInner({
                         </span>
                       )}
                     </td>
-                    <td className={`px-2 py-3 ${styles.moreCell}`}>
+                    <td className={`px-5 py-[9px] ${styles.moreCell}`}>
                       {menuItems.length > 0 ? (
                         <>
                           <button
