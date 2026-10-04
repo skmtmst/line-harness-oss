@@ -1360,6 +1360,13 @@ async function runFrequentHeavyJobs(
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
     {
+      name: 'follower import continuation',
+      run: async () => {
+        const { processPendingFollowerImports } = await import('./services/follower-import-background.js');
+        await processPendingFollowerImports(env.DB, { credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY });
+      },
+    },
+    {
       // EC の再試行（上限つき）の回収。落ちた受信を保存済み payload から
       // 同じ入口で回し直す。上限到達は dead letter へ倒す。安定キーと
       // claim で二重実行なし。停止中は回さない。

@@ -69,19 +69,19 @@ export default function NewLineAccountPage() {
   useEffect(() => { stepPanelRef.current?.focus() }, [currentStep])
 
   useEffect(() => {
-    if (!createdId || !importingIds) return
+    if (!createdId || !['importing_ids','hydrating_profiles'].includes(importState?.phase ?? connection?.followerImport.phase ?? '')) return
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const advance = async () => {
       try {
-        const response = await api.lineAccounts.stepFollowerImport(createdId)
+        const response = await api.lineAccounts.followerImportState(createdId)
         if (!active || !response.success) return
-        setImportState(response.data.state)
-        if (response.data.state.phase === 'importing_ids') {
-          timer = setTimeout(() => void advance(), 350)
+        setImportState(response.data)
+        if (['importing_ids','hydrating_profiles'].includes(response.data.phase)) {
+          timer = setTimeout(() => void advance(), 3000)
         }
       } catch {
-        if (active) timer = setTimeout(() => void advance(), 1500)
+        if (active) timer = setTimeout(() => void advance(), 5000)
       }
     }
     void advance()
@@ -89,7 +89,7 @@ export default function NewLineAccountPage() {
       active = false
       if (timer) clearTimeout(timer)
     }
-  }, [createdId, importingIds])
+  }, [createdId, importState?.phase, connection?.followerImport.phase])
 
   const update = (key: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [key]: value }))

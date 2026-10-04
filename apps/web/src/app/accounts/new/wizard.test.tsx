@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import NewLineAccountPage from './page'
 
 const calls = vi.hoisted(() => ({
-  connectCheck: vi.fn(), connect: vi.fn(), stepFollowerImport: vi.fn(),
+  connectCheck: vi.fn(), connect: vi.fn(), followerImportState: vi.fn(),
 }))
 // 登録完了直後の契約者専用LINEの登録案内（★V6 37-7）。既定は「運営側で未設定」なので何も出ない
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
@@ -154,16 +154,16 @@ describe('LINEアカウント作成ウィザード', () => {
         followerImport: { capability: 'available', phase: 'importing_ids' },
       },
     })
-    calls.stepFollowerImport.mockImplementation(() => new Promise((resolve) => { finishStep = resolve }))
+    calls.followerImportState.mockImplementation(() => new Promise((resolve) => { finishStep = resolve }))
     await enterConnectionStep()
     await checkConnection()
     fireEvent.click(screen.getByRole('button', { name: '接続して保存する' }))
     expect(await screen.findAllByText(/既存の友だちを取り込んでいます/)).toHaveLength(2)
     expect((screen.getByRole('button', { name: '登録したアカウントを見る' }) as HTMLButtonElement).disabled).toBe(true)
-    await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalled())
-    finishStep({ success: true, data: { state: {
+    await waitFor(() => expect(calls.followerImportState).toHaveBeenCalled())
+    finishStep({ success: true, data: {
       capability: 'available', phase: 'hydrating_profiles', received: 10, imported: 10,
-    }, busy: false } })
+    } })
     await waitFor(() => expect(screen.getByRole('link', { name: '登録したアカウントを見る' })).toBeTruthy())
   })
 })
