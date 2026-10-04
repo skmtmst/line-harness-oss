@@ -161,6 +161,8 @@ interface AdConversionLogRow {
   event_name: string;
   request_body: string | null;
   created_at: string;
+  idempotency_key: string | null;
+  status: string;
 }
 
 /** 送った中身から金額だけ拾う。無ければ付けない（送り直しは金額なしでも送れる）。 */
@@ -168,7 +170,7 @@ function pickEventValue(requestBody: string | null): number | undefined {
   if (!requestBody) return undefined;
   try {
     const parsed = JSON.parse(requestBody) as Record<string, unknown>;
-    for (const key of ['value', 'event_value', 'amount', 'eventValue']) {
+    for (const key of ['v', 'value', 'event_value', 'amount', 'eventValue']) {
       const candidate = parsed[key];
       if (typeof candidate === 'number' && Number.isFinite(candidate)) return candidate;
     }
@@ -178,8 +180,20 @@ function pickEventValue(requestBody: string | null): number | undefined {
   }
 }
 
+/** 今の記録は cur、旧形式は currency。主単位で保存された金額を再換算しない。 */
+function pickEventCurrency(requestBody: string | null): string | undefined {
+  if (!requestBody) return undefined;
+  try {
+    const parsed = JSON.parse(requestBody) as Record<string, unknown>;
+    const currency = parsed.cur ?? parsed.currency;
+    return typeof currency === 'string' && /^[a-z]{3}$/i.test(currency) ? currency.toUpperCase() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
- * F-22 広告への送信のやり直し。同じ目印（記録のID）で送り直すので、
+ * F-22 広告への送信のやり直し。元の送信と同じ目印で送り直すので、
  * 押した回数だけ重複しない。90日を過ぎた記録は受け付けない。
  */
 export async function resendAdConversion(
@@ -190,12 +204,14 @@ export async function resendAdConversion(
 ): Promise<{ logId: string; resent: boolean }> {
   const log = await db
     .prepare(
-      `SELECT l.id, l.ad_platform_id, l.friend_id, l.event_name, l.request_body, l.created_at
+      `SELECT l.id, l.ad_platform_id, l.friend_id, l.event_name, l.request_body, l.created_at,
+              l.idempotency_key, l.status
          FROM ad_conversion_logs l
          JOIN ad_platforms pl ON pl.id = l.ad_platform_id
-        WHERE l.id = ? AND pl.line_account_id = ?`,
+        WHERE l.id = ? AND pl.line_account_id = ?
+          AND (l.line_account_id IS NULL OR l.line_account_id = ?)`,
     )
-    .bind(logId, lineAccountId)
+    .bind(logId, lineAccountId, lineAccountId)
     .first<AdConversionLogRow>();
   if (!log) {
     throw new AdEventMappingError('log_not_found', '送信履歴が見つからないか、別のLINE公式アカウントにあります', 404);
@@ -205,11 +221,17 @@ export async function resendAdConversion(
   if (!Number.isFinite(ageDays) || ageDays > 90) {
     throw new AdEventMappingError('resend_expired', '90日を過ぎた送信はやり直せません', 409);
   }
+  if (log.status === 'sent') return { logId: log.id, resent: false };
+  if (log.status !== 'failed') {
+    throw new AdEventMappingError('resend_unavailable', '失敗した送信だけやり直せます', 409);
+  }
   await sendAdConversions(db, log.friend_id, log.event_name, pickEventValue(log.request_body), {
-    idempotencyKey: log.id,
+    idempotencyKey: log.idempotency_key || log.id,
     lineAccountId,
     platformId: log.ad_platform_id,
     credentialKey: opts?.credentialKey,
+    currency: pickEventCurrency(log.request_body),
+    now: opts?.now,
   });
   return { logId: log.id, resent: true };
 }

@@ -1,5 +1,5 @@
 // F-21 対応表の読み書き・F-22 送信のやり直し。
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type Database from 'better-sqlite3';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import {
@@ -8,6 +8,7 @@ import {
   resendAdConversion,
   saveAdEventMappings,
 } from './ad-event-mappings.js';
+import { sendAdConversions } from './ad-conversion.js';
 
 let db: SqliteD1;
 let raw: Database.Database;
@@ -37,6 +38,10 @@ beforeEach(() => {
   db = created;
   raw = created.raw;
   seedBase();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('F-21 対応表の読み書き', () => {
@@ -74,6 +79,38 @@ describe('F-21 対応表の読み書き', () => {
 });
 
 describe('F-22 送信のやり直し', () => {
+  it('失敗した元の送信を同じ目印・金額・通貨でやり直し、成功後は送らない', async () => {
+    raw.prepare(`UPDATE ad_platforms SET is_active = 1,
+      config = '{"pixel_id":"pixel-1","access_token":"token-1","click_id_validity_days":3650}'
+      WHERE id = 'platform-1'`).run();
+    raw.prepare(`INSERT INTO ref_tracking
+      (id, ref_code, friend_id, fbclid, line_account_id, ad_conversion_consent_at, created_at)
+      VALUES ('ref-1', 'ref-1', 'friend-1', 'click-1', 'account-1', ?, ?)`).run(
+        new Date().toISOString(), new Date().toISOString(),
+      );
+    const bodies: unknown[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: { body: string }) => {
+      bodies.push(JSON.parse(init.body));
+      return { ok: bodies.length > 1, status: bodies.length > 1 ? 200 : 500, text: async () => 'result' };
+    }));
+    await sendAdConversions(db.db, 'friend-1', 'Purchase', 1000, {
+      idempotencyKey: 'purchase-1', lineAccountId: 'account-1', currency: 'USD', amountInMinorUnit: true,
+    });
+    const log = raw.prepare('SELECT id FROM ad_conversion_logs').get() as { id: string };
+    expect(await resendAdConversion(db.db, log.id, 'account-1')).toEqual({ logId: log.id, resent: true });
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1]).toMatchObject({ data: [{
+      event_id: 'purchase-1:platform-1', event_name: 'Purchase',
+      custom_data: { value: 10, currency: 'USD' },
+    }] });
+    expect(raw.prepare('SELECT id, status, idempotency_key FROM ad_conversion_logs').all()).toEqual([
+      { id: log.id, status: 'sent', idempotency_key: 'purchase-1' },
+    ]);
+    expect(await resendAdConversion(db.db, log.id, 'account-1')).toEqual({ logId: log.id, resent: false });
+    expect(bodies).toHaveLength(2);
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM ad_conversion_outbox').get()).toEqual({ count: 1 });
+  });
+
   function insertLog(createdAt: string): string {
     raw.prepare(
       `INSERT INTO ad_conversion_logs
