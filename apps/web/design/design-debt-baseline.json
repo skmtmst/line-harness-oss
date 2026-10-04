@@ -1089,7 +1089,7 @@
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 35
+    "unresolved-classname": 36
   },
   "components/support/email-thread.tsx": {
     "arbitrary-value": 7
