@@ -3,6 +3,7 @@
  * ★V8 CTA・フォーム（`Q0Jrk`）の描画。
  * 差し替えるのは通信だけ。カードの一覧・選んだカードの欄・申込フォームが実在する。
  */
+import { fireEvent } from '@testing-library/react'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -32,10 +33,12 @@ import type { WebinarEditor } from '@/lib/api'
 
 const EDITOR = { version: 5, registrationFormId: null } as WebinarEditor
 
-function render(): HTMLElement {
+const roots: Root[] = []
+function render(props: Partial<Pick<React.ComponentProps<typeof CtaV8>, 'onDirtyChange' | 'registerSave'>> = {}): HTMLElement {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
+  roots.push(root)
   act(() => {
     root.render(
       <CtaV8
@@ -44,6 +47,7 @@ function render(): HTMLElement {
         durationSeconds={3600}
         editor={EDITOR}
         onEditorChange={() => undefined}
+        {...props}
       />,
     )
   })
@@ -70,6 +74,7 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
   })
 
   afterEach(() => {
+    act(() => { for (const root of roots.splice(0)) root.unmount() })
     document.body.innerHTML = ''
     vi.clearAllMocks()
   })
@@ -98,6 +103,27 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     })
     expect(apiMocks.saveCtas).not.toHaveBeenCalled()
     expect(host.textContent).toContain('2枚目')
+  })
+
+  it('下の保存操作へ登録し、失敗では入力と未保存の印を残して再試行できる', async () => {
+    let save: (() => Promise<boolean>) | null = null
+    const dirty = vi.fn()
+    const host = render({ registerSave: (callback) => { save = callback }, onDirtyChange: dirty })
+    await act(async () => undefined)
+    const title = host.querySelector('input') as HTMLInputElement
+    await act(async () => fireEvent.change(title, { target: { value: '新しいCTA' } }))
+    expect(dirty).toHaveBeenLastCalledWith(true)
+    apiMocks.saveCtas.mockRejectedValueOnce(new Error('temporary')).mockResolvedValueOnce({ data: [] })
+    let result = true
+    await act(async () => { result = await save!() })
+    expect(result).toBe(false)
+    expect(title.value).toBe('新しいCTA')
+    expect(host.textContent).toContain('入力は残っています')
+    expect(dirty).toHaveBeenLastCalledWith(true)
+    await act(async () => { result = await save!() })
+    expect(result).toBe(true)
+    expect(dirty).toHaveBeenLastCalledWith(false)
+    expect(apiMocks.saveCtas).toHaveBeenCalledTimes(2)
   })
 
   it('2枚とも埋めて保存すると2枚で送る', async () => {

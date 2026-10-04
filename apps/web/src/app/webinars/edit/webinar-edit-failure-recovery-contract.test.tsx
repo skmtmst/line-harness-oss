@@ -232,6 +232,10 @@ beforeAll(async () => {
     HTMLElement: FakeElement,
     HTMLIFrameElement: class extends FakeElement {},
     getSelection: () => null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    location: new URL('http://localhost/webinars/edit?id=webinar-1&pane=cta'),
+    history: { state: null, pushState: () => undefined, replaceState: () => undefined },
   })
   Object.assign(globalThis, {
     window: windowStub,
@@ -425,14 +429,14 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
       .mockResolvedValueOnce({ success: true, data: [{ id: 'form-a', name: '相談フォームA', isActive: true }] })
 
     const view = await mount(<EditWebinarPage />)
-    expect(view.container.textContent).toContain('フォーム候補を読み込めませんでした。')
+    expect(view.container.textContent).toContain('回答フォームを読み込めませんでした。')
     expect(view.container.textContent).toContain('候補が取れない間は種類をURLに切り替えて保存できます。')
 
     await clickButton(view.container, 'もう一度読み込む')
 
     expect(apiMocks.fetchApi).toHaveBeenCalledTimes(2)
     expect(view.container.textContent).toContain('相談フォームA')
-    expect(view.container.textContent).not.toContain('フォーム候補を読み込めませんでした。')
+    expect(view.container.textContent).not.toContain('回答フォームを読み込めませんでした。')
   })
 
   it('account切替後は、古いaccountの遅延応答で候補を上書きしない', async () => {
@@ -554,7 +558,7 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(inputValues(view.container)).not.toContain('旧CTA・A')
     expect(view.container.textContent).toContain('回答フォームを読み込んでいます。')
     expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(true)
-    expect(isDisabled(findExactButton(view.container, '保存する'))).toBe(true)
+    expect(isDisabled(findExactButton(view.container, 'CTAカードを保存する'))).toBe(true)
 
     formsB.resolve({ success: true, data: [{ id: 'form-b', name: '新フォームB', isActive: true }] })
     ctasB.resolve({ data: [ctaCard('新CTA・B', 60, 'form-b')] })
