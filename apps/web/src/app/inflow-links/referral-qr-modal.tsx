@@ -101,34 +101,9 @@ export default function ReferralQrModal({
             <div className="mt-5 text-center">
               {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}
               <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-card border border-hairline bg-canvas p-2" />
-              <p className="mt-3 break-all font-mono text-xs text-ink-secondary">{url}</p>
-              <div className="mt-3 flex gap-2">
-                {route.id ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => void downloadPdf()}
-                    disabled={pdfState === 'working'}
-                    className="flex-1"
-                  >
-                    {pdfState === 'working' ? '作っています…' : '印刷用PDF'}
-                  </Button>
-                ) : null}
-                <Button variant="primary" href={downloadUrl} download={`referral-${route.refCode}.png`} className="flex-1">
-                  PNGを保存
-                </Button>
-              </div>
-              {pdfState === 'failed' ? (
-                <p role="alert" className="mt-2 text-xs text-danger">
-                  PDFを作れませんでした。もう一度押してください。
-                </p>
-              ) : (
-                <p className="mt-2 text-xs text-ink-faint">
-                  印刷するときはPDFがきれいです。チラシ・POPでは3cm以上の大きさにしてください。
-                </p>
-              )}
-              <button type="button" onClick={copy} className="mt-2 text-xs font-semibold text-action hover:underline">
-                {copied ? 'コピーしました' : 'URLをコピー'}
-              </button>
+              <Button variant="primary" href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 w-full">
+                PNGを保存
+              </Button>
             </div>
           </>
         )}

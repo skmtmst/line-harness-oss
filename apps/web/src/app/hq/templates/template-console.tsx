@@ -14,6 +14,7 @@ import { hqTemplatesApi, type TemplateType, type TemplateDetail, type TemplateIn
 import styles from './template-console.module.css'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
 import TemplateDefinitionEditor, { definitionError, definitionForName, definitionName, freshDefinition, referenceCount } from './template-definition-editor'
+import TemplateMessageFormV8 from './template-message-v8'
 import { formatDateTime } from '@/lib/format'
 
 const LABELS: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム' }
@@ -391,7 +392,26 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
         <p className={styles.muted}>配ったあとに直すと、各アカウントへは新しい版として届きます（配布先の版で確かめられます）。</p>
       </>}
     </>}
-    {stage === 'edit' && <>
+    {stage === 'edit' && theme === 'v8' && type === 'template' && 'template' in definition && <>
+      {/* 板 X4JcOf（V8だけ）：絵の「ひな形の中身＋右に LINE の見え方＋一段のひな形を保存」。保存する中身は今の口のまま。 */}
+      <TemplateMessageFormV8
+        key={formKey}
+        name={name}
+        onNameChange={setName}
+        value={definition}
+        onChange={setDefinition}
+        disabled={busy || createUncertain}
+        busy={busy}
+        validation={validation}
+        createUncertain={createUncertain}
+        catalogFailed={catalogFailed}
+        onReloadCatalog={reloadCatalog}
+        onBusyChange={setUploadBusy}
+        onReceipt={noteSessionUpload}
+        onSave={() => save(false)}
+      />
+    </>}
+    {stage === 'edit' && !(theme === 'v8' && type === 'template') && <>
       {/* 正規エディタ（タグ/回答フォーム）は右asideを持たないため、空の260px段を残さない。谷間帯（1280〜1400px）で入力欄が潰れるのを防ぐ。 */}
       <div className={canonicalEditorOwnsSave ? styles.stack : styles.grid}><div className={styles.stack}><section className={styles.panel}>
         {catalogFailed ? (

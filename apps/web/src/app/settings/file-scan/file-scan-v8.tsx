@@ -5,9 +5,9 @@ import SearchField from '@/components/shared/search-field'
 import { DataTable, TableHeadRow, Th, Td, Tr } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
-import Select from '@/components/shared/select'
 import { RowActions } from '@/components/shared/row-actions'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -16,12 +16,12 @@ import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import { SettingsShellV8 } from '../settings-nav-v8'
 import styles from '../settings-v8.module.css'
 
-const STATUS_OPTIONS = [
-  { value: 'quarantined', label: '状態：しまったもの' },
-  { value: 'pending', label: '状態：確かめています' },
-  { value: 'rejected', label: '状態：使えません' },
-  { value: 'clean', label: '状態：使えます' },
-]
+/* 板 `PfA4o` の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
+const STATUS_CHIPS = [
+  { value: 'quarantined', label: 'しまったファイル' },
+  { value: 'pending', label: '確かめ中' },
+  { value: 'released', label: '戻した' },
+] as const
 
 /**
  * ファイルの検査の V8 画面（★V8-B `PfA4o`）。
@@ -33,6 +33,7 @@ export function FileScanV8() {
     phase,
     items,
     total,
+    counts,
     statusFilter,
     query,
     page,
@@ -199,13 +200,25 @@ export function FileScanV8() {
           しまったファイル
           <span className={`${styles.statusChip} ${styles.statusWarn} ${styles.chipInline}`}>{total}件</span>
         </h2>
-        <SearchField aria-label="ファイル名で探す" placeholder="ファイル名で探す" value={query} onChange={changeQuery} className={styles.toolbarSearch} />
-        <Select
-          aria-label="検査の状態"
-          value={statusFilter}
-          onChange={changeStatusFilter}
-          options={STATUS_OPTIONS}
-        />
+        <span className={styles.toolbarSearch}>
+          <input
+            type="search"
+            aria-label="ファイル名で探す"
+            placeholder="ファイル名で探す"
+            value={query}
+            onChange={(event) => changeQuery(event.target.value)}
+          />
+        </span>
+        {STATUS_CHIPS.map((chip) => (
+          <FilterChip
+            key={chip.value}
+            selected={statusFilter === chip.value}
+            onChange={() => changeStatusFilter(chip.value)}
+            count={counts[chip.value]}
+          >
+            {chip.label}
+          </FilterChip>
+        ))}
       </div>
 
       {items.length === 0 ? (

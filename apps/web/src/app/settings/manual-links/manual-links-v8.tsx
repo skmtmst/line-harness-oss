@@ -5,7 +5,7 @@ import SearchField from '@/components/shared/search-field'
 import { DataTable, TableHeadRow, Th, Td, Tr } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
+import FilterChip from '@/components/shared/filter-chip'
 import {
   LINK_STATUS_LABEL,
   VERIFY_SCHEDULE_NOTE,
@@ -43,7 +43,6 @@ export function ManualLinksV8() {
     startEdit,
     cancelEdit,
     saveEdit,
-    statusFilters,
   } = useManualLinks()
 
   if (status !== 'ready') {
@@ -91,13 +90,25 @@ export function ManualLinksV8() {
       </p>
 
       <div className={styles.toolbar}>
-        <SearchField aria-label="画面ID・画面名で検索" placeholder="画面ID・画面名で検索" value={query} onChange={setQuery} className={styles.toolbarSearch} />
-        <Select
-          aria-label="リンクの状態"
-          value={filter}
-          onChange={(value) => setFilter(value as typeof filter)}
-          options={statusFilters.map((f) => ({ value: f.value, label: `状態：${f.label}` }))}
-        />
+        <span className={styles.toolbarSearch}>
+          <input
+            type="search"
+            aria-label="画面ID・画面名で検索"
+            placeholder="画面ID・画面名で検索"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </span>
+        <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>
+          すべて
+        </FilterChip>
+        <FilterChip
+          selected={filter === 'broken'}
+          onChange={(next) => setFilter(next ? 'broken' : 'all')}
+          count={rows.filter((row) => row.status === 'broken').length}
+        >
+          開けない
+        </FilterChip>
         <Button variant="secondary" disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…">
           いま全部を確かめる
         </Button>

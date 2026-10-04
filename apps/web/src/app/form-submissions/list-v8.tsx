@@ -47,7 +47,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListRange from '@/components/ui/list-range'
 import { notifyToast } from '@/components/shared/toast'
 import { runUndoable } from '@/lib/undoable'
-import { loadFailureCopy } from '@/components/shared/api-error-message'
+import { isForbidden, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
@@ -1244,22 +1244,25 @@ export default function FormSubmissionsListV8() {
   } else if (loading) {
     listBody = <FormListSkeleton label="回答フォームの一覧を読み込んでいます" />
   } else if (loadError) {
-    /*
-     * 読み込み失敗の1枚は共通の案内文（m23m）。403 は押しても直らないので
-     * 再試行を出さない。429 は待てば直るので再試行を残す（R539）。
-     */
-    const failure = loadFailureCopy(loadFailure, '回答フォーム')
+    // 403は押しても直らないので再試行を出さない。429は待てば直るので
+    // 混み合いの案内と再試行を出す（R602）。絵の失敗の1枚が正本。
+    const forbidden = isForbidden(loadFailure)
+    const rateLimited = isForbiddenOrRateLimited(loadFailure) && !forbidden
     listBody = (
       <div className={styles.stateCard}>
         <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={20} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>
-          {failure.title}
+          {forbidden ? 'この一覧を見る権限がありません' : rateLimited ? '混み合っています' : '回答フォームを読み込めませんでした'}
         </p>
         <p className={styles.stateDesc}>
-          {failure.description}
+          {forbidden
+            ? 'アカウントの担当・役割の設定を確認してください。'
+            : rateLimited
+              ? '少し待ってから、もう一度お試しください。'
+              : '再読み込みしても直らないときは、エラー報告へお知らせください。'}
         </p>
-        {failure.retryable ? (
-          <Button type="button" variant="secondary" onClick={() => void loadForms()}>もう一度読み込む</Button>
+        {!forbidden ? (
+          <Button type="button" variant="secondary" onClick={() => void loadForms()}>もう一度試す</Button>
         ) : null}
       </div>
     )

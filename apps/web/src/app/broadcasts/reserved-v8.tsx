@@ -9,9 +9,9 @@
  * ボタン）＋送る前の注意 → 右の欄（次にできること → スマホの見本）。
  */
 import Link from 'next/link'
-import { CalendarCheck2, Copy, Eye, List, Send, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, CalendarCheck2, Copy, Eye, List, Send, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import type { ApiBroadcast } from '@/lib/api'
 import { messageTypeLabel } from '@/lib/broadcast-summary'
@@ -220,19 +220,29 @@ export default function ReservedV8({
         </aside>
       </div>
 
-      <ConfirmDialog
+      <Dialog
         open={cancelOpen}
         designNode="BeNtj"
         title={`「${broadcast.title}」の予約を取り消しますか？`}
-        description={`${scheduledLabel}に送る予定の${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`}に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。承認はやり直しになります。`}
-        confirmLabel="予約を取り消す"
-        cancelLabel="予約のまま残す"
-        primaryAction="cancel"
-        destructive
+        description="予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。送信が始まったあとは取り消せません。"
+        designNode="BeNtj"
         busy={cancelling}
         error={cancelError || undefined}
-        onConfirm={confirmCancel}
         onCancel={closeCancel}
+        footer={
+          <div className="flex w-full flex-wrap items-center gap-2">
+            <Button type="button" variant="danger" onClick={confirmCancel} disabled={cancelling} busy={cancelling} busyLabel="取り消しています…">
+              予約を取り消す
+            </Button>
+            <Button type="button" onClick={closeCancel} disabled={cancelling}>
+              やめる
+            </Button>
+            <span className="flex-1" />
+            <Button type="button" variant="primary" onClick={closeCancel} disabled={cancelling}>
+              <ArrowLeft aria-hidden="true" className="h-4 w-4" />予約のまま残す
+            </Button>
+          </div>
+        }
       >
         <dl className="text-ink-secondary space-y-1 text-xs">
           <div className="flex gap-2">
@@ -240,7 +250,7 @@ export default function ReservedV8({
             <dd className="min-w-0">{scheduledLabel}</dd>
           </div>
         </dl>
-      </ConfirmDialog>
+      </Dialog>
     </div>
   )
 }

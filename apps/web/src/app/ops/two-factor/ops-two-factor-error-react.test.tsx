@@ -94,7 +94,7 @@ async function submit() {
 }
 
 const submitButton = () =>
-  Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('登録を完了') || b.textContent?.includes('確認しています'))
+  Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('登録する') || b.textContent?.includes('登録しています'))
 
 describe('2要素認証の確認エラー', () => {
   it('400 が返ってもボタンを戻し、サーバーの文言をそのまま出す', async () => {
@@ -105,7 +105,7 @@ describe('2要素認証の確認エラー', () => {
     expect(alert?.textContent).toContain('認証コードが正しくありません')
     // 「確認しています…」のまま固まらず、もう一度押せる。
     const button = submitButton()
-    expect(button?.textContent).toContain('確認して登録を完了する')
+    expect(button?.textContent).toContain('登録する')
     expect(button?.disabled).toBe(false)
   })
 
@@ -118,7 +118,7 @@ describe('2要素認証の確認エラー', () => {
     const alert = host.querySelector('[role="alert"]')
     expect(alert?.textContent).toContain('サーバーでエラーが起きました')
     const button = submitButton()
-    expect(button?.textContent).toContain('確認して登録を完了する')
+    expect(button?.textContent).toContain('登録する')
     expect(button?.disabled).toBe(false)
   })
 
