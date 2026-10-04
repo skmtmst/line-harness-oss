@@ -69,7 +69,7 @@ describe('N-113 ウェビナーの申込フォーム選択の契約', () => {
     /* 保存済みの表示は editor の公開フォーム詳細から描く。 */
     expect(PAGE).toContain('editor.publicPage?.form')
     /* 公開前確認は公開フォームの有効状態を見る。 */
-    expect(PAGE).toContain('webinarApi.publishValidation(webinar.id)')
+    expect(fs.readFileSync(path.join(__dirname, 'review-v8.tsx'), 'utf8')).toContain('webinarApi.publishValidation(webinar.id)')
     expect(WORKER).toContain("key: 'form_active'")
     /* 保存後の案内で公開前確認へ誘導する。 */
     expect(PAGE).toContain('公開前確認で申込フォーム')

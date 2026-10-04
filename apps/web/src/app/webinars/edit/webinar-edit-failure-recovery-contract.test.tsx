@@ -20,6 +20,7 @@ const apiMocks = vi.hoisted(() => {
     fetchApi: vi.fn(),
     get: vi.fn(),
     editor: vi.fn(),
+    notifications: vi.fn(),
     analytics: vi.fn(),
     userComments: vi.fn(),
     participants: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock('@/lib/api', () => ({
   webinarApi: {
     get: apiMocks.get,
     editor: apiMocks.editor,
+    notifications: apiMocks.notifications,
     analytics: apiMocks.analytics,
     userComments: apiMocks.userComments,
     participants: apiMocks.participants,
@@ -254,6 +256,7 @@ beforeEach(() => {
   navigationMocks.query = 'id=webinar-1'
   apiMocks.get.mockImplementation((id: string) => Promise.resolve({ data: { ...webinar, id } }))
   apiMocks.editor.mockResolvedValue({ data: editor })
+  apiMocks.notifications.mockResolvedValue({ data: { settings: null } })
   apiMocks.analytics.mockResolvedValue({ data: analytics })
   apiMocks.ctas.mockResolvedValue({ data: [] })
   apiMocks.userComments.mockResolvedValue({ data: [] })

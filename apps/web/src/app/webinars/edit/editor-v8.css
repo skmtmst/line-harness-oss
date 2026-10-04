@@ -11,6 +11,7 @@
 [data-webinar-editor="v8"] [data-webinar-pane] { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 0; margin: 0 -24px; border-top: 1px solid var(--color-hairline); }
 [data-webinar-editor="v8"] [data-webinar-pane] > :is(div, fieldset):first-child { border: 0; margin: 0; padding: 24px 28px; min-width: 0; }
 [data-webinar-editor="v8"] [data-webinar-pane] > aside { width: auto; min-width: 0; padding: 24px; border-left: 1px solid var(--color-hairline); }
+[data-webinar-pane="review"] > :last-child { grid-column: 1 / -1; }
 [data-webinar-tabs] { display: flex; flex-wrap: wrap; gap: 24px; border-bottom: 1px solid var(--color-hairline); margin: 0 -24px; padding: 0 24px; }
 [data-webinar-tabs] button { padding: 8px 0; color: var(--color-ink-secondary); font-size: 13px; white-space: nowrap; border-bottom: 2px solid transparent; }
 [data-webinar-tabs] button[aria-current="page"] { border-bottom-color: var(--color-ink); color: var(--color-ink); font-weight: 600; }

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(__dirname, 'list-v8.tsx'), 'utf8')
 const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
 const PARTICIPANTS = fs.readFileSync(path.join(__dirname, 'edit/participants-v8.tsx'), 'utf8')
+const REVIEW = fs.readFileSync(path.join(__dirname, 'edit/review-v8.tsx'), 'utf8')
 const ANALYTICS = fs.readFileSync(path.join(__dirname, 'edit/analytics-v8.tsx'), 'utf8')
 const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
@@ -153,7 +154,6 @@ describe('V6 ウェビナー一覧の契約', () => {
   it('編集・公開前検査・運用・参加者・分析を実APIへ接続する', () => {
     for (const call of [
       'webinarApi.editor(id)',
-      'webinarApi.publishValidation(webinar.id)',
       'webinarApi.testPublicPage(webinar.id, editor.version)',
     ]) expect(EDIT).toContain(call)
     for (const call of [
@@ -161,6 +161,7 @@ describe('V6 ウェビナー一覧の契約', () => {
       'webinarApi.testNotifications(id)',
       'webinarApi.duplicate(id, editor.version)',
     ]) expect(PUBLISHED).toContain(call)
+    expect(REVIEW).toContain('webinarApi.publishValidation(webinar.id)')
     expect(PARTICIPANTS).toContain('webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE, filter || undefined)')
     expect(ANALYTICS).toContain('retention={analytics.retention')
     expect(PUBLISHED).toContain('editor.monitoring.notificationFailures')
