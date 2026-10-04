@@ -207,6 +207,12 @@ export default function TagsTabV8({
   /* 行の「…」メニュー。「フォルダへ移す」はメニューの2段目。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
+  /*
+   * ActionMenu は項目を選ぶと必ず onClose を呼ぶ。「フォルダへ移す」は
+   * 閉じずに2段目へ切り替えるため、選んだ直後の onClose だけ見送る印。
+   * （一斉配信の一覧と同じ直し。2段目を選ぶと閉じない不具合があった）
+   */
+  const keepMenuOpenRef = useRef(false)
   const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
   const load = useCallback(async () => {
@@ -467,7 +473,7 @@ export default function TagsTabV8({
   const rowMenuItems = (tag: Tag): ActionMenuItem[] => {
     if (menuMoveFor === tag.id) {
       return [
-        { id: 'move-back', label: '← 操作にもどる', onSelect: () => setMenuMoveFor(null) },
+        { id: 'move-back', label: '← 操作にもどる', onSelect: () => { keepMenuOpenRef.current = true; setMenuMoveFor(null) } },
         { id: 'move-ungrouped', label: '未分類', onSelect: () => void moveTagToGroup(tag, null) },
         ...groups.map((group) => ({
           id: `move-${group.id}`,
@@ -481,7 +487,7 @@ export default function TagsTabV8({
     const items_: ActionMenuItem[] = [
       { id: 'edit', label: '編集', external: true, disabled: readonly, disabledReason: readonly ? readonlyReason : undefined, onSelect: () => router.push(`/tags/edit?id=${tag.id}`) },
       { id: 'copy', label: '複製して作る', external: true, disabled: readonly, disabledReason: readonly ? readonlyReason : undefined, onSelect: () => router.push(`/tags/new?copy=${tag.id}`) },
-      { id: 'move', label: 'フォルダへ移す', disabled: readonly, disabledReason: readonly ? readonlyReason : undefined, onSelect: () => setMenuMoveFor(tag.id) },
+      { id: 'move', label: 'フォルダへ移す', disabled: readonly, disabledReason: readonly ? readonlyReason : undefined, onSelect: () => { keepMenuOpenRef.current = true; setMenuMoveFor(tag.id) } },
     ]
     /* 保管済みに戻す口は無いため、同じ確認を繰り返さない（v7 R190）。 */
     if (tag.status !== 'archived') {
@@ -771,7 +777,14 @@ export default function TagsTabV8({
                             </button>
                             <ActionMenu
                               open={openMenuId === tag.id}
-                              onClose={() => { setOpenMenuId(null); setMenuMoveFor(null) }}
+                              onClose={() => {
+                                // 2段目への切り替え直後は閉じない。外側・Esc は閉じる。
+                                if (keepMenuOpenRef.current) {
+                                  keepMenuOpenRef.current = false
+                                  return
+                                }
+                                setOpenMenuId(null)
+                              }}
                               ariaLabel={`タグ「${tag.name}」の操作`}
                               items={rowMenuItems(tag)}
                             />

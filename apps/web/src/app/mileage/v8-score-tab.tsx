@@ -34,6 +34,8 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import { DelayedSkeleton, Skeleton, useDelayedSkeleton } from '@/components/shared/skeleton'
+import MileageTableSkeleton from './mileage-table-skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ActionMenu from '@/components/shared/action-menu'
 import {
@@ -137,6 +139,9 @@ export default function V8ScoreTab({
   const [config, setConfig] = useState<ActionScoreRuleConfiguration | null>(null)
   const [rulesLoading, setRulesLoading] = useState(true)
   const [rulesError, setRulesError] = useState(false)
+  /* 骨組み判定（0.3秒以内なら出さない・出したら最低0.4秒）。表と数の帯で使う。 */
+  const showKpiSkel = useDelayedSkeleton(loading)
+  const showRulesSkel = useDelayedSkeleton(rulesLoading)
   const [ruleSearchInput, setRuleSearchInput] = useState('')
   const [ruleSearch, setRuleSearch] = useState('')
   const [gainOnly, setGainOnly] = useState(false)
@@ -394,8 +399,7 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>点が高い（{formatMileageNumber(highMin)}点〜）</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError ? '—' : formatMileageNumber(summary?.high ?? 0)}
-            <span className={styles.kpiUnit}> 人</span>
+            {showKpiSkel ? <Skeleton width="5ch" height={24} /> : loading || loadError ? '—' : (<>{formatMileageNumber(summary?.high ?? 0)}<span className={styles.kpiUnit}> 人</span></>)}
           </p>
           <p className={styles.kpiSub}>よく動く</p>
         </div>
@@ -405,8 +409,7 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>中くらい（{formatMileageNumber(normalMin)}〜{formatMileageNumber(highMin - 1)}点）</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError ? '—' : formatMileageNumber(summary?.normal ?? 0)}
-            <span className={styles.kpiUnit}> 人</span>
+            {showKpiSkel ? <Skeleton width="5ch" height={24} /> : loading || loadError ? '—' : (<>{formatMileageNumber(summary?.normal ?? 0)}<span className={styles.kpiUnit}> 人</span></>)}
           </p>
           <p className={styles.kpiSub}>ふつう</p>
         </div>
@@ -416,8 +419,7 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>低い（〜{formatMileageNumber(normalMin - 1)}点）</span>
           </div>
           <p className={styles.kpiValue}>
-            {loading || loadError ? '—' : formatMileageNumber(summary?.low ?? 0)}
-            <span className={styles.kpiUnit}> 人</span>
+            {showKpiSkel ? <Skeleton width="5ch" height={24} /> : loading || loadError ? '—' : (<>{formatMileageNumber(summary?.low ?? 0)}<span className={styles.kpiUnit}> 人</span></>)}
           </p>
           <p className={styles.kpiSub}>しばらく動いていない</p>
         </div>
@@ -427,10 +429,10 @@ export default function V8ScoreTab({
             <span className={styles.kpiLabel}>公開中のルール</span>
           </div>
           <p className={styles.kpiValue}>
-            {rulesLoading ? '—' : publishedVersionNo === null ? 'なし' : `版 ${formatMileageNumber(publishedVersionNo)}`}
+            {showRulesSkel ? <Skeleton width="5ch" height={24} /> : rulesLoading ? '—' : publishedVersionNo === null ? 'なし' : `版 ${formatMileageNumber(publishedVersionNo)}`}
           </p>
           <p className={styles.kpiSub}>
-            {rulesLoading ? '—' : hasDraftChanges ? '下書きに変更あり' : '下書きとの差はありません'}
+            {showRulesSkel ? <Skeleton width="10ch" height={12} /> : rulesLoading ? '—' : hasDraftChanges ? '下書きに変更あり' : '下書きとの差はありません'}
           </p>
         </div>
       </div>
@@ -492,19 +494,23 @@ export default function V8ScoreTab({
         </span>
       </div>
 
-      {loading ? (
-        <div className={styles.stateWrap} role="status" aria-label="読み込み中">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className={styles.skelRow} aria-hidden="true">
-              <span className={styles.skelDot} />
-              <span className={styles.skelBar} style={{ width: '22%' }} />
-              <span className={styles.skelBar} style={{ width: '14%' }} />
-              <span className={styles.skelBar} style={{ width: '18%' }} />
-              <span className={styles.skelBar} style={{ width: '10%', marginLeft: 'auto' }} />
-            </div>
-          ))}
-        </div>
-      ) : loadError ? (
+      <div aria-busy={loading}>
+        <DelayedSkeleton
+          loading={loading}
+          skeleton={(
+            <MileageTableSkeleton
+              columns={[
+                { header: '友だち', bar: '40%' },
+                { header: 'いまの点数', bar: '50%' },
+                { header: '帯', bar: '55%' },
+                { header: '30日間の変化', bar: '60%' },
+                { header: '最後の反応', bar: '60%' },
+                { header: '操作', bar: '80%' },
+              ]}
+            />
+          )}
+        >
+          {loadError ? (
         <div className={styles.stateWrap}>
           <div className={styles.errorBand} role="alert">
             行動スコアを読み込めませんでした
@@ -598,6 +604,8 @@ export default function V8ScoreTab({
           </table>
         </div>
       )}
+        </DelayedSkeleton>
+      </div>
 
       {!loading && !loadError && total > 0 ? (
         <div className={styles.footer}>
@@ -681,17 +689,21 @@ export default function V8ScoreTab({
           </span>
         </div>
 
-        {rulesLoading ? (
-          <div className={styles.stateWrap} role="status" aria-label="読み込み中">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className={styles.skelRow} aria-hidden="true">
-                <span className={styles.skelDot} />
-                <span className={styles.skelBar} style={{ width: '30%' }} />
-                <span className={styles.skelBar} style={{ width: '12%', marginLeft: 'auto' }} />
-              </div>
-            ))}
-          </div>
-        ) : rulesError || !editable ? (
+        <div aria-busy={rulesLoading}>
+          <DelayedSkeleton
+            loading={rulesLoading}
+            skeleton={(
+              <MileageTableSkeleton
+                columns={[
+                  { header: 'できごと（数え方）', bar: '45%' },
+                  { header: '点・今月当てはまった人', bar: '55%' },
+                  { header: '状態', bar: '70%' },
+                  { header: '操作', bar: '80%' },
+                ]}
+              />
+            )}
+          >
+            {rulesError || !editable ? (
           <div className={styles.stateWrap}>
             <div className={styles.errorBand} role="alert">
               できごとの決めごとを読み込めませんでした
@@ -785,6 +797,8 @@ export default function V8ScoreTab({
             </table>
           </div>
         )}
+          </DelayedSkeleton>
+        </div>
 
         {!readonly ? (
           <div className={styles.toolbar}>

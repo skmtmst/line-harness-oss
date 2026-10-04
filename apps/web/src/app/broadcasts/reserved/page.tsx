@@ -7,6 +7,7 @@ import { CalendarCheck2, Copy, Eye, List, Send } from 'lucide-react'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
@@ -227,6 +228,25 @@ function ReservedBroadcastContent() {
     )
   }
   if (accountLoading || loading) {
+    // V8 は出来上がり（頭の板と状態の段）と同じ形の骨組み（サクサク感 A）。
+    if (adminTheme === 'v8') {
+      return (
+        <div aria-busy="true" aria-label="予約結果を確認しています">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true" className="flex flex-col gap-4">
+                <Skeleton width="16ch" height="1.4em" />
+                <Skeleton width="60%" height="0.9em" />
+                <Skeleton width="100%" height="4em" />
+                <Skeleton width="100%" height="8em" />
+                <Skeleton width="100%" height="6em" />
+              </div>
+            )}
+          />
+        </div>
+      )
+    }
     return <ListState kind="loading" title="予約結果を確認しています" />
   }
 

@@ -9,6 +9,8 @@ import type { FriendListItem } from '@/lib/api'
 import type { FriendListColumn } from './friend-list-table'
 import Avatar from '@/components/shared/avatar'
 import Checkbox from '@/components/shared/checkbox'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatDay } from '@/lib/format'
 
 interface Props {
@@ -17,6 +19,10 @@ interface Props {
   onToggleSelect?: () => void
   onToggleAttention?: () => void
   visibleColumns: Set<FriendListColumn>
+  /** 行を押したとき（V8 は右の詳しい内容、v7 は従来どおり詳細へ）。 */
+  onSelect?: (friend: FriendListItem) => void
+  /** 詳しい画面へ進む（V8 はつながる移り変わり）。 */
+  onOpenDetail?: (href: string) => void
 }
 
 function statusView(status: FriendListItem['chatStatus']) {
@@ -50,8 +56,12 @@ export default function FriendListRow({
   onToggleSelect,
   onToggleAttention,
   visibleColumns,
+  onSelect,
+  onOpenDetail,
 }: Props) {
   const router = useRouter()
+  /* サクサク感 C〜E は V8 のときだけ。v7 は動きも行き先も今のままにする。 */
+  const isV8 = useAdminTheme() === 'v8'
   const status = statusView(friend.chatStatus)
   const latest = friend.latestIncomingMessage
   const lastContact = selectLastContactAt(friend)
@@ -60,20 +70,46 @@ export default function FriendListRow({
   /*
    * 行を押した先は友だちの詳細。一覧の行として正しい行き先にする。
    * 受信箱へは最新メッセージの列の明示のリンクからのみ行く。
+   * V8 は行を押すと右の詳しい内容（C①）、詳細へは入り口から移り変わりで進む（E）。
    */
-  const openDetail = () => router.push(`/friends/detail?id=${friend.id}`)
+  const detailHref = `/friends/detail?id=${friend.id}`
+  const chatHref = `/chats?friend=${friend.id}`
+  const openDetail = () => {
+    if (onOpenDetail) onOpenDetail(detailHref)
+    else router.push(detailHref)
+  }
+  const pressRow = () => {
+    if (isV8 && onSelect) onSelect(friend)
+    else openDetail()
+  }
 
-  return (
+  /*
+   * 右クリックでも行と同じ品ぞろえ（V8「サクサク感」D）。
+   * 注目は星と同じ向き（付ける・外すを今の状態で言い換える）。
+   */
+  const contextItems: ContextMenuItem[] = [
+    { id: 'detail', label: '詳細を開く', onSelect: () => openDetail() },
+    { id: 'chat', label: '受信箱で開く', onSelect: () => (onOpenDetail ? onOpenDetail(chatHref) : router.push(chatHref)) },
+  ]
+  if (onToggleAttention) {
+    contextItems.push({
+      id: 'attention',
+      label: attention ? '注目を外す' : '注目を付ける',
+      onSelect: () => onToggleAttention(),
+    })
+  }
+
+  const body = (
     <div
       role="link"
       tabIndex={0}
-      aria-label={`${friend.displayName}の詳細を開く`}
-      onClick={openDetail}
+      aria-label={isV8 && onSelect ? `${friend.displayName}の詳しい内容を見る` : `${friend.displayName}の詳細を開く`}
+      onClick={pressRow}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return
         if (event.key === 'Enter') {
           event.preventDefault()
-          openDetail()
+          pressRow()
         }
       }}
       data-friend-cols
@@ -217,6 +253,14 @@ export default function FriendListRow({
       ) : null}
     </div>
   )
+  if (isV8 && (onSelect || onOpenDetail)) {
+    return (
+      <ContextMenu label={`${friend.displayName}の操作`} items={contextItems}>
+        {body}
+      </ContextMenu>
+    )
+  }
+  return body
 }
 
 /**

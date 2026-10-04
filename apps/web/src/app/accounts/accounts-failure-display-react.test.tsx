@@ -20,7 +20,9 @@ vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
 vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/accounts',
 }))
 
 const ACCOUNTS = [
