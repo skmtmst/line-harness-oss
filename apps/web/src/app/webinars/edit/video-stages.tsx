@@ -38,7 +38,7 @@ const NEXT_LABEL: Record<string, string> = {
  * N: 動画の準備の段を見る・進める。準備（ready）が済むまで公開できない。
  * 従来の動画（資産の行が無い）には出さない。
  */
-export default function VideoStages({ webinarId, hasVideo }: { webinarId: string; hasVideo: boolean }) {
+export default function VideoStages({ webinarId, hasVideo, canEdit = true }: { webinarId: string; hasVideo: boolean; canEdit?: boolean }) {
   const [asset, setAsset] = useState<WebinarVideoAsset | null | undefined>(undefined)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -59,6 +59,7 @@ export default function VideoStages({ webinarId, hasVideo }: { webinarId: string
   }, [hasVideo, load])
 
   const advance = async (stage: string) => {
+    if (!canEdit || busy) return
     setBusy(true)
     setError('')
     try {
@@ -74,7 +75,7 @@ export default function VideoStages({ webinarId, hasVideo }: { webinarId: string
   if (!hasVideo) return null
   if (asset === undefined) {
     return error ? (
-      <p className="text-danger mt-3 text-xs" role="alert">
+      <p className="text-ink-secondary mt-3 text-xs" role="alert">
         {error}
         <button type="button" onClick={() => void load()} className="ml-2 font-medium underline">
           もう一度読み込む
@@ -87,7 +88,7 @@ export default function VideoStages({ webinarId, hasVideo }: { webinarId: string
   if (asset === null) {
     return (
       <div className="mt-3">
-        <Button onClick={() => void advance('uploaded')} disabled={busy} busy={busy} busyLabel="始めています…">動画の準備を始める
+        <Button onClick={() => void advance('uploaded')} disabled={busy || !canEdit} busy={busy} busyLabel="始めています…">動画の準備を始める
         </Button>
         {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
       </div>
@@ -143,7 +144,7 @@ export default function VideoStages({ webinarId, hasVideo }: { webinarId: string
       {nextStages.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {nextStages.map((next) => (
-            <Button key={next} onClick={() => void advance(next)} disabled={busy}>
+            <Button key={next} onClick={() => void advance(next)} disabled={busy || !canEdit}>
               {NEXT_LABEL[next] ?? next}
             </Button>
           ))}

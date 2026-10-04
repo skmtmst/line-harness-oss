@@ -11,9 +11,8 @@ import NewWebinarPage from './page'
 
 /*
  * ★V8-B ウェビナー①基本設定（作る）（板 `j7PP04`）の契約。
- * `<html data-theme="v8">` の下でだけ新しい作る画面に切り替わり、
+ * V8 の作る画面に統一し、
  * 5段の帯・開催形式・見え方・下の帯が出ることを実DOMで固定する。
- * v7 では従来の作る画面が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -68,10 +67,4 @@ test('v8 では j7PP04 の作る画面（5段の帯・開催形式・見え方�
   expect(board?.textContent).toContain('日時指定配信')
   expect(board?.textContent).toContain('LINE での見え方')
   expect(board?.textContent).toContain('動画の設定へ')
-})
-
-test('v7 では従来の作る画面が出て j7PP04 は出ない', async () => {
-  await renderPage()
-  expect(host.querySelector('[data-design-node="j7PP04"]')).toBeNull()
-  expect(host.querySelector('[data-design-node="lvaY5"]')).not.toBeNull()
 })

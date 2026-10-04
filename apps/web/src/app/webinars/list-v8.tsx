@@ -1,35 +1,6 @@
 'use client'
 
-/*
- * ★V8-B ウェビナー一覧（Pencil「★V8-B 画面の地図」のウェビナーの行：
- * 一覧 `UyUMw`、状態 `eAQ3t`、1152 `uBMuB`、閲覧のみ `jiNg0`、
- * アーカイブの確かめ `VXZ6T`）。
- *
- * v7 の一覧（`page.tsx` の WebinarsPage）とは別の部品として持つ。
- * データの口（取得・絞り込み・ページ送り・フォルダ・アーカイブ）は同じ。
- * 違いは置き場と見せ方——「ウェビナーを作る」はフォルダの列の上、
- * 数の帯は白い板の左右いっぱい・区切り線、表は「名前・状態・申込・
- * 視聴（完了／開始の2行）・公開期間・操作（編集＋…）」。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- *
- * 見本と今の作りが合わない所（API が無い所は作らない。今の形のまま）：
- * - 頭の「CSV で書き出す」：一覧ぶんの書き出し口が無いので置かない。
- *   参加者ぶんの書き出しは公開後の参加者の画面（`uNsEy`）に出す。
- * - 数の帯の「…」：押した先が無いので置かない。
- * - 帯の「今月の申込」「先月より+36」：概要の口は全期間の集計で、
- *   今月・先月の区切りが無いので「申込」「延べ予約 N件」と出す。
- * - 帯の「視聴完了」「CTAクリック」：概要の口の視聴は未集計、
- *   CTAは人数と回数が取れるので「CTA反応」「押した人 N人・N回」と出す。
- * - 行の「視聴完了」：一覧の口に完了数が無いので「—」。
- *   一覧の口の視聴数（入場した友だち）は「視聴開始」に出す。
- * - 行の「非公開」「受付中」：公開期間が終わったものは「終了」にそろえる
- *   （`VXZ6T` と同じ。`UyUMw` の5行目は「非公開」とあるが不整合）。
- * - 道具の並び順：見本に無いが、仕様（17 §1）が操作に挙げているので残す。
- * - 行の「…」の中身：今ある操作だけ（参加者・分析・コメント演出・
- *   アーカイブ）。複製・削除・公開ページを見るは口が無いので足さない。
- * - アーカイブの確かめの「いつでも元に戻せます」：戻す口が無いので
- *   「「アーカイブ」のフォルダで確認できます」と出す。
- */
+/* ★V8の一覧・閲覧のみ・狭い幅。数は実データで、未集計のものは「—」。 */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -46,6 +17,8 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import SortSelect from '@/components/ui/sort-select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
+import HelpTip from '@/components/shared/help-tip'
+import { webinarListCsv } from './list-csv'
 import FilterChip from '@/components/shared/filter-chip'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -74,12 +47,16 @@ import { webinarLoadFailure, type WebinarLoadFailure } from './webinar-load-fail
 import styles from './list-v8.module.css'
 
 type SortKey = 'updated' | 'created' | 'name'
-type SavedFilter = '' | 'active' | 'draft'
+type SavedFilter = '' | 'active' | 'draft' | 'archived'
 
 const UNFILED = '__unfiled__'
 
 /** 検索入力を口へ渡すまでの待ち時間。1文字ごとの取り直しを束ねる。 */
-const WEBINAR_SEARCH_DEBOUNCE_MS = 300
+export const WEBINAR_SEARCH_DEBOUNCE_MS = 300
+export function scheduleWebinarSearch(query: string, onReady: (value: string) => void): () => void {
+  const timer = setTimeout(() => onReady(query), WEBINAR_SEARCH_DEBOUNCE_MS)
+  return () => clearTimeout(timer)
+}
 
 function scheduleSummary(w: Webinar): string {
   if (w.schedule.length === 0) return '未設定'
@@ -123,16 +100,17 @@ function publicationSummary(webinar: WebinarListItem): string {
  * 使わない。公開の予定は「公開予定」にそろえる。
  */
 function statusLabelV8(webinar: WebinarListItem): string {
+  if (webinar.status === 'archived') return 'アーカイブ'
   if (webinar.publicationState === 'scheduled') return '公開予定'
   if (webinar.publicationState === 'ended') return '終了'
   if (webinar.status === 'draft') return '下書き'
-  if (webinar.status === 'archived') return 'アーカイブ'
   return '公開中'
 }
 
 function statusPillClass(webinar: WebinarListItem): string {
+  if (webinar.status === 'archived') return `${styles.pill} ${styles.pillNeutral}`
   if (webinar.publicationState === 'scheduled') return `${styles.pill} ${styles.pillScheduled}`
-  if (webinar.status === 'active') return `${styles.pill} ${styles.pillActive}`
+  if (webinar.status === 'active' && webinar.publicationState !== 'ended') return `${styles.pill} ${styles.pillActive}`
   return `${styles.pill} ${styles.pillNeutral}`
 }
 
@@ -191,7 +169,7 @@ function webinarKpiCells(overview: WebinarOverview | null): KpiCell[] {
     { key: 'webinars', icon: <Video size={14} />, label: 'ウェビナー', value: total, unit: '件', sub: active },
     { key: 'registrations', icon: <Users size={14} />, label: '申込', value: registrations, unit: '人', sub: bookings },
     { key: 'viewers', icon: <CalendarClock size={14} />, label: '視聴', value: viewers, unit: '人', sub: viewRate },
-    { key: 'cta', icon: <MousePointerClick size={14} />, label: 'CTA反応', value: ctaClicks, unit: '回', sub: ctaPeople },
+    { key: 'cta', icon: <MousePointerClick size={14} />, label: 'CTAクリック', value: ctaClicks, unit: '回', sub: ctaPeople },
   ]
 }
 
@@ -251,7 +229,7 @@ function WebinarFolderDialog({
  * 3点目の「いつでも元に戻せます」は戻す口が無いので、
  * 「「アーカイブ」のフォルダで確認できます」と出す。
  */
-function WebinarArchiveConfirmV8({
+export function WebinarArchiveConfirmV8({
   target,
   busy,
   error,
@@ -265,26 +243,27 @@ function WebinarArchiveConfirmV8({
   onConfirm: () => void
 }) {
   const blocked = target.status === 'active'
+  const restoring = target.status === 'archived'
   return (
     <ConfirmDialog
       open
       designNode="VXZ6T"
-      title="ウェビナーをアーカイブしますか？"
-      description="アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。"
-      confirmLabel="アーカイブする"
-      destructive
+      title={restoring ? 'ウェビナーを下書きに戻しますか？' : 'ウェビナーをアーカイブしますか？'}
+      description={restoring ? '通常の一覧に戻します。公開するまでは、新しい申込は受け付けません。' : 'アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。'}
+      confirmLabel={restoring ? '下書きに戻す' : 'アーカイブする'}
+      destructive={!restoring}
       busy={busy}
       error={error}
       onCancel={onCancel}
       onConfirm={blocked ? undefined : onConfirm}
     >
-      <p className={styles.archiveTarget}>アーカイブの対象</p>
+      <p className={styles.archiveTarget}>{restoring ? '下書きに戻す対象' : 'アーカイブの対象'}</p>
       <p className={styles.archiveTargetSub}>{target.title}（{publicationSummary(target)}）</p>
-      <ul className={styles.archiveAfter}>
+      {restoring ? <p className={styles.archiveAfter}>参加者・視聴の記録・分析はそのまま残ります。</p> : <ul className={styles.archiveAfter}>
         <li>・参加者・視聴の記録・分析はそのまま見られます</li>
         <li>・公開ページは閉じ、新しい申込は受け付けません</li>
-        <li>・「アーカイブ」のフォルダで確認できます</li>
-      </ul>
+        <li>・絞り込みの「アーカイブ済み」から確認し、下書きに戻せます</li>
+      </ul>}
       {blocked ? (
         <Notice tone="warn">
           公開中のウェビナーは、このままではアーカイブできません。先に公開を停止してから、もう一度アーカイブしてください。
@@ -343,7 +322,7 @@ function WebinarListSkeleton() {
   )
 }
 
-function WebinarListTableV8({
+export function WebinarListTableV8({
   items,
   canEdit,
   readonlyReason,
@@ -370,7 +349,7 @@ function WebinarListTableV8({
         </thead>
         <tbody>
           {items.map((w) => {
-            const unpublished = isUnpublished(w)
+            const unpublished = w.status !== 'archived' && isUnpublished(w)
             const viewStarted = unpublished ? '—' : peopleText(w.viewerCount)
             const period = publicationSummary(w)
             return (
@@ -402,7 +381,7 @@ function WebinarListTableV8({
                         { id: 'comments', label: 'コメント演出を開く', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=comments`) },
                         {
                           id: 'archive',
-                          label: 'アーカイブする',
+                          label: w.status === 'archived' ? '下書きに戻す' : 'アーカイブする',
                           onSelect: () => onArchive(w),
                           disabled: !canEdit,
                           disabledReason: canEdit ? undefined : readonlyReason,
@@ -448,7 +427,7 @@ function commitWebinarListResponse(args: {
   return { items: res.data.items as WebinarListItem[], total: res.data.total, loadedAccountId: args.accountId }
 }
 
-async function requestWebinarListV8(args: {
+export async function requestWebinarListV8(args: {
   list: (accountId: string, params: WebinarListParams) => Promise<{ data: WebinarListResponse }>
   snapshot: WebinarListSnapshot
   generation: number
@@ -464,6 +443,20 @@ async function requestWebinarListV8(args: {
     accountId: args.accountId,
     res,
   })
+}
+
+export function WebinarListErrorNotice({ failure, onRetry }: { failure: WebinarLoadFailure; onRetry: () => void }) {
+  return <div role="alert" className="border-hairline border-b px-4 py-3"><p className="text-ink text-sm font-semibold">{failure.title}</p><p className="text-ink-secondary mt-1 text-xs">{failure.description}</p>{failure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : null}</div>
+}
+
+export function WebinarListContent({ accountLoading, loading, selectedAccountId, accountsCount, loadFailure, visibleItems, panelGrand, refreshing, onRetry, onArchive, canEdit = true, readonlyReason = '', onClearFilters = () => undefined }: {
+  accountLoading: boolean; loading: boolean; selectedAccountId: string | null; accountsCount: number; loadFailure: WebinarLoadFailure | null; visibleItems: WebinarListItem[]; panelGrand: number | null; refreshing: boolean; onRetry: () => void; onArchive: (item: WebinarListItem) => void; canEdit?: boolean; readonlyReason?: string; onClearFilters?: () => void
+}) {
+  if (accountLoading || loading) return <WebinarListSkeleton />
+  if (!selectedAccountId) return <ListState kind="empty" title={accountsCount > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
+  if (loadFailure && visibleItems.length === 0) return <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : undefined} />
+  if (visibleItems.length === 0) return panelGrand === 0 ? <ListState kind="empty" title="まだ、ウェビナーはありません" description="録画やライブのセミナーを作ると、LINEで案内して申込を受けられます。" action={canEdit ? <Button href="/webinars/new">＋ ウェビナーを作る</Button> : <Button disabled title={readonlyReason}>＋ ウェビナーを作る</Button>} /> : <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索や絞り込みを外すと、すべて出ます。" action={<Button onClick={onClearFilters}>条件を外す</Button>} />
+  return <>{loadFailure ? <WebinarListErrorNotice failure={loadFailure} onRetry={onRetry} /> : null}{refreshing ? <p role="status" className="text-ink-faint text-xs">検索中…</p> : null}<WebinarListTableV8 items={visibleItems} canEdit={canEdit} readonlyReason={readonlyReason} onArchive={onArchive} /></>
 }
 
 export default function WebinarListV8() {
@@ -491,6 +484,7 @@ function WebinarListV8Inner() {
   const [grandTotal, setGrandTotal] = useState(0)
   const [grandAccountId, setGrandAccountId] = useState<string | null>(null)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
+  const [overviewFailure, setOverviewFailure] = useState<WebinarLoadFailure | null>(null)
   const [overview, setOverview] = useState<WebinarOverview | null>(null)
   const [loadedOverviewAccountId, setLoadedOverviewAccountId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -506,6 +500,7 @@ function WebinarListV8Inner() {
   const [archiveTarget, setArchiveTarget] = useState<WebinarListItem | null>(null)
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState('')
+  const [foldersReady, setFoldersReady] = useState(false)
   const [folders, setFolders] = useState<WebinarFolder[]>([])
   const [selectedFolder, setSelectedFolder] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
@@ -571,6 +566,7 @@ function WebinarListV8Inner() {
   const refreshOverview = useCallback(async () => {
     const generation = ++overviewRequestGeneration.current
     setOverview(null)
+    setOverviewFailure(null)
     setLoadedOverviewAccountId(null)
     if (!selectedAccountId) return
     const accountId = selectedAccountId
@@ -579,9 +575,10 @@ function WebinarListV8Inner() {
       if (overviewRequestGeneration.current !== generation) return
       setOverview(res.data)
       setLoadedOverviewAccountId(accountId)
-    } catch {
+    } catch (cause) {
       if (overviewRequestGeneration.current !== generation) return
       setLoadedOverviewAccountId(accountId)
+      setOverviewFailure(webinarLoadFailure(cause))
     }
   }, [selectedAccountId])
 
@@ -594,11 +591,7 @@ function WebinarListV8Inner() {
   }, [items, total, loadedAccountId])
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setPage(1)
-      setDebouncedQuery(query)
-    }, WEBINAR_SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
+    return scheduleWebinarSearch(query, (value) => { setPage(1); setDebouncedQuery(value) })
   }, [query])
 
   useEffect(() => {
@@ -629,11 +622,12 @@ function WebinarListV8Inner() {
   const refreshFolders = useCallback(async () => {
     const generation = ++folderRequestGeneration.current
     setFolders([])
+    setFoldersReady(false)
     if (!selectedAccountId) return
     try {
       const response = await webinarApi.folders(selectedAccountId)
       if (folderRequestGeneration.current === generation) {
-        setFolders(response.success ? response.data : [])
+        setFolders(response.success ? response.data : []); setFoldersReady(response.success && Array.isArray(response.data))
       }
     } catch {
       if (folderRequestGeneration.current === generation) setFolders([])
@@ -646,7 +640,7 @@ function WebinarListV8Inner() {
   }, [refreshFolders])
 
   const saveFolder = async (name: string) => {
-    if (!selectedAccountId || folderBusy) return
+    if (!selectedAccountId || !canEdit || folderBusy) return
     setFolderBusy(true)
     setFolderError('')
     try {
@@ -671,7 +665,7 @@ function WebinarListV8Inner() {
    * 5秒は Toast の「元に戻す」で止められる（戻す口は同じ並べ替え）。
    */
   const moveFolder = (index: number, direction: -1 | 1) => {
-    if (!selectedAccountId || folderBusy) return
+    if (!selectedAccountId || !canEdit || folderBusy) return
     const otherIndex = index + direction
     const current = folders[index]
     const other = folders[otherIndex]
@@ -701,7 +695,7 @@ function WebinarListV8Inner() {
   }
 
   const removeFolder = async () => {
-    if (!selectedAccountId || !deletingFolder || folderBusy) return
+    if (!selectedAccountId || !canEdit || !deletingFolder || folderBusy) return
     setFolderBusy(true)
     setFolderError('')
     try {
@@ -726,8 +720,8 @@ function WebinarListV8Inner() {
   const pageCount = Math.max(1, Math.ceil(visibleTotal / pageSize))
   const currentPage = Math.min(page, pageCount)
   const visible = visibleItems
-  const panelGrand = grandAccountId === selectedAccountId ? grandTotal : 0
-  const unfiledCount = Math.max(0, panelGrand - folders.reduce((sum, folder) => sum + folder.count, 0))
+  const panelGrand = grandAccountId === selectedAccountId ? grandTotal : null
+  const unfiledCount = panelGrand === null || !foldersReady ? null : Math.max(0, panelGrand - folders.reduce((sum, folder) => sum + folder.count, 0))
 
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
@@ -743,13 +737,19 @@ function WebinarListV8Inner() {
     setArchiving(true)
     setArchiveError('')
     try {
-      await webinarApi.archive(archiveTarget.id)
+      if (archiveTarget.status === 'archived') {
+        await webinarApi.update(archiveTarget.id, { status: 'draft' })
+      } else {
+        await webinarApi.archive(archiveTarget.id)
+      }
       setArchiveTarget(null)
       await Promise.all([refresh(), refreshOverview(), refreshGrandTotal()])
     } catch (error) {
       setArchiveError(error instanceof ApiError && error.status === 409
         ? '公開中のウェビナーは、先に公開を停止してください。'
-        : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。')
+        : archiveTarget.status === 'archived'
+          ? '下書きに戻せませんでした。もう一度お試しください。'
+          : 'アーカイブできませんでした。状態を読み直して、もう一度お試しください。')
     } finally {
       setArchiving(false)
     }
@@ -770,61 +770,34 @@ function WebinarListV8Inner() {
       label: folder.name,
       count: folder.count,
       color: folder.color,
-      onEdit: () => { setFolderError(''); setEditingFolder(folder) },
-      onMoveUp: index > 0 ? () => void moveFolder(index, -1) : undefined,
-      onMoveDown: index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
-      onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
+      onEdit: canEdit ? () => { setFolderError(''); setEditingFolder(folder) } : undefined,
+      onMoveUp: canEdit && index > 0 ? () => void moveFolder(index, -1) : undefined,
+      onMoveDown: canEdit && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
+      onDelete: canEdit ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
       deleteNote: '削除しても、中のウェビナーは未分類に残ります。',
     })),
     { id: UNFILED, label: '未分類', count: unfiledCount },
   ]
 
-  const listBody = (() => {
-    if (accountLoading || loading) return <WebinarListSkeleton />
-    if (!selectedAccountId) {
-      return (
-        <ListState
-          kind="empty"
-          title={accounts.length > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'}
-        />
-      )
-    }
-    if (loadFailure) {
-      return (
-        <ListState
-          kind={loadFailure.kind}
-          title={loadFailure.title}
-          description={loadFailure.description}
-          action={loadFailure.retryable ? <Button onClick={() => void refresh()}>もう一度読み込む</Button> : undefined}
-        />
-      )
-    }
-    if (visible.length === 0) {
-      return panelGrand === 0 ? (
-        <ListState
-          kind="empty"
-          title="まだ、ウェビナーはありません"
-          description="録画やライブのセミナーを作ると、LINEで案内して申込を受けられます。"
-          action={canEdit
-            ? <Button variant="primary" href="/webinars/new">＋ ウェビナーを作る</Button>
-            : <Button variant="primary" disabled title={readonlyReason}>＋ ウェビナーを作る</Button>}
-        />
-      ) : (
-        <ListState
-          kind="empty"
-          title="条件に合うウェビナーはありません"
-          description="検索や絞り込みを外すと、すべて出ます。"
-          action={<Button onClick={clearFilters}>条件を外す</Button>}
-        />
-      )
-    }
-    return (
-      <>
-        {refreshing ? <p role="status" className={styles.rangeText}>検索中…</p> : null}
-        <WebinarListTableV8 items={visible} canEdit={canEdit} readonlyReason={readonlyReason} onArchive={openArchive} />
-      </>
-    )
-  })()
+  const [csvBusy, setCsvBusy] = useState(false)
+  const [csvError, setCsvError] = useState('')
+  const csvLock = useRef(false)
+  const csvScope = `${selectedAccountId}:${debouncedQuery}:${selectedFolder}:${savedFilter}:${sortKey}`
+  const currentCsvScope = useRef(csvScope)
+  currentCsvScope.current = csvScope
+  useEffect(() => { setCsvError('') }, [csvScope])
+  const exportCsv = async () => {
+    if (!selectedAccountId || csvLock.current) return
+    csvLock.current = true; setCsvBusy(true); setCsvError('')
+    try {
+      const csv = await webinarListCsv({ accountId: selectedAccountId, params: { q: debouncedQuery.trim() || undefined, folder: selectedFolder || undefined, status: savedFilter || undefined, sort: sortKey }, list: webinarApi.list, isCurrent: () => currentCsvScope.current === csvScope })
+      if (csv === null) return
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      const link = document.createElement('a'); link.href = url; link.download = 'webinars.csv'; link.click(); URL.revokeObjectURL(url)
+    } catch { if (currentCsvScope.current === csvScope) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') }
+    finally { csvLock.current = false; setCsvBusy(false) }
+  }
+  const listBody = <WebinarListContent accountLoading={accountLoading} loading={loading} selectedAccountId={selectedAccountId} accountsCount={accounts.length} loadFailure={loadFailure} visibleItems={visible} panelGrand={panelGrand} refreshing={refreshing} onRetry={() => void refresh()} onArchive={openArchive} canEdit={canEdit} readonlyReason={readonlyReason} onClearFilters={clearFilters} />
 
   return (
     <div className={styles.board} data-design-node="UyUMw">
@@ -833,23 +806,26 @@ function WebinarListV8Inner() {
           <h1 className={styles.headTitle}>ウェビナー</h1>
           <p className={styles.headDescription}>録画やライブのセミナーをLINEで案内し、申込から視聴・相談までをつなげます。</p>
         </div>
+        <Button onClick={() => void exportCsv()} disabled={!hasListData || query !== debouncedQuery || csvBusy} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す</Button>
       </div>
 
+      {csvError ? <Notice tone="info">{csvError}</Notice> : null}
+      {overviewFailure && !loadFailure ? <Notice tone="info" action={overviewFailure.retryable ? <Button onClick={() => void refreshOverview()}>集計を読み直す</Button> : undefined}>集計を表示できませんでした。</Notice> : null}
       <section className={styles.kpiBand} aria-label="ウェビナーの数の帯">
         {webinarKpiCells(visibleOverview).map((cell) => (
           <div className={styles.kpiCell} key={cell.key}>
             <div className={styles.kpiHead}>
               <span className={styles.kpiIcon} aria-hidden="true">{cell.icon}</span>
-              <span className={styles.kpiLabel}>{cell.label}</span>
+              <span className={styles.kpiLabel}>{cell.label}</span><HelpTip label={`${cell.label}の説明`}>{cell.key === 'webinars' ? '登録済みの件数です。' : cell.key === 'registrations' ? '全期間の申込人数です。同じ人の複数予約は1人に数えます。' : cell.key === 'viewers' ? '視聴開始の人数です。視聴完了は一覧の集計では未取得です。' : '全期間にCTAがクリックされた延べ回数です。'}</HelpTip>
             </div>
             <p className={styles.kpiValue}>{cell.value}<span className={styles.kpiUnit}>{cell.unit}</span></p>
-            <p className={styles.kpiSub}>{cell.sub}</p>
+
           </div>
         ))}
       </section>
 
       <Notice tone="info">
-        公開すると、申込ページとLINEの案内が使えるようになります。申込から相談までの流れは、各ウェビナーの「分析」で見られます。
+        {role === 'staff' ? '閲覧のみで見ています。変える操作は管理者に頼んでください。' : '公開すると、申込ページとLINEの案内が使えるようになります。申込から相談までの流れは、各ウェビナーの「分析」で見られます。'}
       </Notice>
 
       <div className={styles.body}>
@@ -884,9 +860,9 @@ function WebinarListV8Inner() {
                   value={selectedFolder}
                   onChange={(value) => { setSelectedFolder(value); setPage(1) }}
                   options={[
-                    { value: '', label: `フォルダ：すべて（${panelGrand}）` },
+                    { value: '', label: `フォルダ：すべて${panelGrand === null ? '' : `（${panelGrand}）`}` },
                     ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}（${folder.count}）` })),
-                    { value: UNFILED, label: `フォルダ：未分類（${unfiledCount}）` },
+                    { value: UNFILED, label: `フォルダ：未分類${unfiledCount === null ? '' : `（${unfiledCount}）`}` },
                   ]}
                 />
               </div>
@@ -914,6 +890,7 @@ function WebinarListV8Inner() {
                   { value: '', label: 'よく使う絞り込み' },
                   { value: 'active', label: '公開中のみ' },
                   { value: 'draft', label: '下書きのみ' },
+                  { value: 'archived', label: 'アーカイブ済み' },
                 ]}
               />
               <SortSelect
@@ -935,7 +912,7 @@ function WebinarListV8Inner() {
               <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" />
             </div>
           ) : null}
-          <p className={styles.footNote}>行の「…」から 参加者・分析・コメント演出・アーカイブ。</p>
+
         </section>
       </div>
 

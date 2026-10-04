@@ -69,6 +69,15 @@ describe('ウェビナー一覧のページ送りと絞り込み', () => {
     expect(rows.map((row) => row.id).sort()).toEqual(['w1', 'w2', 'w3']);
   });
 
+  it('アーカイブを選んだときだけ記録を読み、範囲外の記録は返さない', async () => {
+    sqlite.exec("INSERT INTO webinars (id, account_id, title, slug, status, created_at, updated_at) VALUES ('other-archive', 'account-2', '他店舗の旧版', 'other-old', 'archived', '2026-08-04', '2026-08-13')");
+    const filters = { status: 'archived' as const, q: '旧版' };
+    const rows = await getWebinarList(db, SCOPE, { limit: 1, offset: 0 }, filters);
+    expect(rows.map((row) => row.id)).toEqual(['w4']);
+    expect(await countWebinarList(db, SCOPE, filters)).toBe(1);
+    expect(await getWebinarList(db, SCOPE, { limit: 1, offset: 1 }, filters)).toEqual([]);
+  });
+
   it('題名とスラッグの両方で探せる', async () => {
     const byTitle = await getWebinarList(db, SCOPE, { limit: 50, offset: 0 }, { q: '講座' });
     expect(byTitle.map((row) => row.id)).toEqual(['w2']);

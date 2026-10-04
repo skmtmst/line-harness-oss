@@ -15791,7 +15791,7 @@ export type WebinarListParams = {
   limit?: number
   q?: string
   folder?: string
-  status?: 'active' | 'draft'
+  status?: 'active' | 'draft' | 'archived'
   sort?: 'updated' | 'created' | 'name'
 }
 

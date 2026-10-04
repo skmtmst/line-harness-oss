@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import EditWebinarPage from './page'
+import { webinarApi } from '@/lib/api'
 
 /**
  * Issue #1002 DETAIL-03/04/05/06/07 の回帰試験。
@@ -149,6 +150,7 @@ function installFetch() {
     const path = url.pathname + url.search
     const method = init?.method ?? 'GET'
     net.calls.push({ path, method })
+    if (path === '/api/staff/me') return json({ role: 'admin' })
     if (path.includes('/api/media')) return json({ items: [], nextCursor: null })
     if (path.includes('/api/webinars/webinar-1/participants')) {
       /* カーソルは offset。limit 指定があればその数だけ返す。 */
@@ -252,11 +254,122 @@ function paneVisible(nodeSelector: string): boolean {
 const putCalls = () => net.calls.filter((call) => call.method === 'PUT' && call.path === '/api/webinars/webinar-1')
 const participantCalls = () => net.calls.filter((call) => call.path.includes('/participants'))
 
+describe('集計は必要なときに1回だけ読み込む', () => {
+  it('基本設定では集計を取らず、参加者と分析で読み込んだ結果を共有する', async () => {
+    const analytics = vi.spyOn(webinarApi, 'analytics')
+    await render()
+    await flush()
+    expect(analytics).not.toHaveBeenCalled()
+
+    await act(async () => { buttonByText('参加者').click() })
+    await flush()
+    expect(analytics).toHaveBeenCalledTimes(1)
+    await act(async () => { buttonByText('分析').click() })
+    await flush()
+    expect(host.querySelector('[data-analytics-kpis]')).not.toBeNull()
+    expect(analytics).toHaveBeenCalledTimes(1)
+  })
+
+  it('遅い応答を待つ間に段を行き来しても取り直さず、届いた集計を表示する', async () => {
+    let resolve!: (response: Awaited<ReturnType<typeof webinarApi.analytics>>) => void
+    const analytics = vi.spyOn(webinarApi, 'analytics').mockImplementation(() => new Promise((done) => { resolve = done }))
+    fixture.params = new URLSearchParams('id=webinar-1&pane=participants')
+    await render()
+    await flush()
+    await act(async () => { buttonByText('設定').click() })
+    await act(async () => { buttonByText('分析').click() })
+    await flush()
+    expect(analytics).toHaveBeenCalledTimes(1)
+    await act(async () => { resolve({ data: analyticsData }) })
+    await flush()
+    expect(host.querySelector('[data-analytics-kpis]')).not.toBeNull()
+  })
+
+  it('失敗した集計だけを1回取り直し、参加者の一覧は残す', async () => {
+    const analytics = vi.spyOn(webinarApi, 'analytics').mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ data: analyticsData })
+    fixture.params = new URLSearchParams('id=webinar-1&pane=participants')
+    await render()
+    await flush()
+    expect(host.textContent).toContain('参加者 1')
+    expect(host.textContent).toContain('集計を読み込めませんでした')
+    expect(analytics).toHaveBeenCalledTimes(1)
+    await act(async () => { buttonByText('もう一度読み込む').click() })
+    await flush()
+    expect(analytics).toHaveBeenCalledTimes(2)
+    expect(host.textContent).not.toContain('集計を読み込めませんでした')
+    expect(host.textContent).toContain('参加者 1')
+  })
+
+  it('失敗後に設定へ戻り、分析を開き直すと1回だけ再試行する', async () => {
+    const analytics = vi.spyOn(webinarApi, 'analytics').mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ data: analyticsData })
+    fixture.params = new URLSearchParams('id=webinar-1&pane=analytics')
+    await render()
+    await flush()
+    expect(host.textContent).toContain('分析データを読み込めませんでした')
+    await act(async () => { buttonByText('設定').click() })
+    await flush()
+    expect(analytics).toHaveBeenCalledTimes(1)
+    await act(async () => { buttonByText('分析').click() })
+    await flush()
+    expect(analytics).toHaveBeenCalledTimes(2)
+    expect(host.querySelector('[data-analytics-kpis]')).not.toBeNull()
+  })
+
+  it('ウェビナーを切り替えた後に届いた前の集計で表示を書き換えない', async () => {
+    let resolveOld!: (response: Awaited<ReturnType<typeof webinarApi.analytics>>) => void
+    const analytics = vi.spyOn(webinarApi, 'analytics')
+      .mockImplementationOnce(() => new Promise((done) => { resolveOld = done }))
+      .mockResolvedValue({ data: analyticsData })
+    vi.spyOn(webinarApi, 'get').mockImplementation(async (id) => ({ data: { ...webinar, id } }))
+    vi.spyOn(webinarApi, 'editor').mockResolvedValue({ data: editor })
+    fixture.params = new URLSearchParams('id=webinar-1&pane=analytics')
+    await render()
+    await flush()
+    fixture.params = new URLSearchParams('id=webinar-2&pane=analytics')
+    await render()
+    await flush()
+    expect(analytics.mock.calls).toEqual([['webinar-1'], ['webinar-2']])
+    const currentTiles = host.querySelector('[data-analytics-kpis]')?.textContent
+    expect(currentTiles).toBeTruthy()
+    await act(async () => { resolveOld({ data: { ...analyticsData, summary: { ...analyticsData.summary, reservations: 999 } } }) })
+    await flush()
+    expect(host.querySelector('[data-analytics-kpis]')?.textContent).toBe(currentTiles)
+  })
+})
+
 function listLink(): HTMLAnchorElement {
   const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('ウェビナー一覧'))
   if (!link) throw new Error('list link not found')
   return link
 }
+
+
+describe('視聴後アクションも未保存の入力を守る', () => {
+  it('未保存のメッセージを持って一覧へ出ると確認し、保存後だけ確認を外す', async () => {
+    fixture.params = new URLSearchParams('id=webinar-1&pane=actions')
+    await render()
+    await flush()
+    const message = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="視聴完了メッセージ本文"]')!
+    expect(message).not.toBeNull()
+    await act(async () => { fireEvent.change(message, { target: { value: '未保存のお礼' } }) })
+    await flush()
+    const beforeUnload = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(beforeUnload)
+    expect(beforeUnload.defaultPrevented).toBe(true)
+    await act(async () => { listLink().click() })
+    await flush()
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(fixture.push).not.toHaveBeenCalled()
+    await act(async () => { buttonByText('閉じる').click() })
+    expect(message.value).toBe('未保存のお礼')
+    await act(async () => { buttonByText('視聴後アクションを保存する').click() })
+    await flush()
+    const afterSave = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterSave)
+    expect(afterSave.defaultPrevented).toBe(false)
+    expect(net.calls.some((call) => call.path === '/api/webinars/webinar-1/editor' && call.method === 'PUT')).toBe(true)
+  })
+})
 
 describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を離れない', () => {
   async function openNotificationsPane() {
@@ -307,7 +420,7 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
     await flush()
 
     /* 固定バーの「下書き保存」は通知の保存を呼ぶ。成功で未保存の印が降りる。 */
-    await act(async () => { buttonByText('下書きを保存する').click() })
+    await act(async () => { buttonByText('下書きを保存').click() })
     await flush()
     expect(host.textContent).not.toContain('保存していない変更があります')
 
@@ -410,19 +523,19 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     await flush()
 
     /* 固定バーの「下書き保存」は飾りではない。押せて、実際に保存する。 */
-    expect(buttonByText('下書きを保存する').disabled).toBe(false)
+    expect(buttonByText('下書きを保存').disabled).toBe(false)
 
     await act(async () => { buttonContaining('動画へ').click() })
     await flush()
 
     expect(putCalls()).toHaveLength(1)
-    expect(paneVisible('div[data-design-node="PV1Vh"]')).toBe(true)
+    expect(paneVisible('div[data-design-node="VWNaA"]')).toBe(true)
 
     /* STEP 1 へ戻る。保存済みの新しいタイトルがそのまま残る。 */
     await act(async () => { buttonContaining('STEP 1').click() })
     await flush()
 
-    expect(paneVisible('div[data-design-node="PV1Vh"]')).toBe(false)
+    expect(paneVisible('div[data-design-node="VWNaA"]')).toBe(false)
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '変更したタイトル')).toBe(true)
   })
 
@@ -449,12 +562,12 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     await flush()
 
     await act(async () => { fireEvent.change(titleInput(), { target: { value: '下書きで保存する題名' } }) })
-    await act(async () => { buttonByText('下書きを保存する').click() })
+    await act(async () => { buttonByText('下書きを保存').click() })
     await flush()
 
     expect(putCalls()).toHaveLength(1)
     /* 段は基本設定のまま。保存できたので未保存の印は消える。 */
-    expect(host.querySelector('div[data-design-node="PV1Vh"]')).toBeNull()
+    expect(host.querySelector('div[data-design-node="VWNaA"]')).toBeNull()
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '下書きで保存する題名')).toBe(true)
     expect(host.textContent).not.toContain('保存していない変更があります')
   })
@@ -471,30 +584,30 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
 
     expect(putCalls()).toHaveLength(1)
     /* 動画の段へは進まず、入力は消えない。 */
-    expect(host.querySelector('div[data-design-node="PV1Vh"]')).toBeNull()
+    expect(host.querySelector('div[data-design-node="VWNaA"]')).toBeNull()
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '失敗時に残る題名')).toBe(true)
     expect(host.textContent).toContain('保存できませんでした')
   })
 })
 
 describe('DETAIL-05 無反応のボタンを残さない', () => {
-  it('動画の段: 非公開では「公開ページを見る」を押せない形にして理由を出す', async () => {
+  it('動画の段: 非公開では「PCで見る」を押せない形にして理由を出す', async () => {
     fixture.params = new URLSearchParams('id=webinar-1&pane=video')
     await render()
     await flush()
 
-    const button = buttonByText('公開ページを見る')
+    const button = buttonByText('PCで見る')
     expect(button.disabled).toBe(true)
     expect(host.textContent).toContain('公開すると、友だちが見るページを確認できます。')
   })
 
-  it('動画の段: 公開中なら「公開ページを見る」は公開URLへのリンクになる', async () => {
+  it('動画の段: 公開中なら「PCで見る」は公開URLへのリンクになる', async () => {
     net.webinarStatus = 'active'
     fixture.params = new URLSearchParams('id=webinar-1&pane=video')
     await render()
     await flush()
 
-    const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('公開ページを見る'))
+    const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('PCで見る'))
     expect(link?.getAttribute('href')).toBe('https://liff.example.test/preview')
   })
 
@@ -544,15 +657,17 @@ describe('DETAIL-06 参加者一覧を最後の1人まで読める', () => {
   }
 
   function renderedNames(): string[] {
-    return Array.from(new Set(host.textContent?.match(/参加者 \d+/g) ?? []))
+    return Array.from(host.querySelectorAll('a[href^="/friends/detail?id="]')).map((a) => a.textContent ?? '')
   }
 
-  it.each([9, 50])('%i人: 1頁で全員表示され、最後の人まで届く', async (total) => {
+  it.each([9, 50])('%i人: 検索とページ送りで最後の人まで届く', async (total) => {
     net.participantTotal = total
     await openParticipants()
 
+    expect(renderedNames()).toHaveLength(Math.min(total, 20))
+    const search = host.querySelector('input[type="search"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(search, { target: { value: `参加者 ${total}` } }) })
     expect(host.textContent).toContain(`参加者 ${total}`)
-    expect(renderedNames()).toHaveLength(total)
     /* 続きが無いときは「続きを読み込む」を出さない。 */
     expect(Array.from(host.querySelectorAll('button')).some((b) => b.textContent?.trim() === '続きを読み込む')).toBe(false)
   })
@@ -561,13 +676,16 @@ describe('DETAIL-06 参加者一覧を最後の1人まで読める', () => {
     net.participantTotal = 201
     await openParticipants()
 
-    expect(host.textContent).toContain('参加者 50')
-    expect(host.textContent).not.toContain('参加者 51')
+    expect(host.textContent).toContain('参加者 20')
+    expect(renderedNames()).not.toContain('参加者 51')
 
     await loadAllPages()
 
+    expect(host.textContent).toContain('201件中')
+    const search = host.querySelector('input[type="search"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(search, { target: { value: '参加者 201' } }) })
     expect(host.textContent).toContain('参加者 201')
-    expect(renderedNames()).toHaveLength(201)
+    expect(renderedNames()).toHaveLength(1)
     /* 初回 + カーソル4回 = 5頁。limit と cursor が実際に付く。 */
     const calls = participantCalls()
     expect(calls).toHaveLength(5)
