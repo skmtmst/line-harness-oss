@@ -22,6 +22,8 @@ import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Button from '@/components/shared/button'
+import Disclosure from '@/components/shared/disclosure'
+import StickyBar from '@/components/shared/sticky-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import DateField from '@/components/shared/date-field'
@@ -52,10 +54,10 @@ const DAILY_CAPS = [
 export default function V8EarningRuleNew() {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
-  const [name, setName] = useState('予約してくれたら 300 マイル')
+  const [name, setName] = useState('')
   const [eventType, setEventType] = useState<string>('booking_created')
   const [source, setSource] = useState('')
-  const [amount, setAmount] = useState('300')
+  const [amount, setAmount] = useState('')
   const [grantStyle] = useState('決まった数')
   const [initialStatus, setInitialStatus] = useState<'available' | 'pending'>('available')
   const [ignoreMultiplier, setIgnoreMultiplier] = useState(false)
@@ -105,8 +107,8 @@ export default function V8EarningRuleNew() {
   )
 
   const dirty = Boolean(
-    name !== '予約してくれたら 300 マイル' || eventType !== 'booking_created' || source ||
-    amount !== '300' || initialStatus !== 'available' || ignoreMultiplier || dailyCap ||
+    name || eventType !== 'booking_created' || source ||
+    amount || initialStatus !== 'available' || ignoreMultiplier || dailyCap ||
     uniqueMode || beneficiary !== 'actor' || validFrom || validUntil ||
     expiresAfterDays !== '365' || !reverseOnCancellation || targetConditions !== null ||
     !isActive || !notifyFriend,
@@ -413,8 +415,7 @@ export default function V8EarningRuleNew() {
                 <DateField value={validUntil} onChange={setValidUntil} aria-label="終了日" />
               </label>
             </div>
-            <details className={formStyles.details}>
-              <summary>詳しい設定（倍率・通知・取り消し・公開）</summary>
+            <Disclosure title="詳しい設定（倍率・通知・取り消し・公開）" size="compact">
               <div className={formStyles.detailsBody}>
                 <label className={formStyles.field}>
                   <span className={formStyles.label}>付いたマイルの有効期限</span>
@@ -453,7 +454,7 @@ export default function V8EarningRuleNew() {
                   作成したらすぐ動かす
                 </Checkbox>
               </div>
-            </details>
+            </Disclosure>
           </section>
         </div>
 
@@ -499,7 +500,7 @@ export default function V8EarningRuleNew() {
         </aside>
       </div>
 
-      <div className={formStyles.stickyBar}>
+      <StickyBar actions={<>
         <Button variant="secondary" href="/mileage?tab=earning-rules">キャンセル</Button>
         <Button variant="secondary" onClick={() => void save(true)} disabled={saving} busy={saving} busyLabel="保存しています">
           保存して続けて作る
@@ -507,7 +508,7 @@ export default function V8EarningRuleNew() {
         <Button variant="primary" onClick={() => void save(false)} disabled={saving} busy={saving} busyLabel="保存しています">
           <Check size={14} aria-hidden="true" /> 保存して動かす
         </Button>
-      </div>
+      </>} />
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した決めごと" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
