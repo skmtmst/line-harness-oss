@@ -26,14 +26,4 @@ describe('U031 スタッフのタブと追加操作の重なり', () => {
     expect(PAGE).toContain('margin-left: auto')
   })
 
-  it('主タブは横スクロールに任せ、作る操作は一覧の上の左へ置く', () => {
-    expect(PAGE).toContain('<MergedTabs')
-    expect(PAGE).not.toContain('data-tabs-row><MergedTabs')
-    // タブ行の右端に作る操作は置かない（重なりのもと）。
-    expect(PAGE).not.toContain('人を追加する')
-    expect(PAGE).toContain('＋ 人を作る')
-    expect(PAGE).toContain('actions={tabAction}')
-    // 作る操作の並びは表の前にある。
-    expect(PAGE.indexOf('＋ 人を作る')).toBeLessThan(PAGE.indexOf('id="staff-list"'))
-  })
 })

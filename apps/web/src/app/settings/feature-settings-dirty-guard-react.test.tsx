@@ -109,7 +109,7 @@ async function makeDirty() {
     ?? [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')].find((item) => !item.disabled)
   if (!toggle) throw new Error('切替可能な機能がありません')
   await act(async () => { toggle.click(); await Promise.resolve() })
-  expect(button('機能設定を保存する').disabled).toBe(false)
+  expect(button('機能設定を保存').disabled).toBe(false)
 }
 
 /** 保存に必須の変更理由を入れる。 */
@@ -134,18 +134,18 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     await render()
     await makeDirty()
     await act(async () => { button('並びを変える').click() })
-    const link = [...host.querySelectorAll('a')].find((item) => item.getAttribute('href') === '/settings/manual-links')
+    const link = [...host.querySelectorAll('a')].find((item) => item.getAttribute('href') === '/accounts')
     if (!link) throw new Error('画面内遷移のLinkがありません')
     await act(async () => { link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })) })
     expect(document.body.textContent).toContain('保存していない変更があります')
     expect(navigation.push).not.toHaveBeenCalled()
     await act(async () => { button('編集を続ける').click() })
     expect(document.body.textContent).not.toContain('保存せずに移る')
-    expect(button('機能設定を保存する').disabled).toBe(false)
+    expect(button('機能設定を保存').disabled).toBe(false)
     await act(async () => { link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })) })
     await act(async () => { button('保存せずに移る').click() })
     expect(navigation.push).toHaveBeenCalledTimes(1)
-    expect(navigation.push).toHaveBeenCalledWith('/settings/manual-links')
+    expect(navigation.push).toHaveBeenCalledWith('/accounts')
   })
 
   it('dirtyの戻る操作は復元側popstateを一度だけ通し、次の戻るで確認を出す', async () => {
@@ -177,12 +177,12 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     expect(add.mock.calls.filter(([name]) => name === 'beforeunload')).toHaveLength(1)
 
     network.saveFails = true
-    await act(async () => { button('機能設定を保存する').click(); await settle() })
+    await act(async () => { button('機能設定を保存').click(); await settle() })
     expect(network.puts).toBe(1)
     expect(beforeUnload().defaultPrevented).toBe(true)
 
     network.saveFails = false
-    await act(async () => { button('機能設定を保存する').click(); await settle(); await settle() })
+    await act(async () => { button('機能設定を保存').click(); await settle(); await settle() })
     expect(network.puts).toBe(2)
     expect(beforeUnload().defaultPrevented).toBe(false)
     expect(remove.mock.calls.some(([name]) => name === 'beforeunload')).toBe(true)
@@ -198,7 +198,7 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     await render()
     expect(beforeUnload().defaultPrevented).toBe(false)
     expect(document.body.textContent).not.toContain('保存していない変更があります')
-    expect(button('機能設定を保存する').disabled).toBe(true)
+    expect(button('機能設定を保存').disabled).toBe(true)
     expect(add.mock.calls.filter(([name]) => name === 'beforeunload')).toHaveLength(1)
     expect(addDocument.mock.calls.filter(([name]) => name === 'click')).toHaveLength(1)
   })

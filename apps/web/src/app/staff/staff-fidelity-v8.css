@@ -1,0 +1,9 @@
+/* nku0f / A35Gh：設定メニュー・一覧・実データの要点を3列に並べる。 */
+.staff-fid-page { min-width: 0; display: flex; flex-direction: column; gap: 16px; container-type: inline-size; }
+.staff-fid-layout { display: grid; grid-template-columns: 176px minmax(0, 1fr) 300px; align-items: start; gap: 24px; }
+.staff-fid-main, .staff-fid-aside { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.staff-fid-aside { border-left: 1px solid var(--color-hairline); padding-left: 24px; }
+.staff-fid-detail { display: flex; flex-direction: column; gap: 6px; padding: 16px 0; border-bottom: 1px solid var(--color-hairline); }
+.staff-fid-detail p { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+@container (max-width: 1100px) { .staff-fid-layout { grid-template-columns: 176px minmax(0, 1fr); } .staff-fid-aside { grid-column: 2; border-left: 0; padding-left: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .staff-fid-layout { grid-template-columns: minmax(0, 1fr); } .staff-fid-aside { grid-column: 1; grid-template-columns: minmax(0, 1fr); } }

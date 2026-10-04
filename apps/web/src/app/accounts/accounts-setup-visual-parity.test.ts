@@ -20,7 +20,7 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
       `/hq` は統括向けの店舗管理として、店舗ウィザードは飲食店向けの入口として残す。
     */
     expect(accountsSource).not.toContain("redirect('/hq')")
-    expect(accountsSource).toContain('data-design-node="QT91v"')
+    expect(accountsSource).toContain('ReadonlyDesignNode node="V7vn3"')
     expect(setupSource).not.toContain("redirect('/restaurant-test/stores/new')")
     expect(setupSource).toContain('data-design-node="b2NGxk"')
   })
@@ -59,14 +59,18 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     expect(wizardSource).toContain('type="password"')
   })
 
-  it('階層編集部品を一覧の操作から開き、保存APIへつなぐ', () => {
+  it('階層編集部品は残すが、板に無いので一覧からは開かない', () => {
     // R191: 移動先メニュー（キーボード・クリックの代替経路）が増えたので、
     // 見出しは「ドラッグ＆ドロップで編集」とは言わず「編集」に留める。
     for (const label of ['未設定のLINEアカウント', 'LINEアカウント階層を編集', '未保存の変更', '構成を保存する']) {
       expect(orderingSource).toContain(label)
     }
     expect(orderingSource).toContain('api.lineAccounts.updateHierarchy')
-    expect(accountsSource).toContain('{orderingOpen && <AccountOrdering />}')
+    /*
+      板 V7vn3 に並び順の操作は無いので、一覧からは外した。
+      部品自体は残し、絵に無い塊を一覧に出さない。
+    */
+    expect(accountsSource).not.toContain('AccountOrdering')
   })
 
   it('共通アカウント切替部品は確認後に管理対象を切り替える', () => {

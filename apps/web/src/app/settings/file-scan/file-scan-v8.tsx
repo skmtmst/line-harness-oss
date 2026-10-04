@@ -1,6 +1,9 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import SearchField from '@/components/shared/search-field'
+import { DataTable, TableHeadRow, Th, Td, Tr } from '@/components/shared/table'
+import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -148,7 +151,8 @@ export function FileScanV8() {
     return (
       <SettingsShellV8
         title="ファイルの検査"
-        back={{ href: '/settings', label: '機能設定へ' }}
+        description="上げたファイルに危ないものがないかを確かめます。"
+      back={{ href: '/settings', label: '機能設定へ' }}
       >
         {phase === 'loading' ? (
           <ListState kind="loading" />
@@ -180,6 +184,7 @@ export function FileScanV8() {
   return (
     <SettingsShellV8
       title="ファイルの検査"
+      description="上げたファイルに危ないものがないかを確かめます。"
       back={{ href: '/settings', label: '機能設定へ' }}
     >
       <p className={`${styles.band} ${styles.bandInfo}`}>
@@ -194,15 +199,7 @@ export function FileScanV8() {
           しまったファイル
           <span className={`${styles.statusChip} ${styles.statusWarn} ${styles.chipInline}`}>{total}件</span>
         </h2>
-        <span className={styles.toolbarSearch}>
-          <input
-            type="search"
-            aria-label="ファイル名で探す"
-            placeholder="ファイル名で探す"
-            value={query}
-            onChange={(event) => changeQuery(event.target.value)}
-          />
-        </span>
+        <SearchField aria-label="ファイル名で探す" placeholder="ファイル名で探す" value={query} onChange={changeQuery} className={styles.toolbarSearch} />
         <Select
           aria-label="検査の状態"
           value={statusFilter}
@@ -226,28 +223,28 @@ export function FileScanV8() {
         </div>
       ) : (
         <div className={styles.tableCard}>
-          <table>
+          <DataTable className="rounded-none border-0">
             <colgroup>
               <col style={{ width: '32%' }} />
               <col style={{ width: '20%' }} />
-              <col style={{ width: '30%' }} />
-              <col style={{ width: '18%' }} />
+              <col style={{ width: 'auto' }} />
+              <col style={{ width: '200px' }} />
             </colgroup>
             <thead>
-              <tr>
-                <th>ファイル</th>
-                <th>上げた人</th>
-                <th>見つかったもの</th>
-                <th className={styles.tdRight}>操作</th>
-              </tr>
+              <TableHeadRow>
+                <Th>ファイル</Th>
+                <Th>上げた人</Th>
+                <Th>見つかったもの</Th>
+                <Th className={styles.tdRight}>操作</Th>
+              </TableHeadRow>
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.id}>
-                  <td><span className={styles.urlCell} title={item.filename}>{item.filename}</span></td>
-                  <td><span className={styles.urlCell} title={item.uploaderLabel ?? '—'}>{item.uploaderLabel ?? '—'}</span></td>
-                  <td><span className={styles.urlCell} title={item.reasonLabel ?? '確認が必要です'}>{item.reasonLabel ?? '確認が必要です'}</span></td>
-                  <td className={styles.tdRight}>
+                <Tr key={item.id}>
+                  <Td><span className={styles.urlCell} title={item.filename}>{item.filename}</span>{item.releasedAt && <StatusBadge tone="neutral" size="compact">戻した</StatusBadge>}</Td>
+                  <Td><span className={styles.urlCell} title={item.uploaderLabel ?? '—'}>{item.uploaderLabel ?? '—'}</span></Td>
+                  <Td><span className={styles.urlCell} title={item.reasonLabel ?? '確認が必要です'}>{item.reasonLabel ?? '確認が必要です'}</span></Td>
+                  <Td className={styles.tdRight}>
                     {item.status === 'quarantined' ? (
                       <RowActions
                         subjectName={item.filename}
@@ -262,11 +259,11 @@ export function FileScanV8() {
                     ) : (
                       <span className={styles.cardMeta}>—</span>
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </DataTable>
         </div>
       )}
 
@@ -287,7 +284,7 @@ export function FileScanV8() {
 
       <section className={styles.card}>
         <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>外の検査</h2>
+          <h2 className={styles.cardTitle}>外の検査サービス</h2>
         </div>
         <div className={`${styles.row} ${styles.blockRow}`}>
           <p className={styles.rowNote}>
