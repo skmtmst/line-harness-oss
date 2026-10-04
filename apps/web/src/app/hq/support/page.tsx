@@ -193,7 +193,7 @@ export default function HqSupportPage() {
       </Dialog>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
-        <nav aria-label="統括の設定" className="flex shrink-0 flex-col gap-0.5 xl:w-48">
+        <nav aria-label="統括の設定" className="flex shrink-0 flex-col gap-1 xl:w-48">
           <p className="px-2 py-1 text-micro font-semibold text-ink-faint">統括の設定</p>
           <SettingsNavLink href="/hq/members" icon={<Users aria-hidden="true" className="h-4 w-4" />}>メンバー</SettingsNavLink>
           <SettingsNavLink href="/hq/settings" icon={<Building2 aria-hidden="true" className="h-4 w-4" />}>統括の情報</SettingsNavLink>
@@ -294,15 +294,15 @@ export default function HqSupportPage() {
                 </ul>
               ) : null}
               {attachments.length < SUPPORT_ATTACHMENT_MAX ? (
-                <button
+                <Button variant="secondary"
                   type="button"
                   disabled={sending}
                   onClick={() => fileRef.current?.click()}
-                  className="flex h-18 w-full items-center justify-center gap-2 rounded-control border border-hairline bg-canvas px-3 text-caption text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
+                  style={{ width: '100%', height: 72, fontSize: 12, gap: 8 }}
                 >
                   <ImagePlus aria-hidden="true" className="h-4.5 w-4.5" />
                   クリックして画像を選ぶ（PNG・JPEG、1枚 5MB まで）
-                </button>
+                </Button>
               ) : null}
             </div>
 
@@ -377,7 +377,7 @@ export default function HqSupportPage() {
                             : 'inline-flex h-4.5 items-center gap-1 rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep'
                         }
                       >
-                        <span aria-hidden="true" className="h-1 w-1 rounded-full bg-current" />
+                        <span aria-hidden="true" className="h-1 w-1 rounded-pill bg-current" />
                         {SUPPORT_STATUS_LABELS[item.status]}
                       </span>
                     </Td>

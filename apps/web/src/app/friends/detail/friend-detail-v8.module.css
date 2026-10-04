@@ -17,7 +17,7 @@
 .summary { display: flex; flex-direction: column; gap: 22px; }
 .summarySections { display: flex; flex-direction: column; gap: 22px; }
 .section { min-width: 0; }
-.summarySections > section + section { padding: 12px 14px; border-radius: 12px; background: var(--color-surface-pearl); }
+.summarySections > section + section { padding: 12px 14px; border-radius: var(--radius-card); background: var(--color-surface-pearl); }
 @container (max-width: 950px) {
   .overview { grid-template-columns: 256px minmax(0, 1fr); }
   .profile { padding-right: 20px; }

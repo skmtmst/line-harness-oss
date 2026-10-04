@@ -64,7 +64,7 @@ export default function ScheduledSessionRow({ webinarId, startAt, canEdit, busy,
         {error ? <div role="alert" className="text-ink-secondary mt-2 text-xs">{error}{session === undefined ? <Button size="compact" onClick={() => setAttempt((n) => n + 1)}>もう一度読み込む</Button> : null}</div> : null}
       </Td>
       <Td align="right"><span className="whitespace-nowrap text-xs">{session ? `${formatNumber(session.reservedCount)}人` : '—'}</span></Td>
-      <Td><StatusBadge tone={session?.state === 'full' ? 'warning' : session?.state === 'open' ? 'info' : 'neutral'}>{session === undefined ? error ? '取得できません' : '確認中' : session === null ? '定員未設定' : session.state === 'closed' ? '受付終了' : session.state === 'full' ? '満員' : session.remaining === null ? '受付中' : `残り ${formatNumber(session.remaining)}人`}</StatusBadge></Td>
+      <Td><StatusBadge tone={session?.state === 'full' ? 'warning' : session?.state === 'open' ? 'info' : 'neutral'}>{session === undefined ? error ? '読み込めません' : '確認中' : session === null ? '定員未設定' : session.state === 'closed' ? '受付終了' : session.state === 'full' ? '満員' : session.remaining === null ? '受付中' : `残り ${formatNumber(session.remaining)}人`}</StatusBadge></Td>
       <Td><RowActions subjectName={`${date}の開催回`} menuItems={[
         { id: 'capacity', label: '定員を変える', disabled: !canEdit || busy || saving || session === undefined, disabledReason: !canEdit ? '変更はオーナーか管理者に依頼してください' : undefined, onSelect: () => { setInput(session?.capacity == null ? '' : String(session.capacity)); setError(''); setEditing(true) } },
         { id: 'duplicate', label: '複製する', disabled: !canEdit || busy || saving || editing, onSelect: onDuplicate },

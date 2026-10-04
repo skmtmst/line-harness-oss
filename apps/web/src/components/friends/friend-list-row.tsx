@@ -87,7 +87,7 @@ export default function FriendListRow({
         }
       }}
       data-friend-cols
-      className={`grid h-[60px] min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition ${selected ? 'bg-accent-soft' : 'bg-canvas'} hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none`}
+      className={`grid h-15 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition ${selected ? 'bg-accent-soft' : 'bg-canvas'} hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none`}
     >
       <div onClick={(event) => event.stopPropagation()}>
         {/* ★V7 共通 チェックボックス（gvjpx）。 */}

@@ -1,5 +1,7 @@
 'use client'
 
+import { Th } from '@/components/shared/table'
+
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
  * 一覧 `axFrW`・狭い板 `wjfLe`、状態の板は `BxGhV`、複製の窓は `Al4Ek`）。
@@ -49,6 +51,12 @@ import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
 import Pagination from '@/components/shared/pagination'
 import PageSizeSelect from '@/components/ui/page-size-select'
+import DetailPanel from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import InlineEdit from '@/components/shared/inline-edit'
+import { withViewTransition } from '@/components/shared/view-transition'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { runUndoable } from '@/lib/undoable'
 import styles from './list-v8.module.css'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
@@ -132,15 +140,10 @@ export default function ScenariosListV8() {
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set())
 
   /* まとめて「止める／再開」の確認窓。 */
-  const [bulkToggle, setBulkToggle] = useState<{ next: boolean; ids: string[] } | null>(null)
-  const [bulkBusy, setBulkBusy] = useState(false)
-  const [bulkError, setBulkError] = useState('')
 
   /* まとめて/1件のフォルダ移動の窓。 */
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
-  const [moving, setMoving] = useState(false)
-  const [moveError, setMoveError] = useState('')
 
   /* 削除の確認窓。 */
   const [deleteTarget, setDeleteTarget] = useState<ScenarioRow | null>(null)
@@ -155,6 +158,8 @@ export default function ScenariosListV8() {
 
   /* 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /* 行の詳細パネル（V8「サクサク感」C①）。開いている行のID。 */
+  const [panelId, setPanelId] = useState<string | null>(null)
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
   /** キーボードで動かした結果を読み上げる（live 領域）。 */
@@ -270,7 +275,21 @@ export default function ScenariosListV8() {
     load: loadScenarioPage,
     initialLimit: perPage,
   })
-  const scenarios = scenarioList.items
+  /*
+   * 押した瞬間の見せ方（★V8 サクサク感 B）。軽い操作は先にこの重ねで
+   * 描き換え、裏で保存する。確定・失敗・取り消しで重ねを外し、読み直す。
+   * ページ・絞り込みが変わったら重ねは捨てる（違う一覧に貼らない）。
+   */
+  const [optimisticRows, setOptimisticRows] = useState<{ key: string; rows: ScenarioRow[] } | null>(null)
+  const listContextKey = JSON.stringify({
+    account: selectedAccountId ?? '',
+    query: serverQuery,
+    stopped: stoppedOnly,
+    month: createdThisMonthOnly,
+    folder: folderFilter,
+    page: scenarioList.page,
+  })
+  const scenarios = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : scenarioList.items
   const loadScenarios = scenarioList.retry
 
   /*
@@ -304,34 +323,33 @@ export default function ScenariosListV8() {
   }
   const scenarioFilterActive = Boolean(serverQuery || stoppedOnly || createdThisMonthOnly || folderFilter)
 
-  /** 掴んで入れ替えた並びを保存する。失敗したら読み直して元に戻す。 */
-  const handleReorder = async (ids: string[]) => {
-    setActionError('')
-    try {
-      const res = await api.scenarios.reorder(ids)
-      if (!res.success) throw new Error(res.error)
-      void loadScenarios()
-    } catch {
-      setActionError('並び順を保存できませんでした。最新の並び順を読み直しました。')
-      void loadScenarios()
-    }
-  }
-
-  /**
-   * フォルダを付け替える（まとめての帯と移動の窓、どちらもここへ来る）。
-   * 1件でも失敗があれば例外を投げ、呼び出し元の窓に残す。
+  /*
+   * 掴んで入れ替えた並びを先に描き換え、裏で保存する（★V8 サクサク感 B）。
+   * 5秒のあいだは知らせの「元に戻す」で送らずに戻せる。
    */
-  const handleMoveFolders = async (ids: string[], folderId: string) => {
+  const handleReorder = (ids: string[]) => {
     setActionError('')
-    const results = await Promise.all(
-      ids.map((id) => api.scenarios.update(id, { folderId: folderId || null }).catch(() => null)),
-    )
-    const failed = results.filter((res) => !res || !res.success).length
-    void loadScenarios()
-    void loadFolders()
-    if (failed > 0) {
-      throw new Error(`${failed}件のフォルダ移動に失敗しました`)
+    const key = listContextKey
+    const byId = new Map(scenarios.map((s) => [s.id, s]))
+    const nextRows = ids.map((id) => byId.get(id)).filter((s): s is ScenarioRow => s !== undefined)
+    if (nextRows.length !== scenarios.length) {
+      void loadScenarios()
+      return
     }
+    setOptimisticRows({ key, rows: nextRows })
+    runUndoable({
+      message: '並び順を変えました',
+      commit: async () => {
+        const res = await api.scenarios.reorder(ids)
+        if (!res.success) throw new Error(res.error)
+      },
+      undo: () => setOptimisticRows(null),
+      failureMessage: '並び順を保存できませんでした。',
+      onCommitted: () => {
+        setOptimisticRows(null)
+        void loadScenarios()
+      },
+    })
   }
 
   const handleDelete = async (id: string) => {
@@ -372,32 +390,38 @@ export default function ScenariosListV8() {
     })
   }
 
-  const runBulkToggle = async () => {
-    if (!bulkToggle || bulkBusy) return
-    setBulkBusy(true)
-    setBulkError('')
-    try {
-      const results = await Promise.all(
-        bulkToggle.ids.map((id) =>
-          api.scenarios.update(id, { isActive: bulkToggle.next }).catch(() => null),
-        ),
-      )
-      const failed = results.filter((res) => !res || !res.success).length
-      void loadScenarios()
-      void loadStats()
-      if (failed > 0) {
-        setBulkError(
-          bulkToggle.next
-            ? `${failed}件の開始ができませんでした。状態を読み直してから、もう一度お試しください。`
-            : `${failed}件の停止ができませんでした。状態を読み直してから、もう一度お試しください。`,
+  /*
+   * まとめて「止める／再開」は押した瞬間に描き換え、裏で保存する
+   * （★V8 サクサク感 B）。確認の窓は出さず、5秒のあいだ知らせの
+   * 「元に戻す」で送らずに戻せる。1本ずつの開始前チェックは詳細画面で行う。
+   */
+  const runBulkToggle = (next: boolean, ids: string[]) => {
+    if (ids.length === 0) return
+    const key = listContextKey
+    setOptimisticRows({
+      key,
+      rows: scenarios.map((s) => (ids.includes(s.id) ? { ...s, isActive: next } : s)),
+    })
+    runUndoable({
+      message: next ? `${ids.length}件の配信を始めました` : `${ids.length}件を停止しました`,
+      commit: async () => {
+        const results = await Promise.all(
+          ids.map((id) => api.scenarios.update(id, { isActive: next }).catch(() => null)),
         )
-        return
-      }
-      setBulkToggle(null)
-      setSelectedIds(new Set())
-    } finally {
-      setBulkBusy(false)
-    }
+        const failed = results.filter((res) => !res || !res.success).length
+        if (failed > 0) throw new Error(`${failed}件の保存に失敗しました`)
+      },
+      undo: () => setOptimisticRows(null),
+      failureMessage: next
+        ? '配信を始められませんでした。'
+        : '停止できませんでした。',
+      onCommitted: () => {
+        setOptimisticRows(null)
+        setSelectedIds(new Set())
+        void loadScenarios()
+        void loadStats()
+      },
+    })
   }
 
   /* ===== フォルダ移動の窓 ===== */
@@ -405,24 +429,42 @@ export default function ScenariosListV8() {
   const openMove = (ids: string[]) => {
     if (ids.length === 0) return
     setMoveDraft('')
-    setMoveError('')
     setMoveIds(ids)
   }
 
-  const runMove = async () => {
-    if (!moveIds || moveIds.length === 0 || moving) return
-    setMoving(true)
-    setMoveError('')
-    try {
-      await handleMoveFolders(moveIds, moveDraft)
-      const moved = new Set(moveIds)
-      setSelectedIds((current) => new Set([...current].filter((id) => !moved.has(id))))
-      setMoveIds(null)
-    } catch {
-      setMoveError('フォルダを移動できませんでした。状態を読み直してから、もう一度お試しください。')
-    } finally {
-      setMoving(false)
-    }
+  /*
+   * フォルダ移動は窓で行き先だけ選び、押した瞬間に描き換えて裏で保存する
+   * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で送らずに戻せる。
+   */
+  const runMove = () => {
+    if (!moveIds || moveIds.length === 0) return
+    const ids = moveIds
+    const folderId = moveDraft || null
+    const key = listContextKey
+    setOptimisticRows({
+      key,
+      rows: scenarios.map((s) => (ids.includes(s.id) ? { ...s, folderId } : s)),
+    })
+    setMoveIds(null)
+    runUndoable({
+      message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
+      commit: async () => {
+        const results = await Promise.all(
+          ids.map((id) => api.scenarios.update(id, { folderId }).catch(() => null)),
+        )
+        const failed = results.filter((res) => !res || !res.success).length
+        if (failed > 0) throw new Error(`${failed}件のフォルダ移動に失敗しました`)
+      },
+      undo: () => setOptimisticRows(null),
+      failureMessage: 'フォルダを移動できませんでした。',
+      onCommitted: () => {
+        setOptimisticRows(null)
+        const moved = new Set(ids)
+        setSelectedIds((current) => new Set([...current].filter((id) => !moved.has(id))))
+        void loadScenarios()
+        void loadFolders()
+      },
+    })
   }
 
   /* ===== 削除 ===== */
@@ -610,7 +652,10 @@ export default function ScenariosListV8() {
     {
       id: 'results',
       label: '配信結果を見る',
-      onSelect: () => router.push(`/scenarios/results?id=${encodeURIComponent(s.id)}`),
+      onSelect: () =>
+        withViewTransition(() => {
+          router.push(`/scenarios/results?id=${encodeURIComponent(s.id)}`)
+        }),
     },
     {
       id: 'delete',
@@ -626,17 +671,90 @@ export default function ScenariosListV8() {
     },
   ]
 
+  /* ===== 行の詳細パネル（V8「サクサク感」C①②・D・E） ===== */
+
+  /** 一覧の行→詳細はつながる移り変わりで開く。 */
+  const goDetail = (id: string) => {
+    withViewTransition(() => {
+      router.push(`/scenarios/detail?id=${id}`)
+    })
+  }
+
+  /** 右クリックは「…」と同じ項目をマウスの位置に出す。 */
+  const rowContextItems = (s: ScenarioRow): ContextMenuItem[] =>
+    rowMenuItems(s).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
+
+  const panelIndex = panelId === null ? -1 : scenarios.findIndex((s) => s.id === panelId)
+  const panelRow = panelIndex >= 0 ? scenarios[panelIndex] : null
+
+  /** パネル内の名前のその場の書き換え。失敗したら InlineEdit が戻す。 */
+  const renameScenario = async (id: string, next: string): Promise<unknown> => {
+    const res = await api.scenarios.update(id, { name: next })
+    if (!res.success) throw new Error(res.error)
+    await loadScenarios()
+    return res
+  }
+
   /* ===== 表 ===== */
+
+  /*
+   * 読み込み中の骨組み（★V8 サクサク感 A）。出来上がりの表と同じ
+   * 列幅・行の高さで5行出し、入れ替わってもガタつかない（CLS 0）。
+   * 0.3秒以内に来たら出さず、出したら最低0.4秒残すのは共通部品に任せる。
+   */
+  const loadingSkeleton = (
+    <table className={styles.table}>
+      <colgroup>
+        {canEdit && <col style={{ width: 40 }} />}
+        <col style={{ width: 44 }} />
+        <col />
+        <col style={{ width: 112 }} />
+        <col style={{ width: 96 }} />
+        <col style={{ width: 44 }} />
+      </colgroup>
+      <thead>
+        <tr>
+          {canEdit && <Th className={styles.selectCell} aria-label="選択" />}
+          <Th aria-label="並び替え" />
+          <Th>シナリオ</Th>
+          <Th>購読 / 読了</Th>
+          <Th>状態</Th>
+          <Th aria-label="操作" />
+        </tr>
+      </thead>
+      <tbody>
+        {[0, 1, 2, 3, 4].map((n) => (
+          <tr key={n}>
+            {canEdit && <td className={styles.selectCell} />}
+            <td className={styles.gripCell} />
+            <td>
+              <Skeleton width={200} height={16} />
+              <span style={{ display: 'block', height: 4 }} aria-hidden="true" />
+              <Skeleton width={280} height={12} />
+            </td>
+            <td className={styles.countCell}>
+              <Skeleton width={56} height={16} />
+            </td>
+            <td>
+              <Skeleton width={72} height={24} className="rounded-pill" />
+            </td>
+            <td className={styles.menuCell} />
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
 
   const table =
     scenarioList.loading && scenarios.length === 0 ? (
-      <div className={styles.skeletonRows} aria-label="読み込んでいます">
-        {[0, 1, 2, 3, 4].map((n) => (
-          <div key={n} className={styles.skeletonRow}>
-            <span className={styles.skeletonDot} />
-            <span className={styles.skeletonBar} />
-          </div>
-        ))}
+      <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
+        <DelayedSkeleton loading skeleton={loadingSkeleton} />
       </div>
     ) : scenarioList.error ? (
       /* 板 `BxGhV`「読み込めなかった」：表の場所に出る細い帯。数の帯は「—」のまま。 */
@@ -688,20 +806,20 @@ export default function ScenariosListV8() {
             <thead>
               <tr>
                 {canEdit && (
-                  <th className={styles.selectCell} aria-label="選択">
+                  <Th className={styles.selectCell} aria-label="選択">
                     <Checkbox
                       checked={allOnPageSelected}
                       indeterminate={!allOnPageSelected && selectedCount > 0}
                       onCheckedChange={() => toggleAllOnPage()}
                       aria-label="このページのシナリオをすべて選択"
                     />
-                  </th>
+                  </Th>
                 )}
-                <th aria-label="並び替え" />
-                <th>シナリオ</th>
-                <th>購読中・読み終えた</th>
-                <th>状態</th>
-                <th aria-label="操作" />
+                <Th aria-label="並び替え" />
+                <Th>シナリオ</Th>
+                <Th>購読中・読み終えた</Th>
+                <Th>状態</Th>
+                <Th aria-label="操作" />
               </tr>
             </thead>
             <tbody>
@@ -720,12 +838,12 @@ export default function ScenariosListV8() {
                     key={s.id}
                     className={styles.rowClick}
                     tabIndex={0}
-                    onClick={() => router.push(`/scenarios/detail?id=${s.id}`)}
+                    onClick={() => setPanelId(s.id)}
                     onKeyDown={(event) => {
                       if (event.target !== event.currentTarget) return
                       if (event.key === 'Enter') {
                         event.preventDefault()
-                        router.push(`/scenarios/detail?id=${s.id}`)
+                        setPanelId(s.id)
                       }
                     }}
                   >
@@ -762,7 +880,12 @@ export default function ScenariosListV8() {
                           href={`/scenarios/detail?id=${s.id}`}
                           title={s.name}
                           className={styles.cellTitle}
-                          onClick={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                            event.preventDefault()
+                            goDetail(s.id)
+                          }}
                         >
                           {s.name}
                         </Link>
@@ -794,14 +917,19 @@ export default function ScenariosListV8() {
                       </span>
                     </td>
                     <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
-                      <button
-                        type="button"
-                        className={styles.menuButton}
-                        title={`シナリオ「${s.name}」の操作`}
-                        onClick={() => setOpenMenuId((current) => (current === s.id ? null : s.id))}
+                      <ContextMenu
+                        label={`シナリオ「${s.name}」の操作`}
+                        items={rowContextItems(s)}
                       >
-                        <MoreHorizontal size={16} aria-hidden="true" />
-                      </button>
+                        <button
+                          type="button"
+                          className={styles.menuButton}
+                          title={`シナリオ「${s.name}」の操作`}
+                          onClick={() => setOpenMenuId((current) => (current === s.id ? null : s.id))}
+                        >
+                          <MoreHorizontal size={16} aria-hidden="true" />
+                        </button>
+                      </ContextMenu>
                       <ActionMenu
                         open={openMenuId === s.id}
                         onClose={() => setOpenMenuId(null)}
@@ -823,12 +951,9 @@ export default function ScenariosListV8() {
             <Button
               type="button"
               variant="secondary"
-              disabled={bulkBusy || stoppableIds.length === 0}
+              disabled={stoppableIds.length === 0}
               title={stoppableIds.length === 0 ? '稼働中のシナリオが選ばれていません' : undefined}
-              onClick={() => {
-                setBulkError('')
-                setBulkToggle({ next: false, ids: stoppableIds })
-              }}
+              onClick={() => runBulkToggle(false, stoppableIds)}
             >
               <Square size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               止める
@@ -836,12 +961,9 @@ export default function ScenariosListV8() {
             <Button
               type="button"
               variant="secondary"
-              disabled={bulkBusy || resumableIds.length === 0}
+              disabled={resumableIds.length === 0}
               title={resumableIds.length === 0 ? '停止中のシナリオが選ばれていません' : undefined}
-              onClick={() => {
-                setBulkError('')
-                setBulkToggle({ next: true, ids: resumableIds })
-              }}
+              onClick={() => runBulkToggle(true, resumableIds)}
             >
               <Play size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               再開
@@ -849,7 +971,6 @@ export default function ScenariosListV8() {
             <Button
               type="button"
               variant="secondary"
-              disabled={bulkBusy}
               onClick={() => openMove([...selectedIds])}
             >
               <FolderIcon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
@@ -922,36 +1043,70 @@ export default function ScenariosListV8() {
         />
       )}
 
-      {/* まとめて「止める」の確認。 */}
-      <ConfirmDialog
-        open={bulkToggle !== null && !bulkToggle.next}
-        title={`${bulkToggle?.ids.length ?? 0}件のシナリオを停止しますか？`}
-        description="停止すると新しい配信を止めます。これまでの配信履歴と、途中まで届いたメッセージは残ります。"
-        confirmLabel="まとめて止める"
-        busy={bulkBusy}
-        error={bulkError}
-        onConfirm={() => void runBulkToggle()}
-        onCancel={() => {
-          if (bulkBusy) return
-          setBulkToggle(null)
-          setBulkError('')
-        }}
-      />
-      {/* まとめて「再開」の確認。1本ずつの開始前チェック（対象人数・送信枠）は詳細画面で行う。 */}
-      <ConfirmDialog
-        open={bulkToggle !== null && bulkToggle.next}
-        title={`${bulkToggle?.ids.length ?? 0}件のシナリオの配信を始めますか？`}
-        description="開始すると条件に一致した友だちから順に配信されます。対象人数と送信枠は、各シナリオの詳細画面で確認できます。"
-        confirmLabel="まとめて再開"
-        busy={bulkBusy}
-        error={bulkError}
-        onConfirm={() => void runBulkToggle()}
-        onCancel={() => {
-          if (bulkBusy) return
-          setBulkToggle(null)
-          setBulkError('')
-        }}
-      />
+      {/* 行の詳細パネル（V8「サクサク感」C①②・E）。一覧は左に見えたまま。 */}
+      {panelRow && (
+        <DetailPanel
+          open
+          title={panelRow.name}
+          description={[
+            deliveryModeLabels[panelRow.deliveryMode ?? 'relative'],
+            panelRow.stepCount === undefined ? '—通' : `${panelRow.stepCount}通`,
+          ].join('・')}
+          onClose={() => setPanelId(null)}
+          onPrev={panelIndex > 0 ? () => setPanelId(scenarios[panelIndex - 1].id) : undefined}
+          onNext={
+            panelIndex < scenarios.length - 1 ? () => setPanelId(scenarios[panelIndex + 1].id) : undefined
+          }
+          hasPrev={panelIndex > 0}
+          hasNext={panelIndex < scenarios.length - 1}
+          footer={
+            <>
+              <Button variant="primary" onClick={() => goDetail(panelRow.id)}>
+                開く
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  withViewTransition(() => {
+                    router.push(`/scenarios/results?id=${encodeURIComponent(panelRow.id)}`)
+                  })
+                }
+              >
+                配信結果を見る
+              </Button>
+              <Button variant="secondary" disabled={!canEdit} onClick={() => openDuplicate(panelRow)}>
+                複製する
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!canEdit}
+                onClick={() => {
+                  setDeleteError('')
+                  setDeleteTarget(panelRow)
+                  setPanelId(null)
+                }}
+              >
+                削除する
+              </Button>
+            </>
+          }
+        >
+          <p>
+            {panelRow.isActive ? '稼働中' : '停止中'} ／ 購読{' '}
+            {panelRow.subscriberCount === undefined ? '—' : formatNumber(panelRow.subscriberCount)}人 ／
+            読了 {formatNumber(panelRow.completedCount ?? 0)}人
+          </p>
+          {panelRow.description && <p>{panelRow.description}</p>}
+          {canEdit && (
+            <InlineEdit
+              value={panelRow.name}
+              label="シナリオ名"
+              onSave={(next) => renameScenario(panelRow.id, next)}
+              maxLength={80}
+            />
+          )}
+        </DetailPanel>
+      )}
 
       {/* フォルダ移動の窓。1件でも複数件でも同じ形。 */}
       <ConfirmDialog
@@ -962,14 +1117,10 @@ export default function ScenariosListV8() {
             : `${moveIds?.length ?? 0}件のシナリオのフォルダを移動`
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
-        confirmLabel={moving ? '移動中…' : '移動する'}
-        busy={moving}
-        error={moveError}
-        onConfirm={() => void runMove()}
+        confirmLabel="移動する"
+        onConfirm={() => runMove()}
         onCancel={() => {
-          if (moving) return
           setMoveIds(null)
-          setMoveError('')
         }}
       >
         <label className="block">
@@ -979,7 +1130,6 @@ export default function ScenariosListV8() {
             size="full"
             value={moveDraft}
             onChange={(value) => setMoveDraft(value)}
-            disabled={moving}
             options={[
               { value: '', label: '未分類' },
               ...folders.map((folder) => ({ value: folder.id, label: folder.name })),

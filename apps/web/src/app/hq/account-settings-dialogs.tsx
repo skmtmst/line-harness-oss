@@ -227,31 +227,27 @@ export function AccountSettingsDialog({ account, accounts, archived, onClose, on
             {tags.map((tag) => {
               const selected = selectedTags.includes(tag.id)
               return (
-                <button
+                <Button variant="secondary"
                   key={tag.id}
                   type="button"
                   aria-pressed={selected}
                   disabled={busy}
                   onClick={() => toggleTag(tag.id)}
-                  className={
-                    selected
-                      ? 'inline-flex items-center gap-1 rounded-pill bg-ink px-2.5 py-1 text-caption font-semibold text-white disabled:opacity-50'
-                      : 'inline-flex items-center gap-1 rounded-pill border border-hairline bg-white px-2.5 py-1 text-caption text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50'
-                  }
+                  style={{ minHeight: 0, height: 'auto', padding: '4px 10px', borderRadius: 'var(--radius-pill)', fontSize: 12, lineHeight: '16px', gap: 4, background: selected ? 'var(--color-ink)' : 'var(--color-canvas)', color: selected ? 'var(--color-on-accent)' : 'var(--color-ink-secondary)', borderColor: selected ? 'transparent' : 'var(--color-hairline)' }}
                 >
                   {tag.name}
-                </button>
+                </Button>
               )
             })}
             {!addingTag ? (
-              <button
+              <Button variant="secondary"
                 type="button"
                 disabled={busy}
                 onClick={() => { setNewTagName(''); setAddingTag(true) }}
-                className="inline-flex items-center gap-1 rounded-pill border border-dashed border-hairline px-2.5 py-1 text-caption text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"
+                style={{ minHeight: 0, height: 'auto', padding: '4px 10px', borderRadius: 'var(--radius-pill)', fontSize: 12, lineHeight: '16px', gap: 4, borderStyle: 'dashed' }}
               >
                 <Plus aria-hidden="true" className="h-3.5 w-3.5" />タグを追加
-              </button>
+              </Button>
             ) : null}
           </div>
           {addingTag ? (

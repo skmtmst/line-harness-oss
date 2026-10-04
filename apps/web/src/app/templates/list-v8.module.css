@@ -48,8 +48,8 @@
 .readonlyBand {
   margin: 0;
   padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--color-info-bg, #e8f1fd);
+  border-radius: var(--radius-control);
+  background: var(--color-info-bg);
   color: var(--color-ink-secondary);
   font-size: 13px;
   line-height: 1.6;

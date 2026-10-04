@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Activity,
+  Download,
   Info,
   MoreHorizontal,
   Plus,
@@ -49,13 +50,21 @@ import {
   type ActionScoreSort,
   type FriendScoreDetail,
 } from '@/lib/api'
-import { actionScoreReasonLabel, formatMileageDate, formatMileageNumber } from './mileage-display'
+import { actionScoreReasonLabel, formatMileageChange, formatMileageDate, formatMileageMonthDay, formatMileageNumber } from './mileage-display'
+import { csvCell } from '@/lib/presentation'
 import { actionScoreAdjustmentErrorMessage } from './action-score-adjustment-dialog'
 import styles from './mileage-v8.module.css'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
   normal: '中くらい',
+  low: '低い',
+}
+
+/* 友だちの表の帯の札（絵は「高い・ふつう・低い」）。 */
+const FRIEND_BAND_LABELS: Record<ActionScoreBand, string> = {
+  high: '高い',
+  normal: 'ふつう',
   low: '低い',
 }
 
@@ -182,6 +191,28 @@ export default function V8ScoreTab({
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
   }, [accountId, filter, page, pageSize, search, sort])
+
+  // v7 と同じ6列（友だち・いまの点数・帯・30日間の変化・最後に点数が変わった理由・最終変動）。
+  const exportCurrentPage = () => {
+    if (!overview?.items.length) return
+    const rows = overview.items.map((item) => [
+      item.displayName,
+      item.currentScore ?? '',
+      BAND_LABELS[item.band],
+      item.change30d ?? '',
+      actionScoreReasonLabel(item.lastReason),
+      formatMileageDate(item.lastChangedAt),
+    ])
+    const csv = [['友だち', 'いまの点数', '帯', '30日間の変化', '最後に点数が変わった理由', '最終変動'], ...rows]
+      .map((row) => row.map((value) => csvCell(value)).join(','))
+      .join('\n')
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `action-scores-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   const loadRules = useCallback(async () => {
     const accountAtRequest = accountId
@@ -468,6 +499,9 @@ export default function V8ScoreTab({
           </FilterChip>
         ))}
         <span className={styles.toolbarRight}>
+          <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
+            <Download size={14} aria-hidden="true" /> この頁の行動スコアをCSVで書き出す
+          </Button>
           <Button href={broadcastHref}>
             <Send size={14} aria-hidden="true" /> この帯の人に送る
           </Button>
@@ -545,19 +579,20 @@ export default function V8ScoreTab({
                     <p className={styles.cellMain} title={item.displayName}>{item.displayName}</p>
                   </td>
                   <td><span className={styles.num}>{formatMileageNumber(item.currentScore)}</span></td>
-                  <td><span className={bandPill(item.band)}>{BAND_LABELS[item.band]}</span></td>
+                  <td><span className={bandPill(item.band)}>{FRIEND_BAND_LABELS[item.band]}</span></td>
                   <td>
                     <span className={styles.num}>
                       {typeof item.change30d === 'number' && Number.isFinite(item.change30d)
-                        ? `${item.change30d > 0 ? '+' : ''}${formatMileageNumber(item.change30d)}`
+                        ? formatMileageChange(item.change30d)
                         : '—'}
                     </span>
                   </td>
                   <td>
                     <p className={styles.cellSubDark} title={actionScoreReasonLabel(item.lastReason)}>
-                      {actionScoreReasonLabel(item.lastReason)}
+                      {formatMileageMonthDay(item.lastChangedAt) === '—'
+                        ? actionScoreReasonLabel(item.lastReason)
+                        : `${formatMileageMonthDay(item.lastChangedAt)} ${actionScoreReasonLabel(item.lastReason)}`}
                     </p>
-                    <p className={styles.cellSub}>{formatMileageDate(item.lastChangedAt)}</p>
                   </td>
                   <td>
                     <span className={styles.rowActions}>
@@ -794,7 +829,7 @@ export default function V8ScoreTab({
             </Button>
           </div>
         ) : null}
-        <p className={styles.footnote}>行の「…」から 編集・外す。表の下の「＋できごとを足す」で増やせます。公開中のルールを止めるときは、題の横の「…」から。</p>
+        <p className={styles.footnote}>行の「…」から 編集・外す。表の下の「＋ できごとを足す」で増やせます（30日間反応がない、も選べる）。公開中のルールを止めるときは、題の横の「…」から。</p>
       </section>
 
       {adjustTarget && !readonly ? (

@@ -2,10 +2,12 @@
 
 /* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import { notifyToast } from '@/components/shared/toast'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Pagination from '@/components/shared/pagination'
 import { DragHandle, MoreAction } from '@/components/shared/row-actions'
@@ -39,20 +41,31 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [historyTarget, setHistoryTarget] = useState<BookingMenu | null>(null)
-  const [visibilityTarget, setVisibilityTarget] = useState<BookingMenu | null>(null)
   const [visibilityError, setVisibilityError] = useState<string | null>(null)
   const [updatingVisibility, setUpdatingVisibility] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [reorderBusy, setReorderBusy] = useState(false)
   const [reorderError, setReorderError] = useState<string | null>(null)
+  /* 先に画面を変える分（公開・並び）。裏の保存が終わるまでここが勝つ。 */
+  const [visOverride, setVisOverride] = useState<Record<string, boolean>>({})
+  const [orderOverride, setOrderOverride] = useState<string[] | null>(null)
+  const menusRef = useRef(menus)
+  menusRef.current = menus
+
+  const orderedBase = useMemo(() => {
+    const sorted = sortedMenus(menus)
+    if (!orderOverride || orderOverride.length !== sorted.length) return sorted
+    const byId = new Map(sorted.map((menu) => [menu.id, menu]))
+    const applied = orderOverride.map((id) => byId.get(id)).filter((menu): menu is BookingMenu => Boolean(menu))
+    return applied.length === sorted.length ? applied : sorted
+  }, [menus, orderOverride])
 
   const shown = useMemo(() => {
-    const ordered = sortedMenus(menus)
     const keyword = query.trim()
     return keyword
-      ? ordered.filter((menu) => menu.name.toLowerCase().includes(keyword.toLowerCase()))
-      : ordered
-  }, [menus, query])
+      ? orderedBase.filter((menu) => menu.name.toLowerCase().includes(keyword.toLowerCase()))
+      : orderedBase
+  }, [orderedBase, query])
   const pageCount = Math.max(1, Math.ceil(shown.length / MENU_PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
   const visible = shown.slice((safePage - 1) * MENU_PAGE_SIZE, safePage * MENU_PAGE_SIZE)
@@ -62,10 +75,10 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
     router.push(`/booking/menus/new?menu=${menu.id}`)
   }
 
-  /* 「…」の上へ・下へ。2件の sort_order を版つき updateMenu で交換する（v7 と同じ）。 */
+  /* 「…」の上へ・下へ。先に並びを変えて裏で保存する。 */
   async function moveMenu(menu: BookingMenu, delta: -1 | 1) {
     if (reorderBusy) return
-    const ordered = sortedMenus(menus)
+    const ordered = orderedBase
     const index = ordered.findIndex((item) => item.id === menu.id)
     const nextIndex = index + delta
     if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return
@@ -78,40 +91,96 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
       setReorderError('最新の状態を読み直しました。もう一度お試しください。')
       return
     }
+    const nextIds = ordered.map((item) => item.id)
+    const moved = nextIds[index]
+    nextIds[index] = nextIds[nextIndex]
+    nextIds[nextIndex] = moved
+    setOrderOverride(nextIds)
     setReorderBusy(true)
     setReorderError(null)
     try {
       await bookingApi.updateMenu(accountId, menu.id, version, { ...menu, sort_order: other.sort_order })
       await bookingApi.updateMenu(accountId, other.id, otherVersion, { ...other, sort_order: menu.sort_order })
+      setOrderOverride(null)
       onReload()
+      notifyToast(`「${menu.name}」を${delta < 0 ? '上' : '下'}へ移しました。`, {
+        actionLabel: '元に戻す',
+        onAction: () => {
+          const latest = menusRef.current.find((item) => item.id === menu.id) ?? menu
+          void moveMenu(latest, delta < 0 ? 1 : -1)
+        },
+      })
     } catch (cause) {
-      setReorderError(bookingErrorMessage(cause, '保存'))
+      setOrderOverride(null)
+      onReload()
+      notifyToast(bookingErrorMessage(cause, '保存'), {
+        actionLabel: 'もう一度',
+        onAction: () => {
+          const latest = menusRef.current.find((item) => item.id === menu.id) ?? menu
+          void moveMenu(latest, delta)
+        },
+      })
     } finally {
       setReorderBusy(false)
     }
   }
 
-  async function toggleVisibility(menu: BookingMenu) {
+  /* 公開・止める。先に札を変えて裏で保存する。 */
+  async function toggleVisibility(menu: BookingMenu, force?: boolean) {
+    if (updatingVisibility) return
+    const next = force ?? !(visOverride[menu.id] ?? menu.is_active)
+    setVisOverride((current) => ({ ...current, [menu.id]: next }))
     setUpdatingVisibility(true)
     setVisibilityError(null)
     try {
       const version = menu.version
       if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
-        onReload()
-        setVisibilityError('最新の状態を読み直しました。もう一度お試しください。')
-        return
+        throw new Error('booking_menu_version_missing')
       }
-      await bookingApi.patchMenu(accountId, menu.id, version, { is_active: !menu.is_active })
-      setVisibilityTarget(null)
+      await bookingApi.patchMenu(accountId, menu.id, version, { is_active: next })
+      setVisOverride((current) => {
+        const copy = { ...current }
+        delete copy[menu.id]
+        return copy
+      })
       onReload()
+      notifyToast(next ? `「${menu.name}」をお客さまの画面へ出しました。` : `「${menu.name}」の新しい予約を止めました。`, {
+        actionLabel: '元に戻す',
+        onAction: () => {
+          const latest = menusRef.current.find((item) => item.id === menu.id) ?? menu
+          void toggleVisibility(latest, !next)
+        },
+      })
     } catch (cause) {
-      setVisibilityError(bookingErrorMessage(cause, '保存'))
+      setVisOverride((current) => {
+        const copy = { ...current }
+        delete copy[menu.id]
+        return copy
+      })
+      onReload()
+      if (cause instanceof Error && cause.message === 'booking_menu_version_missing') {
+        setVisibilityError('最新の状態を読み直しました。もう一度お試しください。')
+      } else {
+        notifyToast(bookingErrorMessage(cause, '保存'), {
+          actionLabel: 'もう一度',
+          onAction: () => {
+            const latest = menusRef.current.find((item) => item.id === menu.id) ?? menu
+            void toggleVisibility(latest, next)
+          },
+        })
+      }
     } finally {
       setUpdatingVisibility(false)
     }
   }
 
-  if (status === 'loading') return <SkeletonRows rows={5} />
+  if (status === 'loading') {
+    return (
+      <div aria-busy="true">
+        <DelayedSkeleton loading skeleton={<SkeletonRows rows={5} />} />
+      </div>
+    )
+  }
   if (status === 'error') {
     return (
       <StateCard
@@ -150,6 +219,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
       </div>
 
       {reorderError ? <p className="text-danger mt-2 text-xs" role="alert">{reorderError}</p> : null}
+      {visibilityError ? <p className="text-danger mt-2 text-xs" role="alert">{visibilityError}</p> : null}
 
       {menus.length === 0 ? (
         <StateCard
@@ -206,9 +276,9 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                 },
                 {
                   id: 'visibility',
-                  label: menu.is_active ? '止める' : '出す',
+                  label: (visOverride[menu.id] ?? menu.is_active) ? '止める' : '出す',
                   dividerBefore: true,
-                  onSelect: () => { setVisibilityError(null); setVisibilityTarget(menu) },
+                  onSelect: () => void toggleVisibility(menu),
                 },
               ] satisfies ActionMenuItem[] : []),
             ]
@@ -256,9 +326,9 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                   <span className={styles.cellNum}>{menu.booking_count_30_days ?? 0}件</span>
                 </span>
                 <span className={styles.colStatus}>
-                  <span className={`${styles.statePill} ${menu.is_active ? styles.statePillOn : styles.statePillOff}`}>
+                  <span className={`${styles.statePill} ${(visOverride[menu.id] ?? menu.is_active) ? styles.statePillOn : styles.statePillOff}`}>
                     <span className={styles.stateDot} aria-hidden="true" />
-                    {menu.is_active ? '公開中' : '止めている'}
+                    {(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '止めている'}
                   </span>
                 </span>
                 <span className={styles.colMenu}>
@@ -309,19 +379,6 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
         />
       ) : null}
 
-      <ConfirmDialog
-        open={visibilityTarget !== null}
-        title={`「${visibilityTarget?.name ?? ''}」を${visibilityTarget?.is_active ? '止め' : '出し'}ますか？`}
-        description={visibilityTarget?.is_active
-          ? 'お客さまの画面から外し、新しい予約を止めます。すでに入っている予約はそのまま残ります。'
-          : 'お客さまの画面へ出し、新しい予約を受け付けます。担当と受付枠を確認してから出してください。'}
-        confirmLabel={visibilityTarget?.is_active ? '新しい予約を止める' : 'お客さまの画面へ出す'}
-        destructive={Boolean(visibilityTarget?.is_active)}
-        busy={updatingVisibility}
-        error={visibilityError ?? undefined}
-        onCancel={() => { setVisibilityTarget(null); setVisibilityError(null) }}
-        onConfirm={() => { if (visibilityTarget) void toggleVisibility(visibilityTarget) }}
-      />
     </div>
   )
 }

@@ -284,8 +284,8 @@ export default function NewLineAccountPage() {
                   aria-hidden="true"
                   className={
                     complete || active
-                      ? 'grid h-5 w-5 shrink-0 place-items-center rounded-full bg-accent-deep text-nano font-bold text-white'
-                      : 'grid h-5 w-5 shrink-0 place-items-center rounded-full bg-canvas-sunken text-nano font-bold text-ink-faint'
+                      ? 'grid h-5 w-5 shrink-0 place-items-center rounded-pill bg-accent-deep text-nano font-bold text-on-accent'
+                      : 'grid h-5 w-5 shrink-0 place-items-center rounded-pill bg-canvas-sunken text-nano font-bold text-ink-faint'
                   }
                 >
                   {complete ? <Check aria-hidden="true" className="h-3 w-3" /> : step.number}
@@ -459,7 +459,7 @@ function InfoSection({ title, children }: { title: string; children: ReactNode }
 }
 
 function ManualLink({ anchor, label }: { anchor: 'm1' | 'm2' | 'm3'; label: string }) {
-  return <a href={`/manuals/line-connect/index.html#${anchor}`} target="_blank" rel="noreferrer" className="text-ink inline-flex shrink-0 items-center gap-1.5 rounded-control border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold hover:bg-canvas-sunken"><CircleHelp aria-hidden="true" className="h-3.5 w-3.5" />{label}</a>
+  return <Button variant="secondary" href={`/manuals/line-connect/index.html#${anchor}`} target="_blank" rel="noreferrer" className="text-ink shrink-0 items-center gap-1.5 rounded-control border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold hover:bg-canvas-sunken"><CircleHelp aria-hidden="true" className="h-3.5 w-3.5" />{label}</Button>
 }
 
 function Choice({ checked, onChange, label, value }: { checked: boolean; onChange: () => void; label: string; value: string }) {

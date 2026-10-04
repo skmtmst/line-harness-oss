@@ -59,7 +59,7 @@ function AccountName({ account }: { account: AccountWithStats }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="" className="h-9 w-9 shrink-0 rounded-control object-cover" />
       ) : (
-        <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-control bg-accent-deep text-body font-bold text-white">
+        <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-control bg-accent-deep text-body font-bold text-on-accent">
           {name.slice(0, 1)}
         </span>
       )}
@@ -211,7 +211,7 @@ export default function AccountBrowser({
         <Button href="/accounts/new" variant="primary">
           <Plus aria-hidden="true" className="h-4 w-4" />アカウントを登録
         </Button>
-        <div className="flex flex-col gap-0.5" aria-label="タグで絞り込み">
+        <div className="flex flex-col" style={{ gap: 2 }} aria-label="タグで絞り込み">
           <p className="px-2 py-1 text-micro font-semibold text-ink-faint">タグ</p>
           <TagRow selected={tag === null} onSelect={() => { setTag(null); resetPage() }} name="すべて" count={accounts.length} />
           {tags.map((t) => (
@@ -263,7 +263,7 @@ export default function AccountBrowser({
               title="カードで見る"
               aria-label="カードで見る"
               onClick={() => setView('cards')}
-              className={view === 'cards' ? 'rounded-control bg-ink p-2 text-white' : 'rounded-control p-2 text-ink-secondary hover:bg-canvas-sunken'}
+              className={view === 'cards' ? 'rounded-control bg-ink p-2 text-on-accent' : 'rounded-control p-2 text-ink-secondary hover:bg-canvas-sunken'}
             >
               <LayoutGrid aria-hidden="true" className="h-4 w-4" />
             </button>
@@ -273,7 +273,7 @@ export default function AccountBrowser({
               title="表で見る"
               aria-label="表で見る"
               onClick={() => setView('table')}
-              className={view === 'table' ? 'rounded-control bg-ink p-2 text-white' : 'rounded-control p-2 text-ink-secondary hover:bg-canvas-sunken'}
+              className={view === 'table' ? 'rounded-control bg-ink p-2 text-on-accent' : 'rounded-control p-2 text-ink-secondary hover:bg-canvas-sunken'}
             >
               <ListIcon aria-hidden="true" className="h-4 w-4" />
             </button>
@@ -315,7 +315,7 @@ export default function AccountBrowser({
                   {(account.tags ?? []).length > 0 ? (
                     <ul className="flex flex-wrap gap-1.5" aria-label="付けたタグ">
                       {(account.tags ?? []).map((t) => (
-                        <li key={t.id} className="inline-flex items-center rounded-mini border border-hairline bg-white px-1.5 py-0.5 text-micro text-ink-secondary">
+                        <li key={t.id} className="inline-flex items-center rounded-mini border border-hairline bg-canvas px-1.5 py-0.5 text-micro text-ink-secondary">
                           {t.name}
                         </li>
                       ))}

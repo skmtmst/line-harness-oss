@@ -99,7 +99,7 @@ export default function GettingStartedPage() {
             </div>
           </div>
 
-          <ol className={styles.steps} aria-label="はじめの設定の順路">
+          <ol className={styles.steps} aria-label="はじめの設定の順路" data-design-node="BOj1a">
             {steps.map((step) => (
               <StepRow key={step.key} step={step} />
             ))}

@@ -3,12 +3,16 @@
 /* ★V8の一覧・閲覧のみ・狭い幅。数は実データで、未集計のものは「—」。 */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CalendarClock, MousePointerClick, Users, Video } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { RowActions } from '@/components/shared/row-actions'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import DetailPanel from '@/components/shared/detail-panel'
+import InlineEdit from '@/components/shared/inline-edit'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -26,7 +30,6 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { runUndoable } from '@/lib/undoable'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { X } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
@@ -173,7 +176,12 @@ function webinarKpiCells(overview: WebinarOverview | null): KpiCell[] {
   ]
 }
 
-function WebinarFolderDialog({
+/*
+ * フォルダの追加・名前の変更の入力（右の詳細パネルに入れる中身）。
+ * 以前は真ん中の窓だったが、V8「サクサク感」の決まりで右のパネルへ移した。
+ * 取り消せない削除の確かめは確認の窓のまま。
+ */
+function WebinarFolderPanelForm({
   folder,
   busy,
   error,
@@ -187,39 +195,27 @@ function WebinarFolderDialog({
   onSave: (name: string) => void
 }) {
   const [name, setName] = useState(folder?.name ?? '')
-  const panelRef = useOverlayFocus(true, onCancel, busy)
 
   return (
-    <div className="bg-ink/35 fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="webinar-v8-folder-title">
-      <section ref={panelRef} className="bg-canvas rounded-card w-full max-w-md border border-hairline p-5 shadow-card">
-        <div className="flex items-start justify-between gap-3">
-          <h2 id="webinar-v8-folder-title" className="text-ink text-lg font-bold">
-            {folder ? 'フォルダ名を変更' : 'フォルダを追加'}
-          </h2>
-          <button type="button" onClick={onCancel} disabled={busy} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-        <p className="text-ink-secondary mt-2 text-sm">ウェビナーを整理する名前を入力してください。</p>
-        <label className="text-ink mt-4 block text-sm font-semibold" htmlFor="webinar-v8-folder-name">フォルダ名</label>
-        <input
-          id="webinar-v8-folder-name"
-          autoFocus
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && name.trim() && !busy) onSave(name.trim())
-          }}
-          className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-          placeholder="例: 商品説明"
-        />
-        {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
-        <div className="mt-5 flex justify-end gap-2">
-          <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
-          <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy} busy={busy}>保存する
-          </Button>
-        </div>
-      </section>
+    <div>
+      <p className="text-ink-secondary mt-2 text-sm">ウェビナーを整理する名前を入力してください。</p>
+      <label className="text-ink mt-4 block text-sm font-semibold" htmlFor="webinar-v8-folder-name">フォルダ名</label>
+      <input
+        id="webinar-v8-folder-name"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && name.trim() && !busy) onSave(name.trim())
+        }}
+        className="border-hairline rounded-control focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+        placeholder="例: 商品説明"
+      />
+      {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
+      <div className="mt-5 flex justify-end gap-2">
+        <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
+        <Button variant="primary" onClick={() => onSave(name.trim())} disabled={!name.trim() || busy} busy={busy}>保存する
+        </Button>
+      </div>
     </div>
   )
 }
@@ -322,16 +318,54 @@ function WebinarListSkeleton() {
   )
 }
 
+/*
+ * 行の「…」の中身（右クリックでも同じものを出す。D）。
+ * 2箇所で別々に書くとずれるので、ここで1つ作って両方へ渡す。
+ */
+function webinarRowMenuItems(
+  w: WebinarListItem,
+  canEdit: boolean,
+  readonlyReason: string,
+  router: ReturnType<typeof useRouter>,
+  onArchive: (target: WebinarListItem) => void,
+): ActionMenuItem[] {
+  return [
+    { id: 'participants', label: '参加者を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=participants`) },
+    { id: 'analytics', label: '分析を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=analytics`) },
+    { id: 'comments', label: 'コメント演出を開く', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=comments`) },
+    {
+      id: 'archive',
+      label: w.status === 'archived' ? '下書きに戻す' : 'アーカイブする',
+      onSelect: () => onArchive(w),
+      disabled: !canEdit,
+      disabledReason: canEdit ? undefined : readonlyReason,
+    },
+  ]
+}
+
+function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
+  return menuItems.map((item) => ({
+    id: item.id,
+    label: item.label,
+    danger: item.tone === 'danger',
+    disabled: item.disabled,
+    onSelect: () => item.onSelect(),
+  }))
+}
+
 export function WebinarListTableV8({
   items,
   canEdit,
   readonlyReason,
   onArchive,
+  onOpenDetail,
 }: {
   items: WebinarListItem[]
   canEdit: boolean
   readonlyReason: string
   onArchive: (target: WebinarListItem) => void
+  /** 行を押すと右から詳細パネル（C①）。つながる移り変わりで開く（E）。 */
+  onOpenDetail: (id: string) => void
 }) {
   const router = useRouter()
   return (
@@ -352,10 +386,22 @@ export function WebinarListTableV8({
             const unpublished = w.status !== 'archived' && isUnpublished(w)
             const viewStarted = unpublished ? '—' : peopleText(w.viewerCount)
             const period = publicationSummary(w)
+            const menuItems = webinarRowMenuItems(w, canEdit, readonlyReason, router, onArchive)
             return (
-              <tr key={w.id}>
+              <tr key={w.id} data-row-id={w.id}>
                 <td className={styles.nameCell}>
-                  <Link href={`/webinars/edit?id=${w.id}`} className={styles.nameLink} title={w.title}>{w.title}</Link>
+                  <ContextMenu label={`「${w.title}」の操作`} items={toContextMenuItems(menuItems)}>
+                    <button
+                      type="button"
+                      className={styles.nameLink}
+                      style={{ background: 'none', border: 0, padding: 0, font: 'inherit', textAlign: 'left', cursor: 'pointer', width: '100%' }}
+                      title={`${w.title}の詳細を見る`}
+                      aria-label={`「${w.title}」の詳細を見る`}
+                      onClick={() => onOpenDetail(w.id)}
+                    >
+                      {w.title}
+                    </button>
+                  </ContextMenu>
                   <span className={styles.slug} title={`/${w.slug}`}>/{w.slug}</span>
                 </td>
                 <td><span className={statusPillClass(w)}>● {statusLabelV8(w)}</span></td>
@@ -375,18 +421,7 @@ export function WebinarListTableV8({
                     <RowActions
                       subjectName={w.title}
                       menuNote={canEdit ? undefined : readonlyReason}
-                      menuItems={[
-                        { id: 'participants', label: '参加者を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=participants`) },
-                        { id: 'analytics', label: '分析を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=analytics`) },
-                        { id: 'comments', label: 'コメント演出を開く', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=comments`) },
-                        {
-                          id: 'archive',
-                          label: w.status === 'archived' ? '下書きに戻す' : 'アーカイブする',
-                          onSelect: () => onArchive(w),
-                          disabled: !canEdit,
-                          disabledReason: canEdit ? undefined : readonlyReason,
-                        },
-                      ]}
+                      menuItems={menuItems}
                     />
                   </span>
                 </td>
@@ -449,14 +484,14 @@ export function WebinarListErrorNotice({ failure, onRetry }: { failure: WebinarL
   return <div role="alert" className="border-hairline border-b px-4 py-3"><p className="text-ink text-sm font-semibold">{failure.title}</p><p className="text-ink-secondary mt-1 text-xs">{failure.description}</p>{failure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : null}</div>
 }
 
-export function WebinarListContent({ accountLoading, loading, selectedAccountId, accountsCount, loadFailure, visibleItems, panelGrand, refreshing, onRetry, onArchive, canEdit = true, readonlyReason = '', onClearFilters = () => undefined }: {
-  accountLoading: boolean; loading: boolean; selectedAccountId: string | null; accountsCount: number; loadFailure: WebinarLoadFailure | null; visibleItems: WebinarListItem[]; panelGrand: number | null; refreshing: boolean; onRetry: () => void; onArchive: (item: WebinarListItem) => void; canEdit?: boolean; readonlyReason?: string; onClearFilters?: () => void
+export function WebinarListContent({ accountLoading, loading, selectedAccountId, accountsCount, loadFailure, visibleItems, panelGrand, refreshing, onRetry, onArchive, canEdit = true, readonlyReason = '', onClearFilters = () => undefined, onOpenDetail = () => undefined }: {
+  accountLoading: boolean; loading: boolean; selectedAccountId: string | null; accountsCount: number; loadFailure: WebinarLoadFailure | null; visibleItems: WebinarListItem[]; panelGrand: number | null; refreshing: boolean; onRetry: () => void; onArchive: (item: WebinarListItem) => void; canEdit?: boolean; readonlyReason?: string; onClearFilters?: () => void; onOpenDetail?: (id: string) => void
 }) {
   if (accountLoading || loading) return <WebinarListSkeleton />
   if (!selectedAccountId) return <ListState kind="empty" title={accountsCount > 0 ? '上のバーでLINE公式アカウントを選んでください' : 'LINE公式アカウントが登録されていません'} />
   if (loadFailure && visibleItems.length === 0) return <ListState kind={loadFailure.kind} title={loadFailure.title} description={loadFailure.description} action={loadFailure.retryable ? <Button onClick={onRetry}>もう一度読み込む</Button> : undefined} />
   if (visibleItems.length === 0) return panelGrand === 0 ? <ListState kind="empty" title="まだ、ウェビナーはありません" description="録画やライブのセミナーを作ると、LINEで案内して申込を受けられます。" action={canEdit ? <Button href="/webinars/new">＋ ウェビナーを作る</Button> : <Button disabled title={readonlyReason}>＋ ウェビナーを作る</Button>} /> : <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索や絞り込みを外すと、すべて出ます。" action={<Button onClick={onClearFilters}>条件を外す</Button>} />
-  return <>{loadFailure ? <WebinarListErrorNotice failure={loadFailure} onRetry={onRetry} /> : null}{refreshing ? <p role="status" className="text-ink-faint text-xs">検索中…</p> : null}<WebinarListTableV8 items={visibleItems} canEdit={canEdit} readonlyReason={readonlyReason} onArchive={onArchive} /></>
+  return <>{loadFailure ? <WebinarListErrorNotice failure={loadFailure} onRetry={onRetry} /> : null}{refreshing ? <p role="status" className="text-ink-faint text-xs">検索中…</p> : null}<WebinarListTableV8 items={visibleItems} canEdit={canEdit} readonlyReason={readonlyReason} onArchive={onArchive} onOpenDetail={onOpenDetail} /></>
 }
 
 export default function WebinarListV8() {
@@ -470,6 +505,7 @@ export default function WebinarListV8() {
 function WebinarListV8Inner() {
   usePageTitle('ウェビナー')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
+  const router = useRouter()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   // jiNg0「閲覧のみ」：押せない形にする（隠さない）。
   const role = useStaffRole()
@@ -497,6 +533,8 @@ function WebinarListV8Inner() {
   const [refreshing, setRefreshing] = useState(false)
   const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
   const listSnapshotRef = useRef<WebinarListSnapshot>({ items: [], total: 0, loadedAccountId: null })
+  /* C①：右から出る詳細パネル。今開いている行の id だけ持つ。 */
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [archiveTarget, setArchiveTarget] = useState<WebinarListItem | null>(null)
   const [archiving, setArchiving] = useState(false)
   const [archiveError, setArchiveError] = useState('')
@@ -720,6 +758,34 @@ function WebinarListV8Inner() {
   const pageCount = Math.max(1, Math.ceil(visibleTotal / pageSize))
   const currentPage = Math.min(page, pageCount)
   const visible = visibleItems
+
+  /* C①・E：行→詳細パネル。開閉と↑↓の移動はつながる移り変わりで。 */
+  const activeIndex = visible.findIndex((w) => w.id === activeId)
+  const active = activeIndex >= 0 ? visible[activeIndex] : null
+  const openDetail = useCallback((id: string) => {
+    withViewTransition(() => setActiveId(id))
+  }, [])
+  const closeDetail = useCallback(() => {
+    withViewTransition(() => setActiveId(null))
+  }, [])
+  const goDetail = (direction: -1 | 1) => {
+    const next = visible[activeIndex + direction]
+    if (!next) return
+    withViewTransition(() => setActiveId(next.id))
+  }
+
+  /*
+   * C②：行の名前のその場の書き換え。題だけの更新は更新口が
+   * 部分受けする（requireCore なし）ので、他は触らず題だけ送る。
+   * 失敗したら投げて入力欄に理由を出す（勝手に進めない）。
+   */
+  const renameWebinar = async (target: WebinarListItem, next: string) => {
+    const trimmed = next.trim()
+    if (!trimmed) throw new Error('empty_name')
+    if (trimmed === target.title) return
+    await webinarApi.update(target.id, { title: trimmed })
+    setItems((current) => current.map((w) => (w.id === target.id ? { ...w, title: trimmed } : w)))
+  }
   const panelGrand = grandAccountId === selectedAccountId ? grandTotal : null
   const unfiledCount = panelGrand === null || !foldersReady ? null : Math.max(0, panelGrand - folders.reduce((sum, folder) => sum + folder.count, 0))
 
@@ -770,7 +836,7 @@ function WebinarListV8Inner() {
       label: folder.name,
       count: folder.count,
       color: folder.color,
-      onEdit: canEdit ? () => { setFolderError(''); setEditingFolder(folder) } : undefined,
+      onEdit: canEdit ? () => { setFolderError(''); closeDetail(); setEditingFolder(folder) } : undefined,
       onMoveUp: canEdit && index > 0 ? () => void moveFolder(index, -1) : undefined,
       onMoveDown: canEdit && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
       onDelete: canEdit ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
@@ -797,7 +863,7 @@ function WebinarListV8Inner() {
     } catch { if (currentCsvScope.current === csvScope) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') }
     finally { csvLock.current = false; setCsvBusy(false) }
   }
-  const listBody = <WebinarListContent accountLoading={accountLoading} loading={loading} selectedAccountId={selectedAccountId} accountsCount={accounts.length} loadFailure={loadFailure} visibleItems={visible} panelGrand={panelGrand} refreshing={refreshing} onRetry={() => void refresh()} onArchive={openArchive} canEdit={canEdit} readonlyReason={readonlyReason} onClearFilters={clearFilters} />
+  const listBody = <WebinarListContent accountLoading={accountLoading} loading={loading} selectedAccountId={selectedAccountId} accountsCount={accounts.length} loadFailure={loadFailure} visibleItems={visible} panelGrand={panelGrand} refreshing={refreshing} onRetry={() => void refresh()} onArchive={openArchive} canEdit={canEdit} readonlyReason={readonlyReason} onClearFilters={clearFilters} onOpenDetail={openDetail} />
 
   return (
     <div className={styles.board} data-design-node="UyUMw">
@@ -837,7 +903,7 @@ function WebinarListV8Inner() {
             <FolderPanel
               activeId={selectedFolder}
               onSelect={setSelectedFolder}
-              onAddFolder={() => { if (!canEdit) return; setFolderError(''); setFolderDialogOpen(true) }}
+              onAddFolder={() => { if (!canEdit) return; setFolderError(''); closeDetail(); setFolderDialogOpen(true) }}
               addFolderDisabled={!selectedAccountId || !canEdit}
               addFolderTitle={canEdit ? undefined : readonlyReason}
               rows={folderRows}
@@ -912,7 +978,7 @@ function WebinarListV8Inner() {
               <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="ウェビナー一覧のページ送り" />
             </div>
           ) : null}
-
+          <p className={styles.footNote}>行を押すと右に詳細が出ます（↑↓で次の行へ）。右クリックでも「…」と同じ操作（参加者・分析・コメント演出・アーカイブ）が選べます。</p>
         </section>
       </div>
 
@@ -926,19 +992,86 @@ function WebinarListV8Inner() {
         />
       ) : null}
       {(folderDialogOpen || editingFolder) ? (
-        <WebinarFolderDialog
-          folder={editingFolder}
-          busy={folderBusy}
-          error={folderError}
-          onCancel={() => {
+        <DetailPanel
+          open
+          title={editingFolder ? 'フォルダ名を変更' : 'フォルダを追加'}
+          description={editingFolder ? `「${editingFolder.name}」の名前を変えます。中のウェビナーはそのまま残ります。` : undefined}
+          onClose={() => {
             if (folderBusy) return
-            setFolderDialogOpen(false)
-            setEditingFolder(null)
-            setFolderError('')
+            withViewTransition(() => {
+              setFolderDialogOpen(false)
+              setEditingFolder(null)
+              setFolderError('')
+            })
           }}
-          onSave={(name) => void saveFolder(name)}
-        />
+        >
+          <WebinarFolderPanelForm
+            key={editingFolder?.id ?? 'new'}
+            folder={editingFolder}
+            busy={folderBusy}
+            error={folderError}
+            onCancel={() => {
+              if (folderBusy) return
+              setFolderDialogOpen(false)
+              setEditingFolder(null)
+              setFolderError('')
+            }}
+            onSave={(name) => void saveFolder(name)}
+          />
+        </DetailPanel>
       ) : null}
+      <DetailPanel
+        open={active !== null}
+        title={active?.title ?? ''}
+        description={active ? publicationSummary(active) : undefined}
+        onClose={closeDetail}
+        hasPrev={activeIndex > 0}
+        hasNext={activeIndex >= 0 && activeIndex < visible.length - 1}
+        onPrev={activeIndex > 0 ? () => goDetail(-1) : undefined}
+        onNext={activeIndex >= 0 && activeIndex < visible.length - 1 ? () => goDetail(1) : undefined}
+        footer={active ? (
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            {canEdit
+              ? <Button href={`/webinars/edit?id=${active.id}`}>編集する</Button>
+              : <Button disabled title={readonlyReason}>編集する</Button>}
+            <Button
+              variant="secondary"
+              disabled={!canEdit}
+              title={canEdit ? undefined : readonlyReason}
+              onClick={() => { closeDetail(); openArchive(active) }}
+            >
+              アーカイブする
+            </Button>
+          </div>
+        ) : undefined}
+      >
+        {active ? (
+          <div>
+            <p className={styles.archiveTarget}>ウェビナー名</p>
+            <InlineEdit
+              value={active.title}
+              label="ウェビナー名"
+              disabled={!canEdit}
+              onSave={(next) => renameWebinar(active, next)}
+            />
+            <p className={styles.archiveTarget}>状態</p>
+            <p className={styles.archiveTargetSub}><span className={statusPillClass(active)}>● {statusLabelV8(active)}</span></p>
+            <p className={styles.archiveTarget}>申込・視聴</p>
+            <p className={styles.archiveTargetSub}>
+              申込 {isUnpublished(active) ? '—' : peopleText(active.registrationCount)}
+              　視聴開始 {isUnpublished(active) ? '—' : peopleText(active.viewerCount)}
+            </p>
+            <p className={styles.archiveTarget}>公開ページの目印</p>
+            <p className={styles.archiveTargetSub}>/{active.slug}</p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <Button variant="secondary" onClick={() => router.push(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=participants`)}>参加者を見る</Button>
+              <Button variant="secondary" onClick={() => router.push(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=analytics`)}>分析を見る</Button>
+              <Button variant="secondary" onClick={() => router.push(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=comments`)}>コメント演出を開く</Button>
+            </div>
+            {!canEdit ? <p className={styles.archiveTargetSub}>{readonlyReason}</p> : null}
+          </div>
+        ) : null}
+      </DetailPanel>
       <ConfirmDialog
         open={deletingFolder !== null}
         title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}

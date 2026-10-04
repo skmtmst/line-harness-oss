@@ -259,12 +259,12 @@ export function NewOfferV8() {
                 aria-label="成果地点"
                 value=""
                 onChange={() => {}}
-                options={[{ value: '', label: '準備中' }]}
+                options={[{ value: '', label: 'この画面では選べません' }]}
                 disabled
                 size="standard"
               />
             </label>
-            <p className="af-create-footnote">成果地点の選び方は準備中です。用意ができたらここで選べるようになります。</p>
+            <p className="af-create-footnote">成果地点と案件をつなぐ操作にはまだ対応していません。</p>
           </section>
 
           <section className="af-create-card" aria-label="いくら払うか">

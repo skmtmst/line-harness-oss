@@ -2368,7 +2368,7 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
         {Array.from({ length: 24 }, (_, hour) => {
           const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
           // 高さだけの棒は読み上げに届かない。1本ごとに時間と回数を名前にする。
-          return <div key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t-mini bg-accent" style={{ height: `${clicks / maxHourly * 96}px` }} /><span aria-hidden="true" className="h-3 whitespace-nowrap text-[10px] leading-3 text-ink-faint">{hour % 3 === 0 ? `${hour}時` : ''}</span></div>
+          return <div key={hour} role="img" aria-label={`${hour}時台 ${clicks}回`} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${hour}時台 ${clicks}回`}><span className="w-full rounded-t-mini bg-accent" style={{ height: `${clicks / maxHourly * 96}px` }} /><span aria-hidden="true" className="h-3 whitespace-nowrap text-nano leading-3 text-ink-faint">{hour % 3 === 0 ? `${hour}時` : ''}</span></div>
         })}
       </div>
     </section>

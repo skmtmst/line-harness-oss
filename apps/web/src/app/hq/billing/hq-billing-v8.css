@@ -23,7 +23,7 @@
 /* 契約の帯（板の灰色の箱）。 */
 .hq-billing-v8__contract {
   background: var(--color-surface-pearl);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 10px 12px;
   font-size: var(--text-caption);
   line-height: 1.5;

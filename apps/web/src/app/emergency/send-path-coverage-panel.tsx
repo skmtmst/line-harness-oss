@@ -89,7 +89,7 @@ export function SendPathCoveragePanel({ accountId, revision }: { accountId: stri
           {group.title}{group.stopped ? '（停止中）' : ''}
         </p>
         <ul className="mt-2 space-y-1.5">
-          {group.paths.map((path) => <li key={path.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
+          {group.paths.map((path) => <li key={path.id} className="flex flex-wrap items-baseline gap-x-3 text-xs" style={{ rowGap: 2 }}>
             <span className={`shrink-0 rounded-pill px-2 py-0.5 font-bold ${path.state === 'stopped' ? 'bg-danger-bg text-danger' : path.state === 'running' ? 'bg-success-bg text-success' : 'bg-canvas-sunken text-ink-faint'}`}>
               {path.state === 'stopped' ? '停止中' : path.state === 'running' ? '稼働中' : '対象外'}
             </span>

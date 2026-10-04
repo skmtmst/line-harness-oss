@@ -150,12 +150,12 @@ function validityText(rule: MileageEarningRuleV6): string {
 
 type SortKey = 'order' | 'granted' | 'name' | 'amount'
 
-const PRESETS: Array<{ value: string; label: string; active: boolean; pending: boolean; sort: SortKey }> = [
-  { value: 'default', label: 'よく使う絞り込み', active: false, pending: false, sort: 'order' },
-  { value: 'active-granted', label: '動いている・付いたマイルが多い順', active: true, pending: false, sort: 'granted' },
-  { value: 'active-name', label: '動いている・名前順', active: true, pending: false, sort: 'name' },
-  { value: 'stopped', label: '止めているのみ', active: false, pending: false, sort: 'order' },
-  { value: 'pending', label: '確定待ちありのみ', active: false, pending: true, sort: 'order' },
+const PRESETS: Array<{ value: string; label: string; active: boolean; pending: boolean; stopped: boolean; sort: SortKey }> = [
+  { value: 'default', label: 'よく使う絞り込み', active: false, pending: false, stopped: false, sort: 'order' },
+  { value: 'active-granted', label: '動いている・付いたマイルが多い順', active: true, pending: false, stopped: false, sort: 'granted' },
+  { value: 'active-name', label: '動いている・名前順', active: true, pending: false, stopped: false, sort: 'name' },
+  { value: 'stopped', label: '止めているのみ', active: false, pending: false, stopped: true, sort: 'order' },
+  { value: 'pending', label: '確定待ちありのみ', active: false, pending: true, stopped: false, sort: 'order' },
 ]
 
 export default function V8EarningRulesTab({
@@ -165,7 +165,7 @@ export default function V8EarningRulesTab({
 }: {
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
-  registerTabCount: (key: MileageV8TabKey, text: string | null) => void
+  registerTabCount?: (key: MileageV8TabKey, text: string | null) => void
 }) {
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -188,6 +188,7 @@ export default function V8EarningRulesTab({
   const [folder, setFolder] = useState<FolderKey>('all')
   const [activeOnly, setActiveOnly] = useState(false)
   const [pendingOnly, setPendingOnly] = useState(false)
+  const [stoppedOnly, setStoppedOnly] = useState(false)
   const [sort, setSort] = useState<SortKey>('order')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
@@ -329,7 +330,7 @@ export default function V8EarningRulesTab({
 
   /* タブの名の横の件数。読み直し中・失敗時は消す。 */
   useEffect(() => {
-    registerTabCount('earning-rules', loading || loadError ? null : formatMileageNumber(rules.length))
+    registerTabCount?.('earning-rules', loading || loadError ? null : formatMileageNumber(rules.length))
   }, [loading, loadError, registerTabCount, rules.length])
 
   const activeRules = useMemo(() => rules.filter((rule) => rule.published.status === 'published'), [rules])
@@ -349,6 +350,7 @@ export default function V8EarningRulesTab({
     const filtered = rules.filter((rule) => {
       if (folder !== 'all' && folderOf(rule) !== folder) return false
       if (activeOnly && rule.published.status !== 'published') return false
+      if (stoppedOnly && rule.published.status === 'published') return false
       if (pendingOnly && rule.draft.initialStatus !== 'pending') return false
       if (keyword && !rule.draft.name.includes(keyword)) return false
       return true
@@ -360,15 +362,15 @@ export default function V8EarningRulesTab({
       if (sort === 'amount') return b.draft.amount - a.draft.amount
       return (order.get(a.id) ?? a.draft.sortOrder) - (order.get(b.id) ?? b.draft.sortOrder)
     })
-  }, [activeOnly, folder, pendingOnly, ruleOrder, rules, search, sort])
+  }, [activeOnly, folder, pendingOnly, stoppedOnly, ruleOrder, rules, search, sort])
 
   const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
   const visible = shown.slice((page - 1) * pageSize, page * pageSize)
   const presetValue = PRESETS.find((p) =>
-    p.active === activeOnly && p.pending === pendingOnly && p.sort === sort)?.value ?? 'custom'
+    p.active === activeOnly && p.pending === pendingOnly && p.stopped === stoppedOnly && p.sort === sort)?.value ?? 'custom'
 
   const moveRule = (id: string, direction: -1 | 1) => {
-    if (readonly || folder !== 'all' || activeOnly || pendingOnly || search.trim() || sort !== 'order') return
+    if (readonly || folder !== 'all' || activeOnly || pendingOnly || stoppedOnly || search.trim() || sort !== 'order') return
     setRuleOrder((current) => {
       const index = current.indexOf(id)
       const target = index + direction
@@ -512,6 +514,7 @@ export default function V8EarningRulesTab({
     setFolder('all')
     setActiveOnly(false)
     setPendingOnly(false)
+    setStoppedOnly(false)
     setSort('order')
     setPage(1)
   }
@@ -625,7 +628,10 @@ export default function V8EarningRulesTab({
             />
             <FilterChip
               selected={activeOnly}
-              onChange={(selected) => resetPage(() => setActiveOnly(selected))}
+              onChange={(selected) => resetPage(() => {
+                setActiveOnly(selected)
+                if (selected) setStoppedOnly(false)
+              })}
             >
               動いている {formatMileageNumber(activeRules.length)}
             </FilterChip>
@@ -654,6 +660,7 @@ export default function V8EarningRulesTab({
                   setPage(1)
                   setActiveOnly(preset.active)
                   setPendingOnly(preset.pending)
+                  setStoppedOnly(preset.stopped)
                   setSort(preset.sort)
                 }}
               />

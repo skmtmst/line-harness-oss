@@ -345,8 +345,8 @@ function UsageBars({ usage }: { usage: BannerUsage | null }) {
         return (
           <div key={label} className="flex items-center gap-2">
             <span className="w-8 shrink-0 text-micro text-ink-secondary">{label}</span>
-            <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-hairline">
-              <span className="block h-full rounded-full bg-success" style={{ width: `${pct}%` }} />
+            <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-pill bg-hairline">
+              <span className="block h-full rounded-pill bg-success" style={{ width: `${pct}%` }} />
             </span>
             <span className="shrink-0 text-micro text-ink-secondary">残り{bucket.remaining}/{bucket.limit}枚</span>
           </div>

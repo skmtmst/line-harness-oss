@@ -38,6 +38,7 @@ import kpiStyles from '@/components/shared/kpi-card.module.css'
 import styles from './friend-detail-v8.module.css'
 import { loadFailureKind } from './load-failure-kind'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
  * 友だち詳細。
@@ -432,7 +433,7 @@ function SupportMarkBadge({ status }: { status?: 'unread' | 'in_progress' | 'on_
   } as const
   const s = map[status]
   return (
-    <span className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${s.className}`}>
+    <span className={`rounded-pill px-2 py-0.5 text-micro font-medium ${s.className}`}>
       {s.label}
     </span>
   )
@@ -445,6 +446,10 @@ function FriendDetailInner() {
   const rawTab = params.get('tab')
   // 既定はタイムライン。設計でも最初に開くのはやり取り。
   const tab: TabKey = (TABS.find((t) => t.key === rawTab)?.key ?? 'timeline') as TabKey
+  // ★V8 `Q5F2QE`：概要・履歴・回答フォームのタブに板ID。v7 はそのまま。
+  // （情報欄タブは #1236 の分。合流したら1枚になる）
+  const adminTheme = useAdminTheme()
+  const v8 = adminTheme === 'v8'
 
   const [upcoming, setUpcoming] = useState<FriendUpcoming | null>(null)
   const [upcomingFailed, setUpcomingFailed] = useState(false)
@@ -1563,7 +1568,7 @@ function FriendDetailInner() {
                   ) : (
                     <span className="text-ink-faint text-xs">タグはありません</span>
                   )}
-                  <Button variant="secondary" className="text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] h-auto whitespace-normal" href={inboxHrefForFriend(friendId)}>
+                  <Button variant="secondary" className="text-ink-secondary rounded-pill px-2 py-0.5 text-micro h-auto whitespace-normal" href={inboxHrefForFriend(friendId)}>
                     ＋ 追加
                   </Button>
                 </div>
@@ -1930,7 +1935,7 @@ function FriendDetailInner() {
               0件・取得失敗・読み込み中を分け、続きは「さらに読み込む」。
             */}
             {tab === 'history' && (
-              <div className="@container bg-canvas rounded-card border-hairline overflow-hidden border">
+              <div className="@container bg-canvas rounded-card border-hairline overflow-hidden border" data-design-node={v8 ? 'Q5F2QE' : undefined}>
                 {/* #985 CHK-04 / #773: 見出しの表組みはカード幅(@lg)で切り替える。 */}
                 <div className="bg-canvas-sunken border-hairline hidden border-b px-4 py-3 text-xs font-semibold text-ink-faint @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
                   <span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span>
@@ -2112,7 +2117,7 @@ function FriendDetailInner() {
                             {FIELD_TYPE_LABELS[field.type] ?? field.type}
                           </span>
                           {field.isPersonal && (
-                            <span className="bg-warning-bg text-warning rounded-pill ml-1.5 px-1.5 py-0.5 text-[10px]">
+                            <span className="bg-warning-bg text-warning rounded-pill ml-1.5 px-1.5 py-0.5 text-nano">
                               個人情報
                             </span>
                           )}
@@ -2181,7 +2186,7 @@ function FriendDetailInner() {
             )}
 
             {tab === 'forms' && (
-              <div className="bg-canvas rounded-card border-hairline border p-5">
+              <div className="bg-canvas rounded-card border-hairline border p-5" data-design-node={v8 ? 'Q5F2QE' : undefined}>
                 {submissionsStatus === 'loading' || submissionsStatus === 'idle' ? (
                   <p className="text-ink-faint py-6 text-center text-sm">回答を読み込んでいます…</p>
                 ) : submissionsStatus === 'error' ? (

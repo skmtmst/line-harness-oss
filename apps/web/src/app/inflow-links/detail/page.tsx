@@ -210,7 +210,7 @@ function InflowLinkDetailPageContent() {
 
   /** コピーできなかったとき、選んでコピーできる欄をその場に出す（ブラウザの入力窓は使わない。V6R-S3-f）。 */
   const [copyFailed, setCopyFailed] = useState(false)
-  const { accounts } = useAccount()
+  const { accounts = [] } = useAccount()
   // 板 Q5le3 の操作の口。
   const [qrOpen, setQrOpen] = useState(false)
   const [showOrders, setShowOrders] = useState(false)

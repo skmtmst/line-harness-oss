@@ -1,5 +1,7 @@
 'use client'
 
+import { Th } from '@/components/shared/table'
+
 /*
  * ★V8-B 共通アクションの版と使われている場所（板 `ziSgL`）。
  *
@@ -373,12 +375,12 @@ function VersionsV8Inner() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th scope="col">利用先</th>
-                  <th scope="col">固定中の版</th>
-                  <th scope="col">実行中</th>
-                  <th scope="col">待機中</th>
-                  <th scope="col">状態</th>
-                  <th scope="col"><span className={styles.visuallyHidden}>操作</span></th>
+                  <Th scope="col">利用先</Th>
+                  <Th scope="col">固定中の版</Th>
+                  <Th scope="col">実行中</Th>
+                  <Th scope="col">待機中</Th>
+                  <Th scope="col">状態</Th>
+                  <Th scope="col"><span className={styles.visuallyHidden}>操作</span></Th>
                 </tr>
               </thead>
               <tbody>

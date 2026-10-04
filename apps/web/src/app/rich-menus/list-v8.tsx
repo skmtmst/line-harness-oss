@@ -1018,11 +1018,12 @@ export default function RichMenusListV8() {
   )
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node={canEdit ? 'rZEGN' : 'ZoKow'}>
       {/*
         骨格の印（data-design）は v7 の page.tsx 側が担う。ここへ別の節名を
         足すと design-structure の検査が V7＋V8 の和集合で見えてしまう。
         KPIs は V7 と同じ節名なので残す。
+        板の印だけは付ける（ZoKow＝閲覧のみ、rZEGN＝操作できる一覧）。
       */}
       <div>
         <div className={styles.head}>
@@ -1030,6 +1031,7 @@ export default function RichMenusListV8() {
             <h2 className={styles.headTitle}>リッチメニュー</h2>
             <p className={styles.headDescription}>
               トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。
+              {canEdit ? null : '閲覧のみで見ています。変える操作は管理者に頼んでください。'}
             </p>
           </div>
           <Button

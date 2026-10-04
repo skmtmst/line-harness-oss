@@ -229,7 +229,7 @@ export default function NewRestaurantStorePage() {
             {/* faGn4: 店舗ごとのプロバイダーの注意は基本情報の時点で伝える。 */}
             <div className="rounded-control bg-canvas-sunken p-3"><p className="text-xs font-semibold leading-5 text-ink">店舗ごとに、新しいプロバイダーを作ってください。</p><p className="mt-2 text-xs leading-5 text-ink-secondary">LINEのユーザーIDはプロバイダーごとに発行されます。複数の店舗を同じプロバイダーにまとめると、同じお客様を店舗ごとに別々に管理できなくなります。</p></div>
             {termsAgreedAt && <p className="text-xs leading-5 text-ink-secondary">利用規約に同意済み{agreementDate ? `（${agreementDate}）` : ''}</p>}
-            <StickyBar actions={<><Link href="/hq" className="inline-flex items-center rounded-control border border-hairline bg-canvas px-4 py-2.5 text-sm font-semibold text-ink">キャンセル</Link><Button variant="primary" className="px-5 py-2.5 border-0 h-auto whitespace-normal" type="button" onClick={nextFromBasics}>次へ</Button></>} />
+            <StickyBar actions={<><Button variant="secondary" href="/hq" >キャンセル</Button><Button variant="primary" className="px-5 py-2.5 border-0 h-auto whitespace-normal" type="button" onClick={nextFromBasics}>次へ</Button></>} />
           </div>}
 
           {step === STEP.OFFICIAL_ACCOUNT && <div className="mt-7 space-y-5">

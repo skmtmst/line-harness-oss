@@ -1,5 +1,7 @@
 'use client'
 
+import { Th } from '@/components/shared/table'
+
 /*
  * ★V8-B 動いた記録（板 `g98F9`・状態 `S3pdQ`・1152 `En14p`）。
  *
@@ -72,15 +74,6 @@ const STATUS_LABEL: Record<RunStatus, string> = {
   partial: '一部だけできました',
   permanent_failed: '失敗しました',
   cancelled: '取り消しました',
-}
-
-function statusPill(status: RunStatus): string {
-  if (status === 'succeeded') return `${styles.pill} ${styles.pillActive}`
-  if (status === 'permanent_failed' || status === 'partial') return `${styles.pill} ${styles.pillDanger}`
-  if (status === 'retry_wait' || status === 'queued' || status === 'claimed' || status === 'waiting') {
-    return `${styles.pill} ${styles.pillWarn}`
-  }
-  return `${styles.pill} ${styles.pillStopped}`
 }
 
 const STEP_STATUS_LABEL: Record<AutomationRunDetail['steps'][number]['status'], string> = {
@@ -505,12 +498,12 @@ export function V8RunsTab({
           <table className={styles.table}>
             <thead>
               <tr>
-                <th scope="col">いつ・だれに</th>
-                <th scope="col">オートメーション</th>
-                <th scope="col">結果</th>
-                <th scope="col">したこと</th>
-                <th scope="col">かかった時間</th>
-                <th scope="col"><span className={styles.visuallyHidden}>操作</span></th>
+                <Th scope="col">いつ・だれに</Th>
+                <Th scope="col">オートメーション</Th>
+                <Th scope="col">結果</Th>
+                <Th scope="col">したこと</Th>
+                <Th scope="col">かかった時間</Th>
+                <Th scope="col"><span className={styles.visuallyHidden}>操作</span></Th>
               </tr>
             </thead>
             <tbody>
@@ -528,7 +521,7 @@ export function V8RunsTab({
                     </p>
                     <p className={styles.cellSub} title={run.triggerLabel}>{run.triggerLabel}</p>
                   </td>
-                  <td><span className={statusPill(run.status)}>{STATUS_LABEL[run.status]}</span></td>
+                  <td><span className={`${styles.pill} ${run.status === 'succeeded' ? styles.pillActive : run.status === 'permanent_failed' || run.status === 'partial' ? styles.pillDanger : run.status === 'retry_wait' || run.status === 'queued' || run.status === 'claimed' || run.status === 'waiting' ? styles.pillWarn : styles.pillStopped}`} >{STATUS_LABEL[run.status]}</span></td>
                   <td><p className={styles.cellSub} title={run.detail ?? '何もしていません'}>{run.detail ?? '何もしていません'}</p></td>
                   <td><span className={styles.num}>{formatDuration(run.durationMs)}</span></td>
                   <td>

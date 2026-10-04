@@ -28,7 +28,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   font-size: var(--text-label);
   font-weight: 500;
   color: var(--color-ink-secondary);

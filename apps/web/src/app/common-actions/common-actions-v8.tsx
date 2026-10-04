@@ -1,5 +1,7 @@
 'use client'
 
+import { Th } from '@/components/shared/table'
+
 /*
  * ★V8-B 共通アクションの一覧（板 `LnGNw`・状態 `S3pdQ`・1152 `En14p`）。
  *
@@ -322,12 +324,12 @@ export function V8CommonActionsTab({
           <table className={styles.table}>
             <thead>
               <tr>
-                <th scope="col">アクション名</th>
-                <th scope="col">状態</th>
-                <th scope="col">中の処理</th>
-                <th scope="col">呼び出し元</th>
-                <th scope="col">版</th>
-                <th scope="col"><span className={styles.visuallyHidden}>操作</span></th>
+                <Th scope="col">アクション名</Th>
+                <Th scope="col">状態</Th>
+                <Th scope="col">中の処理</Th>
+                <Th scope="col">呼び出し元</Th>
+                <Th scope="col">版</Th>
+                <Th scope="col"><span className={styles.visuallyHidden}>操作</span></Th>
               </tr>
             </thead>
             <tbody>

@@ -238,7 +238,7 @@ export default function OpsDashboardPage() {
                     <MiniStat label="対応中" value={`${data.tickets.inProgressCount} 件`} />
                     <MiniStat label="平均の初回返信" value={v8HoursLabel(data.tickets.avgFirstReplyMinutes)} />
                   </div>
-                  <Link href="/ops/support" className="mt-2 inline-block text-caption font-semibold text-accent-deep underline-offset-2 hover:underline">すべて見る →</Link>
+                  <Link href="/ops/support" className="mt-2 inline-block text-caption font-semibold text-action underline-offset-2 hover:underline">すべて見る →</Link>
                 </>
               ) : <ListState kind="loading" title="読み込んでいます" />}
             </>

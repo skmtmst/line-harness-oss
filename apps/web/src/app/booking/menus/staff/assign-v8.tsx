@@ -1,5 +1,7 @@
 'use client'
 
+import { Th } from '@/components/shared/table'
+
 /*
  * ★V8「担当メニューをまとめて決める」（板 ooufy）。
  *
@@ -66,16 +68,16 @@ function MatrixSkeleton() {
         <table className={styles.matrix}>
           <thead>
             <tr>
-              <th className={styles.matrixMenuHead} scope="col"><Skeleton width={80} height={14} /></th>
+              <Th className={styles.matrixMenuHead} scope="col"><Skeleton width={80} height={14} /></Th>
               {[0, 1, 2].map((i) => (
-                <th key={i} className={styles.matrixStaffHead} scope="col"><Skeleton width={64} height={14} /></th>
+                <Th key={i} className={styles.matrixStaffHead} scope="col"><Skeleton width={64} height={14} /></Th>
               ))}
             </tr>
           </thead>
           <tbody>
             {[0, 1, 2, 3, 4].map((row) => (
               <tr key={row}>
-                <th scope="row" className={styles.matrixMenuCell}><Skeleton width="80%" height={15} /></th>
+                <Th scope="row" className={styles.matrixMenuCell}><Skeleton width="80%" height={15} /></Th>
                 {[0, 1, 2].map((col) => (
                   <td key={col} className={styles.matrixCell}><Skeleton width={18} height={18} /></td>
                 ))}
@@ -376,15 +378,15 @@ export default function AssignMatrixV8() {
                   <table className={styles.matrix}>
                     <thead>
                       <tr>
-                        <th className={styles.matrixMenuHead} scope="col">メニュー</th>
+                        <Th className={styles.matrixMenuHead} scope="col">メニュー</Th>
                         {staff.map((s) => (
-                          <th key={s.id} className={styles.matrixStaffHead} scope="col">
+                          <Th key={s.id} className={styles.matrixStaffHead} scope="col">
                             <span className={styles.matrixStaffName} title={staffLabel(s)}>
                               {staffLabel(s)}
                             </span>
                             {!s.is_active ? <span className={styles.matrixStaffOff}>止めている</span> : null}
                             {s.is_designation_optional === 1 ? <span className={styles.matrixStaffOff}>指名なし</span> : null}
-                          </th>
+                          </Th>
                         ))}
                       </tr>
                     </thead>
@@ -395,9 +397,9 @@ export default function AssignMatrixV8() {
                           id={`menu-${m.id}`}
                           className={focusMenuId === m.id ? styles.matrixRowFocus : undefined}
                         >
-                          <th scope="row" className={styles.matrixMenuCell}>
+                          <Th scope="row" className={styles.matrixMenuCell}>
                             <span className={styles.matrixMenuName} title={m.name}>{m.name}</span>
-                          </th>
+                          </Th>
                           {staff.map((s) => {
                             const row = grid[s.id]?.[m.id]
                             const offered = Boolean(row?.is_offered)

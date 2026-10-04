@@ -727,27 +727,26 @@ function ResourcePickRow(props: {
 }) {
   const { title, id, selectLabel, value, onPick, options, tagsLoading, tagsFailed, failedNote } = props
   return (
-    <div className={styles.field}>
-      <label className={styles.label} htmlFor={id}>
+    <div className="space-y-2">
+      <label className={styles.fieldLabel} htmlFor={id}>
         {title}<RequiredBadge />
       </label>
-      <div className={styles.field}>
+      <div className="space-y-2">
         <Select
           id={id}
           value={value}
           disabled={tagsLoading || tagsFailed}
           onChange={(value) => onPick(value)}
           aria-label={selectLabel}
-          className={styles.select}
           size="standard"
           options={[
             { value: '', label: '— 選んでください —' },
             ...options.map((option) => ({ value: option.value, label: option.label })),
           ]}
         />
-        {tagsLoading ? <p className={styles.note}>読み込んでいます</p> : null}
+        {tagsLoading ? <p className={styles.footnote}>読み込んでいます</p> : null}
         {tagsFailed ? (
-          <p className={styles.note}>
+          <p className={styles.footnote}>
             {failedNote}
           </p>
         ) : null}
