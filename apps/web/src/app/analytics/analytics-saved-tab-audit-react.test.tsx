@@ -173,7 +173,7 @@ describe('R462 履歴の失敗は一覧を隠さず回復したら消える', ()
     expect(host.textContent).toContain('結果の履歴を読み込めませんでした')
     expect(host.textContent).toContain('保存した分析')
     // 「—・読み込めませんでした」のままにならない（件数が出る）
-    expect(host.textContent).not.toMatch(/保存した結果\s*—/)
+    expect(host.textContent).not.toMatch(/保存結果数\s*—/)
 
     // もう一度で履歴200が返ると古い案内が消える
     await act(async () => { button('もう一度').click() })
