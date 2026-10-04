@@ -445,6 +445,8 @@ function FriendDetailInner() {
   const rawTab = params.get('tab')
   // 既定はタイムライン。設計でも最初に開くのはやり取り。
   const tab: TabKey = (TABS.find((t) => t.key === rawTab)?.key ?? 'timeline') as TabKey
+  // ★V8 `Q5F2QE`：概要・履歴・回答フォームのタブに板ID。v7 はそのまま。
+  // （情報欄タブは #1236 の分。合流して4枚になった）
 
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [fields, setFields] = useState<FriendField[]>([])
@@ -1750,7 +1752,7 @@ function FriendDetailInner() {
             </div>
 
             {tab === 'timeline' && (
-              <div className="space-y-4">
+              <div className="space-y-4" data-design-node={v8 ? 'Q5F2QE' : undefined}>
                 <div className="grid gap-4 xl:grid-cols-2">
                   <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
                     <h2 className="text-ink text-sm font-bold">進行中の配信・自動処理</h2>
@@ -1934,7 +1936,7 @@ function FriendDetailInner() {
               0件・取得失敗・読み込み中を分け、続きは「さらに読み込む」。
             */}
             {tab === 'history' && (
-              <div className="@container bg-canvas rounded-card border-hairline overflow-hidden border">
+              <div className="@container bg-canvas rounded-card border-hairline overflow-hidden border" data-design-node={v8 ? 'Q5F2QE' : undefined}>
                 {/* #985 CHK-04 / #773: 見出しの表組みはカード幅(@lg)で切り替える。 */}
                 <div className="bg-canvas-sunken border-hairline hidden border-b px-4 py-3 text-xs font-semibold text-ink-faint @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
                   <span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span>
@@ -2185,7 +2187,7 @@ function FriendDetailInner() {
             )}
 
             {tab === 'forms' && (
-              <div className="bg-canvas rounded-card border-hairline border p-5">
+              <div className="bg-canvas rounded-card border-hairline border p-5" data-design-node={v8 ? 'Q5F2QE' : undefined}>
                 {submissionsStatus === 'loading' || submissionsStatus === 'idle' ? (
                   <p className="text-ink-faint py-6 text-center text-sm">回答を読み込んでいます…</p>
                 ) : submissionsStatus === 'error' ? (
