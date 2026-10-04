@@ -1,10 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { Plug } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { api, type MeasurementSite } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import SectionHeader from '@/components/shared/section-header'
+import PageHeader from '@/components/shared/page-header'
+import ActionMenu from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
+import './site-script-v8.css'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -36,6 +42,7 @@ type TrackingSummary = {
 export default function SiteScript() {
   const { selectedAccountId } = useAccount()
   const [pages, setPages] = useState<PageRow[]>([])
+  const [dataAccountId, setDataAccountId] = useState(selectedAccountId)
   const [summary, setSummary] = useState<TrackingSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -62,6 +69,13 @@ export default function SiteScript() {
   >(null)
   const [resumeTarget, setResumeTarget] = useState<MeasurementSite | null>(null)
   const [siteActionError, setSiteActionError] = useState('')
+  const [siteMenuId, setSiteMenuId] = useState<string | null>(null)
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [pagesFailed, setPagesFailed] = useState(false)
+  const loadGeneration = useRef(0)
+  const accountRef = useRef(selectedAccountId)
+  accountRef.current = selectedAccountId
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
   const snippet = trackingKey
     ? `<script async src="${apiUrl}/api/site/script.js" data-key="${trackingKey}"></script>`
@@ -73,6 +87,15 @@ export default function SiteScript() {
       : null
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setPages([])
+      setSites([])
+      setSummary(null)
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setFailed(false)
     const [pagesResult, summaryResult, sitesResult] = await Promise.allSettled([
@@ -80,8 +103,13 @@ export default function SiteScript() {
       api.siteTracking.summary(selectedAccountId ?? undefined),
       api.measurementSites.list(selectedAccountId ?? undefined),
     ])
+    if (generation !== loadGeneration.current || accountAtRequest !== accountRef.current) return
     if (pagesResult.status === 'fulfilled' && pagesResult.value.success) {
       setPages(pagesResult.value.data)
+      setPagesFailed(false)
+    } else {
+      setPages([])
+      setPagesFailed(true)
     }
     /*
      * 計測状況の正本は集計。集計が読めないときは「未接続」にせず
@@ -106,12 +134,13 @@ export default function SiteScript() {
   // サイトの追加・変更は owner/admin だけ。staff は閲覧まで。
   useEffect(() => {
     let active = true
+    if (!selectedAccountId) { setCanManage(false); return }
     void api.staff.me().then((response) => {
       if (!active) return
       setCanManage(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
     }).catch(() => undefined)
     return () => { active = false }
-  }, [])
+  }, [selectedAccountId])
 
   const parseDomains = (text: string) =>
     text.split(/[\s,]+/).map((d) => d.trim()).filter(Boolean)
@@ -183,14 +212,28 @@ export default function SiteScript() {
   }
 
   useEffect(() => {
+    setPages([])
+    setSites([])
+    setSummary(null)
+    setDataAccountId(selectedAccountId)
+    setSelectedSiteId(null)
+    setSiteMenuId(null)
+    setCanManage(false)
+    setSiteDialog(null)
+    setStopDialog(null)
+    setResumeTarget(null)
     void load()
+    return () => { loadGeneration.current += 1 }
   }, [load])
 
-  // 選択中アカウントの計測鍵を取る。未選択のときは口に省いて送り、
-  // 可視アカウントが1つだけなら向こうで補う。複数ある・失敗のときは
-  // コードを出さず案内にする。
+  // 選択中アカウントの計測鍵だけを取得する。未選択では通信せず、
+  // 切り替え時は前の鍵とコピー状態を消す。取得失敗時はコードを出さない。
   useEffect(() => {
     let cancelled = false
+    setTrackingKey(null)
+    setCopied(false)
+    setCopyFailed(false)
+    if (!selectedAccountId) { setKeyLoading(false); return }
     setKeyLoading(true)
     void api.siteTracking
       .trackingKey(selectedAccountId ?? undefined)
@@ -210,10 +253,14 @@ export default function SiteScript() {
     }
   }, [selectedAccountId, keyAttempt])
 
-  const copy = async () => {
-    if (!snippet) return
+  const selectedSite = sites.find((site) => site.id === selectedSiteId) ?? null
+  const displayedSnippet = selectedSite ? selectedSite.stoppedAt ? null : siteSnippet(selectedSite.id) : snippet
+  const copy = async (forAgency = false) => {
+    if (!displayedSnippet) return
     try {
-      await navigator.clipboard.writeText(snippet)
+      await navigator.clipboard.writeText(forAgency
+        ? `ホームページの </head> の直前に、次の計測コードをそのまま貼ってください。ページごとの書き換えは不要です。\n${displayedSnippet}`
+        : displayedSnippet)
       setCopied(true)
       setCopyFailed(false)
       setTimeout(() => setCopied(false), 2000)
@@ -234,304 +281,99 @@ export default function SiteScript() {
     }
   }
 
+  if (!selectedAccountId) return <ListState kind="empty" title="LINEアカウントを選択してください" />
+  if (dataAccountId !== selectedAccountId) return <ListState kind="loading" title="サイトの計測状況を読み込んでいます" />
+
   return (
-    <div className="space-y-4" data-design-node="IhSBB">
-      <Notice tone="info">
-        見ているページを数えるためのコードです。サイトに貼ると、どのページを見た人が友だちになったかが分かります。入力フォームの中身など、個人が特定できる情報は送りません。
-      </Notice>
-
-      {showInitialLoading ? (
-        <ListState kind="loading" title="サイトの計測状況を読み込んでいます" />
-      ) : failed ? (
-        <section className="rounded-card border border-hairline bg-canvas p-5" aria-label="サイトの計測を読み込めませんでした">
-          <h2 className="text-sm font-bold text-ink">サイトの計測を読み込めませんでした</h2>
-          <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
-            {lastSeen ? `最後に受け取ったのは ${lastSeen} です。` : ''}
-            タグが外れていないか、サイトの公開先が変わっていないかを確かめてください。
-          </p>
-          <div className="mt-2">
-            <button type="button" onClick={() => void load()} className="text-action text-xs underline">
-              もう一度読み込む
-            </button>
-          </div>
-          <Disclosure title="確かめ方を見る" size="compact" className="mt-2">
-            <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-ink-secondary">
-              <li>タグを貼ったあと、サイトを1ページ開いてから確かめてください。</li>
-              <li>テーマの更新などでタグが外れていないか確かめてください。</li>
-              <li>サイトの公開先（アドレス）が変わっていないか確かめてください。</li>
-            </ul>
-          </Disclosure>
-        </section>
-      ) : receiving ? (
-        <section className="rounded-card border border-success-bg bg-success-bg p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-success">
-                {`動いています。最後にデータが届いたのは ${lastSeen} です。`}
-              </p>
-              <p className="mt-1 text-xs text-ink-faint">
-                {`今日は ${formatNumber(summary?.todayEvents)}件、${formatNumber(summary?.pathCount)}種類のページから届いています。`}
-              </p>
-            </div>
-            <Button onClick={() => void load()}>いま届いているか確かめる</Button>
-          </div>
-        </section>
-      ) : (
-        <section className="rounded-card border border-hairline bg-canvas-sunken p-5" aria-label="サイトの計測は未接続">
-          <div className="flex items-start justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
-              <Plug aria-hidden="true" className="h-4 w-4 shrink-0" />
-              サイトの計測
-            </h2>
-            <Chip tone="neutral">未接続</Chip>
-          </div>
-          <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
-            計測用のタグをサイトに入れると、ここに訪問と成果が出ます。数字は出しません（0と書かない）。
-          </p>
-          <div className="mt-3">
-            <Button variant="secondary" onClick={scrollToCode}>つなぎ方を見る</Button>
-          </div>
-        </section>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-4">
-          <section id="site-script-code" className="rounded-card border border-hairline bg-canvas p-5">
-            <h2 className="text-base font-bold text-ink">サイトに貼るコード</h2>
-            <p className="mt-1 text-xs leading-relaxed text-ink-faint">ホームページの &lt;/head&gt; の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。</p>
-            {keyLoading ? (
-              <p className="mt-3 text-xs text-ink-faint">あなたのアカウントのコードを取得しています…</p>
-            ) : snippet ? (
-              <>
-                <div className="mt-3 rounded-control bg-ink p-4 text-on-accent">
-                  <p className="text-xs text-on-accent">あなたのアカウントで使うコード</p>
-                  <div className="mt-2 flex items-center gap-3">
-                    <code className="min-w-0 flex-1 overflow-x-auto text-xs">{snippet}</code>
-                    <Button onClick={copy}>{copied ? 'コピーしました' : 'コピー'}</Button>
-                  </div>
-                </div>
-                {copyFailed && <p className="mt-2 text-xs text-danger">コピーできませんでした。上のコードを選んでコピーしてください。</p>}
-              </>
-            ) : (
-              <div className="mt-3 rounded-control bg-canvas-sunken p-4">
-                <p className="text-xs leading-relaxed text-ink-secondary">
-                  計測コードを取得できませんでした。アカウントごとの鍵が無いと他の計測と混ざるため、以前の共通の鍵は表示しません。通信状態を確かめて、もう一度お試しください。
-                </p>
-                <div className="mt-2">
-                  <Button onClick={() => setKeyAttempt((n) => n + 1)}>コードをもう一度取得する</Button>
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-card border border-hairline bg-canvas p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base font-bold text-ink">成果を数えるサイト</h2>
-                <p className="mt-1 text-xs leading-relaxed text-ink-faint">
-                  サイトごとに「ここから届いた成果だけ数える」範囲を決めます。ここに無いドメインから届いた分は成果に数えず、届いた件数と最後の場所だけを残します。
-                </p>
-              </div>
-              {canManage ? (
-                <Button
-                  variant="secondary"
-                  onClick={() => setSiteDialog({ mode: 'create', label: '', domainsText: '', error: null })}
-                >
-                  サイトを追加する
-                </Button>
-              ) : null}
-            </div>
-            {sitesFailed ? (
-              <p className="mt-3 text-xs leading-relaxed text-ink-secondary" role="status">
-                計測サイトを読み込めませんでした。
-                <button type="button" onClick={() => void load()} className="text-action ml-1 underline">
-                  もう一度読み込む
-                </button>
-              </p>
-            ) : sites.length === 0 ? (
-              <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-                まだサイトがありません。追加するとサイトごとの計測コードが出ます。
-              </p>
-            ) : (
-              <ul className="mt-3 space-y-3">
-                {siteActionError ? (
-                  <li className="text-xs text-danger" role="alert">{siteActionError}</li>
-                ) : null}
-                {sites.map((site) => {
-                  const stopped = site.stoppedAt != null
-                  const code = stopped ? null : siteSnippet(site.id)
-                  return (
-                    <li key={site.id} className="rounded-control border border-hairline p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-ink" title={site.label}>
-                            {site.label}
-                            {stopped ? (
-                              <Chip tone="warn" className="ml-2">停止中</Chip>
-                            ) : null}
-                          </p>
-                          <p className="mt-0.5 text-xs text-ink-faint">
-                            サイトID <code className="break-all">{site.id}</code>
-                          </p>
-                        </div>
-                        {canManage ? (
-                          <div className="flex gap-2">
-                            <Button
-                              variant="secondary"
-                              onClick={() =>
-                                setSiteDialog({
-                                  mode: 'edit',
-                                  site,
-                                  label: site.label,
-                                  domainsText: site.domains.join('\n'),
-                                  error: null,
-                                })
-                              }
-                            >
-                              編集
-                            </Button>
-                            {stopped ? (
-                              <Button variant="secondary" onClick={() => setResumeTarget(site)}>
-                                計測を再開する
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="secondary"
-                                onClick={() => setStopDialog({ site, reason: '', error: null })}
-                              >
-                                計測を止める
-                              </Button>
-                            )}
-                          </div>
-                        ) : null}
-                      </div>
-                      {stopped ? (
-                        <p className="mt-2 text-xs text-status-warn-deep">
-                          計測を止めています。このサイトから届く分は数えません。止めたときの記録は残っています。
-                          {site.stoppedReason ? `（理由: ${site.stoppedReason}）` : ''}
-                        </p>
-                      ) : null}
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {site.domains.map((host) => (
-                          <Chip key={host} tone="neutral">{host}</Chip>
-                        ))}
-                      </div>
-                      {site.rejectedCount > 0 ? (
-                        <p className="mt-2 text-xs text-status-warn-deep">
-                          許可にない場所から届いた分: {formatNumber(site.rejectedCount)}件
-                          {site.lastRejectedHost ? `（最後: ${site.lastRejectedHost}）` : ''}
-                        </p>
-                      ) : null}
-                      {code ? (
-                        <div className="mt-2 rounded-control bg-ink p-3">
-                          <code className="block overflow-x-auto text-xs text-on-accent">{code}</code>
-                        </div>
-                      ) : null}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </section>
-
-          <section className="rounded-card border border-hairline bg-canvas p-5">
-            <h2 className="text-base font-bold text-ink">閲覧の記録への同意</h2>
-            <p className="mt-1 text-xs leading-relaxed text-ink-faint">
-              計測コードを貼ると、サイトの下に記録の案内が出ます。選ぶまでは閲覧を記録せず、数えなかった分だけここに出します。
-            </p>
-            <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken p-4" aria-label="サイトに出る案内の見本">
-              <p className="text-xs text-ink-secondary">サイトの下に出る案内（見本）</p>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-control bg-canvas p-3 shadow-card">
-                <p className="text-xs text-ink">広告の効果を知るため、この端末での閲覧を記録してよいですか？</p>
-                <div className="flex gap-2">
-                  <span className="rounded-control border border-hairline px-3 py-1.5 text-xs text-ink-secondary">記録しない</span>
-                  <span className="rounded-control bg-accent-deep px-3 py-1.5 text-xs font-semibold text-on-accent">記録してよい</span>
-                </div>
-              </div>
-            </div>
-            {summary?.consent && (
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <div className="rounded-control border border-hairline p-4">
-                  <p className="text-xs text-ink-faint">同意した</p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums text-ink">
-                    {summary.consent.grantedRate == null ? '—' : `${Math.round(summary.consent.grantedRate * 100)}%`}
-                  </p>
-                  <p className="mt-1 text-xs text-ink-faint">
-                    {formatNumber(summary.consent.granted)}件が記録を許可
-                    {summary.consent.declined > 0 ? `・${formatNumber(summary.consent.declined)}件が拒否` : ''}
-                  </p>
-                </div>
-                <div className="rounded-control border border-hairline p-4">
-                  <p className="text-xs text-ink-faint">数えなかった</p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{formatNumber(summary.consent.suppressed)}件</p>
-                  <p className="mt-1 text-xs text-ink-faint">同意がなかったため記録していません</p>
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className="rounded-card border border-hairline bg-canvas p-5">
-            <h2 className="text-base font-bold text-ink">貼るとできるようになること</h2>
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-              <Capability title="どのページを見て来たか" description="友だち追加の直前に見ていたページが、その人の記録に残ります。" />
-              <Capability title="どれくらい迷ったか" description="はじめて来てから友だちになるまでの日数が分かります。" />
-              <Capability title="成果を数える" description="カートに入れた・買った・申し込んだを成果地点として数えられます。" />
-            </div>
-          </section>
-
-          <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
-            <div className="border-b border-hairline px-4 py-3">
-              <h2 className="text-base font-bold text-ink">いま届いているページ</h2>
-              <p className="mt-1 text-xs text-ink-faint">コードを貼ったページの届き具合です。</p>
-            </div>
-            {loading ? <ListState kind="loading" title="サイトの計測状況を読み込んでいます" /> : pages.length === 0 ? (
-              <ListState kind="empty" title="まだ記録がありません" description="コードを貼ったあと、サイトを開くと数分で表示されます。" />
-            ) : (
-              <table className="w-full table-fixed text-xs">
-                <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint"><TableHeadRow><Th>サイト</Th><Th>ページ</Th><Th align="right">この30日のページ表示</Th><Th align="right">友だち追加</Th></TableHeadRow></thead>
-                <tbody className="divide-y divide-hairline">
-                  {pages.map((page) => {
-                    return <tr key={`${page.host ?? ''}:${page.path}`}>
-                      <td className="truncate px-4 py-3 text-ink-secondary" title={page.host ?? '以前の記録'}>{page.host ?? '以前の記録'}</td>
-                      <td className="truncate px-4 py-3 font-semibold text-ink" title={page.path}>{page.path}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{formatNumber(page.views)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">{formatNumber(page.visitors)}人</td>
-                    </tr>
-                  })}
-                </tbody>
-              </table>
-            )}
-          </section>
+    <div className="space-y-4" data-design-node="XjOte" data-inflow-site>
+      <PageHeader title="サイトスクリプト" titleDisplay="always"
+        breadcrumb={[{ label: '← 流入と計測へ', href: '/inflow-links' }]}
+        description="ホームページに1行貼ると、サイトを見た人とLINEの友だちを結びつけ、成果も数えられます。"
+        actions={<Button variant="secondary" onClick={() => setHelpOpen(true)}>貼りかたが分からないときは</Button>} />
+      <Card padding="default">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SectionHeader title={`成果を数えるサイト ${loading || sitesFailed ? '—' : formatNumber(sites.length)}`} help="サイトごとにコードを分けます。止めたサイトの成果は数えません。ここにないドメインから届いた分も成果には数えません。" helpLabel="成果を数えるサイトの説明" />
+          {canManage ? <Button variant="secondary" onClick={() => setSiteDialog({ mode: 'create', label: '', domainsText: '', error: null })}>サイトを追加する</Button> : null}
         </div>
-
-        <aside className="space-y-4">
-          <section className="rounded-card border border-hairline bg-canvas p-5">
-            <h2 className="text-sm font-bold text-ink">貼りかたが分からないときは</h2>
-            <dl className="mt-3 space-y-4">
-              <Help title="WordPress をお使いなら" description="テーマの header.php か、コードを貼るプラグインに入れます" />
-              <Help title="Shopify をお使いなら" description="テーマの theme.liquid の </head> の前に入れます" />
-              <Help title="制作会社にお願いするなら" description="このコードをそのまま送れば伝わります。書き換えは不要です" />
-            </dl>
-          </section>
-          <section className="rounded-card border border-hairline bg-canvas p-5">
-            <h2 className="text-sm font-bold text-ink">つながる先</h2>
-            <ul className="mt-3 space-y-3 text-xs"><li className="text-action">→ 流入と計測</li><li className="text-action">→ コンバージョン</li><li className="text-action">→ 友だち</li><li className="text-action">→ 分析</li></ul>
-          </section>
-          <section className="rounded-card border border-hairline bg-canvas p-5">
-            <h2 className="text-sm font-bold text-ink">どうやって友だちと結びつくか</h2>
-            <ol className="mt-3 space-y-2 text-xs text-ink-secondary">
-              <li><strong>1. LINEから開いた場合</strong> その場で経路を記録します。</li>
-              <li><strong>2. あとからLINEを追加した場合</strong> 同じブラウザの記録と結びつけます。</li>
-              <li><strong>3. 結びつかない場合</strong> 個人を推測せず経路不明として数えます。</li>
-            </ol>
-          </section>
-          <section className="rounded-card border border-status-warn bg-status-warn-soft p-5">
-            <h2 className="text-sm font-bold text-status-warn-deep">気をつけること</h2>
-            <ul className="mt-3 space-y-3 text-xs leading-relaxed text-status-warn-deep"><li>個人が特定できる情報は送りません</li></ul>
-          </section>
+        {siteActionError ? <Notice tone="warn" message={siteActionError} /> : null}
+        {loading ? <ListState kind="loading" title="サイトの計測状況を読み込んでいます" /> : sitesFailed ? failed ? null : <ListState kind="error" title="計測サイトを読み込めませんでした" onRetry={() => void load()} /> : sites.length === 0 ? <ListState kind="empty" title="まだサイトがありません" description="追加するとサイトごとの計測コードが出ます。" /> : (
+          <div className="mt-3 overflow-hidden">
+            <table className="w-full table-fixed text-xs">
+              <colgroup><col /><col className="w-1/4" /><col className="w-28" /><col className="w-28" /><col className="w-14" /></colgroup>
+              <thead><TableHeadRow><Th>サイト</Th><Th>ドメイン</Th><Th>状態</Th><Th>最後に届いた</Th><Th align="right">操作</Th></TableHeadRow></thead>
+              <tbody className="divide-y divide-hairline">{sites.map((site) => {
+                const stopped = site.stoppedAt != null
+                return <tr key={site.id}>
+                  <td className="px-3 py-3"><span className="block truncate font-semibold text-ink" title={site.label}>{site.label}</span>{stopped && site.stoppedReason ? <span className="block truncate text-ink-secondary" title={site.stoppedReason}>理由: {site.stoppedReason}</span> : null}
+                    {site.rejectedCount > 0 ? <p className="text-status-warn-deep">許可にない場所から届いた分: {formatNumber(site.rejectedCount)}件{site.lastRejectedHost ? `（最後: ${site.lastRejectedHost}）` : ''}</p> : null}
+                  </td>
+                  <td className="truncate px-3 py-3 text-ink-secondary" title={site.domains.join('・')}>{site.domains.join('・') || '—'}</td>
+                  <td className="px-3 py-3"><Chip tone={stopped ? 'neutral' : 'ok'}>{stopped ? '停止中' : '計測中'}</Chip></td>
+                  <td className="px-3 py-3 text-ink-secondary">—</td>
+                  <td className="relative px-3 py-3 text-right">
+                    <MoreAction label={`${site.label}の操作`} onClick={() => setSiteMenuId(siteMenuId === site.id ? null : site.id)} />
+                    <ActionMenu open={siteMenuId === site.id} onClose={() => setSiteMenuId(null)} ariaLabel={`${site.label}の操作`} items={[
+                      { id: 'code', label: 'コードを見る', disabled: stopped, disabledReason: stopped ? '計測を止めています' : undefined, onSelect: () => { setSiteMenuId(null); setSelectedSiteId(site.id); setCopied(false); scrollToCode() } },
+                      ...(canManage ? [
+                        { id: 'edit', label: '編集', onSelect: () => { setSiteMenuId(null); setSiteDialog({ mode: 'edit', site, label: site.label, domainsText: site.domains.join('\n'), error: null }) } },
+                        stopped ? { id: 'resume', label: '計測を再開する', onSelect: () => { setSiteMenuId(null); setResumeTarget(site) } } : { id: 'stop', label: '計測を止める', onSelect: () => { setSiteMenuId(null); setStopDialog({ site, reason: '', error: null }) } },
+                      ] : []),
+                    ]} />
+                  </td>
+                </tr>
+              })}</tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+      <div data-inflow-site-columns>
+        <div className="min-w-0 space-y-3">
+          <Card padding="default" id="site-script-code">
+            <SectionHeader title="サイトに貼るコード" note={selectedSite?.label} help="ホームページの </head> の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。サイトの行の操作から、サイトごとのコードを選べます。" helpLabel="サイトに貼るコードの説明" />
+            {keyLoading ? <p className="mt-3 text-xs text-ink-secondary">あなたのアカウントのコードを取得しています…</p> : displayedSnippet ? <>
+              <div className="mt-3 overflow-x-auto rounded-control bg-ink p-3 text-on-accent"><code className="whitespace-nowrap text-xs">{displayedSnippet}</code></div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button variant="primary" onClick={() => void copy()}>{copied ? 'コピーしました' : 'コードをコピー'}</Button>
+                <Button variant="secondary" onClick={() => void copy(true)}>制作会社へ送る文をコピー</Button>
+                {selectedSite ? <Button variant="secondary" onClick={() => { setSelectedSiteId(null); setCopied(false) }}>アカウント共通のコードを見る</Button> : null}
+              </div>
+              {copyFailed ? <p className="mt-2 text-xs text-ink-secondary" role="status">コピーできませんでした。上のコードを選んでコピーしてください。</p> : null}
+            </> : selectedSite?.stoppedAt ? <p className="mt-3 text-xs text-ink-secondary">計測を止めています。このサイトから届く分は数えません。</p> : <div className="mt-3 text-xs text-ink-secondary"><p>計測コードを取得できませんでした。通信状態を確かめて、もう一度お試しください。</p><Button variant="secondary" className="mt-2" onClick={() => setKeyAttempt((n) => n + 1)}>コードをもう一度取得する</Button></div>}
+          </Card>
+          <Card padding="default">
+            <SectionHeader title="計測を許可するドメイン" help="このサイトから届いた成果だけを数えます。1行に1つ。wwwの有無は同じサイトとして扱います。変更はサイトの行の「編集」から行います。" helpLabel="計測を許可するドメインの説明" />
+            <TextArea className="mt-3" aria-label="計測を許可するドメイン" readOnly value={(selectedSite ? selectedSite.domains : [...new Set(sites.flatMap((site) => site.domains))]).join('\n')} placeholder="まだドメインがありません" />
+          </Card>
+          <Card padding="default">
+            <SectionHeader title="閲覧の記録への同意（サイトの下に出る案内の見本）" help="選ぶまでは閲覧を記録しません。同意しなかった人は記録せず、数えなかった件数だけ残します。個人が特定できる情報は送りません。" helpLabel="閲覧の記録への同意の説明" />
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-control border border-hairline p-3" aria-label="サイトに出る案内の見本">
+              <p className="text-xs text-ink">広告の効果を知るため、この端末での閲覧を記録してよいですか？</p>
+              <div className="flex gap-2" aria-hidden="true"><span className="rounded-control border border-hairline px-3 py-2 text-xs text-ink-secondary">記録しない</span><span className="rounded-control bg-accent-deep px-3 py-2 text-xs text-on-accent">記録してよい</span></div>
+            </div>
+            {summary?.consent ? <Disclosure title="同意と数えなかった件数" size="compact" className="mt-3"><p className="text-xs text-ink-secondary">同意した {summary.consent.grantedRate == null ? '—' : `${Math.round(summary.consent.grantedRate * 100)}%`}・{formatNumber(summary.consent.granted)}件が記録を許可・{formatNumber(summary.consent.declined)}件が拒否・数えなかった {formatNumber(summary.consent.suppressed)}件</p></Disclosure> : null}
+          </Card>
+        </div>
+        <aside className="min-w-0 space-y-3">
+          <Card padding="default">
+            <SectionHeader title="いま届いているか" />
+            {showInitialLoading ? <ListState kind="loading" title="サイトの計測状況を読み込んでいます" /> : failed ? <div className="mt-3" aria-label="サイトの計測を読み込めませんでした">
+              <p className="text-xs text-ink-secondary">サイトの計測を読み込めませんでした。{lastSeen ? `最後に受け取ったのは ${lastSeen} です。` : ''}</p>
+              <Button className="mt-2" variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>
+              <Disclosure title="確かめ方を見る" size="compact" className="mt-2"><p className="text-xs text-ink-secondary">タグを貼ったあとサイトを1ページ開き、タグが外れていないか、サイトの公開先が変わっていないか確かめてください。</p></Disclosure>
+            </div> : receiving ? <div className="mt-3">
+              <Chip tone="ok">届いている</Chip>
+              <p className="mt-2 text-xs text-ink-secondary">動いています。最後にデータが届いたのは {lastSeen} です。</p>
+              <p className="mt-1 text-xs text-ink-secondary">今日は {formatNumber(summary?.todayEvents)}件、{formatNumber(summary?.pathCount)}種類のページから届いています。</p>
+              <Button className="mt-2" variant="secondary" onClick={() => void load()}>いま届いているか確かめる</Button>
+            </div> : <div className="mt-3" aria-label="サイトの計測は未接続"><Chip tone="neutral">未接続</Chip><p className="mt-2 text-xs text-ink-secondary">計測用のタグをサイトに入れると、ここに訪問と成果が出ます。受信前は数字は出しません。</p><Button className="mt-2" variant="secondary" onClick={scrollToCode}>つなぎ方を見る</Button></div>}
+            <div className="mt-3"><SectionHeader title="いま届いているページ" help="コードを貼ったページの届き具合です。記録は直近30日の集計です。訪問者は同じブラウザを1人として数え、友だち追加の人数とは分けます。" helpLabel="いま届いているページの説明" /></div>
+            {loading ? null : failed ? null : pagesFailed ? <ListState kind="error" title="ページの記録を読み込めませんでした" onRetry={() => void load()} /> : pages.length === 0 ? <ListState kind="empty" title="まだ記録がありません" /> : <table className="mt-3 w-full table-fixed text-xs"><colgroup><col /><col className="w-20" /><col className="w-20" /></colgroup><thead><TableHeadRow><Th>ページ</Th><Th align="right">ページ表示</Th><Th align="right">訪問者</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{pages.map((page) => <tr key={`${page.host ?? ''}:${page.path}`}><td className="px-3 py-3"><span className="block truncate text-ink" title={page.path}>{page.path}</span><span className="block truncate text-ink-secondary" title={page.host ?? '以前の記録'}>{page.host ?? '以前の記録'}</span></td><td className="px-3 py-3 text-right tabular-nums text-ink-secondary">{formatNumber(page.views)}</td><td className="px-3 py-3 text-right tabular-nums text-ink-secondary">{formatNumber(page.visitors)}人</td></tr>)}</tbody></table>}
+          </Card>
+          <Card padding="default"><SectionHeader title="どうやって友だちと結びつくか" /><ol className="mt-3 space-y-2 text-xs text-ink-secondary"><li>1. LINEから開いた場合：その場で経路を記録します。</li><li>2. あとからLINEを追加した場合：同じブラウザの記録と結びつけます。</li><li>3. 結びつかない場合：個人を推測せず経路不明として数えます。</li></ol></Card>
+          <Card padding="default"><SectionHeader title="つながる先" /><div className="mt-3 flex flex-wrap gap-3 text-xs text-action"><Link href="/conversions">→ コンバージョン</Link><Link href="/analytics">→ 分析</Link><Link href="/friends">→ 友だち</Link><Link href="/inflow-links">→ 流入と計測</Link></div></Card>
         </aside>
       </div>
-
+      <Dialog open={helpOpen} title="貼りかたが分からないときは" confirmLabel="閉じる" onConfirm={() => setHelpOpen(false)} onCancel={() => setHelpOpen(false)}><dl className="space-y-4"><Help title="WordPressをお使いなら" description="テーマのheader.phpか、コードを貼るプラグインに入れます。" /><Help title="Shopifyをお使いなら" description="テーマのtheme.liquidの </head> の前に入れます。" /><Help title="制作会社にお願いするなら" description="「制作会社へ送る文をコピー」で文とコードをコピーして送ってください。書き換えは不要です。" /></dl></Dialog>
       <Dialog
         open={siteDialog !== null}
         title={siteDialog?.mode === 'edit' ? '計測サイトを直す' : '計測サイトを追加'}
@@ -616,15 +458,6 @@ function formatLastReceived(value: string | null | undefined): string | null {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return null
   return formatDateTime(date)
-}
-
-function Capability({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-control bg-canvas-sunken p-4">
-      <h3 className="text-sm font-semibold text-ink">{title}</h3>
-      <p className="mt-1 text-xs leading-relaxed text-ink-faint">{description}</p>
-    </div>
-  )
 }
 
 function Help({ title, description }: { title: string; description: string }) {

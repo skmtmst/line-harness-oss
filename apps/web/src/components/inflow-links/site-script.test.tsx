@@ -11,8 +11,9 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const account = vi.hoisted(() => ({ id: 'acc-1' as string | null }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, selectedAccount: null, loading: false }),
 }))
 
 import SiteScript from './site-script'
@@ -55,6 +56,7 @@ async function settle() {
 }
 
 beforeEach(() => {
+  account.id = 'acc-1'
   mode = 'empty'
   gated = false
   gate = []
@@ -119,6 +121,55 @@ afterEach(() => {
 })
 
 describe('サイトスクリプトの計測状況', () => {
+  it('アカウント未選択では通信せず、解除後も前のコードとサイトを出さない', async () => {
+    account.id = null
+    await act(async () => { root.render(<SiteScript />) })
+    expect(text()).toContain('LINEアカウントを選択してください')
+    expect(fetch).not.toHaveBeenCalled()
+    account.id = 'acc-1'
+    await act(async () => { root.render(<SiteScript />) })
+    await settle()
+    expect(text()).toContain('hk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+    account.id = null
+    await act(async () => { root.render(<SiteScript />) })
+    expect(text()).not.toContain('hk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+    expect(text()).toContain('LINEアカウントを選択してください')
+  })
+
+  it('切り替え前に始めた通信が遅れて届いても、古いサイトを表示しない', async () => {
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!
+    let resolveOld!: (response: Response) => void
+    const oldResponse = new Promise<Response>((resolve) => { resolveOld = resolve })
+    vi.mocked(fetch).mockImplementation(async (...args) => {
+      const url = String(args[0])
+      if (url.includes('/api/measurement-sites') && url.includes('acc-1')) return oldResponse
+      return originalFetch(...args)
+    })
+    sites = [{ id: 'current-site', label: '今のアカウントのサイト', domains: ['current.example.com'], rejectedCount: 0, stoppedAt: null }]
+    await act(async () => { root.render(<SiteScript />) })
+    account.id = 'acc-2'
+    await act(async () => { root.render(<SiteScript />) })
+    await settle()
+    expect(text()).toContain('今のアカウントのサイト')
+    resolveOld(new Response(JSON.stringify({ success: true, data: [{ id: 'old-site', label: '前のアカウントのサイト', domains: ['old.example.com'], rejectedCount: 0, stoppedAt: null }] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    await settle()
+    expect(text()).not.toContain('前のアカウントのサイト')
+    expect(text()).toContain('今のアカウントのサイト')
+  })
+
+  it('選んだサイトのコードだけを制作会社向けの文へコピーする', async () => {
+    sites = [{ id: 'selected-site', label: '公式ショップ', domains: ['shop.example.com'], rejectedCount: 0, stoppedAt: null }]
+    const writeText = vi.fn(async () => {})
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
+    await act(async () => { root.render(<SiteScript />) })
+    await settle()
+    await act(async () => { document.querySelector<HTMLButtonElement>('[aria-label="公式ショップの操作"]')!.click() })
+    await act(async () => { Array.from(document.querySelectorAll('button')).find((button) => button.textContent === 'コードを見る')!.click() })
+    expect(text()).toContain('data-site="selected-site"')
+    await act(async () => { Array.from(host.querySelectorAll('button')).find((button) => button.textContent === '制作会社へ送る文をコピー')!.click() })
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('data-site="selected-site"'))
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('</head>'))
+  })
   it('読み込み中は未接続とも失敗とも出さない', async () => {
     gated = true
     await act(async () => { root.render(<SiteScript />) })
@@ -213,6 +264,7 @@ describe('R275 計測サイトの停止と再開', () => {
     await settle()
     await settle()
 
+    await act(async () => { document.querySelector<HTMLButtonElement>('[aria-label="公式ショップの操作"]')!.click() })
     const stop = button('計測を止める')
     expect(stop).toBeTruthy()
     await act(async () => { stop!.click() })
@@ -236,6 +288,7 @@ describe('R275 計測サイトの停止と再開', () => {
     expect(text()).toContain('停止中')
     expect(text()).toContain('理由: サイトを閉じたため')
     expect(text()).not.toContain('data-site="site-1"')
+    await act(async () => { document.querySelector<HTMLButtonElement>('[aria-label="公式ショップの操作"]')!.click() })
     expect(button('計測を再開する')).toBeTruthy()
     expect(button('計測を止める')).toBeFalsy()
   })
