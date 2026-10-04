@@ -8,6 +8,7 @@
  * v7 を直す必要が出たら `webhook-interactions.tsx` 側も同じ判断を入れる。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { RefreshCw } from 'lucide-react'
 import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/shared'
 
@@ -373,7 +374,24 @@ export default function WebhooksV8Interactions() {
   }
 
   if (loadedAccountId !== selectedAccountId && !error) {
-    return <ListState kind="loading" title="やり取りの記録を読み込んでいます" />
+    return (
+      <div aria-busy="true" aria-label="やり取りの記録を読み込んでいます">
+        <DelayedSkeleton
+          loading
+          skeleton={(
+            <div aria-hidden="true">
+              {[0, 1, 2, 3].map((row) => (
+                <div key={row} style={{ display: 'flex', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-hairline)' }}>
+                  <span style={{ flex: 1 }}><Skeleton height={14} width="60%" /><Skeleton className="mt-1" height={11} width="45%" /></span>
+                  <Skeleton height={14} width="6rem" />
+                  <Skeleton height={14} width="8rem" />
+                </div>
+              ))}
+            </div>
+          )}
+        />
+      </div>
+    )
   }
 
   return (
@@ -390,7 +408,22 @@ export default function WebhooksV8Interactions() {
       {notice ? <Notice tone="danger" message={notice.message} onClose={() => setNotice(null)} /> : null}
 
       {loading && data.items.length === 0 ? (
-        <ListState kind="loading" title="やり取りの記録を読み込んでいます" />
+        <div aria-busy="true" aria-label="やり取りの記録を読み込んでいます">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true">
+                {[0, 1, 2, 3].map((row) => (
+                  <div key={row} style={{ display: 'flex', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-hairline)' }}>
+                    <span style={{ flex: 1 }}><Skeleton height={14} width="60%" /><Skeleton className="mt-1" height={11} width="45%" /></span>
+                    <Skeleton height={14} width="6rem" />
+                    <Skeleton height={14} width="8rem" />
+                  </div>
+                ))}
+              </div>
+            )}
+          />
+        </div>
       ) : error ? (
         <ListState
           kind="error"

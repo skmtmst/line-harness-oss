@@ -8,6 +8,7 @@
  * v7 を直す必要が出たら `google-sheets-panel.tsx` 側も同じ判断を入れる。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { useSearchParams } from 'next/navigation'
 import { api, type GoogleSheetsConnection, type GoogleSheetsSyncRun } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -364,7 +365,21 @@ export default function WebhooksV8Sheets() {
       )}
 
       {status === 'loading' && (
-        <p className={styles.lead}>読み込んでいます…</p>
+        <div aria-busy="true" aria-label="連携の状態を読み込んでいます">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true">
+                <Skeleton height={18} width="45%" />
+                <Skeleton className="mt-1" height={13} width="80%" />
+                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+                  <Skeleton height={36} width="10rem" />
+                  <Skeleton height={36} width="10rem" />
+                </div>
+              </div>
+            )}
+          />
+        </div>
       )}
       {/*
        * 操作の結果は読み込み状態と別に出す。
@@ -607,7 +622,22 @@ export default function WebhooksV8Sheets() {
                 </div>
               )}
               {runsLoading && runs.length === 0 && !runsError && (
-                <p className={styles.lead}>読み込んでいます…</p>
+                <div aria-busy="true" aria-label="連携の状態を読み込んでいます">
+                  <DelayedSkeleton
+                    loading
+                    skeleton={(
+                      <div aria-hidden="true">
+                        {[0, 1, 2].map((row) => (
+                          <div key={row} style={{ display: 'flex', gap: 16, padding: '10px 0', borderBottom: '1px solid var(--color-hairline)' }}>
+                            <Skeleton height={14} width="8rem" />
+                            <Skeleton height={14} width="6rem" />
+                            <span style={{ flex: 1 }}><Skeleton height={12} width="70%" /></span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  />
+                </div>
               )}
               {runs.length > 0 && (
                 <ul className={styles.runList}>

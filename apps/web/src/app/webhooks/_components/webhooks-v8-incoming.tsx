@@ -8,7 +8,7 @@
  * 受け取り口の作り替え・合言葉の入れ替えは本人確認が要る（v7 と同じ）。
  * v7 を直す必要が出たら `page.tsx`・`webhook-overviews.tsx` 側も同じ判断を入れる。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { IncomingWebhook } from '@line-crm/shared'
 import { ApiError, api, type IncomingWebhookDetail, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem } from '@/lib/api'
@@ -19,6 +19,9 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
+import Toggle from '@/components/shared/toggle'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { inputClass } from '@/components/shared/form-controls'
@@ -193,7 +196,25 @@ export default function WebhooksV8Incoming({ onCounts }: { onCounts?: (total: nu
 
   const canManage = role === null || role === 'owner'
   const canResolveUnmatched = role === null || role === 'owner' || role === 'admin'
-  const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null
+  /*
+   * B. 押した瞬間に札とスイッチを変えて裏で保存する。`optimisticActive`
+   * がある行はその値を先に見せ、保存に失敗したら消して元へ戻す。
+   */
+  const [optimisticActive, setOptimisticActive] = useState<Record<string, boolean>>({})
+  const displayed = useMemo(() => (
+    items.map((item) => (
+      optimisticActive[item.id] === undefined ? item : { ...item, isActive: optimisticActive[item.id] }
+    ))
+  ), [items, optimisticActive])
+  const clearOptimistic = (id: string) => {
+    setOptimisticActive((current) => {
+      if (current[id] === undefined) return current
+      const next = { ...current }
+      delete next[id]
+      return next
+    })
+  }
+  const selected = displayed.find((item) => item.id === selectedId) ?? displayed[0] ?? null
   const selectedDetailId = selected?.id ?? null
 
   const load = useCallback(async () => {
@@ -392,17 +413,37 @@ export default function WebhooksV8Incoming({ onCounts }: { onCounts?: (total: nu
   const toggleSelected = async () => {
     const accountId = selectedAccountId
     if (!accountId || !selected || toggling) return
+    const currentActive = optimisticActive[selected.id] ?? selected.isActive
+    // 先に札とスイッチを変える。裏の保存が終わるまでこの値を出し続ける。
+    setOptimisticActive((current) => ({ ...current, [selected.id]: !currentActive }))
     setToggling(true)
     setToggleError('')
+    const failMessage = (reason: string) => {
+      clearOptimistic(selected.id)
+      setToggleError(reason)
+      notifyToast(reason, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void toggleSelected() },
+      })
+    }
     try {
-      const res = await api.webhooks.incoming.update(selected.id, accountId, { isActive: !selected.isActive })
-      if (!res.success) throw new Error(res.error)
+      const res = await api.webhooks.incoming.update(selected.id, accountId, { isActive: !currentActive })
+      if (!res.success) {
+        failMessage(`「${selected.name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。`)
+        return
+      }
       await load()
+      clearOptimistic(selected.id)
       setDetailReloadKey((key) => key + 1)
+      notifyToast(`「${selected.name}」を${!currentActive ? '動かしました' : '止めました'}。`, {
+        actionLabel: '元に戻す',
+        onAction: () => { void toggleSelected() },
+      })
     } catch (caught) {
       // 切り替えは統括だけの操作。権限不足は通信の失敗と分けて案内する（R32）。
       const forbidden = caught instanceof ApiError && caught.status === 403
-      setToggleError(forbidden
+      failMessage(forbidden
         ? '統括だけが切り替えできます。必要なときは統括に頼んでください。状態は変わっていません。'
         : '切り替えに失敗しました。状態は変わっていません。時間をおいて、もう一度お試しください。')
     } finally {
@@ -513,7 +554,23 @@ export default function WebhooksV8Incoming({ onCounts }: { onCounts?: (total: nu
   }
 
   if (status === 'loading') {
-    return <ListState kind="loading" title="こちらで受け取る設定を読み込んでいます" />
+    return (
+      <div aria-busy="true" aria-label="受け取り口を読み込んでいます">
+        <DelayedSkeleton
+          loading
+          skeleton={(
+            <div aria-hidden="true">
+              {[0, 1, 2].map((row) => (
+                <div key={row} style={{ padding: '12px 0', borderBottom: '1px solid var(--color-hairline)' }}>
+                  <Skeleton height={14} width="70%" />
+                  <Skeleton className="mt-1" height={11} width="50%" />
+                </div>
+              ))}
+            </div>
+          )}
+        />
+      </div>
+    )
   }
   if (status === 'error') {
     return (
@@ -755,7 +812,7 @@ export default function WebhooksV8Incoming({ onCounts }: { onCounts?: (total: nu
         )}
         <p className={styles.railTitle}>受け取り口</p>
         <ul className={styles.railList}>
-          {items.map((item) => (
+          {displayed.map((item) => (
             <li key={item.id}>
               <button
                 type="button"
@@ -789,9 +846,19 @@ export default function WebhooksV8Incoming({ onCounts }: { onCounts?: (total: nu
                   <h2 className={styles.panelTitle}>{selected.name}</h2>
                   <p className={styles.panelLead}>相手のサービスの「Webhook URL」に、下のURLを貼ってください。</p>
                 </div>
-                <StatusBadge tone={selected.isActive ? 'success' : 'neutral'}>
-                  {selected.isActive ? '動いています' : '止めています'}
+                <StatusBadge tone={toggling ? 'info' : selected.isActive ? 'success' : 'neutral'}>
+                  ● {toggling ? '切り替え中' : selected.isActive ? '動いています' : '止めています'}
                 </StatusBadge>
+                {canManage ? (
+                  <span title={!selected.hasSecret && !selected.isActive ? '合言葉を設定してから動かしてください' : undefined}>
+                    動かす
+                    <Toggle
+                      checked={selected.isActive}
+                      label={`${selected.name}を動かす`}
+                      onChange={toggling || (!selected.hasSecret && !selected.isActive) ? undefined : () => void toggleSelected()}
+                    />
+                  </span>
+                ) : null}
               </div>
               {/* 板 `gW0F2`「段 どこから受け取るか」。 */}
               <h3 className={styles.urlTitle}>どこから受け取るか</h3>
@@ -836,16 +903,6 @@ export default function WebhooksV8Incoming({ onCounts }: { onCounts?: (total: nu
               <div className={styles.panelButtons}>
                 {canManage ? (
                   <>
-                    <Button
-                      variant="secondary"
-                      onClick={() => void toggleSelected()}
-                      disabled={toggling || (!selected.hasSecret && !selected.isActive)}
-                      busy={toggling}
-                      busyLabel={selected.isActive ? '止めています…' : '動かしています…'}
-                      title={!selected.hasSecret && !selected.isActive ? '合言葉を設定してから動かしてください' : undefined}
-                    >
-                      {selected.isActive ? '止める' : '動かす'}
-                    </Button>
                     <Button variant="secondary" onClick={() => {
                       // 開いた時点のアカウントを固定する（d23b R420）。
                       setRotateTarget({ id: selected.id, name: selected.name, accountId: selectedAccountId ?? '' })
@@ -1057,7 +1114,7 @@ export default function WebhooksV8Incoming({ onCounts }: { onCounts?: (total: nu
               <section aria-label="そのほかの受け取り口">
                 <h2 className={styles.otherTitle}>そのほかの受け取り口</h2>
                 <div className={styles.otherGrid}>
-                  {items.filter((item) => item.id !== selected.id).map((item) => (
+                  {displayed.filter((item) => item.id !== selected.id).map((item) => (
                     <div key={item.id} className={styles.otherCard}>
                       <button
                         type="button"

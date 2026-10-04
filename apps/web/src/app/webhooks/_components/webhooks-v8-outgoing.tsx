@@ -17,6 +17,8 @@ import type { WebhookInteractionSummary } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -24,7 +26,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import { RowActions } from '@/components/shared/row-actions'
+import ActionMenu from '@/components/shared/action-menu'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
@@ -110,6 +112,7 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [panelId, setPanelId] = useState<string | null>(null)
+  const [menuId, setMenuId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -183,10 +186,29 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
     return () => { cancelled = true }
   }, [])
 
+  /*
+   * B. 押した瞬間に札を変えて裏で保存する。`optimisticActive` がある行は
+   * その値を先に見せ、保存に失敗したら消して元へ戻す。
+   */
+  const [optimisticActive, setOptimisticActive] = useState<Record<string, boolean>>({})
+  const displayed = useMemo(() => (
+    items.map((item) => (
+      optimisticActive[item.id] === undefined ? item : { ...item, isActive: optimisticActive[item.id] }
+    ))
+  ), [items, optimisticActive])
+  const clearOptimistic = (id: string) => {
+    setOptimisticActive((current) => {
+      if (current[id] === undefined) return current
+      const next = { ...current }
+      delete next[id]
+      return next
+    })
+  }
+
   const filtered = useMemo(() => {
-    const rows = items.filter((item) => matches(item, filter, query))
+    const rows = displayed.filter((item) => matches(item, filter, query))
     return [...rows].sort((a, b) => b.deliverySummary.total - a.deliverySummary.total)
-  }, [filter, items, query])
+  }, [displayed, filter, query])
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
@@ -198,12 +220,12 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
     () => filtered.slice((page - 1) * pageSize, page * pageSize),
     [filtered, page, pageSize],
   )
-  const panelItem = panelId ? items.find((item) => item.id === panelId) ?? null : null
+  const panelItem = panelId ? displayed.find((item) => item.id === panelId) ?? null : null
 
-  const activeCount = items.filter((item) => item.isActive).length
-  const pausedCount = items.length - activeCount
-  const failedCount = items.filter((item) => item.deliverySummary.failed > 0).length
-  const failedNames = items
+  const activeCount = displayed.filter((item) => item.isActive).length
+  const pausedCount = displayed.length - activeCount
+  const failedCount = displayed.filter((item) => item.deliverySummary.failed > 0).length
+  const failedNames = displayed
     .filter((item) => item.deliverySummary.failed > 0)
     .map((item) => item.name.split('／')[0].trim())
     .join('、')
@@ -219,14 +241,34 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
   const toggleItem = async (item: OutgoingWebhookOverview) => {
     const accountId = selectedAccountId
     if (!accountId || togglingId) return
+    const currentActive = optimisticActive[item.id] ?? item.isActive
+    setOptimisticActive((current) => ({ ...current, [item.id]: !currentActive }))
     setTogglingId(item.id)
     setActionError('')
+    const failMessage = () => {
+      clearOptimistic(item.id)
+      const reason = `「${item.name}」は切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。`
+      setActionError(reason)
+      notifyToast(reason, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void toggleItem(item) },
+      })
+    }
     try {
-      const res = await api.webhooks.outgoing.update(item.id, accountId, { isActive: !item.isActive })
-      if (!res.success) throw new Error(res.error)
+      const res = await api.webhooks.outgoing.update(item.id, accountId, { isActive: !currentActive })
+      if (!res.success) {
+        failMessage()
+        return
+      }
       await load()
+      clearOptimistic(item.id)
+      notifyToast(`「${item.name}」を${!currentActive ? '動かしました' : '止めました'}。`, {
+        actionLabel: '元に戻す',
+        onAction: () => { void toggleItem({ ...item, isActive: !currentActive }) },
+      })
     } catch {
-      setActionError(`「${item.name}」を切り替えできませんでした。状態は変わっていません。確かめてから、もう一度お試しください。`)
+      failMessage()
     } finally {
       setTogglingId(null)
     }
@@ -438,15 +480,36 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
           </div>
 
           {status === 'loading' ? (
-            <div className={styles.tableWrap} aria-label="読み込み中">
-              {[0, 1, 2, 3].map((index) => (
-                <div className={styles.skeletonRow} key={index}>
-                  <span className={styles.skeletonBar} style={{ width: '24%' }} />
-                  <span className={styles.skeletonBar} style={{ width: '30%' }} />
-                  <span className={styles.skeletonBar} style={{ width: '14%' }} />
-                  <span className={styles.skeletonBar} style={{ width: '14%' }} />
-                </div>
-              ))}
+            <div
+              className={styles.tableWrap}
+              aria-busy="true"
+              aria-label="送り先を読み込んでいます"
+            >
+              <DelayedSkeleton
+                loading
+                skeleton={(
+                  <div aria-hidden="true">
+                    <div style={{ display: 'flex', gap: 20, padding: '13px 20px' }}>
+                      <Skeleton height={12} width={120} />
+                      <Skeleton height={12} width={90} />
+                      <Skeleton height={12} width={110} />
+                      <Skeleton height={12} width={70} />
+                      <Skeleton height={12} width={60} />
+                      <Skeleton height={12} width={60} />
+                    </div>
+                    {[0, 1, 2, 3, 4].map((row) => (
+                      <div key={row} style={{ display: 'flex', gap: 20, padding: '9px 20px', borderTop: '1px solid var(--color-hairline)' }}>
+                        <span style={{ flex: 1 }}><Skeleton height={14} width="60%" /><Skeleton className="mt-1" height={11} width="40%" /></span>
+                        <Skeleton height={14} width="8rem" />
+                        <Skeleton height={14} width="10rem" />
+                        <Skeleton height={14} width="5rem" />
+                        <Skeleton height={14} width="6rem" />
+                        <Skeleton height={30} width="8rem" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              />
             </div>
           ) : status === 'error' ? (
             <div className={styles.stateBox} role="alert">
@@ -563,18 +626,31 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
                               中身を見る
                             </Button>
                           )}{' '}
-                          {/* 板 `ZSbFY` 全行の操作欄2つ目。小窓を開く。 */}
-                          <Button variant="secondary" size="compact" onClick={() => setPanelId(item.id)}>
+                          {/*
+                           * 板 `ZSbFY` 全行の操作欄2つ目。「設定」を押すと
+                           * 操作の一覧（中身を見る・試しに送る・止める…）が出る。
+                           */}
+                          <Button
+                            variant="secondary"
+                            size="compact"
+                            aria-haspopup="menu"
+                            aria-expanded={menuId === item.id}
+                            onClick={() => setMenuId(menuId === item.id ? null : item.id)}
+                          >
                             設定
-                          </Button>{' '}
-                          <RowActions
-                            menuItems={[
-                              { id: 'detail', label: '中身を見る', onSelect: () => setPanelId(item.id) },
+                          </Button>
+                          <ActionMenu
+                            open={menuId === item.id}
+                            onClose={() => setMenuId(null)}
+                            ariaLabel={`「${item.name}」の設定`}
+                            note={readonly ? '閲覧のみのため変える操作は使えません' : undefined}
+                            items={[
+                              { id: 'detail', label: '中身を見る', onSelect: () => { setMenuId(null); setPanelId(item.id) } },
                               {
                                 id: 'test',
                                 label: '試しに送る',
                                 disabled: !item.isActive,
-                                onSelect: () => setTestTarget(item),
+                                onSelect: () => { setMenuId(null); setTestTarget(item) },
                               },
                               {
                                 id: 'retry',
@@ -587,6 +663,7 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
                                 label: '鍵を作り直す',
                                 disabled: readonly,
                                 onSelect: () => {
+                                  setMenuId(null)
                                   setRotateTarget(item)
                                   setRotateSecret('')
                                   setRotateError('')
@@ -596,26 +673,25 @@ export default function WebhooksV8Outgoing({ onCounts }: { onCounts?: (total: nu
                                 id: 'toggle',
                                 label: item.isActive ? '止める' : '動かす',
                                 disabled: readonly || togglingId !== null,
-                                onSelect: () => void toggleItem(item),
+                                onSelect: () => { setMenuId(null); void toggleItem(item) },
                               },
                               {
                                 id: 'duplicate',
                                 label: '複製する',
                                 disabled: readonly || duplicatingId !== null,
-                                onSelect: () => void duplicateItem(item),
+                                onSelect: () => { setMenuId(null); void duplicateItem(item) },
                               },
                               {
                                 id: 'delete',
                                 label: '削除する',
                                 disabled: readonly,
                                 onSelect: () => {
+                                  setMenuId(null)
                                   setDeleteTarget(item)
                                   setDeleteError('')
                                 },
                               },
                             ]}
-                            menuNote={readonly ? '閲覧のみのため変える操作は使えません' : undefined}
-                            subjectName={item.name}
                           />
                         </td>
                       </tr>

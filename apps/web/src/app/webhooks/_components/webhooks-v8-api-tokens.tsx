@@ -9,6 +9,7 @@
  * v7 を直す必要が出たら `api-tokens-panel.tsx` 側も同じ判断を入れる。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { api, ApiError, type IntegrationApiTokenInfo } from '@/lib/api'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
@@ -284,7 +285,24 @@ export default function WebhooksV8ApiTokens() {
         </section>
       ) : null}
 
-      {status === 'loading' ? <ListState kind="loading" /> : null}
+      {status === 'loading' ? (
+        <div aria-busy="true" aria-label="鍵を読み込んでいます">
+          <DelayedSkeleton
+            loading
+            skeleton={(
+              <div aria-hidden="true">
+                {[0, 1, 2].map((row) => (
+                  <div key={row} style={{ display: 'flex', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-hairline)' }}>
+                    <span style={{ flex: 1 }}><Skeleton height={14} width="50%" /><Skeleton className="mt-1" height={11} width="70%" /></span>
+                    <Skeleton height={14} width="7rem" />
+                    <Skeleton height={30} width="6rem" />
+                  </div>
+                ))}
+              </div>
+            )}
+          />
+        </div>
+      ) : null}
       {status === 'error' ? (
         <ListState kind="error" description={loadError} action={<Button onClick={() => void load()}>鍵の一覧を再読み込み</Button>} />
       ) : null}
