@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsTenantDetailPage from './page'
 
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('id=t1') }))
+vi.mock('next/navigation', () => ({ usePathname: () => '/ops/tenants/detail', useSearchParams: () => new URLSearchParams('id=t1') }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 

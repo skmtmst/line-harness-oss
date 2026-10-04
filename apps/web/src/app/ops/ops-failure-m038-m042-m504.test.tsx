@@ -15,6 +15,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/ops/announcements',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: 'musubo' }) }))

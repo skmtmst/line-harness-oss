@@ -12,6 +12,7 @@ vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.Re
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/ops/announcements',
   useRouter: () => ({ push: navigation.push, replace: vi.fn(), back: vi.fn() }),
 }))
 
@@ -119,16 +120,16 @@ describe('画面', () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     const text = host.textContent ?? ''
-    expect(text).toContain('契約者専用LINEの登録 21人 / 24人')
+    expect(host.querySelector('button[aria-label="契約者専用LINEの登録状況"]')).not.toBeNull()
     expect(text).toContain('9月20日 深夜のメンテナンスのお知らせ')
     expect(text).toContain('送信済み')
     expect(text).toContain('21 / 24')
     expect(text).toContain('5 / 24')
     expect(text).toContain('下書き')
-    expect(text).toContain('12件の契約先・24人の権限者')
-    expect(Array.from(document.querySelectorAll('button')).filter((b) => b.textContent === '編集')).toHaveLength(1)
+    expect(host.querySelector('button[aria-label="宛先の見込み"]')).not.toBeNull()
+    expect(Array.from(document.querySelectorAll('button')).filter((b) => b.textContent === '直す')).toHaveLength(1)
     expect(calls.some((c) => c.url.endsWith('/api/ops/announcements/preview') && c.method === 'POST')).toBe(true)
-    expect(document.querySelector('[data-design-node="q2CokV"]')).not.toBeNull()
+    expect(document.querySelector('[data-design-node="tQ2MJ"]')).not.toBeNull()
   })
 
   it('件名・本文を入れて「今すぐ送る」→確認の窓→送信。mode=send と送り方が API に渡る', async () => {
