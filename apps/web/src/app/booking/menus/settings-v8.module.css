@@ -531,14 +531,6 @@
   border-bottom: 0;
 }
 
-.skeletonDot {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-sunken);
-}
-
 .skeletonBar {
   height: 12px;
   flex: 1;

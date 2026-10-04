@@ -13,6 +13,7 @@
  * 選ぶ中身が無いときは空き枠の代わりにその旨を出す。
  */
 import type { BookingAvailabilitySlot, BookingMenu, BookingStaff } from '@/lib/api'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './settings-v8.module.css'
 
 const WEEKDAY_JP = '日月火水木金土'
@@ -43,6 +44,23 @@ function priceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>): strin
   if (menu.price_mode === 'free') return '無料'
   if (menu.price_mode === 'inquiry') return 'お問い合わせ'
   return `¥${menu.base_price.toLocaleString('ja-JP')}`
+}
+
+/** 写しの中の読み込み待ちの骨組み（札2枚の形。写し全体が role="img" のため読み上げは付けない）。 */
+function PhoneListSkeleton() {
+  return (
+    <span aria-hidden="true">
+      {[0, 1].map((i) => (
+        <span key={i} className={styles.phoneCard}>
+          <Skeleton width={48} height={48} />
+          <span className={styles.phoneCardBody}>
+            <Skeleton width="70%" height={15} />
+            <Skeleton width="90%" height={12} />
+          </span>
+        </span>
+      ))}
+    </span>
+  )
 }
 
 function PhoneChrome({ step, children }: { step: number; children: React.ReactNode }) {
@@ -124,7 +142,7 @@ export function LiffPhoneMenuStep({
       <div className={styles.phoneBody}>
         <h3 className={styles.phoneTitle}>メニューを選んでください</h3>
         {status === 'loading' ? (
-          <p className={styles.phoneSub}>読み込んでいます…</p>
+          <DelayedSkeleton loading skeleton={<PhoneListSkeleton />} />
         ) : status === 'error' ? (
           <p className={styles.phoneSub}>読み込めませんでした。</p>
         ) : list.length === 0 ? (
@@ -170,7 +188,7 @@ export function LiffPhoneStaffStep({
       <div className={styles.phoneBody}>
         <h3 className={styles.phoneTitle}>担当を選んでください</h3>
         {status === 'loading' ? (
-          <p className={styles.phoneSub}>読み込んでいます…</p>
+          <DelayedSkeleton loading skeleton={<PhoneListSkeleton />} />
         ) : status === 'error' ? (
           <p className={styles.phoneSub}>読み込めませんでした。</p>
         ) : null}
@@ -297,7 +315,16 @@ export function LiffPhoneDatetimeStep({
           </div>
         )}
         {status === 'loading' ? (
-          <p className={styles.phoneSub}>空きを調べています…</p>
+          <DelayedSkeleton
+            loading
+            skeleton={
+              <span className={styles.phoneSlots} aria-hidden="true">
+                {[0, 1, 2].map((i) => (
+                  <Skeleton key={i} width="100%" height={36} />
+                ))}
+              </span>
+            }
+          />
         ) : status === 'error' ? (
           <p className={styles.phoneSub}>空きを読み込めませんでした。</p>
         ) : selected === null ? (

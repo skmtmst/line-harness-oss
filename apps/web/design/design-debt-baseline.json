@@ -97,17 +97,17 @@
     "unresolved-classname": 75
   },
   "app/booking/menus/new/menu-form-v8.tsx": {
-    "unresolved-classname": 115
+    "unresolved-classname": 122
   },
   "app/booking/menus/new/page.tsx": {
     "unresolved-classname": 11
   },
   "app/booking/menus/settings-v8.tsx": {
-    "unresolved-classname": 225
+    "unresolved-classname": 207
   },
   "app/booking/menus/staff/assign-v8.tsx": {
-    "unresolved-classname": 61,
-    "direct-th": 3
+    "unresolved-classname": 66,
+    "direct-th": 6
   },
   "app/booking/menus/staff/page.tsx": {
     "unresolved-classname": 1
@@ -119,7 +119,7 @@
     "unresolved-classname": 5
   },
   "app/booking/staff/new/staff-new-v8.tsx": {
-    "unresolved-classname": 69
+    "unresolved-classname": 70
   },
   "app/booking/staff/shifts/liff-preview.tsx": {
     "direct-primary-button": 2,
@@ -142,7 +142,7 @@
     "unresolved-classname": 76
   },
   "app/broadcasts/page.tsx": {
-    "arbitrary-value": 1,
+    "arbitrary-value": 2,
     "unresolved-classname": 1,
     "direct-secondary-button": 1
   },
@@ -153,7 +153,7 @@
     "unresolved-classname": 35
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 25,
+    "arbitrary-value": 37,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
   },
@@ -213,7 +213,7 @@
   },
   "app/emergency/page.tsx": {
     "unresolved-classname": 4,
-    "arbitrary-value": 3
+    "arbitrary-value": 6
   },
   "app/events/bookings/bookings-v8.tsx": {
     "unresolved-classname": 45
@@ -271,7 +271,7 @@
   },
   "app/friends/detail/page.tsx": {
     "unresolved-classname": 4,
-    "arbitrary-value": 2
+    "arbitrary-value": 5
   },
   "app/friends/friends-nav-v8.tsx": {
     "unresolved-classname": 11
@@ -335,7 +335,7 @@
   },
   "app/line-notifications/page.tsx": {
     "direct-primary-button": 1,
-    "arbitrary-value": 4,
+    "arbitrary-value": 7,
     "unresolved-classname": 3
   },
   "app/login/two-factor/page.tsx": {
@@ -582,14 +582,14 @@
   },
   "app/settings/page.tsx": {
     "unresolved-classname": 1,
-    "arbitrary-value": 2
+    "arbitrary-value": 15
   },
   "app/settings/settings-nav-v8.tsx": {
     "unresolved-classname": 9
   },
   "app/staff/new/page.tsx": {
     "direct-secondary-button": 1,
-    "arbitrary-value": 1
+    "arbitrary-value": 2
   },
   "app/staff/page.tsx": {
     "arbitrary-value": 14
@@ -640,7 +640,8 @@
     "unresolved-classname": 49
   },
   "app/templates/carousel/page.tsx": {
-    "unresolved-classname": 7
+    "unresolved-classname": 7,
+    "arbitrary-value": 1
   },
   "app/templates/detail/detail-v8.tsx": {
     "unresolved-classname": 85,
@@ -664,7 +665,7 @@
   },
   "app/templates/page.tsx": {
     "unresolved-classname": 6,
-    "arbitrary-value": 2
+    "arbitrary-value": 12
   },
   "app/templates/questions/question-v8.tsx": {
     "unresolved-classname": 17
@@ -757,8 +758,11 @@
   },
   "components/accounts/account-switcher.tsx": {
     "unresolved-classname": 2,
-    "arbitrary-value": 2,
+    "arbitrary-value": 12,
     "direct-secondary-button": 1
+  },
+  "components/accounts/test-recipients-setting.tsx": {
+    "arbitrary-value": 1
   },
   "components/auth-guard.tsx": {
     "arbitrary-value": 1
@@ -771,11 +775,12 @@
   },
   "components/chats/friend-info-sidebar.tsx": {
     "unresolved-classname": 12,
-    "arbitrary-value": 3
+    "arbitrary-value": 50
   },
   "components/chats/inbox-dropdown.tsx": {
     "unresolved-classname": 9,
-    "direct-secondary-button": 3
+    "direct-secondary-button": 3,
+    "arbitrary-value": 1
   },
   "components/chats/inbox-filter-panel.tsx": {
     "arbitrary-value": 2,
@@ -827,7 +832,7 @@
     "unresolved-classname": 8
   },
   "components/friend-attributes-v2/tag-list-v2.tsx": {
-    "arbitrary-value": 51,
+    "arbitrary-value": 78,
     "unresolved-classname": 6,
     "direct-th": 3
   },
@@ -855,11 +860,11 @@
   "components/friend-fields/tag-editor-v4.tsx": {
     "direct-primary-button": 1,
     "unresolved-classname": 12,
-    "arbitrary-value": 10
+    "arbitrary-value": 14
   },
   "components/friend-fields/tags-page-v4.tsx": {
     "unresolved-classname": 4,
-    "arbitrary-value": 12
+    "arbitrary-value": 15
   },
   "components/friends/advanced-search-dialog.tsx": {
     "arbitrary-value": 2
@@ -985,7 +990,7 @@
   },
   "components/shared/create-page.tsx": {
     "unresolved-classname": 1,
-    "arbitrary-value": 2,
+    "arbitrary-value": 3,
     "direct-secondary-button": 1
   },
   "components/shared/date-field.tsx": {
@@ -1123,6 +1128,6 @@
   },
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
-    "arbitrary-value": 1
+    "arbitrary-value": 2
   }
 }
