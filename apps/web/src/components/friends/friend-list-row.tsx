@@ -188,7 +188,7 @@ export default function FriendListRow({
           {friend.tags.slice(0, 1).map((tag) => (
             <span key={tag.id} title={tag.name} className="max-w-28 min-w-0 truncate rounded-mini border border-hairline bg-canvas px-1.5 py-0.5 text-micro text-ink-secondary">{tag.name}</span>
           ))}
-          {friend.tags.length > 1 ? <span title={friend.tags.slice(2).map((tag) => tag.name).join('・')} className="shrink-0 text-micro text-ink-secondary">+{friend.tags.length - 1}</span> : null}
+          {friend.tags.length > 1 ? <span title={friend.tags.slice(1).map((tag) => tag.name).join('・')} className="shrink-0 text-micro text-ink-secondary">+{friend.tags.length - 1}</span> : null}
           {!friend.tags.length ? <span className="text-micro text-ink-disabled">—</span> : null}
         </div>
       ) : null}

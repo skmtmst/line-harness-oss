@@ -180,3 +180,13 @@ describe('友だち行の行き先', () => {
     expect(name?.className).toContain('truncate')
   })
 })
+
+it('省略したタグの件数から、隠れたすべてのタグ名を確認できる', () => {
+  render({ ...BASE, tags: [
+    { id: 'tag-1', name: '表示するタグ' },
+    { id: 'tag-2', name: '省略したタグ1' },
+    { id: 'tag-3', name: '省略したタグ2' },
+  ] })
+  const count = [...host.querySelectorAll('span')].find((span) => span.textContent === '+2')!
+  expect(count.title).toBe('省略したタグ1・省略したタグ2')
+})
