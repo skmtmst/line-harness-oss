@@ -16,7 +16,7 @@ import type {
   FriendAddEventKind,
   FriendAddEventRoutingStatus,
 } from '@line-crm/shared'
-import { AlertCircle, History, MoreHorizontal, Pause, Settings2 } from 'lucide-react'
+import { AlertCircle, Download, History, MoreHorizontal, Pause, Pencil } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunList } from '@/lib/api'
 import { describeFriendAddFailure } from '../friend-add-failure'
@@ -378,10 +378,10 @@ function FriendAddRunsV8Inner() {
             onClick={() => setStopDialogOpen(true)}
           >
             <Pause size={14} aria-hidden="true" />
-            止める
+            一時停止する
           </Button>
           <Button href="/friend-add-settings" variant="secondary">
-            <Settings2 size={14} aria-hidden="true" />
+            <Pencil size={14} aria-hidden="true" />
             設定の一覧へ
           </Button>
           <Button
@@ -391,6 +391,7 @@ function FriendAddRunsV8Inner() {
             busyLabel="書き出し中…"
             onClick={() => void exportCsv()}
           >
+            <Download size={14} aria-hidden="true" />
             CSVで書き出す
           </Button>
         </div>
@@ -432,7 +433,7 @@ function FriendAddRunsV8Inner() {
             <AlertCircle size={15} aria-hidden="true" />
             <span>
               <strong>失敗した処理が {formatNumber(summary?.failed ?? 0)}件あります</strong>
-              <small>案内は届きましたが、シナリオ「新規登録7日間フォロー」を始められませんでした。</small>
+              <small>案内は届きましたが、シナリオを始められませんでした。</small>
             </span>
           </span>
           <span className={styles.failureActions}>
@@ -464,7 +465,7 @@ function FriendAddRunsV8Inner() {
           </FilterChip>
         </span>
         <span className={styles.toolbarSpacer} />
-        <PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); resetCursor() }} />
+        <PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); resetCursor() }} className={styles.pageSize} />
       </div>
       {csvNote ? <p className={styles.csvNote} role="status">{csvNote}</p> : null}
 
@@ -503,6 +504,11 @@ function FriendAddRunsV8Inner() {
               <tbody>
                 {visibleItems.map((item) => {
                   const status = routingLabel(item.status, item.errorCode)
+                  /* 板 `REIxB` の札の言葉と色（口の「エラー」「青の待ち」はV8では出さない）。 */
+                  const pillLabel = status.label === 'エラー' ? '失敗' : status.label
+                  const pillTone = status.label === 'テスト待ち'
+                    ? 'toneWarning'
+                    : TONE_CLASS[status.tone] ?? 'toneNeutral'
                   const routeName = item.attribution.status === 'captured'
                     ? item.attribution.routeName || item.attribution.reason || '選択した経路'
                     : '経路が分からなかった人'
@@ -521,24 +527,29 @@ function FriendAddRunsV8Inner() {
                     <tr key={item.id}>
                       <td className={styles.timeCell}>{formatJstDateTime(item.receivedAt).slice(5)}</td>
                       <td>
-                        <Link href={detailHref(item.id)} title={`${displayName}（${kindLabel}）`} className={styles.cellTitle}>
-                          {displayName}
-                        </Link>
+                        <span className={styles.friendCell}>
+                          <span className={styles.friendAvatar} aria-hidden="true">
+                            {(displayName || '？').slice(0, 1)}
+                          </span>
+                          <Link href={detailHref(item.id)} title={`${displayName}（${kindLabel}）`} className={styles.cellTitle}>
+                            {displayName}
+                          </Link>
+                        </span>
                       </td>
                       <td>
                         <span className={styles.cellSub} title={routeName}>{routeName}</span>
                       </td>
                       <td>
-                        <span className={`${styles.resultPill} ${styles[TONE_CLASS[status.tone] ?? 'toneNeutral']}`}>
+                        <span className={`${styles.resultPill} ${styles[pillTone]}`}>
                           <span className={styles.resultDot} aria-hidden="true" />
-                          {status.label}
+                          {pillLabel}
                         </span>
                       </td>
                       <td>
                         <span className={styles.cellSub} title={action}>{action}</span>
                       </td>
                       <td className={styles.countCell}>{elapsedText(item.receivedAt, item.processedAt)}</td>
-                      <td className={styles.menuCell}>
+                      <td className="text-right">
                         <Link
                           href={detailHref(item.id)}
                           className={styles.menuButton}
@@ -555,11 +566,11 @@ function FriendAddRunsV8Inner() {
             </table>
           </div>
           <div className={styles.pagerRow}>
-            <span className={styles.pagerCount}>
+            <span className="text-ink-faint text-xs">
               {formatNumber(data.total)}件中 {(cursorPage - 1) * perPage + 1}〜{(cursorPage - 1) * perPage + data.items.length}件
             </span>
             {(canPrev || Boolean(data.nextCursor)) && (
-              <div className={styles.pagerButtons} aria-label="実行結果のページ送り">
+              <div className="flex gap-2" aria-label="実行結果のページ送り">
                 <Button disabled={!canPrev || loading} onClick={() => goPrev()}>前へ</Button>
                 <Button disabled={!data.nextCursor || loading} onClick={() => data.nextCursor && goNext(data.nextCursor)}>次へ</Button>
               </div>

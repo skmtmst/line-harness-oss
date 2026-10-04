@@ -54,7 +54,7 @@ describe('#969-U008 会話ヘッダー: 狭い幅では宛先の名前が1行目
   })
 
   it('宛先の名前は truncate で潰れず、誰への返信か読める', () => {
-    const name = region(header, '<div className="min-w-0">', 'LINE・最終受信')
+    const name = region(header, '<div className="min-w-0">', 'lastMessageAt')
     expect(name).toContain('truncate')
     expect(name).toContain('chatDetail.friendName')
   })

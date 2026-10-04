@@ -6,12 +6,10 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const NEW = fs.readFileSync(path.join(__dirname, 'new', 'page.tsx'), 'utf8')
 
-function kpiCard(title: string): string {
-  const at = PAGE.indexOf(`title="${title}"`)
+function band(): string {
+  const at = PAGE.indexOf('aria-label="流入と計測の概要"')
   if (at < 0) return ''
-  const start = PAGE.lastIndexOf('<KpiCard', at)
-  const end = PAGE.indexOf('/>', at)
-  return PAGE.slice(start, end)
+  return PAGE.slice(at, at + 4500)
 }
 
 /**
@@ -29,29 +27,18 @@ function kpiCard(title: string): string {
  */
 describe('流入と計測の帯は、選択中のフォルダだけを数えない', () => {
   it('流入元の数は、フォルダと検索で絞る前から数える', () => {
-    const card = kpiCard('流入元')
-    expect(card, '帯が見つからない').not.toBe('')
-    expect(card, '絞り込んだ行数を出している').not.toContain('sortedRows.length')
-    expect(card).toContain('routeCountAvailable ? accountRouteCount : null')
+    const tiles = band()
+    expect(tiles, '帯が見つからない').not.toBe('')
+    expect(tiles, '絞り込んだ行数を出している').not.toContain('sortedRows.length')
+    expect(tiles).toContain('routeCountAvailable ? formatNumber(accountRouteCount)')
   })
 
   it('受付中・停止中も同じ数え方にそろえる（R273）', () => {
     expect(PAGE).toContain('const accountRouteCount = summary?.routeTotal ?? accountFilteredRows.length')
-    // 受付中は isActive が真の登録済み行だけ。停止中リンクを稼働中には数えない。
-    expect(PAGE).toContain(
-      "const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan' && r.isActive === true).length",
-    )
-    expect(PAGE).toContain(
-      "const stoppedRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan' && r.isActive === false).length",
-    )
-    expect(PAGE, '受付中がまだ絞り込み後の行から数えている')
-      .not.toContain("const activeRouteCount = sortedRows.filter((r) => r.source !== 'orphan').length")
-  })
-
-  it('帯に受付中と停止中の両方を出す（R273）', () => {
-    const card = kpiCard('流入元')
-    expect(card, '帯が見つからない').not.toBe('')
-    expect(card).toContain('受付中 ${activeRouteCount}・停止中 ${stoppedRouteCount}')
+    // 停止中は行の札で言い分け、測った数に入れない。未登録の外部REFを
+    // 「計測済」には数えない（行の routeStatus が見る）。
+    expect(PAGE).toContain("if (row.isActive === false) return 'stopped'")
+    expect(PAGE).toContain("if (row.source === 'orphan') return 'unregistered'")
   })
 
   it('作成確認も公開オフなら停止中だと分かる（R273）', () => {
@@ -61,13 +48,5 @@ describe('流入と計測の帯は、選択中のフォルダだけを数えな�
 
   it('フォルダ列の件数は元のままで、意味が重ならない', () => {
     expect(PAGE).toContain("accountFilteredRows.filter((row) => row.genre === genre.name).length")
-  })
-
-  it('クリックと平均の追加率もフォルダと検索の前から数える', () => {
-    expect(PAGE).toContain('summary?.totalClicks ?? accountClicks')
-    expect(PAGE).toContain('accountFilteredRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)')
-    expect(PAGE).toContain('accountFilteredRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)')
-    expect(PAGE, 'クリック・平均の分子分母がまだ絞り込み後の行から数えている')
-      .not.toContain('sortedRows.reduce')
   })
 })

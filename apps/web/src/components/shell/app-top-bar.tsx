@@ -157,13 +157,18 @@ export default function AppTopBar() {
       v7 はこれまでどおり 1280px から。
     */}
     <div className="hidden xl:block v8-topbar-wrap">
+    {/*
+      ★V8 殻合わせ（絵 V8-B/JKjsE）：統括の画面にも切替の札を出す。
+      選ぶのは状態の切替だけで、画面の移動はしない（従来どおり）。
+      未選択の統括では「店舗を選択」と出る。
+    */}
     <TopBar
       title={shownTitle}
       manualHref={manualHref}
       accounts={options}
       selectedAccountId={selectedAccountId ?? ''}
       onAccountChange={setSelectedAccountId}
-      showAccountSwitcher={!isHq}
+      showAccountSwitcher={true}
       roleLabel={ROLE_LABELS[staffRole] ?? ''}
       onRoleClick={canReturnToHq ? returnToHq : undefined}
       userName={staffName}

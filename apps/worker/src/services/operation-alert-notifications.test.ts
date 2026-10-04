@@ -105,6 +105,26 @@ describe('operation alert notification outbox', () => {
                '2026-09-16T00:00:00.000Z', '2026-09-16T00:10:00.000Z', '2026-09-16T00:10:00.000Z',
                2, 0, '2026-09-16T00:00:00.000Z', '2026-09-16T00:10:00.000Z')`,
     ).run();
+    // 「この異常は検知したときに知らせた」状態にしておく。知らせていない異常の解消は
+    // そもそも送らない決まりなので、その前提がないと重複抑止の試験にならない。
+    testDb.raw.prepare(
+      `INSERT INTO operation_alert_events
+         (id, alert_id, line_account_id, source_run_id, action, severity, summary,
+          alert_version, notification_enqueued_at, created_at)
+       VALUES ('event-o1', 'alert-9', 'account-1', 'run-seed', 'opened', 'danger',
+               '配信処理に遅延または失敗があります', 1,
+               '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:00.000Z')`,
+    ).run();
+    for (const channel of ['line', 'email'] as const) {
+      testDb.raw.prepare(
+        `INSERT INTO operation_alert_notification_outbox
+           (id, event_id, line_account_id, staff_id, channel, status, attempt_count,
+            next_attempt_at, sent_at, created_at, updated_at)
+         VALUES (?, 'event-o1', 'account-1', 'owner-1', ?, 'sent', 1,
+                 '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:01.000Z',
+                 '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:01.000Z')`,
+      ).bind(`outbox-o1-${channel}`, channel).run();
+    }
   }
 
   function outboxActionCounts(testDb: ReturnType<typeof createTestD1>) {
@@ -184,9 +204,13 @@ describe('operation alert notification outbox', () => {
       lineAccountId: 'account-1', now: '2026-09-16T00:21:00.000Z',
     });
     // ownerはLINEとメールの2行。2回目の解消は抑止され、行は増えない
-    expect(outboxActionCounts(testDb)).toEqual([{ action: 'resolved', count: 2 }]);
+    // （openedの2行は「検知を知らせた」記録として最初から入れてある）
+    expect(outboxActionCounts(testDb)).toEqual([
+      { action: 'opened', count: 2 },
+      { action: 'resolved', count: 2 },
+    ]);
     expect(testDb.raw.prepare(
-      'SELECT COUNT(DISTINCT event_id) AS events FROM operation_alert_notification_outbox',
+      "SELECT COUNT(DISTINCT event_id) AS events FROM operation_alert_notification_outbox WHERE event_id <> 'event-o1'",
     ).get()).toEqual({ events: 1 });
   });
 
@@ -202,7 +226,10 @@ describe('operation alert notification outbox', () => {
     await enqueuePendingOperationAlertNotifications(testDb.db, {
       lineAccountId: 'account-1', now: '2026-09-16T00:11:00.000Z',
     });
-    expect(outboxActionCounts(testDb)).toEqual([{ action: 'resolved', count: 2 }]);
+    expect(outboxActionCounts(testDb)).toEqual([
+      { action: 'opened', count: 2 },
+      { action: 'resolved', count: 2 },
+    ]);
 
     testDb.raw.prepare(
       `INSERT INTO operation_alert_events
@@ -213,7 +240,10 @@ describe('operation alert notification outbox', () => {
     await enqueuePendingOperationAlertNotifications(testDb.db, {
       lineAccountId: 'account-1', now: '2026-09-16T00:16:00.000Z',
     });
-    expect(outboxActionCounts(testDb)).toEqual([{ action: 'resolved', count: 2 }]);
+    expect(outboxActionCounts(testDb)).toEqual([
+      { action: 'opened', count: 2 },
+      { action: 'resolved', count: 2 },
+    ]);
     expect(testDb.raw.prepare(
       "SELECT notification_enqueued_at AS enqueued FROM operation_alert_events WHERE id = 'event-o2'",
     ).get()).toEqual({ enqueued: '2026-09-16T00:16:00.000Z' });
@@ -243,6 +273,7 @@ describe('operation alert notification outbox', () => {
       lineAccountId: 'account-1', now: '2026-09-16T00:56:00.000Z',
     });
     expect(outboxActionCounts(testDb)).toEqual([
+      { action: 'opened', count: 2 },
       { action: 'reopened', count: 2 },
       { action: 'resolved', count: 4 },
     ]);

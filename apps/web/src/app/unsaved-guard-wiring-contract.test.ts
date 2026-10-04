@@ -42,7 +42,6 @@ const GUARDED = [
   'app/friend-add-settings/editor-v8.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',
   'app/inflow-links/new/page.tsx',
-  'app/line-notifications/operator/new/page.tsx',
   'app/line-notifications/operator/new/operator-new-v8.tsx',
   'app/mileage/earning-rules/edit/page.tsx',
   'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx',
@@ -107,6 +106,8 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string> = {
+  // V8へ完全切替した入口。描画先の本体が編集状態と番兵を持つ。
+  'app/line-notifications/operator/new/page.tsx': 'app/line-notifications/operator/new/operator-new-v8.tsx',
   'app/templates/edit-v8.tsx': 'app/templates/editor-v8.tsx',
   'app/templates/asset-editor-v8.tsx': 'app/templates/editor-v8.tsx',
   'app/templates/carousel/carousel-v8.tsx': 'app/templates/editor-v8.tsx',

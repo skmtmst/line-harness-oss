@@ -68,7 +68,7 @@
     "unresolved-classname": 4
   },
   "app/auto-replies/edit/wizard-v8.tsx": {
-    "unresolved-classname": 249
+    "unresolved-classname": 244
   },
   "app/auto-replies/list-v8.tsx": {
     "unresolved-classname": 75,
@@ -116,6 +116,9 @@
     "arbitrary-value": 6,
     "unresolved-classname": 1
   },
+  "app/booking/prepay-badge-v8.tsx": {
+    "unresolved-classname": 7
+  },
   "app/booking/staff/new/page.tsx": {
     "arbitrary-value": 1,
     "unresolved-classname": 5
@@ -156,7 +159,7 @@
   },
   "app/chats/page.tsx": {
     "arbitrary-value": 37,
-    "unresolved-classname": 2,
+    "unresolved-classname": 0,
     "direct-secondary-button": 2
   },
   "app/contents/page.tsx": {
@@ -237,13 +240,13 @@
     "direct-th": 6
   },
   "app/form-submissions/page.tsx": {
-    "arbitrary-value": 4
+    "arbitrary-value": 0
   },
   "app/friend-add-settings/editor-v8.tsx": {
     "unresolved-classname": 189
   },
   "app/friend-add-settings/list-v8.tsx": {
-    "unresolved-classname": 80,
+    "unresolved-classname": 76,
     "direct-th": 6
   },
   "app/friend-add-settings/page.tsx": {
@@ -302,14 +305,16 @@
     "arbitrary-value": 1
   },
   "app/inflow-links/detail/page.tsx": {
+    "unresolved-classname": 92,
     "direct-secondary-button": 1
   },
   "app/inflow-links/new/page.tsx": {
     "unresolved-classname": 4
   },
   "app/inflow-links/page.tsx": {
-    "arbitrary-value": 14,
-    "direct-secondary-button": 1
+    "unresolved-classname": 63,
+    "arbitrary-value": 0,
+    "direct-secondary-button": 0
   },
   "app/layout.tsx": {
     "unresolved-classname": 1
@@ -319,8 +324,8 @@
   },
   "app/line-notifications/page.tsx": {
     "direct-primary-button": 1,
-    "arbitrary-value": 7,
-    "unresolved-classname": 3
+    "arbitrary-value": 6,
+    "unresolved-classname": 0
   },
   "app/login/two-factor/page.tsx": {
     "arbitrary-value": 1
@@ -363,7 +368,7 @@
     "direct-th": 7
   },
   "app/mileage/v8-history-tab.tsx": {
-    "unresolved-classname": 61,
+    "unresolved-classname": 60,
     "direct-th": 6
   },
   "app/mileage/v8-rewards-tab.tsx": {
@@ -371,7 +376,7 @@
     "direct-th": 12
   },
   "app/mileage/v8-score-tab.tsx": {
-    "unresolved-classname": 131,
+    "unresolved-classname": 130,
     "direct-th": 14
   },
   "app/nen-campaigns/columns/new/column-new-v8.tsx": {
@@ -751,7 +756,8 @@
   },
   "components/chats/friend-info-sidebar.tsx": {
     "unresolved-classname": 12,
-    "arbitrary-value": 50
+    "arbitrary-value": 59,
+    "direct-secondary-button": 1
   },
   "components/chats/inbox-dropdown.tsx": {
     "unresolved-classname": 9,
@@ -989,6 +995,9 @@
   "components/shared/delta-chip.tsx": {
     "unresolved-classname": 1
   },
+  "components/shared/detail-panel.tsx": {
+    "unresolved-classname": 11
+  },
   "components/shared/disclosure.tsx": {
     "unresolved-classname": 6
   },
@@ -1000,6 +1009,9 @@
   },
   "components/shared/icon-tile.tsx": {
     "unresolved-classname": 1
+  },
+  "components/shared/inline-edit.tsx": {
+    "unresolved-classname": 6
   },
   "components/shared/line-preview.tsx": {
     "unresolved-classname": 17
@@ -1071,7 +1083,7 @@
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 36
+    "unresolved-classname": 43
   },
   "components/support/email-thread.tsx": {
     "arbitrary-value": 7

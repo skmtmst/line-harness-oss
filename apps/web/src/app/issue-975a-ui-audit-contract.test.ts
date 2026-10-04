@@ -129,7 +129,7 @@ describe('U058: 差し込み操作は本文の欄より後に置く', () => {
 describe('U063: 長い選択肢のプルダウンは欄いっぱいに広げる', () => {
   it('運用者通知の選び欄は欄いっぱいに広げる（部品の full 指定）', () => {
     // 選び欄は Select 1 本化済み。幅は部品の size="full" で持たせる。
-    const operator = read('line-notifications/operator/new/page.tsx')
+    const operator = read('line-notifications/operator/new/operator-new-v8.tsx')
     expect(operator.match(/size="full"/g)?.length).toBeGreaterThanOrEqual(7)
     expect(operator).not.toContain('[data-selects-wide] select')
   })
