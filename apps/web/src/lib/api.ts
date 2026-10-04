@@ -9416,6 +9416,7 @@ export const api = {
           | 'ogDefaultImageUrl'
           | 'friendCapacity'
           | 'capacityWarnAt'
+          | 'timezone'
           | 'iconUrl'
         >
       >,
@@ -9424,7 +9425,7 @@ export const api = {
       const touchesMessagingCredentials =
         data.channelAccessToken !== undefined || data.channelSecret !== undefined
       return fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}`, {
-        method: touchesMessagingCredentials ? 'PUT' : 'PATCH',
+        method: touchesMessagingCredentials || data.timezone !== undefined ? 'PUT' : 'PATCH',
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
       })

@@ -1092,6 +1092,8 @@ export interface User {
 // -----------------------------------------------------------------------------
 
 export interface LineAccount {
+  /** 表示と新しい日時入力に使う IANAタイムゾーン。 */
+  timezone?: string;
   /** 主キー (UUIDv4) */
   id: string;
   /** LINE Channel ID (Messaging API) */
