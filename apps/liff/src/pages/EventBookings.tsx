@@ -320,12 +320,13 @@ export default function EventBookings() {
       </div>
       <ConfirmDialog
         open={pendingCancel !== null}
-        title={pendingCancel ? `「${pendingCancel.event_name}」の予約をキャンセルしますか？` : ''}
-        description={
+        designNode="nUYyb"
+        title={
           pendingCancel
-            ? `${utcToJstMd(pendingCancel.slot_starts_at)} ${utcToJstHm(pendingCancel.slot_starts_at)}${pendingCancel.venue_name ? `・${pendingCancel.venue_name}` : ''}の予約を取り消します。`
+            ? `${utcToJstMd(pendingCancel.slot_starts_at)} ${utcToJstHm(pendingCancel.slot_starts_at)} の${pendingCancel.event_name}をキャンセルしますか`
             : ''
         }
+        description="キャンセル待ちの方へ順番に案内されます。前日を過ぎるとここからは変えられません（お店へご連絡ください）。"
         confirmLabel="キャンセルする"
         cancelLabel="やめる"
         destructive
