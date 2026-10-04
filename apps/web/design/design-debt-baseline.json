@@ -257,7 +257,7 @@
     "direct-th": 6
   },
   "app/events/change-review/change-review-v8.tsx": {
-    "unresolved-classname": 31
+    "unresolved-classname": 33
   },
   "app/events/events-list-v8.tsx": {
     "unresolved-classname": 49,
