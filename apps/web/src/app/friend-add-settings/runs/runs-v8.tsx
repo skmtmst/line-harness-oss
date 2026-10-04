@@ -16,7 +16,8 @@ import type {
   FriendAddEventKind,
   FriendAddEventRoutingStatus,
 } from '@line-crm/shared'
-import { AlertCircle, History, MoreHorizontal, Pause, Settings2 } from 'lucide-react'
+import { AlertCircle, Download, History, MoreHorizontal, Pause, Pencil } from 'lucide-react'
+import Avatar from '@/components/shared/avatar'
 import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunList } from '@/lib/api'
 import { describeFriendAddFailure } from '../friend-add-failure'
@@ -378,10 +379,10 @@ function FriendAddRunsV8Inner() {
             onClick={() => setStopDialogOpen(true)}
           >
             <Pause size={14} aria-hidden="true" />
-            止める
+            一時停止する
           </Button>
           <Button href="/friend-add-settings" variant="secondary">
-            <Settings2 size={14} aria-hidden="true" />
+            <Pencil size={14} aria-hidden="true" />
             設定の一覧へ
           </Button>
           <Button
@@ -391,6 +392,7 @@ function FriendAddRunsV8Inner() {
             busyLabel="書き出し中…"
             onClick={() => void exportCsv()}
           >
+            <Download size={14} aria-hidden="true" />
             CSVで書き出す
           </Button>
         </div>
@@ -432,7 +434,7 @@ function FriendAddRunsV8Inner() {
             <AlertCircle size={15} aria-hidden="true" />
             <span>
               <strong>失敗した処理が {formatNumber(summary?.failed ?? 0)}件あります</strong>
-              <small>案内は届きましたが、シナリオ「新規登録7日間フォロー」を始められませんでした。</small>
+              <small>案内は届きましたが、シナリオを始められませんでした。</small>
             </span>
           </span>
           <span className={styles.failureActions}>
@@ -503,6 +505,11 @@ function FriendAddRunsV8Inner() {
               <tbody>
                 {visibleItems.map((item) => {
                   const status = routingLabel(item.status, item.errorCode)
+                  /* 板 `REIxB` の札の言葉と色（口の「エラー」「青の待ち」はV8では出さない）。 */
+                  const pillLabel = status.label === 'エラー' ? '失敗' : status.label
+                  const pillTone = status.label === 'テスト待ち'
+                    ? 'toneWarning'
+                    : TONE_CLASS[status.tone] ?? 'toneNeutral'
                   const routeName = item.attribution.status === 'captured'
                     ? item.attribution.routeName || item.attribution.reason || '選択した経路'
                     : '経路が分からなかった人'
@@ -521,17 +528,20 @@ function FriendAddRunsV8Inner() {
                     <tr key={item.id}>
                       <td className={styles.timeCell}>{formatJstDateTime(item.receivedAt).slice(5)}</td>
                       <td>
-                        <Link href={detailHref(item.id)} title={`${displayName}（${kindLabel}）`} className={styles.cellTitle}>
-                          {displayName}
-                        </Link>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Avatar name={displayName} size={24} />
+                          <Link href={detailHref(item.id)} title={`${displayName}（${kindLabel}）`} className={styles.cellTitle}>
+                            {displayName}
+                          </Link>
+                        </span>
                       </td>
                       <td>
                         <span className={styles.cellSub} title={routeName}>{routeName}</span>
                       </td>
                       <td>
-                        <span className={`${styles.resultPill} ${styles[TONE_CLASS[status.tone] ?? 'toneNeutral']}`}>
+                        <span className={`${styles.resultPill} ${styles[pillTone]}`}>
                           <span className={styles.resultDot} aria-hidden="true" />
-                          {status.label}
+                          {pillLabel}
                         </span>
                       </td>
                       <td>

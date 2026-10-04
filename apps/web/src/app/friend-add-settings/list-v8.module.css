@@ -159,6 +159,13 @@
   gap: 8px;
 }
 
+/* 板 `MRhef`：件数の選びは「20件表示」だけ出す（「表示件数」の字は置かない）。 */
+.toolbar > label > span:first-child {
+  display: none;
+}
+
+
+
 /* 広い板では「作る」とフォルダ選びはフォルダの列にいる。道具の段には出さない。 */
 .toolbarCreate,
 .folderSelectWrap {

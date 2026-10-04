@@ -4,9 +4,10 @@
 import React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Circle, Star } from 'lucide-react'
+import { Circle, Star, MessageCircle, UserRound } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import type { FriendListColumn } from './friend-list-table'
+import { RowActions } from '@/components/shared/row-actions'
 import Avatar from '@/components/shared/avatar'
 import Checkbox from '@/components/shared/checkbox'
 import { formatDay } from '@/lib/format'
@@ -59,7 +60,7 @@ export default function FriendListRow({
 
   /*
    * 行を押した先は友だちの詳細。一覧の行として正しい行き先にする。
-   * 受信箱へは最新メッセージの列の明示のリンクからのみ行く。
+   * 受信箱へは右端の操作メニューから行く。
    */
   const openDetail = () => router.push(`/friends/detail?id=${friend.id}`)
 
@@ -78,7 +79,7 @@ export default function FriendListRow({
         }
       }}
       data-friend-cols
-      className="grid h-19.5 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none"
+      className={`grid h-13 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition ${selected ? 'bg-accent-soft' : 'bg-canvas'} hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none`}
     >
       <div onClick={(event) => event.stopPropagation()}>
         {/* ★V7 共通 チェックボックス（gvjpx）。 */}
@@ -104,17 +105,17 @@ export default function FriendListRow({
       </button>
 
       <div className="flex min-w-0 items-center gap-3 overflow-hidden">
-        {/* アバターは設計 `PhxG6` の 40x40 / r=18。真円（r=20）にしない。 */}
-        <Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />
+        {/* ★V8 ywJ5H：行のアバターは共通部品の32px。 */}
+        <Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />
         <div className="min-w-0 flex-1 overflow-hidden">
           {/*
             長い名前はこの列の中で1行省略＋titleで全文。列幅（minmax）を
             超えて隣の列へはみ出さないよう、受け側も overflow-hidden で受ける。
           */}
-          <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block max-w-full min-h-6 truncate text-sm font-bold text-ink hover:text-action hover:underline">
+          <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block max-w-full min-h-6 truncate text-label font-medium text-ink hover:text-action hover:underline">
             {friend.displayName}
           </Link>
-          <p className="mt-1 max-w-full truncate text-micro text-ink-faint">登録 {formatDate(friend.createdAt)}</p>
+          <p className="mt-1 max-w-full truncate text-micro text-ink-faint">{formatDate(friend.createdAt)}に登録</p>
         </div>
       </div>
 
@@ -169,19 +170,6 @@ export default function FriendListRow({
               </p>
               <p className="mt-1 flex min-w-0 items-center gap-2">
                 <span className="shrink-0 text-micro text-ink-faint">{formatDateTime(latest.createdAt)}</span>
-                {/*
-                  受信箱へ行く口はこの列の明示のリンクだけ。行全体は詳細へ行く。
-                  行の移動を起こさないよう、押下は行へ伝えない。
-                */}
-                <Link
-                  href={`/chats?friend=${friend.id}`}
-                  onClick={(event) => event.stopPropagation()}
-                  aria-label={`${friend.displayName}さんの会話を受信箱で開く`}
-                  title="受信箱で開く"
-                  className="truncate text-micro font-semibold text-action hover:underline"
-                >
-                  受信箱で開く
-                </Link>
               </p>
             </>
           ) : <><span className="text-xs text-ink-secondary">受信なし</span><p className="mt-1 text-micro text-ink-faint">—</p></>}
@@ -189,11 +177,11 @@ export default function FriendListRow({
       ) : null}
 
       {visibleColumns.has('tags') ? (
-        <div className="flex min-w-0 flex-wrap content-center gap-1">
-          {friend.tags.slice(0, 2).map((tag, index) => (
-            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-micro font-semibold ${index === 0 ? 'bg-accent-soft text-accent-deep' : 'bg-chip-alt-soft text-chip-alt'}`}>{tag.name}</span>
+        <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+          {friend.tags.slice(0, 2).map((tag) => (
+            <span key={tag.id} title={tag.name} className="max-w-28 min-w-0 truncate rounded-mini border border-hairline bg-canvas px-1.5 py-0.5 text-micro text-ink-secondary">{tag.name}</span>
           ))}
-          {friend.tags.length > 2 ? <span className="rounded-mini bg-avatar-bg px-2 py-1 text-micro text-ink-secondary">+{friend.tags.length - 2}</span> : null}
+          {friend.tags.length > 2 ? <span title={friend.tags.slice(2).map((tag) => tag.name).join('・')} className="shrink-0 text-micro text-ink-secondary">+{friend.tags.length - 2}</span> : null}
           {!friend.tags.length ? <span className="text-micro text-ink-disabled">—</span> : null}
         </div>
       ) : null}
@@ -216,6 +204,10 @@ export default function FriendListRow({
           {formatDate(lastContact)}
         </div>
       ) : null}
+      <RowActions subjectName={friend.displayName} menuItems={[
+        { id: 'chat', label: 'トークを開く', icon: <MessageCircle aria-hidden="true" size={14} />, onSelect: () => router.push(`/chats?friend=${friend.id}`) },
+        { id: 'detail', label: '友だちの詳細を見る', icon: <UserRound aria-hidden="true" size={14} />, onSelect: openDetail },
+      ]} />
     </div>
   )
 }

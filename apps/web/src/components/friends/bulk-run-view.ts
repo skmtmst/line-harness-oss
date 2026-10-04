@@ -31,9 +31,13 @@ export const OPERATIONS: ReadonlyArray<{
 }> = [
   { kind: 'add_tag', label: 'タグを付ける', note: '選んだタグを付けます', reversible: true },
   { kind: 'remove_tag', label: 'タグを外す', note: '選んだタグを外します', reversible: true },
-  { kind: 'assign_operator', label: '担当者を決める', note: '担当者を割り当てます', reversible: true },
-  { kind: 'start_scenario', label: 'シナリオを始める', note: '選んだシナリオを開始します', reversible: false },
+  { kind: 'assign_operator', label: '担当者を変更', note: '担当者を割り当てます', reversible: true },
+  { kind: 'start_scenario', label: 'シナリオを開始', note: '選んだシナリオを開始します', reversible: true },
+  { kind: 'stop_scenario', label: 'シナリオを停止', note: '選んだシナリオを停止します', reversible: true },
+  { kind: 'set_support', label: '対応マークを変更', note: '選んだ対応マークに変更します', reversible: true },
+  { kind: 'set_reminder', label: 'リマインダーを設定', note: '指定した日時で登録します', reversible: true },
   { kind: 'send_message', label: 'メッセージを送る', note: '送ったメッセージは取り消せません', reversible: false },
+  { kind: 'run_common_action', label: 'アクションを実行', note: '公開済みのアクションを実行します', reversible: false },
 ]
 
 export function operationLabel(kind: string): string {

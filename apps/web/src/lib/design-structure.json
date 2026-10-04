@@ -267,44 +267,38 @@
       ]
     },
     "/friends": {
-      "node": "PhxG6",
-      "name": "V6 3-1 友だち（1920）",
+      "node": "ywJ5H",
+      "name": "V8 友だち一覧",
       "visualVerification": {
         "status": "unverified",
         "referenceNodeIds": [
-          "PhxG6"
+          "ywJ5H",
+          "x6QsVz",
+          "CYJ0L"
         ],
         "requiredViewports": [
+          1152,
           1440,
           1920
         ],
-        "reason": "Pencilと実装を同寸法で目視比較済み。ただしシェルの例示データと現在地表示に意図した差があるため、完全一致とは扱わない",
-        "referenceScreenshots": [
-          "docs/design-reference/friends-v6/PhxG6-1920.png"
-        ],
-        "implementationScreenshots": [
-          "docs/design-qa/friends-v6/implementation-1440.png",
-          "docs/design-qa/friends-v6/implementation-1920.png"
-        ],
-        "checkedAt": "2026-08-27T11:51:26+09:00",
-        "evidence": "docs/design-qa/friends-v6/design-qa.md"
+        "reason": "V8へ完全切替。画像撮影と幅の確認は司令塔が実施する。"
       },
       "sections": [
-        "V6Tabs",
-        "V6FriendKpis",
-        "V6SearchPanel",
-        "V4BulkBar",
-        "V6FriendTable"
+        "Steps",
+        "V8FriendKpis",
+        "V8SearchPanel",
+        "V8BulkBar",
+        "V8FriendTable"
       ],
       "parts": [
-        "有効友だち",
+        "有効な友だち",
         "ブロック・非表示",
         "未対応",
         "今月の追加",
         "CSVで書き出す",
         "UID移行",
         "一括操作",
-        "名前・LINE名・タグ・メモで検索",
+        "名前・LINE名・タグ・メモで探す",
         "詳細条件",
         "保存した検索",
         "友だち追加の新しい順",
@@ -312,8 +306,8 @@
         "対象を確認してから操作を選んでください",
         "対応・担当",
         "シナリオ",
-        "最新メッセージ",
-        "タグ・属性",
+        "最新のメッセージ",
+        "タグ",
         "最終接触",
         "表示項目を編集",
         "件表示",

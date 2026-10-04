@@ -1,10 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { Tag, Send, UserRound, CircleCheck, Bell, Zap, Play, Square } from 'lucide-react'
+import Dialog from '@/components/shared/dialog'
+import Stepper from '@/components/shared/stepper'
+import { TableHeadRow, Th, Td } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Combobox from '@/components/shared/combobox'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import { ApiError, api } from '@/lib/api'
 import type { FriendListItem } from '@/lib/api'
@@ -21,6 +24,8 @@ import {
 } from './bulk-run-view'
 import styles from './bulk-run-dialog.module.css'
 import { formatNumber } from '@/lib/format'
+import BulkOperationEditor from './bulk-operation-editor'
+import { buildBulkOperation, EMPTY_BULK_INPUT, type BulkOperationInput } from './bulk-operation-input'
 
 type Phase = 'operation' | 'confirm' | 'result'
 type ResultState = 'idle' | 'loading' | 'ready' | 'error'
@@ -46,6 +51,7 @@ export default function BulkRunDialog({
   selectedFriends,
   tags,
   accountId,
+  supportMarksEnabled = true,
   onClose,
   onDone,
 }: {
@@ -54,12 +60,13 @@ export default function BulkRunDialog({
   selectedFriends: FriendListItem[]
   tags: Array<{ id: string; name: string }>
   accountId: string | null
+  supportMarksEnabled?: boolean
   onClose: () => void
   onDone: () => void
 }) {
   const [phase, setPhase] = useState<Phase>('operation')
   const [operationKind, setOperationKind] = useState<FriendBulkOperation['kind']>('add_tag')
-  const [tagId, setTagId] = useState('')
+  const [input, setInput] = useState<BulkOperationInput>(EMPTY_BULK_INPUT)
   const [preview, setPreview] = useState<FriendBulkPreview | null>(null)
   const [previewState, setPreviewState] = useState<'idle' | 'loading' | 'error' | 'forbidden'>('idle')
   const [detail, setDetail] = useState<FriendBulkRunDetail | null>(null)
@@ -92,12 +99,7 @@ export default function BulkRunDialog({
   const chosen = OPERATIONS.find((o) => o.kind === operationKind)
   const reversible = preview?.reversible ?? chosen?.reversible ?? false
 
-  const operation = useCallback((): FriendBulkOperation | null => {
-    if (operationKind === 'add_tag' || operationKind === 'remove_tag') {
-      return tagId ? { kind: operationKind, tagId } : null
-    }
-    return null
-  }, [operationKind, tagId])
+  const operation = useCallback(() => buildBulkOperation(operationKind, input), [operationKind, input])
 
   const loadPreview = useCallback(async () => {
     const op = operation()
@@ -180,6 +182,7 @@ export default function BulkRunDialog({
       次のpreviewを押すまで世代を進めないと、切替前の遅い返事が新しい画面へ入る。
     */
     setPhase('operation'); setPreview(null); setDetail(null); setRunId(null)
+    setInput(EMPTY_BULK_INPUT)
     setFailure(null); setIrreversibleConfirmed(false); setPreviewState('idle')
     setResultState('idle'); setResultAction('execute'); setBusy(false)
     requestRef.current = {
@@ -313,38 +316,62 @@ export default function BulkRunDialog({
         ? operationLabel(detail.operation.kind)
         : '一括操作'
   const resultComplete = detail ? isRunComplete(detail.status) : false
-  const operationTiles = [
-    { kind: 'add_tag', label: 'タグを付ける', note: '友だちを分類します', icon: '◇', available: true },
-    { kind: 'start_scenario', label: 'シナリオを開始', note: 'ステップ配信を開始します', icon: '▷', available: false },
-    { kind: 'assign_operator', label: '担当者を変更', note: '担当者をまとめて変更します', icon: '♙', available: false },
-    { kind: 'set_support', label: '対応マークを変更', note: '対応状況を更新します', icon: '✓', available: false },
-    { kind: 'set_reminder', label: 'リマインダーを設定', note: '指定日時に通知します', icon: '♧', available: false },
-    { kind: 'send_message', label: 'メッセージを送る', note: '同じ内容をまとめて送ります', icon: '□', available: false },
-    { kind: 'run_common_action', label: 'アクションを実行', note: '登録済みのアクションを実行します', icon: 'ϟ', available: false },
-    { kind: 'remove_tag', label: 'タグを外す', note: '付いているタグをまとめて外します', icon: '◇', available: true },
-    { kind: 'stop_scenario', label: 'シナリオを停止', note: '進行中のステップ配信を止めます', icon: '▣', available: false },
+  const groups = [
+    { label: 'よく使う', operations: [
+      { kind: 'add_tag', label: 'タグを付ける', Icon: Tag },
+      { kind: 'send_message', label: 'メッセージを送る', Icon: Send },
+      { kind: 'assign_operator', label: '担当者を変更', Icon: UserRound },
+    ] },
+    { label: 'タグ・シナリオ', operations: [
+      { kind: 'remove_tag', label: 'タグを外す', Icon: Tag },
+      { kind: 'start_scenario', label: 'シナリオを開始', Icon: Play },
+      { kind: 'stop_scenario', label: 'シナリオを停止', Icon: Square },
+    ] },
+    { label: '対応・その他', operations: [
+      { kind: 'set_support', label: '対応マークを変更', Icon: CircleCheck },
+      { kind: 'set_reminder', label: 'リマインダーを設定', Icon: Bell },
+      { kind: 'run_common_action', label: 'アクションを実行', Icon: Zap },
+    ] },
   ] as const
+  const selectedOperation = groups.flatMap((group) => [...group.operations]).find((item) => item.kind === operationKind)
+  const OperationIcon = selectedOperation?.Icon ?? Tag
+  const operationSummary = operationKind === 'send_message' ? input.content
+    : operationKind === 'set_reminder' ? `${input.resourceName}・${input.targetDate.replace('T', ' ')}（日本時間）`
+      : input.resourceName
+  const phaseIndex = ['operation', 'confirm', 'result'].indexOf(phase)
+  const footer = (
+    <div className={styles.footer}>
+      <span className={styles.hint}>手順 {phaseIndex + 1} / 3</span>
+      <div className={styles.actions}>
+        {phase === 'operation' ? <>
+          <Button onClick={close}>閉じる</Button>
+          <Button variant="primary" disabled={!operation() || previewState === 'loading'} onClick={() => void loadPreview()} busy={previewState === 'loading'}>実行内容を確認 →</Button>
+        </> : null}
+        {phase === 'confirm' && preview ? <>
+          <Button onClick={() => setPhase('operation')} disabled={busy}>← 戻る</Button>
+          <Button variant="primary" disabled={!canExecute({ preview, busy, irreversibleConfirmed, reversible })} onClick={() => void execute()} busy={busy} busyLabel="実行中…">{`${countText(preview.targetCount, '人')}に実行する`}</Button>
+        </> : null}
+        {phase === 'result' ? <>
+          {resultState === 'ready' && canUndo(detail) ? <Button onClick={() => void undo()} disabled={busy}>取り消す</Button> : null}
+          {resultState === 'ready' && canRetry(detail) ? <Button onClick={() => void retry()} disabled={busy}>失敗した{countText(detail?.temporaryFailureCount, '人')}だけやり直す</Button> : null}
+          {runId ? <Button onClick={() => void pollRun(runId, resultAction)} disabled={busy || resultState === 'loading'}>読み直す</Button> : null}
+          <Button variant="primary" onClick={close} disabled={busy}>← 友だち一覧へ戻る</Button>
+        </> : null}
+      </div>
+    </div>
+  )
 
   return (
-    <div className={styles.backdrop} role="dialog" aria-modal="true" aria-label="友だちを一括操作">
+    <Dialog open={open} title="友だちを一括操作" description="対象を確認してから操作を選んでください" onCancel={close} busy={busy} footer={footer} designNode="CYJ0L">
       <div className={styles.panel} data-design-node="IAf7j">
-        <header className={styles.head}>
-          <h2 className={styles.screenTitle}>友だちを一括操作</h2>
-          <div className="flex items-center justify-between gap-3">
-            <button type="button" className={styles.backButton} onClick={close}>← 友だち一覧へ戻る</button>
-            <button type="button" className="inline-flex items-center justify-center rounded-mini p-1.5 text-ink-secondary hover:bg-canvas hover:text-ink" onClick={close} aria-label="閉じる">
-              <X aria-hidden="true" size={20} />
-            </button>
-          </div>
-          <div className={styles.selectionBanner}>
-            <strong>✓　{formatNumber(friendIds.length)}人を選択中</strong>
-            <span>対象を確認してから操作を選んでください</span>
-            <button type="button" onClick={close}>選択を解除</button>
-          </div>
-        </header>
+        <Stepper label="一括操作の手順" currentKey={phase} steps={(['operation', 'confirm', 'result'] as const).map((key, index) => ({
+          key,
+          label: ['操作を選ぶ', '確かめる', '結果'][index],
+          state: index < phaseIndex ? 'done' : 'todo',
+        }))} />
 
         {failure ? (
-          <div className={failure.kind === 'forbidden' ? styles.notice : styles.warn} role="alert" data-failure-kind={failure.kind}>
+          <div className={phase === 'result' || failure.kind === 'forbidden' ? styles.notice : styles.warn} role="alert" data-failure-kind={failure.kind}>
             <p>{failure.message}</p>
             {failure.canReload ? <Button onClick={reloadFailure}>読み直す</Button> : null}
           </div>
@@ -352,49 +379,31 @@ export default function BulkRunDialog({
 
         {phase === 'operation' ? (
           <div className={styles.body}>
-            <div className={styles.operationLayout}>
-            <fieldset className={styles.operationPanel}>
-              <legend className={styles.panelTitle}>実行する操作を選択</legend>
-              <div className={styles.categoryTabs}><strong>よく使う</strong><span>タグ</span><span>シナリオ</span><span>担当者・対応マーク</span><span>その他</span></div>
-              <div className={styles.ops}>
-                {operationTiles.map((op) => (
-                  <button
-                    key={op.kind}
-                    type="button"
-                    role="radio"
-                    aria-checked={operationKind === op.kind}
-                    disabled={!op.available}
-                    title={op.available ? undefined : '入力項目と実行APIを接続後に利用できます'}
-                    onClick={() => op.available && setOperationKind(op.kind)}
-                    className={operationKind === op.kind ? styles.opOn : styles.op}
-                  >
-                    <span className={styles.opIcon}>{op.icon}</span>
-                    <span className={styles.opLabel}>{op.label}</span>
-                    <span className={styles.opNote}>{op.note}</span>
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <aside className={styles.executionPanel}>
-              <h3 className={styles.panelTitle}>実行内容</h3>
-              <dl className={styles.executionSummary}>
-                <div><dt>対象</dt><dd>選択した友だち {friendIds.length}人</dd></div>
-                <div><dt>操作</dt><dd>{operationLabel(operationKind)}</dd></div>
-                <div><dt>タグ</dt><dd>{tags.find((tag) => tag.id === tagId)?.name ?? '選択してください'}</dd></div>
-              </dl>
-            <div className={styles.field}>
-              <span className={styles.label}>どのタグ</span>
-              <Combobox
-                aria-label="どのタグ"
-                placeholder="選んでください"
-                value={tagId}
-                onChange={setTagId}
-                options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
-              />
+            <div className={styles.selectionBanner}>
+              <strong>選択した友だち {formatNumber(friendIds.length)}人</strong>
+              <span title={selectedFriends.map((friend) => friend.displayName).join('・')}>{selectedFriends.map((friend) => friend.displayName).join('・')}</span>
+              <Button onClick={close}>選び直す</Button>
             </div>
-            <p className={styles.executionHint}>ⓘ 実行前に対象と操作内容を確認できます。</p>
-
+            {groups.map((group) => (
+              <fieldset key={group.label} className={styles.operationPanel}>
+                <legend className={styles.panelTitle}>{group.label}</legend>
+                <div className={styles.ops}>
+                  {group.operations.filter((op) => op.kind !== 'set_support' || supportMarksEnabled).map((op) => (
+                    <button key={op.kind} type="button" aria-pressed={operationKind === op.kind} disabled={previewState === 'loading'}
+                      onClick={() => {
+                        setOperationKind(op.kind); setInput(EMPTY_BULK_INPUT)
+                        setPreview(null); setFailure(null); setPreviewState('idle'); setIrreversibleConfirmed(false)
+                      }} className={operationKind === op.kind ? styles.opOn : styles.op}>
+                      <span className={styles.opLabel}><op.Icon aria-hidden="true" size={16} />{op.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+            <div className={styles.field}>
+              <h3 className={styles.panelTitle}>実行内容</h3>
+              <BulkOperationEditor kind={operationKind} accountId={accountId} tags={tags} input={input} onChange={setInput} disabled={previewState === 'loading'} />
+            </div>
             {previewState === 'loading' ? <ListState kind="loading" title="対象を数えています" /> : null}
             {previewState === 'error' ? (
               <ListState
@@ -412,33 +421,17 @@ export default function BulkRunDialog({
               />
             ) : null}
 
-            <div className={styles.actions}>
-              <Button variant="primary" disabled={!tagId || previewState === 'loading'} onClick={() => void loadPreview()}>
-                実行内容を確認
-              </Button>
-            </div>
-            </aside>
-            </div>
-
-            <section className={styles.selectedPanel}>
-              <div className={styles.selectedHead}><h3>選択した友だち</h3><strong>{friendIds.length}人</strong></div>
-              <div className={styles.selectedTable}>
-                <div className={styles.selectedRowHead}><span>名前</span><span>流入元</span><span>担当</span><span>現在のタグ</span></div>
-                {selectedFriends.map((friend) => (
-                  <div className={styles.selectedRow} key={friend.id}>
-                    <strong>{friend.displayName}</strong>
-                    <span>{friend.firstTrackedLinkName ?? 'LINE'}</span>
-                    <span>{friend.operator?.name ?? '未割り当て'}</span>
-                    <span>{friend.tags.map((tag) => tag.name).join('・') || '—'}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
           </div>
         ) : null}
 
         {phase === 'confirm' && preview ? (
           <div className={styles.body}>
+            <div className={styles.notice}>
+              <OperationIcon aria-hidden="true" size={18} />
+              <div className="min-w-0"><h3 className={styles.blockTitle}>{selectedOperation?.label ?? '一括操作'}</h3>
+              <p className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-ink-secondary">{operationSummary}</p>
+              {reversible ? <p className={styles.hint}>あとから「取り消し」で元に戻せます</p> : null}</div>
+            </div>
             <dl className={styles.summary}>
               <div><dt>選んだ人</dt><dd>{countText(preview.selectedCount, '人')}</dd></div>
               <div><dt>実際の対象</dt><dd className={styles.strong}>{countText(preview.targetCount, '人')}</dd></div>
@@ -473,12 +466,25 @@ export default function BulkRunDialog({
             {preview.sample.length > 0 ? (
               <section className={styles.block}>
                 <h3 className={styles.blockTitle}>選択した友だち</h3>
-                <ul className={styles.list}>
-                  {preview.sample.map((item) => (
-                    /* 内部IDは出さない。名前が無いときは「名前未登録」。 */
-                    <li key={item.friendId}>{item.displayName ?? '名前未登録'}</li>
-                  ))}
-                </ul>
+                <table className="w-full table-fixed text-xs">
+                  <colgroup><col className="w-1/4" /><col className="w-1/5" /><col className="w-1/5" /><col /></colgroup>
+                  <thead><TableHeadRow><Th>名前</Th><Th>流入元</Th><Th>担当者</Th><Th>現在のタグ</Th></TableHeadRow></thead>
+                  <tbody>
+                    {preview.sample.map((item) => {
+                      const friend = selectedFriends.find((selected) => selected.id === item.friendId)
+                      const name = item.displayName ?? '名前未登録'
+                      const source = friend ? friend.firstTrackedLinkName || '不明' : '—'
+                      const operator = friend ? friend.operator?.name ?? '未割り当て' : '—'
+                      const tagNames = friend ? friend.tags.map((tag) => tag.name).join('・') || '—' : '—'
+                      return <tr key={item.friendId}>
+                        <Td><span className="block truncate" title={name}>{name}</span></Td>
+                        <Td><span className="block truncate" title={source}>{source}</span></Td>
+                        <Td><span className="block truncate" title={operator}>{operator}</span></Td>
+                        <Td><span className="block truncate" title={tagNames}>{tagNames}</span></Td>
+                      </tr>
+                    })}
+                  </tbody>
+                </table>
               </section>
             ) : null}
 
@@ -491,15 +497,6 @@ export default function BulkRunDialog({
 
             {blocked ? <p className={styles.hint}>{blocked}</p> : null}
 
-            <div className={styles.actions}>
-              <Button onClick={() => setPhase('operation')} disabled={busy}>戻る</Button>
-              <Button
-                variant="primary"
-                disabled={!canExecute({ preview, busy, irreversibleConfirmed, reversible })}
-                onClick={() => void execute()} busy={busy} busyLabel="実行中…">
-                {`${countText(preview.targetCount, '人')}に実行`}
-              </Button>
-            </div>
           </div>
         ) : null}
 
@@ -519,9 +516,9 @@ export default function BulkRunDialog({
                           : detail.permanentFailureCount
                     return (
                       <div key={group.key}>
-                        <dt>{group.label}</dt>
+                        <dt className="flex items-center gap-1">{group.label}{group.key === 'success' || group.key === 'skipped' ? <HelpTip label={`${group.label}の説明`}>{group.note}</HelpTip> : null}</dt>
                         <dd>{countText(value, '人')}</dd>
-                        <p className={styles.hint}>{group.note}</p>
+                        {group.key === 'temporary_failure' || group.key === 'permanent_failure' ? <p className={styles.hint}>{group.note}</p> : null}
                       </div>
                     )
                   })}
@@ -545,22 +542,9 @@ export default function BulkRunDialog({
                 ) : null}
               </>
             ) : null}
-
-            {resultState === 'ready' && (canUndo(detail) || canRetry(detail)) ? (
-              <div className={styles.actions}>
-                {canUndo(detail) ? (
-                  <Button onClick={() => void undo()} disabled={busy}>取り消す</Button>
-                ) : null}
-                {canRetry(detail) ? (
-                  <Button variant="primary" onClick={() => void retry()} disabled={busy}>
-                    失敗した{countText(detail?.temporaryFailureCount, '人')}だけやり直す
-                  </Button>
-                ) : null}
-              </div>
-            ) : null}
           </div>
         ) : null}
       </div>
-    </div>
+    </Dialog>
   )
 }

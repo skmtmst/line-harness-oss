@@ -16,12 +16,17 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
+  Activity,
   AlertCircle,
+  Clock,
   Eye,
+  FileText,
+  FolderPlus,
   History,
   Link2,
   Lock,
   MoreHorizontal,
+  Pause,
   Pencil,
   Route,
   Send,
@@ -57,10 +62,11 @@ const KIND_LABELS: Record<FriendAddRuleKind, string> = {
 
 /** 未分類の印。V7 の一覧と同じく、サーバでは '__uncategorized' を使う。 */
 const UNFILED = '__uncategorized'
-const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string }> = [
-  { key: 'published', label: '有効' },
-  { key: 'draft', label: '下書き' },
-  { key: 'stopped', label: '停止中' },
+/* 板 `LEwkJ`：状態の札には印を付ける（選んでいないときも意味が読める）。 */
+const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string; icon: typeof Clock }> = [
+  { key: 'published', label: '有効', icon: Clock },
+  { key: 'draft', label: '下書き', icon: FileText },
+  { key: 'stopped', label: '停止中', icon: Pause },
 ]
 
 function countText(value: number | null, unit: string) {
@@ -749,7 +755,7 @@ function FriendAddListV8Inner() {
           </p>
         </div>
         <Button href="/friend-add-settings/runs" variant="secondary">
-          <History size={14} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />
+          <Activity size={14} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />
           実行結果を見る
         </Button>
       </div>
@@ -813,7 +819,7 @@ function FriendAddListV8Inner() {
             activeId={folder ?? ''}
             onSelect={(id) => selectFolder(id || null)}
             onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
-            addFolderDisabled={folderBusy || !canEdit}
+            addFolderDisabled={folderBusy}
             rows={[
               { id: '', label: 'すべて', count: data?.total ?? items.length },
               ...folders.map((entry) => ({
@@ -822,7 +828,15 @@ function FriendAddListV8Inner() {
                 count: entry.count,
               })),
             ]}
-          />
+          >
+            {/* 板 `LEwkJ`：閲覧のみでも「フォルダを追加」は文字の口で置く（押せない形）。 */}
+            {canEdit ? null : (
+              <span className="mt-2 inline-flex items-center gap-2 text-xs text-ink-faint" aria-disabled="true" title={readonlyReason}>
+                <FolderPlus size={14} aria-hidden="true" />
+                フォルダを追加
+              </span>
+            )}
+          </FolderPanel>
           <p className={styles.folderNote}>フォルダを消しても、中の設定は未分類に残ります</p>
         </div>
 
@@ -876,6 +890,7 @@ function FriendAddListV8Inner() {
                 selected={statusFilter === chip.key}
                 onChange={(on) => selectStatus(on ? chip.key : '')}
               >
+                <chip.icon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />
                 {chip.label}
               </FilterChip>
             ))}
