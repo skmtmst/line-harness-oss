@@ -1,3 +1,10 @@
+import {
+  normalizeLiffFormAppearance,
+  type LiffFormAppearance,
+  type LiffFormAppearanceMode,
+  type LiffHeadingFont,
+  type LiffTheme,
+} from '@line-crm/shared';
 import { boundedListLimit, jstDateString, jstNow, MAX_LIST_LIMIT, toJstString } from './utils.js';
 
 /**
@@ -41,8 +48,28 @@ export interface Form {
   og_title: string | null;
   og_description: string | null;
   og_image_url: string | null;
+  /** 見た目（M3・migration 562）。列が無い古い DB では undefined。 */
+  liff_appearance_mode?: string | null;
+  liff_theme?: string | null;
+  liff_primary_color?: string | null;
+  liff_background_color?: string | null;
+  liff_heading_font?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * フォームごとの見た目（M3）。既定は 'inherit'（店の設定に合わせる）。
+ * migration 562 前の行（列が無い）や壊れた値は既定に倒す。
+ */
+export function formLiffAppearance(form: Form): LiffFormAppearance {
+  return normalizeLiffFormAppearance({
+    mode: form.liff_appearance_mode,
+    theme: form.liff_theme,
+    primaryColor: form.liff_primary_color,
+    backgroundColor: form.liff_background_color,
+    headingFont: form.liff_heading_font,
+  });
 }
 
 export interface FormSubmission {
@@ -691,6 +718,12 @@ export interface CreateFormInput {
   ogTitle?: string | null;
   ogDescription?: string | null;
   ogImageUrl?: string | null;
+  /** 見た目（M3・複製の引き継ぎ用）。未指定は既定（店の設定に合わせる）。 */
+  liffAppearanceMode?: LiffFormAppearanceMode;
+  liffTheme?: LiffTheme;
+  liffPrimaryColor?: string | null;
+  liffBackgroundColor?: string | null;
+  liffHeadingFont?: LiffHeadingFont;
   /** 新規作成画面から作る空レコードは公開しない。未指定は既存互換で公開中。 */
   isActive?: boolean;
   /** 明示したLINE公式アカウントだけで利用する。 */
@@ -700,18 +733,40 @@ export interface CreateFormInput {
 export async function createForm(db: D1Database, input: CreateFormInput): Promise<Form> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  // 見た目の指定があるか（複製の引き継ぎ）。migration 562 未適用の DB
+  // では指定が無い作成だけ通す。
+  const hasLiffAppearance = input.liffAppearanceMode !== undefined
+    || input.liffTheme !== undefined
+    || input.liffPrimaryColor !== undefined
+    || input.liffBackgroundColor !== undefined
+    || input.liffHeadingFont !== undefined;
 
-  try {
-    await db
+  const attemptInsert = (withAppearance: boolean) => {
+    const columns = withAppearance
+      ? `,
+          liff_appearance_mode, liff_theme, liff_primary_color,
+          liff_background_color, liff_heading_font`
+      : '';
+    const values = withAppearance ? `, ?, ?, ?, ?, ?` : '';
+    const appearanceBinds: Array<string | null> = withAppearance
+      ? [
+        input.liffAppearanceMode ?? 'inherit',
+        input.liffTheme ?? 'line',
+        input.liffPrimaryColor ?? null,
+        input.liffBackgroundColor ?? null,
+        input.liffHeadingFont ?? 'default',
+      ]
+      : [];
+    return db
       .prepare(
         `INSERT INTO forms
          (id, name, description, fields, layout, on_submit_tag_id, on_submit_scenario_id,
           on_submit_message_type, on_submit_message_content,
           on_submit_webhook_url, on_submit_webhook_headers, on_submit_webhook_fail_message,
           save_to_metadata, is_active, submit_count,
-          og_title, og_description, og_image_url,
+          og_title, og_description, og_image_url${columns},
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?${values}, ?, ?)`,
       )
       .bind(
         id,
@@ -730,10 +785,21 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
         input.ogTitle ?? null,
         input.ogDescription ?? null,
         input.ogImageUrl ?? null,
+        ...appearanceBinds,
         now,
         now,
       )
       .run();
+  };
+
+  try {
+    try {
+      await attemptInsert(true);
+    } catch (error) {
+      const missingColumn = error instanceof Error && /(?:no such column|has no column named)/i.test(error.message);
+      if (!missingColumn || hasLiffAppearance) throw error;
+      await attemptInsert(false);
+    }
 
     await attachFormAccounts(db, id, input.lineAccountIds ?? []);
     if (input.isActive !== false) {
@@ -766,6 +832,15 @@ export interface UpdateFormInput {
   ogTitle?: string | null;
   ogDescription?: string | null;
   ogImageUrl?: string | null;
+  /**
+   * 見た目（M3）。省いた項目は今の値を保つ。色の null は「型の色・店の色」。
+   * mode が 'inherit' のとき他は使わないが値は残す（custom に戻せるよう）。
+   */
+  liffAppearanceMode?: LiffFormAppearanceMode;
+  liffTheme?: LiffTheme;
+  liffPrimaryColor?: string | null;
+  liffBackgroundColor?: string | null;
+  liffHeadingFont?: LiffHeadingFont;
 }
 
 /**
@@ -805,10 +880,41 @@ export async function updateForm(
   if (!existing) return { kind: 'not_found' };
 
   const now = jstNow();
+  // 見た目の指定があるか。migration 562 未適用の DB では指定が無い
+  // 保存だけ通し、指定がある保存は黙って捨てずに投げる（適用待ちが分かる）。
+  const hasLiffAppearance = 'liffAppearanceMode' in input
+    || 'liffTheme' in input
+    || 'liffPrimaryColor' in input
+    || 'liffBackgroundColor' in input
+    || 'liffHeadingFont' in input;
 
-  const result = await db
-    .prepare(
-      `UPDATE forms
+  const attempt = (withAppearance: boolean) => {
+    const appearanceSet = withAppearance
+      ? `,
+           liff_appearance_mode = ?,
+           liff_theme = ?,
+           liff_primary_color = ?,
+           liff_background_color = ?,
+           liff_heading_font = ?`
+      : '';
+    const appearanceBinds: Array<string | null> = withAppearance
+      ? [
+        'liffAppearanceMode' in input
+          ? (input.liffAppearanceMode ?? 'inherit')
+          : (existing.liff_appearance_mode ?? 'inherit'),
+        'liffTheme' in input ? (input.liffTheme ?? 'line') : (existing.liff_theme ?? 'line'),
+        'liffPrimaryColor' in input ? (input.liffPrimaryColor ?? null) : (existing.liff_primary_color ?? null),
+        'liffBackgroundColor' in input
+          ? (input.liffBackgroundColor ?? null)
+          : (existing.liff_background_color ?? null),
+        'liffHeadingFont' in input
+          ? (input.liffHeadingFont ?? 'default')
+          : (existing.liff_heading_font ?? 'default'),
+      ]
+      : [];
+    return db
+      .prepare(
+        `UPDATE forms
        SET name = ?,
            description = ?,
            fields = ?,
@@ -824,50 +930,61 @@ export async function updateForm(
            is_active = ?,
            og_title = ?,
            og_description = ?,
-           og_image_url = ?,
+           og_image_url = ?${appearanceSet},
            updated_at = ?,
            revision = revision + 1,
            content_revision = content_revision + 1
        WHERE id = ? AND content_revision = ?`,
-    )
-    .bind(
-      input.name ?? existing.name,
-      'description' in input ? (input.description ?? null) : existing.description,
-      input.fields ?? existing.fields,
-      'layout' in input ? (input.layout ?? null) : existing.layout,
-      'onSubmitTagId' in input ? (input.onSubmitTagId ?? null) : existing.on_submit_tag_id,
-      'onSubmitScenarioId' in input
-        ? (input.onSubmitScenarioId ?? null)
-        : existing.on_submit_scenario_id,
-      'onSubmitMessageType' in input
-        ? (input.onSubmitMessageType ?? null)
-        : existing.on_submit_message_type,
-      'onSubmitMessageContent' in input
-        ? (input.onSubmitMessageContent ?? null)
-        : existing.on_submit_message_content,
-      'onSubmitWebhookUrl' in input
-        ? (input.onSubmitWebhookUrl ?? null)
-        : existing.on_submit_webhook_url,
-      'onSubmitWebhookHeaders' in input
-        ? (input.onSubmitWebhookHeaders ?? null)
-        : existing.on_submit_webhook_headers,
-      'onSubmitWebhookFailMessage' in input
-        ? (input.onSubmitWebhookFailMessage ?? null)
-        : existing.on_submit_webhook_fail_message,
-      'saveToMetadata' in input
-        ? (input.saveToMetadata !== false ? 1 : 0)
-        : existing.save_to_metadata,
-      'isActive' in input
-        ? (input.isActive && existing.current_published_version_id ? 1 : 0)
-        : existing.is_active,
-      'ogTitle' in input ? (input.ogTitle ?? null) : existing.og_title,
-      'ogDescription' in input ? (input.ogDescription ?? null) : existing.og_description,
-      'ogImageUrl' in input ? (input.ogImageUrl ?? null) : existing.og_image_url,
-      now,
-      id,
-      expectedContentRevision,
-    )
-    .run();
+      )
+      .bind(
+        input.name ?? existing.name,
+        'description' in input ? (input.description ?? null) : existing.description,
+        input.fields ?? existing.fields,
+        'layout' in input ? (input.layout ?? null) : existing.layout,
+        'onSubmitTagId' in input ? (input.onSubmitTagId ?? null) : existing.on_submit_tag_id,
+        'onSubmitScenarioId' in input
+          ? (input.onSubmitScenarioId ?? null)
+          : existing.on_submit_scenario_id,
+        'onSubmitMessageType' in input
+          ? (input.onSubmitMessageType ?? null)
+          : existing.on_submit_message_type,
+        'onSubmitMessageContent' in input
+          ? (input.onSubmitMessageContent ?? null)
+          : existing.on_submit_message_content,
+        'onSubmitWebhookUrl' in input
+          ? (input.onSubmitWebhookUrl ?? null)
+          : existing.on_submit_webhook_url,
+        'onSubmitWebhookHeaders' in input
+          ? (input.onSubmitWebhookHeaders ?? null)
+          : existing.on_submit_webhook_headers,
+        'onSubmitWebhookFailMessage' in input
+          ? (input.onSubmitWebhookFailMessage ?? null)
+          : existing.on_submit_webhook_fail_message,
+        'saveToMetadata' in input
+          ? (input.saveToMetadata !== false ? 1 : 0)
+          : existing.save_to_metadata,
+        'isActive' in input
+          ? (input.isActive && existing.current_published_version_id ? 1 : 0)
+          : existing.is_active,
+        'ogTitle' in input ? (input.ogTitle ?? null) : existing.og_title,
+        'ogDescription' in input ? (input.ogDescription ?? null) : existing.og_description,
+        'ogImageUrl' in input ? (input.ogImageUrl ?? null) : existing.og_image_url,
+        ...appearanceBinds,
+        now,
+        id,
+        expectedContentRevision,
+      )
+      .run();
+  };
+
+  let result;
+  try {
+    result = await attempt(true);
+  } catch (error) {
+    const missingColumn = error instanceof Error && /(?:no such column|has no column named)/i.test(error.message);
+    if (!missingColumn || hasLiffAppearance) throw error;
+    result = await attempt(false);
+  }
 
   if ((result.meta?.changes ?? 0) !== 1) {
     const latest = await getFormById(db, id);

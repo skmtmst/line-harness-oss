@@ -42,6 +42,15 @@ import {
   type LiffDateView,
 } from '@line-crm/db';
 import { parseBookingStaffInput, BOOKING_SETTINGS_KEY, BOOKING_STAFF_OWN_KEY, BOOKING_MENUS_KEY } from '@line-crm/shared';
+import {
+  LIFF_CALENDAR_MODES,
+  LIFF_HEADING_FONTS,
+  LIFF_THEMES,
+  normalizeLiffColor,
+  type LiffCalendarMode,
+  type LiffHeadingFont,
+  type LiffTheme,
+} from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole, requirePermission, hasStaffPermission } from '../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt, rescheduleByTrigger } from '../services/reminder-trigger.js';
@@ -714,20 +723,37 @@ booking.get('/api/liff/booking/availability', async (c) => {
 // 空き枠そのものは /availability を期間指定で呼ぶ（月の分は28日ずつ）。
 // liffId で店舗が決まる既存の LIFF 口と同じ構え：不明な liffId は 404、
 // 他店舗の設定は読めない。migration 前の行は既定値（list・60日）を返す。
+// 見た目（M3・migration 562）も同じ口で返す。描画への適用は M2。
 booking.get('/api/liff/booking/settings', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
   // SELECT * で読む。liff_date_view 列が無い migration 前の DB でも
-  // 既定値を返せるよう、列名の指定はしない。
+  // 既定値を返せるよう、列名の指定はしない。見た目の列も同じ。
   const row = await c.env.DB
     .prepare(`SELECT * FROM booking_settings WHERE line_account_id = ?`)
     .bind(accountId)
     .first<Record<string, unknown>>();
   const windowDays = Number(row?.booking_window_days);
+  const primaryColor = normalizeLiffColor(row?.liff_primary_color);
+  const backgroundColor = normalizeLiffColor(row?.liff_background_color);
   return c.json({
     liff_date_view: normalizeLiffDateView(row?.liff_date_view),
     booking_window_days:
       Number.isInteger(windowDays) && windowDays >= 1 && windowDays <= 365 ? windowDays : 60,
+    liff_theme: typeof row?.liff_theme === 'string' && (LIFF_THEMES as string[]).includes(row.liff_theme)
+      ? row.liff_theme
+      : 'line',
+    liff_primary_color: primaryColor === 'invalid' ? null : (primaryColor ?? null),
+    liff_background_color: backgroundColor === 'invalid' ? null : (backgroundColor ?? null),
+    liff_heading_font: typeof row?.liff_heading_font === 'string' && (LIFF_HEADING_FONTS as string[]).includes(row.liff_heading_font)
+      ? row.liff_heading_font
+      : 'default',
+    liff_calendar_mode: typeof row?.liff_calendar_mode === 'string' && (LIFF_CALENDAR_MODES as string[]).includes(row.liff_calendar_mode)
+      ? row.liff_calendar_mode
+      : 'week_first',
+    liff_vacancy_dots: row?.liff_vacancy_dots === undefined || row?.liff_vacancy_dots === null
+      ? true
+      : row.liff_vacancy_dots !== 0,
   });
 });
 
@@ -1856,6 +1882,12 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       reminderDayBeforeTime: string | null;
       reminderHoursBefore: number | null;
       liffDateView?: LiffDateView;
+      liffTheme?: LiffTheme;
+      liffPrimaryColor?: string | null;
+      liffBackgroundColor?: string | null;
+      liffHeadingFont?: LiffHeadingFont;
+      liffCalendarMode?: LiffCalendarMode;
+      liffVacancyDots?: boolean;
       businessHours?: BookingBusinessHours;
     };
   }
@@ -1889,6 +1921,35 @@ function readBookingAdminSettings(input: Record<string, unknown>):
     : input.liffDateView === 'list' || input.liffDateView === 'calendar'
       ? input.liffDateView
       : 'invalid';
+  // お客さまの予約画面の見た目（M3）。省いたら今の値を保つ。
+  // 色の null・空文字は「型の色」。形が違う値は拒否する（保存は止めない
+  // のは見やすさの注意だけで、形の間違いは断る）。
+  const liffTheme = input.liffTheme === undefined
+    ? undefined
+    : typeof input.liffTheme === 'string' && (LIFF_THEMES as string[]).includes(input.liffTheme)
+      ? input.liffTheme as LiffTheme
+      : 'invalid';
+  const liffPrimaryColor = input.liffPrimaryColor === undefined
+    ? undefined
+    : normalizeLiffColor(input.liffPrimaryColor);
+  const liffBackgroundColor = input.liffBackgroundColor === undefined
+    ? undefined
+    : normalizeLiffColor(input.liffBackgroundColor);
+  const liffHeadingFont = input.liffHeadingFont === undefined
+    ? undefined
+    : typeof input.liffHeadingFont === 'string' && (LIFF_HEADING_FONTS as string[]).includes(input.liffHeadingFont)
+      ? input.liffHeadingFont as LiffHeadingFont
+      : 'invalid';
+  const liffCalendarMode = input.liffCalendarMode === undefined
+    ? undefined
+    : typeof input.liffCalendarMode === 'string' && (LIFF_CALENDAR_MODES as string[]).includes(input.liffCalendarMode)
+      ? input.liffCalendarMode as LiffCalendarMode
+      : 'invalid';
+  const liffVacancyDots = input.liffVacancyDots === undefined
+    ? undefined
+    : typeof input.liffVacancyDots === 'boolean'
+      ? input.liffVacancyDots
+      : 'invalid';
 
   if (expectedVersion === null) return { ok: false, error: 'expectedVersionが正しくありません' };
   if (!isValidTimeZone(timeZone)) return { ok: false, error: 'タイムゾーンが正しくありません' };
@@ -1913,6 +1974,21 @@ function readBookingAdminSettings(input: Record<string, unknown>):
   if (liffDateView === 'invalid') {
     return { ok: false, error: '日時を選ぶ画面の最初の形が正しくありません' };
   }
+  if (liffTheme === 'invalid') {
+    return { ok: false, error: 'お客さまの予約画面の型が正しくありません' };
+  }
+  if (liffPrimaryColor === 'invalid' || liffBackgroundColor === 'invalid') {
+    return { ok: false, error: '店の色は # に続けて6桁の16進数で入れてください（例: #123d2f）。型の色に戻すときは空にしてください' };
+  }
+  if (liffHeadingFont === 'invalid') {
+    return { ok: false, error: '見出しの書体が正しくありません' };
+  }
+  if (liffCalendarMode === 'invalid') {
+    return { ok: false, error: 'カレンダーの出し方が正しくありません' };
+  }
+  if (liffVacancyDots === 'invalid') {
+    return { ok: false, error: '空きの点の指定が正しくありません' };
+  }
   if (businessHours && !businessHours.ok) return businessHours;
   return {
     ok: true,
@@ -1929,6 +2005,12 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       reminderDayBeforeTime: reminderDayBeforeTime === 'invalid' ? null : reminderDayBeforeTime,
       reminderHoursBefore,
       ...(liffDateView !== undefined ? { liffDateView } : {}),
+      ...(liffTheme !== undefined ? { liffTheme } : {}),
+      ...(liffPrimaryColor !== undefined ? { liffPrimaryColor } : {}),
+      ...(liffBackgroundColor !== undefined ? { liffBackgroundColor } : {}),
+      ...(liffHeadingFont !== undefined ? { liffHeadingFont } : {}),
+      ...(liffCalendarMode !== undefined ? { liffCalendarMode } : {}),
+      ...(liffVacancyDots !== undefined ? { liffVacancyDots } : {}),
       ...(businessHours ? { businessHours: businessHours.value } : {}),
     },
   };

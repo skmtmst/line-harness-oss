@@ -995,6 +995,13 @@ describe('LIFF 日時表示の最初の形 (liff_date_view)', () => {
     await expect(own.json()).resolves.toEqual({
       liff_date_view: 'calendar',
       booking_window_days: 45,
+      // 見た目（M3）：選んでいない店は型 LINE らしい・型の色・週を先に・空きの点オン。
+      liff_theme: 'line',
+      liff_primary_color: null,
+      liff_background_color: null,
+      liff_heading_font: 'default',
+      liff_calendar_mode: 'week_first',
+      liff_vacancy_dots: true,
     });
     // 別店舗の liffId では別店舗の値にならない（設定行が無い新店舗は既定値）。
     const other = await app.request('/api/liff/booking/settings?liffId=liff-empty', {}, env);
@@ -1002,6 +1009,12 @@ describe('LIFF 日時表示の最初の形 (liff_date_view)', () => {
     await expect(other.json()).resolves.toEqual({
       liff_date_view: 'list',
       booking_window_days: 60,
+      liff_theme: 'line',
+      liff_primary_color: null,
+      liff_background_color: null,
+      liff_heading_font: 'default',
+      liff_calendar_mode: 'week_first',
+      liff_vacancy_dots: true,
     });
   });
 
@@ -1056,5 +1069,149 @@ describe('LIFF 日時表示の最初の形 (liff_date_view)', () => {
       env,
     );
     expect(fit.status).toBe(200);
+  });
+});
+
+describe('お客さまの予約画面の見た目 (M3・migration 562)', () => {
+  let sqlite: Database.Database;
+  let db: D1Database;
+
+  const baseBody = {
+    expectedVersion: 0,
+    timeZone: 'Asia/Tokyo',
+    bookingWindowDays: 60,
+    cutoffMinutesBefore: 1440,
+    cancelDeadlineMinutesBefore: 1440,
+    maxActiveBookingsPerFriend: 1,
+    approvalMode: 'automatic',
+    holdMinutes: 15,
+    slotGranularityMinutes: 15,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+    sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = ON');
+    sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
+    sqlite.exec(`
+      INSERT INTO line_accounts
+        (id, channel_id, name, channel_access_token, channel_secret, liff_id)
+      VALUES
+        ('account-a', 'channel-a', '本店', 'token-a', 'secret-a', 'liff-a'),
+        ('account-empty', 'channel-empty', '新店舗', 'token-empty', 'secret-empty', 'liff-empty');
+      INSERT INTO booking_settings
+        (id, line_account_id, booking_window_days, cutoff_minutes_before,
+         cancel_deadline_minutes_before, approval_mode)
+      VALUES ('settings-a', 'account-a', 60, 1440, 720, 'manual');
+    `);
+    db = asD1(sqlite);
+  });
+
+  afterEach(() => sqlite.close());
+
+  test('選んでいない店は型 LINE らしい・型の色・週を先に・空きの点オン', async () => {
+    const { app, env } = makeApp(db);
+    const res = await app.request('/api/booking/admin/settings?account_id=account-a', {}, env);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: {
+        liffTheme: 'line',
+        liffPrimaryColor: null,
+        liffBackgroundColor: null,
+        liffHeadingFont: 'default',
+        liffCalendarMode: 'week_first',
+        liffVacancyDots: true,
+      },
+    });
+  });
+
+  test('④夜・店の色・月の出し方・空きの点を保存し、そのまま読み出せる', async () => {
+    const { app, env } = makeApp(db);
+    const created = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...baseBody,
+        liffTheme: 'night',
+        liffPrimaryColor: '#c9a96a',
+        liffBackgroundColor: '#0f1c33',
+        liffHeadingFont: 'serif',
+        liffCalendarMode: 'month_first',
+        liffVacancyDots: false,
+      }),
+    }, env);
+    expect(created.status).toBe(201);
+    await expect(created.json()).resolves.toMatchObject({
+      success: true,
+      data: {
+        liffTheme: 'night',
+        liffPrimaryColor: '#c9a96a',
+        liffBackgroundColor: '#0f1c33',
+        liffHeadingFont: 'serif',
+        liffCalendarMode: 'month_first',
+        liffVacancyDots: false,
+      },
+    });
+    // LIFF の読み口にも同じ値が出る（描画への適用は M2）。
+    const liff = await app.request('/api/liff/booking/settings?liffId=liff-empty', {}, env);
+    expect(liff.status).toBe(200);
+    await expect(liff.json()).resolves.toMatchObject({
+      liff_theme: 'night',
+      liff_primary_color: '#c9a96a',
+      liff_background_color: '#0f1c33',
+      liff_heading_font: 'serif',
+      liff_calendar_mode: 'month_first',
+      liff_vacancy_dots: false,
+    });
+  });
+
+  test('型を替えても店の色は残る・型の色に戻すと null になる', async () => {
+    const { app, env } = makeApp(db);
+    const created = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...baseBody, liffTheme: 'night', liffPrimaryColor: '#c9a96a' }),
+    }, env);
+    expect(created.status).toBe(201);
+    // 型だけ替え、色は送らない → 色は残る。
+    const updated = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...baseBody, expectedVersion: 1, liffTheme: 'gentle' }),
+    }, env);
+    expect(updated.status).toBe(200);
+    await expect(updated.json()).resolves.toMatchObject({
+      success: true,
+      data: { liffTheme: 'gentle', liffPrimaryColor: '#c9a96a' },
+    });
+    // 色に null を送る → 型の色に戻る。
+    const reset = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...baseBody, expectedVersion: 2, liffPrimaryColor: null }),
+    }, env);
+    expect(reset.status).toBe(200);
+    await expect(reset.json()).resolves.toMatchObject({
+      success: true,
+      data: { liffTheme: 'gentle', liffPrimaryColor: null },
+    });
+  });
+
+  test('形が違う型・色・出し方は 400 で保存しない', async () => {
+    const { app, env } = makeApp(db);
+    for (const patch of [
+      { liffTheme: 'midnight' },
+      { liffPrimaryColor: 'red' },
+      { liffBackgroundColor: '#12345' },
+      { liffHeadingFont: 'comic' },
+      { liffCalendarMode: 'year' },
+      { liffVacancyDots: 'yes' },
+    ]) {
+      const res = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...baseBody, ...patch }),
+      }, env);
+      expect(res.status).toBe(400);
+    }
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM booking_settings
+      WHERE line_account_id = 'account-empty'`).get()).toEqual({ count: 0 });
   });
 });

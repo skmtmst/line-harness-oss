@@ -1,4 +1,9 @@
 {
+  "app/booking/menus/settings-v8.tsx": {
+    "color": 4,
+    "radius": 0,
+    "shadow": 0
+  },
   "app/contents/contents-permission-behavior.spec.mjs": {
     "color": 1,
     "radius": 0,
@@ -11,6 +16,11 @@
   },
   "app/form-submissions/edit/form-design-settings.tsx": {
     "color": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/form-submissions/edit/form-liff-appearance.tsx": {
+    "color": 4,
     "radius": 0,
     "shadow": 0
   },

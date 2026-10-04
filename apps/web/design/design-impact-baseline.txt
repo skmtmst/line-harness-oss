@@ -95,6 +95,7 @@ shared-button-importer app/events/events-list-v8.tsx
 shared-button-importer app/events/page.tsx
 shared-button-importer app/events/preview/page.tsx
 shared-button-importer app/form-submissions/edit/form-design-settings.tsx
+shared-button-importer app/form-submissions/edit/form-liff-appearance.tsx
 shared-button-importer app/form-submissions/edit/page.tsx
 shared-button-importer app/form-submissions/list-v8.tsx
 shared-button-importer app/form-submissions/page.tsx
