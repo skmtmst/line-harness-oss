@@ -6,40 +6,44 @@
 - 本体・文字・点・アイコン・棒の済み部分について、幅・高さ・上下左右padding・gap・border幅・outline色/幅/offset・角丸・地色・文字サイズ/太さ/行間/字間/色・影を比較。直接の文字は親の文字指定を測定。本体の幅は文字・点・gap・paddingを含む。
 - 描かれないborder/outlineの色は比較対象外。枠があるタグ・経路・タイル・？は正本のoutlineの色と太さで比較。
 - SVG正本は線を輪郭のpathに変換している。実装はLucideの線で、外側の寸法と描画の前景色を比較。オンの星は塗り・縁の色・1px線が一致。SVG内のpath個数やfill/strokeの表現方法を同一としていない。
-- 数値：21/21合格。画像の最終合否は司令塔Claudeの確認待ち。
+- 再照合：2026-10-05 02:02 日本時間。21/21部品のレーン内照合に合格。本体・文字・点・アイコン・済み部分の内部位置は最大0px、padding/gapも最大0px。4px超は0件。保存した21組の画像と重ね合わせをCodexが目視確認した。司令塔Claudeの採用判断は別途行う。
 
-| ID | 部品 | 最大寸法差 | 色の不一致 | 数値判定 |
-|---|---|---|---|---|
-| mpVfY | 状態・対応済み | 0px | 0 | 数値合格 |
-| ekmYd | 状態・予約中 | 0px | 0 | 数値合格 |
-| ii85L | 状態・対応中 | 0px | 0 | 数値合格 |
-| XwfSH | 状態・未対応 | 0px | 0 | 数値合格 |
-| hQeAo | 状態・下書き | 0px | 0 | 数値合格 |
-| C6DGX | 増減・良い | 0px | 0 | 数値合格 |
-| OEQxt | 増減・悪い | 0px | 0 | 数値合格 |
-| r9qfM2 | 増減・要確認 | 0px | 0 | 数値合格 |
-| h7Ch3y | タグ | 0px | 0 | 数値合格 |
-| HNps2 | 経路 | 0px | 0 | 数値合格 |
-| zcGgI | 注目の星・オフ | 0px | 0 | 数値合格 |
-| w0R1PQ | 注目の星・オン | 0px | 0 | 数値合格 |
-| MFTlt | 顔・小 | 0px | 0 | 数値合格 |
-| pDKi6 | 顔・中 | 0px | 0 | 数値合格 |
-| zjEbn | 顔・大 | 0px | 0 | 数値合格 |
-| C9CaMS | 印のタイル・小 | 0px | 0 | 数値合格 |
-| E7USZ9 | 印のタイル・中 | 0px | 0 | 数値合格 |
-| A2mryd | 印のタイル・大 | 0px | 0 | 数値合格 |
-| KjC1z | ？ | 0px | 0 | 数値合格 |
-| x4FeKG | 動きの印 | 0px | 0 | 数値合格 |
-| tydx2 | 進みの棒 | 0px | 0 | 数値合格 |
+| ID | 部品 | 寸法差 | 内部位置差 | 余白差 | 色の不一致 | 4px超 | レーン判定 |
+|---|---|---|---|---|---|---|---|
+| mpVfY | 状態の札/送信済み・対応済み | 0px | 0px | 0px | 0 | 0 | 合格 |
+| ekmYd | 状態の札/予約中・案内 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| ii85L | 状態の札/対応中・注意 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| XwfSH | 状態の札/未対応・失敗 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| hQeAo | 状態の札/下書き・停止 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| C6DGX | 増減の札/良い | 0px | 0px | 0px | 0 | 0 | 合格 |
+| OEQxt | 増減の札/悪い | 0px | 0px | 0px | 0 | 0 | 合格 |
+| r9qfM2 | 増減の札/要確認 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| h7Ch3y | タグ | 0px | 0px | 0px | 0 | 0 | 合格 |
+| HNps2 | 経路の札 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| zcGgI | 注目の星/オフ | 0px | 0px | 0px | 0 | 0 | 合格 |
+| w0R1PQ | 注目の星/オン | 0px | 0px | 0px | 0 | 0 | 合格 |
+| MFTlt | 顔/小 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| pDKi6 | 顔/中 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| zjEbn | 顔/大 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| C9CaMS | 印のタイル/小 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| E7USZ9 | 印のタイル/中 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| A2mryd | 印のタイル/大 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| KjC1z | ？ | 0px | 0px | 0px | 0 | 0 | 合格 |
+| x4FeKG | 動きの印 | 0px | 0px | 0px | 0 | 0 | 合格 |
+| tydx2 | 進みの棒 | 0px | 0px | 0px | 0 | 0 | 合格 |
 
 比較した属性は合計 811 個。寸法差は最大0px、比較色はすべて完全一致。
 
 ## 画像と実測値
 
-- `<ID>.png`：左＝絵・右＝実装、21枚。`badges-overview.png`：代表9例。
-- 左の色が全面に広がる部品は、正本HTMLのbodyにも部品と同じ地色が指定されているため。比較対象はiframe内のdata-pencil-id要素。右は白い地に実装を置いている。
+- `<ID>.png`：部品単位に切り出した左＝絵・右＝実装、21枚。`<ID>-overlay.png`：部品の左上をそろえた50%重ね合わせ。`badges-overlay-overview.png`：全21部品の絵・実装・重ね合わせ。`badges-overview.png`：前回の代表9例。
+- 正本のbodyに塗られた地色は部品の外側にも続くため、比較用画像の外側だけ本体の角丸に沿って白へ戻した。正本HTMLと撮影元画像は変更していない。
+- 撮影元はブラウザーが返したJPEG（`<ID>-reference-raw.jpg`、`badges-position-page.jpg`）。全体画像の右列がDOM測定時より7.5px右に写るため、切り出し時に列全体へ共通7.5pxを加えた。部品別の位置補正はしていない。
+- JPEGの圧縮と文字のぼかしがあるため、画像の完全な画素一致とは判定していない。数の差はCSS・DOM位置で比較し、SVGの輪郭は重ね合わせを目で確認した。
 - `badges-measurements.json`：getComputedStyleの実測値。`badges-icon-paints.json`：SVGの塗りと線の色。
-- `badges-reference-sha256.json`：正本HTMLの指紋。
+- `badges-reference-sha256.json`：正本HTMLの指紋。再照合でも21本すべて変更なし。
+- `badges-reference-position.json` / `badges-implementation-position.json`：本体基準の各要素の位置、文字のRange矩形、CSS値。
+- `badges-overlay-results.json`：196項目の位置比較と余白比較の結果。全件0px。比較用画像の補正は数値比較に使っていない。
 - `handmade-badges.md`：画面に残る手書き部品の候補62件。画面は変更していない。
 
 ## V7と機能の確認
@@ -47,12 +51,12 @@
 - 同じ本番CSS・書体・HTMLで、開始時HEADの部品CSSを重ねたV7（変更前）と現在のV7（変更後）を比較。19例の画像差は0画素、17例の本体の寸法とcomputedStyleも完全一致。全機能画面の撮影をしたという意味ではない。
 - `badges-v7-before.png` / `badges-v7-after.png` / `badges-v7-measurements.json`に保存。
 - vitest：関連9ファイル・76件合格。顔の画像失敗時の代替、補足の開閉/Escape/フォーカス、状態表示、処理の停止/失敗/読み上げ、新しい星の状態とdisabledを含む。
-- apps/web tsc、確認用本番ビルド、git diff --check：合格（ビルドは既存のlint警告あり）。
+- 今回の関連9ファイル76試験、apps/web tsc、git diff --check：合格。本番ビルドは前回の成功した出力を再利用（部品とページの描画コードに追加変更なし）。
 - design:debt:check：増加なし。design-debt-baseline.jsonは変更していない。
 
 ## 手渡し
 
-機能画面・docs/brain・docs/v6-*は変更していない。push・マージ・rebase・stash・force push・Slack投稿・DB更新・配備は行っていない。司令塔は21枚を見て画像の合否を決め、画面レーンへ手書き一覧を渡す。
+機能画面・docs/brain・docs/v6-*は変更していない。push・マージ・rebase・stash・force push・Slack投稿・DB更新・配備は行っていない。レーン内の寸法・内部位置・余白・色と画像の確認は21件合格。司令塔は保存画像を採用判断に使い、画面レーンへ手書き一覧を渡す。
 
 ## 属性ごとの比較
 

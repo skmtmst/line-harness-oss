@@ -1,0 +1,195 @@
+{
+  "criterion": "DOM element/text positions (not JPEG pixel distance)",
+  "screenshotColumnOffset": 7.5,
+  "parts": [
+    {
+      "id": "mpVfY",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 12,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "ekmYd",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 12,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "ii85L",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 12,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "XwfSH",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 12,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "hQeAo",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 12,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "C6DGX",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 12,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "OEQxt",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 12,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "r9qfM2",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "h7Ch3y",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "HNps2",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "zcGgI",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "w0R1PQ",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "MFTlt",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "pDKi6",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "zjEbn",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "C9CaMS",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "E7USZ9",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "A2mryd",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "KjC1z",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "x4FeKG",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    },
+    {
+      "id": "tydx2",
+      "maxPositionDelta": 0,
+      "positionsBeyond4px": 0,
+      "positionChecks": 8,
+      "maxSpacingDelta": 0.0,
+      "styleMismatches": [],
+      "status": "PASS"
+    }
+  ]
+}
