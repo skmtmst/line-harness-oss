@@ -33,6 +33,9 @@ import {
   knownUsageCount,
 } from '@/components/friend-fields/field-list'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
+import { notifyToast } from '@/components/shared/toast'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -162,8 +165,14 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
       await load()
     } catch (reason) {
       setItems(previous)
-      setActionError(reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした')
+      const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
+      setActionError(message)
       setRetryOrder(next)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void applyOrder(next) },
+      })
     }
   }
 
@@ -401,18 +410,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
             </p>
           ) : null}
 
-          {status === 'loading' ? (
-            <div className={styles.skeletonRows} role="status">
-              <span className="sr-only">読み込んでいます</span>
-              {[0, 1, 2, 3].map((row) => (
-                <div key={row} className={styles.skeletonRow}>
-                  <span className={styles.skeletonDot} />
-                  <span className={styles.skeletonBar} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-                </div>
-              ))}
-            </div>
-          ) : status === 'forbidden' ? (
+          {status === 'forbidden' ? (
             <div className={styles.stateCard}>
               <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
                 <AlertCircle size={20} aria-hidden="true" />
@@ -446,7 +444,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
               ) : null}
             </div>
           ) : (
-            <>
+            <DelayedSkeleton loading={status === 'loading'} skeleton={<TagRowsSkeleton rows={4} narrow={[120]} />}>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
@@ -559,7 +557,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                 <h2 className={styles.safetyNoteTitle}>既定値・種類・削除の安全確認</h2>
                 <p className={styles.safetyNoteBody}>既定値は空欄送信事故を防ぎます。種類は新規登録後に変更不可とし、値が入っている項目は削除せず新しい項目へ移行します。</p>
               </section>
-            </>
+            </DelayedSkeleton>
           )}
         </div>
       </div>

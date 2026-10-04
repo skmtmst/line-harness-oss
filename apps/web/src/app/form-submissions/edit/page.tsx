@@ -15,6 +15,7 @@
 
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
+import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -105,6 +106,8 @@ function FormEditInner() {
   const answerUrl = liffId ? `https://liff.line.me/${liffId}/forms/${id}` : null
 
   const [name, setName] = useState('')
+  /* 保存前に欄を離れたとき出す直し方（文は保存時と同じ）。 */
+  const [nameError, setNameError] = useState<string | null>(null)
   usePageTitle(name || '回答フォーム編集')
   const [description, setDescription] = useState('')
   const [isActive, setIsActive] = useState(true)
@@ -549,8 +552,10 @@ function FormEditInner() {
     }
     if (!name.trim()) {
       setError('フォーム名を入力してください')
+      setNameError('フォーム名を入力してください')
       return false
     }
+    setNameError(null)
     const unnamed = layout.header
       .concat(layout.sections.flatMap((s) => s.blocks))
       .find((b) => b.kind === 'input' && !b.label.trim())
@@ -705,8 +710,10 @@ function FormEditInner() {
         setPublishedVersionId(published.data.id)
         setIsActive(true)
         setNotice(published.data.replayed ? 'この版は公開済みです' : 'この版を公開しました')
+        notifyToast(published.data.replayed ? 'この版は公開済みです' : 'この版を公開しました')
       } else {
         setNotice(publishedVersionId ? '下書きを保存しました。公開中の内容は変わっていません' : '下書きを保存しました')
+        notifyToast('下書きを保存しました')
       }
       if (publishAfter) {
         savedSnapshot.current = JSON.stringify({
@@ -1267,13 +1274,18 @@ function FormEditInner() {
             data-design="Meta"
             className="bg-canvas rounded-card border-hairline grid gap-4 border p-4 sm:grid-cols-2 xl:grid-cols-5"
           >
-            <Field label="フォーム名" htmlFor="fm-name" required>
+            <Field label="フォーム名" htmlFor="fm-name" required error={nameError}>
               <input
                 id="fm-name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  if (nameError !== null) setNameError(e.target.value.trim() ? null : 'フォーム名を入力してください')
+                }}
+                onBlur={() => setNameError(name.trim() ? null : 'フォーム名を入力してください')}
                 className={inputClass}
+                aria-invalid={nameError !== null}
               />
             </Field>
 

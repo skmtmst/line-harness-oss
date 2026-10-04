@@ -31,6 +31,8 @@ import { createResponseGate } from '@/lib/latest-request'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import StickyBar from '@/components/shared/sticky-bar'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { TagFormSkeleton } from './tag-rows-skeleton'
 import TargetMissing from '@/components/shared/target-missing'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
@@ -797,7 +799,9 @@ function SearchEditorV8Inner() {
     }
   }
 
-  if (loading) return <p className="text-sm text-ink-faint">読み込んでいます</p>
+  if (loading) {
+    return <DelayedSkeleton loading skeleton={<TagFormSkeleton />} />
+  }
   if (!id) {
     return (
       <TargetMissing
