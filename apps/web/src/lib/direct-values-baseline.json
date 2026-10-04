@@ -1,4 +1,9 @@
 {
+  "app/auto-replies/quick-create-v8.module.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
   "app/contents/contents-permission-behavior.spec.mjs": {
     "color": 1,
     "radius": 0,

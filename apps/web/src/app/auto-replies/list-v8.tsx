@@ -72,6 +72,7 @@ import {
   visibleAutoReplyLoadState,
   type LoadState,
 } from './auto-reply-words'
+import QuickCreateV8 from './quick-create-v8'
 import styles from './list-v8.module.css'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
@@ -222,6 +223,8 @@ export default function AutoRepliesListV8() {
   /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
   const [panelId, setPanelId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
+  /* ★V8 かんたんに作る（板 `G4GejG`）。詳しい分け方（Xr6eu）は P6vbxn 待ち。 */
+  const [quickOpen, setQuickOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [pendingToggle, setPendingToggle] = useState<PendingToggle | null>(null)
@@ -1065,9 +1068,14 @@ export default function AutoRepliesListV8() {
           よく届く質問や営業時間外の連絡に、自動で返せます。ひな形からも作れます。
         </p>
         {canEdit ? (
-          <Button type="button" variant="secondary" onClick={() => router.push('/auto-replies/edit')}>
-            ＋ ルールを作る
-          </Button>
+          <>
+            <Button type="button" variant="primary" onClick={() => router.push('/auto-replies/edit')}>
+              ＋ ルールを作る
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setQuickOpen(true)}>
+              かんたんに作る
+            </Button>
+          </>
         ) : (
           <Button type="button" variant="secondary" disabled title={NO_MANAGE_NOTE}>
             ＋ ルールを作る
@@ -1672,6 +1680,16 @@ export default function AutoRepliesListV8() {
           >
             ＋ ルールを作る
           </Button>
+          {canEdit ? (
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              onClick={() => setQuickOpen(true)}
+            >
+              かんたんに作る
+            </Button>
+          ) : null}
           {folderPanel}
         </div>
 
@@ -1786,6 +1804,13 @@ export default function AutoRepliesListV8() {
           {listBody}
         </div>
       </div>
+      {quickOpen ? (
+        <QuickCreateV8
+          accountId={selectedAccountId}
+          onClose={() => setQuickOpen(false)}
+          onCreated={() => void load()}
+        />
+      ) : null}
     </div>
   )
 }
