@@ -20,6 +20,7 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -411,13 +412,10 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
           ) : null}
 
           {status === 'forbidden' ? (
-            <div className={styles.stateCard}>
-              <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
-                <AlertCircle size={20} aria-hidden="true" />
-              </span>
-              <p className={styles.stateTitle}>友だち情報欄を見る権限がありません</p>
-              <p className={styles.stateDesc}>オーナーか管理者に確認してください。</p>
-            </div>
+            <NoPermissionV8
+              featureName="友だち情報欄"
+              capabilitiesHref="/staff"
+            />
           ) : status === 'error' ? (
             <div className={styles.stateCard}>
               <span className={`${styles.stateIcon} ${styles.stateIconError}`}>

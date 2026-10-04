@@ -1,6 +1,7 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -160,10 +161,11 @@ export function FileScanV8() {
             onRetry={() => void load()}
           />
         ) : phase === 'forbidden' ? (
-          <ListState
-            kind="forbidden"
-            title="ファイルの検査は管理者だけが開けます"
-            description="しまったファイルの確認は、owner・admin の操作です。変えたいときは管理者に頼んでください。"
+          <NoPermissionV8
+            featureName="ファイルの検査"
+            capabilitiesHref="/staff"
+            backLabel="機能設定へ戻る"
+            backHref="/settings"
           />
         ) : (
           <ListState

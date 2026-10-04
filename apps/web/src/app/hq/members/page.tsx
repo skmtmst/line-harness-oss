@@ -11,6 +11,7 @@ import type { LineAccount, StaffMember } from '@line-crm/shared'
 import MemberDialog, { type MemberDialogValue } from '@/components/hq/members/member-dialog'
 import StepUpPrompt from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -223,7 +224,14 @@ function MembersInner() {
             {status === 'loading' ? (
               <ListState kind="loading" title="権限者を読み込んでいます" />
             ) : status === 'forbidden' ? (
-              <ListState kind="forbidden" />
+              theme === 'v8' ? (
+                <NoPermissionV8
+                  featureName="権限者"
+                  capabilitiesHref="/staff"
+                />
+              ) : (
+                <ListState kind="forbidden" />
+              )
             ) : status === 'error' ? (
               <ListState kind="error" title="権限者を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
             ) : restricted ? (

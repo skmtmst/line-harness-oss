@@ -14,6 +14,7 @@ import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dial
 import UploadButton from '@/components/hq/banners/upload-button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -416,6 +417,17 @@ function ProjectInner() {
     )
   }
   if (status === 'forbidden') {
+    if (theme === 'v8') {
+      return (
+        <NoPermissionV8
+          featureName="バナー生成"
+          requiredRoleLabel="統括"
+          capabilitiesHref="/staff"
+          backLabel="プロジェクト一覧へ戻る"
+          backHref="/hq/banners"
+        />
+      )
+    }
     return (
       <ListState
         kind="forbidden"

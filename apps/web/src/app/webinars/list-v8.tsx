@@ -36,6 +36,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CalendarClock, MousePointerClick, Users, Video } from 'lucide-react'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { RowActions } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
@@ -790,6 +791,14 @@ function WebinarListV8Inner() {
       )
     }
     if (loadFailure) {
+      if (loadFailure.kind === 'forbidden') {
+        return (
+          <NoPermissionV8
+            featureName="ウェビナー"
+            capabilitiesHref="/staff"
+          />
+        )
+      }
       return (
         <ListState
           kind={loadFailure.kind}

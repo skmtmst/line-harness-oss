@@ -11,6 +11,7 @@
  */
 import { Info } from 'lucide-react'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import Checkbox from '@/components/shared/checkbox'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import HelpTip from '@/components/shared/help-tip'
@@ -34,7 +35,14 @@ export default function FriendMigrationsV8() {
   const m = useFriendMigrations()
 
   if (m.status === 'loading') return <ListState kind="loading" title="書き出し・取り込みを読み込んでいます" />
-  if (m.status === 'forbidden') return <ListState kind="forbidden" title="書き出し・取り込みを見る権限がありません" description="見るには権限が要ります。オーナーか管理者の方に確認してください。" />
+  if (m.status === 'forbidden') {
+    return (
+      <NoPermissionV8
+        featureName="書き出し・取り込み"
+        capabilitiesHref="/staff"
+      />
+    )
+  }
   if (m.status === 'error') return <ListState kind="error" title="書き出し・取り込みを表示できませんでした" description="履歴は消えていません。" action={<Button onClick={() => void m.load()}>もう一度試す</Button>} />
 
   const reflectable = m.summary ? m.summary.add + m.summary.update : 0

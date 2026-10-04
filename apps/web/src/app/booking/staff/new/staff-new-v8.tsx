@@ -20,6 +20,7 @@ import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '
 import { api, bookingApi, type BookingMenu, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -274,10 +275,9 @@ export default function StaffNewV8() {
     return (
       <div className={shell.shell} data-design-node="CcA4k">
         <div className="mx-auto max-w-2xl p-6">
-          <ListState
-            kind="error"
-            title="予約設定の変更権限がありません"
-            description="予約スタッフの登録は、予約設定の権限を持つログインユーザーだけが実行できます。管理者へ権限の確認を依頼してください。"
+          <NoPermissionV8
+            featureName="予約スタッフ"
+            capabilitiesHref="/staff"
           />
         </div>
       </div>

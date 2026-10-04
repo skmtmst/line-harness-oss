@@ -7,6 +7,7 @@ import { Check, CreditCard, Info } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
@@ -141,6 +142,14 @@ function BillingInner() {
 
   if (status === 'loading') return <ListState kind="loading" title="契約状況を読み込んでいます" />
   // 担当者は見られない（権限表: 課金プランは担当者 不可。閲覧のみは閲覧できる）。
+  if (status === 'forbidden' && theme === 'v8') {
+    return (
+      <NoPermissionV8
+        featureName="契約状況"
+        capabilitiesHref="/staff"
+      />
+    )
+  }
   if (status === 'forbidden' || role === 'staff') return <ListState kind="forbidden" />
   if (status === 'error' || !summary) {
     return <ListState kind="error" title="契約状況を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />

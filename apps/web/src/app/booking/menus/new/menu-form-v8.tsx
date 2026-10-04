@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -674,10 +675,9 @@ export default function MenuFormV8() {
     return (
       <div className={shell.shell} data-design-node="QqER7">
         <div className="mx-auto max-w-2xl p-6">
-          <ListState
-            kind="error"
-            title="予約メニューの変更権限がありません"
-            description="メニューの作成・変更は、予約メニューの権限を持つログインユーザーだけが実行できます。管理者へ権限の確認を依頼してください。"
+          <NoPermissionV8
+            featureName="予約メニュー"
+            capabilitiesHref="/staff"
           />
         </div>
       </div>

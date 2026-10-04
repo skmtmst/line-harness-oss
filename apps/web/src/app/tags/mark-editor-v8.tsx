@@ -17,6 +17,7 @@ import { api, describeSaveFailure, type SaveSupportMarkAutomationRule, type Supp
 import { useCanManageSupportMark } from '@/components/friend-fields/support-mark-permissions'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import Checkbox from '@/components/shared/checkbox'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Select from '@/components/shared/select'
@@ -377,11 +378,9 @@ export default function MarkEditorV8({ markId }: { markId?: string }) {
       </div>
 
       {hideForm ? (
-        <ListState
-          kind="forbidden"
-          description={editing
-            ? '対応マークを編集する権限がありません。オーナーか管理者に確認してください。'
-            : '対応マークを作る権限がありません。オーナーか管理者に確認してください。'}
+        <NoPermissionV8
+          featureName="対応マーク"
+          capabilitiesHref="/staff"
         />
       ) : null}
       {!hideForm && loadState === 'error' ? (

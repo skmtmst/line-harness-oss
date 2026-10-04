@@ -32,6 +32,7 @@ import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -1076,20 +1077,21 @@ export default function FormSubmissionsListV8() {
   } else if (loading) {
     listBody = <FormListSkeleton label="回答フォームの一覧を読み込んでいます" />
   } else if (loadError) {
-    listBody = (
+    listBody = isForbiddenOrRateLimited(loadFailure) ? (
+      <NoPermissionV8
+        featureName="回答フォーム"
+        capabilitiesHref="/staff"
+      />
+    ) : (
       <div className={styles.stateCard}>
         <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={20} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>
-          {isForbiddenOrRateLimited(loadFailure) ? 'この一覧を見る権限がありません' : '回答フォームを読み込めませんでした'}
+          回答フォームを読み込めませんでした
         </p>
         <p className={styles.stateDesc}>
-          {isForbiddenOrRateLimited(loadFailure)
-            ? 'アカウントの担当・役割の設定を確認してください。'
-            : '再読み込みしても直らないときは、エラー報告へお知らせください。'}
+          再読み込みしても直らないときは、エラー報告へお知らせください。
         </p>
-        {!isForbiddenOrRateLimited(loadFailure) ? (
-          <Button type="button" variant="secondary" onClick={() => void loadForms()}>もう一度読み込む</Button>
-        ) : null}
+        <Button type="button" variant="secondary" onClick={() => void loadForms()}>もう一度読み込む</Button>
       </div>
     )
   } else if (reviewMode && reviewForbidden) {

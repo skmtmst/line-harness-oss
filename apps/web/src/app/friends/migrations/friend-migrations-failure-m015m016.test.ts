@@ -35,7 +35,9 @@ describe('M015/M016 UID・顧客データ移行の失敗表示', () => {
 
   it('読み込み 403 は権限の面に分ける（M016）', () => {
     expect(PAGE).toContain("'loading' | 'ready' | 'error' | 'forbidden'")
-    expect(PAGE).toContain('書き出し・取り込みを見る権限がありません')
+    // 権限の面は共通の板（O5tUeE）で出す。文言ではなく受け口で固定する。
+    expect(PAGE).toContain('<NoPermissionV8')
+    expect(PAGE).toContain('featureName="書き出し・取り込み"')
   })
 
   it('owner/admin 専用の操作はボタンの近くに理由を出す（M016）', () => {

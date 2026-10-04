@@ -1,6 +1,7 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import {
@@ -65,10 +66,12 @@ export function ManualLinksV8() {
         title="マニュアルの正本表"
         back={{ href: '/settings', label: '機能設定へ' }}
       >
-        <ListState
-          kind="forbidden"
-          title="この表は運営だけが見られます"
-          description="画面のトップバーにある「マニュアル」の行き先を決める表です。変えたいときは運営に頼んでください。"
+        <NoPermissionV8
+          featureName="マニュアルの正本表"
+          requiredRoleLabel="運営"
+          capabilitiesHref="/staff"
+          backLabel="機能設定へ"
+          backHref="/settings"
         />
       </SettingsShellV8>
     )

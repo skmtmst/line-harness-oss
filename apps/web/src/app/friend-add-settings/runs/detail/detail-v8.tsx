@@ -14,6 +14,7 @@ import { AlertCircle, Check, MessageCircle, Settings2, XCircle } from 'lucide-re
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { api, type FriendAddRunDetail } from '@/lib/api'
@@ -189,11 +190,11 @@ function FriendAddRunDetailV8Inner() {
   if (error || !detail) {
     if (errorStatus === 403) {
       return (
-        <ListState
-          kind="forbidden"
-          title="実行詳細を表示する権限がありません"
-          description={error}
-          onRetry={() => void load()}
+        <NoPermissionV8
+          featureName="実行詳細"
+          capabilitiesHref="/staff"
+          backLabel="実行履歴の一覧へ戻る"
+          backHref={listHref}
         />
       )
     }

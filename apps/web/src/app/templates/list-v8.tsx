@@ -48,6 +48,7 @@ import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
@@ -992,22 +993,23 @@ export default function TemplatesListV8() {
           : 'LINE公式アカウントが登録されていません'}
       </p>
     </div>
-  ) : view === 'forbidden' || view === 'error' ? (
+  ) : view === 'forbidden' ? (
+    <NoPermissionV8
+      featureName="テンプレート"
+      capabilitiesHref="/staff"
+    />
+  ) : view === 'error' ? (
     <div className={styles.stateCard}>
       <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
         <TriangleAlert size={18} aria-hidden="true" />
       </span>
       <p className={styles.stateTitle}>
-        {view === 'forbidden' ? (failure?.title ?? '見る権限がありません') : 'テンプレートを読み込めませんでした'}
+        テンプレートを読み込めませんでした
       </p>
       <p className={styles.stateDesc}>
-        {view === 'forbidden'
-          ? (failure?.description ?? '')
-          : '登録したテンプレートは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'}
+        登録したテンプレートは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。
       </p>
-      {view === 'error' && (
-        <Button type="button" onClick={() => void load()}>もう一度試す</Button>
-      )}
+      <Button type="button" onClick={() => void load()}>もう一度試す</Button>
     </div>
   ) : filteredTemplates.length === 0 ? (
     filterActive ? (

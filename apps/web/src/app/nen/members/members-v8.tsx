@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, RefreshCw, Users, PawPrint, ShoppingBag, Link2 } from 'lucide-react'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Chip from '@/components/shared/chip'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -409,7 +410,10 @@ function MembersTabV8({
         {status === 'loading' && !data ? (
           <ListState kind="loading" title="会員を読み込んでいます" />
         ) : status === 'forbidden' ? (
-          <ListState kind="forbidden" />
+          <NoPermissionV8
+            featureName="会員"
+            capabilitiesHref="/staff"
+          />
         ) : status === 'error' ? (
           <ListState kind="error" title="会員を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
         ) : data && data.items.length === 0 ? (
@@ -725,7 +729,14 @@ function RankSettingsTabV8({
 
   const noticeEl = notice ? <p className={styles.notice} role="status">{notice}</p> : null
   if (status === 'loading' && !settings) return <>{noticeEl}<ListState kind="loading" title="ランク設定を読み込んでいます" /></>
-  if (status === 'forbidden') return <ListState kind="forbidden" />
+  if (status === 'forbidden') {
+    return (
+      <NoPermissionV8
+        featureName="ランク設定"
+        capabilitiesHref="/staff"
+      />
+    )
+  }
   if (status === 'error') return <ListState kind="error" title="ランク設定を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
   if (!settings) return <>{noticeEl}<ListState kind="loading" title="ランク設定を読み込んでいます" /></>
 
@@ -1011,7 +1022,14 @@ function LifetimeTabV8({
 
   const noticeEl = notice ? <p className={styles.notice} role="status">{notice}</p> : null
   if (status === 'loading' && !settings) return <>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></>
-  if (status === 'forbidden') return <ListState kind="forbidden" />
+  if (status === 'forbidden') {
+    return (
+      <NoPermissionV8
+        featureName="ライフタイム"
+        capabilitiesHref="/staff"
+      />
+    )
+  }
   if (status === 'error') return <ListState kind="error" title="ライフタイムを読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={onRetry} />
   if (!settings) return <>{noticeEl}<ListState kind="loading" title="ライフタイムを読み込んでいます" /></>
 

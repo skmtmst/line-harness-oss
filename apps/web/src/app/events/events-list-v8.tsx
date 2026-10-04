@@ -21,6 +21,7 @@ import { withRequestTimeout } from '@/lib/request-timeout'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
@@ -476,9 +477,10 @@ export default function EventsListV8() {
           ) : loadStatus === 'loading' ? (
             <EventListSkeleton />
           ) : loadStatus === 'forbidden' ? (
-            <div className={styles.tableWrap}>
-              <ListState kind="forbidden" title="イベントを見る権限がありません" />
-            </div>
+            <NoPermissionV8
+              featureName="イベント"
+              capabilitiesHref="/staff"
+            />
           ) : loadStatus === 'error' ? (
             <div className={styles.tableWrap}>
               <ListState
