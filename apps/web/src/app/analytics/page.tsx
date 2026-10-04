@@ -2498,16 +2498,16 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
         {menuFeaturesError}
       </Notice>
     )}
-    <div id="usage-items" className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
+    <div className="v8-ro-analytics-usageBody"><div id="usage-items" className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>最終利用</Th><Th align="right">操作</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.categories.map((item) => {
         return <tr key={item.key} className="text-sm"><td className="px-4 py-3"><p className="font-semibold" title={item.label}>{item.label}</p></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3"><DateTimeMetricCell metric={item.lastUsedAt} /></td><td className="px-3 py-2"><RowActions subjectName={item.label} detail={{ label: '中身を見る', href: item.href }} menuItems={canTidyUsage(item) ? [{ id: 'tidy', label: '片づける', onSelect: () => window.location.assign(item.href) }] : []} /></td></tr>
       })}</tbody>
     </table></div>
-    <section className="v8-ro-analytics-observations"><div className="v8-ro-analytics-sectionHead"><h2>気づいたこと</h2><Button variant="secondary" onClick={() => { state.retry(); setMenuReload((value) => value + 1) }}>もう一度確認</Button></div><p className="mt-2 text-xs">確認できた参照切れ <MetricCell metric={overview.summary.brokenReferences} />件</p><ul>{overview.categories.map((item) => {
+    <aside className="v8-ro-analytics-observations"><h2 className="text-sm font-semibold">気づいたこと</h2><p className="mt-2 text-xs">確認できた参照切れ <MetricCell metric={overview.summary.brokenReferences} />件</p><ul>{overview.categories.filter((item) => usageObservation(item).tone !== 'normal').slice(0, 3).map((item) => <li key={item.key}>{item.label}：{usageObservation(item).text}</li>)}</ul><Button variant="secondary" onClick={() => { state.retry(); setMenuReload((value) => value + 1) }}>もう一度確認</Button><Disclosure title="機能ごとの確認結果" size="compact"><ul>{overview.categories.map((item) => {
       const observation = usageObservation(item)
       return <li key={item.key}><span>{item.label}：{observation.text}</span><span title={item.brokenReferences.reason ?? undefined}> ／ {referenceHealthText(item.brokenReferences)}</span></li>
-    })}</ul></section>
+    })}</ul></Disclosure></aside></div>
     <Disclosure title="集計期間を変える" hint={`この${days}日`} size="compact"><AnalyticsPeriodControl days={days} onChange={setDays} /></Disclosure>
     <AnalyticsExportButton headerOnly onClick={exportUsage} disabled={overview.categories.length === 0} />
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
