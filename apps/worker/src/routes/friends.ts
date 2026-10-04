@@ -36,6 +36,7 @@ import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
+import { listResponse } from '../lib/list-etag.js';
 import {
   classifyLineOutboundFailure,
   completeOutboundSendStatement,
@@ -813,7 +814,8 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       }
     }
 
-    return c.json({
+    // 同じ中身なら304（list-etag）。本文のハッシュだけ見て個人情報は混ぜない。
+    return listResponse(c, {
       success: true,
       data: {
         items: itemsWithTags,
