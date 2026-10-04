@@ -99,10 +99,16 @@ async function findMatches(
     try {
       for (let index = 0; index < tokens.length; index += MATCH_TOKEN_CHUNK) {
         const chunk = tokens.slice(index, index + MATCH_TOKEN_CHUNK);
+        // LIKE '%...%' だと、R2キーやライブURLのような長いトークンでD1が
+        // 「LIKE or GLOB pattern too complex」を返して全読み口が503になる
+        // （staging実測：85文字のR2キーで発生、D1側のLIKEパターン長の壁は50文字）。
+        // ワイルドカードを使わない単純な部分一致なので instr() に替える。
+        // 副作用として、トークンに %・_ が含まれていても誤ってワイルドカード
+        // 扱いされなくなる（以前は意図せずヒットが広がる可能性があった）。
         const conditions = source.columns
-          .flatMap((col) => chunk.map(() => `${col} LIKE ?`))
+          .flatMap((col) => chunk.map(() => `instr(${col}, ?) > 0`))
           .join(' OR ');
-        const binds = source.columns.flatMap(() => chunk.map((token) => `%${token}%`));
+        const binds = source.columns.flatMap(() => chunk.map((token) => token));
         const rows = await db
           .prepare(
             `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions}`,

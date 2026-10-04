@@ -180,6 +180,21 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     expect(document.body.textContent).not.toContain('再読み込み')
   })
 
+  it('読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {
+    fetchApi.mockImplementation(() => new Promise(() => {}))
+    await renderList()
+    expect(document.querySelector('[aria-busy="true"]'), '場所取りがある').toBeTruthy()
+    expect(document.body.textContent).toContain('イベントの一覧を読み込んでいます')
+    expect(document.body.textContent).not.toContain('読み込み中')
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 350))
+    })
+    expect(
+      document.querySelectorAll('[data-skeleton]').length,
+      '骨組みの行が出る',
+    ).toBeGreaterThanOrEqual(5)
+  })
+
   it('V8 の決まり（layer・色直書きなし・準備中なし）を守る', () => {
     expect(v8css.split('\n')[0]).toContain('@layer properties, theme, base, components, utilities;')
     expect(v8css).not.toMatch(/#[0-9a-fA-F]{3,8}/)

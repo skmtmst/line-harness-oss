@@ -484,9 +484,9 @@
 }
 
 .chipActive {
-  border-color: var(--color-ink);
-  background: var(--color-ink);
-  color: var(--color-canvas);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
 }
 
 .chip:disabled {
