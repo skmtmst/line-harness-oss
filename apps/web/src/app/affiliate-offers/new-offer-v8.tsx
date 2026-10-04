@@ -1,15 +1,6 @@
 'use client'
 
-/*
- * ★V8-B 案件を作る（板 `Td4TN`）。
- *
- * v7（affiliate-offers/new/page.tsx の器）とは別の器。データの口・動きは
- * v7 と同じ（作成・途中保存の更新・候補の取り直し・離脱の番兵）。
- * 何を成果として数えるか（成果地点）は口が無いので見た目だけ持つ
- * （選んだ値は送らない。API待ち）。
- * 変える操作は器の外（共通の部品・API）へ触らない。
- * v7 を直す必要が出たら new/page.tsx 側も同じ判断を入れる。
- */
+/** ★V8-B 案件を作る（Td4TN）。成果地点の紐付けはAPI未対応。 */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -26,7 +17,7 @@ import Toggle from '@/components/shared/toggle'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { formatNumber } from '@/lib/format'
-import styles from '../affiliates/create-v8.module.css'
+import '../affiliates/create-v8.css'
 
 const OFFER_LIST_PATH = '/conversions?tab=offers'
 
@@ -53,6 +44,8 @@ export function NewOfferV8() {
   const [rewardMiles, setRewardMiles] = useState('')
   const [tagId, setTagId] = useState('')
   const [scenarioId, setScenarioId] = useState('')
+  const [tagEnabled, setTagEnabled] = useState(false)
+  const [scenarioEnabled, setScenarioEnabled] = useState(false)
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
@@ -72,6 +65,8 @@ export function NewOfferV8() {
     setOperationId(crypto.randomUUID())
     setTagId('')
     setScenarioId('')
+    setTagEnabled(false)
+    setScenarioEnabled(false)
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -121,6 +116,8 @@ export function NewOfferV8() {
     if (tagsFetch === 'failed' || scenariosFetch === 'failed') {
       return 'タグまたはシナリオの候補を読み込めませんでした。「もう一度読み込む」で取り直してから保存してください'
     }
+    if (tagEnabled && !tagId) return '付けるタグを選んでください'
+    if (scenarioEnabled && !scenarioId) return '開始するシナリオを選んでください'
     if (!rewardAmount && !rewardMiles) return '報酬（円かマイル）のどちらかを入れてください'
     const amountError = rewardIntegerError(rewardAmount, 'amount')
     if (amountError) return amountError
@@ -136,6 +133,8 @@ export function NewOfferV8() {
     setRewardMiles('')
     setTagId('')
     setScenarioId('')
+    setTagEnabled(false)
+    setScenarioEnabled(false)
     setCreatedId(null)
     setOperationId(crypto.randomUUID())
   }
@@ -204,39 +203,39 @@ export function NewOfferV8() {
     }
   }
 
-  const dirty = Boolean(name || description || rewardAmount || rewardMiles || tagId || scenarioId)
+  const dirty = Boolean(name || description || rewardAmount || rewardMiles || tagId || scenarioId || tagEnabled || scenarioEnabled)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const tagName = tags.find((tag) => tag.id === tagId)?.name ?? null
   const scenarioName = scenarios.find((item) => item.id === scenarioId)?.name ?? null
 
   return (
-    <div data-design-node="Td4TN" className={styles.board}>
-      <div className={styles.head}>
-        <Link href="/affiliates" className={styles.backLink}>← 成果とアフィリエイトへ</Link>
-        <h1 className={styles.headTitle}>案件を作る</h1>
-        <p className={styles.headDescription}>「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。</p>
+    <div data-design-node="Td4TN" className="af-create-board">
+      <div className="af-create-head">
+        <Link href="/affiliates" className="af-create-backLink">← 成果とアフィリエイトへ</Link>
+        <h1 className="af-create-headTitle">案件を作る</h1>
+        <p className="af-create-headDescription">「何を紹介すると、いくら払うか」を決めます。公開すると、アフィリエイターの画面に出ます。</p>
       </div>
 
-      <div className={styles.columns}>
-        <div className={styles.main}>
-          <section className={styles.card} aria-label="どんな案件か">
-            <h2 className={styles.cardTitle}>どんな案件か</h2>
-            <p className={styles.cardNote}>アフィリエイターの画面に出ます</p>
-            <label className={styles.fieldLabel} htmlFor="v8-offer-name">
+      <div className="af-create-columns">
+        <div className="af-create-main">
+          <section className="af-create-card" aria-label="どんな案件か">
+            <h2 className="af-create-cardTitle">どんな案件か</h2>
+            <p className="af-create-cardNote">アフィリエイターの画面に出ます</p>
+            <label className="af-create-fieldLabel" htmlFor="of-name">
               案件名
               <TextField
-                id="v8-offer-name"
+                id="of-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="例：定期便の初回"
                 maxLength={120}
               />
             </label>
-            <label className={styles.fieldLabel} htmlFor="v8-offer-description">
+            <label className="af-create-fieldLabel" htmlFor="of-description">
               説明 任意
               <TextArea
-                id="v8-offer-description"
+                id="of-description"
                 rows={3}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
@@ -250,10 +249,10 @@ export function NewOfferV8() {
             成果地点の候補を返す口が無いので、選んだ値はどこにも送らない。
             口ができたらここを本物の選択肢に替える。
           */}
-          <section className={styles.card} aria-label="何を成果として数えるか">
-            <h2 className={styles.cardTitle}>何を成果として数えるか</h2>
-            <p className={styles.cardNote}>コンバージョンで作った成果地点から選びます</p>
-            <label className={styles.fieldLabel} htmlFor="v8-offer-point">
+          <section className="af-create-card" aria-label="何を成果として数えるか">
+            <h2 className="af-create-cardTitle">何を成果として数えるか</h2>
+            <p className="af-create-cardNote">コンバージョンで作った成果地点から選びます</p>
+            <label className="af-create-fieldLabel" htmlFor="v8-offer-point">
               成果地点
               <Select
                 id="v8-offer-point"
@@ -265,17 +264,17 @@ export function NewOfferV8() {
                 size="standard"
               />
             </label>
-            <p className={styles.footnote}>成果地点の選び方は準備中です。用意ができたらここで選べるようになります。</p>
+            <p className="af-create-footnote">成果地点の選び方は準備中です。用意ができたらここで選べるようになります。</p>
           </section>
 
-          <section className={styles.card} aria-label="いくら払うか">
-            <h2 className={styles.cardTitle}>いくら払うか</h2>
-            <p className={styles.cardNote}>アフィリエイター側の決まりが「定額」のときにこの額を使います</p>
-            <div className={styles.grid2}>
-              <label className={styles.fieldLabel} htmlFor="v8-offer-amount">
+          <section className="af-create-card" aria-label="いくら払うか">
+            <h2 className="af-create-cardTitle">いくら払うか</h2>
+            <p className="af-create-cardNote">アフィリエイター側の決まりが「定額」のときにこの額を使います</p>
+            <div className="af-create-grid2">
+              <label className="af-create-fieldLabel" htmlFor="of-amount">
                 報酬額（円）
                 <TextField
-                  id="v8-offer-amount"
+                  id="of-amount"
                   type="number"
                   min={0}
                   step={1}
@@ -284,10 +283,10 @@ export function NewOfferV8() {
                   placeholder="2000"
                 />
               </label>
-              <label className={styles.fieldLabel} htmlFor="v8-offer-miles">
+              <label className="af-create-fieldLabel" htmlFor="of-miles">
                 マイル（任意） 任意
                 <TextField
-                  id="v8-offer-miles"
+                  id="of-miles"
                   type="number"
                   min={0}
                   step={1}
@@ -297,24 +296,25 @@ export function NewOfferV8() {
                 />
               </label>
             </div>
-            <p className={styles.footnote}>現金とマイルは併用できます。マイルは標準プログラムで付けます。</p>
-            <div className={styles.staticBox}>
-              <p className={styles.staticLabel}>誘導するLINEアカウント</p>
-              <p className={styles.staticValue}>{selectedAccount ? selectedAccount.name : '未選択（画面上部で選んでください）'}</p>
-              <p className={styles.staticReason}>紹介リンクを開いた方を、このアカウントへ案内します。他のアカウントに作りたいときは、先に上部で切り替えてください。</p>
+            <p className="af-create-footnote">現金とマイルは併用できます。マイルは標準プログラムで付けます。</p>
+            <div className="af-create-staticBox">
+              <p className="af-create-staticLabel">誘導するLINEアカウント</p>
+              <p className="af-create-staticValue">{selectedAccount ? selectedAccount.name : '未選択（画面上部で選んでください）'}</p>
+              <p className="af-create-staticReason">紹介リンクを開いた方を、このアカウントへ案内します。他のアカウントに作りたいときは、先に上部で切り替えてください。</p>
             </div>
           </section>
 
-          <section className={styles.card} aria-label="成果を認めたときにすること">
-            <h2 className={styles.cardTitle}>成果を認めたときにすること</h2>
-            <p className={styles.cardNote}>任意</p>
-            <div className={styles.switchRow}>
-              <Toggle checked={tagId !== ''} label="タグを付ける" onChange={(next) => { if (!next) setTagId('') }} />
-              <div className={styles.switchBody}>
-                <p className={styles.switchName}>タグを付ける</p>
-                <p className={styles.switchNote}>{tagName ?? 'まだ決めていません'}</p>
-                {tagId !== '' || tags.length > 0 ? (
+          <section className="af-create-card" aria-label="成果を認めたときにすること">
+            <h2 className="af-create-cardTitle">成果を認めたときにすること</h2>
+            <p className="af-create-cardNote">任意</p>
+            <div className="af-create-switchRow">
+              <Toggle checked={tagEnabled} label="タグを付ける" onChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} />
+              <div className="af-create-switchBody">
+                <p className="af-create-switchName">タグを付ける</p>
+                <p className="af-create-switchNote">{tagName ?? 'まだ決めていません'}</p>
+                {tagEnabled ? (
                   <Select
+                    id="of-tag"
                     aria-label="付けるタグ"
                     value={tagId}
                     onChange={(value) => setTagId(value)}
@@ -325,10 +325,10 @@ export function NewOfferV8() {
                     size="standard"
                   />
                 ) : null}
-                {tagsFetch === 'loading' ? <p className={styles.footnote}>タグの候補を読み込んでいます</p> : null}
+                {tagsFetch === 'loading' ? <p className="af-create-footnote">タグの候補を読み込んでいます</p> : null}
                 {tagsFetch === 'failed' ? (
-                  <div className={styles.toolbar}>
-                    <p className={styles.errorText}>タグの候補を読み込めませんでした。</p>
+                  <div className="af-create-toolbar">
+                    <p className="af-create-errorText">タグの候補を読み込めませんでした。</p>
                     <Button type="button" variant="secondary" size="compact" onClick={() => setCandidateSeq((n) => n + 1)}>
                       もう一度読み込む
                     </Button>
@@ -336,13 +336,14 @@ export function NewOfferV8() {
                 ) : null}
               </div>
             </div>
-            <div className={styles.switchRow}>
-              <Toggle checked={scenarioId !== ''} label="シナリオ配信を始める" onChange={(next) => { if (!next) setScenarioId('') }} />
-              <div className={styles.switchBody}>
-                <p className={styles.switchName}>シナリオ配信を始める</p>
-                <p className={styles.switchNote}>{scenarioName ?? 'まだ決めていません'}</p>
-                {scenarioId !== '' || scenarios.length > 0 ? (
+            <div className="af-create-switchRow">
+              <Toggle checked={scenarioEnabled} label="シナリオ配信を始める" onChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} />
+              <div className="af-create-switchBody">
+                <p className="af-create-switchName">シナリオ配信を始める</p>
+                <p className="af-create-switchNote">{scenarioName ?? 'まだ決めていません'}</p>
+                {scenarioEnabled ? (
                   <Select
+                    id="of-scenario"
                     aria-label="開始するシナリオ"
                     value={scenarioId}
                     onChange={(value) => setScenarioId(value)}
@@ -353,10 +354,10 @@ export function NewOfferV8() {
                     size="standard"
                   />
                 ) : null}
-                {scenariosFetch === 'loading' ? <p className={styles.footnote}>シナリオの候補を読み込んでいます</p> : null}
+                {scenariosFetch === 'loading' ? <p className="af-create-footnote">シナリオの候補を読み込んでいます</p> : null}
                 {scenariosFetch === 'failed' ? (
-                  <div className={styles.toolbar}>
-                    <p className={styles.errorText}>シナリオの候補を読み込めませんでした。</p>
+                  <div className="af-create-toolbar">
+                    <p className="af-create-errorText">シナリオの候補を読み込めませんでした。</p>
                     <Button type="button" variant="secondary" size="compact" onClick={() => setCandidateSeq((n) => n + 1)}>
                       もう一度読み込む
                     </Button>
@@ -366,24 +367,24 @@ export function NewOfferV8() {
             </div>
           </section>
 
-          {saveError ? <p className={styles.errorText} role="alert">{saveError}</p> : null}
-          {saveNote ? <p className={styles.footnote} role="status">{saveNote}</p> : null}
+          {saveError ? <p className="af-create-errorText" role="alert">{saveError}</p> : null}
+          {saveNote ? <p className="af-create-footnote" role="status">{saveNote}</p> : null}
         </div>
 
-        <aside className={styles.rail} aria-label="公開の確認">
-          <section className={styles.card}>
-            <h2 className={styles.cardTitle}>アフィリエイターの画面での見え方</h2>
-            <p className={styles.cardNote}>公開するとこう見えます</p>
-            <div className={styles.previewBox}>
-              <p className={styles.previewName}>{name.trim() || '（案件名）'}</p>
-              {description.trim() ? <p className={styles.footnote}>{description.trim()}</p> : null}
-              <p className={styles.previewReward}>報酬 ¥{formatNumber(yen)}{miles > 0 ? ` ＋ ${formatNumber(miles)}マイル` : ''} / 件</p>
+        <aside className="af-create-rail" aria-label="公開の確認">
+          <section className="af-create-card">
+            <h2 className="af-create-cardTitle">アフィリエイターの画面での見え方</h2>
+            <p className="af-create-cardNote">公開するとこう見えます</p>
+            <div className="af-create-previewBox">
+              <p className="af-create-previewName">{name.trim() || '（案件名）'}</p>
+              {description.trim() ? <p className="af-create-footnote">{description.trim()}</p> : null}
+              <p className="af-create-previewReward">報酬 ¥{formatNumber(yen)}{miles > 0 ? ` ＋ ${formatNumber(miles)}マイル` : ''} / 件</p>
             </div>
           </section>
 
-          <section className={styles.card}>
-            <h2 className={styles.cardTitle}>気をつけること</h2>
-            <ul className={styles.noteList}>
+          <section className="af-create-card">
+            <h2 className="af-create-cardTitle">気をつけること</h2>
+            <ul className="af-create-noteList">
               <li>公開中の案件の報酬額を変えると、変えたあとの成果から新しい額になります</li>
             </ul>
           </section>

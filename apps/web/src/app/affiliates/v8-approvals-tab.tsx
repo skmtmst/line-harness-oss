@@ -35,7 +35,7 @@ import AttributionSection from './attribution-view'
 import { csvCell, pageCountOf, pageOf } from './offer-list-view'
 import { formatDateTime, formatYenNullable, listAllConversionApprovals } from './tabs'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
-import styles from './list-v8.module.css'
+import './list-v8.css'
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
@@ -397,14 +397,14 @@ export default function ApprovalsTabV8({
 
       {actionError ? <NoticeBar tone="warn">{actionError}</NoticeBar> : null}
 
-      <div className={styles.tools}>
+      <div className="af-list-tools">
         <SearchField
           placeholder="名前・注文番号で探す"
           aria-label="名前・注文番号で探す"
           value={query}
           onChange={(value) => { setQuery(value); setPage(1); clearSelections() }}
           onClear={() => { setQuery(''); setPage(1); clearSelections() }}
-          className={styles.toolsSearch}
+          className="af-list-toolsSearch"
         />
         {affiliateFilter ? (
           <FilterChip
@@ -439,7 +439,7 @@ export default function ApprovalsTabV8({
         >
           確認したほうがよい
         </FilterChip>
-        <span className={styles.toolsSpacer} />
+        <span className="af-list-toolsSpacer" />
         <Select
           aria-label="よく使う絞り込み"
           value={flaggedOnly ? 'flagged' : status}
@@ -484,12 +484,12 @@ export default function ApprovalsTabV8({
       ) : listState === 'zero' ? (
         <ZeroResultState onReset={() => { setQuery(''); setFlaggedOnly(false); setStatus('pending'); setAffiliateFilter(null); setPage(1); clearSelections() }} />
       ) : (
-        <div className={styles.tableWrap}>
-          <div className={styles.tableScroll}>
-            <table className={styles.table}>
+        <div className="af-list-tableWrap">
+          <div className="af-list-tableScroll">
+            <table className="af-list-table">
               <thead>
                 <tr>
-                  <th className={styles.cellCheck}>
+                  <th className="af-list-cellCheck">
                     {status === 'pending' ? (
                       <Checkbox
                         aria-label="このページの確認不要な成果をすべて選ぶ"
@@ -512,9 +512,9 @@ export default function ApprovalsTabV8({
                   <th>紹介した人</th>
                   <th>アカウント</th>
                   <th>案件と成果地点</th>
-                  <th className={styles.numRight}>報酬</th>
-                  <th className={styles.numCenter}>確認</th>
-                  <th className={styles.numRight}>決める</th>
+                  <th className="af-list-numRight">報酬</th>
+                  <th className="af-list-numCenter">確認</th>
+                  <th className="af-list-numRight">決める</th>
                 </tr>
               </thead>
               <tbody>
@@ -523,7 +523,7 @@ export default function ApprovalsTabV8({
                   const needsReview = reviewReasons.length > 0
                   return (
                     <tr key={item.eventId} style={needsReview ? { background: 'var(--color-status-warn-soft)' } : undefined}>
-                      <td className={styles.cellCheck}>
+                      <td className="af-list-cellCheck">
                         {status === 'pending' ? (
                           <Checkbox
                             aria-label={`${personNameText(item.friendName)}の成果を選ぶ`}
@@ -542,32 +542,32 @@ export default function ApprovalsTabV8({
                         ) : null}
                       </td>
                       <td>
-                        <span className={styles.cellMain} style={{ fontWeight: 600 }}>{personNameText(item.friendName)}</span>
-                        <span className={styles.cellSub}>{formatDateTime(item.createdAt)} に成果</span>
+                        <span className="af-list-cellMain" style={{ fontWeight: 600 }}>{personNameText(item.friendName)}</span>
+                        <span className="af-list-cellSub">{formatDateTime(item.createdAt)} に成果</span>
                       </td>
-                      <td><span className={styles.cellMain}>{item.affiliateName ?? '名前を読み込めませんでした'}</span></td>
-                      <td><span className={styles.cellMain} style={{ color: 'var(--color-ink-secondary)' }}>{item.lineAccountName ?? 'アカウント未設定'}</span></td>
+                      <td><span className="af-list-cellMain">{item.affiliateName ?? '名前を読み込めませんでした'}</span></td>
+                      <td><span className="af-list-cellMain" style={{ color: 'var(--color-ink-secondary)' }}>{item.lineAccountName ?? 'アカウント未設定'}</span></td>
                       <td>
-                        <span className={styles.cellMain}>{item.offerName ?? '未設定'}</span>
-                        <span className={styles.cellSub}>{item.conversionPointName ?? '成果地点は未設定'}</span>
-                        <span className={styles.cellSub}>成果額 {formatYenNullable(item.value)}</span>
+                        <span className="af-list-cellMain">{item.offerName ?? '未設定'}</span>
+                        <span className="af-list-cellSub">{item.conversionPointName ?? '成果地点は未設定'}</span>
+                        <span className="af-list-cellSub">成果額 {formatYenNullable(item.value)}</span>
                       </td>
-                      <td className={styles.numRight}>
+                      <td className="af-list-numRight">
                         <strong>{item.rewardAmount != null ? formatYenNullable(item.rewardAmount) : '未確定'}</strong>
                       </td>
-                      <td className={styles.numCenter}>
+                      <td className="af-list-numCenter">
                         {needsReview ? (
-                          <span className={`${styles.statusBadge} ${styles.statusWarn}`} title={reviewReasons.join('・')}>
-                            <span className={styles.statusDot} aria-hidden="true" />要確認
+                          <span className={`af-list-statusBadge af-list-statusWarn`} title={reviewReasons.join('・')}>
+                            <span className="af-list-statusDot" aria-hidden="true" />要確認
                           </span>
                         ) : (
-                          <span className={`${styles.statusBadge} ${styles.statusOk}`}>
-                            <span className={styles.statusDot} aria-hidden="true" />問題なし
+                          <span className={`af-list-statusBadge af-list-statusOk`}>
+                            <span className="af-list-statusDot" aria-hidden="true" />問題なし
                           </span>
                         )}
                       </td>
                       <td>
-                        <div className={styles.rowActions}>
+                        <div className="af-list-rowActions">
                           {status === 'pending' ? (
                             <>
                               <Button
@@ -616,7 +616,7 @@ export default function ApprovalsTabV8({
 
       {listState === 'ready' ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 24px 0' }}>
-          <p className={styles.footNote} style={{ padding: 0 }}>
+          <p className="af-list-footNote" style={{ padding: 0 }}>
             {formatNumber(shownItems.length)}件 / 全 {formatNumber(counts[status])}件
             {truncatedStatuses.includes(status) ? '（まだ続きがあります）' : ''}
           </p>
@@ -634,16 +634,16 @@ export default function ApprovalsTabV8({
         </NoticeBar>
       ) : null}
 
-      <p className={styles.footNote}>
+      <p className="af-list-footNote">
         却下理由の記録は未接続です。却下状態はまとめて保存できます。行を選ぶと、下にまとめて操作の帯が出ます。
       </p>
 
       {/* まとめて操作の浮き帯（板 `OylSV`：「②件を選択中　☰操作を選ぶ」） */}
       {canEdit && selected.size > 0 ? (
-        <div className={styles.bulkBar} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount}>{formatNumber(selected.size)}</span>
-          <span className={styles.bulkHint}>件を選択中　対象を確認してから操作を選んでください</span>
-          <span className={styles.bulkActions}>
+        <div className="af-list-bulkBar" role="region" aria-label="選択中のまとめ操作">
+          <span className="af-list-bulkCount">{formatNumber(selected.size)}</span>
+          <span className="af-list-bulkHint">件を選択中　対象を確認してから操作を選んでください</span>
+          <span className="af-list-bulkActions">
             <Button type="button" onClick={openBulkWizard}>
               ☰ 操作を選ぶ
             </Button>
@@ -742,7 +742,7 @@ export default function ApprovalsTabV8({
       ) : null}
 
       {bulkResult ? (
-        <div className={styles.notice} role="status" aria-label="まとめて処理の結果" style={{ margin: '12px 24px 0', alignItems: 'flex-start' }}>
+        <div className="af-list-notice" role="status" aria-label="まとめて処理の結果" style={{ margin: '12px 24px 0', alignItems: 'flex-start' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <strong style={{ color: 'var(--color-ink)' }}>まとめて処理の結果</strong>
             <p style={{ margin: '4px 0 0', fontSize: 13 }}>

@@ -14,11 +14,7 @@ import {
 } from './offer-list-view'
 
 const TABS = readFileSync(new URL('./tabs.tsx', import.meta.url), 'utf8')
-const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
-const CREATE_PAGE = readFileSync(
-  new URL('../../components/shared/create-page.tsx', import.meta.url),
-  'utf8',
-)
+const NEW_PAGE = readFileSync(new URL('./new-affiliate-v8.tsx', import.meta.url), 'utf8')
 
 function offer(over: Partial<AffiliateOffer> & { id: string }): AffiliateOffer {
   return {
@@ -191,53 +187,12 @@ describe('V6 案件一覧（GH8VL）の画面', () => {
 })
 
 describe('V6 アフィリエイターを作る（xqT1Z）', () => {
-  it('設計のV6寸法を使う版を指定する', () => {
-    expect(NEW_PAGE).toContain('variant="v6"')
-    expect(NEW_PAGE).toContain('designNode="xqT1Z"')
-  })
-
-  it('V6版は保存を下部追従バーに置き、カードの中には置かない', () => {
-    expect(CREATE_PAGE).toContain("import StickyBar from '@/components/shared/sticky-bar'")
-    expect(CREATE_PAGE).toContain('{v6 ? null : <div className="flex flex-wrap gap-2">{actions}</div>}')
-  })
-
-  it('V6版だけ設計の余白18pxと右カラム390pxを使い、V5版は動かさない', () => {
-    expect(CREATE_PAGE).toContain("v6 ? 'rounded-card space-y-3 p-[18px]' : 'rounded-card space-y-5 p-6'")
-    expect(CREATE_PAGE).toContain("v6 ? 'xl:w-[390px]' : 'xl:w-80'")
-  })
-
-  it('入力欄は設計の幅を持ち、高さ40pxの共通部品を通す', () => {
-    expect(NEW_PAGE).toContain("import { TextInput } from '@/components/shared/form-controls'")
-    expect(NEW_PAGE).toContain("const W_NAME = 'w-[360px] max-w-full'")
-    expect(NEW_PAGE).toContain("const W_CODE = 'w-[320px] max-w-full'")
-    expect(NEW_PAGE).toContain("const W_EMAIL = 'w-[340px] max-w-full'")
-    expect(NEW_PAGE).toContain("const W_RATE = 'w-[200px] max-w-full tabular-nums'")
-    expect(NEW_PAGE).toContain("const W_HOLD = 'w-[220px] max-w-full tabular-nums'")
-  })
-
-  it('口の無い項目は押せない入力欄ではなく、—と理由で出す', () => {
-    expect(NEW_PAGE).toContain('function Unavailable(')
-    // ★V7 C6: 未接続の断り書き（上限・振込先・成果時の動き）は出さない。残るのは接続と無関係の理由だけ。
-    for (const label of ['1件あたりの報酬', '成果として数えるもの']) {
-      expect(NEW_PAGE).toContain(`label="${label}"`)
-    }
-    for (const label of ['1件あたりの上限', '振込先の登録', '成果時の動き']) {
-      expect(NEW_PAGE).not.toContain(`label="${label}"`)
-    }
-    expect(NEW_PAGE).toContain('api.friends.list(friendSearchParams(friendSearch, friendPage, selectedAccountId))')
-    expect(NEW_PAGE).toContain('aria-label="友だち候補のページ"')
-    expect(NEW_PAGE).toContain('friendId: friendId || undefined')
-    // 押せない入力欄を残していない。
-    expect(NEW_PAGE).not.toMatch(/<TextInput\s+disabled/)
-    expect(NEW_PAGE).not.toContain('<select id="af-account" disabled')
-  })
-
   it('未接続の断り書きは出さない（★V7 C6）', () => {
     expect(NEW_PAGE).not.toContain('まだ繋がっていません')
   })
 
   it('URLのコピーは、コードが決まっているときだけ押せる', () => {
-    expect(NEW_PAGE).toContain('{previewUrl && (')
+    expect(NEW_PAGE).toContain('{previewUrl ? (')
     expect(NEW_PAGE).toContain('navigator.clipboard?.writeText(previewUrl)')
   })
 

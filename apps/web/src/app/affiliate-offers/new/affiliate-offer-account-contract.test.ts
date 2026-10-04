@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(join(import.meta.dirname, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(import.meta.dirname, '../new-offer-v8.tsx'), 'utf8')
 
 /**
  * V6 案件作成のLINEアカウント選択の契約（#505 重大1 / #686 cross-account）。
