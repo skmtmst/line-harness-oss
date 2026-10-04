@@ -18,6 +18,7 @@ import {
   percent,
 } from './participants-shared'
 import RetentionSection from './retention-section'
+import AnalyticsFunnelV8 from './analytics-funnel-v8'
 import SessionCapacityCell from './session-capacity-cell'
 import VideoStages from './video-stages'
 import LinePreview from '@/components/shared/line-preview'
@@ -588,18 +589,21 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
       5節（概要・視聴・離脱・CTA・申込）はこの段に出ないので入口も置かない。
     */
     const analyticsSections = [
-      { label: '視聴結果', href: '#webinar-analytics-result' },
-      { label: '視聴行動', href: '#webinar-analytics-behavior' },
+      { label: '数の帯', href: '#webinar-analytics-tiles' },
+      { label: 'どこで人数が減っているか', href: '#webinar-analytics-funnel' },
       { label: 'どこまで見られたか', href: '#webinar-analytics-retention' },
     ] as const
     return (
       <div className="space-y-4" data-design-node="yxyzQ">
         <div className="flex flex-wrap items-center justify-between gap-3"><nav aria-label="この段の見出しへ移動" className="flex flex-wrap gap-2">{analyticsSections.map((item) => <Button variant="secondary" className="text-ink-secondary px-3 py-2 hover:underline h-auto whitespace-normal" key={item.label} href={item.href}>{item.label}</Button>)}</nav>{participantsState === 'ready' ? <div className="flex gap-2">{onOpenParticipants ? <Button onClick={onOpenParticipants}>参加者一覧へ</Button> : null}<Button disabled={csvBusy} onClick={() => downloadParticipantsCsv()} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す</Button></div> : null}</div>
         {csvError ? <p className="text-danger text-xs" role="alert">{csvError}</p> : null}
-        <div className="flex flex-col gap-4 xl:flex-row">
+        {/*
+          ★V8-B 分析 `z2dgw`。数の帯・減りの棒・見られた所の線。
+          どこから申し込んだかは集計の口が無いので出さない。
+        */}
+        <div className="flex flex-col gap-4 xl:flex-row" data-design-node="z2dgw">
           <div className="min-w-0 flex-1 space-y-3">
-            <section id="webinar-analytics-result" className="border-hairline bg-canvas rounded-card scroll-mt-4 border p-4 shadow-card"><h2 className="text-ink text-base font-semibold">視聴結果</h2><p className="text-ink-faint mt-1 text-xs">申込・再生・完了率を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">申込</dt><dd className="text-ink text-sm font-semibold">{formatNumber(summary.reservations)}人</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">再生</dt><dd className="text-ink text-sm font-semibold">{formatNumber(summary.viewers)}人（{percent(summary.viewers, summary.reservations)}）</dd></div></dl></section>
-            <section id="webinar-analytics-behavior" className="border-hairline bg-canvas rounded-card scroll-mt-4 border p-4 shadow-card"><h2 className="text-ink text-base font-semibold">視聴行動</h2><p className="text-ink-faint mt-1 text-xs">離脱箇所とCTA反応を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">平均視聴時間</dt><dd className="text-ink text-sm font-semibold">{fmtSec(summary.avgWatchedSeconds)}（{avgRate}%）</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">最大離脱</dt><dd className="text-ink text-sm font-semibold">{largestDropoff !== null ? `${fmtSec(largestDropoff)}付近` : `—（${analytics.measurement?.reason ?? '区間未取得'}）`}</dd></div></dl></section>
+            <AnalyticsFunnelV8 summary={summary} daily={analytics.daily} />
             <RetentionSection
               retention={analytics.retention ?? { bucketSeconds: 60, started: 0, points: [] }}
               completed={summary.completed}
