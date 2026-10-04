@@ -633,3 +633,22 @@
 .readonly { padding-block: 12px; }
 .deliveryFailures { padding: 12px; border-block: 1px solid var(--color-hairline); font-size: 13px; }
 .deliveryFailures > div { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; }
+
+/* cniyw：採用した写真は幅288、写真150、操作は1列で横いっぱい。 */
+.adopted .cards { grid-template-columns: repeat(auto-fill, minmax(min(288px, 100%), 288px)); }
+.adopted .cardPhoto { height: 150px; }
+.adopted .cardBody { gap: 8px; }
+.adopted .cardActions { grid-template-columns: minmax(0, 1fr); }
+.adopted .searchGrow { max-width: 312px; }
+.adopted .toolsNote { max-width: 540px; line-height: 1.5; }
+
+/* ujcar：620pxの窓、理由・補足・届く文章・危険ボタン。窓の制御は共通部品。 */
+:global([data-design-node="ujcar"]) > :global([role="alertdialog"]) { width: min(620px, 100%); border-radius: 16px; }
+:global([data-design-node="ujcar"]) :global([role="alertdialog"]) > div:nth-child(2) { display: flex; flex-direction: column; gap: 14px; }
+.pillDot { width: 18px; height: 18px; border: 1.5px solid var(--color-control-border); }
+.reasonTextarea { min-height: 56px; width: 100%; resize: vertical; border: 1px solid var(--color-control-border); border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 19px; font-weight: 400; }
+.previewBox { background: var(--color-line-preview-bg, #8fa9c4); border: 0; border-radius: 10px; }
+.previewBox p { margin: 0; border-radius: 14px; background: var(--color-canvas); padding: 8px 11px; color: var(--color-ink); font-size: 11px; line-height: 18px; }
+.dialogPhotoThumb { width: 44px; height: 44px; }
+.followup { font-size: 12px; color: var(--color-ink-secondary); }
+.followup summary { cursor: pointer; }

@@ -763,7 +763,7 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
         {status === 'adopted' ? (
           <div className={styles.cardChips}>
             <Chip tone="ok">採用</Chip>
-            <span className={styles.cardOwner}>{mileStatusLabel(photo.point_sync_status)}</span>
+            <span className={styles.cardOwner}>{Number.isFinite(Number(photo.awarded_points)) && photo.awarded_points != null && text(photo.point_sync_status) === 'synced' ? `${formatNumber(Number(photo.awarded_points))} マイル付与済み` : mileStatusLabel(photo.point_sync_status)}</span>
           </div>
         ) : null}
         {status === 'adopted' ? (
@@ -786,16 +786,16 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
         {status === 'adopted' ? (
           <div className={styles.cardActions}>
             {consented ? (
-              <Button variant="secondary" onClick={props.onOpenPublications}>公式サイトに出す</Button>
+              <Button variant="secondary" disabled={!props.canEdit} onClick={() => props.onOpenPublications()}><Globe size={15} aria-hidden="true" />公式サイトに出す</Button>
             ) : null}
             {notificationFailed ? (
-              <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中...">LINE通知を再送</Button>
+              <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中..."><Send size={15} aria-hidden="true" />LINE通知を再送</Button>
             ) : null}
           </div>
         ) : null}
         {status !== 'adopted' && notificationFailed ? (
           <div className={styles.cardActionSingle}>
-            <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中...">LINE通知を再送</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中..."><Send size={15} aria-hidden="true" />LINE通知を再送</Button>
           </div>
         ) : null}
       </div>
@@ -844,15 +844,7 @@ function RejectDialogV8({
     : ''
   const imageSrc = photo ? safePhotoSrc(photo.image_url) : null
   return (
-    <div className={styles.dialogOverlay} data-design-node="ujcar">
-      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="この写真を見送りますか？">
-        <div className={styles.dialogHead}>
-          <div>
-            <h2 className={styles.dialogTitle}>この写真を見送りますか？</h2>
-            <p className={styles.dialogDesc}>理由をえらぶと、お客様への文章が自動でつくられます。見送っても、この方のマイルは減りません。</p>
-          </div>
-          <button type="button" className={styles.dialogClose} onClick={onClose} aria-label="閉じる">✕</button>
-        </div>
+    <Dialog open designNode="ujcar" title="この写真を見送りますか？" description="理由をえらぶと、お客様への文章が自動でつくられます。見送っても、この方のマイルは減りません。" confirmation tone="destructive" busy={busy} error={reasonError} onCancel={onClose} onConfirm={onConfirm} confirmLabel="見送る">
         {photo ? (
           <div className={styles.dialogPhoto}>
             {imageSrc ? (
@@ -865,10 +857,10 @@ function RejectDialogV8({
             </div>
           </div>
         ) : null}
-        <fieldset className={styles.pillGroup}>
+        <fieldset className={styles.pillGroup} role="radiogroup" aria-label="見送り理由">
           <legend className={styles.fieldLabel}>見送った理由</legend>
           {REVIEW_REASONS.map((reason) => (
-            <button key={reason.value} type="button" role="radio" aria-checked={reasonCode === reason.value} className={styles.pill} onClick={() => onReasonCode(reason.value)}>
+            <button key={reason.value} type="button" role="radio" aria-checked={reasonCode === reason.value} className={styles.pill} onClick={() => { onReasonCode(reason.value); onReasonNote(reason.value === 'other' ? '' : reason.message) }}>
               <span aria-hidden="true" className={styles.pillDot} />
               {reason.label}
             </button>
@@ -876,25 +868,17 @@ function RejectDialogV8({
         </fieldset>
         <label className={styles.fieldLabel}>
           お客様に届く補足（直せます）
-          <TextField aria-label="お客様に届く補足" value={reasonNote} maxLength={500} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
+          <textarea aria-label="お客様に届く補足" className={styles.reasonTextarea} value={reasonNote} maxLength={500} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} onChange={(event) => onReasonNote(event.target.value)} />
         </label>
         <label className={styles.checkRow}>
           <Checkbox checked={resubmitInvite} onCheckedChange={onResubmitInvite}>もう一度 送ってもらえるようお願いする</Checkbox>
         </label>
-        <label className={styles.checkRow}>
-          <Checkbox checked={watchSubmitter} onCheckedChange={onWatchSubmitter}>この人の次の投稿は、必ず人が見る</Checkbox>
-        </label>
+        <details className={styles.followup}><summary>次の投稿の確認方法</summary><Checkbox checked={watchSubmitter} onCheckedChange={onWatchSubmitter}>この人の次の投稿は、必ず人が見る</Checkbox></details>
         <div>
           <p className={styles.fieldLabel}>投稿者に届く内容</p>
-          <p className={styles.previewBox}>{preview}</p>
+          <div className={styles.previewBox}><p>{preview}{resubmitInvite ? '\nまたのお写真をお待ちしています。' : ''}</p></div>
         </div>
-        {reasonError ? <p className={styles.errorText} role="alert">{reasonError}</p> : null}
-        <div className={styles.dialogFoot}>
-          <Button variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button variant="primary" onClick={onConfirm} disabled={busy} busy={busy} busyLabel="送っています…">見送る</Button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   )
 }
 
