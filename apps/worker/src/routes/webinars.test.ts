@@ -1596,6 +1596,7 @@ describe('admin CRUD', () => {
     expect(body.data).toMatchObject({
       version: 4, deliveryKind: 'on_demand', publicDescription: '説明',
       ctaCount: 2,
+      updatedAt: expect.any(String) as unknown as string,
       viewingCondition: { kind: 'registered', label: '申込済みの友だち' },
       publicPage: {
         liffId: '999-test', form: {

@@ -15754,6 +15754,8 @@ export type WebinarEditor = {
     viewSegmentFailures: number
     actionFailures: number
   }
+  /** 同時編集の見分けに使う、読んだときの更新日時。無い口では undefined。 */
+  updatedAt?: string | null
 }
 
 export type WebinarPublishValidation = {
@@ -15852,8 +15854,10 @@ export const webinarApi = {
   ),
   get: (id: string) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}`),
   editor: (id: string) => fetchApi<{ data: WebinarEditor }>(`/api/webinars/${id}/editor`),
-  saveEditor: (id: string, input: Partial<Omit<WebinarEditor, 'version' | 'publicPage' | 'publication' | 'monitoring' | 'actionPolicy'>> & {
+  saveEditor: (id: string, input: Partial<Omit<WebinarEditor, 'version' | 'publicPage' | 'publication' | 'monitoring' | 'actionPolicy' | 'updatedAt'>> & {
     expectedVersion: number
+    /** 読んだときの更新日時。付けると違っていたら 409 で止まる。 */
+    expectedUpdatedAt?: string
     actionTemplateBody?: string
     missingResultPolicy?: WebinarEditor['actionPolicy']['missingResultPolicy']
     publicPageTest?: Record<string, unknown> | null
