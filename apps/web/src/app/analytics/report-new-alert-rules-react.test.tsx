@@ -250,6 +250,58 @@ describe('定期レポートの「知らせの決めごと」(N-285)', () => {
     )
   })
 
+  it.each(['作成', '編集', '1回送信'].flatMap((action) => [
+    { action, label: 'ブロック率のしきい値（%）', metric: 'block_rate', key: 'threshold', value: '0' },
+    { action, label: '友だち減少のしきい値（%）', metric: 'friend_adds', key: 'threshold', value: '20' },
+    { action, label: '成果0件がつづく日数のしきい値', metric: 'conversions', key: 'threshold', value: '3' },
+    { action, label: 'ブロック条件の判定に必要な最低件数', metric: 'block_rate', key: 'minimumSample', value: '20' },
+  ]))('$action：$label の空欄では送らず、入力し直した値で進める', async ({ action, label, metric, key, value }) => {
+    if (action === '編集') fixture.editId = 'report-1'
+    await render()
+    if (action !== '編集') {
+      const person = Array.from(host.querySelectorAll('input[type="checkbox"]')).find(
+        (item) => item.closest('label')?.textContent?.includes('テスト'),
+      ) as HTMLInputElement
+      await act(async () => { person.click() })
+    }
+    await typeNumber(label, '')
+    const actionLabel = action === '編集' ? '変更を保存する' : action === '1回送信' ? '今すぐ1回だけ送る' : 'つくって動かす'
+    await act(async () => { button(actionLabel).click() })
+    expect(writeCalls('POST')).toHaveLength(0)
+    expect(writeCalls('PUT')).toHaveLength(0)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    const input = numberInput(label)
+    expect(input.value).toBe('')
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(document.getElementById(input.getAttribute('aria-describedby')!)?.textContent).toContain('入力してください')
+
+    await typeNumber(label, value)
+    expect(input.getAttribute('aria-invalid')).not.toBe('true')
+    await act(async () => { button(actionLabel).click() })
+    if (action === '1回送信') {
+      const confirm = Array.from(document.body.querySelectorAll('button')).find((item) => item.textContent?.trim() === '確認して1回だけ送る')!
+      await act(async () => { confirm.click() })
+    }
+    const calls = writeCalls(action === '編集' ? 'PUT' : 'POST')
+    expect(calls).toHaveLength(1)
+    expect((calls[0].body as { alertRules: unknown[] }).alertRules).toContainEqual(
+      expect.objectContaining({ metric, [key]: Number(value) }),
+    )
+  })
+
+  it('使わない条件の空欄は保存を止めず、その条件を送らない', async () => {
+    fixture.editId = 'report-1'
+    await render()
+    await typeNumber('ブロック率のしきい値（%）', '')
+    const toggle = host.querySelector('input[aria-label="ブロック増の条件を使う"]') as HTMLInputElement
+    await act(async () => { toggle.click() })
+    expect(numberInput('ブロック率のしきい値（%）').getAttribute('aria-invalid')).not.toBe('true')
+    await act(async () => { button('変更を保存する').click() })
+    const calls = writeCalls('PUT')
+    expect(calls).toHaveLength(1)
+    expect((calls[0].body as { alertRules: Array<{ metric: string }> }).alertRules.some((rule) => rule.metric === 'block_rate')).toBe(false)
+  })
+
   it('条件ごとのon/offで、その条件だけ送らなくなる', async () => {
     await render()
     const toggle = host.querySelector('input[aria-label="友だち減少の条件を使う"]') as HTMLInputElement | null

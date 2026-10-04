@@ -576,6 +576,10 @@ function AnalyticsReportFormPage() {
       for (const def of ALERT_RULE_DEFS) {
         const draft = alertDrafts[def.id]
         if (!draft?.enabled) continue
+        // 空欄を Number('') で0に変え、意図しない条件を保存しない。
+        if (!draft.threshold.trim() || !draft.minimumSample.trim()) {
+          return { ok: false, error: '知らせる条件のしきい値と最低件数を入力してください' }
+        }
         const threshold = Number(draft.threshold)
         const minimumSample = Number(draft.minimumSample)
         if (!Number.isFinite(threshold) || threshold < 0 || !Number.isInteger(minimumSample) || minimumSample < 1) {
@@ -935,6 +939,7 @@ function AnalyticsReportFormPage() {
       for (const def of ALERT_RULE_DEFS) {
         const draft = alertDrafts[def.id]
         if (!draft?.enabled) continue
+        if (!draft.threshold.trim() || !draft.minimumSample.trim()) continue
         const threshold = Number(draft.threshold)
         const minimumSample = Number(draft.minimumSample)
         if (!Number.isFinite(threshold) || !Number.isInteger(minimumSample)) continue
@@ -1113,11 +1118,23 @@ function AnalyticsReportFormPage() {
               {[...ALERT_RULE_DEFS].sort((a, b) => (a.id === 'friend_adds' ? -1 : b.id === 'friend_adds' ? 1 : 0)).map((def) => {
                 const draft = alertDrafts[def.id]
                 const fieldsDisabled = !alertsEnabled || !draft.enabled
+                const thresholdMissing = !fieldsDisabled && !draft.threshold.trim()
+                const sampleMissing = !fieldsDisabled && !draft.minimumSample.trim()
+                const thresholdErrorId = `report-alert-${def.id}-threshold-error`
+                const sampleErrorId = `report-alert-${def.id}-sample-error`
                 return <li className="report-v8-selectionCard" key={def.id}>
                   <Checkbox checked={draft.enabled} disabled={!alertsEnabled} aria-label={`${def.name}を使う`} onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}><strong>{def.id === 'friend_adds' ? '友だちが減った' : def.id === 'block_rate' ? 'ブロックが増えた' : '成果が0件のまま続いた'}</strong></Checkbox>
                   <div className="report-v8-scheduleGrid">
-                    <label className="report-v8-field">{def.id === 'conversions' ? '続いた日数' : def.id === 'block_rate' ? 'ブロック率のしきい値（%）' : 'しきい値（%）'}<TextField type="number" min={0} step={def.step} inputMode="decimal" aria-label={def.thresholdLabel} value={draft.threshold} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))} /></label>
-                    <label className="report-v8-field"><span className="report-v8-label">判定に必要な最低件数<HelpTip label={`${def.name}の最低件数`}>集計できた件数が、この数以上のときだけ判定します。</HelpTip></span><TextField type="number" min={1} step={1} inputMode="numeric" aria-label={def.sampleLabel} value={draft.minimumSample} disabled={fieldsDisabled} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))} /></label>
+                    <label className="report-v8-field">
+                      {def.id === 'conversions' ? '続いた日数' : def.id === 'block_rate' ? 'ブロック率のしきい値（%）' : 'しきい値（%）'}
+                      <TextField type="number" min={0} step={def.step} inputMode="decimal" aria-label={def.thresholdLabel} value={draft.threshold} disabled={fieldsDisabled} invalid={thresholdMissing} aria-describedby={thresholdMissing ? thresholdErrorId : undefined} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], threshold: event.target.value } }))} />
+                      {thresholdMissing && <span id={thresholdErrorId} className="report-v8-fieldError" role="alert">{def.id === 'conversions' ? '続いた日数' : 'しきい値'}を入力してください。</span>}
+                    </label>
+                    <label className="report-v8-field">
+                      <span className="report-v8-label">判定に必要な最低件数<HelpTip label={`${def.name}の最低件数`}>集計できた件数が、この数以上のときだけ判定します。</HelpTip></span>
+                      <TextField type="number" min={1} step={1} inputMode="numeric" aria-label={def.sampleLabel} value={draft.minimumSample} disabled={fieldsDisabled} invalid={sampleMissing} aria-describedby={sampleMissing ? sampleErrorId : undefined} onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], minimumSample: event.target.value } }))} />
+                      {sampleMissing && <span id={sampleErrorId} className="report-v8-fieldError" role="alert">判定に必要な最低件数を入力してください。</span>}
+                    </label>
                   </div>
                 </li>
               })}
