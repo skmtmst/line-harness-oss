@@ -84,6 +84,8 @@ function FriendsPageInner({
    * 確認が終わるまで（staffRole === null）は押し口も理由も出さない。
    */
   const [rowAction, setRowAction] = useState<{ friend: FriendListItem; action: FriendAction } | null>(null)
+  // アカウントを変えたら、前の相手への操作を引き継がない。
+  useEffect(() => { setRowAction(null) }, [selectedAccountId])
   const [staffRole, setStaffRole] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
