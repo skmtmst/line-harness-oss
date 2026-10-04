@@ -62,6 +62,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         ...actual.api.richMenuGroups,
         list: async () => ({ success: true, data: [] }),
         listSchedules: async () => ({ success: true, data: [] }),
+        publishProgress: async () => ({ success: true, data: { steps: [], run: null, message: null } }),
         schedule: async (
           _groupId: string,
           input: Record<string, unknown>,

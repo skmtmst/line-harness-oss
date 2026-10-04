@@ -7,6 +7,10 @@ const page = readFileSync(
   resolve(root, 'apps/web/src/app/inflow-links/page.tsx'),
   'utf8',
 );
+const listStyles = readFileSync(
+  resolve(root, 'apps/web/src/app/inflow-links/inflow-list-v8.module.css'),
+  'utf8',
+);
 const modal = readFileSync(
   resolve(root, 'apps/web/src/app/inflow-links/_components/edit-route-modal.tsx'),
   'utf8',
@@ -21,14 +25,21 @@ describe('inflow link tag auto-assignment UI wiring', () => {
     expect(page).toContain('if (tagRes.success) setTags(tagRes.data)');
     expect(page).toContain('tagId: r.tagId');
     expect(page).toContain('const tag = tags.find((t) => t.id === r.tagId)');
-    expect(page).toContain('title={tag.name}');
+    // V8はシナリオとタグを「友だちになったら」の2行にまとめる。
+    expect(page).toContain('becameLines(r, sc, tag)');
+    expect(page).toContain('タグ「${tag.name}」');
+    expect(page).toContain('title={becameSecond}>{becameSecond}');
     expect(page).toContain('tags={tags}');
-    expect(page).toContain('colSpan={12}');
   });
 
   test('desktop referral table stays compact without breaking identifiers mid-word', () => {
-    expect(page).toContain('w-full table-fixed text-xs');
-    expect(page).toContain('truncate whitespace-nowrap');
+    expect(page).toContain('className={styles.tableShell}');
+    for (const cell of ['nameLink', 'refCode', 'twoLine', 'twoLineSub']) {
+      const rule = listStyles.match(new RegExp(`\\.${cell} \\{([^}]+)\\}`))?.[1];
+      expect(rule, cell).toContain('text-overflow: ellipsis');
+      expect(rule, cell).toContain('white-space: nowrap');
+    }
+    expect(page).toContain('title={r.refCode}');
     expect(page).not.toContain('min-w-[1180px]');
     expect(page).not.toContain('font-mono text-blue-600 break-all');
   });

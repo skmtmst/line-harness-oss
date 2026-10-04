@@ -133,7 +133,6 @@ shared-button-importer app/inflow-links/detail/page.tsx
 shared-button-importer app/inflow-links/page.tsx
 shared-button-importer app/inflow-links/referral-qr-modal.tsx
 shared-button-importer app/line-notifications/operator-notification-rules.tsx
-shared-button-importer app/line-notifications/operator/new/page.tsx
 shared-button-importer app/line-notifications/page.tsx
 shared-button-importer app/login/page.tsx
 shared-button-importer app/login/two-factor/page.tsx
