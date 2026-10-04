@@ -30,6 +30,11 @@ export const FOLDER_KINDS = [
   // 友だち情報欄の分類。友だち詳細の上に並ぶタブ（飼い主情報・ペット
   // プロフィールなど）がこれ。friend_fields.folder_id が指す先。
   'friend_field',
+  // F-13（自動化と外部連携）。中身の folder_id 列はまだ無いので、
+  // 件数は「数えていない」（#730）で返る。556 で箱の種類だけ足す。
+  'common_action',
+  'webhook',
+  'conversion',
 ] as const;
 
 export type FolderKind = (typeof FOLDER_KINDS)[number];

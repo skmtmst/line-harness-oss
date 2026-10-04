@@ -423,7 +423,7 @@ export default function OpsSupportPage() {
           onCancel={() => { if (!busy) setConfirmReply(false) }}
           footer={(
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy}>下書きを消す</Button>
+              <Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy}>下書きを削除</Button>
               <span className="ml-auto flex items-center gap-2">
                 <Button onClick={() => { if (!busy) setConfirmReply(false) }} disabled={busy}>戻って直す</Button>
                 <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…">送って解決にする</Button>
