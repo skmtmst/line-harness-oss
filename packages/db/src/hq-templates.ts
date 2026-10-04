@@ -50,6 +50,7 @@ export interface HqTemplatePreflight {
   distribution_mode: HqTemplateDistributionMode;
   idempotency_fingerprint: string;
   snapshot_token: string;
+  text_override?: string | null;
   status: 'ready' | 'blocked' | 'expired' | 'consumed';
   created_by: string | null;
   created_at: string;

@@ -2570,3 +2570,5 @@ export interface HqScenarioDefinition {
   scenario: { name: string; description: string | null }
   steps: Array<{ id: string; delayMinutes: number; messageType: 'text' | 'flex'; messageContent: string }>
 }
+
+export interface HqTemplateTextOverride { accountId: string; text: string }

@@ -18,7 +18,7 @@ vi.mock('./template-definition-editor', () => {
   const freshDefinition = (type: TemplateType): TemplateDefinition => type === 'tag'
     ? { schemaVersion: 1, tag: { name: '', folderId: null }, folders: [] }
     : { schemaVersion: 1, tag: { name: '', folderId: null }, folders: [] } as TemplateDefinition
-  const definitionName = (type: TemplateType, value: TemplateDefinition) => type === 'tag' && 'tag' in value ? value.tag.name : ''
+  const definitionName = (type: TemplateType, value: TemplateDefinition) => type === 'tag' && 'tag' in value ? value.tag.name : type==='template' && 'template' in value ? value.template.name : ''
   const definitionForName = (type: TemplateType, value: TemplateDefinition, name: string, description: string): TemplateDefinition => value
   const definitionError = () => null
   function Editor() { return null }
@@ -67,6 +67,22 @@ describe('配布の V8（meBRB）', () => {
     fireEvent.click(screen.getByRole('button',{name:'来店済みを複製'}))
     await screen.findByText('ひな形を複製しました。')
     expect(calls.duplicate).toHaveBeenCalledWith('t1','来店済みのコピー',3,expect.any(String))
+  })
+
+  it('配り先の本文を原本から変え、重複確認に一緒に渡す',async()=>{
+    const item={...template,template_type:'template',name:'ご案内'}
+    const definition={schemaVersion:1,template:{id:'hq-authored-message',name:'ご案内',messageType:'text',messageContent:'原本の案内'},media:[]}
+    calls.list.mockResolvedValue([item]); calls.get.mockResolvedValue({template:item,definition})
+    calls.preflight.mockResolvedValue({...checked(),stores:[{...checked().stores[0],textOverride:'本店の案内'}]})
+    render(<TemplateConsole type="template" useCanonicalEditors={false}/>)
+    fireEvent.click(await screen.findByLabelText('ご案内の操作'))
+    fireEvent.click(screen.getByRole('button',{name:'ご案内を配布'}))
+    const input=await screen.findByLabelText('銀座本店に配る本文'); expect((input as HTMLTextAreaElement).value).toBe('原本の案内')
+    fireEvent.change(input,{target:{value:'本店の案内'}})
+    fireEvent.click(screen.getByRole('checkbox',{name:'銀座本店'}))
+    fireEvent.click(screen.getByRole('button',{name:'1アカウントの重複を確認'}))
+    await screen.findByText('本店の案内')
+    expect(calls.preflight).toHaveBeenCalledWith('t1',['a'],[{accountId:'a',text:'本店の案内'}])
   })
 
   it('行の「…」は矢印キーで項目を移動できる', async () => {

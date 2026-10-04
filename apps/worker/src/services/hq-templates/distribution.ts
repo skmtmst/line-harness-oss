@@ -1,3 +1,4 @@
+import { parseTextOverrides } from './text-overrides.js';
 import { parseScenarioDefinition, scenarioSnapshot, inspectScenario, planScenario } from './scenario.js';
 import {
   beginHqTemplateDistributionRun, getHqTemplate, listHqTemplates, HQ_TEMPLATE_TYPES,
@@ -131,9 +132,10 @@ export async function deleteTemplate(db: D1Database, authority: HqTemplateAuthor
 export async function listTemplates(db: D1Database, authority: HqTemplateAuthority, type?: HqTemplateType): Promise<HqTemplate[]> {
   return listHqTemplates(db, authority.tenantId, type);
 }
-export async function preflightDistribution(db: D1Database, authority: HqTemplateAuthority, id: string, accountIds: string[], bucket?: R2Bucket) {
+export async function preflightDistribution(db: D1Database, authority: HqTemplateAuthority, id: string, accountIds: string[], bucket?: R2Bucket, textOverrides?: unknown) {
   const accounts = await requireTargetAccounts(db, authority, accountIds);
   const { template, definition } = await templateDetail(db, authority, id);
+  const overrides = parseTextOverrides(textOverrides,accountIds,template.template_type);
   const input = { templateVersionId: template.current_version_id!, definitionJson: JSON.stringify(definition) };
   const tagDefinition = template.template_type === 'tag' ? parseTagDefinition(definition) : null;
   const scenarioDefinition = template.template_type === 'scenario' ? parseScenarioDefinition(definition) : null;
@@ -158,19 +160,19 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
     let r2: Awaited<ReturnType<typeof inspectR2RuntimeStore>> | null = null;
     if (template.template_type === 'template' || template.template_type === 'rich_menu') {
       if (!bucket) throw new HqTemplateError('UNSUPPORTED', 422);
-      try { r2 = await inspectR2RuntimeStore({ db, bucket, authority, templateId: id, templateVersionId: template.current_version_id! }, account.id); }
+      try { r2 = await inspectR2RuntimeStore({ db, bucket, authority, templateId: id, templateVersionId: template.current_version_id!, textOverride: overrides.get(account.id) }, account.id); }
       catch (error) { rethrowR2(error); }
     }
     const items = scenarioDefinition ? inspectScenario(scenarioDefinition,snapshot!) : tagDefinition ? inspectTags(tagDefinition, snapshot!) : form
       ? [{ sourceId: form.sourceId, itemKind: form.itemKind, name: form.name, targetId: form.targetId, expectedRevision: form.expectedRevision, duplicate: form.duplicate, allowedModes: [...form.allowedModes] }, ...formReferences.map(item => ({ ...item, allowedModes: [...item.allowedModes] }))]
       : r2!.items;
     const storeId = crypto.randomUUID(), token = tagDefinition || scenarioDefinition ? `hqts1.${await digest(snapshot!)}` : form?.snapshotToken ?? r2!.snapshotToken;
-    statements.push({ sql: `INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES (?,?,?,?,?,'create',?,?,'ready',?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, authority.actorId, expiresAt] });
+    statements.push({ sql: `INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at,text_override) VALUES (?,?,?,?,?,'create',?,?,'ready',?,?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, authority.actorId, expiresAt, overrides.get(account.id) ?? null] });
     for (const item of items) {
       const fixedRichReferenceMode = template.template_type === 'rich_menu' && item.itemKind !== 'rich_menu' ? item.allowedModes[0] : 'create';
       statements.push({ sql: `INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, item.sourceId, item.itemKind, fixedRichReferenceMode, item.targetId, item.expectedRevision] });
     }
-    stores.push({ accountId: account.id, accountName: account.name, items });
+    stores.push({ accountId: account.id, accountName: account.name, items, ...(overrides.has(account.id) ? {textOverride:overrides.get(account.id)} : {}) });
   }
   for (const account of accounts) statements.unshift(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [account.id, authority.tenantId]));
   await batch(db, statements);

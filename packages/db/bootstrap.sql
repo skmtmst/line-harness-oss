@@ -3375,7 +3375,8 @@ CREATE TABLE hq_template_preflights (
   status TEXT NOT NULL CHECK (status IN ('ready', 'blocked', 'expired', 'consumed')),
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  expires_at TEXT,
+  expires_at TEXT, text_override TEXT
+  CHECK (text_override IS NULL OR length(trim(text_override)) BETWEEN 1 AND 5000),
   PRIMARY KEY (id, tenant_id),
   UNIQUE (tenant_id, target_account_id, idempotency_fingerprint),
   UNIQUE (
@@ -9649,6 +9650,10 @@ CREATE TRIGGER hq_template_run_terminal_guard
 BEFORE UPDATE OF status ON hq_template_distribution_runs
 WHEN OLD.status != 'running' AND NEW.status != OLD.status
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_RUN_TERMINAL'); END;
+
+CREATE TRIGGER hq_template_text_override_immutable BEFORE UPDATE OF text_override ON hq_template_preflights
+WHEN NEW.text_override IS NOT OLD.text_override
+BEGIN SELECT RAISE(ABORT,'HQ_TEXT_OVERRIDE_IMMUTABLE'); END;
 
 CREATE TRIGGER hq_template_version_binding_guard
 BEFORE UPDATE ON hq_template_versions

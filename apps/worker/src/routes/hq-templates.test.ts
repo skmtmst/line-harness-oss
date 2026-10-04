@@ -410,3 +410,19 @@ describe('V8 scenario templates',()=>{
     expect((await request('','POST',{type:'scenario',name:'不正',definition:{...scenario,steps:[{...scenario.steps[0],delayMinutes:-1}]},requestId:crypto.randomUUID()})).status).toBe(422);
   });
 });
+
+describe('V8 account wording',()=>{
+ test('preflight stores each wording, distribution and retry use it while source stays unchanged',async()=>{
+  const source={schemaVersion:1,template:{id:'hq-authored-message',name:'ご案内',category:'general',messageType:'text',messageContent:'原本の案内',carouselActionsJson:null,carouselTapLimitMode:'none',carouselTapLimitText:null,questionJson:null,questionStatus:'draft'},media:[]};
+  const created=await request('','POST',{type:'template',name:'ご案内',definition:source,requestId:crypto.randomUUID()});
+  expect(created.status).toBe(201);const id=created.body.data.template.id;
+  const checked=await request(`/${id}/preflight`,'POST',{accountIds:['a1','a2'],textOverrides:[{accountId:'a1',text:'本店の案内'},{accountId:'a2',text:'支店の案内'}]});
+  expect(checked.status,JSON.stringify(checked.body)).toBe(200);expect(checked.body.data.stores[0].textOverride).toBe('本店の案内');
+  expect(()=>sql.prepare('UPDATE hq_template_preflights SET text_override=? WHERE id=?').run('後から変更',sql.prepare('SELECT id FROM hq_template_preflights LIMIT 1').pluck().get())).toThrow('HQ_TEXT_OVERRIDE_IMMUTABLE');
+  const sent=await execute(id,checked.body.data);expect(sent.status,JSON.stringify(sent.body)).toBe(200);expect(sent.body.data.status).toBe('completed');
+  expect(sql.prepare('SELECT line_account_id,message_content FROM templates ORDER BY line_account_id').all()).toEqual([{line_account_id:'a1',message_content:'本店の案内'},{line_account_id:'a2',message_content:'支店の案内'}]);
+  expect((await execute(id,checked.body.data)).body.data).toEqual(sent.body.data);expect(count('templates')).toBe(2);
+  expect((await request(`/${id}`)).body.data.definition.template.messageContent).toBe('原本の案内');
+  for(const textOverrides of [[{accountId:'b1',text:'範囲外'}],[{accountId:'a1',text:''}],[{accountId:'a1',text:'1'},{accountId:'a1',text:'2'}]]) expect((await request(`/${id}/preflight`,'POST',{accountIds:['a1'],textOverrides})).status).toBe(422);
+ });
+});

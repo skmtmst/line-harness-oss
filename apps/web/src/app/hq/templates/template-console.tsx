@@ -117,6 +117,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
   const theme = useAdminTheme()
   const [stage, setStage] = useState<Stage>('list')
   const [folders, setFolders] = useState<import('@line-crm/shared').HqTemplateFolder[]>([])
+  const [textOverrides,setTextOverrides] = useState<Record<string,string>>({})
   const duplicateAttempts = useRef(new Map<string, string>())
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folderFilter, setFolderFilter] = useState<string>('all')
@@ -306,14 +307,15 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     setCreateUncertain(false)
     setTemplates(current => [saved.template, ...current.filter(row => row.id !== saved.template.id)])
     setMessage('ひな形を保存しました。')
-    if (continueToAccounts) { setSelected([]); setSearch(''); setStage('accounts') }
+    if (continueToAccounts) { setSelected([]); setTextOverrides({}); setSearch(''); setStage('accounts') }
     // R561: 「保存して続けて作る」は新規作成のときだけ、保存済みの行を残したまま空の新規入力へ戻る。
     else if (andAnother && isNew) { setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey(current => current + 1); setStage('edit') }
     else setStage('list')
   })
   const checkStores = (ids: string[]) => void perform(async () => {
     if (!detail || !ids.length) return
-    const checked = await hqTemplatesApi.preflight(detail.template.id, ids)
+    const overrides = theme==='v8' && type==='template' && 'template' in definition && definition.template.messageType==='text' ? ids.filter(id=>textOverrides[id] !== undefined).map(accountId=>({accountId,text:textOverrides[accountId]})) : undefined
+    const checked = await hqTemplatesApi.preflight(detail.template.id, ids, overrides?.length ? overrides : undefined)
     // Never execute a preflight that does not match the selected destination set.
     if (checked.stores.length !== ids.length || new Set(checked.stores.map(s => s.accountId)).size !== ids.length || checked.stores.some(s => !ids.includes(s.accountId))) throw new Error('配布先を確認できませんでした。もう一度アカウントを選択してください。')
     if (!alive.current) return
@@ -458,13 +460,14 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     </>}
     {stage === 'accounts' && <>
       <div className={styles.grid}><section className={styles.panel}><div className={styles.toolbar}><input aria-label="アカウントを検索" className={`${styles.input} ${styles.search}`} placeholder="アカウント名で検索" value={search} onChange={e => setSearch(e.target.value)} /><Checkbox disabled={busy || !shownAccounts.length} checked={!!shownAccounts.length && shownAccounts.every(a => selected.includes(a.id))} onCheckedChange={(checked) => setSelected(current => checked ? [...new Set([...current, ...shownAccounts.map(a => a.id)])] : current.filter(id => !shownAccounts.some(a => a.id === id)))}>表示中をすべて選択</Checkbox></div>
-        {shownAccounts.map(account => <div key={account.id} className={styles.account}><Checkbox aria-label={account.name} checked={selected.includes(account.id)} disabled={busy} onCheckedChange={(checked) => setSelected(current => checked ? [...current, account.id] : current.filter(id => id !== account.id))}>{account.name}</Checkbox><Button disabled={busy} onClick={() => checkStores([account.id])}>{account.name}だけに配布</Button></div>)}{!shownAccounts.length && <p className={styles.empty}>選択できるアカウントがありません。</p>}
+        {shownAccounts.map(account => <div key={account.id} className={styles.account}><Checkbox aria-label={account.name} checked={selected.includes(account.id)} disabled={busy} onCheckedChange={(checked) => setSelected(current => checked ? [...current, account.id] : current.filter(id => id !== account.id))}>{account.name}</Checkbox><Button disabled={busy} onClick={() => checkStores([account.id])}>{account.name}だけに配布</Button>{theme==='v8' && type==='template' && 'template' in definition && definition.template.messageType==='text' && <label className={styles.field}>{account.name}に配る本文<textarea aria-label={`${account.name}に配る本文`} className={styles.textarea} disabled={busy} maxLength={5000} value={textOverrides[account.id] ?? definition.template.messageContent} onChange={e=>setTextOverrides(current=>({...current,[account.id]:e.target.value}))}/></label>}</div>)}{!shownAccounts.length && <p className={styles.empty}>選択できるアカウントがありません。</p>}
       </section><aside className={styles.stack}><section className={styles.panel}><h2>配布するひな形</h2><p>{detail?.template.name}</p><p className={styles.muted}>参照先 {referenceCount(type, definition)}件を含む</p></section><section className={`${styles.panel} ${styles.success}`}><h2>選択済み</h2><strong className={styles.selection}>{selected.length}アカウント</strong><p>{selected.map(accountName).join('・')}</p></section><p className={styles.notice}>次に重複を確認します。既存の同名項目はアカウントごとに上書き・別名を選べます。</p></aside></div>
       <footer className={styles.footer}><Button disabled={busy} onClick={toList}>戻る</Button><Button aria-label={`${selected.length}アカウントの重複を確認`} variant="primary" disabled={busy || !selected.length} onClick={() => checkStores(selected)}>{selected.length === 1 ? '選択した1アカウントへ配布' : `選択した${selected.length}アカウントへ一括配布`}</Button></footer>
     </>}
     {stage === 'duplicates' && preflight && <>
       <p className={styles.notice}>参照先の重複も含みます。「既存を使用」は内容を変更せず、選んだ版の参照先を使います。上書きできない項目は「別名で作成」を選んでください。</p>
       <div className={styles.toolbar}><div><strong>一括設定</strong><p className={styles.muted}>個別設定で変更できます</p></div><div className={styles.actions}><Button disabled={busy} onClick={() => bulk('overwrite')}>上書き・再利用を一括指定</Button><Button disabled={busy} variant="primary" onClick={() => bulk('alias')}>すべて別名で作る</Button></div></div>
+      {preflight.stores.some(s=>s.textOverride!==undefined) && <section className={styles.panel}><h2>配り先ごとの本文</h2>{preflight.stores.filter(s=>s.textOverride!==undefined).map(s=><div key={s.accountId}><strong>{s.accountName}</strong><p style={{whiteSpace:'pre-wrap'}}>{s.textOverride}</p></div>)}</section>}
       <section className={styles.panel}><table className={styles.table}><thead><tr><Th>アカウント</Th><Th>項目</Th><Th className={styles.optional}>配布先の版</Th><Th>配布方法</Th></tr></thead><tbody>{preflight.stores.flatMap(store => store.items.map(item => <tr key={choiceKey(store.accountId, item.sourceId)}><td data-label="アカウント"><span className={styles.name} title={store.accountName}>{store.accountName}</span></td><td data-label="項目"><span className={styles.name} title={item.name}>{item.name}</span><span className={styles.muted}>{item.itemKind === 'folder' ? 'タググループ' : item.itemKind === 'rich_menu' ? 'リッチメニュー' : item.itemKind === 'form' ? '回答フォーム' : item.itemKind === 'media' ? '登録メディア' : item.itemKind === 'template' ? 'テンプレート' : item.itemKind}</span></td><td data-label="配布先の版" className={styles.optional}>{item.expectedRevision ?? '新規'}</td><td data-label="配布方法">{item.duplicate ? <div role="group" aria-label={`${store.accountName} ${item.name}の配布方法`} className={styles.actions}>{(item.operation === 'reuse' ? ['overwrite'] as const : ['overwrite', 'alias'] as const).map(mode => <Button key={mode} disabled={busy || !item.allowedModes.includes(mode)} variant={choices[choiceKey(store.accountId, item.sourceId)] === mode ? 'primary' : 'secondary'} aria-pressed={choices[choiceKey(store.accountId, item.sourceId)] === mode} onClick={() => setChoices(current => ({ ...current, [choiceKey(store.accountId, item.sourceId)]: mode }))}>{item.operation === 'reuse' && mode === 'overwrite' ? '既存を使用' : MODES[mode]}</Button>)}</div> : '新規作成'}</td></tr>))}</tbody></table></section>
       <p className={`${styles.notice} ${styles.error}`}>配布直前に版を再確認します。配布先で編集があれば、そのアカウントの変更を取り消します。</p>
       {expired && <p role="alert">確認の有効期限が切れました。アカウントの現在版をもう一度確認してください。</p>}

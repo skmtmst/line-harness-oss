@@ -79,7 +79,7 @@ export interface PreflightItem {
 }
 export interface Preflight {
   preflightId: string; expiresAt: string
-  stores: { accountId: string; accountName: string; items: PreflightItem[] }[]
+  stores: { accountId: string; accountName: string; items: PreflightItem[]; textOverride?: string }[]
 }
 export interface Resolution { accountId: string; sourceId: string; mode: DistributionMode }
 export interface DistributionResult {
@@ -182,7 +182,7 @@ export const hqTemplatesApi = {
   ),
   update: (id: string, input: TemplateInput & { expectedRevision: number }) => request<TemplateDetail>(idPath(id), 'PATCH', input),
   remove: (id: string, expectedRevision: number) => request<unknown>(idPath(id), 'DELETE', { expectedRevision }),
-  preflight: (id: string, accountIds: string[]) => request<Preflight>(`${idPath(id)}/preflight`, 'POST', { accountIds }),
+  preflight: (id: string, accountIds: string[], textOverrides?: import('@line-crm/shared').HqTemplateTextOverride[]) => request<Preflight>(`${idPath(id)}/preflight`, 'POST', { accountIds, ...(textOverrides ? {textOverrides} : {}) }),
   distribute: (id: string, preflightId: string, resolutions: Resolution[]) => request<DistributionResult>(`${idPath(id)}/distribute`, 'POST', { preflightId, resolutions }),
   result: (id: string, runId: string) => request<DistributionResult>(`${idPath(id)}/distributions/${encodeURIComponent(runId)}`),
 }

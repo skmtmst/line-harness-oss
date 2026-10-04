@@ -111,7 +111,7 @@ hqTemplates.delete('/api/hq/templates/:id', async c => {
 hqTemplates.post('/api/hq/templates/:id/preflight', async c => {
   const input = await body(c);
   if (!Array.isArray(input.accountIds) || input.accountIds.some(v => typeof v !== 'string')) throw new HqTemplateError('INVALID_ACCOUNTS');
-  return c.json({ success: true, data: await preflightDistribution(dbFor(c.env), await authority(c), c.req.param('id'), input.accountIds as string[], c.env.IMAGES) });
+  return c.json({ success: true, data: await preflightDistribution(dbFor(c.env), await authority(c), c.req.param('id'), input.accountIds as string[], c.env.IMAGES, input.textOverrides) });
 });
 hqTemplates.post('/api/hq/templates/:id/distribute', async c => {
   const input = await body(c);
