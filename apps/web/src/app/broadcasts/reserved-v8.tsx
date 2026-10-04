@@ -222,9 +222,12 @@ export default function ReservedV8({
 
       <ConfirmDialog
         open={cancelOpen}
+        designNode="BeNtj"
         title={`「${broadcast.title}」の予約を取り消しますか？`}
-        description="予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。送信が始まったあとは取り消せません。"
+        description={`${scheduledLabel}に送る予定の${audienceCount === null ? '対象の友だち' : `${formatNumber(audienceCount)}人`}に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。承認はやり直しになります。`}
         confirmLabel="予約を取り消す"
+        cancelLabel="予約のまま残す"
+        primaryAction="cancel"
         destructive
         busy={cancelling}
         error={cancelError || undefined}

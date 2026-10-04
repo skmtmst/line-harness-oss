@@ -993,7 +993,8 @@ export default function RichMenusListV8() {
         骨格の印（data-design）は v7 の page.tsx 側が担う。ここへ別の節名を
         足すと design-structure の検査が V7＋V8 の和集合で見えてしまう。
         KPIs は V7 と同じ節名なので残す。
-        板IDは V8 の枠にだけ付ける（`rZEGN` 一覧／`ZoKow` 閲覧のみ）。
+        板IDは V8 の枠にだけ付ける（`rZEGN` 一覧／`ZoKow` 閲覧のみ。
+        1152 の `Y9ASp` は同じ画面の幅違いで、畳み CSS と試験で押さえる）。
       */}
       <div>
         <div className={styles.head}>
