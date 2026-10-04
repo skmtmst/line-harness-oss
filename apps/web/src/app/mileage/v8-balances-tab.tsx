@@ -33,7 +33,7 @@ import {
   type MileageFriendsV6Overview,
 } from '@/lib/api'
 import { isMileageFriendsV6Overview } from './friends-overview-guard'
-import { formatMileageDate, formatMileageNumber } from './mileage-display'
+import { formatMileageDate, formatMileageNumber, formatMileageShortDateTime } from './mileage-display'
 import type { MileageV8TabKey } from './mileage-v8'
 import { mileagePaginationTotal } from './mileage-response-state'
 import { csvCell } from '@/lib/presentation'
@@ -51,15 +51,6 @@ function expiringText(member: MileageFriendV6): string {
     return `30日以内はなし`
   }
   return `${formatMileageNumber(member.expiringMiles30d)}`
-}
-
-/* 申請の日時（絵は「10/2 15:20」）。日本時間に直して出す。 */
-function formatApprovalAt(iso: string | null): string {
-  if (!iso) return ''
-  const time = new Date(iso).getTime()
-  if (Number.isNaN(time)) return ''
-  const jst = new Date(time + 9 * 60 * 60 * 1000)
-  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.getUTCHours()}:${String(jst.getUTCMinutes()).padStart(2, '0')}`
 }
 
 function rankLabel(rank: string | null) {
@@ -391,7 +382,7 @@ export default function V8BalancesTab({
                   {formatNumber(request.amount)} マイル</strong>
                 </p>
                 <p className={styles.cellSub} title={request.reason}>{request.reason}</p>
-                <p className={styles.cellSub}>申請 {request.requested_by_staff_name}（{formatApprovalAt(request.created_at)}）</p>
+                <p className={styles.cellSub}>申請 {request.requested_by_staff_name}（{formatMileageShortDateTime(request.created_at)}）</p>
               </div>
               {isOwner && !readonly ? (
                 <>
