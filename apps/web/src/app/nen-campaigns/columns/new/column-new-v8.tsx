@@ -17,6 +17,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Disclosure from '@/components/shared/disclosure'
 import DateTimeField from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -223,14 +224,13 @@ export default function ColumnNewV8() {
               </label>
             ) : null}
             <p className={styles.note}>この条件では {audienceCount == null ? '—' : formatNumber(audienceCount)}人に届きます。</p>
-            <details className={styles.details}>
-              <summary>公開日時も記録する（任意）</summary>
+            <Disclosure title="公開日時も記録する（任意）" size="compact">
             <div className={styles.fieldLabel}>
               <label htmlFor="nen-publish-v8">公開日時（日本時間）</label>
               <DateTimeField id="nen-publish-v8" aria-label="公開日時（日本時間）" value={draft.publishedAt} invalid={Boolean(touched && errorFor('publishedAt'))} onChange={(v) => set({ publishedAt: v })} />
             </div>
             <p className={styles.note}>空のままなら公開日時は入りません。日本時間で保存します。</p>
-            </details>
+            </Disclosure>
           </section>
 
           <section className={styles.card} aria-label="読んだ人にすること">
