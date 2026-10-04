@@ -12,7 +12,8 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, Copy, Download, MoreHorizontal, RefreshCw, Trash2 } from 'lucide-react'
+import { Check, Copy, Download, MoreHorizontal, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { notifyToast } from '@/components/shared/toast'
 import {
   api,
   type ApiBroadcast,
@@ -150,6 +151,7 @@ export default function BroadcastDetailV8({
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [testing, setTesting] = useState(false)
 
   const editHref = `/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`
   const duplicateHref = `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`
@@ -170,6 +172,21 @@ export default function BroadcastDetailV8({
       setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  /* テストを送る（`Q28Gb`：下書きの頭出し）。下書きの口がそのまま受け付ける。 */
+  const sendTest = async () => {
+    if (testing) return
+    setTesting(true)
+    try {
+      const res = await api.broadcasts.testSend(broadcast.id)
+      if (!res.success) throw new Error(res.error)
+      notifyToast(`テスト送信が完了しました（成功 ${res.sent ?? 0}件・失敗 ${res.failed ?? 0}件）。`)
+    } catch {
+      notifyToast('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。', { tone: 'error' })
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -270,6 +287,19 @@ export default function BroadcastDetailV8({
             <Button size="field" onClick={onExportCsv}>
               <Download size={14} aria-hidden="true" />
               CSVで書き出す
+            </Button>
+          )}
+          {isDraft && (
+            <Button
+              size="field"
+              onClick={() => void sendTest()}
+              disabled={!canEdit || testing}
+              busy={testing}
+              busyLabel="テスト送信中…"
+              title={canEdit ? undefined : readonlyReason}
+            >
+              <Send size={14} aria-hidden="true" />
+              テストを送る
             </Button>
           )}
           {isDraft && (

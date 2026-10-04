@@ -31,7 +31,8 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -100,7 +101,7 @@ describe('M032 公開・テスト送信の失敗は生文を出さない', () =>
     render(<NewOperatorNotificationPage />)
     await waitFor(() => expect(screen.getByText('花子')).toBeTruthy())
 
-    fireEvent.click(screen.getByRole('button', { name: '運用者へのお知らせを公開' }))
+    fireEvent.click(screen.getByRole('button', { name: /運用者へのお知らせを公開/ }))
     // 板 `sDXNy`「このお知らせを公開しますか？」を見てから送る。
     const confirm = await screen.findByText('このお知らせを公開しますか？')
     expect(confirm).toBeTruthy()

@@ -40,6 +40,11 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('id=route-1'),
 }))
 
+vi.mock('@/contexts/account-context', () => ({
+  // 詳細の「入ったLINEアカウント」欄だけに使う。試験では空のまま。
+  useAccount: () => ({ accounts: [], selectedAccountId: 'acc-1' }),
+}))
+
 vi.mock('@/lib/api', () => ({
   ApiError: fixture.ApiError,
   fetchApi: fixture.fetchApi,
