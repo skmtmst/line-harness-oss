@@ -156,21 +156,11 @@
 }
 
 /* 板 `MRhef`：件数の選びは「20件表示」だけ出す（「表示件数」の字は置かない）。 */
-.pageSize > span:first-child {
+.toolbar > label > span:first-child {
   display: none;
 }
 
-/* 板 `LEwkJ`：閲覧のみの「フォルダを追加」は文字の口（押せない形）。 */
-.folderAddLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 0;
-  color: var(--color-action);
-  opacity: 0.55;
-  font-size: 13px;
-  cursor: not-allowed;
-}
+
 
 /* 広い板では「作る」とフォルダ選びはフォルダの列にいる。道具の段には出さない。 */
 .toolbarCreate,

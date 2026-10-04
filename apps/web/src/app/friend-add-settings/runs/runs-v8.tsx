@@ -17,6 +17,7 @@ import type {
   FriendAddEventRoutingStatus,
 } from '@line-crm/shared'
 import { AlertCircle, Download, History, MoreHorizontal, Pause, Pencil } from 'lucide-react'
+import Avatar from '@/components/shared/avatar'
 import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunList } from '@/lib/api'
 import { describeFriendAddFailure } from '../friend-add-failure'
@@ -465,7 +466,7 @@ function FriendAddRunsV8Inner() {
           </FilterChip>
         </span>
         <span className={styles.toolbarSpacer} />
-        <PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); resetCursor() }} className={styles.pageSize} />
+        <PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); resetCursor() }} />
       </div>
       {csvNote ? <p className={styles.csvNote} role="status">{csvNote}</p> : null}
 
@@ -527,10 +528,8 @@ function FriendAddRunsV8Inner() {
                     <tr key={item.id}>
                       <td className={styles.timeCell}>{formatJstDateTime(item.receivedAt).slice(5)}</td>
                       <td>
-                        <span className={styles.friendCell}>
-                          <span className={styles.friendAvatar} aria-hidden="true">
-                            {(displayName || '？').slice(0, 1)}
-                          </span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Avatar name={displayName} size={24} />
                           <Link href={detailHref(item.id)} title={`${displayName}（${kindLabel}）`} className={styles.cellTitle}>
                             {displayName}
                           </Link>

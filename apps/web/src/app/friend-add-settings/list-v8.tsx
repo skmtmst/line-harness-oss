@@ -830,7 +830,7 @@ function FriendAddListV8Inner() {
           >
             {/* 板 `LEwkJ`：閲覧のみでも「フォルダを追加」は文字の口で置く（押せない形）。 */}
             {canEdit ? null : (
-              <span className={styles.folderAddLink} aria-disabled="true" title={readonlyReason}>
+              <span className="mt-2 inline-flex items-center gap-2 text-xs text-ink-faint" aria-disabled="true" title={readonlyReason}>
                 <FolderPlus size={14} aria-hidden="true" />
                 フォルダを追加
               </span>
@@ -894,7 +894,7 @@ function FriendAddListV8Inner() {
               </FilterChip>
             ))}
             <span className={styles.toolbarSpacer} />
-            <PageSizeSelect value={perPage} onChange={changePerPage} className={styles.pageSize} />
+            <PageSizeSelect value={perPage} onChange={changePerPage} />
           </div>
           {tableBody}
         </div>
