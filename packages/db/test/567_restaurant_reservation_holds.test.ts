@@ -4,7 +4,10 @@ import { expect, it } from 'vitest';
 it('仮押さえと予約の同時重複をDBで止め、期限切れなら卓を使える', () => {
   const db = new Database(':memory:');
   try {
-    for (const file of ['168_restaurant_test_foundation.sql', '567_restaurant_reservation_holds.sql']) db.exec(readFileSync(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
+    db.exec(readFileSync(new URL(`../migrations/168_restaurant_test_foundation.sql`, import.meta.url), 'utf8'));
+    // 本番では 171_restaurant_email_parsers.sql がこの列を足す（567 は足さない）。
+    db.exec('ALTER TABLE rt_reservations ADD COLUMN hold_expires_at TEXT');
+    for (const file of ['567_restaurant_reservation_holds.sql']) db.exec(readFileSync(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
     db.exec(`INSERT INTO rt_organizations (id, account_id, name) VALUES ('o','a','店'); INSERT INTO rt_stores(id,organization_id,name,code) VALUES ('s','o','店','S');
       INSERT INTO rt_tables(id,store_id,code,label,seat_type,max_capacity) VALUES('t','s','T','卓','table',4);
       INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,table_id,status,hold_expires_at)

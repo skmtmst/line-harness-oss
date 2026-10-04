@@ -1,5 +1,5 @@
 -- 仮押さえは期限まで席を占有し、解除後も予約台帳に履歴を残す。
-ALTER TABLE rt_reservations ADD COLUMN hold_expires_at TEXT;
+-- hold_expires_at は 171_restaurant_email_parsers.sql で足し済み（ここで足すと列の重複で止まる）。
 CREATE INDEX idx_rt_reservation_hold_expiry ON rt_reservations(hold_expires_at) WHERE status = 'pending' AND hold_expires_at IS NOT NULL;
 
 -- 時間の異なる同時要求も、同じ卓の重なりを一回の書き込みで止める。
