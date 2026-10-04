@@ -335,3 +335,16 @@ export async function setMileageManualAdjustmentPolicy(
     JSON.stringify({ approvalThreshold: policy.approvalThreshold }),
   );
 }
+
+/** 初期セットは実際に保存された機能の束があるときだけ完了。 */
+export async function hasSavedFeatureConfiguration(db: D1Database, accountId: string): Promise<boolean> {
+  const value = await getAccountSetting(db, accountId, 'feature.settings_bundle_v1');
+  if (!value) return false;
+  try {
+    const data = JSON.parse(value);
+    const features = data?.data?.features;
+    return Number.isInteger(data.version) && data.version >= 1 && features != null
+      && typeof features === 'object' && !Array.isArray(features)
+      && Object.keys(features).length > 0 && Object.values(features).every((flag) => typeof flag === 'boolean');
+  } catch { return false; }
+}

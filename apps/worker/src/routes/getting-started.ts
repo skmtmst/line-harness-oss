@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { hasFirstDeliveredMessage, resolveLineCredential } from '@line-crm/db';
+import { hasFirstDeliveredMessage, hasSavedFeatureConfiguration, resolveLineCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -19,6 +19,7 @@ export type StepState = 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown';
 
 const STEP_HREFS = {
   accounts: '/accounts',
+  featureSet: '/settings?tab=features',
   attributes: '/tags?tab=tags',
   friendAdd: '/friend-add-settings',
   scenario: '/scenarios',
@@ -27,6 +28,7 @@ const STEP_HREFS = {
 
 const STEP_PERMISSIONS: Record<keyof typeof STEP_HREFS, string[]> = {
   accounts: ['/accounts', 'account.definition.edit'],
+  featureSet: ['feature_settings.edit'],
   attributes: ['/tags', 'tag.definition.edit'],
   friendAdd: ['/friend-add-settings', 'friend_add.definition.edit'],
   scenario: ['/scenarios', 'scenario.definition.edit'],
@@ -211,6 +213,11 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
             : 'todo'),
       withAccess(staff, 'firstMessage', firstMessage ? 'done' : 'todo'),
     ];
+
+    if (c.req.query('version') === 'v8') {
+      const configured = accountId ? await hasSavedFeatureConfiguration(c.env.DB, accountId) : false;
+      steps.splice(1, 0, withAccess(staff, 'featureSet', configured ? 'done' : 'todo'));
+    }
 
     /*
       「閉じた」は本人単位の記憶。**完了判定には使わない**（要件 §15）。

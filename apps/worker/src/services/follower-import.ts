@@ -320,7 +320,7 @@ export interface FollowerImportStepResult {
 
 /**
  * Process one bounded unit. State/cursors live in D1, so closing the browser
- * only pauses the job; the next request resumes it. No cron is involved.
+ * continues in the scheduled lane; requests may also resume it under the same lock.
  */
 export async function processFollowerImportStep(
   db: D1Database,
@@ -361,7 +361,7 @@ export async function processFollowerImportStep(
     }
     state.lastError = null;
   } catch (err) {
-    state.lastError = err instanceof Error ? err.message : '移行処理に失敗しました';
+    state.lastError = '取り込みを再試行しています。しばらくして進み具合を確認してください。';
   } finally {
     state.lockToken = null;
     state.lockUntil = null;

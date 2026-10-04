@@ -7,7 +7,7 @@
  * 接続確認→完了）とは手順の並びと見せ方だけが違う。
  * 入力・検証・接続確認（5段）・保存・取り込み・本人確認・重複時の復帰の
  * 動きは v7 と同じで、使う口も同じ（`api.lineAccounts.connectCheck` /
- * `connect` / `stepFollowerImport`＋タグ・友だち総数）。
+ * `connect` / `followerImportState`＋タグ・友だち総数）。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（二重管理）。
  */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
@@ -15,6 +15,8 @@ import { api, type FollowerImportState, type LineAccountConnectData, type LineAc
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import type { StaffMember } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import RadioCard from '@/components/shared/radio-card'
@@ -45,12 +47,15 @@ type FormState = {
   loginChannelSecret: string
   lineId: string
   tagIds: string[]
+  parentId: string
+  staffIds: string[]
+  liffId: string
   importFriends: boolean
 }
 
 const emptyForm: FormState = {
   name: '', channelId: '', channelSecret: '', loginChannelId: '', loginChannelSecret: '',
-  lineId: '', tagIds: [], importFriends: true,
+  lineId: '', tagIds: [], parentId: '', staffIds: [], liffId: '', importFriends: true,
 }
 
 /*
@@ -66,6 +71,9 @@ type DraftState = {
   loginChannelId: string
   lineId: string
   tagIds: string[]
+  parentId: string
+  staffIds: string[]
+  liffId: string
   importFriends: boolean
 }
 
@@ -83,6 +91,9 @@ function readDraft(): DraftState | null {
       loginChannelId: typeof parsed.loginChannelId === 'string' ? parsed.loginChannelId : '',
       lineId: typeof parsed.lineId === 'string' ? parsed.lineId : '',
       tagIds: Array.isArray(parsed.tagIds) ? parsed.tagIds.filter((id): id is string => typeof id === 'string') : [],
+      parentId: typeof parsed.parentId === 'string' ? parsed.parentId : '',
+      staffIds: Array.isArray(parsed.staffIds) ? parsed.staffIds.filter((id): id is string => typeof id === 'string') : [],
+      liffId: typeof parsed.liffId === 'string' ? parsed.liffId : '',
       importFriends: parsed.importFriends !== false,
     }
   } catch {
@@ -200,6 +211,9 @@ export default function RegisterV8() {
   const [resultOpen, setResultOpen] = useState(false)
   const [manualAck, setManualAck] = useState(false)
   const [tags, setTags] = useState<LineAccountTag[] | null>(null)
+  const [parents, setParents] = useState<Array<{ id: string; name: string }>>([])
+  const [staffOptions, setStaffOptions] = useState<StaffMember[]>([])
+  const [optionsError, setOptionsError] = useState('')
   const [newTagName, setNewTagName] = useState('')
   const [insightTotal, setInsightTotal] = useState<number | null>(null)
   const [draftRestored, setDraftRestored] = useState(false)
@@ -231,7 +245,7 @@ export default function RegisterV8() {
       channelId: draft.channelId,
       loginChannelId: draft.loginChannelId,
       lineId: draft.lineId,
-      tagIds: draft.tagIds,
+      tagIds: draft.tagIds, parentId: draft.parentId, staffIds: draft.staffIds, liffId: draft.liffId,
       importFriends: draft.importFriends,
     }))
     setDraftRestored(true)
@@ -250,11 +264,11 @@ export default function RegisterV8() {
       channelId: form.channelId,
       loginChannelId: form.loginChannelId,
       lineId: form.lineId,
-      tagIds: form.tagIds,
+      tagIds: form.tagIds, parentId: form.parentId, staffIds: form.staffIds, liffId: form.liffId,
       importFriends: form.importFriends,
     }
     try { window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)) } catch { /* 書けなくても入力は続ける。 */ }
-  }, [createdId, currentStep, accountMethod, form.name, form.channelId, form.loginChannelId, form.lineId, form.tagIds, form.importFriends])
+  }, [createdId, currentStep, accountMethod, form.name, form.channelId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends])
 
   // ③でタグの一覧を一度だけ読む。取れなくても登録は続ける。
   useEffect(() => {
@@ -269,21 +283,38 @@ export default function RegisterV8() {
     return () => { active = false }
   }, [currentStep, tags])
 
-  // ⑤：取り込みを進める（取り込む設定のときだけ）。
   useEffect(() => {
-    if (!createdId || !importingIds || !form.importFriends) return
+    if (currentStep !== 3) return
+    let active = true
+    void (async () => {
+      try {
+        const [accounts, staff] = await Promise.all([api.lineAccounts.list(), api.staff.list()])
+        if (!accounts.success || !staff.success) throw new Error('候補取得失敗')
+        if (active) {
+          setParents(accounts.data.filter(a => a.isActive && !a.archivedAt).map(a => ({ id: a.id, name: a.name })))
+          setStaffOptions(staff.data.filter(s => s.isActive && s.accountScope === 'accounts' && s.inviteStatus === 'active'))
+          setOptionsError('')
+        }
+      } catch { if (active) setOptionsError('親アカウント・担当者を読み込めませんでした。選択する場合は画面を開き直してください。') }
+    })()
+    return () => { active = false }
+  }, [currentStep])
+
+  // ⑤：Workerが画面を閉じても進める取り込みを、読み取りだけで確認する。
+  useEffect(() => {
+    if (!createdId || !['importing_ids', 'hydrating_profiles'].includes(importState?.phase ?? connection?.followerImport.phase ?? '') || !form.importFriends) return
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const advance = async () => {
       try {
-        const response = await api.lineAccounts.stepFollowerImport(createdId)
+        const response = await api.lineAccounts.followerImportState(createdId)
         if (!active || !response.success) return
-        setImportState(response.data.state)
-        if (response.data.state.phase === 'importing_ids') {
-          timer = setTimeout(() => void advance(), 350)
+        setImportState(response.data)
+        if (['importing_ids', 'hydrating_profiles'].includes(response.data.phase)) {
+          timer = setTimeout(() => void advance(), 3000)
         }
       } catch {
-        if (active) timer = setTimeout(() => void advance(), 1500)
+        if (active) timer = setTimeout(() => void advance(), 5000)
       }
     }
     void advance()
@@ -291,7 +322,7 @@ export default function RegisterV8() {
       active = false
       if (timer) clearTimeout(timer)
     }
-  }, [createdId, importingIds, form.importFriends])
+  }, [createdId, importState?.phase, connection?.followerImport.phase, form.importFriends])
 
   // ⑤：取り込みの総数（前日の友だち数）。取れなければ取り込んだ数だけ出す。
   useEffect(() => {
@@ -335,6 +366,8 @@ export default function RegisterV8() {
     channelSecret: form.channelSecret,
     loginChannelId: form.loginChannelId.trim(),
     loginChannelSecret: form.loginChannelSecret,
+    tagIds: form.tagIds, staffIds: form.staffIds, parentLineAccountId: form.parentId || null,
+    ...(form.liffId.trim() ? { liffId: form.liffId.trim() } : {}),
   })
 
   /*
@@ -388,7 +421,7 @@ export default function RegisterV8() {
       setBusyAction(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.channelId, form.channelSecret, form.loginChannelId, form.loginChannelSecret, form.name])
+  }, [form.channelId, form.channelSecret, form.loginChannelId, form.loginChannelSecret, form.name, form.tagIds, form.staffIds, form.parentId, form.liffId])
 
   // ④「接続して設定する」：検査して、通れば結果の窓（qw80E）を開く。
   const runCheckThenReview = async () => {
@@ -451,14 +484,6 @@ export default function RegisterV8() {
         }
         setError(response.error)
         return
-      }
-      // 選んだタグを付ける。失敗しても登録自体は続ける（あとで付け直せる）。
-      if (form.tagIds.length > 0 && response.data.id) {
-        try {
-          await api.lineAccountTags.setForAccount(response.data.id, form.tagIds)
-        } catch {
-          setError('タグの付け直しが必要です。アカウントの詳細でタグを付け直してください。')
-        }
       }
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
@@ -676,7 +701,12 @@ export default function RegisterV8() {
                       <Button type="button" onClick={() => void addTag()} disabled={!newTagName.trim() || busyAction === 'tags'} busy={busyAction === 'tags'} busyLabel="追加しています…">タグを追加</Button>
                     </div>
                   </div>
-                  <div className={styles.noteBox}>LIFF は登録のときに自動で作ります。親アカウントと担当範囲は、登録のあと「設定」と「メンバー」で決めます。</div>
+                  <div className={styles.twoCol}>
+                    <div><span className={styles.fieldLabel}>親アカウント</span><Select aria-label="親アカウント" value={form.parentId} onChange={value => update('parentId', value)} options={[{value:'',label:'親なし'}, ...parents.map(a => ({value:a.id,label:a.name}))]} /></div>
+                    <div><label className={styles.fieldLabel} htmlFor="v8-existing-liff">既存のLIFF ID（任意）</label><input id="v8-existing-liff" className={styles.fieldInput} value={form.liffId} onChange={e => update('liffId',e.target.value)} placeholder="未入力なら自動で用意します" /></div>
+                  </div>
+                  <fieldset><legend className={styles.fieldLabel}>このアカウントを担当範囲に追加する人</legend><div className={styles.tagRow}>{staffOptions.map(member => <Checkbox key={member.id} aria-label={member.name} checked={form.staffIds.includes(member.id)} onCheckedChange={checked => update('staffIds',checked ? [...form.staffIds,member.id] : form.staffIds.filter(id => id !== member.id))}>{member.name}</Checkbox>)}</div><p className={styles.fieldHelp}>全アカウント担当者は追加操作なしで閲覧できます。</p></fieldset>
+                  {optionsError ? <p role="alert" className={styles.fieldError}>{optionsError}</p> : null}
                   <div>
                     <span className={styles.fieldLabel}>Callback URL</span>
                     <div className={styles.endpointRow}>
@@ -718,7 +748,7 @@ export default function RegisterV8() {
                         <div><dt>LINE ID</dt><dd>{form.lineId || '接続確認で取得します'}</dd></div>
                         <div><dt>タグ</dt><dd>{selectedTags.length > 0 ? selectedTags.map((tag) => tag.name).join('・') : 'なし'}</dd></div>
                       </dl>
-                      <p className={styles.fieldHelp}>親アカウントと担当範囲は、登録のあと「設定」と「メンバー」で決めます。</p>
+                      <p className={styles.fieldHelp}>タグ・親アカウント・担当者は、登録と一緒に保存します。</p>
                     </aside>
                   </div>
                   <div className={styles.panel}>

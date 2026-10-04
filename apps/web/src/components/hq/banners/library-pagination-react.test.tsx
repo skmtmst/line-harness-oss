@@ -58,7 +58,7 @@ describe('画像ライブラリの取得枚数と続きの読み込み', () => {
   it('V8は10枚で読み込み、取得条件の説明を押して確認できる', async () => {
     const list = vi.spyOn(api.hqBanners.images, 'list').mockResolvedValue(page(['first'], 'cursor-10'))
     await open()
-    expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 10 })
+    expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 10, withCounts: true })
     expect(screen.getByRole('button', { name: 'さらに10枚を表示' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '画像の取得件数の説明' }))
     expect(screen.getByText(/一度に読み込む画像の枚数です/)).toBeTruthy()
@@ -70,13 +70,13 @@ describe('画像ライブラリの取得枚数と続きの読み込み', () => {
     list.mockResolvedValue(page(['new'], 'new-cursor'))
     await chooseSize(size)
     await screen.findByRole('button', { name: `さらに${size}枚を表示` })
-    expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: size })
+    expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: size, withCounts: true })
     expect(view.container.querySelector('img')?.getAttribute('src')).toBe('https://example.test/new.png')
 
     list.mockResolvedValue(page(['next']))
     fireEvent.click(screen.getByRole('button', { name: `さらに${size}枚を表示` }))
     await screen.findByText('2枚を表示中')
-    expect(list).toHaveBeenLastCalledWith({ favorite: false, before: 'new-cursor', limit: size })
+    expect(list).toHaveBeenLastCalledWith({ favorite: false, before: 'new-cursor', limit: size, withCounts: true })
   })
 
   it('続きを追加すると重複画像を除き、最後まで読んだら追加ボタンを閉じる', async () => {
@@ -113,7 +113,7 @@ describe('画像ライブラリの取得枚数と続きの読み込み', () => {
     list.mockResolvedValue(page(['retried']))
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     await screen.findByText('1枚を表示中')
-    expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 20 })
+    expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 20, withCounts: true })
   })
 
   it('v7の取得は30枚のままで、取得枚数の選択欄を出さない', async () => {
@@ -124,4 +124,15 @@ describe('画像ライブラリの取得枚数と続きの読み込み', () => {
     expect(screen.getByRole('button', { name: 'さらに30枚を表示' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '画像の取得件数' })).toBeNull()
   })
+})
+
+it('検索・渡し済み条件をAPIへ送り、続きにも同じ条件を送る', async () => {
+  const list = vi.spyOn(api.hqBanners.images, 'list').mockResolvedValue(page(['first'], 'cursor'))
+  await open()
+  fireEvent.change(screen.getByRole('searchbox', { name: 'テキスト・指示・プロジェクト名で検索' }), { target: { value: '全件の検索' } })
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 10, q: '全件の検索', withCounts: true }))
+  fireEvent.click(screen.getByRole('button', { name: 'アカウントへ渡し済み' }))
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith({ favorite: false, limit: 10, q: '全件の検索', delivered: true, withCounts: true }))
+  fireEvent.click(await screen.findByRole('button', { name: 'さらに10枚を表示' }))
+  await waitFor(() => expect(list).toHaveBeenLastCalledWith({ favorite: false, before: 'cursor', limit: 10, q: '全件の検索', delivered: true, withCounts: true }))
 })

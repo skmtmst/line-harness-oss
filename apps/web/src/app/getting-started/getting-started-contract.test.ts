@@ -339,3 +339,9 @@ describe('下の2枚', () => {
     expect(Object.values(STEP_STATE_LABEL)).toContain('まだです')
   })
 })
+
+ it('V8 displays six server states without assuming a test was delivered', () => {
+  const steps = buildStepsFromApi(['accounts','featureSet','attributes','friendAdd','scenario','firstMessage'].map(key => ({key:key as import('@/lib/api').GettingStartedStep['key'], state:key === 'featureSet' ? 'done' : 'todo', href:'/settings', reason:null})));
+  expect(steps.map(s=>s.ordinal)).toEqual(['1','2','3','4','5','6']);
+  expect(steps[1].state).toBe('done'); expect(steps[5].state).toBe('todo'); expect(doneCount(steps)).toBe(1);
+ });

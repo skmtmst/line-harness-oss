@@ -20,6 +20,7 @@ import {
   progressHeadline,
   stoppedReasons,
 } from './getting-started-view'
+import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
 import styles from './getting-started.module.css'
 
 /**
@@ -45,7 +46,7 @@ export default function GettingStartedPage() {
     setStatus('loading')
     setLoadError(null)
     try {
-      const res = await api.gettingStarted.get(accountId ?? undefined)
+      const res = await api.gettingStarted.get(accountId ?? undefined, 'v8')
       if (!res.success) throw new Error(res.error)
       // 初期セット（段2）は機能設定の実物で確かめる。取れなければ未確認のまま。
       let entry = null
@@ -58,7 +59,9 @@ export default function GettingStartedPage() {
           entry = caught instanceof ApiError && caught.status === 403 ? { kind: 'forbidden' } as const : null
         }
       }
-      setSteps(insertFeatureSet(buildStepsFromApi(res.data.steps), entry))
+      setSteps(res.data.steps.some(step => step.key === 'featureSet')
+        ? buildStepsFromApi(res.data.steps)
+        : insertFeatureSet(buildStepsFromApi(res.data.steps), entry))
       setStatus('ready')
     } catch (caught) {
       setLoadError(caught)
@@ -68,6 +71,12 @@ export default function GettingStartedPage() {
 
   useEffect(() => {
     void load()
+  }, [load])
+
+  useEffect(() => {
+    const refresh = () => { void load() }
+    window.addEventListener(FEATURE_SETTINGS_UPDATED_EVENT, refresh)
+    return () => window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, refresh)
   }, [load])
 
   const reasons = stoppedReasons(steps)

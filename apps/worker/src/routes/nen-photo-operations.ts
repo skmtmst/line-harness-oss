@@ -122,6 +122,7 @@ nenPhotoOperations.get(
           versionNumber: version.version_number,
           policyKey: version.policy_key,
           points: version.points,
+          publicationPoints: Number(version.publication_points ?? 0),
           summary: version.summary,
           effectiveFrom: version.effective_from,
           createdBy: version.created_by_staff_id,
@@ -140,11 +141,15 @@ nenPhotoOperations.post(
   '/api/nen-members/photo-reward-policy/versions',
   requireRole('owner', 'admin'),
   async (c) => {
-    type Body = { points?: unknown; summary?: unknown; effectiveFrom?: unknown; expectedVersion?: unknown };
+    type Body = { publicationPoints?: unknown; points?: unknown; summary?: unknown; effectiveFrom?: unknown; expectedVersion?: unknown };
     const body = await c.req.json<Body>().catch((): Body => ({}));
     const key = idempotencyKey(c);
     if (!key) {
       return c.json({ success: false, error: '再実行キーを確認してください' }, 400);
+    }
+    const publicationPoints = body.publicationPoints;
+    if (publicationPoints !== undefined && (typeof publicationPoints !== 'number' || !Number.isInteger(publicationPoints) || publicationPoints < 0 || publicationPoints > 100000)) {
+      return c.json({ success: false, error: '掲載時の追加点数を0〜100000で入力してください' }, 400);
     }
     const points = Number(body.points);
     const summary = typeof body.summary === 'string' ? body.summary : '';
@@ -167,6 +172,7 @@ nenPhotoOperations.post(
     try {
       const { created, version } = await createPhotoRewardPolicy(c.env.DB, {
         points,
+        publicationPoints: publicationPoints as number | undefined,
         summary,
         effectiveFrom,
         expectedVersion,
@@ -181,6 +187,7 @@ nenPhotoOperations.post(
             versionNumber: version.version_number,
             policyKey: version.policy_key,
             points: version.points,
+          publicationPoints: Number(version.publication_points ?? 0),
             summary: version.summary,
             effectiveFrom: version.effective_from,
             createdAt: version.created_at,
@@ -188,6 +195,9 @@ nenPhotoOperations.post(
         },
       });
     } catch (error) {
+      if (String(error).includes('PHOTO_REWARD_POLICY_IDEMPOTENCY_CONFLICT')) {
+        return c.json({ success: false, error: '同じ確認キーが別の入力に使われています' }, 409);
+      }
       if (String(error).includes('PHOTO_REWARD_POLICY_VERSION_CONFLICT')) {
         return c.json({ success: false, error: 'ほかの担当者が先に保存しました。開き直して確認してください', code: 'VERSION_CONFLICT' }, 409);
       }
@@ -225,6 +235,7 @@ nenPhotoOperations.post(
             versionNumber: version.version_number,
             policyKey: version.policy_key,
             points: version.points,
+          publicationPoints: Number(version.publication_points ?? 0),
             summary: version.summary,
             effectiveFrom: version.effective_from,
             createdAt: version.created_at,

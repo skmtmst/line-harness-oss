@@ -1,3 +1,4 @@
+import type { CreateTrafficPoolRequest } from '@line-crm/shared';
 import { Hono, type Context } from 'hono';
 import {
   getTrafficPools,
@@ -128,28 +129,39 @@ trafficPools.get('/api/traffic-pools/accounts', async (c) => {
 
 // POST /api/traffic-pools — create
 trafficPools.post('/api/traffic-pools', requireRole('owner'), async (c) => {
+  let body: CreateTrafficPoolRequest;
+  try { body = await c.req.json<CreateTrafficPoolRequest>(); }
+  catch { return c.json({ success: false, error: 'Invalid JSON' }, 400); }
+  if (!body || typeof body.slug !== 'string' || !/^[a-z0-9][a-z0-9-]{1,31}$/.test(body.slug)
+    || typeof body.name !== 'string' || !body.name.trim() || body.name.length > 200
+    || typeof body.activeAccountId !== 'string' || !body.activeAccountId
+    || (body.accountIds !== undefined && (!Array.isArray(body.accountIds) || body.accountIds.length > 50
+      || body.accountIds.some((id) => typeof id !== 'string' || !id)))) {
+    return c.json({ success: false, error: 'プール名・URL名・受け入れ先を確認してください' }, 422);
+  }
+  const accountIds = [...new Set(body.accountIds ?? [body.activeAccountId])];
+  if (!accountIds.length || !accountIds.includes(body.activeAccountId)) {
+    return c.json({ success: false, error: '受け入れ先は1件以上必要です' }, 422);
+  }
   try {
-    const body = await c.req.json<{
-      slug: string;
-      name: string;
-      activeAccountId: string;
-    }>();
-
-    if (!body.slug || !body.name || !body.activeAccountId) {
-      return c.json({ success: false, error: 'slug, name, and activeAccountId are required' }, 400);
-    }
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.activeAccountId])) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), accountIds)) {
       return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
-
+    const accounts = await c.env.DB.prepare(`SELECT id FROM line_accounts
+      WHERE id IN (${accountIds.map(() => '?').join(',')}) AND is_active = 1 AND archived_at IS NULL`)
+      .bind(...accountIds).all<{ id: string }>();
+    if (accounts.results.length !== accountIds.length) {
+      return c.json({ success: false, error: '稼働中のアカウントを選んでください' }, 422);
+    }
     const pool = await createTrafficPool(c.env.DB, {
-      slug: body.slug,
-      name: body.name,
-      activeAccountId: body.activeAccountId,
+      slug: body.slug, name: body.name.trim(), activeAccountId: body.activeAccountId, accountIds,
     });
     return c.json({ success: true, data: serialize(pool) }, 201);
   } catch (err) {
-    console.error('POST /api/traffic-pools error:', err);
+    if (String(err).includes('UNIQUE constraint failed: traffic_pools.slug')) {
+      return c.json({ success: false, error: 'このURL名はすでに使われています' }, 409);
+    }
+    console.error('POST /api/traffic-pools failed');
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

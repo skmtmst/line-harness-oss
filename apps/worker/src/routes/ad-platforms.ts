@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import {
   AD_PLATFORM_SECRET_KEYS,
   getAdPlatforms,
+  connectVerifiedAdPlatform,
   getAdPlatformById,
   getAdPlatformForVerify,
   createAdPlatform,
@@ -18,6 +19,7 @@ import {
   type AdPlatformWriteScope,
 } from '@line-crm/db';
 import type { AdConversionLog } from '@line-crm/db';
+import { verifyAdPlatformReadAccess } from '../services/ad-cost-import.js';
 import { sendAdConversions } from '../services/ad-conversion.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -89,7 +91,9 @@ function serializeLog(log: AdConversionLog) {
   };
 }
 
+import { adEventMappings } from './ad-event-mappings.js';
 const adPlatforms = new Hono<Env>();
+adPlatforms.route('/', adEventMappings);
 
 // GET /api/ad-platforms - list visible accounts only
 adPlatforms.get('/api/ad-platforms', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -186,6 +190,19 @@ async function adPlatformWriteScope(
   const scope = await getVisibleLineAccountScope(db, staff);
   return { accountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned };
 }
+
+// 読み取り疎通確認を済ませた設定だけを接続する。外部応答・鍵は返さない。
+adPlatforms.post('/api/ad-platforms/:id/connect', requireRole('owner'), async c => {
+  const platform = await getAdPlatformById(c.env.DB, c.req.param('id'));
+  if (!platform?.line_account_id || !await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[platform.line_account_id])) return c.json({success:false,error:'対象が見つかりません'},404);
+  try { await verifyAdPlatformReadAccess(platform,c.env.LINE_CREDENTIAL_ENCRYPTION_KEY); }
+  catch { return c.json({success:false,error:'広告の接続を確認できませんでした。アカウントID・権限・鍵を確認してください'},502); }
+  if (!await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[platform.line_account_id])) return c.json({success:false,error:'対象が見つかりません'},404);
+  const at = new Date().toISOString();
+  if (!await connectVerifiedAdPlatform(c.env.DB,platform,at)) return c.json({success:false,error:'確認中に設定が変わりました。読み直して再確認してください'},409);
+  const data: import('@line-crm/shared').AdPlatformConnectResult = {id:platform.id,connected:true,verifiedAt:at};
+  return c.json({success:true,data});
+});
 
 // PUT /api/ad-platforms/:id - update
 adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {

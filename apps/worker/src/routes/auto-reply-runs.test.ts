@@ -225,3 +225,17 @@ describe('GET /api/auto-reply-runs', () => {
     });
   });
 });
+
+describe('実行期間の契約', () => {
+  it('一覧・集計・内訳へ同じ日本時間の範囲を渡す', async () => {
+    const response = await app().request('/api/auto-reply-runs?from=2026-09-30&to=2026-09-30', {}, { DB: db });
+    expect(response.status).toBe(200);
+    for (const query of [mocks.listAutoReplyEvaluationRuns, mocks.getAutoReplyEvaluationSummary, mocks.getAutoReplyTriggerBreakdown]) {
+      expect(query).toHaveBeenCalledWith(db, expect.objectContaining({ from: '2026-09-30T00:00:00+09:00', until: '2026-10-01T00:00:00+09:00', lineAccountIds: ['account-a'] }));
+    }
+  });
+  it('不正日付はDBを読まず拒否する', async () => {
+    expect((await app().request('/api/auto-reply-runs?from=2026-02-30', {}, { DB: db })).status).toBe(400);
+    expect(mocks.listAutoReplyEvaluationRuns).not.toHaveBeenCalled();
+  });
+});

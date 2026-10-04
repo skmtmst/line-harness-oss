@@ -6,8 +6,7 @@
  * v7（restaurant-console.tsx の Tables）と同じ口・同じ集計で、板の形に置く：
  * 数4（卓数・総席数・結合可能・個室）→ ＋卓を追加する → フロアマップ
  * （選ぶと結合札・停止中は灰色）→ 卓の詳細（変更・停止／再開）→ 自動配席ルール。
- * 配置図のドラッグ移動は今の作りのまま扱わない（申送り BERxg の指摘どおり、
- * 閲覧だけ。座標の保存口が無いため動かせない）。
+ * 配置図の順番と結合グループを店舗別に保存する。数値入力でも移動できる。
  * - 板 `gBrCz`（追加・変更）：見本は窓だが、共通の窓部品への置き換えは
  *   仕上げ係 M10 の範囲なので、今の作りの枠のまま外枠に印だけ付ける。
  * - 板 `eY9F3`（止める確認）：見本の先の予約の一覧・移し先の選択・LINE通知は、
@@ -46,6 +45,8 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const { data, store, busy, mutate } = ctx
   const { selectedAccountId } = useAccount()
   const rows = store ? data.tables.filter((row) => row.store_id === store.id) : data.tables
+  const placed = [...rows].sort((a,b)=>a.floor_y-b.floor_y || a.floor_x-b.floor_x || a.code.localeCompare(b.code))
+  const [dragId, setDragId] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState('')
@@ -65,6 +66,9 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         seatType: fd.get('seatType'),
         minCapacity: Number(fd.get('minCapacity')),
         maxCapacity: Number(fd.get('maxCapacity')),
+        floorX: Number(fd.get('floorX')),
+        floorY: Number(fd.get('floorY')),
+        joinGroup: String(fd.get('joinGroup') || '') || null,
       }),
       '卓を追加しました。',
     )
@@ -81,10 +85,27 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         seatType: fd.get('seatType'),
         minCapacity: Number(fd.get('minCapacity')),
         maxCapacity: Number(fd.get('maxCapacity')),
+        floorX: Number(fd.get('floorX')),
+        floorY: Number(fd.get('floorY')),
+        joinGroup: String(fd.get('joinGroup') || '') || null,
       }),
       '卓を更新しました。',
     )
     if (ok) setEditingId('')
+  }
+
+  const moveTable = (targetId: string) => {
+    if (!store || !selectedAccountId || !dragId || dragId === targetId || busy) return
+    const from = placed.findIndex(t=>t.id===dragId)
+    const to = placed.findIndex(t=>t.id===targetId)
+    setDragId('')
+    if (from < 0 || to < 0) return
+    const reordered = [...placed]
+    reordered.splice(to,0,reordered.splice(from,1)[0])
+    void mutate(()=>restaurantTestApi.saveTableLayout(selectedAccountId,{
+      storeId: store.id,
+      tables: reordered.map((t,index)=>({id:t.id,floorX:index%3,floorY:Math.floor(index/3),joinGroup:t.join_group})),
+    }),'卓の配置を保存しました。')
   }
 
   const stop = (table: RestaurantTable) => {
@@ -127,6 +148,9 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
             </label>
             <label className={styles.field}>最小人数<input name="minCapacity" type="number" defaultValue="1" required aria-label="最小人数" className={styles.numberInput} /></label>
             <label className={styles.field}>最大人数<input name="maxCapacity" type="number" defaultValue="4" required aria-label="最大人数" className={styles.numberInput} /></label>
+            <label className={styles.field}>配置の列（0から）<input name="floorX" type="number" min="0" max="10000" defaultValue={rows.length%3} required aria-label="配置の列" className={styles.numberInput} /></label>
+            <label className={styles.field}>配置の行（0から）<input name="floorY" type="number" min="0" max="10000" defaultValue={Math.floor(rows.length/3)} required aria-label="配置の行" className={styles.numberInput} /></label>
+            <label className={styles.field}>結合グループ<TextField name="joinGroup" maxLength={100} defaultValue="" aria-label="結合グループ" /></label>
             <div className={styles.formActions}>
               <Button type="submit" variant="primary" disabled={busy}>追加する</Button>
             </div>
@@ -147,6 +171,9 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
             </label>
             <label className={styles.field}>最小人数<input name="minCapacity" type="number" defaultValue={String(editing.min_capacity)} required aria-label="最小人数" className={styles.numberInput} /></label>
             <label className={styles.field}>最大人数<input name="maxCapacity" type="number" defaultValue={String(editing.max_capacity)} required aria-label="最大人数" className={styles.numberInput} /></label>
+            <label className={styles.field}>配置の列（0から）<input name="floorX" type="number" min="0" max="10000" defaultValue={editing.floor_x} required aria-label="配置の列" className={styles.numberInput} /></label>
+            <label className={styles.field}>配置の行（0から）<input name="floorY" type="number" min="0" max="10000" defaultValue={editing.floor_y} required aria-label="配置の行" className={styles.numberInput} /></label>
+            <label className={styles.field}>結合グループ<TextField name="joinGroup" maxLength={100} defaultValue={editing.join_group || ''} aria-label="結合グループ" /></label>
             <div className={styles.formActions}>
               <Button type="button" onClick={() => setEditingId('')}>キャンセル</Button>
               <Button type="submit" variant="primary" disabled={busy}>保存する</Button>
@@ -165,16 +192,22 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
         onCancel={() => setStopId('')}
         onConfirm={() => { if (stopping) stop(stopping) }}
       />
-      <Panel title="フロアマップ" description="ドラッグ配置は切り離し後の専用サーバーで永続化します。" flush>
+      <Panel title="フロアマップ" description="卓を別の卓へドラッグして並べ替えると保存されます。「変更」から列・行・結合グループも指定できます。" flush>
         <ul className={styles.mapGrid}>
-          {rows.map((item) => {
+          {placed.map((item) => {
             const selected = item.id === selectedId
             return (
-              <li key={item.id}>
+              <li key={item.id} onDragOver={event=>{if(dragId && !busy) event.preventDefault()}} onDrop={event=>{event.preventDefault();moveTable(item.id)}}>
                 <button
                   type="button"
                   className={`${styles.mapCard} ${item.is_active ? '' : styles.mapCardStopped}`}
                   aria-pressed={selected}
+                  disabled={busy}
+                  draggable={!busy}
+                  onDragStart={event=>{setDragId(item.id);event.dataTransfer.setData('text/plain',item.id);event.dataTransfer.effectAllowed='move'}}
+                  onDragEnd={()=>setDragId('')}
+                  data-floor-x={item.floor_x}
+                  data-floor-y={item.floor_y}
                   aria-label={`${item.code} ${item.label} ${item.min_capacity}〜${item.max_capacity}名${item.is_active ? '' : '（停止中）'}`}
                   onClick={() => setSelectedId((current) => (current === item.id ? '' : item.id))}
                 >

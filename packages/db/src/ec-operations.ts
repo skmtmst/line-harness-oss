@@ -1,4 +1,4 @@
-import { REVENUE_IMPACT_KEYS } from '@line-crm/shared';
+import { REVENUE_IMPACT_KEYS, type EcIdentityCandidateSummary } from '@line-crm/shared';
 
 export type EcOrderState = 'current' | 'refunded' | 'cancelled';
 export type EcActionExecutionStatus =
@@ -660,16 +660,9 @@ export async function listEcIdentityCandidates(
 ): Promise<{
   items: Array<Record<string, unknown>>;
   total: number;
-  summary: {
-    unmatched: number;
-    candidates: number;
-    candidateExternalCustomers: number;
-    duplicateSuspicions: number;
-    linked: number;
-    potentialRevenue: number | null;
-  };
+  summary: EcIdentityCandidateSummary;
 }> {
-  const [rows, count, pendingSummary, unmatched, linked, duplicates] = await Promise.all([
+  const [rows, count, pendingSummary, unmatched, linked, duplicates, revenue, withoutCandidates] = await Promise.all([
     db.prepare(
       `SELECT id, status, version, confidence_score, left_snapshot_json, right_snapshot_json,
               evidence_json, impact_json, detected_at, reviewed_at
@@ -703,6 +696,24 @@ export async function listEcIdentityCandidates(
           GROUP BY external_customer_id HAVING COUNT(*) > 1
        )`,
     ).bind(input.tenantId, input.lineAccountId).first<{ count: number }>(),
+    db.prepare(
+      `WITH per_customer AS (
+        SELECT COALESCE(c.external_customer_id, c.left_subject_id) AS customer,
+          MAX(CASE WHEN json_extract(m.value, '$.key') IN (${REVENUE_IMPACT_KEYS.map(() => '?').join(',')})
+            AND json_type(m.value, '$.value') IN ('integer','real')
+            THEN json_extract(m.value, '$.value') END) AS amount
+        FROM identity_candidates c LEFT JOIN json_each(c.impact_json) m
+        WHERE c.tenant_id = ? AND c.kind = 'ec_member' AND c.left_line_account_id = ? AND c.status = 'pending'
+        GROUP BY c.source_key, COALESCE(c.external_customer_id, c.left_subject_id)
+      ) SELECT COUNT(*) AS customers, COUNT(amount) AS measured, COALESCE(SUM(amount),0) AS amount FROM per_customer`,
+    ).bind(...REVENUE_IMPACT_KEYS, input.tenantId, input.lineAccountId)
+      .first<{customers:number;measured:number;amount:number}>(),
+    db.prepare(`SELECT COUNT(DISTINCT e.customer_id) AS count FROM ec_events e
+      WHERE e.line_account_id = ? AND e.status = 'identity_pending' AND e.customer_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM identity_candidates c
+        WHERE c.tenant_id = ? AND c.kind = 'ec_member' AND c.left_line_account_id = e.line_account_id
+          AND c.status = 'pending' AND c.external_customer_id = e.customer_id AND c.source_key = e.source)`)
+      .bind(input.lineAccountId,input.tenantId).first<{count:number}>(),
   ]);
   const items = rows.results.map((row) => ({
     id: String(row.id), status: String(row.status), version: Number(row.version),
@@ -711,18 +722,14 @@ export async function listEcIdentityCandidates(
     evidence: parseMaskedJson(row.evidence_json), impact: parseMaskedJson(row.impact_json),
     detectedAt: String(row.detected_at), reviewedAt: row.reviewed_at == null ? null : String(row.reviewed_at),
   }));
-  const revenueValues = items.flatMap((item) => Array.isArray(item.impact)
-    ? (item.impact as Array<Record<string, unknown>>)
-      .filter((metric) => REVENUE_IMPACT_KEYS.includes(String(metric.key)))
-      .map((metric) => typeof metric.value === 'number' ? metric.value : null)
-    : []).filter((value): value is number => value !== null);
   return {
     items, total: Number(count?.count ?? 0),
     summary: {
       unmatched: Number(unmatched?.count ?? 0), candidates: Number(pendingSummary?.count ?? 0),
       candidateExternalCustomers: Number(pendingSummary?.customer_count ?? 0),
       duplicateSuspicions: Number(duplicates?.count ?? 0), linked: Number(linked?.count ?? 0),
-      potentialRevenue: revenueValues.length ? revenueValues.reduce((sum, value) => sum + value, 0) : null,
+      withoutCandidates: Number(withoutCandidates?.count ?? 0),
+      potentialRevenue: revenue && revenue.customers === revenue.measured ? Number(revenue.amount) : null,
     },
   };
 }

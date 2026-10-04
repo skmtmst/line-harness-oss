@@ -7,7 +7,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
@@ -16,6 +16,7 @@ const api = vi.hoisted(() => ({
   poolsList: vi.fn(),
   templatesList: vi.fn(),
   tagGroupsList: vi.fn(),
+  genresList: vi.fn(),
 }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -29,6 +30,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       pools: { ...actual.api.pools, list: api.poolsList },
       templates: { ...actual.api.templates, list: api.templatesList },
       tagGroups: { ...actual.api.tagGroups, list: api.tagGroupsList },
+      entryRouteGenres: { ...actual.api.entryRouteGenres, list: api.genresList },
     },
   }
 })
@@ -96,6 +98,7 @@ function stubCandidates() {
   }))
   api.poolsList.mockResolvedValue({ success: true as const, data: [] })
   api.tagGroupsList.mockResolvedValue({ success: true as const, data: [] })
+  api.genresList.mockResolvedValue({ success: true as const, data: [] })
 }
 
 async function settle(milliseconds = 50) {
@@ -177,9 +180,11 @@ describe('R23横展開 流入リンク作成の候補は選択accountで絞る',
     // account-2 へ切り替えると候補が変わり、前の選択は外れる
     fixture.accountId = 'account-2'
     await act(async () => { root.render(React.createElement(NewInflowLinkPage)) })
-    await settle(150)
-    expect(host.textContent).toContain('まだ決めていません')
-    expect(host.textContent).toContain('今のアカウントにないため外しました')
+    // 候補の取得・選択解除が描画へ反映されたことを待つ。固定時間に依存しない。
+    await waitFor(() => {
+      expect(host.textContent).toContain('まだ決めていません')
+      expect(host.textContent).toContain('今のアカウントにないため外しました')
+    })
   })
 
   it('外すものがなければ知らせは出ない', async () => {

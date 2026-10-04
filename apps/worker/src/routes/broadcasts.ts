@@ -1,3 +1,4 @@
+import { parseExecutionDateRange } from '@line-crm/shared';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -609,8 +610,11 @@ broadcasts.get('/api/broadcasts', async (c) => {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
     // 並び順は一覧画面の選択と連動する。知らない値は新しい順に倒す。
+    let range;
+    try { range = parseExecutionDateRange({ from: c.req.query('from'), to: c.req.query('to') }); }
+    catch (error) { return c.json({ success: false, error: (error as Error).message }, 400); }
     const sort = c.req.query('sort') === 'oldest' ? 'asc' as const : 'desc' as const;
-    const allItems = await getBroadcasts(c.env.DB, lineAccountId || undefined, scope, { order: sort });
+    const allItems = await getBroadcasts(c.env.DB, lineAccountId || undefined, scope, { order: sort, ...range });
     const status = c.req.query('status');
     const folderId = c.req.query('folderId');
     /*

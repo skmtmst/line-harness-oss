@@ -28,6 +28,7 @@ function setup() {
   const sqlite = new Database(':memory:');
   sqlite.pragma('foreign_keys = ON');
   sqlite.exec(migration);
+  sqlite.exec(readFileSync(join(root, 'migrations/571_hq_scenario_templates.sql'), 'utf8'));
   const db = asD1(sqlite);
   return { sqlite, db };
 }

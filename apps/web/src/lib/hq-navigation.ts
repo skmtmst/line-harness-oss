@@ -4,6 +4,7 @@ export const ACCOUNT_SELECTION_KEY = 'lh_selected_account'
 export const AUTH_SELECTION_CLEARED_KEY = 'lh_auth_selection_cleared'
 
 export const HQ_OPEN_TARGETS = {
+  scenarios: { label: 'シナリオ管理', destination: '/scenarios' },
   tags: { label: 'タグ', destination: '/tags' },
   templates: { label: 'テンプレート管理', destination: '/templates' },
   'rich-menus': { label: 'リッチメニュー管理', destination: '/rich-menus' },

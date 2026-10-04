@@ -8,9 +8,7 @@
  * 番号つきの節、右にプレビュー、下に追従する帯。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  *
- * 作るときに受け入れ先を複数選べる。口は1件ずつしか足せないので、
- * 先頭でプールを作ってから残りを1件ずつ足す。途中で落ちた分は
- * 名前を挙げて伝え、一覧から足し直せるようにする（部分失敗の決まり）。
+ * 全所属を1回の保存で登録する。失敗したときはプールも所属も作られない。
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -129,19 +127,9 @@ export default function PoolNewV8() {
           name: name.trim(),
           slug: slug.trim(),
           activeAccountId: accountIds[0],
+          accountIds,
         })
         if (!res.success) throw new Error(res.error)
-        // 2件目以降は1件ずつ足す。落ちた分は名前を挙げて伝え、足し直せるようにする。
-        const failed: string[] = []
-        for (const accountId of accountIds.slice(1)) {
-          const added = await api.pools.accounts.add(res.data.id, accountId)
-          if (!added.success) {
-            failed.push(accounts.find((account) => account.id === accountId)?.name ?? '名前の分からないアカウント')
-          }
-        }
-        if (failed.length > 0) {
-          throw new Error(`プールは作りましたが、${failed.join('・')}の追加に失敗しました。一覧からプールを開き、受け入れ先を足し直してください。`)
-        }
         return res.data.id
       }}
     >

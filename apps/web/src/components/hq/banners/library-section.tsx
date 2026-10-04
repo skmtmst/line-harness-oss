@@ -36,7 +36,7 @@ const PAGE_SIZE = 30
  * 35-3 画像ライブラリの本体。Pencil `QEWug`。
  *
  * 統括の全画像を新しい順に30枚ずつ。お気に入りは API で絞り、
- * 渡し済み・未使用・用途（形）は読み込んだ分を手元で絞る。
+ * V8では検索・渡し済み・未使用・用途（形）も全件をサーバで絞る。
  * 並び順は「作成が新しい順」だけなので、選べないプルダウンは置かない（§2-2）。
  */
 export default function LibrarySection({
@@ -64,6 +64,7 @@ export default function LibrarySection({
   const [loadingMore, setLoadingMore] = useState(false)
   const [projects, setProjects] = useState<Record<string, BannerProject>>({})
   const [query, setQuery] = useState('')
+  const [counts, setCounts] = useState<import('@line-crm/shared').HqBannerImageCounts | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [shape, setShape] = useState<ShapeFilter | null>(null)
   const [openImage, setOpenImage] = useState<BannerImage | null>(null)
@@ -72,6 +73,8 @@ export default function LibrarySection({
   const [actionError, setActionError] = useState('')
   const requestRef = useRef(0)
 
+  const serverFilters = useMemo(() => theme === 'v8' ? { ...(query.trim() ? { q: query.trim() } : {}), ...(shape ? { shape } : {}), ...(filter === 'delivered' || filter === 'unused' ? { delivered: filter === 'delivered' } : {}), withCounts: true } : {}, [theme, query, shape, filter])
+
   const load = useCallback(async () => {
     const requestId = ++requestRef.current
     setStatus('loading')
@@ -79,13 +82,14 @@ export default function LibrarySection({
     setActionError('')
     try {
       const [imageRes, activeRes, archivedRes] = await Promise.all([
-        api.hqBanners.images.list({ favorite: filter === 'favorite', limit: pageSize }),
+        api.hqBanners.images.list({ favorite: filter === 'favorite', limit: pageSize, ...serverFilters }),
         api.hqBanners.projects.list(),
         api.hqBanners.projects.list({ archived: true }),
       ])
       if (requestId !== requestRef.current) return
       if (!imageRes.success) throw new Error(imageRes.error)
       setImages(imageRes.data)
+      setCounts(imageRes.counts ?? null)
       setNextBefore(imageRes.nextBefore ?? null)
       const map: Record<string, BannerProject> = {}
       for (const p of [...(activeRes.success ? activeRes.data : []), ...(archivedRes.success ? archivedRes.data : [])]) map[p.id] = p
@@ -95,7 +99,7 @@ export default function LibrarySection({
       if (requestId !== requestRef.current) return
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [filter, pageSize])
+  }, [filter, pageSize, serverFilters])
 
   useEffect(() => {
     void load()
@@ -109,7 +113,7 @@ export default function LibrarySection({
     const requestId = requestRef.current
     setLoadingMore(true)
     try {
-      const res = await api.hqBanners.images.list({ favorite: filter === 'favorite', before: nextBefore, limit: pageSize })
+      const res = await api.hqBanners.images.list({ favorite: filter === 'favorite', before: nextBefore, limit: pageSize, ...serverFilters })
       if (requestId !== requestRef.current) return
       if (!res.success) throw new Error(res.error)
       setImages((prev) => [...prev, ...res.data.filter((i) => !prev.some((p) => p.id === i.id))])
@@ -185,24 +189,24 @@ export default function LibrarySection({
       nav: status === 'ready' ? (
         <BannerSideNav
           items={[
-            { key: 'all', label: 'すべて', count: images.length, selected: filter === 'all', onSelect: () => setFilter('all') },
-            { key: 'favorite', label: 'お気に入り', count: images.filter((i) => i.isFavorite).length, selected: filter === 'favorite', onSelect: () => setFilter('favorite') },
-            { key: 'delivered', label: '渡し済み', count: images.filter((i) => i.deliveredAccountIds.length > 0).length, selected: filter === 'delivered', onSelect: () => setFilter('delivered') },
-            { key: 'unused', label: '未使用', count: images.filter((i) => i.deliveredAccountIds.length === 0).length, selected: filter === 'unused', onSelect: () => setFilter('unused') },
+            { key: 'all', label: 'すべて', count: counts?.all ?? images.length, selected: filter === 'all', onSelect: () => setFilter('all') },
+            { key: 'favorite', label: 'お気に入り', count: counts?.favorite ?? images.filter((i) => i.isFavorite).length, selected: filter === 'favorite', onSelect: () => setFilter('favorite') },
+            { key: 'delivered', label: '渡し済み', count: counts?.delivered ?? images.filter((i) => i.deliveredAccountIds.length > 0).length, selected: filter === 'delivered', onSelect: () => setFilter('delivered') },
+            { key: 'unused', label: '未使用', count: counts?.unused ?? images.filter((i) => i.deliveredAccountIds.length === 0).length, selected: filter === 'unused', onSelect: () => setFilter('unused') },
           ]}
         />
       ) : null,
     })
-  }, [onChrome, status, images, filter])
+  }, [onChrome, status, images, filter, counts])
 
   const shapeKeys = useMemo(() => (shape ? new Set(presetKeysForShape(presets, shape)) : null), [presets, shape])
   const visible = useMemo(
     () =>
-      images
+      theme === 'v8' ? images : images
         .filter((i) => imageMatchesQuery(i, query, projects[i.projectId]?.name))
         .filter((i) => (filter === 'delivered' ? i.deliveredAccountIds.length > 0 : filter === 'unused' ? i.deliveredAccountIds.length === 0 : true))
         .filter((i) => (shapeKeys ? (i.generation ? shapeKeys.has(i.generation.presetKey) : false) : true)),
-    [images, query, filter, shapeKeys, projects],
+    [images, query, filter, shapeKeys, projects, theme],
   )
 
   return (
@@ -248,7 +252,7 @@ export default function LibrarySection({
             <span className="inline-flex items-center gap-1 whitespace-nowrap text-caption text-ink-secondary">
               取得件数
               <HelpTip label="画像の取得件数の説明">
-                一度に読み込む画像の枚数です。検索と用途・渡し済みの条件は、読み込んだ画像に適用します。
+                一度に読み込む画像の枚数です。検索と用途・渡し済みの条件は、すべての画像に適用します。
               </HelpTip>
             </span>
             <Select

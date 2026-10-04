@@ -61,6 +61,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         kind: fd.get('kind'),
         name: fd.get('name'),
         price: Number(fd.get('price')),
+        effectiveAt: fd.get('effectiveAt') ? new Date(String(fd.get('effectiveAt'))).toISOString() : null,
         allergens: String(fd.get('allergens') || '').split(',').map((part) => part.trim()).filter(Boolean),
         servicePeriods: [fd.get('period')],
       }),
@@ -78,10 +79,11 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         kind: fd.get('kind'),
         name: fd.get('name'),
         price: Number(fd.get('price')),
+        effectiveAt: fd.get('effectiveAt') ? new Date(String(fd.get('effectiveAt'))).toISOString() : null,
         allergens: String(fd.get('allergens') || '').split(',').map((part) => part.trim()).filter(Boolean),
         servicePeriods: period === 'both' ? ['lunch', 'dinner'] : [period],
       }),
-      'メニューを更新しました。',
+      Number(fd.get('price')) !== editing.price ? '価格変更を承認待ちとして申請しました。現在の価格は変わりません。' : 'メニューを更新しました。',
     )
     if (ok) setEditingId('')
   }
@@ -150,6 +152,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
             </label>
             <label className={styles.field}>メニュー名<TextField name="name" defaultValue={editing.name} required aria-label="メニュー名" /></label>
             <label className={styles.field}>価格（税込）<input name="price" type="number" defaultValue={String(editing.price)} required aria-label="価格（税込）" className={styles.numberInput} /></label>
+            <label className={styles.field}>新価格の開始日時<input type="datetime-local" name="effectiveAt" aria-label="新価格の開始日時" className={styles.numberInput} /><span>空欄なら承認後すぐに反映します。</span></label>
             <label className={styles.field}>アレルギー（カンマ区切り）<TextField name="allergens" defaultValue={safeArray(editing.allergens_json).join(', ')} aria-label="アレルギー（カンマ区切り）" /></label>
             <label className={styles.field}>提供時間
               <select
@@ -208,7 +211,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                 <Td>{periodLabel(safeArray(item.service_periods_json))}</Td>
                 <Td>{item.duration_minutes ? `${item.duration_minutes}分` : '—'}</Td>
                 <Td>{safeArray(item.allergens_json).join('・') || 'なし'}</Td>
-                <Td><Status value={archived ? 'archived' : 'active'} /></Td>
+                <Td>{item.pendingPrice != null ? <span><span>{item.priceChangeStatus === 'approved' ? '承認済・開始待ち' : '申請中'}</span><br />新価格 {formatYen(item.pendingPrice)}{item.pendingEffectiveAt ? <><br />{new Date(item.pendingEffectiveAt).toLocaleString('ja-JP')}</> : null}</span> : <Status value={archived ? 'archived' : item.status === 'draft' ? 'draft' : 'active'} />}</Td>
                 <Td align="right">
                   <span className={styles.rowActions}>
                     {archived ? <Button size="compact" disabled={busy} onClick={() => resume(item)}>再開</Button> : null}
