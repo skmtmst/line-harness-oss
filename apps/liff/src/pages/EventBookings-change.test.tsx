@@ -20,6 +20,8 @@ vi.mock('../lib/api.js', () => ({
     getEventSlots: vi.fn(),
     changeMyEventBooking: vi.fn(),
     liffConfig: vi.fn().mockResolvedValue({ success: true, data: {} }),
+    // 予約の画面の包み (LiffLookScope) が読む。見た目は既定のまま。
+    bookingSettings: vi.fn().mockResolvedValue({ liff_date_view: 'list', booking_window_days: 60 }),
   },
 }));
 

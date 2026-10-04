@@ -73,4 +73,9 @@ describe('点検・軽: LINE通知の画面契約(#580)', () => {
     expect(PAGE).toContain('role="switch"')
     expect(PAGE).toContain('のお知らせを出す・止める')
   })
+
+  it('読み上げ: 運用者知らせの失敗は alert・成功は status で出す', () => {
+    expect(OPERATOR_RULES).toContain("role={notice.error ? 'alert' : 'status'}")
+    expect(OPERATOR_RULES).toContain('{notice.text}')
+  })
 })
