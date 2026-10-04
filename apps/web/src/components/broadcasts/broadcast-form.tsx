@@ -2862,15 +2862,14 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 space-y-3 text-sm">
-                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-medium text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${formatNumber(audienceDisplayCount)}人`}</dd></div>
-                <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-medium text-ink">未設定</dd></div>
-                <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-medium text-ink">{bubbles.length}通</dd></div>
+                <div><dt className="text-xs text-ink-faint">送る相手</dt><dd className="font-medium text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${formatNumber(audienceDisplayCount)}人`}</dd></div>
+                <div><dt className="text-xs text-ink-faint">送る日時</dt><dd className="font-medium text-ink">{scheduledLabel ?? '未設定'}</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信後のアクション</dt><dd className="font-medium text-ink">{publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'なし'}</dd></div>
               </dl>
             </section>
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">対象の確認ポイント</h3>
-              <p className="mt-2 text-xs text-ink-faint">送信できない友だちを事前に除外します。</p>
-              <ul className="mt-3 space-y-2 text-xs text-ink-secondary"><li>✓ ブロック・非表示を除外</li><li>✓ 同一人物の重複を除外</li><li>✓ 配信停止中を除外</li></ul>
+              <p className="mt-2 text-xs text-ink-secondary">・人数は送る直前にもう一度数え直します ・ブロック中の人には届きません</p>
             </section>
           </div>
         ) : (
