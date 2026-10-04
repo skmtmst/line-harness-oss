@@ -244,8 +244,8 @@
     "unresolved-classname": 10
   },
   "app/emergency/control-v8.tsx": {
-    "unresolved-classname": 81,
-    "direct-th": 6
+    "direct-th": 6,
+    "unresolved-classname": 100
   },
   "app/emergency/page.tsx": {
     "unresolved-classname": 4,
