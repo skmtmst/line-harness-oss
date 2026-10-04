@@ -26,7 +26,6 @@ const BOOKING = read('booking', 'bookings', 'page.tsx')
 const CHATS = read('chats', 'page.tsx')
 const FRIENDS = read('friends', 'page.tsx')
 const NOTIFY = read('line-notifications', 'page.tsx')
-const NOTIFY_KPIS = read('line-notifications', 'customer-kpis.ts')
 const WEBINARS = read('webinars', 'page.tsx')
 const ANALYTICS = read('analytics', 'page.tsx')
 const BOOKING_MENUS = read('booking', 'menus', 'page.tsx')
@@ -135,16 +134,10 @@ describe('#670 02 担当者の二重ラベルと並び順の見出し', () => {
   })
 })
 
-describe('#670 24 お知らせの集計カードは意味で分ける', () => {
-  it('お知らせの数と月の送信枠を別の段に分ける', () => {
-    expect(NOTIFY).toContain("kpi.group === 'notice'")
-    expect(NOTIFY).toContain("kpi.group === 'quota'")
-    expect(NOTIFY_KPIS).toContain("group: 'notice'")
-    expect(NOTIFY_KPIS).toContain("group: 'quota'")
-  })
-
-  it('送信枠の3枚は3列で並ぶ', () => {
-    expect(NOTIFY).toContain('sm:grid-cols-3')
+describe('V8 お知らせの集計カード', () => {
+  it('お知らせと送信枠の意味を保って、4枚を同じ段に並べる', () => {
+    expect(NOTIFY).toContain('kpisWithSendCountsState.map(renderKpiCard)')
+    expect(NOTIFY).toContain('sm:grid-cols-2 xl:grid-cols-4')
   })
 })
 

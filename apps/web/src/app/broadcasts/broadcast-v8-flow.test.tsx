@@ -67,6 +67,8 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
 }))
 
+vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push, replace: mocks.replace, refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
   useSearchParams: () => new URLSearchParams(mocks.query),
@@ -87,6 +89,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { id: 'admin-1', role: 'admin', name: '管理者' } }) },
       tags: { ...actual.api.tags, list: mocks.tagsList },
       scenarios: { ...actual.api.scenarios, list: mocks.scenariosList },
       folders: { ...actual.api.folders, list: mocks.foldersList },
@@ -130,7 +133,14 @@ function unmount() {
 }
 
 beforeEach(() => {
+  // 予約を取り消せるオーナーとして操作する。実APIや他の試験の役割に依存させない。
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => key === 'lh_staff_role' ? 'owner' : null,
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+  })
   mocks.query = ''
+  window.localStorage.setItem('lh_staff_role', 'admin')
   mocks.listRows = [draftRow('b-1', 'はじめの配信')]
   mocks.push.mockClear()
   mocks.create.mockClear()
@@ -140,6 +150,8 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount()
+  window.localStorage.removeItem('lh_staff_role')
+  vi.unstubAllGlobals()
 })
 
 describe('V8 一斉配信の通し', () => {

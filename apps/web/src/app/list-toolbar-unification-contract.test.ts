@@ -25,11 +25,11 @@ const TOOLBAR_PAGES = [
   'reminders/page.tsx',
   'scenarios/page.tsx',
   'auto-replies/page.tsx',
-  'form-submissions/page.tsx',
+  // V8はlist-v8の道具欄へ完全切替。V8の画面・操作試験で守る。
   'webinars/page.tsx',
   'events/page.tsx',
   'templates/page.tsx',
-  'inflow-links/page.tsx',
+  // 流入と計測もV8の道具欄へ切替済み（inflow-link-tag-uiで守る）。
   'conversions/page.tsx',
   'common-actions/page.tsx',
   'rich-menus/page.tsx',

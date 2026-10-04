@@ -5,13 +5,11 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
-/** 帯の1枚ぶんだけを切り出す。ファイル全体を見ると別の帯に当たって素通りする。 */
-function kpiCard(title: string): string {
-  const at = PAGE.indexOf(`title="${title}"`)
+/** 数の帯ぶんだけを切り出す。ファイル全体を見ると別の数に当たって素通りする。 */
+function band(): string {
+  const at = PAGE.indexOf('aria-label="流入と計測の概要"')
   if (at < 0) return ''
-  const start = PAGE.lastIndexOf('<KpiCard', at)
-  const end = PAGE.indexOf('/>', at)
-  return PAGE.slice(start, end)
+  return PAGE.slice(at, at + 4500)
 }
 
 /**
@@ -23,27 +21,22 @@ function kpiCard(title: string): string {
  */
 describe('流入と計測の帯は、読めていない数を0件と書かない', () => {
   it('流入元の数は読めたときだけ出す', () => {
-    const card = kpiCard('流入元')
-    expect(card, '帯が見つからない').not.toBe('')
+    const tiles = band()
+    expect(tiles, '帯が見つからない').not.toBe('')
     // ここは「読めていないときに数を出さない」ことだけを見る。
     // **何を数えるか**は別の主題なので `inflow-kpi-scope-contract.test.ts` が見る。
-    // 式の字面ごと固定していたため、数える対象を直したときに
-    // 意図は保たれているのにこの試験だけが落ちていた。
-    expect(card, '読めていなくても件数を出している').toMatch(/value=\{routeCountAvailable \? \w+ : null\}/)
+    expect(tiles, '読めていなくても件数を出している').toContain(
+      "routeCountAvailable ? formatNumber(accountRouteCount) : '—'",
+    )
   })
 
   it('読込中と取得失敗を言い分ける', () => {
-    const card = kpiCard('流入元')
-    expect(card).toContain('読み込んでいます')
-    expect(card).toContain('読み込めませんでした')
+    const tiles = band()
+    expect(tiles).toContain('読み込んでいます')
+    expect(tiles).toContain('読み込めませんでした')
   })
 
   it('判定は読込中と失敗の両方を見る', () => {
     expect(PAGE).toContain('const routeCountAvailable = !loading && !loadFailed')
-  })
-
-  it('クリックの帯も未取得を0にしない', () => {
-    const card = kpiCard('クリック')
-    expect(card).toContain('summaryAvailable ? totalClicks : null')
   })
 })

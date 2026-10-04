@@ -44,6 +44,7 @@ shared-button-importer app/booking/menus/page.tsx
 shared-button-importer app/booking/menus/settings-v8.tsx
 shared-button-importer app/booking/menus/staff/assign-v8.tsx
 shared-button-importer app/booking/menus/staff/page.tsx
+shared-button-importer app/booking/prepay-badge-v8.tsx
 shared-button-importer app/booking/staff/new/staff-new-v8.tsx
 shared-button-importer app/booking/staff/page.tsx
 shared-button-importer app/booking/staff/shifts/liff-preview.tsx
@@ -97,7 +98,6 @@ shared-button-importer app/events/preview/page.tsx
 shared-button-importer app/form-submissions/edit/form-design-settings.tsx
 shared-button-importer app/form-submissions/edit/page.tsx
 shared-button-importer app/form-submissions/list-v8.tsx
-shared-button-importer app/form-submissions/page.tsx
 shared-button-importer app/form-submissions/responses/page.tsx
 shared-button-importer app/friend-add-settings/editor-v8.tsx
 shared-button-importer app/friend-add-settings/friend-add-rule-editor.tsx
@@ -125,6 +125,7 @@ shared-button-importer app/hq/billing/page.tsx
 shared-button-importer app/hq/members/page.tsx
 shared-button-importer app/hq/open/page.tsx
 shared-button-importer app/hq/page.tsx
+shared-button-importer app/hq/settings/page.tsx
 shared-button-importer app/hq/support/detail/page.tsx
 shared-button-importer app/hq/support/page.tsx
 shared-button-importer app/hq/templates/template-console.tsx
@@ -134,7 +135,6 @@ shared-button-importer app/inflow-links/detail/page.tsx
 shared-button-importer app/inflow-links/page.tsx
 shared-button-importer app/inflow-links/referral-qr-modal.tsx
 shared-button-importer app/line-notifications/operator-notification-rules.tsx
-shared-button-importer app/line-notifications/operator/new/page.tsx
 shared-button-importer app/line-notifications/page.tsx
 shared-button-importer app/login/page.tsx
 shared-button-importer app/login/two-factor/page.tsx
