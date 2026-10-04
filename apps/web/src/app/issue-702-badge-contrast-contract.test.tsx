@@ -82,14 +82,21 @@ describe('Issue #702: 危険バッジは濃い赤のトークンを指す', () =
 })
 
 describe('Issue #702: 4画面の札・タブはトークンで書く', () => {
-  it('ウェビナー一覧の状態札は薄い背景＋濃い文字の3組（生の灰・緑・黄は使わない）', () => {
+  it('ウェビナー一覧のV8札は薄い背景＋濃い文字を使う', () => {
     const page = read('webinars/page.tsx')
-    expect(page).toContain("draft: 'bg-shell text-ink-secondary'")
-    expect(page).toContain("active: 'bg-success-bg text-success'")
-    expect(page).toContain("archived: 'bg-warning-bg text-warning'")
-    expect(page).not.toContain('bg-gray-100 text-gray-600')
-    expect(page).not.toContain('bg-green-100 text-green-700')
-    expect(page).not.toContain('bg-amber-100 text-amber-700')
+    const css = read('webinars/list-v8.module.css')
+    expect(page).toContain('className={statusPillClass(w)}')
+    for (const [name, bg, fg] of [
+      ['pillNeutral', 'shell', 'ink-secondary'],
+      ['pillActive', 'success-bg', 'success'],
+      ['pillScheduled', 'warning-bg', 'warning'],
+    ]) {
+      expect(page).toContain(`styles.${name}`)
+      const rule = css.match(new RegExp(`\\.${name}\\s*\\{[^}]*\\}`))?.[0]
+      expect(rule).toContain(`background: var(--color-${bg});`)
+      expect(rule).toContain(`color: var(--color-${fg});`)
+    }
+    expect(page).not.toMatch(/bg-(?:gray|green|amber)-100/)
   })
 
   it('自動応答の凡例の札は成功・注意トークン（生の緑700・黄700は使わない）', () => {
