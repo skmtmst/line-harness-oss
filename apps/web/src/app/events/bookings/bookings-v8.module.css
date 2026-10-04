@@ -11,7 +11,7 @@
 .board {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
   container-type: inline-size;
 }
@@ -27,7 +27,7 @@
 .headTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -67,23 +67,28 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .kpiValue {
   color: var(--color-ink);
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
   line-height: 1.3;
   font-variant-numeric: tabular-nums;
 }
 
+/* 承認待ちがあるときだけ注意の色（板 `Mu8qW`）。 */
+.kpiValueWarn {
+  color: var(--color-warning);
+}
+
 .kpiUnit {
   margin-left: 4px;
-  color: var(--color-ink-secondary);
-  font-size: 12px;
+  color: var(--color-ink-faint);
+  font-size: 11px;
   font-weight: 400;
 }
 
@@ -92,7 +97,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-ink-faint);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 /* 段のカード。 */

@@ -208,8 +208,9 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     await render()
     await flush()
 
-    expect(host.textContent).toContain('視聴結果')
-    expect(host.textContent).toContain('15:00') // 平均視聴時間900秒の集計は見える
+    // V8-B `z2dgw`：見出しは数の帯・減りの棒に変わった。集計の数が見えることを確かめる。
+    expect(host.textContent).toContain('どこで人数が減っているか')
+    expect(host.textContent).toContain('申込')
     expect(csvLinks()).toEqual([])
     expect(host.textContent).not.toContain(FRIEND_NAME)
   })
@@ -250,7 +251,8 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     await render()
     await flush()
 
-    expect(host.textContent).toContain('視聴結果')
+    // V8-B `z2dgw`：見出しは数の帯・減りの棒に変わった。
+    expect(host.textContent).toContain('どこで人数が減っているか')
     expect(csvLinks()).toEqual([])
     const callsBefore = net.calls.length
     await act(async () => { csvButton()!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
