@@ -76,7 +76,8 @@ export default function KnowledgeEditor({ article: initial, ticket, onClose, onS
       <Button onClick={() => void save()} disabled={busy} variant={editing ? 'primary' : 'secondary'}>{editing ? '承認待ちで保存する' : '下書きを保存する'}</Button>
       {!editing && <Button variant="primary" disabled={busy || !canApprove} onClick={() => { setError(''); setApproving(true) }}>承認して有効にする</Button>}
     </div>}>
-    <div className={styles.editor}>
+    {/* 板 `R5ckwJ`（ナレッジの記事の中身）。窓自体の印は ZAOc7／DHdsw。 */}
+    <div className={styles.editor} data-design-node="R5ckwJ">
       {/* ★V7: 緑は「正常」だけ。説明の帯は枠なしの info の小さい帯にする。 */}
       <Notice tone="info">{editing
         ? '変更を保存すると承認待ちに戻ります。再承認するまで、この記事は AI の返信に使われません。'

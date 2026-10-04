@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import KpiCard from '@/components/shared/kpi-card'
 import StatusBadge from '@/components/shared/status-badge'
@@ -106,7 +107,20 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      {orderingOpen && <AccountOrdering />}
+      {/* 板 `a7lUk`（LINEアカウントの並び順と親子を変える窓）。V8 のときだけ窓で開く。 */}
+      {theme === 'v8' ? (
+        <Dialog
+          open={orderingOpen}
+          designNode="a7lUk"
+          title="LINEアカウント階層を編集"
+          description="カードの「…」から「最上位（親）にする」「○○の子にする」を選びます。上下に動かすと並び順が変わります。"
+          onCancel={() => setOrderingOpen(false)}
+        >
+          <AccountOrdering />
+        </Dialog>
+      ) : (
+        <>{orderingOpen && <AccountOrdering />}</>
+      )}
 
       <div data-design="KPIs" data-ro-kpis="true" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {/* ★V7：「100%」の札は何の割合でもない固定の文字だったので外す。 */}
