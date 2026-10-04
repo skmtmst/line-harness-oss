@@ -126,3 +126,21 @@
   border-color: var(--color-accent-deep);
 }
 }
+
+/* 正本 w6uYMd / RRxK5：枠を寸法に足さず、上端にチェックをそろえる。 */
+[data-theme='v8'] .card {
+  align-items: flex-start; border: 0; border-radius: 12px;
+  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+}
+[data-theme='v8'] .checked, [data-theme='v8'] .checked:hover { outline-color: var(--color-accent-deep); }
+[data-theme='v8'] .box { border: 0; border-radius: 5px; outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
+[data-theme='v8'] .box:checked { outline-color: var(--color-accent-deep); }
+[data-theme='v8'] .box:focus-visible { outline: 2px solid var(--color-action); outline-offset: 3px; }
+[data-theme='v8'] .body { display: flex; flex: 1; flex-direction: column; gap: 2px; }
+[data-theme='v8'] .title { line-height: 21px; }
+[data-theme='v8'] .note { line-height: 18px; font-weight: 400; }
+[data-theme='v8'] .disabled, [data-theme='v8'] .disabled .box { outline-color: var(--color-ink-disabled); }
+
+[data-theme='v8'] .body { align-items: flex-start; }
+[data-theme='v8'] .note { width: 100%; }
