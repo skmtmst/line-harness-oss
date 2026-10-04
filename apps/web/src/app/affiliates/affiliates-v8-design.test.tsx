@@ -86,6 +86,21 @@ describe('KdFRI アフィリエイタータブの絵合わせ', () => {
     expect(screen.getByText('認めると報酬に入ります')).toBeTruthy()
   })
 
+  test('v9JWQ 閲覧のみ：変える操作が止まり見る操作は残る', async () => {
+    render(<AffiliatesTabV8 accountId="acc-1" canEdit={false} registerHeaderActions={() => {}} />)
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: '成果を見る' }).length).toBe(3)
+    })
+    // 作る・選ぶは止まる
+    expect((screen.getByRole('button', { name: /アフィリエイターを作る/ }) as HTMLButtonElement).disabled).toBe(true)
+    for (const box of screen.getAllByRole('checkbox')) {
+      expect((box as HTMLInputElement).disabled).toBe(true)
+    }
+    // 探す・絞る・見るは使える
+    expect(screen.getByLabelText('名前・紹介コードで探す')).toBeTruthy()
+    expect(screen.getByLabelText('よく使う絞り込み')).toBeTruthy()
+  })
+
   test('道具が絵どおり', async () => {
     render(<AffiliatesTabV8 accountId="acc-1" canEdit registerHeaderActions={() => {}} />)
     await waitFor(() => {

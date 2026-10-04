@@ -5,8 +5,9 @@
  * 1152 は `KdFRI`、状態別は `rRk0C`、閲覧のみは `v9JWQ`）。
  *
  * データの口は v7（tabs.tsx の AffiliatorsTab）と同じ。ここでは見せ方だけを
- * V8-B の板に合わせる。フォルダの列はアフィリエイターに割り当てる API が
- * 無いので描かない（DEVIN-QUESTIONS に記録）。
+ * V8-B の板に合わせる。板 `nJlxX`・`v9JWQ` の左のフォルダの棚（数・
+ * 未分類・フォルダを追加）は、アフィリエイターを分ける API が無いので
+ * 描かない。止めた日・1件ごとの固定額も同じ理由で出さない。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
