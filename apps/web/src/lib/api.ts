@@ -14336,6 +14336,60 @@ export interface BookingPaymentAdminConfig {
   testMode: boolean;
 }
 
+export interface BookingNoshowSettings {
+  enabled: boolean;
+  threshold: number;
+  windowMonths: number;
+  noPaymentMode: 'notice' | 'notice_call';
+}
+
+export interface BookingNoshowFlagEvent {
+  action: 'manual_on' | 'manual_off';
+  reason: string | null;
+  staffId: string | null;
+  staffName: string | null;
+  at: string;
+}
+
+export interface BookingPrepayDecision {
+  noshowCount: number;
+  threshold: number;
+  enabled: boolean;
+  windowMonths: number;
+  noPaymentMode: 'notice' | 'notice_call';
+  prepayOnly: boolean;
+  manual: boolean;
+  recentDates: string[];
+  lastEvent: BookingNoshowFlagEvent | null;
+}
+
+export interface BookingSalesSummaryMenu {
+  menu_id: string;
+  menu_name: string;
+  bookings: number;
+  confirmed: number;
+  revenue: number;
+  cancelRate: number;
+  noshowRate: number;
+}
+
+export interface BookingSalesSummaryWeekday {
+  weekday: number;
+  bookings: number;
+  confirmed: number;
+  revenue: number;
+}
+
+export interface BookingSalesSummary {
+  from: string;
+  to: string;
+  total: { bookings: number; confirmed: number; revenue: number; cancelRate: number; noshowRate: number; cancelled: number; noshow: number };
+  menus: BookingSalesSummaryMenu[];
+  weekdays: BookingSalesSummaryWeekday[];
+  previous: { revenue: number; bookings: number; cancelRate: number; noshowRate: number };
+  revenueSource: 'menu' | 'paid';
+}
+
 export const bookingApi = {
   getPaymentConfig: (accountId: string) =>
     fetchApi<{ success: true; data: BookingPaymentAdminConfig }>(
@@ -14361,6 +14415,35 @@ export const bookingApi = {
   clearMenuPayment: (accountId: string, menuId: string) =>
     fetchApi<{ success: true; data: { cleared: boolean } }>(
       withAccount(`/api/booking/admin/menus/${menuId}/payment`, accountId),
+      { method: 'DELETE' },
+    ),
+  getSalesSummary: (accountId: string, from: string, to: string) => {
+    const params = new URLSearchParams({ account_id: accountId, from, to });
+    return fetchApi<{ success: true; data: BookingSalesSummary }>(
+      `/api/booking/admin/sales-summary?${params}`,
+    );
+  },
+  getNoshowSettings: (accountId: string) =>
+    fetchApi<{ success: true; data: BookingNoshowSettings }>(
+      withAccount('/api/booking/admin/noshow-settings', accountId),
+    ),
+  saveNoshowSettings: (accountId: string, body: Partial<BookingNoshowSettings>) =>
+    fetchApi<{ success: true; data: BookingNoshowSettings }>(
+      withAccount('/api/booking/admin/noshow-settings', accountId),
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+  getFriendNoshow: (accountId: string, friendId: string) =>
+    fetchApi<{ success: true; data: BookingPrepayDecision }>(
+      withAccount(`/api/booking/admin/friends/${encodeURIComponent(friendId)}/noshow`, accountId),
+    ),
+  setFriendPrepay: (accountId: string, friendId: string, body: { mode: 'manual_on' | 'manual_off'; reason?: string }) =>
+    fetchApi<{ success: true; data: BookingPrepayDecision }>(
+      withAccount(`/api/booking/admin/friends/${encodeURIComponent(friendId)}/prepay`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  clearFriendPrepay: (accountId: string, friendId: string) =>
+    fetchApi<{ success: true; data: BookingPrepayDecision }>(
+      withAccount(`/api/booking/admin/friends/${encodeURIComponent(friendId)}/prepay`, accountId),
       { method: 'DELETE' },
     ),
   previewReminders: (accountId: string, startsAt: string) => {

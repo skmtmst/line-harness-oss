@@ -22,6 +22,7 @@ import {
   saveBookingAdminSettings,
   createBookingPayment,
   decidePrepayOnly,
+  prepayNoticeFor,
   resolveBookingPaymentConfig,
   listBookingAdminResources,
   getBookingAvailabilityException,
@@ -1096,9 +1097,11 @@ booking.post('/api/liff/booking/requests', async (c) => {
     console.error('booking payment record failed:', error);
   }
   // 無断キャンセルの前払いのみ。前払いの人は案内を付ける（予約自体は仮押さえのまま）。
-  let selfPrepayOnly = false;
+  let selfPrepayNotice: string | null = null;
   try {
-    selfPrepayOnly = (await decidePrepayOnly(c.env.DB, accountId, friendId)).prepayOnly;
+    selfPrepayNotice = await prepayNoticeFor(
+      c.env.DB, accountId, await decidePrepayOnly(c.env.DB, accountId, friendId),
+    );
   } catch (error) {
     console.error('prepay decision failed:', error);
   }
@@ -1107,11 +1110,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
     booking_id: bookingId,
     status: 'requested',
     ...(bookingPayment ? { payment: bookingPayment } : {}),
-    ...(selfPrepayOnly
-      ? {
-          prepayNotice: '無断キャンセルが続いているため、この予約は前払いのみです。お支払いが終わるまで確定しません。',
-        }
-      : {}),
+    ...(selfPrepayNotice ? { prepayNotice: selfPrepayNotice } : {}),
   };
   await saveIdempotencyResponse(c.env.DB, {
     key: idemKey,
@@ -5510,9 +5509,12 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   // 無断キャンセルの前払いのみ。前払いの人（友だち登録があるときだけ判定）は
   // ここでは確定させず、支払い済みの知らせで確定させる。
   let adminPrepayOnly = false;
+  let adminPrepayNotice: string | null = null;
   if (friendId) {
     try {
-      adminPrepayOnly = (await decidePrepayOnly(c.env.DB, accountId, friendId)).prepayOnly;
+      const decision = await decidePrepayOnly(c.env.DB, accountId, friendId);
+      adminPrepayOnly = decision.prepayOnly;
+      adminPrepayNotice = await prepayNoticeFor(c.env.DB, accountId, decision);
     } catch (error) {
       console.error('prepay decision failed:', error);
     }
@@ -5828,7 +5830,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     status: initialStatus,
     ...(adminPrepayOnly
       ? {
-          prepayNotice: '無断キャンセルが続いているため、この予約は前払いのみです。お支払いが終わるまで確定しません。',
+          prepayNotice: adminPrepayNotice,
           payment: adminPrepayPayment,
         }
       : {}),

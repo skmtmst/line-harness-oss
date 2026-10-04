@@ -507,7 +507,8 @@
     "558_booking_payments.sql",
     "559_booking_plus_repeat_waitlist_visit.sql",
     "560_booking_sales_noshow.sql",
-    "564_form_versions_purge_delete.sql"
+    "564_form_versions_purge_delete.sql",
+    "565_booking_noshow_settings_reasons.sql"
   ],
-  "migrationCount": 508
+  "migrationCount": 509
 }

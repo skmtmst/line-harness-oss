@@ -756,6 +756,13 @@
       "column": "line_account_id"
     }
   },
+  "booking_noshow_flag_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "broadcast_after_action_runs": {
     "category": "purge",
     "scope": {

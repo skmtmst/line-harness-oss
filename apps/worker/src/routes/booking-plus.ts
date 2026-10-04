@@ -2,9 +2,11 @@ import { Hono } from 'hono';
 import {
   decidePrepayOnly,
   getBookingSalesSummary,
-  getNoshowThreshold,
-  saveNoshowThreshold,
+  getNoshowSettings,
+  logNoshowFlagEvent,
+  saveNoshowSettings,
   setNoshowFlagMode,
+  type NoshowNoPaymentMode,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -47,7 +49,7 @@ bookingPlus.get(
   },
 );
 
-// GET /api/booking/admin/noshow-settings — 無断キャンセルの基準
+// GET /api/booking/admin/noshow-settings — 無断キャンセルの数え方
 bookingPlus.get(
   '/api/booking/admin/noshow-settings',
   requireRole('owner', 'admin', 'staff'),
@@ -59,12 +61,12 @@ bookingPlus.get(
     }
     return c.json({
       success: true,
-      data: { threshold: await getNoshowThreshold(c.env.DB, accountId) },
+      data: await getNoshowSettings(c.env.DB, accountId),
     });
   },
 );
 
-// PUT /api/booking/admin/noshow-settings — 基準を変える
+// PUT /api/booking/admin/noshow-settings — 数え方を変える
 bookingPlus.put(
   '/api/booking/admin/noshow-settings',
   requireRole('owner', 'admin'),
@@ -74,13 +76,33 @@ bookingPlus.put(
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: '対象が見つかりません' }, 404);
     }
-    const body = await c.req.json<{ threshold?: unknown }>().catch(() => null);
-    const threshold = Number(body?.threshold);
+    const body = await c.req.json<{
+      enabled?: unknown; threshold?: unknown; windowMonths?: unknown; noPaymentMode?: unknown;
+    }>().catch(() => null);
+    if (!body || typeof body !== 'object') {
+      return c.json({ success: false, error: '設定を送ってください' }, 400);
+    }
+    const current = await getNoshowSettings(c.env.DB, accountId);
+    const enabled = body.enabled === undefined ? current.enabled : body.enabled === true;
+    const threshold = body.threshold === undefined ? current.threshold : Number(body.threshold);
     if (!Number.isInteger(threshold) || threshold < 1 || threshold > 100) {
       return c.json({ success: false, error: 'threshold は 1〜100 の整数で指定してください' }, 400);
     }
-    await saveNoshowThreshold(c.env.DB, accountId, threshold);
-    return c.json({ success: true, data: { threshold } });
+    const windowMonths = body.windowMonths === undefined ? current.windowMonths : Number(body.windowMonths);
+    if (!Number.isInteger(windowMonths) || windowMonths < 1 || windowMonths > 120) {
+      return c.json({ success: false, error: 'windowMonths は 1〜120 の整数で指定してください' }, 400);
+    }
+    let noPaymentMode: NoshowNoPaymentMode = current.noPaymentMode;
+    if (body.noPaymentMode !== undefined) {
+      if (body.noPaymentMode !== 'notice' && body.noPaymentMode !== 'notice_call') {
+        return c.json({ success: false, error: 'noPaymentMode は notice か notice_call で指定してください' }, 400);
+      }
+      noPaymentMode = body.noPaymentMode;
+    }
+    const saved = await saveNoshowSettings(c.env.DB, accountId, {
+      enabled, threshold, windowMonths, noPaymentMode,
+    });
+    return c.json({ success: true, data: saved });
   },
 );
 
@@ -119,12 +141,26 @@ bookingPlus.post(
       return c.json({ success: false, error: '対象が見つかりません' }, 404);
     }
     // 体だけでも送れるよう、読めないときは付ける扱いにする。
-    const body = await c.req.json<{ mode?: unknown }>().catch(() => null);
+    const body = await c.req.json<{ mode?: unknown; reason?: unknown }>().catch(() => null);
     const mode = body?.mode ?? 'manual_on';
     if (mode !== 'manual_on' && mode !== 'manual_off') {
       return c.json({ success: false, error: 'mode は manual_on か manual_off で指定してください' }, 400);
     }
+    // 印を外すときは理由を1行書く（だれがいつ外したか残す）。
+    const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 200) : '';
+    if (mode === 'manual_off' && !reason) {
+      return c.json({ success: false, error: '印を外すときは理由を1行書いてください' }, 400);
+    }
+    const staff = c.get('staff');
     await setNoshowFlagMode(c.env.DB, accountId, friendId, mode);
+    await logNoshowFlagEvent(c.env.DB, {
+      lineAccountId: accountId,
+      friendId,
+      action: mode,
+      reason: reason || null,
+      staffId: staff?.id ?? null,
+      staffName: staff?.name ?? null,
+    });
     return c.json({ success: true, data: await decidePrepayOnly(c.env.DB, accountId, friendId) });
   },
 );
