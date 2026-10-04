@@ -147,3 +147,27 @@ describe('分析画面の配線（見た目と数字の一致）', () => {
     expect(analyticsPage).toContain('増加 {selectedDay.added}人・減少 {selectedDay.removed}人')
   })
 })
+
+/*
+ * V8 QA 1003-1459 ①：読み上げ用の表が見えないまま画面いっぱいの箱になり、
+ * 画面全体の横はみ出し（1440で286px・1152で110px）の原因になっていた。
+ * 表は `height: 0` を最小と読むうえ、画面側の `table { width: 100% }`
+ * （層の外）が幅を奪い、絶対配置の包含塊＝画面いっぱいに広がる。
+ * 最小・最大の両方を 0 で押さえ、箱を作らない。読み上げは残す。
+ */
+describe('読み上げ用の表は箱を作らない', () => {
+  it('表は読み上げに残る（隠し属性なし・見出しつき）', () => {
+    render(<BarChart items={SAMPLE} />)
+    const table = document.querySelector('table') as HTMLTableElement
+    expect(table.getAttribute('aria-hidden')).toBeNull()
+    expect(table.querySelector('caption')?.textContent).toBe('日ごとの増減')
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(3)
+  })
+
+  it('.srOnly は最小・最大の両方を 0 で押さえる', () => {
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*min-width:\s*0/s)
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*max-width:\s*0/s)
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*max-height:\s*0/s)
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*overflow:\s*hidden/s)
+  })
+})
