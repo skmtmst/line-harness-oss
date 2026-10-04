@@ -1071,7 +1071,7 @@
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 35
+    "unresolved-classname": 36
   },
   "components/shared/virtual-rows.tsx": {
     "unresolved-classname": 2
