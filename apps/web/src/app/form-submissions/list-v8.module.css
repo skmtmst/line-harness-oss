@@ -396,10 +396,13 @@
 
 .answerSub {
   margin: 2px 0 0;
+  max-width: 100%;
+  overflow: hidden;
   color: var(--color-ink-faint);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* 「URL」列：配っているURLを写す小さなボタン。 */
