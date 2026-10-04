@@ -1,6 +1,7 @@
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatJstEventAt } from '../lib/datetime.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 import Button from '../components/ui/Button.js';
 import Icon from '../components/ui/Icon.js';
@@ -34,7 +35,7 @@ export default function EventDone() {
   }
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node="qVdiX">
+    <LiffLookScope className="min-h-screen bg-ground" designNode="qVdiX">
       <LiffHeader title="イベント" />
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10">
         <StatusView
@@ -50,6 +51,6 @@ export default function EventDone() {
           </Button>
         </div>
       </div>
-    </div>
+    </LiffLookScope>
   );
 }

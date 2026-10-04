@@ -40,6 +40,15 @@ describe('本文の見本表示', () => {
     expect(renderReminderBodySample('{{meet_datetime}}に集合')).toBe('{{meet_datetime}}に集合')
   })
 
+  it('個別相談の予約日時とMeet URLを見本で読む', () => {
+    expect(renderReminderBodySample('{{reservation_datetime}}にお待ちしています')).toBe(
+      '10月1日(木) 10:00にお待ちしています',
+    )
+    expect(renderReminderBodySample('参加はこちら{{meet_url}}')).toBe(
+      '参加はこちらhttps://meet.google.com/sample-0000',
+    )
+  })
+
   it('確認表は日時の書き方・先の日付を落とさない', () => {
     const settings = {
       ...SETTINGS,
@@ -57,5 +66,15 @@ describe('本文の見本表示', () => {
       steps: [{ messageContent: '{{meet_datetime}}に集合' }],
     } as never
     expect(reminderPlaceholders(settings, null)).toHaveLength(0)
+  })
+
+  it('確認表は個別相談の差し込みを取得元付きで拾う', () => {
+    const settings = {
+      ...SETTINGS,
+      steps: [{ messageContent: '{{reservation_datetime}}に{{meet_url}}から' }],
+    } as never
+    const rows = reminderPlaceholders(settings, null)
+    expect(rows.map((row) => row.token)).toEqual(['{{reservation_datetime}}', '{{meet_url}}'])
+    expect(rows.map((row) => row.source)).toEqual(['個別相談の予約日時', '個別相談のMeet URL'])
   })
 })
