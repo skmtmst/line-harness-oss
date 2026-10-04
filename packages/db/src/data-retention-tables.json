@@ -1331,9 +1331,9 @@
     "category": "purge",
     "scope": {
       "by": "parent",
-      "column": "on_submit_tag_id",
-      "parent": "tags",
-      "parentColumn": "id"
+      "column": "id",
+      "parent": "form_accounts",
+      "parentColumn": "form_id"
     }
   },
   "friend_add_action_runs": {

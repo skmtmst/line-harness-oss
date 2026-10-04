@@ -20,6 +20,8 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
   'app/affiliate-offers/new/page.tsx',
+  'app/affiliate-offers/new-offer-v8.tsx',
+  'app/affiliates/new-affiliate-v8.tsx',
   'app/analytics/reports/new/page.tsx',
   'app/auto-replies/edit/wizard-v8.tsx',
   'app/booking/menus/new/menu-form-v8.tsx',
@@ -95,6 +97,7 @@ const GUARDED = [
   'app/webinars/new/page.tsx',
   'components/accounts/account-ordering.tsx',
   'components/broadcasts/broadcast-form.tsx',
+  'components/events/event-form.tsx',
   'components/events/event-wizard.tsx',
   'components/friend-fields/support-mark-editor.tsx',
   'components/reminders/reminder-publish-flow.tsx',
@@ -310,8 +313,6 @@ const UNTRIAGED: Record<string, string> = {
     's2: 自動応答の編集。共通ダイアログは背景クリックとEscで閉じる。V6R-S2-a（board#1066）で付ける',
   'components/broadcasts/broadcast-asset-manager.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'components/events/event-form.tsx':
-    's3: イベント作成。V6R-S3-b（board#1067）で付ける',
   'components/friend-fields/edit-tag-page-v4.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/friend-fields/support-mark-rules-panel.tsx':

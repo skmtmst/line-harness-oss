@@ -9877,10 +9877,6 @@ CREATE TRIGGER trg_form_versions_immutable
 BEFORE UPDATE ON form_versions
 BEGIN SELECT RAISE(ABORT, 'published form versions are immutable'); END;
 
-CREATE TRIGGER trg_form_versions_no_delete
-BEFORE DELETE ON form_versions
-BEGIN SELECT RAISE(ABORT, 'published form versions cannot be deleted'); END;
-
 CREATE TRIGGER trg_forms_activation_requires_published_version
 BEFORE UPDATE OF is_active ON forms
 WHEN NEW.is_active = 1 AND NEW.current_published_version_id IS NULL

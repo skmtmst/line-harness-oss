@@ -6,6 +6,9 @@
 import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import Checkbox from './checkbox'
 
 afterEach(() => cleanup())
@@ -47,5 +50,13 @@ describe('チェックボックス（★V7 gvjpx）', () => {
     render(<Checkbox checked={false} disabled onCheckedChange={() => { changes += 1 }}>すべての友だちに送る</Checkbox>)
     fireEvent.click(screen.getByText('すべての友だちに送る'))
     expect(changes).toBe(0)
+  })
+
+  it('押せる24pxは札のpaddingで受け、inputは箱からはみ出さない（M3報告のはみ出し対応）', () => {
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'checkbox.module.css'), 'utf8')
+    // input は 18px の箱に収める（負の inset で外へ出さない）。
+    expect(css).toMatch(/\.input \{\s*position:\s*absolute;\s*inset:\s*0;/s)
+    // 24px の当たりは札（.line）の padding＋戻し margin で持つ。
+    expect(css).toMatch(/\.line \{[^}]*padding:\s*3px;[^}]*margin:\s*-3px;/s)
   })
 })

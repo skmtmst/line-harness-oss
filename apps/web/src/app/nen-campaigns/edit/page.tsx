@@ -230,8 +230,8 @@ function NenColumnEditInner() {
                           ? '変更があります。保存するまで反映されません。'
                           : ''}
                 </p>
-                <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 py-1.5 font-medium h-auto whitespace-normal" onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}>
-                  {savingId === column.id ? '保存中...' : '保存する'}
+                <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 py-1.5 font-medium h-auto whitespace-normal" onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')} busy={savingId === column.id} done={savedId === column.id}>
+                  保存する
                 </Button>
               </div>
             </div>
