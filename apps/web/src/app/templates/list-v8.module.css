@@ -205,6 +205,12 @@
   background: var(--color-canvas-sunken);
 }
 
+/* 消える行は 150ms で薄くなる（V8 の動き §8）。 */
+.rowClick[data-leaving='true'] {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease-out);
+}
+
 .selectCell {
   text-align: center;
 }

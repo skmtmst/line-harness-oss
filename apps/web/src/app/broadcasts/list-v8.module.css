@@ -380,6 +380,12 @@
   transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 
+/* 消える行は 150ms で薄くなる（V8 の動き §8）。 */
+.rowClick[data-leaving='true'] {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease-out);
+}
+
 .rowClick:hover td {
   background: var(--color-canvas-sunken);
 }

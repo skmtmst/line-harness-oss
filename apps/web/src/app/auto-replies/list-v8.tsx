@@ -38,6 +38,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
+import { useRowLeaving } from '@/components/shared/row-leaving'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import HelpTip from '@/components/shared/help-tip'
@@ -454,6 +455,8 @@ export default function AutoRepliesListV8() {
     }
   }
 
+  const { isLeaving, fadeOut } = useRowLeaving()
+
   const runDelete = async () => {
     if (!pendingDelete) return
     if (pendingDelete.accountId !== selectedAccountId) {
@@ -471,7 +474,8 @@ export default function AutoRepliesListV8() {
         return
       }
       setPendingDelete(null)
-      if (selectedAccountIdRef.current === requestAccountId) await load()
+      // 消えた行は 150ms 薄くしてから読み直す（V8 の動き §8）。
+      if (selectedAccountIdRef.current === requestAccountId) await fadeOut([targetId], () => load())
     } catch (reason) {
       setDeleteError(
         reason instanceof ApiError && reason.status === 403
@@ -932,6 +936,7 @@ export default function AutoRepliesListV8() {
                 <tr
                   key={r.id}
                   className={styles.rowClick}
+                  data-leaving={isLeaving(r.id) || undefined}
                   tabIndex={0}
                   onClick={() => router.push(`/auto-replies/edit?id=${r.id}`)}
                   onKeyDown={(event) => {
