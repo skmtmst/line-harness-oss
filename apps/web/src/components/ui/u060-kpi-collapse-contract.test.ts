@@ -32,7 +32,7 @@ describe('KPI折りたたみの適用（#975 U060）', () => {
     ['app/automations/page.tsx', 'KpiCollapse'],
     ['app/automations/runs/page.tsx', 'KpiCollapse'],
     ['app/hq/page.tsx', 'KpiCollapse'],
-    ['app/hq/members/page.tsx', 'KpiCollapse'],
+    // 統括メンバーは数えない。数の帯が無い（板 yLKwV・BHEl9）。
     ['app/nen-campaigns/nen-overview.tsx', 'KpiCollapse'],
     ['app/ec-commerce/page.tsx', 'KpiCollapse'],
     ['app/emergency/page.tsx', 'KpiCollapse'],
