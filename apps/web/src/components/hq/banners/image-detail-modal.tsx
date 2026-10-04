@@ -1,6 +1,5 @@
 'use client'
 
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import '@/app/hq/readonly-v8.css'
 import { Download, ImagePlus, RefreshCw, Star, Store, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -9,6 +8,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import SearchField from '@/components/shared/search-field'
 import type { AccountWithStats } from '@/contexts/account-context'
 import {
   fileSizeLabel,
@@ -56,16 +56,23 @@ export default function ImageDetailModal({
   /** 「参照画像にする」（★V6 35-2 の参照画像欄へ入れる）。ライブラリから開いたときは渡さない。 */
   onUseAsReference?: () => void
 }) {
-  const theme = useAdminTheme()
   const panelRef = useOverlayFocus(true, onClose, busy)
   const [mounted, setMounted] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
   const [confirmRemove, setConfirmRemove] = useState(false)
+  const [accountQuery, setAccountQuery] = useState('')
   useEffect(() => setMounted(true), [])
 
   const delivered = useMemo(() => new Set(image.deliveredAccountIds), [image.deliveredAccountIds])
   const rows = generationConditionRows(image, presets)
   const deliverable = accounts.filter((a) => !delivered.has(a.id))
+  const visibleAccounts = useMemo(() => {
+    const q = accountQuery.trim().toLowerCase()
+    if (!q) return accounts
+    return accounts.filter((a) =>
+      `${a.displayName ?? a.name}\n${a.basicId ?? ''}\n${a.channelId ?? ''}`.toLowerCase().includes(q),
+    )
+  }, [accounts, accountQuery])
 
   const toggle = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -81,7 +88,7 @@ export default function ImageDetailModal({
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-scrim"
       role="presentation"
-      data-design-node={theme === 'v8' ? 'rI5uh' : 'g4MyEA'}
+      data-design-node="rI5uh"
       onMouseDown={(event) => {
         if (!busy && event.target === event.currentTarget) onClose()
       }}
@@ -145,28 +152,25 @@ export default function ImageDetailModal({
           </div>
 
           <div className="flex flex-col gap-4">
-            <section data-design-node="i5KDb" className="flex flex-col gap-2.5 rounded-card bg-surface-pearl p-4">
-              <h3 className="text-body font-bold text-ink">{image.generation ? '生成時の条件' : 'この画像について'}</h3>
-              <dl className="flex flex-col gap-2">
-                {rows.map((row) => (
-                  <div key={row.label} className="flex gap-3">
-                    <dt className="w-24 shrink-0 text-caption font-semibold text-ink-faint">{row.label}</dt>
-                    <dd className="min-w-0 flex-1 whitespace-pre-wrap break-words text-label text-ink">{row.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-
             <section data-design-node="qyeVH" className="flex flex-col gap-2 rounded-card border border-hairline bg-canvas p-4">
               <div className="flex items-baseline gap-2">
                 <h3 className="text-body font-bold text-ink">アカウントへ渡す</h3>
                 <p className="text-caption text-ink-faint">渡したアカウントの登録メディアに入ります</p>
               </div>
+              <SearchField
+                placeholder="アカウント名で探す"
+                aria-label="渡すアカウントをアカウント名で探す"
+                value={accountQuery}
+                onChange={setAccountQuery}
+                onClear={() => setAccountQuery('')}
+              />
               {accounts.length === 0 ? (
                 <p className="text-caption text-ink-faint">この統括にアカウントがありません。</p>
+              ) : visibleAccounts.length === 0 ? (
+                <p className="text-caption text-ink-faint">当てはまるアカウントがありません。</p>
               ) : (
                 <ul className="flex flex-col">
-                  {accounts.map((account) => {
+                  {visibleAccounts.map((account) => {
                     const already = delivered.has(account.id)
                     const checked = selected.includes(account.id)
                     return (
@@ -209,8 +213,35 @@ export default function ImageDetailModal({
                   })}
                 </ul>
               )}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {selected.length > 0 ? (
+                  <p className="text-caption text-ink-faint">{selected.length}アカウントを選んでいます</p>
+                ) : null}
+                <span className="flex-1" />
+                <Button
+                  variant="primary"
+                  disabled={busy || selected.length === 0 || deliverable.length === 0}
+                  onClick={() => void onDeliver(selected).then(() => setSelected([]))} busy={busy} busyLabel="渡しています…">
+                  <Store aria-hidden="true" className="h-4 w-4" />
+                  {`${selected.length}アカウントへ渡す`}
+                </Button>
+              </div>
             </section>
           </div>
+        </div>
+
+        <div className="px-5 pb-1">
+          <section data-design-node="i5KDb" className="flex flex-col gap-2.5 rounded-card bg-surface-pearl p-4">
+            <h3 className="text-body font-bold text-ink">{image.generation ? '生成時の条件' : 'この画像について'}</h3>
+            <dl className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
+              {rows.map((row) => (
+                <div key={row.label} className="flex gap-3">
+                  <dt className="w-24 shrink-0 text-caption font-semibold text-ink-faint">{row.label}</dt>
+                  <dd className="min-w-0 flex-1 whitespace-pre-wrap break-words text-label text-ink">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
         </div>
 
         {error ? <p className="px-5 text-label text-danger" role="alert">{error}</p> : null}
@@ -239,13 +270,6 @@ export default function ImageDetailModal({
               参照画像にする
             </Button>
           ) : null}
-          <Button
-            variant="primary"
-            disabled={busy || selected.length === 0 || deliverable.length === 0}
-            onClick={() => void onDeliver(selected).then(() => setSelected([]))} busy={busy} busyLabel="渡しています…">
-            <Store aria-hidden="true" className="h-4 w-4" />
-            {`${selected.length}アカウントへ渡す`}
-          </Button>
         </div>
       </div>
 
