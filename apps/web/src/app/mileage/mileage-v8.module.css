@@ -267,9 +267,9 @@
   table-layout: fixed;
 }
 
-/* 1列目は伸び縮み（余った幅を取る・狭いときは中の省略で縮む）。ほかは中身の幅。 */
-.table thead th:first-child,
-.table tbody td:first-child {
+/* 固定割付の表は colgroup の配分を使い、先頭列の全幅指定を掛けない。 */
+.table:not(.tableFit) thead th:first-child,
+.table:not(.tableFit) tbody td:first-child {
   width: 100%;
 }
 

@@ -592,12 +592,13 @@ try {
       putResults: ['conflict'],
     })
     /*
-     * 編集画面へは**一覧の名前を押して**入る。直接 URL を開くと、静的書き出し
+     * 編集画面へは一覧の名前で詳細パネルを開き、「編集する」から入る。直接 URL を開くと、静的書き出し
      * された頁では `useSearchParams` が `?id=` を拾えず、読み込みが始まらない。
      * 運用者の通り道と同じ経路で確かめる。
      */
     await openList(page)
-    await page.getByRole('link', { name: 'サーバ側の名前', exact: true }).click()
+    await page.getByRole('button', { name: '「サーバ側の名前」の詳細を見る', exact: true }).click()
+    await page.getByRole('link', { name: '編集する', exact: true }).click()
     const nameInput = page.locator('#fm-name')
     await nameInput.waitFor({ timeout: 15_000 })
     await page.waitForFunction(
@@ -649,7 +650,8 @@ try {
       putResults: ['conflict'],
     })
     await openList(page)
-    await page.getByRole('link', { name: 'サーバ側の名前', exact: true }).click()
+    await page.getByRole('button', { name: '「サーバ側の名前」の詳細を見る', exact: true }).click()
+    await page.getByRole('link', { name: '編集する', exact: true }).click()
     await page.locator('#fm-name').waitFor({ timeout: 15_000 })
     await page.waitForFunction(
       () => document.querySelector('#fm-name')?.value === 'サーバ側の名前',
