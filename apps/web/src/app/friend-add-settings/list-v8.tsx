@@ -491,7 +491,7 @@ function FriendAddListV8Inner() {
     ...(rule.isFallback
       ? [{
           id: 'stop-fallback',
-          label: '一時停止する',
+          label: '止める',
           disabled: !canEdit,
           disabledReason: canEdit ? undefined : readonlyReason,
           onSelect: () => setFallbackStop(true),
@@ -500,7 +500,7 @@ function FriendAddListV8Inner() {
           ...(rule.status === 'published'
             ? [{
                 id: 'stop',
-                label: '一時停止する',
+                label: '止める',
                 disabled: !canEdit,
                 disabledReason: canEdit ? undefined : readonlyReason,
                 onSelect: () => {
@@ -782,7 +782,7 @@ function FriendAddListV8Inner() {
                     onClose={() => setOpenMenuId(null)}
                     ariaLabel={`設定「${sinkRule.name}」の操作`}
                     items={rowMenuItems(sinkRule)}
-                    note="この設定は消せません（いちばん最後の受け皿）"
+                    note="この設定は削除できません（いちばん最後の受け皿）"
                   />
                 </td>
               </tr>
@@ -975,9 +975,9 @@ function FriendAddListV8Inner() {
       {/* 通常の設定の一時停止の確かめ。 */}
       <ConfirmDialog
         open={stopTarget !== null}
-        title={stopTarget ? `「${stopTarget.name}」を一時停止する` : ''}
+        title={stopTarget ? `「${stopTarget.name}」を止める` : ''}
         description="止めると、この流入リンクから来た人にはいちばん下の「経路が分からなかった人」の案内が動きます。"
-        confirmLabel="一時停止する"
+        confirmLabel="止める"
         busy={stopBusy}
         error={stopError}
         onConfirm={() => void runStop()}
