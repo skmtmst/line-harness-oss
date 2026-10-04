@@ -2,7 +2,12 @@
 
 import Disclosure from '@/components/shared/disclosure'
 import Select from '@/components/shared/select'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import Card from '@/components/shared/card'
+import SectionHeader from '@/components/shared/section-header'
+import HelpTip from '@/components/shared/help-tip'
+import styles from './create-v8.module.css'
 import {
   api,
   ApiError,
@@ -26,9 +31,7 @@ import {
 } from 'lucide-react'
 import CreatePage, {
   AsideCard,
-  ChoiceCard,
   Field,
-  FormSection,
   inputClass,
 } from '@/components/shared/create-page'
 import Button from '@/components/shared/button'
@@ -43,20 +46,6 @@ import { useAccount } from '@/contexts/account-context'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
 import { formatNumber } from '@/lib/format'
 
-/**
- * 成果地点を作る（設計 V6 19-1-B）。
- *
- * 設計は「何を成果として数えるか → どうやって数えるか → 金額の扱い」の順に
- * 聞く。数え方を決めないと、作っただけで1件も増えないので、そこを2番目に
- * 置いて飛ばせないようにしている。
- */
-
-/**
- * 種別。設計は3つにまとめている。
- *
- * eventType は自由な文字列なので、過去に作られた値（signup / reserve / other）も
- * そのまま残る。一覧側のラベル表にも同じ3つを載せてある。
- */
 type TriggerKind = 'order' | 'form' | 'booking' | 'page' | 'video' | 'tag'
 
 interface TriggerChoice {
@@ -163,6 +152,13 @@ async function fetchUsageTargets(kind: UsageGroupKind, accountId: string): Promi
   }))
 }
 
+function ConversionSection({ label, help, children }: { label: string; help?: ReactNode; children: ReactNode }) {
+  return <Card padding="default" className={styles.section}>
+    <SectionHeader title={label} help={help} helpLabel={`${label}の説明`} />
+    <div className={styles.fields}>{children}</div>
+  </Card>
+}
+
 export default function NewConversionPointPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
@@ -195,6 +191,7 @@ export default function NewConversionPointPage() {
   const [preview, setPreview] = useState<ConversionDefinitionPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewFailed, setPreviewFailed] = useState(false)
+  const [previewRetry, setPreviewRetry] = useState(0)
   const previewRequests = useRef(createLatestPreviewRequestGate())
 
   // 右の「同種の成果地点」に要る。作る前に、似たものが既にあるか分かるように。
@@ -327,7 +324,7 @@ export default function NewConversionPointPage() {
       window.clearTimeout(timer)
       request?.abort()
     }
-  }, [deduplicationMode, eventType, exclusion, exclusionMemo, lineAccountId, measureMethod, reversalPolicy, targetUrl, triggerKind, valueMode, yen])
+  }, [deduplicationMode, eventType, exclusion, exclusionMemo, lineAccountId, measureMethod, previewRetry, reversalPolicy, targetUrl, triggerKind, valueMode, yen])
 
   const toggleUsage = (target: UsageTarget) => {
     setSelectedUsageKeys((current) => {
@@ -380,15 +377,20 @@ export default function NewConversionPointPage() {
   }
 
   return (
-    <div data-design-node="j8p3yj cXqlS">
+    <div className={styles.root}>
+      <div className={styles.heading}>
+        <Link href="/conversions?tab=points" className={styles.back}>← コンバージョンへ</Link>
+        <h2>成果地点を作る</h2>
+        <p>「何が起きたら・何回まで・いくら」を決めると、その日から数えはじめます。前の日にさかのぼっては数えません。</p>
+      </div>
     <CreatePage
       title="成果地点を作る"
       description="「申込」「購入」など、成果として数えたい行動を登録します。"
       showHeader={false}
       parent={['コンバージョン', '/conversions?tab=points']}
       successHref={(id) => `/conversions?tab=points${id ? `&highlight=${encodeURIComponent(id)}` : ''}`}
-      saveLabel={saveAsDraft ? '下書きを保存する' : 'つくって数えはじめる'}
-      designNode="GtylA"
+      saveLabel={saveAsDraft ? '下書きを保存する' : '保存して数えはじめる'}
+      designNode="j8p3yj"
       variant="v6"
       validate={() => {
         if (!name.trim()) return '成果地点の名前を入力してください'
@@ -462,244 +464,24 @@ export default function NewConversionPointPage() {
       }}
       aside={
         <>
-          <section className="border-info bg-info-bg rounded-card border p-4">
-            <h2 className="text-info text-sm font-bold">この決めごとをこの30日にあてはめると</h2>
-            <div className="mt-3 flex items-end justify-between gap-4" aria-busy={previewLoading}>
-              <div>
-                <p className="text-info text-2xl font-bold tabular-nums">{preview ? `${formatNumber(preview.estimatedCount)}件` : '—'}</p>
-                <p className="text-info mt-1 text-xs tabular-nums">1日あたり {preview ? `${formatNumber(preview.dailyAverage)}件` : '—'}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-info text-xl font-bold tabular-nums">{preview ? `¥${formatNumber(preview.estimatedValue)}` : '—'}</p>
-                <p className="text-info mt-1 text-xs tabular-nums">
-                  {preview && preview.estimatedCount > 0
-                    ? `1件あたり ¥${formatNumber(Math.round(preview.estimatedValue / preview.estimatedCount))}`
-                    : '1件あたり —'}
-                </p>
-              </div>
-            </div>
-            <p className="text-ink-secondary mt-3 text-xs leading-relaxed">
-              {previewFailed
-                ? '保存前の試算を読み込めませんでした。入力内容は保存されていません。'
-                : preview
-                  ? `入力中の条件だけで試算しています。重複除外 ${preview.duplicateExcludedCount}件・取消 ${preview.cancellationCount}件。試算では成果を追加しません。`
-                  : '入力中の条件を試算しています。'}
-            </p>
-            {/* R40: 試算の注意(excludedReasons)は画面に出す。無いときは出さない。 */}
-            {preview && !previewFailed && preview.excludedReasons.length > 0 ? (
-              <ul className="text-ink-secondary mt-2 space-y-1 text-xs leading-relaxed">
-                {preview.excludedReasons.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-            ) : null}
-          </section>
-
-          <AsideCard title="つながる先">
-            <ul className="text-ink-secondary divide-hairline divide-y text-xs">
-              <li className="flex justify-between gap-3 py-2"><span>成果とアフィリエイト</span><span className="text-ink-faint">案件から使う</span></li>
-              <li className="flex justify-between gap-3 py-2"><span>分析</span><span className="text-ink-faint">成果のグラフ</span></li>
-              <li className="flex justify-between gap-3 py-2"><span>自動応答</span><span className="text-ink-faint">成果後の通知</span></li>
-              <li className="flex justify-between gap-3 py-2"><span>流入と計測</span><span className="text-ink-faint">どの経路から起きたか</span></li>
-              <li className="flex justify-between gap-3 py-2"><span>マイル</span><span className="text-ink-faint">成果でマイルを付与</span></li>
-            </ul>
-            <p className="text-ink-faint mt-3 text-xs">選んだ利用先は成果地点の公開版と一緒に保存します。</p>
-          </AsideCard>
-
-          <section className="border-warning bg-warning-bg rounded-card border p-4">
-            <h2 className="text-warning text-sm font-bold">気をつけること</h2>
-            <ul className="text-ink-secondary mt-3 space-y-2 text-xs leading-relaxed">
-              <li>同じ意味の成果地点を2つ作ると、分析の数字が二重になります。</li>
-              <li>似たものがないか、上の同種実績を確認してください。</li>
-              <li>過去にさかのぼっては数えません。作った後の成果から記録します。</li>
-            </ul>
-          </section>
-        </>
-      }
-    >
-      <FormSection step={1} label="何が起きたら数えますか">
-        {/* #975 U062: 390pxで6枚の大カードを積まない。短い選択群にし、説明は選択中の1種類だけ下へ出す。 */}
-        <RadioCardGroup legend="数えるきっかけ" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {TRIGGER_CHOICES.map((choice) => {
-            const selected = triggerKind === choice.value
-            return (
-              <RadioCard
-                key={choice.value}
-                name="conversion-trigger"
-                value={choice.value}
-                checked={selected}
-                disabled={!choice.connected}
-                disabledReason={choice.connected ? undefined : 'このきっかけはまだ使えません'}
-                onChange={() => selectTrigger(choice)}
-                title={choice.label}
-                note={choice.note}
-              />
-            )
-          })}
-        </RadioCardGroup>
-        {(() => {
-          const current = TRIGGER_CHOICES.find((choice) => choice.value === triggerKind)
-          return current ? (
-            <p className="mt-2 text-xs text-ink-secondary" role="status">
-              「{current.label}」… {current.note}の出来事が起きた人を数えます。
-            </p>
-          ) : null
-        })()}
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <Field
-            label="成果地点の名前"
-            htmlFor="cv-name"
-            required
-            help="一覧・案件・分析にこの名前で並びます。"
-          >
-            <input
-              id="cv-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="例：商品を買った"
-              className={inputClass}
-            />
-            {duplicateName && (
-              <p className="text-danger mt-1 text-xs" role="alert">
-                同じ名前の「{duplicateName.name}」があります。同じ意味の成果地点を2つ作らないでください。
-              </p>
-            )}
-            {/*
-              R597: 同名のもとが読めないときは、警告が出ないこと自体を伝える。
-              読み込めなかった時は赤を使わない（★V7）。再試行で直れば
-              同名警告が戻る。保存自体は止めない（保存時の重複拒否は
-              監査の範囲外のため、ここでは未確認のまま残す）。
-            */}
-            {pointsFailed && (
-              <div className="mt-1">
-                <p className="text-ink-secondary text-xs" role="alert">
-                  同じ名前があるか確認できませんでした。同じ意味の成果地点があるかもしれません。
-                </p>
-                <Button
-                  variant="secondary"
-                  size="field"
-                  className="mt-1.5"
-                  onClick={() => requestPoints()}
-                >
-                  同名の確認を再読み込み
-                </Button>
-              </div>
-            )}
-          </Field>
-
-          {measureMethod === 'url_reach' ? (
-            <Field
-              label="数えてよいページ"
-              htmlFor="cv-url"
-              required
-              help="「?」以降と「#」以降を除いて前方一致で判定します。"
-            >
-              <input
-                id="cv-url"
-                type="url"
-                value={targetUrl}
-                onChange={(e) => setTargetUrl(e.target.value)}
-                placeholder="https://example.com/thanks"
-                className={inputClass}
-              />
-            </Field>
-          ) : (
-            // R41: 起点ごとに対象を言う。タグ起点で「注文」と出さない。
-            <Field label={origin.targetLabel} help={origin.target}>
-              <p className="bg-canvas-sunken text-ink rounded-control px-3 py-2 text-sm">
-                {origin.target}
-              </p>
-            </Field>
-          )}
-        </div>
-
-        {/* R40: 数えない条件は共通の条件部品で選ぶ。自由文のメモとは分ける。 */}
-        <Field
-          label="数えない条件"
-          help="条件に当てはまる人は数えません。選ばないままなら、除外せずに数えます。試算の数字にも反映します。"
-          note="条件に当てはまる人は、保存後の記録から除きます。"
-        >
-          <ConditionBuilder
-            value={exclusion}
-            onChange={setExclusion}
-            label="数えない条件"
-            showCount={false}
-          />
-        </Field>
-        <Field
-          label="数えない条件のメモ（任意）"
-          htmlFor="cv-exclusion-memo"
-          note="運用の引き継ぎ用です。数え方には影響しません。"
-        >
-          <input
-            id="cv-exclusion-memo"
-            type="text"
-            value={exclusionMemo}
-            onChange={(event) => setExclusionMemo(event.target.value)}
-            placeholder="例：テスト用の注文は条件で除いています"
-            maxLength={500}
-            className={inputClass}
-          />
-        </Field>
-      </FormSection>
-
-      <FormSection
-        step={2}
-        label="同じ人を何回まで数えるか"
-        note="ここを間違えると、売上を重ねて数えることがあります。"
-      >
-        <div className="grid gap-2 sm:grid-cols-3">
-          {/* m22d: 「1件」は試算の「1件あたり」に集約し、ここでは書かない。 */}
-          <ChoiceCard selected={deduplicationMode === 'every'} title="何回でも数える" note="買うたびに数えます。売上を追うときに使います" onClick={() => setDeduplicationMode('every')} />
-          <ChoiceCard selected={deduplicationMode === 'once_per_friend'} title="1人1回だけ" note="はじめての人だけを数えます" onClick={() => setDeduplicationMode('once_per_friend')} />
-          <ChoiceCard selected={deduplicationMode === 'window'} title="30日に1回まで" note="短い間にくり返し起きるものに使います" onClick={() => setDeduplicationMode('window')} />
-        </div>
-      </FormSection>
-
-      <FormSection step={3} label="金額をどう出すか">
-        <div className="grid gap-3 md:grid-cols-3">
-          {/* 起点に金額が無いもの(タグ・フォーム・予約・ページ・動画など)では注文の金額を出さない。選択肢は対応表が持つ。 */}
-          <Field label="金額の出し方" htmlFor="cv-value-mode" help={origin.amount}>
-            <Select
-              size="full"
-              aria-label="金額の出し方"
-              id="cv-value-mode"
-              value={valueMode}
-              onChange={(value) => {
-                setValueMode(value as ConversionValueMode)
-                setValueModeNotice(null)
-              }}
-              options={origin.valueModes.map((mode) => ({ value: mode, label: VALUE_MODE_LABELS[mode] }))}
-            />
-            {valueModeNotice ? (
-              <p className="text-warning mt-1 text-xs" role="status">
-                {valueModeNotice}
-              </p>
-            ) : null}
-          </Field>
-          {/* m22d: 「1件」は試算の「1件あたり」に集約し、ここでは書かない。 */}
-          <Field label="決まった金額（円）" htmlFor="cv-value" help="成果ごとの金額です。">
-            <input
-              id="cv-value"
-              type="number"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="0"
-              disabled={valueMode === 'none'}
-              className={`${inputClass} tabular-nums disabled:bg-canvas-sunken`}
-            />
-          </Field>
-          <Field label="取り消しの扱い" htmlFor="cv-reversal-policy" help="元の成果は消さず、取消記録を追加します。">
-            <Select size="full" aria-label="取り消しの扱い" id="cv-reversal-policy" value={reversalPolicy} onChange={(value) => setReversalPolicy(value as ConversionReversalPolicy)} options={[ { value: 'source_cancelled', label: '返品されたら取り消す' }, { value: 'manual', label: '担当者が取り消す' }, { value: 'none', label: '取り消しを数えない' }, ]} />
-          </Field>
-        </div>
-      </FormSection>
-
-      <FormSection step={4} label="この成果地点を使う場所">
+          <Card padding="default" className={styles.section}>
+            <SectionHeader title="この決めごとを この30日に あてはめると"
+              help="前の日にさかのぼっては数えません。入力中の条件だけで試算し、成果は追加しません。"
+              helpLabel="試算の説明" />
+            <dl className={styles.preview} aria-busy={previewLoading}>
+              <div><dt>成果</dt><dd>{preview && !previewFailed ? `${formatNumber(preview.estimatedCount)}件` : '—'}</dd></div>
+              <div><dt>金額</dt><dd>{preview && !previewFailed ? `¥${formatNumber(preview.estimatedValue)}` : '—'}</dd></div>
+              <div><dt>人数<HelpTip label="人数の説明">除く条件に当てはまらなかった人を、重複せずに数えています。</HelpTip></dt><dd>{previewFailed || preview?.uniqueFriendCount == null ? '—' : `${formatNumber(preview.uniqueFriendCount)}人`}</dd></div>
+              <div><dt>除いた成果<HelpTip label="除いた成果の説明">数えない条件に当てはまった過去の成果です。回数による重複除外とは分けています。</HelpTip></dt><dd>{previewFailed || preview?.excludedCount == null ? '—' : `${formatNumber(preview.excludedCount)}件`}</dd></div>
+            </dl>
+            {previewFailed ? <div className="mt-3"><p className="text-ink-secondary text-xs" role="alert">保存前の試算を読み込めませんでした。入力内容は保存されていません。</p><Button size="field" className="mt-2" onClick={() => setPreviewRetry((value) => value + 1)}>試算を再読み込み</Button></div>
+              : previewLoading ? <p className="text-ink-faint mt-3 text-xs" role="status">入力中の条件を試算しています。</p> : null}
+            {preview && !previewFailed ? <p className="text-ink-secondary mt-3 text-xs">重複除外 {formatNumber(preview.duplicateExcludedCount)}件・取消 {formatNumber(preview.cancellationCount)}件</p> : null}
+            {preview && !previewFailed && preview.excludedReasons.length > 0 ? <ul className="text-ink-secondary mt-2 space-y-1 text-xs">{preview.excludedReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul> : null}
+          </Card>
+      <AsideCard title="この成果地点を使う場所">
         <p className="text-ink-faint text-xs">ふつうは呼ぶ側から選びます。ここで選んだ場所は作成と同時につながります。</p>
-        <div className="grid gap-2 md:grid-cols-3">
+        <div className="space-y-3">
           {USAGE_GROUPS.map((group) => {
             const kindResult = usageKinds[group.kind]
             const targets = kindResult.targets
@@ -749,13 +531,173 @@ export default function NewConversionPointPage() {
             )
           })}
         </div>
+      </AsideCard>
+
+        </>
+      }
+    >
+      <ConversionSection label="何が起きたら数えますか" help="名前は一覧で見分けるため。お客さまには見えません。">
+          <Field
+            label="名前"
+            htmlFor="cv-name"
+            required
+            help="一覧・案件・分析にこの名前で並びます。"
+          >
+            <input
+              id="cv-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="例：商品を買った"
+              className={inputClass}
+            />
+            {duplicateName && (
+              <p className="text-danger mt-1 text-xs" role="alert">
+                同じ名前の「{duplicateName.name}」があります。同じ意味の成果地点を2つ作らないでください。
+              </p>
+            )}
+            {/*
+              R597: 同名のもとが読めないときは、警告が出ないこと自体を伝える。
+              読み込めなかった時は赤を使わない（★V7）。再試行で直れば
+              同名警告が戻る。保存自体は止めない（保存時の重複拒否は
+              監査の範囲外のため、ここでは未確認のまま残す）。
+            */}
+            {pointsFailed && (
+              <div className="mt-1">
+                <p className="text-ink-secondary text-xs" role="alert">
+                  同じ名前があるか確認できませんでした。同じ意味の成果地点があるかもしれません。
+                </p>
+                <Button
+                  variant="secondary"
+                  size="field"
+                  className="mt-1.5"
+                  onClick={() => requestPoints()}
+                >
+                  同名の確認を再読み込み
+                </Button>
+              </div>
+            )}
+          </Field>
+
+        <Field label="できごと" htmlFor="cv-trigger" help="選んだできごとが起きた人を数えます。">
+          <Select id="cv-trigger" aria-label="できごと" size="full" value={triggerKind}
+            onChange={(value) => {
+              const choice = TRIGGER_CHOICES.find((item) => item.value === value)
+              if (choice) selectTrigger(choice)
+            }}
+            options={TRIGGER_CHOICES.map((choice) => ({ value: choice.value, label: `${choice.label}（${choice.note}）` }))}
+          />
+        </Field>
+          {measureMethod === 'url_reach' ? (
+            <Field
+              label="数えてよいページ"
+              htmlFor="cv-url"
+              required
+              help="「?」以降と「#」以降を除いて前方一致で判定します。"
+            >
+              <input
+                id="cv-url"
+                type="url"
+                value={targetUrl}
+                onChange={(e) => setTargetUrl(e.target.value)}
+                placeholder="https://example.com/thanks"
+                className={inputClass}
+              />
+            </Field>
+          ) : (
+            // R41: 起点ごとに対象を言う。タグ起点で「注文」と出さない。
+            <Field label={origin.targetLabel} help={origin.target}>
+              <p className="bg-canvas-sunken text-ink rounded-control px-3 py-2 text-sm">
+                {origin.target}
+              </p>
+            </Field>
+          )}
+      </ConversionSection>
+
+      <ConversionSection label="同じ人を何回まで数えるか" help="くり返し起きるできごとの数えすぎを防ぎます。">
+        <RadioCardGroup legend="同じ人を何回まで数えるか" className="grid gap-2 sm:grid-cols-3">
+          <RadioCard name="conversion-dedup" value="once_per_friend" checked={deduplicationMode === 'once_per_friend'} title="1人1回だけ" note="はじめての人だけを数えます" onChange={() => setDeduplicationMode('once_per_friend')} />
+          <RadioCard name="conversion-dedup" value="window" checked={deduplicationMode === 'window'} title="30日に1回まで" note="短い間にくり返し起きるものに" onChange={() => setDeduplicationMode('window')} />
+          <RadioCard name="conversion-dedup" value="every" checked={deduplicationMode === 'every'} title="何回でも数える" note="買うたびに数えます。売上を追うときに" onChange={() => setDeduplicationMode('every')} />
+        </RadioCardGroup>
+      </ConversionSection>
+
+      <ConversionSection label="金額をどう出すか" help="アフィリエイトの報酬や、配信ごとの売上の計算に使います。">
+        <div className="grid gap-3 md:grid-cols-2">
+          {/* 起点に金額が無いもの(タグ・フォーム・予約・ページ・動画など)では注文の金額を出さない。選択肢は対応表が持つ。 */}
+          <Field label="金額の出し方" htmlFor="cv-value-mode" help={origin.amount}>
+            <Select
+              size="full"
+              aria-label="金額の出し方"
+              id="cv-value-mode"
+              value={valueMode}
+              onChange={(value) => {
+                setValueMode(value as ConversionValueMode)
+                setValueModeNotice(null)
+              }}
+              options={origin.valueModes.map((mode) => ({ value: mode, label: VALUE_MODE_LABELS[mode] }))}
+            />
+            {valueModeNotice ? (
+              <p className="text-warning mt-1 text-xs" role="status">
+                {valueModeNotice}
+              </p>
+            ) : null}
+          </Field>
+          <Field label="取り消しの扱い" htmlFor="cv-reversal-policy" help="元の成果は消さず、取消記録を追加します。">
+            <Select size="full" aria-label="取り消しの扱い" id="cv-reversal-policy" value={reversalPolicy} onChange={(value) => setReversalPolicy(value as ConversionReversalPolicy)} options={[ { value: 'source_cancelled', label: '返品されたら取り消す' }, { value: 'manual', label: '担当者が取り消す' }, { value: 'none', label: '取り消しを数えない' }, ]} />
+          </Field>
+        </div>
+        {valueMode === 'fixed' ? (
+          <Field label="決まった金額（円）" htmlFor="cv-value" help="成果ごとの金額です。">
+            <input
+              id="cv-value"
+              type="number"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="0"
+              className={`${inputClass} tabular-nums disabled:bg-canvas-sunken`}
+            />
+          </Field>
+        ) : null}
+      </ConversionSection>
+
+      <ConversionSection label="数えない条件" help="任意。テスト用の注文などを除きます。">
+        <Field
+          label="メモ"
+          htmlFor="cv-exclusion-memo"
+          help="任意。運用の引き継ぎ用です。数え方には影響しません。"
+        >
+          <input
+            id="cv-exclusion-memo"
+            type="text"
+            value={exclusionMemo}
+            onChange={(event) => setExclusionMemo(event.target.value)}
+            placeholder="例：テスト用の注文は条件で除いています"
+            maxLength={500}
+            className={inputClass}
+          />
+        </Field>
+        {/* R40: 数えない条件は共通の条件部品で選ぶ。自由文のメモとは分ける。 */}
+        <Field
+          label="除く条件"
+          help="条件に当てはまる人は数えません。選ばないままなら、除外せずに数えます。試算の数字にも反映します。"
+        >
+          <ConditionBuilder
+            value={exclusion}
+            onChange={setExclusion}
+            label="数えない条件"
+            showCount={false}
+          />
+        </Field>
+
+        <Disclosure size="compact" title="詳細設定" hint="下書き・帰属期間・集計対象">
         <Checkbox
           checked={saveAsDraft}
           onCheckedChange={setSaveAsDraft}
           description="一覧の「下書き」に入ります。数えはじめるには一覧から公開します。"
           className="border-hairline rounded-control mt-3 border p-3"
         >まだ計測せず、下書きとして保存する</Checkbox>
-        <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
+          <div>
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="友だち追加からの計測期間" htmlFor="cv-days" note="空欄なら既定の90日です。">
               <div className="flex items-center gap-1.5">
@@ -773,8 +715,9 @@ export default function NewConversionPointPage() {
               </p>
             </Field>
           </div>
+          </div>
         </Disclosure>
-      </FormSection>
+      </ConversionSection>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した成果地点" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
     </div>

@@ -43,7 +43,7 @@ describe('成果地点の削除確認', () => {
 
   it('停止の本体が二度押しを止め、3操作の返事を確かめ、finally で戻す', () => {
     const body = slice(PAGE, 'const runStop = async', '\n  const exportCsv')
-    expect(body, '処理中でも受け付けてしまう').toContain('if (!stopTarget || stopping) return')
+    expect(body, '処理中でも受け付けてしまう').toContain('if (!stopTarget || stopping || !canReverse) return')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body).toContain('api.conversions.stopDefinition')
     expect(body).toContain('api.conversions.replaceDefinition')
@@ -56,7 +56,7 @@ describe('成果地点の削除確認', () => {
   it('安全な計測停止を既定にし、設計の重ね画面を名乗る', () => {
     const dialog = dialogWith(DIALOGS, 'open={stopTarget !== null}')
     expect(dialog, '物理削除の赤い確認に戻っている').not.toContain('destructive')
-    expect(dialog, '設計の重ね画面のNodeが無い').toContain('designNode="d8d3Mz"')
+    expect(dialog, '設計の重ね画面のNodeが無い').toContain('designNode="r6dJFy"')
     expect(dialog, '処理中を窓へ渡していない').toContain('busy={stopping || stopImpactLoading}')
     expect(dialog, '失敗を窓の中に出していない').toContain('error={stopError}')
     for (const label of ['数えるのをやめる', '差し替えて数えるのをやめる', 'この成果地点を削除する']) {
