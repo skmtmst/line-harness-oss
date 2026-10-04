@@ -30,7 +30,9 @@ export default function OtpInput({
   disabled = false,
   autoFocus = false,
   success = false,
+  visualLabel,
 }: {
+  visualLabel?: string
   value: string
   onChange: (value: string) => void
   /** 全マスがそろった瞬間に1回呼ぶ。 */
@@ -147,6 +149,8 @@ export default function OtpInput({
   }
 
   return (
+    <div className={styles.field}>
+      {visualLabel ? <span className={styles.label}>{visualLabel}</span> : null}
     <div
       role="group"
       aria-label={labelledBy ? undefined : (label ?? '認証コード')}
@@ -193,6 +197,7 @@ export default function OtpInput({
           }}
         />
       ))}
+    </div>
     </div>
   )
 }
