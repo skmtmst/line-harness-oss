@@ -136,4 +136,12 @@
   [data-theme='v8'] .trailing {
     order: 4;
   }
+
+[data-theme='v8'] .toolbar { margin-bottom: 0; }
+[data-theme='v8'] .row1 > .search { width: 280px; min-width: 0; flex: 0 1 280px; }
+
+
+[data-theme='v8'] .toolbar button:not(:focus-visible):not([class*='ghost']) { border: 0; }
+[data-theme='v8'] .trailing button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+
 }

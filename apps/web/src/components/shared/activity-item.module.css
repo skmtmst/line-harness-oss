@@ -76,7 +76,11 @@
   line-height: var(--text-lh);
 }
 
-[data-theme='v8'] .marker { gap: 0; border-radius: 999px; }
-[data-theme='v8'] .marker svg { flex-shrink: 0; }
+[data-theme='v8'] .title { line-height: 20px; }
+[data-theme='v8'] .note, [data-theme='v8'] .time { line-height: 18px; }
 
+[data-theme='v8'] .marker { border-radius: 999px; gap: 0; }
+[data-theme='v8'] .body { align-items: flex-start; gap: 0; }
 }
+
+[data-theme='v8'] .marker svg { flex-shrink: 0; }

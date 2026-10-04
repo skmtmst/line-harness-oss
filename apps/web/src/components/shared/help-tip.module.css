@@ -204,20 +204,6 @@
     transform: translateY(0);
   }
 }
-
-[data-theme='v8'] .mark {
-  gap: 0;
-  border: 0;
-  outline: 1.2px solid var(--color-ink-faint);
-  outline-offset: -0.6px;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--color-ink-faint);
-  font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
-  font-size: 10px;
-  line-height: 10px;
-}
-
 }
 
 /* 正本 f6zwfs：影なし、枠なし、上下6、行間18。 */
@@ -230,3 +216,18 @@
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .tip { -webkit-font-smoothing: auto; }
+
+@layer components {
+[data-theme='v8'] .mark {
+  gap: 0;
+  border: 0;
+  outline: 1.2px solid var(--color-ink-faint);
+  outline-offset: -0.6px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-ink-faint);
+  font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
+  font-size: 10px;
+  line-height: 10px;
+}
+}

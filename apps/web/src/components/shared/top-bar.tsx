@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useEffect, type ChangeEvent } from 'react'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
 import styles from './top-bar.module.css'
@@ -47,6 +48,9 @@ export interface TopBarProps {
    * 押しても何も起きない偽の操作になる。
    */
   v8Chrome?: boolean
+  /** 画面の絵に合わせた外側の形。統括などの既存の形は default。 */
+  chromeVariant?: 'default' | 'shell'
+  menuCollapsed?: boolean
   /**
    * ★V8：パンくずの手前の段。「ホーム」「一斉配信」など。
    * 渡されなければ従来どおり選んでいるアカウント名を出す。
@@ -81,6 +85,8 @@ export default function TopBar({
   onLogout,
   notificationUnreadCount = 0,
   v8Chrome = false,
+  chromeVariant = 'default',
+  menuCollapsed = false,
   crumbs,
   onRevertTheme,
   className,
@@ -111,7 +117,7 @@ export default function TopBar({
   }, [])
 
   return (
-    <header className={classes} data-design-node="cBSCb">
+    <header className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined}>
       {/*
         ★V8 外側（Pencil `y3gx8R`）：左に畳むボタンとパンくず
         （アカウント › 画面名）。v7 では .v8-only が消す。
@@ -127,7 +133,7 @@ export default function TopBar({
             title="メニューを畳む（⌘\）"
             onClick={() => window.dispatchEvent(new Event(SIDEBAR_TOGGLE_EVENT))}
           >
-            <PanelLeftIcon />
+            {chromeVariant === 'shell' ? (menuCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />) : <PanelLeftIcon />}
           </button>
           <nav className={styles.crumbs} aria-label="パンくず">
             {/*
@@ -138,7 +144,7 @@ export default function TopBar({
             <Link href="/" className={styles.crumbHome}>
               <HomeGridIcon /><span>ホーム</span>
             </Link>
-            <span className={styles.crumbSep} aria-hidden="true">›</span>
+            <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
             {/*
               手前の段。ページが crumbs を渡したらそれを出す
               （一覧からの詳細で「一斉配信 › 配信名」）。渡さない画面は
@@ -153,13 +159,13 @@ export default function TopBar({
                   ) : (
                     <span className={styles.crumbFrom}>{crumb.label}</span>
                   )}
-                  <span className={styles.crumbSep} aria-hidden="true">›</span>
+                  <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
                 </span>
               ))
-            ) : current ? (
+            ) : crumbs == null && current ? (
               <>
                 <span className={styles.crumbFrom}>{current.label}</span>
-                <span className={styles.crumbSep} aria-hidden="true">›</span>
+                <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
               </>
             ) : null}
             <h1 className={styles.crumbCurrent} title={title}>{title}</h1>
@@ -197,13 +203,13 @@ export default function TopBar({
             */}
             {roleLabel ? (
               <span className={styles.pillText}>
-                <span className={`${styles.pillRole} v8-only`}>{roleLabel}</span>
+                <span className={`${styles.pillRole} v8-only`}>{chromeVariant === 'shell' ? 'LINEアカウント' : roleLabel}</span>
                 <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
               </span>
             ) : (
               <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
             )}
-            <ChevronIcon />
+            {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
             <select
               className={styles.accountSelect}
               value={selectedAccountId}

@@ -61,3 +61,10 @@
   padding-right: 0;
   padding-left: 0;
 }
+
+[data-theme="v8"] .root { height: auto; padding: 4px 20px 16px; }
+[data-theme="v8"] .mark { width: 36px; height: 36px; font-size: 15px; font-weight: 700; line-height: 23px; }
+[data-theme="v8"] .name { font-size: 14px; line-height: 18px; }
+[data-theme="v8"] .version { font-family: var(--font-inter), Inter, sans-serif; font-size: 12px; font-weight: 400; line-height: 18px; }
+
+[data-theme="v8"] [data-collapsed] .root { height: 36px; padding: 0; margin-bottom: 14px; }

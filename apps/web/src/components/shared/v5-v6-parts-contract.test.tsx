@@ -83,7 +83,7 @@ describe('共通KpiCard', () => {
         aria-label="友だち集計"
       />,
     )
-    expect(html).toContain('1,234人')
+    expect(html.replace(/<[^>]*>/g, '')).toContain('1,234人')
     expect(html).toContain('hidden=""')
     expect(html).toContain('aria-label="友だち集計"')
   })

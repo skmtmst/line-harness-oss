@@ -40,4 +40,8 @@
   flex-shrink: 0;
   align-items: center;
 }
+[data-theme='v8'] .title { line-height: 23px; }
+/* 当たり28pxは保持し、見える円だけ CugIm の16pxに合わせる。 */
+[data-theme='v8'] .help button > span[aria-hidden] { border: 0; border-radius: 999px; outline: 1px solid var(--color-ink-faint); outline-offset: -.5px; background: transparent; color: var(--color-ink-faint); }
+
 }

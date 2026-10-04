@@ -1,0 +1,51 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/* faSbC: V7 の箱は既存の utility、V8 は右に一本だけの線。 */
+[data-theme='v8'] .panel {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 224.5px; min-height: 612px; height: auto; flex-shrink: 0;
+  padding: 16px 12px; border: 0; border-right: 1px solid var(--color-hairline);
+  border-radius: 0; background: var(--color-canvas); box-shadow: none;
+  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif;
+}
+[data-theme='v8'] .create { width: 100%; margin-bottom: 16px; }
+[data-theme='v8'] .create > * { width: 100%; }
+[data-theme='v8'] .heading { border: 0; padding: 0; margin-bottom: 8px; }
+[data-theme='v8'] .heading > p { font-size: 12px; font-weight: 600; line-height: normal; color: var(--color-ink-faint); }
+[data-theme='v8'] .rows { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 0; }
+[data-theme='v8'] .select:focus-visible,
+[data-theme='v8'] .add:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .select {
+  padding: 7px 10px; gap: 8px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; line-height: normal; color: var(--color-ink-secondary);
+}
+[data-theme='v8'] .row[data-active] { border-radius: 8px; background: var(--color-shell); }
+[data-theme='v8'] .row[data-active] .select { background: var(--color-shell); color: var(--color-ink); font-weight: 600; }
+[data-theme='v8'] .folderIcon { display: inline-flex; flex-shrink: 0; }
+[data-theme='v8'] .count { font-family: var(--font-inter), Inter, sans-serif; font-size: 12px; font-weight: 400; line-height: normal; }
+[data-theme='v8'] .footer { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border: 0; padding: 0; margin-top: 12px; }
+[data-theme='v8'] .add {
+  display: flex; justify-content: flex-start; width: fit-content;
+  height: auto; min-height: 0; padding: 6px 10px; gap: 6px;
+  border: 0; border-radius: 0; background: transparent; box-shadow: none;
+  font-size: 13px; font-weight: 600; line-height: normal; color: var(--color-action);
+}
+[data-theme='v8'] .footer { font-size: 11px; line-height: 17px; color: var(--color-ink-faint); }
+
+
+[data-theme='v8'] .panel .add { height: auto; padding: 6px 10px; box-shadow: none; }
+[data-theme='v8'] .create button { border: 0; }
+[data-theme='v8'] .label { min-width: 0; }
+[data-theme='v8'] .row[data-active] .label { font-weight: 600; }
+
+
+[data-theme='v8'] .panel { max-width: 100%; min-width: 0; }
+[data-theme='v8'] .row { padding: 7px 10px; gap: 8px; border-radius: 8px; }
+[data-theme='v8'] .row .select { padding: 0; }
+[data-theme='v8'] .menu { width: 14px; height: 14px; flex-shrink: 0; }
+[data-theme='v8'] .menuButton { position: absolute; left: -9px; top: -9px; width: 32px; height: 32px; opacity: 1; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+[data-theme='v8'] .row .select { min-height: 0; height: auto; }
+}
+
+/* controls のボタンの輪郭を継承せず、layout 正本の文字操作を保つ。 */
+@layer components { [data-theme='v8'] .panel .add:not(:focus-visible) { outline: none; } }
