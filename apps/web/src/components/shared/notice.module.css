@@ -108,3 +108,15 @@
   outline-offset: 1px;
 }
 }
+
+/* 正本 ThDed。案内の印だけ青、本文は副文字色。 */
+[data-theme='v8'] .notice {
+  gap: 10px; padding: 10px 14px; border-radius: 10px;
+  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+  line-height: 20px;
+}
+[data-theme='v8'] .info { background: var(--color-status-info-soft); }
+[data-theme='v8'] .info .icon { color: var(--color-action); }
+.infoIconV8 { display: none; }
+[data-theme='v8'] .infoIconV8 { display: block; }
+[data-theme='v8'] .infoIconV7 { display: none; }
