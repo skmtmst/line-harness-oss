@@ -463,9 +463,9 @@ function CarouselEditorV8Inner() {
                     type="button"
                     className={`${styles.toolButton} ${styles.toolButtonDanger}`}
                     disabled={panels.length <= 1}
-                    title={panels.length <= 1 ? 'カードは1枚必要です' : 'このカードを消す'}
+                    title={panels.length <= 1 ? 'カードは1枚必要です' : 'このカードを削除'}
                     onClick={() => removePanel(selectedIndex)}
-                  ><Trash2 size={14} /> このカードを消す</button>
+                  ><Trash2 size={14} /> このカードを削除</button>
                 </div>
 
                 <Field label="画像" htmlFor={`cr8-panel-image`} note="入れるなら全部のカードに入れてください（1040 × 1040px または横1024 × 縦678px）">

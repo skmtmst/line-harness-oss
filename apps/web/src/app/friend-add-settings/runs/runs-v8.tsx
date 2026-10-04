@@ -245,7 +245,7 @@ function FriendAddRunsV8Inner() {
       const detail = await api.friendAddRules.get(selectedAccountId, activeRuleId)
       if (!detail.success) throw new Error('rule detail missing')
       const response = await api.friendAddRules.stop(selectedAccountId, activeRuleId, detail.data.rule.version)
-      setStopMessage(response.success ? '配信を一時停止しました。' : '配信を停止できませんでした。')
+      setStopMessage(response.success ? '配信を止めました。' : '配信を止められませんでした。')
       if (response.success) {
         setStopDialogOpen(false)
         await load()
@@ -378,7 +378,7 @@ function FriendAddRunsV8Inner() {
             onClick={() => setStopDialogOpen(true)}
           >
             <Pause size={14} aria-hidden="true" />
-            一時停止する
+            止める
           </Button>
           <Button href="/friend-add-settings" variant="secondary">
             <Settings2 size={14} aria-hidden="true" />
@@ -602,9 +602,9 @@ function FriendAddRunsV8Inner() {
 
       <ConfirmDialog
         open={stopDialogOpen}
-        title="友だち追加時の配信を一時停止しますか？"
+        title="友だち追加時の配信を止めますか？"
         description="停止後は、新しく友だち追加された人へこの案内が送られません。設定は残るため、あとで再開できます。"
-        confirmLabel="一時停止する"
+        confirmLabel="止める"
         busy={stopBusy}
         error={stopMessage.includes('できませんでした') ? stopMessage : undefined}
         onCancel={() => {
