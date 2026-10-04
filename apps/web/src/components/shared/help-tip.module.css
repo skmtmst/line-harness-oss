@@ -204,4 +204,18 @@
     transform: translateY(0);
   }
 }
+
+[data-theme='v8'] .mark {
+  gap: 0;
+  border: 0;
+  outline: 1.2px solid var(--color-ink-faint);
+  outline-offset: -0.6px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-ink-faint);
+  font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
+  font-size: 10px;
+  line-height: 10px;
+}
+
 }
