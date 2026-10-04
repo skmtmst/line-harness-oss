@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import Select from '@/components/shared/select'
 
 import Link from 'next/link'
@@ -37,13 +36,9 @@ const STATUS_TONE: Record<EcSubscription['status'], string> = {
   cancelled: styles.statusMuted,
 }
 
-/** 1ページに出す件数。 */
-const PAGE_SIZE = 100
-
 export default function SubscriptionsPanel({ accountId }: { accountId: string | null }) {
-  const theme = useAdminTheme()
   const [v8PageSize, setV8PageSize] = useState(10)
-  const pageSize = theme === 'v8' ? v8PageSize : PAGE_SIZE
+  const pageSize = v8PageSize
   const loadGeneration = useRef(0)
   const [data, setData] = useState<EcSubscriptionList | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
@@ -200,7 +195,7 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
           ? `／ 形が読めなかったお客様のぶん ${formatNumber(data.skipped.malformedSnapshots)}件は数えていません`
           : ''}
       </p>
-      {theme === 'v8' && <div className="flex justify-end"><Select aria-label="定期便の表示件数" value={String(v8PageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件` }))} onChange={(value) => { setV8PageSize(Number(value)); setPage(1) }} /></div>}
+      <div className="flex justify-end"><Select aria-label="定期便の表示件数" value={String(v8PageSize)} options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件` }))} onChange={(value) => { setV8PageSize(Number(value)); setPage(1) }} /></div>
       <Pagination
         page={page}
         pageCount={Math.max(1, Math.ceil(total / pageSize))}
