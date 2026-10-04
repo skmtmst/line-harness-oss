@@ -9,6 +9,7 @@ import type {
 } from '@line-crm/shared'
 import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
+import { useRowLeaving } from '@/lib/use-row-leaving'
 import FeatureGate from '@/components/feature-gate'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -16,6 +17,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
+import styles from './leaving.module.css'
 import MediaPreviewOverlay from './media-preview-overlay'
 import Dialog from '@/components/shared/dialog'
 import {
@@ -41,6 +43,8 @@ import { notifyToast } from '@/components/shared/toast'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import MediaLibraryListV8 from './list-v8'
 import MediaDetailDialog from './media-detail-dialog'
 import FileScanStoppedBanner from './file-scan-stopped-banner'
 import { MediaQuotaGuidance } from './media-quota-guidance'
@@ -127,11 +131,20 @@ function mediaDetailIdFromLocation(): string | null {
   return id || null
 }
 
+/*
+ * ★V8: data-theme="v8" のときだけ新しい一覧（`O7hUt7`）を出す。
+ * v7 の見た目は MediaLibraryInner のまま変えない。
+ */
+function MediaLibraryPageSwitch() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <MediaLibraryListV8 /> : <MediaLibraryInner />
+}
+
 export default function MediaLibraryPage() {
   // 直URLでも登録メディアオフのaccountには画面を出さない。
   return (
     <FeatureGate feature="media">
-      <MediaLibraryInner />
+      <MediaLibraryPageSwitch />
     </FeatureGate>
   )
 }
@@ -148,6 +161,12 @@ function MediaLibraryInner() {
     総数を出すため、同じ棚（アーカイブの扱い）で数えた総数を別に持つ。
   */
   const [overallTotal, setOverallTotal] = useState<number | null>(null)
+  /*
+   * O7hUt7: 4つの数の tile（未使用・アーカイブの数）。絞り込みのたびでは
+   * なく、アカウントが決まったときだけ数える（1件だけ取って総数を読む）。
+   */
+  const [unusedTotal, setUnusedTotal] = useState<number | null>(null)
+  const [archivedTotal, setArchivedTotal] = useState<number | null>(null)
   /*
     m26m: 一覧の総数が「分かっている」かどうか。初期値の total=0 や
     失敗時の残留値をそのまま出すと、実在する件を0件と誤案内する。
@@ -257,6 +276,7 @@ function MediaLibraryInner() {
   const [deleteError, setDeleteError] = useState('')
   /** まとめて削除の確認。ブラウザ標準の確認では戻せないことが伝わらない。 */
   const [bulkConfirm, setBulkConfirm] = useState<string[] | null>(null)
+  const { isLeaving, leaveMany } = useRowLeaving()
   const [bulkBusy, setBulkBusy] = useState(false)
   /** まとめて削除の進み具合。件数が多いときに止まっているように見せない。 */
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
@@ -515,6 +535,22 @@ function MediaLibraryInner() {
     }
   }, [accountLoading, detailId, load, loadFolders, urlReady])
 
+  /* O7hUt7: tile の数はアカウントが決まったときだけ数え直す。 */
+  useEffect(() => {
+    if (accountLoading || !selectedAccountId || detailId) return
+    setUnusedTotal(null)
+    setArchivedTotal(null)
+    const accountAtRequest = selectedAccountId
+    void Promise.all([
+      api.media.list(accountAtRequest, { unusedOnly: true, limit: 1, offset: 0 }).catch(() => null),
+      api.media.list(accountAtRequest, { archived: 'only', limit: 1, offset: 0 }).catch(() => null),
+    ]).then(([unusedRes, archivedRes]) => {
+      if (accountAtRequest !== latestAccountRef.current) return
+      if (unusedRes?.success) setUnusedTotal(unusedRes.data.total)
+      if (archivedRes?.success) setArchivedTotal(archivedRes.data.total)
+    })
+  }, [accountLoading, detailId, selectedAccountId])
+
   const rename = async () => {
     if (!renaming || !selectedAccountId || renamingBusy) return
     const accountAtRequest = selectedAccountId
@@ -605,10 +641,12 @@ function MediaLibraryInner() {
     setError('')
     let deleted = 0
     const failedNames: string[] = []
+    const goneIds: string[] = []
     for (const id of ids) {
       const name = items.find((m) => m.id === id)?.filename ?? id
       try {
         await api.media.delete(id, accountAtRequest)
+        goneIds.push(id)
       } catch {
         /*
           409（読み直したら使われ始めていた）も通信失敗も、ここでは
@@ -632,13 +670,15 @@ function MediaLibraryInner() {
       setBulkProgress({ done: deleted + failedNames.length, total: ids.length })
     }
     const result = summarizeBulkDeleteResult(deleted, failedNames)
-    setSelected(new Set())
     setBulkConfirm(null)
     setBulkBusy(false)
     setBulkProgress(null)
     if (result.tone === 'success') notifyToast(result.message)
     else setError(result.message)
-    void load()
+    leaveMany(goneIds, () => {
+      setSelected(new Set())
+      void load()
+    })
   }
 
   /**
@@ -935,7 +975,7 @@ function MediaLibraryInner() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="primary" onClick={() => setUploadOpen(true)}>ファイルを入れる</Button>
+          <Button type="button" variant="primary" onClick={() => setUploadOpen(true)}>＋ メディアを登録する</Button>
         </div>
         <div className="w-full max-w-xs text-right">
           <p className="text-ink-secondary text-nano font-semibold">
@@ -953,6 +993,31 @@ function MediaLibraryInner() {
           />
         </div>
       </div>
+
+      {/* O7hUt7: 4つの数の tile。一覧の上の帯。 */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-3">
+          <p className="text-ink-secondary text-nano font-semibold">登録メディア</p>
+          <p className="text-ink text-xl font-bold">{overallTotal ?? total}<span className="text-sm font-normal"> 件</span></p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-3">
+          <p className="text-ink-secondary text-nano font-semibold">どこでも使っていない</p>
+          <p className="text-ink text-xl font-bold">{unusedTotal === null ? '—' : (<>{unusedTotal}<span className="text-sm font-normal"> 件</span></>)}</p>
+          <p className="text-ink-faint text-xs">消してよいか確かめられます</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-3">
+          <p className="text-ink-secondary text-nano font-semibold">使っている容量</p>
+          <p className="text-ink text-xl font-bold">{quota ? formatMediaSize(quota.usageBytes) : '—'}</p>
+          <p className="text-ink-faint text-xs">{quota && quota.limitBytes > 0 ? `上限 ${formatMediaSize(quota.limitBytes)} の ${Math.round((quota.usageBytes / quota.limitBytes) * 100)}%` : '容量を確認できません'}</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-3">
+          <p className="text-ink-secondary text-nano font-semibold">アーカイブ</p>
+          <p className="text-ink text-xl font-bold">{archivedTotal === null ? '—' : (<>{archivedTotal}<span className="text-sm font-normal"> 件</span></>)}</p>
+          <p className="text-ink-faint text-xs">一覧と新規選択から外したもの</p>
+        </div>
+      </div>
+
+      <Notice tone="info" message="使っているメディアは消せません。いらなくなったら「アーカイブ」にすると一覧と新規選択から外れます（使っている場所や過去の配信はそのまま動きます）。" />
 
       <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <div className="min-w-0">
@@ -1220,7 +1285,8 @@ function MediaLibraryInner() {
           {current.map((item) => (
             <div
               key={item.id}
-              className={`bg-canvas rounded-card border-hairline overflow-hidden border ${
+              data-leaving={isLeaving(item.id) || undefined}
+              className={`bg-canvas rounded-card border-hairline overflow-hidden border ${styles.card} ${
                 view === 'grid' ? 'flex flex-col' : 'flex flex-row items-center gap-3'
               }`}
             >
@@ -1260,10 +1326,10 @@ function MediaLibraryInner() {
                       <p className="text-danger text-xs" role="alert">{renameError}</p>
                     )}
                     <div className="flex justify-end gap-1">
-                      <Button variant="secondary" className="text-ink-secondary rounded-mini px-2 py-1 text-[11px] h-auto whitespace-normal" onClick={() => setRenaming(null)} disabled={renamingBusy}>
+                      <Button variant="secondary" className="text-ink-secondary rounded-mini px-2 py-1 text-micro h-auto whitespace-normal" onClick={() => setRenaming(null)} disabled={renamingBusy}>
                         キャンセル
                       </Button>
-                      <Button variant="primary" className="rounded-mini px-2 py-1 text-[11px] disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void rename()} disabled={renamingBusy}>
+                      <Button variant="primary" className="rounded-mini px-2 py-1 text-micro disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void rename()} disabled={renamingBusy}>
                         {renamingBusy ? '保存中…' : '保存する'}
                       </Button>
                     </div>
@@ -1295,12 +1361,12 @@ function MediaLibraryInner() {
                           }
                         />
                       ) : null}
-                      <span className="bg-ink-secondary text-on-accent rounded-mini px-1 py-0.5 text-[10px] leading-none">
+                      <span className="bg-ink-secondary text-on-accent rounded-mini px-1 py-0.5 text-nano leading-none">
                         {KINDS.find((k) => k.key === item.kind)?.label ?? 'ファイル'}
                       </span>
                       {item.archivedAt ? (
                         <span
-                          className="bg-canvas-sunken text-ink-secondary rounded-mini px-1 py-0.5 text-[10px] leading-none"
+                          className="bg-canvas-sunken text-ink-secondary rounded-mini px-1 py-0.5 text-nano leading-none"
                           title={item.archiveReason ? `退避の理由：${item.archiveReason}` : '退避済み'}
                         >
                           退避済み
@@ -1613,6 +1679,8 @@ function MediaLibraryInner() {
         </div>
       </div>
       ) : null}
+      {/* O7hUt7: 一覧の下の案内。「…」の中身を先に伝える。 */}
+      <p className="text-ink-faint text-xs leading-5">札の「使用箇所」で使っている場所を見られます。「…」に ダウンロード・編集・アーカイブ・削除（使っているものは消せません）。</p>
         </div>
       </div>
 

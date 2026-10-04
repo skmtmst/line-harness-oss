@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation'
 import { api } from '@/lib/api'
 import { canEditTable } from './manual-links/manual-link-view'
 import styles from './settings-v8.module.css'
+import { Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Bell, type LucideIcon } from 'lucide-react'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 
 /**
  * 設定の中のメニュー（★V8 `ywFJT` の左欄）。
@@ -31,12 +33,13 @@ function useManualLinkAccess(): boolean {
   return allowed
 }
 
-type NavLink = { href: string; label: string }
+type NavLink = { href: string; label: string; icon?: LucideIcon }
 
 const TOP_LINKS: NavLink[] = [
-  { href: '/accounts', label: 'LINEアカウント' },
-  { href: '/staff', label: 'ログインユーザー' },
-  { href: '/getting-started', label: 'はじめの設定' },
+  { href: '/getting-started', label: 'はじめの設定', icon: Rocket },
+  { href: '/accounts', label: 'LINEアカウント', icon: MessageCircle },
+  { href: '/pools', label: 'プール管理', icon: Layers },
+  { href: '/staff', label: 'ログインユーザー', icon: Users },
 ]
 
 const FEATURE_SUB_LINKS: NavLink[] = [
@@ -44,9 +47,9 @@ const FEATURE_SUB_LINKS: NavLink[] = [
 ]
 
 const TAIL_LINKS: NavLink[] = [
-  { href: '/emergency', label: '運用状態' },
-  { href: '/ec-commerce', label: 'EC連携' },
-  { href: '/line-notifications', label: 'LINE通知' },
+  { href: '/emergency', label: '運用状態', icon: Activity },
+  { href: '/ec-commerce', label: 'EC連携', icon: ShoppingCart },
+  { href: '/line-notifications', label: 'LINE通知', icon: Bell },
 ]
 
 export function SettingsNavV8() {
@@ -55,6 +58,7 @@ export function SettingsNavV8() {
 
   const item = (link: NavLink, sub = false) => {
     const active = pathname === link.href
+    const Icon = link.icon
     return (
       <li key={link.href}>
         <Link
@@ -66,7 +70,8 @@ export function SettingsNavV8() {
             active ? styles.navItemActive : '',
           ].filter(Boolean).join(' ')}
         >
-          {link.label}
+          {Icon && <Icon size={14} aria-hidden="true" />}
+          <span className="truncate" title={link.label}>{link.label}</span>
         </Link>
       </li>
     )
@@ -74,11 +79,11 @@ export function SettingsNavV8() {
 
   return (
     <nav className={styles.nav} aria-label="設定の中のメニュー">
-      <p className={styles.navTitle}>設定の中のメニュー</p>
+      <p className={styles.navTitle}>設定</p>
       <ul>
         {/* 会社とロゴは API 待ち。開く先ができるまでメニューへ出さない（今の作りの形を保つ）。 */}
         {TOP_LINKS.map((link) => item(link))}
-        {item({ href: '/settings', label: '機能設定' })}
+        {item({ href: '/settings', label: '機能設定', icon: SlidersHorizontal })}
         {showManualLinks && item({ href: '/settings/manual-links', label: 'マニュアルの正本表' }, true)}
         {FEATURE_SUB_LINKS.map((link) => item(link, true))}
         {TAIL_LINKS.map((link) => item(link))}
@@ -104,21 +109,12 @@ export function SettingsShellV8({
   children: ReactNode
 }) {
   return (
-    <div className={styles.shell}>
-      <SettingsNavV8 />
-      <div className={styles.main}>
-        <header>
-          {back ? (
-            <Link href={back.href} className={styles.back}>
-              ← {back.label}
-            </Link>
-          ) : (
-            <p className={styles.headEyebrow}>設定の中のメニュー</p>
-          )}
-          <h1 className={styles.headTitle}>{title}</h1>
-          {description && <p className={styles.headDesc}>{description}</p>}
-        </header>
-        {children}
+    <div className={styles.page}>
+      {back && <Link href={back.href} className={styles.back}>← {back.label}</Link>}
+      <ReadonlyHeaderV8 title={title} description={description ?? ''} />
+      <div className={styles.shell}>
+        <SettingsNavV8 />
+        <div className={styles.main}>{children}</div>
       </div>
     </div>
   )

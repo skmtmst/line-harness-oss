@@ -1,7 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { V8AutoShell, type AutoV8Counts } from '../automations-v8'
+import { V8RunsTab } from '../runs-v8'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, downloadApiFile, fetchApi, type AutomationRunDetail } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -110,7 +113,37 @@ function automationRunsSearchUrl(
   return suffix ? `${pathname}?${suffix}` : pathname
 }
 
+/*
+ * ★V8-B の切り替え。v8 の器は別ファイル（automations-v8.tsx・
+ * runs-v8.tsx）に置き、v7 の器・動きはこの下の V7 のまま残す。
+ */
 export default function AutomationRunsPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return (
+      <Suspense fallback={null}>
+        <AutomationRunsPageV8 />
+      </Suspense>
+    )
+  }
+  return <AutomationRunsPageV7 />
+}
+
+/* ★V8-B 動いた記録（板 `g98F9`）。 */
+function AutomationRunsPageV8() {
+  const theme = useAdminTheme()
+  const [counts, setCounts] = useState<AutoV8Counts>({})
+  if (theme !== 'v8') return null
+  return (
+    <V8AutoShell
+      tab="runs"
+      counts={counts}
+      render={(model) => <V8RunsTab model={model} onCounts={setCounts} />}
+    />
+  )
+}
+
+function AutomationRunsPageV7() {
   usePageTitle('オートメーション')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const pathname = usePathname()

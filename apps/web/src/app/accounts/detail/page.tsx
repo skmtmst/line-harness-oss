@@ -1,8 +1,7 @@
 'use client'
 
 import '@/app/notifications/readonly-v8.css'
-import ReadonlyHeaderV8, { ReadonlyDesignNode } from '@/app/notifications/readonly-header-v8'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -41,7 +40,6 @@ type AccountDetailView = LineAccount & {
 
 /** 設計 ★V6 33-3（`T9rA9`）。概要 / 接続の確認 / 資格情報 / 乗り換え の 4 タブ。 */
 function AccountDetail() {
-  const theme = useAdminTheme()
   /*
     **`[id]` は使えない。** この管理画面は静的書き出し（`output: 'export'`）
     なので、ビルド時に全IDが分からない動的セグメントは書き出せない
@@ -267,8 +265,8 @@ function AccountDetail() {
   const webhook = webhookLabel(account)
 
   return (
-    <ReadonlyDesignNode node="ihjfd"><div data-design-node="T9rA9" className="flex flex-col gap-4 v8-ro-notifications-page">
-      {theme === 'v8' && <ReadonlyHeaderV8 title={account.name} description="登録の内容・接続状態・送受信の記録を確認します。秘密値は表示しません。" />}
+    <div data-design-node="ihjfd" className="flex flex-col gap-4 v8-ro-notifications-page">
+      <ReadonlyHeaderV8 title={account.name} description="登録の内容・接続状態・送受信の記録を確認します。秘密値は表示しません。" />
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Head">
         <Breadcrumb items={[{ label: 'LINEアカウント', href: '/accounts' }, { label: account.name }]} />
@@ -290,7 +288,7 @@ function AccountDetail() {
               <div className="flex items-start justify-between gap-3">
                 <p className="text-ink text-base font-bold">登録の内容</p>
                 {canManage && (
-                  <Button type="button" onClick={() => setEditSection('basic')}>編集する</Button>
+                  <Button type="button" onClick={() => setEditSection('basic')}>編集</Button>
                 )}
               </div>
               <dl className="mt-3">
@@ -476,6 +474,7 @@ function AccountDetail() {
 
             <Card padding="roomy">
               <p className="text-ink text-sm font-bold">つながる先</p>
+              <Button href="/?qr=base" variant="secondary" className="mt-3">友だち追加URLとQRを見る</Button>
               <ul className="text-ink-secondary mt-3 space-y-3 text-xs">
                 <li><Link className="text-action hover:underline" href="/">ダッシュボード</Link><p className="mt-1">友だち追加URLとQRはここに出ます。</p></li>
                 <li><Link className="text-action hover:underline" href="/staff">ログインユーザー</Link><p className="mt-1">人ごとの既定のアカウントはここで決めます。</p></li>
@@ -643,7 +642,7 @@ function AccountDetail() {
         />
       )}
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
-    </div></ReadonlyDesignNode>
+    </div>
   )
 }
 

@@ -1,22 +1,7 @@
 'use client'
 
-/*
- * ★V8-B ウェビナー①基本設定（作る）（板 `j7PP04`）。
- *
- * v7 の作る画面（`page.tsx` の NewWebinarPage）とは別の部品として持つ。
- * データの口（フォルダ・保存・未保存の番兵）は同じ。違いは置き場と
- * 見せ方——5段の手順の帯、右に LINE の見え方（本物のスマホ）＋
- * テストを送る、下の帯の主ボタン「動画の設定へ →」。
- *
- * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
- * - 公開ページのURL：見本は `musubo.jp/w/nen-start` だが、公開URLの
- *   ドメインの形は口に無いので、アドレスの最後の部分（slug）だけを
- *   入れる欄にする。空なら今までどおり自動で付ける。
- * - 案内文：申込公開ページの説明（`publicDescription`）へ保存する。
- * - 案内する相手：今の作りは申込者向けで固定なので、選ぶ欄は
- *   「申込者向け」1つだけ出す。
- */
-import { Suspense, useCallback, useEffect, useState } from 'react'
+/* ★V8-B ウェビナー作成（j7PP04）。下書きを保存して次の段へ進む。 */
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
@@ -58,7 +43,7 @@ function validateSlugField(value: string): string | null {
 
 function StepBand({ current }: { current: number }) {
   return (
-    <ol className={styles.steps} aria-label="ウェビナー作成の進み方">
+    <ol data-design="Steps" className={styles.steps} aria-label="ウェビナー作成の進み方">
       {STEPS.map((step, index) => {
         const state = index < current ? 'done' : index === current ? 'current' : 'todo'
         return (
@@ -95,6 +80,8 @@ function NewWebinarV8Inner() {
   const [deliveryKind, setDeliveryKind] = useState<DeliveryKind>('on-demand')
   const [folders, setFolders] = useState<WebinarFolder[]>([])
   const [folderId, setFolderId] = useState('')
+  const savingRef = useRef(false)
+  const folderRequestRef = useRef(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   /* 欄を離れたときに出す直し方（保存を押す前から1欄ずつ確かめる）。 */
@@ -113,13 +100,17 @@ function NewWebinarV8Inner() {
       setFoldersState('ready')
       return
     }
+    const request = ++folderRequestRef.current
     setFoldersState('loading')
     try {
       const response = await webinarApi.folders(selectedAccountId)
-      setFolders(response.success && Array.isArray(response.data) ? response.data : [])
+      if (request !== folderRequestRef.current) return
+      if (!response.success || !Array.isArray(response.data)) throw new Error('folders_not_loaded')
+      setFolders(response.data)
       setFoldersState('ready')
       setError((previous) => (previous === FOLDERS_BLOCKED_MESSAGE ? null : previous))
     } catch {
+      if (request !== folderRequestRef.current) return
       setFolders([])
       setFoldersState('error')
     }
@@ -127,9 +118,11 @@ function NewWebinarV8Inner() {
 
   useEffect(() => {
     void loadFolders()
+    return () => { folderRequestRef.current += 1 }
   }, [loadFolders])
 
   async function save(next: 'list' | 'video') {
+    if (savingRef.current) return
     if (!canCreateWebinar) {
       setError('ウェビナーを作る権限がありません。オーナーか管理者に依頼してください。')
       return
@@ -153,6 +146,7 @@ function NewWebinarV8Inner() {
       return
     }
 
+    savingRef.current = true
     setSaving(true)
     setError(null)
     setFieldErrors({})
@@ -175,6 +169,7 @@ function NewWebinarV8Inner() {
       router.push(next === 'video' ? `/webinars/edit?id=${created.data.id}&pane=video` : '/webinars')
     } catch (cause) {
       setError(describeSaveFailure(cause))
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -184,10 +179,10 @@ function NewWebinarV8Inner() {
 
   return (
     <div className={styles.board} data-design-node="j7PP04">
-      <nav className={styles.crumb} aria-label="パンくず">
+      <nav data-design="Crumb" className={styles.crumb} aria-label="パンくず">
         <Link href="/webinars" className={styles.crumbLink}>← ウェビナーへ</Link>
       </nav>
-      <h1 className={styles.headTitle}>ウェビナーを作る</h1>
+      <h1 data-design="Head" className={styles.headTitle}>ウェビナーを作る</h1>
       <StepBand current={0} />
       <p className={styles.headDescription}>管理名と公開ページの基本、開催形式を決めます。保存しても、まだ誰にも公開されません。</p>
 
@@ -195,8 +190,8 @@ function NewWebinarV8Inner() {
         <Notice tone="danger">{error}</Notice>
       ) : null}
 
-      <div className={styles.body}>
-        <div className={styles.form}>
+      <div data-design="Body" className={styles.body}>
+        <div data-design="Left" className={styles.form}>
           <section className={styles.card} aria-labelledby="webinar-v8-basic">
             <h2 className={styles.cardTitle} id="webinar-v8-basic">基本設定</h2>
             <div className={styles.fieldGrid}>
@@ -254,7 +249,7 @@ function NewWebinarV8Inner() {
                   id="webinar-v8-folder"
                   aria-label="フォルダ"
                   value={folderId}
-                  disabled={foldersState === 'error'}
+                  disabled={foldersState !== 'ready'}
                   onChange={(value) => setFolderId(value)}
                   options={[
                     { value: '', label: '未分類' },
@@ -311,20 +306,14 @@ function NewWebinarV8Inner() {
             <div className={styles.fieldGrid}>
               <div className={styles.fieldFull}>
                 <label className={styles.label} htmlFor="webinar-v8-audience-select">案内する相手</label>
-                <Select
-                  id="webinar-v8-audience-select"
-                  aria-label="案内する相手"
-                  value="registered"
-                  onChange={() => {}}
-                  options={[{ value: 'registered', label: '申込者向け' }]}
-                />
+                <p id="webinar-v8-audience-select" className="text-ink text-sm">申込者向け</p>
                 <p className={styles.fieldHelp}>タグ「配信済み」は確認の段で足せます</p>
               </div>
             </div>
           </section>
         </div>
 
-        <aside className={styles.previewCol} aria-label="LINEでの見え方">
+        <aside data-design="Right" className={styles.previewCol} aria-label="LINEでの見え方">
           <h2 className={styles.previewTitle}>LINE での見え方</h2>
           <LinePreview>
             <div>
@@ -347,7 +336,7 @@ function NewWebinarV8Inner() {
           <>
             <Button href="/webinars">キャンセル</Button>
             <Button
-              disabled={saving || !canCreateWebinar || foldersState === 'error'}
+              disabled={saving || !canCreateWebinar || foldersState !== 'ready'}
               title={
                 !canCreateWebinar
                   ? 'ウェビナーの作成はオーナーか管理者が行います'
@@ -359,7 +348,7 @@ function NewWebinarV8Inner() {
             </Button>
             <Button
               variant="primary"
-              disabled={saving || !canCreateWebinar || foldersState === 'error'}
+              disabled={saving || !canCreateWebinar || foldersState !== 'ready'}
               title={
                 !canCreateWebinar
                   ? 'ウェビナーの作成はオーナーか管理者が行います'

@@ -30,6 +30,9 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { findConditionDraftIssue, type SegmentCondition } from '@/lib/segment-condition'
 import Stepper, { type StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -140,7 +143,7 @@ function readLineImageContent(content: string): { originalContentUrl: string; pr
  * 画面で持つ下書き。全部を1つのオブジェクトに入れて、保存済みとの差分を
  * シリアライズ比較（dirty）できるようにする。
  */
-interface WizardForm {
+export interface WizardForm {
   ruleName: string
   folderId: string
   internalMemo: string
@@ -403,6 +406,13 @@ function AutoReplyWizardV8Inner() {
   const [form, setForm] = useState<WizardForm>(EMPTY_FORM)
   /** 最後に読み込み・保存した形。差分が dirty。 */
   const savedSnapshotRef = useRef(JSON.stringify(EMPTY_FORM))
+  // 編集の競合（`UGrd2`：409）。入力は捨てず、比べる・読み込むを選んでもらう。
+  const [saveConflict, setSaveConflict] = useState(false)
+  const [compareTarget, setCompareTarget] = useState<WizardForm | null>(null)
+  const [compareBusy, setCompareBusy] = useState(false)
+  const [compareError, setCompareError] = useState('')
+  // 作る②の1152（`Z2LIUx`）。折り畳みはCSSが担い、ここでは板IDだけを切り替える。
+  const narrow = useNarrowViewport()
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; messageType: string; messageContent: string }>>([])
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
   const [rules, setRules] = useState<RuleRow[]>([])
@@ -422,6 +432,8 @@ function AutoReplyWizardV8Inner() {
 
   const [saving, setSaving] = useState(false)
   const [saveNotice, setSaveNotice] = useState('')
+  /** 保存が通った直後の「✓保存しました」（共通 Button の done、1.2秒）。 */
+  const [saveDone, setSaveDone] = useState(false)
   const [error, setError] = useState('')
   const [weekdayNotice, setWeekdayNotice] = useState('')
   const actionOptions = useActionOptions()
@@ -431,6 +443,10 @@ function AutoReplyWizardV8Inner() {
 
   const patch = (part: Partial<WizardForm>) => setForm((current) => ({ ...current, ...part }))
   const dirty = JSON.stringify(form) !== savedSnapshotRef.current
+
+  useEffect(() => {
+    if (dirty) setSaveDone(false)
+  }, [dirty])
 
   const { leaveTarget, confirmLeave, cancelLeave, disarm, guarded } = useUnsavedGuard({
     dirty,
@@ -759,6 +775,7 @@ function AutoReplyWizardV8Inner() {
       savedSnapshotRef.current = JSON.stringify(form)
       notifyToast('下書きを保存しました')
       // 保存で中身が変わったので、以前の試験・チェックは古いものとして捨てる。
+      setSaveConflict(false)
       setDryRun(null)
       setValidation(null)
       setConfirmState('idle')
@@ -767,7 +784,8 @@ function AutoReplyWizardV8Inner() {
       return { id: savedId!, accountId: body.lineAccountId }
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {
-        setError('ほかの変更が先に保存されました。画面を読み直してから、もう一度お試しください。')
+        setSaveConflict(true)
+        setError('ほかの変更が先に保存されました。比べるか、最新を読み込んでから続けてください。')
       } else {
         setError(describeSaveFailure(caught))
       }
@@ -776,6 +794,35 @@ function AutoReplyWizardV8Inner() {
       setSaving(false)
     }
   }, [buildInput, autoReplyId, versionNumber, form, step, router])
+
+  // `UGrd2`「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
+  const reloadAfterConflict = useCallback(async () => {
+    setSaveConflict(false)
+    setCompareTarget(null)
+    setCompareError('')
+    setError('')
+    await load()
+    setSaveNotice('最新の内容を読み込みました')
+  }, [load])
+
+  // `UGrd2`「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
+  const openCompare = useCallback(async () => {
+    if (!autoReplyId || compareBusy) return
+    setCompareBusy(true)
+    setCompareError('')
+    try {
+      const draftRes = await api.autoReplies.getDraft(autoReplyId)
+      if (!draftRes?.success || !draftRes.data?.settings) {
+        setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+        return
+      }
+      setCompareTarget(formFromSettings(draftRes.data.settings))
+    } catch {
+      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+    } finally {
+      setCompareBusy(false)
+    }
+  }, [autoReplyId, compareBusy])
 
   /* ===== 手順の移動 ===== */
   const goToStep = useCallback(
@@ -1095,7 +1142,7 @@ function AutoReplyWizardV8Inner() {
   const statusBadge = lifecycleStatus === 'draft' ? '下書き' : isActive ? '有効' : '停止中'
 
   return (
-    <div className={styles.page} data-design-node={STEP_DESIGN_NODES[step]}>
+    <div className={styles.page} data-design-node={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]}>
       <Link href="/auto-replies" className={styles.backLink}>
         <ArrowLeft size={14} aria-hidden="true" />
         自動応答へ
@@ -1114,11 +1161,29 @@ function AutoReplyWizardV8Inner() {
             <span>
               ルール名：<span className={styles.sublineName}>{thisRuleName}</span>
             </span>
-            <span className={styles.sublineBadge}>{statusBadge}として編集中</span>
+            <span className={styles.sublineBadge}>{statusBadge}として作っています</span>
           </>
         )}
       </p>
 
+      {saveConflict && (
+        <div className="border-accent bg-accent-soft rounded-card flex flex-wrap items-center gap-3 border p-4" data-design-node="UGrd2" role="alert">
+          <p className="text-ink min-w-0 flex-1 text-sm">
+            ほかの人が先に保存しました。
+            <span className="text-ink-secondary mt-0.5 block text-xs">
+              あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。
+            </span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
+              {compareBusy ? '比べています...' : '違いを比べる'}
+            </Button>
+            <Button type="button" variant="primary" onClick={() => void reloadAfterConflict()}>
+              最新を読み込んで続ける
+            </Button>
+          </div>
+        </div>
+      )}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {saveNotice ? <Notice tone="success" message={saveNotice} onClose={() => setSaveNotice('')} /> : null}
       {staleTest ? (
@@ -1766,6 +1831,7 @@ function AutoReplyWizardV8Inner() {
 
               <section className={styles.card}>
                 <h2 className={styles.cardTitle}>動く順番</h2>
+                <p className={styles.cardNote}>黄色は、このルールと同じ受信に当たるルールです（過去28日の受信で確かめました）。</p>
                 {priorityState === 'error' ? (
                   <p className={styles.hint}>
                     ルールの並びを読み込めませんでした。
@@ -2282,6 +2348,7 @@ function AutoReplyWizardV8Inner() {
               disabled={saving}
               busy={saving}
               busyLabel="保存中…"
+              done={saveDone}
             >
               {step === 'confirm' ? '下書きのまま保存' : '下書きとして保存'}
             </Button>
@@ -2305,6 +2372,7 @@ function AutoReplyWizardV8Inner() {
                 disabled={!publishReady || saving}
                 busy={saving}
                 busyLabel="有効にしています…"
+                done={saveDone}
               >
                 <Power size={14} aria-hidden="true" />
                 {wasPublished || isActive ? 'この内容で更新する' : '有効にする'}
@@ -2313,6 +2381,36 @@ function AutoReplyWizardV8Inner() {
           </>
         }
       />
+
+      <ConfirmDialog
+        open={compareTarget !== null || compareError !== ''}
+        title="最新の保存と比べる"
+        description="あなたの下書きと、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
+        confirmLabel="最新を読み込んで続ける"
+        busy={compareBusy}
+        error={compareError || undefined}
+        onConfirm={() => void reloadAfterConflict()}
+        onCancel={() => {
+          setCompareTarget(null)
+          setCompareError('')
+        }}
+      >
+        {compareTarget && (() => {
+          const lines = describeAutoReplyDiff(form, compareTarget)
+          return lines.length === 0 ? (
+            <p className="text-ink-secondary mt-3 text-sm">違いは見つかりませんでした。そのまま読み込めます。</p>
+          ) : (
+            <ul className="mt-3 space-y-1.5 text-sm">
+              {lines.map((line, index) => (
+                <li key={index} className="flex items-start gap-2">
+                  <span aria-hidden className="text-accent-deep font-bold">・</span>
+                  <span className="text-ink">{line}</span>
+                </li>
+              ))}
+            </ul>
+          )
+        })()}
+      </ConfirmDialog>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}

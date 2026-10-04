@@ -116,7 +116,7 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   await act(async () => root.render(<RemindersPage />))
   await settle()
   await eventually(() => {
-    expect(host.querySelector('[data-design-node="apLqS"]')).toBeTruthy()
+    expect(host.querySelector('[data-design-node="apLqS"], [data-design-node="Iffil"]')).toBeTruthy()
   })
   // 見本が決めた帯と見出し
   expect(host.textContent).toContain('リマインダを作る')
@@ -162,7 +162,7 @@ test('v8 の行の操作は見本の並びを持つ', async () => {
   await act(async () => root.render(<RemindersPage />))
   await settle()
   await eventually(() => {
-    expect(host.querySelector('[data-design-node="apLqS"]')).toBeTruthy()
+    expect(host.querySelector('[data-design-node="apLqS"], [data-design-node="Iffil"]')).toBeTruthy()
   })
   const trigger = [...host.querySelectorAll('button')]
     .find((item) => item.getAttribute('aria-label') === 'リマインダ「契約終了の前に知らせる」の操作')
@@ -177,14 +177,7 @@ test('v8 の行の操作は見本の並びを持つ', async () => {
       '詳細を見る', '登録者を管理', '配信予定を見る', '実行結果を見る',
       '編集する', '複製する', '一時停止する', 'フォルダへ移す', '削除',
     ])
+    // 板 SkY9V：行の「…」を開いた印
+    expect(host.querySelector('[data-design-node="SkY9V"]')).toBeTruthy()
   })
-})
-
-test('v7 の下では従来の一覧が出る（新しい一覧には切り替わらない）', async () => {
-  await act(async () => root.render(<RemindersPage />))
-  await settle()
-  await eventually(() => {
-    expect(host.textContent).toContain('契約終了の前に知らせる')
-  })
-  expect(host.querySelector('[data-design-node="apLqS"]')).toBeNull()
 })

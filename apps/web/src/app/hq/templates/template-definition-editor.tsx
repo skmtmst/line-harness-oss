@@ -78,7 +78,7 @@ export function referenceCount(type: TemplateType, definition: TemplateDefinitio
   return 0
 }
 
-function ImageUpload({ purpose, disabled, expectedSize, onUploaded, onBusyChange, onReceipt }: { purpose: 'message' | 'rich_menu'; disabled: boolean; expectedSize?: { width: number; height: number } | null; onUploaded: (media: MessageTemplateDefinition['media'][number]) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: MessageTemplateDefinition['media'][number]) => void }) {
+export function ImageUpload({ purpose, disabled, expectedSize, onUploaded, onBusyChange, onReceipt }: { purpose: 'message' | 'rich_menu'; disabled: boolean; expectedSize?: { width: number; height: number } | null; onUploaded: (media: MessageTemplateDefinition['media'][number]) => void; onBusyChange?: (busy: boolean) => void; onReceipt?: (media: MessageTemplateDefinition['media'][number]) => void }) {
   const [error, setError] = useState(''), [uploading, setUploading] = useState(false)
   const alive = useRef(true), locked = useRef(false)
   useEffect(() => { alive.current = true; return () => { alive.current = false; onBusyChange?.(false) } }, [onBusyChange])

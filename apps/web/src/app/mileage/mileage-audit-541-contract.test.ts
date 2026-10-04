@@ -7,8 +7,8 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 const ACTION_SCORE = readFileSync(join(HERE, 'action-score-tab.tsx'), 'utf8')
 const HISTORY = readFileSync(join(HERE, 'mileage-history-tab.tsx'), 'utf8')
-const NEW_RULE = readFileSync(join(HERE, 'earning-rules', 'new', 'page.tsx'), 'utf8')
-const REWARD_EDIT = readFileSync(join(HERE, 'rewards', 'edit', 'page.tsx'), 'utf8')
+const NEW_RULE = readFileSync(join(HERE, 'earning-rules', 'new', 'v8-earning-rule-new.tsx'), 'utf8')
+const REWARD_EDIT = readFileSync(join(HERE, 'rewards', 'edit', 'v8-reward-edit.tsx'), 'utf8')
 
 describe('点検 #511(中)の再発防止(#541)', () => {
   it('CSVのボタンは「この頁だけ」と分かる文にする(#511-4)', () => {

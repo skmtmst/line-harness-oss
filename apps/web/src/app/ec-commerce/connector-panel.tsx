@@ -176,7 +176,7 @@ export default function ConnectorPanel({ accountId, canEdit = true }: { accountI
         </NoteBar>
       ) : null}
       <NoteBar tone={connector?.status === 'paused' ? 'warn' : 'info'}>
-        {connector?.status === 'paused' ? '取り込みを止めています。保存済みの設定は残っています。' : connector ? `つながっています。最後にデータが届いたのは ${dateTime(data?.health.lastReceivedAt ?? null)} です。` : 'まだつながっていません。下の情報を入れて保存してください。'}
+        {connector?.status === 'paused' ? '取り込みを止めています。保存済みの設定は残っています。' : connector ? `取り込み中。最後に受け取ったのは ${dateTime(data?.health.lastReceivedAt ?? null)} です。` : 'まだつながっていません。下の情報を入れて保存してください。'}
       </NoteBar>
       {pendingStatusChange ? (
         <NoteBar tone="warn">

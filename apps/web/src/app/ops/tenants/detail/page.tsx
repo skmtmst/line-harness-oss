@@ -4,7 +4,8 @@ import { ChevronLeft, Eye } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type OpsTenantDetail } from '@/lib/api'
-import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import OpsPageHeader from '@/components/shared/page-header'
+import './detail-v8.css'
 import '@/app/ops/readonly-v8.css'
 import {
   PLAN_STATUS_LABEL,
@@ -29,7 +30,6 @@ import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { formatNumber } from '@/lib/format'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
  * 契約先アカウント詳細。★V6 37-4 `vhwld`。第 1 段は 概要／店舗／権限者／監査 のタブ。
@@ -63,8 +63,6 @@ function OpsTenantDetailContent() {
   const [error, setError] = useState('')
   const [statusDialog, setStatusDialog] = useState<StatusTarget | null>(null)
   const [busy, setBusy] = useState(false)
-  const theme = useAdminTheme()
-  const v8 = theme === 'v8'
   // 代理ログインは影響の大きい操作。V8では始める前に確認の小窓を出す。
   const [impersonateConfirm, setImpersonateConfirm] = useState(false)
 
@@ -113,7 +111,7 @@ function OpsTenantDetailContent() {
    */
   if (!id) {
     return (
-      <ReadonlyDesignNode node="Oub6x"><div data-design-node="vhwld">
+      <div data-design-node="Oub6x">
         <TargetMissing
           kind="unspecified"
           title="見る契約先が指定されていません"
@@ -121,52 +119,38 @@ function OpsTenantDetailContent() {
           backHref="/ops/tenants"
           backLabel="契約先の一覧へ戻る"
         />
-      </div></ReadonlyDesignNode>
+      </div>
     )
   }
 
   if (!detail) {
     return (
-      <ReadonlyDesignNode node="Oub6x"><div data-design-node="vhwld">
-        <OpsPageHeader title="契約先アカウント" actions={<BackToList />} />
+      <div data-design-node="Oub6x">
+        <OpsPageHeader breadcrumb={[]} description="" title="契約先アカウント" actions={<BackToList />} />
         {error
           ? <ListState kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
           : <ListState kind="loading" title="契約先を読み込んでいます" />}
-      </div></ReadonlyDesignNode>
+      </div>
     )
   }
 
   const { tenant, accounts, members, audit } = detail
 
   return (
-    <ReadonlyDesignNode node="Oub6x"><div data-design-node="vhwld" className="v8-ro-ops-page flex flex-col gap-4">
+    <div data-design-node="Oub6x" className={`ops-detail-page flex flex-col gap-4`}>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <OpsPageHeader title="契約先アカウント" actions={<BackToList />} />
-
-      <div className="flex flex-wrap items-center gap-2.5">
-        <h2 className="text-heading font-bold text-ink">{tenant.name}</h2>
-        {tenant.plan_key ? <Chip tone="info">{planLabel(tenant.plan_key)}</Chip> : null}
-        {tenantUseStatusChip(tenant.status)}
-        {planStatusChip(tenant.plan_status)}
-        <div className="flex-1" />
-        <Button onClick={() => { if (v8) setImpersonateConfirm(true); else void impersonate() }} disabled={busy || tenant.status === 'archived'}>
-          <Eye aria-hidden="true" className="h-4 w-4" />
-          代理ログイン
-        </Button>
-        {tenant.status === 'active' ? (
-          <>
-            <Button onClick={() => setStatusDialog('suspended')}>停止</Button>
-            <Button onClick={() => setStatusDialog('archived')}>アーカイブ</Button>
-          </>
-        ) : (
-          <Button onClick={() => setStatusDialog('active')}>再開</Button>
-        )}
-      </div>
+      <OpsPageHeader breadcrumb={[]} title={tenant.name} titleDisplay="always" description={`${planLabel(tenant.plan_key)}・${PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status}・${formatDate(tenant.created_at)} から`} actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => setImpersonateConfirm(true)} disabled={busy || tenant.status === 'archived'}><Eye aria-hidden="true" className="h-4 w-4" />代理ログイン（閲覧のみ）</Button>
+          {tenant.status === 'active' ? <><Button variant="danger" onClick={() => setStatusDialog('suspended')}>停止</Button><Button onClick={() => setStatusDialog('archived')}>アーカイブ</Button></> : <Button onClick={() => setStatusDialog('active')}>再開</Button>}
+        </div>
+      } />
+      <BackToList />
 
       {error ? <p role="alert" className="text-caption text-danger">{error}</p> : null}
 
       <div>
-        <Tabs items={TABS.map((t) => ({ label: t.label, current: tab === t.key, onClick: () => setTab(t.key) }))} />
+        <Tabs items={TABS.map((t) => ({ label: t.key === 'accounts' ? `店舗 ${accounts.length}` : t.key === 'members' ? `権限者 ${members.length}` : t.label, current: tab === t.key, onClick: () => setTab(t.key) }))} />
       </div>
 
       {tab === 'overview' ? (
@@ -209,29 +193,31 @@ function OpsTenantDetailContent() {
         </div>
       ) : null}
 
-      {tab === 'accounts' ? (
+      {tab === 'accounts' || tab === 'overview' ? (
+        <section className="ops-detail-section" aria-label="店舗（LINE公式アカウント）"><h3>店舗（LINE公式アカウント）</h3>{
         accounts.length === 0 ? <ListState kind="empty" title="店舗がありません" description="この契約先にはまだ LINE 公式アカウントがつながっていません。" /> : (
           <DataTable>
             <thead>
               <TableHeadRow>
-                <Th>店舗（LINE公式アカウント）</Th>
+                <Th>名前</Th>
+                <Th className="w-32">接続状態</Th>
                 <Th className="w-28" align="right">友だち数</Th>
-                <Th className="w-36">接続状態</Th>
-                <Th className="w-40">最終更新</Th>
+                <Th className="w-32">状態</Th>
               </TableHeadRow>
             </thead>
             <tbody>
               {accounts.map((a) => (
                 <Tr key={a.id}>
                   <Td><span className="block truncate text-label font-medium text-ink" title={a.name}>{a.name}</span></Td>
-                  <Td align="right"><span className="text-label text-ink">{formatNumber(a.friend_count)}</span></Td>
-                  <Td>{a.archived_at ? <Chip tone="neutral">アーカイブ</Chip> : a.is_active ? <Chip tone="ok">接続中</Chip> : <Chip tone="danger">停止</Chip>}</Td>
-                  <Td><span className="text-caption text-ink-secondary">{formatDateTime(a.updated_at)}</span></Td>
+                  <Td>{a.archived_at || !a.is_active ? <Chip tone="neutral">止めている</Chip> : <Chip tone="ok">接続中</Chip>}</Td>
+                  <Td align="right">{a.archived_at ? '—' : formatNumber(a.friend_count)}</Td>
+                  <Td>{a.archived_at ? <Chip tone="neutral">アーカイブ</Chip> : a.is_active ? <Chip tone="ok">有効</Chip> : <Chip tone="neutral">停止</Chip>}</Td>
                 </Tr>
               ))}
             </tbody>
           </DataTable>
         )
+      }</section>
       ) : null}
 
       {tab === 'members' ? (
@@ -261,7 +247,8 @@ function OpsTenantDetailContent() {
         )
       ) : null}
 
-      {tab === 'audit' ? (
+      {tab === 'audit' || tab === 'overview' ? (
+        <section className="ops-detail-section" aria-label="運営の操作（監査）"><h3>運営の操作（監査）</h3>{
         audit.length === 0 ? <ListState kind="empty" title="運営の操作はまだありません" description="運営がこの契約先に対して行った操作が、ここに残ります。" /> : (
           <DataTable>
             <thead>
@@ -270,7 +257,6 @@ function OpsTenantDetailContent() {
                 <Th className="w-40">運営者</Th>
                 <Th className="w-56">操作</Th>
                 <Th>理由</Th>
-                <Th className="w-32">契約先に表示</Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -280,12 +266,12 @@ function OpsTenantDetailContent() {
                   <Td><span className="block truncate text-caption font-medium text-ink">{row.staff_name}</span></Td>
                   <Td>{auditActionChip(row.action)}</Td>
                   <Td><span className="block truncate text-caption text-ink-secondary" title={row.reason ?? ''}>{row.reason ?? '—'}</span></Td>
-                  <Td><span className="text-caption text-ink-faint">{row.visible_to_tenant ? '表示する' : '運営のみ'}</span></Td>
                 </Tr>
               ))}
             </tbody>
           </DataTable>
         )
+      }</section>
       ) : null}
 
       {statusDialog ? (
@@ -297,7 +283,7 @@ function OpsTenantDetailContent() {
           onDone={() => { setStatusDialog(null); void load() }}
         />
       ) : null}
-      {v8 && impersonateConfirm ? (
+      {impersonateConfirm ? (
         <ConfirmDialog
           open
           title={`「${tenant.name}」に代理ログインする`}
@@ -309,7 +295,7 @@ function OpsTenantDetailContent() {
           onCancel={() => { if (!busy) setImpersonateConfirm(false) }}
         />
       ) : null}
-    </div></ReadonlyDesignNode>
+    </div>
   )
 }
 

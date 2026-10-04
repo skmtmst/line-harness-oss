@@ -136,3 +136,50 @@ describe('N-171/N-179 検索条件の一覧・CSV共有', () => {
     }
   })
 })
+
+describe('MKQyJ 後処理の札（済み・未完）', () => {
+  beforeEach(() => {
+    fetchUrls.length = 0
+    fetchApi.mockReset()
+    fetchApi.mockImplementation((async (url: string) => {
+      fetchUrls.push(url)
+      if (url.startsWith('/api/forms/form-1/submissions')) {
+        return {
+          success: true,
+          data: {
+            items: [
+              { id: 'sub-done', formId: 'form-1', friendId: 'friend-1', friendName: '済みさん', data: { q1: 'はい' }, postActions: { state: 'completed', pending: [] }, createdAt: '2026-09-01T10:00:00+09:00' },
+              { id: 'sub-open', formId: 'form-1', friendId: 'friend-2', friendName: '未完さん', data: { q1: 'いいえ' }, postActions: { state: 'failed', pending: ['tag'] }, createdAt: '2026-09-02T10:00:00+09:00' },
+              { id: 'sub-plain', formId: 'form-1', friendId: 'friend-3', friendName: '記録なしさん', data: { q1: 'どちらでも' }, postActions: null, createdAt: '2026-09-03T10:00:00+09:00' },
+            ],
+            total: 3,
+            page: 1,
+            limit: 20,
+          },
+        }
+      }
+      return { success: true, data: formDetail }
+    }) as typeof fetchApi)
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+
+  afterEach(() => {
+    act(() => {
+      root.unmount()
+    })
+    host.remove()
+    vi.restoreAllMocks()
+  })
+
+  it('終わりは済み・未完ありは未完・記録なしは札なし', async () => {
+    await act(async () => {
+      root.render(<FormResponsesPage />)
+    })
+    await settle(50)
+    expect(host.textContent).toContain('済み')
+    expect(host.textContent).toContain('未完')
+    expect(host.textContent).not.toContain('後処理に未完があります')
+  })
+})

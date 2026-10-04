@@ -296,7 +296,7 @@ export default function UsersV8() {
                         className={styles.linkAction}
                         onClick={() => setExpanded((current) => (current === row.identityKey ? null : row.identityKey))}
                       >
-                        {expanded === row.identityKey ? '閉じる' : '詳細を見る'}
+                        {expanded === row.identityKey ? '閉じる' : '開く'}
                       </button>
                     )}
                   </td>

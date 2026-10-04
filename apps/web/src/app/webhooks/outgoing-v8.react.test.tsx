@@ -116,6 +116,8 @@ test('v8 では ZSbFY の一覧（帯・表・動いているの札）が出る'
   // 表の行：いつ送るか・送るもの・ようすの札。
   expect(board?.textContent).toContain('友だちが追加されたとき')
   expect(board?.textContent).toContain('動いている')
+  // 板 `ZSbFY` 全行の操作欄に「中身を見る」「設定」。
+  expect(board?.textContent).toContain('中身を見る')
   expect(board?.textContent).toContain('設定')
 })
 
@@ -133,7 +135,8 @@ test('v8 で失敗がある行は失敗ありの札と失敗の内訳が出る',
   const board = host.querySelector('[data-design-node="ZSbFY"]')
   expect(board?.textContent).toContain('失敗あり')
   expect(board?.textContent).toContain('失敗 2回')
-  expect(board?.textContent).toContain('失敗をやり直す')
+  // 板 `ZSbFY` 行3の操作欄。「…」の中の「失敗をやり直す」ではなく表のボタンの文言で見る。
+  expect(board?.textContent).toContain('やり直す')
 })
 
 test('v8 で何も無いときは wWrpY の「まだ無い」が出る', async () => {
@@ -194,6 +197,50 @@ test('v8 の動かす・止めるは押した瞬間に札が変わり、失敗�
   // 口が失敗したら札が戻り、知らせに「もう一度」が出る。
   await act(async () => { resolveUpdate!(json({ success: false, error: 'boom' })) })
   expect(board.textContent).toContain('動いている')
+})
+
+test('v8 で行を右クリックすると「設定」と同じ操作が押した位置に出る', async () => {
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('/api/staff/me') || url.includes('/staff/me')) {
+      return json({ success: true, data: { role: staffRole } })
+    }
+    if (url.includes('/incoming')) return json({ success: true, data: [] })
+    if (url.includes('/api/webhooks/outgoing') && init?.method === 'PUT') {
+      return json({ success: true, data: outgoing() })
+    }
+    if (url.includes('/api/webhooks/outgoing')) {
+      return json({ success: true, data: outgoingItems })
+    }
+    if (url.includes('/interactions')) {
+      return json({ success: true, data: { summary: {
+        total: 2146, outgoing: 1734, incoming: 412, succeeded: 2144,
+        failed: 2, resultUnknown: 0, outgoingFailed: 2, retryable: 2, averageDurationMs: 400,
+      } } })
+    }
+    return json({ success: false, error: 'not found' }, 404)
+  })
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const board = host.querySelector('[data-design-node="ZSbFY"]')!
+  const row = board.querySelector('tbody tr') as HTMLElement
+  await act(async () => {
+    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 300, clientY: 200 }))
+  })
+  const menu = document.querySelector('[role="menu"]')
+  expect(menu?.getAttribute('aria-label')).toBe('送り先の操作')
+  const layer = document.querySelector('[data-context-menu]')
+  expect(layer?.getAttribute('style')).toContain('left: 300px')
+  expect(layer?.getAttribute('style')).toContain('top: 200px')
+  // 「設定」と同じ中身が出る。
+  for (const label of ['止める', '直す', '合言葉を作り直す', '削除する', '試しに送る']) {
+    expect(menu?.textContent).toContain(label)
+  }
+  // 右クリックから「止める」を押すと「設定」と同じく札が変わる。
+  const stopItem = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === '止める') as HTMLElement
+  await act(async () => { stopItem.click() })
+  expect(board.textContent).toContain('止めている')
+  expect(document.querySelector('[role="menu"]')).toBeNull()
 })
 
 test('v8 の読み込み中は表の形の骨組みが出て「読み込み中」の文字は無い', async () => {

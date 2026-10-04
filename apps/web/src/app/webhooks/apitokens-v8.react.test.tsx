@@ -36,6 +36,19 @@ const token = {
   lastUsedAt: '2026-09-30T10:02:00.000Z',
   rotatedFromId: null,
   createdAt: '2026-06-02T00:00:00.000Z',
+  revokedAt: null,
+}
+
+const revokedToken = {
+  id: 'tok-2',
+  name: '旧ポイント連携',
+  tokenPrefix: 'mhk_old',
+  scopes: ['tags:write'],
+  createdBy: null,
+  lastUsedAt: '2025-08-31T12:00:00.000Z',
+  rotatedFromId: null,
+  createdAt: '2025-11-10T00:00:00.000Z',
+  revokedAt: '2025-09-01T00:00:00.000Z',
 }
 
 const json = (data: unknown, status = 200) => new Response(
@@ -60,7 +73,8 @@ beforeEach(() => {
         failed: 0, resultUnknown: 0, outgoingFailed: 0, retryable: 0, averageDurationMs: null,
       } } })
     }
-    if (url.includes('/api-tokens')) return json({ success: true, data: [token] })
+    if (url.includes('/reactivate')) return json({ success: true, data: { ...revokedToken, revokedAt: null } })
+    if (url.includes('/api-tokens')) return json({ success: true, data: [token, revokedToken] })
     return json({ success: false, error: 'not found' }, 404)
   })
 })
@@ -87,12 +101,32 @@ test('v8 では ralAc の鍵の表（札・入れ替える）が出る', async (
   expect(board?.textContent).toContain('予約システム連携')
   expect(board?.textContent).toContain('使っている')
   expect(board?.textContent).toContain('入れ替える')
-  expect(board?.textContent).toContain('API接続の鍵を発行する')
+  // 板 `ralAc` の作るボタンの文言（本人確認の用途名ではなく表のボタンの文言で見る）。
+  expect(board?.textContent).toContain('鍵を発行する')
 })
 
 test('v7 では従来の鍵タブが出て ralAc は出ない', async () => {
   await renderPage()
   expect(host.querySelector('[data-design-node="ralAc"]')).toBeNull()
+})
+
+test('v8 で行を右クリックすると「…」と同じ止めるが出る', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const board = host.querySelector('[data-design-node="ralAc"]')!
+  const row = board.querySelector('tbody tr') as HTMLElement
+  await act(async () => {
+    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 320, clientY: 180 }))
+  })
+  const menu = document.querySelector('[role="menu"]')
+  expect(menu?.getAttribute('aria-label')).toBe('鍵の操作')
+  expect(document.querySelector('[data-context-menu]')?.getAttribute('style')).toContain('left: 320px')
+  expect(menu?.textContent).toContain('止める')
+  // 右クリックから「止める」を押すと止める確認の窓が開く。
+  const stopItem = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === '止める') as HTMLElement
+  await act(async () => { stopItem.click() })
+  expect(document.querySelector('[role="menu"]')).toBeNull()
+  expect(document.body.textContent).toContain('鍵を止めますか')
 })
 
 test('v8 の読み込み中は鍵の表の形の骨組みが出て「読み込み中」の文字は無い', async () => {

@@ -160,11 +160,10 @@ function constantTimeHexEqual(left: string, right: string): boolean {
 }
 
 /**
- * 公式サイトの掲載閲覧数（F-20）。共通の種類名簿（@line-crm/shared）は
- * 共有部品なので触らず、ここだけで受け付ける。本採用時にM側で名簿へ移す。
+ * 公式サイトの掲載閲覧数（F-20）。種類は共通名簿（@line-crm/shared の
+ * EC_EVENT_TYPES）が正本。ここでは分岐用の名前だけ残す。
  */
 export const PUBLICATION_VIEW_EVENT_TYPE = 'ec.site.publication_viewed';
-const EXTRA_EVENT_TYPES = new Set<string>([PUBLICATION_VIEW_EVENT_TYPE]);
 
 function isValidPublicationViews(value: unknown): boolean {
   if (!Array.isArray(value) || value.length === 0 || value.length > 100) return false;
@@ -184,8 +183,7 @@ export function validateEvent(value: unknown): value is EcEvent {
   if (!value || typeof value !== 'object') return false;
   const event = value as Partial<EcEvent>;
   if (typeof event.event_id !== 'string' || event.event_id.length < 8 || event.event_id.length > 255) return false;
-  if (typeof event.event_type !== 'string'
-    || (!EVENT_TYPES.has(event.event_type) && !EXTRA_EVENT_TYPES.has(event.event_type))) return false;
+  if (typeof event.event_type !== 'string' || !EVENT_TYPES.has(event.event_type)) return false;
   if (event.event_type === PUBLICATION_VIEW_EVENT_TYPE
     && !isValidPublicationViews(event.publication_views)) return false;
   if (event.line_user_id != null

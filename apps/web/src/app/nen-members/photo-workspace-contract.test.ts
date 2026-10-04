@@ -3,16 +3,16 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const here = import.meta.dirname
-const page = readFileSync(join(here, 'page.tsx'), 'utf8')
+const page = readFileSync(join(here, 'photo-review-v8.tsx'), 'utf8')
 const detail = readFileSync(join(here, 'photo-review-detail.tsx'), 'utf8')
-const publications = readFileSync(join(here, 'photo-publications.tsx'), 'utf8')
+const publications = readFileSync(join(here, 'photo-review-v8.tsx'), 'utf8')
 const api = readFileSync(join(here, '..', '..', 'lib', 'api.ts'), 'utf8')
 
-describe('V6 写真審査の一枚表示と掲載管理', () => {
+describe('V8 写真審査の一枚表示と掲載管理', () => {
   it('opens both real states from the existing photo-review route', () => {
-    expect(page).toContain('data-qa-open="hHrz8"')
-    expect(page).toContain("setView('publications')")
-    expect(page).toContain('api.nenMembers.photo(id, selectedAccountId)')
+    expect(page).toContain('onOpenDetail=')
+    expect(page).toContain("view: 'publications'")
+    expect(page).toContain('api.nenMembers.photo(id, accountId)')
     expect(api).toContain('/api/nen-members/photos/publications?accountId=')
   })
 
@@ -54,8 +54,8 @@ describe('V6 写真審査の一枚表示と掲載管理', () => {
   })
 
   it('does not turn an unavailable view count into zero', () => {
-    expect(publications).toContain("value == null ? '—（未取得）'")
-    expect(publications).toContain('表示回数は未取得')
+    expect(publications).toContain("value == null ? '—'")
+    expect(publications).toContain('view_count_30d')
     expect(publications).toContain('withdrawPhotoPublication')
     expect(publications).toContain('updatePhotoPublicationPlacements')
     expect(publications).toContain('使う場所を保存')
@@ -66,13 +66,13 @@ describe('V6 写真審査の一枚表示と掲載管理', () => {
     // 掲載管理は「同意撤回で残った掲載先」と「外し済み」を分けて出す。
     expect(publications).toContain('pendingWithdrawals')
     expect(publications).toContain('withdrawnItems')
-    expect(publications).toContain('整理が必要なもの')
+    expect(publications).toContain('掲載の整理と外した履歴')
     expect(publications).toContain('ご本人が公開の同意を撤回しました')
-    expect(publications).toContain('外したもの')
+    expect(publications).toContain('外した日時')
     expect(publications).toContain('removed_at')
     // 外す操作と「付与済みマイルは戻らない」説明を残す
     expect(publications).toContain('掲載先から外す')
-    expect(publications).toContain('付与済みのマイルは戻りません')
+    expect(publications).toContain('外しても採用時のマイルは戻りません')
     expect(api).toContain('pendingWithdrawals')
     expect(api).toContain('withdrawnItems')
   })

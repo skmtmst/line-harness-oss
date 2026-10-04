@@ -20,6 +20,8 @@ export function useFileScan() {
   const [items, setItems] = useState<FileScanItem[]>([])
   const [total, setTotal] = useState(0)
   const [statusFilter, setStatusFilter] = useState('quarantined')
+  /** 板 `PfA4o` の札の件数。検索語を含めた今の条件での総数。 */
+  const [counts, setCounts] = useState({ quarantined: 0, pending: 0, released: 0 })
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
   const [page, setPage] = useState(1)
@@ -56,25 +58,35 @@ export function useFileScan() {
       setPhase('ready')
       setItems([])
       setTotal(0)
+      setCounts({ quarantined: 0, pending: 0, released: 0 })
       return
     }
     setPhase('loading')
     setActionError('')
     try {
-      const [me, list, configRes] = await Promise.all([
+      const trimmedQuery = deferredQuery.trim() || undefined
+      const [me, list, configRes, quarantinedRes, pendingRes, releasedRes] = await Promise.all([
         api.staff.me(),
         api.fileScan.list(selectedAccountId, {
           status: statusFilter,
-          q: deferredQuery.trim() || undefined,
+          q: trimmedQuery,
           limit: FILE_SCAN_PAGE_SIZE,
           offset: (page - 1) * FILE_SCAN_PAGE_SIZE,
         }),
         api.fileScan.getConfig(selectedAccountId),
+        api.fileScan.list(selectedAccountId, { status: 'quarantined', q: trimmedQuery, limit: 1 }),
+        api.fileScan.list(selectedAccountId, { status: 'pending', q: trimmedQuery, limit: 1 }),
+        api.fileScan.list(selectedAccountId, { status: 'released', q: trimmedQuery, limit: 1 }),
       ])
       if (!me.success || !list.success || !configRes.success) {
         setPhase('error')
         return
       }
+      setCounts({
+        quarantined: quarantinedRes.success ? quarantinedRes.data.total : 0,
+        pending: pendingRes.success ? pendingRes.data.total : 0,
+        released: releasedRes.success ? releasedRes.data.total : 0,
+      })
       if (me.data.role !== 'owner' && me.data.role !== 'admin') {
         setPhase('forbidden')
         return
@@ -230,6 +242,7 @@ export function useFileScan() {
     phase,
     items,
     total,
+    counts,
     statusFilter,
     query,
     page,

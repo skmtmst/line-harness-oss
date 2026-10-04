@@ -137,7 +137,7 @@ describe('ログインユーザーの権限確認 (IDEA-30)', () => {
       expect((button as HTMLButtonElement).disabled).toBe(true)
     }
     // かたまりの選択も効かせない
-    const bundleButton = screen.getAllByRole('button').find((item) => item.textContent?.includes('運用') && item.textContent?.includes('人'))
+    const bundleButton = screen.getAllByRole('button').find((item) => item.textContent?.includes('スタッフ') && item.textContent?.includes('人'))
     expect(bundleButton && (bundleButton as HTMLButtonElement).disabled).toBe(true)
     // 管理者であることと、この画面では確認だけできることを示す
     expect(screen.getByText(/管理者はすべての機能を使えます。/)).toBeTruthy()

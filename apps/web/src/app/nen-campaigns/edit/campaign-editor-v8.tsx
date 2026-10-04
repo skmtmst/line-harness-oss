@@ -25,6 +25,9 @@ import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import { TextInput } from '@/components/shared/form-controls'
+import { Check } from 'lucide-react'
 import { TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -228,6 +231,10 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
       setError(`${formIssueMessage}。フォームを外して選び直してから保存してください`)
       return
     }
+    if (mileageAction && (!Number.isInteger(mileageAction.amount) || mileageAction.amount < 1 || mileageAction.amount > 1_000_000)) {
+      setError('付けるマイルは1〜1,000,000の整数で入力してください')
+      return
+    }
     setSaving(true)
     setError('')
     setNotice('')
@@ -279,10 +286,10 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
 
   return (
     <div data-design-node="w5pwG" className={styles.board}>
-      <nav className={styles.crumb} aria-label="パンくず">
-        <Link href="/nen-campaigns">← NEN配信へ</Link>
-      </nav>
       <div className={styles.head}>
+        <nav className={styles.crumb} aria-label="パンくず">
+          <Link href="/nen-campaigns">← NEN配信へ</Link>
+        </nav>
         <h1 className={styles.headTitle}>{setting.label}（配信を直す）</h1>
         <p className={styles.headDesc}>{timing}。保存した新しい中身は、次のきっかけからの配信に使われます。</p>
       </div>
@@ -312,6 +319,11 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
               <div className={styles.fieldLabel}>
                 きっかけ
                 <p className={styles.static}>{triggerLabel(setting)}</p>
+                {!isBirthday ? <label className={styles.delay}>
+                  <TextInput aria-label="きっかけからの日数" type="number" min={0} max={365}
+                    value={String(merged.delayDays)} onChange={(event) => setDraft((previous) => ({ ...previous, delayDays: Number(event.target.value) }))} />
+                  <span>日後</span>
+                </label> : null}
               </div>
               <div className={styles.fieldLabel}>
                 送る時刻
@@ -351,7 +363,10 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             <p className={styles.note}>この配信は1通で届きます</p>
             <div className={styles.fieldLabel}>
               届く形
-              <p className={styles.note}>リッチメッセージ（今の作りのまま。文字だけの切り替えの口はまだありません）</p>
+              <RadioCardGroup legend="届く形" className={styles.row2}>
+                <RadioCard name="message-kind" value="rich" checked onChange={() => {}} title="リッチメッセージ" />
+                <RadioCard name="message-kind" value="text" checked={false} onChange={() => {}} title="文字だけ" disabled disabledReason="この配信では選べません" />
+              </RadioCardGroup>
             </div>
             <label className={styles.fieldLabel}>
               配信本文
@@ -402,7 +417,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             {mileageAction?.kind === 'award_mileage' ? (
               <div className={styles.actionRow}>
                 <div>
-                  <p className={styles.actionTitle}>回答後に{formatNumber(mileageAction.amount)}マイル付ける</p>
+                  <label className={styles.fieldLabel}>回答後に付けるマイル<TextInput aria-label="回答後に付けるマイル" type="number" min={1} max={1_000_000} step={1} value={mileageAction.amount || ''} onChange={(event) => setActions(actions.map((action) => action === mileageAction ? { ...action, amount: Number(event.target.value) } : action))} /></label>
                   <p className={styles.note}>回答フォームへの送信をきっかけにしています</p>
                 </div>
                 <Button type="button" variant="secondary" aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}>外す</Button>
@@ -416,8 +431,8 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
         </div>
 
         <aside className={styles.side}>
-          <section className={styles.card} aria-label="届き方の見本">
-            <h2 className={styles.cardTitle}>高橋 直人さん（ももちゃん）にはこう届きます</h2>
+          <section className={styles.preview} aria-label="届き方の見本">
+            <h2 className={styles.cardTitle}>お客さまにはこう届きます</h2>
             <LinePreview caption={`◷ ${timing}`}>
               <div className={styles.previewBody}>
                 <p className={styles.previewText}>{previewBody(merged.bodyText)}</p>
@@ -470,7 +485,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
         actions={(
           <>
             <Button href="/nen-campaigns">キャンセル</Button>
-            <Button type="button" variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits} busy={saving} busyLabel="保存しています…">配信内容を保存する</Button>
+            <Button type="button" variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits} busy={saving} busyLabel="保存しています…"><Check size={14} aria-hidden="true" />配信内容を保存する</Button>
           </>
         )}
       />

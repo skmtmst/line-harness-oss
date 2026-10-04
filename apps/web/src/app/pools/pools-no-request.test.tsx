@@ -72,7 +72,7 @@ describe('プール管理の発行前ゲート（#703）', () => {
     const view = render(<PoolsPage />)
 
     await waitFor(() => expect(view.getByText('メインプール')).toBeTruthy())
-    expect(view.getAllByText(/プールをつくる/)[0]).toBeTruthy()
+    expect(view.getAllByText(/新規プール/)[0]).toBeTruthy()
     expect(seenPaths).toContain('/api/traffic-pools')
   })
 })

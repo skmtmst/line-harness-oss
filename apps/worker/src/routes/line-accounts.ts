@@ -1194,14 +1194,71 @@ async function probeFollowerCapability(channelAccessToken: string): Promise<'ava
   }
 }
 
+/*
+ * V8 登録 ④接続確認（`v2KMj`）用の検証の内訳。`steps` の5段とは切り口が
+ * 違い、画面の5行（チャネル・同じプロバイダー・Webhook・LINE ID・友だち
+ * 追加URL）にそのまま載る。LINEにプロバイダ照合の口は無いため、
+ * 同じプロバイダーは「Messaging APIとLINE Loginの両方の認証が通ったこと」
+ * を代理条件にする（どちらかが落ちればここも落ちる）。
+ */
+export interface LineConnectVerification {
+  tokenOk: boolean;
+  loginOk: boolean;
+  sameProvider: boolean;
+  webhook: {
+    expectedUrl: string;
+    registeredUrl: string | null;
+    active: boolean | null;
+    testPassed: boolean | null;
+  };
+  followerTotal: number | null;
+}
+
+function stepPassed(steps: LineConnectStep[], order: LineConnectStep['order']): boolean {
+  return steps.some((item) => item.order === order && item.state === 'passed');
+}
+
+/* 友だち数の統計は前日分しか無い。日本時間の昨日を yyyyMMdd で返す。 */
+export function insightDateJst(now: Date = new Date()): string {
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000 - 24 * 60 * 60 * 1000);
+  const year = jst.getUTCFullYear();
+  const month = String(jst.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(jst.getUTCDate()).padStart(2, '0');
+  return `${year}${month}${day}`;
+}
+
+/*
+ * 登録前の友だち総数。V8 ④の結果窓（`qw80E`）のボット情報に出す。
+ * 取れなければ null（表示は名前だけにする）。検査の合否には使わない。
+ */
+export async function fetchPreConnectFollowerTotal(channelAccessToken: string): Promise<number | null> {
+  try {
+    const insight = await new LineClient(channelAccessToken).getFollowersInsight(insightDateJst());
+    return typeof insight.followers === 'number' ? insight.followers : null;
+  } catch {
+    return null;
+  }
+}
+
 function publicConnectData(
   prepared: Awaited<ReturnType<typeof prepareLineConnection>>,
   steps: LineConnectStep[],
   followerImport: { capability: 'unknown' | 'available' | 'unavailable'; phase: string },
   id?: string,
+  followerTotal: number | null = null,
 ) {
+  const tokenOk = stepPassed(steps, 1);
+  const loginOk = stepPassed(steps, 4);
+  const verification: LineConnectVerification = {
+    tokenOk,
+    loginOk,
+    sameProvider: tokenOk && loginOk,
+    webhook: { ...prepared.webhook },
+    followerTotal,
+  };
   return {
     steps,
+    verification,
     id,
     displayName: prepared.bot?.displayName,
     pictureUrl: prepared.bot?.pictureUrl ?? null,
@@ -1233,12 +1290,15 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner'), asyn
   const finalStep = capability === 'unknown'
     ? lineConnectStep(5, 'failed', '認証状態を確認できませんでした。時間をおいて、もう一度お試しください。')
     : lineConnectStep(5, 'passed');
+  const followerTotal = await fetchPreConnectFollowerTotal(prepared.channelAccessToken);
   return c.json({
     success: true,
     data: publicConnectData(
       prepared,
       [...prepared.steps.slice(0, 4), finalStep],
       { capability, phase: 'not_started' },
+      undefined,
+      followerTotal,
     ),
   });
 });

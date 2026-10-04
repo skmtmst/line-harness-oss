@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -15,7 +15,9 @@ const read = (relative: string) => readFileSync(join(HERE, relative), 'utf8')
 describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
   it('一覧の外枠に EML2F（一覧）と bIdqV（一覧の状態）を付ける', () => {
     const list = read('list-v8.tsx')
-    expect(list, '一覧の板が無い').toContain('data-design-node="EML2F bIdqV"')
+    // 閲覧のみは NtCE3 に切り替わる形で両方の印を残す（印を消さない）。
+    expect(list, '一覧の板が無い').toContain("data-design-node={canEdit ? 'EML2F bIdqV' : 'NtCE3'}")
+    expect(list).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
   })
 
   it('一覧の道具の段に rfdmA（1152）を付ける', () => {
@@ -26,6 +28,13 @@ describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
   it('予約した後の外枠に CRtK8 を付ける', () => {
     const reserved = read('reserved-v8.tsx')
     expect(reserved, '予約した後の板が無い').toContain('data-design-node="CRtK8"')
+  })
+
+  it('予約の取消の窓は板 BeNtj・取り消す／やめる／残すの3つを出す', () => {
+    const reserved = read('reserved-v8.tsx')
+    expect(reserved, 'BeNtj の板が無い').toContain('designNode="BeNtj"')
+    expect(reserved, 'やめるが無い').toContain('やめる')
+    expect(reserved, '予約のまま残すが無い').toContain('予約のまま残す')
   })
 
   it('詳細の外枠に dK1aE（下書き）・wfHIE（承認待ち）・tPm3e（送った後）を付ける', () => {

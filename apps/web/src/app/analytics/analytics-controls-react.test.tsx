@@ -24,7 +24,7 @@ const net = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: ({ children }: { children?: unknown }) => children }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/analytics',
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/components/layout/merged-tabs', () => ({
@@ -214,6 +214,31 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     }
   })
 
+  it('URLの状態を絞ると、ページに出ていない同じ状態のリンクもCSVへ入る', async () => {
+    fixture.tab = 'url-clicks'
+    const metric = (value: number) => ({ value, state: 'available', reason: null })
+    net.handler = async (path) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'viewer' } }
+      return { success: true, data: { period: expectedRange(30), dataCutoffAt: null, data: {
+        stateReason: null, hasMore: false, clickRateDefinition: '中継URLの実測',
+        links: Array.from({ length: 26 }, (_, i) => ({ trackedLinkId: `link-${i}`, name: `リンク${i}`, originalUrl: `https://example.invalid/${i}`, isActive: i % 2 === 0, clicks: metric(i), knownClickPeople: metric(i), deliveredPeople: metric(100), clickRate: metric(i), usageLocations: ['一斉配信'] })),
+      } } }
+    }
+    let csv: Blob | undefined
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => { csv = blob as Blob; return 'blob:test' })
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    await render()
+    await select('url-state', 'active')
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(10)
+    expect(host.textContent).toContain('13件中')
+    await click('CSV で書き出す')
+    const body = await csv!.text()
+    expect(body).toContain('"リンク24",')
+    expect(body).not.toContain('"リンク1",')
+    expect(body.split('\n')).toHaveLength(14)
+  })
+
   it('ファネルは3種別を実POSTし、7/30/90日のcohort期間で再集計する', async () => {
     fixture.tab = 'funnel'
     net.handler = async (path) => {
@@ -237,7 +262,7 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     await act(async () => { firstStage?.click(); await Promise.resolve() })
 
     for (const selection of ['reached', 'stopped', 'in_progress'] as const) {
-      await select('funnel-audience-selection', selection)
+      await click({ reached: '到達した人', stopped: '止まった人', in_progress: '進行中の人' }[selection])
       await click('友だち一覧で見る')
       const request = net.calls.filter((call) => call.path.startsWith('/api/analytics/results/run-1/audiences?')).at(-1)
       expect(request, JSON.stringify(net.calls)).toBeDefined()
@@ -249,7 +274,7 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     const secondStage = host.querySelector('button[aria-label="申込の段"]') as HTMLButtonElement | null
     expect(secondStage).not.toBeNull()
     await act(async () => { secondStage?.click(); await Promise.resolve() })
-    await select('funnel-audience-selection', 'stopped')
+    await click('止まった人')
     await click('友だち一覧で見る')
     const secondRequest = net.calls.filter((call) => call.path.startsWith('/api/analytics/results/run-1/audiences?')).at(-1)
     expect(JSON.parse(String(secondRequest?.init?.body))).toMatchObject({ stepOrder: 2, selection: 'stopped' })
@@ -331,7 +356,7 @@ describe('分析の対象者種別・期間選択(#835)', () => {
      * 閉じている間は短い状態だけが見え、開くと全文が読める。
      */
     expect(host.textContent).not.toContain('確認できた参照だけの合計です')
-    const descriptionButton = host.querySelector('button[aria-label="確認できた参照切れの説明"]') as HTMLButtonElement | null
+    const descriptionButton = host.querySelector('button[aria-label="作ったのに使っていないの説明"]') as HTMLButtonElement | null
     expect(descriptionButton, '説明アイコンが無い').not.toBeNull()
     await act(async () => { descriptionButton!.click(); await Promise.resolve() })
     expect(host.textContent).toContain('確認できた参照だけの合計です')

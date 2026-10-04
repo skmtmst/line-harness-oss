@@ -105,13 +105,14 @@ describe('マイル・紹介は中身を全部残し、6-mile の順に並べる
     expect(src).toContain('合算しています');
   });
 
-  it('増やす (取り組み・登録マイル・履歴) と未登録のはじめるがある', () => {
+  it('増やす (取り組み・登録マイル・履歴) と未登録の紹介者になるがある', () => {
     const src = affiliate();
     expect(src).toContain('今、マイルを増やせます');
     expect(src).toContain('LINEアカウント登録マイル');
     expect(src).toContain('マイル履歴');
-    expect(src).toContain('はじめる（無料）');
-    expect(src).toContain('紹介リンクを使う');
+    expect(src).toContain('紹介者になる');
+    expect(src).toContain('お友だちを紹介してマイルをもらう');
+    expect(src).toContain('vqu9B');
   });
 
   it('紹介の成果 (数・参加中とリンク・参加できる・その他) がある', () => {

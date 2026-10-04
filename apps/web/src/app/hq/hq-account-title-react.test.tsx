@@ -9,9 +9,11 @@ const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: (title: unknown) => { titles.seen.push(title) },
+  usePageChrome: () => ({}),
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
+  usePathname: () => '/hq',
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ setSelectedAccountId: vi.fn(), refreshAccounts: vi.fn(async () => {}) }),

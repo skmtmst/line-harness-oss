@@ -419,7 +419,7 @@ export default function TemplatePicker({
                   まとめて選ぶ
                 </button>
               ) : null}
-              <span className="ml-auto text-[11px] text-ink-faint">
+              <span className="ml-auto text-micro text-ink-faint">
                 {visibleTemplatesStatus === 'ready' ? `${total}件` : '—'}
               </span>
             </div>
@@ -428,7 +428,7 @@ export default function TemplatePicker({
               1件も無いときは、推測ではなく実績が無いことを先に断る。
             */}
             {category === 'frequent' && visibleTemplatesStatus === 'ready' && shown.length > 0 && !frequentHasUsage ? (
-              <p className="mb-2 text-[11px] leading-relaxed text-ink-faint">
+              <p className="mb-2 text-micro leading-relaxed text-ink-faint">
                 まだ送信・使用の実績がないため、実績順ではなく登録順で表示しています。
               </p>
             ) : null}
@@ -523,7 +523,7 @@ export default function TemplatePicker({
                 </div>
                 <p className="mt-5 text-xs font-semibold text-ink-faint">送信内容のプレビュー</p>
                 <div className="mt-3 min-h-[250px] rounded-card bg-line-talk p-5 shadow-card">
-                  <div className="flex justify-center"><span className="rounded-pill bg-canvas/85 px-3 py-1 text-[11px] text-ink-faint">今日</span></div>
+                  <div className="flex justify-center"><span className="rounded-pill bg-canvas/85 px-3 py-1 text-micro text-ink-faint">今日</span></div>
                   <div className="mt-4 max-w-[78%] rounded-card rounded-tl-mini bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-ink-secondary shadow-card">{previewContent ?? selected.messageContent}</div>
                 </div>
                 {previewContent !== null && resolvedPreview?.unresolved.length ? (

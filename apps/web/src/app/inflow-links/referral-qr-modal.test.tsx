@@ -21,6 +21,7 @@ describe('停止中の流入経路のQR', () => {
     expect(markup).toContain('のQRコード')
     expect(markup).toContain('/api/qr')
     expect(markup).toContain('URLをコピー')
+    expect(markup).toContain('PNGを保存')
   })
 
   it('停止中の経路はQR・コピー・ダウンロードを出さず理由を出す', () => {

@@ -224,7 +224,7 @@ async function renderPage(element: React.ReactElement) {
 function expectNoDuplicateCounts() {
   const text = host.textContent ?? ''
   const counts: Record<string, number> = {}
-  for (const m of text.matchAll(/(\d[\d,]*)\s*件/g)) counts[m[1]] = (counts[m[1]] || 0) + 1
+  for (const m of text.matchAll(/(\d[\d,]*)\s*件(?!\s*(?:ごと|あたり))/g)) counts[m[1]] = (counts[m[1]] || 0) + 1
   const flagged = Object.entries(counts).filter(([n, c]) => c >= 3 && n !== '0')
   expect(flagged).toEqual([])
 }

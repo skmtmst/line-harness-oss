@@ -6,8 +6,9 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
 
-const SCENARIOS = read('scenarios', 'page.tsx')
-const REMINDERS = read('reminders', 'page.tsx')
+/* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。 */
+const SCENARIOS = read('scenarios', 'list-v8.tsx')
+const REMINDERS = read('reminders', 'list-v8.tsx')
 const BROADCASTS = read('broadcasts', 'page.tsx')
 const AUTO_REPLIES = read('auto-replies', 'page.tsx')
 const TEMPLATES = read('templates', 'page.tsx')

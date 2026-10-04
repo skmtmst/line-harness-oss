@@ -1,7 +1,10 @@
 'use client'
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { V8AutoShell, type AutoV8Counts } from '@/app/automations/automations-v8'
+import { V8CommonActionsTab } from './common-actions-v8'
 import { ExternalLink, MoreHorizontal, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, type CommonActionSummary } from '@/lib/api'
@@ -45,7 +48,37 @@ const STATUS_LABEL: Record<CommonActionSummary['status'], string> = {
   archived: '保管',
 }
 
+/*
+ * ★V8-B の切り替え。v8 の器は別ファイル（common-actions-v8.tsx）に置き、
+ * v7 の器・動きはこの下の V7 のまま残す。外枠のタブは共通（automations-v8）。
+ */
 export default function CommonActionsPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return (
+      <Suspense fallback={null}>
+        <CommonActionsPageV8 />
+      </Suspense>
+    )
+  }
+  return <CommonActionsPageV7 />
+}
+
+/* ★V8-B 共通アクションの一覧（板 `LnGNw`）。 */
+function CommonActionsPageV8() {
+  const theme = useAdminTheme()
+  const [counts, setCounts] = useState<AutoV8Counts>({})
+  if (theme !== 'v8') return null
+  return (
+    <V8AutoShell
+      tab="common-actions"
+      counts={counts}
+      render={(model) => <V8CommonActionsTab model={model} onCounts={setCounts} />}
+    />
+  )
+}
+
+function CommonActionsPageV7() {
   const canManage = useCanManageCommonActions()
   /*
    * 監査 R466: 書き出しの権限（automation.run.export）がない担当者には

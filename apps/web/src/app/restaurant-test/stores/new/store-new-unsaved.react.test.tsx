@@ -74,3 +74,14 @@ describe('R161: 店舗追加の書きかけがある間の離脱確認', () => {
     await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith('/hq'))
   })
 })
+
+describe('faGn4: 店舗の基本情報の案内', () => {
+  it('プロバイダーの注意・同意済み・キャンセルが出る', async () => {
+    render(<NewRestaurantStorePage />)
+    fireEvent.click(await screen.findByRole('button', { name: '規約に同意する' }))
+    await screen.findByText('店舗の基本情報')
+    await screen.findByText('店舗ごとに、新しいプロバイダーを作ってください。')
+    await screen.findByText(/利用規約に同意済み/)
+    expect(screen.getByRole('link', { name: 'キャンセル' })).toBeTruthy()
+  })
+})

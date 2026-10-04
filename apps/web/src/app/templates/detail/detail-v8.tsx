@@ -519,7 +519,7 @@ export default function TemplateDetailV8() {
                     本文{template.hasDraft ? '（下書き）' : ''}
                   </h2>
                   {canMutateTemplates ? (
-                    <Button href={editHref} variant="secondary">編集する</Button>
+                    <Button href={editHref} variant="secondary">編集</Button>
                   ) : null}
                 </div>
                 <p className={styles.cardNote}>

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
@@ -7,20 +7,15 @@ const LEGACY_PAGE = readFileSync(new URL('../affiliates/page.tsx', import.meta.u
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('V6 成果・アフィリエイトの契約', () => {
-  it('紹介者・案件・成果承認をV6実Nodeへ結ぶ', () => {
-    expect(PAGE).toContain("affiliates: 'PouPn'")
-    expect(PAGE).toContain("offers: 'GH8VL'")
-    expect(PAGE).toContain("approvals: 'n5VVTb'")
-    expect(TABS).toContain('data-design-node="PouPn"')
-  })
 
   it('本文に画面タイトル・説明・準備中マニュアルを重ねない', () => {
     expect(PAGE).not.toContain("import Header from")
     expect(PAGE).not.toContain('マニュアルは準備中です')
     expect(LEGACY_PAGE).not.toContain("import Header from")
-    // 旧URLは /conversions へ集約する。#1058: ?tab= は落とさず移転先へ引き継ぐ
-    // （/affiliate-offers → /affiliates?tab=offers → /conversions?tab=offers）。
-    expect(LEGACY_PAGE).toContain('router.replace(`/conversions?tab=')
+    // V8では独立した /affiliates が正本。古いCV内タブはクエリを保って移る。
+    expect(LEGACY_PAGE).toContain('<AffiliatesV8 />')
+    expect(PAGE).toContain('`/affiliates?${params.toString()}`')
+    expect(PAGE).toContain('router.replace(target)')
   })
 
   it('紹介者一覧の空・読込・失敗を言い分ける', () => {

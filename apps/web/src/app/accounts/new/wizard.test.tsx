@@ -47,13 +47,13 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }
 async function enterConnectionStep() {
   render(<NewLineAccountPage />)
   next()
-  next()
   fill('channel-id', '123456789')
   fill('channel-secret', 'synthetic-secret')
   fill('login-channel-id', '2007123456')
   fill('login-channel-secret', 'synthetic-login-secret')
   next()
-  expect(screen.getByText('4. LINE側の設定')).toBeTruthy()
+  next()
+  expect(screen.getByRole('button', { name: '接続して設定する' })).toBeTruthy()
 }
 
 async function checkConnection() {
@@ -62,17 +62,24 @@ async function checkConnection() {
 }
 
 describe('LINEアカウント作成ウィザード', () => {
-  it('手順1は表示名だけで、未入力のまま次へ進める', () => {
+  it('手順1はLINE側の準備で、手順3が表示名だけ（未入力のまま次へ進める）', () => {
     render(<NewLineAccountPage />)
+    expect(screen.getByText('1. LINE側の準備')).toBeTruthy()
+    next()
+    expect(screen.getByText('接続に必要な4項目')).toBeTruthy()
+    fill('channel-id', '123456789')
+    fill('channel-secret', 'synthetic-secret')
+    fill('login-channel-id', '2007123456')
+    fill('login-channel-secret', 'synthetic-login-secret')
+    next()
     expect(document.getElementById('account-name')).toBeTruthy()
     expect(document.querySelectorAll('input')).toHaveLength(1)
     next()
-    expect(screen.getByText('2. LINE側の準備')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '接続して設定する' })).toBeTruthy()
   })
 
   it('新規を選んだときだけ公式アカウント作成リンクを出す', () => {
     render(<NewLineAccountPage />)
-    next()
     expect(screen.queryByRole('link', { name: /LINE公式アカウントを作る/ })).toBeNull()
     fireEvent.click(screen.getByLabelText('新しく公式アカウントを作成'))
     const link = screen.getByRole('link', { name: /LINE公式アカウントを作る/ })
@@ -80,9 +87,8 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(link.getAttribute('target')).toBe('_blank')
   })
 
-  it('手順3は4項目だけを必須にし、マニュアルを別タブで開く', () => {
+  it('手順2は4項目だけを必須にし、マニュアルを別タブで開く', () => {
     render(<NewLineAccountPage />)
-    next()
     next()
     const ids = ['channel-id', 'channel-secret', 'login-channel-id', 'login-channel-secret']
     expect(ids.every((id) => (document.getElementById(id) as HTMLInputElement).required)).toBe(true)

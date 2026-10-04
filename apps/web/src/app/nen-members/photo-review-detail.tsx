@@ -21,9 +21,10 @@ import { formatDay, formatNumber } from '@/lib/format'
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? formatNumber(Number(value)) : '—'
 
 export function PhotoReviewDetail({
-  photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
+  canEdit = true, photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
   onBack, onMove, onApprove, onReturn, onAdoptWithoutReward, onProcessReviewAsset, onSaveRotation, onDownloadOriginal, onPointAction, pointActionBusy,
 }: {
+  canEdit?: boolean
   photo: Record<string, unknown> | null
   position: number
   total: number
@@ -191,11 +192,11 @@ export function PhotoReviewDetail({
            * 通したあと元の向きへ戻ってしまう。保存するまで元の向き。
            */}
           <Button
-            disabled={rotation === savedRotation || rotationSaving}
+            disabled={!canEdit || rotation === savedRotation || rotationSaving}
             onClick={() => onSaveRotation(rotation)}
             title={rotation === savedRotation ? '回したあとに保存できます' : '回した向きをこの写真へ保存します'} busy={rotationSaving} busyLabel="保存中...">向きを保存する</Button>
           <Button disabled title="切り取りは派生画像の生成口を接続後に使えます">切り取る</Button>
-          <Button disabled={assetProcessing} onClick={onProcessReviewAsset} busy={assetProcessing} busyLabel="作成中...">審査用画像を作り直す</Button>
+          <Button disabled={!canEdit || assetProcessing} onClick={onProcessReviewAsset} busy={assetProcessing} busyLabel="作成中...">審査用画像を作り直す</Button>
           <Button onClick={() => { setDownloadOpen(true); setDownloadCode(''); setDownloadError('') }}>もとの画像を保存する</Button>
         </div>
         <p className="px-4 pb-4 pt-1 text-xs text-ink-faint">{numberOrDash(reviewDerivative?.width ?? photo.image_width)} × {numberOrDash(reviewDerivative?.height ?? photo.image_height)} ／ {(reviewDerivative?.byteSize ?? photo.image_byte_size) == null ? '—（未取得）' : `${(Number(reviewDerivative?.byteSize ?? photo.image_byte_size) / 1024 / 1024).toFixed(1)}MB`} ／ {text(photo.captured_device) || '—（未取得）'}　派生画像：{reviewDerivative ? `審査用 v${reviewDerivative.sourceVersion}` : latestAssetJob ? `${assetStatusLabel(latestAssetJob.status)}（v${latestAssetJob.requestedVersion}）` : '未取得'}</p>
@@ -285,9 +286,9 @@ export function PhotoReviewDetail({
                 : null}
               {reward && ['stale', 'failed_retryable'].includes(text(reward.state))
                 ? <dd className="mt-2 flex flex-wrap gap-2">
-                  <Button size="field" disabled={pointActionBusy !== null} onClick={() => void onPointAction('retry')} busy={pointActionBusy === 'retry'} busyLabel="送り直しています…">マイル手続きをもう一度送る
+                  <Button size="field" disabled={!canEdit || pointActionBusy !== null} onClick={() => void onPointAction('retry')} busy={pointActionBusy === 'retry'} busyLabel="送り直しています…">マイル手続きをもう一度送る
                   </Button>
-                  <Button size="field" disabled={pointActionBusy !== null} onClick={() => void onPointAction('reconcile')} busy={pointActionBusy === 'reconcile'} busyLabel="照合しています…">EC側と照合する
+                  <Button size="field" disabled={!canEdit || pointActionBusy !== null} onClick={() => void onPointAction('reconcile')} busy={pointActionBusy === 'reconcile'} busyLabel="照合しています…">EC側と照合する
                   </Button>
                 </dd>
                 : null}
@@ -310,13 +311,13 @@ export function PhotoReviewDetail({
           ? `${total}枚のうち ${position + 1}枚目。重複のため、却下か報酬なしで採用を選んでください。`
           : `${total}枚のうち ${position + 1}枚目。あと${Math.max(0, total - position - 1)}枚あります。`}
         actions={duplicate ? <>
-        <Button disabled={reviewing} onClick={onReturn}>却下する</Button>
+        <Button disabled={!canEdit || reviewing} onClick={onReturn}>却下する</Button>
         <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
-        <Button variant="primary" disabled={reviewing} onClick={adoptWithoutReward} busy={reviewing} busyLabel="処理中...">報酬なしで採用</Button>
+        <Button variant="primary" disabled={!canEdit || reviewing} onClick={adoptWithoutReward} busy={reviewing} busyLabel="処理中...">報酬なしで採用</Button>
         </> : <>
-        <Button disabled={reviewing} onClick={onReturn}>見送る（理由を選ぶ）</Button>
+        <Button disabled={!canEdit || reviewing} onClick={onReturn}>見送る（理由を選ぶ）</Button>
         <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
-        <Button variant="primary" disabled={reviewing} onClick={onApprove} busy={reviewing} busyLabel="処理中...">このまま採用</Button>
+        <Button variant="primary" disabled={!canEdit || reviewing} onClick={onApprove} busy={reviewing} busyLabel="処理中...">このまま採用</Button>
         </>}
       />
     </div>

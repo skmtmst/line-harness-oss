@@ -293,7 +293,7 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   height: 30px;
   padding: 0 12px;
   border: 1px solid var(--color-hairline);
@@ -391,6 +391,12 @@
 
 .rowClick td {
   transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
+/* 消える行は 150ms で薄くなる（V8 の動き §8）。 */
+.rowClick[data-leaving='true'] {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease-out);
 }
 
 .rowClick:hover td {

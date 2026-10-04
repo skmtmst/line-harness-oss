@@ -178,6 +178,9 @@ export default function OpsLoginPage() {
       <p className="text-center text-caption text-ink-faint">
         運営メンバーの招待を受けた方は、招待メールのリンクから設定してください
       </p>
+      <p className="text-center text-caption text-ink-faint">
+        この画面は運営メンバーだけが開けます。操作はすべて記録されます。
+      </p>
     </AuthCard>
   )
 }

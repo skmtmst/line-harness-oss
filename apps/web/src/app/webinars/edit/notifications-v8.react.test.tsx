@@ -12,6 +12,8 @@ const apiMocks = vi.hoisted(() => ({
   saveNotifications: vi.fn(),
   testNotifications: vi.fn(),
   actions: vi.fn(),
+  editor: vi.fn(),
+  saveEditor: vi.fn(),
 }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -23,6 +25,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
       saveNotifications: apiMocks.saveNotifications,
       testNotifications: apiMocks.testNotifications,
       actions: apiMocks.actions,
+      editor: apiMocks.editor,
+      saveEditor: apiMocks.saveEditor,
     },
   }
 })
@@ -45,10 +49,12 @@ const SETTINGS = {
 
 const EDITOR = { version: 2, notificationTest: null } as unknown as WebinarEditor
 
+const roots: Root[] = []
 function render(): HTMLElement {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
+  roots.push(root)
   act(() => {
     root.render(
       <NotificationsV8
@@ -67,6 +73,7 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     apiMocks.notifications.mockResolvedValue({
       data: { settings: SETTINGS, overview: { total: 423, sent: 412, failed: 3, skipped: 8 } },
     })
+    apiMocks.editor.mockResolvedValue({ data: EDITOR })
     apiMocks.actions.mockResolvedValue({ data: [] })
     apiMocks.saveNotifications.mockImplementation(async (_id: string, input: Record<string, unknown>) => ({
       data: { settings: { ...SETTINGS, ...input }, queued: 0, cancelled: 0 },
@@ -74,6 +81,7 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
   })
 
   afterEach(() => {
+    act(() => { for (const root of roots.splice(0)) root.unmount() })
     document.body.innerHTML = ''
     vi.clearAllMocks()
   })
@@ -90,7 +98,7 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     expect(host.textContent).toContain('視聴完了')
   })
 
-  it('入り切りを押すとその場で保存する', async () => {
+  it('入り切りの入力を残し、下書き保存したときだけ保存する', async () => {
     const host = render()
     await act(async () => undefined)
     const toggle = host.querySelector('button[role="switch"][aria-label="申込のお礼"]')
@@ -98,8 +106,26 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     await act(async () => {
       toggle!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
+    expect(apiMocks.saveNotifications).not.toHaveBeenCalled()
+    await act(async () => { [...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存')!.click() })
     expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
     const input = apiMocks.saveNotifications.mock.calls[0][1] as { registrationEnabled: boolean }
     expect(input.registrationEnabled).toBe(false)
   })
+  it('下書き保存に失敗してもスイッチの入力を残して再試行できる', async () => {
+    apiMocks.saveNotifications.mockRejectedValueOnce(new Error('network'))
+    const host = render()
+    await act(async () => undefined)
+    const toggle = host.querySelector('button[role="switch"][aria-label="申込のお礼"]') as HTMLButtonElement
+    await act(async () => { toggle.click() })
+    const save = [...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存')!
+    await act(async () => { save.click() })
+    expect(host.textContent).toContain('入力を残しました')
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
+    await act(async () => { save.click() })
+    expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(2)
+    expect(apiMocks.saveNotifications.mock.calls[1][1].registrationEnabled).toBe(false)
+  })
+
 })

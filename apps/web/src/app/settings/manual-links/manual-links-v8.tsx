@@ -1,8 +1,11 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import SearchField from '@/components/shared/search-field'
+import { DataTable, TableHeadRow, Th, Td, Tr } from '@/components/shared/table'
+import StatusBadge from '@/components/shared/status-badge'
 import ListState from '@/components/shared/list-state'
-import Select from '@/components/shared/select'
+import FilterChip from '@/components/shared/filter-chip'
 import {
   LINK_STATUS_LABEL,
   VERIFY_SCHEDULE_NOTE,
@@ -40,14 +43,14 @@ export function ManualLinksV8() {
     startEdit,
     cancelEdit,
     saveEdit,
-    statusFilters,
   } = useManualLinks()
 
   if (status !== 'ready') {
     return (
       <SettingsShellV8
         title="マニュアルの正本表"
-        back={{ href: '/settings', label: '機能設定へ' }}
+        description="画面の上の「マニュアル」が開く行き先を、画面ごとに決めます。"
+      back={{ href: '/settings', label: '機能設定へ' }}
       >
         <ListState
           kind={status === 'error' ? 'error' : 'loading'}
@@ -63,7 +66,8 @@ export function ManualLinksV8() {
     return (
       <SettingsShellV8
         title="マニュアルの正本表"
-        back={{ href: '/settings', label: '機能設定へ' }}
+        description="画面の上の「マニュアル」が開く行き先を、画面ごとに決めます。"
+      back={{ href: '/settings', label: '機能設定へ' }}
       >
         <ListState
           kind="forbidden"
@@ -77,6 +81,7 @@ export function ManualLinksV8() {
   return (
     <SettingsShellV8
       title="マニュアルの正本表"
+      description="画面の上の「マニュアル」が開く行き先を、画面ごとに決めます。"
       back={{ href: '/settings', label: '機能設定へ' }}
     >
       <p className={`${styles.band} ${styles.bandWarn}`}>
@@ -94,12 +99,16 @@ export function ManualLinksV8() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </span>
-        <Select
-          aria-label="リンクの状態"
-          value={filter}
-          onChange={(value) => setFilter(value as typeof filter)}
-          options={statusFilters.map((f) => ({ value: f.value, label: `状態：${f.label}` }))}
-        />
+        <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>
+          すべて
+        </FilterChip>
+        <FilterChip
+          selected={filter === 'broken'}
+          onChange={(next) => setFilter(next ? 'broken' : 'all')}
+          count={rows.filter((row) => row.status === 'broken').length}
+        >
+          開けない
+        </FilterChip>
         <Button variant="secondary" disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…">
           いま全部を確かめる
         </Button>
@@ -117,14 +126,21 @@ export function ManualLinksV8() {
       </p>
 
       {shown.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="当てはまる行がありません"
-          description="検索の言葉か、状態の絞り込みを変えてください。"
-        />
+        <div data-design-node="bR6a1">
+          <ListState
+            kind="empty"
+            title="当てはまる行がありません"
+            description="検索の言葉か、状態の絞り込みを変えてください。"
+            action={query || filter !== 'all' ? (
+              <Button variant="secondary" onClick={() => { setQuery(''); setFilter('all') }}>
+                条件を外す
+              </Button>
+            ) : undefined}
+          />
+        </div>
       ) : (
         <div className={styles.tableCard}>
-          <table>
+          <DataTable className="rounded-none border-0">
             <colgroup>
               <col style={{ width: '9%' }} />
               <col style={{ width: '18%' }} />
@@ -134,24 +150,24 @@ export function ManualLinksV8() {
               <col style={{ width: '13%' }} />
             </colgroup>
             <thead>
-              <tr>
-                <th>画面ID</th>
-                <th>画面名</th>
-                <th>公式記事のURL</th>
-                <th>最後に確かめた日</th>
-                <th>リンクの状態</th>
-                <th className={styles.tdRight}>操作</th>
-              </tr>
+              <TableHeadRow>
+                <Th>画面ID</Th>
+                <Th>画面名</Th>
+                <Th>公式記事のURL</Th>
+                <Th>最後に確かめた日</Th>
+                <Th>リンクの状態</Th>
+                <Th className={styles.tdRight}>操作</Th>
+              </TableHeadRow>
             </thead>
             <tbody>
               {shown.map((row) => {
                 const key = row.taskId ?? row.screenId
                 const editing = editingKey === key
                 return (
-                  <tr key={key}>
-                    <td>{row.screenId}</td>
-                    <td>{row.name}</td>
-                    <td>
+                  <Tr key={key}>
+                    <Td>{row.screenId}</Td>
+                    <Td><span className={styles.urlCell} title={row.name}>{row.name}</span></Td>
+                    <Td>
                       {editing ? (
                         <input
                           className={styles.editInput}
@@ -164,36 +180,26 @@ export function ManualLinksV8() {
                           {urlLabel(row.url)}
                         </span>
                       )}
-                    </td>
-                    <td className={styles.nowrap}>{checkedLabel(row.checkedAt)}</td>
-                    <td>
-                      <span
-                        className={`${styles.statusChip} ${
-                          row.status === 'ok'
-                            ? styles.statusOk
-                            : row.status === 'broken'
-                              ? styles.statusDanger
-                              : styles.statusNeutral
-                        }`}
-                      >
-                        {LINK_STATUS_LABEL[row.status]}
-                      </span>
-                    </td>
-                    <td className={styles.tdRight}>
+                    </Td>
+                    <Td><span className={styles.urlCell} title={checkedLabel(row.checkedAt)}>{checkedLabel(row.checkedAt)}</span></Td>
+                    <Td>
+                      <StatusBadge tone={row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'} size="compact">{LINK_STATUS_LABEL[row.status]}</StatusBadge>
+                    </Td>
+                    <Td className={styles.tdRight}>
                       {editing ? (
                         <>
                           <Button variant="secondary" disabled={saving} onClick={cancelEdit}>キャンセル</Button>{' '}
                           <Button variant="primary" disabled={saving} onClick={() => void saveEdit()}>決める</Button>
                         </>
                       ) : (
-                        <Button variant="secondary" onClick={() => startEdit(key)}>直す</Button>
+                        <Button variant="secondary" onClick={() => startEdit(key)}>{row.url ? '直す' : '決める'}</Button>
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 )
               })}
             </tbody>
-          </table>
+          </DataTable>
         </div>
       )}
 

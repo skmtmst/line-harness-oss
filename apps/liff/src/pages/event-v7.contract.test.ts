@@ -128,7 +128,8 @@ describe('自分のイベントは期限まで取り消せる', () => {
     // ブラウザの confirm() は使わず、LIFF 共通の確認窓で聞く。
     expect(bookings).toContain('ConfirmDialog');
     expect(bookings).toContain('setPendingCancel(b)');
-    expect(bookings).toContain('の予約をキャンセルしますか');
+    expect(bookings).toContain('をキャンセルしますか');
+    expect(bookings).toContain('designNode="nUYyb"');
     expect(bookings).toContain('api.cancelMyEventBooking(b.id)');
   });
 

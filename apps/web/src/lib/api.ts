@@ -264,6 +264,7 @@ export interface IntegrationApiTokenInfo {
   lastUsedAt: string | null
   rotatedFromId: string | null
   createdAt: string
+  revokedAt: string | null
 }
 
 /** 発行・入れ替えの応答にだけ1回だけ平文が乗る。 */
@@ -1399,6 +1400,10 @@ export type ConversionDefinitionDetail = ConversionDefinitionListItem & {
 export type ConversionDefinitionPreview = {
   range: { from: string; to: string; timeZone: 'Asia/Tokyo' }
   matchedCount: number
+  /** 条件に合う友だちの重複を除いた人数。旧Workerの応答では未取得。 */
+  uniqueFriendCount?: number
+  /** 除外条件に当てはまった過去の成果件数。重複除外とは別。 */
+  excludedCount?: number
   estimatedCount: number
   estimatedValue: number
   duplicateExcludedCount: number
@@ -3107,8 +3112,25 @@ export type LineAccountConnectStep = {
   message: string
 }
 
+export type LineAccountConnectVerification = {
+  tokenOk: boolean
+  loginOk: boolean
+  /** 同じプロバイダー（両チャネル認証の通過を代理条件にする）。 */
+  sameProvider: boolean
+  webhook: {
+    expectedUrl: string
+    registeredUrl: string | null
+    active: boolean | null
+    testPassed: boolean | null
+  }
+  /** 登録前の友だち総数。取れなければ null。 */
+  followerTotal: number | null
+}
+
 export type LineAccountConnectData = {
   steps: LineAccountConnectStep[]
+  /** V8 登録④の5行に載る内訳。古い応答には無いことがある。 */
+  verification?: LineAccountConnectVerification
   id?: string
   displayName?: string
   pictureUrl: string | null
@@ -3117,6 +3139,7 @@ export type LineAccountConnectData = {
   followerImport: Pick<FollowerImportState, 'capability' | 'phase'>
   remainingActions: string[]
 }
+
 export type FriendFormSubmission = {
   id: string
   formId: string
@@ -6238,6 +6261,9 @@ export type StepUpPurpose =
   | 'webhook.api_token'
   | 'webhook.secret'
 
+/** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。 */
+export type LineAccountTag = { id: string; name: string; color: string | null; displayOrder: number }
+
 export const api = {
   system: {
     health: () =>
@@ -9338,6 +9364,28 @@ export const api = {
     ),
     jobs: () => fetchApi<ApiResponse<FriendMigrationJob[]>>('/api/friends/migration-jobs'),
   },
+  /** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。形は `apps/worker/src/routes/line-account-tags.ts`。 */
+  lineAccountTags: {
+    setForAccount: (id: string, tagIds: string[]) =>
+      fetchApi<ApiResponse<{ id: string; tags: LineAccountTag[] }>>(
+        `/api/line-accounts/${id}/tags`,
+        { method: 'PUT', body: JSON.stringify({ tagIds }) },
+      ),
+
+    list: () => fetchApi<ApiResponse<LineAccountTag[]>>('/api/line-account-tags'),
+    create: (name: string) =>
+      fetchApi<ApiResponse<LineAccountTag>>('/api/line-account-tags', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
+    remove: (id: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    replace: (accountId: string, tagIds: string[]) =>
+      fetchApi<ApiResponse<{ id: string; tags: LineAccountTag[] }>>(`/api/line-accounts/${encodeURIComponent(accountId)}/tags`, {
+        method: 'PUT',
+        body: JSON.stringify({ tagIds }),
+      }),
+  },
   lineAccounts: {
     list: (live = false) =>
       fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '?live=1' : ''}`),
@@ -9516,6 +9564,15 @@ export const api = {
         `/api/line-accounts/${id}/follower-import/step`,
         { method: 'POST' },
       ),
+    followerInsight: (id: string, date: string) =>
+      fetchApi<ApiResponse<{
+        lineAccountId: string
+        date: string
+        status: string
+        followers: number | null
+        targetedReaches: number | null
+        blocks: number | null
+      }>>(`/api/line-accounts/${id}/follower-insight?date=${encodeURIComponent(date)}`),
   },
   conversions: {
     definitions: (params: {
@@ -12387,6 +12444,11 @@ export const api = {
           `/api/webhooks/interactions/${id}/retry?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', body: JSON.stringify({ confirmed: options?.confirmed === true }) },
         ),
+      payload: (id: string, lineAccountId: string) =>
+        // F-18: 伏せた本文。available が false のとき body は null。
+        fetchApi<ApiResponse<{ id: string; body: unknown; available: boolean }>>(
+          `/api/webhooks/interactions/${id}/payload?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
       retryFailed: (lineAccountId: string) =>
         // remaining: 1回の外部通信上限で今回やり直せず残った失敗の件数(N-387)。
         // needsReview: 届いたか分からず、相手先で確かめてから1件ずつ
@@ -12398,9 +12460,9 @@ export const api = {
     },
     /* 外部システムが公開APIを呼ぶための鍵(#939 N-380)。 */
     apiTokens: {
-      list: (lineAccountId: string) =>
+      list: (lineAccountId: string, includeRevoked = false) =>
         fetchApi<ApiResponse<IntegrationApiTokenInfo[]>>(
-          `/api/webhooks/api-tokens?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          `/api/webhooks/api-tokens?lineAccountId=${encodeURIComponent(lineAccountId)}${includeRevoked ? '&includeRevoked=1' : ''}`,
         ),
       create: (lineAccountId: string, data: { name: string; scopes: string[] }, stepUpToken?: string) =>
         fetchApi<ApiResponse<IssuedIntegrationApiToken>>('/api/webhooks/api-tokens', {
@@ -12416,6 +12478,11 @@ export const api = {
       rotate: (id: string, lineAccountId: string, stepUpToken?: string) =>
         fetchApi<ApiResponse<IssuedIntegrationApiToken>>(
           `/api/webhooks/api-tokens/${encodeURIComponent(id)}/rotate?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined, body: '{}' },
+        ),
+      reactivate: (id: string, lineAccountId: string, stepUpToken?: string) =>
+        fetchApi<ApiResponse<IntegrationApiTokenInfo>>(
+          `/api/webhooks/api-tokens/${encodeURIComponent(id)}/reactivate?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined, body: '{}' },
         ),
     },
@@ -15743,6 +15810,8 @@ export type WebinarEditor = {
     viewSegmentFailures: number
     actionFailures: number
   }
+  /** 同時編集の見分けに使う、読んだときの更新日時。無い口では undefined。 */
+  updatedAt?: string | null
 }
 
 export type WebinarPublishValidation = {
@@ -15791,7 +15860,7 @@ export type WebinarListParams = {
   limit?: number
   q?: string
   folder?: string
-  status?: 'active' | 'draft'
+  status?: 'active' | 'draft' | 'archived'
   sort?: 'updated' | 'created' | 'name'
 }
 
@@ -15841,8 +15910,10 @@ export const webinarApi = {
   ),
   get: (id: string) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}`),
   editor: (id: string) => fetchApi<{ data: WebinarEditor }>(`/api/webinars/${id}/editor`),
-  saveEditor: (id: string, input: Partial<Omit<WebinarEditor, 'version' | 'publicPage' | 'publication' | 'monitoring' | 'actionPolicy'>> & {
+  saveEditor: (id: string, input: Partial<Omit<WebinarEditor, 'version' | 'publicPage' | 'publication' | 'monitoring' | 'actionPolicy' | 'updatedAt'>> & {
     expectedVersion: number
+    /** 読んだときの更新日時。付けると違っていたら 409 で止まる。 */
+    expectedUpdatedAt?: string
     actionTemplateBody?: string
     missingResultPolicy?: WebinarEditor['actionPolicy']['missingResultPolicy']
     publicPageTest?: Record<string, unknown> | null

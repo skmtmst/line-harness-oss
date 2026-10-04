@@ -13,7 +13,7 @@
  * 6. 残件: 28の並び替えは操作列の「…」の中の上へ・下へで行い、注意書きに導線を書く。
  *    専用APIが無いため既存updateMenu（版つきPUT）でsort_orderを交換する。
  */
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -58,7 +58,7 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
   })
 
   it('フォームはフォーム総件数を出す', () => {
-    const src = read('form-submissions/list-v8.tsx')
+    const src = read('form-submissions/page.tsx')
     // R12: 総数は「すべて」の行に出し、見出しには重ねて出さない。
     // R602補足: 未取得・読込中・取得失敗の総数は不明なので出さない
     // （null は数を出さない約束。偽ゼロにしない）。
@@ -68,8 +68,8 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
   })
 
   it('R12: リマインダは見出しの総数を「すべて」の行と重ねて出さない', () => {
-    const src = read('reminders/page.tsx')
-    expect(src).toContain("{ id: '', label: 'すべて', count: listTotal }")
+    const src = read('reminders/list-v8.tsx')
+    expect(src).toContain("{ id: '', label: 'すべて', count: reminderList.total ?? null, color: 'var(--color-accent)' }")
     expect(src).not.toContain('`${listTotal}件`')
   })
 })
@@ -83,11 +83,12 @@ describe('Issue #709: 一覧表は1440pxの初期表示に操作列まで収め�
   })
 
   it('フォーム一覧は最小幅を実効幅内に収める', () => {
-    const styles = read('form-submissions/list-v8.module.css')
-    expect(styles).toMatch(/\.table\s*\{[^}]*width:\s*100%/)
-    expect(styles).toMatch(/\.table\s*\{[^}]*table-layout:\s*fixed/)
-    const minWidth = styles.match(/\.table\s*\{[^}]*min-width:\s*(\d+)px/)
-    expect(minWidth).toBeTruthy()
+    const src = read('form-submissions/page.tsx')
+    const css = read('form-submissions/list-v8.module.css')
+    expect(src).toContain('className={styles.table}')
+    const table = css.match(/\.table\s*\{[^}]*\}/)?.[0]
+    const minWidth = table?.match(/min-width:\s*(\d+)px/)
+    expect(minWidth, '表の最小幅が付いている').toBeTruthy()
     expect(Number(minWidth![1])).toBeLessThanOrEqual(800)
   })
 })
@@ -109,7 +110,7 @@ describe('Issue #709: リッチメニューの状態表示は共有StatusBadge�
  */
 describe('Issue #709: フォームのフォルダ追加は止まっている理由を常時表示する', () => {
   it('止めずにつなぐ。押せない飾りの口は置かない', () => {
-    const src = read('form-submissions/list-v8.tsx')
+    const src = read('form-submissions/page.tsx')
     expect(src).toContain('onAddFolder=')
     expect(src).not.toContain('addFolderDisabled')
     expect(src).not.toContain('フォルダ保存先はまだ接続されていません')

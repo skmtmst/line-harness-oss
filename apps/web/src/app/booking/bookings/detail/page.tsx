@@ -889,7 +889,7 @@ function BookingDetailInner() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-design-node="If9Mh">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <nav className="text-ink-faint text-xs" aria-label="パンくず">
         <Link href="/booking/bookings" className="hover:underline">
@@ -996,8 +996,8 @@ function BookingDetailInner() {
                   <EditField label="予約メニュー">
                     <Select size="full" aria-label="予約メニュー" value={editMenuId} onChange={(value) => { setEditMenuId(value); setEditTime('') }} options={editMenus.map((item) => ({ value: item.id, label: item.name }))} />
                   </EditField>
-                  <EditField label="担当者">
-                    <Select size="full" aria-label="担当者" value={editStaffId} onChange={(value) => { setEditStaffId(value); setEditTime('') }} options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))} />
+                  <EditField label="スタッフ">
+                    <Select size="full" aria-label="スタッフ" value={editStaffId} onChange={(value) => { setEditStaffId(value); setEditTime('') }} options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))} />
                   </EditField>
                   <EditField label="日付">
                     <DateField

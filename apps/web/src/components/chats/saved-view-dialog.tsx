@@ -175,7 +175,7 @@ export default function SavedViewDialog({
                   検索名 <span className="text-ink-faint font-normal">（必須）</span>
                 </label>
                 {/* 残りではなく「11 / 40文字」。上限が何文字かが分かる。 */}
-                <span className="text-ink-faint text-[11px] tabular-nums">{name.length} / {NAME_LIMIT}文字</span>
+                <span className="text-ink-faint text-micro tabular-nums">{name.length} / {NAME_LIMIT}文字</span>
               </div>
               <input
                 id="saved-view-name"
@@ -265,7 +265,7 @@ export default function SavedViewDialog({
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
-                  <dt className="text-ink-secondary text-xs">担当者</dt>
+                  <dt className="text-ink-secondary text-xs">担当</dt>
                   <dd className="w-40">
                     <Combobox
                       aria-label="保存する担当者"

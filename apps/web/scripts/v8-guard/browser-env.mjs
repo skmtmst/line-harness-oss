@@ -57,5 +57,12 @@ export async function openPage(browser, { baseUrl, route, width, theme, stable =
     })
   }
   await page.waitForTimeout(2500)
+  // Webフォントの読み込み待ち。来る前と来た後で文字の濃さが変わり、
+  // 画素比べがぶれる（v7 友だち詳細の右上の「マイ」など時々違う）。
+  try {
+    await page.evaluate(() => document.fonts.ready.then(() => true))
+  } catch {
+    /* フォントなし環境では待たない */
+  }
   return page
 }

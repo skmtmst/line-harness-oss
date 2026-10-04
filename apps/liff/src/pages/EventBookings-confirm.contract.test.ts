@@ -6,8 +6,9 @@ import { describe, expect, it } from 'vitest';
  * イベント予約の取り消し確認を、ブラウザの `confirm()` から
  * LIFF 共通の確認窓 (`ui/ConfirmDialog`) へ移した契約。
  *
- * 動き・文言の意味・送る中身は変えない。やめるを選ぶと何も起きず、
+ * 動き・送る中身は変えない。やめるを選ぶと何も起きず、
  * 取り消すを選ぶと今までどおり取り消しが動く。
+ * 題と注意書きは V8 の板 nUYyb の形（日時の題・待ちへの案内・前日の締め切り）。
  */
 
 const root = join(import.meta.dirname, '..');
@@ -64,11 +65,19 @@ describe('イベント予約の取り消し確認', () => {
     expect(page).toContain('setPendingCancel(b)');
   });
 
-  it('題は今までどおりの問いかけで、ボタンは「やめる」と取り消し', () => {
-    expect(page).toContain('の予約をキャンセルしますか？');
+  it('題は日時＋行事の問いかけで、ボタンは「やめる」と取り消し', () => {
+    expect(page).toContain('をキャンセルしますか');
     expect(page).toContain('cancelLabel="やめる"');
     expect(page).toContain('confirmLabel="キャンセルする"');
     expect(page).toContain('destructive');
+    expect(page).toContain('キャンセル待ちの方へ順番に案内されます');
+    expect(page).toContain('前日を過ぎるとここからは変えられません');
+  });
+
+  it('取り消しの確認窓に V8 の板の印 nUYyb を付けている', () => {
+    expect(page).toContain('designNode="nUYyb"');
+    expect(dialog).toContain('designNode');
+    expect(dialog).toContain('data-design-node={designNode}');
   });
 
   it('やめるを選ぶと取り消しを送らない', () => {
