@@ -26,16 +26,18 @@ import Button from '@/components/shared/button'
  * 途中で失敗したときにどこまで終わったのか分からなくなる。
  */
 
-type Action =
+export type FriendAction =
   | 'status'
+  | 'operator'
   | 'template'
   | 'scenario'
   | 'tag'
   | 'field'
   | 'reminder'
 
-const LABELS: Record<Action, string> = {
+const LABELS: Record<FriendAction, string> = {
   status: '対応状況を変える',
+  operator: '担当者を変える',
   template: 'テンプレートを送る',
   scenario: 'シナリオを開始',
   tag: 'タグを付ける・外す',
@@ -51,7 +53,11 @@ export default function SingleFriendActions({
   onDone,
   friendTags,
   onFriendTagsChange,
+  initialAction,
+  hideActions = false,
 }: {
+  initialAction?: FriendAction
+  hideActions?: boolean
   friendId: string
   friendName: string
   tags: Tag[]
@@ -66,7 +72,7 @@ export default function SingleFriendActions({
    */
   onFriendTagsChange?: (next: Tag[]) => () => void
 }) {
-  const [open, setOpen] = useState<Action | null>(null)
+  const [open, setOpen] = useState<FriendAction | null>(initialAction ?? null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -76,7 +82,8 @@ export default function SingleFriendActions({
     setBusy(true)
     setError('')
     setMessage('')
-    const res = await fn()
+    let res: { success: boolean; error?: string }
+    try { res = await fn() } catch { res = { success: false, error: '通信できませんでした。もう一度お試しください。' } }
     setBusy(false)
     if (!res.success) {
       setError(res.error ?? 'できませんでした')
@@ -89,8 +96,8 @@ export default function SingleFriendActions({
 
   return (
     <div className="w-full">
-      <div className="flex flex-wrap gap-2">
-        {(Object.keys(LABELS) as Action[]).map((a) => (
+      {!hideActions && <div className="flex flex-wrap gap-2">
+        {(Object.keys(LABELS) as FriendAction[]).map((a) => (
           <Button variant="primary" className={(`rounded-control border px-2.5 py-1 text-xs ${
               open === a
                 ? 'border-accent bg-accent-deep text-on-accent'
@@ -103,7 +110,7 @@ export default function SingleFriendActions({
             {LABELS[a]}
           </Button>
         ))}
-      </div>
+      </div>}
 
       {message && <p className="text-success mt-2 text-xs">{message}</p>}
       {error && <p className="text-danger mt-2 text-xs">{error}</p>}
@@ -113,6 +120,7 @@ export default function SingleFriendActions({
           <p className="text-ink-faint mb-2 text-xs">
             {friendName} に「{LABELS[open]}」
           </p>
+          {open === 'operator' && <OperatorPanel friendId={friendId} busy={busy} run={run} />}
           {open === 'status' && <StatusPanel friendId={friendId} busy={busy} run={run} />}
           {open === 'template' && <TemplatePanel friendId={friendId} accountId={accountId} busy={busy} run={run} />}
           {open === 'scenario' && <ScenarioPanel friendId={friendId} accountId={accountId} busy={busy} run={run} />}
@@ -168,6 +176,7 @@ function StatusPanel({ friendId, busy, run }: { friendId: string; busy: boolean;
         options={[
           { value: 'unread', label: '未対応' },
           { value: 'in_progress', label: '対応中' },
+          { value: 'on_hold', label: '保留' },
           { value: 'resolved', label: '対応済み' },
         ]}
       />
@@ -420,4 +429,24 @@ function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolea
       />
     </Row>
   )
+}
+
+function OperatorPanel({ friendId, busy, run }: { friendId: string; busy: boolean; run: Run }) {
+  const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
+  const [id, setId] = useState('')
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let active = true
+    void api.operators.list().then((res) => {
+      if (!active) return
+      if (res.success) setOperators(res.data)
+      else setFailed(true)
+    }).catch(() => { if (active) setFailed(true) })
+    return () => { active = false }
+  }, [])
+  return <Row>
+    <Select aria-label="担当者" value={id} onChange={setId} options={[{ value: '', label: '未割り当て' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))]} />
+    <Go busy={busy || failed} onClick={() => void run(() => api.chats.update(friendId, { operatorId: id || null }), '担当者を変えました')} />
+    {failed && <p role="alert" className="text-xs text-danger">担当者を読み込めませんでした。閉じてもう一度開いてください。</p>}
+  </Row>
 }
