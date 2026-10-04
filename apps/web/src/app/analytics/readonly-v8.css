@@ -95,3 +95,7 @@
   [data-theme='v8'] .v8-ro-analytics-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   [data-theme='v8'] .v8-ro-analytics-friendsAside { grid-template-columns: minmax(0, 1fr); }
 }
+
+[data-theme='v8'] .v8-ro-analytics-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 12px; }
+[data-theme='v8'] .v8-ro-analytics-toolbar > button:last-child { margin-left: auto; }
+[data-theme='v8'] .v8-ro-analytics-content > div:not(.v8-ro-analytics-friends) { padding-top: 0; }

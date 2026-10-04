@@ -2473,17 +2473,21 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
     { label: '1回でも反応した', value: reactions },
     { label: '成果になった', value: conversions },
   ]
-  return <div data-design-node="YBGtm" className="space-y-4">
-    <AnalyticsPeriodControl days={days} onChange={setDays} />
+  const exportRoutes = () => downloadCsv('analytics-routes.csv', [
+    ['経路', '友だち', '反応', '成果', '売上', 'かかった費用', '差し引き'],
+    ...overview.routes.map((item) => [item.name, shownValue(item.friendAdds), shownValue(item.reactionPeople), shownValue(item.conversions.approved), shownValue(item.conversions.revenue), shownValue(item.adCost), shownValue(item.profitAfterAdCost)]),
+  ])
+  return <div data-design-node="PFe9c" className="space-y-4">
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title={`この${days}日の成果`} value={conversions} unit="件" detail={revenue === null ? '売上は未取得です' : `売上 ${formatNumber(revenue)}円`} />
-      <KpiCard title="かかった広告費" value={adCost} unit="円" detail="" help="接続済みの経路の広告費を合計した金額です" />
+      <KpiCard title="友だちになった" value={friends} unit="人" detail={clicks === null ? 'クリックは未取得です' : `リンクを押した ${formatNumber(clicks)}回から`} />
+      <KpiCard title="成果" value={conversions} unit="件" detail={revenue === null ? '売上は未取得です' : `売上 ${formatNumber(revenue)}円`} />
+      <KpiCard title="かかった広告費" value={adCost} unit="円" detail={`費用を取れない経路 ${overview.routes.filter((item) => shownValue(item.adCost) === null).length}`} help="接続済みの経路の広告費を合計した金額です" />
       <KpiCard title="差し引き" value={profit} unit="円" detail="" help="売上から広告費を引いた残りです" />
-      <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="" help="0円として計算していません" />
+
     </div>
-    <AnalyticsNotice><span>経路ごとに、かかった費用と出た成果を差し引きまで出します。帰属方式は「{overview.attributionLabel}」です。</span> <Link href={overview.searchConsoleHref} className="font-medium text-action hover:underline">Search Consoleを見る</Link>
-      <p className="mt-1"><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /></p>
-    </AnalyticsNotice>
+    <div className="v8-ro-analytics-toolbar"><RangePicker days={days} onChange={setDays} /><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /><Link href={overview.searchConsoleHref} className="text-action">Search Consoleを見る</Link><AnalyticsExportButton onClick={exportRoutes} disabled={overview.routes.length === 0} /></div>
+    <h2 className="text-sm font-semibold">全体の流れ</h2>
+
     <div className="grid grid-cols-4 overflow-hidden rounded-card border border-hairline bg-canvas">{stages.map((stage, index) => {
       const previous = index > 0 ? stages[index - 1].value : null
       const rate = previous && stage.value !== null ? stage.value / previous * 100 : null
@@ -2494,6 +2498,7 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
       <thead><TableHeadRow><Th>経路</Th><Th align="right">友だち</Th><Th align="right">反応</Th><Th align="right">成果</Th><Th align="right">売上</Th><Th align="right">かかった費用</Th><Th align="right">差し引き</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.routes.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間に集計できる経路はありません</td></tr> : overview.routes.map((item) => <tr key={item.id} className="text-sm"><td className="px-3 py-3 font-medium"><p className="truncate" title={item.name}>{item.name}</p><p className="mt-1 truncate text-xs font-normal text-ink-faint">{item.refCode ? `流入と計測 ／ ref=${item.refCode}` : '参照コードなし'} ／ クリック <MetricCell metric={item.clicks} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.friendAdds} /><p className="mt-1 text-xs text-ink-faint">現在 <MetricCell metric={item.currentFriends} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.reactionPeople} /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.approved} /><p className="mt-1 text-xs text-ink-faint">保留 <MetricCell metric={item.conversions.pending} />・却下 <MetricCell metric={item.conversions.rejected} /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.conversions.revenue} currency /></td><td className="px-2 py-3 text-right"><MetricCell metric={item.adCost} currency /><p className="mt-1 text-xs text-ink-faint">友だち1人 <MetricCell metric={item.costPerFriend} currency />・成果1件 <MetricCell metric={item.costPerConversion} currency /></p></td><td className="px-2 py-3 text-right"><MetricCell metric={item.profitAfterAdCost} currency /></td></tr>)}</tbody>
     </table></div>
+    <p className="text-xs text-ink-faint">「—」は費用や成果を取得できない経路です。0として差し引きを計算していません。帰属方式は「{overview.attributionLabel}」です。</p>
   </div>
 }
 
