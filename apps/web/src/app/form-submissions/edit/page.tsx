@@ -33,7 +33,7 @@ import {
   type FormTheme,
 } from '@line-crm/shared'
 import { normalizeSectionName } from '@/components/forms/section-name'
-import { api, ApiError, fetchApi } from '@/lib/api'
+import { api, ApiError, bookingApi, fetchApi, type BookingMenu } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
@@ -271,7 +271,22 @@ function FormEditInner() {
           templates: templateRes.success
             ? templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType }))
             : [],
+          bookingMenus: [],
+          bookingMenuStaff: {},
         })
+        // 「予約を入れる」欄のメニュー選び。本体の読み込みを待たせないよう後追い。
+        // 予約を使わない店では空のまま。読めなくても欄は置ける。
+        if (selectedAccountId) {
+          bookingApi
+            .listMenus(selectedAccountId)
+            .then((menuRes) => {
+              const bookingMenus = (menuRes.menus ?? [])
+                .filter((m) => m.is_active === 1)
+                .map((m) => ({ id: m.id, name: m.name, durationMinutes: m.duration_minutes }))
+              setRefs((prev) => ({ ...prev, bookingMenus }))
+            })
+            .catch(() => {})
+        }
 
         const ok = await loadForm()
         // id なし・未選択は別の面で出す。ここは取得して見つからないときだけ。
@@ -291,6 +306,43 @@ function FormEditInner() {
       }
     })()
   }, [id, loadForm, reloadKey, selectedAccountId])
+
+  // 「予約を入れる」欄の担当選び。欄のメニューが決まったものだけ読む。
+  // 読めなくても欄は置ける（だれでも扱い）。公開前にメニュー必須で止める。
+  useEffect(() => {
+    if (!selectedAccountId) return
+    const menuIds = new Set<string>()
+    for (const section of layout.sections) {
+      for (const b of section.blocks) {
+        if (b.kind === 'input' && b.type === 'booking' && b.booking?.menuId) {
+          menuIds.add(b.booking.menuId)
+        }
+      }
+    }
+    const missing = [...menuIds].filter((menuId) => refs.bookingMenuStaff?.[menuId] === undefined)
+    if (missing.length === 0) return
+    let cancelled = false
+    void (async () => {
+      const entries = await Promise.all(
+        missing.map(async (menuId) => {
+          try {
+            const res = await bookingApi.listMenuStaff(selectedAccountId, menuId)
+            return [menuId, res.staff.map((s) => ({ id: s.id, name: s.display_name }))] as const
+          } catch {
+            return [menuId, []] as const
+          }
+        }),
+      )
+      if (cancelled) return
+      setRefs((prev) => ({
+        ...prev,
+        bookingMenuStaff: { ...(prev.bookingMenuStaff ?? {}), ...Object.fromEntries(entries) },
+      }))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccountId, layout, refs.bookingMenuStaff])
 
   // いま編集している並び（共通ヘッダ か セクション）
   const blocks = useMemo(
@@ -1131,9 +1183,9 @@ function FormEditInner() {
                     削除する
                   </button>
 
-                  <div className="relative">
+                  <div className="relative" data-design-node="WOPjZ">
                     <Button variant="primary" className="px-3 py-1.5 text-xs font-medium border-0 h-auto whitespace-normal" ref={addMenuButtonRef} onClick={() => setShowAddMenu((v) => !v)} aria-expanded={showAddMenu} aria-haspopup="menu">
-                      ＋ ブロックを追加する（12種）
+                      ＋ ブロックを追加する（15種）
                     </Button>
                     <ActionMenu
                       open={showAddMenu}

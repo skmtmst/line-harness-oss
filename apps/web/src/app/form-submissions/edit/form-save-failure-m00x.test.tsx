@@ -52,6 +52,13 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     fetchApi: vi.fn(async () => ({ success: true, data: [] })),
     api: {
       ...actual.api,
+      // 「予約を入れる」欄のメニュー・担当読み。予約を使わない店では空。
+      // 素通しすると実通信で試験が環境へ依存するので、ここで空を返す。
+      bookingApi: {
+        ...actual.bookingApi,
+        listMenus: async () => ({ menus: [] }),
+        listMenuStaff: async () => ({ staff: [] }),
+      },
       friendFields: { ...actual.api.friendFields, list: async () => ({ success: true, data: [] }) },
       scenarios: { ...actual.api.scenarios, list: async () => ({ success: true, data: [] }) },
       reminders: { ...actual.api.reminders, list: async () => ({ success: true, data: [] }) },

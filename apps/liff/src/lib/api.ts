@@ -367,6 +367,19 @@ export const api = {
       `/api/forms/${id}/files${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`,
       file,
     ),
+  /**
+   * F11 郵便番号→住所の候補。選んだ候補だけ住所へ入れ、手入力は残す。
+   * 見つからない・通信失敗のときは投げず、その旨を状態で返す。
+   */
+  postalSearch: (code: string) =>
+    get<{
+      success: boolean;
+      data: {
+        status: 'matched' | 'multiple' | 'none' | 'invalid';
+        candidates: Array<{ postalCode: string; prefecture: string; city: string; town: string }>;
+        manualEntry: { note: string };
+      };
+    }>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
 
   // ===== Webinar =====
   webinarState: (slug: string) => get<WebinarState>(`/api/liff/webinars/${slug}`),
