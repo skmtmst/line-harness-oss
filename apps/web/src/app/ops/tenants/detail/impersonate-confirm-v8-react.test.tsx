@@ -18,6 +18,7 @@ vi.mock('@/lib/api', async importOriginal => ({
 }))
 vi.mock('next/navigation', async importOriginal => ({
   ...await importOriginal<typeof import('next/navigation')>(),
+  usePathname: () => '/ops/tenants/detail',
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? 'tenant-1' : null) }),
 }))
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
@@ -59,7 +60,7 @@ describe('代理ログイン開始の確認窓', () => {
   it('始める前に契約先名・閲覧のみ・記録を確かめる', async () => {
     await render()
     expect(mocks.start).not.toHaveBeenCalled()
-    await act(async () => { button('代理ログイン')!.click() })
+    await act(async () => { button('代理ログイン（閲覧のみ）')!.click() })
     // いきなり始めず、確認の小窓が出る
     expect(mocks.start).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('「契約先A」に代理ログインする')
@@ -72,7 +73,7 @@ describe('代理ログイン開始の確認窓', () => {
   it('失敗したら理由を出して、もう一度押せる', async () => {
     mocks.start.mockResolvedValueOnce({ success: false, error: '代理ログインを始められませんでした' })
     await render()
-    await act(async () => { button('代理ログイン')!.click() })
+    await act(async () => { button('代理ログイン（閲覧のみ）')!.click() })
     await act(async () => { button('代理ログインを始める')!.click() })
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('代理ログインを始められませんでした')
     expect(button('代理ログインを始める')!.disabled).toBe(false)
