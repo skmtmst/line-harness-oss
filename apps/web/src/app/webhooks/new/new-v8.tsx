@@ -25,7 +25,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ecEventLabel } from '@line-crm/shared'
+import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -43,7 +43,11 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
 import styles from './new-v8.module.css'
 
-/* 見本にある出来事のうち、実際に購読できるものだけ出す。 */
+/*
+ * 送る出来事の正本は `packages/db/src/webhooks.ts` の
+ * KNOWN_OUTGOING_EVENT_TYPES（実際に発火する種別だけを載せる）。
+ * 見本に無い種別も購読できるので、ここでは省かない。
+ */
 const V8_EVENT_GROUPS: ReadonlyArray<{
   id: string
   label: string
@@ -51,25 +55,30 @@ const V8_EVENT_GROUPS: ReadonlyArray<{
 }> = [
   {
     id: 'friends',
-    label: '友だち',
+    label: '友だち・メッセージ',
     events: [
       { value: 'friend_add', label: '友だちになった' },
       { value: 'friend_unfollow', label: '友だちを解除された' },
-      { value: 'tag_change', label: 'タグが付いた' },
+      { value: 'message_received', label: 'メッセージを受け取った' },
+      { value: 'postback_received', label: 'ボタン操作を受け取った' },
     ],
   },
   {
     id: 'operation',
-    label: '運用',
-    events: [{ value: 'booking_created', label: '予約が入った' }],
+    label: '運用の動き',
+    events: [
+      { value: 'tag_change', label: 'タグが付いた・外れた' },
+      { value: 'staff_assigned', label: '担当が割り当てられた' },
+      { value: 'manual_reply_sent', label: '個別返信を送った' },
+      { value: 'cv_fire', label: '成果地点が起きた' },
+      { value: 'form_submitted', label: 'フォームが送られた' },
+      { value: 'booking_created', label: '予約が入った' },
+    ],
   },
   {
     id: 'ec',
-    label: 'EC',
-    events: [
-      { value: 'ec.order.confirmed', label: ecEventLabel('ec.order.confirmed') },
-      { value: 'ec.order.shipped', label: ecEventLabel('ec.order.shipped') },
-    ],
+    label: 'ECの出来事',
+    events: EC_EVENT_TYPES.map((value) => ({ value, label: ecEventLabel(value) })),
   },
 ]
 

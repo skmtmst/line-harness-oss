@@ -17,6 +17,8 @@ import { useCanManageCommonActions } from '@/components/automations/use-common-a
 import { TextField } from '@/components/shared/text-field'
 import Select from '@/components/shared/select'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { CommonActionNewV8 } from '../common-action-new-v8'
 import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from '../branch-editor'
 import { mergeOrderedActions, stepNumbers } from '../action-order'
 
@@ -24,7 +26,17 @@ const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
 }
 
+/*
+ * ★V8-B の切り替え。v8 の器は別ファイル（common-action-new-v8.tsx）に置き、
+ * v7 の器・動きはこの下の V7 のまま残す。
+ */
 export default function NewCommonActionPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <CommonActionNewV8 />
+  return <NewCommonActionPageV7 />
+}
+
+function NewCommonActionPageV7() {
   usePageTitle('共通アクションをつくる')
   const canManage = useCanManageCommonActions()
   const router = useRouter()

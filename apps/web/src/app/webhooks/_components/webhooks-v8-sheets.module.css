@@ -1,0 +1,260 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B 外部連携・Google Sheets（板 `DxAAA`）。
+ * 帯・白板の器。板が 1100px を切っても1段のまま読める。
+ */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.lead {
+  margin: 12px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.faintNote {
+  margin: 12px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.banner {
+  padding: 10px 14px;
+  border-radius: var(--radius-control, 8px);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bannerInfo {
+  background: var(--color-info-bg);
+  color: var(--color-ink-secondary);
+}
+
+.bannerWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.bannerError {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.bannerButton {
+  margin-left: 12px;
+}
+
+.card {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.cardHeadText {
+  flex: 1;
+  min-width: 200px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cardTitleLarge {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.cardLead {
+  margin: 8px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: var(--radius-control, 8px);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.badgeOk {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badgeWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.block {
+  margin-top: 12px;
+}
+
+.blockButton {
+  margin-top: 12px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.fact {
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  min-width: 0;
+}
+
+.fact dt {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+.fact dd {
+  margin: 4px 0 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.link {
+  color: var(--color-accent-deep);
+  text-decoration: underline;
+}
+
+.warnText {
+  margin-left: 8px;
+  color: var(--color-warning);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.targetForm {
+  margin-top: 12px;
+  border-top: 1px solid var(--color-hairline);
+  padding-top: 12px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.targetRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.targetRow input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.disclosure {
+  margin-top: 12px;
+}
+
+.checkList {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  line-height: 1.8;
+  list-style: disc;
+}
+
+.runList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.runItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 8px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  font-size: 13px;
+}
+
+.runData {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.runMeta {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+.runOk {
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+.runError {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.runWarn {
+  color: var(--color-warning);
+  font-weight: 700;
+}
+
+.runAt {
+  margin-left: auto;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+@container (max-width: 1099px) {
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

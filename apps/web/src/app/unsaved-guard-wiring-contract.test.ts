@@ -89,6 +89,7 @@ const GUARDED = [
   'app/templates/carousel/page.tsx',
   'app/templates/editor-v8.tsx',
   'app/templates/questions/new/page.tsx',
+  'app/webhooks/new/new-v8.tsx',
   'app/webhooks/new/page.tsx',
   'app/webhooks/new/new-v8.tsx',
   'app/webinars/edit/page.tsx',
@@ -136,6 +137,10 @@ const EXEMPTIONS: Record<string, string> = {
     '「未保存の追加情報を破棄して一覧へ戻る」明示フロー。dirty管理ではなく部分保存の案内',
   'app/automations/new/page.tsx':
     'サーバーへ下書き保存する多段ウィザード。段またぎ・店ごとの退避があり離脱の扱いは別途検討',
+  'app/automations/new/new-v8.tsx':
+    'new/page.tsx と同じ画面の★V8版（M4torY・tJqST・J1VA8）。サーバーへ下書き保存する多段入力で、離脱の扱いは元の画面と一緒に決めるため同じ扱い',
+  'app/common-actions/common-action-new-v8.tsx':
+    'new/page.tsx（s3 未判定）と同じ画面の★V8版。番兵の要否は元の画面と一緒に決めるため、同じ扱いでここに置く',
   'app/accounts/new/page.tsx':
     '登録ウィザードでdirty管理なし（コメント中の「未保存」記述のみ。R523の復帰案内の文言）',
   'app/booking/bookings/new/page.tsx':
@@ -228,6 +233,8 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 のイベント予約者（gHmNK）。承認・キャンセル・待ち順の操作は確認窓で確定して即時保存し、お知らせ送信も「送る」で即時送信する。窓内の理由欄は閉じると戻るダイアログ内の入力で、画面に残る下書きを持たない',
   'app/webinars/list-v8.tsx':
     '★V8-B のウェビナー一覧（UyUMw）。一覧と絞り込みが中心で、フォルダの追加・変更・削除とアーカイブは押した直後に確認窓か即時保存で確定する。フォルダ名の入力は閉じると戻る窓の中だけなので、この画面に残る下書きを持たない',
+  'app/webhooks/_components/webhooks-v8-incoming.tsx':
+    '★V8-B 外部連携・こちらで受け取る（gW0F2）。作る窓・合言葉窓・試す窓の入力は閉じると戻る窓の中だけで、保存は窓の中の「作る」「更新する」で確定する。一覧上の操作（動かす・止める・結び付ける・確認した・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない',
 }
 
 /*
