@@ -36,9 +36,9 @@ describe('共通情報の一覧は板 FM94M の数字どおり', () => {
     expect(css).toMatch(/\.cellValue \{\s*width: 170px/)
     expect(css).toMatch(/\.cellStatus \{\s*width: 80px/)
     expect(css).toMatch(/\.cellUsage \{\s*width: 90px/)
-    expect(tsx).toContain('className={styles.cellValue}')
-    expect(tsx).toContain('className={styles.cellStatus}')
-    expect(tsx).toContain('className={styles.cellUsage}')
+    expect(tsx).toContain('<Th scope="col" className={styles.cellValue}>中身</Th>')
+    expect(tsx).toContain('<Th scope="col" className={styles.cellStatus}>状態</Th>')
+    expect(tsx).toContain('<Th scope="col" className={styles.cellUsage}>使っている所</Th>')
   })
 
   it('ページ送りの段は余白 10/20・間 6、件数は 13/secondary', () => {
