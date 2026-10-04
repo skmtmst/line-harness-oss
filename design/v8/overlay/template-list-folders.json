@@ -1,10 +1,13 @@
 {
-  "over4px": 175,
+  "over4px": 0,
   "compared": 248,
-  "status": "CONTINUE",
+  "status": "PASS",
   "unmatchedRegions": [],
-  "maxEdgeDelta": 72,
-  "pixelDifferenceOver24": 173461,
+  "maxEdgeDelta": 3,
+  "pixelDifferenceOver24": 47913,
+  "excludedArea": null,
+  "excludedMeasurements": [],
+  "footerValidationRequired": false,
   "measurements": [
     {
       "name": "shell-board/白い板",
@@ -22,19 +25,19 @@
         "bottom": 988,
         "height": 928,
         "left": 240,
-        "right": 1500,
+        "right": 1428,
         "top": 60,
-        "width": 1260,
+        "width": 1188,
         "x": 240,
         "y": 60
       },
       "delta": {
         "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "heading/板の頭",
@@ -52,25 +55,25 @@
         "bottom": 147,
         "height": 87,
         "left": 240,
-        "right": 1500,
+        "right": 1428,
         "top": 60,
-        "width": 1260,
+        "width": 1188,
         "x": 240,
         "y": 60
       },
       "delta": {
         "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "tabs/タブの段",
       "implementation": {
-        "bottom": 190,
-        "height": 43,
+        "bottom": 178,
+        "height": 31,
         "left": 240,
         "right": 1428,
         "top": 147,
@@ -79,38 +82,28 @@
         "y": 147
       },
       "reference": {
-        "bottom": 178.5,
-        "height": 31.5,
+        "bottom": 177.5,
+        "height": 30.5,
         "left": 240,
-        "right": 1476,
+        "right": 1428,
         "top": 147,
-        "width": 1236,
+        "width": 1188,
         "x": 240,
         "y": 147
       },
       "delta": {
         "left": 0,
         "top": 0,
-        "right": -48,
-        "bottom": 11.5
+        "right": 0,
+        "bottom": 0.5
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "stats/数の帯",
       "implementation": {
-        "bottom": 307,
+        "bottom": 295,
         "height": 117,
-        "left": 240,
-        "right": 1428,
-        "top": 190,
-        "width": 1188,
-        "x": 240,
-        "y": 190
-      },
-      "reference": {
-        "bottom": 294.5,
-        "height": 116.5,
         "left": 240,
         "right": 1428,
         "top": 178,
@@ -118,103 +111,113 @@
         "x": 240,
         "y": 178
       },
+      "reference": {
+        "bottom": 292.5,
+        "height": 115.5,
+        "left": 240,
+        "right": 1428,
+        "top": 177,
+        "width": 1188,
+        "x": 240,
+        "y": 177
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12.5
+        "bottom": 2.5
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "body/本文",
       "implementation": {
-        "bottom": 998,
-        "height": 691,
+        "bottom": 988,
+        "height": 693,
         "left": 240,
         "right": 1428,
-        "top": 307,
+        "top": 295,
         "width": 1188,
         "x": 240,
-        "y": 307
+        "y": 295
       },
       "reference": {
-        "bottom": 1020,
-        "height": 726,
+        "bottom": 988,
+        "height": 696,
         "left": 240,
-        "right": 1500,
-        "top": 294,
-        "width": 1260,
+        "right": 1428,
+        "top": 292,
+        "width": 1188,
         "x": 240,
-        "y": 294
+        "y": 292
       },
       "delta": {
         "left": 0,
-        "top": 13,
-        "right": -72,
-        "bottom": -22
+        "top": 3,
+        "right": 0,
+        "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "folders/フォルダの列",
       "implementation": {
-        "bottom": 998,
-        "height": 691,
+        "bottom": 988,
+        "height": 693,
         "left": 240,
         "right": 440,
-        "top": 307,
+        "top": 295,
         "width": 200,
         "x": 240,
-        "y": 307
+        "y": 295
       },
       "reference": {
-        "bottom": 1020,
-        "height": 726,
+        "bottom": 986,
+        "height": 694,
         "left": 240,
-        "right": 464.5,
-        "top": 294,
-        "width": 224.5,
+        "right": 439.5,
+        "top": 292,
+        "width": 199.5,
         "x": 240,
-        "y": 294
+        "y": 292
       },
       "delta": {
         "left": 0,
-        "top": 13,
-        "right": -24.5,
-        "bottom": -22
+        "top": 3,
+        "right": 0.5,
+        "bottom": 2
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "pagination/ページ送り",
       "implementation": {
-        "bottom": 998,
+        "bottom": 811,
         "height": 52,
         "left": 440,
         "right": 1428,
-        "top": 946,
+        "top": 759,
         "width": 988,
         "x": 440,
-        "y": 946
+        "y": 759
       },
       "reference": {
-        "bottom": 985,
+        "bottom": 808,
         "height": 52,
-        "left": 464,
-        "right": 1500,
-        "top": 933,
-        "width": 1036,
-        "x": 464,
-        "y": 933
+        "left": 439,
+        "right": 1428,
+        "top": 756,
+        "width": 989,
+        "x": 439,
+        "y": 756
       },
       "delta": {
-        "left": -24,
-        "top": 13,
-        "right": -72,
-        "bottom": 13
+        "left": 1,
+        "top": 3,
+        "right": 0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:CSVで一括登録する/CSVで一括登録する",
@@ -231,20 +234,20 @@
       "reference": {
         "bottom": 125.5,
         "height": 36,
-        "left": 1312.078125,
-        "right": 1476,
+        "left": 1240.078125,
+        "right": 1404,
         "top": 89.5,
         "width": 163.921875,
-        "x": 1312.078125,
+        "x": 1240.078125,
         "y": 89.5
       },
       "delta": {
-        "left": -72.0,
+        "left": 0.0,
         "top": 0.0,
-        "right": -72,
+        "right": 0,
         "bottom": 0.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:LINEアカウントの切り替え/LINEアカウントの切り替え",
@@ -261,34 +264,24 @@
       "reference": {
         "bottom": 48,
         "height": 36,
-        "left": 960,
-        "right": 1158,
+        "left": 888,
+        "right": 1086,
         "top": 12,
         "width": 198,
-        "x": 960,
+        "x": 888,
         "y": 12
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:…/…",
       "implementation": {
-        "bottom": 226,
-        "height": 16,
-        "left": 501,
-        "right": 517,
-        "top": 210,
-        "width": 16,
-        "x": 501,
-        "y": 210
-      },
-      "reference": {
         "bottom": 214,
         "height": 16,
         "left": 501,
@@ -298,27 +291,27 @@
         "x": 501,
         "y": 198
       },
+      "reference": {
+        "bottom": 213,
+        "height": 16,
+        "left": 501,
+        "right": 517,
+        "top": 197,
+        "width": 16,
+        "x": 501,
+        "y": 197
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:…/…",
       "implementation": {
-        "bottom": 226,
-        "height": 16,
-        "left": 798,
-        "right": 814,
-        "top": 210,
-        "width": 16,
-        "x": 798,
-        "y": 210
-      },
-      "reference": {
         "bottom": 214,
         "height": 16,
         "left": 798,
@@ -328,27 +321,27 @@
         "x": 798,
         "y": 198
       },
+      "reference": {
+        "bottom": 213,
+        "height": 16,
+        "left": 798,
+        "right": 814,
+        "top": 197,
+        "width": 16,
+        "x": 798,
+        "y": 197
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:…/…",
       "implementation": {
-        "bottom": 226,
-        "height": 16,
-        "left": 1095,
-        "right": 1111,
-        "top": 210,
-        "width": 16,
-        "x": 1095,
-        "y": 210
-      },
-      "reference": {
         "bottom": 214,
         "height": 16,
         "left": 1095,
@@ -358,27 +351,27 @@
         "x": 1095,
         "y": 198
       },
+      "reference": {
+        "bottom": 213,
+        "height": 16,
+        "left": 1095,
+        "right": 1111,
+        "top": 197,
+        "width": 16,
+        "x": 1095,
+        "y": 197
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:…/…",
       "implementation": {
-        "bottom": 226,
-        "height": 16,
-        "left": 1392,
-        "right": 1408,
-        "top": 210,
-        "width": 16,
-        "x": 1392,
-        "y": 210
-      },
-      "reference": {
         "bottom": 214,
         "height": 16,
         "left": 1392,
@@ -388,223 +381,233 @@
         "x": 1392,
         "y": 198
       },
+      "reference": {
+        "bottom": 213,
+        "height": 16,
+        "left": 1392,
+        "right": 1408,
+        "top": 197,
+        "width": 16,
+        "x": 1392,
+        "y": 197
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:その他の操作/その他の操作",
       "implementation": {
-        "bottom": 427.5,
+        "bottom": 415.5,
         "height": 14,
         "left": 403,
         "right": 417,
-        "top": 413.5,
+        "top": 401.5,
         "width": 14,
         "x": 403,
-        "y": 413.5
+        "y": 401.5
       },
       "reference": {
-        "bottom": 414.5,
+        "bottom": 412.5,
         "height": 14,
-        "left": 427.5,
-        "right": 441.5,
-        "top": 400.5,
+        "left": 402.5,
+        "right": 416.5,
+        "top": 398.5,
         "width": 14,
-        "x": 427.5,
-        "y": 400.5
+        "x": 402.5,
+        "y": 398.5
       },
       "delta": {
-        "left": -24.5,
-        "top": 13.0,
-        "right": -24.5,
-        "bottom": 13.0
+        "left": 0.5,
+        "top": 3.0,
+        "right": 0.5,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:その他の操作/その他の操作",
       "implementation": {
-        "bottom": 492.25,
+        "bottom": 442.75,
         "height": 28,
-        "left": 1424,
-        "right": 1452,
-        "top": 464.25,
+        "left": 1376,
+        "right": 1404,
+        "top": 414.75,
         "width": 28,
-        "x": 1424,
-        "y": 464.25
+        "x": 1376,
+        "y": 414.75
       },
       "reference": {
-        "bottom": 479.25,
+        "bottom": 439.75,
         "height": 28,
-        "left": 1448,
-        "right": 1476,
-        "top": 451.25,
+        "left": 1375,
+        "right": 1403,
+        "top": 411.75,
         "width": 28,
-        "x": 1448,
-        "y": 451.25
+        "x": 1375,
+        "y": 411.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:その他の操作/その他の操作",
       "implementation": {
-        "bottom": 577.25,
+        "bottom": 502.75,
         "height": 28,
-        "left": 1424,
-        "right": 1452,
-        "top": 549.25,
+        "left": 1376,
+        "right": 1404,
+        "top": 474.75,
         "width": 28,
-        "x": 1424,
-        "y": 549.25
+        "x": 1376,
+        "y": 474.75
       },
       "reference": {
-        "bottom": 564.25,
+        "bottom": 499.75,
         "height": 28,
-        "left": 1448,
-        "right": 1476,
-        "top": 536.25,
+        "left": 1375,
+        "right": 1403,
+        "top": 471.75,
         "width": 28,
-        "x": 1448,
-        "y": 536.25
+        "x": 1375,
+        "y": 471.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:その他の操作/その他の操作",
       "implementation": {
-        "bottom": 662.25,
+        "bottom": 562.75,
         "height": 28,
-        "left": 1424,
-        "right": 1452,
-        "top": 634.25,
+        "left": 1376,
+        "right": 1404,
+        "top": 534.75,
         "width": 28,
-        "x": 1424,
-        "y": 634.25
+        "x": 1376,
+        "y": 534.75
       },
       "reference": {
-        "bottom": 649.25,
+        "bottom": 559.75,
         "height": 28,
-        "left": 1448,
-        "right": 1476,
-        "top": 621.25,
+        "left": 1375,
+        "right": 1403,
+        "top": 531.75,
         "width": 28,
-        "x": 1448,
-        "y": 621.25
+        "x": 1375,
+        "y": 531.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:その他の操作/その他の操作",
       "implementation": {
-        "bottom": 747.25,
+        "bottom": 622.75,
         "height": 28,
-        "left": 1424,
-        "right": 1452,
-        "top": 719.25,
+        "left": 1376,
+        "right": 1404,
+        "top": 594.75,
         "width": 28,
-        "x": 1424,
-        "y": 719.25
+        "x": 1376,
+        "y": 594.75
       },
       "reference": {
-        "bottom": 734.25,
+        "bottom": 619.75,
         "height": 28,
-        "left": 1448,
-        "right": 1476,
-        "top": 706.25,
+        "left": 1375,
+        "right": 1403,
+        "top": 591.75,
         "width": 28,
-        "x": 1448,
-        "y": 706.25
+        "x": 1375,
+        "y": 591.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:その他の操作/その他の操作",
       "implementation": {
-        "bottom": 832.25,
+        "bottom": 682.75,
         "height": 28,
-        "left": 1424,
-        "right": 1452,
-        "top": 804.25,
+        "left": 1376,
+        "right": 1404,
+        "top": 654.75,
         "width": 28,
-        "x": 1424,
-        "y": 804.25
+        "x": 1376,
+        "y": 654.75
       },
       "reference": {
-        "bottom": 819.25,
+        "bottom": 679.75,
         "height": 28,
-        "left": 1448,
-        "right": 1476,
-        "top": 791.25,
+        "left": 1375,
+        "right": 1403,
+        "top": 651.75,
         "width": 28,
-        "x": 1448,
-        "y": 791.25
+        "x": 1375,
+        "y": 651.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:その他の操作/その他の操作",
       "implementation": {
-        "bottom": 917.25,
+        "bottom": 742.75,
         "height": 28,
-        "left": 1424,
-        "right": 1452,
-        "top": 889.25,
+        "left": 1376,
+        "right": 1404,
+        "top": 714.75,
         "width": 28,
-        "x": 1424,
-        "y": 889.25
+        "x": 1376,
+        "y": 714.75
       },
       "reference": {
-        "bottom": 904.25,
+        "bottom": 739.75,
         "height": 28,
-        "left": 1448,
-        "right": 1476,
-        "top": 876.25,
+        "left": 1375,
+        "right": 1403,
+        "top": 711.75,
         "width": 28,
-        "x": 1448,
-        "y": 876.25
+        "x": 1375,
+        "y": 711.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
@@ -621,20 +624,20 @@
       "reference": {
         "bottom": 38,
         "height": 16,
-        "left": 1178,
-        "right": 1194,
+        "left": 1106,
+        "right": 1122,
         "top": 22,
         "width": 16,
-        "x": 1178,
+        "x": 1106,
         "y": 22
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
@@ -651,20 +654,20 @@
       "reference": {
         "bottom": 37.5,
         "height": 15,
-        "left": 1392,
-        "right": 1407,
+        "left": 1320,
+        "right": 1335,
         "top": 22.5,
         "width": 15,
-        "x": 1392,
+        "x": 1320,
         "y": 22.5
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0.0,
-        "right": -72,
+        "right": 0,
         "bottom": 0.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
@@ -681,34 +684,24 @@
       "reference": {
         "bottom": 115,
         "height": 15,
-        "left": 1326.078125,
-        "right": 1341.078125,
+        "left": 1254.078125,
+        "right": 1269.078125,
         "top": 100,
         "width": 15,
-        "x": 1326.078125,
+        "x": 1254.078125,
         "y": 100
       },
       "delta": {
-        "left": -72.0,
+        "left": 0.0,
         "top": 0,
-        "right": -72.0,
+        "right": 0.0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
       "implementation": {
-        "bottom": 224.5,
-        "height": 13,
-        "left": 265.5,
-        "right": 278.5,
-        "top": 211.5,
-        "width": 13,
-        "x": 265.5,
-        "y": 211.5
-      },
-      "reference": {
         "bottom": 212.5,
         "height": 13,
         "left": 265.5,
@@ -718,27 +711,27 @@
         "x": 265.5,
         "y": 199.5
       },
+      "reference": {
+        "bottom": 211.5,
+        "height": 13,
+        "left": 265.5,
+        "right": 278.5,
+        "top": 198.5,
+        "width": 13,
+        "x": 265.5,
+        "y": 198.5
+      },
       "delta": {
         "left": 0.0,
-        "top": 12.0,
+        "top": 1.0,
         "right": 0.0,
-        "bottom": 12.0
+        "bottom": 1.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
       "implementation": {
-        "bottom": 224.5,
-        "height": 13,
-        "left": 562.5,
-        "right": 575.5,
-        "top": 211.5,
-        "width": 13,
-        "x": 562.5,
-        "y": 211.5
-      },
-      "reference": {
         "bottom": 212.5,
         "height": 13,
         "left": 562.5,
@@ -748,27 +741,27 @@
         "x": 562.5,
         "y": 199.5
       },
+      "reference": {
+        "bottom": 211.5,
+        "height": 13,
+        "left": 562.5,
+        "right": 575.5,
+        "top": 198.5,
+        "width": 13,
+        "x": 562.5,
+        "y": 198.5
+      },
       "delta": {
         "left": 0.0,
-        "top": 12.0,
+        "top": 1.0,
         "right": 0.0,
-        "bottom": 12.0
+        "bottom": 1.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
       "implementation": {
-        "bottom": 224.5,
-        "height": 13,
-        "left": 859.5,
-        "right": 872.5,
-        "top": 211.5,
-        "width": 13,
-        "x": 859.5,
-        "y": 211.5
-      },
-      "reference": {
         "bottom": 212.5,
         "height": 13,
         "left": 859.5,
@@ -778,27 +771,27 @@
         "x": 859.5,
         "y": 199.5
       },
+      "reference": {
+        "bottom": 211.5,
+        "height": 13,
+        "left": 859.5,
+        "right": 872.5,
+        "top": 198.5,
+        "width": 13,
+        "x": 859.5,
+        "y": 198.5
+      },
       "delta": {
         "left": 0.0,
-        "top": 12.0,
+        "top": 1.0,
         "right": 0.0,
-        "bottom": 12.0
+        "bottom": 1.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
       "implementation": {
-        "bottom": 224.5,
-        "height": 13,
-        "left": 1156.5,
-        "right": 1169.5,
-        "top": 211.5,
-        "width": 13,
-        "x": 1156.5,
-        "y": 211.5
-      },
-      "reference": {
         "bottom": 212.5,
         "height": 13,
         "left": 1156.5,
@@ -808,259 +801,269 @@
         "x": 1156.5,
         "y": 199.5
       },
+      "reference": {
+        "bottom": 211.5,
+        "height": 13,
+        "left": 1156.5,
+        "right": 1169.5,
+        "top": 198.5,
+        "width": 13,
+        "x": 1156.5,
+        "y": 198.5
+      },
       "delta": {
         "left": 0.0,
-        "top": 12.0,
+        "top": 1.0,
         "right": 0.0,
-        "bottom": 12.0
+        "bottom": 1.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
       "implementation": {
-        "bottom": 348.5,
+        "bottom": 336.5,
         "height": 15,
         "left": 296.5,
         "right": 311.5,
-        "top": 333.5,
+        "top": 321.5,
         "width": 15,
         "x": 296.5,
-        "y": 333.5
-      },
-      "reference": {
-        "bottom": 335.5,
-        "height": 15,
-        "left": 308.75,
-        "right": 323.75,
-        "top": 320.5,
-        "width": 15,
-        "x": 308.75,
-        "y": 320.5
-      },
-      "delta": {
-        "left": -12.25,
-        "top": 13.0,
-        "right": -12.25,
-        "bottom": 13.0
-      },
-      "over4px": true
-    },
-    {
-      "name": "name:アイコン/アイコン",
-      "implementation": {
-        "bottom": 346.5,
-        "height": 15,
-        "left": 1161.171875,
-        "right": 1176.171875,
-        "top": 331.5,
-        "width": 15,
-        "x": 1161.171875,
-        "y": 331.5
+        "y": 321.5
       },
       "reference": {
         "bottom": 333.5,
         "height": 15,
-        "left": 1233.171875,
-        "right": 1248.171875,
+        "left": 296.25,
+        "right": 311.25,
         "top": 318.5,
         "width": 15,
-        "x": 1233.171875,
+        "x": 296.25,
         "y": 318.5
       },
       "delta": {
-        "left": -72.0,
-        "top": 13.0,
-        "right": -72.0,
-        "bottom": 13.0
+        "left": 0.25,
+        "top": 3.0,
+        "right": 0.25,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
       "implementation": {
-        "bottom": 486.25,
-        "height": 16,
-        "left": 1430,
-        "right": 1446,
-        "top": 470.25,
-        "width": 16,
-        "x": 1430,
-        "y": 470.25
+        "bottom": 334.5,
+        "height": 15,
+        "left": 1161.171875,
+        "right": 1176.171875,
+        "top": 319.5,
+        "width": 15,
+        "x": 1161.171875,
+        "y": 319.5
       },
       "reference": {
-        "bottom": 473.25,
-        "height": 16,
-        "left": 1454,
-        "right": 1470,
-        "top": 457.25,
-        "width": 16,
-        "x": 1454,
-        "y": 457.25
+        "bottom": 331.5,
+        "height": 15,
+        "left": 1161.171875,
+        "right": 1176.171875,
+        "top": 316.5,
+        "width": 15,
+        "x": 1161.171875,
+        "y": 316.5
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 0.0,
+        "top": 3.0,
+        "right": 0.0,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
       "implementation": {
-        "bottom": 571.25,
+        "bottom": 436.75,
         "height": 16,
-        "left": 1430,
-        "right": 1446,
-        "top": 555.25,
+        "left": 1382,
+        "right": 1398,
+        "top": 420.75,
         "width": 16,
-        "x": 1430,
-        "y": 555.25
+        "x": 1382,
+        "y": 420.75
       },
       "reference": {
-        "bottom": 558.25,
+        "bottom": 433.75,
         "height": 16,
-        "left": 1454,
-        "right": 1470,
-        "top": 542.25,
+        "left": 1381,
+        "right": 1397,
+        "top": 417.75,
         "width": 16,
-        "x": 1454,
-        "y": 542.25
+        "x": 1381,
+        "y": 417.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
       "implementation": {
-        "bottom": 656.25,
+        "bottom": 496.75,
         "height": 16,
-        "left": 1430,
-        "right": 1446,
-        "top": 640.25,
+        "left": 1382,
+        "right": 1398,
+        "top": 480.75,
         "width": 16,
-        "x": 1430,
-        "y": 640.25
+        "x": 1382,
+        "y": 480.75
       },
       "reference": {
-        "bottom": 643.25,
+        "bottom": 493.75,
         "height": 16,
-        "left": 1454,
-        "right": 1470,
-        "top": 627.25,
+        "left": 1381,
+        "right": 1397,
+        "top": 477.75,
         "width": 16,
-        "x": 1454,
-        "y": 627.25
+        "x": 1381,
+        "y": 477.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
       "implementation": {
-        "bottom": 741.25,
+        "bottom": 556.75,
         "height": 16,
-        "left": 1430,
-        "right": 1446,
-        "top": 725.25,
+        "left": 1382,
+        "right": 1398,
+        "top": 540.75,
         "width": 16,
-        "x": 1430,
-        "y": 725.25
+        "x": 1382,
+        "y": 540.75
       },
       "reference": {
-        "bottom": 728.25,
+        "bottom": 553.75,
         "height": 16,
-        "left": 1454,
-        "right": 1470,
-        "top": 712.25,
+        "left": 1381,
+        "right": 1397,
+        "top": 537.75,
         "width": 16,
-        "x": 1454,
-        "y": 712.25
+        "x": 1381,
+        "y": 537.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
       "implementation": {
-        "bottom": 826.25,
+        "bottom": 616.75,
         "height": 16,
-        "left": 1430,
-        "right": 1446,
-        "top": 810.25,
+        "left": 1382,
+        "right": 1398,
+        "top": 600.75,
         "width": 16,
-        "x": 1430,
-        "y": 810.25
+        "x": 1382,
+        "y": 600.75
       },
       "reference": {
-        "bottom": 813.25,
+        "bottom": 613.75,
         "height": 16,
-        "left": 1454,
-        "right": 1470,
-        "top": 797.25,
+        "left": 1381,
+        "right": 1397,
+        "top": 597.75,
         "width": 16,
-        "x": 1454,
-        "y": 797.25
+        "x": 1381,
+        "y": 597.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:アイコン/アイコン",
       "implementation": {
-        "bottom": 911.25,
+        "bottom": 676.75,
         "height": 16,
-        "left": 1430,
-        "right": 1446,
-        "top": 895.25,
+        "left": 1382,
+        "right": 1398,
+        "top": 660.75,
         "width": 16,
-        "x": 1430,
-        "y": 895.25
+        "x": 1382,
+        "y": 660.75
       },
       "reference": {
-        "bottom": 898.25,
+        "bottom": 673.75,
         "height": 16,
-        "left": 1454,
-        "right": 1470,
-        "top": 882.25,
+        "left": 1381,
+        "right": 1397,
+        "top": 657.75,
         "width": 16,
-        "x": 1454,
-        "y": 882.25
+        "x": 1381,
+        "y": 657.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
+    },
+    {
+      "name": "name:アイコン/アイコン",
+      "implementation": {
+        "bottom": 736.75,
+        "height": 16,
+        "left": 1382,
+        "right": 1398,
+        "top": 720.75,
+        "width": 16,
+        "x": 1382,
+        "y": 720.75
+      },
+      "reference": {
+        "bottom": 733.75,
+        "height": 16,
+        "left": 1381,
+        "right": 1397,
+        "top": 717.75,
+        "width": 16,
+        "x": 1381,
+        "y": 717.75
+      },
+      "delta": {
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
+      },
+      "over4px": false
     },
     {
       "name": "name:タブ タグ/タブ タグ",
       "implementation": {
-        "bottom": 191,
-        "height": 44,
+        "bottom": 177,
+        "height": 30,
         "left": 264,
         "right": 291,
         "top": 147,
@@ -1069,8 +1072,8 @@
         "y": 147
       },
       "reference": {
-        "bottom": 191,
-        "height": 44,
+        "bottom": 177,
+        "height": 30,
         "left": 264,
         "right": 291,
         "top": 147,
@@ -1192,19 +1195,19 @@
         "bottom": 60,
         "height": 60,
         "left": 240,
-        "right": 1500,
+        "right": 1428,
         "top": 0,
-        "width": 1260,
+        "width": 1188,
         "x": 240,
         "y": 0
       },
       "delta": {
         "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:パンくず/パンくず",
@@ -1222,229 +1225,229 @@
         "bottom": 40,
         "height": 20,
         "left": 290,
-        "right": 950,
+        "right": 878,
         "top": 20,
-        "width": 660,
+        "width": 588,
         "x": 290,
         "y": 20
       },
       "delta": {
         "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:フォルダの印/フォルダの印",
       "implementation": {
-        "bottom": 485.25,
+        "bottom": 435.75,
         "height": 14,
-        "left": 894,
-        "right": 908,
-        "top": 471.25,
+        "left": 846,
+        "right": 860,
+        "top": 421.75,
         "width": 14,
-        "x": 894,
-        "y": 471.25
+        "x": 846,
+        "y": 421.75
       },
       "reference": {
-        "bottom": 472.25,
+        "bottom": 432.75,
         "height": 14,
-        "left": 918,
-        "right": 932,
-        "top": 458.25,
+        "left": 845,
+        "right": 859,
+        "top": 418.75,
         "width": 14,
-        "x": 918,
-        "y": 458.25
+        "x": 845,
+        "y": 418.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:フォルダの印/フォルダの印",
       "implementation": {
-        "bottom": 570.25,
+        "bottom": 495.75,
         "height": 14,
-        "left": 894,
-        "right": 908,
-        "top": 556.25,
+        "left": 846,
+        "right": 860,
+        "top": 481.75,
         "width": 14,
-        "x": 894,
-        "y": 556.25
+        "x": 846,
+        "y": 481.75
       },
       "reference": {
-        "bottom": 557.25,
+        "bottom": 492.75,
         "height": 14,
-        "left": 918,
-        "right": 932,
-        "top": 543.25,
+        "left": 845,
+        "right": 859,
+        "top": 478.75,
         "width": 14,
-        "x": 918,
-        "y": 543.25
+        "x": 845,
+        "y": 478.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:フォルダの印/フォルダの印",
       "implementation": {
-        "bottom": 655.25,
+        "bottom": 555.75,
         "height": 14,
-        "left": 894,
-        "right": 908,
-        "top": 641.25,
+        "left": 846,
+        "right": 860,
+        "top": 541.75,
         "width": 14,
-        "x": 894,
-        "y": 641.25
+        "x": 846,
+        "y": 541.75
       },
       "reference": {
-        "bottom": 642.25,
+        "bottom": 552.75,
         "height": 14,
-        "left": 918,
-        "right": 932,
-        "top": 628.25,
+        "left": 845,
+        "right": 859,
+        "top": 538.75,
         "width": 14,
-        "x": 918,
-        "y": 628.25
+        "x": 845,
+        "y": 538.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:フォルダの印/フォルダの印",
       "implementation": {
-        "bottom": 740.25,
+        "bottom": 615.75,
         "height": 14,
-        "left": 894,
-        "right": 908,
-        "top": 726.25,
+        "left": 846,
+        "right": 860,
+        "top": 601.75,
         "width": 14,
-        "x": 894,
-        "y": 726.25
+        "x": 846,
+        "y": 601.75
       },
       "reference": {
-        "bottom": 727.25,
+        "bottom": 612.75,
         "height": 14,
-        "left": 918,
-        "right": 932,
-        "top": 713.25,
+        "left": 845,
+        "right": 859,
+        "top": 598.75,
         "width": 14,
-        "x": 918,
-        "y": 713.25
+        "x": 845,
+        "y": 598.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:フォルダの印/フォルダの印",
       "implementation": {
-        "bottom": 825.25,
+        "bottom": 675.75,
         "height": 14,
-        "left": 894,
-        "right": 908,
-        "top": 811.25,
+        "left": 846,
+        "right": 860,
+        "top": 661.75,
         "width": 14,
-        "x": 894,
-        "y": 811.25
+        "x": 846,
+        "y": 661.75
       },
       "reference": {
-        "bottom": 812.25,
+        "bottom": 672.75,
         "height": 14,
-        "left": 918,
-        "right": 932,
-        "top": 798.25,
+        "left": 845,
+        "right": 859,
+        "top": 658.75,
         "width": 14,
-        "x": 918,
-        "y": 798.25
+        "x": 845,
+        "y": 658.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:フォルダの印/フォルダの印",
       "implementation": {
-        "bottom": 910.25,
+        "bottom": 735.75,
         "height": 14,
-        "left": 894,
-        "right": 908,
-        "top": 896.25,
+        "left": 846,
+        "right": 860,
+        "top": 721.75,
         "width": 14,
-        "x": 894,
-        "y": 896.25
+        "x": 846,
+        "y": 721.75
       },
       "reference": {
-        "bottom": 897.25,
+        "bottom": 732.75,
         "height": 14,
-        "left": 918,
-        "right": 932,
-        "top": 883.25,
+        "left": 845,
+        "right": 859,
+        "top": 718.75,
         "width": 14,
-        "x": 918,
-        "y": 883.25
+        "x": 845,
+        "y": 718.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:フォルダを追加/フォルダを追加",
       "implementation": {
-        "bottom": 622,
+        "bottom": 610,
         "height": 31,
         "left": 252,
         "right": 383,
-        "top": 591,
+        "top": 579,
         "width": 131,
         "x": 252,
-        "y": 591
+        "y": 579
       },
       "reference": {
-        "bottom": 609,
+        "bottom": 607,
         "height": 31,
         "left": 252,
         "right": 383,
-        "top": 578,
+        "top": 576,
         "width": 131,
         "x": 252,
-        "y": 578
+        "y": 576
       },
       "delta": {
         "left": 0,
-        "top": 13,
+        "top": 3,
         "right": 0,
-        "bottom": 13
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:メニューを畳む/メニューを畳む",
@@ -1491,214 +1494,204 @@
       "reference": {
         "bottom": 48,
         "height": 36,
-        "left": 1378,
-        "right": 1492,
+        "left": 1306,
+        "right": 1420,
         "top": 12,
         "width": 114,
-        "x": 1378,
+        "x": 1306,
         "y": 12
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:一覧に出す 星/オフ/一覧に出す 星/オフ",
       "implementation": {
-        "bottom": 660.25,
+        "bottom": 560.75,
         "height": 24,
         "left": 464,
         "right": 488,
-        "top": 636.25,
+        "top": 536.75,
         "width": 24,
         "x": 464,
-        "y": 636.25
+        "y": 536.75
       },
       "reference": {
-        "bottom": 647.25,
+        "bottom": 557.75,
         "height": 24,
-        "left": 488,
-        "right": 512,
-        "top": 623.25,
+        "left": 463,
+        "right": 487,
+        "top": 533.75,
         "width": 24,
-        "x": 488,
-        "y": 623.25
+        "x": 463,
+        "y": 533.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:一覧に出す 星/オフ/一覧に出す 星/オフ",
       "implementation": {
-        "bottom": 745.25,
+        "bottom": 620.75,
         "height": 24,
         "left": 464,
         "right": 488,
-        "top": 721.25,
+        "top": 596.75,
         "width": 24,
         "x": 464,
-        "y": 721.25
+        "y": 596.75
       },
       "reference": {
-        "bottom": 732.25,
+        "bottom": 617.75,
         "height": 24,
-        "left": 488,
-        "right": 512,
-        "top": 708.25,
+        "left": 463,
+        "right": 487,
+        "top": 593.75,
         "width": 24,
-        "x": 488,
-        "y": 708.25
+        "x": 463,
+        "y": 593.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:一覧に出す 星/オフ/一覧に出す 星/オフ",
       "implementation": {
-        "bottom": 830.25,
+        "bottom": 680.75,
         "height": 24,
         "left": 464,
         "right": 488,
-        "top": 806.25,
+        "top": 656.75,
         "width": 24,
         "x": 464,
-        "y": 806.25
+        "y": 656.75
       },
       "reference": {
-        "bottom": 817.25,
+        "bottom": 677.75,
         "height": 24,
-        "left": 488,
-        "right": 512,
-        "top": 793.25,
+        "left": 463,
+        "right": 487,
+        "top": 653.75,
         "width": 24,
-        "x": 488,
-        "y": 793.25
+        "x": 463,
+        "y": 653.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:一覧に出す 星/オフ/一覧に出す 星/オフ",
       "implementation": {
-        "bottom": 915.25,
+        "bottom": 740.75,
         "height": 24,
         "left": 464,
         "right": 488,
-        "top": 891.25,
+        "top": 716.75,
         "width": 24,
         "x": 464,
-        "y": 891.25
+        "y": 716.75
       },
       "reference": {
-        "bottom": 902.25,
+        "bottom": 737.75,
         "height": 24,
-        "left": 488,
-        "right": 512,
-        "top": 878.25,
+        "left": 463,
+        "right": 487,
+        "top": 713.75,
         "width": 24,
-        "x": 488,
-        "y": 878.25
+        "x": 463,
+        "y": 713.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:一覧に出す 星/オン/一覧に出す 星/オン",
       "implementation": {
-        "bottom": 490.25,
+        "bottom": 440.75,
         "height": 24,
         "left": 464,
         "right": 488,
-        "top": 466.25,
+        "top": 416.75,
         "width": 24,
         "x": 464,
-        "y": 466.25
+        "y": 416.75
       },
       "reference": {
-        "bottom": 477.25,
+        "bottom": 437.75,
         "height": 24,
-        "left": 488,
-        "right": 512,
-        "top": 453.25,
+        "left": 463,
+        "right": 487,
+        "top": 413.75,
         "width": 24,
-        "x": 488,
-        "y": 453.25
+        "x": 463,
+        "y": 413.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:一覧に出す 星/オン/一覧に出す 星/オン",
       "implementation": {
-        "bottom": 575.25,
+        "bottom": 500.75,
         "height": 24,
         "left": 464,
         "right": 488,
-        "top": 551.25,
+        "top": 476.75,
         "width": 24,
         "x": 464,
-        "y": 551.25
+        "y": 476.75
       },
       "reference": {
-        "bottom": 562.25,
+        "bottom": 497.75,
         "height": 24,
-        "left": 488,
-        "right": 512,
-        "top": 538.25,
+        "left": 463,
+        "right": 487,
+        "top": 473.75,
         "width": 24,
-        "x": 488,
-        "y": 538.25
+        "x": 463,
+        "y": 473.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:上/上",
       "implementation": {
-        "bottom": 230,
-        "height": 24,
-        "left": 260,
-        "right": 517,
-        "top": 206,
-        "width": 257,
-        "x": 260,
-        "y": 206
-      },
-      "reference": {
         "bottom": 218,
         "height": 24,
         "left": 260,
@@ -1708,27 +1701,27 @@
         "x": 260,
         "y": 194
       },
+      "reference": {
+        "bottom": 217,
+        "height": 24,
+        "left": 260,
+        "right": 517,
+        "top": 193,
+        "width": 257,
+        "x": 260,
+        "y": 193
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:上/上",
       "implementation": {
-        "bottom": 230,
-        "height": 24,
-        "left": 557,
-        "right": 814,
-        "top": 206,
-        "width": 257,
-        "x": 557,
-        "y": 206
-      },
-      "reference": {
         "bottom": 218,
         "height": 24,
         "left": 557,
@@ -1738,27 +1731,27 @@
         "x": 557,
         "y": 194
       },
+      "reference": {
+        "bottom": 217,
+        "height": 24,
+        "left": 557,
+        "right": 814,
+        "top": 193,
+        "width": 257,
+        "x": 557,
+        "y": 193
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:上/上",
       "implementation": {
-        "bottom": 230,
-        "height": 24,
-        "left": 854,
-        "right": 1111,
-        "top": 206,
-        "width": 257,
-        "x": 854,
-        "y": 206
-      },
-      "reference": {
         "bottom": 218,
         "height": 24,
         "left": 854,
@@ -1768,27 +1761,27 @@
         "x": 854,
         "y": 194
       },
+      "reference": {
+        "bottom": 217,
+        "height": 24,
+        "left": 854,
+        "right": 1111,
+        "top": 193,
+        "width": 257,
+        "x": 854,
+        "y": 193
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:上/上",
       "implementation": {
-        "bottom": 230,
-        "height": 24,
-        "left": 1151,
-        "right": 1408,
-        "top": 206,
-        "width": 257,
-        "x": 1151,
-        "y": 206
-      },
-      "reference": {
         "bottom": 218,
         "height": 24,
         "left": 1151,
@@ -1798,57 +1791,57 @@
         "x": 1151,
         "y": 194
       },
+      "reference": {
+        "bottom": 217,
+        "height": 24,
+        "left": 1151,
+        "right": 1408,
+        "top": 193,
+        "width": 257,
+        "x": 1151,
+        "y": 193
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:下/下",
       "implementation": {
-        "bottom": 290,
+        "bottom": 278,
         "height": 18,
         "left": 260,
         "right": 517,
-        "top": 272,
+        "top": 260,
         "width": 257,
         "x": 260,
-        "y": 272
+        "y": 260
       },
       "reference": {
-        "bottom": 278,
+        "bottom": 277,
         "height": 18,
         "left": 260,
         "right": 517,
-        "top": 260,
+        "top": 259,
         "width": 257,
         "x": 260,
-        "y": 260
+        "y": 259
       },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:下/下",
       "implementation": {
-        "bottom": 290,
-        "height": 18,
-        "left": 557,
-        "right": 814,
-        "top": 272,
-        "width": 257,
-        "x": 557,
-        "y": 272
-      },
-      "reference": {
         "bottom": 278,
         "height": 18,
         "left": 557,
@@ -1858,27 +1851,27 @@
         "x": 557,
         "y": 260
       },
+      "reference": {
+        "bottom": 277,
+        "height": 18,
+        "left": 557,
+        "right": 814,
+        "top": 259,
+        "width": 257,
+        "x": 557,
+        "y": 259
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:下/下",
       "implementation": {
-        "bottom": 290,
-        "height": 18,
-        "left": 854,
-        "right": 1111,
-        "top": 272,
-        "width": 257,
-        "x": 854,
-        "y": 272
-      },
-      "reference": {
         "bottom": 278,
         "height": 18,
         "left": 854,
@@ -1888,27 +1881,27 @@
         "x": 854,
         "y": 260
       },
+      "reference": {
+        "bottom": 277,
+        "height": 18,
+        "left": 854,
+        "right": 1111,
+        "top": 259,
+        "width": 257,
+        "x": 854,
+        "y": 259
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:下/下",
       "implementation": {
-        "bottom": 290,
-        "height": 18,
-        "left": 1151,
-        "right": 1408,
-        "top": 272,
-        "width": 257,
-        "x": 1151,
-        "y": 272
-      },
-      "reference": {
         "bottom": 278,
         "height": 18,
         "left": 1151,
@@ -1918,193 +1911,203 @@
         "x": 1151,
         "y": 260
       },
+      "reference": {
+        "bottom": 277,
+        "height": 18,
+        "left": 1151,
+        "right": 1408,
+        "top": 259,
+        "width": 257,
+        "x": 1151,
+        "y": 259
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:並べ替え/並べ替え",
       "implementation": {
-        "bottom": 476.25,
+        "bottom": 426.75,
         "height": 14,
         "left": 504,
         "right": 518,
-        "top": 462.25,
+        "top": 412.75,
         "width": 14,
         "x": 504,
-        "y": 462.25
+        "y": 412.75
       },
       "reference": {
-        "bottom": 463.25,
+        "bottom": 423.75,
         "height": 14,
-        "left": 528,
-        "right": 542,
-        "top": 449.25,
+        "left": 503,
+        "right": 517,
+        "top": 409.75,
         "width": 14,
-        "x": 528,
-        "y": 449.25
+        "x": 503,
+        "y": 409.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:並べ替え/並べ替え",
       "implementation": {
-        "bottom": 561.25,
+        "bottom": 486.75,
         "height": 14,
         "left": 504,
         "right": 518,
-        "top": 547.25,
+        "top": 472.75,
         "width": 14,
         "x": 504,
-        "y": 547.25
+        "y": 472.75
       },
       "reference": {
-        "bottom": 548.25,
+        "bottom": 483.75,
         "height": 14,
-        "left": 528,
-        "right": 542,
-        "top": 534.25,
+        "left": 503,
+        "right": 517,
+        "top": 469.75,
         "width": 14,
-        "x": 528,
-        "y": 534.25
+        "x": 503,
+        "y": 469.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:並べ替え/並べ替え",
       "implementation": {
-        "bottom": 646.25,
+        "bottom": 546.75,
         "height": 14,
         "left": 504,
         "right": 518,
-        "top": 632.25,
+        "top": 532.75,
         "width": 14,
         "x": 504,
-        "y": 632.25
+        "y": 532.75
       },
       "reference": {
-        "bottom": 633.25,
+        "bottom": 543.75,
         "height": 14,
-        "left": 528,
-        "right": 542,
-        "top": 619.25,
+        "left": 503,
+        "right": 517,
+        "top": 529.75,
         "width": 14,
-        "x": 528,
-        "y": 619.25
+        "x": 503,
+        "y": 529.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:並べ替え/並べ替え",
       "implementation": {
-        "bottom": 731.25,
+        "bottom": 606.75,
         "height": 14,
         "left": 504,
         "right": 518,
-        "top": 717.25,
+        "top": 592.75,
         "width": 14,
         "x": 504,
-        "y": 717.25
+        "y": 592.75
       },
       "reference": {
-        "bottom": 718.25,
+        "bottom": 603.75,
         "height": 14,
-        "left": 528,
-        "right": 542,
-        "top": 704.25,
+        "left": 503,
+        "right": 517,
+        "top": 589.75,
         "width": 14,
-        "x": 528,
-        "y": 704.25
+        "x": 503,
+        "y": 589.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:並べ替え/並べ替え",
       "implementation": {
-        "bottom": 816.25,
+        "bottom": 666.75,
         "height": 14,
         "left": 504,
         "right": 518,
-        "top": 802.25,
+        "top": 652.75,
         "width": 14,
         "x": 504,
-        "y": 802.25
+        "y": 652.75
       },
       "reference": {
-        "bottom": 803.25,
+        "bottom": 663.75,
         "height": 14,
-        "left": 528,
-        "right": 542,
-        "top": 789.25,
+        "left": 503,
+        "right": 517,
+        "top": 649.75,
         "width": 14,
-        "x": 528,
-        "y": 789.25
+        "x": 503,
+        "y": 649.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:並べ替え/並べ替え",
       "implementation": {
-        "bottom": 901.25,
+        "bottom": 726.75,
         "height": 14,
         "left": 504,
         "right": 518,
-        "top": 887.25,
+        "top": 712.75,
         "width": 14,
         "x": 504,
-        "y": 887.25
+        "y": 712.75
       },
       "reference": {
-        "bottom": 888.25,
+        "bottom": 723.75,
         "height": 14,
-        "left": 528,
-        "right": 542,
-        "top": 874.25,
+        "left": 503,
+        "right": 517,
+        "top": 709.75,
         "width": 14,
-        "x": 528,
-        "y": 874.25
+        "x": 503,
+        "y": 709.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:会社/会社",
@@ -2139,272 +2142,272 @@
     {
       "name": "name:作る/作る",
       "implementation": {
-        "bottom": 359,
+        "bottom": 347,
         "height": 36,
         "left": 252,
         "right": 427,
-        "top": 323,
+        "top": 311,
         "width": 175,
         "x": 252,
-        "y": 323
-      },
-      "reference": {
-        "bottom": 346,
-        "height": 36,
-        "left": 252,
-        "right": 451.5,
-        "top": 310,
-        "width": 199.5,
-        "x": 252,
-        "y": 310
-      },
-      "delta": {
-        "left": 0,
-        "top": 13,
-        "right": -24.5,
-        "bottom": 13
-      },
-      "over4px": true
-    },
-    {
-      "name": "name:保存した検索/保存した検索",
-      "implementation": {
-        "bottom": 357,
-        "height": 36,
-        "left": 1147.171875,
-        "right": 1300.171875,
-        "top": 321,
-        "width": 153,
-        "x": 1147.171875,
-        "y": 321
+        "y": 311
       },
       "reference": {
         "bottom": 344,
         "height": 36,
-        "left": 1219.171875,
-        "right": 1372.171875,
+        "left": 252,
+        "right": 426.5,
         "top": 308,
-        "width": 153,
-        "x": 1219.171875,
+        "width": 174.5,
+        "x": 252,
         "y": 308
       },
       "delta": {
-        "left": -72.0,
-        "top": 13,
-        "right": -72.0,
-        "bottom": 13
+        "left": 0,
+        "top": 3,
+        "right": 0.5,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
+    },
+    {
+      "name": "name:保存した検索/保存した検索",
+      "implementation": {
+        "bottom": 345,
+        "height": 36,
+        "left": 1147.171875,
+        "right": 1300.171875,
+        "top": 309,
+        "width": 153,
+        "x": 1147.171875,
+        "y": 309
+      },
+      "reference": {
+        "bottom": 342,
+        "height": 36,
+        "left": 1147.171875,
+        "right": 1300.171875,
+        "top": 306,
+        "width": 153,
+        "x": 1147.171875,
+        "y": 306
+      },
+      "delta": {
+        "left": 0.0,
+        "top": 3,
+        "right": 0.0,
+        "bottom": 3
+      },
+      "over4px": false
     },
     {
       "name": "name:列 タグ/列 タグ",
       "implementation": {
-        "bottom": 411.75,
+        "bottom": 387.25,
         "height": 17,
         "left": 504,
-        "right": 878,
-        "top": 394.75,
-        "width": 374,
+        "right": 830,
+        "top": 370.25,
+        "width": 326,
         "x": 504,
-        "y": 394.75
+        "y": 370.25
       },
       "reference": {
-        "bottom": 398.75,
+        "bottom": 384.25,
         "height": 17,
-        "left": 528,
-        "right": 902,
-        "top": 381.75,
-        "width": 374,
-        "x": 528,
-        "y": 381.75
+        "left": 503,
+        "right": 829,
+        "top": 367.25,
+        "width": 326,
+        "x": 503,
+        "y": 367.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:列 フォルダ/列 フォルダ",
       "implementation": {
-        "bottom": 411.75,
+        "bottom": 387.25,
         "height": 17,
-        "left": 894,
-        "right": 964,
-        "top": 394.75,
+        "left": 846,
+        "right": 916,
+        "top": 370.25,
         "width": 70,
-        "x": 894,
-        "y": 394.75
+        "x": 846,
+        "y": 370.25
       },
       "reference": {
-        "bottom": 398.75,
+        "bottom": 384.25,
         "height": 17,
-        "left": 918,
-        "right": 988,
-        "top": 381.75,
+        "left": 845,
+        "right": 915,
+        "top": 367.25,
         "width": 70,
-        "x": 918,
-        "y": 381.75
+        "x": 845,
+        "y": 367.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:列 一覧に出す（星）/列 一覧に出す（星）",
       "implementation": {
-        "bottom": 410.25,
+        "bottom": 385.75,
         "height": 14,
         "left": 464,
         "right": 488,
-        "top": 396.25,
+        "top": 371.75,
         "width": 24,
         "x": 464,
-        "y": 396.25
+        "y": 371.75
       },
       "reference": {
-        "bottom": 397.25,
+        "bottom": 382.75,
         "height": 14,
-        "left": 488,
-        "right": 512,
-        "top": 383.25,
+        "left": 463,
+        "right": 487,
+        "top": 368.75,
         "width": 24,
-        "x": 488,
-        "y": 383.25
+        "x": 463,
+        "y": 368.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:列 人数/列 人数",
       "implementation": {
-        "bottom": 411.75,
+        "bottom": 387.25,
         "height": 17,
-        "left": 980,
-        "right": 1040,
-        "top": 394.75,
+        "left": 932,
+        "right": 992,
+        "top": 370.25,
         "width": 60,
-        "x": 980,
-        "y": 394.75
+        "x": 932,
+        "y": 370.25
       },
       "reference": {
-        "bottom": 398.75,
+        "bottom": 384.25,
         "height": 17,
-        "left": 1004,
-        "right": 1064,
-        "top": 381.75,
+        "left": 931,
+        "right": 991,
+        "top": 367.25,
         "width": 60,
-        "x": 1004,
-        "y": 381.75
+        "x": 931,
+        "y": 367.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:列 付け方/列 付け方",
       "implementation": {
-        "bottom": 411.75,
+        "bottom": 387.25,
         "height": 17,
-        "left": 1056,
-        "right": 1146,
-        "top": 394.75,
+        "left": 1008,
+        "right": 1098,
+        "top": 370.25,
         "width": 90,
-        "x": 1056,
-        "y": 394.75
+        "x": 1008,
+        "y": 370.25
       },
       "reference": {
-        "bottom": 398.75,
+        "bottom": 384.25,
         "height": 17,
-        "left": 1080,
-        "right": 1170,
-        "top": 381.75,
+        "left": 1007,
+        "right": 1097,
+        "top": 367.25,
         "width": 90,
-        "x": 1080,
-        "y": 381.75
+        "x": 1007,
+        "y": 367.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:列 使っている所/列 使っている所",
       "implementation": {
-        "bottom": 411.75,
+        "bottom": 387.25,
         "height": 17,
-        "left": 1288,
-        "right": 1408,
-        "top": 394.75,
+        "left": 1240,
+        "right": 1360,
+        "top": 370.25,
         "width": 120,
-        "x": 1288,
-        "y": 394.75
+        "x": 1240,
+        "y": 370.25
       },
       "reference": {
-        "bottom": 398.75,
+        "bottom": 384.25,
         "height": 17,
-        "left": 1312,
-        "right": 1432,
-        "top": 381.75,
+        "left": 1239,
+        "right": 1359,
+        "top": 367.25,
         "width": 120,
-        "x": 1312,
-        "y": 381.75
+        "x": 1239,
+        "y": 367.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:列 連動/列 連動",
       "implementation": {
-        "bottom": 411.75,
+        "bottom": 387.25,
         "height": 17,
-        "left": 1162,
-        "right": 1272,
-        "top": 394.75,
+        "left": 1114,
+        "right": 1224,
+        "top": 370.25,
         "width": 110,
-        "x": 1162,
-        "y": 394.75
+        "x": 1114,
+        "y": 370.25
       },
       "reference": {
-        "bottom": 398.75,
+        "bottom": 384.25,
         "height": 17,
-        "left": 1186,
-        "right": 1296,
-        "top": 381.75,
+        "left": 1113,
+        "right": 1223,
+        "top": 367.25,
         "width": 110,
-        "x": 1186,
-        "y": 381.75
+        "x": 1113,
+        "y": 367.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:区切り/区切り",
@@ -3039,24 +3042,24 @@
     {
       "name": "name:印/印",
       "implementation": {
-        "bottom": 958.75,
+        "bottom": 959.25,
         "height": 16,
         "left": 22,
         "right": 38,
-        "top": 942.75,
+        "top": 943.25,
         "width": 16,
         "x": 22,
-        "y": 942.75
+        "y": 943.25
       },
       "reference": {
-        "bottom": 958.75,
+        "bottom": 959.25,
         "height": 16,
         "left": 22,
         "right": 38,
-        "top": 942.75,
+        "top": 943.25,
         "width": 16,
         "x": 22,
-        "y": 942.75
+        "y": 943.25
       },
       "delta": {
         "left": 0,
@@ -3141,34 +3144,24 @@
       "reference": {
         "bottom": 42,
         "height": 24,
-        "left": 966,
-        "right": 990,
+        "left": 894,
+        "right": 918,
         "top": 18,
         "width": 24,
-        "x": 966,
+        "x": 894,
         "y": 18
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:印/印",
       "implementation": {
-        "bottom": 230,
-        "height": 24,
-        "left": 260,
-        "right": 284,
-        "top": 206,
-        "width": 24,
-        "x": 260,
-        "y": 206
-      },
-      "reference": {
         "bottom": 218,
         "height": 24,
         "left": 260,
@@ -3178,27 +3171,27 @@
         "x": 260,
         "y": 194
       },
+      "reference": {
+        "bottom": 217,
+        "height": 24,
+        "left": 260,
+        "right": 284,
+        "top": 193,
+        "width": 24,
+        "x": 260,
+        "y": 193
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:印/印",
       "implementation": {
-        "bottom": 230,
-        "height": 24,
-        "left": 557,
-        "right": 581,
-        "top": 206,
-        "width": 24,
-        "x": 557,
-        "y": 206
-      },
-      "reference": {
         "bottom": 218,
         "height": 24,
         "left": 557,
@@ -3208,27 +3201,27 @@
         "x": 557,
         "y": 194
       },
+      "reference": {
+        "bottom": 217,
+        "height": 24,
+        "left": 557,
+        "right": 581,
+        "top": 193,
+        "width": 24,
+        "x": 557,
+        "y": 193
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:印/印",
       "implementation": {
-        "bottom": 230,
-        "height": 24,
-        "left": 854,
-        "right": 878,
-        "top": 206,
-        "width": 24,
-        "x": 854,
-        "y": 206
-      },
-      "reference": {
         "bottom": 218,
         "height": 24,
         "left": 854,
@@ -3238,27 +3231,27 @@
         "x": 854,
         "y": 194
       },
+      "reference": {
+        "bottom": 217,
+        "height": 24,
+        "left": 854,
+        "right": 878,
+        "top": 193,
+        "width": 24,
+        "x": 854,
+        "y": 193
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:印/印",
       "implementation": {
-        "bottom": 230,
-        "height": 24,
-        "left": 1151,
-        "right": 1175,
-        "top": 206,
-        "width": 24,
-        "x": 1151,
-        "y": 206
-      },
-      "reference": {
         "bottom": 218,
         "height": 24,
         "left": 1151,
@@ -3268,13 +3261,23 @@
         "x": 1151,
         "y": 194
       },
+      "reference": {
+        "bottom": 217,
+        "height": 24,
+        "left": 1151,
+        "right": 1175,
+        "top": 193,
+        "width": 24,
+        "x": 1151,
+        "y": 193
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:名/名",
@@ -3309,182 +3312,182 @@
     {
       "name": "name:名/名",
       "implementation": {
-        "bottom": 478.75,
+        "bottom": 429.25,
         "height": 19,
         "left": 504,
         "right": 618.375,
-        "top": 459.75,
+        "top": 410.25,
         "width": 114.375,
         "x": 504,
-        "y": 459.75
+        "y": 410.25
       },
       "reference": {
-        "bottom": 465.75,
+        "bottom": 426.25,
         "height": 19,
-        "left": 528,
-        "right": 642.375,
-        "top": 446.75,
+        "left": 503,
+        "right": 617.375,
+        "top": 407.25,
         "width": 114.375,
-        "x": 528,
-        "y": 446.75
+        "x": 503,
+        "y": 407.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24.0,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1.0,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:名/名",
       "implementation": {
-        "bottom": 563.75,
+        "bottom": 489.25,
         "height": 19,
         "left": 504,
         "right": 657.078125,
-        "top": 544.75,
+        "top": 470.25,
         "width": 153.078125,
         "x": 504,
-        "y": 544.75
+        "y": 470.25
       },
       "reference": {
-        "bottom": 550.75,
+        "bottom": 486.25,
         "height": 19,
-        "left": 528,
-        "right": 681.078125,
-        "top": 531.75,
+        "left": 503,
+        "right": 656.078125,
+        "top": 467.25,
         "width": 153.078125,
-        "x": 528,
-        "y": 531.75
+        "x": 503,
+        "y": 467.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24.0,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1.0,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:名/名",
       "implementation": {
-        "bottom": 648.75,
+        "bottom": 549.25,
         "height": 19,
         "left": 504,
         "right": 577.1875,
-        "top": 629.75,
+        "top": 530.25,
         "width": 73.1875,
         "x": 504,
-        "y": 629.75
+        "y": 530.25
       },
       "reference": {
-        "bottom": 635.75,
+        "bottom": 546.25,
         "height": 19,
-        "left": 528,
-        "right": 601.1875,
-        "top": 616.75,
+        "left": 503,
+        "right": 576.1875,
+        "top": 527.25,
         "width": 73.1875,
-        "x": 528,
-        "y": 616.75
+        "x": 503,
+        "y": 527.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24.0,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1.0,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:名/名",
       "implementation": {
-        "bottom": 733.75,
+        "bottom": 609.25,
         "height": 19,
         "left": 504,
         "right": 628,
-        "top": 714.75,
+        "top": 590.25,
         "width": 124,
         "x": 504,
-        "y": 714.75
+        "y": 590.25
       },
       "reference": {
-        "bottom": 720.75,
+        "bottom": 606.25,
         "height": 19,
-        "left": 528,
-        "right": 652,
-        "top": 701.75,
+        "left": 503,
+        "right": 627,
+        "top": 587.25,
         "width": 124,
-        "x": 528,
-        "y": 701.75
+        "x": 503,
+        "y": 587.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:名/名",
       "implementation": {
-        "bottom": 818.75,
+        "bottom": 669.25,
         "height": 19,
         "left": 504,
         "right": 563,
-        "top": 799.75,
+        "top": 650.25,
         "width": 59,
         "x": 504,
-        "y": 799.75
+        "y": 650.25
       },
       "reference": {
-        "bottom": 805.75,
+        "bottom": 666.25,
         "height": 19,
-        "left": 528,
-        "right": 587,
-        "top": 786.75,
+        "left": 503,
+        "right": 562,
+        "top": 647.25,
         "width": 59,
-        "x": 528,
-        "y": 786.75
+        "x": 503,
+        "y": 647.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:名/名",
       "implementation": {
-        "bottom": 903.75,
+        "bottom": 729.25,
         "height": 19,
         "left": 504,
         "right": 641,
-        "top": 884.75,
+        "top": 710.25,
         "width": 137,
         "x": 504,
-        "y": 884.75
+        "y": 710.25
       },
       "reference": {
-        "bottom": 890.75,
+        "bottom": 726.25,
         "height": 19,
-        "left": 528,
-        "right": 665,
-        "top": 871.75,
+        "left": 503,
+        "right": 640,
+        "top": 707.25,
         "width": 137,
-        "x": 528,
-        "y": 871.75
+        "x": 503,
+        "y": 707.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:左メニュー/左メニュー",
@@ -3531,34 +3534,24 @@
       "reference": {
         "bottom": 26,
         "height": 18,
-        "left": 1190,
-        "right": 1208,
+        "left": 1118,
+        "right": 1136,
         "top": 8,
         "width": 18,
-        "x": 1190,
+        "x": 1118,
         "y": 8
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数/数",
       "implementation": {
-        "bottom": 264,
-        "height": 26,
-        "left": 260,
-        "right": 517,
-        "top": 238,
-        "width": 257,
-        "x": 260,
-        "y": 238
-      },
-      "reference": {
         "bottom": 252,
         "height": 26,
         "left": 260,
@@ -3568,27 +3561,27 @@
         "x": 260,
         "y": 226
       },
+      "reference": {
+        "bottom": 251,
+        "height": 26,
+        "left": 260,
+        "right": 517,
+        "top": 225,
+        "width": 257,
+        "x": 260,
+        "y": 225
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数/数",
       "implementation": {
-        "bottom": 264,
-        "height": 26,
-        "left": 557,
-        "right": 814,
-        "top": 238,
-        "width": 257,
-        "x": 557,
-        "y": 238
-      },
-      "reference": {
         "bottom": 252,
         "height": 26,
         "left": 557,
@@ -3598,27 +3591,27 @@
         "x": 557,
         "y": 226
       },
+      "reference": {
+        "bottom": 251,
+        "height": 26,
+        "left": 557,
+        "right": 814,
+        "top": 225,
+        "width": 257,
+        "x": 557,
+        "y": 225
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数/数",
       "implementation": {
-        "bottom": 264,
-        "height": 26,
-        "left": 854,
-        "right": 1111,
-        "top": 238,
-        "width": 257,
-        "x": 854,
-        "y": 238
-      },
-      "reference": {
         "bottom": 252,
         "height": 26,
         "left": 854,
@@ -3628,27 +3621,27 @@
         "x": 854,
         "y": 226
       },
+      "reference": {
+        "bottom": 251,
+        "height": 26,
+        "left": 854,
+        "right": 1111,
+        "top": 225,
+        "width": 257,
+        "x": 854,
+        "y": 225
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数/数",
       "implementation": {
-        "bottom": 264,
-        "height": 26,
-        "left": 1151,
-        "right": 1408,
-        "top": 238,
-        "width": 257,
-        "x": 1151,
-        "y": 238
-      },
-      "reference": {
         "bottom": 252,
         "height": 26,
         "left": 1151,
@@ -3658,27 +3651,27 @@
         "x": 1151,
         "y": 226
       },
+      "reference": {
+        "bottom": 251,
+        "height": 26,
+        "left": 1151,
+        "right": 1408,
+        "top": 225,
+        "width": 257,
+        "x": 1151,
+        "y": 225
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数 今月付けた回数/数 今月付けた回数",
       "implementation": {
-        "bottom": 306,
-        "height": 116,
-        "left": 834,
-        "right": 1131,
-        "top": 190,
-        "width": 297,
-        "x": 834,
-        "y": 190
-      },
-      "reference": {
         "bottom": 294,
         "height": 116,
         "left": 834,
@@ -3688,27 +3681,27 @@
         "x": 834,
         "y": 178
       },
+      "reference": {
+        "bottom": 293,
+        "height": 116,
+        "left": 834,
+        "right": 1131,
+        "top": 177,
+        "width": 297,
+        "x": 834,
+        "y": 177
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数 付けている友だち/数 付けている友だち",
       "implementation": {
-        "bottom": 306,
-        "height": 116,
-        "left": 537,
-        "right": 834,
-        "top": 190,
-        "width": 297,
-        "x": 537,
-        "y": 190
-      },
-      "reference": {
         "bottom": 294,
         "height": 116,
         "left": 537,
@@ -3718,27 +3711,27 @@
         "x": 537,
         "y": 178
       },
+      "reference": {
+        "bottom": 293,
+        "height": 116,
+        "left": 537,
+        "right": 834,
+        "top": 177,
+        "width": 297,
+        "x": 537,
+        "y": 177
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数 整理の候補/数 整理の候補",
       "implementation": {
-        "bottom": 306,
-        "height": 116,
-        "left": 1131,
-        "right": 1428,
-        "top": 190,
-        "width": 297,
-        "x": 1131,
-        "y": 190
-      },
-      "reference": {
         "bottom": 294,
         "height": 116,
         "left": 1131,
@@ -3748,27 +3741,27 @@
         "x": 1131,
         "y": 178
       },
+      "reference": {
+        "bottom": 293,
+        "height": 116,
+        "left": 1131,
+        "right": 1428,
+        "top": 177,
+        "width": 297,
+        "x": 1131,
+        "y": 177
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数 未使用/数 未使用",
       "implementation": {
-        "bottom": 306,
-        "height": 116,
-        "left": 240,
-        "right": 537,
-        "top": 190,
-        "width": 297,
-        "x": 240,
-        "y": 190
-      },
-      "reference": {
         "bottom": 294,
         "height": 116,
         "left": 240,
@@ -3778,27 +3771,27 @@
         "x": 240,
         "y": 178
       },
+      "reference": {
+        "bottom": 293,
+        "height": 116,
+        "left": 240,
+        "right": 537,
+        "top": 177,
+        "width": 297,
+        "x": 240,
+        "y": 177
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数の行/数の行",
       "implementation": {
-        "bottom": 264,
-        "height": 26,
-        "left": 260,
-        "right": 517,
-        "top": 238,
-        "width": 257,
-        "x": 260,
-        "y": 238
-      },
-      "reference": {
         "bottom": 252,
         "height": 26,
         "left": 260,
@@ -3808,27 +3801,27 @@
         "x": 260,
         "y": 226
       },
+      "reference": {
+        "bottom": 251,
+        "height": 26,
+        "left": 260,
+        "right": 517,
+        "top": 225,
+        "width": 257,
+        "x": 260,
+        "y": 225
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数の行/数の行",
       "implementation": {
-        "bottom": 264,
-        "height": 26,
-        "left": 557,
-        "right": 814,
-        "top": 238,
-        "width": 257,
-        "x": 557,
-        "y": 238
-      },
-      "reference": {
         "bottom": 252,
         "height": 26,
         "left": 557,
@@ -3838,27 +3831,27 @@
         "x": 557,
         "y": 226
       },
+      "reference": {
+        "bottom": 251,
+        "height": 26,
+        "left": 557,
+        "right": 814,
+        "top": 225,
+        "width": 257,
+        "x": 557,
+        "y": 225
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数の行/数の行",
       "implementation": {
-        "bottom": 264,
-        "height": 26,
-        "left": 854,
-        "right": 1111,
-        "top": 238,
-        "width": 257,
-        "x": 854,
-        "y": 238
-      },
-      "reference": {
         "bottom": 252,
         "height": 26,
         "left": 854,
@@ -3868,27 +3861,27 @@
         "x": 854,
         "y": 226
       },
+      "reference": {
+        "bottom": 251,
+        "height": 26,
+        "left": 854,
+        "right": 1111,
+        "top": 225,
+        "width": 257,
+        "x": 854,
+        "y": 225
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:数の行/数の行",
       "implementation": {
-        "bottom": 264,
-        "height": 26,
-        "left": 1151,
-        "right": 1408,
-        "top": 238,
-        "width": 257,
-        "x": 1151,
-        "y": 238
-      },
-      "reference": {
         "bottom": 252,
         "height": 26,
         "left": 1151,
@@ -3898,13 +3891,23 @@
         "x": 1151,
         "y": 226
       },
+      "reference": {
+        "bottom": 251,
+        "height": 26,
+        "left": 1151,
+        "right": 1408,
+        "top": 225,
+        "width": 257,
+        "x": 1151,
+        "y": 225
+      },
       "delta": {
         "left": 0,
-        "top": 12,
+        "top": 1,
         "right": 0,
-        "bottom": 12
+        "bottom": 1
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:文/文",
@@ -3921,20 +3924,20 @@
       "reference": {
         "bottom": 46,
         "height": 32,
-        "left": 998,
-        "right": 1126,
+        "left": 926,
+        "right": 1054,
         "top": 14,
         "width": 128,
-        "x": 998,
+        "x": 926,
         "y": 14
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:文/文",
@@ -3951,230 +3954,230 @@
       "reference": {
         "bottom": 46.5,
         "height": 33,
-        "left": 1254,
-        "right": 1358,
+        "left": 1182,
+        "right": 1286,
         "top": 13.5,
         "width": 104,
-        "x": 1254,
+        "x": 1182,
         "y": 13.5
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0.0,
-        "right": -72,
+        "right": 0,
         "bottom": 0.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:星/星",
       "implementation": {
-        "bottom": 410.25,
+        "bottom": 385.75,
         "height": 14,
         "left": 469,
         "right": 483,
-        "top": 396.25,
+        "top": 371.75,
         "width": 14,
         "x": 469,
-        "y": 396.25
+        "y": 371.75
       },
       "reference": {
-        "bottom": 397.25,
+        "bottom": 382.75,
         "height": 14,
-        "left": 493,
-        "right": 507,
-        "top": 383.25,
+        "left": 468,
+        "right": 482,
+        "top": 368.75,
         "width": 14,
-        "x": 493,
-        "y": 383.25
+        "x": 468,
+        "y": 368.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:星/星",
       "implementation": {
-        "bottom": 657.25,
+        "bottom": 557.75,
         "height": 18,
         "left": 467,
         "right": 485,
-        "top": 639.25,
+        "top": 539.75,
         "width": 18,
         "x": 467,
-        "y": 639.25
+        "y": 539.75
       },
       "reference": {
-        "bottom": 644.25,
+        "bottom": 554.75,
         "height": 18,
-        "left": 491,
-        "right": 509,
-        "top": 626.25,
+        "left": 466,
+        "right": 484,
+        "top": 536.75,
         "width": 18,
-        "x": 491,
-        "y": 626.25
+        "x": 466,
+        "y": 536.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:星/星",
       "implementation": {
-        "bottom": 742.25,
+        "bottom": 617.75,
         "height": 18,
         "left": 467,
         "right": 485,
-        "top": 724.25,
+        "top": 599.75,
         "width": 18,
         "x": 467,
-        "y": 724.25
+        "y": 599.75
       },
       "reference": {
-        "bottom": 729.25,
+        "bottom": 614.75,
         "height": 18,
-        "left": 491,
-        "right": 509,
-        "top": 711.25,
+        "left": 466,
+        "right": 484,
+        "top": 596.75,
         "width": 18,
-        "x": 491,
-        "y": 711.25
+        "x": 466,
+        "y": 596.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:星/星",
       "implementation": {
-        "bottom": 827.25,
+        "bottom": 677.75,
         "height": 18,
         "left": 467,
         "right": 485,
-        "top": 809.25,
+        "top": 659.75,
         "width": 18,
         "x": 467,
-        "y": 809.25
+        "y": 659.75
       },
       "reference": {
-        "bottom": 814.25,
+        "bottom": 674.75,
         "height": 18,
-        "left": 491,
-        "right": 509,
-        "top": 796.25,
+        "left": 466,
+        "right": 484,
+        "top": 656.75,
         "width": 18,
-        "x": 491,
-        "y": 796.25
+        "x": 466,
+        "y": 656.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:星/星",
       "implementation": {
-        "bottom": 912.25,
+        "bottom": 737.75,
         "height": 18,
         "left": 467,
         "right": 485,
-        "top": 894.25,
+        "top": 719.75,
         "width": 18,
         "x": 467,
-        "y": 894.25
+        "y": 719.75
       },
       "reference": {
-        "bottom": 899.25,
+        "bottom": 734.75,
         "height": 18,
-        "left": 491,
-        "right": 509,
-        "top": 881.25,
+        "left": 466,
+        "right": 484,
+        "top": 716.75,
         "width": 18,
-        "x": 491,
-        "y": 881.25
+        "x": 466,
+        "y": 716.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:星（黄色）/星（黄色）",
       "implementation": {
-        "bottom": 487.25,
+        "bottom": 437.75,
         "height": 18,
         "left": 467,
         "right": 485,
-        "top": 469.25,
+        "top": 419.75,
         "width": 18,
         "x": 467,
-        "y": 469.25
+        "y": 419.75
       },
       "reference": {
-        "bottom": 474.25,
+        "bottom": 434.75,
         "height": 18,
-        "left": 491,
-        "right": 509,
-        "top": 456.25,
+        "left": 466,
+        "right": 484,
+        "top": 416.75,
         "width": 18,
-        "x": 491,
-        "y": 456.25
+        "x": 466,
+        "y": 416.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:星（黄色）/星（黄色）",
       "implementation": {
-        "bottom": 572.25,
+        "bottom": 497.75,
         "height": 18,
         "left": 467,
         "right": 485,
-        "top": 554.25,
+        "top": 479.75,
         "width": 18,
         "x": 467,
-        "y": 554.25
+        "y": 479.75
       },
       "reference": {
-        "bottom": 559.25,
+        "bottom": 494.75,
         "height": 18,
-        "left": 491,
-        "right": 509,
-        "top": 541.25,
+        "left": 466,
+        "right": 484,
+        "top": 476.75,
         "width": 18,
-        "x": 491,
-        "y": 541.25
+        "x": 466,
+        "y": 476.75
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:未対応の数（赤い通知）/未対応の数（赤い通知）",
@@ -4209,1112 +4212,1112 @@
     {
       "name": "name:検索/検索",
       "implementation": {
-        "bottom": 357,
+        "bottom": 345,
         "height": 36,
         "left": 464,
         "right": 704,
-        "top": 321,
+        "top": 309,
         "width": 240,
         "x": 464,
-        "y": 321
+        "y": 309
       },
       "reference": {
-        "bottom": 344,
+        "bottom": 342,
         "height": 36,
-        "left": 488,
-        "right": 728,
-        "top": 308,
+        "left": 463,
+        "right": 703,
+        "top": 306,
         "width": 240,
-        "x": 488,
-        "y": 308
+        "x": 463,
+        "y": 306
       },
       "delta": {
-        "left": -24,
-        "top": 13,
-        "right": -24,
-        "bottom": 13
+        "left": 1,
+        "top": 3,
+        "right": 1,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 496.75,
+        "bottom": 447.25,
         "height": 37,
         "left": 504,
-        "right": 878,
-        "top": 459.75,
-        "width": 374,
+        "right": 830,
+        "top": 410.25,
+        "width": 326,
         "x": 504,
-        "y": 459.75
+        "y": 410.25
       },
       "reference": {
-        "bottom": 483.75,
+        "bottom": 444.25,
         "height": 37,
-        "left": 528,
-        "right": 902,
-        "top": 446.75,
-        "width": 374,
-        "x": 528,
-        "y": 446.75
+        "left": 503,
+        "right": 829,
+        "top": 407.25,
+        "width": 326,
+        "x": 503,
+        "y": 407.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 485.75,
+        "bottom": 436.25,
         "height": 15,
-        "left": 894,
-        "right": 964,
-        "top": 470.75,
+        "left": 846,
+        "right": 916,
+        "top": 421.25,
         "width": 70,
-        "x": 894,
-        "y": 470.75
+        "x": 846,
+        "y": 421.25
       },
       "reference": {
-        "bottom": 472.75,
+        "bottom": 433.25,
         "height": 15,
-        "left": 918,
-        "right": 988,
-        "top": 457.75,
+        "left": 845,
+        "right": 915,
+        "top": 418.25,
         "width": 70,
-        "x": 918,
-        "y": 457.75
+        "x": 845,
+        "y": 418.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 486.75,
+        "bottom": 437.25,
         "height": 17,
-        "left": 980,
-        "right": 1040,
-        "top": 469.75,
+        "left": 932,
+        "right": 992,
+        "top": 420.25,
         "width": 60,
-        "x": 980,
-        "y": 469.75
+        "x": 932,
+        "y": 420.25
       },
       "reference": {
-        "bottom": 473.75,
+        "bottom": 434.25,
         "height": 17,
-        "left": 1004,
-        "right": 1064,
-        "top": 456.75,
+        "left": 931,
+        "right": 991,
+        "top": 417.25,
         "width": 60,
-        "x": 1004,
-        "y": 456.75
+        "x": 931,
+        "y": 417.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 486.75,
+        "bottom": 437.25,
         "height": 17,
-        "left": 1056,
-        "right": 1146,
-        "top": 469.75,
+        "left": 1008,
+        "right": 1098,
+        "top": 420.25,
         "width": 90,
-        "x": 1056,
-        "y": 469.75
+        "x": 1008,
+        "y": 420.25
       },
       "reference": {
-        "bottom": 473.75,
+        "bottom": 434.25,
         "height": 17,
-        "left": 1080,
-        "right": 1170,
-        "top": 456.75,
+        "left": 1007,
+        "right": 1097,
+        "top": 417.25,
         "width": 90,
-        "x": 1080,
-        "y": 456.75
+        "x": 1007,
+        "y": 417.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 486.75,
+        "bottom": 437.25,
         "height": 17,
-        "left": 1162,
-        "right": 1272,
-        "top": 469.75,
+        "left": 1114,
+        "right": 1224,
+        "top": 420.25,
         "width": 110,
-        "x": 1162,
-        "y": 469.75
+        "x": 1114,
+        "y": 420.25
       },
       "reference": {
-        "bottom": 473.75,
+        "bottom": 434.25,
         "height": 17,
-        "left": 1186,
-        "right": 1296,
-        "top": 456.75,
+        "left": 1113,
+        "right": 1223,
+        "top": 417.25,
         "width": 110,
-        "x": 1186,
-        "y": 456.75
+        "x": 1113,
+        "y": 417.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 486.75,
+        "bottom": 437.25,
         "height": 17,
-        "left": 1288,
-        "right": 1408,
-        "top": 469.75,
+        "left": 1240,
+        "right": 1360,
+        "top": 420.25,
         "width": 120,
-        "x": 1288,
-        "y": 469.75
+        "x": 1240,
+        "y": 420.25
       },
       "reference": {
-        "bottom": 473.75,
+        "bottom": 434.25,
         "height": 17,
-        "left": 1312,
-        "right": 1432,
-        "top": 456.75,
+        "left": 1239,
+        "right": 1359,
+        "top": 417.25,
         "width": 120,
-        "x": 1312,
-        "y": 456.75
+        "x": 1239,
+        "y": 417.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 581.75,
+        "bottom": 507.25,
         "height": 37,
         "left": 504,
-        "right": 878,
-        "top": 544.75,
-        "width": 374,
+        "right": 830,
+        "top": 470.25,
+        "width": 326,
         "x": 504,
-        "y": 544.75
+        "y": 470.25
       },
       "reference": {
-        "bottom": 568.75,
+        "bottom": 504.25,
         "height": 37,
-        "left": 528,
-        "right": 902,
-        "top": 531.75,
-        "width": 374,
-        "x": 528,
-        "y": 531.75
+        "left": 503,
+        "right": 829,
+        "top": 467.25,
+        "width": 326,
+        "x": 503,
+        "y": 467.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 571.75,
+        "bottom": 497.25,
         "height": 17,
-        "left": 894,
-        "right": 964,
-        "top": 554.75,
+        "left": 846,
+        "right": 916,
+        "top": 480.25,
         "width": 70,
-        "x": 894,
-        "y": 554.75
+        "x": 846,
+        "y": 480.25
       },
       "reference": {
-        "bottom": 558.75,
+        "bottom": 494.25,
         "height": 17,
-        "left": 918,
-        "right": 988,
-        "top": 541.75,
+        "left": 845,
+        "right": 915,
+        "top": 477.25,
         "width": 70,
-        "x": 918,
-        "y": 541.75
+        "x": 845,
+        "y": 477.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 571.75,
+        "bottom": 497.25,
         "height": 17,
-        "left": 980,
-        "right": 1040,
-        "top": 554.75,
+        "left": 932,
+        "right": 992,
+        "top": 480.25,
         "width": 60,
-        "x": 980,
-        "y": 554.75
+        "x": 932,
+        "y": 480.25
       },
       "reference": {
-        "bottom": 558.75,
+        "bottom": 494.25,
         "height": 17,
-        "left": 1004,
-        "right": 1064,
-        "top": 541.75,
+        "left": 931,
+        "right": 991,
+        "top": 477.25,
         "width": 60,
-        "x": 1004,
-        "y": 541.75
+        "x": 931,
+        "y": 477.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 571.75,
+        "bottom": 497.25,
         "height": 17,
-        "left": 1056,
-        "right": 1146,
-        "top": 554.75,
+        "left": 1008,
+        "right": 1098,
+        "top": 480.25,
         "width": 90,
-        "x": 1056,
-        "y": 554.75
+        "x": 1008,
+        "y": 480.25
       },
       "reference": {
-        "bottom": 558.75,
+        "bottom": 494.25,
         "height": 17,
-        "left": 1080,
-        "right": 1170,
-        "top": 541.75,
+        "left": 1007,
+        "right": 1097,
+        "top": 477.25,
         "width": 90,
-        "x": 1080,
-        "y": 541.75
+        "x": 1007,
+        "y": 477.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 570.75,
+        "bottom": 496.25,
         "height": 15,
-        "left": 1162,
-        "right": 1272,
-        "top": 555.75,
+        "left": 1114,
+        "right": 1224,
+        "top": 481.25,
         "width": 110,
-        "x": 1162,
-        "y": 555.75
+        "x": 1114,
+        "y": 481.25
       },
       "reference": {
-        "bottom": 557.75,
+        "bottom": 493.25,
         "height": 15,
-        "left": 1186,
-        "right": 1296,
-        "top": 542.75,
+        "left": 1113,
+        "right": 1223,
+        "top": 478.25,
         "width": 110,
-        "x": 1186,
-        "y": 542.75
+        "x": 1113,
+        "y": 478.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 571.75,
+        "bottom": 497.25,
         "height": 17,
-        "left": 1288,
-        "right": 1408,
-        "top": 554.75,
+        "left": 1240,
+        "right": 1360,
+        "top": 480.25,
         "width": 120,
-        "x": 1288,
-        "y": 554.75
+        "x": 1240,
+        "y": 480.25
       },
       "reference": {
-        "bottom": 558.75,
+        "bottom": 494.25,
         "height": 17,
-        "left": 1312,
-        "right": 1432,
-        "top": 541.75,
+        "left": 1239,
+        "right": 1359,
+        "top": 477.25,
         "width": 120,
-        "x": 1312,
-        "y": 541.75
+        "x": 1239,
+        "y": 477.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 666.75,
+        "bottom": 567.25,
         "height": 37,
         "left": 504,
-        "right": 878,
-        "top": 629.75,
-        "width": 374,
+        "right": 830,
+        "top": 530.25,
+        "width": 326,
         "x": 504,
-        "y": 629.75
+        "y": 530.25
       },
       "reference": {
-        "bottom": 653.75,
+        "bottom": 564.25,
         "height": 37,
-        "left": 528,
-        "right": 902,
-        "top": 616.75,
-        "width": 374,
-        "x": 528,
-        "y": 616.75
+        "left": 503,
+        "right": 829,
+        "top": 527.25,
+        "width": 326,
+        "x": 503,
+        "y": 527.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 656.75,
+        "bottom": 557.25,
         "height": 17,
-        "left": 894,
-        "right": 964,
-        "top": 639.75,
+        "left": 846,
+        "right": 916,
+        "top": 540.25,
         "width": 70,
-        "x": 894,
-        "y": 639.75
+        "x": 846,
+        "y": 540.25
       },
       "reference": {
-        "bottom": 643.75,
+        "bottom": 554.25,
         "height": 17,
-        "left": 918,
-        "right": 988,
-        "top": 626.75,
+        "left": 845,
+        "right": 915,
+        "top": 537.25,
         "width": 70,
-        "x": 918,
-        "y": 626.75
+        "x": 845,
+        "y": 537.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 656.75,
+        "bottom": 557.25,
         "height": 17,
-        "left": 980,
-        "right": 1040,
-        "top": 639.75,
+        "left": 932,
+        "right": 992,
+        "top": 540.25,
         "width": 60,
-        "x": 980,
-        "y": 639.75
+        "x": 932,
+        "y": 540.25
       },
       "reference": {
-        "bottom": 643.75,
+        "bottom": 554.25,
         "height": 17,
-        "left": 1004,
-        "right": 1064,
-        "top": 626.75,
+        "left": 931,
+        "right": 991,
+        "top": 537.25,
         "width": 60,
-        "x": 1004,
-        "y": 626.75
+        "x": 931,
+        "y": 537.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 656.75,
+        "bottom": 557.25,
         "height": 17,
-        "left": 1056,
-        "right": 1146,
-        "top": 639.75,
+        "left": 1008,
+        "right": 1098,
+        "top": 540.25,
         "width": 90,
-        "x": 1056,
-        "y": 639.75
+        "x": 1008,
+        "y": 540.25
       },
       "reference": {
-        "bottom": 643.75,
+        "bottom": 554.25,
         "height": 17,
-        "left": 1080,
-        "right": 1170,
-        "top": 626.75,
+        "left": 1007,
+        "right": 1097,
+        "top": 537.25,
         "width": 90,
-        "x": 1080,
-        "y": 626.75
+        "x": 1007,
+        "y": 537.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 656.75,
+        "bottom": 557.25,
         "height": 17,
-        "left": 1162,
-        "right": 1272,
-        "top": 639.75,
+        "left": 1114,
+        "right": 1224,
+        "top": 540.25,
         "width": 110,
-        "x": 1162,
-        "y": 639.75
+        "x": 1114,
+        "y": 540.25
       },
       "reference": {
-        "bottom": 643.75,
+        "bottom": 554.25,
         "height": 17,
-        "left": 1186,
-        "right": 1296,
-        "top": 626.75,
+        "left": 1113,
+        "right": 1223,
+        "top": 537.25,
         "width": 110,
-        "x": 1186,
-        "y": 626.75
+        "x": 1113,
+        "y": 537.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 656.75,
+        "bottom": 557.25,
         "height": 17,
-        "left": 1288,
-        "right": 1408,
-        "top": 639.75,
+        "left": 1240,
+        "right": 1360,
+        "top": 540.25,
         "width": 120,
-        "x": 1288,
-        "y": 639.75
+        "x": 1240,
+        "y": 540.25
       },
       "reference": {
-        "bottom": 643.75,
+        "bottom": 554.25,
         "height": 17,
-        "left": 1312,
-        "right": 1432,
-        "top": 626.75,
+        "left": 1239,
+        "right": 1359,
+        "top": 537.25,
         "width": 120,
-        "x": 1312,
-        "y": 626.75
+        "x": 1239,
+        "y": 537.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 751.75,
+        "bottom": 627.25,
         "height": 37,
         "left": 504,
-        "right": 878,
-        "top": 714.75,
-        "width": 374,
+        "right": 830,
+        "top": 590.25,
+        "width": 326,
         "x": 504,
-        "y": 714.75
+        "y": 590.25
       },
       "reference": {
-        "bottom": 738.75,
+        "bottom": 624.25,
         "height": 37,
-        "left": 528,
-        "right": 902,
-        "top": 701.75,
-        "width": 374,
-        "x": 528,
-        "y": 701.75
+        "left": 503,
+        "right": 829,
+        "top": 587.25,
+        "width": 326,
+        "x": 503,
+        "y": 587.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 740.75,
+        "bottom": 616.25,
         "height": 15,
-        "left": 894,
-        "right": 964,
-        "top": 725.75,
+        "left": 846,
+        "right": 916,
+        "top": 601.25,
         "width": 70,
-        "x": 894,
-        "y": 725.75
+        "x": 846,
+        "y": 601.25
       },
       "reference": {
-        "bottom": 727.75,
+        "bottom": 613.25,
         "height": 15,
-        "left": 918,
-        "right": 988,
-        "top": 712.75,
+        "left": 845,
+        "right": 915,
+        "top": 598.25,
         "width": 70,
-        "x": 918,
-        "y": 712.75
+        "x": 845,
+        "y": 598.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 741.75,
+        "bottom": 617.25,
         "height": 17,
-        "left": 980,
-        "right": 1040,
-        "top": 724.75,
+        "left": 932,
+        "right": 992,
+        "top": 600.25,
         "width": 60,
-        "x": 980,
-        "y": 724.75
+        "x": 932,
+        "y": 600.25
       },
       "reference": {
-        "bottom": 728.75,
+        "bottom": 614.25,
         "height": 17,
-        "left": 1004,
-        "right": 1064,
-        "top": 711.75,
+        "left": 931,
+        "right": 991,
+        "top": 597.25,
         "width": 60,
-        "x": 1004,
-        "y": 711.75
+        "x": 931,
+        "y": 597.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 741.75,
+        "bottom": 617.25,
         "height": 17,
-        "left": 1056,
-        "right": 1146,
-        "top": 724.75,
+        "left": 1008,
+        "right": 1098,
+        "top": 600.25,
         "width": 90,
-        "x": 1056,
-        "y": 724.75
+        "x": 1008,
+        "y": 600.25
       },
       "reference": {
-        "bottom": 728.75,
+        "bottom": 614.25,
         "height": 17,
-        "left": 1080,
-        "right": 1170,
-        "top": 711.75,
+        "left": 1007,
+        "right": 1097,
+        "top": 597.25,
         "width": 90,
-        "x": 1080,
-        "y": 711.75
+        "x": 1007,
+        "y": 597.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 741.75,
+        "bottom": 617.25,
         "height": 17,
-        "left": 1162,
-        "right": 1272,
-        "top": 724.75,
+        "left": 1114,
+        "right": 1224,
+        "top": 600.25,
         "width": 110,
-        "x": 1162,
-        "y": 724.75
+        "x": 1114,
+        "y": 600.25
       },
       "reference": {
-        "bottom": 728.75,
+        "bottom": 614.25,
         "height": 17,
-        "left": 1186,
-        "right": 1296,
-        "top": 711.75,
+        "left": 1113,
+        "right": 1223,
+        "top": 597.25,
         "width": 110,
-        "x": 1186,
-        "y": 711.75
+        "x": 1113,
+        "y": 597.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 741.75,
+        "bottom": 617.25,
         "height": 17,
-        "left": 1288,
-        "right": 1408,
-        "top": 724.75,
+        "left": 1240,
+        "right": 1360,
+        "top": 600.25,
         "width": 120,
-        "x": 1288,
-        "y": 724.75
+        "x": 1240,
+        "y": 600.25
       },
       "reference": {
-        "bottom": 728.75,
+        "bottom": 614.25,
         "height": 17,
-        "left": 1312,
-        "right": 1432,
-        "top": 711.75,
+        "left": 1239,
+        "right": 1359,
+        "top": 597.25,
         "width": 120,
-        "x": 1312,
-        "y": 711.75
+        "x": 1239,
+        "y": 597.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 836.75,
+        "bottom": 687.25,
         "height": 37,
         "left": 504,
-        "right": 878,
-        "top": 799.75,
-        "width": 374,
+        "right": 830,
+        "top": 650.25,
+        "width": 326,
         "x": 504,
-        "y": 799.75
+        "y": 650.25
       },
       "reference": {
-        "bottom": 823.75,
+        "bottom": 684.25,
         "height": 37,
-        "left": 528,
-        "right": 902,
-        "top": 786.75,
-        "width": 374,
-        "x": 528,
-        "y": 786.75
+        "left": 503,
+        "right": 829,
+        "top": 647.25,
+        "width": 326,
+        "x": 503,
+        "y": 647.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 826.75,
+        "bottom": 677.25,
         "height": 17,
-        "left": 894,
-        "right": 964,
-        "top": 809.75,
+        "left": 846,
+        "right": 916,
+        "top": 660.25,
         "width": 70,
-        "x": 894,
-        "y": 809.75
+        "x": 846,
+        "y": 660.25
       },
       "reference": {
-        "bottom": 813.75,
+        "bottom": 674.25,
         "height": 17,
-        "left": 918,
-        "right": 988,
-        "top": 796.75,
+        "left": 845,
+        "right": 915,
+        "top": 657.25,
         "width": 70,
-        "x": 918,
-        "y": 796.75
+        "x": 845,
+        "y": 657.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 826.75,
+        "bottom": 677.25,
         "height": 17,
-        "left": 980,
-        "right": 1040,
-        "top": 809.75,
+        "left": 932,
+        "right": 992,
+        "top": 660.25,
         "width": 60,
-        "x": 980,
-        "y": 809.75
+        "x": 932,
+        "y": 660.25
       },
       "reference": {
-        "bottom": 813.75,
+        "bottom": 674.25,
         "height": 17,
-        "left": 1004,
-        "right": 1064,
-        "top": 796.75,
+        "left": 931,
+        "right": 991,
+        "top": 657.25,
         "width": 60,
-        "x": 1004,
-        "y": 796.75
+        "x": 931,
+        "y": 657.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 826.75,
+        "bottom": 677.25,
         "height": 17,
-        "left": 1056,
-        "right": 1146,
-        "top": 809.75,
+        "left": 1008,
+        "right": 1098,
+        "top": 660.25,
         "width": 90,
-        "x": 1056,
-        "y": 809.75
+        "x": 1008,
+        "y": 660.25
       },
       "reference": {
-        "bottom": 813.75,
+        "bottom": 674.25,
         "height": 17,
-        "left": 1080,
-        "right": 1170,
-        "top": 796.75,
+        "left": 1007,
+        "right": 1097,
+        "top": 657.25,
         "width": 90,
-        "x": 1080,
-        "y": 796.75
+        "x": 1007,
+        "y": 657.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 825.75,
+        "bottom": 676.25,
         "height": 15,
-        "left": 1162,
-        "right": 1272,
-        "top": 810.75,
+        "left": 1114,
+        "right": 1224,
+        "top": 661.25,
         "width": 110,
-        "x": 1162,
-        "y": 810.75
+        "x": 1114,
+        "y": 661.25
       },
       "reference": {
-        "bottom": 812.75,
+        "bottom": 673.25,
         "height": 15,
-        "left": 1186,
-        "right": 1296,
-        "top": 797.75,
+        "left": 1113,
+        "right": 1223,
+        "top": 658.25,
         "width": 110,
-        "x": 1186,
-        "y": 797.75
+        "x": 1113,
+        "y": 658.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 826.75,
+        "bottom": 677.25,
         "height": 17,
-        "left": 1288,
-        "right": 1408,
-        "top": 809.75,
+        "left": 1240,
+        "right": 1360,
+        "top": 660.25,
         "width": 120,
-        "x": 1288,
-        "y": 809.75
+        "x": 1240,
+        "y": 660.25
       },
       "reference": {
-        "bottom": 813.75,
+        "bottom": 674.25,
         "height": 17,
-        "left": 1312,
-        "right": 1432,
-        "top": 796.75,
+        "left": 1239,
+        "right": 1359,
+        "top": 657.25,
         "width": 120,
-        "x": 1312,
-        "y": 796.75
+        "x": 1239,
+        "y": 657.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 921.75,
+        "bottom": 747.25,
         "height": 37,
         "left": 504,
-        "right": 878,
-        "top": 884.75,
-        "width": 374,
+        "right": 830,
+        "top": 710.25,
+        "width": 326,
         "x": 504,
-        "y": 884.75
+        "y": 710.25
       },
       "reference": {
-        "bottom": 908.75,
+        "bottom": 744.25,
         "height": 37,
-        "left": 528,
-        "right": 902,
-        "top": 871.75,
-        "width": 374,
-        "x": 528,
-        "y": 871.75
+        "left": 503,
+        "right": 829,
+        "top": 707.25,
+        "width": 326,
+        "x": 503,
+        "y": 707.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 910.75,
+        "bottom": 736.25,
         "height": 15,
-        "left": 894,
-        "right": 964,
-        "top": 895.75,
+        "left": 846,
+        "right": 916,
+        "top": 721.25,
         "width": 70,
-        "x": 894,
-        "y": 895.75
+        "x": 846,
+        "y": 721.25
       },
       "reference": {
-        "bottom": 897.75,
+        "bottom": 733.25,
         "height": 15,
-        "left": 918,
-        "right": 988,
-        "top": 882.75,
+        "left": 845,
+        "right": 915,
+        "top": 718.25,
         "width": 70,
-        "x": 918,
-        "y": 882.75
+        "x": 845,
+        "y": 718.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 911.75,
+        "bottom": 737.25,
         "height": 17,
-        "left": 980,
-        "right": 1040,
-        "top": 894.75,
+        "left": 932,
+        "right": 992,
+        "top": 720.25,
         "width": 60,
-        "x": 980,
-        "y": 894.75
+        "x": 932,
+        "y": 720.25
       },
       "reference": {
-        "bottom": 898.75,
+        "bottom": 734.25,
         "height": 17,
-        "left": 1004,
-        "right": 1064,
-        "top": 881.75,
+        "left": 931,
+        "right": 991,
+        "top": 717.25,
         "width": 60,
-        "x": 1004,
-        "y": 881.75
+        "x": 931,
+        "y": 717.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 911.75,
+        "bottom": 737.25,
         "height": 17,
-        "left": 1056,
-        "right": 1146,
-        "top": 894.75,
+        "left": 1008,
+        "right": 1098,
+        "top": 720.25,
         "width": 90,
-        "x": 1056,
-        "y": 894.75
+        "x": 1008,
+        "y": 720.25
       },
       "reference": {
-        "bottom": 898.75,
+        "bottom": 734.25,
         "height": 17,
-        "left": 1080,
-        "right": 1170,
-        "top": 881.75,
+        "left": 1007,
+        "right": 1097,
+        "top": 717.25,
         "width": 90,
-        "x": 1080,
-        "y": 881.75
+        "x": 1007,
+        "y": 717.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 911.75,
+        "bottom": 737.25,
         "height": 17,
-        "left": 1162,
-        "right": 1272,
-        "top": 894.75,
+        "left": 1114,
+        "right": 1224,
+        "top": 720.25,
         "width": 110,
-        "x": 1162,
-        "y": 894.75
+        "x": 1114,
+        "y": 720.25
       },
       "reference": {
-        "bottom": 898.75,
+        "bottom": 734.25,
         "height": 17,
-        "left": 1186,
-        "right": 1296,
-        "top": 881.75,
+        "left": 1113,
+        "right": 1223,
+        "top": 717.25,
         "width": 110,
-        "x": 1186,
-        "y": 881.75
+        "x": 1113,
+        "y": 717.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:欄/欄",
       "implementation": {
-        "bottom": 911.75,
+        "bottom": 737.25,
         "height": 17,
-        "left": 1288,
-        "right": 1408,
-        "top": 894.75,
+        "left": 1240,
+        "right": 1360,
+        "top": 720.25,
         "width": 120,
-        "x": 1288,
-        "y": 894.75
+        "x": 1240,
+        "y": 720.25
       },
       "reference": {
-        "bottom": 898.75,
+        "bottom": 734.25,
         "height": 17,
-        "left": 1312,
-        "right": 1432,
-        "top": 881.75,
+        "left": 1239,
+        "right": 1359,
+        "top": 717.25,
         "width": 120,
-        "x": 1312,
-        "y": 881.75
+        "x": 1239,
+        "y": 717.25
       },
       "delta": {
-        "left": -24,
-        "top": 13.0,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3.0,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:組 コンテンツ/組 コンテンツ",
@@ -5571,260 +5574,260 @@
       "reference": {
         "bottom": 48,
         "height": 36,
-        "left": 1214,
-        "right": 1368,
+        "left": 1142,
+        "right": 1296,
         "top": 12,
         "width": 154,
-        "x": 1214,
+        "x": 1142,
         "y": 12
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:虫めがね/虫めがね",
       "implementation": {
-        "bottom": 346,
+        "bottom": 334,
         "height": 14,
         "left": 476,
         "right": 490,
-        "top": 332,
+        "top": 320,
         "width": 14,
         "x": 476,
-        "y": 332
+        "y": 320
       },
       "reference": {
-        "bottom": 333,
+        "bottom": 331,
         "height": 14,
-        "left": 500,
-        "right": 514,
-        "top": 319,
+        "left": 475,
+        "right": 489,
+        "top": 317,
         "width": 14,
-        "x": 500,
-        "y": 319
+        "x": 475,
+        "y": 317
       },
       "delta": {
-        "left": -24,
-        "top": 13,
-        "right": -24,
-        "bottom": 13
+        "left": 1,
+        "top": 3,
+        "right": 1,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:行 EC顧客連携済み/行 EC顧客連携済み",
       "implementation": {
-        "bottom": 521.5,
-        "height": 85.5,
+        "bottom": 459.5,
+        "height": 60.5,
         "left": 440,
-        "right": 1476,
-        "top": 436,
-        "width": 1036,
+        "right": 1428,
+        "top": 399,
+        "width": 988,
         "x": 440,
-        "y": 436
+        "y": 399
       },
       "reference": {
-        "bottom": 508.5,
-        "height": 85.5,
-        "left": 464,
-        "right": 1500,
-        "top": 423,
-        "width": 1036,
-        "x": 464,
-        "y": 423
+        "bottom": 456.5,
+        "height": 60.5,
+        "left": 439,
+        "right": 1427,
+        "top": 396,
+        "width": 988,
+        "x": 439,
+        "y": 396
       },
       "delta": {
-        "left": -24,
-        "top": 13,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:行 LINEログイン連携済み/行 LINEログイン連携済み",
       "implementation": {
-        "bottom": 606.5,
-        "height": 85.5,
+        "bottom": 519.5,
+        "height": 60.5,
         "left": 440,
-        "right": 1476,
-        "top": 521,
-        "width": 1036,
+        "right": 1428,
+        "top": 459,
+        "width": 988,
         "x": 440,
-        "y": 521
+        "y": 459
       },
       "reference": {
-        "bottom": 593.5,
-        "height": 85.5,
-        "left": 464,
-        "right": 1500,
-        "top": 508,
-        "width": 1036,
-        "x": 464,
-        "y": 508
+        "bottom": 516.5,
+        "height": 60.5,
+        "left": 439,
+        "right": 1427,
+        "top": 456,
+        "width": 988,
+        "x": 439,
+        "y": 456
       },
       "delta": {
-        "left": -24,
-        "top": 13,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:行 NEN会員/行 NEN会員",
       "implementation": {
-        "bottom": 691.5,
-        "height": 85.5,
+        "bottom": 579.5,
+        "height": 60.5,
         "left": 440,
-        "right": 1476,
-        "top": 606,
-        "width": 1036,
+        "right": 1428,
+        "top": 519,
+        "width": 988,
         "x": 440,
-        "y": 606
+        "y": 519
       },
       "reference": {
-        "bottom": 678.5,
-        "height": 85.5,
-        "left": 464,
-        "right": 1500,
-        "top": 593,
-        "width": 1036,
-        "x": 464,
-        "y": 593
+        "bottom": 576.5,
+        "height": 60.5,
+        "left": 439,
+        "right": 1427,
+        "top": 516,
+        "width": 988,
+        "x": 439,
+        "y": 516
       },
       "delta": {
-        "left": -24,
-        "top": 13,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:行 商品到着確認対象/行 商品到着確認対象",
       "implementation": {
-        "bottom": 776.5,
-        "height": 85.5,
+        "bottom": 639.5,
+        "height": 60.5,
         "left": 440,
-        "right": 1476,
-        "top": 691,
-        "width": 1036,
+        "right": 1428,
+        "top": 579,
+        "width": 988,
         "x": 440,
-        "y": 691
+        "y": 579
       },
       "reference": {
-        "bottom": 763.5,
-        "height": 85.5,
-        "left": 464,
-        "right": 1500,
-        "top": 678,
-        "width": 1036,
-        "x": 464,
-        "y": 678
+        "bottom": 636.5,
+        "height": 60.5,
+        "left": 439,
+        "right": 1427,
+        "top": 576,
+        "width": 988,
+        "x": 439,
+        "y": 576
       },
       "delta": {
-        "left": -24,
-        "top": 13,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:行 未契約/行 未契約",
       "implementation": {
-        "bottom": 861.5,
-        "height": 85.5,
+        "bottom": 699.5,
+        "height": 60.5,
         "left": 440,
-        "right": 1476,
-        "top": 776,
-        "width": 1036,
+        "right": 1428,
+        "top": 639,
+        "width": 988,
         "x": 440,
-        "y": 776
+        "y": 639
       },
       "reference": {
-        "bottom": 848.5,
-        "height": 85.5,
-        "left": 464,
-        "right": 1500,
-        "top": 763,
-        "width": 1036,
-        "x": 464,
-        "y": 763
+        "bottom": 696.5,
+        "height": 60.5,
+        "left": 439,
+        "right": 1427,
+        "top": 636,
+        "width": 988,
+        "x": 439,
+        "y": 636
       },
       "delta": {
-        "left": -24,
-        "top": 13,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:行 誕生日クーポン対象/行 誕生日クーポン対象",
       "implementation": {
-        "bottom": 946.5,
-        "height": 85.5,
+        "bottom": 759.5,
+        "height": 60.5,
         "left": 440,
-        "right": 1476,
-        "top": 861,
-        "width": 1036,
+        "right": 1428,
+        "top": 699,
+        "width": 988,
         "x": 440,
-        "y": 861
+        "y": 699
       },
       "reference": {
-        "bottom": 933.5,
-        "height": 85.5,
-        "left": 464,
-        "right": 1500,
-        "top": 848,
-        "width": 1036,
-        "x": 464,
-        "y": 848
+        "bottom": 756.5,
+        "height": 60.5,
+        "left": 439,
+        "right": 1427,
+        "top": 696,
+        "width": 988,
+        "x": 439,
+        "y": 696
       },
       "delta": {
-        "left": -24,
-        "top": 13,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:表の見出し/表の見出し",
       "implementation": {
-        "bottom": 436.5,
-        "height": 65.5,
+        "bottom": 399.5,
+        "height": 40.5,
         "left": 440,
-        "right": 1476,
-        "top": 371,
-        "width": 1036,
+        "right": 1428,
+        "top": 359,
+        "width": 988,
         "x": 440,
-        "y": 371
+        "y": 359
       },
       "reference": {
-        "bottom": 423.5,
-        "height": 65.5,
-        "left": 464,
-        "right": 1500,
-        "top": 358,
-        "width": 1036,
-        "x": 464,
-        "y": 358
+        "bottom": 396.5,
+        "height": 40.5,
+        "left": 439,
+        "right": 1427,
+        "top": 356,
+        "width": 988,
+        "x": 439,
+        "y": 356
       },
       "delta": {
-        "left": -24,
-        "top": 13,
-        "right": -24,
-        "bottom": 13.0
+        "left": 1,
+        "top": 3,
+        "right": 1,
+        "bottom": 3.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:見出し/見出し",
@@ -5961,20 +5964,20 @@
       "reference": {
         "bottom": 48,
         "height": 36,
-        "left": 1168,
-        "right": 1204,
+        "left": 1096,
+        "right": 1132,
         "top": 12,
         "width": 36,
-        "x": 1168,
+        "x": 1096,
         "y": 12
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:通知の枠/通知の枠",
@@ -5991,110 +5994,110 @@
       "reference": {
         "bottom": 48,
         "height": 36,
-        "left": 1168,
-        "right": 1204,
+        "left": 1096,
+        "right": 1132,
         "top": 12,
         "width": 36,
-        "x": 1168,
+        "x": 1096,
         "y": 12
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:選ぶ 付け方：すべて/選ぶ 付け方：すべて",
       "implementation": {
-        "bottom": 357,
+        "bottom": 345,
         "height": 36,
         "left": 864.578125,
         "right": 996.15625,
-        "top": 321,
+        "top": 309,
         "width": 131.578125,
         "x": 864.578125,
-        "y": 321
+        "y": 309
       },
       "reference": {
-        "bottom": 344,
+        "bottom": 342,
         "height": 36,
-        "left": 888.578125,
-        "right": 1020.15625,
-        "top": 308,
+        "left": 863.578125,
+        "right": 995.15625,
+        "top": 306,
         "width": 131.578125,
-        "x": 888.578125,
-        "y": 308
+        "x": 863.578125,
+        "y": 306
       },
       "delta": {
-        "left": -24.0,
-        "top": 13,
-        "right": -24.0,
-        "bottom": 13
+        "left": 1.0,
+        "top": 3,
+        "right": 1.0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:選ぶ 使用状態：すべて/選ぶ 使用状態：すべて",
       "implementation": {
-        "bottom": 357,
+        "bottom": 345,
         "height": 36,
         "left": 712,
         "right": 856.578125,
-        "top": 321,
+        "top": 309,
         "width": 144.578125,
         "x": 712,
-        "y": 321
+        "y": 309
       },
       "reference": {
-        "bottom": 344,
+        "bottom": 342,
         "height": 36,
-        "left": 736,
-        "right": 880.578125,
-        "top": 308,
+        "left": 711,
+        "right": 855.578125,
+        "top": 306,
         "width": 144.578125,
-        "x": 736,
-        "y": 308
+        "x": 711,
+        "y": 306
       },
       "delta": {
-        "left": -24,
-        "top": 13,
-        "right": -24.0,
-        "bottom": 13
+        "left": 1,
+        "top": 3,
+        "right": 1.0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:選ぶ 表示件数（10・20・50件）/選ぶ 表示件数（10・20・50件）",
       "implementation": {
-        "bottom": 357,
+        "bottom": 345,
         "height": 36,
         "left": 1308.171875,
         "right": 1404,
-        "top": 321,
+        "top": 309,
         "width": 95.828125,
         "x": 1308.171875,
-        "y": 321
+        "y": 309
       },
       "reference": {
-        "bottom": 344,
+        "bottom": 342,
         "height": 36,
-        "left": 1380.171875,
-        "right": 1476,
-        "top": 308,
+        "left": 1308.171875,
+        "right": 1404,
+        "top": 306,
         "width": 95.828125,
-        "x": 1380.171875,
-        "y": 308
+        "x": 1308.171875,
+        "y": 306
       },
       "delta": {
-        "left": -72.0,
-        "top": 13,
-        "right": -72,
-        "bottom": 13
+        "left": 0.0,
+        "top": 3,
+        "right": 0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:開く/開く",
@@ -6111,110 +6114,110 @@
       "reference": {
         "bottom": 37,
         "height": 14,
-        "left": 1134,
-        "right": 1148,
+        "left": 1062,
+        "right": 1076,
         "top": 23,
         "width": 14,
-        "x": 1134,
+        "x": 1062,
         "y": 23
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:開く/開く",
       "implementation": {
-        "bottom": 346,
+        "bottom": 334,
         "height": 14,
         "left": 832.578125,
         "right": 846.578125,
-        "top": 332,
+        "top": 320,
         "width": 14,
         "x": 832.578125,
-        "y": 332
+        "y": 320
       },
       "reference": {
-        "bottom": 333,
+        "bottom": 331,
         "height": 14,
-        "left": 856.578125,
-        "right": 870.578125,
-        "top": 319,
+        "left": 831.578125,
+        "right": 845.578125,
+        "top": 317,
         "width": 14,
-        "x": 856.578125,
-        "y": 319
+        "x": 831.578125,
+        "y": 317
       },
       "delta": {
-        "left": -24.0,
-        "top": 13,
-        "right": -24.0,
-        "bottom": 13
+        "left": 1.0,
+        "top": 3,
+        "right": 1.0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:開く/開く",
       "implementation": {
-        "bottom": 346,
+        "bottom": 334,
         "height": 14,
         "left": 972.15625,
         "right": 986.15625,
-        "top": 332,
+        "top": 320,
         "width": 14,
         "x": 972.15625,
-        "y": 332
+        "y": 320
       },
       "reference": {
-        "bottom": 333,
+        "bottom": 331,
         "height": 14,
-        "left": 996.15625,
-        "right": 1010.15625,
-        "top": 319,
+        "left": 971.15625,
+        "right": 985.15625,
+        "top": 317,
         "width": 14,
-        "x": 996.15625,
-        "y": 319
+        "x": 971.15625,
+        "y": 317
       },
       "delta": {
-        "left": -24.0,
-        "top": 13,
-        "right": -24.0,
-        "bottom": 13
+        "left": 1.0,
+        "top": 3,
+        "right": 1.0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:開く/開く",
       "implementation": {
-        "bottom": 346,
+        "bottom": 334,
         "height": 14,
         "left": 1380,
         "right": 1394,
-        "top": 332,
+        "top": 320,
         "width": 14,
         "x": 1380,
-        "y": 332
+        "y": 320
       },
       "reference": {
-        "bottom": 333,
+        "bottom": 331,
         "height": 14,
-        "left": 1452,
-        "right": 1466,
-        "top": 319,
+        "left": 1380,
+        "right": 1394,
+        "top": 317,
         "width": 14,
-        "x": 1452,
-        "y": 319
+        "x": 1380,
+        "y": 317
       },
       "delta": {
-        "left": -72,
-        "top": 13,
-        "right": -72,
-        "bottom": 13
+        "left": 0,
+        "top": 3,
+        "right": 0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:開閉/開閉",
@@ -6459,272 +6462,272 @@
     {
       "name": "name:頁 1/頁 1",
       "implementation": {
-        "bottom": 988,
+        "bottom": 801,
         "height": 32,
         "left": 1186,
         "right": 1218,
-        "top": 956,
+        "top": 769,
         "width": 32,
         "x": 1186,
-        "y": 956
+        "y": 769
       },
       "reference": {
-        "bottom": 975,
+        "bottom": 798,
         "height": 32,
-        "left": 1258,
-        "right": 1290,
-        "top": 943,
+        "left": 1186,
+        "right": 1218,
+        "top": 766,
         "width": 32,
-        "x": 1258,
-        "y": 943
+        "x": 1186,
+        "y": 766
       },
       "delta": {
-        "left": -72,
-        "top": 13,
-        "right": -72,
-        "bottom": 13
+        "left": 0,
+        "top": 3,
+        "right": 0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:頁 12/頁 12",
       "implementation": {
-        "bottom": 988,
+        "bottom": 801,
         "height": 32,
         "left": 1338,
         "right": 1370,
-        "top": 956,
+        "top": 769,
         "width": 32,
         "x": 1338,
-        "y": 956
+        "y": 769
       },
       "reference": {
-        "bottom": 975,
+        "bottom": 798,
         "height": 32,
-        "left": 1410,
-        "right": 1442,
-        "top": 943,
+        "left": 1338,
+        "right": 1370,
+        "top": 766,
         "width": 32,
-        "x": 1410,
-        "y": 943
+        "x": 1338,
+        "y": 766
       },
       "delta": {
-        "left": -72,
-        "top": 13,
-        "right": -72,
-        "bottom": 13
+        "left": 0,
+        "top": 3,
+        "right": 0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:頁 2/頁 2",
       "implementation": {
-        "bottom": 988,
+        "bottom": 801,
         "height": 32,
         "left": 1224,
         "right": 1256,
-        "top": 956,
+        "top": 769,
         "width": 32,
         "x": 1224,
-        "y": 956
+        "y": 769
       },
       "reference": {
-        "bottom": 975,
+        "bottom": 798,
         "height": 32,
-        "left": 1296,
-        "right": 1328,
-        "top": 943,
+        "left": 1224,
+        "right": 1256,
+        "top": 766,
         "width": 32,
-        "x": 1296,
-        "y": 943
+        "x": 1224,
+        "y": 766
       },
       "delta": {
-        "left": -72,
-        "top": 13,
-        "right": -72,
-        "bottom": 13
+        "left": 0,
+        "top": 3,
+        "right": 0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:頁 3/頁 3",
       "implementation": {
-        "bottom": 988,
+        "bottom": 801,
         "height": 32,
         "left": 1262,
         "right": 1294,
-        "top": 956,
+        "top": 769,
         "width": 32,
         "x": 1262,
-        "y": 956
+        "y": 769
       },
       "reference": {
-        "bottom": 975,
+        "bottom": 798,
         "height": 32,
-        "left": 1334,
-        "right": 1366,
-        "top": 943,
+        "left": 1262,
+        "right": 1294,
+        "top": 766,
         "width": 32,
-        "x": 1334,
-        "y": 943
+        "x": 1262,
+        "y": 766
       },
       "delta": {
-        "left": -72,
-        "top": 13,
-        "right": -72,
-        "bottom": 13
+        "left": 0,
+        "top": 3,
+        "right": 0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:頁 …/頁 …",
       "implementation": {
-        "bottom": 988,
+        "bottom": 801,
         "height": 32,
         "left": 1300,
         "right": 1332,
-        "top": 956,
+        "top": 769,
         "width": 32,
         "x": 1300,
-        "y": 956
+        "y": 769
       },
       "reference": {
-        "bottom": 975,
+        "bottom": 798,
         "height": 32,
-        "left": 1372,
-        "right": 1404,
-        "top": 943,
+        "left": 1300,
+        "right": 1332,
+        "top": 766,
         "width": 32,
-        "x": 1372,
-        "y": 943
+        "x": 1300,
+        "y": 766
       },
       "delta": {
-        "left": -72,
-        "top": 13,
-        "right": -72,
-        "bottom": 13
+        "left": 0,
+        "top": 3,
+        "right": 0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:頁 ‹/頁 ‹",
       "implementation": {
-        "bottom": 988,
+        "bottom": 801,
         "height": 32,
         "left": 1148,
         "right": 1180,
-        "top": 956,
+        "top": 769,
         "width": 32,
         "x": 1148,
-        "y": 956
+        "y": 769
       },
       "reference": {
-        "bottom": 975,
+        "bottom": 798,
         "height": 32,
-        "left": 1220,
-        "right": 1252,
-        "top": 943,
+        "left": 1148,
+        "right": 1180,
+        "top": 766,
         "width": 32,
-        "x": 1220,
-        "y": 943
+        "x": 1148,
+        "y": 766
       },
       "delta": {
-        "left": -72,
-        "top": 13,
-        "right": -72,
-        "bottom": 13
+        "left": 0,
+        "top": 3,
+        "right": 0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:頁 ›/頁 ›",
       "implementation": {
-        "bottom": 988,
+        "bottom": 801,
         "height": 32,
         "left": 1376,
         "right": 1408,
-        "top": 956,
+        "top": 769,
         "width": 32,
         "x": 1376,
-        "y": 956
+        "y": 769
       },
       "reference": {
-        "bottom": 975,
+        "bottom": 798,
         "height": 32,
-        "left": 1448,
-        "right": 1480,
-        "top": 943,
+        "left": 1376,
+        "right": 1408,
+        "top": 766,
         "width": 32,
-        "x": 1448,
-        "y": 943
+        "x": 1376,
+        "y": 766
       },
       "delta": {
-        "left": -72,
-        "top": 13,
-        "right": -72,
-        "bottom": 13
+        "left": 0,
+        "top": 3,
+        "right": 0,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:項目 EC・フォロー/項目 EC・フォロー",
       "implementation": {
-        "bottom": 542,
+        "bottom": 530,
         "height": 33,
         "left": 252,
         "right": 427,
-        "top": 509,
+        "top": 497,
         "width": 175,
         "x": 252,
-        "y": 509
+        "y": 497
       },
       "reference": {
-        "bottom": 529,
+        "bottom": 527,
         "height": 33,
         "left": 252,
-        "right": 451.5,
-        "top": 496,
-        "width": 199.5,
+        "right": 426.5,
+        "top": 494,
+        "width": 174.5,
         "x": 252,
-        "y": 496
+        "y": 494
       },
       "delta": {
         "left": 0,
-        "top": 13,
-        "right": -24.5,
-        "bottom": 13
+        "top": 3,
+        "right": 0.5,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:項目 すべて/項目 すべて",
       "implementation": {
-        "bottom": 437,
+        "bottom": 425,
         "height": 33,
         "left": 252,
         "right": 427,
-        "top": 404,
+        "top": 392,
         "width": 175,
         "x": 252,
-        "y": 404
+        "y": 392
       },
       "reference": {
-        "bottom": 424,
+        "bottom": 422,
         "height": 33,
         "left": 252,
-        "right": 451.5,
-        "top": 391,
-        "width": 199.5,
+        "right": 426.5,
+        "top": 389,
+        "width": 174.5,
         "x": 252,
-        "y": 391
+        "y": 389
       },
       "delta": {
         "left": 0,
-        "top": 13,
-        "right": -24.5,
-        "bottom": 13
+        "top": 3,
+        "right": 0.5,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:項目 イベント予約/項目 イベント予約",
@@ -6789,32 +6792,32 @@
     {
       "name": "name:項目 キャンペーン/項目 キャンペーン",
       "implementation": {
-        "bottom": 507,
+        "bottom": 495,
         "height": 33,
         "left": 252,
         "right": 427,
-        "top": 474,
+        "top": 462,
         "width": 175,
         "x": 252,
-        "y": 474
+        "y": 462
       },
       "reference": {
-        "bottom": 494,
+        "bottom": 492,
         "height": 33,
         "left": 252,
-        "right": 451.5,
-        "top": 461,
-        "width": 199.5,
+        "right": 426.5,
+        "top": 459,
+        "width": 174.5,
         "x": 252,
-        "y": 461
+        "y": 459
       },
       "delta": {
         "left": 0,
-        "top": 13,
-        "right": -24.5,
-        "bottom": 13
+        "top": 3,
+        "right": 0.5,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:項目 シナリオ配信/項目 シナリオ配信",
@@ -7059,32 +7062,32 @@
     {
       "name": "name:項目 予約配信/項目 予約配信",
       "implementation": {
-        "bottom": 472,
+        "bottom": 460,
         "height": 33,
         "left": 252,
         "right": 427,
-        "top": 439,
+        "top": 427,
         "width": 175,
         "x": 252,
-        "y": 439
+        "y": 427
       },
       "reference": {
-        "bottom": 459,
+        "bottom": 457,
         "height": 33,
         "left": 252,
-        "right": 451.5,
-        "top": 426,
-        "width": 199.5,
+        "right": 426.5,
+        "top": 424,
+        "width": 174.5,
         "x": 252,
-        "y": 426
+        "y": 424
       },
       "delta": {
         "left": 0,
-        "top": 13,
-        "right": -24.5,
-        "bottom": 13
+        "top": 3,
+        "right": 0.5,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:項目 共通情報/項目 共通情報",
@@ -7269,32 +7272,32 @@
     {
       "name": "name:項目 未分類/項目 未分類",
       "implementation": {
-        "bottom": 577,
+        "bottom": 565,
         "height": 33,
         "left": 252,
         "right": 427,
-        "top": 544,
+        "top": 532,
         "width": 175,
         "x": 252,
-        "y": 544
+        "y": 532
       },
       "reference": {
-        "bottom": 564,
+        "bottom": 562,
         "height": 33,
         "left": 252,
-        "right": 451.5,
-        "top": 531,
-        "width": 199.5,
+        "right": 426.5,
+        "top": 529,
+        "width": 174.5,
         "x": 252,
-        "y": 531
+        "y": 529
       },
       "delta": {
         "left": 0,
-        "top": 13,
-        "right": -24.5,
-        "bottom": 13
+        "top": 3,
+        "right": 0.5,
+        "bottom": 3
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "name:項目 登録メディア一覧/項目 登録メディア一覧",
@@ -7389,24 +7392,24 @@
     {
       "name": "name:項目 設定/項目 設定",
       "implementation": {
-        "bottom": 971,
-        "height": 41.5,
+        "bottom": 966,
+        "height": 30.5,
         "left": 12,
-        "right": 248,
-        "top": 929.5,
-        "width": 236,
+        "right": 228,
+        "top": 935.5,
+        "width": 216,
         "x": 12,
-        "y": 929.5
+        "y": 935.5
       },
       "reference": {
-        "bottom": 971,
-        "height": 41.5,
+        "bottom": 966,
+        "height": 30.5,
         "left": 12,
-        "right": 248,
-        "top": 929.5,
-        "width": 236,
+        "right": 228,
+        "top": 935.5,
+        "width": 216,
         "x": 12,
-        "y": 929.5
+        "y": 935.5
       },
       "delta": {
         "left": 0,
@@ -7431,20 +7434,20 @@
       "reference": {
         "bottom": 44,
         "height": 28,
-        "left": 1218,
-        "right": 1246,
+        "left": 1146,
+        "right": 1174,
         "top": 16,
         "width": 28,
-        "x": 1218,
+        "x": 1146,
         "y": 16
       },
       "delta": {
-        "left": -72,
+        "left": 0,
         "top": 0,
-        "right": -72,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     }
   ]
 }

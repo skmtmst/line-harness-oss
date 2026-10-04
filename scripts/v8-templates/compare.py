@@ -2,7 +2,8 @@
 """文字を塗り、1440px の重ね合わせと矩形の差を保存する。
 python3 scripts/v8-templates/compare.py /tmp/v8-capture design/v8/overlay
 Pillow と NumPy が必要。撮影は capture.mjs と Browser スキルで行う。
-参照画像を補正せず、隠れている段も測定結果には残す。
+司令塔2026-10-05 04時の決定：保存帯は共通StickyBarで別検証する。
+本文の可視範囲を比較し、除外した範囲・元の四辺を記録する。
 """
 import json, math, sys
 from collections import defaultdict
@@ -13,6 +14,8 @@ from PIL import Image, ImageChops, ImageDraw
 source, output = map(Path, sys.argv[1:3])
 output.mkdir(parents=True, exist_ok=True)
 captures = json.loads((source / 'captures.json').read_text())
+footer_check_path = source / 'footer-check.json'
+footer_checks = json.loads(footer_check_path.read_text())['results'] if footer_check_path.exists() else []
 # 型で置き換えた外枠も、正本と明示的に対応させて測る。
 regions = {
  'dashboard': [('heading','板の頭'),('notice','はじめの設定'),('stats','今日やること（数の帯）'),('row','段A'),('row','段B'),('row','段C'),('row','段D')],
@@ -34,11 +37,31 @@ for kind, capture in captures.items():
   raise ValueError(f'途中の描画を撮っています: {kind}')
  measurements = []
  unmatched = []
+ excluded = []
+ footer = next((b['rect'] for b in impl['boxes'] if b['region']=='footer'),None)
+ board = next(b['rect'] for b in impl['boxes'] if b['region']=='shell-board')
+ cutoff = footer['top']-12 if kind in ['create','settings'] and footer else None
+ if kind in ['create','settings'] and cutoff is None:
+  raise ValueError(f'別検証する保存帯がありません: {kind}')
+ if cutoff is not None:
+  checks=[r for r in footer_checks if r['kind']==kind]
+  required={(w,h) for w in [1152,1280,1440,1920] for h in [1000,900]}
+  if {(r['width'],r['height']) for r in checks}!=required or any(r['issues'] for r in checks):
+   unmatched.append('共通StickyBarの4幅×2高さの別検証が未合格')
  def record(label,a,b):
+  if cutoff is not None and not label.startswith('shell-board/'):
+   original={'name':label,'implementation':a,'reference':b}
+   if a['top']>=cutoff and b['top']>=cutoff:
+    excluded.append({**original,'reason':'保存帯または本文の可視範囲より下'});return
+   if a['bottom']>cutoff or b['bottom']>cutoff:
+    excluded.append({**original,'reason':'保存帯のための領域に入る下辺だけを除外'})
+    a={**a,'bottom':min(a['bottom'],cutoff)};b={**b,'bottom':min(b['bottom'],cutoff)}
   delta={edge:round(a[edge]-b[edge],2) for edge in ['left','top','right','bottom']}
   measurements.append({'name':label,'implementation':a,'reference':b,'delta':delta,'over4px':max(map(abs,delta.values()))>4})
  used=defaultdict(int)
  for region,name in [('shell-board','白い板'), *regions[kind]]:
+  if region=='footer' and cutoff is not None:
+   excluded.append({'name':region+'/'+name,'reason':'古い絵の帯を共通StickyBarの別検証に置換'});continue
   candidates=[b for b in impl['boxes'] if b['region']==region]
   refs=[b for b in ref['boxes'] if b['name']==name]
   if kind=='create' and region=='footer' and not refs:
@@ -68,6 +91,8 @@ for kind, capture in captures.items():
   for r in data['texts']:
    if r['width']>0 and r['height']>0:
     draw.rectangle([math.floor(r['x']),math.floor(r['y']),math.ceil(r['x']+r['width']),math.ceil(r['y']+r['height'])],fill=(160,160,160))
+  if cutoff is not None:
+   draw.rectangle([board['left'],cutoff,board['right'],1000],fill=(240,240,240))
   im.save(output/f'template-{kind}-{mode}-masked.png');images.append(im)
  if images[0].size!=images[1].size:raise ValueError('画像サイズが違います')
  overlay=Image.blend(images[1],images[0],.5)
@@ -76,7 +101,7 @@ for kind, capture in captures.items():
  diff.save(output/f'template-{kind}-diff.png')
  a=np.asarray(images[0]).astype(np.int16);b=np.asarray(images[1]).astype(np.int16)
  count=sum(m['over4px'] for m in measurements)
- summary[kind]={'over4px':count,'compared':len(measurements),'status':'PASS' if count==0 and not unmatched else 'CONTINUE','unmatchedRegions':unmatched,'maxEdgeDelta':max(max(map(abs,m['delta'].values())) for m in measurements),'pixelDifferenceOver24':int((np.abs(a-b).max(axis=2)>24).sum()),'measurements':measurements}
+ summary[kind]={'over4px':count,'compared':len(measurements),'status':'PASS' if count==0 and not unmatched else 'CONTINUE','unmatchedRegions':unmatched,'maxEdgeDelta':max(max(map(abs,m['delta'].values())) for m in measurements),'pixelDifferenceOver24':int((np.abs(a-b).max(axis=2)>24).sum()),'excludedArea':{'left':board['left'],'top':cutoff,'right':board['right'],'bottom':1000} if cutoff is not None else None,'excludedMeasurements':excluded,'footerValidationRequired':cutoff is not None,'measurements':measurements}
  (output/f'template-{kind}.json').write_text(json.dumps(summary[kind],ensure_ascii=False,indent=2)+'\n')
  print(kind, summary[kind]['status'], f'{count}/{len(measurements)} 箇所が4px超', f'未比較の段 {len(unmatched)}')
 (output/'template-summary.json').write_text(json.dumps({k:{a:v for a,v in d.items() if a!='measurements'} for k,d in summary.items()},ensure_ascii=False,indent=2)+'\n')

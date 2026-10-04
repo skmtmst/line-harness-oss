@@ -5,7 +5,10 @@
     "status": "PASS",
     "unmatchedRegions": [],
     "maxEdgeDelta": 0,
-    "pixelDifferenceOver24": 2492
+    "pixelDifferenceOver24": 2492,
+    "excludedArea": null,
+    "excludedMeasurements": [],
+    "footerValidationRequired": false
   },
   "list": {
     "over4px": 0,
@@ -13,25 +16,594 @@
     "status": "PASS",
     "unmatchedRegions": [],
     "maxEdgeDelta": 4.0,
-    "pixelDifferenceOver24": 3296
+    "pixelDifferenceOver24": 3296,
+    "excludedArea": null,
+    "excludedMeasurements": [],
+    "footerValidationRequired": false
   },
   "list-folders": {
-    "over4px": 175,
+    "over4px": 0,
     "compared": 248,
-    "status": "CONTINUE",
+    "status": "PASS",
     "unmatchedRegions": [],
-    "maxEdgeDelta": 72,
-    "pixelDifferenceOver24": 173461
+    "maxEdgeDelta": 3,
+    "pixelDifferenceOver24": 47913,
+    "excludedArea": null,
+    "excludedMeasurements": [],
+    "footerValidationRequired": false
   },
   "create": {
-    "over4px": 2,
-    "compared": 181,
-    "status": "CONTINUE",
-    "unmatchedRegions": [
-      "段がありません: create/footer/下の追従帯"
+    "over4px": 0,
+    "compared": 167,
+    "status": "PASS",
+    "unmatchedRegions": [],
+    "maxEdgeDelta": 0.56,
+    "pixelDifferenceOver24": 1347,
+    "excludedArea": {
+      "left": 240,
+      "top": 890,
+      "right": 1428,
+      "bottom": 1000
+    },
+    "excludedMeasurements": [
+      {
+        "name": "body/中身",
+        "implementation": {
+          "bottom": 890,
+          "height": 753,
+          "left": 240,
+          "right": 1428,
+          "top": 137,
+          "width": 1188,
+          "x": 240,
+          "y": 137
+        },
+        "reference": {
+          "bottom": 1134,
+          "height": 997,
+          "left": 240,
+          "right": 1428,
+          "top": 137,
+          "width": 1188,
+          "x": 240,
+          "y": 137
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "preview/LINE の見え方",
+        "implementation": {
+          "bottom": 890,
+          "height": 753,
+          "left": 1048,
+          "right": 1428,
+          "top": 137,
+          "width": 380,
+          "x": 1048,
+          "y": 137
+        },
+        "reference": {
+          "bottom": 1134,
+          "height": 997,
+          "left": 1048,
+          "right": 1428,
+          "top": 137,
+          "width": 380,
+          "x": 1048,
+          "y": 137
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "footer/下の追従帯",
+        "reason": "古い絵の帯を共通StickyBarの別検証に置換"
+      },
+      {
+        "name": "A3L7G/ホームの線",
+        "implementation": {
+          "bottom": 891,
+          "height": 14,
+          "left": 1083.5,
+          "right": 1393.5,
+          "top": 877,
+          "width": 310,
+          "x": 1083.5,
+          "y": 877
+        },
+        "reference": {
+          "bottom": 891,
+          "height": 14,
+          "left": 1083.5,
+          "right": 1393.5,
+          "top": 877,
+          "width": 310,
+          "x": 1083.5,
+          "y": 877
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "EdPwc/組 専用機能（開くと項目）",
+        "implementation": {
+          "bottom": 897,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 867,
+          "width": 216,
+          "x": 12,
+          "y": 867
+        },
+        "reference": {
+          "bottom": 897,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 867,
+          "width": 216,
+          "x": 12,
+          "y": 867
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "FJC4n/見出し",
+        "implementation": {
+          "bottom": 928,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 898,
+          "width": 216,
+          "x": 12,
+          "y": 898
+        },
+        "reference": {
+          "bottom": 928,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 898,
+          "width": 216,
+          "x": 12,
+          "y": 898
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "MxskT/印",
+        "implementation": {
+          "bottom": 959.25,
+          "height": 16,
+          "left": 22,
+          "right": 38,
+          "top": 943.25,
+          "width": 16,
+          "x": 22,
+          "y": 943.25
+        },
+        "reference": {
+          "bottom": 959.25,
+          "height": 16,
+          "left": 22,
+          "right": 38,
+          "top": 943.25,
+          "width": 16,
+          "x": 22,
+          "y": 943.25
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "OM9uS/配信イメージを見る",
+        "implementation": {
+          "bottom": 1110,
+          "height": 36,
+          "left": 1230.25,
+          "right": 1396,
+          "top": 1074,
+          "width": 165.75,
+          "x": 1230.25,
+          "y": 1074
+        },
+        "reference": {
+          "bottom": 1110,
+          "height": 36,
+          "left": 1230.25,
+          "right": 1396,
+          "top": 1074,
+          "width": 165.75,
+          "x": 1230.25,
+          "y": 1074
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "OcVII/アイコン",
+        "implementation": {
+          "bottom": 1099.5,
+          "height": 15,
+          "left": 1102.125,
+          "right": 1117.125,
+          "top": 1084.5,
+          "width": 15,
+          "x": 1102.125,
+          "y": 1084.5
+        },
+        "reference": {
+          "bottom": 1099.5,
+          "height": 15,
+          "left": 1102.125,
+          "right": 1117.125,
+          "top": 1084.5,
+          "width": 15,
+          "x": 1102.125,
+          "y": 1084.5
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "OcVII/アイコン",
+        "implementation": {
+          "bottom": 1099.5,
+          "height": 15,
+          "left": 1244.25,
+          "right": 1259.25,
+          "top": 1084.5,
+          "width": 15,
+          "x": 1244.25,
+          "y": 1084.5
+        },
+        "reference": {
+          "bottom": 1099.5,
+          "height": 15,
+          "left": 1244.25,
+          "right": 1259.25,
+          "top": 1084.5,
+          "width": 15,
+          "x": 1244.25,
+          "y": 1084.5
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "T7XSI6/左メニュー",
+        "implementation": {
+          "bottom": 1000,
+          "height": 1000,
+          "left": 0,
+          "right": 240,
+          "top": 0,
+          "width": 240,
+          "x": 0,
+          "y": 0
+        },
+        "reference": {
+          "bottom": 1000,
+          "height": 1000,
+          "left": 0,
+          "right": 240,
+          "top": 0,
+          "width": 240,
+          "x": 0,
+          "y": 0
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "UKLOn/設定内容",
+        "implementation": {
+          "bottom": 1060,
+          "height": 113,
+          "left": 1081,
+          "right": 1396,
+          "top": 947,
+          "width": 315,
+          "x": 1081,
+          "y": 947
+        },
+        "reference": {
+          "bottom": 1060,
+          "height": 113,
+          "left": 1081,
+          "right": 1396,
+          "top": 947,
+          "width": 315,
+          "x": 1081,
+          "y": 947
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "cZy7t/見出し",
+        "implementation": {
+          "bottom": 897,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 867,
+          "width": 216,
+          "x": 12,
+          "y": 867
+        },
+        "reference": {
+          "bottom": 897,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 867,
+          "width": 216,
+          "x": 12,
+          "y": 867
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "enuna/LINEの見え方",
+        "implementation": {
+          "bottom": 901,
+          "height": 690,
+          "left": 1073.5,
+          "right": 1403.5,
+          "top": 211,
+          "width": 330,
+          "x": 1073.5,
+          "y": 211
+        },
+        "reference": {
+          "bottom": 901,
+          "height": 690,
+          "left": 1073.5,
+          "right": 1403.5,
+          "top": 211,
+          "width": 330,
+          "x": 1073.5,
+          "y": 211
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "fz8eU/開閉",
+        "implementation": {
+          "bottom": 892.5,
+          "height": 14,
+          "left": 204,
+          "right": 218,
+          "top": 878.5,
+          "width": 14,
+          "x": 204,
+          "y": 878.5
+        },
+        "reference": {
+          "bottom": 892.5,
+          "height": 14,
+          "left": 204,
+          "right": 218,
+          "top": 878.5,
+          "width": 14,
+          "x": 204,
+          "y": 878.5
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "gDoz1/項目 設定",
+        "implementation": {
+          "bottom": 966,
+          "height": 30.5,
+          "left": 12,
+          "right": 228,
+          "top": 935.5,
+          "width": 216,
+          "x": 12,
+          "y": 935.5
+        },
+        "reference": {
+          "bottom": 966,
+          "height": 30.5,
+          "left": 12,
+          "right": 228,
+          "top": 935.5,
+          "width": 216,
+          "x": 12,
+          "y": 935.5
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "iDN1G/行 送る相手",
+        "implementation": {
+          "bottom": 1008,
+          "height": 18,
+          "left": 1081,
+          "right": 1396,
+          "top": 990,
+          "width": 315,
+          "x": 1081,
+          "y": 990
+        },
+        "reference": {
+          "bottom": 1008,
+          "height": 18,
+          "left": 1081,
+          "right": 1396,
+          "top": 990,
+          "width": 315,
+          "x": 1081,
+          "y": 990
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "iel0a/開閉",
+        "implementation": {
+          "bottom": 923.5,
+          "height": 14,
+          "left": 204,
+          "right": 218,
+          "top": 909.5,
+          "width": 14,
+          "x": 204,
+          "y": 909.5
+        },
+        "reference": {
+          "bottom": 923.5,
+          "height": 14,
+          "left": 204,
+          "right": 218,
+          "top": 909.5,
+          "width": 14,
+          "x": 204,
+          "y": 909.5
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "r1FO7/組 飲食店向け（テスト）（開くと項目）",
+        "implementation": {
+          "bottom": 928,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 898,
+          "width": 216,
+          "x": 12,
+          "y": 898
+        },
+        "reference": {
+          "bottom": 928,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 898,
+          "width": 216,
+          "x": 12,
+          "y": 898
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "rCypk/行 送る日時",
+        "implementation": {
+          "bottom": 1034,
+          "height": 18,
+          "left": 1081,
+          "right": 1396,
+          "top": 1016,
+          "width": 315,
+          "x": 1081,
+          "y": 1016
+        },
+        "reference": {
+          "bottom": 1034,
+          "height": 18,
+          "left": 1081,
+          "right": 1396,
+          "top": 1016,
+          "width": 315,
+          "x": 1081,
+          "y": 1016
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "xFPhW/確かめる",
+        "implementation": {
+          "bottom": 1110,
+          "height": 36,
+          "left": 1081,
+          "right": 1396,
+          "top": 1074,
+          "width": 315,
+          "x": 1081,
+          "y": 1074
+        },
+        "reference": {
+          "bottom": 1110,
+          "height": 36,
+          "left": 1081,
+          "right": 1396,
+          "top": 1074,
+          "width": 315,
+          "x": 1081,
+          "y": 1074
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "y8nJlb/行 配信後のアクション",
+        "implementation": {
+          "bottom": 1060,
+          "height": 18,
+          "left": 1081,
+          "right": 1396,
+          "top": 1042,
+          "width": 315,
+          "x": 1081,
+          "y": 1042
+        },
+        "reference": {
+          "bottom": 1060,
+          "height": 18,
+          "left": 1081,
+          "right": 1396,
+          "top": 1042,
+          "width": 315,
+          "x": 1081,
+          "y": 1042
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "zkvpQ/画面",
+        "implementation": {
+          "bottom": 891,
+          "height": 670,
+          "left": 1083.5,
+          "right": 1393.5,
+          "top": 221,
+          "width": 310,
+          "x": 1083.5,
+          "y": 221
+        },
+        "reference": {
+          "bottom": 891,
+          "height": 670,
+          "left": 1083.5,
+          "right": 1393.5,
+          "top": 221,
+          "width": 310,
+          "x": 1083.5,
+          "y": 221
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "ztXCo/テストを送る",
+        "implementation": {
+          "bottom": 1110,
+          "height": 36,
+          "left": 1081,
+          "right": 1222.25,
+          "top": 1074,
+          "width": 141.25,
+          "x": 1081,
+          "y": 1074
+        },
+        "reference": {
+          "bottom": 1110,
+          "height": 36,
+          "left": 1081,
+          "right": 1222.25,
+          "top": 1074,
+          "width": 141.25,
+          "x": 1081,
+          "y": 1074
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      }
     ],
-    "maxEdgeDelta": 244,
-    "pixelDifferenceOver24": 9714
+    "footerValidationRequired": true
   },
   "detail": {
     "over4px": 0,
@@ -39,7 +611,10 @@
     "status": "PASS",
     "unmatchedRegions": [],
     "maxEdgeDelta": 0,
-    "pixelDifferenceOver24": 2459
+    "pixelDifferenceOver24": 2459,
+    "excludedArea": null,
+    "excludedMeasurements": [],
+    "footerValidationRequired": false
   },
   "inbox": {
     "over4px": 0,
@@ -47,22 +622,281 @@
     "status": "PASS",
     "unmatchedRegions": [],
     "maxEdgeDelta": 0,
-    "pixelDifferenceOver24": 0
+    "pixelDifferenceOver24": 0,
+    "excludedArea": null,
+    "excludedMeasurements": [],
+    "footerValidationRequired": false
   },
   "settings": {
-    "over4px": 40,
-    "compared": 130,
-    "status": "CONTINUE",
+    "over4px": 0,
+    "compared": 124,
+    "status": "PASS",
     "unmatchedRegions": [],
-    "maxEdgeDelta": 236,
-    "pixelDifferenceOver24": 32929
+    "maxEdgeDelta": 0,
+    "pixelDifferenceOver24": 4428,
+    "excludedArea": {
+      "left": 240,
+      "top": 890,
+      "right": 1428,
+      "bottom": 1000
+    },
+    "excludedMeasurements": [
+      {
+        "name": "body/中身",
+        "implementation": {
+          "bottom": 890,
+          "height": 741,
+          "left": 240,
+          "right": 1428,
+          "top": 149,
+          "width": 1188,
+          "x": 240,
+          "y": 149
+        },
+        "reference": {
+          "bottom": 929,
+          "height": 780,
+          "left": 240,
+          "right": 1428,
+          "top": 149,
+          "width": 1188,
+          "x": 240,
+          "y": 149
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "footer/保存していない変更の帯（下に固定）",
+        "reason": "古い絵の帯を共通StickyBarの別検証に置換"
+      },
+      {
+        "name": "EdPwc/組 専用機能（開くと項目）",
+        "implementation": {
+          "bottom": 897,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 867,
+          "width": 216,
+          "x": 12,
+          "y": 867
+        },
+        "reference": {
+          "bottom": 897,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 867,
+          "width": 216,
+          "x": 12,
+          "y": 867
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "FJC4n/見出し",
+        "implementation": {
+          "bottom": 928,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 898,
+          "width": 216,
+          "x": 12,
+          "y": 898
+        },
+        "reference": {
+          "bottom": 928,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 898,
+          "width": 216,
+          "x": 12,
+          "y": 898
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "MxskT/印",
+        "implementation": {
+          "bottom": 959.25,
+          "height": 16,
+          "left": 22,
+          "right": 38,
+          "top": 943.25,
+          "width": 16,
+          "x": 22,
+          "y": 943.25
+        },
+        "reference": {
+          "bottom": 959.25,
+          "height": 16,
+          "left": 22,
+          "right": 38,
+          "top": 943.25,
+          "width": 16,
+          "x": 22,
+          "y": 943.25
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "T7XSI6/左メニュー",
+        "implementation": {
+          "bottom": 1000,
+          "height": 1000,
+          "left": 0,
+          "right": 240,
+          "top": 0,
+          "width": 240,
+          "x": 0,
+          "y": 0
+        },
+        "reference": {
+          "bottom": 1000,
+          "height": 1000,
+          "left": 0,
+          "right": 240,
+          "top": 0,
+          "width": 240,
+          "x": 0,
+          "y": 0
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "cZy7t/見出し",
+        "implementation": {
+          "bottom": 897,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 867,
+          "width": 216,
+          "x": 12,
+          "y": 867
+        },
+        "reference": {
+          "bottom": 897,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 867,
+          "width": 216,
+          "x": 12,
+          "y": 867
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "fz8eU/開閉",
+        "implementation": {
+          "bottom": 892.5,
+          "height": 14,
+          "left": 204,
+          "right": 218,
+          "top": 878.5,
+          "width": 14,
+          "x": 204,
+          "y": 878.5
+        },
+        "reference": {
+          "bottom": 892.5,
+          "height": 14,
+          "left": 204,
+          "right": 218,
+          "top": 878.5,
+          "width": 14,
+          "x": 204,
+          "y": 878.5
+        },
+        "reason": "保存帯のための領域に入る下辺だけを除外"
+      },
+      {
+        "name": "gDoz1/項目 設定",
+        "implementation": {
+          "bottom": 966,
+          "height": 30.5,
+          "left": 12,
+          "right": 228,
+          "top": 935.5,
+          "width": 216,
+          "x": 12,
+          "y": 935.5
+        },
+        "reference": {
+          "bottom": 966,
+          "height": 30.5,
+          "left": 12,
+          "right": 228,
+          "top": 935.5,
+          "width": 216,
+          "x": 12,
+          "y": 935.5
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "iel0a/開閉",
+        "implementation": {
+          "bottom": 923.5,
+          "height": 14,
+          "left": 204,
+          "right": 218,
+          "top": 909.5,
+          "width": 14,
+          "x": 204,
+          "y": 909.5
+        },
+        "reference": {
+          "bottom": 923.5,
+          "height": 14,
+          "left": 204,
+          "right": 218,
+          "top": 909.5,
+          "width": 14,
+          "x": 204,
+          "y": 909.5
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      },
+      {
+        "name": "r1FO7/組 飲食店向け（テスト）（開くと項目）",
+        "implementation": {
+          "bottom": 928,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 898,
+          "width": 216,
+          "x": 12,
+          "y": 898
+        },
+        "reference": {
+          "bottom": 928,
+          "height": 30,
+          "left": 12,
+          "right": 228,
+          "top": 898,
+          "width": 216,
+          "x": 12,
+          "y": 898
+        },
+        "reason": "保存帯または本文の可視範囲より下"
+      }
+    ],
+    "footerValidationRequired": true
   },
   "analytics": {
-    "over4px": 31,
+    "over4px": 0,
     "compared": 173,
-    "status": "CONTINUE",
+    "status": "PASS",
     "unmatchedRegions": [],
-    "maxEdgeDelta": 40,
-    "pixelDifferenceOver24": 34569
+    "maxEdgeDelta": 4,
+    "pixelDifferenceOver24": 31143,
+    "excludedArea": null,
+    "excludedMeasurements": [],
+    "footerValidationRequired": false
   }
 }

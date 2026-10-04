@@ -1,0 +1,2149 @@
+{
+  "authority": "司令塔2026-10-05 04時：StickyBarを正本として画面の古い帯とは別検証",
+  "results": [
+    {
+      "kind": "create",
+      "width": 1152,
+      "height": 1000,
+      "before": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 662,
+          "right": 718,
+          "top": 920,
+          "width": 56,
+          "x": 662,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 662,
+            "right": 718,
+            "top": 920,
+            "width": 56,
+            "x": 662,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1116,
+          "top": 902,
+          "width": 852,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 571,
+          "position": 0,
+          "rect": {
+            "bottom": 818,
+            "height": 571,
+            "left": 240,
+            "right": 1140,
+            "top": 247,
+            "width": 900,
+            "x": 240,
+            "y": 247
+          },
+          "viewport": 571
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1152
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 662,
+          "right": 718,
+          "top": 920,
+          "width": 56,
+          "x": 662,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 662,
+            "right": 718,
+            "top": 920,
+            "width": 56,
+            "x": 662,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1116,
+          "top": 902,
+          "width": 852,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 571,
+          "position": 0,
+          "rect": {
+            "bottom": 818,
+            "height": 571,
+            "left": 240,
+            "right": 1140,
+            "top": 247,
+            "width": 900,
+            "x": 240,
+            "y": 247
+          },
+          "viewport": 571
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1152
+      },
+      "issues": []
+    },
+    {
+      "kind": "settings",
+      "width": 1152,
+      "height": 1000,
+      "before": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 591,
+          "right": 789,
+          "top": 920,
+          "width": 198,
+          "x": 591,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 591,
+            "right": 686,
+            "top": 920,
+            "width": 95,
+            "x": 591,
+            "y": 920
+          },
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 694,
+            "right": 789,
+            "top": 920,
+            "width": 95,
+            "x": 694,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1116,
+          "top": 902,
+          "width": 852,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 912,
+          "position": 0,
+          "rect": {
+            "bottom": 890,
+            "height": 741,
+            "left": 240,
+            "right": 1140,
+            "top": 149,
+            "width": 900,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 741
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1152
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 591,
+          "right": 789,
+          "top": 920,
+          "width": 198,
+          "x": 591,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 591,
+            "right": 686,
+            "top": 920,
+            "width": 95,
+            "x": 591,
+            "y": 920
+          },
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 694,
+            "right": 789,
+            "top": 920,
+            "width": 95,
+            "x": 694,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1116,
+          "top": 902,
+          "width": 852,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 912,
+          "position": 171,
+          "rect": {
+            "bottom": 890,
+            "height": 741,
+            "left": 240,
+            "right": 1140,
+            "top": 149,
+            "width": 900,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 741
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1152
+      },
+      "issues": []
+    },
+    {
+      "kind": "create",
+      "width": 1280,
+      "height": 1000,
+      "before": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 726,
+          "right": 782,
+          "top": 920,
+          "width": 56,
+          "x": 726,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 726,
+            "right": 782,
+            "top": 920,
+            "width": 56,
+            "x": 726,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1244,
+          "top": 902,
+          "width": 980,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 571,
+          "position": 0,
+          "rect": {
+            "bottom": 818,
+            "height": 571,
+            "left": 240,
+            "right": 1268,
+            "top": 247,
+            "width": 1028,
+            "x": 240,
+            "y": 247
+          },
+          "viewport": 571
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1280
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 726,
+          "right": 782,
+          "top": 920,
+          "width": 56,
+          "x": 726,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 726,
+            "right": 782,
+            "top": 920,
+            "width": 56,
+            "x": 726,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1244,
+          "top": 902,
+          "width": 980,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 571,
+          "position": 0,
+          "rect": {
+            "bottom": 818,
+            "height": 571,
+            "left": 240,
+            "right": 1268,
+            "top": 247,
+            "width": 1028,
+            "x": 240,
+            "y": 247
+          },
+          "viewport": 571
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1280
+      },
+      "issues": []
+    },
+    {
+      "kind": "settings",
+      "width": 1280,
+      "height": 1000,
+      "before": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 655,
+          "right": 853,
+          "top": 920,
+          "width": 198,
+          "x": 655,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 655,
+            "right": 750,
+            "top": 920,
+            "width": 95,
+            "x": 655,
+            "y": 920
+          },
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 758,
+            "right": 853,
+            "top": 920,
+            "width": 95,
+            "x": 758,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1244,
+          "top": 902,
+          "width": 980,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 912,
+          "position": 0,
+          "rect": {
+            "bottom": 890,
+            "height": 741,
+            "left": 240,
+            "right": 1268,
+            "top": 149,
+            "width": 1028,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 741
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1280
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 655,
+          "right": 853,
+          "top": 920,
+          "width": 198,
+          "x": 655,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 655,
+            "right": 750,
+            "top": 920,
+            "width": 95,
+            "x": 655,
+            "y": 920
+          },
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 758,
+            "right": 853,
+            "top": 920,
+            "width": 95,
+            "x": 758,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1244,
+          "top": 902,
+          "width": 980,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 912,
+          "position": 171,
+          "rect": {
+            "bottom": 890,
+            "height": 741,
+            "left": 240,
+            "right": 1268,
+            "top": 149,
+            "width": 1028,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 741
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1280
+      },
+      "issues": []
+    },
+    {
+      "kind": "create",
+      "width": 1440,
+      "height": 1000,
+      "before": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 806,
+          "right": 862,
+          "top": 920,
+          "width": 56,
+          "x": 806,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 806,
+            "right": 862,
+            "top": 920,
+            "width": 56,
+            "x": 806,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1404,
+          "top": 902,
+          "width": 1140,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 997,
+          "position": 0,
+          "rect": {
+            "bottom": 890,
+            "height": 753,
+            "left": 1048,
+            "right": 1428,
+            "top": 137,
+            "width": 380,
+            "x": 1048,
+            "y": 137
+          },
+          "viewport": 753
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1440
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 806,
+          "right": 862,
+          "top": 920,
+          "width": 56,
+          "x": 806,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 806,
+            "right": 862,
+            "top": 920,
+            "width": 56,
+            "x": 806,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1404,
+          "top": 902,
+          "width": 1140,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 997,
+          "position": 244,
+          "rect": {
+            "bottom": 890,
+            "height": 753,
+            "left": 1048,
+            "right": 1428,
+            "top": 137,
+            "width": 380,
+            "x": 1048,
+            "y": 137
+          },
+          "viewport": 753
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1440
+      },
+      "issues": []
+    },
+    {
+      "kind": "settings",
+      "width": 1440,
+      "height": 1000,
+      "before": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 735,
+          "right": 933,
+          "top": 920,
+          "width": 198,
+          "x": 735,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 735,
+            "right": 830,
+            "top": 920,
+            "width": 95,
+            "x": 735,
+            "y": 920
+          },
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 838,
+            "right": 933,
+            "top": 920,
+            "width": 95,
+            "x": 838,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1404,
+          "top": 902,
+          "width": 1140,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 741,
+          "position": 0,
+          "rect": {
+            "bottom": 890,
+            "height": 741,
+            "left": 240,
+            "right": 1428,
+            "top": 149,
+            "width": 1188,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 741
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1440
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 735,
+          "right": 933,
+          "top": 920,
+          "width": 198,
+          "x": 735,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 735,
+            "right": 830,
+            "top": 920,
+            "width": 95,
+            "x": 735,
+            "y": 920
+          },
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 838,
+            "right": 933,
+            "top": 920,
+            "width": 95,
+            "x": 838,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1404,
+          "top": 902,
+          "width": 1140,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 741,
+          "position": 0,
+          "rect": {
+            "bottom": 890,
+            "height": 741,
+            "left": 240,
+            "right": 1428,
+            "top": 149,
+            "width": 1188,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 741
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1440
+      },
+      "issues": []
+    },
+    {
+      "kind": "create",
+      "width": 1920,
+      "height": 1000,
+      "before": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 1046,
+          "right": 1102,
+          "top": 920,
+          "width": 56,
+          "x": 1046,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 1046,
+            "right": 1102,
+            "top": 920,
+            "width": 56,
+            "x": 1046,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1884,
+          "top": 902,
+          "width": 1620,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 997,
+          "position": 0,
+          "rect": {
+            "bottom": 890,
+            "height": 753,
+            "left": 1528,
+            "right": 1908,
+            "top": 137,
+            "width": 380,
+            "x": 1528,
+            "y": 137
+          },
+          "viewport": 753
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1920
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 1046,
+          "right": 1102,
+          "top": 920,
+          "width": 56,
+          "x": 1046,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 1046,
+            "right": 1102,
+            "top": 920,
+            "width": 56,
+            "x": 1046,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1884,
+          "top": 902,
+          "width": 1620,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 997,
+          "position": 244,
+          "rect": {
+            "bottom": 890,
+            "height": 753,
+            "left": 1528,
+            "right": 1908,
+            "top": 137,
+            "width": 380,
+            "x": 1528,
+            "y": 137
+          },
+          "viewport": 753
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1920
+      },
+      "issues": []
+    },
+    {
+      "kind": "settings",
+      "width": 1920,
+      "height": 1000,
+      "before": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 975,
+          "right": 1173,
+          "top": 920,
+          "width": 198,
+          "x": 975,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 975,
+            "right": 1070,
+            "top": 920,
+            "width": 95,
+            "x": 975,
+            "y": 920
+          },
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 1078,
+            "right": 1173,
+            "top": 920,
+            "width": 95,
+            "x": 1078,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1884,
+          "top": 902,
+          "width": 1620,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 741,
+          "position": 0,
+          "rect": {
+            "bottom": 890,
+            "height": 741,
+            "left": 240,
+            "right": 1908,
+            "top": 149,
+            "width": 1668,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 741
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1920
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 956,
+          "height": 36,
+          "left": 975,
+          "right": 1173,
+          "top": 920,
+          "width": 198,
+          "x": 975,
+          "y": 920
+        },
+        "buttonRects": [
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 975,
+            "right": 1070,
+            "top": 920,
+            "width": 95,
+            "x": 975,
+            "y": 920
+          },
+          {
+            "bottom": 956,
+            "height": 36,
+            "left": 1078,
+            "right": 1173,
+            "top": 920,
+            "width": 95,
+            "x": 1078,
+            "y": 920
+          }
+        ],
+        "height": 1000,
+        "rect": {
+          "bottom": 974,
+          "height": 72,
+          "left": 264,
+          "right": 1884,
+          "top": 902,
+          "width": 1620,
+          "x": 264,
+          "y": 902
+        },
+        "scroll": {
+          "height": 741,
+          "position": 0,
+          "rect": {
+            "bottom": 890,
+            "height": 741,
+            "left": 240,
+            "right": 1908,
+            "top": 149,
+            "width": 1668,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 741
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1920
+      },
+      "issues": []
+    },
+    {
+      "kind": "create",
+      "width": 1152,
+      "height": 900,
+      "before": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 662,
+          "right": 718,
+          "top": 820,
+          "width": 56,
+          "x": 662,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 662,
+            "right": 718,
+            "top": 820,
+            "width": 56,
+            "x": 662,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1116,
+          "top": 802,
+          "width": 852,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 571,
+          "position": 0,
+          "rect": {
+            "bottom": 790,
+            "height": 543,
+            "left": 240,
+            "right": 1140,
+            "top": 247,
+            "width": 900,
+            "x": 240,
+            "y": 247
+          },
+          "viewport": 543
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1152
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 662,
+          "right": 718,
+          "top": 820,
+          "width": 56,
+          "x": 662,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 662,
+            "right": 718,
+            "top": 820,
+            "width": 56,
+            "x": 662,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1116,
+          "top": 802,
+          "width": 852,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 571,
+          "position": 28,
+          "rect": {
+            "bottom": 790,
+            "height": 543,
+            "left": 240,
+            "right": 1140,
+            "top": 247,
+            "width": 900,
+            "x": 240,
+            "y": 247
+          },
+          "viewport": 543
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1152
+      },
+      "issues": []
+    },
+    {
+      "kind": "settings",
+      "width": 1152,
+      "height": 900,
+      "before": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 591,
+          "right": 789,
+          "top": 820,
+          "width": 198,
+          "x": 591,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 591,
+            "right": 686,
+            "top": 820,
+            "width": 95,
+            "x": 591,
+            "y": 820
+          },
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 694,
+            "right": 789,
+            "top": 820,
+            "width": 95,
+            "x": 694,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1116,
+          "top": 802,
+          "width": 852,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 912,
+          "position": 0,
+          "rect": {
+            "bottom": 790,
+            "height": 641,
+            "left": 240,
+            "right": 1140,
+            "top": 149,
+            "width": 900,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 641
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1152
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 591,
+          "right": 789,
+          "top": 820,
+          "width": 198,
+          "x": 591,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 591,
+            "right": 686,
+            "top": 820,
+            "width": 95,
+            "x": 591,
+            "y": 820
+          },
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 694,
+            "right": 789,
+            "top": 820,
+            "width": 95,
+            "x": 694,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1116,
+          "top": 802,
+          "width": 852,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 912,
+          "position": 271,
+          "rect": {
+            "bottom": 790,
+            "height": 641,
+            "left": 240,
+            "right": 1140,
+            "top": 149,
+            "width": 900,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 641
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1152
+      },
+      "issues": []
+    },
+    {
+      "kind": "create",
+      "width": 1280,
+      "height": 900,
+      "before": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 726,
+          "right": 782,
+          "top": 820,
+          "width": 56,
+          "x": 726,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 726,
+            "right": 782,
+            "top": 820,
+            "width": 56,
+            "x": 726,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1244,
+          "top": 802,
+          "width": 980,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 571,
+          "position": 0,
+          "rect": {
+            "bottom": 790,
+            "height": 543,
+            "left": 240,
+            "right": 1268,
+            "top": 247,
+            "width": 1028,
+            "x": 240,
+            "y": 247
+          },
+          "viewport": 543
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1280
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 726,
+          "right": 782,
+          "top": 820,
+          "width": 56,
+          "x": 726,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 726,
+            "right": 782,
+            "top": 820,
+            "width": 56,
+            "x": 726,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1244,
+          "top": 802,
+          "width": 980,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 571,
+          "position": 28,
+          "rect": {
+            "bottom": 790,
+            "height": 543,
+            "left": 240,
+            "right": 1268,
+            "top": 247,
+            "width": 1028,
+            "x": 240,
+            "y": 247
+          },
+          "viewport": 543
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1280
+      },
+      "issues": []
+    },
+    {
+      "kind": "settings",
+      "width": 1280,
+      "height": 900,
+      "before": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 655,
+          "right": 853,
+          "top": 820,
+          "width": 198,
+          "x": 655,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 655,
+            "right": 750,
+            "top": 820,
+            "width": 95,
+            "x": 655,
+            "y": 820
+          },
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 758,
+            "right": 853,
+            "top": 820,
+            "width": 95,
+            "x": 758,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1244,
+          "top": 802,
+          "width": 980,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 912,
+          "position": 0,
+          "rect": {
+            "bottom": 790,
+            "height": 641,
+            "left": 240,
+            "right": 1268,
+            "top": 149,
+            "width": 1028,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 641
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1280
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 655,
+          "right": 853,
+          "top": 820,
+          "width": 198,
+          "x": 655,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 655,
+            "right": 750,
+            "top": 820,
+            "width": 95,
+            "x": 655,
+            "y": 820
+          },
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 758,
+            "right": 853,
+            "top": 820,
+            "width": 95,
+            "x": 758,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1244,
+          "top": 802,
+          "width": 980,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 912,
+          "position": 271,
+          "rect": {
+            "bottom": 790,
+            "height": 641,
+            "left": 240,
+            "right": 1268,
+            "top": 149,
+            "width": 1028,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 641
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1280
+      },
+      "issues": []
+    },
+    {
+      "kind": "create",
+      "width": 1440,
+      "height": 900,
+      "before": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 806,
+          "right": 862,
+          "top": 820,
+          "width": 56,
+          "x": 806,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 806,
+            "right": 862,
+            "top": 820,
+            "width": 56,
+            "x": 806,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1404,
+          "top": 802,
+          "width": 1140,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 997,
+          "position": 0,
+          "rect": {
+            "bottom": 790,
+            "height": 653,
+            "left": 1048,
+            "right": 1428,
+            "top": 137,
+            "width": 380,
+            "x": 1048,
+            "y": 137
+          },
+          "viewport": 653
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1440
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 806,
+          "right": 862,
+          "top": 820,
+          "width": 56,
+          "x": 806,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 806,
+            "right": 862,
+            "top": 820,
+            "width": 56,
+            "x": 806,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1404,
+          "top": 802,
+          "width": 1140,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 997,
+          "position": 344,
+          "rect": {
+            "bottom": 790,
+            "height": 653,
+            "left": 1048,
+            "right": 1428,
+            "top": 137,
+            "width": 380,
+            "x": 1048,
+            "y": 137
+          },
+          "viewport": 653
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1440
+      },
+      "issues": []
+    },
+    {
+      "kind": "settings",
+      "width": 1440,
+      "height": 900,
+      "before": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 735,
+          "right": 933,
+          "top": 820,
+          "width": 198,
+          "x": 735,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 735,
+            "right": 830,
+            "top": 820,
+            "width": 95,
+            "x": 735,
+            "y": 820
+          },
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 838,
+            "right": 933,
+            "top": 820,
+            "width": 95,
+            "x": 838,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1404,
+          "top": 802,
+          "width": 1140,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 718,
+          "position": 0,
+          "rect": {
+            "bottom": 790,
+            "height": 641,
+            "left": 240,
+            "right": 1428,
+            "top": 149,
+            "width": 1188,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 641
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1440
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 735,
+          "right": 933,
+          "top": 820,
+          "width": 198,
+          "x": 735,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 735,
+            "right": 830,
+            "top": 820,
+            "width": 95,
+            "x": 735,
+            "y": 820
+          },
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 838,
+            "right": 933,
+            "top": 820,
+            "width": 95,
+            "x": 838,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1404,
+          "top": 802,
+          "width": 1140,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 718,
+          "position": 77,
+          "rect": {
+            "bottom": 790,
+            "height": 641,
+            "left": 240,
+            "right": 1428,
+            "top": 149,
+            "width": 1188,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 641
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1440
+      },
+      "issues": []
+    },
+    {
+      "kind": "create",
+      "width": 1920,
+      "height": 900,
+      "before": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 1046,
+          "right": 1102,
+          "top": 820,
+          "width": 56,
+          "x": 1046,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 1046,
+            "right": 1102,
+            "top": 820,
+            "width": 56,
+            "x": 1046,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1884,
+          "top": 802,
+          "width": 1620,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 997,
+          "position": 0,
+          "rect": {
+            "bottom": 790,
+            "height": 653,
+            "left": 1528,
+            "right": 1908,
+            "top": 137,
+            "width": 380,
+            "x": 1528,
+            "y": 137
+          },
+          "viewport": 653
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1920
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 1046,
+          "right": 1102,
+          "top": 820,
+          "width": 56,
+          "x": 1046,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 1046,
+            "right": 1102,
+            "top": 820,
+            "width": 56,
+            "x": 1046,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1884,
+          "top": 802,
+          "width": 1620,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 997,
+          "position": 344,
+          "rect": {
+            "bottom": 790,
+            "height": 653,
+            "left": 1528,
+            "right": 1908,
+            "top": 137,
+            "width": 380,
+            "x": 1528,
+            "y": 137
+          },
+          "viewport": 653
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1920
+      },
+      "issues": []
+    },
+    {
+      "kind": "settings",
+      "width": 1920,
+      "height": 900,
+      "before": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 975,
+          "right": 1173,
+          "top": 820,
+          "width": 198,
+          "x": 975,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 975,
+            "right": 1070,
+            "top": 820,
+            "width": 95,
+            "x": 975,
+            "y": 820
+          },
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 1078,
+            "right": 1173,
+            "top": 820,
+            "width": 95,
+            "x": 1078,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1884,
+          "top": 802,
+          "width": 1620,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 718,
+          "position": 0,
+          "rect": {
+            "bottom": 790,
+            "height": 641,
+            "left": 240,
+            "right": 1908,
+            "top": 149,
+            "width": 1668,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 641
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1920
+      },
+      "after": {
+        "actionRect": {
+          "bottom": 856,
+          "height": 36,
+          "left": 975,
+          "right": 1173,
+          "top": 820,
+          "width": 198,
+          "x": 975,
+          "y": 820
+        },
+        "buttonRects": [
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 975,
+            "right": 1070,
+            "top": 820,
+            "width": 95,
+            "x": 975,
+            "y": 820
+          },
+          {
+            "bottom": 856,
+            "height": 36,
+            "left": 1078,
+            "right": 1173,
+            "top": 820,
+            "width": 95,
+            "x": 1078,
+            "y": 820
+          }
+        ],
+        "height": 900,
+        "rect": {
+          "bottom": 874,
+          "height": 72,
+          "left": 264,
+          "right": 1884,
+          "top": 802,
+          "width": 1620,
+          "x": 264,
+          "y": 802
+        },
+        "scroll": {
+          "height": 718,
+          "position": 77,
+          "rect": {
+            "bottom": 790,
+            "height": 641,
+            "left": 240,
+            "right": 1908,
+            "top": 149,
+            "width": 1668,
+            "x": 240,
+            "y": 149
+          },
+          "viewport": 641
+        },
+        "style": {
+          "background": "rgb(255, 255, 255)",
+          "border": "0px",
+          "bottom": "12px",
+          "display": "grid",
+          "position": "sticky",
+          "shadow": "rgba(0, 0, 0, 0.08) 0px 8px 24px 0px"
+        },
+        "width": 1920
+      },
+      "issues": []
+    }
+  ]
+}

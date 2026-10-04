@@ -5,6 +5,9 @@
   "unmatchedRegions": [],
   "maxEdgeDelta": 0,
   "pixelDifferenceOver24": 0,
+  "excludedArea": null,
+  "excludedMeasurements": [],
+  "footerValidationRequired": false,
   "measurements": [
     {
       "name": "shell-board/白い板",
@@ -1449,24 +1452,24 @@
     {
       "name": "MxskT/印",
       "implementation": {
-        "bottom": 953.75,
+        "bottom": 953.25,
         "height": 16,
         "left": 22,
         "right": 38,
-        "top": 937.75,
+        "top": 937.25,
         "width": 16,
         "x": 22,
-        "y": 937.75
+        "y": 937.25
       },
       "reference": {
-        "bottom": 953.75,
+        "bottom": 953.25,
         "height": 16,
         "left": 22,
         "right": 38,
-        "top": 937.75,
+        "top": 937.25,
         "width": 16,
         "x": 22,
-        "y": 937.75
+        "y": 937.25
       },
       "delta": {
         "left": 0,
@@ -3639,22 +3642,22 @@
     {
       "name": "gDoz1/項目 設定",
       "implementation": {
-        "bottom": 961,
-        "height": 31.5,
+        "bottom": 960,
+        "height": 30.5,
         "left": 12,
-        "right": 248,
+        "right": 228,
         "top": 929.5,
-        "width": 236,
+        "width": 216,
         "x": 12,
         "y": 929.5
       },
       "reference": {
-        "bottom": 961,
-        "height": 31.5,
+        "bottom": 960,
+        "height": 30.5,
         "left": 12,
-        "right": 248,
+        "right": 228,
         "top": 929.5,
-        "width": 236,
+        "width": 216,
         "x": 12,
         "y": 929.5
       },

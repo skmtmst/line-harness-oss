@@ -337,8 +337,8 @@
       {
         "display": "block",
         "rect": {
-          "bottom": 190,
-          "height": 43,
+          "bottom": 178,
+          "height": 31,
           "left": 240,
           "right": 1140,
           "top": 147,
@@ -351,28 +351,28 @@
       {
         "display": "block",
         "rect": {
-          "bottom": 325,
+          "bottom": 313,
           "height": 135,
           "left": 240,
           "right": 1140,
-          "top": 190,
+          "top": 178,
           "width": 900,
           "x": 240,
-          "y": 190
+          "y": 178
         },
         "region": "stats"
       },
       {
         "display": "flex",
         "rect": {
-          "bottom": 1016,
-          "height": 691,
+          "bottom": 988,
+          "height": 675,
           "left": 240,
           "right": 1140,
-          "top": 325,
+          "top": 313,
           "width": 900,
           "x": 240,
-          "y": 325
+          "y": 313
         },
         "region": "body"
       },
@@ -393,42 +393,42 @@
       {
         "display": "flex",
         "rect": {
-          "bottom": 389,
+          "bottom": 377,
           "height": 64,
           "left": 240,
           "right": 1140,
-          "top": 325,
+          "top": 313,
           "width": 900,
           "x": 240,
-          "y": 325
+          "y": 313
         },
         "region": "toolbar"
       },
       {
         "display": "block",
         "rect": {
-          "bottom": 964.5,
-          "height": 575.5,
+          "bottom": 777.5,
+          "height": 400.5,
           "left": 240,
           "right": 1140,
-          "top": 389,
+          "top": 377,
           "width": 900,
           "x": 240,
-          "y": 389
+          "y": 377
         },
         "region": "content"
       },
       {
         "display": "block",
         "rect": {
-          "bottom": 1016,
+          "bottom": 829,
           "height": 52,
           "left": 240,
           "right": 1140,
-          "top": 964,
+          "top": 777,
           "width": 900,
           "x": 240,
-          "y": 964
+          "y": 777
         },
         "region": "pagination"
       }
@@ -789,8 +789,8 @@
       {
         "display": "flex",
         "rect": {
-          "bottom": 1182,
-          "height": 831,
+          "bottom": 1037,
+          "height": 686,
           "left": 264,
           "right": 984,
           "top": 351,
@@ -1269,8 +1269,8 @@
       {
         "display": "block",
         "rect": {
-          "bottom": 190,
-          "height": 43,
+          "bottom": 178,
+          "height": 31,
           "left": 240,
           "right": 1268,
           "top": 147,
@@ -1283,28 +1283,28 @@
       {
         "display": "block",
         "rect": {
-          "bottom": 307,
+          "bottom": 295,
           "height": 117,
           "left": 240,
           "right": 1268,
-          "top": 190,
+          "top": 178,
           "width": 1028,
           "x": 240,
-          "y": 190
+          "y": 178
         },
         "region": "stats"
       },
       {
         "display": "flex",
         "rect": {
-          "bottom": 998,
-          "height": 691,
+          "bottom": 988,
+          "height": 693,
           "left": 240,
           "right": 1268,
-          "top": 307,
+          "top": 295,
           "width": 1028,
           "x": 240,
-          "y": 307
+          "y": 295
         },
         "region": "body"
       },
@@ -1325,42 +1325,42 @@
       {
         "display": "flex",
         "rect": {
-          "bottom": 371,
+          "bottom": 359,
           "height": 64,
           "left": 240,
           "right": 1268,
-          "top": 307,
+          "top": 295,
           "width": 1028,
           "x": 240,
-          "y": 307
+          "y": 295
         },
         "region": "toolbar"
       },
       {
         "display": "block",
         "rect": {
-          "bottom": 946.5,
-          "height": 575.5,
+          "bottom": 759.5,
+          "height": 400.5,
           "left": 240,
           "right": 1268,
-          "top": 371,
+          "top": 359,
           "width": 1028,
           "x": 240,
-          "y": 371
+          "y": 359
         },
         "region": "content"
       },
       {
         "display": "block",
         "rect": {
-          "bottom": 998,
+          "bottom": 811,
           "height": 52,
           "left": 240,
           "right": 1268,
-          "top": 946,
+          "top": 759,
           "width": 1028,
           "x": 240,
-          "y": 946
+          "y": 759
         },
         "region": "pagination"
       }
@@ -1721,8 +1721,8 @@
       {
         "display": "flex",
         "rect": {
-          "bottom": 1182,
-          "height": 831,
+          "bottom": 1037,
+          "height": 686,
           "left": 264,
           "right": 984,
           "top": 351,
@@ -2201,8 +2201,8 @@
       {
         "display": "block",
         "rect": {
-          "bottom": 190,
-          "height": 43,
+          "bottom": 178,
+          "height": 31,
           "left": 240,
           "right": 1428,
           "top": 147,
@@ -2215,84 +2215,84 @@
       {
         "display": "block",
         "rect": {
-          "bottom": 307,
+          "bottom": 295,
           "height": 117,
           "left": 240,
           "right": 1428,
-          "top": 190,
+          "top": 178,
           "width": 1188,
           "x": 240,
-          "y": 190
+          "y": 178
         },
         "region": "stats"
       },
       {
         "display": "flex",
         "rect": {
-          "bottom": 998,
-          "height": 691,
+          "bottom": 988,
+          "height": 693,
           "left": 240,
           "right": 1428,
-          "top": 307,
+          "top": 295,
           "width": 1188,
           "x": 240,
-          "y": 307
+          "y": 295
         },
         "region": "body"
       },
       {
         "display": "flex",
         "rect": {
-          "bottom": 998,
-          "height": 691,
+          "bottom": 988,
+          "height": 693,
           "left": 240,
           "right": 440,
-          "top": 307,
+          "top": 295,
           "width": 200,
           "x": 240,
-          "y": 307
+          "y": 295
         },
         "region": "folders"
       },
       {
         "display": "flex",
         "rect": {
-          "bottom": 371,
+          "bottom": 359,
           "height": 64,
           "left": 440,
           "right": 1428,
-          "top": 307,
+          "top": 295,
           "width": 988,
           "x": 440,
-          "y": 307
+          "y": 295
         },
         "region": "toolbar"
       },
       {
         "display": "block",
         "rect": {
-          "bottom": 946.5,
-          "height": 575.5,
+          "bottom": 759.5,
+          "height": 400.5,
           "left": 440,
           "right": 1428,
-          "top": 371,
+          "top": 359,
           "width": 988,
           "x": 440,
-          "y": 371
+          "y": 359
         },
         "region": "content"
       },
       {
         "display": "block",
         "rect": {
-          "bottom": 998,
+          "bottom": 811,
           "height": 52,
           "left": 440,
           "right": 1428,
-          "top": 946,
+          "top": 759,
           "width": 988,
           "x": 440,
-          "y": 946
+          "y": 759
         },
         "region": "pagination"
       }
@@ -2653,8 +2653,8 @@
       {
         "display": "flex",
         "rect": {
-          "bottom": 866,
-          "height": 709,
+          "bottom": 843,
+          "height": 686,
           "left": 496,
           "right": 1216,
           "top": 157,
@@ -3133,8 +3133,8 @@
       {
         "display": "block",
         "rect": {
-          "bottom": 190,
-          "height": 43,
+          "bottom": 178,
+          "height": 31,
           "left": 240,
           "right": 1908,
           "top": 147,
@@ -3147,84 +3147,84 @@
       {
         "display": "block",
         "rect": {
-          "bottom": 307,
+          "bottom": 295,
           "height": 117,
           "left": 240,
           "right": 1908,
-          "top": 190,
+          "top": 178,
           "width": 1668,
           "x": 240,
-          "y": 190
+          "y": 178
         },
         "region": "stats"
       },
       {
         "display": "flex",
         "rect": {
-          "bottom": 998,
-          "height": 691,
+          "bottom": 988,
+          "height": 693,
           "left": 240,
           "right": 1908,
-          "top": 307,
+          "top": 295,
           "width": 1668,
           "x": 240,
-          "y": 307
+          "y": 295
         },
         "region": "body"
       },
       {
         "display": "flex",
         "rect": {
-          "bottom": 998,
-          "height": 691,
+          "bottom": 988,
+          "height": 693,
           "left": 240,
           "right": 440,
-          "top": 307,
+          "top": 295,
           "width": 200,
           "x": 240,
-          "y": 307
+          "y": 295
         },
         "region": "folders"
       },
       {
         "display": "flex",
         "rect": {
-          "bottom": 371,
+          "bottom": 359,
           "height": 64,
           "left": 440,
           "right": 1908,
-          "top": 307,
+          "top": 295,
           "width": 1468,
           "x": 440,
-          "y": 307
+          "y": 295
         },
         "region": "toolbar"
       },
       {
         "display": "block",
         "rect": {
-          "bottom": 946.5,
-          "height": 575.5,
+          "bottom": 759.5,
+          "height": 400.5,
           "left": 440,
           "right": 1908,
-          "top": 371,
+          "top": 359,
           "width": 1468,
           "x": 440,
-          "y": 371
+          "y": 359
         },
         "region": "content"
       },
       {
         "display": "block",
         "rect": {
-          "bottom": 998,
+          "bottom": 811,
           "height": 52,
           "left": 440,
           "right": 1908,
-          "top": 946,
+          "top": 759,
           "width": 1468,
           "x": 440,
-          "y": 946
+          "y": 759
         },
         "region": "pagination"
       }
@@ -3585,8 +3585,8 @@
       {
         "display": "flex",
         "rect": {
-          "bottom": 866,
-          "height": 709,
+          "bottom": 843,
+          "height": 686,
           "left": 496,
           "right": 1216,
           "top": 157,

@@ -1,10 +1,13 @@
 {
-  "over4px": 31,
+  "over4px": 0,
   "compared": 173,
-  "status": "CONTINUE",
+  "status": "PASS",
   "unmatchedRegions": [],
-  "maxEdgeDelta": 40,
-  "pixelDifferenceOver24": 34569,
+  "maxEdgeDelta": 4,
+  "pixelDifferenceOver24": 31143,
+  "excludedArea": null,
+  "excludedMeasurements": [],
+  "footerValidationRequired": false,
   "measurements": [
     {
       "name": "shell-board/白い板",
@@ -22,19 +25,19 @@
         "bottom": 988,
         "height": 928,
         "left": 240,
-        "right": 1468,
+        "right": 1428,
         "top": 60,
-        "width": 1228,
+        "width": 1188,
         "x": 240,
         "y": 60
       },
       "delta": {
         "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "heading/板の頭",
@@ -52,19 +55,19 @@
         "bottom": 149,
         "height": 89,
         "left": 240,
-        "right": 1468,
+        "right": 1428,
         "top": 60,
-        "width": 1228,
+        "width": 1188,
         "x": 240,
         "y": 60
       },
       "delta": {
         "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "period/期間の行",
@@ -82,19 +85,19 @@
         "bottom": 209,
         "height": 60,
         "left": 240,
-        "right": 1468,
+        "right": 1428,
         "top": 149,
-        "width": 1228,
+        "width": 1188,
         "x": 240,
         "y": 149
       },
       "delta": {
         "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "stats/数の帯",
@@ -109,8 +112,8 @@
         "y": 209
       },
       "reference": {
-        "bottom": 331.5,
-        "height": 123,
+        "bottom": 329.5,
+        "height": 121,
         "left": 240,
         "right": 1428,
         "top": 208.5,
@@ -122,7 +125,7 @@
         "left": 0,
         "top": 0.5,
         "right": 0,
-        "bottom": 1.5
+        "bottom": 3.5
       },
       "over4px": false
     },
@@ -139,22 +142,22 @@
         "y": 333
       },
       "reference": {
-        "bottom": 1028,
-        "height": 697,
+        "bottom": 988,
+        "height": 659,
         "left": 240,
-        "right": 1468,
-        "top": 331,
-        "width": 1228,
+        "right": 1428,
+        "top": 329,
+        "width": 1188,
         "x": 240,
-        "y": 331
+        "y": 329
       },
       "delta": {
         "left": 0,
-        "top": 2,
-        "right": -40,
-        "bottom": -40
+        "top": 4,
+        "right": 0,
+        "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "content/主",
@@ -169,22 +172,22 @@
         "y": 333
       },
       "reference": {
-        "bottom": 1028,
-        "height": 697,
+        "bottom": 988,
+        "height": 659,
         "left": 240,
-        "right": 1128,
-        "top": 331,
-        "width": 888,
+        "right": 1129,
+        "top": 329,
+        "width": 889,
         "x": 240,
-        "y": 331
+        "y": 329
       },
       "delta": {
         "left": 0,
-        "top": 2,
-        "right": 0,
-        "bottom": -40
+        "top": 4,
+        "right": -1,
+        "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "aside/右の列（300）",
@@ -199,22 +202,22 @@
         "y": 333
       },
       "reference": {
-        "bottom": 1028,
-        "height": 697,
-        "left": 1127.5,
-        "right": 1468,
-        "top": 331,
-        "width": 340.5,
-        "x": 1127.5,
-        "y": 331
+        "bottom": 986,
+        "height": 657,
+        "left": 1128.5,
+        "right": 1428,
+        "top": 329,
+        "width": 299.5,
+        "x": 1128.5,
+        "y": 329
       },
       "delta": {
-        "left": 0.5,
-        "top": 2,
-        "right": -40,
-        "bottom": -40
+        "left": -0.5,
+        "top": 4,
+        "right": 0,
+        "bottom": 2
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "AHKVC/項目 ウェビナー",
@@ -759,30 +762,30 @@
     {
       "name": "CNGio/段の題 最近の実行",
       "implementation": {
-        "bottom": 577,
+        "bottom": 576,
         "height": 23,
         "left": 264,
         "right": 1104,
-        "top": 554,
+        "top": 553,
         "width": 840,
         "x": 264,
-        "y": 554
+        "y": 553
       },
       "reference": {
-        "bottom": 575,
+        "bottom": 572,
         "height": 23,
         "left": 264,
-        "right": 1104,
-        "top": 552,
-        "width": 840,
+        "right": 1105,
+        "top": 549,
+        "width": 841,
         "x": 264,
-        "y": 552
+        "y": 549
       },
       "delta": {
         "left": 0,
-        "top": 2,
-        "right": 0,
-        "bottom": 2
+        "top": 4,
+        "right": -1,
+        "bottom": 4
       },
       "over4px": false
     },
@@ -879,30 +882,30 @@
     {
       "name": "E5FGf/日 9/27",
       "implementation": {
-        "bottom": 539.5,
+        "bottom": 538.5,
         "height": 101,
         "left": 506.859375,
         "right": 618.28125,
-        "top": 438.5,
+        "top": 437.5,
         "width": 111.421875,
         "x": 506.859375,
-        "y": 438.5
+        "y": 437.5
       },
       "reference": {
-        "bottom": 537.5,
+        "bottom": 534.5,
         "height": 101,
         "left": 506.859375,
         "right": 618.28125,
-        "top": 436.5,
+        "top": 433.5,
         "width": 111.421875,
         "x": 506.859375,
-        "y": 436.5
+        "y": 433.5
       },
       "delta": {
         "left": 0.0,
-        "top": 2.0,
+        "top": 4.0,
         "right": 0.0,
-        "bottom": 2.0
+        "bottom": 4.0
       },
       "over4px": false
     },
@@ -1029,60 +1032,60 @@
     {
       "name": "FO1NB/行 Masato.S",
       "implementation": {
-        "bottom": 705,
+        "bottom": 704,
         "height": 50,
         "left": 264,
         "right": 1104,
-        "top": 655,
+        "top": 654,
         "width": 840,
         "x": 264,
-        "y": 655
+        "y": 654
       },
       "reference": {
-        "bottom": 703,
+        "bottom": 700,
         "height": 50,
         "left": 264,
-        "right": 1104,
-        "top": 653,
-        "width": 840,
+        "right": 1105,
+        "top": 650,
+        "width": 841,
         "x": 264,
-        "y": 653
+        "y": 650
       },
       "delta": {
         "left": 0,
-        "top": 2,
-        "right": 0,
-        "bottom": 2
+        "top": 4,
+        "right": -1,
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "Fd17h/日 10/1",
       "implementation": {
-        "bottom": 539.5,
+        "bottom": 538.5,
         "height": 92,
         "left": 992.578125,
         "right": 1104,
-        "top": 447.5,
+        "top": 446.5,
         "width": 111.421875,
         "x": 992.578125,
-        "y": 447.5
+        "y": 446.5
       },
       "reference": {
-        "bottom": 537.5,
+        "bottom": 534.5,
         "height": 92,
         "left": 992.578125,
         "right": 1104,
-        "top": 445.5,
+        "top": 442.5,
         "width": 111.421875,
         "x": 992.578125,
-        "y": 445.5
+        "y": 442.5
       },
       "delta": {
         "left": 0.0,
-        "top": 2.0,
+        "top": 4.0,
         "right": 0,
-        "bottom": 2.0
+        "bottom": 4.0
       },
       "over4px": false
     },
@@ -1251,20 +1254,20 @@
       "reference": {
         "bottom": 26,
         "height": 18,
-        "left": 1158,
-        "right": 1176,
+        "left": 1118,
+        "right": 1136,
         "top": 8,
         "width": 18,
-        "x": 1158,
+        "x": 1118,
         "y": 8
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "GsIWk/LINEアカウントの切り替え",
@@ -1281,20 +1284,20 @@
       "reference": {
         "bottom": 48,
         "height": 36,
-        "left": 928,
-        "right": 1126,
+        "left": 888,
+        "right": 1086,
         "top": 12,
         "width": 198,
-        "x": 928,
+        "x": 888,
         "y": 12
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "GzW5y/行 二重送信の防止",
@@ -1309,22 +1312,22 @@
         "y": 422
       },
       "reference": {
-        "bottom": 438,
+        "bottom": 436,
         "height": 18,
-        "left": 1148.5,
-        "right": 1448,
-        "top": 420,
-        "width": 299.5,
-        "x": 1148.5,
-        "y": 420
+        "left": 1149.5,
+        "right": 1408,
+        "top": 418,
+        "width": 258.5,
+        "x": 1149.5,
+        "y": 418
       },
       "delta": {
-        "left": 0.5,
-        "top": 2,
-        "right": -40,
-        "bottom": 2
+        "left": -0.5,
+        "top": 4,
+        "right": 0,
+        "bottom": 4
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "H0FLH/開閉",
@@ -1431,20 +1434,20 @@
       "reference": {
         "bottom": 37,
         "height": 14,
-        "left": 1102,
-        "right": 1116,
+        "left": 1062,
+        "right": 1076,
         "top": 23,
         "width": 14,
-        "x": 1102,
+        "x": 1062,
         "y": 23
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "HumL0/下",
@@ -1569,90 +1572,90 @@
     {
       "name": "HvWuM/文",
       "implementation": {
-        "bottom": 629,
+        "bottom": 628,
         "height": 38,
         "left": 300,
         "right": 1061.328125,
-        "top": 591,
+        "top": 590,
         "width": 761.328125,
         "x": 300,
-        "y": 591
+        "y": 590
       },
       "reference": {
-        "bottom": 627,
+        "bottom": 624,
         "height": 38,
         "left": 300,
-        "right": 1061.328125,
-        "top": 589,
-        "width": 761.328125,
+        "right": 1062.328125,
+        "top": 586,
+        "width": 762.328125,
         "x": 300,
-        "y": 589
+        "y": 586
       },
       "delta": {
         "left": 0,
-        "top": 2,
-        "right": 0.0,
-        "bottom": 2
+        "top": 4,
+        "right": -1.0,
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "HvWuM/文",
       "implementation": {
-        "bottom": 693,
+        "bottom": 692,
         "height": 38,
         "left": 300,
         "right": 1054.671875,
-        "top": 655,
+        "top": 654,
         "width": 754.671875,
         "x": 300,
-        "y": 655
+        "y": 654
       },
       "reference": {
-        "bottom": 691,
+        "bottom": 688,
         "height": 38,
         "left": 300,
-        "right": 1054.671875,
-        "top": 653,
-        "width": 754.671875,
+        "right": 1055.671875,
+        "top": 650,
+        "width": 755.671875,
         "x": 300,
-        "y": 653
+        "y": 650
       },
       "delta": {
         "left": 0,
-        "top": 2,
-        "right": 0.0,
-        "bottom": 2
+        "top": 4,
+        "right": -1.0,
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "HvWuM/文",
       "implementation": {
-        "bottom": 757,
+        "bottom": 756,
         "height": 38,
         "left": 300,
         "right": 1049.328125,
-        "top": 719,
+        "top": 718,
         "width": 749.328125,
         "x": 300,
-        "y": 719
+        "y": 718
       },
       "reference": {
-        "bottom": 755,
+        "bottom": 752,
         "height": 38,
         "left": 300,
-        "right": 1049.328125,
-        "top": 717,
-        "width": 749.328125,
+        "right": 1050.328125,
+        "top": 714,
+        "width": 750.328125,
         "x": 300,
-        "y": 717
+        "y": 714
       },
       "delta": {
         "left": 0,
-        "top": 2,
-        "right": 0.0,
-        "bottom": 2
+        "top": 4,
+        "right": -1.0,
+        "bottom": 4
       },
       "over4px": false
     },
@@ -1729,44 +1732,44 @@
         "y": 547
       },
       "reference": {
-        "bottom": 605,
+        "bottom": 603,
         "height": 60,
-        "left": 1148.5,
-        "right": 1448,
-        "top": 545,
-        "width": 299.5,
-        "x": 1148.5,
-        "y": 545
+        "left": 1149.5,
+        "right": 1408,
+        "top": 543,
+        "width": 258.5,
+        "x": 1149.5,
+        "y": 543
       },
       "delta": {
-        "left": 0.5,
-        "top": 2,
-        "right": -40,
-        "bottom": 2
+        "left": -0.5,
+        "top": 4,
+        "right": 0,
+        "bottom": 4
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "MxskT/印",
       "implementation": {
-        "bottom": 958.75,
+        "bottom": 959.25,
         "height": 16,
         "left": 22,
         "right": 38,
-        "top": 942.75,
+        "top": 943.25,
         "width": 16,
         "x": 22,
-        "y": 942.75
+        "y": 943.25
       },
       "reference": {
-        "bottom": 958.75,
+        "bottom": 959.25,
         "height": 16,
         "left": 22,
         "right": 38,
-        "top": 942.75,
+        "top": 943.25,
         "width": 16,
         "x": 22,
-        "y": 942.75
+        "y": 943.25
       },
       "delta": {
         "left": 0,
@@ -1941,20 +1944,20 @@
       "reference": {
         "bottom": 37.5,
         "height": 15,
-        "left": 1360,
-        "right": 1375,
+        "left": 1320,
+        "right": 1335,
         "top": 22.5,
         "width": 15,
-        "x": 1360,
+        "x": 1320,
         "y": 22.5
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0.0,
-        "right": -40,
+        "right": 0,
         "bottom": 0.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "OcVII/アイコン",
@@ -1971,20 +1974,20 @@
       "reference": {
         "bottom": 112,
         "height": 15,
-        "left": 1317.140625,
-        "right": 1332.140625,
+        "left": 1277.140625,
+        "right": 1292.140625,
         "top": 97,
         "width": 15,
-        "x": 1317.140625,
+        "x": 1277.140625,
         "y": 97
       },
       "delta": {
-        "left": -40.0,
+        "left": 0.0,
         "top": 0,
-        "right": -40.0,
+        "right": 0.0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "Oyw25/印",
@@ -2199,8 +2202,8 @@
     {
       "name": "S6R5zF/グラフ（幅に合わせて伸縮）",
       "implementation": {
-        "bottom": 540.5,
-        "height": 150.5,
+        "bottom": 539.5,
+        "height": 149.5,
         "left": 264,
         "right": 1104,
         "top": 390,
@@ -2209,20 +2212,20 @@
         "y": 390
       },
       "reference": {
-        "bottom": 538.5,
-        "height": 150.5,
+        "bottom": 535.5,
+        "height": 149.5,
         "left": 264,
         "right": 1104,
-        "top": 388,
+        "top": 386,
         "width": 840,
         "x": 264,
-        "y": 388
+        "y": 386
       },
       "delta": {
         "left": 0,
-        "top": 2,
+        "top": 4,
         "right": 0,
-        "bottom": 2.0
+        "bottom": 4.0
       },
       "over4px": false
     },
@@ -2269,22 +2272,22 @@
         "y": 482
       },
       "reference": {
-        "bottom": 498,
+        "bottom": 496,
         "height": 18,
-        "left": 1148.5,
-        "right": 1448,
-        "top": 480,
-        "width": 299.5,
-        "x": 1148.5,
-        "y": 480
+        "left": 1149.5,
+        "right": 1408,
+        "top": 478,
+        "width": 258.5,
+        "x": 1149.5,
+        "y": 478
       },
       "delta": {
-        "left": 0.5,
-        "top": 2,
-        "right": -40,
-        "bottom": 2
+        "left": -0.5,
+        "top": 4,
+        "right": 0,
+        "bottom": 4
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "Snqqq/印",
@@ -2361,20 +2364,20 @@
       "reference": {
         "bottom": 46,
         "height": 32,
-        "left": 966,
-        "right": 1094,
+        "left": 926,
+        "right": 1054,
         "top": 14,
         "width": 128,
-        "x": 966,
+        "x": 926,
         "y": 14
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "Us7mb/矢印",
@@ -2409,30 +2412,30 @@
     {
       "name": "Us7mb/矢印",
       "implementation": {
-        "bottom": 571.5,
+        "bottom": 570.5,
         "height": 12,
         "left": 1092,
         "right": 1104,
-        "top": 559.5,
+        "top": 558.5,
         "width": 12,
         "x": 1092,
-        "y": 559.5
+        "y": 558.5
       },
       "reference": {
-        "bottom": 569.5,
+        "bottom": 566.5,
         "height": 12,
-        "left": 1092,
-        "right": 1104,
-        "top": 557.5,
+        "left": 1093,
+        "right": 1105,
+        "top": 554.5,
         "width": 12,
-        "x": 1092,
-        "y": 557.5
+        "x": 1093,
+        "y": 554.5
       },
       "delta": {
-        "left": 0,
-        "top": 2.0,
-        "right": 0,
-        "bottom": 2.0
+        "left": -1,
+        "top": 4.0,
+        "right": -1,
+        "bottom": 4.0
       },
       "over4px": false
     },
@@ -2452,19 +2455,19 @@
         "bottom": 60,
         "height": 60,
         "left": 240,
-        "right": 1468,
+        "right": 1428,
         "top": 0,
-        "width": 1228,
+        "width": 1188,
         "x": 240,
         "y": 0
       },
       "delta": {
         "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "W1yz6/項目 予約管理",
@@ -2539,50 +2542,50 @@
         "y": 388
       },
       "reference": {
-        "bottom": 408,
+        "bottom": 406,
         "height": 22,
-        "left": 1148.5,
-        "right": 1448,
-        "top": 386,
-        "width": 299.5,
-        "x": 1148.5,
-        "y": 386
+        "left": 1149.5,
+        "right": 1408,
+        "top": 384,
+        "width": 258.5,
+        "x": 1149.5,
+        "y": 384
       },
       "delta": {
-        "left": 0.5,
-        "top": 2,
-        "right": -40,
-        "bottom": 2
+        "left": -0.5,
+        "top": 4,
+        "right": 0,
+        "bottom": 4
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "XiokJ/日 9/29",
       "implementation": {
-        "bottom": 539.5,
+        "bottom": 538.5,
         "height": 114,
         "left": 749.71875,
         "right": 861.140625,
-        "top": 425.5,
+        "top": 424.5,
         "width": 111.421875,
         "x": 749.71875,
-        "y": 425.5
+        "y": 424.5
       },
       "reference": {
-        "bottom": 537.5,
+        "bottom": 534.5,
         "height": 114,
         "left": 749.71875,
         "right": 861.140625,
-        "top": 423.5,
+        "top": 420.5,
         "width": 111.421875,
         "x": 749.71875,
-        "y": 423.5
+        "y": 420.5
       },
       "delta": {
         "left": 0.0,
-        "top": 2.0,
+        "top": 4.0,
         "right": 0.0,
-        "bottom": 2.0
+        "bottom": 4.0
       },
       "over4px": false
     },
@@ -2599,22 +2602,22 @@
         "y": 353
       },
       "reference": {
-        "bottom": 374,
+        "bottom": 372,
         "height": 23,
-        "left": 1148.5,
-        "right": 1448,
-        "top": 351,
-        "width": 299.5,
-        "x": 1148.5,
-        "y": 351
+        "left": 1149.5,
+        "right": 1408,
+        "top": 349,
+        "width": 258.5,
+        "x": 1149.5,
+        "y": 349
       },
       "delta": {
-        "left": 0.5,
-        "top": 2,
-        "right": -40,
-        "bottom": 2
+        "left": -0.5,
+        "top": 4,
+        "right": 0,
+        "bottom": 4
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "Y45xxR/顔",
@@ -2631,48 +2634,48 @@
       "reference": {
         "bottom": 44,
         "height": 28,
-        "left": 1186,
-        "right": 1214,
+        "left": 1146,
+        "right": 1174,
         "top": 16,
         "width": 28,
-        "x": 1186,
+        "x": 1146,
         "y": 16
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "YC0xb/日 9/28",
       "implementation": {
-        "bottom": 539.5,
+        "bottom": 538.5,
         "height": 124,
         "left": 628.28125,
         "right": 739.71875,
-        "top": 415.5,
+        "top": 414.5,
         "width": 111.4375,
         "x": 628.28125,
-        "y": 415.5
+        "y": 414.5
       },
       "reference": {
-        "bottom": 537.5,
+        "bottom": 534.5,
         "height": 124,
         "left": 628.28125,
         "right": 739.71875,
-        "top": 413.5,
+        "top": 410.5,
         "width": 111.4375,
         "x": 628.28125,
-        "y": 413.5
+        "y": 410.5
       },
       "delta": {
         "left": 0.0,
-        "top": 2.0,
+        "top": 4.0,
         "right": 0.0,
-        "bottom": 2.0
+        "bottom": 4.0
       },
       "over4px": false
     },
@@ -2691,20 +2694,20 @@
       "reference": {
         "bottom": 48,
         "height": 36,
-        "left": 1136,
-        "right": 1172,
+        "left": 1096,
+        "right": 1132,
         "top": 12,
         "width": 36,
-        "x": 1136,
+        "x": 1096,
         "y": 12
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "Yj7Yc/印",
@@ -2839,22 +2842,22 @@
         "y": 512
       },
       "reference": {
-        "bottom": 533,
+        "bottom": 531,
         "height": 23,
-        "left": 1148.5,
-        "right": 1448,
-        "top": 510,
-        "width": 299.5,
-        "x": 1148.5,
-        "y": 510
+        "left": 1149.5,
+        "right": 1408,
+        "top": 508,
+        "width": 258.5,
+        "x": 1149.5,
+        "y": 508
       },
       "delta": {
-        "left": 0.5,
-        "top": 2,
-        "right": -40,
-        "bottom": 2
+        "left": -0.5,
+        "top": 4,
+        "right": 0,
+        "bottom": 4
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "c2Hzs/通知の枠",
@@ -2871,20 +2874,20 @@
       "reference": {
         "bottom": 48,
         "height": 36,
-        "left": 1136,
-        "right": 1172,
+        "left": 1096,
+        "right": 1132,
         "top": 12,
         "width": 36,
-        "x": 1136,
+        "x": 1096,
         "y": 12
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "c2TiTU/印",
@@ -2962,19 +2965,19 @@
         "bottom": 40,
         "height": 20,
         "left": 290,
-        "right": 918,
+        "right": 878,
         "top": 20,
-        "width": 628,
+        "width": 588,
         "x": 290,
         "y": 20
       },
       "delta": {
         "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "dhMsy/印",
@@ -3021,48 +3024,48 @@
       "reference": {
         "bottom": 46.5,
         "height": 33,
-        "left": 1222,
-        "right": 1326,
+        "left": 1182,
+        "right": 1286,
         "top": 13.5,
         "width": 104,
-        "x": 1222,
+        "x": 1182,
         "y": 13.5
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0.0,
-        "right": -40,
+        "right": 0,
         "bottom": 0.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "eSyBZ/日 9/25",
       "implementation": {
-        "bottom": 539.5,
+        "bottom": 538.5,
         "height": 91,
         "left": 264,
         "right": 375.421875,
-        "top": 448.5,
+        "top": 447.5,
         "width": 111.421875,
         "x": 264,
-        "y": 448.5
+        "y": 447.5
       },
       "reference": {
-        "bottom": 537.5,
+        "bottom": 534.5,
         "height": 91,
         "left": 264,
         "right": 375.421875,
-        "top": 446.5,
+        "top": 443.5,
         "width": 111.421875,
         "x": 264,
-        "y": 446.5
+        "y": 443.5
       },
       "delta": {
         "left": 0,
-        "top": 2.0,
+        "top": 4.0,
         "right": 0.0,
-        "bottom": 2.0
+        "bottom": 4.0
       },
       "over4px": false
     },
@@ -3081,20 +3084,20 @@
       "reference": {
         "bottom": 42,
         "height": 24,
-        "left": 934,
-        "right": 958,
+        "left": 894,
+        "right": 918,
         "top": 18,
         "width": 24,
-        "x": 934,
+        "x": 894,
         "y": 18
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "fXIf0/段の題 日ごとの追加",
@@ -3109,20 +3112,20 @@
         "y": 353
       },
       "reference": {
-        "bottom": 374,
+        "bottom": 372,
         "height": 23,
         "left": 264,
-        "right": 1104,
-        "top": 351,
-        "width": 840,
+        "right": 1105,
+        "top": 349,
+        "width": 841,
         "x": 264,
-        "y": 351
+        "y": 349
       },
       "delta": {
         "left": 0,
-        "top": 2,
-        "right": 0,
-        "bottom": 2
+        "top": 4,
+        "right": -1,
+        "bottom": 4
       },
       "over4px": false
     },
@@ -3220,23 +3223,23 @@
       "name": "gDoz1/項目 設定",
       "implementation": {
         "bottom": 966,
-        "height": 31.5,
+        "height": 30.5,
         "left": 12,
-        "right": 248,
-        "top": 934.5,
-        "width": 236,
+        "right": 228,
+        "top": 935.5,
+        "width": 216,
         "x": 12,
-        "y": 934.5
+        "y": 935.5
       },
       "reference": {
         "bottom": 966,
-        "height": 31.5,
+        "height": 30.5,
         "left": 12,
-        "right": 248,
-        "top": 934.5,
-        "width": 236,
+        "right": 228,
+        "top": 935.5,
+        "width": 216,
         "x": 12,
-        "y": 934.5
+        "y": 935.5
       },
       "delta": {
         "left": 0,
@@ -3249,30 +3252,30 @@
     {
       "name": "gdu6W/行き先",
       "implementation": {
-        "bottom": 574.5,
+        "bottom": 573.5,
         "height": 18,
         "left": 1029.3125,
         "right": 1104,
-        "top": 556.5,
+        "top": 555.5,
         "width": 74.6875,
         "x": 1029.3125,
-        "y": 556.5
+        "y": 555.5
       },
       "reference": {
-        "bottom": 572.5,
+        "bottom": 569.5,
         "height": 18,
-        "left": 1029.3125,
-        "right": 1104,
-        "top": 554.5,
+        "left": 1030.3125,
+        "right": 1105,
+        "top": 551.5,
         "width": 74.6875,
-        "x": 1029.3125,
-        "y": 554.5
+        "x": 1030.3125,
+        "y": 551.5
       },
       "delta": {
-        "left": 0.0,
-        "top": 2.0,
-        "right": 0,
-        "bottom": 2.0
+        "left": -1.0,
+        "top": 4.0,
+        "right": -1,
+        "bottom": 4.0
       },
       "over4px": false
     },
@@ -3471,20 +3474,20 @@
       "reference": {
         "bottom": 48,
         "height": 36,
-        "left": 1346,
-        "right": 1460,
+        "left": 1306,
+        "right": 1420,
         "top": 12,
         "width": 114,
-        "x": 1346,
+        "x": 1306,
         "y": 12
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "l5K0J0/項目3",
@@ -3549,150 +3552,150 @@
     {
       "name": "mIiyl/行 Kenta Ka",
       "implementation": {
-        "bottom": 641,
+        "bottom": 640,
         "height": 50,
         "left": 264,
         "right": 1104,
-        "top": 591,
+        "top": 590,
         "width": 840,
         "x": 264,
-        "y": 591
+        "y": 590
       },
       "reference": {
-        "bottom": 639,
+        "bottom": 636,
         "height": 50,
         "left": 264,
-        "right": 1104,
-        "top": 589,
-        "width": 840,
+        "right": 1105,
+        "top": 586,
+        "width": 841,
         "x": 264,
-        "y": 589
+        "y": 586
       },
       "delta": {
         "left": 0,
-        "top": 2,
-        "right": 0,
-        "bottom": 2
+        "top": 4,
+        "right": -1,
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "meITw/線",
       "implementation": {
-        "bottom": 641,
+        "bottom": 640,
         "height": 50,
         "left": 264,
         "right": 288,
-        "top": 591,
+        "top": 590,
         "width": 24,
         "x": 264,
-        "y": 591
+        "y": 590
       },
       "reference": {
-        "bottom": 639,
+        "bottom": 636,
         "height": 50,
         "left": 264,
         "right": 288,
-        "top": 589,
+        "top": 586,
         "width": 24,
         "x": 264,
-        "y": 589
+        "y": 586
       },
       "delta": {
         "left": 0,
-        "top": 2,
+        "top": 4,
         "right": 0,
-        "bottom": 2
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "meITw/線",
       "implementation": {
-        "bottom": 705,
+        "bottom": 704,
         "height": 50,
         "left": 264,
         "right": 288,
-        "top": 655,
+        "top": 654,
         "width": 24,
         "x": 264,
-        "y": 655
+        "y": 654
       },
       "reference": {
-        "bottom": 703,
+        "bottom": 700,
         "height": 50,
         "left": 264,
         "right": 288,
-        "top": 653,
+        "top": 650,
         "width": 24,
         "x": 264,
-        "y": 653
+        "y": 650
       },
       "delta": {
         "left": 0,
-        "top": 2,
+        "top": 4,
         "right": 0,
-        "bottom": 2
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "meITw/線",
       "implementation": {
-        "bottom": 769,
+        "bottom": 768,
         "height": 50,
         "left": 264,
         "right": 288,
-        "top": 719,
+        "top": 718,
         "width": 24,
         "x": 264,
-        "y": 719
+        "y": 718
       },
       "reference": {
-        "bottom": 767,
+        "bottom": 764,
         "height": 50,
         "left": 264,
         "right": 288,
-        "top": 717,
+        "top": 714,
         "width": 24,
         "x": 264,
-        "y": 717
+        "y": 714
       },
       "delta": {
         "left": 0,
-        "top": 2,
+        "top": 4,
         "right": 0,
-        "bottom": 2
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "mtakX/日 9/26",
       "implementation": {
-        "bottom": 539.5,
+        "bottom": 538.5,
         "height": 108,
         "left": 385.421875,
         "right": 496.859375,
-        "top": 431.5,
+        "top": 430.5,
         "width": 111.4375,
         "x": 385.421875,
-        "y": 431.5
+        "y": 430.5
       },
       "reference": {
-        "bottom": 537.5,
+        "bottom": 534.5,
         "height": 108,
         "left": 385.421875,
         "right": 496.859375,
-        "top": 429.5,
+        "top": 426.5,
         "width": 111.4375,
         "x": 385.421875,
-        "y": 429.5
+        "y": 426.5
       },
       "delta": {
         "left": 0.0,
-        "top": 2.0,
+        "top": 4.0,
         "right": 0.0,
-        "bottom": 2.0
+        "bottom": 4.0
       },
       "over4px": false
     },
@@ -3759,120 +3762,120 @@
     {
       "name": "nCZjF/印",
       "implementation": {
-        "bottom": 615,
+        "bottom": 614,
         "height": 24,
         "left": 264,
         "right": 288,
-        "top": 591,
+        "top": 590,
         "width": 24,
         "x": 264,
-        "y": 591
+        "y": 590
       },
       "reference": {
-        "bottom": 613,
+        "bottom": 610,
         "height": 24,
         "left": 264,
         "right": 288,
-        "top": 589,
+        "top": 586,
         "width": 24,
         "x": 264,
-        "y": 589
+        "y": 586
       },
       "delta": {
         "left": 0,
-        "top": 2,
+        "top": 4,
         "right": 0,
-        "bottom": 2
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "nCZjF/印",
       "implementation": {
-        "bottom": 679,
+        "bottom": 678,
         "height": 24,
         "left": 264,
         "right": 288,
-        "top": 655,
+        "top": 654,
         "width": 24,
         "x": 264,
-        "y": 655
+        "y": 654
       },
       "reference": {
-        "bottom": 677,
+        "bottom": 674,
         "height": 24,
         "left": 264,
         "right": 288,
-        "top": 653,
+        "top": 650,
         "width": 24,
         "x": 264,
-        "y": 653
+        "y": 650
       },
       "delta": {
         "left": 0,
-        "top": 2,
+        "top": 4,
         "right": 0,
-        "bottom": 2
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "nCZjF/印",
       "implementation": {
-        "bottom": 743,
+        "bottom": 742,
         "height": 24,
         "left": 264,
         "right": 288,
-        "top": 719,
+        "top": 718,
         "width": 24,
         "x": 264,
-        "y": 719
+        "y": 718
       },
       "reference": {
-        "bottom": 741,
+        "bottom": 738,
         "height": 24,
         "left": 264,
         "right": 288,
-        "top": 717,
+        "top": 714,
         "width": 24,
         "x": 264,
-        "y": 717
+        "y": 714
       },
       "delta": {
         "left": 0,
-        "top": 2,
+        "top": 4,
         "right": 0,
-        "bottom": 2
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "ngA3y/日 9/30",
       "implementation": {
-        "bottom": 539.5,
+        "bottom": 538.5,
         "height": 131,
         "left": 871.140625,
         "right": 982.578125,
-        "top": 408.5,
+        "top": 407.5,
         "width": 111.4375,
         "x": 871.140625,
-        "y": 408.5
+        "y": 407.5
       },
       "reference": {
-        "bottom": 537.5,
+        "bottom": 534.5,
         "height": 131,
         "left": 871.140625,
         "right": 982.578125,
-        "top": 406.5,
+        "top": 403.5,
         "width": 111.4375,
         "x": 871.140625,
-        "y": 406.5
+        "y": 403.5
       },
       "delta": {
         "left": 0.0,
-        "top": 2.0,
+        "top": 4.0,
         "right": 0.0,
-        "bottom": 2.0
+        "bottom": 4.0
       },
       "over4px": false
     },
@@ -3889,22 +3892,22 @@
         "y": 452
       },
       "reference": {
-        "bottom": 468,
+        "bottom": 466,
         "height": 18,
-        "left": 1148.5,
-        "right": 1448,
-        "top": 450,
-        "width": 299.5,
-        "x": 1148.5,
-        "y": 450
+        "left": 1149.5,
+        "right": 1408,
+        "top": 448,
+        "width": 258.5,
+        "x": 1149.5,
+        "y": 448
       },
       "delta": {
-        "left": 0.5,
-        "top": 2,
-        "right": -40,
-        "bottom": 2
+        "left": -0.5,
+        "top": 4,
+        "right": 0,
+        "bottom": 4
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "nqVM9/印",
@@ -3949,20 +3952,20 @@
         "y": 619
       },
       "reference": {
-        "bottom": 653,
+        "bottom": 651,
         "height": 36,
-        "left": 1148.5,
-        "right": 1267.5,
-        "top": 617,
+        "left": 1149.5,
+        "right": 1268.5,
+        "top": 615,
         "width": 119,
-        "x": 1148.5,
-        "y": 617
+        "x": 1149.5,
+        "y": 615
       },
       "delta": {
-        "left": 0.5,
-        "top": 2,
-        "right": 0.5,
-        "bottom": 2
+        "left": -0.5,
+        "top": 4,
+        "right": -0.5,
+        "bottom": 4
       },
       "over4px": false
     },
@@ -4011,20 +4014,20 @@
       "reference": {
         "bottom": 122.5,
         "height": 36,
-        "left": 1303.140625,
-        "right": 1444,
+        "left": 1263.140625,
+        "right": 1404,
         "top": 86.5,
         "width": 140.859375,
-        "x": 1303.140625,
+        "x": 1263.140625,
         "y": 86.5
       },
       "delta": {
-        "left": -40.0,
+        "left": 0.0,
         "top": 0.0,
-        "right": -40,
+        "right": 0,
         "bottom": 0.0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "ocXcw/アイコン",
@@ -4549,22 +4552,22 @@
         "y": 388
       },
       "reference": {
-        "bottom": 408,
+        "bottom": 406,
         "height": 22,
-        "left": 1385,
-        "right": 1448,
-        "top": 386,
+        "left": 1345,
+        "right": 1408,
+        "top": 384,
         "width": 63,
-        "x": 1385,
-        "y": 386
+        "x": 1345,
+        "y": 384
       },
       "delta": {
-        "left": -40,
-        "top": 2,
-        "right": -40,
-        "bottom": 2
+        "left": 0,
+        "top": 4,
+        "right": 0,
+        "bottom": 4
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "t0gKLe/名",
@@ -4669,20 +4672,20 @@
         "y": 569
       },
       "reference": {
-        "bottom": 583,
+        "bottom": 581,
         "height": 16,
-        "left": 1162.5,
-        "right": 1178.5,
-        "top": 567,
+        "left": 1163.5,
+        "right": 1179.5,
+        "top": 565,
         "width": 16,
-        "x": 1162.5,
-        "y": 567
+        "x": 1163.5,
+        "y": 565
       },
       "delta": {
-        "left": 0.5,
-        "top": 2,
-        "right": 0.5,
-        "bottom": 2
+        "left": -0.5,
+        "top": 4,
+        "right": -0.5,
+        "bottom": 4
       },
       "over4px": false
     },
@@ -4779,90 +4782,90 @@
     {
       "name": "x4489/アイコン",
       "implementation": {
-        "bottom": 609,
+        "bottom": 608,
         "height": 12,
         "left": 270,
         "right": 282,
-        "top": 597,
+        "top": 596,
         "width": 12,
         "x": 270,
-        "y": 597
+        "y": 596
       },
       "reference": {
-        "bottom": 607,
+        "bottom": 604,
         "height": 12,
         "left": 270,
         "right": 282,
-        "top": 595,
+        "top": 592,
         "width": 12,
         "x": 270,
-        "y": 595
+        "y": 592
       },
       "delta": {
         "left": 0,
-        "top": 2,
+        "top": 4,
         "right": 0,
-        "bottom": 2
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "x4489/アイコン",
       "implementation": {
-        "bottom": 673,
+        "bottom": 672,
         "height": 12,
         "left": 270,
         "right": 282,
-        "top": 661,
+        "top": 660,
         "width": 12,
         "x": 270,
-        "y": 661
+        "y": 660
       },
       "reference": {
-        "bottom": 671,
+        "bottom": 668,
         "height": 12,
         "left": 270,
         "right": 282,
-        "top": 659,
+        "top": 656,
         "width": 12,
         "x": 270,
-        "y": 659
+        "y": 656
       },
       "delta": {
         "left": 0,
-        "top": 2,
+        "top": 4,
         "right": 0,
-        "bottom": 2
+        "bottom": 4
       },
       "over4px": false
     },
     {
       "name": "x4489/アイコン",
       "implementation": {
-        "bottom": 737,
+        "bottom": 736,
         "height": 12,
         "left": 270,
         "right": 282,
-        "top": 725,
+        "top": 724,
         "width": 12,
         "x": 270,
-        "y": 725
+        "y": 724
       },
       "reference": {
-        "bottom": 735,
+        "bottom": 732,
         "height": 12,
         "left": 270,
         "right": 282,
-        "top": 723,
+        "top": 720,
         "width": 12,
         "x": 270,
-        "y": 723
+        "y": 720
       },
       "delta": {
         "left": 0,
-        "top": 2,
+        "top": 4,
         "right": 0,
-        "bottom": 2
+        "bottom": 4
       },
       "over4px": false
     },
@@ -4941,48 +4944,48 @@
       "reference": {
         "bottom": 38,
         "height": 16,
-        "left": 1146,
-        "right": 1162,
+        "left": 1106,
+        "right": 1122,
         "top": 22,
         "width": 16,
-        "x": 1146,
+        "x": 1106,
         "y": 22
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     },
     {
       "name": "z6sUs/行 菅野 亮 に送れ",
       "implementation": {
-        "bottom": 769,
+        "bottom": 768,
         "height": 50,
         "left": 264,
         "right": 1104,
-        "top": 719,
+        "top": 718,
         "width": 840,
         "x": 264,
-        "y": 719
+        "y": 718
       },
       "reference": {
-        "bottom": 767,
+        "bottom": 764,
         "height": 50,
         "left": 264,
-        "right": 1104,
-        "top": 717,
-        "width": 840,
+        "right": 1105,
+        "top": 714,
+        "width": 841,
         "x": 264,
-        "y": 717
+        "y": 714
       },
       "delta": {
         "left": 0,
-        "top": 2,
-        "right": 0,
-        "bottom": 2
+        "top": 4,
+        "right": -1,
+        "bottom": 4
       },
       "over4px": false
     },
@@ -5181,20 +5184,20 @@
       "reference": {
         "bottom": 48,
         "height": 36,
-        "left": 1182,
-        "right": 1336,
+        "left": 1142,
+        "right": 1296,
         "top": 12,
         "width": 154,
-        "x": 1182,
+        "x": 1142,
         "y": 12
       },
       "delta": {
-        "left": -40,
+        "left": 0,
         "top": 0,
-        "right": -40,
+        "right": 0,
         "bottom": 0
       },
-      "over4px": true
+      "over4px": false
     }
   ]
 }
