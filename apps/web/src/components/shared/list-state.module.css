@@ -111,3 +111,6 @@
 [data-theme='v8'] [data-list-state='empty'] .action svg { width: 15px; height: 15px; }
 
 [data-theme='v8'] [data-list-state='empty'] .action { --shadow-primary-action: var(--v8-parts-primary-shadow); }
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .root { -webkit-font-smoothing: auto; }
