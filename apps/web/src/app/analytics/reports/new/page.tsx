@@ -992,12 +992,11 @@ function AnalyticsReportFormPage() {
   }
   if (editMissing || (editing === null && editId)) return <ListState kind="error" title="定期レポートが見つかりませんでした" description="一覧から選び直してください。" />
   if (editing?.isOneTime) return <ListState kind="empty" title="1回だけ送る依頼は変更できません" description="同じ内容が必要なときは、新しく作ってください。" />
-  if (!options || options.recipients.length === 0) return (
+  if (!options) return (
     <ListState
-      kind="empty"
-      title="受け取るログインユーザーがいません"
-      description="先に、受け取る人をログインユーザーへ追加してください。"
-      action={<Button href="/staff">ログインユーザーを確認する</Button>}
+      kind="error"
+      title="定期レポートを表示できませんでした"
+      onRetry={() => setReloadSeq((n) => n + 1)}
     />
   )
 
@@ -1073,6 +1072,7 @@ function AnalyticsReportFormPage() {
               {emails.map((email, index) => email.trim() && <Chip key={index}><span title={email}>{email}</span><Button size="compact" aria-label={`${email}を宛先から外す`} onClick={() => setEmails((current) => current.filter((_, value) => value !== index))}>×</Button></Chip>)}
             </div>
             <Disclosure title="＋ 宛先を足す" size="compact" defaultOpen={hasInvalidEmail}>
+              {options.recipients.length === 0 && <p className="report-v8-sub">受け取るログインユーザーがいません。メールだけの宛先を追加できます。</p>}
               <ul className="report-v8-recipients divide-y" aria-label="レポートを受け取る人">
                 {options.recipients.map((person) => {
                   const checked = staffIds.includes(person.id)

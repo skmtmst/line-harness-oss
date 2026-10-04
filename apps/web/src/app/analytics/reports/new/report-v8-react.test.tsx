@@ -61,6 +61,7 @@ const net = vi.hoisted(() => ({
   getDeferred: [] as Array<(value: Response) => void>,
   latestVersion: '2026-09-01T00:00:00.000Z',
   latestName: null as string | null,
+  emailOnly: false,
 }))
 
 function installFetch() {
@@ -90,7 +91,7 @@ function installFetch() {
       if (net.putMode === 'deferred') {
         return new Promise<Response>((resolve) => { net.deferred.push(resolve) })
       }
-      net.puts.push(1)
+      net.puts.push(JSON.parse(String(init.body)))
       return new Response(JSON.stringify({ success: true, data: { ...SCHEDULE, updatedAt: '2026-09-03T00:00:00.000Z' } }), { status: 200 })
     }
     if (url.pathname.startsWith('/api/analytics/report-schedules')) {
@@ -101,7 +102,12 @@ function installFetch() {
       const name = net.latestName ?? (net.gets === 1 ? SCHEDULE.name : 'ほかの人が変えた名前')
       return new Response(JSON.stringify({
         success: true,
-        data: { items: [{ ...SCHEDULE, name, updatedAt: net.latestVersion }], options: OPTIONS },
+        data: {
+          items: [{ ...SCHEDULE, name, updatedAt: net.latestVersion,
+            ...(net.emailOnly ? { recipients: [{ kind: 'email', email: 'report@example.com', label: 'report@example.com' }], channels: ['email'] } : {}),
+          }],
+          options: { ...OPTIONS, recipients: net.emailOnly ? [] : OPTIONS.recipients },
+        },
       }), { status: 200 })
     }
     return new Response(JSON.stringify({ success: false, error: '未設定' }), { status: 500 })
@@ -172,6 +178,7 @@ beforeEach(() => {
   net.getDeferred.length = 0
   net.latestVersion = SCHEDULE.updatedAt
   net.latestName = null
+  net.emailOnly = false
   installFetch()
 })
 
@@ -183,6 +190,47 @@ afterEach(async () => {
 })
 
 describe('V8 レポート作成（H5UoIu）', () => {
+  it.each([false, true])('担当者候補が0人でもメール宛先だけで作成・1回送信できる（1回送信=%s）', async (sendOnce) => {
+    net.emailOnly = true
+    await mount()
+    await settle()
+    expect(buttonByText('つくって動かす').disabled).toBe(true)
+    await click([...container.querySelectorAll('summary')].find((item) => item.textContent?.includes('＋ 宛先を足す'))!)
+    await click(buttonByText('メールだけの宛先を足す'))
+    const email = container.querySelector('input[aria-label="宛先のメールアドレス 1行目"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(email, { target: { value: ' report@example.com ' } }) })
+    await click([...container.querySelectorAll('summary')].find((item) => item.textContent?.startsWith('通知方法'))!)
+    const dashboard = [...container.querySelectorAll('input[type="checkbox"]')].find((item) => item.closest('label')?.textContent?.includes('管理画面のお知らせにも出す'))!
+    const emailChannel = [...container.querySelectorAll('input[type="checkbox"]')].find((item) => item.closest('label')?.textContent?.includes('メールでも送る'))!
+    await act(async () => { fireEvent.click(dashboard); fireEvent.click(emailChannel) })
+    await click(buttonByText(sendOnce ? '今すぐ1回だけ送る' : 'つくって動かす'))
+    if (sendOnce) {
+      expect(document.querySelector('[role="dialog"]')!.textContent).toContain('宛先：report@example.com')
+      expect(net.posts).toHaveLength(0)
+      await click(overlayButtonByText('確認して1回だけ送る'))
+    }
+    expect(net.posts).toHaveLength(1)
+    expect(net.posts[0].body).toMatchObject({
+      sendOnce, channels: ['email'],
+      recipients: [{ kind: 'email', email: 'report@example.com', label: 'report@example.com' }],
+    })
+  })
+
+  it('担当者候補が0人でも保存済みのメール宛先を変えずに編集できる', async () => {
+    net.emailOnly = true
+    fixture.editId = 'report-1'
+    await mount()
+    await settle()
+    const name = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(name, { target: { value: 'メール向け週次まとめ' } }) })
+    await click(buttonByText('変更を保存する'))
+    expect(net.puts).toEqual([expect.objectContaining({
+      name: 'メール向け週次まとめ', channels: ['email'],
+      recipients: [{ kind: 'email', email: 'report@example.com', label: 'report@example.com' }],
+      expectedUpdatedAt: SCHEDULE.updatedAt,
+    })])
+  })
+
   async function selectRecipient() {
     const person = [...container.querySelectorAll('input[type="checkbox"]')].find(
       (item) => item.closest('label')?.textContent?.includes('担当1'),
