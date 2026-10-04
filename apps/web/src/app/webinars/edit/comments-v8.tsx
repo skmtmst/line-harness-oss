@@ -9,6 +9,7 @@ import { Th } from '@/components/shared/table'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { ApiError, webinarApi, type WebinarSakuraComment } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 
 function validateImportRow(raw: unknown): WebinarSakuraComment | string {
   if (typeof raw !== 'object' || raw === null) return 'オブジェクトではありません'
@@ -25,6 +26,7 @@ function validateImportRow(raw: unknown): WebinarSakuraComment | string {
 }
 
 export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: { webinarId: string; onDirtyChange?: (dirty: boolean) => void; registerSave?: (save: (() => Promise<boolean>) | null) => void }) {
+  const canEdit = canManageRole(useStaffRole())
   const [comments, setComments] = useState<WebinarSakuraComment[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'denied'>('loading')
   const [attempt, setAttempt] = useState(0)
@@ -63,7 +65,7 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
     setComments((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c)))
 
   const save = async (): Promise<boolean> => {
-    if (state !== 'ready' || locked.current) return false
+    if (!canEdit || state !== 'ready' || locked.current) return false
     setMessage(null)
     setIsErrorMessage(true)
     if (importJson.trim()) { setMessage('貼り付けたJSONを読み込んでから保存してください。'); return false }
@@ -97,7 +99,7 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
       if (request === generation.current) setSaving(false)
     }
   }
-  useEffect(() => { registerSave?.(save); return () => registerSave?.(null) }, [registerSave, comments, importJson, state, webinarId])
+  useEffect(() => { registerSave?.(canEdit ? save : null); return () => registerSave?.(null) }, [registerSave, comments, importJson, state, webinarId, canEdit])
 
   const doImport = () => {
     try {
@@ -128,11 +130,12 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
       <div className="min-w-0 flex-1 space-y-3">
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card" aria-label="コメント演出">
           <h2 className="text-ink text-base font-bold">コメント演出<HelpTip label="コメント演出の説明">動画の途中で出すコメントをあらかじめ入れます。{WEBINAR_SAKURA_COMMENTS_MAX}件まで。</HelpTip></h2>
+          {!canEdit && state === 'ready' ? <Notice tone="info">閲覧のみです。変更はオーナーか管理者に依頼してください。</Notice> : null}
           {message ? <Notice tone={isErrorMessage ? 'danger' : 'info'}>{message}</Notice> : null}
           {state === 'error' ? <Notice tone="info" action={<Button onClick={() => setAttempt((value) => value + 1)}>もう一度読み込む</Button>}>コメントを読み込めませんでした。保存前に読み直してください。</Notice> : state === 'denied' ? <Notice tone="info">コメントを編集する権限がありません。管理者に確認してください。</Notice> : state === 'loading' ? (
             <p className="text-ink-faint py-6 text-center text-sm">読み込んでいます。</p>
           ) : (
-            <fieldset disabled={saving} className="min-w-0">
+            <fieldset disabled={!canEdit || saving} className="min-w-0">
               <div className="mt-3 overflow-x-auto rounded-control border border-hairline">
                 <table className="w-full table-fixed text-sm">
                   <thead>
@@ -227,7 +230,7 @@ export default function CommentsV8({ webinarId, onDirtyChange, registerSave }: {
           )}
         </section>
       </div>
-      <StickyBar status={dirty ? '保存していない変更があります' : undefined} actions={<><Button href="/webinars">キャンセル</Button><Button disabled={state !== 'ready' || saving} busy={saving} busyLabel="保存しています…" onClick={() => void save()}>保存する</Button></>} />
+      <StickyBar status={dirty ? '保存していない変更があります' : undefined} actions={<><Button href="/webinars">キャンセル</Button><Button disabled={!canEdit || state !== 'ready' || saving} busy={saving} busyLabel="保存しています…" onClick={() => void save()}>保存する</Button></>} />
     </div>
   )
 }

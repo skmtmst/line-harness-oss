@@ -34,6 +34,8 @@ const apiMocks = vi.hoisted(() => {
 
 const navigationMocks = vi.hoisted(() => ({ query: 'id=webinar-1' }))
 
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
+
 vi.mock('@/lib/api', () => ({
   ApiError: apiMocks.ApiError,
   extractApiErrorCode: apiMocks.extractApiErrorCode,

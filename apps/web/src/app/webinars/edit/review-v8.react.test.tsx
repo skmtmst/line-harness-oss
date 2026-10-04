@@ -12,7 +12,10 @@ const apiMocks = vi.hoisted(() => ({
   notifications: vi.fn(),
   publish: vi.fn(),
   testPublicPage: vi.fn(),
+  role: 'admin',
 }))
+
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => apiMocks.role, canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -71,6 +74,7 @@ function render(): HTMLElement {
 
 describe('公開の前に確かめるのV8（XCUNf）', () => {
   beforeEach(() => {
+    apiMocks.role = 'admin'
     apiMocks.publishValidation.mockResolvedValue({
       data: {
         checks: [
@@ -117,6 +121,22 @@ describe('公開の前に確かめるのV8（XCUNf）', () => {
     const publish = [...host.querySelectorAll('button')].find((el) => el.textContent === 'この版を公開')
     expect((publish as HTMLButtonElement).disabled).toBe(true)
     expect(apiMocks.publish).not.toHaveBeenCalled()
+  })
+
+  it('閲覧のみでは検査結果を読み、合格していても公開・テストを止める', async () => {
+    apiMocks.role = 'staff'
+    apiMocks.publishValidation.mockResolvedValue({ data: { checks: [{ key: 'page', label: '公開ページ', status: 'passed' }] } })
+    const host = render()
+    await act(async () => undefined)
+    expect(host.textContent).toContain('1/1')
+    expect(host.textContent).toContain('閲覧のみ')
+    for (const label of ['この版を公開', 'ページをテスト', '通知のテストを送る']) {
+      const button = [...host.querySelectorAll('button')].find((element) => element.textContent === label)!
+      expect(button.disabled).toBe(true)
+      await act(async () => { button.click() })
+    }
+    expect(apiMocks.publish).not.toHaveBeenCalled()
+    expect(apiMocks.testPublicPage).not.toHaveBeenCalled()
   })
 
   it('ページのテスト後は更新された保存版で公開し、二重クリックを一回にする', async () => {

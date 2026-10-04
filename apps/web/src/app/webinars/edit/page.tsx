@@ -42,6 +42,7 @@ import {
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { webinarLoadFailure, type WebinarLoadFailure } from '../webinar-load-failure'
@@ -280,9 +281,11 @@ function PublicPreviewStep({
   onEditorChange: (editor: WebinarEditor) => void
 }) {
   const canOpenPublicPage = webinar.status === 'active' && publicUrl !== null
+  const canEdit = canManageRole(useStaffRole())
   const [testing, setTesting] = useState(false)
   const [testNotice, setTestNotice] = useState('')
   const testPublicPage = async () => {
+    if (!canEdit || testing) return
     setTesting(true)
     setTestNotice('')
     try {
@@ -306,7 +309,7 @@ function PublicPreviewStep({
         ['公開期間', deliveryWindow(webinar)],
         ['対象', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
       ]} previewBody={editor.publicDescription || webinar.title}>
-        <div className="flex gap-2"><Button disabled={testing || !publicUrl} onClick={() => void testPublicPage()} busy={testing} busyLabel="確認中…">{editor.publicPage.test?.status === 'passed' ? 'ページ確認済み' : 'ページをテスト'}</Button>{canOpenPublicPage ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
+        <div className="flex gap-2"><Button disabled={!canEdit || testing || !publicUrl} title={!canEdit ? 'ページのテストはオーナーか管理者に依頼してください' : undefined} onClick={() => void testPublicPage()} busy={testing} busyLabel="確認中…">{editor.publicPage.test?.status === 'passed' ? 'ページ確認済み' : 'ページをテスト'}</Button>{canOpenPublicPage ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
         {testNotice ? <p className="text-ink-secondary text-xs">{testNotice}</p> : null}
         {!canOpenPublicPage ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
       </SummaryAside>

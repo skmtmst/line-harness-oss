@@ -11,6 +11,7 @@ import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { webinarApi, type Webinar, type WebinarEditor, type WebinarPublishValidation } from '@/lib/api'
 import { reviewActionSummaryText, reviewMonitoringText, reviewTestSummaryBody } from './review-text'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 
 const NOTIFICATION_FLAGS = ['registrationEnabled', 'dayBeforeEnabled', 'hourBeforeEnabled', 'startEnabled', 'missedEnabled', 'completedEnabled'] as const
 
@@ -27,6 +28,7 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
   canOpenPublicPage?: boolean
   publicPageReason?: string
 }) {
+  const canEdit = canManageRole(useStaffRole())
   const [validation, setValidation] = useState<WebinarPublishValidation | null>(null)
   const [validationState, setValidationState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [publishing, setPublishing] = useState(false)
@@ -68,13 +70,13 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
   }, [webinar.id])
 
   const blockers = validation?.checks.filter((check) => check.status === 'failed') ?? []
-  const canPublish = validationState === 'ready' && validation !== null && blockers.length === 0 && !publishing && !testing
+  const canPublish = canEdit && validationState === 'ready' && validation !== null && blockers.length === 0 && !publishing && !testing
   const passed = validation?.checks.filter((check) => check.status === 'passed').length ?? 0
   const total = validation?.checks.length ?? 0
   const monitoringFailures = editor.monitoring.notificationFailures + editor.monitoring.viewSegmentFailures + editor.monitoring.actionFailures
 
   const testPublicPage = async () => {
-    if (operationLock.current) return
+    if (!canEdit || operationLock.current) return
     operationLock.current = true
     setTesting(true)
     setTestNotice('')
@@ -118,6 +120,7 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
 
   return <div data-webinar-pane="review" data-design-node="XCUNf">
     <div className="space-y-3">
+      {!canEdit ? <Notice tone="info">閲覧のみです。公開やテストはオーナーか管理者に依頼してください。</Notice> : null}
       <section className="border-hairline bg-canvas rounded-card border p-4" aria-label="公開前の確認">
         <div className="flex items-center gap-2"><h2 className="text-ink text-base font-semibold">公開前の確認</h2><HelpTip label="公開前の確認の説明">公開に必要な設定と、公開ページ・通知のテスト結果を確認します。公開すると、その時点の保存版を使います。</HelpTip>{validationState === 'ready' ? <span className="text-ink-secondary text-xs tabular-nums">{passed}/{total}</span> : null}</div>
         {validationState === 'error' ? <Notice tone="info" action={<Button onClick={loadValidation}>もう一度読み込む</Button>}>公開前検査を読み込めませんでした。このままでは公開できません。</Notice> : null}
@@ -126,7 +129,7 @@ export default function ReviewV8({ webinar, editor, registrations, ctaCount, onP
           {validationState === 'loading' ? <li className="text-ink-faint py-3 text-sm" role="status">公開前検査を読み込んでいます。</li> : null}
         </ul>
         {validationState === 'ready' ? blockers.length > 0 ? <Notice tone="warn">このままでは公開できません：{blockers.map((check) => check.detail || check.label).join('・')}</Notice> : <p className="text-success mt-2 text-xs">必要なものは揃っています。</p> : null}
-        <div className="mt-3 flex flex-wrap gap-2"><Button disabled={publishing || testing} onClick={onTestNotifications}>通知のテストを送る</Button><Button disabled={publishing || testing} busy={testing} busyLabel="確認中…" onClick={() => void testPublicPage()}>ページをテスト</Button></div>
+        <div className="mt-3 flex flex-wrap gap-2"><Button disabled={!canEdit || publishing || testing} onClick={onTestNotifications}>通知のテストを送る</Button><Button disabled={!canEdit || publishing || testing} busy={testing} busyLabel="確認中…" onClick={() => void testPublicPage()}>ページをテスト</Button></div>
         {testNotice ? <p className="text-ink-secondary mt-2 text-xs" role="status">{testNotice}</p> : null}
         {publishError ? <p className="text-danger mt-2 text-xs" role="alert">{publishError}</p> : null}
       </section>

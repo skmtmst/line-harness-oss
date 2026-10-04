@@ -36,6 +36,7 @@ const net = vi.hoisted(() => ({
   participantTotal: 1,
   /** 参加者の1頁あたり（limit 指定がそのまま効く）。 */
   webinarStatus: 'draft' as 'draft' | 'active',
+  staffRole: 'admin',
 }))
 
 vi.mock('next/link', () => ({
@@ -150,7 +151,7 @@ function installFetch() {
     const path = url.pathname + url.search
     const method = init?.method ?? 'GET'
     net.calls.push({ path, method })
-    if (path === '/api/staff/me') return json({ role: 'admin' })
+    if (path === '/api/staff/me') return json({ role: net.staffRole })
     if (path.includes('/api/media')) return json({ items: [], nextCursor: null })
     if (path.includes('/api/webinars/webinar-1/participants')) {
       /* カーソルは offset。limit 指定があればその数だけ返す。 */
@@ -199,6 +200,7 @@ beforeEach(() => {
   net.commentsFail = false
   net.participantTotal = 1
   net.webinarStatus = 'draft'
+  net.staffRole = 'admin'
   installFetch()
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
@@ -343,6 +345,40 @@ function listLink(): HTMLAnchorElement {
   return link
 }
 
+
+describe('閲覧担当者の編集画面', () => {
+  it('コメントとCTAの下書き保存を登録せず、公開前確認からも変更・送信しない', async () => {
+    net.staffRole = 'staff'
+    fixture.params = new URLSearchParams('id=webinar-1&pane=cta')
+    await render()
+    await flush()
+    expect(buttonByText('下書きを保存').disabled).toBe(true)
+    expect(buttonByText('＋ CTAカードを足す').disabled).toBe(true)
+    await act(async () => { buttonByText('コメント演出').click() })
+    await flush()
+    expect(buttonByText('保存する').disabled).toBe(true)
+    expect(buttonByText('＋ 追加').closest('fieldset')!.disabled).toBe(true)
+    await act(async () => { buttonByText('設定').click() })
+    await act(async () => { buttonContaining('STEP 5').click() })
+    await flush()
+    expect(buttonByText('この版を公開').disabled).toBe(true)
+    expect(buttonByText('ページをテスト').disabled).toBe(true)
+    expect(net.calls.filter((call) => call.method !== 'GET')).toEqual([])
+  })
+
+  it('公開プレビューの確認状態を更新せず、公開済みページは閲覧できる', async () => {
+    net.staffRole = 'staff'
+    net.webinarStatus = 'active'
+    fixture.params = new URLSearchParams('id=webinar-1&pane=preview')
+    await render()
+    await flush()
+    expect(buttonByText('ページをテスト').disabled).toBe(true)
+    const link = [...host.querySelectorAll('a')].find((element) => element.textContent === '公開ページを見る')!
+    expect(link.href).toBe(editor.publicPage.url)
+    await act(async () => { buttonByText('ページをテスト').click() })
+    expect(net.calls.filter((call) => call.method !== 'GET')).toEqual([])
+  })
+})
 
 describe('視聴後アクションも未保存の入力を守る', () => {
   it('未保存のメッセージを持って一覧へ出ると確認し、保存後だけ確認を外す', async () => {

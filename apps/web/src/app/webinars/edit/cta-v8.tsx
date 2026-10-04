@@ -13,6 +13,7 @@ import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
 import { ApiError, fetchApi, webinarApi, type WebinarCtaCard, type WebinarEditor } from '@/lib/api'
 import { ctaCardProblems } from './cta-card-validation'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 
 /* 申込フォームの候補（編集画面の CtaDesignStep と同じ形）。 */
 type FormCandidates = {
@@ -65,6 +66,7 @@ export default function CtaV8({
   onDirtyChange?: (dirty: boolean) => void
   registerSave?: (save: (() => Promise<boolean>) | null) => void
 }) {
+  const canEdit = canManageRole(useStaffRole())
   const [ctas, setCtas] = useState<WebinarCtaCard[] | null>(null)
   const [times, setTimes] = useState<string[]>([])
   const [selected, setSelected] = useState(0)
@@ -158,7 +160,7 @@ export default function CtaV8({
   }
 
   const save = async (): Promise<boolean> => {
-    if (ctas === null || savingRef.current || conflict) return false
+    if (!canEdit || ctas === null || savingRef.current || conflict) return false
     const problems = ctaCardProblems(ctas, times, durationSeconds, parseMinSec)
     if (problems.length > 0) {
       setMessage(problems[0])
@@ -187,7 +189,7 @@ export default function CtaV8({
   }
 
   const saveRegistrationForm = async (): Promise<boolean> => {
-    if (savingRef.current || conflict) return false
+    if (!canEdit || savingRef.current || conflict) return false
     if (formCandidates.state !== 'ready') {
       setRegistrationError('回答フォームの候補を読み込んでから保存してください。')
       return false
@@ -262,19 +264,20 @@ export default function CtaV8({
   const formDirty = selectedRegistrationFormId !== savedForm
   const saveCurrent = useRef<() => Promise<boolean>>(async () => false)
   saveCurrent.current = async () => {
-    if (ctas === null || savingRef.current || conflict) return false
+    if (!canEdit || ctas === null || savingRef.current || conflict) return false
     if (cardsDirty && !(await save())) return false
     if (formDirty && !(await saveRegistrationForm())) return false
     return true
   }
   useEffect(() => { onDirtyChange?.(cardsDirty || formDirty) }, [cardsDirty, formDirty, onDirtyChange])
   useEffect(() => {
-    registerSave?.(() => saveCurrent.current())
+    registerSave?.(canEdit ? () => saveCurrent.current() : null)
     return () => registerSave?.(null)
-  }, [registerSave])
+  }, [registerSave, canEdit])
 
   return (
     <>
+      {!canEdit ? <Notice tone="info">閲覧のみです。変更はオーナーか管理者に依頼してください。</Notice> : null}
       {conflict ? <div data-design-node="pvimJ"><Notice tone="warn" action={<Button disabled={readingLatest} busy={readingLatest} onClick={() => void compareLatest()}>違いを比べる</Button>}>別の画面でこのウェビナーが更新されました。申込フォームの入力は残しています。最新版を確認してから保存してください。</Notice>
         {latestEditor ? <div className="border-hairline mt-3 rounded-control border p-3 text-sm"><p>保存されている申込フォーム：{latestEditor.publicPage.form?.name ?? (latestEditor.registrationFormId ? publishedForms.find((form) => form.id === latestEditor.registrationFormId)?.name ?? '選択済みのフォーム' : '未設定')}</p><p className="mt-2">この画面の入力：{publishedForms.find((form) => form.id === selectedRegistrationFormId)?.name ?? (selectedRegistrationFormId ? '選択済みのフォーム' : '未設定')}</p><Button className="mt-3" onClick={() => setReplaceConfirm(true)}>最新を読み込んで続ける</Button></div> : null}
       </div> : null}
@@ -299,7 +302,7 @@ export default function CtaV8({
                       <span className="text-ink min-w-0 flex-1 truncate text-sm" title={card.title}>{card.title || '（見出しなし）'}</span>
                       <StatusBadge tone={card.kind === 'form' ? 'success' : 'neutral'}>{card.kind === 'form' ? '回答フォーム' : 'URL'}</StatusBadge>
                     </button>
-                    <span className="relative"><Button size="compact" aria-label={`カード${index + 1}の操作`} aria-expanded={menuOpen === index} onClick={() => setMenuOpen(menuOpen === index ? null : index)}>…</Button><ActionMenu open={menuOpen === index} onClose={() => setMenuOpen(null)} ariaLabel={`カード${index + 1}の操作`} items={[
+                    <span className="relative"><Button disabled={!canEdit} size="compact" aria-label={`カード${index + 1}の操作`} aria-expanded={menuOpen === index} onClick={() => setMenuOpen(menuOpen === index ? null : index)}>…</Button><ActionMenu open={canEdit && menuOpen === index} onClose={() => setMenuOpen(null)} ariaLabel={`カード${index + 1}の操作`} items={[
                       { id: 'copy', label: '複製する', onSelect: () => { setCtas((prev) => prev ? [...prev.slice(0, index + 1), { ...prev[index] }, ...prev.slice(index + 1)] : prev); setTimes((prev) => [...prev.slice(0, index + 1), prev[index], ...prev.slice(index + 1)]) } },
                       { id: 'delete', label: '消す', tone: 'danger', onSelect: () => { setCtas((prev) => prev ? prev.filter((_, j) => j !== index) : prev); setTimes((prev) => prev.filter((_, j) => j !== index)); setSelected(0) } },
                     ]} /></span>
@@ -309,6 +312,7 @@ export default function CtaV8({
               <div className="mt-3">
                 <Button
                   variant="secondary"
+                  disabled={!canEdit}
                   onClick={() => {
                     setCtas((prev) => [...(prev ?? []), EMPTY_CARD(0)])
                     setTimes((prev) => [...prev, '0:00'])
@@ -319,7 +323,7 @@ export default function CtaV8({
                 </Button>
               </div>
               {current ? (
-                <div className="bg-canvas-sunken mt-3 space-y-3 rounded-control p-3">
+                <fieldset disabled={!canEdit} className="bg-canvas-sunken mt-3 space-y-3 rounded-control p-3">
                   <p className="text-ink text-sm font-semibold">
                     選んでいるカード：{fmtMinSec(current.atSeconds)}
                   </p>
@@ -394,10 +398,10 @@ export default function CtaV8({
                   >
                     ボタンを押したら、フォームを自動で開く
                   </Checkbox>
-                </div>
+                </fieldset>
               ) : null}
               <div className="mt-3">
-                <Button disabled={saving || ctas === null} busy={saving} busyLabel="保存しています…" onClick={save}>
+                <Button disabled={!canEdit || saving || ctas === null} busy={saving} busyLabel="保存しています…" onClick={save}>
                   CTAカードを保存する
                 </Button>
               </div>
@@ -413,7 +417,7 @@ export default function CtaV8({
           {formCandidates.state === 'error' ? <p className="text-ink-secondary mt-3 text-sm" role="alert">回答フォームを読み込めませんでした。候補が取れない間は種類をURLに切り替えて保存できます。 <Button onClick={loadForms}>もう一度読み込む</Button></p> : null}
           {formCandidates.state === 'forbidden' ? <p className="text-ink-secondary mt-3 text-sm">回答フォームを見る権限がありません。管理者に権限の確認を依頼してください。</p> : null}
           {formCandidates.state === 'ready' && publishedForms.length === 0 ? <p className="text-ink-faint mt-3 text-sm">公開中の回答フォームがありません。</p> : null}
-          {formCandidates.state === 'ready' && publishedForms.length > 0 ? <div className="mt-3"><Select label="申込フォーム" aria-label="申込に使う回答フォーム" value={selectedRegistrationFormId} onChange={setSelectedRegistrationFormId} options={[{ value: '', label: '申込フォームを選ぶ' }, ...publishedForms.map((form) => ({ value: form.id, label: form.name }))]} /></div> : null}
+          {formCandidates.state === 'ready' && publishedForms.length > 0 ? <div className="mt-3"><Select disabled={!canEdit} label="申込フォーム" aria-label="申込に使う回答フォーム" value={selectedRegistrationFormId} onChange={setSelectedRegistrationFormId} options={[{ value: '', label: '申込フォームを選ぶ' }, ...publishedForms.map((form) => ({ value: form.id, label: form.name }))]} /></div> : null}
           {formCandidates.state === 'ready' && selectedRegistrationFormId && !publishedForms.some((form) => form.id === selectedRegistrationFormId) ? <p role="alert" className="text-warning mt-2 text-sm">前に選んだフォームは使えなくなりました。公開中のフォームを選び直してください。</p> : null}
           {formCandidates.state === 'ready' && editor.registrationFormId && !publishedForms.some((form) => form.id === editor.registrationFormId) ? <p className="text-warning mt-2 text-sm">保存済みの申込フォームは公開中ではありません。</p> : null}
           {registrationError ? <p className="text-danger mt-2 text-xs" role="alert">{registrationError}</p> : null}
@@ -421,7 +425,7 @@ export default function CtaV8({
           <div className="mt-3">
             <Button
               variant="secondary"
-              disabled={conflict || readingLatest || savingRegistrationForm || formCandidates.state !== 'ready' || !accountId}
+              disabled={!canEdit || conflict || readingLatest || savingRegistrationForm || formCandidates.state !== 'ready' || !accountId}
               busy={savingRegistrationForm}
               busyLabel="保存しています…"
               onClick={saveRegistrationForm}

@@ -10,7 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const apiMocks = vi.hoisted(() => ({
   comments: vi.fn(),
   saveComments: vi.fn(),
+  role: 'admin',
 }))
+
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => apiMocks.role, canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -40,6 +43,7 @@ function render(): HTMLElement {
 
 describe('コメント演出のV8（Omqd4）', () => {
   beforeEach(() => {
+    apiMocks.role = 'admin'
     apiMocks.comments.mockResolvedValue({
       data: [{ atSeconds: 10, authorName: '田中', body: 'こんばんは' }],
     })
@@ -107,6 +111,20 @@ describe('コメント演出のV8（Omqd4）', () => {
     expect(apiMocks.saveComments).toHaveBeenCalledTimes(2)
     expect(apiMocks.saveComments.mock.calls[1][1]).toEqual([{ atSeconds: 10, authorName: '田中', body: 'こんばんは' }])
     expect(host.textContent).toContain('1件保存しました')
+  })
+
+  it('閲覧のみではコメントを読み、追加・変更・保存を止める', async () => {
+    apiMocks.role = 'staff'
+    const host = render()
+    await act(async () => undefined)
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="1行目の名前"]')!
+    expect(input.value).toBe('田中')
+    expect(input.closest('fieldset')!.disabled).toBe(true)
+    expect(host.textContent).toContain('閲覧のみ')
+    const save = [...host.querySelectorAll('button')].find((button) => button.textContent === '保存する')!
+    expect(save.disabled).toBe(true)
+    await act(async () => { save.click() })
+    expect(apiMocks.saveComments).not.toHaveBeenCalled()
   })
 
 })

@@ -14,7 +14,10 @@ const apiMocks = vi.hoisted(() => ({
   saveCtas: vi.fn(),
   saveEditor: vi.fn(),
   fetchApi: vi.fn(),
+  role: 'admin',
 }))
+
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => apiMocks.role, canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -58,6 +61,7 @@ function render(props: Partial<Pick<React.ComponentProps<typeof CtaV8>, 'onDirty
 
 describe('CTA・フォームのV8（Q0Jrk）', () => {
   beforeEach(() => {
+    apiMocks.role = 'admin'
     apiMocks.ctas.mockResolvedValue({
       data: [
         {
@@ -89,6 +93,28 @@ describe('CTA・フォームのV8（Q0Jrk）', () => {
     expect(host.textContent).toContain('個別導入診断、受付中です')
     expect(host.textContent).toContain('申込に使う回答フォーム')
     expect(host.textContent).toContain('カードの見え方')
+  })
+
+  it('閲覧のみではカードを選んで確認でき、入力・追加・保存を止める', async () => {
+    apiMocks.role = 'staff'
+    apiMocks.fetchApi.mockResolvedValue({ success: true, data: [{ id: 'form-1', name: '申込用', isActive: true }] })
+    const host = render()
+    await act(async () => undefined)
+    expect(host.textContent).toContain('個別導入診断、受付中です')
+    const card = host.querySelector<HTMLButtonElement>('button[aria-current="true"]')!
+    expect(card.closest('fieldset')!.disabled).toBe(false)
+    expect(host.querySelector('input')!.closest('fieldset')!.disabled).toBe(true)
+    expect(host.querySelector<HTMLButtonElement>('button[aria-label="カード1の操作"]')!.disabled).toBe(true)
+    for (const label of ['＋ CTAカードを足す', 'CTAカードを保存する', '申込フォームを保存する']) {
+      expect([...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === label)!.disabled).toBe(true)
+    }
+    let save!: (() => Promise<boolean>) | null
+    const registered = render({ registerSave: (handler) => { save = handler } })
+    await act(async () => undefined)
+    expect(save).toBeNull()
+    expect(registered.textContent).toContain('閲覧のみ')
+    expect(apiMocks.saveCtas).not.toHaveBeenCalled()
+    expect(apiMocks.saveEditor).not.toHaveBeenCalled()
   })
 
   it('空のまま保存すると注意が出て送らない', async () => {
