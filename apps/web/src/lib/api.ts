@@ -14250,7 +14250,38 @@ function withAccount(path: string, accountId: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}account_id=${encodeURIComponent(accountId)}`;
 }
 
+/** 前払いのみの印を付け外しした記録（理由は店だけが見る）。 */
+export interface BookingNoshowFlagEvent {
+  action: 'manual_on' | 'manual_off';
+  reason: string | null;
+  staffId: string | null;
+  staffName: string | null;
+  at: string;
+}
+
+/** 友だちの無断キャンセルから決めた前払いのみの判定。 */
+export interface BookingPrepayDecision {
+  noshowCount: number;
+  threshold: number;
+  enabled: boolean;
+  windowMonths: number;
+  noPaymentMode: 'notice' | 'notice_call';
+  prepayOnly: boolean;
+  manual: boolean;
+  recentDates: string[];
+  lastEvent: BookingNoshowFlagEvent | null;
+}
+
 export const bookingApi = {
+  getFriendNoshow: (accountId: string, friendId: string) =>
+    fetchApi<{ success: true; data: BookingPrepayDecision }>(
+      withAccount(`/api/booking/admin/friends/${encodeURIComponent(friendId)}/noshow`, accountId),
+    ),
+  setFriendPrepay: (accountId: string, friendId: string, body: { mode: 'manual_on' | 'manual_off'; reason?: string }) =>
+    fetchApi<{ success: true; data: BookingPrepayDecision }>(
+      withAccount(`/api/booking/admin/friends/${encodeURIComponent(friendId)}/prepay`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   previewReminders: (accountId: string, startsAt: string) => {
     const params = new URLSearchParams({ account_id: accountId, starts_at: startsAt });
     return fetchApi<{ reminders: Array<{ kind: 'day_before' | 'hours_before'; scheduledAt: string }> }>(

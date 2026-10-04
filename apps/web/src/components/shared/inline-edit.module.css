@@ -1,0 +1,87 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * その場の書き換え（V8「サクサク感」C②）。見る目は文字だけ、
+ * 押すと入力欄になる。入力欄は選ぶ欄と同じ高さ 36・角丸 10・文字 13。
+ * v7 の画面では使わない部品のため v7 側の規定は持たない。
+ */
+
+.view {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.view:hover:not(:disabled) .viewValue {
+  text-decoration: underline;
+  text-decoration-color: var(--color-action);
+  text-underline-offset: 3px;
+}
+
+.view:disabled {
+  cursor: not-allowed;
+}
+
+.viewValue {
+  display: inline-block;
+  overflow: hidden;
+  max-width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.view:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.edit {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.input {
+  min-width: 0;
+  flex: 1 1 160px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-accent-deep);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.input:disabled {
+  opacity: 0.7;
+}
+
+.saving {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.error {
+  flex-basis: 100%;
+  color: var(--color-status-danger);
+  font-size: 12px;
+}
+}
