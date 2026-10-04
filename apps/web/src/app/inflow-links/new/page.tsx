@@ -179,7 +179,7 @@ function NewInflowLinkFormV7() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   return (
-    <>
+    <div data-design-node="KMaMk vWJEm">
     <CreatePage
       title="流入リンクをつくる"
       description="流入経路ごとにURLを分けると、どこから友だちになったかが分かります。"
@@ -448,7 +448,7 @@ function NewInflowLinkFormV7() {
     </CreatePage>
 
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した流入リンク" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </div>
   )
 }
 

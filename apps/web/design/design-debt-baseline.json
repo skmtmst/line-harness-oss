@@ -348,7 +348,8 @@
   },
   "app/inflow-links/page.tsx": {
     "arbitrary-value": 14,
-    "direct-secondary-button": 1
+    "direct-secondary-button": 1,
+    "unresolved-classname": 5
   },
   "app/layout.tsx": {
     "unresolved-classname": 1

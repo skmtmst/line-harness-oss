@@ -20,6 +20,7 @@ import { originInfoOf } from './origin-labels'
 import { readExclusionCondition, readExclusionMemo } from './conversion-exclusion'
 import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder'
 import KpiCard from '@/components/shared/kpi-card'
+import styles from './conversions-v8.module.css'
 
 /**
  * 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。
@@ -924,10 +925,15 @@ function ConversionsPageInner({ accountId, v8 }: { accountId: string | null; v8:
   }
 
   return (
-    <div data-conversion-points-design="v6" className="flex flex-col gap-4">
+    <div data-conversion-points-design="v6" data-design-node="r6dJFy WSGvo E2l8cw BygrU" className="flex flex-col gap-4">
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/*
+        ★V8（`BygrU` 1152）：数の帯は区切り線で並べる1本の帯にする。
+        包み div の札も帯のマスにする組立ては conversions-v8.module.css。
+        v7 の見た目は変えない。
+      */}
+      <KpiCollapse data-design="KPIs" gridClassName={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 ${styles.kpis}`}>
         <KpiCard
           title="決めてある成果地点"
           value={definitions?.pagination.total ?? null}
@@ -1415,7 +1421,12 @@ function ReportTab({ accountId }: { accountId: string | null }) {
       </div>
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
 
-      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/*
+        ★V8（`BygrU` 1152）：数の帯は区切り線で並べる1本の帯にする。
+        包み div の札も帯のマスにする組立ては conversions-v8.module.css。
+        v7 の見た目は変えない。
+      */}
+      <KpiCollapse data-design="KPIs" gridClassName={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 ${styles.kpis}`}>
         <KpiCard
           title={`この${periodDays}日の成果`}
           value={report.kpis.netCount}
