@@ -17,6 +17,7 @@ describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
     const list = read('list-v8.tsx')
     // 閲覧のみは NtCE3 に切り替わる形で両方の印を残す（印を消さない）。
     expect(list, '一覧の板が無い').toContain("data-design-node={canEdit ? 'EML2F bIdqV' : 'NtCE3'}")
+    expect(list).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
   })
 
   it('一覧の道具の段に rfdmA（1152）を付ける', () => {
