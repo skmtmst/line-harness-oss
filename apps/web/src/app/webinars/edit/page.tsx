@@ -2,7 +2,7 @@
 
 import Disclosure from '@/components/shared/disclosure'
 import CommentsV8 from './comments-v8'
-import ParticipantsV8 from './participants-v8'
+import ParticipantsV8, { type ParticipantExport } from './participants-v8'
 import CtaV8 from './cta-v8'
 import ReviewV8 from './review-v8'
 import NotificationsV8 from './notifications-v8'
@@ -1702,6 +1702,8 @@ function EditWebinarInner() {
   const [analyticsId, setAnalyticsId] = useState<string | null>(null)
   /* 取得の世代印。切替後に遅れて届いた前のウェビナーの応答はここで捨てる。 */
   const loadRequestId = useRef(0)
+  const [participantExport, setParticipantExport] = useState<ParticipantExport | null>(null)
+  const handleParticipantExport = useCallback((value: ParticipantExport | null) => setParticipantExport(value), [])
 
   const webinar = loadedWebinar && loadedWebinar.id === id ? loadedWebinar.webinar : null
   const editor = loadedWebinar && loadedWebinar.id === id ? loadedWebinar.editor : null
@@ -2077,8 +2079,10 @@ function EditWebinarInner() {
   return (
     <div className="min-w-0" data-webinar-editor="v8">
       {/* ★V7: 左右の余白は共通の枠が持つ。画面側で幅と横余白を足すと 24px ずれる。 */}
-      <h1 className="text-ink text-xl font-semibold">{showSteps ? paneTitle[pane] : webinar.title}</h1>
       <nav data-design="Crumb" className="text-action text-xs font-semibold"><Link href="/webinars" className="hover:underline">← ウェビナー一覧</Link></nav>
+      <div className="flex items-center justify-between gap-3"><h1 className="text-ink min-w-0 truncate text-xl font-semibold" title={showSteps ? paneTitle[pane] : webinar.title}>{showSteps ? paneTitle[pane] : webinar.title}</h1>{pane === 'participants' && participantExport?.available ? <Button onClick={participantExport.download} disabled={participantExport.busy} busy={participantExport.busy} busyLabel="書き出しています…">CSVで書き出す</Button> : null}</div>
+
+      {!showSteps ? <p className="text-ink-secondary text-xs">{editor.deliveryKind === 'on_demand' ? 'オンデマンド・いつでも視聴' : '日時指定'}・{webinarStatusLabel(webinar.status)}（版 {editor.version}）</p> : null}
 
       {showSteps ? (
         <ol data-design="Steps" className="flex" data-webinar-steps="true">
@@ -2127,6 +2131,7 @@ function EditWebinarInner() {
       */}
       <nav aria-label="参加者・分析・演出へ移動" className="flex" data-webinar-tabs="true">
         {([
+          { key: 'basic', label: '設定' },
           { key: 'participants', label: '参加者' },
           { key: 'analytics', label: '分析' },
           { key: 'comments', label: 'コメント演出' },
@@ -2228,11 +2233,7 @@ function EditWebinarInner() {
         </div>
       ) : null}
       {pane === 'preview' && <PublicPreviewStep webinar={webinar} editor={editor} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} onEditorChange={setEditor} />}
-      {/*
-        ★V8 切替（参加者管理 `uNsEy`）。v7 の見た目は
-        data-theme="v8" が付くまで 1画素も変えない。
-      */}
-      {pane === 'participants' && (adminTheme === 'v8' ? <ParticipantsV8 webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} /> : <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" analytics={analytics} analyticsState={analyticsState} webinarStatus={webinar.status} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} />)}
+      {pane === 'participants' && <ParticipantsV8 webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} onExportChange={handleParticipantExport} />}
       {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} webinarStatus={webinar.status} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} onOpenParticipants={() => goStep('participants')} />}
 
       {/* 保存はこの一段だけ。各段の中に別の保存バーは出さない。共通 StickyBar を使い、画面幅いっぱいの fixed 配置でサイドバーに重ねない。 */}
@@ -2248,7 +2249,7 @@ function EditWebinarInner() {
           )}
         />
       ) : null}
-      {pane === 'participants' ? <div className="flex justify-end gap-2"><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=analytics`}>分析を見る</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーの設定を編集</Button></div> : null}
+
       {leaveConfirmDialog}
     </div>
   )

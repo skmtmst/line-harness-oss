@@ -80,10 +80,13 @@ const ITEMS = [
   },
 ]
 
+const roots: Root[] = []
+
 function render(): HTMLElement {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
+  roots.push(root)
   act(() => {
     root.render(
       <ParticipantsV8
@@ -106,6 +109,7 @@ describe('参加者管理のV8（uNsEy）', () => {
   })
 
   afterEach(() => {
+    act(() => { for (const root of roots.splice(0)) root.unmount() })
     document.body.innerHTML = ''
     vi.clearAllMocks()
   })
@@ -119,7 +123,7 @@ describe('参加者管理のV8（uNsEy）', () => {
       expect(host.textContent).toContain(label)
     }
     expect(host.textContent).toContain('Kenta Kawano')
-    const detail = host.querySelector('a[href="/friends/detail?id=friend-1"]')
+    const detail = host.querySelector('a[href="/chats?friend=friend-1"]')
     expect(detail).not.toBeNull()
     expect(detail!.textContent).toContain('チャットを見る')
   })
@@ -135,4 +139,20 @@ describe('参加者管理のV8（uNsEy）', () => {
     const last = apiMocks.participants.mock.calls.at(-1) as unknown[]
     expect(last?.[3]).toBe('completed')
   })
+  it('続きを待つ間に分類を変えても、古い参加者を混ぜない', async () => {
+    let resolveMore!: (value: unknown) => void
+    apiMocks.participants.mockImplementation((_id, cursor, _limit, filter) => {
+      if (cursor) return new Promise((resolve) => { resolveMore = resolve })
+      return Promise.resolve({ data: { items: filter ? [ITEMS[1]] : [ITEMS[0]], nextCursor: filter ? null : 'next' } })
+    })
+    const host = render()
+    await act(async () => undefined)
+    await act(async () => { [...host.querySelectorAll('button')].find((el) => el.textContent === '続きを読み込む')!.click() })
+    await act(async () => { [...host.querySelectorAll('button')].find((el) => el.textContent?.includes('視聴完了') && el.hasAttribute('aria-pressed'))!.click() })
+    await act(async () => { resolveMore({ data: { items: [{ ...ITEMS[0], friendId: 'old', friendName: '古い条件の参加者' }], nextCursor: null } }) })
+    expect(host.textContent).toContain('山田 太郎')
+    expect(host.textContent).not.toContain('古い条件の参加者')
+    expect(host.textContent).not.toContain('Kenta Kawano')
+  })
+
 })

@@ -14,7 +14,7 @@ describe('V6 ウェビナー編集の集計の遅延読み込みの契約', () =
 
   it('参加者・分析の段に親の集計を渡す', () => {
     // v7 参加者・V8 参加者（uNsEy）・分析の3か所。子は集計を取らず、親から受ける。
-    expect(PAGE.match(/analytics=\{analytics\} analyticsState=\{analyticsState\}/g)).toHaveLength(3)
+    expect(PAGE.match(/analytics=\{analytics\} analyticsState=\{analyticsState\}/g)).toHaveLength(2)
   })
 
   it('参加者一覧はカーソルで最後まで読め、コメントとは取り口を分ける', () => {

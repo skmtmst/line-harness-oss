@@ -544,15 +544,17 @@ describe('DETAIL-06 参加者一覧を最後の1人まで読める', () => {
   }
 
   function renderedNames(): string[] {
-    return Array.from(new Set(host.textContent?.match(/参加者 \d+/g) ?? []))
+    return Array.from(host.querySelectorAll('a[href^="/friends/detail?id="]')).map((a) => a.textContent ?? '')
   }
 
-  it.each([9, 50])('%i人: 1頁で全員表示され、最後の人まで届く', async (total) => {
+  it.each([9, 50])('%i人: 検索とページ送りで最後の人まで届く', async (total) => {
     net.participantTotal = total
     await openParticipants()
 
+    expect(renderedNames()).toHaveLength(Math.min(total, 20))
+    const search = host.querySelector('input[type="search"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(search, { target: { value: `参加者 ${total}` } }) })
     expect(host.textContent).toContain(`参加者 ${total}`)
-    expect(renderedNames()).toHaveLength(total)
     /* 続きが無いときは「続きを読み込む」を出さない。 */
     expect(Array.from(host.querySelectorAll('button')).some((b) => b.textContent?.trim() === '続きを読み込む')).toBe(false)
   })
@@ -561,13 +563,16 @@ describe('DETAIL-06 参加者一覧を最後の1人まで読める', () => {
     net.participantTotal = 201
     await openParticipants()
 
-    expect(host.textContent).toContain('参加者 50')
-    expect(host.textContent).not.toContain('参加者 51')
+    expect(host.textContent).toContain('参加者 20')
+    expect(renderedNames()).not.toContain('参加者 51')
 
     await loadAllPages()
 
+    expect(host.textContent).toContain('201件中')
+    const search = host.querySelector('input[type="search"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(search, { target: { value: '参加者 201' } }) })
     expect(host.textContent).toContain('参加者 201')
-    expect(renderedNames()).toHaveLength(201)
+    expect(renderedNames()).toHaveLength(1)
     /* 初回 + カーソル4回 = 5頁。limit と cursor が実際に付く。 */
     const calls = participantCalls()
     expect(calls).toHaveLength(5)
