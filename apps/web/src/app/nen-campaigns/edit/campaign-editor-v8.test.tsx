@@ -85,7 +85,7 @@ describe('配信を直す V8', () => {
     for (const title of ['いつ送りますか', '送るもの', '押されたあとにすること']) {
       expect(screen.getByText(title)).toBeTruthy()
     }
-    expect(screen.getByText('高橋 直人さん（ももちゃん）にはこう届きます')).toBeTruthy()
+    expect(screen.getByText('お客さまにはこう届きます')).toBeTruthy()
     expect(screen.getByRole('button', { name: '配信内容を保存する' })).toBeTruthy()
   })
 })
