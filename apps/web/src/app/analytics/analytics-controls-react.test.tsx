@@ -214,6 +214,31 @@ describe('分析の対象者種別・期間選択(#835)', () => {
     }
   })
 
+  it('URLの状態を絞ると、ページに出ていない同じ状態のリンクもCSVへ入る', async () => {
+    fixture.tab = 'url-clicks'
+    const metric = (value: number) => ({ value, state: 'available', reason: null })
+    net.handler = async (path) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'viewer' } }
+      return { success: true, data: { period: expectedRange(30), dataCutoffAt: null, data: {
+        stateReason: null, hasMore: false, clickRateDefinition: '中継URLの実測',
+        links: Array.from({ length: 26 }, (_, i) => ({ trackedLinkId: `link-${i}`, name: `リンク${i}`, originalUrl: `https://example.invalid/${i}`, isActive: i % 2 === 0, clicks: metric(i), knownClickPeople: metric(i), deliveredPeople: metric(100), clickRate: metric(i), usageLocations: ['一斉配信'] })),
+      } } }
+    }
+    let csv: Blob | undefined
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => { csv = blob as Blob; return 'blob:test' })
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    await render()
+    await select('url-state', 'active')
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(10)
+    expect(host.textContent).toContain('13件中')
+    await click('CSV で書き出す')
+    const body = await csv!.text()
+    expect(body).toContain('"リンク24",')
+    expect(body).not.toContain('"リンク1",')
+    expect(body.split('\n')).toHaveLength(14)
+  })
+
   it('ファネルは3種別を実POSTし、7/30/90日のcohort期間で再集計する', async () => {
     fixture.tab = 'funnel'
     net.handler = async (path) => {

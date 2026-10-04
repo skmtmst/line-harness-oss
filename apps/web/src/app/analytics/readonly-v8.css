@@ -106,3 +106,5 @@
 [data-theme='v8'] #usage-items th:nth-child(5) { width: 24%; }
 [data-theme='v8'] #usage-items th:last-child { width: 16%; }
 [data-theme='v8'] #usage-items td:last-child { overflow: visible; }
+
+[data-theme='v8'] .v8-ro-analytics-search { flex: 1 1 260px; min-width: 200px; }
