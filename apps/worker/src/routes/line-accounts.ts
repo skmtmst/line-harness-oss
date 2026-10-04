@@ -10,7 +10,6 @@ import {
   getLineAccountCredentialHealth,
   createLineAccount,
   listLineAccountTags,
-  attachLineAccountRegistrationTags,
   updateLineAccount,
   updateLineAccountFields,
   updateLineAccountOrder,
@@ -1178,6 +1177,7 @@ function readConnectBody(body: ConnectBody):
   if (!/^\d+$/.test(loginChannelId)) return { ok: false, error: 'LINE LoginのチャネルIDは半角数字で入力してください' };
   if (!loginChannelSecret) return { ok: false, error: 'LINE Loginのチャネルシークレットを入力してください' };
   const id=(v:unknown):v is string=>typeof v==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(v);
+  if (Array.isArray(body.tagIds) && body.tagIds.length > 30) return { ok: false, error: '登録前のタグは30件以内で指定してください' };
   for(const value of [body.tagIds,body.staffIds]) if(value!==undefined && (!Array.isArray(value)||value.length>50||value.some(v=>!id(v))||new Set(value).size!==value.length)) return {ok:false,error:'タグ・担当者の指定を確認してください'};
   if(body.parentLineAccountId!==undefined && body.parentLineAccountId!==null && !id(body.parentLineAccountId)) return {ok:false,error:'親アカウントを確認してください'};
   if(body.liffId!==undefined && (typeof body.liffId!=='string'||!/^\d+-[A-Za-z0-9_-]+$/.test(body.liffId))) return {ok:false,error:'LIFF IDを確認してください'};
@@ -1189,7 +1189,7 @@ async function readConnectRequest(c: Context<Env>) {
     const parsed = readConnectBody(await c.req.json<ConnectBody>());
     if (parsed.ok && parsed.value.tagIds.length) {
       const tags = await listLineAccountTags(c.env.DB, c.get('staff').tenantId ?? DEFAULT_TENANT_ID);
-      if (!parsed.value.tagIds.every(id => tags.some(tag => tag.id === id))) return { ok: false as const, error: '指定した登録前のタグが見つかりません' };
+      if (!parsed.value.tagIds.every(id => tags.some(tag => tag.id === id))) return { ok: false as const, error: '指定した登録前のタグが見つかりません', status: 403 as const };
     }
     return parsed;
   } catch {
@@ -1290,7 +1290,7 @@ function publicConnectData(
 // UI用の自動接続確認。LINE側のWebhook・LIFFは設定するが、musuboのDBには書き込まない。
 lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner'), async (c) => {
   const parsed = await readConnectRequest(c);
-  if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
+  if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 'status' in parsed ? parsed.status : 422);
   let registration;
   try { registration=await validateRegistrationOptions(c.env.DB,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,parsed.value,c.get('staff').id); }
   catch(error) { if(error instanceof RegistrationOptionsError) return c.json({success:false,error:'タグ・親・担当者の指定を確認してください',code:error.code},error.status); throw error; }
@@ -1326,7 +1326,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
   }
   const parsed = await readConnectRequest(c);
-  if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
+  if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 'status' in parsed ? parsed.status : 422);
   let registration;
   try { registration=await validateRegistrationOptions(c.env.DB,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,parsed.value,c.get('staff').id); }
   catch(error) { if(error instanceof RegistrationOptionsError) return c.json({success:false,error:'タグ・親・担当者の指定を確認してください',code:error.code},error.status); throw error; }
@@ -1364,8 +1364,6 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
       lineBasicId: prepared.bot.basicId ?? null,
       lineProfileSyncedAt: jstNow(),
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
-
-    if (parsed.value.tagIds.length) await attachLineAccountRegistrationTags(c.env.DB, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, account.id, parsed.value.tagIds);
 
     const followerState = await detectFollowerImportCapability(
       c.env.DB,
