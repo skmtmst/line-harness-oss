@@ -231,6 +231,10 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
       setError(`${formIssueMessage}。フォームを外して選び直してから保存してください`)
       return
     }
+    if (mileageAction && (!Number.isInteger(mileageAction.amount) || mileageAction.amount < 1 || mileageAction.amount > 1_000_000)) {
+      setError('付けるマイルは1〜1,000,000の整数で入力してください')
+      return
+    }
     setSaving(true)
     setError('')
     setNotice('')
@@ -413,7 +417,7 @@ export default function CampaignEditorV8({ campaignKey }: { campaignKey: string 
             {mileageAction?.kind === 'award_mileage' ? (
               <div className={styles.actionRow}>
                 <div>
-                  <p className={styles.actionTitle}>回答後に{formatNumber(mileageAction.amount)}マイル付ける</p>
+                  <label className={styles.fieldLabel}>回答後に付けるマイル<TextInput aria-label="回答後に付けるマイル" type="number" min={1} max={1_000_000} step={1} value={mileageAction.amount || ''} onChange={(event) => setActions(actions.map((action) => action === mileageAction ? { ...action, amount: Number(event.target.value) } : action))} /></label>
                   <p className={styles.note}>回答フォームへの送信をきっかけにしています</p>
                 </div>
                 <Button type="button" variant="secondary" aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}>外す</Button>
