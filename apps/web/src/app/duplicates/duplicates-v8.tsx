@@ -56,10 +56,10 @@ export default function DuplicatesV8() {
             onClick={() => void d.detect()}
             disabled={d.refreshing}
             busy={d.refreshing}
-            busyLabel="再検出中…"
+            busyLabel="見直し中…"
           >
             <RotateCw aria-hidden="true" className="h-3.5 w-3.5" />
-            重複を再検出
+            もう一度見直す
           </Button>
         </div>
       </div>
@@ -132,11 +132,11 @@ export default function DuplicatesV8() {
         <div className={styles.searchWrap}>
           <SearchField
             className="w-full"
-            aria-label="名前・メール・電話で検索"
+            aria-label="名前・メール・電話で探す"
             value={d.query}
             onChange={d.setQuery}
             onClear={() => d.setQuery('')}
-            placeholder="名前・メール・電話で検索"
+            placeholder="名前・メール・電話で探す"
           />
         </div>
         <div className={styles.selectWrap}>
@@ -243,7 +243,7 @@ export default function DuplicatesV8() {
                 <td>{formatDateTime(candidate.reviewedAt ?? candidate.detectedAt)}</td>
                 <td>
                   <Link className={styles.linkAction} href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>
-                    根拠を確認 →
+                    比べて決める →
                   </Link>
                 </td>
               </tr>
