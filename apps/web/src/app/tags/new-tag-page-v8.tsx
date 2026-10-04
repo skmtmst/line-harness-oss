@@ -13,6 +13,7 @@ import { api, type TagDefinition } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import TagEditorV8 from './tag-editor-v8'
 import { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 
@@ -109,6 +110,7 @@ export default function NewTagPageV8() {
         actions: definitionsForSave(values.actions),
       })
       if (!created.success) throw new Error(created.error)
+      notifyToast(`「${values.name.trim()}」を作りました`)
       if (andAnother) {
         const next = new URLSearchParams()
         if (copyId) next.set('copy', copyId)

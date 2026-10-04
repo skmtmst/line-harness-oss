@@ -95,3 +95,23 @@ test('v7 では従来の鍵タブが出て ralAc は出ない', async () => {
   await renderPage()
   expect(host.querySelector('[data-design-node="ralAc"]')).toBeNull()
 })
+
+test('v8 の読み込み中は鍵の表の形の骨組みが出て「読み込み中」の文字は無い', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  vi.useFakeTimers()
+  try {
+    vi.stubGlobal('fetch', () => new Promise<Response>(() => {}))
+    await act(async () => {
+      root.render(<WebhooksPage />)
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(350)
+    })
+    const board = host.querySelector('[data-design-node="ralAc"]')
+    expect(board?.querySelector('[aria-label="鍵を読み込んでいます"]')).not.toBeNull()
+    expect(board?.querySelectorAll('[data-skeleton]').length).toBeGreaterThan(0)
+    expect(board?.textContent).not.toContain('読み込み中')
+  } finally {
+    vi.useRealTimers()
+  }
+})

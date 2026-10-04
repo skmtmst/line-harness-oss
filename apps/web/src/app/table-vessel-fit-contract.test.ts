@@ -74,8 +74,13 @@ describe('表は器の幅にぴったり収める', () => {
     const page = read('inflow-links/page.tsx')
     // 数字の列が中身より狭い（友だち追加 72>68・クリック 60>53）と
     // 器からはみ出す。流入元名から回し、割合の合計は変えない（86%）。
+    // v7 は w-[13%] のまま。V8 だけ流入元名を伸び縮みにする（1152 の決まり）。
+    // 掛け金クラスを外すと V8 の上書きが効かなくなる。
     expect(page).toMatch(/<col className="w-\[11%\]" \/>\s*<col className="w-\[9%\]" \/>/)
-    expect(page).toContain('<col className="w-[13%]" />')
+    expect(page).toMatch(/<col className="w-\[13%\][^"]*" \/>/)
+    expect(page).toContain('inflow-name-col')
+    const css = read('globals.css')
+    expect(css).toMatch(/\[data-theme="v8"\] col\.inflow-name-col \{\s*width:\s*auto;/)
     expect(page).not.toContain('<col className="w-[17%]" />')
     expect(page).not.toContain('<col className="w-[7%]" />')
     const values = [...page.matchAll(/w-\[(\d+(?:\.\d+)?)%\]/g)].map((m) => Number(m[1]))
