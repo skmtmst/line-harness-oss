@@ -43,6 +43,29 @@ async function observe(status: OperationHealthStatus, runId: string, now: string
   });
 }
 
+/**
+ * 実運用と同じ形で1回分の確認を記録する。確認の履歴（operation_health_results）も
+ * 残すので、「前回も正常だったか」を見る解消の判定を試験できる。
+ */
+async function observeRecorded(status: OperationHealthStatus, runId: string, now: string): Promise<void> {
+  sqlite.prepare(
+    `INSERT OR IGNORE INTO operation_health_runs
+       (id, scope_key, line_account_id, window_started_at, source, status, overall_status, started_at, completed_at)
+     VALUES (?, 'account-1', 'account-1', ?, 'scheduled', 'completed', ?, ?, ?)`,
+  ).run(runId, now, status, now, now);
+  const result = { ...healthResult(status), runId, observedAt: now };
+  sqlite.prepare(
+    `INSERT INTO operation_health_results (id, run_id, check_key, status, summary, source, observed_at)
+     VALUES (?, ?, ?, ?, ?, 'test', ?)`,
+  ).run(result.id, runId, result.checkKey, status, result.summary, now);
+  await reconcileOperationHealthAlerts(db, { lineAccountId: 'account-1', runId, results: [result], now });
+}
+
+function outboxCount(): number {
+  return (sqlite.prepare('SELECT COUNT(*) AS count FROM operation_alert_notification_outbox')
+    .get() as { count: number }).count;
+}
+
 beforeEach(() => {
   sqlite = new Database(':memory:');
   sqlite.exec(readFileSync(join(import.meta.dirname, '..', 'bootstrap.sql'), 'utf8'));
@@ -99,7 +122,8 @@ describe('運用異常alertのライフサイクル', () => {
 
     await observe('normal', 'run-resolved', '2026-09-16T00:15:00.000Z');
     expect(await listOperationAlerts(db, { lineAccountId: 'account-1' })).toEqual([]);
-    await observe('warning', 'run-reopened', '2026-09-16T00:20:00.000Z');
+    // 解消の直後（30分以内）の再発は通知をまとめるので、各actionの積み増しを見るこの試験では窓の外に置く。
+    await observe('warning', 'run-reopened', '2026-09-16T00:55:00.000Z');
 
     [alert] = await listOperationAlerts(db, { lineAccountId: 'account-1', includeResolved: true });
     expect(alert).toMatchObject({
@@ -122,10 +146,10 @@ describe('運用異常alertのライフサイクル', () => {
        VALUES ('owner-1', 'Owner', 'owner@example.test', 'owner', 'key-owner', 'tenant-1')`,
     ).run();
     await enqueuePendingOperationAlertNotifications(db, {
-      lineAccountId: 'account-1', now: '2026-09-16T00:21:00.000Z',
+      lineAccountId: 'account-1', now: '2026-09-16T00:56:00.000Z',
     });
     await enqueuePendingOperationAlertNotifications(db, {
-      lineAccountId: 'account-1', now: '2026-09-16T00:22:00.000Z',
+      lineAccountId: 'account-1', now: '2026-09-16T00:57:00.000Z',
     });
     expect(sqlite.prepare(
       `SELECT e.action, COUNT(*) AS count
@@ -252,5 +276,56 @@ describe('運用異常alertのライフサイクル', () => {
 
     expect(await listOperationAlerts(countingDb, { lineAccountId: 'account-1' })).toHaveLength(6);
     expect(prepareCount).toBe(3);
+  });
+
+  it('解消は次の確認でも正常だったときに確定する（1回で閉じて再発を繰り返さない）', async () => {
+    await observeRecorded('danger', 'run-1', '2026-09-16T00:00:00.000Z');
+    let [alert] = await listOperationAlerts(db, { lineAccountId: 'account-1' });
+    expect(alert).toMatchObject({ status: 'open', severity: 'danger' });
+
+    // 1回正常になっただけでは閉じない。
+    await observeRecorded('normal', 'run-2', '2026-09-16T00:05:00.000Z');
+    [alert] = await listOperationAlerts(db, { lineAccountId: 'account-1' });
+    expect(alert).toMatchObject({ status: 'open', severity: 'danger' });
+    expect(alert.events.map(({ action }) => action)).toEqual(['opened']);
+
+    // 続けて正常なら解消にする。
+    await observeRecorded('normal', 'run-3', '2026-09-16T00:10:00.000Z');
+    expect(await listOperationAlerts(db, { lineAccountId: 'account-1' })).toEqual([]);
+    const [resolved] = await listOperationAlerts(db, { lineAccountId: 'account-1', includeResolved: true });
+    expect(resolved).toMatchObject({ status: 'resolved' });
+    expect(resolved.events.map(({ action }) => action)).toEqual(['resolved', 'opened']);
+  });
+
+  it('「未確認」はLINE・メールで知らせず、知らせていない異常の解消も知らせない', async () => {
+    sqlite.prepare(
+      `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id)
+       VALUES ('owner-1', 'Owner', 'owner@example.test', 'owner', 'key-owner', 'tenant-1')`,
+    ).run();
+
+    // 確認そのものができなかった状態。画面には出すが、知らせは鳴らさない。
+    await observeRecorded('unknown', 'run-u1', '2026-09-16T00:00:00.000Z');
+    await enqueuePendingOperationAlertNotifications(db, { lineAccountId: 'account-1', now: '2026-09-16T00:01:00.000Z' });
+    const [pending] = await listOperationAlerts(db, { lineAccountId: 'account-1' });
+    expect(pending).toMatchObject({ status: 'open', severity: 'unknown' });
+    expect(outboxCount()).toBe(0);
+
+    // 知らせていない異常が消えても「解消しました」とは知らせない。
+    await observeRecorded('normal', 'run-n1', '2026-09-16T00:05:00.000Z');
+    await observeRecorded('normal', 'run-n2', '2026-09-16T00:10:00.000Z');
+    await enqueuePendingOperationAlertNotifications(db, { lineAccountId: 'account-1', now: '2026-09-16T00:11:00.000Z' });
+    expect(await listOperationAlerts(db, { lineAccountId: 'account-1' })).toEqual([]);
+    expect(outboxCount()).toBe(0);
+
+    // 本当のエラーになったときは知らせる（解消から30分以上あけて再発）。
+    await observeRecorded('danger', 'run-d1', '2026-09-16T00:45:00.000Z');
+    await enqueuePendingOperationAlertNotifications(db, { lineAccountId: 'account-1', now: '2026-09-16T00:46:00.000Z' });
+    expect(sqlite.prepare(
+      `SELECT e.action, e.severity, o.staff_id, o.channel
+         FROM operation_alert_notification_outbox o
+         JOIN operation_alert_events e ON e.id = o.event_id`,
+    ).all()).toEqual([
+      { action: 'reopened', severity: 'danger', staff_id: 'owner-1', channel: 'email' },
+    ]);
   });
 });
