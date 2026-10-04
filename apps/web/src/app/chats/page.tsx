@@ -2581,6 +2581,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
       <div
         data-design="Panes"
+        data-design-node="M0393"
         className="border-hairline bg-canvas shadow-card relative flex h-[calc(100vh-196px)] min-h-[560px] overflow-hidden rounded-card border"
       >
         {/* Left Panel: Chat List */}

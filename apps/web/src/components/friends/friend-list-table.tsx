@@ -164,6 +164,7 @@ export default function FriendListTable({
             >
               <div
                 className="w-52 rounded-card border border-hairline bg-canvas p-2 shadow-float"
+                data-design-node="CYJ0L"
                 // 最上層では absolute 指定を無効にする（位置は器が決める）。
                 style={{ position: 'static' }}
               >

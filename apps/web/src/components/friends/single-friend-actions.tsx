@@ -8,6 +8,8 @@ import { runOptimistic, runUndoable } from '@/lib/undoable'
 import DateTimeField from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
+import { TextArea } from '@/components/shared/text-field'
 
 /**
  * 1人だけ選んだときの操作（設計 `BulkBar` の6つ）。
@@ -33,6 +35,7 @@ type Action =
   | 'tag'
   | 'field'
   | 'reminder'
+  | 'schedule'
 
 const LABELS: Record<Action, string> = {
   status: '対応状況を変える',
@@ -41,6 +44,7 @@ const LABELS: Record<Action, string> = {
   tag: 'タグを付ける・外す',
   field: '友だち情報を書き換える',
   reminder: 'リマインダを開始',
+  schedule: '予約して送る',
 }
 
 export default function SingleFriendActions({
@@ -88,7 +92,7 @@ export default function SingleFriendActions({
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full" data-design-node="CYJ0L">
       <div className="flex flex-wrap gap-2">
         {(Object.keys(LABELS) as Action[]).map((a) => (
           <Button variant="primary" className={(`rounded-control border px-2.5 py-1 text-xs ${
@@ -131,6 +135,20 @@ export default function SingleFriendActions({
           {open === 'field' && <FieldPanel friendId={friendId} busy={busy} run={run} />}
           {open === 'reminder' && <ReminderPanel friendId={friendId} busy={busy} run={run} />}
         </div>
+      )}
+
+      {/*
+       * ★V8 `MyJP7` 予約して送るの小窓。受信箱を開かずに予約できる。
+       * 文と日時だけ送る（画像の予約送信の口が無いため画像は付けない）。
+       */}
+      {open === 'schedule' && (
+        <ScheduleDialog
+          friendId={friendId}
+          friendName={friendName}
+          accountId={accountId}
+          onClose={() => setOpen(null)}
+          onReserved={() => { setMessage('予約しました'); onDone() }}
+        />
       )}
     </div>
   )
@@ -419,5 +437,159 @@ function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolea
         label="開始する"
       />
     </Row>
+  )
+}
+
+/* 日本時間の時計。サーバも端末も日本時間のつもりで扱う。 */
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000
+
+/* 日本時間での「日付+時刻」を作る（`Date.UTC` でずらして持つ）。 */
+function jstDateTime(offsetDays: number, hour: number, minute: number): Date {
+  const jstNow = new Date(Date.now() + JST_OFFSET_MS)
+  return new Date(Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate() + offsetDays, hour, minute))
+}
+
+/* 次の月曜10時。今日が月曜で10時前なら今日。 */
+function nextMonday10(): Date {
+  const jstNow = new Date(Date.now() + JST_OFFSET_MS)
+  const day = jstNow.getUTCDay()
+  const pastTen = jstNow.getUTCHours() * 60 + jstNow.getUTCMinutes() >= 10 * 60
+  let offset = (8 - day) % 7
+  if (offset === 0 && pastTen) offset = 7
+  return jstDateTime(offset, 10, 0)
+}
+
+function toLocalInput(date: Date): string {
+  return date.toISOString().slice(0, 16)
+}
+
+function formatReserveLabel(value: string): string {
+  const [date, time] = value.split('T')
+  const [, month, day] = date.split('-').map(Number)
+  const [hour, minute] = time.split(':')
+  return `${month}/${day} ${hour}:${minute}に予約`
+}
+
+type ScheduleChoice = 'tomorrow9' | 'tomorrow13' | 'monday10' | 'custom'
+
+/*
+ * ★V8 `MyJP7` 予約して送るの小窓。文と日時を `POST /api/chats/:id/schedule`
+ * で予約する（友だちIDで引ける・二重押し防止の鍵つき）。
+ * 画像は予約送信の口が無いため付けない。
+ */
+function ScheduleDialog({ friendId, friendName, accountId, onClose, onReserved }: {
+  friendId: string
+  friendName: string
+  accountId: string | null
+  onClose: () => void
+  onReserved: () => void
+}) {
+  const [content, setContent] = useState('')
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [choice, setChoice] = useState<ScheduleChoice>('tomorrow9')
+  const [custom, setCustom] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const keysRef = useRef(new IdempotencyKeyStore())
+
+  useEffect(() => {
+    setTemplates([])
+    void api.templates.list(undefined, accountId ?? undefined).then((res) => {
+      if (res.success) {
+        setTemplates((res.data as unknown as Template[]).filter((t) => t.messageType === 'text'))
+      }
+    })
+  }, [accountId])
+
+  const presets: Array<{ key: Exclude<ScheduleChoice, 'custom'>; label: string; value: string }> = [
+    { key: 'tomorrow9', label: '明日9:00', value: toLocalInput(jstDateTime(1, 9, 0)) },
+    { key: 'tomorrow13', label: '明日13:00', value: toLocalInput(jstDateTime(1, 13, 0)) },
+    { key: 'monday10', label: '月曜10:00', value: toLocalInput(nextMonday10()) },
+  ]
+  const scheduledAt = choice === 'custom' ? custom : presets.find((p) => p.key === choice)?.value ?? ''
+
+  const reserve = async () => {
+    if (busy) return
+    if (!content.trim()) {
+      setError('送るものを入力してください')
+      return
+    }
+    if (!scheduledAt) {
+      setError('送る日時を選んでください')
+      return
+    }
+    setBusy(true)
+    setError('')
+    const signature = `${friendId}:${scheduledAt}`
+    const result = await api.chats.schedule(
+      friendId,
+      { content: content.trim(), scheduledAt: `${scheduledAt}:00+09:00` },
+      keysRef.current.get(signature),
+    )
+    setBusy(false)
+    if (!result.success) {
+      setError(result.error || '予約できませんでした')
+      return
+    }
+    keysRef.current.clear(signature)
+    onReserved()
+    onClose()
+  }
+
+  return (
+    <Dialog
+      open
+      title={`${friendName}さんに予約して送る`}
+      description="受信箱を開かずに予約できます。"
+      cancelLabel="キャンセル"
+      confirmLabel={scheduledAt ? formatReserveLabel(scheduledAt) : '日時を選んで予約'}
+      busy={busy}
+      error={error}
+      designNode="MyJP7"
+      onCancel={onClose}
+      onConfirm={() => void reserve()}
+    >
+      <p className="text-ink-secondary mb-1 text-xs font-semibold">送るもの</p>
+      <TextArea
+        aria-label="送るもの"
+        rows={3}
+        value={content}
+        onChange={(event) => setContent(event.target.value)}
+        placeholder="送る文を書きます"
+      />
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Select
+          aria-label="テンプレートを選択"
+          value=""
+          onChange={(id) => {
+            const picked = templates.find((t) => t.id === id)
+            if (picked) setContent(picked.messageContent)
+          }}
+          options={[{ value: '', label: 'テンプレートを選択' }, ...templates.map((t) => ({ value: t.id, label: t.name }))]}
+        />
+      </div>
+      <p className="text-ink-secondary mt-4 mb-1 text-xs font-semibold">送る日時</p>
+      <div className="flex flex-wrap gap-2">
+        {presets.map((preset) => (
+          <Button
+            key={preset.key}
+            type="button"
+            variant={choice === preset.key ? 'primary' : 'secondary'}
+            onClick={() => setChoice(preset.key)}
+          >
+            {preset.label}
+          </Button>
+        ))}
+        <Button type="button" variant={choice === 'custom' ? 'primary' : 'secondary'} onClick={() => setChoice('custom')}>
+          日時を決める
+        </Button>
+      </div>
+      {choice === 'custom' && (
+        <div className="mt-2">
+          <DateTimeField aria-label="送る日時" value={custom} onChange={setCustom} />
+        </div>
+      )}
+      <p className="text-ink-faint mt-3 text-xs">受信箱の会話にも「これから送る予約」として出ます。</p>
+    </Dialog>
   )
 }

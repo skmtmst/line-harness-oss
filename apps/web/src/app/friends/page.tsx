@@ -870,9 +870,13 @@ function FriendsPageHost() {
    * 管理画面側（重複検出・統合ユーザー）は各 -v8 ファイルが
    * 「← 友だち一覧 › データ管理 › 今の画面」の段を自分で出す。
    */
+  /*
+   * ★V8 `ywJ5H` 友だち一覧・`x6QsVz` 閲覧のみ。同じ画面の状態で、
+   * 閲覧のみは操作が押せない形になる（切り替えの分岐は無い）。
+   */
   if (theme === 'v8') {
     return (
-      <div data-friends-page="v8" data-design-node="sdbsQ" className="flex flex-col gap-4">
+      <div data-friends-page="v8" data-design-node="sdbsQ ywJ5H x6QsVz" className="flex flex-col gap-4">
         {tab === 'list' ? (
           <>
             <FriendsListHeadV8 onExportCurrentPage={exportCurrentPage} />
