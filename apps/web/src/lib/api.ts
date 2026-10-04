@@ -1399,6 +1399,10 @@ export type ConversionDefinitionDetail = ConversionDefinitionListItem & {
 export type ConversionDefinitionPreview = {
   range: { from: string; to: string; timeZone: 'Asia/Tokyo' }
   matchedCount: number
+  /** 条件に合う友だちの重複を除いた人数。旧Workerの応答では未取得。 */
+  uniqueFriendCount?: number
+  /** 除外条件に当てはまった過去の成果件数。重複除外とは別。 */
+  excludedCount?: number
   estimatedCount: number
   estimatedValue: number
   duplicateExcludedCount: number
@@ -13624,13 +13628,14 @@ export const api = {
   adPlatforms: {
     list: (lineAccountId?: string | null) =>
       fetchApi<ApiResponse<AdPlatform[]>>(`/api/ad-platforms${lineAccountId ? `?lineAccountId=${encodeURIComponent(lineAccountId)}` : ''}`),
-    logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string; lineAccountId?: string | null }) => {
+    logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string; lineAccountId?: string | null; adPlatformId?: string }) => {
       const query = new URLSearchParams()
       query.set('page', String(params?.page ?? 1))
       query.set('limit', String(params?.limit ?? 20))
       if (params?.status && params.status !== 'all') query.set('status', params.status)
       if (params?.query?.trim()) query.set('query', params.query.trim())
       if (params?.lineAccountId) query.set('lineAccountId', params.lineAccountId)
+      if (params?.adPlatformId) query.set('adPlatformId', params.adPlatformId)
       return fetchApi<ApiResponse<{
         items: AdConversionLog[]
         total: number

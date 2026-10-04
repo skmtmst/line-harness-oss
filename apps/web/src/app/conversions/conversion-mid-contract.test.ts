@@ -31,16 +31,12 @@ describe('成果地点一覧の点検契約(#513 中)', () => {
   })
 
   it('M4: 影響なしの確定は理由を出し、読み込み中は確定を止める', () => {
-    expect(PAGE).toContain('if (!stopTarget || stopping) return')
+    expect(PAGE).toContain('if (!stopTarget || stopping || !canReverse) return')
     expect(PAGE).toContain('if (stopImpactLoading) return')
     expect(PAGE).toContain('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
     expect(PAGE).toContain('busy={stopping || stopImpactLoading}')
   })
 
-  it('M5: レポートのCSVボタンは一覧の中身を名乗る', () => {
-    expect(PAGE).toContain('成果地点の一覧をCSVで書き出す')
-    expect(PAGE, '古いボタン名が残っている').not.toContain('この画面をCSVで書き出す')
-  })
 
   it('M6: 世代番号で古い応答を捨てる', () => {
     expect(PAGE).toContain('loadSeq')

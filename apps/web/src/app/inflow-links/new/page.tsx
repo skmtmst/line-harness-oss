@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ApiResponse, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
 import { groupTagsByFolder } from '../tag-options'
 import { api } from '@/lib/api'
@@ -10,13 +10,19 @@ import { qrToDataURL } from '@/lib/qr-image'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
 import Checkbox from '@/components/shared/checkbox'
+import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import SectionHeader from '@/components/shared/section-header'
+import Toggle from '@/components/shared/toggle'
+import Disclosure from '@/components/shared/disclosure'
+import LinePreview from '@/components/shared/line-preview'
+import { TextField } from '@/components/shared/text-field'
+import { Link as LinkIcon } from 'lucide-react'
+import styles from './create-v8.module.css'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import CreatePage, {
-  AsideCard,
   Field,
-  FormSection,
-  inputClass,
 } from '@/components/shared/create-page'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
@@ -42,12 +48,25 @@ function suggestRef(name: string): string {
 
 export default function NewInflowLinkPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [widePreview, setWidePreview] = useState(true)
+  useEffect(() => {
+    if (!rootRef.current || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setWidePreview(entry.contentRect.width >= 1100)
+    })
+    observer.observe(rootRef.current)
+    return () => observer.disconnect()
+  }, [])
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState('')
   const [genre, setGenre] = useState('')
   const [refCode, setRefCode] = useState('')
   const [refTouched, setRefTouched] = useState(false)
   const [tagId, setTagId] = useState('')
+  const [tagEnabled, setTagEnabled] = useState(false)
+  const [messageEnabled, setMessageEnabled] = useState(false)
+  const [scenarioEnabled, setScenarioEnabled] = useState(false)
   const [scenarioId, setScenarioId] = useState('')
   const [introTemplateId, setIntroTemplateId] = useState('')
   const [poolId, setPoolId] = useState('')
@@ -67,10 +86,24 @@ export default function NewInflowLinkPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [qrDataUrl, setQrDataUrl] = useState('')
   // R23横展開: アカウントを切り替えたら、前の候補にしかない選択を外して知らせる。
+  const [candidateLoading, setCandidateLoading] = useState(true)
+  const [candidateFailed, setCandidateFailed] = useState(false)
+  const [candidateAttempt, setCandidateAttempt] = useState(0)
   const [pruneNotice, setPruneNotice] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
+    setCandidateLoading(true)
+    setCandidateFailed(false)
+    if (!selectedAccountId) {
+      setTags([])
+      setTagGroups([])
+      setScenarios([])
+      setTemplates([])
+      setPools([])
+      setCandidateLoading(false)
+      return
+    }
     // プールは補助データ。機能がオフでもリンク発行画面そのものは止めない。
     // 403 の応答自体が console error になるため、有効と分からない限り
     // 口を発行しない（#703）。
@@ -89,24 +122,24 @@ export default function NewInflowLinkPage() {
       api.tagGroups.list(selectedAccountId),
     ]).then(([t, s, p, tp, tg]) => {
       if (cancelled) return
-      if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
+      setCandidateLoading(false)
+      setCandidateFailed([t, s, tp].some((result) => result.status === 'rejected' || !result.value.success))
+      setTags(t.status === 'fulfilled' && t.value.success ? t.value.data : [])
       /*
         **フォルダが取れなくてもタグは選べるままにする。**
         束ねられないだけで、選択そのものを止める理由はない。
       */
-      if (tg.status === 'fulfilled' && tg.value.success) setTagGroups(tg.value.data)
-      if (s.status === 'fulfilled' && s.value.success) setScenarios(s.value.data)
-      if (p.status === 'fulfilled' && p.value.success) setPools(p.value.data)
-      if (tp.status === 'fulfilled' && tp.value.success) {
-        setTemplates(tp.value.data as unknown as Template[])
-      }
+      setTagGroups(tg.status === 'fulfilled' && tg.value.success ? tg.value.data : [])
+      setScenarios(s.status === 'fulfilled' && s.value.success ? s.value.data : [])
+      setPools(p.status === 'fulfilled' && p.value.success ? p.value.data : [])
+      setTemplates(tp.status === 'fulfilled' && tp.value.success ? tp.value.data as unknown as Template[] : [])
     })
     return () => {
       cancelled = true
     }
     // R39: 候補（タグ・シナリオ・プール・テンプレート）はアカウントごとに
     // 違う。切替後に古い候補のまま保存しないよう、取り直す。入力は残す。
-  }, [selectedAccountId])
+  }, [selectedAccountId, candidateAttempt])
 
   /*
    * R23横展開(m18hと同じ形): 新しい候補にない選択は外す。
@@ -145,7 +178,7 @@ export default function NewInflowLinkPage() {
     // 少し待ってから作り、古い解決は捨てる。
     let stale = false
     const timer = window.setTimeout(() => {
-      void qrToDataURL(previewUrl, { width: 180, margin: 1, color: { dark: '#171717', light: '#ffffff' } }).then((url) => {
+      void qrToDataURL(previewUrl, { width: 180, margin: 1 }).then((url) => {
         if (!stale) setQrDataUrl(url)
       })
     }, 250)
@@ -162,28 +195,37 @@ export default function NewInflowLinkPage() {
    */
   const dirty = Boolean(
     name || genre || refCode || tagId || scenarioId || introTemplateId
-    || poolId || redirectUrl || !isActive,
+    || poolId || redirectUrl || !isActive || tagEnabled || messageEnabled || scenarioEnabled,
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   return (
-    <>
+    <div ref={rootRef} className={styles.root}>
+      <header className={styles.heading}>
+        <Link href="/inflow-links">← 流入と計測へ</Link>
+        <h2>流入リンクを作る</h2>
+        <p>発行すると URL と QR コードができます。友だちになった人を、この経路で数えます。</p>
+      </header>
     <CreatePage
-      title="流入リンクをつくる"
+      title="流入リンクを作る"
       description="流入経路ごとにURLを分けると、どこから友だちになったかが分かります。"
       showHeader={false}
       parent={['流入と計測', '/inflow-links']}
       saveLabel="発行してURLを受け取る"
       successHref={(id) => `/inflow-links/detail?id=${id}`}
-      designNode="TEVk8"
+      designNode="KMaMk"
       variant="v6"
       statusLabel={isActive ? 'まだ発行されていません。発行すると、すぐにこのURLが使えます。' : 'まだ発行されていません。公開オフのまま発行すると、URLを開いても友だち追加できません。'}
       validate={() => {
         if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
+        if (candidateLoading) return '友だち追加時の動きの候補を読み込み中です。少し待ってから発行してください'
         if (!name.trim()) return 'リンク名を入力してください'
         if (!validRef) {
           return 'refコードは、半角英数字・_・ハイフンで1〜64文字にしてください'
         }
+        if (tagEnabled && !tagId) return '付けるタグを選んでください'
+        if (messageEnabled && !introTemplateId) return '送るメッセージを選んでください'
+        if (scenarioEnabled && !scenarioId) return '始めるシナリオ配信を選んでください'
         return null
       }}
       /*
@@ -219,232 +261,127 @@ export default function NewInflowLinkPage() {
         }
       }}
       aside={
-        <>
-          <AsideCard title="お客さまはこの順に進みます">
-            <ol className="space-y-3 text-xs leading-relaxed text-ink-secondary">
-              <FlowStep step="1" title="案内や広告を見る" description="投稿・広告・チラシなどの案内を見ます。" />
-              <FlowStep step="2" title="このURLを一瞬だけ通る" description="画面には何も出ません。ここで経路を記録します。" />
-              <FlowStep step="3" title="LINEの友だち追加が開く" description="いつもの追加画面で、友だち追加をします。" />
-              <FlowStep step="4" title="あいさつとシナリオが届く" description="左で決めた動きが、この瞬間に始まります。" />
+        <Disclosure key={widePreview ? 'wide' : 'compact'} title="お客さまの進み方と LINE の見え方" defaultOpen={widePreview} className={styles.previewPanel}>
+          <SectionHeader title="お客さまはこの順に進みます" />
+          <Card padding="default">
+            <ol className={styles.flow}>
+              <FlowStep step="1">QR コード・URL を開く</FlowStep>
+              <FlowStep step="2">{redirectUrl.trim() ? '転送先のページへ進む' : 'LINE で友だちになる（この経路で数える）'}</FlowStep>
+              {tagId ? <FlowStep step="3">タグ「{tags.find((tag) => tag.id === tagId)?.name}」が付く</FlowStep> : null}
+              {introTemplateId ? <FlowStep step={tagId ? '4' : '3'}>選んだメッセージが届く（右のスマホ）</FlowStep> : null}
+              {scenarioId ? <FlowStep step={String(3 + Number(Boolean(tagId)) + Number(Boolean(introTemplateId)))}>シナリオ「{scenarios.find((scenario) => scenario.id === scenarioId)?.name}」が始まる</FlowStep> : null}
             </ol>
-          </AsideCard>
-          <AsideCard title="つながる先">
-            <ul className="space-y-2 text-xs font-semibold text-action">
-              <li><Link href="/scenarios">→ シナリオ配信</Link></li>
-              <li><Link href="/tags">→ 友だち属性</Link></li>
-              <li><Link href="/mileage">→ マイル</Link></li>
-              <li><Link href="/conversions">→ コンバージョン</Link></li>
-              <li><Link href="/analytics">→ 分析</Link></li>
-            </ul>
-          </AsideCard>
-          <AsideCard title="気をつけること">
-            <ul className="space-y-2 text-xs leading-relaxed text-ink-faint">
-              <li>REFを変えると別の経路になります。</li>
-              <li>印刷ずみのQRコードは古いREFのままです。</li>
-              <li>LINEの追加ボタンを直接置くと数えられません。かならず発行したURLを通してください。</li>
-            </ul>
-          </AsideCard>
-        </>
+          </Card>
+          <LinePreview
+            accountName={selectedAccount?.name}
+            caption="友だち追加直後"
+            empty={!introTemplateId ? '追加直後に送るメッセージを選ぶと、ここに表示されます。' : false}
+          >
+            {introTemplateId ? <p className={styles.message}>
+              {templates.find((template) => template.id === introTemplateId)?.messageType === 'text'
+                ? templates.find((template) => template.id === introTemplateId)?.messageContent || '本文を取得できませんでした'
+                : `テンプレート「${templates.find((template) => template.id === introTemplateId)?.name}」を送ります`}
+            </p> : null}
+          </LinePreview>
+        </Disclosure>
       }
     >
-      {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} className="mb-3" /> : null}
-      <FormSection step={1} label="どこに置くリンクですか">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Field label="流入元の名前" htmlFor="ir-name" required note="管理画面で見分けるための名前です。">
-          <input
-            id="ir-name"
-            type="text"
-            value={name}
-            onChange={(e) => {
+      {candidateLoading ? <p role="status" className="text-xs text-ink-secondary">友だち追加時の動きの候補を読み込んでいます</p> : null}
+      {candidateFailed ? <Notice tone="warn" message="友だち追加時の動きの候補を読み込めませんでした。選び直す前に、もう一度読み込んでください。" action={<Button onClick={() => setCandidateAttempt((value) => value + 1)}>候補を再読み込み</Button>} /> : null}
+      {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} /> : null}
+      <InflowSection label="どこに置くリンクですか" help="名前は一覧で見分けるためのものです。お客さまには見えません。">
+        <div className={styles.pair}>
+          <Field label="名前" htmlFor="ir-name" required>
+            <TextField id="ir-name" value={name} onChange={(e) => {
               setName(e.target.value)
               if (!refTouched) setRefCode(suggestRef(e.target.value))
-            }}
-            placeholder="例：夏のInstagram投稿"
-            className={inputClass}
-          />
-        </Field>
-
-        <Field label="REF（URLに入る文字）" htmlFor="ir-ref" required note="あとから変えられません。配ったURLが使えなくなるためです。">
-          <input id="ir-ref" type="text" value={refCode} onChange={(e) => { setRefTouched(true); setRefCode(e.target.value) }} placeholder="summer-ig" className={`${inputClass} font-mono`} />
-        </Field>
-
-        <Field label="フォルダ" htmlFor="ir-genre" note="選んだフォルダの中に追加されます。">
-          <input
-            id="ir-genre"
-            type="text"
-            value={genre}
-            onChange={(e) => setGenre(e.target.value)}
-            placeholder="例：SNS"
-            className={inputClass}
-          />
-        </Field>
+            }} placeholder="例：夏のInstagram投稿" />
+          </Field>
+          <Field label="フォルダ" htmlFor="ir-genre" help="選んだフォルダの中に追加されます。新しい名前を入力することもできます。">
+            <TextField id="ir-genre" value={genre} onChange={(e) => setGenre(e.target.value)} placeholder="例：SNS" />
+          </Field>
         </div>
-      </FormSection>
+        <Field label="転送先（入れると友だち追加へ進みません）" htmlFor="ir-redirect">
+          <TextField id="ir-redirect" type="url" value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} placeholder="（空欄）" />
+        </Field>
+        <Field label="見分けるための文字（URL の最後に付く）" htmlFor="ir-ref" required help="REF（URLに入る文字）。半角英数字・_・ハイフンで1〜64文字にします。配ったURLが使えなくなるため、発行後は変えられません。">
+          <TextField id="ir-ref" value={refCode} onChange={(e) => { setRefTouched(true); setRefCode(e.target.value) }} placeholder="summer-ig" />
+        </Field>
+      </InflowSection>
 
-      <FormSection step={2} label="発行されるURL">
-        <p className="text-xs text-ink-faint">紙にはQRコード、Webにはリンクを使ってください。</p>
-        {previewUrl ? (
-          <div className="mt-3">
-            {/* #975 U065: 保存前は「未発行の見本」と明記する。 */}
-            <p className="inline-flex items-center rounded-pill border border-hairline bg-canvas-sunken px-3 py-1 text-xs font-medium text-ink-secondary">
-              保存前の見本 — まだ発行されていません
-            </p>
-            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-4">
-              <div className="space-y-2 sm:col-span-3">
-                <div className="rounded-control border border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-secondary"><span className="font-semibold">{previewUrl}</span></div>
-                <p className="text-xs text-ink-faint">「発行してURLを受け取る」を押すと、このURLが使えるようになります。押す前に配ると開けません。</p>
-              </div>
-              <div className="text-center">
-                {/* eslint-disable-next-line @next/next/no-img-element -- Workerが撮影用QRを生成する */}
-                {qrDataUrl && <img src={qrDataUrl} alt="発行されるURLのQRコード（保存前の見本）" className="mx-auto h-24 w-24 rounded-control border border-hairline bg-canvas p-1" />}
-                <span className="mt-1 block text-xs text-ink-faint">見本のQR — 保存後に画像で保存できます</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-3">
-            <div className="rounded-control border border-dashed border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-faint">
-              <span className="font-semibold">例: {workerBase}/r/summer-ig</span>
-            </div>
-            <p className="mt-2 text-xs text-ink-faint">まだ発行されていません。上の「REF」を決めると、発行されるURLとQRコードの見本がここに出ます。例のURLは実際には開けないので配らないでください。</p>
-          </div>
-        )}
-      </FormSection>
+      <InflowSection label="どの LINE アカウントに入れますか" help="友だちになる先のアカウントです。一覧では選んだアカウントの分だけ表示されます。">
+        <Field label="所属するLINEアカウント" help="画面上部で選んだアカウントに所属します。">
+          <p className={styles.account} title={selectedAccount?.name ?? undefined}>
+            {selectedAccountId ? selectedAccount?.name ?? selectedAccountId : '画面上部でLINEアカウントを選んでください'}
+          </p>
+        </Field>
+        {pools.length > 0 ? <Field label="入れるアカウント" htmlFor="ir-pool" help="選ばないと、全体の既定の振り分けに従います。いっぱいのときの振り分けはLINEアカウント側の設定に従います。">
+          <Select id="ir-pool" value={poolId} onChange={setPoolId} aria-label="友だちの追加先アカウント" size="full" options={[
+            { value: '', label: 'メインプールで自動振り分け' },
+            ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
+          ]} />
+        </Field> : null}
+      </InflowSection>
 
-      <FormSection step={3} label="この経路から友だちになったときにすること" note="設定しないと、ふつうの友だち追加と同じ扱いになります。">
-        <p className="rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">
-          動きを追加する（あいさつの差し替え・対応マーク・通知・外部連携）内容は、下の項目で選びます。
-        </p>
-        <div className="grid gap-3 lg:grid-cols-3">
-        <Field
-          label="タグを自動で付ける"
-          htmlFor="ir-tag"
-          note="あとで配信の絞り込みに使えます。"
-        >
-          <Select
-            id="ir-tag"
-            value={tagId}
-            onChange={(value) => setTagId(value)}
-            aria-label="自動で付けるタグ"
-            size="full"
-            options={[
+      <InflowSection label="友だちになったときにすること" help="何も決めないと「動きが未設定」になり、数えるだけになります。">
+        <div className={styles.action}>
+          <Toggle checked={tagEnabled || Boolean(tagId)} label="タグを付ける" onChange={(next) => { setTagEnabled(next); if (!next) setTagId('') }} />
+          <Field label="タグを付ける" htmlFor="ir-tag" help="あとで配信の絞り込みに使えます。">
+            <Select id="ir-tag" value={tagId} onChange={(value) => { setTagId(value); setTagEnabled(Boolean(value)) }} aria-label="自動で付けるタグ" size="full" options={[
               { value: '', label: '（なし）' },
-              ...tagOptionGroups.flatMap((group) =>
-                group.tags.map((tag) => ({
-                  value: tag.id,
-                  label: group.label ? `${group.label} / ${tag.name}` : tag.name,
-                })),
-              ),
-            ]}
-          />
-        </Field>
-
-        <Field
-          label="シナリオ配信を開始する"
-          htmlFor="ir-scenario"
-          note="経路ごとに違う案内を送れます。"
-        >
-          <Select
-            id="ir-scenario"
-            value={scenarioId}
-            onChange={(value) => setScenarioId(value)}
-            aria-label="開始するシナリオ配信"
-            size="full"
-            options={[
-              { value: '', label: '（なし）' },
-              ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
-            ]}
-          />
-        </Field>
-
-        <Field
-          label="追加直後にメッセージを送る"
-          htmlFor="ir-intro"
-          note="シナリオとは別に、その場で1通だけ送ります。"
-        >
-          <Select
-            id="ir-intro"
-            value={introTemplateId}
-            onChange={(value) => setIntroTemplateId(value)}
-            aria-label="追加直後に送るメッセージ"
-            size="full"
-            options={[
-              { value: '', label: '送らない' },
-              ...templates.map((template) => ({ value: template.id, label: template.name })),
-            ]}
-          />
-        </Field>
+              ...tagOptionGroups.flatMap((group) => group.tags.map((tag) => ({ value: tag.id, label: group.label ? `${group.label} / ${tag.name}` : tag.name }))),
+            ]} />
+          </Field>
         </div>
+        <div className={styles.action}>
+          <Toggle checked={messageEnabled || Boolean(introTemplateId)} label="メッセージを送る" onChange={(next) => { setMessageEnabled(next); if (!next) setIntroTemplateId('') }} />
+          <Field label="メッセージを送る" htmlFor="ir-intro" help="シナリオとは別に、追加直後に1通だけ送ります。">
+            <Select id="ir-intro" value={introTemplateId} onChange={(value) => { setIntroTemplateId(value); setMessageEnabled(Boolean(value)) }} aria-label="追加直後に送るメッセージ" size="full" options={[
+              { value: '', label: '送らない' }, ...templates.map((template) => ({ value: template.id, label: template.name })),
+            ]} />
+          </Field>
+        </div>
+        <div className={styles.action}>
+          <Toggle checked={scenarioEnabled || Boolean(scenarioId)} label="シナリオ配信を始める" onChange={(next) => { setScenarioEnabled(next); if (!next) setScenarioId('') }} />
+          <Field label="シナリオ配信を始める" htmlFor="ir-scenario" help="経路ごとに違う案内を送れます。">
+            <Select id="ir-scenario" value={scenarioId} onChange={(value) => { setScenarioId(value); setScenarioEnabled(Boolean(value)) }} aria-label="開始するシナリオ配信" size="full" options={[
+              { value: '', label: '（なし）' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
+            ]} />
+          </Field>
+        </div>
+        <Disclosure size="compact" title="公開の詳細設定" hint={isActive ? '発行したらすぐ使えます' : '公開オフで発行します'}>
+          <Checkbox checked={isActive} onCheckedChange={setIsActive}>発行したらすぐ使えるようにする</Checkbox>
+        </Disclosure>
+      </InflowSection>
 
-        <details className="rounded-control border border-hairline px-3 py-2">
-          <summary className="cursor-pointer text-xs font-semibold text-action">転送・公開の詳細設定</summary>
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            {/* 有効期限を持つ列が無いので、期限なしであることだけを示す。 */}
-            <Field label="有効期限" note="期限での自動停止は、まだ保存する場所がありません。">
-              <p className="rounded-control bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">期限なし</p>
-            </Field>
-            <Field label="転送先" htmlFor="ir-redirect" note="空欄なら友だち追加へ進みます。">
-              <input id="ir-redirect" type="url" value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} placeholder="https://example.com/lp" className={inputClass} />
-            </Field>
-          </div>
-          <Checkbox
-            checked={isActive}
-            onCheckedChange={setIsActive}
-            description="オフにすると、URLを開いても友だち追加できません。"
-            className="mt-3"
-          >発行したらすぐ使えるようにする</Checkbox>
-        </details>
-      </FormSection>
-
-      <FormSection step={4} label="どのLINEアカウントに入れるか">
-        <Field
-          label="所属するLINEアカウント"
-          note="発行したリンクはこのアカウントに所属します。一覧では選んだアカウントの分だけ表示されます。"
-        >
-          {selectedAccountId ? (
-            <p className="rounded-control bg-canvas-sunken px-3 py-2 text-sm font-semibold text-ink">
-              {selectedAccount?.name ?? selectedAccountId}
-            </p>
-          ) : (
-            <p className="rounded-control bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">
-              画面上部でLINEアカウントを選んでください
-            </p>
-          )}
-        </Field>
-        <Field
-          label="入れるアカウント"
-          htmlFor="ir-pool"
-          note="選ばないと、全体の既定の振り分けに従います。"
-        >
-          <Select
-            id="ir-pool"
-            value={poolId}
-            onChange={(value) => setPoolId(value)}
-            aria-label="友だちの追加先アカウント"
-            size="full"
-            options={[
-              { value: '', label: 'メインプールで自動振り分け' },
-              ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
-            ]}
-          />
-        </Field>
-        <p className="rounded-control bg-canvas-sunken px-3 py-2 text-xs leading-relaxed text-ink-faint">
-          いっぱいのときの振り分けは、LINEアカウント側の設定に従います。
-        </p>
-      </FormSection>
+      <InflowSection label="発行される URL" help="発行したあと、一覧の「…」から QR コードと URL をコピーできます。紙にはQRコード、Webにはリンクを使ってください。">
+        <div className={styles.url}>
+          <LinkIcon size={16} aria-hidden="true" />
+          <span>{previewUrl || '見分けるための文字を決めると URL ができます'}</span>
+          <span>発行するとできます</span>
+        </div>
+        {previewUrl ? <Disclosure size="compact" title="保存前の見本 — まだ発行されていません">
+          <p className="text-xs text-ink-secondary">発行する前に配ると開けません。</p>
+          {/* eslint-disable-next-line @next/next/no-img-element -- ローカル生成した保存前の見本 */}
+          {qrDataUrl ? <img src={qrDataUrl} alt="発行されるURLのQRコード（保存前の見本）" width={96} height={96} /> : null}
+          <p className="text-xs text-ink-secondary">見本のQR — 保存後に画像で保存できます</p>
+        </Disclosure> : null}
+      </InflowSection>
 
     </CreatePage>
 
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した流入リンク" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </>
+    </div>
   )
 }
 
-function FlowStep({ step, title, description }: { step: string; title: string; description: string }) {
-  return (
-    <li className="flex gap-2">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-accent-deep text-xs font-medium text-on-accent">{step}</span>
-      <span><strong className="block text-ink-secondary">{title}</strong>{description}</span>
-    </li>
-  )
+function FlowStep({ step, children }: { step: string; children: ReactNode }) {
+  return <li><span>{step}</span><span>{children}</span></li>
+}
+
+function InflowSection({ label, help, children }: { label: string; help?: string; children: ReactNode }) {
+  return <Card padding="default">
+    <SectionHeader title={label} help={help} helpLabel={`${label}の説明`} />
+    <div className={styles.fields}>{children}</div>
+  </Card>
 }

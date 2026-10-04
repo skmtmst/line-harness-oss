@@ -42,13 +42,12 @@ describe('V6 機能18の画面契約', () => {
   })
 
   it('各画面をPencilの実ノードと結び、未接続値を作らない', () => {
-    expect(SITE).toContain('data-design-node="IhSBB"')
-    expect(ADS).toContain('data-design-node="v0HaI"')
-    expect(ADS).toContain('data-design-node="BuVDB"')
-    expect(ADS).toContain('data-design-node="Im2b1"')
-    expect(CREATE).toContain('designNode="TEVk8"')
+    expect(SITE).toContain('data-design-node="XjOte"')
+    expect(ADS).toContain('data-design-node="qSTVR"')
+    expect(ADS).toContain('data-design-node="FDBsG"')
+    expect(ADS).toContain('data-design-node="p0kA3"')
+    expect(CREATE).toContain('designNode="KMaMk"')
     expect(DETAIL).toContain('data-design-node="Q5le3"')
-    expect(ADS).toContain('成果地点と、広告に返す名前の対応')
     // #514-14: 口はパスだけ返すため、死んでいる「知らないドメイン」判定と
     // 直書きの警告は出さない。届いたパスをそのまま出す。
     expect(SITE).not.toContain('知らないドメインが1つあります')

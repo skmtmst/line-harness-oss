@@ -195,4 +195,44 @@ describe('流入リンクの新規作成(実React)', () => {
     expect(host.textContent).toContain('/r/audit-sample')
     expect(api.create).not.toHaveBeenCalled()
   })
+  it('動きをオンにしても候補を勝手に選ばず、選択前の発行を止める', async () => {
+    api.tagsList.mockResolvedValue({ success: true, data: [{ id: 'tag-1', name: '最初のタグ' }] })
+    await render()
+    await setValue(byId('ir-name'), '確認用のリンク')
+    await setValue(byId('ir-ref'), 'toggle-test')
+    const toggle = host.querySelector('[role="switch"][aria-label="タグを付ける"]') as HTMLElement
+    await click(toggle)
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    expect(host.querySelector('#ir-tag')?.textContent).toContain('（なし）')
+    await click(byExactText('button', '発行してURLを受け取る'))
+    expect(api.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('付けるタグを選んでください')
+    await click(toggle)
+    await click(byExactText('button', '発行してURLを受け取る'))
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ tagId: null }))
+  })
+
+  it('候補の取得失敗を知らせ、同じ画面で取り直せる', async () => {
+    api.tagsList.mockRejectedValueOnce(new Error('network error'))
+    await render()
+    expect(host.textContent).toContain('動きの候補を読み込めませんでした')
+    await click(byExactText('button', '候補を再読み込み'))
+    expect(api.tagsList).toHaveBeenCalledTimes(2)
+    expect(host.textContent).not.toContain('動きの候補を読み込めませんでした')
+  })
+
+  it('候補の取得中は発行せず、読み込み後に同じ入力で発行できる', async () => {
+    let resolveTags!: (value: unknown) => void
+    api.tagsList.mockReturnValueOnce(new Promise((resolve) => { resolveTags = resolve }))
+    await render()
+    await setValue(byId('ir-name'), '読み込み確認')
+    await setValue(byId('ir-ref'), 'loading-test')
+    await click(byExactText('button', '発行してURLを受け取る'))
+    expect(api.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('少し待ってから発行してください')
+    await act(async () => { resolveTags({ success: true, data: [] }) })
+    await click(byExactText('button', '発行してURLを受け取る'))
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ name: '読み込み確認', refCode: 'loading-test' }))
+  })
+
 })

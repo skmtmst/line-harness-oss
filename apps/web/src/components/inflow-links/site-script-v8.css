@@ -1,0 +1,6 @@
+/* 板 XjOte：白い板の幅で2列に切り替える。部品の見た目は共通部品が持つ。 */
+[data-inflow-site] { container-type: inline-size; }
+[data-inflow-site-columns] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+@container (min-width: 1100px) {
+  [data-inflow-site-columns] { grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); }
+}

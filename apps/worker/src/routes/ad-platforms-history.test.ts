@@ -81,5 +81,19 @@ describe('GET /api/ad-platforms/logs', () => {
       expect(body.data.total).toBe(1);
       expect(body.data.summary).toMatchObject({ sentLast30Days: 8, pendingLast30Days: 1, failedLast30Days: 1 });
     }
+    const request = (platformId: string) => app.request(`/api/ad-platforms/logs?lineAccountId=a1&adPlatformId=${encodeURIComponent(platformId)}&status=sent&limit=200`, {}, { DB: testDb.db } as Env['Bindings']);
+    const googleResponse = await request('p2');
+    const google = await googleResponse.json() as { data: { total: number; items: Array<{ adPlatformId: string }>; summary: { sentLast30Days: number } } };
+    expect(google.data.total).toBe(4);
+    expect(google.data.items).toHaveLength(4);
+    expect(google.data.items.every((log) => log.adPlatformId === 'p2')).toBe(true);
+    expect(google.data.summary.sentLast30Days).toBe(8);
+    const otherAccount = await (await request('p3')).json() as { data: { total: number; items: unknown[] } };
+    expect(otherAccount.data.total).toBe(0);
+    expect(otherAccount.data.items).toEqual([]);
+    const injection = await (await request("p2' OR 1=1 --")).json() as { data: { total: number; items: unknown[] } };
+    expect(injection.data.total).toBe(0);
+    expect(injection.data.items).toEqual([]);
+    expect((await request('x'.repeat(129))).status).toBe(400);
   });
 });

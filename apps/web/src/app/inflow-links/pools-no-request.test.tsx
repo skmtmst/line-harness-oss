@@ -109,7 +109,7 @@ describe('流入リンクのプール取得ゲート（#703）', () => {
     await mount(<NewInflowLinkPage />)
     await settle(300)
 
-    expect(host.textContent).toContain('メインプールで自動振り分け')
+    expect(host.textContent).toContain('所属するLINEアカウント')
     expect(fetchUrls.some((u) => u.includes('/api/traffic-pools'))).toBe(false)
   })
 
@@ -119,7 +119,7 @@ describe('流入リンクのプール取得ゲート（#703）', () => {
     await mount(<NewInflowLinkPage />)
     await settle(300)
 
-    expect(host.textContent).toContain('メインプールで自動振り分け')
+    expect(host.textContent).toContain('所属するLINEアカウント')
     expect(fetchUrls.some((u) => u.includes('/api/traffic-pools'))).toBe(true)
   })
 
