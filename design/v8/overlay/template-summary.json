@@ -1,0 +1,68 @@
+{
+  "dashboard": {
+    "over4px": 0,
+    "compared": 259,
+    "status": "PASS",
+    "unmatchedRegions": [],
+    "maxEdgeDelta": 0,
+    "pixelDifferenceOver24": 2492
+  },
+  "list": {
+    "over4px": 0,
+    "compared": 252,
+    "status": "PASS",
+    "unmatchedRegions": [],
+    "maxEdgeDelta": 4.0,
+    "pixelDifferenceOver24": 3296
+  },
+  "list-folders": {
+    "over4px": 174,
+    "compared": 247,
+    "status": "CONTINUE",
+    "unmatchedRegions": [],
+    "maxEdgeDelta": 72,
+    "pixelDifferenceOver24": 162175
+  },
+  "create": {
+    "over4px": 69,
+    "compared": 180,
+    "status": "CONTINUE",
+    "unmatchedRegions": [
+      "作成型の下の追従帯が正本HTMLに存在しない"
+    ],
+    "maxEdgeDelta": 344,
+    "pixelDifferenceOver24": 50282
+  },
+  "detail": {
+    "over4px": 0,
+    "compared": 193,
+    "status": "PASS",
+    "unmatchedRegions": [],
+    "maxEdgeDelta": 0,
+    "pixelDifferenceOver24": 2459
+  },
+  "inbox": {
+    "over4px": 0,
+    "compared": 195,
+    "status": "PASS",
+    "unmatchedRegions": [],
+    "maxEdgeDelta": 0,
+    "pixelDifferenceOver24": 0
+  },
+  "settings": {
+    "over4px": 39,
+    "compared": 129,
+    "status": "CONTINUE",
+    "unmatchedRegions": [],
+    "maxEdgeDelta": 236,
+    "pixelDifferenceOver24": 29165
+  },
+  "analytics": {
+    "over4px": 30,
+    "compared": 172,
+    "status": "CONTINUE",
+    "unmatchedRegions": [],
+    "maxEdgeDelta": 40,
+    "pixelDifferenceOver24": 34569
+  }
+}

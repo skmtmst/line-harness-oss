@@ -1,0 +1,39 @@
+# V8 の画面の型
+
+対象は `[data-theme="v8"]`。外側の白い板・左メニュー・上の帯は AppShell が持つ。型は板の頭、段、列、余白を持ち、画面はデータ・権限・保存処理を持つ。共通部品は `components/shared` のものを使う。
+
+| 型 | 用途・代表 | 内容を渡す props（ReactNode） |
+|---|---|---|
+| DashboardPage | ダッシュボード d8X09（載せ替え済み） | notice・stats・children・overlays。段は DashboardRow／DashboardColumns |
+| ListPage | 表・カードの一覧。タグ I1E7Bt（載せ替え済み）、統括アカウント JKjsE | tabs・stats・folders・collapsedFolders・toolbar・children・pagination・overlays |
+| CreatePage | 作成・編集・手順。一斉配信 iychL | steps・children・preview・previewToggle・footerActions・destructive・status |
+| DetailPage | 詳細。友だち tBB0a | tabs・stats・summary・children |
+| InboxPage | 受信箱 M0393 | heading（任意）・list・conversationHeader・children（会話）・composer・summary・summaryToggle |
+| SettingsPage | 設定 R2ojn | navigation・children・saveActions・saveStatus |
+| AnalyticsPage | 分析 bx1eN | period・stats・children・aside・asideToggle |
+
+共通の頭は `title`（必須）・`description`・`help`（？の説明）・`identity`（顔など）・`actions`・`steps`。`boardId` は正本の板ID。`standalone` は確認ページのように外側の本文余白がない場所でだけ使う。既存の設定専用の外側（本文余白が0）を使う画面も `standalone` にする。
+
+```tsx
+import { ListPage } from '@/components/templates'
+
+<ListPage title="テンプレート" description="配信に使う内容を管理します。"
+  actions={<Button variant="primary" href="/templates/edit">作る</Button>}
+  folders={<FolderPanel {...folderProps} />}
+  collapsedFolders={<Select {...folderSelectProps} />}
+  toolbar={<SearchField {...searchProps} />}
+  pagination={<Pagination {...paginationProps} />}>
+  <TemplateTable items={items} />
+</ListPage>
+```
+
+- **型の外で白い箱、段の余白、列の幅を手書きしない。** `className` による外形の上書き口は設けていない。中身の表・グラフ・フォームの配置は内容側で持つ。
+- 取得処理を持つ一覧の子は `ListPageBody` を使う。ページ送りの表示条件をその子が持つ場合は `ListPagePagination`。頭や白い板を重ねない。
+- フォルダの列・右の欄は**白い板の幅1100px未満**で畳む。`collapsedFolders` と右欄を開く操作を必ず渡す。権限なし・閲覧のみは、広い／狭い両方の操作へ同じ条件を渡す。
+- 作成の保存操作は下の `StickyBar` に一本化。設定の `saveActions` は変更がある間だけ渡す。状態管理・離脱確認・競合の再取得は画面が持つ。
+- 未取得の数を0にしない。空・読込・失敗・権限なしのときの本文とページ送りは画面が決める。
+- V7 の画面は既存の描画を使う。V8 の型をV7へ適用しない。ログイン・LIFF・小窓・部品の説明板は7型の外側を直接適用する対象ではない。
+
+正本：`design/v8/html/components-NbomF.html`・`components-x6BDY.html`・代表 d8X09／I1E7Bt。全板の割り当ては `design/v8/TEMPLATE-MAP.md`。確認ページは `/v8-templates?type=dashboard`（list・list-folders・create・detail・inbox・settings・analytics）。`source=reference` で正本、`capture=1` で確認メニューを隠す。中身は正本から抽出した固定値で、実データを保存・送信しない。圧縮した確認用HTMLは通常の画面では読み込まない。
+
+画像比較を再現するには、`python3 scripts/v8-templates/generate-fixtures.py /abs/design/v8/html` → 本番ビルド（ローカルの画面確認用API）→ Browserスキルの `viewport.set({width:1440,height:900})` → 通常の店舗選択 → `capture.mjs` の `captureTemplates` → `python3 scripts/v8-templates/compare.py /tmp/v8-capture design/v8/overlay`。文字は灰色の塗りへ変え、段の矩形と同じ識別子を持つ容器の四辺も測る。正本HTMLの幅や余白を比較側で補正しない。型別の画像は `template-<型>.png`、差は `template-<型>-diff.png`、数値は同名のJSON。数値の合格だけで、共通部品の見た目や操作まで合格にしない。詳しい結果は `design/v8/overlay/templates-report.md`。
