@@ -26,10 +26,11 @@ import { useAccount } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import DetailPanel from '@/components/shared/detail-panel'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
@@ -312,9 +313,20 @@ function InteractionsV8Inner() {
     }
   }
 
+  // E. 行→詳細の移り変わりをつなげる（非対応・減らす設定では素通り）。
   const openDetail = (item: WebhookInteraction) => {
-    setSelected(item)
-    setTechOpen(false)
+    withViewTransition(() => {
+      setSelected(item)
+      setTechOpen(false)
+    })
+  }
+
+  // C①. 右から出る詳細パネル用の前・次の行（一覧は左に見えたまま）。
+  const selectedIndex = selected ? data.items.findIndex((item) => item.id === selected.id) : -1
+  const stepDetail = (delta: -1 | 1) => {
+    if (selectedIndex === -1) return
+    const target = data.items[selectedIndex + delta]
+    if (target) openDetail(target)
   }
 
   const summary = data.summary
@@ -516,7 +528,37 @@ function InteractionsV8Inner() {
           </span>
         </div>
 
-        {listBody}
+        {selected !== null ? (
+          <div className={styles.listDetail}>
+            <div className={styles.listPane}>{listBody}</div>
+            <DetailPanel
+              open
+              title="やり取りの中身"
+              description="接続先URL、シークレット、本文は安全のため表示しません。"
+              onClose={() => setSelected(null)}
+              onPrev={() => stepDetail(-1)}
+              onNext={() => stepDetail(1)}
+              hasPrev={selectedIndex > 0}
+              hasNext={selectedIndex >= 0 && selectedIndex < data.items.length - 1}
+              busy={retrying !== null}
+            >
+              <InteractionDetailV8
+                item={selected}
+                techOpen={techOpen}
+                setTechOpen={setTechOpen}
+                canRetry={canRetry}
+                retrying={retrying === selected.id}
+                onRetry={() => {
+                  if (selected.failureReasonCode === 'unknown') setConfirmingRetry(selected)
+                  else void retry(selected)
+                }}
+                onClose={() => setSelected(null)}
+              />
+            </DetailPanel>
+          </div>
+        ) : (
+          listBody
+        )}
 
         {loadedAccountId === selectedAccountId && !error && data.total > 0 ? (
           <div className={styles.pagerRow}>
@@ -528,23 +570,6 @@ function InteractionsV8Inner() {
         ) : null}
         <p className={styles.footNote}>行の「中身を見る」から 送った中身と返事・もう一度送る（失敗のとき）。</p>
       </div>
-
-      <Dialog open={selected !== null} title="やり取りの中身" description="接続先URL、シークレット、本文は安全のため表示しません。" onCancel={() => setSelected(null)}>
-        {selected ? (
-          <InteractionDetailV8
-            item={selected}
-            techOpen={techOpen}
-            setTechOpen={setTechOpen}
-            canRetry={canRetry}
-            retrying={retrying === selected.id}
-            onRetry={() => {
-              if (selected.failureReasonCode === 'unknown') setConfirmingRetry(selected)
-              else void retry(selected)
-            }}
-            onClose={() => setSelected(null)}
-          />
-        ) : null}
-      </Dialog>
 
       <ConfirmDialog
         open={confirmingRetry !== null}

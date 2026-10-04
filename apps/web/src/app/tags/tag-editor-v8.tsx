@@ -104,6 +104,7 @@ export default function TagEditorV8({
   onCancel,
   onSave,
   onDelete,
+  readOnly = false,
   embedded = false,
   resources,
   allowedActionTypes,
@@ -127,6 +128,12 @@ export default function TagEditorV8({
   onCancel: () => void
   onSave: (values: TagEditorValues, andAnother: boolean, applyRetroactive: boolean, previewToken?: string) => Promise<void>
   onDelete?: () => void
+  /*
+   * 閲覧のみ（`fkGUR`）。中身の入力・仕掛けは fieldset で一括して
+   * 押せなくし、リンク型のボタンだけ取り替える（fieldset は
+   * リンクを止められないため）。見た目は変えない。
+   */
+  readOnly?: boolean
   embedded?: boolean
   resources?: CommonActionResources | null
   allowedActionTypes?: readonly TagEditorActionLabel[]
@@ -258,6 +265,11 @@ export default function TagEditorV8({
 
       {error && <Notice tone="danger" message={error} />}
 
+      {/*
+       * 閲覧のみは入力欄も仕掛けの押し口も押せない形にする。
+       * 枠の見た目は消してある（中身の CSS はそのまま）。
+       */}
+      <fieldset disabled={readOnly} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
       <div className={styles.split} data-design="Body">
         <div className={styles.main} data-design="Left">
           {/* 段：基本 */}
@@ -510,12 +522,20 @@ export default function TagEditorV8({
         actions={(
           <>
             <Button onClick={onCancel}>キャンセル</Button>
-            {mode === 'edit' && !embedded ? <Button href={`/tags/new?copy=${tag?.id ?? ''}`}>複製して作る</Button> : null}
+            {mode === 'edit' && !embedded ? (
+              // リンク型の押し口は fieldset で止められないので、閲覧のみでは押せない型に替える。
+              readOnly ? (
+                <Button type="button" disabled>複製して作る</Button>
+              ) : (
+                <Button href={`/tags/new?copy=${tag?.id ?? ''}`}>複製して作る</Button>
+              )
+            ) : null}
             {mode === 'create' ? <Button disabled={saving} onClick={() => requestSave(true)}>保存して続けて作る</Button> : null}
             <Button variant="primary" disabled={saving} onClick={() => requestSave(false)} busy={saving}>{mode === 'create' ? 'タグを作る' : 'タグを保存する'}</Button>
           </>
         )}
       />
+      </fieldset>
 
       {drawerOpen && <ActionDrawer accountId={accountId} suppliedResources={resources} allowedActionTypes={allowedActionTypes} referenceState={referenceDrawerState} onClose={() => setDrawerOpen(false)} onAdd={(action) => { setActions((current) => [...current, action]); setDrawerOpen(false) }} />}
       {retroactiveOpen && <RetroactiveDialog referenceState={referenceRetroactiveState} values={values} count={tag?.friendCount ?? 0} tagId={tag?.id ?? null} accountId={accountId} onCancel={() => { setRetroactiveOpen(false); void onSave({ ...values, applyToExisting: false }, false, false) }} onSave={(previewToken) => { setRetroactiveOpen(false); void onSave(values, false, true, previewToken) }} />}

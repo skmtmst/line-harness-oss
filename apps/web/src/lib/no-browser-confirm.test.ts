@@ -112,19 +112,18 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
     )
   })
 
-  it('リマインダの一括削除が共通の確認窓を使う', () => {
-    const src = fs.readFileSync(path.join(SRC, 'app', 'reminders', 'page.tsx'), 'utf8')
+  it('リマインダの削除が共通の確認窓を使う', () => {
+    /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。 */
+    const src = fs.readFileSync(path.join(SRC, 'app', 'reminders', 'list-v8.tsx'), 'utf8')
     expect(src).toContain('ConfirmDialog')
     expect(src).toContain('confirmLabel="削除する"')
     expect(src).toContain('destructive')
     expect(code(src), 'ブラウザのconfirmへ戻っている').not.toMatch(BROWSER_CONFIRM)
     // 押している間に二度押しできない
-    expect(src).toContain('selected.size === 0 || deleting')
-    // 失敗を握りつぶさず、成功済みを再試行しない。
-    // 一部成功後に全件を選んだままにすると、成功済みの404で残りへ進めなくなる。
-    const body = src.slice(src.indexOf('const handleDeleteSelected'), src.indexOf('const filtered'))
-    expect(body, '削除の返事を確かめていない').toContain('return res.success')
-    expect(body, '失敗したものだけを選び直していない').toContain('setSelected(new Set(failed))')
-    expect(body, '一部失敗を運用者へ知らせていない').toContain('削除できなかったものだけを残しています')
+    expect(src).toContain('deleting || !deleteStillListed')
+    // 失敗を握りつぶさない。戻りの success を見て、失敗時は窓を閉じない。
+    const body = src.slice(src.indexOf('const runDelete'), src.indexOf('/* ===== 複製'))
+    expect(body, '削除の返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
+    expect(body, '成功時に窓を閉じていない').toContain('setDeleteTarget(null)')
   })
 })

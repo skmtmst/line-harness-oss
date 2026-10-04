@@ -56,11 +56,12 @@
   min-width: 0;
 }
 
+/* 板 `NGh7b`「段」：余白 20（四方）。 */
 .card {
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
-  padding: 20px 24px;
+  padding: 20px;
 }
 
 .cardTitle {

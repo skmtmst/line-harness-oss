@@ -223,12 +223,14 @@ test('v8 の受け皿は一番下・操作に「削除する」がなく消せ�
     const menu = document.querySelector('[role="menu"]')
     expect(menu).toBeTruthy()
     const labels = [...menu!.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())
-    expect(labels).toContain('編集する')
+    expect(labels).toContain('編集')
     expect(labels).toContain('実行結果を見る')
     expect(labels).toContain('テストを送る')
     expect(labels).toContain('止める')
     expect(labels).not.toContain('削除する')
     expect(menu!.textContent).toContain('この設定は削除できません')
+    // 板 C0lfUP：受け皿の「…」を開いた印
+    expect(host.querySelector('[data-design-node="C0lfUP"]')).toBeTruthy()
   })
 })
 

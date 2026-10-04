@@ -7,10 +7,8 @@ import { ApiError, api, type NenColumn } from '@/lib/api'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import CampaignEditor from './campaign-editor'
 import CampaignEditorV8 from './campaign-editor-v8'
 import { useAccount } from '@/contexts/account-context'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatDay } from '@/lib/format'
 import Button from '@/components/shared/button'
 
@@ -30,8 +28,6 @@ type Column = Pick<NenColumn, 'id' | 'slug' | 'title' | 'introText' | 'published
  * という食い違いになる。
  */
 function NenColumnEditInner() {
-  const params = useSearchParams()
-  const campaignKey = params.get('key') ?? ''
   const { selectedAccountId } = useAccount()
 
   const [columns, setColumns] = useState<Column[]>([])
@@ -140,8 +136,6 @@ function NenColumnEditInner() {
    * ★V8-B：data-theme="v8" のときだけ新しい配信編集画面（w5pwG）へ切り替える。
    * v7 の見た目はそのまま。取得・保存の決めごとは変えない。
    */
-  const theme = useAdminTheme()
-  if (campaignKey) return theme === 'v8' ? <CampaignEditorV8 campaignKey={campaignKey} /> : <CampaignEditor campaignKey={campaignKey} />
 
   return (
     <div className="flex flex-col gap-4">
@@ -244,11 +238,17 @@ function NenColumnEditInner() {
   )
 }
 
+function NenEditRoute() {
+  const params = useSearchParams()
+  const campaignKey = params.get('key') ?? ''
+  return campaignKey ? <CampaignEditorV8 campaignKey={campaignKey} /> : <NenColumnEditInner />
+}
+
 export default function NenColumnEditPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <NenColumnEditInner />
+      <NenEditRoute />
     </Suspense>
   )
 }

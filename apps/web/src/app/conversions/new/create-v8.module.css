@@ -1,0 +1,79 @@
+.root {
+  container-type: inline-size;
+  min-width: 0;
+}
+.heading {
+  margin-bottom: 24px;
+}
+.back {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+.back:hover { text-decoration: underline; }
+.heading h2 {
+  margin: 12px 0 6px;
+  color: var(--color-ink);
+  font-size: var(--text-title);
+  font-weight: 600;
+}
+.heading p {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
+/* CreatePage は保存・取消・未保存の状態を担当し、ここではこの画面だけの段組みを合わせる。 */
+.root [data-design='Crumb'] { display: none; }
+.root [data-design='Body'] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+}
+.root [data-design='Left'] {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.root [data-design='Left'] > * { margin-top: 0; }
+.root [data-design='Right'] { width: auto; min-width: 0; }
+.section { min-width: 0; }
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+.preview { margin-top: 16px; }
+.preview > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.preview > div:last-child { border: 0; padding-bottom: 0; }
+.preview dt { color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.preview dd {
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+@container (max-width: 1099px) {
+  .root [data-design='Body'] { grid-template-columns: minmax(0, 1fr); }
+  .root [data-design='Right'] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .root [data-design='Right'] > * { margin-top: 0; }
+}
+@container (max-width: 640px) {
+  .root [data-design='Right'] { grid-template-columns: minmax(0, 1fr); }
+}

@@ -20,9 +20,9 @@ import { logoutAndGoToLogin } from '@/lib/logout'
  * 「プロフィールを編集」は本人の情報を変える画面ができるまで出さない（出す＝使える、§7-10）。
  */
 const ROLE_LABELS: Record<string, string> = {
-  owner: '統括',
+  owner: 'オーナー',
   admin: '管理者',
-  staff: '担当者',
+  staff: 'スタッフ',
   viewer: '閲覧のみ',
 }
 

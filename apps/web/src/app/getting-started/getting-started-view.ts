@@ -6,9 +6,10 @@ import type {
   StaffMember,
 } from '@line-crm/shared'
 import type { GettingStartedStep } from '@/lib/api'
+import type { FeatureSetEntry } from './feature-presets'
 
 /**
- * 設計 ★V6 34-1「はじめの設定」（`RAW35`）の順路。
+ * 設計板 xuJ7D「はじめの設定」の順路（6段）。
  *
  * **画面を開いたかではなく、実際に作られたもので判断する。**
  * だから判定はすべてサーバから取った実物（アカウント・タグ・ルール・シナリオ）
@@ -38,17 +39,19 @@ export const STEP_STATE_LABEL: Record<StepState, string> = {
   unknown: '確かめられません',
 }
 
-export type StepKey = 'accounts' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
+export type StepKey = 'accounts' | 'featureSet' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
 
 export interface StepResult {
   key: StepKey
-  /** 左の丸に出す文字。最終段だけ数字ではなく「最終」。 */
+  /** 左の丸に出す文字。板の段番号。 */
   ordinal: string
   title: string
+  /** 板の2段目の言葉。 */
+  sub: string
   state: StepState
-  /** 終わったと見なす条件。状態によらず必ず出す。 */
+  /** 終わったと見なす条件。 */
   condition: string
-  /** 次にすること。 */
+  /** 次にすること。「いま止まっている理由」に出す。 */
   next: string
   /** 行き先。押せないときは null。 */
   action: { label: string; href: string } | null
@@ -59,6 +62,8 @@ export interface StepResult {
 /** 判定に使う実物。**足りないものは `null` で受け、勝手に「終わった」ことにしない。** */
 export interface GettingStartedInput {
   accounts: LineAccount[]
+  /** 初期セットの選択状況。機能設定の実物。`null` は未取得。 */
+  featureSet: FeatureSetEntry | null
   tagCount: number
   friendFieldCount: number
   /*
@@ -99,7 +104,8 @@ function accountsStep(input: GettingStartedInput): StepResult {
   return {
     key: 'accounts',
     ordinal: '1',
-    title: 'LINEアカウントをつなぐ',
+    title: 'LINE アカウントをつなぐ',
+    sub: 'チャネルIDとアクセストークン',
     state: done ? 'done' : hasAny ? 'stalled' : 'todo',
     condition:
       '稼働中のアカウントが1つ以上あり、Webhookが合っていて利用設定がオンで、シークレットが確かめられている',
@@ -113,19 +119,43 @@ function accountsStep(input: GettingStartedInput): StepResult {
   }
 }
 
-/** 段2 友だちの分け方を決める。タグか友だち情報欄が1つでもあればよい。 */
+/**
+ * 段2 使う機能の初期セット。保存済みの設定（version > 0）があれば終わり。
+ * まだ選んでいなければ、機能設定で選ぶ。
+ */
+export function featureSetStep(entry: FeatureSetEntry | null): StepResult {
+  const state: StepState = entry === null ? 'unknown' : entry.kind === 'configured' ? 'done' : entry.kind === 'forbidden' ? 'forbidden' : 'todo'
+  return {
+    key: 'featureSet',
+    ordinal: '2',
+    title: '使う機能の初期セット',
+    sub: '業種に合わせて機能を出す',
+    state,
+    condition: '使う機能の初期セットを選んである',
+    next: state === 'done'
+      ? '終わっています。機能の入り切りは機能設定から。'
+      : state === 'forbidden'
+        ? '管理者に頼んでください。'
+        : '業種に合う初期セットを選ぶと、使う機能がそろいます。',
+    action: state === 'todo' ? { label: '使う機能を選ぶ', href: '/settings' } : null,
+    blockedReason: state === 'forbidden' ? '管理者に頼んでください' : state === 'unknown' ? '状態を取得できませんでした' : null,
+  }
+}
+
+/** 段3 友だちの分け方を決める。タグか友だち情報欄が1つでもあればよい。 */
 function attributesStep(input: GettingStartedInput): StepResult {
   const done = input.tagCount > 0 || input.friendFieldCount > 0
   return {
     key: 'attributes',
-    ordinal: '2',
+    ordinal: '3',
     title: '友だちの分け方を決める',
+    sub: 'タグと友だち属性を作る',
     state: done ? 'done' : 'todo',
     condition: 'タグか友だち情報欄が1つ以上ある',
     next: done
       ? '終わっています。タグを増やすときはこちらから。'
       : 'タグを1つ作ると、友だちを分けて配信できるようになります。',
-    action: { label: 'タグを見る', href: '/tags' },
+    action: { label: '友だちの分け方へ', href: '/tags?tab=tags' },
     blockedReason: null,
   }
 }
@@ -143,8 +173,9 @@ function friendAddStep(input: GettingStartedInput): StepResult {
   const done = published && input.friendAdd?.configured === true
   return {
     key: 'friendAdd',
-    ordinal: '3',
+    ordinal: '4',
     title: '友だち追加時の配信を作る',
+    sub: '友だちになった人へのあいさつ',
     state: done ? 'done' : hasDraft ? 'stalled' : 'todo',
     condition: '公開したルールが1つ以上あり、どれにも当たらない人を受ける決まりがある',
     next: done
@@ -152,7 +183,7 @@ function friendAddStep(input: GettingStartedInput): StepResult {
       : hasDraft
         ? '下書きがありますが、まだ公開していません。公開すると動きはじめます。'
         : '友だちが増えたときに何をするかを決めて、公開します。',
-    action: { label: '友だち追加時の配信を開く', href: '/friend-add-settings' },
+    action: { label: '友だち追加時の配信へ', href: '/friend-add-settings' },
     blockedReason: null,
   }
 }
@@ -173,8 +204,9 @@ function scenarioStep(input: GettingStartedInput): StepResult {
   const hasAny = input.scenarios.length > 0
   return {
     key: 'scenario',
-    ordinal: '4',
+    ordinal: '5',
     title: 'シナリオを作る',
+    sub: '決まった日数ごとに送る',
     state: done ? 'done' : hasAny ? 'stalled' : 'todo',
     condition: '公開したシナリオが1つ以上あり、段3のルールから始まる',
     next: done
@@ -183,7 +215,7 @@ function scenarioStep(input: GettingStartedInput): StepResult {
         ? 'シナリオはありますが、段3のルールから始まるものがまだありません。'
         : 'レシピから作ると、7通ぶんの下書きが一度にできます。',
     action: hasAny
-      ? { label: 'シナリオを開く', href: '/scenarios' }
+      ? { label: 'シナリオ配信へ', href: '/scenarios' }
       : { label: 'レシピから作る', href: '/recipes' },
     blockedReason: null,
   }
@@ -201,14 +233,15 @@ function firstMessageStep(input: GettingStartedInput): StepResult {
   const allowed = !isViewer(input.role)
   return {
     key: 'firstMessage',
-    ordinal: '最終',
+    ordinal: '6',
     title: '最初の1通を受け取る',
+    sub: '自分のLINEで受け取って確かめる',
     state: allowed ? 'unknown' : 'forbidden',
     condition: '友だち追加時の配信かシナリオの1通目が、実際に1件届いている',
     next: allowed
       ? '届いたかどうかを数える口がまだありません。QRを読んで自分を友だちに追加するか、テスト受信者へ送って、受信箱で確かめてください。'
       : 'QRを読んで自分を友だちに追加するか、テスト受信者へ送ります。',
-    action: allowed ? { label: 'ダッシュボードでQRを見る', href: '/' } : null,
+    action: allowed ? { label: 'テストを送る', href: '/chats' } : null,
     blockedReason: allowed ? null : '管理者に頼んでください',
   }
 }
@@ -216,6 +249,7 @@ function firstMessageStep(input: GettingStartedInput): StepResult {
 export function buildSteps(input: GettingStartedInput): StepResult[] {
   return [
     accountsStep(input),
+    featureSetStep(input.featureSet),
     attributesStep(input),
     friendAddStep(input),
     scenarioStep(input),
@@ -224,13 +258,17 @@ export function buildSteps(input: GettingStartedInput): StepResult[] {
 }
 
 /**
- * サーバが判定した5段を、設計の説明と操作へ結び付ける。
+ * サーバが判定した段を、設計の説明と操作へ結び付ける。
  * 完了判定を画面で再計算しないため、状態・権限・行き先は必ずAPIを正本にする。
+ *
+ * 初期セット（段2）は口に無いのでここでは含めない。ダッシュボードの帯は
+ * この5段のまま数える。はじめの設定の画面で `insertFeatureSet` を足す。
  */
 export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>): StepResult[] {
-  const byKey = new Map(serverSteps.map((step) => [step.key, step]))
+  const byKey = new Map<string, GettingStartedStep>(serverSteps.map((step) => [step.key, step]))
   const display = buildSteps({
     accounts: [],
+    featureSet: null,
     tagCount: 0,
     friendFieldCount: 0,
     friendAdd: null,
@@ -239,7 +277,9 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
     role: null,
   })
 
-  return display.map((base) => {
+  return display
+    .filter((base) => base.key !== 'featureSet')
+    .map((base) => {
     const server = byKey.get(base.key)
     if (!server) return { ...base, state: 'unknown', action: null, blockedReason: '状態を取得できませんでした' }
 
@@ -250,6 +290,7 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
         stalled: server.reason ?? 'Webhookかシークレットがまだ確かめられていません。',
         todo: 'LINEアカウントを1つ登録して、Webhookをつなぎます。',
       },
+      featureSet: {},
       attributes: {
         done: '終わっています。タグを増やすときはこちらから。',
         todo: 'タグを1つ作ると、友だちを分けて配信できるようになります。',
@@ -261,7 +302,7 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
       },
       scenario: {
         done: '終わっています。中身を直すときはこちらから。',
-        stalled: server.reason ?? 'シナリオはありますが、段3のルールから始まるものがまだありません。',
+        stalled: server.reason ?? 'シナリオはありますが、段4のルールから始まるものがまだありません。',
         todo: 'レシピから作ると、7通ぶんの下書きが一度にできます。',
       },
       firstMessage: {
@@ -271,14 +312,20 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
         forbidden: 'QRを読んで自分を友だちに追加するか、テスト受信者へ送ります。',
       },
     }
+    // 行き先の言葉は板が正本。
     const labels: Record<StepKey, string> = {
       accounts: state === 'done' ? '接続の確認を見る' : 'LINEアカウントを開く',
-      attributes: 'タグを見る',
-      friendAdd: '友だち追加時の配信を開く',
-      scenario: state === 'todo' ? 'レシピから作る' : 'シナリオを開く',
-      firstMessage: 'ダッシュボードでQRを見る',
+      featureSet: '使う機能を選ぶ',
+      attributes: '友だちの分け方へ',
+      friendAdd: '友だち追加時の配信へ',
+      scenario: state === 'todo' ? 'レシピから作る' : 'シナリオ配信へ',
+      firstMessage: 'テストを送る',
     }
-    const href = base.key === 'scenario' && state === 'todo' ? '/recipes' : server.href
+    let href: string | null = server.href
+    // まだ無いものを作りに行く行き先は、口の保存先ではなく作る画面にする。
+    if (base.key === 'scenario' && state === 'todo') href = '/recipes'
+    // テスト送信は受信箱で行う（口の権限表 `message.test.send` の持ち場）。
+    if (base.key === 'firstMessage') href = '/chats'
     const action = href && state !== 'forbidden' ? { label: labels[base.key], href } : null
 
     return {
@@ -288,7 +335,18 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
       action,
       blockedReason: action ? null : server.reason,
     }
-  })
+    })
+}
+
+/**
+ * 口の5段へ初期セット（段2）を足して板の6段にする。段番号を振り直す。
+ * 初期セットの状態は機能設定の実物から `featureSetStep` で作る。
+ */
+export function insertFeatureSet(steps: ReadonlyArray<StepResult>, entry: FeatureSetEntry | null): StepResult[] {
+  const feature = featureSetStep(entry)
+  const at = steps.findIndex((step) => step.key === 'accounts')
+  const merged = at < 0 ? [feature, ...steps] : [...steps.slice(0, at + 1), feature, ...steps.slice(at + 1)]
+  return merged.map((step, index) => ({ ...step, ordinal: String(index + 1) }))
 }
 
 /** 終わった段の数。**`unknown` は終わっていない側に数える。** */
@@ -301,12 +359,9 @@ export function allDone(steps: ReadonlyArray<StepResult>): boolean {
   return steps.every((s) => s.state === 'done')
 }
 
-/** 見出しの1行。数には単位を付ける（common-rules）。 */
+/** 板の帯の1行。`2 / 6 済み` の形。数は実測だけ。 */
 export function progressHeadline(steps: ReadonlyArray<StepResult>): string {
-  const done = doneCount(steps)
-  const next = steps.find((s) => s.state !== 'done')
-  if (!next) return `はじめの設定 ${done} / ${steps.length} が完了。すべて終わりました。`
-  return `はじめの設定 ${done} / ${steps.length} が完了。次は「${next.title}」です。`
+  return `${doneCount(steps)} / ${steps.length} 済み`
 }
 
 /**
@@ -328,30 +383,12 @@ export function stoppedReasons(steps: ReadonlyArray<StepResult>): string[] {
   return lines
 }
 
-/** 右カラムの「つながる先」。要件 §5-2 のとおり 33・04・09・05・01 だけ。 */
-export const FEATURE_LINKS = [
-  { label: 'LINEアカウント', note: 'つなぎ先と接続の状態はここで見ます。', href: '/accounts' },
-  { label: '友だち属性', note: 'タグと友だち情報欄はここで作ります。', href: '/tags' },
-  {
-    label: '友だち追加時の配信',
-    note: '段3のルールはここにあります。',
-    href: '/friend-add-settings',
-  },
-  { label: 'シナリオ配信', note: '段4のシナリオはここにあります。', href: '/scenarios' },
-  { label: 'ダッシュボード', note: '友だち追加のQRはここに出ます。', href: '/' },
-] as const
-
-/** 右カラムの「気をつけること」。設計 `RAW35` の 3 行。 */
+/** 板の下の「気をつけること」。 */
 export const CARE_ITEMS = [
   {
-    head: '終わったかどうかは、画面を開いたかではなく、実際に作られたもので判断します。',
+    head: '手順は飛ばしても使えます。',
   },
   {
-    head: '順番は飛ばせます。',
-    note: '前の段が終わっていなくても、後の段の画面は開けます。',
-  },
-  {
-    head: '全部終わると、ダッシュボードの帯は出なくなります。',
-    note: 'ここからならいつでも見返せます。',
+    head: 'あとからこの画面に戻れます（設定 › はじめの設定）。',
   },
 ] as const

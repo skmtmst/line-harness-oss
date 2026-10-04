@@ -175,7 +175,7 @@ describe('R453 変えない保存で通知方法が変わらない', () => {
     fixture.editId = 'report-1'
     net.handler = listHandler([STAFF_SCHEDULE])
     await render()
-    expect(host.textContent).toContain('「担当者メール利用」を直しています')
+    expect((host.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('担当者メール利用')
 
     await act(async () => { button('変更を保存する').click() })
     const putCall = net.calls.find((call) => call.path.startsWith('/api/analytics/report-schedules/report-1?') && call.method === 'PUT')
@@ -188,7 +188,7 @@ describe('R453 変えない保存で通知方法が変わらない', () => {
     fixture.editId = 'report-2'
     net.handler = listHandler([EMAIL_ONLY_SCHEDULE])
     await render()
-    expect(host.textContent).toContain('「メールのみ」を直しています')
+    expect((host.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('メールのみ')
 
     await act(async () => { button('変更を保存する').click() })
     const putCall = net.calls.find((call) => call.path.startsWith('/api/analytics/report-schedules/report-2?') && call.method === 'PUT')
@@ -209,7 +209,7 @@ describe('R455 遅い保存応答で編集先が戻らない', () => {
       return listHandler([STAFF_SCHEDULE, EMAIL_ONLY_SCHEDULE])(path, init)
     }
     await render()
-    expect(host.textContent).toContain('「担当者メール利用」を直しています')
+    expect((host.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('担当者メール利用')
 
     // A1の保存を開始（応答はまだ返さない）
     let savePromise: Promise<void> | null = null
@@ -219,7 +219,7 @@ describe('R455 遅い保存応答で編集先が戻らない', () => {
     // 同じ画面のままA2へ移る
     fixture.editId = 'report-2'
     await render()
-    expect(host.textContent).toContain('「メールのみ」を直しています')
+    expect((host.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('メールのみ')
 
     // 遅れてA1の成功応答が返る
     await act(async () => {
@@ -230,8 +230,8 @@ describe('R455 遅い保存応答で編集先が戻らない', () => {
     })
 
     // A2のまま。A1への2回目のPUTは出ない
-    expect(host.textContent).toContain('「メールのみ」を直しています')
-    expect(host.textContent).not.toContain('「担当者メール利用」を直しています')
+    expect((host.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('メールのみ')
+    expect((host.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).not.toBe('担当者メール利用')
     const puts = net.calls.filter((call) => call.method === 'PUT')
     expect(puts).toHaveLength(1)
     expect(puts[0].path).toContain('report-1')

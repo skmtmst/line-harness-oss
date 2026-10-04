@@ -207,7 +207,7 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     expect(valueOf(byLabel('電話客のペット名'))).toBe('ポチ')
     expect(valueOf(byLabel('予約メニュー'))).toBe('menu-ny')
     // 担当・時刻は一覧と空き枠の到着後に確かめてから選ぶ。
-    expect(valueOf(byLabel('担当者'))).toBe('staff-ny')
+    expect(valueOf(byLabel('スタッフ'))).toBe('staff-ny')
     expect(valueOf(byLabel('空いている時間'))).toBe('10:00')
     const dateInput = all('input').find((element) => element.getAttribute('name') === 'date')!
     expect(valueOf(dateInput)).toBe('2026-11-02')
@@ -256,7 +256,7 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     // 担当一覧はメニュー選択後に届く。届いた時点で display_name で照合して選ぶ。
     await act(async () => { setValue(byLabel('予約メニュー'), 'menu-ny') })
     await flush()
-    expect(valueOf(byLabel('担当者'))).toBe('staff-ny')
+    expect(valueOf(byLabel('スタッフ'))).toBe('staff-ny')
     // 時刻は空き枠に実在するときだけ選ぶ。
     expect(valueOf(byLabel('空いている時間'))).toBe('10:00')
   })
@@ -271,7 +271,7 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
 
     await act(async () => { setValue(byLabel('予約メニュー'), 'menu-ny') })
     await flush()
-    expect(valueOf(byLabel('担当者'))).toBe('staff-ny')
+    expect(valueOf(byLabel('スタッフ'))).toBe('staff-ny')
     // 15:00 は空き枠に無いので選ばれない。
     expect(valueOf(byLabel('空いている時間'))).toBe('')
   })

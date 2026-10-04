@@ -1,20 +1,11 @@
-/* ★V8 参加者管理（`uNsEy`）の分類の札。素の button に付ける。 */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
+.root { display: flex; flex-direction: column; gap: 16px; }
+.root [data-participant-kpis] { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 -24px; border-bottom: 1px solid var(--color-hairline); }
+.root [data-participant-kpi] { min-width: 0; padding: 20px; border-right: 1px solid var(--color-hairline); }
+.root [data-participant-kpi]:last-child { border-right: 0; }
+.root [data-participant-table] { margin: 0 -24px; overflow: hidden; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); }
+@media (max-width: 640px) { .root [data-participant-kpis] { grid-template-columns: repeat(2, minmax(0, 1fr)); } .root [data-participant-table] { overflow-x: auto; } .root [data-participant-table] table { min-width: 760px; } }
 
-.chip[data-selected='true'] {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-}
+.root col:nth-child(2) { width: 12%; }
+.root col:nth-child(3) { width: 19%; }
+.root col:nth-child(4) { width: 16%; }
+.root col:nth-child(5) { width: 160px; }

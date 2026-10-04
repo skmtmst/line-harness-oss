@@ -66,7 +66,7 @@ function replaceSessionStorage(overrides: Partial<Pick<Storage, 'getItem' | 'set
 }
 async function list() { render(<TemplateConsole type="tag" useCanonicalEditors={false} />); await screen.findByLabelText('来店済みの操作'); fireEvent.click(screen.getByLabelText('来店済みの操作')) }
 async function chooseStores() {
-  await list(); fireEvent.click(screen.getByRole('button', { name: '来店済みを配布' })); await screen.findByRole('checkbox', { name: '銀座本店' })
+  await list(); fireEvent.click(screen.getByRole('button', { name: '来店済みをアカウントへ配る' })); await screen.findByRole('checkbox', { name: '銀座本店' })
   expect((screen.getByRole('button', { name: '0アカウントの重複を確認' }) as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('checkbox', { name: '表示中をすべて選択' })); fireEvent.click(screen.getByRole('button', { name: '2アカウントの重複を確認' })); await screen.findByText('重複する項目が2件あります')
 }
@@ -192,7 +192,7 @@ describe('HQひな形の配布フロー', () => {
   })
   it('配布先が差し替わった事前確認を拒否する', async () => {
     calls.preflight.mockResolvedValue({ ...checked(), stores: [{ ...checked().stores[0], accountId: 'outside' }] })
-    await list(); fireEvent.click(screen.getByRole('button', { name: '来店済みを配布' })); await screen.findByRole('checkbox', { name: '銀座本店' }); fireEvent.click(screen.getByRole('checkbox', { name: '銀座本店' })); fireEvent.click(screen.getByRole('button', { name: '1アカウントの重複を確認' }))
+    await list(); fireEvent.click(screen.getByRole('button', { name: '来店済みをアカウントへ配る' })); await screen.findByRole('checkbox', { name: '銀座本店' }); fireEvent.click(screen.getByRole('checkbox', { name: '銀座本店' })); fireEvent.click(screen.getByRole('button', { name: '1アカウントの重複を確認' }))
     await screen.findByRole('alert'); expect(screen.queryByRole('button', { name: /この内容で/ })).toBeNull(); expect(calls.distribute).not.toHaveBeenCalled()
   })
   it('失敗アカウントだけを新しい事前確認へ戻し、成功分は再送しない', async () => {

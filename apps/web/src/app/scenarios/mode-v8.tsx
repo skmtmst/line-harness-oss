@@ -287,7 +287,7 @@ export default function ScenarioModeV8() {
   const disabled = (Boolean(id) && !scenario) || detailsSaving || saving !== null
 
   return (
-    <div className={styles.board} data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
+    <div className={styles.board} data-design-node="dnzqC" data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
       <div className={styles.head} data-design="Head">
         <div>
           <h2 className={styles.headTitle}>{id ? '配信方式を変える' : 'シナリオを作る'}</h2>

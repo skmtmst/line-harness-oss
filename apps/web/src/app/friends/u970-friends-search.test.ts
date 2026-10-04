@@ -9,6 +9,7 @@ const DIALOG = readFileSync(
   'utf8',
 )
 /* #984 LAY-14: 主タブの定義は friends-tabs.ts が正本（UID移行側も同じ一覧を使う）。 */
+const NAV = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'friends-nav-v8.tsx'), 'utf8')
 const TABS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'friends-tabs.ts'), 'utf8')
 
 /*
@@ -70,16 +71,17 @@ describe('U011-U013 詳細検索の狭幅対応', () => {
  */
 describe('タブと右側操作の重なり（共通の横スクロールへ寄せる）', () => {
   it('画面側でタブ行を折り返す上書きを残さない', () => {
-    expect(PAGE).toContain('data-design="V6Tabs" data-design-node="JB0Ki"')
+    expect(PAGE).toContain('data-friends-page="v8"')
     expect(PAGE).not.toContain('data-tabs-row')
     expect(PAGE).not.toContain('nav:has(> span)')
-    expect(PAGE).toContain('<MergedTabs')
+    expect(PAGE).not.toContain('<MergedTabs')
+    expect(PAGE).toContain('<FriendsListHeadV8')
   })
 
   it('タブと右側操作そのものは残す', () => {
     expect(TABS).toContain("{ key: 'duplicates', label: '重複検出'")
     expect(TABS).toContain("{ key: 'merged', label: '統合ユーザー'")
-    expect(PAGE).toContain('表示中をCSVで書き出す')
+    expect(NAV).toContain('表示中をCSVで書き出す')
   })
 
   it('UID移行は主タブの1項目だけで、アクションへ重複して置かない', () => {

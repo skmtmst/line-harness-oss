@@ -118,7 +118,7 @@ async function openDetail() {
     ;(row as HTMLElement).click()
   })
   await settle()
-  const retry = findButton('未完の工程だけ再実行する')
+  const retry = findButton('後処理をやり直す')
   expect(retry, '再実行ボタンがある').toBeTruthy()
   return retry!
 }

@@ -7,9 +7,10 @@
  *   角丸 4段 mini6/control8/card12/pill9999（★V7 でカード・窓は12に一本化）
  *   余白 5段 4/8/12/16/24（gap-1/2/3/4/6。Tailwind 既定の4px基準を使う）
  *
- * 既存の半端値（text-[11px] 201か所など）は使う画面と設計固定テストが
- * あるので残す。新規で増やさないことをここで見張る（ラチェット）。
- * 落ちたらトークンか正規段へ寄せる。それでも足りない段があれば、
+ * 既存の半端値は M10 polish で同pxトークンへ寄せた（text-[17px]・
+ * [26px] 各1だけ v7 側の見た目が変わるため残す）。新規で増やさない
+ * ことをここで見張る（ラチェット）。落ちたらトークンか正規段へ寄せ、
+ * 減った分だけ基準値を下げる（増やさない）。それでも足りない段があれば、
  * Issue #704 で設計（Pencil）と合わせて決めてから基準値を更新する。
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs'
@@ -107,17 +108,9 @@ describe('#704 半端値を新規で使わない（ラチェット）', () => {
     const counts = countUsages(/text-\[\d+px\]/g)
     expect(
       increased(counts, {
-        'text-[11px]': 202,
-        'text-[10px]': 108,
-        'text-[13px]': 18,
-        'text-[12px]': 11,
-        'text-[9px]': 9,
-        'text-[14px]': 3,
-        'text-[8px]': 1,
-        'text-[30px]': 1,
-        'text-[28px]': 1,
+        // M10 polish で同pxトークンへ寄せた分は外す（0は新規1件で落ちる）。
+        // 残りは v7 側の見た目が変わるため残す（inbox-kpis・tag-list-v2）。
         'text-[26px]': 1,
-        'text-[18px]': 1,
         'text-[17px]': 1,
       }),
     ).toEqual([])
@@ -136,7 +129,6 @@ describe('#704 半端値を新規で使わない（ラチェット）', () => {
       increased(counts, {
         'gap-[7px]': 1,
         'gap-[5px]': 1,
-        'gap-[18px]': 1,
         'gap-[14px]': 1,
         'gap-[13px]': 1,
       }),
@@ -147,9 +139,9 @@ describe('#704 半端値を新規で使わない（ラチェット）', () => {
     const counts = countUsages(/(?:gap|gap-x|gap-y)-\d+\.\d+/g)
     expect(
       increased(counts, {
-        'gap-1.5': 172,
+        'gap-1.5': 167,
         'gap-2.5': 23,
-        'gap-0.5': 16,
+        'gap-0.5': 14,
         'gap-3.5': 2,
         'gap-y-1.5': 1,
         'gap-y-0.5': 1,

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -76,16 +76,24 @@ describe('標準ボタンの第1段階移行', () => {
     // 残す（部品の既定値への意図的な上書き）。禁止するのは variant と同値の
     // クラスの再指定だけ——静的な className で部品の役割を二重に書くのを防ぐ。
     // 動的 className（${} 入り）は条件で見た目を切り替える正当な利用なので対象外。
-    const duplicatesVariant =
-      /\b(?:bg-accent|bg-accent-deep|text-on-accent|border-hairline|rounded-control|bg-danger|bg-canvas|hover:brightness-92|hover:bg-canvas-sunken)\b/
+    // 別variantの色は意図的な上書き。同じvariantが持つ値だけを禁止する。
+    const duplicatesByVariant: Record<string, RegExp> = {
+      primary: /\b(?:bg-accent-deep|text-on-accent|hover:brightness-92)\b/,
+      secondary: /\b(?:border-hairline|bg-canvas|hover:bg-canvas-sunken)\b/,
+      danger: /\b(?:bg-danger|text-on-accent)\b/,
+      ghost: /\bhover:bg-canvas-sunken\b/,
+    }
 
     for (const [path, source] of Object.entries(sources)) {
       for (const opening of buttonOpenings(path, source)) {
         const cls = /className="([^"]*)"/.exec(opening)?.[1]
         if (!cls) continue
-        expect(cls, `${path} が共通Buttonへ variant と同値の指定を重ねている`).not.toMatch(
-          duplicatesVariant,
-        )
+        const variant = /variant="([^"]+)"/.exec(opening)?.[1] ?? 'secondary'
+        expect(cls, `${path} が共通Buttonの丸みを重ねている`).not.toMatch(/\brounded-control\b/)
+        const duplicates = duplicatesByVariant[variant]
+        if (duplicates) {
+          expect(cls, `${path} が共通Buttonへ variant と同値の指定を重ねている`).not.toMatch(duplicates)
+        }
       }
     }
   })
@@ -105,7 +113,7 @@ describe('標準ボタンの第1段階移行', () => {
     for (const handler of [
       'onClick={exportCsv}',
       'onClick={handleCreate}',
-      "onAddFolder={() => setEditingGenre('new')}",
+      "onAddFolder={readonly ? undefined : () => setEditingGenre('new')}",
       'onClick={save}',
       'onClick={onCancel}',
     ]) {

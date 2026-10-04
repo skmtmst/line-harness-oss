@@ -41,7 +41,13 @@ vi.mock('@/contexts/account-context', () => ({
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
+  usePageCrumbs: () => {},
 }))
+
+vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
+  const actual = await importOriginal()
+  return { ...actual, useStaffRole: () => 'owner' }
+})
 
 vi.mock('@/components/shared/list-kpis', () => ({
   default: () => null,
@@ -90,56 +96,56 @@ async function flush() {
 }
 
 describe('リマインダ一覧の行操作', () => {
-  it('行の先頭に枠つき「詳細」ボタンと「・・・」が並び、削除は行に無い', async () => {
+  it('行に名前のリンクと「…」が並び、削除は行に無い', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
 
-    const detail = [...host.querySelectorAll('a')]
-      .find((el) => el.getAttribute('href') === '/reminders/detail?id=r-1' && el.textContent?.includes('詳細'))
-    expect(detail, '枠つき「詳細」ボタンが見つかりません').toBeTruthy()
+    const name = [...host.querySelectorAll('a')]
+      .find((el) => el.getAttribute('href') === '/reminders/detail?id=r-1' && el.textContent?.includes('予約前のお知らせ'))
+    expect(name, '名前のリンクが見つかりません').toBeTruthy()
 
     expect(host.querySelector('button[aria-label="予約前のお知らせを削除する"]')).toBeNull()
 
-    const more = host.querySelector('button[aria-label="予約前のお知らせのその他操作"]') as HTMLButtonElement
-    expect(more, 'その他ボタンが見つかりません').toBeTruthy()
+    const more = host.querySelector('button[aria-label="リマインダ「予約前のお知らせ」の操作"]') as HTMLButtonElement
+    expect(more, '操作ボタンが見つかりません').toBeTruthy()
   })
 
-  it('「・・・」を押すとメニュー（登録者を管理など）と削除が開く', async () => {
+  it('「…」を押すとメニュー（詳細・登録者を管理など）と削除が開く', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
-    const more = host.querySelector('button[aria-label="予約前のお知らせのその他操作"]') as HTMLButtonElement
+    const more = host.querySelector('button[aria-label="リマインダ「予約前のお知らせ」の操作"]') as HTMLButtonElement
     act(() => { more.click() })
     // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
+    expect(menu!.textContent).toContain('詳細を見る')
     expect(menu!.textContent).toContain('登録者を管理')
-    expect(menu!.textContent).toContain('配信予定を確認')
-    expect(menu!.textContent).toContain('削除する')
+    expect(menu!.textContent).toContain('削除')
   })
 
-  it('R13: メニューの「削除する」は確認の窓を出し、詳細へは移動しない', async () => {
+  it('メニューの「削除」は確認の窓を出し、詳細へは移動しない', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
-    const more = host.querySelector('button[aria-label="予約前のお知らせのその他操作"]') as HTMLButtonElement
+    const more = host.querySelector('button[aria-label="リマインダ「予約前のお知らせ」の操作"]') as HTMLButtonElement
     act(() => { more.click() })
     // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const item = [...document.querySelectorAll('[role="menuitem"]')]
-      .find((el) => el.textContent?.includes('削除する')) as HTMLButtonElement
+      .find((el) => el.textContent === '削除') as HTMLButtonElement
     await act(async () => { item.click() })
     await flush()
     // 削除の確認が出る（確認の窓は body 直下の portal）。行の詳細遷移（router.push）は動かない。
-    expect(document.body.textContent).toContain('「予約前のお知らせ」を削除しますか？')
+    expect(document.body.textContent).toContain('「予約前のお知らせ」を削除する')
     expect(routerPush).not.toHaveBeenCalled()
   })
 
-  it('R13: 確認で「削除する」を押すと、その行だけ消える', async () => {
+  it('確認で「削除する」を押すと、その行だけ消える', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
-    const more = host.querySelector('button[aria-label="予約前のお知らせのその他操作"]') as HTMLButtonElement
+    const more = host.querySelector('button[aria-label="リマインダ「予約前のお知らせ」の操作"]') as HTMLButtonElement
     act(() => { more.click() })
     // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
     const item = [...document.querySelectorAll('[role="menuitem"]')]
-      .find((el) => el.textContent?.includes('削除する')) as HTMLButtonElement
+      .find((el) => el.textContent === '削除') as HTMLButtonElement
     await act(async () => { item.click() })
     await flush()
     const confirm = [...document.body.querySelectorAll('button')]

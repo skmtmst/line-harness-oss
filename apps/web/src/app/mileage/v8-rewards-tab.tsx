@@ -131,7 +131,7 @@ export default function V8RewardsTab({
 }: {
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
-  registerTabCount: (key: MileageV8TabKey, text: string | null) => void
+  registerTabCount?: (key: MileageV8TabKey, text: string | null) => void
 }) {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountId = selectedAccountId
@@ -143,6 +143,7 @@ export default function V8RewardsTab({
   const [popularName, setPopularName] = useState<string | null>(null)
   const [popularCount, setPopularCount] = useState<number | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
   const [failed, setFailed] = useState<FailedRedemption[]>([])
@@ -194,6 +195,7 @@ export default function V8RewardsTab({
       setPopularName(redeemedCount ? (overviewSummary?.mostRedeemedRewardName ?? null) : null)
       setPopularCount(redeemedCount)
       setReachMetrics(Array.isArray(response.data.reachMetrics) ? response.data.reachMetrics : [])
+      setLoadedAccountId(accountId)
       setStatus('ready')
     } catch (reason) {
       if (request !== requestRef.current) return
@@ -379,7 +381,7 @@ export default function V8RewardsTab({
 
   /* タブの名の横の件数。読み直し中・失敗時は消す。 */
   useEffect(() => {
-    registerTabCount('rewards', status !== 'ready' ? null : formatMileageNumber(rewards.length))
+    registerTabCount?.('rewards', status !== 'ready' ? null : formatMileageNumber(rewards.length))
   }, [registerTabCount, rewards.length, status])
 
   const publishedCount = rewards.filter((r) => r.status === 'published').length
@@ -435,8 +437,10 @@ export default function V8RewardsTab({
    * 頭の「CSV で書き出す」。使い道の書き出し口は無いので、
    * 今見えている表の中身をそのまま出す（本物の読み物）。
    */
+  const canExport = !accountLoading && !!accountId && loadedAccountId === accountId
+    && status === 'ready' && shown.length > 0
   const exportCsv = useCallback(() => {
-    if (shown.length === 0) return
+    if (!canExport) return
     setActionError('')
     try {
       const rows = shown.map((reward) => [
@@ -461,16 +465,16 @@ export default function V8RewardsTab({
     } catch {
       setActionError('CSVを書き出せませんでした。もう一度お試しください。')
     }
-  }, [shown])
+  }, [canExport, shown])
 
   useEffect(() => {
     registerHeaderActions(
-      <Button onClick={exportCsv} disabled={status !== 'ready' || rewards.length === 0}>
+      <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>
         <Download size={14} aria-hidden="true" /> CSV で書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)
-  }, [exportCsv, registerHeaderActions, rewards.length, status])
+  }, [canExport, exportCsv, registerHeaderActions])
 
   return (
     <>

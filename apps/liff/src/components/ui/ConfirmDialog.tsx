@@ -30,6 +30,7 @@ export default function ConfirmDialog({
   busy = false,
   error,
   children,
+  designNode,
   onConfirm,
   onCancel,
 }: {
@@ -42,6 +43,8 @@ export default function ConfirmDialog({
   busy?: boolean;
   error?: string;
   children?: ReactNode;
+  /** V8 の板の印。渡したときだけ枠に data-design-node を付ける。 */
+  designNode?: string;
   /** 渡さないと実行ボタンそのものを出さない (条件を満たすまで押させない止め方)。 */
   onConfirm?: () => void;
   onCancel: () => void;
@@ -114,6 +117,7 @@ export default function ConfirmDialog({
     >
       <div
         ref={panelRef}
+        data-design-node={designNode}
         role={destructive ? 'alertdialog' : 'dialog'}
         aria-modal="true"
         aria-label={title}

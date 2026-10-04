@@ -80,7 +80,7 @@ export default function BroadcastKpis({
               </span>
             </DelayedSkeleton>
           </p>
-          <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
+          <p className="text-ink-faint mt-1 text-micro leading-relaxed">
             {/*
               ★V7 `x63W5x`：読み込み中は「読み込んでいます」、失敗は
               「読み込めませんでした」と言い分ける（失敗の言葉で待たせない）。

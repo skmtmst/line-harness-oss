@@ -186,7 +186,7 @@ describe('登録メディア詳細のURL復元（N-196）', () => {
     await waitForText('ファイルのこと')
 
     await act(async () => { window.history.back(); await settle() })
-    await waitForText('ファイルを入れる')
+    await waitForText('メディアを登録する')
     expect(new URLSearchParams(window.location.search).get('id')).toBeNull()
 
     await act(async () => { window.history.forward(); await settle() })
@@ -238,5 +238,16 @@ describe('登録メディア詳細のURL復元（N-196）', () => {
     })
     expect(host.textContent).not.toContain(MEDIA_A.filename)
     expect(host.textContent).toContain(MEDIA_B.filename)
+  })
+})
+
+describe('登録メディア一覧の数の帯（O7hUt7）', () => {
+  it('4つの数とアーカイブの案内が出る', async () => {
+    await renderPage()
+    await waitForText(MEDIA_A.filename)
+    await waitForText('どこでも使っていない')
+    await waitForText('使っている容量')
+    await waitForText('一覧と新規選択から外したもの')
+    await waitForText('使っているメディアは消せません')
   })
 })

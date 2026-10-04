@@ -28,6 +28,7 @@ export const ANALYTICS_EVENT_TYPE_LIST = [
   'ec.subscription.card_updated',
   'ec.subscription.cancelled',
   'ec.customer.profile_updated',
+  'ec.site.publication_viewed',
 ] as const;
 
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPE_LIST)[number];

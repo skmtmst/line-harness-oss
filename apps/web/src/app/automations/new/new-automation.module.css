@@ -431,3 +431,24 @@
     grid-template-columns: 1fr;
   }
 }
+
+/*
+ * ★V8-B 板 `tJqST`（ルールを作る）の数字。v7 には載せない。
+ * 選ぶカード：余白14・gap8・丸み12。選ぶ欄・ボタン：高さ36・丸み10。
+ * （選ぶ欄の右余白は開く印の逃げとして残す。）
+ */
+[data-theme='v8'] .eventCard {
+  gap: 8px;
+  border-radius: var(--radius-card);
+  padding: 14px;
+}
+
+[data-theme='v8'] .select {
+  height: 36px;
+  border-radius: var(--radius-control, 10px);
+}
+
+[data-theme='v8'] .action {
+  height: 36px;
+  border-radius: var(--radius-control, 10px);
+}

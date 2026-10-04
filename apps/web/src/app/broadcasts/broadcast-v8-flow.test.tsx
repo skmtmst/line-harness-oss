@@ -79,6 +79,9 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin' }))
+vi.mock('@/lib/staff-capability', () => ({ canEditFeature: () => true }))
+
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: mocks.accountId, selectedAccount: null, loading: false }),
 }))
@@ -204,7 +207,7 @@ describe('V8 一斉配信の通し', () => {
     })
     await screen.findByText('「予約ずみ配信」の予約を取り消しますか？')
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+      fireEvent.click(screen.getByRole('button', { name: '予約のまま残す' }))
     })
     await waitFor(() => expect(screen.queryByText('「予約ずみ配信」の予約を取り消しますか？')).toBeNull())
     expect(mocks.cancelReservation).not.toHaveBeenCalled()

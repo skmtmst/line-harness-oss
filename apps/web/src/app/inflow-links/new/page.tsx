@@ -1,25 +1,22 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import type { ApiResponse, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
+import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TagGroup, TrafficPool, Template } from '@line-crm/shared'
 import { groupTagsByFolder } from '../tag-options'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
-import { qrToDataURL } from '@/lib/qr-image'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
-import Checkbox from '@/components/shared/checkbox'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
-import CreatePage, {
-  AsideCard,
-  Field,
-  FormSection,
-  inputClass,
-} from '@/components/shared/create-page'
+import Button from '@/components/shared/button'
+import { Field, inputClass } from '@/components/shared/create-page'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
+import Toggle from '@/components/shared/toggle'
+import styles from './inflow-create-v8.module.css'
 
 /** 流入元の情報と、友だち追加時の動きをまとめて設定する。 */
 
@@ -41,10 +38,14 @@ function suggestRef(name: string): string {
 }
 
 export default function NewInflowLinkPage() {
+  const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [genre, setGenre] = useState('')
+  const [newGenre, setNewGenre] = useState('')
+  const [genres, setGenres] = useState<EntryRouteGenre[]>([])
   const [refCode, setRefCode] = useState('')
   const [refTouched, setRefTouched] = useState(false)
   const [tagId, setTagId] = useState('')
@@ -65,11 +66,22 @@ export default function NewInflowLinkPage() {
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
-  const [qrDataUrl, setQrDataUrl] = useState('')
+  const [showTagPick, setShowTagPick] = useState(false)
+  const [showIntroPick, setShowIntroPick] = useState(false)
+  const [showScenarioPick, setShowScenarioPick] = useState(false)
   // R23横展開: アカウントを切り替えたら、前の候補にしかない選択を外して知らせる。
   const [pruneNotice, setPruneNotice] = useState<string | null>(null)
+  /*
+   * vWJEm（作る・競合）: 発行が 409（見分けるための文字が使用中）で返り、
+   * 同じ文字の発行済みリンクが見つかったときだけ立つ。誰が保存したかは
+   * 口が持っていないので出さない。保存日時と名前は実データを出す。
+   */
+  const [conflict, setConflict] = useState<EntryRoute | null>(null)
+  const [showCompare, setShowCompare] = useState(false)
 
   useEffect(() => {
+    // vWJEm: アカウントが変わったら前の競合は古いので閉じる。
+    clearConflict()
     let cancelled = false
     // プールは補助データ。機能がオフでもリンク発行画面そのものは止めない。
     // 403 の応答自体が console error になるため、有効と分からない限り
@@ -87,7 +99,8 @@ export default function NewInflowLinkPage() {
       poolsRequest,
       api.templates.list(undefined, selectedAccountId ?? undefined),
       api.tagGroups.list(selectedAccountId),
-    ]).then(([t, s, p, tp, tg]) => {
+      api.entryRouteGenres.list().catch(() => ({ success: false as const, data: [] as EntryRouteGenre[] })),
+    ]).then(([t, s, p, tp, tg, g]) => {
       if (cancelled) return
       if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
       /*
@@ -100,12 +113,14 @@ export default function NewInflowLinkPage() {
       if (tp.status === 'fulfilled' && tp.value.success) {
         setTemplates(tp.value.data as unknown as Template[])
       }
+      if (g.status === 'fulfilled' && g.value.success) setGenres(g.value.data)
     })
     return () => {
       cancelled = true
     }
     // R39: 候補（タグ・シナリオ・プール・テンプレート）はアカウントごとに
     // 違う。切替後に古い候補のまま保存しないよう、取り直す。入力は残す。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
 
   /*
@@ -135,25 +150,6 @@ export default function NewInflowLinkPage() {
   const previewUrl = validRef ? `${workerBase}/r/${refCode}` : ''
   // #514-7: 短縮 URL(/s/xxxx)は Worker に経路が無い。開けない URL を
   // 印刷物・SMS に載せないよう、表示しない。
-  useEffect(() => {
-    // #975 U065: 未入力のQRを作らない。見本QRは「保存前の見本」と分かるURLだけ。
-    if (!previewUrl) {
-      setQrDataUrl('')
-      return
-    }
-    // キー入力ごとに作り直すと、遅れて届いた古い QR が表示とずれて残る。
-    // 少し待ってから作り、古い解決は捨てる。
-    let stale = false
-    const timer = window.setTimeout(() => {
-      void qrToDataURL(previewUrl, { width: 180, margin: 1, color: { dark: '#171717', light: '#ffffff' } }).then((url) => {
-        if (!stale) setQrDataUrl(url)
-      })
-    }, 250)
-    return () => {
-      stale = true
-      window.clearTimeout(timer)
-    }
-  }, [previewUrl])
 
   /*
    * R18: 入力の途中で一覧リンク・左メニュー・戻る・再読込へ出るときは、
@@ -161,290 +157,582 @@ export default function NewInflowLinkPage() {
    * プログラムの移動なので、この確認は出ない。
    */
   const dirty = Boolean(
-    name || genre || refCode || tagId || scenarioId || introTemplateId
+    name || genre || newGenre || refCode || tagId || scenarioId || introTemplateId
     || poolId || redirectUrl || !isActive,
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
+  const validate = (): string | null => {
+    if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
+    if (!name.trim()) return 'リンク名を入力してください'
+    if (!validRef) {
+      return 'refコードは、半角英数字・_・ハイフンで1〜64文字にしてください'
+    }
+    return null
+  }
+
+  /*
+   * M030: 発行の失敗は原文のまま出さない。403は権限の案内、
+   * 400は入力の直し方つき、409は重複の立て直し文、429は待ち案内、
+   * 機械コードだけの失敗は再試行の案内にする。
+   */
+  const doSave = async () => {
+    const problem = validate()
+    if (problem) {
+      setSaveError(problem)
+      return
+    }
+    if (!selectedAccountId) {
+      setSaveError('LINEアカウントを選んでください（画面上部で選べます）')
+      return
+    }
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const genreName = genre === '__new' ? newGenre.trim() : genre
+      const res = await api.entryRoutes.create({
+        name: name.trim(),
+        genre: genreName || null,
+        refCode: refCode.trim(),
+        tagId: tagId || null,
+        scenarioId: scenarioId || null,
+        introTemplateId: introTemplateId || null,
+        poolId: poolId || null,
+        redirectUrl: redirectUrl.trim() || null,
+        isActive,
+        lineAccountId: selectedAccountId,
+      })
+      if (!res.success) throw new Error(res.error)
+      router.push(`/inflow-links/detail?id=${res.data.id}`)
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        // vWJEm: 見分けるための文字が使用中。同じ文字の発行済みリンクを
+        // 探して比べられるようにする。見つからなければ通常の失敗文のまま。
+        const existing = await findRouteByRef(refCode.trim(), selectedAccountId)
+        if (existing) {
+          setConflict(existing)
+          setShowCompare(false)
+          setSaveError(null)
+          return
+        }
+      }
+      setSaveError(describeApiFailure(error, '発行', {
+        forbidden: '発行するには権限が要ります。オーナーか管理者に依頼してください。',
+      }))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /*
+   * vWJEm: ref は全体で一意（entry-routes.ts の UNIQUE 制約）のため、
+   * まず今のアカウント、無ければ見える範囲の全部から同じ文字を探す。
+   */
+  async function findRouteByRef(ref: string, accountId: string): Promise<EntryRoute | null> {
+    const pick = (routes: EntryRoute[]): EntryRoute | null =>
+      routes.find((route) => route.refCode === ref) ?? null
+    try {
+      const scoped = await api.entryRoutes.list(accountId)
+      if (scoped.success) {
+        const hit = pick(scoped.data)
+        if (hit) return hit
+      }
+      const all = await api.entryRoutes.list()
+      if (all.success) return pick(all.data)
+    } catch {
+      // 探せないときは競合にしない。通常の失敗文を出す。
+    }
+    return null
+  }
+
+  /** vWJEm: 文字を変えたら競合は解けたものとして帯と比べを閉じる。 */
+  function clearConflict(): void {
+    if (conflict) {
+      setConflict(null)
+      setShowCompare(false)
+    }
+  }
+
+  /*
+   * vWJEm「最新を読み込んで続ける」: 保存されている値（実データ）を
+   * 入力へ写す。文字は競合のままなので変えてから発行する。
+   * 今のアカウントに無い候補は選べないため空ける。
+   */
+  function loadLatestAndContinue(): void {
+    if (!conflict) return
+    setName(conflict.name)
+    if (conflict.genre && genres.some((item) => item.name === conflict.genre)) {
+      setGenre(conflict.genre)
+      setNewGenre('')
+    } else if (conflict.genre) {
+      setGenre('__new')
+      setNewGenre(conflict.genre)
+    } else {
+      setGenre('')
+      setNewGenre('')
+    }
+    setTagId(conflict.tagId && tags.some((tag) => tag.id === conflict.tagId) ? conflict.tagId : '')
+    setScenarioId(conflict.scenarioId && scenarios.some((scenario) => scenario.id === conflict.scenarioId) ? conflict.scenarioId : '')
+    setIntroTemplateId(conflict.introTemplateId && templates.some((template) => template.id === conflict.introTemplateId) ? conflict.introTemplateId : '')
+    setPoolId(conflict.poolId && pools.some((pool) => pool.id === conflict.poolId) ? conflict.poolId : '')
+    setRedirectUrl(conflict.redirectUrl ?? '')
+    setIsActive(conflict.isActive)
+    setShowCompare(false)
+    setSaveError(null)
+  }
+
+  /** vWJEm: 保存日時（実データ）を「M月d日 H:mm」にする。壊れていたら出さない。 */
+  function formatSavedAt(value: string): string {
+    const time = new Date(value).getTime()
+    if (Number.isNaN(time)) return ''
+    const date = new Date(time)
+    const hour = String(date.getHours()).padStart(2, '0')
+    const minute = String(date.getMinutes()).padStart(2, '0')
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${hour}:${minute}`
+  }
+
+  const tagName = tags.find((tag) => tag.id === tagId)?.name ?? null
+  const scenarioName = scenarios.find((scenario) => scenario.id === scenarioId)?.name ?? null
+  const introTemplate = templates.find((template) => template.id === introTemplateId) ?? null
+  const previewMessage = introTemplate?.messageContent
+    || 'はじめまして。友だち追加ありがとうございます。'
+
+  /*
+   * vWJEm「違いを比べる」の行。左は今の入力、右は保存されている値
+   * （どちらも実データ）。候補に無いIDは、その旨を正直に出す。
+   */
+  const resolveCandidate = (id: string | null, names: Map<string, string>, empty: string): string => {
+    if (!id) return empty
+    return names.get(id) ?? '（このアカウントにありません）'
+  }
+  const tagNames = new Map(tags.flatMap((tag) => [[tag.id, tag.name] as const]))
+  const scenarioNames = new Map(scenarios.map((scenario) => [scenario.id, scenario.name] as const))
+  const templateNames = new Map(templates.map((template) => [template.id, template.name] as const))
+  const poolNames = new Map(pools.map((pool) => [pool.id, pool.name] as const))
+  const poolName = poolId ? poolNames.get(poolId) ?? '（このアカウントにありません）' : 'メインプールで自動振り分け'
+  const conflictRows = conflict ? [
+    { label: '名前', mine: name.trim() || '（未設定）', saved: conflict.name },
+    {
+      label: 'フォルダ',
+      mine: genre === '__new' ? newGenre.trim() || '（未設定）' : genre || '（未設定）',
+      saved: conflict.genre ?? '（未設定）',
+    },
+    { label: '転送先', mine: redirectUrl.trim() || '（未設定）', saved: conflict.redirectUrl ?? '（未設定）' },
+    {
+      label: 'タグ',
+      mine: tagName ?? '（未設定）',
+      saved: resolveCandidate(conflict.tagId, tagNames, '（未設定）'),
+    },
+    {
+      label: 'メッセージ',
+      mine: introTemplate ? `テンプレート「${introTemplate.name}」` : '送らない',
+      saved: conflict.introTemplateId && templateNames.has(conflict.introTemplateId)
+        ? `テンプレート「${templateNames.get(conflict.introTemplateId)}」`
+        : resolveCandidate(conflict.introTemplateId, templateNames, '送らない'),
+    },
+    {
+      label: 'シナリオ',
+      mine: scenarioName ?? '（始めない）',
+      saved: resolveCandidate(conflict.scenarioId, scenarioNames, '（始めない）'),
+    },
+    {
+      label: '追加先',
+      mine: poolName,
+      saved: conflict.poolId
+        ? poolNames.get(conflict.poolId) ?? '（このアカウントにありません）'
+        : 'メインプールで自動振り分け',
+    },
+    { label: '公開', mine: isActive ? '公開する' : '公開しない', saved: conflict.isActive ? '公開する' : '公開しない' },
+  ] : []
+  const conflictSavedAt = conflict ? formatSavedAt(conflict.updatedAt) : ''
+
   return (
     <>
-    <CreatePage
-      title="流入リンクをつくる"
-      description="流入経路ごとにURLを分けると、どこから友だちになったかが分かります。"
-      showHeader={false}
-      parent={['流入と計測', '/inflow-links']}
-      saveLabel="発行してURLを受け取る"
-      successHref={(id) => `/inflow-links/detail?id=${id}`}
-      designNode="TEVk8"
-      variant="v6"
-      statusLabel={isActive ? 'まだ発行されていません。発行すると、すぐにこのURLが使えます。' : 'まだ発行されていません。公開オフのまま発行すると、URLを開いても友だち追加できません。'}
-      validate={() => {
-        if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
-        if (!name.trim()) return 'リンク名を入力してください'
-        if (!validRef) {
-          return 'refコードは、半角英数字・_・ハイフンで1〜64文字にしてください'
-        }
-        return null
-      }}
-      /*
-       * M030: 発行の失敗は原文のまま出さない。403は権限の案内、
-       * 400は入力の直し方つき、409は重複の立て直し文、429は待ち案内、
-       * 機械コードだけの失敗は再試行の案内にする。
-       */
-      describeError={(e) => describeApiFailure(e, '発行', {
-        forbidden: '発行するには権限が要ります。オーナーか管理者に依頼してください。',
-      })}
-      onSave={async () => {
-        if (!selectedAccountId) {
-          throw new Error('LINEアカウントを選んでください（画面上部で選べます）')
-        }
-        setSaving(true)
-        try {
-          const res = await api.entryRoutes.create({
-            name: name.trim(),
-            genre: genre.trim() || null,
-            refCode: refCode.trim(),
-            tagId: tagId || null,
-            scenarioId: scenarioId || null,
-            introTemplateId: introTemplateId || null,
-            poolId: poolId || null,
-            redirectUrl: redirectUrl.trim() || null,
-            isActive,
-            lineAccountId: selectedAccountId,
-          })
-          if (!res.success) throw new Error(res.error)
-          return res.data.id
-        } finally {
-          setSaving(false)
-        }
-      }}
-      aside={
-        <>
-          <AsideCard title="お客さまはこの順に進みます">
-            <ol className="space-y-3 text-xs leading-relaxed text-ink-secondary">
-              <FlowStep step="1" title="案内や広告を見る" description="投稿・広告・チラシなどの案内を見ます。" />
-              <FlowStep step="2" title="このURLを一瞬だけ通る" description="画面には何も出ません。ここで経路を記録します。" />
-              <FlowStep step="3" title="LINEの友だち追加が開く" description="いつもの追加画面で、友だち追加をします。" />
-              <FlowStep step="4" title="あいさつとシナリオが届く" description="左で決めた動きが、この瞬間に始まります。" />
+    <div className={styles.board} data-design-node="KMaMk">
+      <nav aria-label="パンくず">
+        <Link href="/inflow-links" className={styles.backLink}>
+          ← 流入と計測へ
+        </Link>
+      </nav>
+      <div>
+        <h2 className={styles.title}>流入リンクを作る</h2>
+        <p className={styles.sub}>発行するとURLとQRコードができます。友だちになった人を、この経路で数えます。</p>
+      </div>
+
+      {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} /> : null}
+      {saveError ? <Notice tone="error" message={saveError} onClose={() => setSaveError(null)} /> : null}
+      {conflict ? (
+        <section className={styles.conflictBand} data-design-node="vWJEm" aria-label="文字が重複しています">
+          <div className={styles.conflictText}>
+            <div className={styles.conflictTitle}>「{conflict.refCode}」は既に使われています</div>
+            <div className={styles.conflictSub}>
+              {conflictSavedAt ? `${conflictSavedAt} 保存の` : ''}「{conflict.name}」があります。同じ文字のまま発行はできません。文字を変えるか、違いを比べてください。
+            </div>
+          </div>
+          <div className={styles.conflictActions}>
+            <Button variant="secondary" onClick={() => setShowCompare((current) => !current)} aria-expanded={showCompare}>
+              違いを比べる
+            </Button>
+            <Button variant="secondary" onClick={loadLatestAndContinue}>
+              最新を読み込んで続ける
+            </Button>
+          </div>
+        </section>
+      ) : null}
+      {conflict && showCompare ? (
+        <section className={styles.card} aria-label="いまの入力と保存されている値の違い">
+          <h3 className={styles.cardTitle}>いまの入力と保存されている値の違い</h3>
+          <p className={styles.cardSub}>左が今の入力、右が保存されている値です。どちらも実際の設定です</p>
+          <table className={styles.compareTable}>
+            <thead>
+              <tr>
+                <th scope="col">項目</th>
+                <th scope="col">いまの入力</th>
+                <th scope="col">保存されている値</th>
+              </tr>
+            </thead>
+            <tbody>
+              {conflictRows.map((row) => (
+                <tr key={row.label}>
+                  <th scope="row">{row.label}</th>
+                  <td>{row.mine}</td>
+                  <td>{row.saved}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
+      <div className={styles.columns}>
+        <div className={styles.mainCol}>
+          <section className={styles.card} aria-label="どこに置くリンクですか">
+            <h3 className={styles.cardTitle}>どこに置くリンクですか</h3>
+            <p className={styles.cardSub}>名前は一覧で分けるため。お客さまには見えません</p>
+            <div className={styles.fields}>
+              <div className={styles.twoCol}>
+                <Field label="名前" htmlFor="ir-name" required>
+                  <input
+                    id="ir-name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      if (!refTouched) setRefCode(suggestRef(e.target.value))
+                      if (saveError) setSaveError(null)
+                    }}
+                    placeholder="夏のInstagram投稿"
+                    className={inputClass}
+                  />
+                </Field>
+                <div>
+                  <label className={styles.fieldLabel} htmlFor="ir-genre">フォルダ</label>
+                  <Select
+                    id="ir-genre"
+                    value={genre}
+                    onChange={(value) => setGenre(value)}
+                    aria-label="フォルダ"
+                    size="full"
+                    options={[
+                      { value: '', label: '（選ばない）' },
+                      ...genres.map((item) => ({ value: item.name, label: item.name })),
+                      { value: '__new', label: '新しいフォルダ…' },
+                    ]}
+                  />
+                  {genre === '__new' ? (
+                    <input
+                      type="text"
+                      value={newGenre}
+                      onChange={(e) => setNewGenre(e.target.value)}
+                      placeholder="新しいフォルダの名前"
+                      aria-label="新しいフォルダの名前"
+                      className={`${inputClass} mt-2`}
+                    />
+                  ) : null}
+                </div>
+              </div>
+              <Field
+                label="転送先（任意）"
+                htmlFor="ir-redirect"
+                note="入れると友だち追加へ進みません"
+              >
+                <input
+                  id="ir-redirect"
+                  type="url"
+                  value={redirectUrl}
+                  onChange={(e) => setRedirectUrl(e.target.value)}
+                  placeholder="（空欄）"
+                  className={inputClass}
+                />
+              </Field>
+              <div>
+                <label className={styles.fieldLabel} htmlFor="ir-ref">見分けるための文字（URL の最後に付く）</label>
+                <input
+                  id="ir-ref"
+                  type="text"
+                  value={refCode}
+                  onChange={(e) => { setRefTouched(true); setRefCode(e.target.value); if (saveError) setSaveError(null); clearConflict() }}
+                  placeholder="summer-ig"
+                  aria-invalid={refCode !== '' && !validRef}
+                  className={`${inputClass} font-mono`}
+                />
+                {refCode !== '' && !validRef ? (
+                  <p className={styles.fieldError} role="alert">
+                    半角英数字・_・ハイフンで1〜64文字にしてください
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
+          <section className={styles.card} aria-label="どのLINEアカウントに入れますか">
+            <h3 className={styles.cardTitle}>どの LINE アカウントに入れますか</h3>
+            <p className={styles.cardSub}>友だちになる先のアカウント</p>
+            <div className={styles.fields}>
+              <div>
+                <label className={styles.fieldLabel} htmlFor="ir-pool">友だちの追加先</label>
+                <Select
+                  id="ir-pool"
+                  value={poolId}
+                  onChange={(value) => setPoolId(value)}
+                  aria-label="友だちの追加先アカウント"
+                  size="full"
+                  options={[
+                    { value: '', label: 'メインプールで自動振り分け' },
+                    ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
+                  ]}
+                />
+              </div>
+              <div>
+                <Field label="所属するLINEアカウント">
+                  {selectedAccount ? selectedAccount.name : '選択なし'}
+                </Field>
+              </div>
+              <p className={styles.cardSub}>
+                {selectedAccount
+                  ? 'いっぱいのときの振り分けは、LINEアカウント側の設定に従います。'
+                  : '画面上部でLINEアカウントを選んでください。'}
+              </p>
+            </div>
+          </section>
+
+          <section className={styles.card} aria-label="友だちになったときにすること">
+            <h3 className={styles.cardTitle}>友だちになったときにすること</h3>
+            <p className={styles.cardSub}>何も決めないと「動きが未設定」になり、数えるだけになります</p>
+            <div className={styles.fields}>
+              <div>
+                <div className={styles.toggleRow}>
+                  <Toggle
+                    checked={tagId !== ''}
+                    label="タグを付ける"
+                    onChange={(next) => { if (!next) setTagId('') }}
+                  />
+                  <div className={styles.toggleText}>
+                    <div className={styles.toggleTitle}>タグを付ける</div>
+                    <div className={styles.toggleValue}>{tagName ?? 'まだ決めていません'}</div>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowTagPick((current) => !current)}
+                    aria-expanded={showTagPick}
+                    aria-label={tagName ? '付けるタグを変える' : '付けるタグを決める'}
+                  >
+                    {tagName ? '変える' : '決める'}
+                  </Button>
+                </div>
+                {showTagPick ? (
+                  <div className={styles.togglePick}>
+                    <Select
+                      id="ir-tag"
+                      value={tagId}
+                      onChange={(value) => { setTagId(value); setShowTagPick(false) }}
+                      aria-label="付けるタグ"
+                      size="full"
+                      options={[
+                        { value: '', label: '（付けない）' },
+                        ...tagOptionGroups.flatMap((group) =>
+                          group.tags.map((tag) => ({
+                            value: tag.id,
+                            label: group.label ? `${group.label} / ${tag.name}` : tag.name,
+                          })),
+                        ),
+                      ]}
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <div className={styles.toggleRow}>
+                  <Toggle
+                    checked={introTemplateId !== ''}
+                    label="メッセージを送る"
+                    onChange={(next) => { if (!next) setIntroTemplateId('') }}
+                  />
+                  <div className={styles.toggleText}>
+                    <div className={styles.toggleTitle}>メッセージを送る</div>
+                    <div className={styles.toggleValue}>
+                      {introTemplate ? `テンプレート「${introTemplate.name}」` : 'まだ決めていません'}
+                    </div>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowIntroPick((current) => !current)}
+                    aria-expanded={showIntroPick}
+                    aria-label={introTemplate ? '送るメッセージを変える' : '送るメッセージを決める'}
+                  >
+                    {introTemplate ? '変える' : '決める'}
+                  </Button>
+                </div>
+                {showIntroPick ? (
+                  <div className={styles.togglePick}>
+                    <Select
+                      id="ir-intro"
+                      value={introTemplateId}
+                      onChange={(value) => { setIntroTemplateId(value); setShowIntroPick(false) }}
+                      aria-label="送るメッセージ"
+                      size="full"
+                      options={[
+                        { value: '', label: '送らない' },
+                        ...templates.map((template) => ({ value: template.id, label: template.name })),
+                      ]}
+                    />
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <div className={styles.toggleRow}>
+                  <Toggle
+                    checked={scenarioId !== ''}
+                    label="シナリオ配信を始める"
+                    onChange={(next) => { if (!next) setScenarioId('') }}
+                  />
+                  <div className={styles.toggleText}>
+                    <div className={styles.toggleTitle}>シナリオ配信を始める</div>
+                    <div className={styles.toggleValue}>
+                      {scenarioName ? `シナリオ「${scenarioName}」` : 'まだ決めていません'}
+                    </div>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowScenarioPick((current) => !current)}
+                    aria-expanded={showScenarioPick}
+                    aria-label={scenarioName ? '始めるシナリオを変える' : '始めるシナリオを決める'}
+                  >
+                    {scenarioName ? '変える' : '決める'}
+                  </Button>
+                </div>
+                {showScenarioPick ? (
+                  <div className={styles.togglePick}>
+                    <Select
+                      id="ir-scenario"
+                      value={scenarioId}
+                      onChange={(value) => { setScenarioId(value); setShowScenarioPick(false) }}
+                      aria-label="始めるシナリオ配信"
+                      size="full"
+                      options={[
+                        { value: '', label: '（始めない）' },
+                        ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
+                      ]}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
+          <section className={styles.card} aria-label="発行されるURL">
+            <h3 className={styles.cardTitle}>発行される URL</h3>
+            <p className={styles.cardSub}>発行したあと、一覧の「…」から QR コードと URL をコピーできます</p>
+            <div className={styles.fields}>
+              <div className={styles.urlBox}>
+                <span className={styles.urlText}>
+                  {previewUrl ? previewUrl : <>例: {workerBase}/r/summer-ig</>}
+                </span>
+                <span className={styles.urlNote}>
+                  {previewUrl ? '発行するとできます' : 'まだ発行されていません'}
+                </span>
+              </div>
+              {!previewUrl ? (
+                <p className={styles.cardSub}>上の「見分けるための文字」を決めると、発行されるURLがここに出ます。例のURLは実際には開けないので配らないでください。</p>
+              ) : null}
+              {/*
+                絵には無いが、公開オフで仕込む口は残す。URL カードの発行の話なのでここに置く。
+                オフのまま発行すると URL を開いても友だち追加できない旨は、その場に出す。
+              */}
+              <div className={styles.toggleRow}>
+                <Toggle
+                  checked={isActive}
+                  label="発行したらすぐ使えるようにする"
+                  onChange={(next) => setIsActive(next)}
+                />
+                <div className={styles.toggleText}>
+                  <div className={styles.toggleTitle}>発行したらすぐ使えるようにする</div>
+                  <div className={styles.toggleValue}>
+                    {isActive
+                      ? '発行すると、すぐにこのURLが使えます。'
+                      : '公開オフのまま発行すると、URLを開いても友だち追加できません。'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div className={styles.sideCol}>
+          <div className={styles.stepsCard}>
+            <h3 className={styles.stepsTitle}>お客さまはこの順に進みます</h3>
+            <ol className={styles.steps}>
+              <li className={styles.step}>
+                <span className={styles.stepNum} aria-hidden="true">1</span>
+                <span>QR コード・URL を開く</span>
+              </li>
+              <li className={styles.step}>
+                <span className={styles.stepNum} aria-hidden="true">2</span>
+                <span>LINE で友だちになる（この経路で数える）</span>
+              </li>
+              <li className={styles.step}>
+                <span className={styles.stepNum} aria-hidden="true">3</span>
+                <span>{tagName ? `タグ「${tagName}」が付く` : 'タグは付かない'}</span>
+              </li>
+              <li className={styles.step}>
+                <span className={`${styles.stepNum} ${styles.stepNumNow}`} aria-hidden="true">4</span>
+                <span>
+                  {introTemplate
+                    ? `メッセージ「${introTemplate.name}」が届く（右のスマホ）`
+                    : scenarioName
+                      ? `シナリオ「${scenarioName}」が始まる`
+                      : 'あいさつのメッセージが届く（右のスマホ）'}
+                </span>
+              </li>
             </ol>
-          </AsideCard>
-          <AsideCard title="つながる先">
-            <ul className="space-y-2 text-xs font-semibold text-action">
-              <li><Link href="/scenarios">→ シナリオ配信</Link></li>
-              <li><Link href="/tags">→ 友だち属性</Link></li>
-              <li><Link href="/mileage">→ マイル</Link></li>
-              <li><Link href="/conversions">→ コンバージョン</Link></li>
-              <li><Link href="/analytics">→ 分析</Link></li>
-            </ul>
-          </AsideCard>
-          <AsideCard title="気をつけること">
-            <ul className="space-y-2 text-xs leading-relaxed text-ink-faint">
-              <li>REFを変えると別の経路になります。</li>
-              <li>印刷ずみのQRコードは古いREFのままです。</li>
-              <li>LINEの追加ボタンを直接置くと数えられません。かならず発行したURLを通してください。</li>
-            </ul>
-          </AsideCard>
-        </>
-      }
-    >
-      {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} className="mb-3" /> : null}
-      <FormSection step={1} label="どこに置くリンクですか">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Field label="流入元の名前" htmlFor="ir-name" required note="管理画面で見分けるための名前です。">
-          <input
-            id="ir-name"
-            type="text"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value)
-              if (!refTouched) setRefCode(suggestRef(e.target.value))
-            }}
-            placeholder="例：夏のInstagram投稿"
-            className={inputClass}
-          />
-        </Field>
-
-        <Field label="REF（URLに入る文字）" htmlFor="ir-ref" required note="あとから変えられません。配ったURLが使えなくなるためです。">
-          <input id="ir-ref" type="text" value={refCode} onChange={(e) => { setRefTouched(true); setRefCode(e.target.value) }} placeholder="summer-ig" className={`${inputClass} font-mono`} />
-        </Field>
-
-        <Field label="フォルダ" htmlFor="ir-genre" note="選んだフォルダの中に追加されます。">
-          <input
-            id="ir-genre"
-            type="text"
-            value={genre}
-            onChange={(e) => setGenre(e.target.value)}
-            placeholder="例：SNS"
-            className={inputClass}
-          />
-        </Field>
-        </div>
-      </FormSection>
-
-      <FormSection step={2} label="発行されるURL">
-        <p className="text-xs text-ink-faint">紙にはQRコード、Webにはリンクを使ってください。</p>
-        {previewUrl ? (
-          <div className="mt-3">
-            {/* #975 U065: 保存前は「未発行の見本」と明記する。 */}
-            <p className="inline-flex items-center rounded-pill border border-hairline bg-canvas-sunken px-3 py-1 text-xs font-medium text-ink-secondary">
-              保存前の見本 — まだ発行されていません
-            </p>
-            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-4">
-              <div className="space-y-2 sm:col-span-3">
-                <div className="rounded-control border border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-secondary"><span className="font-semibold">{previewUrl}</span></div>
-                <p className="text-xs text-ink-faint">「発行してURLを受け取る」を押すと、このURLが使えるようになります。押す前に配ると開けません。</p>
-              </div>
-              <div className="text-center">
-                {/* eslint-disable-next-line @next/next/no-img-element -- Workerが撮影用QRを生成する */}
-                {qrDataUrl && <img src={qrDataUrl} alt="発行されるURLのQRコード（保存前の見本）" className="mx-auto h-24 w-24 rounded-control border border-hairline bg-canvas p-1" />}
-                <span className="mt-1 block text-xs text-ink-faint">見本のQR — 保存後に画像で保存できます</span>
+            <div className={styles.phone} role="img" aria-label="友だち追加直後に届くメッセージの見本">
+              <div className={styles.phoneHead}>{selectedAccount?.name ?? 'LINE'}</div>
+              <div className={styles.phoneBody}>
+                <div className={styles.bubble}>
+                  {previewMessage}
+                  <div className={styles.bubbleTime}>10:00</div>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className={styles.footer}>
+        <Button variant="secondary" href="/inflow-links">キャンセル</Button>
+        {conflict ? (
+          <Button variant="primary" onClick={() => setShowCompare(true)} disabled={saving}>
+            比べてから保存
+          </Button>
         ) : (
-          <div className="mt-3">
-            <div className="rounded-control border border-dashed border-hairline bg-canvas-sunken px-3 py-3 text-sm text-ink-faint">
-              <span className="font-semibold">例: {workerBase}/r/summer-ig</span>
-            </div>
-            <p className="mt-2 text-xs text-ink-faint">まだ発行されていません。上の「REF」を決めると、発行されるURLとQRコードの見本がここに出ます。例のURLは実際には開けないので配らないでください。</p>
-          </div>
+          <Button variant="primary" onClick={() => void doSave()} disabled={saving} aria-busy={saving}>
+            {saving ? '発行しています…' : '発行してURLを受け取る'}
+          </Button>
         )}
-      </FormSection>
-
-      <FormSection step={3} label="この経路から友だちになったときにすること" note="設定しないと、ふつうの友だち追加と同じ扱いになります。">
-        <p className="rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">
-          動きを追加する（あいさつの差し替え・対応マーク・通知・外部連携）内容は、下の項目で選びます。
-        </p>
-        <div className="grid gap-3 lg:grid-cols-3">
-        <Field
-          label="タグを自動で付ける"
-          htmlFor="ir-tag"
-          note="あとで配信の絞り込みに使えます。"
-        >
-          <Select
-            id="ir-tag"
-            value={tagId}
-            onChange={(value) => setTagId(value)}
-            aria-label="自動で付けるタグ"
-            size="full"
-            options={[
-              { value: '', label: '（なし）' },
-              ...tagOptionGroups.flatMap((group) =>
-                group.tags.map((tag) => ({
-                  value: tag.id,
-                  label: group.label ? `${group.label} / ${tag.name}` : tag.name,
-                })),
-              ),
-            ]}
-          />
-        </Field>
-
-        <Field
-          label="シナリオ配信を開始する"
-          htmlFor="ir-scenario"
-          note="経路ごとに違う案内を送れます。"
-        >
-          <Select
-            id="ir-scenario"
-            value={scenarioId}
-            onChange={(value) => setScenarioId(value)}
-            aria-label="開始するシナリオ配信"
-            size="full"
-            options={[
-              { value: '', label: '（なし）' },
-              ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
-            ]}
-          />
-        </Field>
-
-        <Field
-          label="追加直後にメッセージを送る"
-          htmlFor="ir-intro"
-          note="シナリオとは別に、その場で1通だけ送ります。"
-        >
-          <Select
-            id="ir-intro"
-            value={introTemplateId}
-            onChange={(value) => setIntroTemplateId(value)}
-            aria-label="追加直後に送るメッセージ"
-            size="full"
-            options={[
-              { value: '', label: '送らない' },
-              ...templates.map((template) => ({ value: template.id, label: template.name })),
-            ]}
-          />
-        </Field>
-        </div>
-
-        <details className="rounded-control border border-hairline px-3 py-2">
-          <summary className="cursor-pointer text-xs font-semibold text-action">転送・公開の詳細設定</summary>
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            {/* 有効期限を持つ列が無いので、期限なしであることだけを示す。 */}
-            <Field label="有効期限" note="期限での自動停止は、まだ保存する場所がありません。">
-              <p className="rounded-control bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">期限なし</p>
-            </Field>
-            <Field label="転送先" htmlFor="ir-redirect" note="空欄なら友だち追加へ進みます。">
-              <input id="ir-redirect" type="url" value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} placeholder="https://example.com/lp" className={inputClass} />
-            </Field>
-          </div>
-          <Checkbox
-            checked={isActive}
-            onCheckedChange={setIsActive}
-            description="オフにすると、URLを開いても友だち追加できません。"
-            className="mt-3"
-          >発行したらすぐ使えるようにする</Checkbox>
-        </details>
-      </FormSection>
-
-      <FormSection step={4} label="どのLINEアカウントに入れるか">
-        <Field
-          label="所属するLINEアカウント"
-          note="発行したリンクはこのアカウントに所属します。一覧では選んだアカウントの分だけ表示されます。"
-        >
-          {selectedAccountId ? (
-            <p className="rounded-control bg-canvas-sunken px-3 py-2 text-sm font-semibold text-ink">
-              {selectedAccount?.name ?? selectedAccountId}
-            </p>
-          ) : (
-            <p className="rounded-control bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">
-              画面上部でLINEアカウントを選んでください
-            </p>
-          )}
-        </Field>
-        <Field
-          label="入れるアカウント"
-          htmlFor="ir-pool"
-          note="選ばないと、全体の既定の振り分けに従います。"
-        >
-          <Select
-            id="ir-pool"
-            value={poolId}
-            onChange={(value) => setPoolId(value)}
-            aria-label="友だちの追加先アカウント"
-            size="full"
-            options={[
-              { value: '', label: 'メインプールで自動振り分け' },
-              ...pools.map((pool) => ({ value: pool.id, label: pool.name })),
-            ]}
-          />
-        </Field>
-        <p className="rounded-control bg-canvas-sunken px-3 py-2 text-xs leading-relaxed text-ink-faint">
-          いっぱいのときの振り分けは、LINEアカウント側の設定に従います。
-        </p>
-      </FormSection>
-
-    </CreatePage>
+      </div>
+    </div>
 
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した流入リンク" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </>
-  )
-}
-
-function FlowStep({ step, title, description }: { step: string; title: string; description: string }) {
-  return (
-    <li className="flex gap-2">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-pill bg-accent-deep text-xs font-medium text-on-accent">{step}</span>
-      <span><strong className="block text-ink-secondary">{title}</strong>{description}</span>
-    </li>
   )
 }

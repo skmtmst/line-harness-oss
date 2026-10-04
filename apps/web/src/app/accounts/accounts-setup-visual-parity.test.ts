@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -20,7 +20,7 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
       `/hq` は統括向けの店舗管理として、店舗ウィザードは飲食店向けの入口として残す。
     */
     expect(accountsSource).not.toContain("redirect('/hq')")
-    expect(accountsSource).toContain('data-design-node="QT91v"')
+    expect(accountsSource).toContain('ReadonlyDesignNode node="V7vn3"')
     expect(setupSource).not.toContain("redirect('/restaurant-test/stores/new')")
     expect(setupSource).toContain('data-design-node="b2NGxk"')
   })
@@ -33,7 +33,7 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
       'api.lineAccounts.stepFollowerImport',
       'data-design-node="a8qMXX"',
       'data-design-node="oeVQQ"',
-      'data-design-node="YEHCR"',
+      'data-design-node="JYfda"',
       'data-design-node="K1zHyx"',
       "'VPh1U'",
       "'t3Mlu'",
@@ -59,14 +59,18 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     expect(wizardSource).toContain('type="password"')
   })
 
-  it('階層編集部品を一覧の操作から開き、保存APIへつなぐ', () => {
+  it('階層編集部品は残すが、板に無いので一覧からは開かない', () => {
     // R191: 移動先メニュー（キーボード・クリックの代替経路）が増えたので、
     // 見出しは「ドラッグ＆ドロップで編集」とは言わず「編集」に留める。
     for (const label of ['未設定のLINEアカウント', 'LINEアカウント階層を編集', '未保存の変更', '構成を保存する']) {
       expect(orderingSource).toContain(label)
     }
     expect(orderingSource).toContain('api.lineAccounts.updateHierarchy')
-    expect(accountsSource).toContain('{orderingOpen && <AccountOrdering />}')
+    /*
+      板 V7vn3 に並び順の操作は無いので、一覧からは外した。
+      部品自体は残し、絵に無い塊を一覧に出さない。
+    */
+    expect(accountsSource).not.toContain('AccountOrdering')
   })
 
   it('共通アカウント切替部品は確認後に管理対象を切り替える', () => {
@@ -79,7 +83,11 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
 
   it('再利用する編集モーダルは秘密値を読まず、狭い画面でも入力欄を切らない', () => {
     expect(editModalSource).toContain('Edit modal never reads persisted credential values')
-    expect(editModalSource).not.toContain('sm:items-center')
+    // 相対import先の別部品でなく、このモーダルの外枠を調べる。
+    const modalOverlay = editModalSource.match(/className="fixed inset-0[^\"]*"/)?.[0]
+    expect(modalOverlay).toContain('items-start')
+    expect(modalOverlay).toContain('overflow-y-auto')
+    expect(modalOverlay).not.toContain('sm:items-center')
     expect(editModalSource).toContain('sticky top-0')
     expect(editModalSource).toContain('grid grid-cols-1 gap-3 sm:grid-cols-2')
   })

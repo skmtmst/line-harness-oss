@@ -1,9 +1,8 @@
 'use client'
 
 import ReadonlyHeader from './readonly-header-v8'
-import AccountBrowser, { type HqBrowserAccount } from './account-browser-v8'
+import AccountBrowser from './account-browser-v8'
 import './readonly-v8.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, fetchApi } from '@/lib/api'
@@ -14,7 +13,6 @@ import { classifyApiFailure, loadFailureNotice } from '@/components/shared/api-e
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import { AccountArchiveDialog, AccountRestoreDialog, AccountSettingsDialog } from './account-settings-dialogs'
 import KpiCard from '@/components/shared/kpi-card'
@@ -23,20 +21,18 @@ import OperatorHistory from '@/components/hq/operator-history'
 import PlatformNotices from '@/components/hq/platform-notices'
 
 export default function HqPage() {
-  const theme = useAdminTheme()
   // 左のメニューと同じ名前を見出しにする（バナー生成・課金プランなどと同じ書き方）。
   usePageTitle('アカウント')
   const router = useRouter()
   const { setSelectedAccountId, refreshAccounts } = useAccount()
-  /* 一覧APIは tags・archivedAt・parentLineAccountId まで付けて返す。 */
-  const [accounts, setAccounts] = useState<HqBrowserAccount[]>([])
+  const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)
   // M021：捕まえた失敗を持ち、共通部品へ渡す（403 は権限の案内になる）。
   const [loadError, setLoadError] = useState<unknown>(null)
-  const [editingAccount, setEditingAccount] = useState<HqBrowserAccount | null>(null)
+  const [editingAccount, setEditingAccount] = useState<AccountWithStats | null>(null)
   /* 板 `HMpVx`・`D6ljr`・`HFsO9`：カードの「設定」から開く3つの窓。 */
-  const [settingsAccount, setSettingsAccount] = useState<HqBrowserAccount | null>(null)
-  const [archiveTarget, setArchiveTarget] = useState<{ account: HqBrowserAccount; mode: 'archive' | 'restore' } | null>(null)
+  const [settingsAccount, setSettingsAccount] = useState<AccountWithStats | null>(null)
+  const [archiveTarget, setArchiveTarget] = useState<{ account: AccountWithStats; mode: 'archive' | 'restore' } | null>(null)
   const [checkingConnections, setCheckingConnections] = useState(false)
   const [connectionProgress, setConnectionProgress] = useState('')
   const [connectionResult, setConnectionResult] = useState('')
@@ -46,7 +42,7 @@ export default function HqPage() {
     setLoadError(null)
     const accountResponse = await api.lineAccounts.list()
     if (!accountResponse.success) throw new Error(accountResponse.error)
-    setAccounts(accountResponse.data as unknown as HqBrowserAccount[])
+    setAccounts(accountResponse.data as AccountWithStats[])
   }, [])
 
   useEffect(() => {
@@ -63,30 +59,6 @@ export default function HqPage() {
 
   const reloadAfterSave = async () => {
     await Promise.all([load(), refreshAccounts()])
-  }
-
-  /* 板 `JKjsE`：要確認カードの「更新する」はその1件だけ確かめ直す。 */
-  const refreshSingleAccount = async (account: HqBrowserAccount) => {
-    setConnectionProgress(`「${account.displayName || account.name}」の接続情報を更新中`)
-    setConnectionResult('')
-    try {
-      const expectedRevision = account.revision
-      if (typeof expectedRevision !== 'number' || !Number.isInteger(expectedRevision) || expectedRevision < 1) {
-        setConnectionResult('接続情報を更新できませんでした。')
-        return
-      }
-      await fetchApi(`/api/line-accounts/${encodeURIComponent(account.id)}/connection-checks`, {
-        method: 'POST',
-        headers: { 'Idempotency-Key': `hq-check-${account.id}-${crypto.randomUUID()}` },
-        body: JSON.stringify({ expectedRevision }),
-      })
-      await Promise.all([load(), refreshAccounts()])
-      setConnectionResult('LINE IDと接続状態を更新しました。')
-    } catch {
-      setConnectionResult('接続情報を更新できませんでした。')
-    } finally {
-      setConnectionProgress('')
-    }
   }
 
   const refreshConnectionInfo = async () => {
@@ -143,23 +115,18 @@ export default function HqPage() {
   const month = new Date().getMonth() + 1
 
   return (
-    <div data-design-node={theme === 'v8' ? 'JKjsE' : 'MjMCg'} className="v8-ro-hq-page flex flex-col gap-4">
+    <div data-design-node="JKjsE" className="v8-ro-hq-page flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      {theme === 'v8' && <ReadonlyHeader title="統括のアカウント" description="各アカウントの接続状態、友だち、配信の状況を確認できます。" />}
+      <ReadonlyHeader title="統括のアカウント" description="各アカウントの接続状態、友だち、配信の状況を確認できます。" />
       <PlatformNotices />
-      {theme !== 'v8' && (
-        <div data-design="Actions" data-design-node="x5Tkb6" className="flex flex-wrap justify-end gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={checkingConnections || loading || accounts.length === 0}
-            onClick={() => { void refreshConnectionInfo() }} busy={checkingConnections} busyLabel="接続情報を更新中">LINE ID・接続状態を更新する
-          </Button>
-          <Button href="/accounts/new" variant="primary" className="shrink-0">
-            ＋ LINEアカウントを登録する
-          </Button>
-        </div>
-      )}
+      <div data-design="Actions" data-design-node="x5Tkb6" className="flex flex-wrap justify-end gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={checkingConnections || loading || accounts.length === 0}
+          onClick={() => { void refreshConnectionInfo() }} busy={checkingConnections} busyLabel="接続情報を更新中">LINE ID・接続状態を更新する
+        </Button>
+      </div>
 
       {connectionProgress ? <p className="mb-4 text-sm text-ink-secondary" role="status">{connectionProgress}</p> : null}
       {connectionResult ? <Notice tone="info" message={connectionResult} className="mb-4" /> : null}
@@ -194,12 +161,12 @@ export default function HqPage() {
 
       {!loadError && !loading ? (
         <>
-          {/* 板 `JKjsE`：数のタイルは角丸の4枚のカード（単位は数の下）。 */}
-          <KpiCollapse data-ro-kpis data-design="KPIs" data-design-node="w7yY6" className="v8-ro-hq-tiles" gridClassName="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard variant="v6" title="アカウント" value={accounts.length} unit="" detail="件" />
-            <KpiCard variant="v6" title="友だち合計" value={totals.friends} unit="" detail="人・全アカウントの合計" />
-            <KpiCard variant="v6" title="今月の配信" value={totals.messages} unit="" detail="通" help={`${month}/1 から今日までの配信です`} />
-            <KpiCard variant="v6" title="接続に問題" value={totals.warnings} unit="" detail="件" valueTone="warning" />
+          {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
+          <KpiCollapse data-ro-kpis data-design="KPIs" data-design-node="w7yY6" gridClassName="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <KpiCard variant="v6" title="アカウント" value={accounts.length} unit="件" detail={`有効 ${totals.active}・停止中 ${accounts.length - totals.active}`} />
+            <KpiCard variant="v6" title="友だち合計" value={totals.friends} unit="人" detail="" help="全アカウントの合計です" />
+            <KpiCard variant="v6" title="今月の配信" value={totals.messages} unit="通" detail="" help={`${month}/1 から今日までの配信です`} />
+            <KpiCard variant="v6" title="要確認" value={totals.warnings} unit="件" detail="接続に問題があるアカウント" valueTone="warning" />
           </KpiCollapse>
         </>
       ) : null}
@@ -215,39 +182,33 @@ export default function HqPage() {
       ) : null}
 
       {!loadError && !loading && accounts.length > 0 ? (
-        theme === 'v8'
-          ? (
-            <AccountBrowser
-              accounts={accounts}
-              onSelect={login}
-              onSettings={setSettingsAccount}
-              onShowDetails={setEditingAccount}
-              onRestore={(account) => setArchiveTarget({ account, mode: 'restore' })}
-              onRefresh={refreshSingleAccount}
-            />
-          )
-          : <HqAccountList accounts={accounts} onSelect={login} onSettings={setSettingsAccount} />
+        <AccountBrowser
+          accounts={accounts}
+          onSelect={login}
+          onSettings={setSettingsAccount}
+          onDetail={setEditingAccount}
+          onRestore={(account) => setArchiveTarget({ account, mode: 'restore' })}
+          onRefreshConnection={() => { void refreshConnectionInfo() }}
+          checkingConnections={checkingConnections}
+          onChanged={() => { void reloadAfterSave() }}
+        />
       ) : null}
 
-      {/*
-        運営が書き込みを伴う操作をしたときだけ出る（★V6 37-5）。
-        V8 の板 `JKjsE` に無いので V8 では出さない（v7 は今のまま）。
-      */}
-      {theme !== 'v8' && <OperatorHistory />}
+      {/* 運営が書き込みを伴う操作をしたときだけ出る（★V6 37-5）。 */}
+      <OperatorHistory />
 
       {settingsAccount ? (
         <AccountSettingsDialog
           account={settingsAccount}
           accounts={accounts}
-          archived={Boolean(settingsAccount.archivedAt)}
-          accountTags={settingsAccount.tags ?? []}
+          archived={Boolean((settingsAccount as { archivedAt?: string | null }).archivedAt)}
           onClose={() => setSettingsAccount(null)}
           onSaved={() => {
             setSettingsAccount(null)
             void reloadAfterSave()
           }}
           onArchive={() => {
-            setArchiveTarget({ account: settingsAccount, mode: settingsAccount.archivedAt ? 'restore' : 'archive' })
+            setArchiveTarget({ account: settingsAccount, mode: (settingsAccount as { archivedAt?: string | null }).archivedAt ? 'restore' : 'archive' })
             setSettingsAccount(null)
           }}
           onShowDetails={() => {

@@ -8,10 +8,11 @@
  * アカウント一覧 → 権限マトリクス。名簿の登録だけではログイン権限は
  * 変わらない（v7 と同じ注記）。
  */
-import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { Plus, RotateCw } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError } from '@/lib/api'
@@ -44,12 +45,10 @@ function intakeDate(value: string): string {
   return formatDateTime(date)
 }
 
-/** 板「店舗管理」の1行。編集は行の下に畳んで開く。 */
-function StoreRow({ store, editing, onEdit, children }: {
+/** 板「店舗管理」の1行。編集は板 `vCEKM` の窓で開く。 */
+function StoreRow({ store, onEdit }: {
   store: RestaurantStore
-  editing: boolean
   onEdit: () => void
-  children?: ReactNode
 }) {
   return (
     <div className={styles.storeRow}>
@@ -62,9 +61,8 @@ function StoreRow({ store, editing, onEdit, children }: {
           <p className={styles.cellSub}>{store.code} ・ {store.area || 'エリア未設定'} ・ {store.capacity}席</p>
           <p className={styles.storeLine}>LINE: {store.line_account_name ? `${store.line_account_name} 公式` : '未設定'}</p>
         </div>
-        <Button size="compact" onClick={onEdit}>{editing ? '閉じる' : '編集'}</Button>
+        <Button size="compact" onClick={onEdit}>編集</Button>
       </div>
-      {editing ? children : null}
     </div>
   )
 }
@@ -270,6 +268,7 @@ function IntakeAddressPanel({ accountId, store }: { accountId: string; store: Re
       ) : null}
       <ConfirmDialog
         open={reissueOpen}
+        designNode="rSRFK"
         title="新しい取り込みアドレスを発行しますか？"
         description="いまのアドレスは90日後に失効します。それまでに、媒体側の通知先を新しいアドレスへ変えてください。変えないと予約の取り込みが止まります。"
         confirmLabel="発行する"
@@ -327,7 +326,10 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const [editingMemberId, setEditingMemberId] = useState('')
   const [stopId, setStopId] = useState('')
   const editingMember = members.find((m) => m.id === editingMemberId)
+  const editingStore = data.stores.find((s) => s.id === editingStoreId)
   const stopping = members.find((m) => m.id === stopId)
+  const closeStoreDialog = useCallback(() => { setShowStoreForm(false); setEditingStoreId('') }, [])
+  const closeMemberDialog = useCallback(() => { setShowMemberForm(false); setEditingMemberId('') }, [])
   const accountId = selectedAccountId || ''
 
   const submitStore = (id: string | null) => (form: FormData) => {
@@ -387,19 +389,30 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <Panel
           title="店舗管理"
           description="1店舗につき1つのLINE公式アカウントを割り当てます。"
-          aside={<Button size="compact" onClick={() => { setShowStoreForm((v) => !v); setEditingStoreId('') }}><Plus size={13} aria-hidden />店舗を追加する</Button>}
+          aside={<Button size="compact" onClick={() => { setShowStoreForm(true); setEditingStoreId('') }}><Plus size={13} aria-hidden />店舗を追加する</Button>}
         >
-          {showStoreForm ? (
-            <StoreForm accounts={accounts} stores={data.stores} busy={busy} onSubmit={submitStore(null)} onCancel={() => setShowStoreForm(false)} />
-          ) : null}
           <div className={styles.storeList}>
             {data.stores.map((s) => (
-              <StoreRow key={s.id} store={s} editing={editingStoreId === s.id} onEdit={() => setEditingStoreId((v) => (v === s.id ? '' : s.id))}>
-                <StoreForm store={s} accounts={accounts} stores={data.stores} busy={busy} onSubmit={submitStore(s.id)} onCancel={() => setEditingStoreId('')} />
-              </StoreRow>
+              <StoreRow key={s.id} store={s} onEdit={() => { setEditingStoreId(s.id); setShowStoreForm(false) }} />
             ))}
           </div>
         </Panel>
+        {/* 板 `vCEKM`（店舗の追加・編集の窓）。 */}
+        <Dialog
+          open={showStoreForm || editingStore !== undefined}
+          designNode="vCEKM"
+          title={editingStore ? `${editingStore.name}を編集` : '店舗を追加する'}
+          onCancel={closeStoreDialog}
+        >
+          <StoreForm
+            store={editingStore}
+            accounts={accounts}
+            stores={data.stores}
+            busy={busy}
+            onSubmit={submitStore(editingStore ? editingStore.id : null)}
+            onCancel={closeStoreDialog}
+          />
+        </Dialog>
         <IntakeAddressPanel accountId={accountId} store={store} />
         <div className={styles.stats}>
           <Stat label="所属ユーザー" value={`${members.length}名`} note="名簿に載っている人数" />
@@ -409,19 +422,24 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <Panel
           title="アカウント一覧"
           description="この一覧は名簿です。ここでの役割・担当店舗の登録だけではログイン権限は変わりません。実際の操作は、ログイン中のスタッフの役割（オーナー・管理者・スタッフ）で決まります。"
-          aside={<Button variant="primary" size="compact" onClick={() => { setShowMemberForm((v) => !v); setEditingMemberId('') }}><Plus size={13} aria-hidden />ユーザーを追加する</Button>}
+          aside={<Button variant="primary" size="compact" onClick={() => { setShowMemberForm(true); setEditingMemberId('') }}><Plus size={13} aria-hidden />ユーザーを追加する</Button>}
           flush
         >
-          {showMemberForm ? (
-            <div className={styles.panelBodyPad}>
-              <MemberForm stores={data.stores} busy={busy} onSubmit={submitMember(null)} onCancel={() => setShowMemberForm(false)} />
-            </div>
-          ) : null}
-          {editingMember ? (
-            <div className={styles.panelBodyPad}>
-              <MemberForm member={editingMember} stores={data.stores} busy={busy} onSubmit={submitMember(editingMember.id)} onCancel={() => setEditingMemberId('')} />
-            </div>
-          ) : null}
+          {/* 板 `ou60i`（飲食店向けユーザーの追加・変更の窓）。 */}
+          <Dialog
+            open={showMemberForm || editingMember !== undefined}
+            designNode="ou60i"
+            title={editingMember ? `${editingMember.staff_name}を変更` : '飲食店向けユーザーを追加'}
+            onCancel={closeMemberDialog}
+          >
+            <MemberForm
+              member={editingMember}
+              stores={data.stores}
+              busy={busy}
+              onSubmit={submitMember(editingMember ? editingMember.id : null)}
+              onCancel={closeMemberDialog}
+            />
+          </Dialog>
           <DataTable className="rounded-none border-0">
             <thead>
               <TableHeadRow>
@@ -464,6 +482,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
         </Panel>
         <ConfirmDialog
           open={Boolean(stopping)}
+          designNode="bMpC5"
           title="この所属ユーザーを停止しますか？"
           description="名簿には残り、再開できます。この名簿だけではログイン権限は変わりません。"
           confirmLabel="停止する"

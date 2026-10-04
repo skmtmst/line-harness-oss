@@ -221,7 +221,10 @@ async function typeCode(digits: string) {
 }
 
 function executeButton(): HTMLButtonElement {
-  const button = Array.from(document.body.querySelectorAll('button'))
+  // 確認の窓の中の実行ボタン。帯（stickyBar）にも同じ文言があるため窓の中に限る。
+  const dialog = document.body.querySelector('[role="dialog"], [role="alertdialog"]')
+  expect(dialog, '確認の窓がある').not.toBeNull()
+  const button = Array.from(dialog!.querySelectorAll('button'))
     .find((button) => button.textContent === '緊急停止する')
   expect(button, '「緊急停止する」がある').toBeDefined()
   return button as HTMLButtonElement

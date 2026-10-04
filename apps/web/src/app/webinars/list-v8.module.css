@@ -53,16 +53,18 @@
 .kpiBand {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 -24px;
   border-top: 1px solid var(--color-hairline);
   border-bottom: 1px solid var(--color-hairline);
 }
 
+/* 数の帯のマス（板 `UyUMw`「数」：余白 16/20・間 8）。 */
 .kpiCell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
-  padding: 10px 16px;
+  padding: 16px 20px;
 }
 
 .kpiCell + .kpiCell {
@@ -88,12 +90,14 @@
   color: var(--color-ink-secondary);
 }
 
+/* 数の帯の題（板 `UyUMw`「題」：12・500・ink・行18）。 */
 .kpiLabel {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
+  line-height: 1.5;
   color: var(--color-ink);
 }
 
@@ -125,7 +129,7 @@
 /* 本体2列：左フォルダ列＋右（一覧）。 */
 .body {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 200px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
   min-width: 0;
@@ -164,9 +168,11 @@
   gap: 8px 12px;
 }
 
+/* 探す欄の幅（板 `UyUMw`「検索」：幅 240・高さは共有部品）。 */
 .searchWrap {
-  flex: 1 1 200px;
-  max-width: 320px;
+  flex: 0 0 auto;
+  width: 240px;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -189,13 +195,15 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 13px;
 }
 
+/* 表の見出しの地（板 `UyUMw`「表の見出し」：#fafafb＝table-head）。文字 12/500/secondary は合っている。 */
 .table thead th {
-  background: var(--color-canvas-sunken);
+  background: var(--color-table-head);
   border-bottom: 1px solid var(--color-hairline);
-  padding: 13px 20px;
+  padding: 12px;
   font-size: 12px;
   font-weight: 500;
   color: var(--color-ink-secondary);
@@ -205,7 +213,7 @@
 
 .table tbody td {
   border-bottom: 1px solid var(--color-hairline);
-  padding: 9px 20px;
+  padding: 12px;
   vertical-align: middle;
 }
 
@@ -223,7 +231,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
-  color: var(--color-ink);
+  color: var(--color-action);
 }
 
 .slug {
@@ -253,7 +261,8 @@
 
 .periodCell {
   overflow: hidden;
-  max-width: 220px;
+  display: block;
+  width: 100%;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-ink-secondary);
@@ -333,7 +342,7 @@
 }
 
 /* 板 1100px 未満（`uBMuB`）：フォルダの列を畳んで道具の段へ、道具は2段。 */
-@container (max-width: 1100px) {
+@container (max-width: 1052px) {
   .body {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -359,19 +368,11 @@
     margin-left: 0;
   }
 
-  .kpiBand {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .kpiCell + .kpiCell {
-    border-left: 0;
-  }
-
-  .kpiCell:nth-child(even) {
-    border-left: 1px solid var(--color-hairline);
-  }
-
-  .kpiCell:nth-child(n + 3) {
-    border-top: 1px solid var(--color-hairline);
-  }
+  .kpiBand { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+.table th:nth-child(2) { width: 12%; }
+.table th:nth-child(3) { width: 9%; }
+.table th:nth-child(4) { width: 16%; }
+.table th:nth-child(5) { width: 22%; }
+.table th:nth-child(6) { width: 120px; }
+@media (max-width: 640px) { .kpiBand { grid-template-columns: repeat(2, minmax(0, 1fr)); } .table { min-width: 720px; } }

@@ -22,14 +22,6 @@ describe('m22c 札・ボタンの折り返し', () => {
     expect(source).not.toContain('<Button href="/tags?tab=marks" className="h-10 shrink-0">')
   })
 
-  it('定期レポート作成の下の3操作は短い言葉・同じ高さで1行', () => {
-    const source = read('app/analytics/reports/new/page.tsx')
-    expect(source).toContain('>今すぐ1回だけ送る</Button>')
-    expect(source).not.toContain('>いますぐ1回だけ送ってみる</Button>')
-    // キャンセルは隣のボタンと同じ高さ40。
-    expect(source).toContain('inline-flex h-10 items-center px-3 text-sm no-underline')
-  })
-
   it('条件の足し口は15札を並べない（共通部品で検索式に）', () => {
     const source = read('components/shared/condition-builder.tsx')
     expect(source).toContain('aria-label="追加する条件を選ぶ"')

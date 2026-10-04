@@ -1,10 +1,13 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import SearchField from '@/components/shared/search-field'
+import { DataTable, TableHeadRow, Th, Td, Tr } from '@/components/shared/table'
+import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
-import Select from '@/components/shared/select'
 import { RowActions } from '@/components/shared/row-actions'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -13,12 +16,12 @@ import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
 import { SettingsShellV8 } from '../settings-nav-v8'
 import styles from '../settings-v8.module.css'
 
-const STATUS_OPTIONS = [
-  { value: 'quarantined', label: '状態：しまったもの' },
-  { value: 'pending', label: '状態：確かめています' },
-  { value: 'rejected', label: '状態：使えません' },
-  { value: 'clean', label: '状態：使えます' },
-]
+/* 板 `PfA4o` の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
+const STATUS_CHIPS = [
+  { value: 'quarantined', label: 'しまったファイル' },
+  { value: 'pending', label: '確かめ中' },
+  { value: 'released', label: '戻した' },
+] as const
 
 /**
  * ファイルの検査の V8 画面（★V8-B `PfA4o`）。
@@ -30,6 +33,7 @@ export function FileScanV8() {
     phase,
     items,
     total,
+    counts,
     statusFilter,
     query,
     page,
@@ -148,7 +152,8 @@ export function FileScanV8() {
     return (
       <SettingsShellV8
         title="ファイルの検査"
-        back={{ href: '/settings', label: '機能設定へ' }}
+        description="上げたファイルに危ないものがないかを確かめます。"
+      back={{ href: '/settings', label: '機能設定へ' }}
       >
         {phase === 'loading' ? (
           <ListState kind="loading" />
@@ -180,6 +185,7 @@ export function FileScanV8() {
   return (
     <SettingsShellV8
       title="ファイルの検査"
+      description="上げたファイルに危ないものがないかを確かめます。"
       back={{ href: '/settings', label: '機能設定へ' }}
     >
       <p className={`${styles.band} ${styles.bandInfo}`}>
@@ -203,44 +209,55 @@ export function FileScanV8() {
             onChange={(event) => changeQuery(event.target.value)}
           />
         </span>
-        <Select
-          aria-label="検査の状態"
-          value={statusFilter}
-          onChange={changeStatusFilter}
-          options={STATUS_OPTIONS}
-        />
+        {STATUS_CHIPS.map((chip) => (
+          <FilterChip
+            key={chip.value}
+            selected={statusFilter === chip.value}
+            onChange={() => changeStatusFilter(chip.value)}
+            count={counts[chip.value]}
+          >
+            {chip.label}
+          </FilterChip>
+        ))}
       </div>
 
       {items.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="当てはまるファイルがありません"
-          description="状態の絞り込みを変えてください。"
-        />
+        <div data-design-node="bR6a1">
+          <ListState
+            kind="empty"
+            title="当てはまるファイルがありません"
+            description="状態の絞り込みを変えてください。"
+            action={query ? (
+              <Button variant="secondary" onClick={() => changeQuery('')}>
+                条件を外す
+              </Button>
+            ) : undefined}
+          />
+        </div>
       ) : (
         <div className={styles.tableCard}>
-          <table>
+          <DataTable className="rounded-none border-0">
             <colgroup>
               <col style={{ width: '32%' }} />
               <col style={{ width: '20%' }} />
-              <col style={{ width: '30%' }} />
-              <col style={{ width: '18%' }} />
+              <col style={{ width: 'auto' }} />
+              <col style={{ width: '200px' }} />
             </colgroup>
             <thead>
-              <tr>
-                <th>ファイル</th>
-                <th>上げた人</th>
-                <th>見つかったもの</th>
-                <th className={styles.tdRight}>操作</th>
-              </tr>
+              <TableHeadRow>
+                <Th>ファイル</Th>
+                <Th>上げた人</Th>
+                <Th>見つかったもの</Th>
+                <Th className={styles.tdRight}>操作</Th>
+              </TableHeadRow>
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.id}>
-                  <td><span className={styles.urlCell} title={item.filename}>{item.filename}</span></td>
-                  <td><span className={styles.urlCell} title={item.uploaderLabel ?? '—'}>{item.uploaderLabel ?? '—'}</span></td>
-                  <td><span className={styles.urlCell} title={item.reasonLabel ?? '確認が必要です'}>{item.reasonLabel ?? '確認が必要です'}</span></td>
-                  <td className={styles.tdRight}>
+                <Tr key={item.id}>
+                  <Td><span className={styles.urlCell} title={item.filename}>{item.filename}</span>{item.releasedAt && <StatusBadge tone="neutral" size="compact">戻した</StatusBadge>}</Td>
+                  <Td><span className={styles.urlCell} title={item.uploaderLabel ?? '—'}>{item.uploaderLabel ?? '—'}</span></Td>
+                  <Td><span className={styles.urlCell} title={item.reasonLabel ?? '確認が必要です'}>{item.reasonLabel ?? '確認が必要です'}</span></Td>
+                  <Td className={styles.tdRight}>
                     {item.status === 'quarantined' ? (
                       <RowActions
                         subjectName={item.filename}
@@ -255,11 +272,11 @@ export function FileScanV8() {
                     ) : (
                       <span className={styles.cardMeta}>—</span>
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </DataTable>
         </div>
       )}
 
@@ -280,7 +297,7 @@ export function FileScanV8() {
 
       <section className={styles.card}>
         <div className={styles.cardHead}>
-          <h2 className={styles.cardTitle}>外の検査</h2>
+          <h2 className={styles.cardTitle}>外の検査サービス</h2>
         </div>
         <div className={`${styles.row} ${styles.blockRow}`}>
           <p className={styles.rowNote}>

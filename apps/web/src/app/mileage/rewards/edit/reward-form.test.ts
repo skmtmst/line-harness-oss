@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { optionalInteger, validateReward, type FormState } from './reward-form'
 
-const RAW_PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
+const RAW_PAGE = readFileSync(join(__dirname, 'v8-reward-edit.tsx'), 'utf8')
 const API = readFileSync(join(__dirname, '..', '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 
 /**

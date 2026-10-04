@@ -1,11 +1,12 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-const LIST = read('page.tsx')
+/* 完全切り替え：v7 の page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+const LIST = read('list-v8.tsx')
 const CREATE = read('new', 'page.tsx')
 const API = read('..', '..', 'lib', 'api.ts')
 
@@ -35,7 +36,9 @@ describe('リマインダのフォルダ', () => {
   })
 
   it('一覧と受け口は前から folderId を通していた（画面だけが遅れていた）', () => {
-    expect(LIST).toContain('folderId: folderId || null')
+    expect(LIST).toContain('const folderId = moveDraft || null')
+    expect(LIST).toContain('api.reminders.update(id, { folderId })')
+    expect(LIST).toContain("failureMessage: 'フォルダを移動できませんでした。'")
     expect(API).toContain('folderId?: string | null')
   })
 })

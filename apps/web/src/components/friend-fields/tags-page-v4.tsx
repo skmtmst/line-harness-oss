@@ -348,7 +348,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
         「保管済み」の印が付いた行が一覧に残るため、それを除くと
         フォルダの内訳と合計が合わなくなる。
       */}
-      <p className="border-t border-hairline px-4 py-3 text-[11px] leading-5 text-ink-faint">フォルダを削除しても、中のタグは未分類として残ります。件数には保管済みのタグも含みます。</p>
+      <p className="border-t border-hairline px-4 py-3 text-micro leading-5 text-ink-faint">フォルダを削除しても、中のタグは未分類として残ります。件数には保管済みのタグも含みます。</p>
       <ConfirmDialog
         open={Boolean(deleteGroup)}
         title={deleteGroup ? `「${deleteGroup.name}」を削除しますか？` : 'フォルダを削除しますか？'}
@@ -1086,7 +1086,7 @@ export default function TagsPageV4({
                             {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-medium text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                           </div>
                           {/* ATTR-20: 登録日は名前の下へ畳む。独立した列にすると1024pxでつぶれる。 */}
-                          <p className="mt-0.5 pl-4 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
+                          <p className="mt-0.5 pl-4 text-micro text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
                         </Td>
                         {/*
                           フォルダは文字だけ（m21o）。行ごとの選び直し欄は
@@ -1180,7 +1180,7 @@ export default function TagsPageV4({
                                 {/* IDEA-04: 重複名の整理候補はカード表示でも行ごとに示す。 */}
                                 {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-medium text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
                               </div>
-                              <p className="mt-0.5 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録・{sourceLabel(tag)}</p>
+                              <p className="mt-0.5 text-micro text-ink-faint">{formatDate(tag.createdAt)} 登録・{sourceLabel(tag)}</p>
                               {chips.length > 0 ? (
                                 <p className="mt-1 flex flex-wrap gap-1.5">
                                   {chips.map((chip) => <span key={chip.label} className={`rounded-mini px-[7px] py-[2px] text-micro font-semibold ${chip.tone}`}>{chip.label}</span>)}

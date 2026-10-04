@@ -278,7 +278,7 @@ describe('行の編集は質問の編集へ行く（R27・実マウント）', (
       root.render(<FormSubmissionsPage />)
     })
     // 名前自体が編集画面への行き先になっている。
-    const nameLink = [...host.querySelectorAll('a[href="/form-submissions/edit?id=f-a1&tab=basic"]')].find(
+    const nameLink = [...host.querySelectorAll('button[aria-label="「箱フォーム」の詳細を見る"]')].find(
       (a) => a.textContent === '箱フォーム',
     )
     expect(nameLink).toBeTruthy()

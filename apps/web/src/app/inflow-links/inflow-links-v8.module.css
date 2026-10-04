@@ -1,0 +1,58 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8 流入と計測の一覧（`y1ztx` 1152）。
+ * 板の幅が 1100px を切ったら左のフォルダの列を畳み、道具の段の
+ * フォルダ選びへ切り替える（見本どおり。v7 は1画素も変えないため、
+ * 枡・畳みはすべて [data-theme="v8"] の下だけ）。
+ */
+/* 器の指定自体も v8 の下だけ（v7 は1画素も変えない）。 */
+[data-theme="v8"] .board {
+  container-type: inline-size;
+}
+
+/*
+ * 数の帯の列。v8 の下だけ 2列→768px 以上で4列の1本帯にする。
+ * Tailwind の列指定より強い指定（属性＋級）で上書きするので、
+ * v7・並び順の競合に左右されない。
+ */
+[data-theme="v8"] .kpis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 768px) {
+  [data-theme="v8"] .kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /*
+   * 4列の1本帯：先頭以外に左の線だけ。共有の帯CSSは2列想定で
+   * 3・4番目に上の線を引くので、ここで消す（属性を重ねて強くする）。
+   */
+  [data-theme="v8"][data-theme="v8"] .kpis > :nth-child(n + 2) {
+    border-left: 1px solid var(--color-divider);
+  }
+
+  [data-theme="v8"][data-theme="v8"] .kpis > :nth-child(n + 3) {
+    border-top: 0;
+  }
+}
+
+/* 畳んだときのフォルダ選び。ふだんは畳む（v7 に出さない）。 */
+.railSelect {
+  display: none;
+}
+
+@container (max-width: 1099px) {
+  [data-theme="v8"] .railGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-theme="v8"] .railCol {
+    display: none;
+  }
+
+  [data-theme="v8"] .railSelect {
+    display: block;
+  }
+}

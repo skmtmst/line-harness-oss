@@ -9,7 +9,8 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
+  margin: -20px -24px -28px;
   min-width: 0;
   container-type: inline-size;
 }
@@ -17,7 +18,9 @@
 .head {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-hairline);
 }
 
 .title {
@@ -25,7 +28,7 @@
   color: var(--color-ink);
   font-size: 20px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .description {
@@ -76,7 +79,7 @@
   gap: 16px;
   flex: 1 1 0;
   min-width: 0;
-  padding-right: 24px;
+  padding: 24px 28px;
 }
 
 .aside {
@@ -86,14 +89,14 @@
   width: 380px;
   flex: none;
   border-left: 1px solid var(--color-hairline);
-  padding-left: 24px;
+  padding: 24px;
 }
 
 .card {
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  padding: 20px 24px;
+  padding: 20px;
 }
 
 .cardTitle {
@@ -154,7 +157,7 @@
 
 .grid2 {
   display: grid;
-  gap: 0 16px;
+  gap: 14px 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -290,14 +293,17 @@
   }
 
   .main {
-    padding-right: 0;
+    width: 100%;
+    padding: 24px 28px;
   }
 
   .aside {
     width: 100%;
     border-left: none;
     border-top: 1px solid var(--color-hairline);
-    padding-left: 0;
-    padding-top: 16px;
+    padding: 24px;
   }
 }
+
+.back { color: var(--color-action); font-size: 13px; font-weight: 600; text-decoration: none; align-self: flex-start; }
+.choiceGroup { margin-top: 14px; }

@@ -13,9 +13,8 @@ import type { WebinarListItem } from '@/lib/api'
 
 /*
  * ★V8-B ウェビナー一覧（板 `UyUMw`・状態 `eAQ3t`・閲覧のみ `jiNg0`）の契約。
- * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
+ * V8だけの一覧で、
  * 見本が決めた帯・表・札・押せない形が出ることを実DOMで固定する。
- * v7 では従来の一覧が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -87,14 +86,18 @@ const json = (data: unknown, status = 200) => new Response(
   { status, headers: { 'Content-Type': 'application/json' } },
 )
 
+let fetchCalls: string[] = []
+
 beforeEach(() => {
   listItems = [webinar()]
   staffRole = 'admin'
+  fetchCalls = []
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    fetchCalls.push(`${init?.method ?? 'GET'} ${url}`)
     if (url.includes('/overview')) return json({ data: overviewData })
     if (url.includes('/folders')) return json({ success: true, data: [] })
     if (url.includes('/api/webinars')) {
@@ -165,12 +168,80 @@ test('v8 の閲覧のみ（jiNg0）は作る・編集が押せない形になる
   expect(createButton?.disabled).toBe(true)
   const editButton = [...board!.querySelectorAll('button')].find((button) => button.textContent === '編集')
   expect(editButton?.disabled).toBe(true)
+  expect(board?.textContent).toContain('閲覧のみで見ています')
 })
 
-test('v7 では従来の一覧が出て UyUMw は出ない', async () => {
+/* V8「サクサク感」C①・D・E：行→詳細パネル・右クリック・つながる移り変わり。 */
+function detailButton(title: string): HTMLButtonElement {
+  const found = [...host.querySelectorAll('button')].find(
+    (button) => button.getAttribute('aria-label') === `「${title}」の詳細を見る`,
+  )
+  if (!found) throw new Error(`detail button not found: ${title}`)
+  return found as HTMLButtonElement
+}
+
+test('v8 で行を押すと右の詳細パネルが開き↑↓で次の行へ移る', async () => {
+  listItems = [webinar(), webinar({ id: 'webinar-2', title: '2つ目のセミナー', slug: 'second' })]
+  document.documentElement.dataset.theme = 'v8'
   await renderPage()
-  expect(host.querySelector('[data-design-node="UyUMw"]')).toBeNull()
-  expect(host.querySelector('[data-design-node="ZC13r"]')).not.toBeNull()
+  await act(async () => { detailButton('NEN活用スタートセミナー').click() })
+  const panel = host.querySelector('[data-design-part="detail-panel"]')
+  expect(panel).not.toBeNull()
+  expect(panel?.textContent).toContain('NEN活用スタートセミナー')
+  const next = [...panel!.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === '次の行')
+  expect(next).toBeTruthy()
+  await act(async () => { (next as HTMLButtonElement).click() })
+  const moved = host.querySelector('[data-design-part="detail-panel"]')
+  expect(moved?.textContent).toContain('2つ目のセミナー')
+})
+
+test('v8 で行を右クリックすると「…」と同じ操作が出る', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const button = detailButton('NEN活用スタートセミナー')
+  await act(async () => {
+    button.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 60, clientY: 120 }))
+  })
+  const menu = document.body.querySelector('[data-context-menu]')
+  expect(menu).not.toBeNull()
+  expect(menu?.textContent).toContain('参加者を見る')
+  expect(menu?.textContent).toContain('アーカイブする')
+})
+
+/* V8「サクサク感」C②：名前のその場の書き換え。 */
+test('v8 で詳細パネルの名前をその場で変えると保存口へ届く', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  await act(async () => { detailButton('NEN活用スタートセミナー').click() })
+  const panel = host.querySelector('[data-design-part="detail-panel"]')
+  const edit = [...panel!.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'ウェビナー名を変更する')
+  expect(edit).toBeTruthy()
+  await act(async () => { (edit as HTMLButtonElement).click() })
+  const input = host.querySelector('[data-design-part="detail-panel"] input[aria-label="ウェビナー名"]') as HTMLInputElement | null
+  expect(input).not.toBeNull()
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+    setter?.call(input!, '改名したセミナー')
+    input!.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await act(async () => {
+    input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  })
+  expect(fetchCalls.some((call) => call.startsWith('PUT') && call.includes('/api/webinars/webinar-1'))).toBe(true)
+  expect(host.querySelector('[data-design-node="UyUMw"]')?.textContent).toContain('改名したセミナー')
+})
+
+/* V8「サクサク感」：フォルダの追加は真ん中の窓ではなく右のパネルで。 */
+test('v8 でフォルダの追加を押すと右のパネルで名前を入れられる', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const add = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('フォルダを追加する'))
+  expect(add).toBeTruthy()
+  await act(async () => { (add as HTMLButtonElement).click() })
+  const panel = host.querySelector('[data-design-part="detail-panel"]')
+  expect(panel).not.toBeNull()
+  expect(panel?.textContent).toContain('フォルダを追加')
+  expect(panel?.querySelector('#webinar-v8-folder-name')).not.toBeNull()
 })
 
 test('v8 の読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {
@@ -189,4 +260,40 @@ test('v8 の読み込み中は骨組みで場所を取り「読み込み中」�
   })
   const skeletons = host.querySelectorAll('[data-skeleton]')
   expect(skeletons.length).toBeGreaterThanOrEqual(5)
+})
+
+test('アーカイブ済みを開いて記録を読み、確認してから下書きへ戻せる', async () => {
+  const archived = webinar({ status: 'archived', publicationState: 'ended' })
+  const requests: Array<{ url: string; method: string; body?: string }> = []
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    requests.push({ url, method: init?.method ?? 'GET', body: init?.body as string | undefined })
+    if (url.includes('/overview')) return json({ data: overviewData })
+    if (url.includes('/folders')) return json({ success: true, data: [] })
+    if (init?.method === 'PUT') return json({ data: { ...archived, status: 'draft' } })
+    if (url.includes('/api/webinars')) {
+      const params = new URL(url).searchParams
+      const items = params.get('status') === 'archived' ? [archived] : []
+      return json({ data: { items, total: items.length, limit: 20, sort: [] } })
+    }
+    return json({ data: null }, 404)
+  })
+  await renderPage()
+  await act(async () => { (host.querySelector('button[aria-label="よく使う絞り込み"]') as HTMLButtonElement).click() })
+  const option = [...document.querySelectorAll('[role="option"]')].find((el) => el.textContent === 'アーカイブ済み') as HTMLElement
+  expect(option).toBeTruthy()
+  await act(async () => { option.querySelector('button')!.click() })
+  expect(requests.some((r) => r.url.includes('status=archived'))).toBe(true)
+  const row = host.querySelector('tbody tr')!
+  expect(row.textContent).toContain('● アーカイブ')
+  expect(row.textContent).toContain('124人')
+  expect(row.textContent).toContain('視聴開始 98人')
+  await act(async () => { (row.querySelector('button[aria-label="NEN活用スタートセミナーのその他操作"]') as HTMLButtonElement).click() })
+  const restore = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes('下書きに戻す')) as HTMLElement
+  await act(async () => { restore.click() })
+  expect(requests.filter((r) => r.method === 'PUT')).toHaveLength(0)
+  const dialog = document.querySelector('[role="dialog"]')!
+  expect(dialog.textContent).toContain('公開するまでは、新しい申込は受け付けません')
+  await act(async () => { ([...dialog.querySelectorAll('button')].find((el) => el.textContent === '下書きに戻す') as HTMLButtonElement).click() })
+  expect(requests.filter((r) => r.method === 'PUT').map((r) => JSON.parse(r.body!))).toEqual([{ status: 'draft' }])
 })

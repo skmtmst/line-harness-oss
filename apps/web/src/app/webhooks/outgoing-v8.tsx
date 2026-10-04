@@ -43,6 +43,7 @@ import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -103,8 +104,9 @@ function isHttpsUrl(value: string): boolean {
 }
 
 function matchesOutgoing(item: OutgoingWebhookOverview, filter: OutgoingFilter, query: string): boolean {
-  const q = query.trim()
-  if (q && !`${item.name} ${firstEventLabel(item)} ${payloadLabel(item)}`.includes(q)) return false
+  // v7 と同じ探し方：名前・URL・イベント型（大文字小文字を区別しない）。
+  const q = query.trim().toLocaleLowerCase('ja-JP')
+  if (q && ![item.name, item.url, ...item.eventTypes].some((value) => value.toLocaleLowerCase('ja-JP').includes(q))) return false
   switch (filter) {
     case 'active': return item.isActive
     case 'paused': return !item.isActive
@@ -847,7 +849,54 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
 }) {
   const router = useRouter()
   const onEdit = (id: string) => router.push(`/webhooks/edit?id=${id}`)
+  // D. 行の「設定」と同じ中身（右クリックでも出す。押せない理由の文言は「設定」の側だけに置く）。
+  const menuItemsFor = (item: OutgoingWebhookOverview): ActionMenuItem[] => {
+    const canActivate = item.hasSecret && isHttpsUrl(item.url)
+    const menuItems: ActionMenuItem[] = []
+    if (canManage) {
+      menuItems.push({
+        id: 'toggle',
+        label: item.isActive ? '止める' : '動かす',
+        onSelect: () => { setMenuId(null); onToggle(item.id, item.isActive) },
+        disabled: !item.isActive && !canActivate,
+        disabledReason: !item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined,
+      })
+      menuItems.push({ id: 'edit', label: '直す', external: true, onSelect: () => { setMenuId(null); onEdit(item.id) } })
+      menuItems.push({ id: 'secret', label: '合言葉を作り直す', onSelect: () => { setMenuId(null); onRotate(item) } })
+      menuItems.push({ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuId(null); onDelete(item) } })
+    }
+    menuItems.push({
+      id: 'test',
+      label: '試しに送る',
+      onSelect: () => onTest(item),
+      disabled: !canTest || !item.isActive,
+      disabledReason: !item.isActive ? '止めている送り先には試し送信できません' : !canTest ? manageReason : undefined,
+    })
+    return menuItems
+  }
+  // 右クリックされた行。まだ無ければ先頭の行（Shift+F10 の押し口）。
+  const [ctxId, setCtxId] = useState<string | null>(null)
+  const ctxItem = items.find((item) => item.id === ctxId) ?? items[0] ?? null
+  const ctxMenuItems: ContextMenuItem[] = ctxItem
+    ? menuItemsFor(ctxItem).map((menuItem) => ({
+      id: menuItem.id,
+      label: menuItem.label,
+      danger: menuItem.tone === 'danger',
+      disabled: menuItem.disabled,
+      onSelect: () => menuItem.onSelect(),
+    }))
+    : []
   return (
+    <ContextMenu
+      label="送り先の操作"
+      items={ctxMenuItems}
+      shouldOpen={(event) => {
+        const row = (event.target as HTMLElement).closest('tr[data-ctx-row]')
+        if (!row) return false
+        setCtxId(row.getAttribute('data-ctx-row'))
+        return true
+      }}
+    >
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         {/*
@@ -878,29 +927,9 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
             const pending = item.deliverySummary.lastResult?.status === 'pending'
             const failed = !pending && (item.deliverySummary.lastResult?.status === 'failed' || item.deliverySummary.failed > 0)
             const completedAt = item.deliverySummary.lastResult?.completedAt
-            const canActivate = item.hasSecret && isHttpsUrl(item.url)
-            const menuItems: ActionMenuItem[] = []
-            if (canManage) {
-              menuItems.push({
-                id: 'toggle',
-                label: item.isActive ? '止める' : '動かす',
-                onSelect: () => { setMenuId(null); onToggle(item.id, item.isActive) },
-                disabled: !item.isActive && !canActivate,
-                disabledReason: !item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined,
-              })
-              menuItems.push({ id: 'edit', label: '直す', external: true, onSelect: () => { setMenuId(null); onEdit(item.id) } })
-              menuItems.push({ id: 'secret', label: '合言葉を作り直す', onSelect: () => { setMenuId(null); onRotate(item) } })
-              menuItems.push({ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuId(null); onDelete(item) } })
-            }
-            menuItems.push({
-              id: 'test',
-              label: '試しに送る',
-              onSelect: () => onTest(item),
-              disabled: !canTest || !item.isActive,
-              disabledReason: !item.isActive ? '止めている送り先には試し送信できません' : !canTest ? manageReason : undefined,
-            })
+            const menuItems = menuItemsFor(item)
             return (
-              <tr key={item.id}>
+              <tr key={item.id} data-ctx-row={item.id}>
                 <td className={styles.nameCell}>
                   <span className={styles.nameText} title={item.name}>{item.name}</span>
                   <span className={styles.urlText} title={item.url}>{maskedUrl(item.url)}</span>
@@ -954,5 +983,6 @@ function OutgoingV8Table({ items, canManage, canTest, manageReason, menuId, setM
         </tbody>
       </table>
     </div>
+    </ContextMenu>
   )
 }

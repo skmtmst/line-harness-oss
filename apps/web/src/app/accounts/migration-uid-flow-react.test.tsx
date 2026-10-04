@@ -201,10 +201,10 @@ function openDialog(): HTMLElement {
 const writes = () => net.calls.filter((call) => call.method !== 'GET')
 
 describe('UID移行の詳細確認（FRIEND-14）', () => {
-  it('「詳細を見る」は読み取り専用で、更新APIを呼ばない', async () => {
+  it('「開く」は読み取り専用で、更新APIを呼ばない', async () => {
     await render()
     await flush()
-    fireEvent.click(buttonByText('詳細を見る'))
+    fireEvent.click(buttonByText('開く'))
     await flush()
     const dialog = openDialog()
     expect(dialog.textContent).toContain('UOLD-1')
@@ -215,7 +215,7 @@ describe('UID移行の詳細確認（FRIEND-14）', () => {
   it('承認だけが対象itemへ1回書き込む', async () => {
     await render()
     await flush()
-    fireEvent.click(buttonByText('詳細を見る'))
+    fireEvent.click(buttonByText('開く'))
     await flush()
     fireEvent.click(buttonByText('この組合せを承認', openDialog()))
     await flush()
@@ -227,7 +227,7 @@ describe('UID移行の詳細確認（FRIEND-14）', () => {
   it('閉じるだけなら書き込まない', async () => {
     await render()
     await flush()
-    fireEvent.click(buttonByText('詳細を見る'))
+    fireEvent.click(buttonByText('開く'))
     await flush()
     // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
     fireEvent.click(openDialog().querySelector<HTMLButtonElement>('button[aria-label="閉じる"]')!)
@@ -349,7 +349,7 @@ describe('通信例外の結果不明（TECH-07 / FRIEND-33/34）', () => {
     net.failItemPatch = 'network'
     await render()
     await flush()
-    fireEvent.click(buttonByText('詳細を見る'))
+    fireEvent.click(buttonByText('開く'))
     await flush()
     const getsBefore = net.detailGets
     fireEvent.click(buttonByText('この組合せを承認', openDialog()))
@@ -369,7 +369,7 @@ describe('通信例外の結果不明（TECH-07 / FRIEND-33/34）', () => {
     net.failItemPatch = { status: 500, error: 'internal error' }
     await render()
     await flush()
-    fireEvent.click(buttonByText('詳細を見る'))
+    fireEvent.click(buttonByText('開く'))
     await flush()
     const getsBefore = net.detailGets
     fireEvent.click(buttonByText('この組合せを承認', openDialog()))

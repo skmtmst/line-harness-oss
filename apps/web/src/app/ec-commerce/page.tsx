@@ -2,7 +2,6 @@
 
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
@@ -32,7 +31,6 @@ import {
   type EcCommerceOverview,
   type EcOrder,
 } from '@/lib/api'
-import ConnectorPanel from './connector-panel'
 import EcConnectorV8 from './ec-connector-v8'
 import EcTabs from './ec-tabs-view'
 import SubscriptionsPanel from './subscriptions-panel'
@@ -549,13 +547,12 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 }
 
 function EcCommercePageInner() {
-  const theme = useAdminTheme()
   const tab = useMergedTab(EC_TABS, 'tab', 'events')
   const { selectedAccountId } = useAccount()
 
   return (
-    <div className={`${styles.root} ${tab === 'connector' ? '' : 'v8-ro-notifications-page'}`} data-design="Head" data-design-node={theme === 'v8' && tab !== 'connector' ? (tab === 'subscriptions' ? 'wqC8x' : 'GmVR5') : undefined}>
-      {theme === 'v8' && tab !== 'connector' && <ReadonlyHeaderV8 title="EC連携" description="取り込みの記録・会員のつき合わせ・定期便の状況を確認できます。" />}
+    <div className={`${styles.root} ${tab === 'connector' ? '' : 'v8-ro-notifications-page'}`} data-design="Head" data-design-node={tab !== 'connector' ? (tab === 'subscriptions' ? 'wqC8x' : 'GmVR5') : undefined}>
+      {tab !== 'connector' && <ReadonlyHeaderV8 title="EC連携" description="取り込みの記録・会員のつき合わせ・定期便の状況を確認できます。" />}
       {/* マニュアルは共通トップバーに置く。本文に「ECの注文・定期便を取り込み、LINEの配信や成果へつなげます。」という重複説明は置かない。 */}
       <PageHeaderH2
         /* 1段だけのパンくずは上の帯の画面名と重複するので出さない。 */
@@ -572,7 +569,7 @@ function EcCommercePageInner() {
       {tab === 'events' ? <EventsPanel accountId={selectedAccountId} /> : null}
       {tab === 'subscriptions' ? <SubscriptionsPanel accountId={selectedAccountId} /> : null}
       {/* ★V8-B（板 `iLJmw`）：つなぎ先だけ v8 の枠に切り替える。 */}
-      {tab === 'connector' ? (theme === 'v8' ? <EcConnectorV8 /> : <ConnectorPanel accountId={selectedAccountId} />) : null}
+      {tab === 'connector' ? <EcConnectorV8 /> : null}
     </div>
   )
 }

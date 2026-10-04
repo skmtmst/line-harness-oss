@@ -11,7 +11,8 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const DETAIL = readFileSync(join(HERE, 'scenario-detail-client.tsx'), 'utf8')
-const LIST = readFileSync(join(HERE, '..', 'page.tsx'), 'utf8')
+/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+const LIST = readFileSync(join(HERE, '..', 'list-v8.tsx'), 'utf8')
 
 describe('U007: 同時購読のラベルと説明を一致させる', () => {
   it('許可中・不許可で説明を切り替える。固定の説明ではない', () => {
@@ -37,19 +38,14 @@ describe('U007: 同時購読のラベルと説明を一致させる', () => {
 })
 
 describe('U027: シナリオ一覧のフォルダ領域を折り畳む', () => {
-  it('スマホでは畳んだ帯から開き、PCでは左の帯のまま', () => {
-    // 畳む側: <details> がスマホだけ出る。
-    expect(LIST).toMatch(/<details className="[^"]*lg:hidden/)
-    // 畳んだ帯には今の選択が読める。
-    expect(LIST).toContain('フォルダ：{activeFolderLabel}')
-    // PC側は非表示クラス付きの帯で、フォルダの中身は1つの要素を使い回す。
-    expect(LIST).toContain('hidden lg:block')
-    expect(LIST.match(/\{folderPanel\}/g)?.length).toBe(2)
+  it('狭い板では左の列を道具の段の選ぶ欄へ畳む', () => {
+    // 板 `wjfLe`：フォルダの列は道具の段の「フォルダ：すべて」へ畳まれる。
+    expect(LIST).toContain('folderSelectWrap')
+    expect(LIST).toContain('フォルダ：すべて')
+    expect(LIST).toContain('aria-label="フォルダ"')
   })
 
   it('選択肢の行は増えても帯の外は1行。長い名前は FolderPanel 側で省略される', () => {
-    // 帯の見出しは選択名だけを出し、一覧を抱え込まない。
-    expect(LIST).toContain('タップで開く')
     // 絞り込みの選択は今までどおり FolderPanel の行で行う。
     expect(LIST).toContain('onSelect={setFolderFilter}')
     expect(LIST).toContain("id: UNFILED")

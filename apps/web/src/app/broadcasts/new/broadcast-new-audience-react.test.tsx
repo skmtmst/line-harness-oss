@@ -20,6 +20,7 @@ vi.hoisted(() => {
 
 const mocks = vi.hoisted(() => ({
   query: 'audienceId=aud-1',
+  role: 'admin',
   accountId: 'acc-1',
   accountLoading: false,
   audience: vi.fn(),
@@ -36,6 +37,9 @@ vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
 }))
+
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => mocks.role }))
+vi.mock('@/lib/staff-capability', () => ({ canEditFeature: () => mocks.role === 'admin' }))
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: mocks.accountId, loading: mocks.accountLoading }),
@@ -109,11 +113,19 @@ const AUDIENCE = {
 
 describe('配信作成への分析対象者の受け渡し(N-274)', () => {
   beforeEach(() => {
+    mocks.role = 'admin'
     mocks.query = 'audienceId=aud-1'
     mocks.accountId = 'acc-1'
     mocks.accountLoading = false
     mocks.tagsList.mockResolvedValue({ success: true, data: [] })
     mocks.audience.mockResolvedValue({ success: true, data: AUDIENCE })
+  })
+
+  it('閲覧のみの担当者には作成フォームを出さない', async () => {
+    mocks.role = 'staff'
+    await mount(); await flush()
+    expect(host.textContent).toContain('権限')
+    expect(host.querySelector('[data-design-node="FU2aU"]')).toBeNull()
   })
 
   it('有効な対象者は人数と期限を出してフォームを開く', async () => {

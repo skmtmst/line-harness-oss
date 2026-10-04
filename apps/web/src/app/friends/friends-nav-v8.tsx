@@ -14,7 +14,9 @@
  */
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
+import Notice from '@/components/shared/notice'
+import { canEditFeature } from '@/lib/staff-capability'
 import { ChevronDown, Database, Upload } from 'lucide-react'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
@@ -107,7 +109,7 @@ export function FriendsDataMenuV8({
         onClick={() => setOpen((current) => !current)}
       >
         <Database aria-hidden="true" className="h-3.5 w-3.5" />
-        データ管理
+        {onExportCurrentPage ? '表示中をCSVで書き出す' : 'データ管理'}
         <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
       </Button>
       <ActionMenu
@@ -138,6 +140,7 @@ export function FriendsListHeadV8({
   const canEdit = staffRole === null || canManageRole(staffRole)
   const readonlyReason = 'この操作にはオーナーか管理者の権限が要ります'
   return (
+    <>
     <div className={styles.head}>
       <div className={styles.headText}>
         <h2 className={styles.headTitle}>友だち</h2>
@@ -160,6 +163,10 @@ export function FriendsListHeadV8({
         )}
       </div>
     </div>
+    {staffRole !== null && !canManageRole(staffRole) && !canEditFeature('/friends') && !canEditFeature('/chats') ? (
+      <Notice tone="info" data-design-node="x6QsVz">閲覧のみの権限です。友だちの情報を確認できますが、変更や取り込みはできません。</Notice>
+    ) : null}
+    </>
   )
 }
 

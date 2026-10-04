@@ -29,7 +29,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -84,7 +84,7 @@ async function flush() {
 }
 
 function backLink(): HTMLAnchorElement {
-  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('ウェビナー一覧'))
+  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('ウェビナーへ'))
   if (!link) throw new Error('一覧への戻りリンクが見つかりません')
   return link as HTMLAnchorElement
 }
@@ -94,7 +94,7 @@ function dialog(): HTMLElement | null {
 }
 
 async function typeTitle(value: string) {
-  const titleInput = host.querySelector('#webinar-title')! as HTMLInputElement
+  const titleInput = host.querySelector('#webinar-v8-title')! as HTMLInputElement
   await act(async () => {
     fireEvent.change(titleInput, { target: { value } })
   })
@@ -164,6 +164,6 @@ describe('ウェビナー作成の未保存離脱確認（R18）', () => {
     await flush()
     expect(dialog()).toBeNull()
     expect(fixture.push).not.toHaveBeenCalled()
-    expect((host.querySelector('#webinar-title') as HTMLInputElement).value).toBe('QAウェビナー')
+    expect((host.querySelector('#webinar-v8-title') as HTMLInputElement).value).toBe('QAウェビナー')
   })
 })

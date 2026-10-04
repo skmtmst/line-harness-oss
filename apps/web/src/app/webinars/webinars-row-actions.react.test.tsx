@@ -40,7 +40,10 @@ vi.mock('@/contexts/account-context', () => ({
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
+  usePageCrumbs: () => {},
 }))
+
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: (role: string) => role === 'admin' }))
 
 import WebinarsPage from './page'
 
@@ -53,7 +56,7 @@ const webinar = {
   id: 'webinar-5',
   title: '旧機能説明会',
   slug: 'old-feature-briefing',
-  status: 'archived',
+  status: 'draft',
   publicationState: 'ended',
   publicationStartsAt: null,
   publicationEndsAt: null,
@@ -97,7 +100,7 @@ describe('#641 ウェビナー一覧の行操作', () => {
     // 行に箱アイコンだけのボタンは置かない。
     expect(host.querySelector('button[aria-label="旧機能説明会をアーカイブ"]'), '箱アイコンの直置きが残っています').toBeNull()
 
-    const more = host.querySelector('button[data-qa-open="LKuAQ"]') as HTMLButtonElement
+    const more = host.querySelector('button[aria-label="旧機能説明会のその他操作"]') as HTMLButtonElement
     expect(more, '「…」の撮影口が消えています').toBeTruthy()
     expect(more.getAttribute('aria-label')).toBe('旧機能説明会のその他操作')
     act(() => { more.click() })
@@ -111,7 +114,7 @@ describe('#641 ウェビナー一覧の行操作', () => {
     await act(async () => { root.render(<WebinarsPage />) })
     await flush()
 
-    const more = host.querySelector('button[data-qa-open="LKuAQ"]') as HTMLButtonElement
+    const more = host.querySelector('button[aria-label="旧機能説明会のその他操作"]') as HTMLButtonElement
     expect(more, '「…」の撮影口が消えています').toBeTruthy()
     act(() => { more.click() })
     const menu = document.querySelector('[role="menu"]')

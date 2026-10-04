@@ -111,6 +111,16 @@ function triggerById(id: string): HTMLElement {
   return el as HTMLElement
 }
 
+/** 変える・決めるの開閉印を押して、候補の Select を出す。 */
+async function openPicker(ariaLabel: string) {
+  const button = host.querySelector(`button[aria-label="${ariaLabel}"]`)
+  if (!button) throw new Error(`見つかりません: ${ariaLabel}`)
+  await act(async () => {
+    fireEvent.click(button)
+  })
+  await settle(50)
+}
+
 async function chooseOption(triggerId: string, label: string) {
   await act(async () => {
     fireEvent.click(triggerById(triggerId))
@@ -156,18 +166,19 @@ describe('R23横展開 流入リンク作成の候補は選択accountで絞る',
   it('切り替えたら前の候補にしかない選択を外して知らせる', async () => {
     await act(async () => { root.render(React.createElement(NewInflowLinkPage)) })
     await settle(100)
-    // account-1 の候補を選ぶ（共通部品 Select はボタンの見た目）
+    // account-1 の候補を選ぶ（決める印で候補を開いてから選ぶ）
+    await openPicker('付けるタグを決める')
     await chooseOption('ir-tag', '会員')
+    await openPicker('始めるシナリオを決める')
     await chooseOption('ir-scenario', '案内A')
+    await openPicker('送るメッセージを決める')
     await chooseOption('ir-intro', '挨拶A')
-    expect(triggerById('ir-tag').textContent).toContain('会員')
+    expect(host.textContent).toContain('会員')
     // account-2 へ切り替えると候補が変わり、前の選択は外れる
     fixture.accountId = 'account-2'
     await act(async () => { root.render(React.createElement(NewInflowLinkPage)) })
     await settle(150)
-    expect(triggerById('ir-tag').textContent).toContain('（なし）')
-    expect(triggerById('ir-scenario').textContent).toContain('（なし）')
-    expect(triggerById('ir-intro').textContent).toContain('送らない')
+    expect(host.textContent).toContain('まだ決めていません')
     expect(host.textContent).toContain('今のアカウントにないため外しました')
   })
 

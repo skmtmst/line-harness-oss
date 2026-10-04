@@ -4,7 +4,10 @@ import { describe, expect, it, vi } from 'vitest'
 import AppShell from './app-shell'
 
 const route = vi.hoisted(() => ({ pathname: '/accounts/new' }))
-vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }))
+vi.mock('next/navigation', () => ({
+  usePathname: () => route.pathname,
+  useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {}, prefetch: () => {} }),
+}))
 vi.mock('./layout/sidebar', () => ({ default: () => <aside data-test="sidebar" /> }))
 vi.mock('./shell/app-top-bar', () => ({ default: () => <header data-test="topbar" /> }))
 vi.mock('./update/update-banner', () => ({ UpdateBanner: () => null }))

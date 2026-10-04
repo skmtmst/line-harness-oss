@@ -399,7 +399,7 @@ function FriendAddListV8Inner() {
   const rowMenuItems = (rule: FriendAddRule): ActionMenuItem[] => [
     {
       id: 'edit',
-      label: '編集する',
+      label: '編集',
       icon: <Pencil size={15} />,
       disabled: !canEdit,
       disabledReason: canEdit ? undefined : readonlyReason,
@@ -583,13 +583,14 @@ function FriendAddListV8Inner() {
       </span>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
+          {/* 列幅は板 `MRhef`：順 28・設定は伸び縮み・最初に送るもの 170・状態 80・直近7日 64・操作 28 */}
           <colgroup>
-            <col style={{ width: 72 }} />
+            <col style={{ width: 28 }} />
             <col />
-            <col style={{ width: 200 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 80 }} className={styles.recentCol} />
-            <col style={{ width: 44 }} />
+            <col style={{ width: 170 }} />
+            <col style={{ width: 80 }} />
+            <col style={{ width: 64 }} className={styles.recentCol} />
+            <col style={{ width: 28 }} />
           </colgroup>
           <thead>
             <tr>
@@ -703,13 +704,17 @@ function FriendAddListV8Inner() {
                 <td className={`${styles.countCell} ${styles.recentCol}`}>
                   <span className="text-ink tabular-nums">{countText(sinkRule.matchedLast7Days, '人')}</span>
                 </td>
-                <td className={styles.menuCell}>
+                <td
+                  className={styles.menuCell}
+                  data-design-node={openMenuId === sinkRule.id ? 'C0lfUP' : undefined}
+                >
                   <button
                     type="button"
                     className={styles.menuButton}
                     title={`設定「${sinkRule.name}」の操作`}
                     aria-label={`設定「${sinkRule.name}」の操作`}
                     aria-haspopup="menu"
+                    aria-expanded={openMenuId === sinkRule.id}
                     onClick={() =>
                       setOpenMenuId((current) => (current === sinkRule.id ? null : sinkRule.id))
                     }
@@ -830,7 +835,7 @@ function FriendAddListV8Inner() {
           >
             {/* 板 `LEwkJ`：閲覧のみでも「フォルダを追加」は文字の口で置く（押せない形）。 */}
             {canEdit ? null : (
-              <span className={styles.folderAddLink} aria-disabled="true" title={readonlyReason}>
+              <span className="mt-2 inline-flex items-center gap-2 text-xs text-ink-faint" aria-disabled="true" title={readonlyReason}>
                 <FolderPlus size={14} aria-hidden="true" />
                 フォルダを追加
               </span>
@@ -894,7 +899,7 @@ function FriendAddListV8Inner() {
               </FilterChip>
             ))}
             <span className={styles.toolbarSpacer} />
-            <PageSizeSelect value={perPage} onChange={changePerPage} className={styles.pageSize} />
+            <PageSizeSelect value={perPage} onChange={changePerPage} />
           </div>
           {tableBody}
         </div>

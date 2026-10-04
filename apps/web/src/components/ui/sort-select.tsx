@@ -18,19 +18,22 @@ export default function SortSelect({
   value,
   onChange,
   className,
+  label = '並び順',
 }: {
   options: SelectOption[]
   value: string
   onChange: (value: string) => void
   className?: string
+  /** 板 `apLqS` は「並び：」。他は今のまま。 */
+  label?: string
 }) {
   return (
     <label className={['flex min-w-0 items-center gap-2', className].filter(Boolean).join(' ')}>
-      <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+      <span className="text-ink-faint text-xs whitespace-nowrap">{label}</span>
       <Select
         value={value}
         onChange={onChange}
-        aria-label="並び順"
+        aria-label={label.replace(/：$/, '') || '並び順'}
         options={options}
         className="w-auto min-w-40 max-w-full"
       />

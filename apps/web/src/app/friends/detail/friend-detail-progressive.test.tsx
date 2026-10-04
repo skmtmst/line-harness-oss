@@ -94,6 +94,7 @@ const net = vi.hoisted(() => ({
 
 // 試験ごとに差し替える応答。
 const state = vi.hoisted(() => ({
+  upcoming: undefined as (() => Promise<unknown>) | undefined,
   mileage: undefined as
     | (() => Promise<unknown>)
     | undefined,
@@ -161,6 +162,10 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       ...actual.api,
       friends: {
         ...actual.api.friends,
+        upcoming: (...args: unknown[]) => {
+          net.calls.push({ name: 'friends.upcoming', args })
+          return state.upcoming ? state.upcoming() : Promise.resolve({ success: true, data: { nextBooking: null, nextBookingError: false, nextAutoDelivery: null, nextAutoDeliveryError: false } })
+        },
         get: (...args: unknown[]) => {
           net.calls.push({ name: 'friends.get', args })
           return Promise.resolve({ success: true, data: fixtures.friendDetail })
@@ -212,6 +217,7 @@ beforeEach(async () => {
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   net.calls.length = 0
   net.pushed.length = 0
+  state.upcoming = undefined
   state.mileage = undefined
   state.timeline = undefined
   routing.params = new URLSearchParams('id=friend-1')
@@ -454,5 +460,30 @@ describe('NEXT-10 履歴は実際の活動履歴につながっている', () =>
     state.mileage = () => Promise.resolve({ success: false, error: 'unavailable' })
     await render()
     await eventually(() => expect(host.textContent).toContain('つながり情報を取得できませんでした'))
+  })
+})
+
+describe('概要の次の予定', () => {
+  it('予約と自動配信を実際の応答から出す', async () => {
+    state.upcoming = () => Promise.resolve({ success: true, data: {
+      nextBooking: { kind: 'booking', id: 'bk-2', title: 'オンライン相談', startsAt: '2026-10-08T09:00:00+09:00', status: 'confirmed' }, nextBookingError: false,
+      nextAutoDelivery: { kind: 'scenario', id: 'sc-2', name: '秋のご案内', scheduledAt: '2026-10-07T10:00:00+09:00' }, nextAutoDeliveryError: false,
+    } })
+    await render()
+    await eventually(() => expect(host.textContent).toContain('オンライン相談'))
+    expect(host.textContent).toContain('10月8日')
+    expect(host.textContent).toContain('秋のご案内')
+    expect(host.querySelector('a[href="/scenarios/detail?id=sc-2"]')).toBeTruthy()
+    expect(net.calls.some((call) => call.name === 'friends.upcoming' && call.args[0] === 'friend-1')).toBe(true)
+  })
+  it('配信の取り損ねを予定なしで代用せず、再試行で回復する', async () => {
+    state.upcoming = () => Promise.reject(new Error('offline'))
+    await render()
+    await eventually(() => expect(host.textContent).toContain('配信予定を取得できませんでした'))
+    expect(host.textContent).not.toContain('確定した配信予定はありません')
+    state.upcoming = () => Promise.resolve({ success: true, data: { nextBooking: null, nextBookingError: false, nextAutoDelivery: null, nextAutoDeliveryError: false } })
+    const retry = [...host.querySelectorAll('button')].find((button) => button.closest('[role="alert"]')?.textContent?.includes('配信予定を取得できませんでした'))!
+    await act(async () => { retry.click() })
+    await eventually(() => expect(host.textContent).toContain('確定した配信予定はありません'))
   })
 })

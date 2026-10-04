@@ -89,6 +89,7 @@
   font-size: 22px;
   font-weight: 700;
   line-height: 1.2;
+  font-variant-numeric: tabular-nums;
 }
 .kpiValueDanger {
   color: var(--color-danger);
