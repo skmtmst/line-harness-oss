@@ -72,11 +72,13 @@ afterEach(() => {
   host.remove()
 })
 
-function render(friend: FriendListItem = BASE) {
+function render(friend: FriendListItem = BASE, canEdit = false, onAction = vi.fn()) {
   act(() => {
     root.render(
       <FriendListRow
         friend={friend}
+        canEdit={canEdit}
+        onAction={onAction}
         visibleColumns={COLUMNS}
         onToggleSelect={() => {}}
         onToggleAttention={() => {}}
@@ -136,6 +138,31 @@ describe('友だち行の行き先', () => {
     expect(pushes).toEqual(['/friends/detail?id=friend-1'])
   })
 
+  it('編集項目を選ぶと対象の操作だけを開き、行の移動は起こさない', () => {
+    const onAction = vi.fn()
+    render(BASE, true, onAction)
+    const menu = openMenu()
+    const edit = [...menu.querySelectorAll('button')].find((button) => button.textContent === '担当者を変える')
+    if (!edit) throw new Error('担当者の編集項目がありません')
+    act(() => edit.click())
+    expect(onAction).toHaveBeenCalledWith('operator')
+    expect(pushes).toEqual([])
+  })
+
+  it('閲覧のみは変更項目を押せず、トークと詳細へは移動できる', () => {
+    const onAction = vi.fn()
+    render(BASE, false, onAction)
+    const menu = openMenu()
+    const buttons = [...menu.querySelectorAll('button')]
+    expect(buttons.find((button) => button.textContent === 'トークを開く')?.disabled).toBe(false)
+    expect(buttons.find((button) => button.textContent === '友だちの詳細を見る')?.disabled).toBe(false)
+    const changes = buttons.filter((button) => !['トークを開く', '友だちの詳細を見る'].includes(button.textContent ?? ''))
+    expect(changes.length).toBe(8)
+    expect(changes.every((button) => button.disabled)).toBe(true)
+    expect(menu.textContent).toContain('閲覧のみでは変更できません')
+    expect(onAction).not.toHaveBeenCalled()
+  })
+
   it('チェックボックスを押しても移動しない', () => {
     render()
     const checkbox = host.querySelector('input[type="checkbox"]')
@@ -152,4 +179,14 @@ describe('友だち行の行き先', () => {
     expect(name).not.toBeNull()
     expect(name?.className).toContain('truncate')
   })
+})
+
+it('省略したタグの件数から、隠れたすべてのタグ名を確認できる', () => {
+  render({ ...BASE, tags: [
+    { id: 'tag-1', name: '表示するタグ' },
+    { id: 'tag-2', name: '省略したタグ1' },
+    { id: 'tag-3', name: '省略したタグ2' },
+  ] })
+  const count = [...host.querySelectorAll('span')].find((span) => span.textContent === '+2')!
+  expect(count.title).toBe('省略したタグ1・省略したタグ2')
 })

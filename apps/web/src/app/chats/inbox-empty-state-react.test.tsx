@@ -68,7 +68,7 @@ async function eventually(check: () => void, timeout = 1000) {
   }
 }
 async function click(label: string) {
-  const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim().startsWith(label))
+  const button = [...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label') === label || item.textContent?.trim().startsWith(label))
   expect(button, label).toBeTruthy()
   await act(async () => { button!.click() })
 }

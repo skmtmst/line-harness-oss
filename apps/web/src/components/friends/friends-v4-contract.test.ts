@@ -39,8 +39,8 @@ describe('友だちV8の画面契約', () => {
     expect(ROW).not.toContain('V2 2-2')
     expect(KPIS).not.toContain('V2 2-2')
     expect(DETAIL).not.toContain('V2 2-2')
-    expect(DETAIL).toContain('data-friends-detail-design="v4"')
-    expect(STRUCTURE).toContain('"node": "ywJ5H"')
+    expect(DETAIL).toContain('data-friends-detail-design="v8"')
+    expect(PAGE).toContain('data-design-node="ywJ5H"')
     expect(STRUCTURE).toContain('"node": "hsWaL"')
   })
 
@@ -80,14 +80,14 @@ describe('友だちV8の画面契約', () => {
 
   it('一覧の不要な開く列を除き、件数・表示項目・表示件数を見出し右へ置く', () => {
     expect(PAGE).not.toContain('>一括アクション</button>')
-    expect(ROW).toContain('<RowActions subjectName={friend.displayName}')
+    expect(ROW).toContain('<FriendRowMenu friendId={friend.id}')
     expect(ROW).not.toContain('>開く<')
     expect(TABLE).toContain('表示項目を編集')
     // #668: 件数の選び口は共通部品 PageSizeSelect（「表示件数 N件」）。
     expect(TABLE).toContain('PageSizeSelect')
     expect(TABLE).toContain('truncate text-center')
     expect(ROW).toContain('items-center')
-    expect(ROW).toContain('text-center')
+    expect(ROW).toContain('truncate whitespace-nowrap')
   })
 
   it('V8でも検索・絞り込みの実行先を残す', () => {
@@ -172,7 +172,7 @@ describe('友だちV8の画面契約', () => {
       '/chats?friend=',
       '/accounts?tab=migration',
     ]) {
-      expect(PAGE + ROW).toContain(marker)
+      expect(PAGE + ROW + readFileSync(join(HERE, 'friend-row-menu.tsx'), 'utf8')).toContain(marker)
     }
   })
 })

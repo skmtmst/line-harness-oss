@@ -1,0 +1,2 @@
+.panes { height: calc(100dvh - 110px); margin: -24px; }
+@media (max-width: 767px) { .panes { height: calc(100dvh - 140px); margin: -16px; } }

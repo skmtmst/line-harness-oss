@@ -10,6 +10,8 @@ import type { FriendListColumn } from './friend-list-table'
 import { RowActions } from '@/components/shared/row-actions'
 import Avatar from '@/components/shared/avatar'
 import Checkbox from '@/components/shared/checkbox'
+import FriendRowMenu from './friend-row-menu'
+import type { FriendAction } from './single-friend-actions'
 import { formatDay } from '@/lib/format'
 
 interface Props {
@@ -17,6 +19,9 @@ interface Props {
   selected?: boolean
   onToggleSelect?: () => void
   onToggleAttention?: () => void
+  canEdit?: boolean
+  allowedActions?: FriendAction[]
+  onAction?: (action: FriendAction) => void
   visibleColumns: Set<FriendListColumn>
 }
 
@@ -51,6 +56,9 @@ export default function FriendListRow({
   onToggleSelect,
   onToggleAttention,
   visibleColumns,
+  canEdit = false,
+  allowedActions,
+  onAction,
 }: Props) {
   const router = useRouter()
   const status = statusView(friend.chatStatus)
@@ -79,7 +87,7 @@ export default function FriendListRow({
         }
       }}
       data-friend-cols
-      className={`grid h-13 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition ${selected ? 'bg-accent-soft' : 'bg-canvas'} hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none`}
+      className={`grid h-[60px] min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition ${selected ? 'bg-accent-soft' : 'bg-canvas'} hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none`}
     >
       <div onClick={(event) => event.stopPropagation()}>
         {/* ★V7 共通 チェックボックス（gvjpx）。 */}
@@ -93,6 +101,7 @@ export default function FriendListRow({
       <button
         type="button"
         data-part="attention-star"
+        disabled={!canEdit}
         aria-pressed={attention}
         aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
         onClick={(event) => {
@@ -178,10 +187,10 @@ export default function FriendListRow({
 
       {visibleColumns.has('tags') ? (
         <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
-          {friend.tags.slice(0, 2).map((tag) => (
+          {friend.tags.slice(0, 1).map((tag) => (
             <span key={tag.id} title={tag.name} className="max-w-28 min-w-0 truncate rounded-mini border border-hairline bg-canvas px-1.5 py-0.5 text-micro text-ink-secondary">{tag.name}</span>
           ))}
-          {friend.tags.length > 2 ? <span title={friend.tags.slice(2).map((tag) => tag.name).join('・')} className="shrink-0 text-micro text-ink-secondary">+{friend.tags.length - 2}</span> : null}
+          {friend.tags.length > 1 ? <span title={friend.tags.slice(1).map((tag) => tag.name).join('・')} className="shrink-0 text-micro text-ink-secondary">+{friend.tags.length - 1}</span> : null}
           {!friend.tags.length ? <span className="text-micro text-ink-disabled">—</span> : null}
         </div>
       ) : null}
@@ -200,14 +209,11 @@ export default function FriendListRow({
       ) : null}
 
       {visibleColumns.has('last') ? (
-        <div className="text-center text-xs tabular-nums text-ink-faint" title={formatDateTime(lastContact)}>
+        <div className="min-w-0 truncate whitespace-nowrap text-xs tabular-nums text-ink-faint" title={formatDateTime(lastContact)}>
           {formatDate(lastContact)}
         </div>
       ) : null}
-      <RowActions subjectName={friend.displayName} menuItems={[
-        { id: 'chat', label: 'トークを開く', icon: <MessageCircle aria-hidden="true" size={14} />, onSelect: () => router.push(`/chats?friend=${friend.id}`) },
-        { id: 'detail', label: '友だちの詳細を見る', icon: <UserRound aria-hidden="true" size={14} />, onSelect: openDetail },
-      ]} />
+      <FriendRowMenu friendId={friend.id} friendName={friend.displayName} attention={attention} canEdit={canEdit} allowedActions={allowedActions} onAction={onAction} onToggleAttention={onToggleAttention} />
     </div>
   )
 }
@@ -224,6 +230,9 @@ export function FriendListCard({
   onToggleSelect,
   onToggleAttention,
   visibleColumns,
+  canEdit = false,
+  allowedActions,
+  onAction,
 }: Props) {
   const router = useRouter()
   const status = statusView(friend.chatStatus)
@@ -285,7 +294,8 @@ export function FriendListCard({
         <button
           type="button"
           data-part="attention-star"
-          aria-pressed={attention}
+          disabled={!canEdit}
+        aria-pressed={attention}
           aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
           onClick={(event) => {
             event.stopPropagation()
@@ -346,6 +356,7 @@ export function FriendListCard({
           </details>
         ) : null}
       </div>
+      <FriendRowMenu friendId={friend.id} friendName={friend.displayName} attention={attention} canEdit={canEdit} allowedActions={allowedActions} onAction={onAction} onToggleAttention={onToggleAttention} />
     </div>
   )
 }

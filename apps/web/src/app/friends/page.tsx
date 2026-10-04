@@ -10,7 +10,8 @@ import { api, ApiError, fetchApi, type FriendListItem, type SupportMarkListItem 
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
-import SingleFriendActions from '@/components/friends/single-friend-actions'
+import Dialog from '@/components/shared/dialog'
+import SingleFriendActions, { type FriendAction } from '@/components/friends/single-friend-actions'
 import NoticeDialog from '@/components/friends/notice-dialog'
 import SavedSearchDialog from '@/components/friends/saved-search-dialog'
 import { useAccount } from '@/contexts/account-context'
@@ -29,6 +30,7 @@ import Select from '@/components/shared/select'
 import { emptyMessageOf } from './friend-list-empty'
 import { csvExportLine } from './csv-export'
 import BulkRunDialog from '@/components/friends/bulk-run-dialog'
+import { canEditFeature } from '@/lib/staff-capability'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { FRIENDS_MERGED_TABS } from './friends-tabs'
 import { FriendsListHeadV8 } from './friends-nav-v8'
@@ -81,6 +83,9 @@ function FriendsPageInner({
    * 権限のある管理者が一括操作を始められなくなる。
    * 確認が終わるまで（staffRole === null）は押し口も理由も出さない。
    */
+  const [rowAction, setRowAction] = useState<{ friend: FriendListItem; action: FriendAction } | null>(null)
+  // アカウントを変えたら、前の相手への操作を引き継がない。
+  useEffect(() => { setRowAction(null) }, [selectedAccountId])
   const [staffRole, setStaffRole] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -655,6 +660,13 @@ function FriendsPageInner({
       />
 
       <FriendListTable
+          canEdit={canRunBulk(staffRole) || canEditFeature('/friends')}
+          allowedActions={[
+            ...(canRunBulk(staffRole) || canEditFeature('/friends') ? ['tag', 'field'] as FriendAction[] : []),
+            ...(canRunBulk(staffRole) || canEditFeature('/chats') ? ['status', 'operator', 'template'] as FriendAction[] : []),
+            ...(canRunBulk(staffRole) ? ['scenario', 'reminder'] as FriendAction[] : []),
+          ]}
+          onAction={(friend, action) => setRowAction({ friend, action })}
           toolbarFilters={(
             <>
           <FilterChip selected={responseFilter === 'unhandled'} onChange={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))}>
@@ -699,6 +711,10 @@ function FriendsPageInner({
           onToggleAttention={toggleAttention}
       />
 
+      {rowAction && <Dialog open title={`${rowAction.friend.displayName}への操作`} onCancel={() => setRowAction(null)} footer={<Button onClick={() => setRowAction(null)}>閉じる</Button>}>
+        <SingleFriendActions friendId={rowAction.friend.id} friendName={rowAction.friend.displayName} accountId={selectedAccountId} tags={allTags} initialAction={rowAction.action} hideActions friendTags={rowAction.friend.tags} onFriendTagsChange={(next) => applyFriendTags(rowAction.friend.id, next)} onDone={() => { setRowAction(null); void loadFriends() }} />
+      </Dialog>}
+
       {/*
         ★V7 仕上げ §2: 一括バーは表のすぐ下に置き、1件でも選ぶと
         下端から8px上がって出る。0件で下がって消える。
@@ -708,19 +724,7 @@ function FriendsPageInner({
           count={selectedIds.size}
           unit="人"
           hint="対象を確認してから操作を選んでください"
-          below={selectedIds.size === 1 ? (
-            <div className="mt-2">
-              <SingleFriendActions
-                friendId={[...selectedIds][0]}
-                friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'}
-                tags={allTags}
-                accountId={selectedAccountId}
-                onDone={loadFriends}
-                friendTags={friends.find((friend) => friend.id === [...selectedIds][0])?.tags ?? []}
-                onFriendTagsChange={(next) => applyFriendTags([...selectedIds][0], next)}
-              />
-            </div>
-          ) : undefined}
+
         >
           {selectedIds.size > 1 && canRunBulk(staffRole) ? (
             <Button

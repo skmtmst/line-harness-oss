@@ -100,8 +100,8 @@ describe('受信箱V4の画面契約', () => {
 
   it('メール表示と固定の並び順をLINEにそろえる', () => {
     expect(PAGE).toContain('MAIL')
-    expect(PAGE).toContain('aria-label={item.label}')
-    expect(PAGE).toContain("{item.key === 'all' && item.label}")
+    expect(PAGE).toContain('aria-label="受信経路で絞り込む"')
+    expect(PAGE).toContain('options={CHANNELS.map')
     expect(PAGE).not.toContain('{item.label}\n                </button>')
     expect(PAGE).toContain('data-inbox-sort="fixed"')
     // オーナー指示 (m13d)：未読の会話を先に並べる。文言で固定していた旧表示は新表示へ。

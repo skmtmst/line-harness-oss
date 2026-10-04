@@ -14,6 +14,7 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { VirtualRows } from '@/components/shared/virtual-rows'
 import FriendListRow, { FriendListCard } from './friend-list-row'
+import type { FriendAction } from './single-friend-actions'
 import { formatNumber } from '@/lib/format'
 import './friend-list-table.css'
 
@@ -22,6 +23,9 @@ export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'sou
 interface Props {
   toolbarFilters?: ReactNode
   sortControl?: ReactNode
+  canEdit?: boolean
+  allowedActions?: FriendAction[]
+  onAction?: (friend: FriendListItem, action: FriendAction) => void
   friends: FriendListItem[]
   status?: 'loading' | 'ready' | 'error'
   /*
@@ -60,6 +64,9 @@ export default function FriendListTable({
   toolbarFilters,
   sortControl,
   friends,
+  canEdit = false,
+  allowedActions,
+  onAction,
   status = 'ready',
   refreshing = false,
   emptyTitle = '条件に合う友だちが見つかりません',
@@ -320,28 +327,28 @@ export default function FriendListTable({
             列の表示切替（visible）は両側で効く。
           */
           <div key={friend.id} className="contents">
-            {(!singleBranch || desktop === false) && (
-              <div className="lg:hidden">
-                <FriendListCard
-                  friend={friend}
-                  selected={selectedIds?.has(friend.id)}
-                  onToggleSelect={() => onToggleSelect?.(friend.id)}
-                  onToggleAttention={() => onToggleAttention?.(friend)}
-                  visibleColumns={visible}
-                />
-              </div>
-            )}
-            {(!singleBranch || desktop === true) && (
-              <div className="hidden lg:block">
-                <FriendListRow
-                  friend={friend}
-                  selected={selectedIds?.has(friend.id)}
-                  onToggleSelect={() => onToggleSelect?.(friend.id)}
-                  onToggleAttention={() => onToggleAttention?.(friend)}
-                  visibleColumns={visible}
-                />
-              </div>
-            )}
+            <div className="lg:hidden">
+              <FriendListCard
+                friend={friend}
+                canEdit={canEdit} allowedActions={allowedActions}
+                onAction={(action) => onAction?.(friend, action)}
+                selected={selectedIds?.has(friend.id)}
+                onToggleSelect={() => onToggleSelect?.(friend.id)}
+                onToggleAttention={() => onToggleAttention?.(friend)}
+                visibleColumns={visible}
+              />
+            </div>
+            <div className="hidden lg:block">
+              <FriendListRow
+                friend={friend}
+                canEdit={canEdit} allowedActions={allowedActions}
+                onAction={(action) => onAction?.(friend, action)}
+                selected={selectedIds?.has(friend.id)}
+                onToggleSelect={() => onToggleSelect?.(friend.id)}
+                onToggleAttention={() => onToggleAttention?.(friend)}
+                visibleColumns={visible}
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -356,6 +363,7 @@ export default function FriendListTable({
           <ListRange total={total} first={rangeStart} last={rangeEnd} />
         </span>
         <Pagination
+          className="w-full"
           page={page}
           pageCount={pageCount}
           onPageChange={onPageChange}
