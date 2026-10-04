@@ -44,6 +44,17 @@
   line-height: 1.6;
 }
 
+/* 閲覧のみの帯（`hEDTK`：青い帯で変えられないことを先に伝える）。 */
+.readonlyBand {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--color-info-bg, #e8f1fd);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 /* 数の帯：区切り線で並べる1本の帯（`v19Ivv`）。カードを離して並べない。 */
 .kpis {
   display: flex;

@@ -373,7 +373,7 @@ function HealthListV8({
                 />
               ) : null}
             </div>
-            <p className={styles.listHint}>行の「…」から 30日のまとめ・飼い主を開く。</p>
+            <p className={styles.listHint}>行の「…」から 30日のまとめ・飼い主を開く・飼い主にトークで声をかける。1匹の PDF は「30日のまとめ」を開いて印刷する。</p>
           </>
         ) : null}
       </section>
@@ -389,6 +389,8 @@ function HealthRowV8({ row, onOpenSummary }: { row: NenHealthRow; onOpenSummary:
   const menuItems: ActionMenuItem[] = [
     { id: 'summary', label: '30日のまとめ', onSelect: () => onOpenSummary(row.pet.id) },
     { id: 'owner', label: '飼い主を開く', external: true, onSelect: () => { window.location.href = `/friends/detail?id=${encodeURIComponent(row.owner.friendId)}` } },
+    // mIwA4: 飼い主にトークで声をかける（受信箱のその友だちを開く）。
+    { id: 'talk', label: '飼い主にトークで声をかける', external: true, onSelect: () => { window.location.href = `/chats?friend=${encodeURIComponent(row.owner.friendId)}` } },
   ]
   return (
     <Tr>
