@@ -19,7 +19,6 @@ const DASHBOARD_EDITOR = read('components/dashboard/dashboard-editor.tsx')
 const DASHBOARD = read('app/page.tsx')
 const TEMPLATE_EDIT = read('app/templates/edit-v8.tsx')
 const REMINDER_EDIT = read('app/reminders/edit/edit-v8.tsx')
-const STAFF = read('app/staff/page.tsx')
 const FRIEND_ADD_EDITOR = read('app/friend-add-settings/editor-v8.tsx')
 
 /*
@@ -27,8 +26,8 @@ const FRIEND_ADD_EDITOR = read('app/friend-add-settings/editor-v8.tsx')
  * 無いものだけ作る。中身の数値は API の実データを出す。
  */
 describe('最後の細かい板の印', () => {
-  it('友だち一覧にywJ5H・x6QsVzを付ける', () => {
-    expect(FRIENDS_PAGE).toContain('sdbsQ ywJ5H x6QsVz')
+  it('V8の友だち一覧にywJ5Hを付ける', () => {
+    expect(FRIENDS_PAGE).toContain('data-friends-page="v8" data-design-node="ywJ5H"')
   })
 
   it('一覧から開く窓にCYJ0Lを付ける', () => {
@@ -50,10 +49,11 @@ describe('最後の細かい板の印', () => {
     expect(DASHBOARD_EDITOR).toContain('data-design-node="mcOqK"')
   })
 
-  it('1152の幅違いに印を付ける（a1k3d・r1l0bT・wbDHy・xHpkS）', () => {
-    expect(TEMPLATE_EDIT).toContain('u5YC6 a1k3d')
-    expect(REMINDER_EDIT).toContain('p5YuP r1l0bT')
-    expect(STAFF).toContain('wbDHy')
+  it('1152の幅違いを動的に選ぶ（a1k3d・r1l0bT・xHpkS）', () => {
+    expect(TEMPLATE_EDIT).toContain("narrowBoard ? 'a1k3d' : 'u5YC6'")
+    expect(TEMPLATE_EDIT).toContain('data-design-node={designNode}')
+    expect(REMINDER_EDIT).toContain("narrowBoard ? 'r1l0bT' : 'p5YuP'")
+    expect(REMINDER_EDIT).toContain('data-design-node={designNode}')
     expect(FRIEND_ADD_EDITOR).toContain('h8uNW xHpkS')
   })
 
