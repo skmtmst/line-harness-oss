@@ -408,6 +408,35 @@ function FriendAddEditorV8Inner({ ruleId }: { ruleId?: string }) {
     routeIds: current.routeIds.includes(id) ? current.routeIds.filter((routeId) => routeId !== id) : [...current.routeIds, id],
   }))
 
+  /*
+   * 作る②で、ほかの設定がもう使っている流入リンクは選べない形にし、
+   * どの設定が使っているかを出す（板 `kFz4b`）。一覧の定義から作るので
+   * 新しい口は要らない。自分（編集中）は除く。読めないときは何も出さない。
+   */
+  const [routeUse, setRouteUse] = useState<{ kind: FriendAddRuleKind | null, use: Record<string, string[]> }>({ kind: null, use: {} })
+  useEffect(() => {
+    if (step !== 'routes' || !selectedAccountId || loadedAccountId !== selectedAccountId) return
+    if (routeUse.kind === rule.friendKind) return
+    let alive = true
+    void (async () => {
+      try {
+        const res = await api.friendAddRules.list(selectedAccountId, rule.friendKind)
+        if (!alive || !res.success) return
+        const use: Record<string, string[]> = {}
+        for (const item of res.data.items) {
+          if (item.id === ruleId) continue
+          for (const routeId of item.definition.routeIds) {
+            use[routeId] = [...(use[routeId] ?? []), item.name]
+          }
+        }
+        if (alive) setRouteUse({ kind: rule.friendKind, use })
+      } catch {
+        /* 読めないときは重なりの案内を出さない（確認段で見る）。 */
+      }
+    })()
+    return () => { alive = false }
+  }, [step, selectedAccountId, loadedAccountId, rule.friendKind, ruleId, routeUse.kind])
+
   if (accountLoading || loading) return <ListState kind="loading" title="設定を読み込んでいます" />
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description={accounts.length ? '上のバーで対象を選ぶと設定を表示します。' : '先にLINE公式アカウントを登録してください。'} />
   if (loadedAccountId !== selectedAccountId) {
@@ -473,6 +502,7 @@ function FriendAddEditorV8Inner({ ruleId }: { ruleId?: string }) {
               options={options}
               toggleRoute={toggleRoute}
               canEdit={canEdit}
+              routeUse={routeUse.kind === rule.friendKind ? routeUse.use : {}}
               routeError={fieldError?.step === 'routes' ? fieldError.message : undefined}
             />
           ) : null}
@@ -643,13 +673,15 @@ function BasicStepV8({ rule, setRule, options, canEdit, readonlyReason, isExisti
 
 /* ===== 作る② 流入リンク（板 `h8uNW`） ===== */
 
-function RoutesStepV8({ rule, definition, setDefinition, options, toggleRoute, canEdit, routeError }: {
+function RoutesStepV8({ rule, definition, setDefinition, options, toggleRoute, canEdit, routeUse, routeError }: {
   rule: EditorRule
   definition: FriendAddRuleDefinition
   setDefinition: React.Dispatch<React.SetStateAction<FriendAddRuleDefinition>>
   options: FriendAddRuleOptions
   toggleRoute: (id: string) => void
   canEdit: boolean
+  /** 流入リンクごとの、ほかの設定の名前（一覧の定義から作る）。 */
+  routeUse: Record<string, string[]>
   routeError?: string
 }) {
   const [query, setQuery] = useState('')
@@ -676,14 +708,18 @@ function RoutesStepV8({ rule, definition, setDefinition, options, toggleRoute, c
         <ul className={styles.routeList}>
           {visibleRoutes.map((route) => {
             const checked = definition.routeIds.includes(route.id)
+            /* ほかの設定が使っている流入リンクは選べない形にし、名前を出す。
+               自分がもう選んでいる分は外せるように残す。 */
+            const usedBy = (routeUse[route.id] ?? []).filter((name) => name.length > 0)
+            const usedByOthers = usedBy.length > 0 && !checked
             return (
               <li key={route.id}>
                 <button
                   type="button"
                   role="checkbox"
                   aria-checked={checked}
-                  disabled={!canEdit}
-                  title={!canEdit ? 'この操作にはオーナーか管理者の権限が要ります' : undefined}
+                  disabled={!canEdit || usedByOthers}
+                  title={!canEdit ? 'この操作にはオーナーか管理者の権限が要ります' : usedByOthers ? `「${usedBy.join('・')}」で使用中です` : undefined}
                   className={checked ? styles.routeActive : styles.route}
                   onClick={() => toggleRoute(route.id)}
                 >
@@ -692,7 +728,7 @@ function RoutesStepV8({ rule, definition, setDefinition, options, toggleRoute, c
                   </span>
                   <span className={styles.routeText}>
                     <strong>{route.name}</strong>
-                    <small>{route.kind ? `QR・URL（${route.kind}）` : 'QR・URL'}</small>
+                    <small>{route.kind ? `QR・URL（${route.kind}）` : 'QR・URL'}{usedByOthers ? `・「${usedBy.join('・')}」で使用中` : ''}</small>
                   </span>
                 </button>
               </li>
