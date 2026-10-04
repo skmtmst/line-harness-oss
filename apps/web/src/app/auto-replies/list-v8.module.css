@@ -43,22 +43,29 @@
   line-height: 1.6;
 }
 
-/* 数の帯：4つのマス。アイコンつき。 */
+/* 数の帯：区切り線で並べる1本の帯（`uE9gf`）。カードを離して並べない。 */
 .kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  gap: 0;
+  border-top: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
 }
 
 .kpi {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
+  padding: 16px 20px;
+  border: 0;
+  background: transparent;
+}
+
+/* 両端の縦位置をそろえるため、2つ目からは左に区切り線を引く。 */
+.kpi:not(:first-child) {
+  border-left: 1px solid var(--color-hairline);
 }
 
 .kpiLabel {
@@ -66,8 +73,8 @@
   align-items: center;
   gap: 6px;
   color: var(--color-ink-secondary);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .kpiLabel svg {
@@ -78,8 +85,8 @@
   margin: 0;
   color: var(--color-ink);
   font-size: 22px;
-  font-weight: 700;
-  line-height: 1.25;
+  font-weight: 600;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
@@ -93,7 +100,7 @@
 .kpiDetail {
   margin: 0;
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -171,7 +178,7 @@
 }
 
 .searchWrap {
-  width: 240px;
+  width: 200px;
   min-width: 160px;
 }
 
@@ -202,11 +209,9 @@
   cursor: pointer;
 }
 
-/* 表。 */
+/* 表。見出しと行の区切り線だけ（`uE9gf`）。外側の枠は作らない。 */
 .tableWrap {
   overflow-x: auto;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
 }
 
@@ -219,18 +224,18 @@
 }
 
 .table th {
-  padding: 10px 12px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-canvas-sunken);
+  background: var(--color-table-head);
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
 }
 
 .table td {
-  padding: 12px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--color-hairline);
   vertical-align: top;
 }
@@ -247,17 +252,21 @@
   transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 
+/* 消える行は 150ms で薄くなる（V8 の動き §8）。 */
+.rowClick[data-leaving='true'] {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease-out);
+}
+
 .rowClick:hover td {
   background: var(--color-canvas-sunken);
 }
 
 .selectCell {
-  width: 40px;
   text-align: center;
 }
 
 .gripCell {
-  width: 44px;
   color: var(--color-hairline);
   text-align: center;
 }
@@ -266,14 +275,13 @@
   display: block;
   max-width: 100%;
   overflow: hidden;
-  color: var(--color-ink);
-  font-weight: 600;
+  color: var(--color-action);
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .cellTitle:hover {
-  color: var(--color-action);
   text-decoration: underline;
 }
 
@@ -335,7 +343,17 @@
   border-radius: var(--radius-pill);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
-  font-size: 10px;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 引き金の1行（`uE9gf` では11px）。返すものの2行目以降は .cellSub のまま。 */
+.cellTrigger {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -347,6 +365,7 @@
 
 .countMain {
   color: var(--color-ink);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -362,9 +381,9 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 10px;
+  padding: 2px 8px;
   border-radius: var(--radius-pill);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -397,7 +416,6 @@
 }
 
 .menuCell {
-  width: 44px;
   text-align: right;
 }
 
@@ -405,8 +423,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
@@ -474,7 +492,7 @@
 }
 
 .skeletonBar {
-  height: 12px;
+  height: 10px;
   flex: 1;
   border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
@@ -595,8 +613,11 @@
 
 /* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
 @container (max-width: 1099px) {
-  .kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* 狭い板（`WPrd5`）では「今月動いた回数」の5列目を畳む。 */
+  .table col:nth-child(5),
+  .table th:nth-child(5),
+  .table td:nth-child(5) {
+    display: none;
   }
 
   .split {
@@ -617,10 +638,35 @@
   }
 }
 
-/* さらに狭い板では数の帯も1列に。 */
-@container (max-width: 560px) {
+/* かなり狭い板では数の帯を2列に（区切り線を付け替える）。 */
+@container (max-width: 720px) {
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .kpi:nth-child(even) {
+    border-left: 1px solid var(--color-hairline);
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--color-hairline);
+  }
+}
+
+/* さらに狭い板では数の帯も検索も1列に。 */
+@container (max-width: 480px) {
   .kpis {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpi:not(:first-child) {
+    border-left: 0;
+    border-top: 1px solid var(--color-hairline);
   }
 
   .searchWrap {

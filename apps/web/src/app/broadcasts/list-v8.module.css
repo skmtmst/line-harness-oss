@@ -302,9 +302,9 @@
 }
 
 .chip[data-selected='true'] {
-  border-color: transparent;
-  background: var(--color-ink);
-  color: var(--color-canvas);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
 }
 
 .chip[data-selected='true'] svg,
@@ -352,18 +352,18 @@
 }
 
 .table th {
-  padding: 10px 12px;
+  padding: 13px 20px;
   border-bottom: 1px solid var(--color-hairline);
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   text-align: left;
   white-space: nowrap;
 }
 
 .table td {
-  padding: 12px;
+  padding: 9px 20px;
   border-bottom: 1px solid var(--color-hairline);
   vertical-align: top;
 }
@@ -380,6 +380,12 @@
   transition: background-color var(--motion-fast) var(--motion-ease-out);
 }
 
+/* 消える行は 150ms で薄くなる（V8 の動き §8）。 */
+.rowClick[data-leaving='true'] {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease-out);
+}
+
 .rowClick:hover td {
   background: var(--color-canvas-sunken);
 }
@@ -389,7 +395,8 @@
   max-width: 260px;
   overflow: hidden;
   color: var(--color-ink);
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
