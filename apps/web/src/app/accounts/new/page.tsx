@@ -344,7 +344,7 @@ export default function NewLineAccountPage() {
 
           {currentStep === 5 && connection && <div data-design-node={importingIds ? 'VPh1U' : 't3Mlu'}>
             <SetupSection title="登録が完了しました" description="LINEアカウントの接続設定を自動で完了しました。">
-              {importingIds ? <Notice tone="info">認証済みアカウントのため、既存の友だちを取り込んでいます（{importState?.received ?? 0}人 / 確認中）。取り込みが終わるまで、この画面でお待ちください。</Notice> : <Notice tone="success" message="登録が完了しました" />}
+              {importingIds ? <Notice tone="info">認証済みアカウントのため、既存の友だちを取り込んでいます（{importState?.received ?? 0}人 / 確認中）。この画面を開いている間に取り込みます。閉じると止まり、もう一度開くと続きから取り込みます。</Notice> : <Notice tone="success" message="登録が完了しました" />}
               <ReviewGroup title="LINEアカウント">
                 <ReviewRow label="表示名" value={`${connection.displayName ?? form.name}（LINEから取得）`} />
                 <ReviewRow label="LINE ID" value={connection.basicId ?? '取得できませんでした'} />
