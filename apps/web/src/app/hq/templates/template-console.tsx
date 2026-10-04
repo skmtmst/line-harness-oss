@@ -21,7 +21,7 @@ const PAGE_TITLES: Record<TemplateType, string> = { tag: '友だち属性', temp
 const CREATE_LABELS: Record<TemplateType, string> = { tag: '＋ タグを作る', template: 'テンプレートを作る', rich_menu: 'メニューを作る', form: 'フォームを作る' }
 const LIST_DESCRIPTIONS: Record<TemplateType, string> = {
   tag: 'タグのひな形を作成し、各LINEアカウントへ配布します。',
-  template: 'メッセージのひな形を作成し、各LINEアカウントへ配布します。',
+  template: 'メッセージのひな形を作成し、各LINEアカウントへ配布します。友だち属性・リッチメニュー・回答フォームも同じ形です。配るときは、行の「アカウントへ配る」から。',
   rich_menu: 'リッチメニューのひな形を作成し、各LINEアカウントへ配布します。',
   form: '回答フォームのひな形を作成し、各LINEアカウントへ配布します。',
 }
@@ -102,7 +102,7 @@ function TemplateRowMenu({ name, busy, onEdit, onDistribute, onRemove }: {
       <MenuPortal open={open} align="end" getAnchor={() => triggerRef.current} onClose={close}>
         <div role="menu" aria-label={`${name}の操作`} className={styles.rowMenuItems} style={{ position: 'static' }} onKeyDown={moveMenuFocus}>
           <Button disabled={busy} onClick={() => { onEdit(); close() }} aria-label={`${name}を編集`}>編集</Button>
-          <Button disabled={busy} onClick={() => { onDistribute(); close() }} aria-label={`${name}を配布`}>配布</Button>
+          <Button disabled={busy} onClick={() => { onDistribute(); close() }} aria-label={`${name}をアカウントへ配る`}>アカウントへ配る</Button>
           <Button disabled={busy} onClick={() => { onRemove(); close() }} aria-label={`${name}を削除`}>削除する</Button>
         </div>
       </MenuPortal>
@@ -386,8 +386,9 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     {message && <p role="status" className={`${styles.notice} ${styles.success}`}>{message}</p>}
     {stage === 'list' && <>
       {!ready ? <section className={`${styles.panel} ${styles.empty}`}><p role="status">{busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。'}</p></section> : <>
-        <div className={styles.toolbar}><input aria-label="ひな形を検索" className={`${styles.input} ${styles.search}`} placeholder="名前で検索" value={search} onChange={e => setSearch(e.target.value)} /><span>{templates.length}件</span></div>
-        <div className={styles.panel}><table className={styles.table}><thead><tr><Th style={{ width: '28%' }}>名前</Th><Th className={styles.optional}>参照先</Th><Th className={styles.optional}>更新日時</Th><Th>配布先</Th><Th style={{ width: '12%' }}>操作</Th></tr></thead><tbody>{templates.filter(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).map(row => <tr key={row.id}><td data-label="名前"><span className={styles.name} title={row.name}>{row.name}</span><small className={styles.muted}>{LABELS[row.template_type]}</small></td><td data-label="参照先" className={styles.optional}><span className={styles.name} title={row.reference_summary}>{row.reference_summary ?? '—'}</span></td><td data-label="更新日時" className={styles.optional}>{formatDate(row.updated_at)}</td><td data-label="配布先">{row.distributed_account_count === undefined ? '—' : row.distributed_account_count ? `${row.distributed_account_count}アカウント` : '未配布'}</td><td data-label="操作"><TemplateRowMenu name={row.name} busy={busy} onEdit={() => open(row.id, 'edit')} onDistribute={() => open(row.id, 'accounts')} onRemove={() => setRemove(row)} /></td></tr>)}</tbody></table>{!templates.some(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && <p className={styles.empty}>{templates.length ? '検索に一致するひな形はありません。' : 'まだひな形がありません。最初のひな形を作成してください。'}</p>}</div>
+        <div className={styles.toolbar}><input aria-label="ひな形を検索" className={`${styles.input} ${styles.search}`} placeholder="ひな形を探す" value={search} onChange={e => setSearch(e.target.value)} /><span>{templates.length}件</span></div>
+        <div className={styles.panel}><table className={styles.table}><thead><tr><Th style={{ width: '28%' }}>名前</Th><Th className={styles.optional}>参照先</Th><Th className={styles.optional}>更新日時</Th><Th>配布先</Th><Th style={{ width: '12%' }}>操作</Th></tr></thead><tbody>{templates.filter(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).map(row => <tr key={row.id}><td data-label="名前"><span className={styles.name} title={row.name}>{row.name}</span><small className={styles.muted}>{LABELS[row.template_type]}</small></td><td data-label="参照先" className={styles.optional}><span className={styles.name} title={row.reference_summary}>{row.reference_summary ?? '—'}</span></td><td data-label="更新日時" className={styles.optional}>{formatDate(row.updated_at)}</td><td data-label="配布先">{row.distributed_account_count === undefined ? '—' : row.distributed_account_count ? `${row.distributed_account_count}アカウント` : 'まだ配っていない'}</td><td data-label="操作"><TemplateRowMenu name={row.name} busy={busy} onEdit={() => open(row.id, 'edit')} onDistribute={() => open(row.id, 'accounts')} onRemove={() => setRemove(row)} /></td></tr>)}</tbody></table>{!templates.some(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && <p className={styles.empty}>{templates.length ? '検索に一致するひな形はありません。' : 'まだひな形がありません。最初のひな形を作成してください。'}</p>}</div>
+        <p className={styles.muted}>配ったあとに直すと、各アカウントへは新しい版として届きます（配布先の版で確かめられます）。</p>
       </>}
     </>}
     {stage === 'edit' && <>
