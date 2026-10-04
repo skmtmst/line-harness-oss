@@ -1308,7 +1308,7 @@ webinarRoutes.get('/api/webinars', async (c) => {
     const rawSort = c.req.query('sort');
     const sort = rawSort === 'created' || rawSort === 'name' ? rawSort : 'updated';
     const rawStatus = c.req.query('status');
-    const status = rawStatus === 'active' || rawStatus === 'draft' ? rawStatus : undefined;
+    const status = rawStatus === 'active' || rawStatus === 'draft' || rawStatus === 'archived' ? rawStatus : undefined;
     const rawFolder = c.req.query('folder');
     const folderId = !rawFolder ? undefined : rawFolder === '__unfiled__' ? null : rawFolder;
     const q = (c.req.query('q') || '').trim() || undefined;

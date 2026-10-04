@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import styles from './participants-v8.module.css'
+import HelpTip from '@/components/shared/help-tip'
+import FilterChip from '@/components/shared/filter-chip'
+import StatusBadge from '@/components/shared/status-badge'
 import Select from '@/components/shared/select'
 import { Th } from '@/components/shared/table'
 import {
@@ -25,11 +28,7 @@ import {
   type ParticipantRow,
 } from './participants-shared'
 
-/*
- * ★V8 参加者管理（`uNsEy`）。中身は v7 の参加者の段と同じ。
- * 差し替えるのは見た目だけ。一覧・分類・CSV・友だち詳細への導線が実在する。
- * v7 の参加者の段は `page.tsx` に残し、`data-theme="v8"` のときだけ使う。
- */
+export type ParticipantExport = { download: () => void; busy: boolean; available: boolean }
 
 type ParticipantsState = 'loading' | 'ready' | 'error' | 'denied'
 
@@ -76,12 +75,14 @@ export default function ParticipantsV8({
   analytics,
   analyticsState,
   onRetry,
+  onExportChange,
 }: {
   webinarId: string
   durationSeconds: number
   analytics: WebinarAnalytics | null
   analyticsState: 'idle' | 'loading' | 'ready' | 'error'
   onRetry: () => void
+  onExportChange?: (value: ParticipantExport | null) => void
 }) {
   const [items, setItems] = useState<WebinarParticipantPage['items']>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
@@ -98,17 +99,33 @@ export default function ParticipantsV8({
   const [pageSize, setPageSize] = useState('20')
   const [page, setPage] = useState(1)
 
-  const downloadCsv = (selected?: WebinarParticipantClassification): void => {
-    if (csvBusy) return
+  const generation = useRef(0)
+  const csvLock = useRef(false)
+  const moreLock = useRef(false)
+  const downloadCsv = useCallback((selected?: WebinarParticipantClassification): void => {
+    if (csvLock.current) return
+    csvLock.current = true
+    const request = generation.current
     setCsvBusy(true)
     setCsvError('')
     void downloadApiFile(webinarApi.participantsCsvUrl(webinarId, selected), 'webinar-participants.csv')
-      .catch(() => setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
-      .finally(() => setCsvBusy(false))
-  }
+      .catch(() => { if (request === generation.current) setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。') })
+      .finally(() => { csvLock.current = false; setCsvBusy(false) })
+  }, [webinarId])
+
+  useEffect(() => {
+    onExportChange?.({ download: () => downloadCsv(filter || undefined), busy: csvBusy, available: state === 'ready' })
+    return () => onExportChange?.(null)
+  }, [onExportChange, downloadCsv, filter, csvBusy, state])
 
   useEffect(() => {
     let cancelled = false
+    generation.current += 1
+    moreLock.current = false
+    setLoadingMore(false)
+    setRule(null)
+    setMeasurement(null)
+    setCsvError('')
     setState('loading')
     setItems([])
     setNextCursor(null)
@@ -134,16 +151,20 @@ export default function ParticipantsV8({
       })
     return () => {
       cancelled = true
+      generation.current += 1
     }
   }, [webinarId, attempt, filter])
 
   /* サーバーが nextCursor を返す限り、次の頁を読み足せる。重複は friendId で除く。 */
   const loadMore = async (): Promise<void> => {
-    if (!nextCursor || loadingMore) return
+    if (!nextCursor || moreLock.current) return
+    moreLock.current = true
+    const request = generation.current
     setLoadingMore(true)
     setMoreError('')
     try {
       const res = await webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE, filter || undefined)
+      if (request !== generation.current) return
       setItems((prev) => {
         const seen = new Set(prev.map((item) => item.friendId))
         return [...prev, ...res.data.items.filter((item) => !seen.has(item.friendId))]
@@ -152,9 +173,10 @@ export default function ParticipantsV8({
       setRule(res.data.rule ?? null)
       setMeasurement(res.data.measurement ?? null)
     } catch {
+      if (request !== generation.current) return
       setMoreError('続きを読み込めませんでした。もう一度お試しください。')
     } finally {
-      setLoadingMore(false)
+      if (request === generation.current) { moreLock.current = false; setLoadingMore(false) }
     }
   }
 
@@ -168,7 +190,7 @@ export default function ParticipantsV8({
   }
 
   const summary = analytics?.summary ?? null
-  const unviewed = summary ? Math.max(0, summary.reservations - summary.viewers) : 0
+  const unviewed = summary ? Math.max(0, summary.reservations - summary.registeredAndJoined) : 0
   const watching = summary ? Math.max(0, summary.viewers - summary.completed) : 0
   const size = Number(pageSize) || 20
   const searched =
@@ -188,18 +210,8 @@ export default function ParticipantsV8({
   ]
 
   return (
-    <div className="space-y-4" data-design-node="uNsEy">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-ink text-lg font-bold">参加者管理</h2>
-          <p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p>
-        </div>
-        {state === 'ready' ? (
-          <Button disabled={csvBusy} onClick={() => downloadCsv(filter || undefined)} busy={csvBusy} busyLabel="書き出しています…">
-            CSVで書き出す
-          </Button>
-        ) : null}
-      </div>
+    <div className={styles.root} data-design-node="uNsEy">
+      {!onExportChange && state === 'ready' ? <div className="flex justify-end"><Button disabled={csvBusy} onClick={() => downloadCsv(filter || undefined)} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す</Button></div> : null}
       {csvError ? (
         <p className="text-danger text-xs" role="alert">
           {csvError}
@@ -207,20 +219,19 @@ export default function ParticipantsV8({
       ) : null}
 
       {summary ? (
-        <section aria-label="参加の集計" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section aria-label="参加の集計" data-participant-kpis="true">
           {[
             { label: '申込', value: summary.reservations, unit: '人', note: `視聴開始 ${formatNumber(summary.viewers)}人` },
             { label: '視聴完了', value: summary.completed, unit: '人', note: `申込の${percent(summary.completed, summary.reservations)}` },
-            { label: '途中で離れた', value: watching, unit: '人', note: `平均${fmtSec(summary.avgWatchedSeconds)}で離脱` },
+            { label: '途中で離れた', value: watching, unit: '人', note: `視聴開始から完了を引いた人数。平均視聴は${fmtSec(summary.avgWatchedSeconds)}` },
             { label: '見ていない', value: unviewed, unit: '人', note: '見逃し案内の対象' },
           ].map((card) => (
-            <div key={card.label} className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-              <p className="text-ink-faint text-xs">{card.label}</p>
+            <div key={card.label} data-participant-kpi="true">
+              <p className="text-ink-faint flex items-center gap-2 text-xs">{card.label}<HelpTip label={`${card.label}の説明`}>{card.note}。集計は取得時点の全期間です。</HelpTip></p>
               <p className="text-ink mt-2 text-2xl font-medium tabular-nums">
                 {formatNumber(card.value)}
                 <span className="ml-1 text-sm font-normal">{card.unit}</span>
               </p>
-              <p className="text-ink-faint mt-1 text-xs">{card.note}</p>
             </div>
           ))}
         </section>
@@ -255,24 +266,12 @@ export default function ParticipantsV8({
         {chips.map((chip) => {
           const active = filter === chip.key
           return (
-            <button
-              key={chip.key}
-              type="button"
-              aria-pressed={active}
-              onClick={() => {
-                setFilter(active ? '' : chip.key)
-              }}
-              className={styles.chip}
-              data-selected={active}
-            >
-              {chip.label}
-              {chip.count !== null ? ` ${formatNumber(chip.count)}` : ''}
-            </button>
+            <FilterChip key={chip.key} selected={active} onChange={(selected) => setFilter(selected ? chip.key : '')} count={chip.count ?? undefined}>{chip.label}</FilterChip>
           )
         })}
         <span className="flex-1" />
         <Select
-          aria-label="よく使う絞り込み"
+          aria-label="参加者の分類で絞り込む"
           size="page-size"
           value={filter}
           onChange={(value) => setFilter(value as '' | WebinarParticipantClassification)}
@@ -290,18 +289,17 @@ export default function ParticipantsV8({
         />
       </div>
 
-      <section aria-label="参加者一覧" className="border-hairline bg-canvas overflow-hidden rounded-card border shadow-card">
+      <section aria-label="参加者一覧" data-participant-table="true">
         <div className="border-hairline border-b px-4 py-3">
-          <h3 className="text-ink font-bold">参加者</h3>
+
           <p className="text-ink-faint mt-1 text-xs">
-            何をきっかけに、何が実行されたかを分析できます。
             {state === 'ready' ? `${formatNumber(searched.length)}人を表示${nextCursor ? '（まだ続きがあります）' : ''}` : ''}
           </p>
           {rule || measurement?.state === 'unavailable' ? (
-            <p className="text-ink-faint mt-1 text-xs">
+            <HelpTip label="分類の根拠">
               {rule ? `分類の根拠：視聴完了＝最大視聴位置が動画の90%（${fmtSec(rule.completionThresholdSeconds)}）以上。未参加＝申込のみで入場記録なし。ライブ／録画は入場時刻で区別。` : ''}
               {measurement?.state === 'unavailable' ? `${rule ? ' ' : ''}${measurement.reason}。個人の分類は「計測外」になります。` : ''}
-            </p>
+            </HelpTip>
           ) : null}
         </div>
         {state === 'loading' ? (
@@ -319,7 +317,7 @@ export default function ParticipantsV8({
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full table-fixed text-sm"><colgroup><col /><col /><col /><col /><col /></colgroup>
               <thead>
                 <tr className="border-hairline text-ink-faint border-b text-left text-xs">
                   <Th>参加者</Th>
@@ -340,7 +338,7 @@ export default function ParticipantsV8({
                         <span className="flex min-w-0 items-center gap-3">
                           <ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} size="sm" />
                           <span className="min-w-0">
-                            <span className="text-ink block truncate font-semibold">{name}</span>
+                            <a href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`} title={name} className="text-action block truncate font-semibold">{name}</a>
                             <span className="text-ink-faint block truncate text-xs">
                               {joinNote(participant)}
                               {joinKindLabel(participant)}
@@ -358,18 +356,10 @@ export default function ParticipantsV8({
                         <span className="text-ink-faint block text-xs">{participantStateLabel(participant, durationSeconds)}</span>
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={
-                            badge.done
-                              ? 'rounded-pill w-fit bg-success-bg px-2 py-1 text-xs font-semibold text-success'
-                              : 'rounded-pill w-fit bg-canvas-sunken px-2 py-1 text-xs font-semibold text-ink-faint'
-                          }
-                        >
-                          {badge.label}
-                        </span>
+                        <StatusBadge tone={badge.done ? 'success' : 'neutral'}>{badge.label}</StatusBadge>
                       </td>
                       <td className="px-4 py-3">
-                        <Button variant="secondary" href={`/friends/detail?id=${encodeURIComponent(participant.friendId)}`}>
+                        <Button variant="secondary" href={`/chats?friend=${encodeURIComponent(participant.friendId)}`}>
                           チャットを見る →
                         </Button>
                       </td>
@@ -403,7 +393,7 @@ export default function ParticipantsV8({
         ariaLabel="参加者一覧のページ送り"
         summary={`${formatNumber(searched.length)}件中 ${from}～${to}件`}
       />
-      <p className="text-ink-faint text-xs">「チャットを見る」は友だちの詳細を開きます。トークの確認・見逃し案内はそこから行えます。</p>
+
     </div>
   )
 }

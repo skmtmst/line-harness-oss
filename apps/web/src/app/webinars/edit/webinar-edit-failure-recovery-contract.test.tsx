@@ -20,6 +20,7 @@ const apiMocks = vi.hoisted(() => {
     fetchApi: vi.fn(),
     get: vi.fn(),
     editor: vi.fn(),
+    notifications: vi.fn(),
     analytics: vi.fn(),
     userComments: vi.fn(),
     participants: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock('@/lib/api', () => ({
   webinarApi: {
     get: apiMocks.get,
     editor: apiMocks.editor,
+    notifications: apiMocks.notifications,
     analytics: apiMocks.analytics,
     userComments: apiMocks.userComments,
     participants: apiMocks.participants,
@@ -235,6 +237,8 @@ beforeAll(async () => {
     getSelection: () => null,
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
+    location: new URL('http://localhost/webinars/edit?id=webinar-1&pane=cta'),
+    history: { state: null, pushState: () => undefined, replaceState: () => undefined },
   })
   Object.assign(globalThis, {
     window: windowStub,
@@ -253,6 +257,7 @@ beforeEach(() => {
   navigationMocks.query = 'id=webinar-1'
   apiMocks.get.mockImplementation((id: string) => Promise.resolve({ data: { ...webinar, id } }))
   apiMocks.editor.mockResolvedValue({ data: editor })
+  apiMocks.notifications.mockResolvedValue({ data: { settings: null } })
   apiMocks.analytics.mockResolvedValue({ data: analytics })
   apiMocks.ctas.mockResolvedValue({ data: [] })
   apiMocks.userComments.mockResolvedValue({ data: [] })
@@ -428,14 +433,14 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
       .mockResolvedValueOnce({ success: true, data: [{ id: 'form-a', name: '相談フォームA', isActive: true }] })
 
     const view = await mount(<EditWebinarPage />)
-    expect(view.container.textContent).toContain('フォーム候補を読み込めませんでした。')
+    expect(view.container.textContent).toContain('回答フォームを読み込めませんでした。')
     expect(view.container.textContent).toContain('候補が取れない間は種類をURLに切り替えて保存できます。')
 
     await clickButton(view.container, 'もう一度読み込む')
 
     expect(apiMocks.fetchApi).toHaveBeenCalledTimes(2)
     expect(view.container.textContent).toContain('相談フォームA')
-    expect(view.container.textContent).not.toContain('フォーム候補を読み込めませんでした。')
+    expect(view.container.textContent).not.toContain('回答フォームを読み込めませんでした。')
   })
 
   it('account切替後は、古いaccountの遅延応答で候補を上書きしない', async () => {
@@ -557,7 +562,7 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(inputValues(view.container)).not.toContain('旧CTA・A')
     expect(view.container.textContent).toContain('回答フォームを読み込んでいます。')
     expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(true)
-    expect(isDisabled(findExactButton(view.container, '保存する'))).toBe(true)
+    expect(isDisabled(findExactButton(view.container, 'CTAカードを保存する'))).toBe(true)
 
     formsB.resolve({ success: true, data: [{ id: 'form-b', name: '新フォームB', isActive: true }] })
     ctasB.resolve({ data: [ctaCard('新CTA・B', 60, 'form-b')] })
@@ -629,21 +634,11 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
     expect(isDisabled(findButton(view.container, '申込フォームを保存する'))).toBe(false)
   })
 
-  it('R98 分析の見出し移動は表示中の節だけを指し、指し先が実在する', async () => {
+  it('分析は実際に表示している集計とグラフだけを案内する', async () => {
     navigationMocks.query = 'id=webinar-1&pane=analytics'
     const view = await mount(<EditWebinarPage />)
-    const nav = elements(view.container).find((element) => element.tagName === 'NAV' && element.getAttribute('aria-label') === 'この段の見出しへ移動')
-    expect(nav, '見出し移動の nav がありません').toBeTruthy()
-    const links = elements(nav!).filter((element) => element.tagName === 'A')
-    expect(links.length, '表示中の節への移動がありません').toBeGreaterThan(0)
-    const ids = new Set(elements(view.container).map((element) => element.getAttribute('id')).filter((id) => id))
-    for (const link of links) {
-      const href = link.getAttribute('href') ?? ''
-      expect(href.startsWith('#'), `節への移動ではありません: ${href}`).toBe(true)
-      expect(ids.has(href.slice(1)), `指し先の節がありません: ${href}`).toBe(true)
-    }
-    /* 出ない節（旧5節の離脱・CTA・申込）への入口は置かない。 */
-    const labels = links.map((link) => link.textContent)
-    expect(labels).not.toContain('離脱')
-  })
-})
+    const ids = new Set(elements(view.container).map((element) => element.getAttribute('id')))
+    for (const id of ['webinar-analytics-tiles', 'webinar-analytics-funnel', 'webinar-analytics-retention']) expect(ids.has(id)).toBe(true)
+    expect(elements(view.container).some((element) => element.getAttribute('aria-label') === 'この段の見出しへ移動')).toBe(false)
+    expect(view.container.textContent).not.toContain('設定サマリー')
+  })})

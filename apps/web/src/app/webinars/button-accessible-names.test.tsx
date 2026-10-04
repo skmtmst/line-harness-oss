@@ -14,14 +14,13 @@ import { describe, expect, it, vi } from 'vitest'
 import FolderPanel from '@/components/shared/folder-panel'
 import { buttonsWithoutAccessibleName } from '@/test-utils/accessible-name'
 import type { WebinarListItem } from '@/lib/api'
-import WebinarsPage from './page'
+import { WebinarListContent } from './list-v8'
 
 /* 一覧の行操作（R94 参加者・分析・演出への移動）が使う router の撮影口。 */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
 
-const { WebinarListContent } = WebinarsPage.__testing
 
 const ITEM: WebinarListItem = {
   id: 'webinar-1',

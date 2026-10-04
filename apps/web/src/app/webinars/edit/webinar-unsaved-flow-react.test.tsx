@@ -149,6 +149,7 @@ function installFetch() {
     const path = url.pathname + url.search
     const method = init?.method ?? 'GET'
     net.calls.push({ path, method })
+    if (path === '/api/staff/me') return json({ role: 'admin' })
     if (path.includes('/api/media')) return json({ items: [], nextCursor: null })
     if (path.includes('/api/webinars/webinar-1/participants')) {
       /* カーソルは offset。limit 指定があればその数だけ返す。 */
@@ -307,7 +308,7 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
     await flush()
 
     /* 固定バーの「下書き保存」は通知の保存を呼ぶ。成功で未保存の印が降りる。 */
-    await act(async () => { buttonByText('下書きを保存する').click() })
+    await act(async () => { buttonByText('下書きを保存').click() })
     await flush()
     expect(host.textContent).not.toContain('保存していない変更があります')
 
@@ -410,19 +411,19 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     await flush()
 
     /* 固定バーの「下書き保存」は飾りではない。押せて、実際に保存する。 */
-    expect(buttonByText('下書きを保存する').disabled).toBe(false)
+    expect(buttonByText('下書きを保存').disabled).toBe(false)
 
     await act(async () => { buttonContaining('動画へ').click() })
     await flush()
 
     expect(putCalls()).toHaveLength(1)
-    expect(paneVisible('div[data-design-node="PV1Vh"]')).toBe(true)
+    expect(paneVisible('div[data-design-node="VWNaA"]')).toBe(true)
 
     /* STEP 1 へ戻る。保存済みの新しいタイトルがそのまま残る。 */
     await act(async () => { buttonContaining('STEP 1').click() })
     await flush()
 
-    expect(paneVisible('div[data-design-node="PV1Vh"]')).toBe(false)
+    expect(paneVisible('div[data-design-node="VWNaA"]')).toBe(false)
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '変更したタイトル')).toBe(true)
   })
 
@@ -449,12 +450,12 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
     await flush()
 
     await act(async () => { fireEvent.change(titleInput(), { target: { value: '下書きで保存する題名' } }) })
-    await act(async () => { buttonByText('下書きを保存する').click() })
+    await act(async () => { buttonByText('下書きを保存').click() })
     await flush()
 
     expect(putCalls()).toHaveLength(1)
     /* 段は基本設定のまま。保存できたので未保存の印は消える。 */
-    expect(host.querySelector('div[data-design-node="PV1Vh"]')).toBeNull()
+    expect(host.querySelector('div[data-design-node="VWNaA"]')).toBeNull()
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '下書きで保存する題名')).toBe(true)
     expect(host.textContent).not.toContain('保存していない変更があります')
   })
@@ -471,30 +472,30 @@ describe('DETAIL-04 未保存の入力を段の往復で消さない', () => {
 
     expect(putCalls()).toHaveLength(1)
     /* 動画の段へは進まず、入力は消えない。 */
-    expect(host.querySelector('div[data-design-node="PV1Vh"]')).toBeNull()
+    expect(host.querySelector('div[data-design-node="VWNaA"]')).toBeNull()
     expect(Array.from(host.querySelectorAll('input')).some((el) => el.value === '失敗時に残る題名')).toBe(true)
     expect(host.textContent).toContain('保存できませんでした')
   })
 })
 
 describe('DETAIL-05 無反応のボタンを残さない', () => {
-  it('動画の段: 非公開では「公開ページを見る」を押せない形にして理由を出す', async () => {
+  it('動画の段: 非公開では「PCで見る」を押せない形にして理由を出す', async () => {
     fixture.params = new URLSearchParams('id=webinar-1&pane=video')
     await render()
     await flush()
 
-    const button = buttonByText('公開ページを見る')
+    const button = buttonByText('PCで見る')
     expect(button.disabled).toBe(true)
     expect(host.textContent).toContain('公開すると、友だちが見るページを確認できます。')
   })
 
-  it('動画の段: 公開中なら「公開ページを見る」は公開URLへのリンクになる', async () => {
+  it('動画の段: 公開中なら「PCで見る」は公開URLへのリンクになる', async () => {
     net.webinarStatus = 'active'
     fixture.params = new URLSearchParams('id=webinar-1&pane=video')
     await render()
     await flush()
 
-    const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('公開ページを見る'))
+    const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('PCで見る'))
     expect(link?.getAttribute('href')).toBe('https://liff.example.test/preview')
   })
 
@@ -544,15 +545,17 @@ describe('DETAIL-06 参加者一覧を最後の1人まで読める', () => {
   }
 
   function renderedNames(): string[] {
-    return Array.from(new Set(host.textContent?.match(/参加者 \d+/g) ?? []))
+    return Array.from(host.querySelectorAll('a[href^="/friends/detail?id="]')).map((a) => a.textContent ?? '')
   }
 
-  it.each([9, 50])('%i人: 1頁で全員表示され、最後の人まで届く', async (total) => {
+  it.each([9, 50])('%i人: 検索とページ送りで最後の人まで届く', async (total) => {
     net.participantTotal = total
     await openParticipants()
 
+    expect(renderedNames()).toHaveLength(Math.min(total, 20))
+    const search = host.querySelector('input[type="search"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(search, { target: { value: `参加者 ${total}` } }) })
     expect(host.textContent).toContain(`参加者 ${total}`)
-    expect(renderedNames()).toHaveLength(total)
     /* 続きが無いときは「続きを読み込む」を出さない。 */
     expect(Array.from(host.querySelectorAll('button')).some((b) => b.textContent?.trim() === '続きを読み込む')).toBe(false)
   })
@@ -561,13 +564,16 @@ describe('DETAIL-06 参加者一覧を最後の1人まで読める', () => {
     net.participantTotal = 201
     await openParticipants()
 
-    expect(host.textContent).toContain('参加者 50')
-    expect(host.textContent).not.toContain('参加者 51')
+    expect(host.textContent).toContain('参加者 20')
+    expect(renderedNames()).not.toContain('参加者 51')
 
     await loadAllPages()
 
+    expect(host.textContent).toContain('201件中')
+    const search = host.querySelector('input[type="search"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(search, { target: { value: '参加者 201' } }) })
     expect(host.textContent).toContain('参加者 201')
-    expect(renderedNames()).toHaveLength(201)
+    expect(renderedNames()).toHaveLength(1)
     /* 初回 + カーソル4回 = 5頁。limit と cursor が実際に付く。 */
     const calls = participantCalls()
     expect(calls).toHaveLength(5)

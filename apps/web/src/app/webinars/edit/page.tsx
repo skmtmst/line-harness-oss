@@ -2,27 +2,14 @@
 
 import Disclosure from '@/components/shared/disclosure'
 import CommentsV8 from './comments-v8'
-import ParticipantsV8 from './participants-v8'
+import ParticipantsV8, { type ParticipantExport } from './participants-v8'
 import CtaV8 from './cta-v8'
 import ReviewV8 from './review-v8'
 import NotificationsV8 from './notifications-v8'
 import VideoV8 from './video-v8'
-import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
-import {
-  fmtSec,
-  joinKindLabel,
-  ParticipantAvatar,
-  PARTICIPANT_FILTER_OPTIONS,
-  PARTICIPANTS_PAGE_SIZE,
-  participantStateLabel,
-  percent,
-} from './participants-shared'
-import RetentionSection from './retention-section'
-import AnalyticsFunnelV8 from './analytics-funnel-v8'
-import SessionCapacityCell from './session-capacity-cell'
-import VideoStages from './video-stages'
-import WebinarEditConflictBand from './webinar-edit-conflict-band'
-import WebinarEditCompareDialog, { type CompareMine } from './webinar-edit-compare-dialog'
+import './editor-v8.css'
+import { fmtSec } from './participants-shared'
+import AnalyticsV8 from './analytics-v8'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -30,70 +17,44 @@ import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react
 import type { ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import WebinarNotifications from '@/components/webinars/webinar-notifications'
 import { notificationPreview, videoPreview } from './preview-body'
 import { ctaCardProblems } from './cta-card-validation'
 import {
   STEPS,
   nextLabelOf,
   nextStepOf,
-  publishBlockers,
   stepStateOf,
   type StepKey,
 } from './edit-steps'
-import WebinarForm from '@/components/webinars/webinar-form'
+import BasicV8 from './basic-v8'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
-import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import TargetMissing from '@/components/shared/target-missing'
 import { CheckCircle2, Circle, LoaderCircle, TriangleAlert } from 'lucide-react'
 import type { MediaItem } from '@line-crm/shared'
 import {
   ApiError,
   api,
-  downloadApiFile,
   fetchApi,
   webinarApi,
   type WebinarCtaCard,
   type Webinar,
-  type WebinarSakuraComment,
   type WebinarAnalytics,
-  type WebinarUserComment,
   type WebinarAction,
   type WebinarEditor,
   type WebinarNotificationOverview,
   type WebinarNotificationSettings,
-  type WebinarPublishValidation,
-  type WebinarParticipantPage,
-  type WebinarParticipantClassification,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
 import { webinarLoadFailure, type WebinarLoadFailure } from '../webinar-load-failure'
-import {
-  reviewActionSummaryText,
-  reviewMonitoringText,
-  reviewTestSummaryBody,
-} from './review-text'
-import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
-
-function largestDropoffAt(segments: NonNullable<WebinarAnalytics['viewSegments']>): number | null {
-  if (segments.length < 2) return null
-  let largest = { at: segments[1].startSeconds, lost: -Infinity }
-  for (let index = 1; index < segments.length; index += 1) {
-    const lost = segments[index - 1].viewers - segments[index].viewers
-    if (lost > largest.lost) largest = { at: segments[index].startSeconds, lost }
-  }
-  return largest.at
-}
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 function fmtSession(epoch: number): string {
   return formatDateTime(epoch * 1000)
@@ -106,12 +67,6 @@ function webinarStatusLabel(status: Webinar['status']): string {
   if (status === 'active') return '公開中'
   if (status === 'draft') return '下書き'
   return 'アーカイブ'
-}
-
-function durationLabel(seconds: number): string {
-  const minutes = Math.floor(seconds / 60)
-  const rest = seconds % 60
-  return `${minutes}分${String(rest).padStart(2, '0')}秒`
 }
 
 type WebinarWithPublication = Webinar & {
@@ -177,886 +132,6 @@ function EditorDetails({ label, children }: { label: string; children: ReactNode
   return <Disclosure title={label}>{children}</Disclosure>
 }
 
-function CommentsTab({ webinarId }: { webinarId: string }) {
-  const [comments, setComments] = useState<WebinarSakuraComment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [importJson, setImportJson] = useState('')
-  const [message, setMessage] = useState<string | null>(null)
-  const [isErrorMessage, setIsErrorMessage] = useState(false)
-
-  useEffect(() => {
-    webinarApi
-      .comments(webinarId)
-      .then((res) => setComments(res.data))
-      .finally(() => setLoading(false))
-  }, [webinarId])
-
-  const update = (i: number, patch: Partial<WebinarSakuraComment>) =>
-    setComments((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c)))
-
-  const save = async () => {
-    setMessage(null)
-    /* 上限を超えたまま送るとサーバーの 400 で初めて気づく。手前で止める。 */
-    if (comments.length > WEBINAR_SAKURA_COMMENTS_MAX) {
-      setIsErrorMessage(true)
-      setMessage(`コメントは${WEBINAR_SAKURA_COMMENTS_MAX}件までです（いま${comments.length}件）。減らしてから保存してください。`)
-      return
-    }
-    try {
-      const sorted = [...comments].sort((a, b) => a.atSeconds - b.atSeconds)
-      const res = await webinarApi.saveComments(webinarId, sorted)
-      setComments(sorted)
-      setIsErrorMessage(false)
-      setMessage(`${res.data.count}件保存しました`)
-    } catch (err) {
-      setIsErrorMessage(true)
-      setMessage(`保存に失敗しました: ${webinarErrorText(err, '保存できませんでした。入力を見直してください。')}`)
-    }
-  }
-
-  // サーバー側 (PUT /api/webinars/:id/comments) と同じ検証条件を事前に適用する。
-  // ここで弾いておかないと、不正な行が NaN / "undefined" のまま
-  // 「◯件読み込みました」と成功表示されてしまい、保存時のサーバー 400 で
-  // 初めて気づく上にどの行が悪いか分からない。
-  function validateImportRow(raw: unknown): WebinarSakuraComment | string {
-    if (typeof raw !== 'object' || raw === null) return 'オブジェクトではありません'
-    const rec = raw as Record<string, unknown>
-    const atSeconds = Math.floor(Number(rec.atSeconds))
-    // 負の atSeconds = 開始前 (待機ルーム) コメント。サーバーと同じく -3600 まで許容
-    if (!Number.isFinite(atSeconds) || atSeconds < -3600) return 'atSeconds が不正です (-3600〜)'
-    const authorName = typeof rec.authorName === 'string' ? rec.authorName.trim() : ''
-    if (!authorName) return 'authorName が空です'
-    if (authorName.length > 50) return 'authorName が50字を超えています'
-    const body = typeof rec.body === 'string' ? rec.body.trim() : ''
-    if (!body) return 'body が空です'
-    if (body.length > 500) return 'body が500字を超えています'
-    return { atSeconds, authorName, body }
-  }
-
-  const doImport = () => {
-    try {
-      const parsed = JSON.parse(importJson) as unknown
-      if (!Array.isArray(parsed)) throw new Error('配列ではありません')
-      const rows: WebinarSakuraComment[] = []
-      for (let i = 0; i < parsed.length; i++) {
-        const result = validateImportRow(parsed[i])
-        if (typeof result === 'string') {
-          throw new Error(`${i + 1}行目が不正です: ${result}`)
-        }
-        rows.push(result)
-      }
-      setComments(rows)
-      setImportJson('')
-      setIsErrorMessage(false)
-      setMessage(`${rows.length}件読み込みました（保存ボタンで確定）`)
-    } catch (err) {
-      setIsErrorMessage(true)
-      setMessage(`JSON が不正です: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }
-
-  if (loading) {
-    return <div className="text-ink-faint text-sm">読み込み中...</div>
-  }
-
-  return (
-    <div className="space-y-4">
-      {message && (
-        <Notice tone={isErrorMessage ? 'danger' : 'info'}>
-          {message}
-        </Notice>
-      )}
-      <div>
-        <p className="mb-1 text-sm text-ink-secondary">
-          JSON 一括インポート（形式: {'[{"atSeconds":10,"authorName":"田中","body":"こんばんは"}]'}、{WEBINAR_SAKURA_COMMENTS_MAX}件まで）
-        </p>
-        <textarea
-          value={importJson}
-          onChange={(e) => setImportJson(e.target.value)}
-          rows={4}
-          className="w-full rounded-control border border-hairline p-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-action"
-        />
-        <Button onClick={doImport} className="mt-1">
-          読み込む
-        </Button>
-      </div>
-      <DataTable>
-        <thead>
-          <TableHeadRow>
-            <Th style={{ width: 96 }}>秒数</Th>
-            <Th style={{ width: 160 }}>名前</Th>
-            <Th>本文</Th>
-            <Th style={{ width: 48 }}><span className="sr-only">削除</span></Th>
-          </TableHeadRow>
-        </thead>
-        <tbody>
-          {comments.map((c, i) => (
-            <Tr key={i}>
-              <Td>
-                <input
-                  type="number"
-                  value={c.atSeconds}
-                  onChange={(e) => update(i, { atSeconds: Number(e.target.value) })}
-                  className={`${inputClass} w-20`}
-                />
-              </Td>
-              <Td>
-                <input
-                  value={c.authorName}
-                  onChange={(e) => update(i, { authorName: e.target.value })}
-                  className={inputClass}
-                />
-              </Td>
-              <Td>
-                <input
-                  value={c.body}
-                  onChange={(e) => update(i, { body: e.target.value })}
-                  className={inputClass}
-                />
-              </Td>
-              <Td>
-                <button
-                  onClick={() => setComments((prev) => prev.filter((_, j) => j !== i))}
-                  className="text-danger hover:text-danger"
-                  aria-label={`${c.authorName || '名前未入力'}のコメントを削除`}
-                >
-                  ×
-                </button>
-              </Td>
-            </Tr>
-          ))}
-        </tbody>
-      </DataTable>
-      <StickyBar actions={(
-        <>
-        <Button onClick={() => setComments((prev) => [...prev, { atSeconds: 0, authorName: '', body: '' }])}>
-          ＋ 追加する
-        </Button>
-        <button
-          onClick={() => void save()}
-          className="px-4 py-1.5 text-sm font-medium bg-action text-on-action rounded-control hover:bg-action-hover"
-        >
-          保存する
-        </button>
-        </>
-      )} />
-    </div>
-  )
-}
-
-/**
- * 視聴者コメントは分析の概要でだけ使う。**参加者管理では取らない。**
- * 取得・読込・失敗をここに閉じ込めるので、コメントの失敗で
- * 参加者一覧や集計が消えることはない。
- */
-function UserCommentsSection({ webinarId }: { webinarId: string }) {
-  const [comments, setComments] = useState<WebinarUserComment[] | null>(null)
-  const [failed, setFailed] = useState(false)
-  const [attempt, setAttempt] = useState(0)
-
-  useEffect(() => {
-    let cancelled = false
-    setFailed(false)
-    webinarApi.userComments(webinarId)
-      .then((res) => { if (!cancelled) setComments(res.data) })
-      .catch(() => { if (!cancelled) setFailed(true) })
-    return () => { cancelled = true }
-  }, [webinarId, attempt])
-
-  if (failed) {
-    return (
-      <Notice
-        tone="danger"
-        action={<button type="button" onClick={() => setAttempt((count) => count + 1)} className="font-medium underline">もう一度読み込む</button>}
-      >
-        視聴者コメントを読み込めませんでした。
-      </Notice>
-    )
-  }
-  if (!comments || comments.length === 0) return null
-
-  return (
-    <details className="group overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
-      <summary className="flex cursor-pointer list-none items-center justify-between p-5">
-        <div><h3 className="font-bold text-ink">視聴者コメント</h3><p className="mt-1 text-xs text-ink-secondary">実際に届いたコメントを参加者の顔と一緒に確認</p></div>
-        <span className="rounded-pill bg-canvas-sunken px-3 py-1 text-xs text-ink-secondary">{comments.length}件 ▾</span>
-      </summary>
-      <div className="grid gap-3 border-t border-divider-soft p-5 md:grid-cols-2">
-        {comments.map((c) => {
-          const name = c.friendName ?? `友だち ${c.friendId.slice(0, 6)}`
-          return (
-            <Link key={c.id} href={`/chats?friend=${c.friendId}`} className="flex gap-3 rounded-card border border-divider-soft bg-canvas-sunken p-3 hover:border-info hover:bg-action-soft">
-              <ParticipantAvatar name={name} pictureUrl={c.pictureUrl} />
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-ink">{name}</span><span className="text-nano text-ink-faint">{fmtSec(c.atSeconds)}</span></div><p className="mt-1 text-sm leading-6 text-ink-secondary">{c.body}</p></div>
-            </Link>
-          )
-        })}
-      </div>
-    </details>
-  )
-}
-
-function compactDateTime(value: string): string {
-  return formatDateTime(value)
-}
-
-/* 参加者の段の小物（分類フィルタ等）は `./participants-shared` に置く（v7 と V8 の両方から使う）。 */
-
-function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytics, analyticsState, webinarStatus, onRetry, onOpenParticipants }: { webinarId: string; durationSeconds: number; view?: 'participants' | 'analytics' | 'legacy'; analytics: WebinarAnalytics | null; analyticsState: 'idle' | 'loading' | 'ready' | 'error'; webinarStatus: Webinar['status']; onRetry: () => void; onOpenParticipants?: () => void }) {
-  /*
-    参加者一覧は表示目的ごとに独立して読む。コメントや集計の失敗で
-    個人履歴まで消えないよう、読込・失敗はここだけの状態にする。
-  */
-  const [participantItems, setParticipantItems] = useState<WebinarParticipantPage['items']>([])
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [participantsState, setParticipantsState] = useState<'loading' | 'ready' | 'error' | 'denied'>('loading')
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [moreError, setMoreError] = useState('')
-  const [attempt, setAttempt] = useState(0)
-  /* 分類フィルタと、応答が教える分類の根拠・計測可否。古い応答では欠ける。 */
-  const [participantFilter, setParticipantFilter] = useState<'' | WebinarParticipantClassification>('')
-  const [participantRule, setParticipantRule] = useState<WebinarParticipantPage['rule'] | null>(null)
-  const [participantMeasurement, setParticipantMeasurement] = useState<WebinarParticipantPage['measurement'] | null>(null)
-  const [csvBusy, setCsvBusy] = useState(false)
-  const [csvError, setCsvError] = useState('')
-
-  /*
-    #1053: 直リンクは Cookie が届かない経路（Bearer 補完）で401になるため、
-    認証付きで取得してから保存する。失敗は保存しない。
-  */
-  const downloadParticipantsCsv = (filter?: WebinarParticipantClassification) => {
-    if (csvBusy) return
-    setCsvBusy(true)
-    setCsvError('')
-    void downloadApiFile(webinarApi.participantsCsvUrl(webinarId, filter), 'webinar-participants.csv')
-      .catch(() => setCsvError('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
-      .finally(() => setCsvBusy(false))
-  }
-
-  /*
-    集計(`analytics`)は親が1回だけ取る。ここで取ると、分析の段を開くたびに
-    8並列の重い集計が2回走る(親と子で二重取得)。
-  */
-  useEffect(() => {
-    let cancelled = false
-    setParticipantsState('loading')
-    setParticipantItems([])
-    setNextCursor(null)
-    setMoreError('')
-    /*
-      個人の参加履歴はオーナー・管理者だけの口。staff には 403 が返るので、
-      失敗扱いにせず「見られない」とだけ覚えて集計の表示は続ける。
-    */
-    webinarApi.participants(webinarId, undefined, PARTICIPANTS_PAGE_SIZE, participantFilter || undefined)
-      .then((res) => {
-        if (cancelled) return
-        setParticipantItems(res.data.items)
-        setNextCursor(res.data.nextCursor)
-        setParticipantRule(res.data.rule ?? null)
-        setParticipantMeasurement(res.data.measurement ?? null)
-        setParticipantsState('ready')
-      })
-      .catch((cause) => {
-        if (cancelled) return
-        setParticipantsState(cause instanceof ApiError && cause.status === 403 ? 'denied' : 'error')
-      })
-    return () => { cancelled = true }
-  }, [webinarId, attempt, participantFilter])
-
-  /* サーバーが nextCursor を返す限り、次の頁を読み足せる。重複は friendId で除く。 */
-  const loadMoreParticipants = async () => {
-    if (!nextCursor || loadingMore) return
-    setLoadingMore(true)
-    setMoreError('')
-    try {
-      const res = await webinarApi.participants(webinarId, nextCursor, PARTICIPANTS_PAGE_SIZE, participantFilter || undefined)
-      setParticipantItems((prev) => {
-        const seen = new Set(prev.map((item) => item.friendId))
-        return [...prev, ...res.data.items.filter((item) => !seen.has(item.friendId))]
-      })
-      setNextCursor(res.data.nextCursor)
-      setParticipantRule(res.data.rule ?? null)
-      setParticipantMeasurement(res.data.measurement ?? null)
-    } catch {
-      setMoreError('続きを読み込めませんでした。もう一度お試しください。')
-    } finally {
-      setLoadingMore(false)
-    }
-  }
-
-  /*
-    参加者管理は個人履歴の面。集計が読めなくても一覧は出し、
-    一覧が読めなくても集計は出す——片方の失敗で面全体を消さない。
-  */
-  if (view === 'participants') {
-    if (participantsState === 'denied') {
-      return (
-        <div className="border-hairline bg-canvas rounded-card border p-8 text-center shadow-card" role="note">
-          <p className="text-ink text-sm font-bold">個人の参加履歴はオーナーと管理者だけが確認できます。</p>
-          <p className="text-ink-faint mt-2 text-xs">友だちごとの視聴・申込の記録を出す権限がないため、この段は表示できません。集計だけは「分析」から確認できます。</p>
-        </div>
-      )
-    }
-    const summary = analytics?.summary ?? null
-    const unviewed = summary ? Math.max(0, summary.reservations - summary.viewers) : 0
-    const watching = summary ? Math.max(0, summary.viewers - summary.completed) : 0
-    return (
-      <div className="space-y-4" data-design-node="Q8sHa">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-ink text-lg font-bold">参加者管理</h2><p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p></div>{participantsState === 'ready' ? <div className="flex flex-wrap items-center gap-2"><Select aria-label="参加者の分類で絞り込む" size="page-size" value={participantFilter} onChange={(value) => setParticipantFilter(value as '' | WebinarParticipantClassification)} options={PARTICIPANT_FILTER_OPTIONS} /><Button disabled={csvBusy} onClick={() => downloadParticipantsCsv(participantFilter || undefined)} busy={csvBusy} busyLabel="書き出しています…">参加者をCSVで書き出す</Button></div> : null}</div>
-        {csvError ? <p className="text-danger text-xs" role="alert">{csvError}</p> : null}
-        {summary ? (
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[['申込', summary.reservations, 'text-ink'], ['視聴開始', summary.viewers, 'text-ink'], ['視聴完了', summary.completed, 'text-ink'], ['エラー', analytics?.formFunnel.submitErrors ?? 0, 'text-danger']].map(([label, value, tone]) => <div key={String(label)} className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><p className="text-ink-faint text-xs">{label}</p><p className={`${tone} mt-2 text-2xl font-medium tabular-nums`}>{formatNumber(Number(value))}{label === 'エラー' ? '件' : '人'}</p></div>)}
-        </section>
-        ) : (
-        <p className={`rounded-card p-4 text-sm ${analyticsState === 'error' ? 'border-danger bg-danger-bg text-danger border' : 'text-ink-faint'}`} role={analyticsState === 'error' ? 'alert' : undefined}>
-          {analyticsState === 'error' ? '集計を読み込めませんでした。' : '集計を読み込んでいます。'}
-          {analyticsState === 'error' ? <button type="button" onClick={onRetry} className="ml-2 font-medium underline">もう一度読み込む</button> : null}
-        </p>
-        )}
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-          <section className="border-hairline bg-canvas overflow-hidden rounded-card border shadow-card">
-            <div className="border-hairline border-b px-4 py-3"><h3 className="text-ink font-bold">参加者一覧</h3><p className="text-ink-faint mt-1 text-xs">何をきっかけに、何が実行されたかを分析できます。{participantsState === 'ready' ? `${formatNumber(participantItems.length)}人を表示${nextCursor ? '（まだ続きがあります）' : ''}` : ''}</p>{participantRule || participantMeasurement?.state === 'unavailable' ? <p className="text-ink-faint mt-1 text-xs">{participantRule ? `分類の根拠：視聴完了＝最大視聴位置が動画の90%（${fmtSec(participantRule.completionThresholdSeconds)}）以上。未参加＝申込のみで入場記録なし。ライブ／録画は入場時刻で区別。` : ''}{participantMeasurement?.state === 'unavailable' ? `${participantRule ? ' ' : ''}${participantMeasurement.reason}。個人の分類は「計測外」になります。` : ''}</p> : null}</div>
-            {participantsState === 'loading' ? (
-              <p className="text-ink-faint p-8 text-center text-sm">読み込み中...</p>
-            ) : participantsState === 'error' ? (
-              <div className="p-8 text-center text-sm" role="alert">
-                <p className="text-danger">参加者一覧を読み込めませんでした。</p>
-                <button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-action mt-2 font-medium underline">もう一度読み込む</button>
-              </div>
-            ) : null}
-            <div className="divide-hairline divide-y">{participantsState === 'ready' && participantItems.length === 0 ? <p className="text-ink-faint p-8 text-center text-sm">{participantFilter ? 'この分類に該当する人はいません。' : 'まだ参加者がいません。'}</p> : participantItems.map((participant) => {
-              const name = participant.friendName ?? '名前未取得'
-              const rate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, durationSeconds)) * 100))
-              const operational = 'staffIntegrationStatus' in participant ? participant : null
-              /*
-                分類はサーバーの一つのルールで決まる（応答の rule を参照）。
-                視聴データの無い人を未視聴と断定せず、入場記録が無い人は
-                「未参加」、外部動画など計測不能な人は「計測外」と表示する。
-              */
-              const state = participantStateLabel(participant, durationSeconds)
-              const action = operational?.errorDetail
-                ? operational.errorDetail
-                : participant.formSubmittedAt ? '動画・CTA＋フォーム送信' : participant.ctaClickedAt ? '動画・CTA' : participant.maxWatchedSeconds > 0 ? '動画視聴' : '要対応へ追加'
-              const status = operational?.staffIntegrationStatus === 'needs_attention'
-                ? 'エラー'
-                : operational?.staffIntegrationStatus === 'completed' || rate >= 90
-                  ? '成功'
-                  : '分析待ち'
-              return <div key={participant.friendId} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-5 md:items-center"><div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div><span className="text-ink-secondary">{state}{joinKindLabel(participant)}</span><span className="text-ink-secondary" title={operational?.errorDetail ?? undefined}>{action}</span><span className={`rounded-pill w-fit px-2 py-1 text-micro font-semibold ${status === '成功' ? 'bg-success-bg text-success' : status === 'エラー' ? 'bg-danger-bg text-danger' : 'bg-warning-bg text-warning'}`}>{status}</span><time className="text-ink-faint text-xs">{participant.latestJoinedAt ? compactDateTime(participant.latestJoinedAt).split(' ').at(-1) : '—'}</time></div>
-            })}</div>
-            {/* まだ続きがあるときだけ「次の頁」を出す。9人目以降もここから辿れる。 */}
-            {participantsState === 'ready' && (nextCursor || moreError) ? (
-              <div className="border-hairline border-t px-4 py-3 text-center">
-                {moreError ? <p className="text-danger mb-2 text-xs" role="alert">{moreError}</p> : null}
-                {nextCursor ? (
-                  <Button onClick={() => void loadMoreParticipants()} disabled={loadingMore} busy={loadingMore} busyLabel="読み込み中…">続きを読み込む</Button>
-                ) : null}
-              </div>
-            ) : null}
-          </section>
-          {/* 集計が読めていない間・読めなかったときは、内訳の段を出さない。 */}
-          {summary && analytics ? (
-          <aside className="space-y-3">
-            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h3 className="text-ink text-sm font-medium">参加状況の内訳</h3><p className="text-ink-faint mt-1 text-xs">一覧を開かずに効果を分析できます。</p><dl className="divide-hairline mt-3 divide-y">{[['予約', summary.registeredAndJoined, percent(summary.registeredAndJoined, summary.reservations)], ['視聴中', watching, percent(watching, summary.reservations)], ['未参加', unviewed, percent(unviewed, summary.reservations)]].map(([label, count, rate]) => <div key={String(label)} className="flex items-center justify-between py-3 text-xs"><dt className="text-ink-secondary">{label}</dt><dd className="text-ink font-medium">{formatNumber(Number(count))}回 <span className="text-ink-faint ml-2 font-normal">{rate}</span></dd></div>)}</dl></section>
-            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h3 className="text-ink text-sm font-medium">稼働状況</h3><dl className="divide-hairline mt-3 divide-y text-xs"><div className="flex justify-between py-3"><dt className="text-ink-faint">状態</dt><dd className={`${webinarStatus === 'active' ? 'text-success' : 'text-ink'} font-medium`}>{webinarStatusLabel(webinarStatus)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">申込→視聴</dt><dd className="text-ink font-medium">{percent(summary.viewers, summary.reservations)}</dd></div><div className="flex justify-between py-3"><dt className="text-ink-faint">平均視聴</dt><dd className="text-ink font-medium">{fmtSec(summary.avgWatchedSeconds)}</dd></div></dl></section>
-            <section className="border-danger bg-danger-bg rounded-card border p-4"><h3 className="text-danger text-sm font-bold">要分析</h3><p className="text-danger mt-2 text-xs">視聴・送信エラー {analytics.formFunnel.submitErrors}件</p></section>
-            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h3 className="text-ink text-sm font-bold">担当者視聴完了</h3><p className="text-ink-faint mt-2 text-xs">未参加・相談希望の連携状況は運用者通知で確認します。</p></section>
-          </aside>
-          ) : null}
-        </div>
-      </div>
-    )
-  }
-
-  /* 分析・一覧の面は集計が本体。集計の失敗だけは面全体の失敗として扱う。 */
-  if (analyticsState === 'error') {
-    return (
-      <Notice
-        tone="danger"
-        action={<button type="button" onClick={() => { setAttempt((count) => count + 1); onRetry() }} className="font-medium underline">もう一度読み込む</button>}
-      >
-        分析データを読み込めませんでした。
-      </Notice>
-    )
-  }
-  if (!analytics) return <div className="text-ink-faint text-sm">読み込み中...</div>
-
-  const { summary } = analytics
-
-  if (view === 'analytics') {
-    const avgRate = durationSeconds > 0 ? Math.round((summary.avgWatchedSeconds / durationSeconds) * 1000) / 10 : 0
-    const largestDropoff = largestDropoffAt(analytics.viewSegments ?? [])
-    /*
-      R98: 見出しへの移動は表示中の節と同じ定義から作る。旧画面の
-      5節（概要・視聴・離脱・CTA・申込）はこの段に出ないので入口も置かない。
-    */
-    const analyticsSections = [
-      { label: '数の帯', href: '#webinar-analytics-tiles' },
-      { label: 'どこで人数が減っているか', href: '#webinar-analytics-funnel' },
-      { label: 'どこまで見られたか', href: '#webinar-analytics-retention' },
-    ] as const
-    return (
-      <div className="space-y-4" data-design-node="yxyzQ">
-        <div className="flex flex-wrap items-center justify-between gap-3"><nav aria-label="この段の見出しへ移動" className="flex flex-wrap gap-2">{analyticsSections.map((item) => <Button variant="secondary" className="text-ink-secondary px-3 py-2 hover:underline h-auto whitespace-normal" key={item.label} href={item.href}>{item.label}</Button>)}</nav>{participantsState === 'ready' ? <div className="flex gap-2">{onOpenParticipants ? <Button onClick={onOpenParticipants}>参加者一覧へ</Button> : null}<Button disabled={csvBusy} onClick={() => downloadParticipantsCsv()} busy={csvBusy} busyLabel="書き出しています…">CSVで書き出す</Button></div> : null}</div>
-        {csvError ? <p className="text-danger text-xs" role="alert">{csvError}</p> : null}
-        {/*
-          ★V8-B 分析 `z2dgw`。数の帯・減りの棒・見られた所の線。
-          どこから申し込んだかは集計の口が無いので出さない。
-        */}
-        <div className="flex flex-col gap-4 xl:flex-row" data-design-node="z2dgw">
-          <div className="min-w-0 flex-1 space-y-3">
-            <AnalyticsFunnelV8 summary={summary} daily={analytics.daily} />
-            <RetentionSection
-              retention={analytics.retention ?? { bucketSeconds: 60, started: 0, points: [] }}
-              completed={summary.completed}
-              ctaAtSeconds={analytics.ctaAtSeconds ?? null}
-              heartbeatRejects={analytics.heartbeatRejects ?? 0}
-              durationSeconds={durationSeconds}
-            />
-          </div>
-          <SummaryAside rows={[
-            ['視聴完了', `${formatNumber(summary.completed)}人`],
-            ['CTAクリック', `${formatNumber(summary.ctaClicks)}人`],
-            ['申込転換', percent(summary.ctaClicks, summary.reservations)],
-          ]} previewBody={analytics.measurement?.state === 'available' ? 'もっとも視聴された区間を分析できます。' : analytics.measurement?.reason ?? '視聴区間の集計はまだ取得できていません。'}>
-            <div className="flex gap-2"><Button disabled title="分析の段では実行できません">テストを送る</Button><Button disabled title="分析の段では実行できません">公開ページを見る</Button></div>
-          </SummaryAside>
-        </div>
-      </div>
-    )
-  }
-
-  const maxDropoff = Math.max(1, ...analytics.dropoff.map((d) => d.viewers))
-  const daily = analytics.daily.slice(-14)
-  const maxDaily = Math.max(
-    1,
-    ...daily.flatMap((d) => [d.reservations, d.viewers, d.ctaClicks, d.formSubmissions]),
-  )
-  const recentParticipants = analytics.participants.slice(0, 16)
-  const formFunnelStages = [
-    { label: 'CTA表示', value: analytics.formFunnel.ctaImpressions },
-    { label: 'CTAクリック', value: analytics.formFunnel.ctaClicks },
-    { label: 'フォーム表示', value: analytics.formFunnel.formOpens },
-    { label: '入力開始', value: analytics.formFunnel.formStarts },
-    { label: '送信操作', value: analytics.formFunnel.submitAttempts },
-    { label: '送信完了', value: analytics.formFunnel.submitSuccesses },
-  ]
-  const maxFormFunnel = Math.max(1, ...formFunnelStages.map((stage) => stage.value))
-  const fieldLabels: Record<string, string> = {
-    name: 'お名前',
-    company: '会社名・屋号',
-    annual_revenue: '年商規模',
-    budget: '予算感',
-    ai_goal: '改善したいこと',
-    meeting_date_1: '第1希望日',
-    meeting_time_1: '第1希望時刻',
-    meeting_date_2: '第2希望日',
-    meeting_time_2: '第2希望時刻',
-    meeting_date_3: '第3希望日',
-    meeting_time_3: '第3希望時刻',
-  }
-  const funnel = [
-    { label: '参加', value: summary.viewers, color: 'bg-action', note: 'ユニーク' },
-    { label: '5分視聴', value: summary.watched5m, color: 'bg-info', note: percent(summary.watched5m, summary.viewers) },
-    { label: 'CTAクリック', value: summary.ctaClicks, color: 'bg-info', note: percent(summary.ctaClicks, summary.viewers) },
-    { label: 'フォーム送信', value: summary.formSubmissions, color: 'bg-success', note: percent(summary.formSubmissions, summary.viewers) },
-  ]
-  const metricCards = [
-    {
-      label: 'ユニーク参加者',
-      value: formatNumber(summary.viewers),
-      detail: `予約 ${formatNumber(summary.reservations)}人`,
-      tone: 'bg-action-soft border-hairline',
-      dot: 'bg-action',
-    },
-    {
-      label: '予約者の参加率',
-      value: percent(summary.registeredAndJoined, summary.reservations),
-      detail: `${formatNumber(summary.registeredAndJoined)} / ${formatNumber(summary.reservations)}人`,
-      tone: 'bg-info-bg border-hairline',
-      dot: 'bg-info',
-    },
-    {
-      label: '90%以上視聴',
-      value: percent(summary.completed, summary.viewers),
-      detail: `${formatNumber(summary.completed)}人・平均 ${fmtSec(summary.avgWatchedSeconds)}`,
-      tone: 'bg-info-bg border-hairline',
-      dot: 'bg-info',
-    },
-    {
-      label: 'フォーム送信',
-      value: formatNumber(summary.formSubmissions),
-      detail: `CTAから ${percent(summary.formSubmissions, summary.ctaClicks)}`,
-      tone: 'bg-success-bg border-hairline',
-      dot: 'bg-success',
-    },
-  ]
-
-  if (view === 'legacy') {
-    return (
-      <div className="space-y-4" data-design-node="Q8sHa">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-ink text-lg font-bold">参加者管理</h2>
-            <p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p>
-          </div>
-          {participantsState === 'ready' ? (
-            <Button disabled={csvBusy} onClick={() => downloadParticipantsCsv()} busy={csvBusy} busyLabel="書き出しています…">参加者をCSVで書き出す
-            </Button>
-          ) : null}
-        </div>
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="border-hairline bg-canvas rounded-card border p-4">
-            <p className="text-ink-faint text-xs">申込</p>
-            <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{formatNumber(summary.reservations)}人</p>
-          </div>
-          <div className="border-hairline bg-canvas rounded-card border p-4">
-            <p className="text-ink-faint text-xs">視聴開始</p>
-            <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{formatNumber(summary.viewers)}人</p>
-          </div>
-          <div className="border-hairline bg-canvas rounded-card border p-4">
-            <p className="text-ink-faint text-xs">視聴完了</p>
-            <p className="text-ink mt-2 text-2xl font-bold tabular-nums">{formatNumber(summary.completed)}人</p>
-          </div>
-          <div className="border-hairline bg-canvas rounded-card border p-4">
-            <p className="text-ink-faint text-xs">エラー</p>
-            <p className="text-danger mt-2 text-2xl font-bold tabular-nums">{formatNumber(analytics.formFunnel.submitErrors)}件</p>
-          </div>
-        </section>
-        <section className="border-hairline bg-canvas overflow-hidden rounded-card border">
-          <div className="border-hairline border-b px-4 py-3">
-            <h3 className="text-ink font-bold">参加者一覧</h3>
-            <p className="text-ink-faint mt-1 text-xs">何をきっかけに、何が実行されたかを確認できます。</p>
-          </div>
-          {recentParticipants.length === 0 ? (
-            <div className="p-10 text-center text-sm text-ink-faint">まだ参加者がいません</div>
-          ) : (
-            <div className="divide-hairline divide-y">
-              {recentParticipants.map((participant) => {
-                const name = participant.friendName ?? `友だち ${participant.friendId.slice(0, 6)}`
-                const watchedRate = Math.min(100, Math.round((participant.maxWatchedSeconds / Math.max(1, durationSeconds)) * 100))
-                const action = participant.formSubmittedAt ? 'フォーム送信' : participant.ctaClickedAt ? 'CTAクリック' : '視聴のみ'
-                return (
-                  <div key={participant.friendId} className="grid gap-2 px-4 py-3 text-sm md:grid-cols-4 md:items-center">
-                    <div className="flex min-w-0 items-center gap-3"><ParticipantAvatar name={name} pictureUrl={participant.pictureUrl} /><span className="truncate font-semibold">{name}</span></div>
-                    <span className="text-ink-secondary">視聴完了 {watchedRate}%</span>
-                    <span className="text-ink-secondary">{action}</span>
-                    <Link href={`/chats?friend=${participant.friendId}`} className="text-action font-semibold">確認する</Link>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-4 scroll-mt-4" id="webinar-overview" data-design-node="yxyzQ">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-action">Performance overview</p>
-          <h2 className="mt-1 text-xl font-bold tracking-tight text-ink">参加の流れをひと目で確認</h2>
-          <p className="mt-1 text-sm text-ink-secondary">再入場や複数回参加は、同じ友だちとしてまとめています。</p>
-        </div>
-        {analytics.participants.length > 0 && (
-          <div className="flex items-center gap-3 rounded-pill border border-hairline bg-canvas px-3 py-2 shadow-card">
-            <div className="flex -space-x-2">
-              {analytics.participants.slice(0, 5).map((p) => (
-                <ParticipantAvatar
-                  key={p.friendId}
-                  name={p.friendName ?? '友だち'}
-                  pictureUrl={p.pictureUrl}
-                  size="sm"
-                />
-              ))}
-            </div>
-            <span className="text-xs font-medium text-ink-secondary">最近の参加者</span>
-          </div>
-        )}
-      </div>
-
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {metricCards.map((metric) => (
-          <div key={metric.label} className={`rounded-card border p-4 ${metric.tone}`}>
-            <div className="flex items-center gap-2 text-xs font-semibold text-ink-secondary">
-              <span className={`h-2 w-2 rounded-pill ${metric.dot}`} />
-              {metric.label}
-            </div>
-            <div className="mt-3 text-3xl font-bold tabular-nums tracking-[-0.02em] text-ink">{metric.value}</div>
-            <div className="mt-1 text-xs text-ink-secondary">{metric.detail}</div>
-          </div>
-        ))}
-      </section>
-
-      <section id="webinar-cta-funnel" className="scroll-mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h3 className="font-bold text-ink">CTAから相談完了まで</h3>
-            <p className="mt-1 text-xs text-ink-secondary">計測開始後のユニーク人数。どの操作で離脱したかを確認できます。</p>
-          </div>
-          <span className="text-xs text-ink-secondary">
-            送信エラー {formatNumber(analytics.formFunnel.submitErrors)}人
-          </span>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          {formFunnelStages.map((stage, index) => {
-            const previous = index === 0 ? stage.value : formFunnelStages[index - 1].value
-            return (
-              <div key={stage.label} className="rounded-card border border-divider-soft bg-canvas-sunken p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-ink-secondary">{stage.label}</span>
-                  <span className="text-micro text-ink-faint">
-                    {index === 0 ? '起点' : percent(stage.value, previous)}
-                  </span>
-                </div>
-                <div className="mt-2 text-2xl font-bold text-ink">
-                  {formatNumber(stage.value)}
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-pill bg-canvas-sunken">
-                  <div
-                    className="h-full rounded-pill bg-info"
-                    style={{ width: `${Math.max(0, Math.min(100, (stage.value / maxFormFunnel) * 100))}%` }}
-                  />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        {analytics.formFunnel.fieldCompletions.length > 0 && (
-          <details className="mt-4 rounded-card border border-divider-soft bg-canvas-sunken px-4 py-3">
-            <summary className="cursor-pointer text-sm font-semibold text-ink-secondary">
-              項目ごとの到達人数を見る
-            </summary>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {analytics.formFunnel.fieldCompletions.map((field) => (
-                <div key={field.fieldName} className="flex items-center justify-between rounded-control bg-canvas px-3 py-2 text-xs">
-                  <span className="text-ink-secondary">{fieldLabels[field.fieldName] ?? field.fieldName}</span>
-                  <span className="font-bold text-ink">{formatNumber(field.users)}人</span>
-                </div>
-              ))}
-            </div>
-          </details>
-        )}
-      </section>
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
-        <section id="webinar-watch-funnel" className="scroll-mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="font-bold text-ink">参加ファネル</h3>
-              <p className="mt-1 text-xs text-ink-secondary">どこで人数が減っているか</p>
-            </div>
-            <span className="rounded-pill bg-canvas-sunken px-2.5 py-1 text-micro font-medium text-ink-secondary">全期間</span>
-          </div>
-          <div className="mt-5 space-y-4">
-            {funnel.map((stage) => (
-              <div key={stage.label}>
-                <div className="mb-1.5 flex items-center justify-between text-xs">
-                  <span className="font-medium text-ink-secondary">{stage.label}</span>
-                  <span className="text-ink-secondary"><strong className="text-ink">{stage.value}</strong>人 · {stage.note}</span>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-pill bg-canvas-sunken">
-                  <div
-                    className={`h-full rounded-pill ${stage.color}`}
-                    style={{ width: `${Math.max(stage.value > 0 ? 3 : 0, (stage.value / Math.max(1, summary.viewers)) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-divider-soft pt-4">
-            <div>
-              <div className="text-micro text-ink-secondary">15分以上視聴</div>
-              <div className="mt-1 text-lg font-bold text-ink">{summary.watched15m}人</div>
-            </div>
-            <div>
-              <div className="text-micro text-ink-secondary">CTA → フォーム</div>
-              <div className="mt-1 text-lg font-bold text-ink">{percent(summary.formSubmissions, summary.ctaClicks)}</div>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="font-bold text-ink">日別の参加ペース</h3>
-              <p className="mt-1 text-xs text-ink-secondary">直近14日・日ごとのユニーク人数</p>
-            </div>
-            <div className="flex flex-wrap gap-3 text-micro text-ink-secondary">
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-pill bg-hairline" />予約</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-pill bg-action" />参加</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-pill bg-info" />CTA</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-pill bg-success" />フォーム</span>
-            </div>
-          </div>
-          {daily.length === 0 ? (
-            <div className="flex h-52 items-center justify-center text-sm text-ink-faint">まだ日別データがありません</div>
-          ) : (
-            <div className="mt-5 flex h-52 items-end gap-2 overflow-x-auto border-b border-hairline pb-7">
-              {daily.map((day) => (
-                <div key={day.date} className="relative flex h-full min-w-10 flex-1 items-end justify-center gap-0.5" title={`${day.date} 予約${day.reservations}・参加${day.viewers}・CTA${day.ctaClicks}・フォーム${day.formSubmissions}`}>
-                  <div className="w-2 rounded-t-mini bg-hairline" style={{ height: `${Math.max(day.reservations > 0 ? 3 : 0, (day.reservations / maxDaily) * 100)}%` }} />
-                  <div className="w-2 rounded-t-mini bg-action" style={{ height: `${Math.max(day.viewers > 0 ? 3 : 0, (day.viewers / maxDaily) * 100)}%` }} />
-                  <div className="w-2 rounded-t-mini bg-info" style={{ height: `${Math.max(day.ctaClicks > 0 ? 3 : 0, (day.ctaClicks / maxDaily) * 100)}%` }} />
-                  <div className="w-2 rounded-t-mini bg-success" style={{ height: `${Math.max(day.formSubmissions > 0 ? 3 : 0, (day.formSubmissions / maxDaily) * 100)}%` }} />
-                  <span className="absolute -bottom-6 whitespace-nowrap text-nano text-ink-faint">
-                    {formatDay(`${day.date}T00:00:00+09:00`)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
-
-      <section id="webinar-recent" className="scroll-mt-4 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
-        <div className="flex flex-col gap-3 border-b border-divider-soft p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="font-bold text-ink">最近の参加者</h3>
-            <p className="mt-1 text-xs text-ink-secondary">顔写真・視聴状況・フォーム到達を友だち単位で表示</p>
-          </div>
-          <span className="text-xs text-ink-secondary">全 {formatNumber(analytics.participants.length)}人</span>
-        </div>
-        {recentParticipants.length === 0 ? (
-          <div className="p-10 text-center text-sm text-ink-faint">まだ参加者がいません</div>
-        ) : (
-          <>
-            <div className="hidden md:block">
-              <DataTable>
-                <thead>
-                  <TableHeadRow>
-                    <Th style={{ width: '28%' }}>参加者</Th>
-                    <Th style={{ width: '16%' }}>最終参加</Th>
-                    <Th style={{ width: '24%' }}>視聴</Th>
-                    <Th style={{ width: '18%' }}>アクション</Th>
-                    <Th style={{ width: '14%' }} align="right">詳細</Th>
-                  </TableHeadRow>
-                </thead>
-                <tbody>
-                  {recentParticipants.map((p) => {
-                    const name = p.friendName ?? `友だち ${p.friendId.slice(0, 6)}`
-                    const watchedRate = Math.min(100, Math.round((p.maxWatchedSeconds / Math.max(1, durationSeconds)) * 100))
-                    return (
-                      <Tr key={p.friendId} interactive>
-                        <Td>
-                          <div className="flex items-center gap-3">
-                            <ParticipantAvatar name={name} pictureUrl={p.pictureUrl} size="lg" />
-                            <div className="min-w-0">
-                              <div className="max-w-48 truncate font-semibold text-ink" title={name}>{name}</div>
-                              <div className="mt-0.5 text-micro text-ink-faint">{p.sessions > 1 ? `${p.sessions}回参加` : p.registered ? '予約から参加' : '直接参加'}</div>
-                            </div>
-                          </div>
-                        </Td>
-                        <Td className="text-xs text-ink-secondary">{compactDateTime(p.latestJoinedAt)}</Td>
-                        <Td>
-                          <div className="flex items-center justify-between text-micro text-ink-secondary">
-                            <span>{fmtSec(p.maxWatchedSeconds)}</span><span>{watchedRate}%</span>
-                          </div>
-                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-pill bg-canvas-sunken">
-                            <div className="h-full rounded-pill bg-action" style={{ width: `${watchedRate}%` }} />
-                          </div>
-                        </Td>
-                        <Td>
-                          <div className="flex flex-wrap gap-1.5">
-                            {p.formSubmittedAt ? (
-                              <span className="rounded-pill bg-success-bg px-2 py-1 text-nano font-semibold text-success">フォーム送信</span>
-                            ) : p.ctaClickedAt ? (
-                              <span className="rounded-pill bg-info-bg px-2 py-1 text-nano font-semibold text-info">CTAクリック</span>
-                            ) : (
-                              <span className="rounded-pill bg-canvas-sunken px-2 py-1 text-nano font-medium text-ink-secondary">視聴のみ</span>
-                            )}
-                          </div>
-                        </Td>
-                        <Td align="right">
-                          <Link href={`/chats?friend=${p.friendId}`} className="text-xs font-semibold text-action hover:text-action">チャットを見る →</Link>
-                        </Td>
-                      </Tr>
-                    )
-                  })}
-                </tbody>
-              </DataTable>
-            </div>
-            <div className="divide-y divide-hairline md:hidden">
-              {recentParticipants.map((p) => {
-                const name = p.friendName ?? `友だち ${p.friendId.slice(0, 6)}`
-                return (
-                  <Link key={p.friendId} href={`/chats?friend=${p.friendId}`} className="flex items-center gap-3 p-4 active:bg-canvas-sunken">
-                    <ParticipantAvatar name={name} pictureUrl={p.pictureUrl} size="lg" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-ink">{name}</div>
-                      <div className="mt-1 text-micro text-ink-secondary">{compactDateTime(p.latestJoinedAt)} · {fmtSec(p.maxWatchedSeconds)}視聴</div>
-                    </div>
-                    <span className={`h-2.5 w-2.5 rounded-pill ${p.formSubmittedAt ? 'bg-success' : p.ctaClickedAt ? 'bg-info' : 'bg-hairline'}`} />
-                  </Link>
-                )
-              })}
-            </div>
-          </>
-        )}
-      </section>
-
-      <details id="webinar-dropoff" className="group scroll-mt-4 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5">
-          <div>
-            <h3 className="font-bold text-ink">視聴維持・回別の詳細</h3>
-            <p className="mt-1 text-xs text-ink-secondary">必要なときだけ、離脱位置と各回の数字を確認</p>
-          </div>
-          <span className="rounded-pill bg-canvas-sunken px-3 py-1 text-xs text-ink-secondary group-open:bg-info-bg group-open:text-action">{analytics.sessions.length}回 ▾</span>
-        </summary>
-        <div className="grid gap-6 border-t border-divider-soft p-5 xl:grid-cols-2">
-          <div>
-            <h4 className="mb-3 text-sm font-semibold text-ink">最終視聴位置</h4>
-            {analytics.dropoff.length === 0 ? (
-              <p className="text-sm text-ink-faint">まだ視聴データがありません</p>
-            ) : analytics.dropoff.map((d) => (
-              <div key={d.bucketStart} className="mb-2 flex items-center gap-2 text-xs">
-                <span className="w-16 shrink-0 text-ink-secondary">{fmtSec(d.bucketStart)}〜</span>
-                <div className="h-2.5 flex-1 overflow-hidden rounded-pill bg-canvas-sunken">
-                  <div className="h-full rounded-pill bg-action" style={{ width: `${(d.viewers / maxDropoff) * 100}%` }} />
-                </div>
-                <span className="w-7 text-right font-semibold text-ink-secondary">{d.viewers}</span>
-              </div>
-            ))}
-          </div>
-          <div className="min-w-0">
-            <h4 className="mb-3 text-sm font-semibold text-ink">直近の開催回</h4>
-            <div className="max-h-80 overflow-auto rounded-card border border-hairline">
-              {/* 外の箱が枠とスクロールを持つため、表の枠は消す。見出しの吸着は欄ごとに残す。 */}
-              <DataTable className="rounded-none border-0">
-                <thead>
-                  <TableHeadRow><Th className="sticky top-0 bg-surface-pearl">開始</Th><Th className="sticky top-0 bg-surface-pearl">参加</Th><Th className="sticky top-0 bg-surface-pearl">平均視聴</Th><Th className="sticky top-0 bg-surface-pearl">CTA</Th><Th className="sticky top-0 bg-surface-pearl">定員</Th></TableHeadRow>
-                </thead>
-                <tbody>
-                  {analytics.sessions.slice(0, 30).map((s) => (
-                    <Tr key={s.sessionStartAt}><Td className="text-ink-secondary text-xs">{fmtSession(s.sessionStartAt)}</Td><Td className="text-xs">{s.viewers}</Td><Td className="text-xs">{fmtSec(s.avgWatchedSeconds)}</Td><Td className="text-xs">{s.ctaClicks} ({percent(s.ctaClicks, s.viewers)})</Td><Td className="text-xs"><SessionCapacityCell webinarId={webinarId} sessionStartAt={s.sessionStartAt} /></Td></Tr>
-                  ))}
-                </tbody>
-              </DataTable>
-            </div>
-          </div>
-        </div>
-      </details>
-
-      {/* コメントはこの面だけが取る。失敗しても集計・参加者はそのまま残る。 */}
-      <UserCommentsSection webinarId={webinarId} />
-    </div>
-  )
-}
-
-function fmtMinSec(sec: number): string {
-  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
-}
-
-function parseMinSec(v: string): number | null {
-  const m = /^(\d+):([0-5]?\d)$/.exec(v.trim())
-  if (m) return Number(m[1]) * 60 + Number(m[2])
-  const n = Number(v.trim())
-  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
-}
-
 const MEDIA_KIND_LABEL: Record<MediaItem['kind'], string> = {
   image: '画像',
   video: '動画',
@@ -1110,47 +185,6 @@ function VideoMediaLabel({ webinar }: { webinar: Webinar }) {
   )
 }
 
-function VideoDesignStep({ webinar, editor, registrations, publicUrl, canOpenPublicPage, publicPageReason, onWebinarSaved, onDirtyChange, registerSave }: { webinar: Webinar; editor: WebinarEditor; registrations: number | null; publicUrl: string | null; canOpenPublicPage: boolean; publicPageReason: string; onWebinarSaved: (next: Webinar) => void; onDirtyChange?: (dirty: boolean) => void; registerSave?: (save: (() => Promise<boolean>) | null) => void }) {
-  return (
-    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="PV1Vh">
-      <div className="min-w-0 flex-1 space-y-3">
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-          <h2 className="text-ink text-base font-bold">動画設定</h2>
-          <p className="text-ink-faint mt-1 text-xs">動画ファイルまたは外部動画URLを設定します。</p>
-          <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(240px,1fr)]">
-            <div><p className="text-ink-faint text-xs font-semibold">動画</p><div className="border-hairline text-ink mt-1 rounded-control border px-3 py-3 text-sm font-semibold"><VideoMediaLabel webinar={webinar} /></div></div>
-            <div><p className="text-ink-faint text-xs font-semibold">再生時間</p><div className="border-hairline text-ink mt-1 rounded-control border px-3 py-3 text-sm font-semibold">{durationLabel(webinar.durationSeconds)}</div></div>
-          </div>
-          <VideoStages webinarId={webinar.id} hasVideo={Boolean(webinar.videoPrefix || webinar.videoMediaId)} />
-        </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-          <h2 className="text-ink text-base font-bold">公開設定</h2>
-          <p className="text-ink-faint mt-1 text-xs">公開期間・視聴条件・自動再生を設定します。</p>
-          <div className="mt-4 space-y-3">
-            <div className="border-hairline flex items-center justify-between gap-4 rounded-control border bg-canvas-sunken px-4 py-4"><div><p className="text-ink text-sm font-semibold">公開期間</p><p className="text-ink-faint mt-1 text-xs">{deliveryWindow(webinar)}</p></div><span className="text-action">›</span></div>
-            <div className="border-hairline flex items-center justify-between gap-4 rounded-control border bg-canvas-sunken px-4 py-4"><div><p className="text-ink text-sm font-semibold">視聴条件</p><p className="text-ink-faint mt-1 text-xs">{editor.viewingCondition.label}</p></div><span className="text-action">›</span></div>
-          </div>
-        </section>
-        <EditorDetails label="動画・公開の詳細を編集する"><WebinarForm key={`${webinar.id}-${webinar.updatedAt}`} initial={webinar} hideBar onSaved={onWebinarSaved} onDirtyChange={onDirtyChange} registerSave={registerSave} /></EditorDetails>
-      </div>
-      <SummaryAside rows={[
-        ['動画', webinar.videoPrefix ? 'アップロード済み' : '未設定'],
-        ['公開', webinarStatusLabel(webinar.status)],
-        ['申込', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
-      ]} previewBody={videoPreview(webinar).body ?? videoPreview(webinar).empty}>
-        <div className="flex gap-2"><Button disabled title="確認の段で実行します">テストを送る</Button>{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
-        {/* 押せないときは理由を文字で出す。実行できるように見せて無反応にしない。 */}
-        {!(canOpenPublicPage && publicUrl) && publicPageReason ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
-      </SummaryAside>
-    </div>
-  )
-}
-
-/*
-  通知概要の状態は1つの定義から描く。文字だけ変えて成功色のままにすると、
-  未設定・確認中・取得失敗まで設定済みと同じ緑になる(監査 DETAIL-19)。
-  色が見分けにくくてもアイコンと文字で区別できるようにする。
-*/
 type NotificationRowState = 'configured' | 'unset' | 'pending' | 'failed'
 
 const NOTIFICATION_ROW_STATE: Record<
@@ -1243,532 +277,6 @@ function NotificationStateBadge({ state }: { state: NotificationRowState }) {
       <Icon aria-hidden="true" size={14} />
       {view.label}
     </span>
-  )
-}
-
-function NotificationDesignStep({ webinarId, webinarTitle, registrations, publicUrl, canOpenPublicPage, publicPageReason, onDirtyChange, registerSave }: { webinarId: string; webinarTitle: string; registrations: number | null; publicUrl: string | null; canOpenPublicPage: boolean; publicPageReason: string; onDirtyChange?: (dirty: boolean) => void; registerSave?: (save: (() => Promise<boolean>) | null) => void }) {
-  const [settings, setSettings] = useState<WebinarNotificationSettings | null>(null)
-  const [settingsReady, setSettingsReady] = useState(false)
-  const [settingsFailed, setSettingsFailed] = useState(false)
-  const [notifAttempt, setNotifAttempt] = useState(0)
-  const [editor, setEditor] = useState<WebinarEditor | null>(null)
-  const [testConfirmOpen, setTestConfirmOpen] = useState(false)
-  const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState('')
-
-  /*
-    通知の取得は子の編集タブ(`WebinarNotifications`)に一本化し、親は
-    報告を受けて概要だけ描く。同じ口を親子で2回叩かない。
-  */
-  const handleNotificationsLoaded = useCallback((data: { settings: WebinarNotificationSettings | null; overview: WebinarNotificationOverview | null } | null) => {
-    if (data === null) {
-      setSettings(null)
-      setSettingsFailed(true)
-    } else {
-      setSettings(data.settings)
-      setSettingsFailed(false)
-    }
-    setSettingsReady(true)
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    webinarApi.editor(webinarId)
-      .then((editorResponse) => { if (!cancelled) setEditor(editorResponse.data) })
-      .catch(() => { if (!cancelled) setEditor(null) })
-    return () => { cancelled = true }
-  }, [webinarId])
-
-  /*
-    テスト送信は実際にLINEへ届く。押す前に、送る相手と文面を確認させる。
-    設定が読めていない間は実行可能に見せない。
-  */
-  const notificationTestDone = editor?.notificationTest?.status === 'passed'
-  const testDisabledReason = !settingsReady || settingsFailed
-    ? '通知の設定を読み込んでから実行できます'
-    : null
-  const runNotificationTest = async () => {
-    setTestConfirmOpen(false)
-    setTesting(true)
-    setTestResult('')
-    try {
-      const response = await webinarApi.testNotifications(webinarId)
-      setTestResult(`テスト送信しました。成功 ${response.data.sent}件・失敗 ${response.data.failed}件`)
-      /* 結果はエディタの notificationTest に記録される。取り直して印を更新する。 */
-      webinarApi.editor(webinarId)
-        .then((editorResponse) => setEditor(editorResponse.data))
-        .catch(() => undefined)
-    } catch (cause) {
-      setTestResult(webinarErrorText(cause, 'テスト送信できませんでした。時間をおいてもう一度お試しください。'))
-    } finally {
-      setTesting(false)
-    }
-  }
-
-
-  const registrationState = notificationRowState(settings?.registrationEnabled, settingsReady, settingsFailed)
-  const dayBeforeState = notificationRowState(settings?.dayBeforeEnabled, settingsReady, settingsFailed)
-  const reminderState = notificationRowState(
-    Boolean(settings?.dayBeforeEnabled || settings?.hourBeforeEnabled),
-    settingsReady,
-    settingsFailed,
-  )
-  const startState = notificationRowState(settings?.startEnabled, settingsReady, settingsFailed)
-  const missedState = notificationRowState(settings?.missedEnabled, settingsReady, settingsFailed)
-  const completedState = notificationRowState(settings?.completedEnabled, settingsReady, settingsFailed)
-
-  return (
-    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="Ho8z4">
-      <div className="min-w-0 flex-1 space-y-3">
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-          <h2 className="text-ink text-base font-bold">事前案内</h2>
-          <p className="text-ink-faint mt-1 text-xs">申込直後・前日・1時間前の案内を設定します。</p>
-          <dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline">
-            <div className="flex items-center justify-between gap-4 px-4 py-4"><div><dt className="text-ink text-sm font-medium">申込完了</dt><dd className="text-ink-faint mt-1 text-xs">申込完了直後に案内を送信</dd></div><NotificationStateBadge state={registrationState} /></div>
-            <div className="flex items-center justify-between gap-4 px-4 py-4"><div><dt className="text-ink text-sm font-medium">開催前日</dt><dd className="text-ink-faint mt-1 text-xs">LINEでリマインド</dd></div><NotificationStateBadge state={dayBeforeState} /></div>
-          </dl>
-        </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-          <h2 className="text-ink text-base font-bold">当日・見逃し案内</h2>
-          <p className="text-ink-faint mt-1 text-xs">開始前・開始時・未視聴者・見終わった人への案内を設定します。</p>
-          <dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline">
-            <div className="px-4 py-4"><dt className="text-ink text-sm font-medium">配信タイミング</dt><dd className="text-ink-faint mt-1 text-xs">{deliveryTimingSummary(settings, settingsReady, settingsFailed)}</dd></div>
-            <div className="px-4 py-4"><dt className="text-ink text-sm font-medium">見逃し案内</dt><dd className="text-ink-faint mt-1 text-xs">{missedNoticeSummary(settings, settingsReady, settingsFailed)}</dd></div>
-            <div className="px-4 py-4"><dt className="text-ink text-sm font-medium">視聴完了のお礼</dt><dd className="text-ink-faint mt-1 text-xs">{completedNoticeSummary(settings, settingsReady, settingsFailed)}</dd></div>
-          </dl>
-        </section>
-        {settingsFailed && (
-          <button
-            type="button"
-            onClick={() => { setSettingsReady(false); setSettingsFailed(false); setNotifAttempt((count) => count + 1) }}
-            className="text-action text-xs font-medium underline"
-          >
-            通知の設定をもう一度読み込む
-          </button>
-        )}
-        <EditorDetails label="通知ごとの送信設定を編集する"><WebinarNotifications key={notifAttempt} webinarId={webinarId} onLoaded={handleNotificationsLoaded} onDirtyChange={onDirtyChange} registerSave={registerSave} /></EditorDetails>
-      </div>
-      <SummaryAside rows={[
-        ['申込完了', NOTIFICATION_ROW_STATE[registrationState].label],
-        ['リマインド', reminderState === 'configured' ? 'リマインド中' : NOTIFICATION_ROW_STATE[reminderState].label],
-        ['開始時', NOTIFICATION_ROW_STATE[startState].label],
-        ['見逃し案内', NOTIFICATION_ROW_STATE[missedState].label],
-        ['視聴完了', NOTIFICATION_ROW_STATE[completedState].label],
-        ['対象', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
-      ]} previewBody={editor?.notificationMessages.registration || notificationPreview(null).empty}>
-        <div className="flex gap-2"><Button disabled={testing || notificationTestDone || testDisabledReason !== null} title={notificationTestDone ? 'テスト済みです' : testDisabledReason ?? undefined} onClick={() => setTestConfirmOpen(true)} busy={testing} busyLabel="送信中…">{notificationTestDone ? 'テスト送信済み' : 'テストを送る'}</Button>{canOpenPublicPage && publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : <Button disabled title={publicPageReason}>公開ページを見る</Button>}</div>
-        {testResult ? <p className="text-ink-secondary text-xs" role="status">{testResult}</p> : null}
-        {!(canOpenPublicPage && publicUrl) && publicPageReason ? <p className="text-ink-faint text-xs">{publicPageReason}</p> : null}
-      </SummaryAside>
-      {/* 相手と文面を確認してから実送信する。申込者全員には届かない。 */}
-      <ConfirmDialog
-        open={testConfirmOpen}
-        title="通知をテスト送信しますか？"
-        description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。"
-        confirmLabel="テストを送る"
-        busy={testing}
-        onCancel={() => { if (!testing) setTestConfirmOpen(false) }}
-        onConfirm={() => void runNotificationTest()}
-      >
-        <p className="text-ink-secondary text-xs">送る文面（開始のお知らせ）：「{webinarTitle}」が始まりました、という案内に参加URLを添えて送ります。</p>
-      </ConfirmDialog>
-    </div>
-  )
-}
-
-type FormCandidateState = 'idle' | 'loading' | 'ready' | 'error' | 'forbidden'
-
-/*
-  CTA の編集状態は「どのウェビナーの分か」を必ず一緒に持つ。
-  ウェビナーを切り替えた瞬間から前のウェビナーの CTA は出さない・保存させない。
-*/
-type CtaEditing = { webinarId: string; loaded: boolean; ctas: WebinarCtaCard[]; times: string[]; message: string | null }
-
-function emptyCtaEditing(webinarId: string): CtaEditing {
-  return { webinarId, loaded: false, ctas: [], times: [], message: null }
-}
-
-function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, onCtasLoaded }: { webinarId: string; durationSeconds: number; forms: Array<{ id: string; name: string }>; formsState: FormCandidateState; onRetryForms: () => void; onCtasLoaded?: (ctas: WebinarCtaCard[] | null) => void }) {
-  const [editing, setEditing] = useState<CtaEditing>(() => emptyCtaEditing(webinarId))
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  /* 取得の世代印。切替後に遅れて届いた前のウェビナーの応答はここで捨てる。 */
-  const ctaRequestId = useRef(0)
-
-  /* 描くのは今のウェビナーの分だけ。印が違えば「まだ何も無い」として描く。 */
-  const current = editing.webinarId === webinarId ? editing : emptyCtaEditing(webinarId)
-  const { ctas, times, message, loaded } = current
-  /* 編集も今のウェビナーの分にだけ効かせる。 */
-  const editCurrent = useCallback((update: (prev: CtaEditing) => CtaEditing) => {
-    setEditing((prev) => (prev.webinarId === webinarId ? update(prev) : prev))
-  }, [webinarId])
-  const setMessage = useCallback((next: string | null) => {
-    editCurrent((prev) => ({ ...prev, message: next }))
-  }, [editCurrent])
-
-  /*
-    CTA の取得はここに一本化し、親の概要段は報告を受けて件数だけ描く。
-    同じ口を親子で2回叩かない。
-  */
-  const loadCtas = useCallback(async () => {
-    // ロード失敗時に空の状態で保存すると all-or-nothing 置換で既存 CTA を消して
-    // しまうため、初回 GET が成功するまで保存を無効化する
-    const requestId = ++ctaRequestId.current
-    /* 取得を始めた時点で前の中身を捨てる。読み込み中に旧 CTA を触らせない。 */
-    setEditing(emptyCtaEditing(webinarId))
-    try {
-      const res = await webinarApi.ctas(webinarId)
-      /* 先に世代印を見る。切替後に届いた前の応答はここで終わり。 */
-      if (requestId !== ctaRequestId.current) return
-      /*
-        **配列で来なかったら、読めなかったこととして扱う。**
-        口の契約は配列（`apps/worker/src/routes/webinars.ts:904` が
-        `data: ctas.map(...)` を返す）だが、器だけ違う返事が来ると
-        `ctas.map is not a function` で**この面が白い画面になる**。
-        そのまま保存に進むと、置き換えで既存のCTAを消してしまう。
-      */
-      if (!Array.isArray(res.data)) throw new Error('cta_list_not_array')
-      setEditing({ webinarId, loaded: true, ctas: res.data, times: res.data.map((c) => fmtMinSec(c.atSeconds)), message: null })
-      onCtasLoaded?.(res.data)
-    } catch {
-      if (requestId !== ctaRequestId.current) return
-      setEditing({ webinarId, loaded: false, ctas: [], times: [], message: 'CTAカードを読み込めませんでした。もう一度読み込んでください。読み込めるまで保存はできません。' })
-      onCtasLoaded?.(null)
-    }
-  }, [webinarId, onCtasLoaded])
-
-  useEffect(() => {
-    void loadCtas()
-    return () => { ctaRequestId.current += 1 }
-  }, [loadCtas])
-
-  const update = (i: number, patch: Partial<WebinarCtaCard>) =>
-    editCurrent((prev) => ({ ...prev, ctas: prev.ctas.map((c, j) => (j === i ? { ...c, ...patch } : c)) }))
-
-  const save = async () => {
-    /* 読めていない間は保存しない（空で全置換して既存 CTA を消さない）。 */
-    if (!loaded) return
-    setMessage(null)
-    /*
-      保存前に「どのカードの何が足りないか」を枚数で示す。公開前検証で
-      止まる前に、ここで直し方まで伝える。1件でもあれば保存しない。
-    */
-    const problems = ctaCardProblems(ctas, times, durationSeconds, parseMinSec)
-    if (problems.length > 0) {
-      setMessage(problems.join('\n'))
-      return
-    }
-    const merged: WebinarCtaCard[] = ctas.map((card, i) => ({
-      ...card,
-      atSeconds: parseMinSec(times[i] ?? '') as number,
-    }))
-    setSaving(true)
-    setSaved(false)
-    try {
-      const sorted = [...merged].sort((a, b) => a.atSeconds - b.atSeconds)
-      await webinarApi.saveCtas(webinarId, sorted)
-      setSaved(true)
-      editCurrent((prev) => ({ ...prev, ctas: sorted, times: sorted.map((c) => fmtMinSec(c.atSeconds)) }))
-      /* 保存した中身を親の概要段へ流す。取り直しの GET は要らない。 */
-      onCtasLoaded?.(sorted)
-      setMessage(`${sorted.length}件保存しました`)
-    } catch (err) {
-      setMessage(`保存に失敗しました: ${(err as Error).message}`)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-ink-faint">
-        指定時間にチャット欄へ CTA カードが流れます。「フォーム」はウェビナー内でそのまま回答でき、
-        フォーム機能のタグ付与・シナリオ発火が自動で動きます。「URL」は外部ページを開きます。
-      </p>
-      {message && (
-        <Notice
-          tone="info"
-          action={!loaded ? (
-            <button type="button" onClick={() => void loadCtas()} className="font-medium underline">もう一度読み込む</button>
-          ) : undefined}
-        >
-          {message}
-        </Notice>
-      )}
-      {ctas.map((c, i) => (
-        <div key={i} className="space-y-2 rounded-mini border border-hairline p-3">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <label className="flex items-center gap-1">
-              表示時間
-              <input
-                value={times[i] ?? ''}
-                onChange={(e) =>
-                  editCurrent((prev) => ({ ...prev, times: prev.times.map((t, j) => (j === i ? e.target.value : t)) }))
-                }
-                placeholder="45:00"
-                className="w-20 rounded-mini border px-2 py-1"
-              />
-            </label>
-            <Select aria-label="リンクの種類" value={c.kind} onChange={(value) => update(i, { kind: value as 'form' | 'url' })} options={[{ value: "form", label: "フォーム" }, { value: "url", label: "URL" }]} />
-            {c.kind === 'form' ? (
-              <>
-                <Select
-                  aria-label="使うフォーム"
-                  value={c.formId ?? ''}
-                  onChange={(value) => update(i, { formId: value || null })}
-                  options={[{ value: '', label: 'フォームを選択...' }, ...forms.map((f) => ({ value: f.id, label: f.name }))]}
-                />
-                {(formsState === 'error' || formsState === 'forbidden') && (
-                  <p className="text-danger w-full text-xs" role="alert">
-                    {formsState === 'forbidden' ? 'フォーム候補を見る権限がありません。アカウントの権限を確認してください。' : 'フォーム候補を読み込めませんでした。'}
-                    <button type="button" onClick={onRetryForms} className="ml-2 font-medium underline">もう一度読み込む</button>
-                    <span className="text-ink-faint ml-2">候補が取れない間は種類をURLに切り替えて保存できます。</span>
-                  </p>
-                )}
-              </>
-            ) : (
-              <input
-                value={c.url ?? ''}
-                onChange={(e) => update(i, { url: e.target.value || null })}
-                placeholder="https://..."
-                className="min-w-60 flex-1 rounded-mini border px-2 py-1"
-              />
-            )}
-            {c.kind === 'form' && (
-              <Checkbox
-                checked={c.autoOpen}
-                onCheckedChange={(checked) => update(i, { autoOpen: checked })}
-              >自動でフォームを開く</Checkbox>
-            )}
-            <button
-              onClick={() => {
-                editCurrent((prev) => ({ ...prev, ctas: prev.ctas.filter((_, j) => j !== i), times: prev.times.filter((_, j) => j !== i) }))
-              }}
-              className="ml-auto text-danger"
-            >
-              削除
-            </button>
-          </div>
-          <input
-            value={c.title}
-            onChange={(e) => update(i, { title: e.target.value })}
-            placeholder="カード見出し（例: 個別導入診断、受付中です）"
-            className="w-full rounded-mini border px-2 py-1 text-sm font-bold"
-          />
-          <input
-            value={c.body ?? ''}
-            onChange={(e) => update(i, { body: e.target.value || null })}
-            placeholder="補足文（任意。例: この配信を見ている方限定・枠が少なめです）"
-            className="w-full rounded-mini border px-2 py-1 text-sm"
-          />
-          <input
-            value={c.buttonLabel}
-            onChange={(e) => update(i, { buttonLabel: e.target.value })}
-            placeholder="ボタン文言（例: 無料で診断を受ける）"
-            className="w-full rounded-mini border px-2 py-1 text-sm"
-          />
-        </div>
-      ))}
-      <StickyBar actions={(
-        <>
-        <button
-          onClick={() => {
-            editCurrent((prev) => ({
-              ...prev,
-              ctas: [...prev.ctas, {
-                atSeconds: 0, kind: 'form', title: '', body: null,
-                buttonLabel: '', autoOpen: false, formId: null, url: null,
-              }],
-              times: [...prev.times, '0:00'],
-            }))
-          }}
-          className="rounded-mini border px-3 py-1 text-sm"
-        >
-          + CTAカード追加
-        </button>
-        <Button
-          variant="primary"
-          onClick={() => void save()}
-          disabled={!loaded}
-          busy={saving}
-          done={saved}
-        >
-          保存する
-        </Button>
-        </>
-      )} />
-    </div>
-  )
-}
-
-type RegistrationFormOption = { id: string; name: string; isActive: boolean }
-
-/*
-  フォーム候補は「どの account の分か」を必ず一緒に持つ。
-  account を切り替えた瞬間から前の account の候補は出さない・選ばせない・保存させない。
-*/
-type FormCandidates = { accountId: string | null; state: FormCandidateState; items: RegistrationFormOption[] }
-
-function emptyFormCandidates(accountId: string | null): FormCandidates {
-  return { accountId, state: accountId ? 'loading' : 'idle', items: [] }
-}
-
-function CtaDesignStep({ webinarId, accountId, durationSeconds, editor, registrations, onEditorChange, onCtasReport }: { webinarId: string; accountId: string | null; durationSeconds: number; editor: WebinarEditor; registrations: number | null; onEditorChange: (editor: WebinarEditor) => void; onCtasReport?: (ctas: WebinarCtaCard[] | null) => void }) {
-  /* 子から受け取った CTA も「どのウェビナーの分か」を一緒に持つ。 */
-  const [reportedCtas, setReportedCtas] = useState<{ webinarId: string; items: WebinarCtaCard[] }>(() => ({ webinarId, items: [] }))
-  const ctas = reportedCtas.webinarId === webinarId ? reportedCtas.items : []
-  /*
-    申込フォームの候補。CTA内で使うフォームとは別の選択肢。
-    公開中のものだけを候補にし、停止・削除・別アカウントは選ばせない。
-  */
-  const [formCandidates, setFormCandidates] = useState<FormCandidates>(() => emptyFormCandidates(accountId))
-  const [selectedRegistrationFormId, setSelectedRegistrationFormId] = useState<string>(editor.registrationFormId ?? '')
-  const [savingRegistrationForm, setSavingRegistrationForm] = useState(false)
-  const [registrationNotice, setRegistrationNotice] = useState('')
-  const [registrationError, setRegistrationError] = useState('')
-  /* 取得の世代印。切替後に遅れて届いた前の account の応答はここで捨てる。 */
-  const formRequestId = useRef(0)
-
-  /* 描くのは今の account の分だけ。印が違えば「これから読む」として描く。 */
-  const currentFormCandidates = formCandidates.accountId === accountId ? formCandidates : emptyFormCandidates(accountId)
-  const registrationForms = currentFormCandidates.items
-  const registrationFormState = currentFormCandidates.state
-
-  /*
-    CTA の取得は子の編集タブ(`CtasTab`)に一本化し、親は報告を受けて
-    件数だけ描く。同じ口を親子で2回叩かない。
-  */
-  const handleCtasLoaded = useCallback((next: WebinarCtaCard[] | null) => {
-    setReportedCtas({ webinarId, items: next ?? [] })
-    /* 段の印と最終確認もカード件数で決めるため、親へも届ける。 */
-    onCtasReport?.(next)
-  }, [webinarId, onCtasReport])
-
-  const loadRegistrationForms = useCallback(() => {
-    const requestId = ++formRequestId.current
-    if (!accountId) {
-      setFormCandidates({ accountId, state: 'idle', items: [] })
-      return
-    }
-    /* 取得を始めた時点で前の候補を捨てる。読み込み中に旧候補を出さない。 */
-    setFormCandidates({ accountId, state: 'loading', items: [] })
-    fetchApi<{ success: boolean; data: Array<{ id: string; name: string; isActive?: boolean }> }>(`/api/forms?account_id=${encodeURIComponent(accountId)}`)
-      .then((response) => {
-        if (requestId !== formRequestId.current) return
-        const items = Array.isArray(response.data) ? response.data : []
-        setFormCandidates({ accountId, state: 'ready', items: items.map((form) => ({ id: form.id, name: form.name, isActive: form.isActive === true })) })
-      })
-      .catch((cause) => {
-        if (requestId !== formRequestId.current) return
-        /* 口自体は同一アカウントに絞っている。403・404 は権限不足、それ以外は取得失敗。 */
-        setFormCandidates({ accountId, state: cause instanceof ApiError && (cause.status === 403 || cause.status === 404) ? 'forbidden' : 'error', items: [] })
-      })
-  }, [accountId])
-
-  useEffect(() => {
-    loadRegistrationForms()
-    return () => { formRequestId.current += 1 }
-  }, [loadRegistrationForms])
-
-  /* 候補は公開中だけ。停止中は一覧に混ぜない。 */
-  const publishedRegistrationForms = registrationForms.filter((form) => form.isActive)
-
-  const saveRegistrationForm = async () => {
-    /* 今の account の候補が揃うまで保存しない。切替直後に旧候補のIDを書き込ませない。 */
-    if (registrationFormState !== 'ready') {
-      setRegistrationNotice('')
-      setRegistrationError('回答フォームの候補を読み込んでから保存してください。')
-      return
-    }
-    /* 選択が今の候補に無いなら送らない。前の account の選択を新しい相手に保存させない。 */
-    if (selectedRegistrationFormId && !publishedRegistrationForms.some((form) => form.id === selectedRegistrationFormId)) {
-      setRegistrationNotice('')
-      setRegistrationError('選んだ申込フォームは今の候補にありません。公開中のフォームを選び直してください。')
-      return
-    }
-    setSavingRegistrationForm(true)
-    setRegistrationNotice('')
-    setRegistrationError('')
-    try {
-      const response = await webinarApi.saveEditor(webinarId, {
-        expectedVersion: editor.version,
-        registrationFormId: selectedRegistrationFormId || null,
-      })
-      onEditorChange(response.data)
-      setRegistrationNotice('申込フォームを保存しました。公開前確認で申込フォームが公開中か確認してください。')
-    } catch (cause) {
-      if (cause instanceof ApiError && (cause.code === 'form_inactive_or_missing' || cause.code === 'form_account_mismatch')) {
-        /* 停止・削除・別アカウントはサーバーが拒否する。候補を取り直して選び直しを促す。 */
-        loadRegistrationForms()
-      }
-      setRegistrationError(webinarErrorText(cause, '申込フォームを保存できませんでした。開き直して試してください。'))
-    } finally {
-      setSavingRegistrationForm(false)
-    }
-  }
-
-  const primary = ctas[0]
-  const forms = registrationForms.map(({ id, name }) => ({ id, name }))
-  const selectedForm = forms.find((form) => form.id === primary?.formId)
-  /* 保存済みだが候補に無い = 停止・削除・別アカウント。拒否理由と選び直しを出す。 */
-  const savedRegistrationFormMissing = Boolean(
-    editor.registrationFormId && !publishedRegistrationForms.some((form) => form.id === editor.registrationFormId),
-  )
-
-  return (
-    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="d3rFGD">
-      <div className="min-w-0 flex-1 space-y-3">
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-semibold">CTA設定</h2><p className="text-ink-faint mt-1 text-xs">動画内に表示するボタンとタイミングを設定します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">表示タイミング</dt><dd className="text-ink text-sm font-semibold">{primary ? `動画の${Math.floor(primary.atSeconds / 60)}分${String(primary.atSeconds % 60).padStart(2, '0')}秒` : '—（未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">ボタン文言</dt><dd className="text-ink text-sm font-semibold">{primary?.buttonLabel || '—（未設定）'}</dd></div></dl>{(registrationFormState === 'error' || registrationFormState === 'forbidden') && (<p className="text-danger mt-3 text-xs" role="alert">{registrationFormState === 'forbidden' ? 'フォーム候補を見る権限がありません。' : 'フォーム候補を読み込めませんでした。'}<button type="button" onClick={loadRegistrationForms} className="ml-2 font-semibold underline">もう一度読み込む</button></p>)}</section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-base font-semibold">申込フォーム</h2><p className="text-ink-faint mt-1 text-xs">申込情報の保存先と完了アクションを設定します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">入力項目</dt><dd className="text-ink max-w-2xl text-right text-sm font-semibold">{editor.publicPage.form?.fields.join('・') || selectedForm?.name || '—（未設定）'}</dd></div><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">完了アクション</dt><dd className="text-ink max-w-2xl text-right text-sm font-semibold">{editor.publicPage.form?.completionActions.join('・') || '設定なし'}</dd></div></dl></section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-          <h2 className="text-ink text-base font-bold">申込フォームの選択</h2>
-          <p className="text-ink-faint mt-1 text-xs">公開前の確認で使う申込フォームを選びます。動画内のCTAボタンで使うフォームとは別です。同じLINE公式アカウントの公開中の回答フォームだけが候補に出ます。</p>
-          <dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">保存済み</dt><dd className="text-ink max-w-2xl text-right text-sm font-semibold">{editor.publicPage.form ? `${editor.publicPage.form.name}（${editor.publicPage.form.fields.length}項目）` : '—（未設定）'}</dd></div></dl>
-          <div className="mt-4 space-y-3">
-            {!accountId ? <p className="text-ink-faint text-sm">このウェビナーのLINE公式アカウントを確認できません。</p> : null}
-            {accountId && registrationFormState === 'loading' ? <p className="text-ink-faint text-sm">回答フォームを読み込んでいます。</p> : null}
-            {accountId && registrationFormState === 'forbidden' ? (
-              <div className="space-y-2"><p className="text-danger text-sm">回答フォームを見る権限がありません。アカウントの権限を確認してください。</p><Button onClick={loadRegistrationForms}>もう一度読み込む</Button></div>
-            ) : null}
-            {accountId && registrationFormState === 'error' ? (
-              <div className="space-y-2"><p className="text-danger text-sm">回答フォームを読み込めませんでした。</p><Button onClick={loadRegistrationForms}>もう一度読み込む</Button></div>
-            ) : null}
-            {accountId && registrationFormState === 'ready' && publishedRegistrationForms.length === 0 ? (
-              <p className="text-ink-faint text-sm">公開中の回答フォームがありません。フォーム機能で公開中のフォームを作ってください。</p>
-            ) : null}
-            {accountId && registrationFormState === 'ready' && publishedRegistrationForms.length > 0 ? (
-              <div className="max-w-md">
-                <Select
-                  value={selectedRegistrationFormId}
-                  onChange={(value) => setSelectedRegistrationFormId(value)}
-                  aria-label="申込に使う回答フォーム"
-                  options={[{ value: '', label: '申込フォームを選ぶ' }, ...publishedRegistrationForms.map((form) => ({ value: form.id, label: form.name }))]}
-                />
-              </div>
-            ) : null}
-            {registrationFormState === 'ready' && selectedRegistrationFormId && !publishedRegistrationForms.some((form) => form.id === selectedRegistrationFormId) ? (
-              <p className="text-warning text-sm">前に選んだフォームは使えなくなりました（停止・削除・別アカウント）。公開中のフォームを選び直して保存してください。</p>
-            ) : null}
-            {savedRegistrationFormMissing && registrationFormState === 'ready' ? (
-              <p className="text-warning text-sm">保存済みの申込フォームは公開中ではありません（停止・削除・別アカウント）。このままでは公開前確認を通りません。</p>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="primary" onClick={() => void saveRegistrationForm()} disabled={savingRegistrationForm || registrationFormState !== 'ready' || !accountId} busy={savingRegistrationForm}>申込フォームを保存する</Button>
-            </div>
-            {registrationNotice ? <p className="text-ink-secondary text-sm">{registrationNotice}</p> : null}
-            {registrationError ? <p className="text-danger text-sm" role="alert">{registrationError}</p> : null}
-          </div>
-        </section>
-        <EditorDetails label="CTAカードとフォームの詳細を編集する"><CtasTab webinarId={webinarId} durationSeconds={durationSeconds} forms={forms} formsState={registrationFormState} onRetryForms={loadRegistrationForms} onCtasLoaded={handleCtasLoaded} /></EditorDetails>
-      </div>
-      <SummaryAside rows={[
-        ['CTA', `${formatNumber(ctas.length)}件`],
-        ['フォーム', primary?.formId ? '公開中' : '未設定'],
-        ['申込', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
-      ]} previewBody={primary?.body || 'CTAの説明文はまだ設定されていません。'} previewButton={primary?.buttonLabel || null}>
-        <div className="flex gap-2"><Button disabled title="確認の段で実行します">テストを送る</Button><Button disabled title="この段では実行できません">公開ページを見る</Button></div>
-      </SummaryAside>
-    </div>
   )
 }
 
@@ -1986,135 +494,6 @@ const EXTRAS = [
 type ExtraKey = (typeof EXTRAS)[number][0]
 type PaneKey = StepKey | ExtraKey
 
-/**
- * STEP 5 確認（設計 `D6yO7e`）。**公開の前に、足りないものを1つずつ言う。**
- * ここで言えないと、公開してから友だちの画面で気づくことになる。
- */
-function ReviewStep({ webinar, editor, registrations, ctaCount, onBack, onPublished }: { webinar: Webinar; editor: WebinarEditor; registrations: number | null; ctaCount: number; onBack: (key: StepKey) => void; onPublished: () => void }) {
-  const [validation, setValidation] = useState<WebinarPublishValidation | null>(null)
-  const [validationState, setValidationState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [publishing, setPublishing] = useState(false)
-  const [publishError, setPublishError] = useState('')
-  const validationRequestId = useRef(0)
-  /*
-    検査の取得に失敗しても「読み込み中」のまま公開ボタンを固めない。
-    失敗は失敗と出して、やり直しと次の一手を添える。
-  */
-  const loadValidation = useCallback(() => {
-    const requestId = ++validationRequestId.current
-    setValidationState('loading')
-    webinarApi.publishValidation(webinar.id)
-      .then((response) => {
-        if (requestId !== validationRequestId.current) return
-        setValidation(response.data)
-        setValidationState('ready')
-      })
-      .catch(() => {
-        if (requestId !== validationRequestId.current) return
-        setValidation(null)
-        setValidationState('error')
-      })
-  }, [webinar.id])
-  useEffect(() => {
-    loadValidation()
-    return () => { validationRequestId.current += 1 }
-  }, [loadValidation])
-  const blockers = validation
-    ? validation.checks.filter((check) => check.status === 'failed').map((check) => check.detail || check.label)
-    : publishBlockers(webinar)
-  /*
-    R93: 最終確認と設定サマリーの文言は値に連動させる。
-    検査の有無・合否と関係ない固定文（「確認しました」「追加」）は出さない。
-  */
-  const actionSummary = reviewActionSummaryText(validation)
-  const testSummaryBody = reviewTestSummaryBody(validation, validationState)
-  const monitoringFailures = editor.monitoring.notificationFailures +
-    editor.monitoring.viewSegmentFailures + editor.monitoring.actionFailures
-  const monitoringSummary = reviewMonitoringText(monitoringFailures)
-  const publish = async () => {
-    setPublishing(true)
-    setPublishError('')
-    try {
-      await webinarApi.publish(webinar.id, editor.version)
-      /*
-        公開できたあとの遷移は「入力を捨てる離脱」ではない。未保存の印が
-        残っていてもブラウザ標準の離脱確認が出ないよう、遷移の直前に
-        未保存ガードを外す。
-      */
-      onPublished()
-      window.location.assign(`/webinars/published?id=${encodeURIComponent(webinar.id)}`)
-    } catch (cause) {
-      setPublishError(webinarErrorText(cause, '公開できませんでした'))
-      setPublishing(false)
-    }
-  }
-  return (
-    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="D6yO7e">
-      <div className="min-w-0 flex-1 space-y-3">
-      <section className="border-hairline bg-canvas space-y-4 rounded-card border p-5 shadow-card">
-      <div><h2 className="text-ink font-bold">公開前チェック</h2><p className="text-ink-faint mt-1 text-xs">公開に必要な設定を確認します。</p></div>
-      {validationState === 'ready' && blockers.length > 0 ? (
-        <Notice tone="warn">
-          <p className="font-bold">このままでは公開できません。</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-            {blockers.map((text) => <li key={text}>{text}</li>)}
-          </ul>
-        </Notice>
-      ) : validationState === 'ready' ? (
-        <Notice tone="success">
-          必要なものは揃っています。
-        </Notice>
-      ) : null}
-      <ul className="divide-hairline border-hairline divide-y rounded-card border text-sm">
-        {(validation?.checks ?? []).map((check) => <li key={check.key} className="text-ink flex items-start gap-2 px-4 py-3"><span className={check.status === 'passed' ? 'text-success' : check.status === 'warning' ? 'text-warning' : 'text-danger'}>{check.status === 'passed' ? '✓' : '!'}</span><span><strong className="block">{check.label}</strong><span className="text-ink-faint text-xs">{check.detail}</span></span></li>)}
-        {validationState === 'loading' ? <li className="text-ink-faint px-4 py-3">公開前検査を読み込んでいます。</li> : null}
-      </ul>
-      {validationState === 'error' ? (
-        <Notice
-          tone="danger"
-          action={<Button onClick={loadValidation}>もう一度読み込む</Button>}
-        >
-          <p className="font-bold">公開前検査を読み込めませんでした。このままでは公開できません。</p>
-          <p className="mt-1 text-xs">まず下のボタンでもう一度読み込んでください。直らなければ基本設定・動画・CTAの各段が保存済みか確かめ、時間をおいて開き直してください。</p>
-        </Notice>
-      ) : null}
-      </section>
-      <section className="border-hairline bg-canvas space-y-4 rounded-card border p-5 shadow-card">
-      <div><h2 className="text-ink font-bold">最終確認</h2><p className="text-ink-faint mt-1 text-xs">公開すると、申込・配信条件に合う友だちが視聴できます。</p></div>
-      <dl className="divide-hairline border-hairline divide-y rounded-card border">
-        {[
-          ['ウェビナー名', webinar.title || '未設定'],
-          ['動画・公開', webinar.videoPrefix ? '申込者向け' : '未設定'],
-          ['公開期間', deliveryWindow(webinar)],
-          ['対象', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
-          ['CTA・フォーム', ctaCount > 0 ? `${ctaCount}件のCTA` : webinar.cta ? '動画＋CTA＋フォーム' : '未設定'],
-          ['アクション', actionSummary],
-        ].map(([label, value]) => (
-          <div key={label} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3">
-            <dt className="text-ink-faint text-xs font-semibold">{label}</dt>
-            <dd className="text-ink text-sm">{value}</dd>
-          </div>
-        ))}
-      </dl>
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => onBack('basic')}>基本設定へ戻る</Button>
-        <Button onClick={() => onBack('video')}>動画へ戻る</Button>
-        <Button variant="primary" disabled={!validation || blockers.length > 0 || publishing} onClick={() => void publish()} busy={publishing} busyLabel="公開中…">この版を公開</Button>
-      </div>
-      {publishError ? <p className="text-danger text-xs" role="alert">{publishError}</p> : null}
-      <p className="text-ink-faint text-xs">公開時点の版を固定し、編集中の下書きとは分けて保存します。</p>
-      </section>
-      </div>
-      <SummaryAside rows={[
-        ['状態', webinar.status === 'active' ? '公開中' : '有効化前'],
-        ['申込見込み', registrations === null ? '—（未取得）' : `${formatNumber(registrations)}人`],
-        ['通知重複', validation?.checks.find((check) => check.key === 'notification_duplicates')?.status === 'passed' ? '重複なし' : '要確認'],
-        ['監視', monitoringSummary],
-      ]} previewBody={testSummaryBody} previewFirst />
-    </div>
-  )
-}
-
 function EditWebinarInner() {
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -2165,6 +544,8 @@ function EditWebinarInner() {
   const [analyticsId, setAnalyticsId] = useState<string | null>(null)
   /* 取得の世代印。切替後に遅れて届いた前のウェビナーの応答はここで捨てる。 */
   const loadRequestId = useRef(0)
+  const [participantExport, setParticipantExport] = useState<ParticipantExport | null>(null)
+  const handleParticipantExport = useCallback((value: ParticipantExport | null) => setParticipantExport(value), [])
 
   const webinar = loadedWebinar && loadedWebinar.id === id ? loadedWebinar.webinar : null
   const editor = loadedWebinar && loadedWebinar.id === id ? loadedWebinar.editor : null
@@ -2210,25 +591,6 @@ function EditWebinarInner() {
     ? requestedPane as PaneKey
     : 'basic'
   const [pane, setPane] = useState<PaneKey>(initialPane)
-  /*
-    ★V8 切替用。共通の useAdminTheme は使わない（node 実行の試験で
-    document が無いときに落ちるため）。ここでは document が読める
-    ときだけ読み、読めなければ v7 のままにする。
-  */
-  const readAdminTheme = (): 'v7' | 'v8' =>
-    typeof document === 'undefined'
-      ? 'v7'
-      : document.documentElement?.dataset?.theme === 'v8'
-        ? 'v8'
-        : 'v7'
-  const [adminTheme, setAdminTheme] = useState<'v7' | 'v8'>(readAdminTheme)
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return
-    const update = () => setAdminTheme(readAdminTheme())
-    update()
-    window.addEventListener(ADMIN_THEME_CHANGED_EVENT, update)
-    return () => window.removeEventListener(ADMIN_THEME_CHANGED_EVENT, update)
-  }, [])
   /*
     CTAの印と最終確認が見るカード件数。初期値はエディタ応答の ctaCount、
     CTAの段を開いた後は子タブが保存・再取得した結果を正本にする。
@@ -2389,9 +751,9 @@ function EditWebinarInner() {
 
   const paneTitle: Record<PaneKey, string> = {
     basic: 'ウェビナー編集',
-    video: '動画と公開設定',
-    cta: 'CTAと申込フォーム',
-    notifications: '通知とリマインド',
+    video: '動画と公開期間',
+    cta: 'CTA・フォーム',
+    notifications: '通知と視聴後のこと',
     review: 'ウェビナー・公開前確認',
     comments: 'コメント演出',
     actions: 'ウェビナー・視聴後通知・アクション',
@@ -2551,14 +913,14 @@ function EditWebinarInner() {
         : 'basic'
   const showSteps = ['basic', 'video', 'cta', 'notifications', 'actions', 'preview', 'review'].includes(pane)
   const nextPane: PaneKey | null = pane === 'notifications'
-    ? 'actions'
+    ? 'review'
     : pane === 'actions'
       ? 'preview'
       : pane === 'preview'
         ? 'review'
         : nextStepOf(pane as StepKey)
   const nextPaneLabel = pane === 'notifications'
-    ? '視聴後アクションへ'
+    ? '確認へ'
     : pane === 'actions'
       ? 'プレビューへ'
       : pane === 'preview'
@@ -2571,9 +933,12 @@ function EditWebinarInner() {
     : nextPaneLabel
 
   return (
-    <div className="flex flex-col gap-4 pb-24 pt-4">
+    <div className="min-w-0" data-webinar-editor="v8">
       {/* ★V7: 左右の余白は共通の枠が持つ。画面側で幅と横余白を足すと 24px ずれる。 */}
       <nav data-design="Crumb" className="text-action text-xs font-semibold"><Link href="/webinars" className="hover:underline">← ウェビナー一覧</Link></nav>
+      <div className="flex items-center justify-between gap-3"><h1 className="text-ink min-w-0 truncate text-xl font-semibold" title={showSteps ? paneTitle[pane] : webinar.title}>{showSteps ? paneTitle[pane] : webinar.title}</h1>{(pane === 'participants' || pane === 'analytics') && participantExport?.available ? <Button onClick={participantExport.download} disabled={participantExport.busy} busy={participantExport.busy} busyLabel="書き出しています…">CSVで書き出す</Button> : null}</div>
+
+      {!showSteps ? <p className="text-ink-secondary text-xs">{editor.deliveryKind === 'on_demand' ? 'オンデマンド・いつでも視聴' : '日時指定'}・{webinarStatusLabel(webinar.status)}（版 {editor.version}）</p> : null}
 
       {conflict ? (
         <WebinarEditConflictBand
@@ -2599,11 +964,11 @@ function EditWebinarInner() {
       ) : null}
 
       {showSteps ? (
-        <ol data-design="Steps" className="border-hairline bg-canvas flex flex-wrap items-center gap-1 rounded-card border p-3 shadow-card">
+        <ol data-design="Steps" className="flex" data-webinar-steps="true">
           {STEPS.map((step) => {
             const state = stepStateOf(step.key, railPane, webinar, ctaCount)
             return (
-              <li key={step.key} className="flex min-w-0 flex-1 items-center gap-2">
+              <li key={step.key} className="flex items-center gap-2">
                 <button
                   type="button"
                   data-qa-open={step.mark}
@@ -2643,8 +1008,9 @@ function EditWebinarInner() {
         R94: 参加者・分析・コメント演出への常設導線。作る手順の段（STEPS）
         とは別に、公開後の運用で開く面をいつでも選べるようにする。
       */}
-      <nav aria-label="参加者・分析・演出へ移動" className="border-hairline bg-canvas flex flex-wrap items-center gap-1 rounded-card border p-3 shadow-card">
+      <nav aria-label="参加者・分析・演出へ移動" className="flex" data-webinar-tabs="true">
         {([
+          { key: 'basic', label: '設定' },
           { key: 'participants', label: '参加者' },
           { key: 'analytics', label: '分析' },
           { key: 'comments', label: 'コメント演出' },
@@ -2671,17 +1037,13 @@ function EditWebinarInner() {
       */}
       {visitedPanes.has('basic') ? (
         <div hidden={pane !== 'basic'}>
-          <WebinarForm key={`${webinar.id}-${webinar.updatedAt}`} initial={webinar} hideBar onSaved={handleWebinarSaved} onDirtyChange={dirtyReporterFor('basic')} registerSave={saveRegistrarFor('basic')} />
+          <BasicV8 key={webinar.id} webinar={webinar} editor={editor} onWebinarSaved={handleWebinarSaved} onEditorChange={setEditor} onDirtyChange={dirtyReporterFor('basic')} registerSave={saveRegistrarFor('basic')} />
         </div>
       ) : null}
       {visitedPanes.has('video') ? (
         <div hidden={pane !== 'video'}>
-          {/*
-            ★V8 切替（動画 `VWNaA`・開催回 `LPOe7`）。v7 の見た目は
-            data-theme="v8" が付くまで 1画素も変えない。
-          */}
-          {adminTheme === 'v8' ? (
-            <VideoV8
+
+<VideoV8
               webinar={webinar}
               editor={editor}
               publicUrl={publicUrl}
@@ -2691,75 +1053,31 @@ function EditWebinarInner() {
               onWebinarSaved={handleWebinarSaved}
               onDirtyChange={dirtyReporterFor('video')}
               registerSave={saveRegistrarFor('video')}
-              onEditVideo={() => goStep('basic')}
+              onEditorChange={setEditor}
             />
-          ) : (
-            <VideoDesignStep webinar={webinar} editor={editor} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onWebinarSaved={handleWebinarSaved} onDirtyChange={dirtyReporterFor('video')} registerSave={saveRegistrarFor('video')} />
-          )}
         </div>
       ) : null}
       {visitedPanes.has('cta') ? (
         <div hidden={pane !== 'cta'}>
-          {/*
-            ★V8 切替（CTA・フォーム `Q0Jrk`）。v7 の見た目は
-            data-theme="v8" が付くまで 1画素も変えない。
-          */}
-          {adminTheme === 'v8' ? (
-            <CtaV8 webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} onEditorChange={setEditor} onCtasReport={handleCtasReport} onEditConflict={(latest, compare) => setConflict({ latest, compare })} />
-          ) : (
-            <CtaDesignStep webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} registrations={registrations} onEditorChange={setEditor} onCtasReport={handleCtasReport} />
-          )}
+
+<CtaV8 webinarId={webinar.id} accountId={webinar.accountId} durationSeconds={webinar.durationSeconds} editor={editor} onEditorChange={setEditor} onCtasReport={handleCtasReport} onDirtyChange={dirtyReporterFor('cta')} registerSave={saveRegistrarFor('cta')} />
         </div>
       ) : null}
       {visitedPanes.has('notifications') ? (
         <div hidden={pane !== 'notifications'}>
-          {/*
-            ★V8 切替（通知 `E7iAYs`）。v7 の見た目は
-            data-theme="v8" が付くまで 1画素も変えない。
-          */}
-          {adminTheme === 'v8' ? (
-            <NotificationsV8 webinarId={webinar.id} webinarTitle={webinar.title} editor={editor} onOpenActions={() => goStep('actions')} />
-          ) : (
-            <NotificationDesignStep webinarId={webinar.id} webinarTitle={webinar.title} registrations={registrations} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} onDirtyChange={dirtyReporterFor('notifications')} registerSave={saveRegistrarFor('notifications')} />
-          )}
+          <NotificationsV8 webinarId={webinar.id} webinarTitle={webinar.title} editor={editor} onEditorChange={setEditor} onOpenActions={() => goStep('actions')} onDirtyChange={dirtyReporterFor('notifications')} registerSave={saveRegistrarFor('notifications')} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} />
         </div>
       ) : null}
-      {pane === 'review' && (
-        /*
-          ★V8 切替（確認 `XCUNf`）。v7 の見た目は
-          data-theme="v8" が付くまで 1画素も変えない。
-        */
-        adminTheme === 'v8' ? (
-          <ReviewV8 webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onPublished={disarm} onTestNotifications={() => goStep('notifications')} />
-        ) : (
-          <ReviewStep webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onBack={goStep} onPublished={disarm} />
-        )
-      )}
-      {visitedPanes.has('comments') ? (
-        <div hidden={pane !== 'comments'}>
-          {/*
-            ★V8 切替（コメント演出 `Omqd4`）。v7 の見た目は
-            data-theme="v8" が付くまで 1画素も変えない。
-          */}
-          {adminTheme === 'v8' ? (
-            <CommentsV8 webinarId={webinar.id} />
-          ) : (
-            <CommentsTab webinarId={webinar.id} />
-          )}
-        </div>
-      ) : null}
+      {pane === 'review' && <ReviewV8 webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onPublished={disarm} onEditorChange={setEditor} onBack={() => goStep('notifications')} onTestNotifications={() => goStep('notifications')} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} />}
+      {visitedPanes.has('comments') ? <div hidden={pane !== 'comments'}><CommentsV8 webinarId={webinar.id} onDirtyChange={dirtyReporterFor('comments')} registerSave={saveRegistrarFor('comments')} /></div> : null}
       {visitedPanes.has('actions') ? (
         <div hidden={pane !== 'actions'}>
           <WebinarActionsTab webinarId={webinar.id} editor={editor} onEditorChange={setEditor} />
         </div>
       ) : null}
       {pane === 'preview' && <PublicPreviewStep webinar={webinar} editor={editor} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} onEditorChange={setEditor} />}
-      {/*
-        ★V8 切替（参加者管理 `uNsEy`）。v7 の見た目は
-        data-theme="v8" が付くまで 1画素も変えない。
-      */}
-      {pane === 'participants' && (adminTheme === 'v8' ? <ParticipantsV8 webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} /> : <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} view="participants" analytics={analytics} analyticsState={analyticsState} webinarStatus={webinar.status} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} />)}
-      {pane === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} webinarStatus={webinar.status} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} onOpenParticipants={() => goStep('participants')} />}
+      {pane === 'participants' && <ParticipantsV8 webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} onExportChange={handleParticipantExport} />}
+      {pane === 'analytics' && <AnalyticsV8 webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} onExportChange={handleParticipantExport} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} />}
 
       {/* 保存はこの一段だけ。各段の中に別の保存バーは出さない。共通 StickyBar を使い、画面幅いっぱいの fixed 配置でサイドバーに重ねない。 */}
       {showSteps && nextPane && nextPaneLabel ? (
@@ -2767,13 +1085,14 @@ function EditWebinarInner() {
           status={unsavedPanes.size > 0 ? '保存していない変更があります' : undefined}
           actions={(
             <>
-              <Button disabled={savingForNav !== false || !savablePanes.has(pane)} title={savablePanes.has(pane) ? undefined : 'この段の中の保存ボタンから保存します'} onClick={() => void handleDraftSave()} busy={savingForNav === 'draft'}>下書きを保存する</Button>
+              <Button href="/webinars">キャンセル</Button>
+              <Button disabled={savingForNav !== false || !savablePanes.has(pane)} title={savablePanes.has(pane) ? undefined : 'この段の中の保存ボタンから保存します'} onClick={() => void handleDraftSave()} busy={savingForNav === 'draft'}>下書きを保存</Button>
               <Button variant="primary" disabled={savingForNav !== false} onClick={() => void handlePrimaryAction()} busy={savingForNav === 'next'}>{primaryLabel}</Button>
             </>
           )}
         />
       ) : null}
-      {pane === 'participants' ? <div className="flex justify-end gap-2"><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=analytics`}>分析を見る</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーの設定を編集</Button></div> : null}
+
       {leaveConfirmDialog}
     </div>
   )

@@ -312,7 +312,7 @@ function webinarScopeWhere(scope: WebinarListScope, alias = 'w'): {
 export interface WebinarListFilters {
   q?: string;
   folderId?: string | null;
-  status?: 'active' | 'draft';
+  status?: 'active' | 'draft' | 'archived';
   sort?: 'updated' | 'created' | 'name';
 }
 
@@ -365,7 +365,7 @@ function webinarListWhere(
   const where = webinarScopeWhere(scope);
   const filter = webinarListFilterWhere(filters);
   return {
-    sql: `${where.sql} AND ${filter.sql} AND w.status <> 'archived'`,
+    sql: `${where.sql} AND ${filter.sql}${filters.status === 'archived' ? '' : " AND w.status <> 'archived'"}`,
     bindings: [...where.bindings, ...filter.bindings],
   };
 }

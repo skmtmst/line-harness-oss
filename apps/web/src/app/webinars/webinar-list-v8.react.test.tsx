@@ -13,9 +13,8 @@ import type { WebinarListItem } from '@/lib/api'
 
 /*
  * ★V8-B ウェビナー一覧（板 `UyUMw`・状態 `eAQ3t`・閲覧のみ `jiNg0`）の契約。
- * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
+ * V8だけの一覧で、
  * 見本が決めた帯・表・札・押せない形が出ることを実DOMで固定する。
- * v7 では従来の一覧が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -169,12 +168,7 @@ test('v8 の閲覧のみ（jiNg0）は作る・編集が押せない形になる
   expect(createButton?.disabled).toBe(true)
   const editButton = [...board!.querySelectorAll('button')].find((button) => button.textContent === '編集')
   expect(editButton?.disabled).toBe(true)
-})
-
-test('v7 では従来の一覧が出て UyUMw は出ない', async () => {
-  await renderPage()
-  expect(host.querySelector('[data-design-node="UyUMw"]')).toBeNull()
-  expect(host.querySelector('[data-design-node="ZC13r"]')).not.toBeNull()
+  expect(board?.textContent).toContain('閲覧のみで見ています')
 })
 
 /* V8「サクサク感」C①・D・E：行→詳細パネル・右クリック・つながる移り変わり。 */
@@ -266,4 +260,40 @@ test('v8 の読み込み中は骨組みで場所を取り「読み込み中」�
   })
   const skeletons = host.querySelectorAll('[data-skeleton]')
   expect(skeletons.length).toBeGreaterThanOrEqual(5)
+})
+
+test('アーカイブ済みを開いて記録を読み、確認してから下書きへ戻せる', async () => {
+  const archived = webinar({ status: 'archived', publicationState: 'ended' })
+  const requests: Array<{ url: string; method: string; body?: string }> = []
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    requests.push({ url, method: init?.method ?? 'GET', body: init?.body as string | undefined })
+    if (url.includes('/overview')) return json({ data: overviewData })
+    if (url.includes('/folders')) return json({ success: true, data: [] })
+    if (init?.method === 'PUT') return json({ data: { ...archived, status: 'draft' } })
+    if (url.includes('/api/webinars')) {
+      const params = new URL(url).searchParams
+      const items = params.get('status') === 'archived' ? [archived] : []
+      return json({ data: { items, total: items.length, limit: 20, sort: [] } })
+    }
+    return json({ data: null }, 404)
+  })
+  await renderPage()
+  await act(async () => { (host.querySelector('button[aria-label="よく使う絞り込み"]') as HTMLButtonElement).click() })
+  const option = [...document.querySelectorAll('[role="option"]')].find((el) => el.textContent === 'アーカイブ済み') as HTMLElement
+  expect(option).toBeTruthy()
+  await act(async () => { option.querySelector('button')!.click() })
+  expect(requests.some((r) => r.url.includes('status=archived'))).toBe(true)
+  const row = host.querySelector('tbody tr')!
+  expect(row.textContent).toContain('● アーカイブ')
+  expect(row.textContent).toContain('124人')
+  expect(row.textContent).toContain('視聴開始 98人')
+  await act(async () => { (row.querySelector('button[aria-label="NEN活用スタートセミナーのその他操作"]') as HTMLButtonElement).click() })
+  const restore = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes('下書きに戻す')) as HTMLElement
+  await act(async () => { restore.click() })
+  expect(requests.filter((r) => r.method === 'PUT')).toHaveLength(0)
+  const dialog = document.querySelector('[role="dialog"]')!
+  expect(dialog.textContent).toContain('公開するまでは、新しい申込は受け付けません')
+  await act(async () => { ([...dialog.querySelectorAll('button')].find((el) => el.textContent === '下書きに戻す') as HTMLButtonElement).click() })
+  expect(requests.filter((r) => r.method === 'PUT').map((r) => JSON.parse(r.body!))).toEqual([{ status: 'draft' }])
 })

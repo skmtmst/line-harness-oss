@@ -91,11 +91,11 @@ describe('通知の設定がまだ無いウェビナー（WEBINAR-09）', () => 
     await act(async () => { entry.click() })
 
     // 編集面が出る。勝手にONになっている通知は1つもない。
-    expect(host.querySelector('[data-design-node="Ho8z4"]')).not.toBeNull()
-    const toggles = [...host.querySelectorAll('input[type="checkbox"]')] as HTMLInputElement[]
+    expect(host.querySelector('[data-webinar-notifications]')).not.toBeNull()
+    const toggles = [...host.querySelectorAll('button[role="switch"]')] as HTMLInputElement[]
     expect(toggles.length).toBe(6)
     for (const toggle of toggles) {
-      expect(toggle.checked, `${toggle.getAttribute('aria-label')} が勝手にONになっている`).toBe(false)
+      expect(toggle.getAttribute('aria-checked') === 'true', `${toggle.getAttribute('aria-label')} が勝手にONになっている`).toBe(false)
     }
   })
 

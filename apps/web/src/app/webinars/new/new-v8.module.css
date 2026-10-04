@@ -103,8 +103,10 @@
 /* 本体2列：左の設定・右の見え方（幅 340〜380・左に細い線）。 */
 .body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 0;
+  margin: 0 -24px;
+  border-top: 1px solid var(--color-hairline);
   align-items: start;
   min-width: 0;
 }
@@ -195,7 +197,7 @@
 .previewCol {
   min-width: 0;
   border-left: 1px solid var(--color-hairline);
-  padding-left: 24px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -238,3 +240,6 @@
     padding-top: 16px;
   }
 }
+
+.form { padding: 24px 28px; }
+@container (max-width: 1052px) { .previewCol { display: none; } }
