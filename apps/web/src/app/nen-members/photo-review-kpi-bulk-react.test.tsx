@@ -132,19 +132,20 @@ async function selectPhoto(index: number) {
 
 /** 「投稿から審査までの日数」カードの大きな値（ラベルの直後の要素）を取る。 */
 function averageTimeValue(): string | undefined {
-  const label = Array.from(host.querySelectorAll('p'))
-    .find((p) => p.textContent?.trim() === '投稿から審査までの日数')
-  return label?.nextElementSibling?.textContent?.trim()
+  const button = Array.from(host.querySelectorAll('button')).find((node) => node.getAttribute('title')?.includes('投稿から審査までの日数'))
+  const title = button?.getAttribute('title') ?? ''
+  return title.split('投稿から審査までの日数：')[1]
+
 }
 
 describe('「投稿から審査までの日数」の読みやすい単位（Issue #666）', () => {
   it.each([
-    [59, '平均 59分'],
-    [61, '平均 約1時間'],
-    [1_439, '平均 約24時間'],
-    [1_441, '平均 約1日'],
+    [59, '59分'],
+    [61, '約1時間'],
+    [1_439, '約24時間'],
+    [1_441, '約1日'],
     // Issue の実測値: 55975分 ≒ 38.8日。
-    [55_975, '平均 約1ヶ月'],
+    [55_975, '約1ヶ月'],
   ])('平均%i分は「%s」と出る', async (minutes, expected) => {
     fixture.averageReviewMinutes = minutes
     net.handler = listHandler()

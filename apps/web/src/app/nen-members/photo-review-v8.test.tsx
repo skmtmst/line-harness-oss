@@ -128,6 +128,22 @@ describe('投稿 V8', () => {
     expect(screen.getByText('見送った理由')).toBeTruthy()
   })
 
+  it('見送りのプレビューは送信される理由・補足・再投稿案内を一度ずつ表示する', async () => {
+    staffMe.me.mockResolvedValue({ success: true, data: { role: 'owner' } })
+    mockAll()
+    render(<PhotoReviewV8 accountId="account-a" />)
+    await screen.findByText('散歩のあと', { exact: false })
+    fireEvent.click(screen.getByRole('button', { name: 'こむぎの写真を見送る' }))
+    fireEvent.click(screen.getByRole('radio', { name: '暗くて見えにくいです' }))
+    const supplement = '明るいところで、もう一度お願いできますか。'
+    const preview = screen.getByText('お写真をご投稿いただきありがとうございます。', { exact: false })
+    expect(preview.textContent?.split(supplement)).toHaveLength(2)
+    expect(preview.textContent).toContain('今回は「写真が暗い・ぼやけている」のため、掲載を見送らせていただきました。')
+    expect(preview.textContent).toContain('内容をご確認のうえ、よろしければ別のお写真をご投稿ください。')
+    fireEvent.click(screen.getByRole('checkbox', { name: 'もう一度 送ってもらえるようお願いする' }))
+    expect(preview.textContent).not.toContain('別のお写真をご投稿ください。')
+  })
+
   it('公式サイト掲載は SyQA1 の印で表を出す', async () => {
     staffMe.me.mockResolvedValue({ success: true, data: { role: 'owner' } })
     mockAll()
