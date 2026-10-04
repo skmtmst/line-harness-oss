@@ -9,8 +9,7 @@ import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import StatusBadge from '@/components/shared/status-badge'
 import { api } from '@/lib/api'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import { imageMatchesQuery, tileCaption, type BannerImage, type BannerPreset, type BannerProject, type BannerReferenceMode } from '@/lib/hq-banners'
+import { imageMatchesQuery, type BannerImage, type BannerPreset, type BannerProject, type BannerReferenceMode } from '@/lib/hq-banners'
 
 type Scope = 'all' | 'favorite' | 'project'
 
@@ -42,8 +41,6 @@ export default function ReferencePickerDialog({
   onPick: (image: BannerImage, usage: BannerReferenceMode) => void
   onUpload: (file: File) => void
 }) {
-  const theme = useAdminTheme()
-  const v8 = theme === 'v8'
   const [images, setImages] = useState<BannerImage[] | null>(null)
   const [nextBefore, setNextBefore] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -137,7 +134,7 @@ const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])),
     <Dialog
       open={open}
       title="参照画像を選ぶ"
-      description={v8 ? 'ライブラリから 1 枚選びます。生成した画像や取り込んだ画像がここに並びます。手元のファイルを選ぶこともできます。' : 'ライブラリから 1 枚選びます。'}
+      description="ライブラリから 1 枚選びます。生成した画像や取り込んだ画像がここに並びます。手元のファイルを選ぶこともできます。"
       onCancel={onClose}
       error={error || undefined}
       designNode="UcBQ5"
@@ -145,7 +142,7 @@ const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])),
         <div className="flex w-full flex-wrap items-center gap-2">
           <Button onClick={() => fileRef.current?.click()}>
             <Upload aria-hidden="true" className="h-4 w-4" />
-            {v8 ? 'ファイルを選ぶ' : '手元のファイルを選ぶ'}
+            ファイルを選ぶ
           </Button>
           <input
             ref={fileRef}
@@ -163,7 +160,7 @@ const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])),
           <Button onClick={onClose}>キャンセル</Button>
           <Button variant="primary" disabled={!current} onClick={() => current && onPick(current, usage)}>
             <Check aria-hidden="true" className="h-4 w-4" />
-            {v8 ? 'この画像を使う' : 'この画像を参照にする'}
+            この画像を使う
           </Button>
         </div>
       }
@@ -221,34 +218,20 @@ const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])),
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={image.media.url} alt="" className="h-full w-full object-cover" loading="lazy" />
                     {selected ? (
-                      v8 ? (
-                        <span className="absolute bottom-2 left-2 rounded-pill bg-accent-deep px-2 py-0.5 text-nano font-semibold text-on-accent">
-                          選んだ
-                        </span>
-                      ) : (
-                        <span className="absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-pill bg-accent-deep text-on-accent">
-                          <Check aria-hidden="true" className="h-3.5 w-3.5" />
-                        </span>
-                      )
+                      <span className="absolute bottom-2 left-2 rounded-pill bg-accent-deep px-2 py-0.5 text-nano font-semibold text-on-accent">
+                        選んだ
+                      </span>
                     ) : null}
                   </span>
-                  {v8 ? (
-                    <>
-                      <span className="truncate text-caption font-semibold text-ink">{referenceName(image)}</span>
-                      <span className="truncate text-nano text-ink-faint tabular-nums">{referenceSize(image, presets)}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="truncate text-caption font-semibold text-ink">{projectNames.get(image.projectId) ?? '—'} #{image.sequence}</span>
-                      <span className="truncate text-nano text-ink-faint">{tileCaption(image, presets)}</span>
-                    </>
-                  )}
+                  <>
+                    <span className="truncate text-caption font-semibold text-ink">{referenceName(image)}</span>
+                    <span className="truncate text-nano text-ink-faint tabular-nums">{referenceSize(image, presets)}</span>
+                  </>
                 </button>
               )
             })}
           </div>
-          {v8 ? (
-            <div className="rounded-control bg-canvas-sunken p-3">
+          <div className="rounded-control bg-canvas-sunken p-3">
               <p className="px-1 text-label font-medium text-ink">参照画像の使い方</p>
               <ul className="mt-1 flex flex-col">
                 {(
@@ -268,7 +251,6 @@ const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])),
                 ))}
               </ul>
             </div>
-          ) : null}
           </>
         )}
         {nextBefore ? (

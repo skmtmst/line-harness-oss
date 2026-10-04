@@ -73,7 +73,7 @@ async function flush(times = 8) {
 }
 
 function open() {
-  root.render(<ProjectsSection usage={null} onChanged={() => undefined} headerActions={() => undefined} />)
+  root.render(<ProjectsSection usage={null} onChanged={() => undefined} />)
 }
 
 function searchFor(word: string) {

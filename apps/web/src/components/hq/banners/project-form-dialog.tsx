@@ -4,7 +4,6 @@ import { useEffect, useId, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import type { BannerProject } from '@/lib/hq-banners'
 
 /**
@@ -30,7 +29,6 @@ export default function ProjectFormDialog({
   onCancel: () => void
 }) {
   const uid = useId()
-  const theme = useAdminTheme()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [localError, setLocalError] = useState('')
@@ -57,29 +55,26 @@ export default function ProjectFormDialog({
   }
 
   // W7Z57: 名前が空のまま作らせない。変えるときは名前が入っている。
-  // v7 の見た目は変えないため、下の帯の差し替えは V8 のときだけ。
   const canSubmit = !busy && (Boolean(project) || name.trim() !== '')
-  const v8Footer =
-    theme === 'v8' ? (
-      <div className="flex w-full flex-wrap items-center justify-end gap-2">
-        <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
-        <Button variant="primary" onClick={submit} disabled={!canSubmit} busy={busy} busyLabel="保存しています…">
-          {project ? '変更を保存' : '＋ 作って開く'}
-        </Button>
-      </div>
-    ) : undefined
   return (
     <Dialog
       open={open}
       title={project ? '名前と説明を変える' : 'プロジェクトを作る'}
-      description={project ? undefined : '案件やキャンペーンごとに1つ作ります。中で生成した画像は、あとでアカウントへ渡せます。'}
+      description={project ? undefined : '案件やキャンペーンごとに作ります。画像はプロジェクトの中で生成・取り込みします。'}
       confirmLabel={project ? '変更を保存' : 'プロジェクトを作る'}
       busy={busy}
       error={localError || error}
       onConfirm={submit}
       onCancel={onCancel}
       designNode="W7Z57"
-      footer={v8Footer}
+      footer={
+        <div className="flex w-full flex-wrap items-center justify-end gap-2">
+          <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
+          <Button variant="primary" onClick={submit} disabled={!canSubmit} busy={busy} busyLabel="保存しています…">
+            {project ? '変更を保存' : '＋ 作って開く'}
+          </Button>
+        </div>
+      }
     >
       <form
         className="flex flex-col gap-4"
