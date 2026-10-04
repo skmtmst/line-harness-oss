@@ -7,6 +7,58 @@ import { featureJobCanRun } from './feature-enforcement.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 
 const AUTO_ASSIGN_KEY = 'booking_auto_assign';
+
+/**
+ * F-25 人の予約の自動で合わせるルール（7項目）。
+ * autoAssign は既存の booking_auto_assign の鍵をそのまま使い、今の動きを変えない。
+ */
+export interface BookingAutoRules {
+  excludeCalendarBlock: boolean
+  writeBackToCalendar: boolean
+  autoAssign: boolean
+  mergeDuplicates: boolean
+  conflictNotify: boolean
+  unconnectedNotify: boolean
+  dailyLimitNotify: boolean
+}
+
+const BOOKING_AUTO_RULE_KEYS: Array<{ field: keyof BookingAutoRules; key: string; defaultValue: boolean }> = [
+  { field: 'excludeCalendarBlock', key: 'booking_auto_rule_exclude_calendar_block', defaultValue: true },
+  { field: 'writeBackToCalendar', key: 'booking_auto_rule_write_back_to_calendar', defaultValue: true },
+  { field: 'autoAssign', key: AUTO_ASSIGN_KEY, defaultValue: false },
+  { field: 'mergeDuplicates', key: 'booking_auto_rule_merge_duplicates', defaultValue: true },
+  { field: 'conflictNotify', key: 'booking_auto_rule_conflict_notify', defaultValue: true },
+  { field: 'unconnectedNotify', key: 'booking_auto_rule_unconnected_notify', defaultValue: true },
+  { field: 'dailyLimitNotify', key: 'booking_auto_rule_daily_limit_notify', defaultValue: false },
+];
+
+export async function getBookingAutoRules(db: D1Database, accountId: string): Promise<BookingAutoRules> {
+  const rows = await db.prepare(
+    `SELECT key, value FROM account_settings WHERE line_account_id = ? AND key IN (${BOOKING_AUTO_RULE_KEYS.map(() => '?').join(',')})`,
+  ).bind(accountId, ...BOOKING_AUTO_RULE_KEYS.map((entry) => entry.key)).all<{ key: string; value: string }>();
+  const values = new Map(rows.results.map((row) => [row.key, row.value]));
+  const read = (entry: (typeof BOOKING_AUTO_RULE_KEYS)[number]): boolean => {
+    const raw = values.get(entry.key);
+    return raw === undefined ? entry.defaultValue : raw === 'true';
+  };
+  return {
+    excludeCalendarBlock: read(BOOKING_AUTO_RULE_KEYS[0]),
+    writeBackToCalendar: read(BOOKING_AUTO_RULE_KEYS[1]),
+    autoAssign: read(BOOKING_AUTO_RULE_KEYS[2]),
+    mergeDuplicates: read(BOOKING_AUTO_RULE_KEYS[3]),
+    conflictNotify: read(BOOKING_AUTO_RULE_KEYS[4]),
+    unconnectedNotify: read(BOOKING_AUTO_RULE_KEYS[5]),
+    dailyLimitNotify: read(BOOKING_AUTO_RULE_KEYS[6]),
+  };
+}
+
+export async function saveBookingAutoRules(db: D1Database, accountId: string, rules: BookingAutoRules): Promise<void> {
+  for (const entry of BOOKING_AUTO_RULE_KEYS) {
+    await db.prepare(`INSERT INTO account_settings (id, line_account_id, key, value) VALUES (?,?,?,?)
+    ON CONFLICT(line_account_id,key) DO UPDATE SET value = excluded.value,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')`).bind(crypto.randomUUID(), accountId, entry.key, String(rules[entry.field])).run();
+  }
+}
 export async function getBookingAutoAssign(db: D1Database, accountId: string): Promise<boolean> {
   const row = await db.prepare('SELECT value FROM account_settings WHERE line_account_id = ? AND key = ?').bind(accountId, AUTO_ASSIGN_KEY).first<{ value: string }>();
   return row?.value === 'true';

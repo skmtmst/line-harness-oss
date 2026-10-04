@@ -506,6 +506,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'PUT /api/restaurant-test/inventory/:id',
     'PUT /api/restaurant-test/line-flows/:id',
     'PUT /api/restaurant-test/opening-hours',
+    // F-24 席の自動ルールの保存は店主・管理者だけ（読むほうは担当者も可）。
+    'PUT /api/restaurant-test/stores/:storeId/auto-rules',
     'PUT /api/settings/features',
     'PUT /api/traffic-pools/:id',
     'PUT /api/traffic-pools/:id/accounts/:accountId',

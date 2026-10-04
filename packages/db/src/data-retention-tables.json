@@ -3610,5 +3610,14 @@
       "parent": "line_accounts",
       "parentColumn": "id"
     }
+  },
+  "rt_store_auto_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
   }
 }
