@@ -35,6 +35,7 @@ import {
 } from '@/lib/api'
 import type { ApiResponse } from '@line-crm/shared'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
+import type { MileageV8TabKey } from './mileage-v8'
 import { formatNumber } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
 import { V8CreateButton } from './mileage-v8'
@@ -120,9 +121,11 @@ const PRESETS: Array<{ value: string; label: string }> = [
 export default function V8RewardsTab({
   readonly,
   registerHeaderActions,
+  registerTabCount,
 }: {
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
+  registerTabCount?: (key: MileageV8TabKey, text: string | null) => void
 }) {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const accountId = selectedAccountId
@@ -342,6 +345,10 @@ export default function V8RewardsTab({
     )
     return () => registerHeaderActions(null)
   }, [canExport, exportCsv, registerHeaderActions])
+
+  useEffect(() => {
+    registerTabCount?.('rewards', status !== 'ready' ? null : formatMileageNumber(rewards.length))
+  }, [registerTabCount, rewards.length, status])
 
   const publishedCount = rewards.filter((r) => r.status === 'published').length
   const draftCount = rewards.filter((r) => r.status === 'draft').length
