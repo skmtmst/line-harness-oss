@@ -140,8 +140,27 @@ function stepShortTiming(step: ReminderDraftStep, mode: ReminderDraftSettings['d
   return describeReminderTiming(step, mode)
 }
 
+/*
+ * 1152 幅の板の印（V8.pen の地図）。板が 1100px を切ったら（画面幅で約 1352px
+ * 未満）、手順③の外枠に 1152 の板 ID を付ける。数える側は印で数える。
+ */
+function useNarrowBoard() {
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const query = window.matchMedia('(max-width: 1351px)')
+    const update = () => setNarrow(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  return narrow
+}
+
 export default function ReminderEditV8({ reminderId, stage }: { reminderId: string; stage: string | null }) {
   const v8stage = stageFor(stage)
+  /* 手順③だけ：1152 幅なら板 `r1l0bT`。ほかの手順は今の印のまま。 */
+  const narrowBoard = useNarrowBoard()
   usePageTitle(
     v8stage === 'basics' ? 'リマインダを作成・基本設定'
       : v8stage === 'target' ? 'リマインダを作成・対象者と止める条件'
@@ -398,9 +417,10 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
             : 'confirm' as const
 
   // 外枠に板 ID を持たせる（見本と突き合わせる目印）。
+  // 手順③（通知の中身）は 1152 幅なら板 `r1l0bT`。
   const designNode = v8stage === 'basics' ? 'VE1u5'
     : v8stage === 'target' ? 'YChR6'
-      : v8stage === 'messages' ? 'p5YuP'
+      : v8stage === 'messages' ? (narrowBoard ? 'r1l0bT' : 'p5YuP')
         : v8stage === 'schedule' ? 'T0nis'
           : v8stage === 'confirm' ? 'ltAaq'
             : 'hjNpJ'
@@ -1124,12 +1144,7 @@ function MessagesStageV8({
                         <button type="button" className={styles.chip} onClick={() => insertToken('{{date}}')}>
                           <CalendarClock size={13} aria-hidden="true" />予約日時
                         </button>
-                        {/*
-                          * Meetの参加URLを差し込む契約は worker に無い（DEVIN-QUESTIONS）。
-                          * 実在しないトークンを入れると、そのまま相手に届いてしまうため
-                          * 押せない形で出す。
-                          */}
-                        <button type="button" className={styles.chip} disabled title="Google Meet の URL の差し込みはまだ対応していません">
+                        <button type="button" className={styles.chip} onClick={() => insertToken('{{meet_url}}')}>
                           <Video size={13} aria-hidden="true" />Google Meet の URL
                         </button>
                         <Select

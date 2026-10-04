@@ -495,7 +495,7 @@ export default function TagEditorV8({
                     </div>
                   ))}
                 </dl>
-                <p className={styles.noteText}>消すと、使っている設定と、いま付いている友だちの印に影響します。</p>
+                <p className={styles.noteText}>削除すると、使っている設定と、いま付いている友だちの印に影響します。</p>
               </div>
             </section>
           ) : null}

@@ -46,21 +46,29 @@
 }
 
 /* 数の帯：4つのマス。アイコンつき。 */
+/* 数の帯：区切り線で並べる1本の帯（`apLqS`）。カードを離して並べない。 */
 .kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  gap: 0;
+  border-top: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
 }
 
 .kpi {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
+  padding: 16px 20px;
+  border: 0;
+  background: transparent;
+}
+
+/* 両端の縦位置をそろえるため、2つ目からは左に区切り線を引く。 */
+.kpi:not(:first-child) {
+  border-left: 1px solid var(--color-hairline);
 }
 
 .kpiLabel {
@@ -68,8 +76,8 @@
   align-items: center;
   gap: 6px;
   color: var(--color-ink-secondary);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .kpiLabel svg {
@@ -80,8 +88,8 @@
   margin: 0;
   color: var(--color-ink);
   font-size: 22px;
-  font-weight: 700;
-  line-height: 1.25;
+  font-weight: 600;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
@@ -95,7 +103,7 @@
 .kpiDetail {
   margin: 0;
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -173,7 +181,7 @@
 }
 
 .searchWrap {
-  width: 240px;
+  width: 200px;
   min-width: 160px;
 }
 
@@ -205,10 +213,9 @@
 }
 
 /* 表。 */
+/* 表。見出しと行の区切り線だけ（`apLqS`）。外側の枠は作らない。 */
 .tableWrap {
   overflow-x: auto;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
 }
 
@@ -221,18 +228,19 @@
 }
 
 .table th {
-  padding: 10px 12px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--color-hairline);
   border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-canvas-sunken);
+  background: var(--color-table-head);
   color: var(--color-ink-faint);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
 }
 
 .table td {
-  padding: 12px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--color-hairline);
   vertical-align: top;
 }
@@ -250,12 +258,10 @@
 }
 
 .selectCell {
-  width: 40px;
   text-align: center;
 }
 
 .gripCell {
-  width: 44px;
   color: var(--color-hairline);
   text-align: center;
 }
@@ -266,7 +272,7 @@
   overflow: hidden;
   /* 板 apLqS：行の名はリンク色（#0b63ce）。 */
   color: var(--color-action);
-  font-weight: 600;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -361,9 +367,9 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 10px;
+  padding: 2px 8px;
   border-radius: var(--radius-pill);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -386,7 +392,6 @@
 }
 
 .menuCell {
-  width: 44px;
   text-align: right;
 }
 
@@ -394,8 +399,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
@@ -590,17 +595,35 @@
   }
 }
 
-/* 数の帯は 1152（板 ~870px）でも4列を保つ（`Iffil`）。760px を切ったら2列に。 */
-@container (max-width: 759px) {
+/* かなり狭い板では数の帯を2列に（区切り線を付け替える）。 */
+@container (max-width: 720px) {
   .kpis {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .kpi:nth-child(even) {
+    border-left: 1px solid var(--color-hairline);
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--color-hairline);
   }
 }
 
 /* さらに狭い板では数の帯も1列に。 */
-@container (max-width: 560px) {
+@container (max-width: 480px) {
   .kpis {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpi:not(:first-child) {
+    border-left: 0;
+    border-top: 1px solid var(--color-hairline);
   }
 
   .searchWrap {

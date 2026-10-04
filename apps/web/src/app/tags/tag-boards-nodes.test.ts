@@ -16,7 +16,9 @@ const EDIT = readFileSync(join(HERE, 'edit-tag-page-v8.tsx'), 'utf8')
  */
 describe('友だち属性の残りの板ID', () => {
   it('状態の4場面に U0aKD が付く', () => {
-    const count = TAB.split('data-design-node="U0aKD"').length - 1
+    // 読み込み場面は共通の骨組み（TagRowsSkeleton）に designNode で渡す。
+    // 注釈の `U0aKD` を除き、札の値を4つ数える。
+    const count = (TAB.match(/(?<!`)U0aKD(?!`)/g) ?? []).length
     expect(count).toBe(4)
   })
 
