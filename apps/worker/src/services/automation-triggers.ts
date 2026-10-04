@@ -28,7 +28,7 @@ export const EC_TRIGGER_EVENT_TYPES: readonly string[] = [
   'ec.customer.profile_updated',
 ];
 
-const EVENT_TRIGGER_TYPES = new Set([
+export const EVENT_TRIGGER_TYPES: ReadonlySet<string> = new Set([
   'friend_add',
   'tag_change',
   'message_received',
@@ -49,7 +49,7 @@ const SUPPORT_MARK_EVENTS = new Set([
   'staff_assigned',
   'response_overdue',
 ]);
-const SCHEDULE_TRIGGER_TYPES = new Set(['datetime', 'daily', 'weekly']);
+export const SCHEDULE_TRIGGER_TYPES: ReadonlySet<string> = new Set(['datetime', 'daily', 'weekly']);
 const EVENT_FILTER_KEYS: Record<string, ReadonlySet<string>> = {
   friend_add: new Set(),
   tag_change: new Set(['tagId', 'action']),

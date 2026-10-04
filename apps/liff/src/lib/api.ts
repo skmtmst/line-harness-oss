@@ -388,6 +388,13 @@ export const api = {
       file,
     ),
   /**
+   * F-11：郵便番号から住所の候補を返す（外部通信なし・日本郵便の公開データ）。
+   * 候補が複数の番号は全部返す。選ばなければ手入力の住所はそのまま残す。
+   */
+  postalCodeSearch: (code: string) =>
+    get<PostalCodeSearchResponse>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
+
+  /**
    * F11 郵便番号→住所の候補。選んだ候補だけ住所へ入れ、手入力は残す。
    * 見つからない・通信失敗のときは投げず、その旨を状態で返す。
    */
