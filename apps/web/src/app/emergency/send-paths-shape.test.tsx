@@ -71,7 +71,7 @@ describe('emergency 台帳の形違い', () => {
     apiMocks.sendPaths.mockResolvedValue({ success: true, data: { items: [], total: 0, page: 1, limit: 20 } })
     render(<Page />)
     await flush()
-    expect(await screen.findByText('送信経路の台帳を取得できませんでした。停止の届く範囲が確認できないため、経路の網羅は保証できません。時間をおいて読み直してください。')).toBeTruthy()
+    expect(await screen.findByText('送信経路の台帳を読み込めませんでした。停止の届く範囲が確認できないため、経路の網羅は保証できません。時間をおいて読み直してください。')).toBeTruthy()
   })
 
   it('本物の形なら経路の一覧を出す', async () => {

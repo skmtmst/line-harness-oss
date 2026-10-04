@@ -176,6 +176,95 @@
   font-weight: 600;
 }
 
+/* 理由・補足（本体）。窓の中と同じ Select＋複数行入力。 */
+.detailBlock {
+  margin-top: 12px;
+}
+
+.detailHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detailHead .fieldLabel {
+  margin-bottom: 4px;
+}
+
+.detailCounter {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.detailTextarea {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+/* 下に張り付く操作帯。選択の概要・初期値に戻す・止める。 */
+.stickyBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-float);
+}
+
+.stickySummary {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stickyActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stickyCancel {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.stickyCancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* つながる先。 */
+.relatedLink {
+  color: var(--color-action);
+  font-weight: 600;
+}
+
 /* 止めているときの赤い帯。 */
 .stoppedBand {
   margin-top: 16px;
