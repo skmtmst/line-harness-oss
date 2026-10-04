@@ -16,7 +16,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Braces, CalendarClock, Eye, Link2, TriangleAlert } from 'lucide-react'
+import { Braces, CalendarClock, Eye, Link2, Pause, TriangleAlert } from 'lucide-react'
 import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
 import {
   api,
@@ -360,12 +360,27 @@ function CommonVarsListV8Inner() {
   const [statusReason, setStatusReason] = useState('')
   const [statusBusy, setStatusBusy] = useState(false)
   const [statusError, setStatusError] = useState('')
+  /* 板 `Hhl9M`：予約中の配信があるときだけ出す帯。読めなくても止める操作は止めない。 */
+  const [statusScheduled, setStatusScheduled] = useState<CommonVarDeleteImpact['items']>([])
 
   const openStatusDialog = (item: CommonVar, action: 'stop' | 'resume') => {
     setStatusTarget(item)
     setStatusAction(action)
     setStatusReason('')
     setStatusError('')
+    setStatusScheduled([])
+    if (action === 'stop' && selectedAccountId) {
+      const varId = item.id
+      const accountId = selectedAccountId
+      void api.commonVars.deleteImpact(varId, accountId)
+        .then((res) => {
+          if (!res.success) return
+          setStatusScheduled(res.data.items.filter((usage) => usage.status === '配信予約中'))
+        })
+        .catch(() => {
+          /* 読めないときは帯を出さない。 */
+        })
+    }
   }
 
   const closeStatusDialog = () => {
@@ -1254,7 +1269,12 @@ function CommonVarsListV8Inner() {
               busy={statusBusy}
               busyLabel={statusAction === 'stop' ? '止めています…' : '再開しています…'}
             >
-              {statusAction === 'stop' ? '止める' : '再開する'}
+              {statusAction === 'stop' ? (
+                <>
+                  <Pause size={14} aria-hidden="true" />
+                  止める
+                </>
+              ) : '再開する'}
             </Button>
           </div>
         }
@@ -1280,6 +1300,15 @@ function CommonVarsListV8Inner() {
                 className={styles.dialogInput}
               />
             </label>
+            {statusAction === 'stop' && statusScheduled.length > 0 ? (
+              <p className={styles.dialogWarn} role="note">
+                <TriangleAlert size={14} aria-hidden="true" />
+                <span>
+                  予約中の{statusScheduled[0].kindLabel}「{statusScheduled[0].name}」が送られなくなります。
+                  {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)}件` : ''}
+                </span>
+              </p>
+            ) : null}
           </div>
         ) : null}
       </Dialog>
