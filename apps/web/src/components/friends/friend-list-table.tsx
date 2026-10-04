@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
 import MenuPortal from '@/components/shared/menu-portal'
@@ -18,6 +18,8 @@ import './friend-list-table.css'
 export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
 
 interface Props {
+  toolbarFilters?: ReactNode
+  sortControl?: ReactNode
   friends: FriendListItem[]
   status?: 'loading' | 'ready' | 'error'
   /*
@@ -53,6 +55,8 @@ const COLUMN_LABELS: Array<{ key: FriendListColumn; label: string }> = [
 ]
 
 export default function FriendListTable({
+  toolbarFilters,
+  sortControl,
   friends,
   status = 'ready',
   refreshing = false,
@@ -104,14 +108,15 @@ export default function FriendListTable({
   const columnTracks = useMemo(() => ([
     { key: 'check', track: '36px' },
     { key: 'star', track: '36px' },
-    { key: 'friend', track: 'minmax(180px,1.3fr)' },
-    { key: 'support', track: 'minmax(125px,.9fr)' },
-    { key: 'scenario', track: 'minmax(85px,.65fr)' },
-    { key: 'latest', track: 'minmax(150px,1.45fr)' },
-    { key: 'tags', track: 'minmax(150px,1.35fr)' },
-    { key: 'source', track: 'minmax(110px,.8fr)' },
-    { key: 'last', track: '90px' },
-  ].filter((column) => column.key === 'check' || column.key === 'star' || column.key === 'friend' || visible.has(column.key as FriendListColumn))), [visible])
+    { key: 'friend', track: 'minmax(0,1.6fr)' },
+    { key: 'support', track: 'minmax(0,1.1fr)' },
+    { key: 'scenario', track: 'minmax(0,.7fr)' },
+    { key: 'latest', track: 'minmax(0,1.2fr)' },
+    { key: 'tags', track: 'minmax(0,1.1fr)' },
+    { key: 'source', track: 'minmax(0,.6fr)' },
+    { key: 'last', track: '70px' },
+    { key: 'actions', track: '36px' },
+  ].filter((column) => column.key === 'check' || column.key === 'star' || column.key === 'friend' || column.key === 'actions' || visible.has(column.key as FriendListColumn))), [visible])
 
   const gridTemplateColumns = columnTracks.map((column) => column.track).join(' ')
   /*
@@ -127,22 +132,16 @@ export default function FriendListTable({
 
   return (
     <section
-      className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card"
+      className="overflow-hidden bg-canvas"
       style={{ '--friend-cols': gridTemplateColumns, '--friend-cols-narrow': narrowGridTemplateColumns } as React.CSSProperties}
-      data-design="V6FriendTable" data-design-node="k4Hz0X" aria-busy={status === 'loading' || undefined}
+      data-design="V8FriendTable" data-design-node="ywJ5H" aria-busy={status === 'loading' || undefined}
     >
       {/*
         FRIEND-17: 狭い幅ではツールバーの右側（件数・表示項目）を折り返して
         隠さない。h-14 の固定高は lg 以上にだけ掛ける。
       */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 lg:h-14 lg:flex-nowrap lg:py-0">
-        <h2 className="whitespace-nowrap text-sm font-bold text-ink">
-          {/*
-            未取得の件数は0件に見せない（絞り込みの行の件数を消した後は、
-            この見出しがその役目を持つ）。取れるまでは「—」。
-          */}
-          友だち一覧 <span className="ml-1 text-xs font-medium text-ink-faint">{status === 'ready' ? `${formatNumber(total)}件` : '—'}</span>
-        </h2>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">{toolbarFilters ?? <span className="text-xs text-ink-faint">{status === 'ready' ? `${formatNumber(total)}件` : '—'}</span>}</div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}
           {selectedCount > 0 ? <span className="whitespace-nowrap font-semibold text-accent-deep">{selectedCount}件選択中</span> : null}
@@ -193,6 +192,7 @@ export default function FriendListTable({
             onChange={onPageSizeChange}
             options={[...pageSizeOptions]}
           />
+          {sortControl}
         </div>
       </div>
 
@@ -211,10 +211,11 @@ export default function FriendListTable({
         <div className="truncate">友だち</div>
         {visible.has('support') ? <div className="truncate">対応・担当</div> : null}
         {visible.has('scenario') ? <div className="truncate" data-column="scenario">シナリオ</div> : null}
-        {visible.has('latest') ? <div className="truncate">最新メッセージ</div> : null}
-        {visible.has('tags') ? <div className="truncate">タグ・属性</div> : null}
+        {visible.has('latest') ? <div className="truncate">最新のメッセージ</div> : null}
+        {visible.has('tags') ? <div className="truncate">タグ</div> : null}
         {visible.has('source') ? <div className="truncate" data-column="source">流入元</div> : null}
         {visible.has('last') ? <div className="truncate text-center">最終接触</div> : null}
+        <span className="sr-only">操作</span>
       </div>
 
       <RefreshCover refreshing={refreshing}>
@@ -297,7 +298,7 @@ export default function FriendListTable({
           onPageChange={onPageChange}
           disabled={status !== 'ready'}
           ariaLabel="友だち一覧のページ"
-          summary={<ListRange bare total={total} first={rangeStart} last={rangeEnd} />}
+          summary={status === 'ready' ? <ListRange bare total={total} first={rangeStart} last={rangeEnd} /> : <span>—</span>}
         />
       </div>
       </RefreshCover>

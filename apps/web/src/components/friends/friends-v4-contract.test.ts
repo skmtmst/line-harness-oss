@@ -5,11 +5,11 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'page.tsx'), 'utf8')
+const NAV = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'friends-nav-v8.tsx'), 'utf8')
 const TABLE = readFileSync(join(HERE, 'friend-list-table.tsx'), 'utf8')
 const ROW = readFileSync(join(HERE, 'friend-list-row.tsx'), 'utf8')
 const TABLE_CSS = readFileSync(join(HERE, 'friend-list-table.css'), 'utf8')
 const KPIS = readFileSync(join(HERE, 'friend-kpis.tsx'), 'utf8')
-const SUMMARY_CARD_CSS = readFileSync(join(HERE, '..', 'shared', 'kpi-card.module.css'), 'utf8')
 const PAGINATION = readFileSync(join(HERE, '..', 'shared', 'pagination.tsx'), 'utf8')
 const ADVANCED = readFileSync(join(HERE, 'advanced-search-dialog.tsx'), 'utf8')
 /* N-039: 保存検索・通知の窓は overlay 規約へ乗せるため部品へ切り出した。 */
@@ -26,35 +26,34 @@ const USERS_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'users', 'page.tsx
 const STRUCTURE = readFileSync(join(HERE, '..', '..', 'lib', 'design-structure.json'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
-describe('友だちV6の画面契約', () => {
+describe('友だちV8の画面契約', () => {
   it('見出し下の説明を外して一覧を上へ詰める', () => {
     expect(PAGE).not.toContain('友だちの状態・配信状況・対応履歴を、1画面で確認して操作できます。')
   })
-  it('V2の固定値ではなくV6を画面の正本にする', () => {
-    expect(PAGE).toContain('data-friends-page="v6"')
-    expect(PAGE).toContain('data-design-node="PhxG6"')
-    expect(PAGE).toContain('data-friends-design="v6"')
+  it('友だち一覧をV8に完全切替する', () => {
+    expect(PAGE).toContain('data-friends-page="v8"')
+    expect(PAGE).toContain('data-design-node="ywJ5H"')
+    expect(PAGE).toContain('data-friends-design="v8"')
     expect(PAGE).not.toContain('V2 2-2')
     expect(TABLE).not.toContain('V2 2-2')
     expect(ROW).not.toContain('V2 2-2')
     expect(KPIS).not.toContain('V2 2-2')
     expect(DETAIL).not.toContain('V2 2-2')
     expect(DETAIL).toContain('data-friends-detail-design="v4"')
-    expect(STRUCTURE).toContain('"node": "PhxG6"')
+    expect(STRUCTURE).toContain('"node": "ywJ5H"')
     expect(STRUCTURE).toContain('"node": "hsWaL"')
   })
 
-  it('画面名はトップバーだけに置き、V6のタブと操作を同じ行に置く', () => {
+  it('データ管理に移しても既存の行き先とCSV操作を残す', () => {
     expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
     expect(PAGE).not.toContain('<Header')
-    expect(PAGE).toContain('data-design="V6Tabs"')
-    expect(PAGE).toContain('data-design-node="JB0Ki"')
+    expect(PAGE).not.toContain('<MergedTabs')
+    expect(PAGE).toContain('<FriendsListHeadV8')
     // 主タブの項目は friends-tabs.ts が正本（#984 LAY-14。UID移行側も同じ一覧を使う）。
     expect(PAGE).toContain('FRIENDS_MERGED_TABS')
     expect(FRIENDS_TABS).toContain("{ key: 'duplicates', label: '重複検出'")
     expect(FRIENDS_TABS).toContain("{ key: 'uid-migration', label: 'UID移行', href: '/accounts?tab=migration' }")
-    expect(PAGE).toContain('actions={')
-    expect(PAGE).toContain('CSVで書き出す')
+    expect(NAV).toContain('CSVで書き出す')
     expect(PAGE).not.toContain('友だち管理のマニュアルは準備中です')
   })
 
@@ -79,19 +78,9 @@ describe('友だちV6の画面契約', () => {
     expect(ROW).toContain('data-column="source"')
   })
 
-  it('V6のカード影と操作色を守る', () => {
-    for (const source of [PAGE, TABLE]) {
-      expect(source).toContain('shadow-card')
-    }
-    expect(KPIS).toContain("import KpiCard from '@/components/shared/kpi-card'")
-    expect(SUMMARY_CARD_CSS).toContain('box-shadow: var(--shadow-card)')
-    expect(PAGE).toContain('text-action')
-    expect(PAGE).toContain('bg-accent')
-  })
-
   it('一覧の不要な開く列を除き、件数・表示項目・表示件数を見出し右へ置く', () => {
     expect(PAGE).not.toContain('>一括アクション</button>')
-    expect(TABLE).not.toContain('>操作<')
+    expect(ROW).toContain('<RowActions subjectName={friend.displayName}')
     expect(ROW).not.toContain('>開く<')
     expect(TABLE).toContain('表示項目を編集')
     // #668: 件数の選び口は共通部品 PageSizeSelect（「表示件数 N件」）。
@@ -101,9 +90,9 @@ describe('友だちV6の画面契約', () => {
     expect(ROW).toContain('text-center')
   })
 
-  it('V6の検索・絞り込みの名前と実行先を固定する', () => {
+  it('V8でも検索・絞り込みの実行先を残す', () => {
     expect(PAGE).toContain('const SEARCH_ROW_SECONDARY')
-    expect(PAGE).toContain('名前・LINE名・タグ・メモで検索')
+    expect(PAGE).toContain('名前・LINE名・タグ・メモで探す')
     expect(PAGE).toContain('詳細条件')
     expect(PAGE).toContain('SavedSearchDialog')
     expect(SAVED_DIALOG).toContain('api.friendSavedViews.list')
@@ -115,7 +104,7 @@ describe('友だちV6の画面契約', () => {
     expect(PAGE).toContain('label="シナリオ"')
     expect(PAGE).toContain("{ value: '', label: 'すべて' }")
     expect(PAGE).toContain('注目のみ')
-    expect(PAGE).toContain('data-design-node="pRHvc"')
+    expect(PAGE).toContain('data-design-node="ywJ5H"')
     expect(ADVANCED).toContain('z-[100]')
     expect(ADVANCED).toContain('現在の条件に一致')
     expect(ADVANCED).toContain('いずれか1つ以上満たす条件')
@@ -123,8 +112,8 @@ describe('友だちV6の画面契約', () => {
   })
 
   it('KPI・検索・一覧をPencilの実ノードへ結び付ける', () => {
-    expect(KPIS).toContain('data-design-node="zZMNG"')
-    expect(TABLE).toContain('data-design-node="k4Hz0X"')
+    expect(KPIS).toContain('data-design-node="ywJ5H"')
+    expect(TABLE).toContain('data-design-node="ywJ5H"')
     expect(KPIS).toContain('variant="v6"')
   })
 
@@ -138,15 +127,12 @@ describe('友だちV6の画面契約', () => {
     expect(API).not.toContain('JSON.stringify({ metadata })')
   })
 
-  it('絞り込みをV6の固定幅に収め、右側へ引き伸ばさない', () => {
-    /*
-      2026-09-02: 幅を設計の実寸へ直した。150/150/160/160 は実装側の痩せで、
-      設計 `PhxG6` はタグ156 / 対応156 / 担当者176 / シナリオ184。
-    */
-    expect(PAGE).toContain('className="w-39 shrink-0" data-filter="tag"')
-    expect(PAGE).toContain('className="w-39 shrink-0" data-filter="response"')
-    expect(PAGE).toContain('className="w-44 shrink-0" data-filter="operator"')
-    expect(PAGE).toContain('className="w-46 shrink-0" data-filter="scenario"')
+  it('絞り込みをV8のコンパクトな幅に収める', () => {
+    /* ★V8 ywJ5H：タグ・対応128px、担当・シナリオ144px。 */
+    expect(PAGE).toContain('className="w-32 shrink-0" data-filter="tag"')
+    expect(PAGE).toContain('className="w-32 shrink-0" data-filter="response"')
+    expect(PAGE).toContain('className="w-36 shrink-0" data-filter="operator"')
+    expect(PAGE).toContain('className="w-36 shrink-0" data-filter="scenario"')
     expect(PAGE).not.toContain('className="w-37.5 shrink-0"')
     expect(PAGE).not.toContain('className="min-w-[150px] flex-1"')
     expect(PAGE).not.toContain('className="min-w-[160px] flex-1"')

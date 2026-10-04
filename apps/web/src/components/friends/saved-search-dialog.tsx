@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { Bookmark, X } from 'lucide-react'
+import HelpTip from '@/components/shared/help-tip'
 import type { Tag } from '@line-crm/shared'
 import { api, type FriendSavedView } from '@/lib/api'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -88,11 +89,16 @@ export default function SavedSearchDialog({
          * FRIEND-30: 低い画面・ブラウザー200%でもタイトル・閉じる・適用へ
          * 到達できるよう、パネル全体を画面内に収めて候補領域だけ縦に伸縮する。
          */
-        className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-card"
+        className="flex max-h-full w-full max-w-140 flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-card"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-start justify-between gap-3 px-5 pt-5">
-          <h2 id="saved-search-title" className="text-lg font-bold text-ink">保存した検索</h2>
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-hairline px-6 py-5">
+          <div>
+            <h2 id="saved-search-title" className="text-lg font-bold text-ink">保存した検索</h2>
+            <p className="text-ink-secondary mt-0.5 text-xs">
+              押すとその条件で一覧を絞り込みます
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -102,11 +108,11 @@ export default function SavedSearchDialog({
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-1">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-2">
         {loading ? <p className="mt-4 text-sm text-ink-faint">読み込み中…</p> : null}
         {error ? (
           <Notice
-            tone="danger"
+            tone="info"
             className="mt-4"
             action={(
               <button
@@ -142,7 +148,14 @@ export default function SavedSearchDialog({
         </div>
         {!loading && !error && saved.length === 0 ? (
           <div className="mt-4 flex shrink-0 items-center justify-end gap-2 border-t border-divider-soft px-5 py-4">
+            <Button type="button" onClick={onClose}>閉じる</Button>
             <Button variant="primary" onClick={onOpenAdvanced}>詳細条件を設定</Button>
+          </div>
+        ) : null}
+        {!loading && !error && saved.length > 0 ? (
+          <div className="mt-4 flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-divider-soft px-5 py-4">
+            <span className="text-xs text-ink-secondary">共有範囲<HelpTip label="共有範囲の説明">「全員」は担当者みんなに見えます。「自分だけ」は保存した本人だけに見えます。</HelpTip></span>
+            <Button type="button" onClick={onClose}>閉じる</Button>
           </div>
         ) : null}
       </section>
@@ -167,20 +180,15 @@ function SavedSearchItem({
   const hiddenCount = summary.length - shown.length
 
   return (
-    <div className="rounded-card border border-divider-soft bg-surface-pearl p-4">
-      {/*
-        FRIEND-29: 区切りのない長い名前でも共有範囲のバッジを押し出さない。
-        名前は最大2行で折り返し、全文は title と展開で確認できる。
-      */}
+    <div className="flex min-w-0 items-center gap-3 border-b border-divider-soft py-4">
+      <Bookmark aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-faint" />
+      <div className="min-w-0 flex-1">
       <div className="flex min-w-0 items-start gap-2">
         <span
           title={search.name}
-          className="min-w-0 flex-1 text-sm font-bold text-ink line-clamp-2 wrap-anywhere"
+          className="min-w-0 flex-1 truncate text-sm font-semibold text-ink"
         >
           {search.name}
-        </span>
-        <span className="shrink-0 rounded-pill bg-canvas px-2 py-0.5 text-xs font-medium text-ink-faint">
-          {search.isShared ? '全員' : '自分だけ'}
         </span>
       </div>
       {/* FRIEND-20: 対象（表示中/非表示/すべて）は常に出す。 */}
@@ -210,12 +218,16 @@ function SavedSearchItem({
           条件を折りたたむ
         </button>
       ) : null}
-      <div className="mt-2 flex items-center justify-between gap-2">
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
         <span className="text-xs font-semibold text-ink">
           {search.match.total === null ? search.match.error ?? '人数を確認できません' : `${formatNumber(search.match.total)}人`}
         </span>
+        <span className="shrink-0 rounded-pill bg-canvas px-2 py-0.5 text-xs font-medium text-ink-faint">
+          {search.isShared ? '全員' : '自分だけ'}
+        </span>
         <Button
-          variant="primary"
+          variant="secondary"
           onClick={() => onApply({
             params: savedSearchParams(search.id, search.conditions),
             summary: [`対象：${describeSavedVisibility(search.conditions)}`, ...summary],
