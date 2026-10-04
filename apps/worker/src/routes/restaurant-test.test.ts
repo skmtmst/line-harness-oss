@@ -199,7 +199,7 @@ describe('電話予約のLINE確認通知', () => {
     expect(testDb.raw.prepare('SELECT id FROM rt_reservations WHERE id = ?').get(result.data.id)).toBeDefined();
     return result.data;
   }
-  it('友だちへの送信に既存の確認文面を使い、自動通知として履歴を残す', async () => {
+  it('確認LINEに店舗・日時・人数・コースを載せ、自動通知として履歴を残す', async () => {
     seedFriend();
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
@@ -215,7 +215,22 @@ describe('電話予約のLINE確認通知', () => {
       messages: [{ type: 'text', text: expect.stringContaining('予約が確定しました。') }] });
     expect(JSON.parse(init.body as string).messages[0].text).toContain('テストコース');
     expect(JSON.parse(init.body as string).messages[0].text).toContain('2026-11-10 19:00');
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('2026-11-10 21:00');
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('人数: 2名');
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('店舗: 銀座店');
     expect(testDb.raw.prepare("SELECT source FROM messages_log WHERE friend_id = 'friend-fixture'").get()).toEqual({ source: 'external' });
+  });
+  it('店舗の時間帯で夜をまたぐ終了日と席のみの予約を案内する', async () => {
+    seedFriend();
+    testDb.raw.prepare("UPDATE rt_stores SET timezone = 'Asia/Bangkok' WHERE id = 'store-ginza'").run();
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await notice({ ...body, guestCount: 3, startsAt: '2026-11-10T16:00:00.000Z', endsAt: '2026-11-10T18:00:00.000Z' })).lineNotice.sent).toBe(true);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const text = JSON.parse(init.body as string).messages[0].text;
+    expect(text).toContain('日時: 2026-11-10 23:00〜2026-11-11 01:00');
+    expect(text).toContain('人数: 3名');
+    expect(text).toContain('コース: 席のみ');
   });
   it.each([undefined, false])('notifyLine=%sでは送らず、従来の予約結果を返す', async notifyLine => {
     seedFriend();

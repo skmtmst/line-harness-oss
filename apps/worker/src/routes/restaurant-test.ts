@@ -1196,6 +1196,7 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
     ? await sendRestaurantLineConfirmation(c, {
       reservationId: saved.id, storeId, tenantId: organization.tenant_id ?? DEFAULT_TENANT_ID,
       lineUid: checked.value.lineUid ?? null, startsAt: checked.value.startsAt,
+      endsAt: checked.value.endsAt, guestCount: checked.value.guestCount,
       courseId: checked.value.courseId ?? null, status: checked.value.status ?? 'confirmed',
     })
     : { sent: false, reason: 'not_requested' };
