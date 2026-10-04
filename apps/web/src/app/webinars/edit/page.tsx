@@ -516,7 +516,14 @@ function EditWebinarInner() {
   const [reloadKey, setReloadKey] = useState(0)
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [analyticsState, setAnalyticsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
-  const [analyticsId, setAnalyticsId] = useState<string | null>(null)
+  const analyticsRequest = useRef<string | null>(null)
+  const analyticsGeneration = useRef(0)
+  const retryAnalytics = useCallback(() => {
+    analyticsGeneration.current += 1
+    analyticsRequest.current = null
+    setAnalytics(null)
+    setAnalyticsState('idle')
+  }, [])
   /* 取得の世代印。切替後に遅れて届いた前のウェビナーの応答はここで捨てる。 */
   const loadRequestId = useRef(0)
   const [participantExport, setParticipantExport] = useState<ParticipantExport | null>(null)
@@ -716,9 +723,7 @@ function EditWebinarInner() {
     if (!id) return
     const requestId = ++loadRequestId.current
     /* 切替時は集計も前のウェビナーの分を捨てる（申込数は段をまたいで出る）。 */
-    setAnalytics(null)
-    setAnalyticsId(null)
-    setAnalyticsState('idle')
+    retryAnalytics()
     Promise.all([webinarApi.get(id), webinarApi.editor(id)])
       .then(([webinarResponse, editorResponse]) => {
         /* 先に世代印を見る。切替後に届いた前の応答はここで終わり。 */
@@ -738,8 +743,11 @@ function EditWebinarInner() {
           setLoadFailure({ id, failure: webinarLoadFailure(err) })
         }
       })
-    return () => { loadRequestId.current += 1 }
-  }, [id, reloadKey])
+    return () => {
+      loadRequestId.current += 1
+      analyticsGeneration.current += 1
+    }
+  }, [id, reloadKey, retryAnalytics])
 
   /*
     集計は8並列の重い口。基本設定だけ直す人にも毎回走らせない。
@@ -750,30 +758,28 @@ function EditWebinarInner() {
     if (!id) return
     if (pane !== 'participants' && pane !== 'analytics') {
       if (analyticsState === 'error') {
-        setAnalytics(null)
-        setAnalyticsId(null)
-        setAnalyticsState('idle')
+        retryAnalytics()
       }
       return
     }
-    if (analyticsId === id && analyticsState !== 'idle') return
-    let cancelled = false
+    if (analyticsRequest.current === id) return
+    // 読み込み中の印は同期して持つ。状態更新や段の移動で同じ通信を増やさない。
+    const generation = analyticsGeneration.current
+    analyticsRequest.current = id
     setAnalyticsState('loading')
     webinarApi.analytics(id)
       .then((response) => {
-        if (cancelled) return
+        if (generation !== analyticsGeneration.current) return
         setAnalytics(response.data)
-        setAnalyticsId(id)
         setAnalyticsState('ready')
       })
       .catch(() => {
-        if (cancelled) return
+        if (generation !== analyticsGeneration.current) return
         setAnalytics(null)
-        setAnalyticsId(id)
         setAnalyticsState('error')
       })
-    return () => { cancelled = true }
-  }, [id, pane, analyticsId, analyticsState])
+    // 段を離れても応答を待つ。別のウェビナー・再試行・アンマウントは世代印で無効化する。
+  }, [id, pane, analyticsState, reloadKey, retryAnalytics])
 
   if (!id) {
     /*
@@ -995,8 +1001,8 @@ function EditWebinarInner() {
         </div>
       ) : null}
       {pane === 'preview' && <PublicPreviewStep webinar={webinar} editor={editor} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} onEditorChange={setEditor} />}
-      {pane === 'participants' && <ParticipantsV8 webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} onExportChange={handleParticipantExport} />}
-      {pane === 'analytics' && <AnalyticsV8 webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} onExportChange={handleParticipantExport} onRetry={() => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') }} />}
+      {pane === 'participants' && <ParticipantsV8 webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} onRetry={retryAnalytics} onExportChange={handleParticipantExport} />}
+      {pane === 'analytics' && <AnalyticsV8 webinarId={webinar.id} durationSeconds={webinar.durationSeconds} analytics={analytics} analyticsState={analyticsState} onExportChange={handleParticipantExport} onRetry={retryAnalytics} />}
 
       {/* 保存はこの一段だけ。各段の中に別の保存バーは出さない。共通 StickyBar を使い、画面幅いっぱいの fixed 配置でサイドバーに重ねない。 */}
       {showSteps && nextPane && nextPaneLabel ? (

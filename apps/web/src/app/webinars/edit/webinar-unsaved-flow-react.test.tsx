@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import EditWebinarPage from './page'
+import { webinarApi } from '@/lib/api'
 
 /**
  * Issue #1002 DETAIL-03/04/05/06/07 の回帰試験。
@@ -252,6 +253,89 @@ function paneVisible(nodeSelector: string): boolean {
 
 const putCalls = () => net.calls.filter((call) => call.method === 'PUT' && call.path === '/api/webinars/webinar-1')
 const participantCalls = () => net.calls.filter((call) => call.path.includes('/participants'))
+
+describe('集計は必要なときに1回だけ読み込む', () => {
+  it('基本設定では集計を取らず、参加者と分析で読み込んだ結果を共有する', async () => {
+    const analytics = vi.spyOn(webinarApi, 'analytics')
+    await render()
+    await flush()
+    expect(analytics).not.toHaveBeenCalled()
+
+    await act(async () => { buttonByText('参加者').click() })
+    await flush()
+    expect(analytics).toHaveBeenCalledTimes(1)
+    await act(async () => { buttonByText('分析').click() })
+    await flush()
+    expect(host.querySelector('[data-analytics-kpis]')).not.toBeNull()
+    expect(analytics).toHaveBeenCalledTimes(1)
+  })
+
+  it('遅い応答を待つ間に段を行き来しても取り直さず、届いた集計を表示する', async () => {
+    let resolve!: (response: Awaited<ReturnType<typeof webinarApi.analytics>>) => void
+    const analytics = vi.spyOn(webinarApi, 'analytics').mockImplementation(() => new Promise((done) => { resolve = done }))
+    fixture.params = new URLSearchParams('id=webinar-1&pane=participants')
+    await render()
+    await flush()
+    await act(async () => { buttonByText('設定').click() })
+    await act(async () => { buttonByText('分析').click() })
+    await flush()
+    expect(analytics).toHaveBeenCalledTimes(1)
+    await act(async () => { resolve({ data: analyticsData }) })
+    await flush()
+    expect(host.querySelector('[data-analytics-kpis]')).not.toBeNull()
+  })
+
+  it('失敗した集計だけを1回取り直し、参加者の一覧は残す', async () => {
+    const analytics = vi.spyOn(webinarApi, 'analytics').mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ data: analyticsData })
+    fixture.params = new URLSearchParams('id=webinar-1&pane=participants')
+    await render()
+    await flush()
+    expect(host.textContent).toContain('参加者 1')
+    expect(host.textContent).toContain('集計を読み込めませんでした')
+    expect(analytics).toHaveBeenCalledTimes(1)
+    await act(async () => { buttonByText('もう一度読み込む').click() })
+    await flush()
+    expect(analytics).toHaveBeenCalledTimes(2)
+    expect(host.textContent).not.toContain('集計を読み込めませんでした')
+    expect(host.textContent).toContain('参加者 1')
+  })
+
+  it('失敗後に設定へ戻り、分析を開き直すと1回だけ再試行する', async () => {
+    const analytics = vi.spyOn(webinarApi, 'analytics').mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ data: analyticsData })
+    fixture.params = new URLSearchParams('id=webinar-1&pane=analytics')
+    await render()
+    await flush()
+    expect(host.textContent).toContain('分析データを読み込めませんでした')
+    await act(async () => { buttonByText('設定').click() })
+    await flush()
+    expect(analytics).toHaveBeenCalledTimes(1)
+    await act(async () => { buttonByText('分析').click() })
+    await flush()
+    expect(analytics).toHaveBeenCalledTimes(2)
+    expect(host.querySelector('[data-analytics-kpis]')).not.toBeNull()
+  })
+
+  it('ウェビナーを切り替えた後に届いた前の集計で表示を書き換えない', async () => {
+    let resolveOld!: (response: Awaited<ReturnType<typeof webinarApi.analytics>>) => void
+    const analytics = vi.spyOn(webinarApi, 'analytics')
+      .mockImplementationOnce(() => new Promise((done) => { resolveOld = done }))
+      .mockResolvedValue({ data: analyticsData })
+    vi.spyOn(webinarApi, 'get').mockImplementation(async (id) => ({ data: { ...webinar, id } }))
+    vi.spyOn(webinarApi, 'editor').mockResolvedValue({ data: editor })
+    fixture.params = new URLSearchParams('id=webinar-1&pane=analytics')
+    await render()
+    await flush()
+    fixture.params = new URLSearchParams('id=webinar-2&pane=analytics')
+    await render()
+    await flush()
+    expect(analytics.mock.calls).toEqual([['webinar-1'], ['webinar-2']])
+    const currentTiles = host.querySelector('[data-analytics-kpis]')?.textContent
+    expect(currentTiles).toBeTruthy()
+    await act(async () => { resolveOld({ data: { ...analyticsData, summary: { ...analyticsData.summary, reservations: 999 } } }) })
+    await flush()
+    expect(host.querySelector('[data-analytics-kpis]')?.textContent).toBe(currentTiles)
+  })
+})
 
 function listLink(): HTMLAnchorElement {
   const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('ウェビナー一覧'))
