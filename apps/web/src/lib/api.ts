@@ -3108,8 +3108,25 @@ export type LineAccountConnectStep = {
   message: string
 }
 
+export type LineAccountConnectVerification = {
+  tokenOk: boolean
+  loginOk: boolean
+  /** 同じプロバイダー（両チャネル認証の通過を代理条件にする）。 */
+  sameProvider: boolean
+  webhook: {
+    expectedUrl: string
+    registeredUrl: string | null
+    active: boolean | null
+    testPassed: boolean | null
+  }
+  /** 登録前の友だち総数。取れなければ null。 */
+  followerTotal: number | null
+}
+
 export type LineAccountConnectData = {
   steps: LineAccountConnectStep[]
+  /** V8 登録④の5行に載る内訳。古い応答には無いことがある。 */
+  verification?: LineAccountConnectVerification
   id?: string
   displayName?: string
   pictureUrl: string | null
@@ -3117,6 +3134,12 @@ export type LineAccountConnectData = {
   liffId?: string
   followerImport: Pick<FollowerImportState, 'capability' | 'phase'>
   remainingActions: string[]
+}
+
+export type LineAccountTag = {
+  id: string
+  name: string
+  color: string | null
 }
 export type FriendFormSubmission = {
   id: string
@@ -9516,6 +9539,28 @@ export const api = {
       fetchApi<ApiResponse<{ state: FollowerImportState; busy: boolean }>>(
         `/api/line-accounts/${id}/follower-import/step`,
         { method: 'POST' },
+      ),
+    followerInsight: (id: string, date: string) =>
+      fetchApi<ApiResponse<{
+        lineAccountId: string
+        date: string
+        status: string
+        followers: number | null
+        targetedReaches: number | null
+        blocks: number | null
+      }>>(`/api/line-accounts/${id}/follower-insight?date=${encodeURIComponent(date)}`),
+  },
+  lineAccountTags: {
+    list: () =>
+      fetchApi<ApiResponse<LineAccountTag[]>>('/api/line-account-tags'),
+    create: (name: string) =>
+      fetchApi<ApiResponse<LineAccountTag>>('/api/line-account-tags', {
+        method: 'POST', body: JSON.stringify({ name }),
+      }),
+    setForAccount: (id: string, tagIds: string[]) =>
+      fetchApi<ApiResponse<{ id: string; tags: LineAccountTag[] }>>(
+        `/api/line-accounts/${id}/tags`,
+        { method: 'PUT', body: JSON.stringify({ tagIds }) },
       ),
   },
   conversions: {

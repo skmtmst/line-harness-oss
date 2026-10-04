@@ -6,7 +6,47 @@
       "lcpMs": 348,
       "pressMs": 84,
       "longTaskMs": 51,
-      "jsBytes": 3715138
+      "jsBytes": 4415133
+    },
+    "inbox": {
+      "route": "/chats",
+      "showMs": 1043,
+      "lcpMs": 324,
+      "pressMs": 67,
+      "longTaskMs": 0,
+      "jsBytes": 3555021
+    },
+    "friends": {
+      "route": "/friends",
+      "showMs": 1146,
+      "lcpMs": 368,
+      "pressMs": 67,
+      "longTaskMs": 51,
+      "jsBytes": 3680432
+    },
+    "broadcasts": {
+      "route": "/broadcasts",
+      "showMs": 1104,
+      "lcpMs": 388,
+      "pressMs": 187,
+      "longTaskMs": 68,
+      "jsBytes": 3665355
+    },
+    "broadcast-new": {
+      "route": "/broadcasts/new",
+      "showMs": 1082,
+      "lcpMs": 440,
+      "pressMs": null,
+      "longTaskMs": 58,
+      "jsBytes": 3568201
+    },
+    "templates": {
+      "route": "/templates",
+      "showMs": 1119,
+      "lcpMs": 364,
+      "pressMs": 66,
+      "longTaskMs": 52,
+      "jsBytes": 3624284
     },
     "booking": {
       "route": "/booking/bookings",
@@ -45,8 +85,16 @@
       "showMs": 1146,
       "lcpMs": 368,
       "pressMs": 67,
-      "longTaskMs": 51,
-      "jsBytes": 3690435
+      "longTaskMs": 56,
+      "jsBytes": 3700223
+    },
+    "settings": {
+      "route": "/settings",
+      "showMs": 1147,
+      "lcpMs": 296,
+      "pressMs": 106,
+      "longTaskMs": 67,
+      "jsBytes": 4287667
     },
     "friends-2000": {
       "route": "/friends",
