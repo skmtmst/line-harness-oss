@@ -1440,5 +1440,7 @@ select:not([multiple]):not(.appearance-none) {
 
 /* cards レーン：正本HTMLの浮く部品の影。v7には適用しない。 */
 [data-theme="v8"] {
+  --v8-parts-primary-shadow: 0 1px 2px #087a3e40, 0 1px 0px #ffffff26;
   --v8-parts-toast-shadow: 0 1px 2px #1d1d1f0f, 0 8px 24px #1d1d1f14;
+  --v8-parts-dialog-shadow: 0 2px 4px #1d1d1f14, 0 24px 48px #1d1d1f29;
 }
