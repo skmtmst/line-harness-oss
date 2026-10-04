@@ -4,7 +4,7 @@
   "status": "CONTINUE",
   "unmatchedRegions": [],
   "maxEdgeDelta": 236,
-  "pixelDifferenceOver24": 29165,
+  "pixelDifferenceOver24": 32929,
   "measurements": [
     {
       "name": "shell-board/白い板",
@@ -69,8 +69,8 @@
     {
       "name": "body/中身",
       "implementation": {
-        "bottom": 790,
-        "height": 641,
+        "bottom": 890,
+        "height": 741,
         "left": 240,
         "right": 1428,
         "top": 149,
@@ -92,7 +92,7 @@
         "left": 0,
         "top": 0,
         "right": -48,
-        "bottom": -222
+        "bottom": -122
       },
       "over4px": true
     },
@@ -129,8 +129,8 @@
     {
       "name": "content/設定の欄（最大720）",
       "implementation": {
-        "bottom": 766,
-        "height": 609,
+        "bottom": 866,
+        "height": 709,
         "left": 496,
         "right": 1216,
         "top": 157,
@@ -152,21 +152,21 @@
         "left": 0,
         "top": 0,
         "right": -236,
-        "bottom": -222
+        "bottom": -122
       },
       "over4px": true
     },
     {
       "name": "footer/保存していない変更の帯（下に固定）",
       "implementation": {
-        "bottom": 874,
+        "bottom": 974,
         "height": 72,
         "left": 264,
         "right": 1404,
-        "top": 802,
+        "top": 902,
         "width": 1140,
         "x": 264,
-        "y": 802
+        "y": 902
       },
       "reference": {
         "bottom": 1096,
@@ -180,9 +180,9 @@
       },
       "delta": {
         "left": 24,
-        "top": -209.5,
+        "top": -109.5,
         "right": -72,
-        "bottom": -222
+        "bottom": -122
       },
       "over4px": true
     },

@@ -5,8 +5,8 @@
   "unmatchedRegions": [
     "段がありません: create/footer/下の追従帯"
   ],
-  "maxEdgeDelta": 344,
-  "pixelDifferenceOver24": 36073,
+  "maxEdgeDelta": 244,
+  "pixelDifferenceOver24": 9714,
   "measurements": [
     {
       "name": "shell-board/白い板",
@@ -71,8 +71,8 @@
     {
       "name": "body/中身",
       "implementation": {
-        "bottom": 790,
-        "height": 653,
+        "bottom": 890,
+        "height": 753,
         "left": 240,
         "right": 1428,
         "top": 137,
@@ -94,7 +94,7 @@
         "left": 0,
         "top": 0,
         "right": 0,
-        "bottom": -344
+        "bottom": -244
       },
       "over4px": true
     },
@@ -131,8 +131,8 @@
     {
       "name": "preview/LINE の見え方",
       "implementation": {
-        "bottom": 790,
-        "height": 653,
+        "bottom": 890,
+        "height": 753,
         "left": 1048,
         "right": 1428,
         "top": 137,
@@ -154,7 +154,7 @@
         "left": 0,
         "top": 0,
         "right": 0,
-        "bottom": -344
+        "bottom": -244
       },
       "over4px": true
     },

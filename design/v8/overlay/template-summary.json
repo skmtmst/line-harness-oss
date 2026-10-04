@@ -21,7 +21,7 @@
     "status": "CONTINUE",
     "unmatchedRegions": [],
     "maxEdgeDelta": 72,
-    "pixelDifferenceOver24": 162175
+    "pixelDifferenceOver24": 173461
   },
   "create": {
     "over4px": 2,
@@ -30,8 +30,8 @@
     "unmatchedRegions": [
       "段がありません: create/footer/下の追従帯"
     ],
-    "maxEdgeDelta": 344,
-    "pixelDifferenceOver24": 36073
+    "maxEdgeDelta": 244,
+    "pixelDifferenceOver24": 9714
   },
   "detail": {
     "over4px": 0,
@@ -55,7 +55,7 @@
     "status": "CONTINUE",
     "unmatchedRegions": [],
     "maxEdgeDelta": 236,
-    "pixelDifferenceOver24": 29165
+    "pixelDifferenceOver24": 32929
   },
   "analytics": {
     "over4px": 31,
