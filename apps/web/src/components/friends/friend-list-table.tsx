@@ -11,6 +11,8 @@ import { RefreshCover } from '@/components/shared/refresh-cover'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ListRange from '@/components/ui/list-range'
 import PageSizeSelect from '@/components/ui/page-size-select'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { VirtualRows } from '@/components/shared/virtual-rows'
 import FriendListRow, { FriendListCard } from './friend-list-row'
 import { formatNumber } from '@/lib/format'
 import './friend-list-table.css'
@@ -124,6 +126,38 @@ export default function FriendListTable({
 
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1
   const rangeEnd = Math.min(page * pageSize, total)
+
+  /*
+   * ★V8：多い行は窓で描く（M10・2,000行対策）。
+   * 机（lg）では行の高さが78pxでそろっているので窓に入れる。
+   * 手（lg未満）の札は高さがばらばらのため窓にせず、見える側だけ描く。
+   * v7・測る前は今までどおり両方描く（描画の不一致を起こさない）。
+   */
+  const theme = useAdminTheme()
+  const [desktop, setDesktop] = useState<boolean | null>(null)
+  useEffect(() => {
+    // テーマの状態は初回v7で来るため、地の値は直接読む（中間の全描画を出さない）。
+    if (document.documentElement.dataset?.theme !== 'v8') {
+      setDesktop(null)
+      return
+    }
+    const query = window.matchMedia('(min-width: 1024px)')
+    const apply = () => setDesktop(query.matches)
+    apply()
+    query.addEventListener?.('change', apply)
+    return () => query.removeEventListener?.('change', apply)
+  }, [theme])
+  const singleBranch = theme === 'v8' && desktop !== null
+  const windowing = singleBranch && desktop === true && friends.length > 60
+  /*
+   * 初回は両テーマとも先頭30行だけ（描画の不一致なし・最初の絵が速い）。
+   * 効果で広げる：v7は全部（settledは今までどおり）・V8は窓か片枝へ。
+   */
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => {
+    setExpanded(true)
+  }, [friends])
+  const firstFriends = !expanded && friends.length > 60 ? friends.slice(0, 30) : friends
 
   return (
     <section
@@ -254,30 +288,58 @@ export default function FriendListTable({
           <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
             <ListState kind="empty" title={emptyTitle} description={emptyDescription} />
           </div>
-        ) : friends.map((friend) => (
+        ) : windowing && expanded ? (
+          /*
+            ★V8：多い行は窓で描く（M10・2,000行対策）。
+            机の行は78pxでそろっているので窓に入れる。札は描かない
+            （窓の高さが合わなくなるため。手では下の片枝描画を使う）。
+          */
+          <VirtualRows
+            count={friends.length}
+            rowHeight={78}
+            renderRow={(index) => {
+              const friend = friends[index]
+              return (
+                <FriendListRow
+                  friend={friend}
+                  selected={selectedIds?.has(friend.id)}
+                  onToggleSelect={() => onToggleSelect?.(friend.id)}
+                  onToggleAttention={() => onToggleAttention?.(friend)}
+                  visibleColumns={visible}
+                />
+              )
+            }}
+          />
+        ) : firstFriends.map((friend) => (
           /*
             FRIEND-17: lg未満はカード、lg以上はグリッド行。
-            両方描いてCSSで分ける。列の表示切替（visible）は両側で効く。
+            V8では見える側だけ描く（v7・初回は両方描いてCSSで分ける）。
+            初回は先頭30行だけ（両テーマ同一・描画の不一致なし）。
+            列の表示切替（visible）は両側で効く。
           */
           <div key={friend.id} className="contents">
-            <div className="lg:hidden">
-              <FriendListCard
-                friend={friend}
-                selected={selectedIds?.has(friend.id)}
-                onToggleSelect={() => onToggleSelect?.(friend.id)}
-                onToggleAttention={() => onToggleAttention?.(friend)}
-                visibleColumns={visible}
-              />
-            </div>
-            <div className="hidden lg:block">
-              <FriendListRow
-                friend={friend}
-                selected={selectedIds?.has(friend.id)}
-                onToggleSelect={() => onToggleSelect?.(friend.id)}
-                onToggleAttention={() => onToggleAttention?.(friend)}
-                visibleColumns={visible}
-              />
-            </div>
+            {(!singleBranch || desktop === false) && (
+              <div className="lg:hidden">
+                <FriendListCard
+                  friend={friend}
+                  selected={selectedIds?.has(friend.id)}
+                  onToggleSelect={() => onToggleSelect?.(friend.id)}
+                  onToggleAttention={() => onToggleAttention?.(friend)}
+                  visibleColumns={visible}
+                />
+              </div>
+            )}
+            {(!singleBranch || desktop === true) && (
+              <div className="hidden lg:block">
+                <FriendListRow
+                  friend={friend}
+                  selected={selectedIds?.has(friend.id)}
+                  onToggleSelect={() => onToggleSelect?.(friend.id)}
+                  onToggleAttention={() => onToggleAttention?.(friend)}
+                  visibleColumns={visible}
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>
