@@ -785,7 +785,8 @@ export default function AdIntegration({
             description="広告をつなぐと毎日自動で取り込みます。取り込めない分は「費用を手で入れる」から足せます。"
           />
         ) : (
-          <table className="w-full table-fixed text-xs">
+          <div className="overflow-x-auto" data-scroll-x>
+          <table className="w-full min-w-[760px] table-fixed text-xs">
             <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
               <TableHeadRow>
                 <Th>流入元</Th>
@@ -826,6 +827,7 @@ export default function AdIntegration({
               ))}
             </tbody>
           </table>
+          </div>
         )}
         {/*
           R275: 手で入れた費用は1行ずつ出す。間違えて入れた分は理由を付けて
