@@ -51,7 +51,7 @@ describe('統括 バナー生成', () => {
   it('生成パネルに品質やクレジットの選択を置かない（2026-09-12 決定）', () => {
     const withoutComments = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
     expect(withoutComments).not.toMatch(/品質|クレジット|高精細|quality/)
-    for (const label of ['用途', '画像に入れるテキスト', 'カラー', '人物', '追加の指示', '枚数']) {
+    for (const label of ['出力サイズ', '画像に入れるテキスト', 'カラー', '人物', '追加の指示', '枚数']) {
       expect(panel).toContain(label)
     }
     // 色は4つの役割（ベース・メイン・サブ・強調）を COLOR_ROLES から並べる（★BG-B `KkTNS`）
@@ -132,6 +132,16 @@ describe('統括 バナー生成', () => {
       const arbitrary = source.match(/className="[^"]*\[[^"]*"/g) ?? []
       expect(arbitrary).toEqual([])
     }
+  })
+
+  it('出力サイズ（★BG-B `xy4EW`）: LINE の規格をカードで並べ、ほかの用途は畳む', () => {
+    expect(panel).toContain('data-design-node="xy4EW"')
+    expect(panel).toContain('LINEの規格から選ぶ')
+    expect(panel).toContain('ほかの用途から選ぶ（Instagram・X・OGPなど）')
+    // プルダウンではなく共通のラジオカードで出す（選択中は淡い緑）
+    expect(panel).toContain('presetCardLabel')
+    expect(panel).toContain('presetSizeLabel')
+    expect(panel).not.toContain('用途を選んでください')
   })
 
   it('参照画像（★BG-B `L1ax1Y`）: 最大 3 枚、1 枚ずつ使い方を決められる', () => {

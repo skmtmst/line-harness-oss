@@ -1,7 +1,7 @@
 'use client'
 
-import { Images, Plus, Sparkles, Upload, X } from 'lucide-react'
-import { useId, useRef, type ReactNode } from 'react'
+import { ChevronDown, Images, Plus, Sparkles, Upload, X } from 'lucide-react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import ColorWell from '@/components/shared/color-well'
 import HelpTip from '@/components/shared/help-tip'
@@ -20,7 +20,8 @@ import {
   TEXT_LINE_LENGTH_MAX,
   TEXT_LINE_MAX,
   groupPresets,
-  presetOptionLabel,
+  presetCardLabel,
+  presetSizeLabel,
   tileCaption,
   type BannerColorRoleKey,
   type BannerCropPosition,
@@ -67,9 +68,6 @@ export default function GenerationPanel({
   const set = <K extends keyof BannerGenerationInput>(key: K, next: BannerGenerationInput[K]) =>
     onChange({ ...value, [key]: next })
 
-  const presetOptions = groupPresets(presets).flatMap((group) =>
-    group.items.map((p) => ({ value: p.key, label: `${group.label}｜${presetOptionLabel(p)}` })),
-  )
   const selectedPreset = presets.find((p) => p.key === value.presetKey)
 
   return (
@@ -105,19 +103,13 @@ export default function GenerationPanel({
       <div className="border-t border-hairline" />
 
       <div data-design-node="E8oZc" className="flex flex-col gap-4 p-4">
-        <Field label="用途" note="LINE と SNS の規格から選ぶ" htmlFor={`${uid}-preset`}>
-          <Select
-            aria-label="用途"
-            size="full"
-            id={`${uid}-preset`}
-            className="w-full"
-            value={value.presetKey}
-            disabled={disabled}
-            onChange={(value) => set('presetKey', value)}
-            options={value.presetKey ? presetOptions : [{ value: '', label: '用途を選んでください' }, ...presetOptions]}
-          />
-          {selectedPreset ? <p className="text-micro text-ink-faint">{selectedPreset.note}</p> : null}
-        </Field>
+        <OutputSize
+          name={`${uid}-preset`}
+          presets={presets}
+          value={value.presetKey}
+          disabled={disabled}
+          onSelect={(key) => set('presetKey', key)}
+        />
 
         {selectedPreset ? (
           <Field
@@ -419,6 +411,69 @@ export function CropPreview({ preset, crop }: { preset: BannerPreset; crop: Bann
       <p className="mt-1 text-micro text-ink-faint">
         生成後にこの範囲で{preset.targetWidth}×{preset.targetHeight}に整えます
       </p>
+    </div>
+  )
+}
+
+/**
+ * 出力サイズ。Pencil ★BG-B `xy4EW`。
+ *
+ * LINE の規格を2列のカードで並べ、選んだカードを淡い緑にする（共通のラジオカード）。
+ * Instagram・X・OGP などは普段使わないので、最初は畳んで「ほかの用途から選ぶ」の
+ * 1行だけ置く。畳んだ中に選択中の規格が入っている場合（「同じ設定でもう一度」など）は
+ * 開いた状態で出す。選べない選択肢は描かない（`docs/v6-common-rules.md` §5-5）。
+ */
+function OutputSize({
+  name,
+  presets,
+  value,
+  disabled,
+  onSelect,
+}: {
+  name: string
+  presets: BannerPreset[]
+  value: string
+  disabled?: boolean
+  onSelect: (key: string) => void
+}) {
+  const [opened, setOpened] = useState(false)
+  const groups = groupPresets(presets)
+  const line = groups.find((g) => g.group === 'line')?.items ?? []
+  const others = groups.find((g) => g.group === 'sns')?.items ?? []
+  const showOthers = opened || others.some((p) => p.key === value)
+
+  return (
+    <div data-design-node="xy4EW" className="flex flex-col gap-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-label font-medium text-ink">出力サイズ</span>
+        <span className="text-micro text-ink-faint">LINEの規格から選ぶ</span>
+      </div>
+      <RadioCardGroup legend="出力サイズ" className="grid grid-cols-2 gap-2">
+        {[...line, ...(showOthers ? others : [])].map((preset) => (
+          <RadioCard
+            key={preset.key}
+            name={name}
+            value={preset.key}
+            checked={value === preset.key}
+            disabled={disabled}
+            onChange={onSelect}
+            title={presetCardLabel(preset)}
+            note={presetSizeLabel(preset)}
+          />
+        ))}
+      </RadioCardGroup>
+      {showOthers ? null : (
+        <Button
+          variant="secondary"
+          size="compact"
+          className="w-full justify-center"
+          disabled={disabled}
+          onClick={() => setOpened(true)}
+        >
+          <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
+          ほかの用途から選ぶ（Instagram・X・OGPなど）
+        </Button>
+      )}
     </div>
   )
 }

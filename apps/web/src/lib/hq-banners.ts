@@ -397,7 +397,7 @@ export function formatLabel(mimeType: string): string {
   return sub.toUpperCase().replace('JPG', 'JPEG')
 }
 
-/** 用途プルダウンの見出し。LINE と SNS を分けて並べる。 */
+/** 用途の見出し。LINE と SNS（ほかの用途）を分けて並べる。 */
 export function groupPresets(presets: BannerPreset[]): Array<{ group: BannerPresetGroup; label: string; items: BannerPreset[] }> {
   return [
     { group: 'line' as const, label: 'LINE', items: presets.filter((p) => p.group === 'line') },
@@ -408,6 +408,19 @@ export function groupPresets(presets: BannerPreset[]): Array<{ group: BannerPres
 /** 「リッチメッセージ（1040×1040）」 */
 export function presetOptionLabel(preset: BannerPreset): string {
   return `${preset.label}（${preset.targetWidth}×${preset.targetHeight}）`
+}
+
+/**
+ * 出力サイズのカードの名前（★BG-B `xy4EW`）。
+ * 「LINE」はカードの見出し（出力サイズ／LINEの規格から選ぶ）で分かるので、頭の「LINE 」は落とす。
+ */
+export function presetCardLabel(preset: BannerPreset): string {
+  return preset.group === 'line' ? preset.label.replace(/^LINE /, '') : preset.label
+}
+
+/** 出力サイズのカードの寸法「1040 × 1040」（★BG-B `xy4EW`）。 */
+export function presetSizeLabel(preset: BannerPreset): string {
+  return `${preset.targetWidth} × ${preset.targetHeight}`
 }
 
 /**
