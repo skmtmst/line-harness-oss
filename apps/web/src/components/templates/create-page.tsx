@@ -20,7 +20,7 @@ export function CreatePage({ boardId, standalone, children, preview, previewTogg
     {previewToggle ? <div className={styles.asideToggle}>{previewToggle}</div> : null}
     <div className={styles.split} data-template-region="body">
       <div className={styles.createContent} data-template-region="content">{children}</div>
-      {preview ? <aside className={styles.preview} data-template-region="preview">{preview}</aside> : null}
+      {preview ? <aside className={styles.preview} data-template-region="preview"><div className={styles.previewContent}>{preview}</div></aside> : null}
     </div>
     <div className={styles.footer} data-template-region="footer"><StickyBar actions={footerActions} destructive={destructive} status={status} /></div>
   </PageFrame>

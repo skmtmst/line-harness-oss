@@ -110,7 +110,15 @@
   max-height: 100%; min-height: 0; overflow-y: auto;
 }
 :global([data-theme='v8']) [data-page-template='create'][data-has-footer] .preview {
-  min-height: 0; overflow-y: auto;
+  min-height: 0; overflow-y: auto; overflow-x: hidden;
+  /* 左右に同じ送り幅を確保し、スクロールバーで中央の見え方を片側へ寄せない。 */
+  scrollbar-gutter: stable both-edges;
+}
+:global([data-theme='v8']) .previewContent {
+  /* 380pxの欄 − 左右32pxの余白 − 1pxの区切り線。
+     送り幅は余白へ収め、中身の幅を削らない。 */
+  width: 315px; flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
 }
 :global([data-theme='v8']) [data-page-template='create'][data-has-footer] .createContent > *,
 :global([data-theme='v8']) [data-page-template='create'][data-has-footer] .preview > * { flex-shrink: 0; }
