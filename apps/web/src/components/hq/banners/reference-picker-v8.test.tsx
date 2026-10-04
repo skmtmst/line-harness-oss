@@ -103,9 +103,9 @@ describe('参照画像を選ぶ（★BG-C `cOgWE`）', () => {
     // 選んだ順が分かる
     expect(await screen.findByText('1枚目')).toBeTruthy()
     expect(document.querySelector('[data-design-node="JOi8G"]')).toBeTruthy()
-    // 既定は「雰囲気を参考にする」
-    const inspire = screen.getByRole('radio', { name: '雰囲気を参考にする' }) as HTMLInputElement
-    expect(inspire.checked).toBe(true)
+    // 既定は「雰囲気を参考にする」（生成パネルと同じ共通の選ぶ欄）
+    const usage = screen.getByRole('button', { name: 'haruの使い方' })
+    expect(usage.textContent).toContain('雰囲気を参考にする')
 
     fireEvent.click(screen.getByRole('button', { name: 'この 1 枚を使う' }))
     expect(picked).toHaveLength(1)
@@ -113,7 +113,10 @@ describe('参照画像を選ぶ（★BG-C `cOgWE`）', () => {
     expect(picked[0].images.map((entry) => entry.id)).toEqual(['img-1'])
 
     // 使い方は 1 枚ずつ変えられる
-    fireEvent.click(screen.getByRole('radio', { name: '土台にする' }))
+    fireEvent.click(usage)
+    await flush(2)
+    fireEvent.click(screen.getByRole('button', { name: '土台にする' }))
+    await flush(2)
     fireEvent.click(screen.getByRole('button', { name: 'この 1 枚を使う' }))
     expect(picked[1].references).toEqual([{ imageId: 'img-1', mode: 'edit' }])
 
