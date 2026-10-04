@@ -307,8 +307,8 @@ export default function FieldEditorV8({
                   <p className={styles.fieldHint}>
                     {mode === 'create' ? 'フォルダを読み込めませんでした。今は未分類にしか入れられません。' : '所属を読み込めませんでした。今の所属は変わらず保存されます。'}
                     {onRetryFolders ? (
-                      <button type="button" onClick={onRetryFolders} disabled={foldersReloading} className="ml-1 font-semibold text-status-info hover:underline disabled:opacity-40">
-                        {foldersReloading ? '読み込んでいます' : 'もう一度読み込む'}
+                      <button type="button" onClick={onRetryFolders} disabled={foldersReloading} aria-busy={foldersReloading || undefined} className="ml-1 font-semibold text-status-info hover:underline disabled:opacity-40">
+                        もう一度読み込む
                       </button>
                     ) : null}
                   </p>

@@ -1,0 +1,41 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * 手順・タブの中身の移り変わり（V8「サクサク感」★A②）。
+ * 次へは右から 24px＋薄く、戻るは逆（240ms glide）。
+ * V8 のときだけ動く。v7 では目印が変わっても今までどおり。
+ * 動きを減らす設定では全体の決まりで止まる（色だけの変化は無い切り替え）。
+ */
+
+.panel {
+  min-width: 0;
+}
+
+[data-theme='v8'] .panel[data-slide-direction='forward'] { animation: slide-panel-forward var(--motion-panel) var(--motion-glide); }
+
+[data-theme='v8'] .panel[data-slide-direction='back'] { animation: slide-panel-back var(--motion-panel) var(--motion-glide); }
+
+@keyframes slide-panel-forward {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-panel-back {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+}

@@ -812,13 +812,13 @@ export default function RemindersListV8() {
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <colgroup>
-              {canEdit && <col style={{ width: 40 }} />}
-              <col style={{ width: 44 }} />
+              {canEdit && <col style={{ width: 64 }} />}
+              <col style={{ width: 62 }} />
               <col />
-              <col style={{ width: 80 }} />
-              <col style={{ width: 96 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 44 }} />
+              <col style={{ width: 128 }} />
+              <col style={{ width: 138 }} />
+              <col style={{ width: 168 }} />
+              <col style={{ width: 76 }} />
             </colgroup>
             <thead>
               <tr>

@@ -8,7 +8,9 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import CampaignEditor from './campaign-editor'
+import CampaignEditorV8 from './campaign-editor-v8'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatDay } from '@/lib/format'
 import Button from '@/components/shared/button'
 
@@ -134,7 +136,12 @@ function NenColumnEditInner() {
     }
   }
 
-  if (campaignKey) return <CampaignEditor campaignKey={campaignKey} />
+  /*
+   * ★V8-B：data-theme="v8" のときだけ新しい配信編集画面（w5pwG）へ切り替える。
+   * v7 の見た目はそのまま。取得・保存の決めごとは変えない。
+   */
+  const theme = useAdminTheme()
+  if (campaignKey) return theme === 'v8' ? <CampaignEditorV8 campaignKey={campaignKey} /> : <CampaignEditor campaignKey={campaignKey} />
 
   return (
     <div className="flex flex-col gap-4">
@@ -223,8 +230,8 @@ function NenColumnEditInner() {
                           ? '変更があります。保存するまで反映されません。'
                           : ''}
                 </p>
-                <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 py-1.5 font-medium h-auto whitespace-normal" onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}>
-                  {savingId === column.id ? '保存中...' : '保存する'}
+                <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 py-1.5 font-medium h-auto whitespace-normal" onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')} busy={savingId === column.id} done={savedId === column.id}>
+                  保存する
                 </Button>
               </div>
             </div>
