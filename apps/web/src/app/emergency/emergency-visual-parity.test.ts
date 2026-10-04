@@ -11,26 +11,32 @@ const visible = source
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*\/\/.*$/gm, '')
 
-describe('V6 機能32 運用状態の表示確認', () => {
-  it('確定済み画面と同じ小さな文字階層を3タブで共通利用する', () => {
-    // 2026-09-04: 画面名の見出しは共通 `PageHeader` へ寄せた。
-    // トップバーが「運用状態」を出しているので、本文では出さない
-    // （題は `sr-only` で残る）。見出しの文字階層はこの下の節から。
+/**
+ * 板 Y4LkX1 運用状態（健全性チェック）の表示確認。
+ *
+ * 板の骨組みが正本。見出し・補足・判定の見方の言葉は板どおりにし、
+ * 数は口の実測だけを使う。
+ */
+describe('Y4LkX1 運用状態の表示確認', () => {
+  it('板 Y4LkX1 の骨組みで作る', () => {
+    expect(source).toContain("data-design-node={tab === 'health' ? 'Y4LkX1'")
+    expect(source).toContain('<ReadonlyHeaderV8 title="運用状態"')
+  })
+
+  it('タブは板の並び（健全性チェック・更新履歴・緊急コントロール）', () => {
+    const start = visible.indexOf('const TABS')
+    const block = visible.slice(start, visible.indexOf(']', start) + 1)
+    const keys = [...block.matchAll(/key: '(\w+)'/g)].map((match) => match[1])
+    expect(keys).toEqual(['health', 'history', 'control'])
+  })
+
+  it('確定済み画面と同じ小さな文字階層を使い、h1 を重ねない', () => {
     expect(source).toContain('<PageHeader')
     expect(visible).not.toMatch(/<h1[\s>]/)
-    expect(source).toContain('text-base font-bold text-ink">チェック結果')
+    expect(source).toContain('text-base font-bold text-ink">{`開いている異常')
     expect(source).toContain('text-base font-bold text-ink">何を止めますか')
     expect(source).toContain('text-base font-bold text-ink">復旧</h2>')
     expect(source).toContain('text-base font-bold text-ink">止めた・戻した記録')
-    expect(source).toContain('text-[11px] font-semibold')
-  })
-
-  it('緊急停止と更新履歴を設計の本文＋右欄へ分ける', () => {
-    expect(source).toContain('xl:w-96 xl:shrink-0')
-    for (const title of ['止めるとどうなるか', '止めたあとにすること', 'この記録でできること', 'つながる先', '気をつけること']) {
-      expect(source).toContain(`title="${title}"`)
-    }
-    expect(source).toContain('sticky bottom-0')
   })
 
   it('タブごとの説明をPenと同じ内容で表示する', () => {
@@ -38,40 +44,26 @@ describe('V6 機能32 運用状態の表示確認', () => {
     expect(source).toContain('止める配信を選び、理由を入力して緊急停止します。')
     expect(source).toContain('エラー、緊急停止、システム更新、設定変更を時間順に確認できます。')
     expect(source).toContain("description={tab === 'history' ? '' : description}")
-    expect(source).toContain('.slice(0, 4)')
   })
 
-  it('仮表示を解除し、異常がないときは異常なしと表示する', () => {
-    expect(source).toContain("const resultTitle = isNormal ? '異常なし'")
-    expect(source).toContain('const CHECK_COUNT = CHECK_DEFINITIONS.length')
-    expect(source).toContain('${CHECK_COUNT}項目を確認し、現在、確認できる異常はありません。')
-    expect(source).toContain("${CHECK_COUNT}項目のすべてが正常です。")
-    expect(source).not.toContain('UI確認モード（仮表示）')
-    expect(source).not.toContain('全UI確認（仮表示）')
-  })
-
-  it('サーバーが保存した9つのチェック項目を常に表示する', () => {
-    for (const label of ['LINE接続', '月間配信数', 'API・外部連携', 'Webhook', '配信処理', '友だち変化', '裏の仕組み', '鍵の期限', '見張り自体']) {
-      expect(source).toContain(`label: '${label}'`)
+  it('サーバーが保存した9つのチェック項目を板の言葉と並びで常に表示する', () => {
+    for (const title of [
+      'LINE のアカウントとつながっているか',
+      '5分ごとの確認が動いているか',
+      'API・外部連携',
+      '送れる数の上限',
+      '友だちの急な減り',
+      'Webhook が届いているか',
+      '配信が送れているか',
+      '裏の仕組み',
+      '鍵・証明書の期限',
+    ]) {
+      expect(source).toContain(`title: '${title}'`)
     }
-    expect(source).not.toContain("label: '定期処理'")
-    expect(source).toContain('${CHECK_COUNT}項目を常に表示し、確認内容と最新結果を示します')
-    for (const key of ['line_connection', 'message_quota', 'external_integrations', 'webhook', 'dispatch_jobs', 'friend_change', 'monitoring_heartbeat', 'infra_canary', 'credential_expiry']) {
-      expect(source).toContain(`${key}: '`)
-    }
-    expect(source).toContain('api.operations.health')
-    expect(source).toContain('api.operations.runHealth')
-    expect(source).toContain('result?.observedAt')
-    expect(source).not.toContain('api.health.getHealth')
-  })
-
-  it('件数と対応は定義の実体から決まる（注釈を除いた狭い構造解析）', () => {
-    // ASTではない。注釈を落としたvisibleで実コードだけを見るので、
-    // 旧行を注釈に残したCHECK_COUNT=9固定も、対応先の取り違えも通らない。
     const definitionsStart = visible.indexOf('const CHECK_DEFINITIONS')
     const definitions = visible.slice(definitionsStart, visible.indexOf('\n]', definitionsStart) + 2)
     const ids = [...definitions.matchAll(/id: '([a-z]+)'/g)].map((match) => match[1])
-    expect(ids).toEqual(['line', 'quota', 'api', 'webhook', 'delivery', 'friends', 'infra', 'credential', 'monitoring'])
+    expect(ids).toEqual(['line', 'monitoring', 'api', 'quota', 'friends', 'webhook', 'delivery', 'infra', 'credential'])
     expect(visible).toContain('const CHECK_COUNT = CHECK_DEFINITIONS.length')
     expect(visible).not.toMatch(/const CHECK_COUNT = \d+/)
     const mappingStart = visible.indexOf('const HEALTH_CHECK_ID')
@@ -90,26 +82,29 @@ describe('V6 機能32 運用状態の表示確認', () => {
       infra_canary: 'infra',
       credential_expiry: 'credential',
     })
-    for (const template of ['${CHECK_COUNT}項目を確認し', '${CHECK_COUNT}項目のすべてが正常です', '${CHECK_COUNT}項目を常に表示し']) {
+  })
+
+  it('件数と対応は定義の実体から決まる', () => {
+    for (const template of ['全体の状態：', '開いている異常 ', '確かめていること', '判定の見方']) {
       expect(visible).toContain(template)
     }
   })
 
-  it('3つの概要カードと上部の主要操作を表示する', () => {
-    for (const label of ['全体の状態', '最後の確認', '緊急停止状態']) {
+  it('全体の帯・下の3枚と上部の主要操作を表示する', () => {
+    for (const label of ['止めた回数', 'いちばん長かった停止', 'いまの版']) {
       expect(source).toContain(`label="${label}"`)
     }
-    expect(source).not.toContain('label="今月の配信残数"')
     expect(source).toContain('いますぐ確かめる')
-    expect(source).toContain('緊急停止を確認')
-    expect(source).toContain('aria-label="判定の見方"')
+    expect(source).toContain('api.operations.history')
   })
 
-  it('緊急停止状態は実APIの停止IDと理由を表示し、取得失敗を通常運用にしない', () => {
-    expect(source).toContain('api.operations.preview(accountId)')
-    expect(source).toContain('operationControlSummary(preview.data.control)')
-    expect(source).toContain("value: '未確認'")
-    expect(source).not.toContain('label="緊急停止状態" value="通常運用"')
+  it('古い確認を現在の正常と混ぜず、10分より古いものは「古い確認」にする', () => {
+    expect(source).toContain('STALE_ITEM_AFTER_MS = 10 * 60 * 1000')
+    expect(source).toContain("label: '古い確認'")
+    expect(source).toContain('api.operations.health')
+    expect(source).toContain('api.operations.runHealth')
+    expect(source).toContain("observedAt: result?.observedAt ?? snapshot.lastCheckedAt")
+    expect(source).not.toContain('api.health.getHealth')
   })
 
   it('5分ごとに実データを再確認する', () => {

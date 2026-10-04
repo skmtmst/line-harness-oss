@@ -30,10 +30,11 @@ describe('機能32のサーバー契約', () => {
   })
 
   it('自動更新では前回の結果を残し、初回確定後に深刻度を通知する(#518 中2)', () => {
-    expect(pageSource).toContain('setRefreshing')
     expect(pageSource).toContain('hasLoaded')
     expect(pageSource).toContain('if (hasLoaded.current) onSeverity(displayedSeverity)')
-    expect(pageSource).toContain("'更新中'")
+    // 板 Y4LkX1 に更新中の札は無いので、2回目以降は loading を立てず
+    // 前回の結果のままにする。
+    expect(pageSource).toContain('if (!hasLoaded.current) setLoading(true)')
   })
 
   it('履歴CSVは数式の先頭文字を無害化する(#518 中3)', () => {
