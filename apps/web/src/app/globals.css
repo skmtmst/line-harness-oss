@@ -522,7 +522,7 @@
  *     既定値 1.4 が効いて1画素も変わらない）
  *   control-border  操作する部品の枠の色（入力・選ぶ・検索・チェック・
  *     ラジオ・トグルのオフ・OTP・色を選ぶ・カードの中の印）。カードや
- *     表・外側の板の枠は hairline のまま（#868e98、板「枠線の色」）
+ *     表・外側の板の枠は hairline のまま（control-border は #c9ced6、絵の変数）
  *   status-warn-soft  注意の薄い地は #fff7e6 → #fdf3e1（夕13・TOKENS）
  *   track  #1d1d1f0a  進みの棒・切り替えの溝の地（夕13・TOKENS）
  *   border-soft  #1d1d1f14  ダイアログ・ふきだしなど重なる物の縁（同上）
@@ -533,7 +533,7 @@
   --radius-control: 10px;
   --radius-panel: 16px;
   --text-lh: 1.5;
-  --color-control-border: #868e98;
+  --color-control-border: #c9ced6; /* 絵の control-border。濃い #868e98 はオーナーが却下 */
   --color-status-warn-soft: #fdf3e1;
   --color-track: #1d1d1f0a;
   --color-border-soft: #1d1d1f14;
