@@ -1,4 +1,19 @@
 {
+  "app/booking/prepay-badge-v8.module.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
+  "app/booking/sales/sales-period.ts": {
+    "color": 0,
+    "radius": 3,
+    "shadow": 0
+  },
+  "app/booking/sales/sales-v8.module.css": {
+    "color": 6,
+    "radius": 7,
+    "shadow": 1
+  },
   "app/contents/contents-permission-behavior.spec.mjs": {
     "color": 1,
     "radius": 0,
@@ -45,7 +60,7 @@
     "shadow": 1
   },
   "app/rich-menus/new/create-v8.module.css": {
-    "color": 6,
+    "color": 5,
     "radius": 4,
     "shadow": 1
   },

@@ -89,9 +89,6 @@ export default function BookingSalesPage() {
   if (status === 'loading' || !summary) {
     return (
       <div>
-        <div className={styles.head}>
-          <h1 className={styles.title}>予約からの売上</h1>
-        </div>
         <p className={styles.center}>{status === 'error' ? '売上を読み込めませんでした。通信状態を確認してください。' : '読み込んでいます…'}</p>
       </div>
     )
@@ -163,7 +160,6 @@ export default function BookingSalesPage() {
   return (
     <div>
       <div className={styles.head}>
-        <h1 className={styles.title}>予約からの売上</h1>
         <SegmentedControl
           aria-label="集計する期間"
           options={PERIOD_OPTIONS}
