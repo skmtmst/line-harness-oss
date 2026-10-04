@@ -150,7 +150,7 @@ function validityText(rule: MileageEarningRuleV6): string {
 type SortKey = 'order' | 'granted' | 'name' | 'amount'
 
 const PRESETS: Array<{ value: string; label: string; active: boolean; pending: boolean; sort: SortKey }> = [
-  { value: 'default', label: '既定の見方', active: false, pending: false, sort: 'order' },
+  { value: 'default', label: 'よく使う絞り込み', active: false, pending: false, sort: 'order' },
   { value: 'active-granted', label: '動いている・付いたマイルが多い順', active: true, pending: false, sort: 'granted' },
   { value: 'active-name', label: '動いている・名前順', active: true, pending: false, sort: 'name' },
   { value: 'stopped', label: '止めているのみ', active: false, pending: false, sort: 'order' },
@@ -317,7 +317,7 @@ export default function V8EarningRulesTab({
   useEffect(() => {
     registerHeaderActions(
       <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
-        <Download size={14} aria-hidden="true" /> CSVで書き出す
+        <Download size={14} aria-hidden="true" /> CSV で書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)
@@ -535,6 +535,7 @@ export default function V8EarningRulesTab({
             }))}
             activeId={folder}
             onSelect={(id) => resetPage(() => setFolder(id as FolderKey))}
+            addFolderNote="フォルダを消しても、中の経路は未分類に残ります"
           />
         </div>
 
