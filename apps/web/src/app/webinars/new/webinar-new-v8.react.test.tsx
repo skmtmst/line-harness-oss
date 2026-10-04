@@ -68,4 +68,3 @@ test('v8 では j7PP04 の作る画面（5段の帯・開催形式・見え方�
   expect(board?.textContent).toContain('LINE での見え方')
   expect(board?.textContent).toContain('動画の設定へ')
 })
-
