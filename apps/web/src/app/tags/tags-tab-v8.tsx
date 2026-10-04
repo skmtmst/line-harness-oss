@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation'
 import { AlertCircle, CalendarPlus, ListChecks, MoreHorizontal, Tag as TagIcon, Users, X } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type ListStats } from '@/lib/api'
+import { useRowLeaving } from '@/lib/use-row-leaving'
 import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -199,6 +200,7 @@ export default function TagsTabV8({
   const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
+  const { leavingId, leave } = useRowLeaving()
   /* フォルダの窓と操作の状態。 */
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
@@ -694,6 +696,7 @@ export default function TagsTabV8({
                         <tr
                           key={tag.id}
                           className={styles.rowClick}
+                          data-leaving={leavingId === tag.id || undefined}
                           tabIndex={0}
                           onClick={() => router.push(editHref)}
                           onKeyDown={(event) => {
@@ -847,7 +850,13 @@ export default function TagsTabV8({
           tag={deleteTarget}
           accountId={accountId}
           onCancel={() => setDeleteTarget(null)}
-          onArchived={(result) => { setDeleteTarget(null); if (result) notifyToast(result); void load() }}
+          onArchived={(result) => {
+            const id = deleteTarget?.id
+            setDeleteTarget(null)
+            if (result) notifyToast(result)
+            if (id) leave(id, () => load())
+            else void load()
+          }}
         />
       )}
     </>

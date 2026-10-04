@@ -34,6 +34,7 @@ import { describeCondition } from '@/components/scenarios/scenario-dialogs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useRowLeaving } from '@/lib/use-row-leaving'
 import { formatDay, formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
@@ -190,6 +191,7 @@ export default function RichMenusListV8() {
   const [externalStatus, setExternalStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [externalError, setExternalError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const { leavingId, leave } = useRowLeaving()
   /* 消したときの影響（契約 #608）。窓を開けてから読む（v7 と同じ）。 */
   const [impact, setImpact] = useState<RichMenuDeleteImpact | null>(null)
   const [impactPhase, setImpactPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -539,8 +541,13 @@ export default function RichMenusListV8() {
         if (!res.success) throw new Error('delete_failed')
       }
       if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
+      // 公開の取り下げは行が残るのでそのまま読み直す。消えた行だけ薄くして外す。
+      const goneId = deleteTarget.kind === 'managed' && deleteTarget.group.status !== 'published'
+        ? deleteTarget.group.id
+        : null
       setDeleteTarget(null)
-      await reload()
+      if (goneId) leave(goneId, () => reload())
+      else await reload()
     } catch (e) {
       if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
       /* 409は「読んだあとに状態が変わった」。新しい影響を描き直す。 */
@@ -807,6 +814,7 @@ export default function RichMenusListV8() {
               <tr
                 key={g.id}
                 className={styles.rowClick}
+                data-leaving={leavingId === g.id || undefined}
                 tabIndex={0}
                 onClick={() => router.push(`/rich-menus/edit?id=${g.id}`)}
                 onKeyDown={(event) => {

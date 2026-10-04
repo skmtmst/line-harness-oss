@@ -29,6 +29,7 @@ import type { Folder, FormLayout } from '@line-crm/shared'
 import { fetchApi, api, ApiError, type FormDeleteImpact, type ListStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useRowLeaving } from '@/lib/use-row-leaving'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 import Button from '@/components/shared/button'
@@ -299,6 +300,7 @@ export default function FormSubmissionsListV8() {
   const [duplicateError, setDuplicateError] = useState('')
   /* アーカイブ・削除の窓（`GVizd`）。開いたら影響を読んでから2つの道を出す。 */
   const [deleteTarget, setDeleteTarget] = useState<Form | null>(null)
+  const { leavingId, leave } = useRowLeaving()
   const [deleteImpact, setDeleteImpact] = useState<FormDeleteImpact | null>(null)
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -617,12 +619,14 @@ export default function FormSubmissionsListV8() {
         ? await api.forms.remove(targetId, selectedAccountId, deleteImpact.revision)
         : await api.forms.archive(targetId, selectedAccountId, deleteImpact.revision)
       if (!result.success) throw new Error('delete_failed')
-      setForms((current) => current.filter((form) => form.id !== targetId))
       setDeleteTarget(null)
       setDeleteImpact(null)
-      // ページの欠け・件数のずれを残さないよう、サーバー側の一覧を読み直す。
-      void loadForms()
-      void loadStats()
+      leave(targetId, () => {
+        setForms((current) => current.filter((form) => form.id !== targetId))
+        // ページの欠け・件数のずれを残さないよう、サーバー側の一覧を読み直す。
+        void loadForms()
+        void loadStats()
+      })
     } catch {
       /*
        * R199: 処理済みなのに失敗を返す経路をなくす。応答が失われたときは
@@ -636,11 +640,13 @@ export default function FormSubmissionsListV8() {
         if (checkError instanceof ApiError && checkError.status === 404) gone = true
       }
       if (gone) {
-        setForms((current) => current.filter((form) => form.id !== targetId))
         setDeleteTarget(null)
         setDeleteImpact(null)
-        void loadForms()
-        void loadStats()
+        leave(targetId, () => {
+          setForms((current) => current.filter((form) => form.id !== targetId))
+          void loadForms()
+          void loadStats()
+        })
       } else {
         setDeleteError(permanentDelete
           ? 'この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。'
@@ -1144,7 +1150,7 @@ export default function FormSubmissionsListV8() {
               const pendingCount = form.pendingPostActionCount ?? 0
               const answerUrl = formAnswerUrl(selectedAccount?.liffId, form.id)
               return (
-                <tr key={form.id}>
+                <tr key={form.id} data-leaving={leavingId === form.id || undefined}>
                   <td>
                     <div className={styles.nameLine}>
                       {reviewMode ? (

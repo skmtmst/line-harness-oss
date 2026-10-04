@@ -320,6 +320,17 @@
   border-bottom: 0;
 }
 
+/* 消える行は薄くなってから外す（150ms。動きを減らす設定では一瞬）。 */
+@media (prefers-reduced-motion: no-preference) {
+  .table tbody tr {
+    transition: opacity var(--motion-exit) var(--motion-ease-out);
+  }
+
+  .table tbody tr[data-leaving='true'] {
+    opacity: 0;
+  }
+}
+
 .table tbody tr:hover {
   background: var(--color-canvas-sunken);
 }
