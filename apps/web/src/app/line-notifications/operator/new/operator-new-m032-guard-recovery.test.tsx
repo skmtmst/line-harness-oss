@@ -38,7 +38,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...actual,
-    api: {
+    api: { notifications: { teams: { list: async () => ({ success: true, data: [] }) } },
       lineNotifications: {
         operatorRules: {
           previewRecipients: fixture.previewRecipients,

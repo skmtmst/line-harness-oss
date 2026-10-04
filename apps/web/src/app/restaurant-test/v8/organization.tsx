@@ -5,16 +5,18 @@
  *
  * v7（restaurant-console.tsx の Organization）と同じ口で、板の形で置く：
  * 左に組織階層、右に 店舗管理 → 予約メール取り込みアドレス → 数3 →
- * アカウント一覧 → 権限マトリクス。名簿の登録だけではログイン権限は
- * 変わらない（v7 と同じ注記）。
+ * アカウント一覧 → 権限マトリクス。ログインと連携した名簿の変更は
+ * 実際のログイン権限にも反映する。
  */
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react'
 import { Plus, RotateCw } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { useStepUpGate, isStepUpRequired } from '@/components/step-up-prompt'
+import type { RestaurantLoginMember } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
 import {
   restaurantTestApi,
@@ -316,6 +318,17 @@ function MemberForm({ member, stores, busy, onSubmit, onCancel }: {
   )
 }
 
+function LoginConnection({ member, logins, busy, save }: { member: RestaurantMembership; logins: RestaurantLoginMember[]; busy: boolean; save: (id: string|null)=>void }) {
+  const [selected, setSelected] = useState(member.staff_id || '')
+  useEffect(()=>setSelected(member.staff_id || ''),[member.staff_id])
+  return <div>
+    <p>{member.staff_id ? `${member.loginName || 'ログインメンバー'}・${member.loginRole === 'owner' ? 'オーナー' : member.loginRole === 'admin' ? '管理者' : 'スタッフ'}${member.loginAccessLevel === 'read_only' ? '（閲覧のみ）' : ''}` : 'ログイン未連携'}</p>
+    {member.staff_id ? <p>{member.loginAccountScope === 'all' ? '全アカウント' : '担当アカウントのみ'}・版 {member.loginPolicyVersion}</p> : null}
+    {logins.length ? <><Select aria-label={`${member.staff_name}のログインメンバー`} value={selected} onChange={setSelected} size="full" options={[{value:'',label:'連携しない'},...logins.map(l=>({value:l.id,label:l.name}))]} />
+      <Button size="compact" disabled={busy || selected===(member.staff_id || '')} onClick={()=>save(selected || null)}>ログインと連携</Button></> : null}
+  </div>
+}
+
 function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const { data, store, selectedStoreId, busy, mutate } = ctx
   const { accounts, selectedAccountId } = useAccount()
@@ -331,6 +344,25 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const closeStoreDialog = useCallback(() => { setShowStoreForm(false); setEditingStoreId('') }, [])
   const closeMemberDialog = useCallback(() => { setShowMemberForm(false); setEditingMemberId('') }, [])
   const accountId = selectedAccountId || ''
+  const { gate, prompt, cancel } = useStepUpGate()
+  const [logins, setLogins] = useState<RestaurantLoginMember[]>([])
+  useEffect(()=>{
+    let current=true
+    setLogins([])
+    if(accountId) void restaurantTestApi.loginMembers(accountId).then(res=>{if(current)setLogins(res.data)}).catch(()=>{if(current)setLogins([])})
+    return ()=>{current=false;cancel()}
+  },[accountId,cancel])
+  const updateMember = async (id: string, body: Record<string, unknown>) => {
+    const member=members.find(m=>m.id===id)
+    const request={...body,expectedPolicyVersion:member?.loginPolicyVersion,idempotencyKey:crypto.randomUUID()}
+    try { return await restaurantTestApi.updateMembership(accountId,id,request) }
+    catch(error) {
+      if(!isStepUpRequired(error)) throw error
+      const token=await gate('staff.permissions.change','店の役割とログイン権限を変更する')
+      if(!token) throw new Error('本人確認を中止しました。変更は保存されていません。')
+      return restaurantTestApi.updateMembership(accountId,id,request,token)
+    }
+  }
 
   const submitStore = (id: string | null) => (form: FormData) => {
     const body = {
@@ -363,7 +395,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
       googleEmail: form.get('googleEmail'),
     }
     if (id) {
-      void mutate(() => restaurantTestApi.updateMembership(accountId, id, body), '所属ユーザーを更新しました。ログイン権限は変わりません。')
+      void mutate(() => updateMember(id, body), members.find(m=>m.id===id)?.staff_id ? '所属ユーザーとログイン権限を更新しました。' : '所属ユーザーを更新しました。')
         .then((ok) => { if (ok) setEditingMemberId('') })
     } else {
       void mutate(() => restaurantTestApi.createMembership(accountId, body), '飲食店向けの名簿へ追加しました。この登録だけではログイン権限は変わりません。')
@@ -373,6 +405,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
 
   return (
     <div className={styles.orgGrid}>
+      {prompt}
       <Panel title="組織階層">
         <p className={styles.cellSub}>統括: {data.organization?.tenant_name || '未設定'}</p>
         <div className={styles.orgRoot}>{data.organization?.name}</div>
@@ -416,12 +449,12 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <IntakeAddressPanel accountId={accountId} store={store} />
         <div className={styles.stats}>
           <Stat label="所属ユーザー" value={`${members.length}名`} note="名簿に載っている人数" />
-          <Stat label="店舗管理者" value={`${members.filter((m) => m.role === 'store_manager').length}名`} note="名簿上の役割（操作権限は別）" />
+          <Stat label="店舗管理者" value={`${members.filter((m) => m.role === 'store_manager').length}名`} note="店の名簿の役割" />
           <Stat label="連携アカウント" value={`${members.filter((m) => m.line_uid || m.google_email).length}件`} note="LINE UID / Google" />
         </div>
         <Panel
           title="アカウント一覧"
-          description="この一覧は名簿です。ここでの役割・担当店舗の登録だけではログイン権限は変わりません。実際の操作は、ログイン中のスタッフの役割（オーナー・管理者・スタッフ）で決まります。"
+          description="既存のログインメンバーと連携すると、役割・担当店舗・停止と再開をログイン権限へ反映します。連携していない名簿はログイン権限を変えません。"
           aside={<Button variant="primary" size="compact" onClick={() => { setShowMemberForm(true); setEditingMemberId('') }}><Plus size={13} aria-hidden />ユーザーを追加する</Button>}
           flush
         >
@@ -461,6 +494,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
                   <Td>{roleLabel[m.role]}</Td>
                   <Td>{data.stores.find((s) => s.id === m.store_id)?.name || '全店舗'}</Td>
                   <Td>
+                    <LoginConnection member={m} logins={logins} busy={busy} save={staffId=>void mutate(()=>restaurantTestApi.linkMembershipLogin(accountId,m.id,staffId),'ログインメンバーとの連携を保存しました。')} />
                     <p className={m.line_uid ? styles.linked : styles.cellSub}>LINE {m.line_uid ? '設定済' : '未設定'}</p>
                     <p className={styles.cellSub}>{m.google_email || 'Google 未設定'}</p>
                   </Td>
@@ -469,7 +503,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
                     <div className={styles.rowActions}>
                       <Button size="compact" disabled={busy} onClick={() => { setEditingMemberId(m.id); setShowMemberForm(false) }}>変更</Button>
                       {m.status === 'suspended' ? (
-                        <Button size="compact" disabled={busy} onClick={() => void mutate(() => restaurantTestApi.updateMembership(accountId, m.id, { status: 'active' }), '再開しました。')}>再開</Button>
+                        <Button size="compact" disabled={busy} onClick={() => void mutate(() => updateMember(m.id, { status: 'active' }), '再開しました。')}>再開</Button>
                       ) : (
                         <Button size="compact" disabled={busy} onClick={() => setStopId(m.id)}>停止</Button>
                       )}
@@ -484,13 +518,13 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantV8Context }) {
           open={Boolean(stopping)}
           designNode="bMpC5"
           title="この所属ユーザーを停止しますか？"
-          description="名簿には残り、再開できます。この名簿だけではログイン権限は変わりません。"
+          description="名簿には残り、再開できます。ログインと連携している場合はログインも停止します。"
           confirmLabel="停止する"
           busy={busy}
           onCancel={() => setStopId('')}
-          onConfirm={() => { if (stopping) void mutate(() => restaurantTestApi.updateMembership(accountId, stopping.id, { status: 'suspended' }), '停止しました。').then(() => setStopId('')) }}
+          onConfirm={() => { if (stopping) void mutate(() => updateMember(stopping.id, { status: 'suspended' }), '停止しました。').then(() => setStopId('')) }}
         />
-        <Panel title="権限マトリクス" description="想定の役割分担です。実際の操作可否は、ログイン中のスタッフの役割（オーナー・管理者・スタッフ）で決まります。" flush>
+        <Panel title="権限マトリクス" description="連携したログインメンバーの役割・閲覧範囲を使います。閲覧のみの担当者は変更できません。" flush>
           <DataTable className="rounded-none border-0">
             <thead>
               <TableHeadRow>

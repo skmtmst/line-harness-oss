@@ -253,6 +253,37 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
     ? REVIEW_REASONS.find((reason) => reason.value === reasonCounts[0][0])?.label ?? '理由未記録'
     : '—'
 
+  const [publicationCandidate, setPublicationCandidate] = useState<{id: string; version: number; key: string} | null>(null)
+  const preparePublication = async (id: string) => {
+    if (!accountId || !canEdit || reviewing) return
+    const generation = accountGeneration.current
+    setReviewing(id)
+    setNotice('')
+    try {
+      const detail = await api.nenMembers.photo(id, accountId)
+      if (generation !== accountGeneration.current) return
+      if (!detail.success) throw new Error(detail.error)
+      setPublicationCandidate({ id, version: Number(detail.data.publication?.version ?? 0), key: crypto.randomUUID() })
+    } catch (error) { if (generation === accountGeneration.current) setNotice(photoNoticeFor(error, '掲載状態を読み込めませんでした。')) }
+    finally { if (generation === accountGeneration.current) setReviewing(null) }
+  }
+  const confirmPublication = async () => {
+    if (!accountId || !publicationCandidate || reviewing) return
+    const generation = accountGeneration.current
+    setReviewing(publicationCandidate.id)
+    setNotice('')
+    try {
+      const response = await api.nenMembers.publishPhoto(publicationCandidate.id, { accountId, expectedVersion: publicationCandidate.version }, publicationCandidate.key)
+      if (generation !== accountGeneration.current) return
+      if (!response.success) throw new Error(response.error)
+      setPublicationCandidate(null)
+      notifyToast('公式サイトへの掲載を保存しました。追加報酬の手続き状況は掲載一覧で確認できます。')
+      await load()
+    } catch (error) { if (generation === accountGeneration.current) setNotice(photoNoticeFor(error, '掲載できませんでした。掲載状態と同意を読み直してください。')) }
+    finally { if (generation === accountGeneration.current) setReviewing(null) }
+  }
+  useEffect(() => { setPublicationCandidate(null) }, [accountId])
+
   const review = async (
     id: string,
     nextStatus: 'adopted' | 'rejected',
@@ -520,6 +551,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
           onRetryNotification={(id) => void retryNotification(id)}
           onOpenDetail={() => navigate({ view: 'detail', status, photoId: text(visiblePhotos[0]?.id), q: searchQuery || undefined })}
           onOpenPublications={() => navigate({ view: 'publications', status })}
+          onPublish={(id) => void preparePublication(id)}
           onLoadMore={() => void loadMore()}
           onRetryLoad={() => void load()}
           onBulkApprove={() => setBulkApproveOpen(true)}
@@ -574,6 +606,10 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
         </label>
       </Dialog>
 
+      <Dialog open={Boolean(publicationCandidate)} title="公式サイトに掲載しますか？"
+        description="公開の同意と採用状態を確認して、公開用画像を掲載します。追加報酬は初回掲載の版で写真ごとに一度だけ手続きします。"
+        confirmLabel="公式サイトに掲載する" error={notice} busy={Boolean(reviewing)} onConfirm={() => void confirmPublication()}
+        onCancel={() => { if (!reviewing) setPublicationCandidate(null) }} />
       <PhotoPolicyHistoryV8 canEdit={canEdit}
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
@@ -623,6 +659,7 @@ type ReviewListV8Props = {
   onReject: (id: string) => void
   onRetryNotification: (id: string) => void
   onOpenDetail: () => void
+  onPublish: (id: string) => void
   onOpenPublications: () => void
   onLoadMore: () => void
   onRetryLoad: () => void
@@ -802,7 +839,7 @@ function PhotoCardV8({ photo, status, ...props }: { photo: Record<string, unknow
         {status === 'adopted' ? (
           <div className={styles.cardActions}>
             {consented ? (
-              <Button variant="secondary" disabled={!props.canEdit} onClick={() => props.onOpenPublications()}><Globe size={15} aria-hidden="true" />公式サイトに出す</Button>
+              <Button variant="secondary" disabled={!props.canEdit || busy} onClick={() => props.onPublish(photoId)}><Globe size={15} aria-hidden="true" />公式サイトに出す</Button>
             ) : null}
             {notificationFailed ? (
               <Button variant="secondary" disabled={busy} onClick={() => props.onRetryNotification(photoId)} busy={busy} busyLabel="再送中..."><Send size={15} aria-hidden="true" />LINE通知を再送</Button>
@@ -918,7 +955,7 @@ function viewsText(value: unknown): string {
 /**
  * 公式サイト掲載（SyQA1）。列：写真・ペット・どこで使っているか・
  * この30日に見た・公開の同意・掲載先から外す。右に出すときの決めごと。
- * 30日集計は未接続なので「—」。掲載先の編集・撤回の整理・外した履歴を保つ。
+ * 30日集計は日別の記録から表示し、記録がなければ「—」。掲載先の編集・撤回の整理・外した履歴を保つ。
  */
 function PublicationsV8({
   accountId,
@@ -933,6 +970,7 @@ function PublicationsV8({
 }) {
   const [state, setState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
   const [items, setItems] = useState<PublicationItem[]>([])
+  const [orderItems, setOrderItems] = useState<PublicationItem[] | null>(null)
   const [topPhotoId, setTopPhotoId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   const [busyId, setBusyId] = useState('')
@@ -978,10 +1016,11 @@ function PublicationsV8({
         setItems(response.data.items ?? [])
         setPendingWithdrawals(response.data.pendingWithdrawals ?? [])
         setWithdrawnItems(response.data.withdrawnItems ?? [])
-        setTopPhotoId(response.data.summary.topPhoto ? text(response.data.summary.topPhoto.id) : null)
+        setTopPhotoId(response.data.summary.topPhoto30Days ? text(response.data.summary.topPhoto30Days.id) : null)
       }
       setState('ready')
     } catch (error) {
+      if (sequence !== loadSequence.current) return
       setItems([])
       setState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
     }
@@ -1010,8 +1049,57 @@ function PublicationsV8({
     } finally { setBusyId('') }
   }
 
+  const openOrder = async () => {
+    if (!canEdit || busyId) return
+    const token = generation.current
+    setBusyId('order-load')
+    try {
+      const response = await api.nenMembers.photoPublicationOrder(accountId)
+      if (token !== generation.current) return
+      if (!response.success) throw new Error(response.error)
+      setOrderItems(response.data.items)
+    } catch (error) { if (token === generation.current) setNotice(photoNoticeFor(error, '掲載順を読み込めませんでした。')) }
+    finally { if (token === generation.current) setBusyId('') }
+  }
+  const moveOrder = (index: number, delta: number) => {
+    setOrderItems((current) => {
+      if (!current || index+delta < 0 || index+delta >= current.length) return current
+      const copy = [...current]; [copy[index], copy[index+delta]] = [copy[index+delta], copy[index]]
+      return copy
+    })
+  }
+  const saveOrder = async () => {
+    if (!orderItems || busyId) return
+    const token = generation.current
+    setBusyId('order')
+    setNotice('')
+    try {
+      const response = await api.nenMembers.savePhotoPublicationOrder({ accountId, items: orderItems.map(item => ({ id: text(item.id), expectedVersion: Number(item.version) })) })
+      if (token !== generation.current) return
+      if (!response.success) throw new Error(response.error)
+      setOrderItems(null)
+      setBusyId('')
+      notifyToast('掲載順を保存しました。')
+      await load()
+      onChanged()
+    } catch (error) {
+      if (token === generation.current) setNotice(error instanceof ApiError && error.status === 409
+        ? '掲載の集合か版が変わりました。キャンセルして最新の全件を読み直してください。'
+        : '掲載順を保存できませんでした。')
+    } finally { if (busyId === 'order' || token === generation.current) setBusyId('') }
+  }
+
   return (
     <>
+      <Dialog open={orderItems !== null} title="掲載順を変える" description="上から順に公式サイトへ表示します。全件と確認した版をまとめて保存します。"
+        confirmLabel="並び順を保存する" error={notice} busy={busyId === 'order'} onConfirm={() => void saveOrder()}
+        onCancel={() => { if (!busyId) { setOrderItems(null); void load() } }}>
+        <ol>{orderItems?.map((item, index) => <li key={text(item.id)} className="flex items-center justify-between gap-2 py-2">
+          <span className="truncate">{index+1}・{photoPetDisplayName(item.pet_name, { honorific: false })}</span>
+          <span className="flex gap-2"><Button disabled={index === 0 || Boolean(busyId)} aria-label={`${text(item.pet_name)}を上へ`} onClick={() => moveOrder(index,-1)}>上へ</Button>
+          <Button disabled={index === orderItems.length-1 || Boolean(busyId)} aria-label={`${text(item.pet_name)}を下へ`} onClick={() => moveOrder(index,1)}>下へ</Button></span>
+        </li>)}</ol>
+      </Dialog>
       {notice ? <Notice tone="danger" message={notice} /> : null}
       {state === 'loading' ? (
         <ListState kind="loading" title="公式サイト掲載中の写真を読み込んでいます" />
@@ -1059,7 +1147,7 @@ function PublicationsV8({
                           <span className={styles.petSubV8}>{Number(item.hide_owner_name) === 0 ? '名前を出しています' : '名前は伏せています'}</span>
                         </Td>
                         <Td><span className="block truncate text-label text-ink-secondary" title={placementLabels(item)}>{placementLabels(item)}</span></Td>
-                        <Td align="right"><span className="text-label tabular-nums text-ink">{viewsText(item.view_count_30d)}</span></Td>
+                        <Td align="right"><span className="text-label tabular-nums text-ink">{viewsText(item.view_count_30_days)}</span></Td>
                         <Td>{consented ? <Chip tone="ok">同意あり</Chip> : <Chip tone="neutral">未取得</Chip>}</Td>
                         <Td align="right">
                           <div className={styles.publicationActions}><Button
@@ -1095,7 +1183,7 @@ function PublicationsV8({
                 <li>外しても採用時のマイルは戻りません</li>
                 <li>原本は公開しません。選んだ場所へ公開用画像を出します</li>
               </ul>
-              <Button variant="secondary" disabled title="掲載順を保存するAPIは未接続です">並び順を変える</Button>
+              <Button variant="secondary" disabled={!canEdit || Boolean(busyId)} onClick={() => void openOrder()}>並び順を変える</Button>
             </section>
           </div>
         </div>

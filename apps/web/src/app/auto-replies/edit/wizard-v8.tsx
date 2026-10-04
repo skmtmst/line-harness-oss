@@ -55,6 +55,7 @@ import {
   exactAllMismatchNotice,
   initialMatchType,
   readInlineActions,
+  newActionKey,
   readKeywordRules,
   toActionPayload,
   toKeywordPayload,
@@ -249,7 +250,7 @@ function formFromSettings(s: AutoReplyDraftInput): WizardForm {
  * `lines` は札に並べる中身の説明で、`apply` が実際に入れる内容と一致させる
  * （入れない後の処理は書かない）。
  */
-const STARTER_TEMPLATES: Array<{
+export const STARTER_TEMPLATES: Array<{
   key: string
   name: string
   lines: string[]
@@ -258,7 +259,7 @@ const STARTER_TEMPLATES: Array<{
   {
     key: 'off-hours',
     name: '営業時間外の自動返信',
-    lines: ['毎日21:00〜09:00に受信', 'テキストで返す'],
+    lines: ['毎日21:00〜09:00に受信', 'テキストで返す', '担当者へ通知（通知先を選択）'],
     apply: (form) => ({
       ...form,
       ruleName: '営業時間外の自動返信',
@@ -268,15 +269,17 @@ const STARTER_TEMPLATES: Array<{
       activeUntil: '09:00',
       mode: 'inline-text',
       responseContent: form.responseContent || '営業時間外のため、翌営業日に担当者からご連絡します。',
+      actions: [{key:newActionKey(),actionType:'notify_staff',config:{notificationRuleId:'',notificationRuleVersion:0,message:'営業時間外のお問い合わせがありました。受信箱を確認してください。'},onFailure:'continue'}],
     }),
   },
   {
     key: 'booking-change',
     name: '予約変更の受付',
-    lines: ['「予約変更」「日程変更」を含む', 'テンプレートで返す'],
+    lines: ['「予約変更」「日程変更」を含む', 'テンプレートで返す', '担当者へ通知・タグ付け（対象を選択）'],
     apply: (form) => ({
       ...form,
       ruleName: '予約変更の受付',
+      actions: [{key:newActionKey(),actionType:'notify_staff',config:{notificationRuleId:'',notificationRuleVersion:0,message:'予約変更のお問い合わせがありました。受信箱を確認してください。'},onFailure:'continue'}, {key:newActionKey(),actionType:'tag',config:{op:'add',tagIds:[]},onFailure:'continue'}],
       keywordRules: [
         { keyword: '予約変更', matchType: 'contains', minLength: '', caseSensitive: true },
         { keyword: '日程変更', matchType: 'contains', minLength: '', caseSensitive: true },
@@ -289,10 +292,11 @@ const STARTER_TEMPLATES: Array<{
   {
     key: 'faq',
     name: 'よくある質問への回答',
-    lines: ['「営業時間」「場所」「料金」を含む', 'テンプレートで返す'],
+    lines: ['「営業時間」「場所」「料金」を含む', 'テンプレートで返す', 'タグ付け（対象を選択）'],
     apply: (form) => ({
       ...form,
       ruleName: 'よくある質問への回答',
+      actions: [{key:newActionKey(),actionType:'tag',config:{op:'add',tagIds:[]},onFailure:'continue'}],
       keywordRules: [
         { keyword: '営業時間', matchType: 'contains', minLength: '', caseSensitive: true },
         { keyword: '場所', matchType: 'contains', minLength: '', caseSensitive: true },

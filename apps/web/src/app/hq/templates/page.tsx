@@ -11,7 +11,7 @@ function Content() {
   const type = requested && TEMPLATE_TYPES.includes(requested as TemplateType)
     ? requested as TemplateType
     : 'template'
-  const config = type === 'tag'
+  const config = type === 'scenario' ? { label: 'シナリオ', target: 'scenarios' as const } : type === 'tag'
     ? { label: '友だち属性', target: 'tags' as const }
     : type === 'rich_menu'
       ? { label: 'リッチメニュー', target: 'rich-menus' as const }

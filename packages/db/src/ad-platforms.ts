@@ -365,6 +365,7 @@ function updateFieldClauses(input: {
   if (input.configEncrypted !== undefined) { fields.push('config_encrypted = ?'); values.push(input.configEncrypted); }
   if (input.isActive !== undefined) { fields.push('is_active = ?'); values.push(input.isActive ? 1 : 0); }
   if (input.lineAccountId !== undefined) { fields.push('line_account_id = ?'); values.push(input.lineAccountId); }
+  if (input.config !== undefined || input.configEncrypted !== undefined || input.name !== undefined || input.lineAccountId !== undefined) fields.push('verified_at = NULL', 'is_active = 0');
   return { fields, values };
 }
 
@@ -941,4 +942,12 @@ export async function getAdConversionLogs(
     .bind(platformId, safeLimit)
     .all<AdConversionLog>();
   return result.results;
+}
+
+/** 確認中の設定変更・所属変更は接続を確定させない。 */
+export async function connectVerifiedAdPlatform(db: D1Database, platform: AdPlatform, at = jstNow()): Promise<boolean> {
+  const result = await db.prepare(`UPDATE ad_platforms SET verified_at = ?, is_active = 1, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND name = ? AND updated_at = ? AND config = ? AND config_encrypted IS ?`)
+    .bind(at,at,platform.id,platform.line_account_id,platform.name,platform.updated_at,platform.config,platform.config_encrypted).run();
+  return Number(result.meta.changes ?? 0) === 1;
 }

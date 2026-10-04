@@ -8,6 +8,8 @@
 import { LineClient } from '@line-crm/line-sdk';
 import {
   getActiveNotificationRulesByEvent,
+  operatorRuleRecipientIds,
+  eligibleTeamStaffIds,
   type NotificationRuleRow,
 } from '@line-crm/db';
 import { sendOperationEmail } from './operation-notifications.js';
@@ -75,6 +77,7 @@ export type OperatorRecipient = {
 };
 
 export type OperatorRuleConditions = {
+  teamId?: string;
   importance?: string;
   recipientIds?: string[];
   recipientLabel?: string;
@@ -138,10 +141,11 @@ export async function operatorRecipients(
       JOIN line_accounts la ON la.id = ?
      WHERE sm.is_active = 1
        AND COALESCE(sm.tenant_id, 'default') = COALESCE(la.tenant_id, 'default')
-       AND (COALESCE(sm.account_scope, 'all') = 'all' OR sm.assigned_line_account_id = ?)
+       AND (COALESCE(sm.account_scope, 'all') = 'all' OR sm.assigned_line_account_id = ?
+         OR EXISTS (SELECT 1 FROM staff_account_scopes sas WHERE sas.staff_id = sm.id AND sas.line_account_id = la.id))
      ORDER BY sm.name, sm.id
   `).bind(lineAccountId, lineAccountId).all<OperatorRecipient>();
-  const requested = recipientIds?.length ? new Set(recipientIds) : null;
+  const requested = recipientIds !== undefined ? new Set(recipientIds) : null;
   return (result.results ?? []).filter((recipient) => !requested || requested.has(recipient.id));
 }
 
@@ -641,7 +645,7 @@ export async function dispatchOperatorRule(
     channels,
   });
   const recipients = await operatorRecipients(
-    db, input.lineAccountId, input.recipientIds ?? conditions.recipientIds,
+    db, input.lineAccountId, input.recipientIds ?? await operatorRuleRecipientIds(db, input.lineAccountId, conditions),
   );
   const token = channels.includes('line') ? await accountToken(db, input.lineAccountId) : null;
   let accepted = 0;
@@ -828,10 +832,11 @@ export async function sweepOperatorNotifications(
     `).bind(row.line_account_id).first<{ tenant_id: string | null }>();
     const sameTenant = Boolean(recipient && account
       && (recipient.tenant_id ?? 'default') === (account.tenant_id ?? 'default'));
-    const inScope = Boolean(recipient
-      && ((recipient.account_scope ?? 'all') === 'all'
-        || recipient.assigned_line_account_id === row.line_account_id));
-    if (!recipient || recipient.is_active !== 1 || !sameTenant || !inScope) {
+    const inScope = (await eligibleTeamStaffIds(db, row.line_account_id, [row.recipient_id])).length === 1;
+    const teamConditions = metadata.conditions as OperatorRuleConditions | undefined;
+    const inTeam = row.execution_mode === 'test' || !teamConditions?.teamId
+      || (await operatorRuleRecipientIds(db, row.line_account_id, teamConditions))?.includes(row.recipient_id);
+    if (!recipient || recipient.is_active !== 1 || !sameTenant || !inScope || !inTeam) {
       await finishOperatorDelivery(db, {
         id: row.id,
         lineAccountId: row.line_account_id,

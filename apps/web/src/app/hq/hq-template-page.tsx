@@ -26,7 +26,8 @@ function Unavailable({ label, target }: { label: string; target: HqOpenTargetKey
 }
 
 export default function HqTemplatePage({ type, label, target }: { type: TemplateType; label: string; target: HqOpenTargetKey }) {
+  const theme = useAdminTheme()
   return <Suspense fallback={<p role="status">{label}を読み込み中…</p>}>
-    {HQ_TEMPLATE_DISTRIBUTION_ENABLED ? <TemplateConsole type={type} /> : <Unavailable label={label} target={target} />}
+    {(HQ_TEMPLATE_DISTRIBUTION_ENABLED || theme === 'v8') ? <TemplateConsole type={type} /> : <Unavailable label={label} target={target} />}
   </Suspense>
 }

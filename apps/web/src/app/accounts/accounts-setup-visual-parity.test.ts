@@ -30,7 +30,7 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
       '`${workerBase}/auth/callback`',
       'api.lineAccounts.connectCheck',
       'api.lineAccounts.connect',
-      'api.lineAccounts.stepFollowerImport',
+      'api.lineAccounts.followerImportState',
       'data-design-node="a8qMXX"',
       'data-design-node="oeVQQ"',
       'data-design-node="JYfda"',

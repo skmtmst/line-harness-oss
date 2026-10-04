@@ -242,7 +242,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/dashboard', '/'],
   ['/api/getting-started', '/getting-started'],
   ['/api/conversions', '/conversions'], ['/api/measurement-sites', '/conversions'], ['/api/scoring', '/scoring'], ['/api/scoring-rules', '/scoring'],
-  ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
+  ['/api/ad-platforms/mappings', '/inflow-links'], ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
   ['/api/mileage', '/mileage'], ['/api/action-scores', '/mileage'],
   ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
   ['/api/automation-templates', '/automations'], ['/api/automation-drafts', '/automations'],
@@ -294,6 +294,7 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   // 公開の撤回・掲載先の変更は審査権限ではなく掲載管理の上位権限（#931 N-311）。
   // 一覧の表示（GET publications）は審査と同じ閲覧権限のままにする。
   [/^\/api\/nen-members\/photos\/publications\/[^/]+\/(?:withdraw|placements)(?:\/|$)/, 'photo.publication.manage'],
+  [/^\/api\/nen-members\/photos\/(?:publications\/order|[^/]+\/publish)(?:\/|$)/, 'photo.publication.manage'],
   [/^\/api\/nen-members\/photos(?:\/|$)/, 'photo.submission.view'],
   [/^\/api\/friends\/[^/]+\/messages(?:\/|$)/, '/chats'],
   [/^\/api\/friends\/[^/]+\/fields(?:\/|$)/, '/tags'],
@@ -413,6 +414,11 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/menus'],
   ['GET', '/api/restaurant-test/channels'],
   ['POST', '/api/restaurant-test/reservations/manual'],
+  ['POST', '/api/restaurant-test/reservations/holds'],
+  ['GET', '/api/restaurant-test/reservations/day'],
+  ['GET', '/api/restaurant-test/customers/search'],
+  ['GET', '/api/restaurant-test/customers/history'],
+  ['GET', '/api/restaurant-test/inventory/day'],
   // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
   ['GET', '/api/restaurant-test/google/connection'],
   ['GET', '/api/restaurant-test/google/reviews'],

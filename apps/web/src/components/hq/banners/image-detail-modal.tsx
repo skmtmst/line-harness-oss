@@ -9,6 +9,8 @@ import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import SearchField from '@/components/shared/search-field'
+import FilterChip from '@/components/shared/filter-chip'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import type { AccountWithStats } from '@/contexts/account-context'
 import {
   fileSizeLabel,
@@ -56,6 +58,9 @@ export default function ImageDetailModal({
   /** 「参照画像にする」（★V6 35-2 の参照画像欄へ入れる）。ライブラリから開いたときは渡さない。 */
   onUseAsReference?: () => void
 }) {
+  const theme = useAdminTheme()
+  const [tagId, setTagId] = useState<string | null>(null)
+  const accountTags = useMemo(() => Array.from(new Map(accounts.flatMap(account => account.tags ?? []).map(tag => [tag.id, tag])).values()), [accounts])
   const panelRef = useOverlayFocus(true, onClose, busy)
   const [mounted, setMounted] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
@@ -68,11 +73,9 @@ export default function ImageDetailModal({
   const deliverable = accounts.filter((a) => !delivered.has(a.id))
   const visibleAccounts = useMemo(() => {
     const q = accountQuery.trim().toLowerCase()
-    if (!q) return accounts
-    return accounts.filter((a) =>
-      `${a.displayName ?? a.name}\n${a.basicId ?? ''}\n${a.channelId ?? ''}`.toLowerCase().includes(q),
-    )
-  }, [accounts, accountQuery])
+    return accounts.filter(a => (!tagId || a.tags?.some(tag => tag.id === tagId)) && (!q ||
+      `${a.displayName ?? a.name}\n${a.basicId ?? ''}\n${a.channelId ?? ''}\n${theme === 'v8' ? (a.tags ?? []).map(tag => tag.name).join(' ') : ''}`.toLowerCase().includes(q)))
+  }, [accounts, accountQuery, tagId, theme])
 
   const toggle = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -158,12 +161,13 @@ export default function ImageDetailModal({
                 <p className="text-caption text-ink-faint">渡したアカウントの登録メディアに入ります</p>
               </div>
               <SearchField
-                placeholder="アカウント名で探す"
+                placeholder={theme === 'v8' ? 'アカウント名・タグで探す' : 'アカウント名で探す'}
                 aria-label="渡すアカウントをアカウント名で探す"
                 value={accountQuery}
                 onChange={setAccountQuery}
                 onClear={() => setAccountQuery('')}
               />
+              {theme === 'v8' && <div className="flex flex-wrap gap-2" role="group" aria-label="配布先のタグ"><FilterChip selected={!tagId} onChange={() => setTagId(null)}>すべて {accounts.length}</FilterChip>{accountTags.map(tag => <FilterChip key={tag.id} selected={tagId === tag.id} onChange={on => setTagId(on ? tag.id : null)}>{tag.name}</FilterChip>)}</div>}
               {accounts.length === 0 ? (
                 <p className="text-caption text-ink-faint">この統括にアカウントがありません。</p>
               ) : visibleAccounts.length === 0 ? (
@@ -185,7 +189,7 @@ export default function ImageDetailModal({
                           }
                         >
                           <Checkbox
-                            checked={already || checked}
+                            checked={theme === 'v8' ? checked : already || checked}
                             disabled={already || busy}
                             onCheckedChange={() => toggle(account.id)}
                             aria-label={`${account.displayName ?? account.name}へ配布`}

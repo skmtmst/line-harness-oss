@@ -504,7 +504,19 @@
     "554_meet_cancel_claim.sql",
     "555_tenant_data_retention.sql",
     "556_f13_folder_kinds.sql",
-    "564_form_versions_purge_delete.sql"
+    "564_form_versions_purge_delete.sql",
+    "567_restaurant_reservation_holds.sql",
+    "568_restaurant_inventory_occupancy.sql",
+    "569_restaurant_booking_policy.sql",
+    "570_hq_template_folders.sql",
+    "571_hq_scenario_templates.sql",
+    "572_hq_template_text_overrides.sql",
+    "573_ad_event_mappings.sql",
+    "574_operator_notification_teams.sql",
+    "575_photo_publication_daily_views.sql",
+    "576_v8_event_venue_address.sql",
+    "577_v8_site_receipt.sql",
+    "578_v8_photo_publication_rewards.sql"
   ],
-  "migrationCount": 505
+  "migrationCount": 517
 }

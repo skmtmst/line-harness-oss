@@ -2,14 +2,14 @@
 /*
  * 板 X4JcOf：メッセージのひな形を作る（V8だけ）。
  * 絵の「ひな形の中身＋右に LINE の見え方＋一段のひな形を保存」。
- * 保存する中身は今の口のまま。口に無い欄（タイトル・ボタン）は置かない。
+ * APIのタイトル・ボタンを含めても一段保存と右の見え方を保つ。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import TemplateConsole from './template-console'
 
-const calls = vi.hoisted(() => Object.fromEntries(['uploadImage', 'deleteImage', 'context', 'list', 'accounts', 'get', 'create', 'update', 'remove', 'preflight', 'distribute', 'result'].map((key) => [key, vi.fn()])))
-vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag', 'template', 'rich_menu', 'form'], hqTemplatesApi: calls }))
+const calls = vi.hoisted(() => Object.fromEntries(['uploadImage', 'deleteImage', 'context', 'list', 'accounts', 'get', 'create', 'update', 'remove', 'preflight', 'distribute', 'result', 'folderList', 'messageReferences'].map((key) => [key, vi.fn()])))
+vi.mock('@/lib/hq-templates-api', () => ({ TEMPLATE_TYPES: ['tag', 'template', 'rich_menu', 'form'], hqTemplatesApi: { ...calls, folders: { list: calls.folderList } } }))
 vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
 vi.mock('next/navigation', () => ({ usePathname: () => '/hq/templates', useRouter: () => ({ push: vi.fn() }) }))
 
@@ -27,6 +27,8 @@ beforeEach(() => {
   calls.context.mockResolvedValue({ tenantId: 'tenant-a', actorId: 'owner' })
   calls.list.mockResolvedValue([])
   calls.accounts.mockResolvedValue([])
+  calls.folderList.mockResolvedValue([])
+  calls.messageReferences.mockResolvedValue([])
   calls.create.mockImplementation(async (input: unknown) => ({ template: { ...(savedDetail().template), name: (input as { name: string }).name }, definition: (input as { definition: unknown }).definition }))
 })
 afterEach(cleanup)
@@ -45,15 +47,19 @@ describe('メッセージのひな形を作るV8（X4JcOf）', () => {
     expect(screen.getByLabelText('ひな形の名前')).toBeTruthy()
     expect(screen.getByLabelText('テンプレートの分類')).toBeTruthy()
     expect(screen.getByLabelText('配信する本文')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('ひな形の形式'), { target: { value: 'flex' } })
     expect(screen.getByLabelText('メッセージ画像を選ぶ')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '下書きを保存する' })).toBeNull()
     expect(screen.queryByRole('button', { name: '保存して配布先を選ぶ' })).toBeNull()
   })
 
-  it('口に無い欄（タイトル・ボタン）は置かない', async () => {
+  it('タイトルとボタンを保存口につなぎ、右のLINEプレビューを残す', async () => {
     await startCreate()
-    expect(screen.queryByLabelText('タイトル')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'ボタンを足す' })).toBeNull()
+    fireEvent.change(screen.getByLabelText('ひな形の形式'), { target: { value: 'flex' } })
+    fireEvent.change(screen.getByLabelText('ひな形のタイトル'), { target: { value: 'お知らせ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ボタンを追加' }))
+    expect(screen.getByLabelText('ボタン1の文字')).toBeTruthy()
+    expect(document.querySelector('[data-design=Right]')).toBeTruthy()
   })
 
   it('保存する中身は今の口のまま送る', async () => {

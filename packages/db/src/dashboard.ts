@@ -1,3 +1,4 @@
+import type { FriendActiveMonthComparison as importFriendActiveMonthComparison } from '@line-crm/shared';
 /**
  * ダッシュボードが1回で読む数。
  *
@@ -1153,7 +1154,7 @@ export async function getInboxStats(
 }
 
 /** 友だち画面の上部に出す数（設計 `V2 2-2 友だち` の KPIs）。 */
-export interface FriendStats {
+export interface FriendStats extends importFriendActiveMonthComparison {
   active: number;
   total: number;
   blockedByThem: number;
@@ -1163,6 +1164,20 @@ export interface FriendStats {
   /** 今月に追加された人数と、前月同期比。 */
   addedThisMonth: number;
   addedLastMonth: number;
+}
+
+/** 前月末の記録が可視対象すべてに揃う場合だけ合計する。 */
+export async function getFriendActiveMonthComparison(db: D1Database, scope: AccountStatsScope, active: number, nowMs = Date.now()): Promise<importFriendActiveMonthComparison> {
+  const now = new Date(nowMs + 9 * 3600_000);
+  const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0)).toISOString().slice(0, 10);
+  const filter = snapshotScopeSql(scope);
+  const row = await db.prepare(`SELECT COUNT(*) AS recorded, SUM(active) AS active FROM friend_daily_snapshots WHERE date = ? AND ${filter.sql}`)
+    .bind(day, ...filter.binds).first<{ recorded: number; active: number | null }>();
+  const expected = 'allTenants' in scope
+    ? (await db.prepare('SELECT COUNT(*) + 1 AS total FROM line_accounts').first<{ total: number }>())?.total ?? 0
+    : new Set([...scope.allowedAccountIds, ...(scope.includeUnassigned ? [UNASSIGNED_SNAPSHOT_ACCOUNT_ID] : [])]).size;
+  const previous = row?.recorded === expected && expected > 0 ? Number(row.active ?? 0) : null;
+  return { activeLastMonth: previous, activeMonthDelta: previous === null ? null : active - previous, activeComparisonDate: day };
 }
 
 /**
@@ -1193,6 +1208,7 @@ export async function getFriendStats(
   ]);
 
   return {
+    ...await getFriendActiveMonthComparison(db, scope, breakdown.active),
     active: breakdown.active,
     total: breakdown.total,
     // 設計は「相手から / 自分から」の2つ。相互は相手からに含める

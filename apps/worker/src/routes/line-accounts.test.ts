@@ -14,6 +14,7 @@ const dbMocks = {
   getLineAccountById: vi.fn(),
   getLineAccountCredentialHealth: vi.fn(),
   createLineAccount: vi.fn(),
+  listLineAccountTags: vi.fn(async () => [{id:'tag-own',tenant_id:'tenant-1'}]),
   updateLineAccount: vi.fn(),
   updateLineAccountFields: vi.fn(),
   updateLineAccountOrder: vi.fn(),
@@ -124,6 +125,7 @@ beforeEach(() => {
   lineClientMocks.getFollowersInsight.mockReset();
   lineClientMocks.getFollowerIds.mockReset();
   dbMocks.getAccountSetting.mockResolvedValue(null);
+  dbMocks.listLineAccountTags.mockResolvedValue([{id:'tag-own',tenant_id:'tenant-1'}]);
   dbMocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
   dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
   dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, parent_line_account_id: null }]);
@@ -1689,4 +1691,32 @@ describe('PUT /api/line-accounts/:id', () => {
       role: '本店',
     });
   });
+});
+
+test('登録前のタグをLINE通信前に検査する', async () => {
+ const remote=vi.fn(); vi.stubGlobal('fetch',remote);
+ for(const tagIds of [['not-own'],['tag-own','tag-own']]) {
+  const response=await setupApp('owner').request('/api/line-accounts/connect/check',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...autoConnectBody,tagIds})});
+  expect(response.status).toBe(tagIds[0] === 'not-own' ? 403 : 422);
+ }
+ expect(remote).not.toHaveBeenCalled();
+});
+test('登録に選んだタグを保存し、秘密と分けてLINE取得項目を返す', async () => {
+ installAutoConnectFetch();
+ let followerSetting: string | null = null;
+ dbMocks.getAccountSetting.mockImplementation(async () => followerSetting);
+ dbMocks.setAccountSetting.mockImplementation(async (_db,_id,_key,value) => {followerSetting=value;});
+ dbMocks.createLineAccount.mockResolvedValue({...fakeAccount,id:'created-account',channel_access_token:'issued-token',revision:1});
+ dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
+ lineClientMocks.getFollowerIds.mockResolvedValue({userIds:[]});
+ const insertTags = vi.fn();
+ const db = { prepare: vi.fn((sql: string) => ({ bind: (...args: unknown[]) => {
+  if (sql.startsWith('INSERT INTO line_account_tag_links')) insertTags(...args);
+  return { first: async () => sql.startsWith('SELECT id FROM staff_members') || sql.startsWith('SELECT id FROM line_account_tags') ? {id:'valid'} : null };
+ } })), batch: vi.fn(async () => []) } as unknown as D1Database;
+ const response=await setupApp('owner', db).request('/api/line-accounts/connect',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...autoConnectBody,tagIds:['tag-own']})});
+ expect(response.status).toBe(201);
+ expect(insertTags).toHaveBeenCalledExactlyOnceWith('created-account','tag-own', expect.any(String));
+ expect(db.batch).toHaveBeenCalledOnce();
+ expect(await response.json()).toMatchObject({data:{basicId:'@line',pictureUrl:'https://example.com/icon.png'}});
 });

@@ -1,3 +1,5 @@
+import { parseTextOverrides } from './text-overrides.js';
+import { parseScenarioDefinition, scenarioSnapshot, inspectScenario, planScenario } from './scenario.js';
 import {
   beginHqTemplateDistributionRun, getHqTemplate, listHqTemplates, HQ_TEMPLATE_TYPES,
   type HqTemplate, type HqTemplatePreflight, type HqTemplatePreflightResolution,
@@ -53,18 +55,19 @@ function canonicalCreationBody(body: Record<string, unknown>): string {
   const stable = (value: unknown): unknown => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).sort(([a],[b]) => a < b ? -1 : a > b ? 1 : 0).map(([key,v]) => [key,stable(v)])) : value;
   return JSON.stringify(stable(Object.fromEntries(Object.entries(body).filter(([key]) => key !== 'requestId'))));
 }
-async function replayTemplateCreation(db: D1Database, authority: HqTemplateAuthority, key: string, requestHash: string, templateId: string, name: string, description: string | null) {
+async function replayTemplateCreation(db: D1Database, authority: HqTemplateAuthority, key: string, requestHash: string, templateId: string, name: string, description: string | null, folderId: string | null) {
   const receipt = await db.prepare(`SELECT request_hash,resource_id FROM operation_request_receipts WHERE action='hq_template.create' AND actor_id=? AND idempotency_key=?`).bind(`tenant:${authority.tenantId}`, key).first<{ request_hash: string; resource_id: string }>();
   if (!receipt) return null;
   if (receipt.request_hash !== requestHash) throw new HqTemplateError('IDEMPOTENCY_CONFLICT', 409);
   if (receipt.resource_id !== templateId) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
-  const initial = await db.prepare(`SELECT t.template_type,t.created_at AS template_created_at,v.id,v.created_at,v.created_by,v.definition_json FROM hq_templates t JOIN hq_template_versions v ON v.tenant_id=t.tenant_id AND v.template_id=t.id AND v.version=1 WHERE t.id=? AND t.tenant_id=?`).bind(templateId, authority.tenantId).first<{ template_type:HqTemplateType; template_created_at:string; id:string; created_at:string; created_by:string|null; definition_json:string }>();
+  const initial = await db.prepare(`SELECT COALESCE(t.extended_type,t.template_type) AS template_type,t.created_at AS template_created_at,v.id,v.created_at,v.created_by,v.definition_json FROM hq_templates t JOIN hq_template_versions v ON v.tenant_id=t.tenant_id AND v.template_id=t.id AND v.version=1 WHERE t.id=? AND t.tenant_id=?`).bind(templateId, authority.tenantId).first<{ template_type:HqTemplateType; template_created_at:string; id:string; created_at:string; created_by:string|null; definition_json:string }>();
   if (!initial) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
   // Return the original creation response, even if the live record was later edited/archived.
-  return { template: { id: templateId, tenant_id: authority.tenantId, template_type: initial.template_type, name, description, current_version_id: initial.id, revision: 2, created_by: initial.created_by, created_at: initial.template_created_at, updated_at: initial.created_at, archived_at: null }, definition: JSON.parse(initial.definition_json) as unknown };
+  return { template: { id: templateId, tenant_id: authority.tenantId, template_type: initial.template_type, name, description, current_version_id: initial.id, revision: 2, created_by: initial.created_by, created_at: initial.template_created_at, updated_at: initial.created_at, archived_at: null, folder_id: folderId }, definition: JSON.parse(initial.definition_json) as unknown };
 }
 function canonicalDefinition(type: HqTemplateType, value: unknown, authority: HqTemplateAuthority): unknown {
   try {
+    if (type === 'scenario') return parseScenarioDefinition(value);
     if (type === 'tag') return parseTagDefinition(value);
     if (type === 'template') return parseMessageTemplateDefinition(value);
     const input = { templateVersionId: 'validation', definitionJson: JSON.stringify(value) };
@@ -90,21 +93,24 @@ export async function saveTemplate(db: D1Database, authority: HqTemplateAuthorit
   const templateId = id ?? `hqt_${await digest(JSON.stringify([authority.tenantId, requestId]))}`;
   const versionId = crypto.randomUUID(), revision = current?.template.revision ?? 0, createdAt = new Date().toISOString();
   if (requestId) {
-    const replay = await replayTemplateCreation(db, authority, requestId, requestHash, templateId, name, description);
+    const replay = await replayTemplateCreation(db, authority, requestId, requestHash, templateId, name, description, body.folderId as string | null ?? null);
     if (replay) return replay;
   }
   if (id && (!Number.isSafeInteger(body.expectedRevision) || body.expectedRevision !== revision)) throw new HqTemplateError('VERSION_CONFLICT', 409);
+  const folderId = body.folderId === undefined ? current?.template.folder_id ?? null : body.folderId;
+  if (folderId !== null && (typeof folderId !== 'string' || !(await db.prepare('SELECT id FROM hq_template_folders WHERE id=? AND tenant_id=? AND archived_at IS NULL').bind(folderId,authority.tenantId).first()))) throw new HqTemplateError('INVALID_FOLDER',422);
   const statements: HqTemplateStatement[] = [];
   if (current) statements.push(guard(`EXISTS(SELECT 1 FROM hq_templates WHERE id=? AND tenant_id=? AND revision=? AND archived_at IS NULL)`, [id!, authority.tenantId, revision]));
   else statements.push(
     { sql: `INSERT INTO operation_request_receipts(action,actor_id,idempotency_key,request_hash,resource_id,created_at) VALUES ('hq_template.create',?,?,?,?,?)`, bindings: [`tenant:${authority.tenantId}`, requestId!, requestHash, templateId, createdAt] },
-    { sql: `INSERT INTO hq_templates(id,tenant_id,template_type,name,description,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`, bindings: [templateId, authority.tenantId, type as HqTemplateType, name, description, authority.actorId, createdAt, createdAt] });
+    { sql: `INSERT INTO hq_templates(id,tenant_id,template_type,extended_type,name,description,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`, bindings: [templateId, authority.tenantId, type === 'scenario' ? 'template' : type as HqTemplateType, type === 'scenario' ? 'scenario' : null, name, description, authority.actorId, createdAt, createdAt] });
   statements.push({ sql: `INSERT INTO hq_template_versions(id,tenant_id,template_id,version,definition_json,content_hash,created_by,created_at) VALUES (?,?,?,(SELECT COALESCE(MAX(version),0)+1 FROM hq_template_versions WHERE tenant_id=? AND template_id=?),?,?,?,?)`, bindings: [versionId, authority.tenantId, templateId, authority.tenantId, templateId, json, await digest(json), authority.actorId, createdAt] });
   statements.push({ sql: `UPDATE hq_templates SET name=?,description=?,current_version_id=?,revision=revision+1,updated_at=? WHERE id=? AND tenant_id=?`, bindings: [name, description, versionId, createdAt, templateId, authority.tenantId] }, audit(authority, current ? 'edited' : 'created', templateId));
+  statements.push({ sql: 'UPDATE hq_templates SET folder_id=? WHERE id=? AND tenant_id=?', bindings: [folderId as string | null, templateId, authority.tenantId] });
   try { await batch(db, statements); }
   catch {
     if (requestId) {
-      const replay = await replayTemplateCreation(db, authority, requestId, requestHash, templateId, name, description);
+      const replay = await replayTemplateCreation(db, authority, requestId, requestHash, templateId, name, description, body.folderId as string | null ?? null);
       if (replay) return replay;
       // Even an operator-deleted receipt cannot make the same key create a second resource.
       if (await getHqTemplate(db, authority.tenantId, templateId)) throw new HqTemplateError('CREATE_RECEIPT_UNAVAILABLE', 409);
@@ -112,7 +118,7 @@ export async function saveTemplate(db: D1Database, authority: HqTemplateAuthorit
     }
     throw new HqTemplateError('VERSION_CONFLICT', 409);
   }
-  return requestId ? (await replayTemplateCreation(db, authority, requestId, requestHash, templateId, name, description))! : templateDetail(db, authority, templateId);
+  return requestId ? (await replayTemplateCreation(db, authority, requestId, requestHash, templateId, name, description, body.folderId as string | null ?? null))! : templateDetail(db, authority, templateId);
 }
 export async function deleteTemplate(db: D1Database, authority: HqTemplateAuthority, id: string, revision: unknown) {
   if (!Number.isSafeInteger(revision)) throw new HqTemplateError('INVALID_REVISION');
@@ -126,15 +132,17 @@ export async function deleteTemplate(db: D1Database, authority: HqTemplateAuthor
 export async function listTemplates(db: D1Database, authority: HqTemplateAuthority, type?: HqTemplateType): Promise<HqTemplate[]> {
   return listHqTemplates(db, authority.tenantId, type);
 }
-export async function preflightDistribution(db: D1Database, authority: HqTemplateAuthority, id: string, accountIds: string[], bucket?: R2Bucket) {
+export async function preflightDistribution(db: D1Database, authority: HqTemplateAuthority, id: string, accountIds: string[], bucket?: R2Bucket, textOverrides?: unknown) {
   const accounts = await requireTargetAccounts(db, authority, accountIds);
   const { template, definition } = await templateDetail(db, authority, id);
+  const overrides = parseTextOverrides(textOverrides,accountIds,template.template_type);
   const input = { templateVersionId: template.current_version_id!, definitionJson: JSON.stringify(definition) };
   const tagDefinition = template.template_type === 'tag' ? parseTagDefinition(definition) : null;
+  const scenarioDefinition = template.template_type === 'scenario' ? parseScenarioDefinition(definition) : null;
   const preflightId = crypto.randomUUID(), expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
   const statements: HqTemplateStatement[] = [], stores = [];
   for (const account of accounts) {
-    const snapshot = tagDefinition ? await tagSnapshot(db, account.id) : null;
+    const snapshot = tagDefinition ? await tagSnapshot(db, account.id) : scenarioDefinition ? await scenarioSnapshot(db,account.id) : null;
     let form: Awaited<ReturnType<typeof inspectFormTemplate>> | null = null;
     let formReferences: Awaited<ReturnType<typeof inspectFormTemplateReferences>> = [];
     if (template.template_type === 'form') {
@@ -152,19 +160,19 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
     let r2: Awaited<ReturnType<typeof inspectR2RuntimeStore>> | null = null;
     if (template.template_type === 'template' || template.template_type === 'rich_menu') {
       if (!bucket) throw new HqTemplateError('UNSUPPORTED', 422);
-      try { r2 = await inspectR2RuntimeStore({ db, bucket, authority, templateId: id, templateVersionId: template.current_version_id! }, account.id); }
+      try { r2 = await inspectR2RuntimeStore({ db, bucket, authority, templateId: id, templateVersionId: template.current_version_id!, textOverride: overrides.get(account.id) }, account.id); }
       catch (error) { rethrowR2(error); }
     }
-    const items = tagDefinition ? inspectTags(tagDefinition, snapshot!) : form
+    const items = scenarioDefinition ? inspectScenario(scenarioDefinition,snapshot!) : tagDefinition ? inspectTags(tagDefinition, snapshot!) : form
       ? [{ sourceId: form.sourceId, itemKind: form.itemKind, name: form.name, targetId: form.targetId, expectedRevision: form.expectedRevision, duplicate: form.duplicate, allowedModes: [...form.allowedModes] }, ...formReferences.map(item => ({ ...item, allowedModes: [...item.allowedModes] }))]
       : r2!.items;
-    const storeId = crypto.randomUUID(), token = tagDefinition ? `hqts1.${await digest(snapshot!)}` : form?.snapshotToken ?? r2!.snapshotToken;
-    statements.push({ sql: `INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at) VALUES (?,?,?,?,?,'create',?,?,'ready',?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, authority.actorId, expiresAt] });
+    const storeId = crypto.randomUUID(), token = tagDefinition || scenarioDefinition ? `hqts1.${await digest(snapshot!)}` : form?.snapshotToken ?? r2!.snapshotToken;
+    statements.push({ sql: `INSERT INTO hq_template_preflights(id,tenant_id,template_id,template_version_id,target_account_id,distribution_mode,idempotency_fingerprint,snapshot_token,status,created_by,expires_at,text_override) VALUES (?,?,?,?,?,'create',?,?,'ready',?,?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, authority.actorId, expiresAt, overrides.get(account.id) ?? null] });
     for (const item of items) {
       const fixedRichReferenceMode = template.template_type === 'rich_menu' && item.itemKind !== 'rich_menu' ? item.allowedModes[0] : 'create';
       statements.push({ sql: `INSERT INTO hq_template_preflight_resolutions(preflight_id,tenant_id,template_id,template_version_id,target_account_id,idempotency_fingerprint,snapshot_token,source_id,item_kind,resolution_mode,target_id,expected_revision) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, bindings: [storeId, authority.tenantId, id, template.current_version_id!, account.id, preflightId, token, item.sourceId, item.itemKind, fixedRichReferenceMode, item.targetId, item.expectedRevision] });
     }
-    stores.push({ accountId: account.id, accountName: account.name, items });
+    stores.push({ accountId: account.id, accountName: account.name, items, ...(overrides.has(account.id) ? {textOverride:overrides.get(account.id)} : {}) });
   }
   for (const account of accounts) statements.unshift(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [account.id, authority.tenantId]));
   await batch(db, statements);
@@ -178,6 +186,7 @@ function resultReason(status: string): string | null {
 }
 function rethrowR2(error: unknown): never {
   if (!(error instanceof HqR2RuntimeError)) throw error;
+  if (error.code === 'CARD_REFERENCE_UNAVAILABLE') throw new HqTemplateError('CARD_REFERENCE_UNAVAILABLE', 409);
   if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);
   if (error.code === 'VERSION_CONFLICT' || error.code.includes('UNAVAILABLE') || error.code.startsWith('AMBIGUOUS_')) throw new HqTemplateError('VERSION_CONFLICT', 409);
   if (error.code.includes('UNSUPPORTED')) throw new HqTemplateError('UNSUPPORTED', 422);
@@ -225,12 +234,12 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     const row = stored.find(r => r.target_account_id === selected.accountId && r.source_id === selected.sourceId);
     if (!row || !['create', 'overwrite', 'alias'].includes(selected.mode)) throw new HqTemplateError('SELECTION_REQUIRED', 409);
     const p = preflights.find(p => p.id === row.preflight_id)!;
-    if (p.status === 'consumed') { if (template.template_type === 'tag' && row.resolution_mode !== selected.mode) throw new HqTemplateError('SELECTION_CHANGED', 409); }
+    if (p.status === 'consumed') { if ((template.template_type === 'tag' || template.template_type === 'scenario') && row.resolution_mode !== selected.mode) throw new HqTemplateError('SELECTION_CHANGED', 409); }
     else if (template.template_type === 'rich_menu' && row.item_kind !== 'rich_menu') {
       if (row.resolution_mode !== selected.mode) throw new HqTemplateError('SELECTION_CHANGED', 409);
     } else if (row.target_id ? selected.mode === 'create' : selected.mode !== 'create') throw new HqTemplateError('SELECTION_REQUIRED', 409);
   }
-  if (template.template_type !== 'tag') {
+  if (template.template_type !== 'tag' && template.template_type !== 'scenario') {
     if ((template.template_type === 'template' || template.template_type === 'rich_menu') && !bucket) throw new HqTemplateError('UNSUPPORTED', 422);
     for (const p of preflights) {
       const selected = selections.filter(selection => selection.accountId === p.target_account_id).map(selection => {
@@ -267,7 +276,8 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     await db.prepare(`UPDATE hq_template_distribution_runs SET status=?,finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND tenant_id=? AND status='running'`).bind(status, runId, authority.tenantId).run();
     return distributionResult(db, authority, templateId, runId, bucket);
   }
-  const definition = parseTagDefinition(JSON.parse(version.definition_json));
+  const definition = JSON.parse(version.definition_json);
+  const storeSnapshot = template.template_type === 'scenario' ? scenarioSnapshot : tagSnapshot;
   await beginHqTemplateDistributionRun(db, { id: runId, tenantId: authority.tenantId, templateId, templateVersionId: preflights[0].template_version_id, idempotencyFingerprint: runId, createdBy: authority.actorId });
   // Claim the complete decision set before any store mutation. This also binds
   // concurrent requests and interrupted runs whose first store has not completed.
@@ -280,12 +290,14 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     const existing = await db.prepare(`SELECT status FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=?`).bind(runId, authority.tenantId, p.target_account_id).first();
     if (existing) continue;
     const selected: HqTemplateResolution[] = selections.filter(s => s.accountId === p.target_account_id).map(s => ({ sourceId: s.sourceId, itemKind: stored.find(r => r.preflight_id === p.id && r.source_id === s.sourceId)!.item_kind, mode: s.mode }));
-    const snapshot = await tagSnapshot(db, p.target_account_id);
+    const snapshot = await storeSnapshot(db, p.target_account_id);
     const conflict = p.expires_at === null || p.expires_at <= new Date().toISOString() || `hqts1.${await digest(snapshot)}` !== p.snapshot_token;
     let status = conflict ? 'version_conflict' : 'succeeded';
     let plan: ReturnType<typeof planTags> | null = null;
     if (!conflict) {
       try {
+        if (template.template_type === 'scenario') plan = planScenario(p.target_account_id,parseScenarioDefinition(definition),snapshot,selected);
+        else {
         const adapter = getHqTemplateAdapter('tag', { db, authority });
         const ok = <T>(result: HqTemplateAdapterResult<T>): T => { if (result.kind !== 'OK') throw new HqTemplateError('UNSUPPORTED', 422); return result.value; };
         const input = { templateVersionId: p.template_version_id, definitionJson: JSON.stringify(definition) };
@@ -296,6 +308,7 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
         const ids = ok(await adapter.buildIdMap(context, verified, duplicates));
         const commit = ok(await adapter.buildCommitPlan(context, input, ids));
         plan = { statements: [...commit.dbCommit], resolutions: [...commit.resolutions], counts: { created: 0, overwritten: 0, aliased: 0 } };
+        }
       }
       catch (error) { status = error instanceof HqTemplateError && error.code === 'VERSION_CONFLICT' ? 'version_conflict' : 'failed'; }
     }
@@ -312,7 +325,7 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
     catch {
       const committed = await db.prepare(`SELECT status FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=?`).bind(runId, authority.tenantId, p.target_account_id).first();
       if (committed) continue;
-      status = !p.expires_at || p.expires_at <= new Date().toISOString() || `hqts1.${await digest(await tagSnapshot(db, p.target_account_id))}` !== p.snapshot_token ? 'version_conflict' : 'failed';
+      status = !p.expires_at || p.expires_at <= new Date().toISOString() || `hqts1.${await digest(await storeSnapshot(db, p.target_account_id))}` !== p.snapshot_token ? 'version_conflict' : 'failed';
       try { await persist(status, [], plan?.resolutions ?? selected); } catch { throw new HqTemplateError('RESULT_UNAVAILABLE', 500); }
     }
   }

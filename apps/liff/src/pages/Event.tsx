@@ -193,6 +193,7 @@ export default function Event() {
             <Icon name="users" className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" />
             <span className={hasSeats ? 'font-bold text-liff-wait-ink' : 'text-ink'}>{seats}</span>
           </p>
+          {event.venue_address && <p className="text-sm text-ink-secondary break-words">{event.venue_address}</p>}
           {isHttpsUrl(event.venue_url) && (
             <a
               href={event.venue_url}

@@ -76,6 +76,7 @@ export interface CreateTrafficPoolInput {
   slug: string;
   name: string;
   activeAccountId: string;
+  accountIds?: string[];
 }
 
 export async function createTrafficPool(
@@ -85,25 +86,16 @@ export async function createTrafficPool(
   const id = crypto.randomUUID();
   const now = jstNow();
 
-  await db
-    .prepare(
-      `INSERT INTO traffic_pools (id, slug, name, active_account_id, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`,
-    )
-    .bind(id, input.slug, input.name, input.activeAccountId, now, now)
-    .run();
-
-  // Mirror the chosen active account into pool_accounts so the new pool isn't
-  // empty in the admin UI and getRandomPoolAccount() includes it on first use.
-  // INSERT OR IGNORE because pool_accounts.UNIQUE(pool_id, line_account_id)
-  // makes a follow-up explicit add idempotent.
-  await db
-    .prepare(
-      `INSERT OR IGNORE INTO pool_accounts (id, pool_id, line_account_id, is_active, created_at)
-       VALUES (?, ?, ?, 1, ?)`,
-    )
-    .bind(crypto.randomUUID(), id, input.activeAccountId, now)
-    .run();
+  const accountIds = [...new Set(input.accountIds ?? [input.activeAccountId])];
+  if (!accountIds.length || !accountIds.includes(input.activeAccountId)) throw new Error('Invalid pool membership');
+  await db.batch([
+    db.prepare(`INSERT INTO traffic_pools (id, slug, name, active_account_id, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 1, ?, ?)`)
+      .bind(id, input.slug, input.name, input.activeAccountId, now, now),
+    ...accountIds.map((accountId) => db.prepare(
+      `INSERT INTO pool_accounts (id, pool_id, line_account_id, is_active, created_at) VALUES (?, ?, ?, 1, ?)`,
+    ).bind(crypto.randomUUID(), id, accountId, now)),
+  ]);
 
   return (await getTrafficPoolById(db, id))!;
 }

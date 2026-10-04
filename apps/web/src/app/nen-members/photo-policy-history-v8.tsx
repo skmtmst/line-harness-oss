@@ -13,7 +13,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatPhotoReceivedAt } from './photo-review-time'
 import styles from './photo-review-v8.module.css'
 
-const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points} マイル・公式サイト掲載 —（未接続）`
+const policyContent = (version: PhotoRewardPolicyVersion) => `採用 ${version.points} マイル・公式サイト掲載 さらに ${version.publicationPoints ?? 0} マイル`
 
 /** N1br7.html の表＋予約中の版＋新しい版の入力。保存は既存の版APIへ送る。 */
 export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged }: {
@@ -24,6 +24,7 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<PhotoRewardPolicyVersion | null>(null)
   const [points, setPoints] = useState('')
+  const [publicationPoints, setPublicationPoints] = useState('0')
   const [summary, setSummary] = useState('')
   const [effective, setEffective] = useState('')
   const [saving, setSaving] = useState(false)
@@ -45,16 +46,18 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
     if (!canEdit || saving) return
     const value = Number(points)
     if (!Number.isInteger(value) || value < 1 || value > 100000) { setSaveError('採用したら付けるマイルを1〜100000で入力してください。'); return }
+    const publicationValue = Number(publicationPoints)
+    if (!Number.isInteger(publicationValue) || publicationValue < 0 || publicationValue > 100000) { setSaveError('掲載時の追加マイルを0〜100000で入力してください。'); return }
     if (effective && !Number.isFinite(Date.parse(effective))) { setSaveError('使い始めの日時を確認してください。'); return }
     setSaving(true); setSaveError('')
     try {
       const response = await api.nenMembers.createPhotoRewardPolicyVersion({
-        points: value, summary: summary.trim(),
+        points: value, publicationPoints: publicationValue, summary: summary.trim(),
         effectiveFrom: effective ? `${effective}:00+09:00` : null,
         ...(versions.length ? { expectedVersion: Math.max(...versions.map((version) => version.versionNumber)) } : {}),
       })
       if (!response.success) throw new Error(response.error)
-      setPoints(''); setSummary(''); setEffective(''); await load(); onChanged()
+      setPoints(''); setPublicationPoints('0'); setSummary(''); setEffective(''); await load(); onChanged()
     } catch { setSaveError('新しい版を保存できませんでした。最新の版を読み直して、もう一度お試しください。') }
     finally { setSaving(false) }
   }
@@ -85,12 +88,12 @@ export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged
           {canEdit ? <form className={styles.railCard} onSubmit={(event) => { event.preventDefault(); void save() }}>
             <h3 className={styles.railTitle}>引き出し：新しい版を作る</h3><p className={styles.railRow}>保存しても、使い始めの日時までは今の版のままです。</p>
             <div className={styles.historyFields}><label className={styles.fieldLabel}>採用したら（マイル）<TextField aria-label="採用したら（マイル）" inputMode="numeric" value={points} onChange={(event) => setPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /></label>
-              <label className={styles.fieldLabel}>掲載されたら（さらに）<TextField aria-label="掲載されたら（さらに）" value="—" disabled title="掲載時の追加報酬はまだ接続されていません" /></label></div>
-            <p className={styles.railNote}>掲載時の追加報酬は未接続です。</p>
+              <label className={styles.fieldLabel}>掲載されたら（さらに）<TextField aria-label="掲載されたら（さらに）" inputMode="numeric" value={publicationPoints} onChange={(event) => setPublicationPoints(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))} disabled={saving} /></label></div>
+            <p className={styles.railNote}>掲載時の追加報酬は、同じ写真に一度だけ付与します。</p>
             <label className={styles.fieldLabel}>ひとこと（なぜ変えるか）<TextField value={summary} maxLength={200} disabled={saving} onChange={(event) => setSummary(event.target.value)} /></label>
             <label className={styles.fieldLabel}>使い始め（日本時間・空ならすぐ）<TextField type="datetime-local" value={effective} disabled={saving} onChange={(event) => setEffective(event.target.value)} /></label>
             {saveError ? <p role="alert" className={styles.errorText}>{saveError}</p> : null}
-            <div className={styles.historyActions}><Button variant="secondary" disabled={saving} onClick={() => { setPoints(''); setSummary(''); setEffective(''); setSaveError('') }}>キャンセル</Button><Button type="submit" variant="primary" busy={saving} disabled={saving}>{effective ? '版を予約する' : '新しい版を保存する'}</Button></div>
+            <div className={styles.historyActions}><Button variant="secondary" disabled={saving} onClick={() => { setPoints(''); setPublicationPoints('0'); setSummary(''); setEffective(''); setSaveError('') }}>キャンセル</Button><Button type="submit" variant="primary" busy={saving} disabled={saving}>{effective ? '版を予約する' : '新しい版を保存する'}</Button></div>
           </form> : null}
         </div>
       </>}
