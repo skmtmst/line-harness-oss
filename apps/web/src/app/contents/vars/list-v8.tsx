@@ -1494,7 +1494,7 @@ function CommonVarsListV8Inner() {
                 busy={deleteBusy}
                 busyLabel="差し替え中…"
               >
-                差し替えて削除
+                差し替えて消す
               </Button>
             ) : null}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete && deleteChoice === 'stop' ? (
@@ -1585,7 +1585,7 @@ function CommonVarsListV8Inner() {
                         }
                       }}
                     >
-                      <p className={styles.choiceTitle}>別の共通情報に差し替えて削除（おすすめ）</p>
+                      <p className={styles.choiceTitle}>別の共通情報に差し替えて消す（おすすめ）</p>
                       <p className={styles.choiceNote}>
                         {formatNumber(deleteImpact.blockingTotal)}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
                       </p>
