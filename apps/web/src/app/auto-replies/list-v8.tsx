@@ -1041,7 +1041,11 @@ export default function AutoRepliesListV8() {
                       </p>
                     )}
                   </td>
-                  <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                  <td
+                    className={styles.menuCell}
+                    onClick={(event) => event.stopPropagation()}
+                    data-design-node={openMenuId === r.id ? 'IIesG' : undefined}
+                  >
                     <button
                       type="button"
                       className={styles.menuButton}
