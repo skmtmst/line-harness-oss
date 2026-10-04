@@ -9,6 +9,9 @@ export const metadata: Metadata = {
     template: '%s | musubo マニュアル',
   },
   description: 'musuboをご利用いただくための公開マニュアルです。',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
