@@ -53,7 +53,7 @@ import {
 } from '@/lib/api'
 import { isMileageFriendsV6Overview } from './friends-overview-guard'
 import { ruleEventLabel } from './earning-rule-view'
-import { formatMileageDate, formatMileageNumber } from './mileage-display'
+import { formatMileageDate, formatMileageMonthDay, formatMileageNumber } from './mileage-display'
 import type { MileageV8TabKey } from './mileage-v8'
 import { describeMileageCsvExportFailure } from './mileage-response-state'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -143,7 +143,7 @@ function validityText(rule: MileageEarningRuleV6): string {
     ? `${days / 365}年`
     : `${formatMileageNumber(days)}日`
   const until = rule.draft.validUntil
-    ? formatMileageDate(rule.draft.validUntil).replace(/^\d+\//, '')
+    ? formatMileageMonthDay(rule.draft.validUntil)
     : '期限なし'
   return `${span}・${until}`
 }

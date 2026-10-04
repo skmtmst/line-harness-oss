@@ -40,8 +40,8 @@ function ruleFixture() {
       amount: 200,
       initialStatus: 'available',
       validFrom: null,
-      validUntil: null,
-      expiresAfterDays: null,
+      validUntil: '2026-12-31T00:00:00.000Z',
+      expiresAfterDays: 365,
       cancellationEventTypes: [],
       targetConditions: null,
       sortOrder: 0,
@@ -235,6 +235,16 @@ async function waitForTabCount(calls: Array<{ key: string; text: string | null }
   }
   throw new Error(`タブの件数が出ませんでした: ${key} ${text}`)
 }
+
+describe('有効期間の短さ（板 `E2Any`）', () => {
+  it('1年・12/31 と出す', async () => {
+    await act(async () => {
+      root.render(<AccountProvider><MileagePage /></AccountProvider>)
+    })
+    await waitForTable()
+    expect(container.textContent ?? '').toContain('1年・12/31')
+  })
+})
 
 describe('行の「…」（板 `OC0gy`）', () => {
   it('編集・止める・複製が並び、複製は止めた状態で写しを作る', async () => {
