@@ -16,7 +16,7 @@ import ConversionsPage from './page'
  * ではなく body に出た `[role="menu"]` の数と、開いた先の詳細の有無。
  */
 
-const fixture = vi.hoisted(() => ({ accountId: 'account-a' as string | null, role: 'owner', roleMode: 'ok', tab: 'points', rows: 1, replace: vi.fn() }))
+const fixture = vi.hoisted(() => ({ accountId: 'account-a' as string | null, role: 'owner', roleMode: 'ok', tab: 'points', rows: 1, states: [] as string[], reads: [] as string[], replace: vi.fn() }))
 let releaseRole: (value: Response) => void
 let writes: Array<{ path: string; body: Record<string, unknown> }> = []
 
@@ -78,7 +78,7 @@ function listBody() {
   return {
     success: true,
     data: {
-      items: Array.from({ length: fixture.rows }, (_, index) => ({ ...DEFINITION, id: `point-${index}`, name: index === 0 ? '購入' : `購入 ${index + 1}` })),
+      items: Array.from({ length: fixture.rows }, (_, index) => ({ ...DEFINITION, state: fixture.states[index] ?? 'active', id: `point-${index}`, name: index === 0 ? '購入' : `購入 ${index + 1}` })),
       stateCounts: { active: fixture.rows, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0, unused: 0 },
       range: { from: '2026-09-01 00:00:00', to: '2026-09-30 23:59:59', timeZone: 'Asia/Tokyo' },
       pagination: { total: fixture.rows, limit: 50, cursor: '0', nextCursor: null },
@@ -100,6 +100,7 @@ function installFetch() {
     if (path.includes('/delete-impact')) return reply({ definition: DEFINITION, usages: [], eventCount: 5, canDelete: false, stopImpact: { affectedUsageCount: 1, preservesPastEvents: true, preservesUsages: true }, replacementCandidates: [] })
     if (path.endsWith('/stop')) return reply({ id: DEFINITION.id, status: 'stopped', version: 4, stoppedAt: '2026-10-04' })
     if (path.startsWith('/api/conversions/definitions')) {
+      fixture.reads.push(path)
       return new Response(JSON.stringify(listBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     if (path.startsWith('/api/conversions/report') || path.startsWith('/api/conversions/definition-report')) {
@@ -147,6 +148,8 @@ beforeEach(() => {
   fixture.roleMode = 'ok'
   fixture.tab = 'points'
   fixture.rows = 1
+  fixture.states = []
+  fixture.reads = []
   fixture.replace.mockClear()
   writes = []
   vi.stubGlobal('localStorage', new MemoryStorage())
@@ -262,5 +265,58 @@ describe('V8 閲覧だけの担当者と権限確認中', () => {
     await mount()
     expect(fixture.replace).toHaveBeenCalledWith('/affiliates?tab=approvals&affiliate=affiliate-a&from=notice')
     expect(container.querySelector('table')).toBeNull()
+  })
+})
+
+
+describe('V8 よく使う絞り込み', () => {
+  function presetItem(prefix: string): HTMLButtonElement | undefined {
+    return [...document.body.querySelectorAll<HTMLButtonElement>('[role="menu"] button')]
+      .find((button) => button.textContent?.trim().startsWith(prefix))
+  }
+
+  it('停止の札で行を絞り、もう一度押すと全件へ戻る', async () => {
+    fixture.rows = 3
+    fixture.states = ['active', 'stopped', 'draft']
+    await mount()
+    const stopped = [...container.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent?.trim().startsWith('止めている'))!
+    await click(stopped)
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+    expect(container.querySelector('tbody')?.textContent).toContain('購入 2')
+    expect(stopped.getAttribute('aria-pressed')).toBe('true')
+    await click(stopped)
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(3)
+    expect(stopped.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('2ページ目から下書きを選ぶと1ページ目に戻り、解除で全件へ戻る', async () => {
+    fixture.rows = 21
+    fixture.states = Array.from({ length: 21 }, (_, index) => index === 0 ? 'draft' : 'active')
+    await mount()
+    await click(container.querySelector<HTMLButtonElement>('button[aria-label="次のページ"]') ?? undefined)
+    await click(byText('よく使う絞り込み'))
+    expect(menus()).toHaveLength(1)
+    await click(presetItem('下書き'))
+    expect(menus()).toHaveLength(0)
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+    expect(container.querySelector('tbody')?.textContent).toContain('購入')
+    expect(container.querySelector('button[aria-label="次のページ"]')).toBeNull()
+    await click(byText('下書き'))
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(20)
+    expect(container.querySelector('button[aria-label="次のページ"]')).not.toBeNull()
+  })
+
+  it('閲覧のみでも並び順を変更でき、選択中のアカウントの一覧へ渡す', async () => {
+    fixture.role = 'staff'
+    await mount()
+    await click(byText('よく使う絞り込み'))
+    await click(presetItem('成果単価が高い順'))
+    expect(menus()).toHaveLength(0)
+    const last = new URL(fixture.reads.at(-1)!, 'http://localhost')
+    expect(last.searchParams.get('sort')).toBe('value_desc')
+    expect(last.searchParams.get('lineAccountId')).toBe('account-a')
+    expect(writes).toEqual([])
+    expect(container.querySelector('a[href="/conversions/new"]')).toBeNull()
   })
 })

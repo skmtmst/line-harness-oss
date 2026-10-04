@@ -134,34 +134,6 @@ const STATE_LABELS: Record<ConversionDefinitionState, string> = {
 type StatusFilter = 'all' | ConversionDefinitionFilter
 
 /**
- * 種別を運用者の言葉にする。
- *
- * 設計は「購入」「申込・登録」の2つでまとめている。実装の eventType は9種
- * あるので、設計の2つに寄せられるものは寄せ、残りはそのまま出す。
- */
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  purchase: '購入',
-  form_submit: '申込・登録',
-  friend_add: '申込・登録',
-  visit: '来店・参加',
-  // 作る画面が以前に送っていた値。過去に作った行がこれで残っている。
-  signup: '申込・登録',
-  reserve: '来店・参加',
-  other: 'その他',
-  scenario_step: 'シナリオ到達',
-  rich_menu_tap: 'リッチメニュー',
-  url_click: 'URLクリック',
-  keyword_sent: 'キーワード',
-  liff_view: 'LIFF閲覧',
-  custom: 'その他',
-  ec_order_confirmed: '購入',
-  ec_subscription_confirmed: '購入',
-  form_submitted: '申込・登録',
-  reservation_confirmed: '来店・参加',
-  webinar_completed: 'その他',
-}
-
-/**
  * IDEA-19: 成果1件の業務状態を運用者の言葉にする。
  * 状態の導出は口(listConversionDefinitionEvents)が済ませている。
  * 「検知」は受信履歴の「受け取った」が担い、ここは確定後の帰結を出す。
@@ -219,7 +191,9 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import ListToolbar from '@/components/shared/list-toolbar'
+import SearchField from '@/components/shared/search-field'
+import ActionMenu from '@/components/shared/action-menu'
+import { Bookmark, Check, Plus } from 'lucide-react'
 import HelpTip from '@/components/shared/help-tip'
 import Select from '@/components/shared/select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -339,6 +313,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<PointSort>('cv-desc')
   const [status, setStatus] = useState<StatusFilter>('all')
+  const [presetOpen, setPresetOpen] = useState(false)
+  const presetAnchorRef = useRef<HTMLButtonElement>(null)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -953,8 +929,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています">CSVで書き出す</Button>
       </div>
 
-      {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* V8 r6dJFy / BygrU：4つの数を区切り線の帯にし、狭い端末の開閉は維持する。 */}
+      <KpiCollapse data-design="KPIs" gridClassName={styles.band}>
         <KpiCard
           title="成果地点"
           value={definitions?.pagination.total ?? null}
@@ -1020,67 +996,76 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         <Notice tone="info" message={`「${highlightedPoint.name}」を保存しました。色の付いた行です。`} className="mb-4" />
       ) : null}
 
-      {canReverse ? <div><Button href="/conversions/new" variant="primary">成果地点を作る</Button></div> : null}
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
 
-      {/*
-        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
-        右端に並び順。期間の目安は2行目の右へ。
-      */}
-      <ListToolbar
-        search={{
-          placeholder: '成果地点の名前で探す',
-          value: query,
-          onChange: (value) => {
-            setQuery(value)
-            setPage(1)
-          },
-        }}
-        filters={
-          <>
-            {/*
-              R595: 一覧が未取得のとき札に 0 を出すと「0件ある」と誤読する。
-              FilterChip は件数が無いとき印を出さない決まりなので、
-              未取得は渡さない（部品側で隠れる）。
-            */}
+      {/* 成果地点の分類を保存する口はまだないため、フォルダの飾りは置かない。 */}
+      <div className="conversion-tools">
+        <div className="conversion-search-row">
+          {canReverse ? <Button href="/conversions/new" variant="primary"><Plus size={16} aria-hidden="true" />成果地点を作る</Button> : null}
+          <SearchField
+            className="conversion-search"
+            aria-label="成果地点の名前で探す"
+            placeholder="成果地点の名前で探す"
+            value={query}
+            onChange={(value) => { setQuery(value); setPage(1) }}
+            onClear={() => { setQuery(''); setPage(1) }}
+          />
+        </div>
+        <div className="conversion-filter-row">
+          <div className="conversion-filters">
+            {/* 未取得の件数は渡さない。選択済みの札を押すと全件へ戻る。 */}
             {([
-              ['all', 'すべて', definitions?.pagination.total],
               ['active', '動いている', definitions?.stateCounts.active],
-              ['draft', '下書き', definitions?.stateCounts.draft],
-              ['invalid', '入力不良', definitions?.stateCounts.invalid],
-              ['sourceStopped', '起点停止', definitions?.stateCounts.sourceStopped],
               ['stopped', '止めている', definitions?.stateCounts.stopped],
-              ['unused', 'どこからも使われていない', definitions?.stateCounts.unused],
             ] as const).map(([value, label, total]) => (
-              <FilterChip
-                key={value}
-                selected={status === value}
-                onChange={() => {
-                  setStatus(value)
-                  setPage(1)
-                }}
-                count={total}
-              >
+              <FilterChip key={value} selected={status === value} count={total}
+                onChange={(selected) => { setStatus(selected ? value : 'all'); setPage(1) }}>
                 {label}
               </FilterChip>
             ))}
-          </>
-        }
-        trailing={
-          <>
+          </div>
+          <div className="conversion-tools-right">
+            <div>
+              <Button ref={presetAnchorRef} aria-expanded={presetOpen} aria-haspopup="menu"
+                onClick={() => setPresetOpen((open) => !open)}>
+                <Bookmark size={16} aria-hidden="true" />よく使う絞り込み
+              </Button>
+              <ActionMenu open={presetOpen} anchorRef={presetAnchorRef}
+                ariaLabel="成果地点の絞り込みと並び順" onClose={() => setPresetOpen(false)}
+                items={[
+                  ...([
+                    ['all', 'すべて', definitions?.pagination.total],
+                    ['active', '動いている', definitions?.stateCounts.active],
+                    ['stopped', '止めている', definitions?.stateCounts.stopped],
+                    ['draft', '下書き', definitions?.stateCounts.draft],
+                    ['invalid', '入力不良', definitions?.stateCounts.invalid],
+                    ['sourceStopped', '起点停止', definitions?.stateCounts.sourceStopped],
+                    ['unused', 'どこからも使われていない', definitions?.stateCounts.unused],
+                  ] as const).map(([value, label, total], index) => ({
+                    id: `state-${value}`, label: total == null ? label : `${label} ${formatNumber(total)}`,
+                    sectionBefore: index === 0 ? '絞り込み' : undefined,
+                    icon: status === value ? <Check size={16} aria-hidden="true" /> : undefined,
+                    onSelect: () => { setStatus(value); setPage(1); setPresetOpen(false) },
+                  })),
+                  ...SORT_OPTIONS.map((option, index) => ({
+                    id: `sort-${option.value}`, label: option.label,
+                    sectionBefore: index === 0 ? '並び順' : undefined,
+                    icon: sort === option.value ? <Check size={16} aria-hidden="true" /> : undefined,
+                    onSelect: () => { setSort(option.value as PointSort); setPage(1); setPresetOpen(false) },
+                  })),
+                ]} />
+            </div>
             <Select size="page-size" aria-label="表示件数" value={String(pageSize)} options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} />
-            <Select
-              aria-label="並び順"
-              value={sort}
-              options={SORT_OPTIONS}
-              onChange={(value) => {
-                setSort(value as PointSort)
-                setPage(1)
-              }}
-            />
-          </>
-        }
-      />
+          </div>
+        </div>
+      </div>
+      {status !== 'all' && status !== 'active' && status !== 'stopped' ? (
+        <div className="conversion-filters" aria-label="選択中の絞り込み">
+          <FilterChip selected onChange={() => { setStatus('all'); setPage(1) }}>
+            {status === 'unused' ? 'どこからも使われていない' : STATE_LABELS[status]}
+          </FilterChip>
+        </div>
+      ) : null}
 
       {listTruncated ? (
         <p
@@ -1174,7 +1159,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 <Th className={styles.triggerColumn}>何が起きたら数えるか</Th>
                 <Th align="right" className={styles.countColumn}>この30日</Th>
                 <Th align="right" className={styles.valueColumn}>金額</Th>
-                <Th>使われている場所</Th>
+                <Th help="利用先の名前は詳細で確認できます。追加するときは分析画面でこの成果地点を選びます。" helpLabel="使われている場所"><span className="conversion-usage-heading" title="使われている場所">使われている場所</span></Th>
                 <Th align="right" className="w-40">操作</Th>
               </TableHeadRow>
             </thead>
@@ -1192,10 +1177,6 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 >
                   <td className="text-ink px-4 py-3 text-sm font-medium">
                     <span className="block truncate" title={point.name}>{point.name}</span>
-                    {/* 辞書に無い種別は中身のない印を出さない。具体的な種別だけ添える。 */}
-                    {EVENT_TYPE_LABELS[point.sourceType] ? (
-                      <p className="text-ink-faint mt-0.5 text-xs">{EVENT_TYPE_LABELS[point.sourceType]}</p>
-                    ) : null}
                     {/* 状態名が無いときは空の札を出さない。口が state を返さない行で灰色の空札が出ていた。 */}
                     {STATE_LABELS[point.state] ? (
                       <p
@@ -1260,8 +1241,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         </>
       )}
 
-      <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-ink-faint text-xs">利用先の名前は詳細で確認できます。追加するときは分析画面でこの成果地点を選びます。</p>
+      <div data-design="tf" className="conversion-pager">
         <div className="flex items-center gap-2 text-xs">
           {/*
             R595: 一覧が未取得のとき「成果地点 0件」と出すと、失敗なのに
