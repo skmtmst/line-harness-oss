@@ -1,6 +1,5 @@
 'use client'
 
-import Disclosure from '@/components/shared/disclosure'
 import CommentsV8 from './comments-v8'
 import ParticipantsV8, { type ParticipantExport } from './participants-v8'
 import CtaV8 from './cta-v8'
@@ -11,14 +10,11 @@ import './editor-v8.css'
 import { fmtSec } from './participants-shared'
 import AnalyticsV8 from './analytics-v8'
 import LinePreview from '@/components/shared/line-preview'
-import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+import ActionsV8 from './actions-v8'
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { notificationPreview, videoPreview } from './preview-body'
-import { ctaCardProblems } from './cta-card-validation'
 import {
   STEPS,
   nextLabelOf,
@@ -29,7 +25,6 @@ import {
 import BasicV8 from './basic-v8'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
@@ -38,14 +33,11 @@ import type { MediaItem } from '@line-crm/shared'
 import {
   ApiError,
   api,
-  fetchApi,
   webinarApi,
   type WebinarCtaCard,
   type Webinar,
   type WebinarAnalytics,
-  type WebinarAction,
   type WebinarEditor,
-  type WebinarNotificationOverview,
   type WebinarNotificationSettings,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -58,9 +50,6 @@ import { formatDateTime, formatNumber } from '@/lib/format'
 function fmtSession(epoch: number): string {
   return formatDateTime(epoch * 1000)
 }
-
-const inputClass =
-  'w-full border border-hairline rounded-control px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-action'
 
 function webinarStatusLabel(status: Webinar['status']): string {
   if (status === 'active') return '公開中'
@@ -125,10 +114,6 @@ function SummaryAside({
       {children}
     </aside>
   )
-}
-
-function EditorDetails({ label, children }: { label: string; children: ReactNode }) {
-  return <Disclosure title={label}>{children}</Disclosure>
 }
 
 const MEDIA_KIND_LABEL: Record<MediaItem['kind'], string> = {
@@ -279,150 +264,6 @@ function NotificationStateBadge({ state }: { state: NotificationRowState }) {
   )
 }
 
-const ACTION_LABELS: Record<WebinarAction['actionType'], string> = {
-  add_tag: 'タグを付ける',
-  remove_tag: 'タグを外す',
-  start_scenario: 'シナリオを開始する',
-  stop_scenario: 'シナリオを停止する',
-  resume_scenario: 'シナリオを再開する',
-  send_message: 'LINEメッセージまたはテンプレートを送る',
-  send_webhook: '外部Webhookへ送る',
-  switch_rich_menu: 'リッチメニューを切り替える',
-  remove_rich_menu: 'リッチメニューを外す',
-}
-
-const TRIGGERS: Array<{ key: WebinarAction['trigger']; label: string }> = [
-  { key: 'completed', label: '視聴完了' },
-  { key: 'cta_clicked', label: 'CTAクリック' },
-  { key: 'unviewed', label: '未視聴' },
-]
-
-function actionReferenceKey(type: WebinarAction['actionType']): string | null {
-  if (type === 'add_tag' || type === 'remove_tag') return 'tagId'
-  if (type === 'start_scenario' || type === 'stop_scenario' || type === 'resume_scenario') return 'scenarioId'
-  if (type === 'send_message') return 'templateId'
-  if (type === 'send_webhook') return 'webhookId'
-  if (type === 'switch_rich_menu') return 'richMenuPageId'
-  return null
-}
-
-function WebinarActionsTab({ webinarId, editor, onEditorChange }: { webinarId: string; editor: WebinarEditor; onEditorChange: (editor: WebinarEditor) => void }) {
-  const [actions, setActions] = useState<WebinarAction[]>([])
-  const [trigger, setTrigger] = useState<WebinarAction['trigger']>('completed')
-  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState('')
-  const [templateBody, setTemplateBody] = useState(editor.actionPolicy.templateBody)
-  const [missingResultPolicy, setMissingResultPolicy] = useState(editor.actionPolicy.missingResultPolicy)
-
-  const load = useCallback(() => {
-    setState('loading')
-    webinarApi.actions(webinarId)
-      .then((response) => { setActions(response.data); setState('ready') })
-      .catch(() => setState('error'))
-  }, [webinarId])
-
-  useEffect(() => { load() }, [load])
-
-  if (state === 'loading') return <div className="text-ink-faint py-12 text-center text-sm">読み込んでいます</div>
-  if (state === 'error') return <div className="text-danger py-12 text-center text-sm">視聴後アクションを読み込めませんでした。<span className="ml-2"><Button onClick={load}>もう一度読み込む</Button></span></div>
-
-  const visible = actions.filter((action) => action.trigger === trigger)
-  const update = (index: number, patch: Partial<WebinarAction>) => {
-    const target = visible[index]
-    setActions((current) => current.map((action) => action === target ? { ...action, ...patch } : action))
-  }
-  const remove = (index: number) => {
-    const target = visible[index]
-    setActions((current) => current.filter((action) => action !== target))
-  }
-  const save = async () => {
-    setSaving(true)
-    setNotice('')
-    try {
-      const response = await webinarApi.saveActions(webinarId, actions)
-      setActions(response.data)
-      const editorResponse = await webinarApi.saveEditor(webinarId, {
-        expectedVersion: editor.version,
-        actionTemplateBody: templateBody,
-        missingResultPolicy,
-      })
-      onEditorChange(editorResponse.data)
-      setNotice('視聴後アクションを保存しました。')
-    } catch {
-      setNotice('保存できませんでした。状態を読み直して、もう一度お試しください。')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const completedActions = actions.filter((action) => action.trigger === 'completed')
-
-  return (
-    <div className="flex flex-col gap-4 xl:flex-row" data-design-node="Xjk8q">
-      <div className="min-w-0 flex-1 space-y-3">
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-          <h2 className="text-ink text-base font-bold">CTA・フォーム</h2>
-          <p className="text-ink-faint mt-1 text-xs">視聴完了・CTAクリック・未視聴ごとの処理を設定します。</p>
-          <div className="mt-4 flex flex-wrap gap-2">{TRIGGERS.map((item) => <span key={item.key} className="rounded-pill border border-hairline px-3 py-1 text-xs font-semibold text-ink-secondary">{item.label}</span>)}</div>
-        </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-          <div className="flex items-center justify-between gap-3"><h2 className="text-ink text-base font-bold">視聴完了メッセージ</h2><Button disabled>変数を挿入</Button></div>
-          <textarea value={templateBody} onChange={(event) => setTemplateBody(event.target.value)} className="border-hairline bg-canvas-sunken text-ink mt-4 min-h-28 w-full rounded-control border p-4 text-sm leading-relaxed" aria-label="視聴完了メッセージ本文" />
-          <div className="mt-3 flex flex-wrap gap-2"><Button disabled>資料を受け取る</Button><Button disabled>個別相談を予約</Button><Button disabled>あとで見る</Button></div>
-        </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-          <dl className="divide-hairline divide-y rounded-control border border-hairline">
-            <div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">実行タイミング</dt><dd className="text-ink text-sm font-semibold">視聴完了直後</dd></div>
-            <div className="flex items-center justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">同じ視聴への実行</dt><dd className="text-ink text-sm font-semibold">1回だけ</dd></div>
-          </dl>
-        </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
-          <div className="flex items-center justify-between gap-3"><div><h2 className="text-ink text-base font-bold">配信後の通知・アクション</h2><p className="text-ink-faint mt-1 text-xs">保存済みの実行内容です。</p></div><span className="text-ink-faint text-xs">{completedActions.length}件</span></div>
-          <ul className="divide-hairline mt-3 divide-y rounded-control border border-hairline">{completedActions.length === 0 ? <li className="text-ink-faint p-4 text-sm">まだ設定されていません。</li> : completedActions.map((action, index) => <li key={action.id ?? index} className="text-ink px-4 py-3 text-sm font-semibold">{ACTION_LABELS[action.actionType]}</li>)}</ul>
-        </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-sm font-bold">視聴結果を取得できない場合</h2><p className="text-ink-faint mt-1 text-xs">再取得するか、要対応へ追加するか選択できます。</p><div className="mt-3 max-w-sm"><Select aria-label="視聴結果を取得できない場合" value={missingResultPolicy} onChange={(value) => setMissingResultPolicy(value as WebinarEditor['actionPolicy']['missingResultPolicy'])} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に再取得' }]} /></div></section>
-        <EditorDetails label="通知・アクションの詳細を編集する">
-        <section className="space-y-4">
-      <div><h2 className="text-ink font-bold">視聴後の通知・アクション</h2><p className="text-ink-faint mt-1 text-xs">視聴完了・CTAクリック・未視聴ごとの処理を設定します。</p></div>
-      <div className="flex flex-wrap gap-2">
-        {TRIGGERS.map((item) => <Button key={item.key} variant={trigger === item.key ? 'primary' : 'secondary'} onClick={() => setTrigger(item.key)}>{item.label}</Button>)}
-      </div>
-      <div className="border-hairline divide-hairline divide-y overflow-hidden rounded-card border">
-        {visible.length === 0 ? <p className="text-ink-faint p-8 text-center text-sm">この条件のアクションはまだありません。</p> : visible.map((action, index) => {
-          const referenceKey = actionReferenceKey(action.actionType)
-          return (
-            <div key={action.id ?? `${trigger}-${index}`} className="bg-canvas grid gap-3 p-4 md:grid-cols-3 md:items-center">
-              <Select
-                value={action.actionType}
-                onChange={(value) => update(index, { actionType: value as WebinarAction['actionType'], config: {} })}
-                aria-label="実行するアクション"
-                options={Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))}
-              />
-              {referenceKey ? <input value={String(action.config[referenceKey] ?? '')} onChange={(event) => update(index, { config: { [referenceKey]: event.target.value } })} placeholder={`${referenceKey}を入力`} className="border-hairline rounded-control border px-3 py-2 text-sm" /> : <span className="text-ink-faint text-xs">追加設定はありません</span>}
-              <Button type="button" onClick={() => remove(index)}>外す</Button>
-            </div>
-          )
-        })}
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button onClick={() => setActions((current) => [...current, { trigger, actionType: 'add_tag', config: { tagId: '' } }])}>通知・アクションを追加</Button>
-        <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving}>視聴後アクションを保存する</Button>
-      </div>
-      {notice ? <p className="text-ink-secondary text-sm">{notice}</p> : null}
-        </section>
-        </EditorDetails>
-      </div>
-      <SummaryAside rows={[
-        ['完了案内', '視聴完了＋ボタン'],
-        ['実行時点', '視聴完了直後'],
-        ['通知・アクション', completedActions.length > 0 ? `${completedActions.length}件` : '未設定'],
-        ['結果未取得時', missingResultPolicy === 'escalate' ? '要対応へ追加' : '翌日に再取得'],
-      ]} previewBody={templateBody || '視聴完了メッセージは未設定です。'} previewFirst />
-    </div>
-  )
-}
-
 function PublicPreviewStep({
   webinar,
   editor,
@@ -526,6 +367,8 @@ function EditWebinarInner() {
   }, [])
   /* 取得の世代印。切替後に遅れて届いた前のウェビナーの応答はここで捨てる。 */
   const loadRequestId = useRef(0)
+  const [actionsRevision, setActionsRevision] = useState(0)
+  const handleActionsSaved = useCallback(() => setActionsRevision((value) => value + 1), [])
   const [participantExport, setParticipantExport] = useState<ParticipantExport | null>(null)
   const handleParticipantExport = useCallback((value: ParticipantExport | null) => setParticipantExport(value), [])
 
@@ -990,14 +833,14 @@ function EditWebinarInner() {
       ) : null}
       {visitedPanes.has('notifications') ? (
         <div hidden={pane !== 'notifications'}>
-          <NotificationsV8 webinarId={webinar.id} webinarTitle={webinar.title} editor={editor} onEditorChange={setEditor} onOpenActions={() => goStep('actions')} onDirtyChange={dirtyReporterFor('notifications')} registerSave={saveRegistrarFor('notifications')} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} />
+          <NotificationsV8 actionsRevision={actionsRevision} webinarId={webinar.id} webinarTitle={webinar.title} editor={editor} onEditorChange={setEditor} onOpenActions={() => goStep('actions')} onDirtyChange={dirtyReporterFor('notifications')} registerSave={saveRegistrarFor('notifications')} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} />
         </div>
       ) : null}
       {pane === 'review' && <ReviewV8 webinar={webinar} editor={editor} registrations={registrations} ctaCount={ctaCount} onPublished={disarm} onEditorChange={setEditor} onBack={() => goStep('notifications')} onTestNotifications={() => goStep('notifications')} publicUrl={publicUrl} canOpenPublicPage={canOpenPublicPage} publicPageReason={publicPageReason} />}
       {visitedPanes.has('comments') ? <div hidden={pane !== 'comments'}><CommentsV8 webinarId={webinar.id} onDirtyChange={dirtyReporterFor('comments')} registerSave={saveRegistrarFor('comments')} /></div> : null}
       {visitedPanes.has('actions') ? (
         <div hidden={pane !== 'actions'}>
-          <WebinarActionsTab webinarId={webinar.id} editor={editor} onEditorChange={setEditor} />
+          <ActionsV8 webinarId={webinar.id} editor={editor} onEditorChange={setEditor} onActionsSaved={handleActionsSaved} onDirtyChange={dirtyReporterFor('actions')} />
         </div>
       ) : null}
       {pane === 'preview' && <PublicPreviewStep webinar={webinar} editor={editor} publicUrl={publicUrl} registrations={registrations} publicPageReason={publicPageReason} onEditorChange={setEditor} />}

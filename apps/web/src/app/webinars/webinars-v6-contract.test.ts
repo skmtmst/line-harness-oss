@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'list-v8.tsx'), 'utf8')
 const EDIT = fs.readFileSync(path.join(__dirname, 'edit/page.tsx'), 'utf8')
+const ACTIONS = fs.readFileSync(path.join(__dirname, 'edit/actions-v8.tsx'), 'utf8')
 const PARTICIPANTS = fs.readFileSync(path.join(__dirname, 'edit/participants-v8.tsx'), 'utf8')
 const REVIEW = fs.readFileSync(path.join(__dirname, 'edit/review-v8.tsx'), 'utf8')
 const ANALYTICS = fs.readFileSync(path.join(__dirname, 'edit/analytics-v8.tsx'), 'utf8')
@@ -136,10 +137,10 @@ describe('V6 ウェビナー一覧の契約', () => {
     for (const label of ['視聴後アクション', '公開プレビュー', '参加者', '分析']) {
       expect(EDIT).toContain(`'${label}'`)
     }
-    expect(EDIT).toContain('webinarApi.saveActions(webinarId, actions)')
+    expect(ACTIONS).toContain('webinarApi.saveActions(webinarId, actions)')
     // #1053: 直リンクは Bearer 補完経路で401になるため、認証付き取得へ。
     expect(ANALYTICS).toContain('downloadApiFile(webinarApi.participantsCsvUrl(webinarId')
-    expect(EDIT).toContain('data-design-node="Xjk8q"')
+    expect(EDIT).toContain('<ActionsV8')
     expect(ANALYTICS).toContain('data-design-node="z2dgw"')
   })
 

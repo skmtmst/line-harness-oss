@@ -15,8 +15,9 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 const TRIGGER_LABEL: Record<WebinarAction['trigger'], string> = { completed: '視聴完了', cta_clicked: 'CTAクリック', unviewed: '未視聴' }
 const ACTION_LABEL: Record<WebinarAction['actionType'], string> = { add_tag: 'タグを付ける', remove_tag: 'タグを外す', start_scenario: 'シナリオを始める', stop_scenario: 'シナリオを止める', resume_scenario: 'シナリオを再開する', send_message: 'メッセージを送る', send_webhook: 'Webhookを送る', switch_rich_menu: 'リッチメニューを変える', remove_rich_menu: 'リッチメニューを外す' }
 
-export default function NotificationsV8({ webinarId, webinarTitle, editor, onEditorChange, onOpenActions, onDirtyChange, registerSave, publicUrl, canOpenPublicPage, publicPageReason }: {
+export default function NotificationsV8({ webinarId, webinarTitle, editor, actionsRevision = 0, onEditorChange, onOpenActions, onDirtyChange, registerSave, publicUrl, canOpenPublicPage, publicPageReason }: {
   webinarId: string; webinarTitle: string; editor: WebinarEditor; onOpenActions: () => void
+  actionsRevision?: number
   onEditorChange?: (value: WebinarEditor) => void
   onDirtyChange?: (value: boolean) => void
   registerSave?: (save: (() => Promise<boolean>) | null) => void
@@ -56,7 +57,7 @@ export default function NotificationsV8({ webinarId, webinarTitle, editor, onEdi
     setActions(null); setActionError(false)
     webinarApi.actions(webinarId).then((res) => { if (current) setActions(res.data) }).catch(() => { if (current) setActionError(true) })
     return () => { current = false }
-  }, [webinarId, actionAttempt])
+  }, [webinarId, actionAttempt, actionsRevision])
   useEffect(() => {
     if (currentPolicyDirty.current) return
     const next = { templateBody: editor.actionPolicy?.templateBody ?? '', policy: editor.actionPolicy?.missingResultPolicy ?? 'escalate' }

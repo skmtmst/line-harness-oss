@@ -343,6 +343,34 @@ function listLink(): HTMLAnchorElement {
   return link
 }
 
+
+describe('視聴後アクションも未保存の入力を守る', () => {
+  it('未保存のメッセージを持って一覧へ出ると確認し、保存後だけ確認を外す', async () => {
+    fixture.params = new URLSearchParams('id=webinar-1&pane=actions')
+    await render()
+    await flush()
+    const message = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="視聴完了メッセージ本文"]')!
+    expect(message).not.toBeNull()
+    await act(async () => { fireEvent.change(message, { target: { value: '未保存のお礼' } }) })
+    await flush()
+    const beforeUnload = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(beforeUnload)
+    expect(beforeUnload.defaultPrevented).toBe(true)
+    await act(async () => { listLink().click() })
+    await flush()
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(fixture.push).not.toHaveBeenCalled()
+    await act(async () => { buttonByText('閉じる').click() })
+    expect(message.value).toBe('未保存のお礼')
+    await act(async () => { buttonByText('視聴後アクションを保存する').click() })
+    await flush()
+    const afterSave = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(afterSave)
+    expect(afterSave.defaultPrevented).toBe(false)
+    expect(net.calls.some((call) => call.path === '/api/webinars/webinar-1/editor' && call.method === 'PUT')).toBe(true)
+  })
+})
+
 describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を離れない', () => {
   async function openNotificationsPane() {
     fixture.params = new URLSearchParams('id=webinar-1&pane=notifications')

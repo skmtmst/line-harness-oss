@@ -211,6 +211,19 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     })
   })
 
-
+  it('アクションを保存した通知を受けたら、通知の未保存入力を残して概要だけ読み直す', async () => {
+    const host = render()
+    await act(async () => undefined)
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button[role="switch"][aria-label="申込のお礼"]')!.click()
+    })
+    apiMocks.actions.mockResolvedValueOnce({ data: [{ trigger: 'completed', actionType: 'remove_tag', config: { tagId: 't1' } }] })
+    await act(async () => {
+      roots[0].render(<NotificationsV8 webinarId="webinar-1" webinarTitle="説明会" editor={EDITOR} actionsRevision={1} onOpenActions={() => undefined} />)
+    })
+    expect(apiMocks.actions).toHaveBeenCalledTimes(2)
+    expect(host.textContent).toContain('タグを外す')
+    expect(host.querySelector('button[role="switch"][aria-label="申込のお礼"]')!.getAttribute('aria-checked')).toBe('false')
+  })
 
 })
