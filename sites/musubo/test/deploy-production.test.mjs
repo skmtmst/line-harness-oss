@@ -38,6 +38,8 @@ test("production deploy program is valid bash and scoped to the apex", () => {
   assert.match(script, /failed-output/);
   assert.match(script, /\/before\/privacy\/index\.html/);
   assert.match(script, /--exclude='\.\/stg\.musubo\.jp'/);
+  assert.doesNotMatch(script, /復元用バックアップ: \$backup/);
+  assert.match(script, /内部パスはログへ出していません/);
   assert.doesNotMatch(script, /rsync --delete|rm -|wrangler|\.env/);
   assert.ok(script.indexOf("tar -czf") < script.indexOf("started=1"));
   assert.match(script, /started=1\ninstall -m 644 '[^']+\/payload\//);

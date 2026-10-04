@@ -203,7 +203,7 @@ ${installLines}
 cd "$root"
 sha256sum -c "$backup/payload/SHA256SUMS"
 echo '本番サイトを設置し、配信ハッシュを照合しました。DNS・メール・stagingは変更していません。'
-echo "復元用バックアップ: $backup/before.tar.gz"
+echo '復元用バックアップをウェブルート外に保存しました。内部パスはログへ出していません。'
 `;
 }
 
