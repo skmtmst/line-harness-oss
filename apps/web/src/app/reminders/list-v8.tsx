@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Bell,
   CalendarClock,
+  Eye,
   Folder as FolderIcon,
   MoreHorizontal,
   Play,
@@ -1096,7 +1097,7 @@ export default function RemindersListV8() {
     )
 
   return (
-    <div className={styles.board} data-design-node={narrow ? 'Iffil' : 'apLqS'}>
+    <div className={styles.board} data-design-node={canEdit ? 'apLqS' : 'a5C1p'}>
       <div data-design="Head">
         <div className={styles.head}>
           <div className={styles.headText}>
@@ -1108,11 +1109,12 @@ export default function RemindersListV8() {
         </div>
       </div>
 
-      {/* 見るだけの人への帯（`a5C1p`）。操作は押せない形のまま置く。 */}
-      {role !== null && !canEdit && (
-        <p className="border-info bg-info-bg text-ink rounded-control border px-3 py-2 text-sm" data-design-node="a5C1p">
-          閲覧のみで見ています。変える操作は管理者に頼んでください。
-        </p>
+      {/* 板 `a5C1p`：閲覧のみの帯。変えられないときだけ頭のすぐ下に出す。 */}
+      {canEdit ? null : (
+        <div className={styles.roBand} role="status">
+          <Eye size={16} aria-hidden="true" />
+          <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
+        </div>
       )}
 
       {/* 数の帯 4つ。 */}

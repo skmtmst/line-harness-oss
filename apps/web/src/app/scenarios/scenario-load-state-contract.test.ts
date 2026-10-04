@@ -14,7 +14,9 @@ describe('V6 シナリオ一覧の読込状態', () => {
 
   it('読込失敗を空のシナリオ一覧として表示しない', () => {
     expect(PAGE).toContain('scenarioList.error')
-    expect(PAGE).toContain('登録したシナリオは消えていません。')
+    /* 板 `BxGhV`「読み込めなかった」：細い帯＋もう一度試す。 */
+    expect(PAGE).toContain('シナリオを読み込めませんでした')
+    expect(PAGE).toContain('>もう一度試す<')
     expect(PAGE).toContain('onClick={() => void loadScenarios()}')
     expect(PAGE).not.toContain("setError(res.error)")
   })
