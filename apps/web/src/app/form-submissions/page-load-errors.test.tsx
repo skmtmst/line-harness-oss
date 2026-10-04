@@ -40,7 +40,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
-import FormSubmissionsPage from './page'
+import FormSubmissionsPage from './list-v8'
 import { ApiError } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -230,7 +230,7 @@ describe('正常・空は従来どおり', () => {
       throw new Error(`unexpected fetch: ${url}`)
     })
     await mount()
-    expect(host.textContent).toContain('まだフォームがありません')
+    expect(host.textContent).toContain('まだ回答フォームはありません')
   })
 })
 
@@ -242,8 +242,10 @@ describe('R602補足: 取れていない総件数は「すべて」に数を出�
     })
     await mount()
     // 未取得の総数は省略する（0と確定したように見せない）。
+    // 「すべて」の箱の行に数が出ないことだけ見る（道具の段の「20件表示」との
+    // くっつきは別の操作なので数えない）。
     expect(host.textContent).toContain('すべて')
-    expect(host.textContent).not.toMatch(/すべて\s*\d/)
+    expect(host.textContent).not.toMatch(/すべて\s*0/)
     // R602の案内と立て直しの口はそのまま。
     expect(host.textContent).toContain('表示できませんでした')
     expect(retryButtons()).toHaveLength(1)

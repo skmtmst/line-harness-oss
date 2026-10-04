@@ -36,7 +36,7 @@ import {
 import { csvCell } from '@/lib/presentation'
 import {
   formatMileageChange,
-  formatMileageDate,
+  formatMileageShortDateTime,
   mileageEntryTypeLabel,
   mileageSourceLabel,
   mileageSourceNoteText,
@@ -198,7 +198,7 @@ export default function V8HistoryTab({
     registerHeaderActions(
       <>
         <Button onClick={exportCsv} disabled={items.length === 0}>
-          <Download size={14} aria-hidden="true" /> CSVで書き出す
+          <Download size={14} aria-hidden="true" /> CSV で書き出す
         </Button>
         {!readonly ? (
           <Button href="/mileage?tab=balances" title="友だちを選んで増減します">
@@ -266,7 +266,6 @@ export default function V8HistoryTab({
             <span className={styles.kpiLabel}>付けた</span>
           </div>
           <p className={styles.kpiValue}>{loading || error ? '—' : formatNumber(amountOf('grant'))}</p>
-          <p className={styles.kpiSub}>この期間に付けた合計</p>
         </div>
         <div className={styles.kpi}>
           <div className={styles.kpiTop}>
@@ -405,7 +404,7 @@ export default function V8HistoryTab({
                         <Link href={friendHref} style={{ color: 'inherit', textDecoration: 'none' }}>{viewName(item)}</Link>
                       </p>
                       <p className={styles.cellSub}>
-                        <time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time>
+                        <time dateTime={item.occurredAt}>{formatMileageShortDateTime(item.occurredAt)}</time>
                         {item.lineAccountName ? `・${item.lineAccountName}` : ''}
                       </p>
                     </td>

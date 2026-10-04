@@ -25,13 +25,10 @@ describe('V6 流入リンク詳細の数字の契約', () => {
   })
 
   it('取れない段は「—」+理由か、設定の有無で言い分ける', () => {
-    expect(PAGE).toContain('残数とブロック数の集計は未接続です')
-    expect(PAGE).toContain('反応・ブロックの集計は未接続のため表示できません')
-    expect(PAGE).toContain('シナリオは始めない')
-    expect(PAGE).toContain('タグは付けない')
-    // R269: 追加直後のメッセージも実際の設定から組み立てる。
-    expect(PAGE).toContain('追加直後に送るメッセージはない')
-    expect(PAGE).toContain("追加直後に「${introTemplateName ?? '取得できません'}」を送る")
+    expect(PAGE).toContain('割合は集計できません')
+    expect(PAGE).toContain('集計を取得できていません')
+    expect(PAGE).toContain('取得できません')
+    expect(PAGE).toContain('動きが未設定')
   })
 
   it('記号入り ref でも URL を壊さない', () => {

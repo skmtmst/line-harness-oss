@@ -16,12 +16,17 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
+  Activity,
   AlertCircle,
+  Clock,
   Eye,
+  FileText,
+  FolderPlus,
   History,
   Link2,
   Lock,
   MoreHorizontal,
+  Pause,
   Pencil,
   Route,
   Send,
@@ -57,10 +62,11 @@ const KIND_LABELS: Record<FriendAddRuleKind, string> = {
 
 /** 未分類の印。V7 の一覧と同じく、サーバでは '__uncategorized' を使う。 */
 const UNFILED = '__uncategorized'
-const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string }> = [
-  { key: 'published', label: '有効' },
-  { key: 'draft', label: '下書き' },
-  { key: 'stopped', label: '停止中' },
+/* 板 `LEwkJ`：状態の札には印を付ける（選んでいないときも意味が読める）。 */
+const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string; icon: typeof Clock }> = [
+  { key: 'published', label: '有効', icon: Clock },
+  { key: 'draft', label: '下書き', icon: FileText },
+  { key: 'stopped', label: '停止中', icon: Pause },
 ]
 
 function countText(value: number | null, unit: string) {
@@ -623,12 +629,12 @@ function FriendAddListV8Inner() {
                     {rule.name}
                   </Link>
                   <p className={styles.cellSub} title={rule.routeNames.join('、') || '未選択'}>
-                    <Link2 size={11} aria-hidden="true" className={styles.cellSubIcon} />
+                    <Link2 size={11} aria-hidden="true" className="shrink-0 text-ink-faint" />
                     {rule.routeNames.join('、') || '未選択'}
                   </p>
                 </td>
                 <td>
-                  <span className={styles.countMain}>{firstSendLabel(rule)}</span>
+                  <span className="text-ink tabular-nums">{firstSendLabel(rule)}</span>
                   {actionLines(rule).map((line) => (
                     <p key={line} className={styles.cellSub}>{line}</p>
                   ))}
@@ -640,7 +646,7 @@ function FriendAddListV8Inner() {
                   </span>
                 </td>
                 <td className={`${styles.countCell} ${styles.recentCol}`}>
-                  <span className={styles.countMain}>
+                  <span className="text-ink tabular-nums">
                     {rule.status === 'draft' ? '—' : countText(rule.matchedLast7Days, '人')}
                   </span>
                 </td>
@@ -678,12 +684,12 @@ function FriendAddListV8Inner() {
                     {sinkRule.name}
                   </Link>
                   <p className={styles.cellSub}>
-                    <Route size={11} aria-hidden="true" className={styles.cellSubIcon} />
+                    <Route size={11} aria-hidden="true" className="shrink-0 text-ink-faint" />
                     基本の追加URL・素のQR・検索など｜いちばん最後に動く・消せない
                   </p>
                 </td>
                 <td>
-                  <span className={styles.countMain}>{firstSendLabel(sinkRule)}</span>
+                  <span className="text-ink tabular-nums">{firstSendLabel(sinkRule)}</span>
                   {actionLines(sinkRule).map((line) => (
                     <p key={line} className={styles.cellSub}>{line}</p>
                   ))}
@@ -695,7 +701,7 @@ function FriendAddListV8Inner() {
                   </span>
                 </td>
                 <td className={`${styles.countCell} ${styles.recentCol}`}>
-                  <span className={styles.countMain}>{countText(sinkRule.matchedLast7Days, '人')}</span>
+                  <span className="text-ink tabular-nums">{countText(sinkRule.matchedLast7Days, '人')}</span>
                 </td>
                 <td className={styles.menuCell}>
                   <button
@@ -748,7 +754,7 @@ function FriendAddListV8Inner() {
           </p>
         </div>
         <Button href="/friend-add-settings/runs" variant="secondary">
-          <History size={14} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />
+          <Activity size={14} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />
           実行結果を見る
         </Button>
       </div>
@@ -812,7 +818,7 @@ function FriendAddListV8Inner() {
             activeId={folder ?? ''}
             onSelect={(id) => selectFolder(id || null)}
             onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
-            addFolderDisabled={folderBusy || !canEdit}
+            addFolderDisabled={folderBusy}
             rows={[
               { id: '', label: 'すべて', count: data?.total ?? items.length },
               ...folders.map((entry) => ({
@@ -821,7 +827,15 @@ function FriendAddListV8Inner() {
                 count: entry.count,
               })),
             ]}
-          />
+          >
+            {/* 板 `LEwkJ`：閲覧のみでも「フォルダを追加」は文字の口で置く（押せない形）。 */}
+            {canEdit ? null : (
+              <span className={styles.folderAddLink} aria-disabled="true" title={readonlyReason}>
+                <FolderPlus size={14} aria-hidden="true" />
+                フォルダを追加
+              </span>
+            )}
+          </FolderPanel>
           <p className={styles.folderNote}>フォルダを消しても、中の設定は未分類に残ります</p>
         </div>
 
@@ -875,11 +889,12 @@ function FriendAddListV8Inner() {
                 selected={statusFilter === chip.key}
                 onChange={(on) => selectStatus(on ? chip.key : '')}
               >
+                <chip.icon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />
                 {chip.label}
               </FilterChip>
             ))}
             <span className={styles.toolbarSpacer} />
-            <PageSizeSelect value={perPage} onChange={changePerPage} />
+            <PageSizeSelect value={perPage} onChange={changePerPage} className={styles.pageSize} />
           </div>
           {tableBody}
         </div>

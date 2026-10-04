@@ -47,7 +47,7 @@ describe('V6 機能18の画面契約', () => {
     expect(ADS).toContain('data-design-node="BuVDB"')
     expect(ADS).toContain('data-design-node="Im2b1"')
     expect(CREATE).toContain('designNode="KMaMk"')
-    expect(DETAIL).toContain('data-design-node="JupxW"')
+    expect(DETAIL).toContain('data-design-node="Q5le3"')
     expect(ADS).toContain('成果地点と、広告に返す名前の対応')
     // #514-14: 口はパスだけ返すため、死んでいる「知らないドメイン」判定と
     // 直書きの警告は出さない。届いたパスをそのまま出す。
