@@ -56,7 +56,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
   it('V8の専用失敗表示も、その場で一覧を読み直せる', () => {
     for (const [target, message, retry] of [
       ['broadcasts/list-v8.tsx', '一斉配信を読み込めませんでした', 'onClick={() => void loadList((page - 1) * pageSize)}'],
-      ['form-submissions/list-v8.tsx', '回答フォームを読み込めませんでした', 'onClick={() => void loadForms()}'],
+      ['form-submissions/list-v8.tsx', "loadFailureCopy(loadFailure, '回答フォーム')", 'onClick={() => void loadForms()}'],
       ['scenarios/list-v8.tsx', 'シナリオを読み込めませんでした', 'onClick={() => void loadScenarios()}'],
       ['reminders/list-v8.tsx', 'リマインダを読み込めませんでした', 'onClick={reminderList.retry}'],
     ]) {
@@ -67,8 +67,8 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
       expect(source.slice(failureAt, failureAt + 1200), target).toContain(retry)
     }
     const forms = readFileSync(join(HERE, 'form-submissions/list-v8.tsx'), 'utf8')
-    expect(forms).toContain('const forbidden = isForbidden(loadFailure)')
-    expect(forms).toContain('{!forbidden ? (')
+    // 403 は共通の案内（loadFailureCopy）が retryable=false を返し、読み直しを出さない。
+    expect(forms).toContain('{failure.retryable ? (')
     const friends = readFileSync(join(HERE, 'friends/page.tsx'), 'utf8')
     expect(friends).toContain('onRetry={() => void loadFriends()}')
   })
