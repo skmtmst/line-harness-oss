@@ -3610,5 +3610,12 @@
       "parent": "line_accounts",
       "parentColumn": "id"
     }
+  },
+  "hq_template_folders": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
   }
 }

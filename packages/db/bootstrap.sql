@@ -3310,6 +3310,17 @@ CREATE TABLE hq_template_distribution_runs (
     REFERENCES hq_template_versions(id, template_id, tenant_id)
 );
 
+CREATE TABLE hq_template_folders (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
+  revision INTEGER NOT NULL DEFAULT 1,
+  archived_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  UNIQUE(id, tenant_id)
+);
+
 CREATE TABLE hq_template_owned_r2_keys (
   run_id TEXT NOT NULL,
   tenant_id TEXT NOT NULL,
@@ -3404,7 +3415,7 @@ CREATE TABLE hq_templates (
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  archived_at TEXT,
+  archived_at TEXT, folder_id TEXT,
   PRIMARY KEY (id, tenant_id),
   FOREIGN KEY (current_version_id, id, tenant_id)
     REFERENCES hq_template_versions(id, template_id, tenant_id)
@@ -8401,6 +8412,8 @@ CREATE INDEX idx_handover_decisions_handover
 
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
+CREATE UNIQUE INDEX idx_hq_folder_name ON hq_template_folders(tenant_id, name) WHERE archived_at IS NULL;
+
 CREATE INDEX idx_hq_support_messages_request
   ON hq_support_messages(request_id, created_at);
 
@@ -8430,6 +8443,8 @@ CREATE INDEX idx_hq_template_runs_template
 
 CREATE INDEX idx_hq_template_versions_template
   ON hq_template_versions(tenant_id, template_id, version DESC);
+
+CREATE INDEX idx_hq_templates_folder ON hq_templates(tenant_id, folder_id, archived_at);
 
 CREATE INDEX idx_hq_templates_tenant_type
   ON hq_templates(tenant_id, template_type, archived_at, updated_at);
@@ -9532,6 +9547,14 @@ WHEN NEW.id != OLD.id
   OR NEW.tenant_id != OLD.tenant_id
   OR NEW.template_type != OLD.template_type
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_BINDING_IMMUTABLE'); END;
+
+CREATE TRIGGER hq_template_folder_insert BEFORE INSERT ON hq_templates
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_template_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND archived_at IS NULL)
+BEGIN SELECT RAISE(ABORT, 'HQ_FOLDER_SCOPE_INVALID'); END;
+
+CREATE TRIGGER hq_template_folder_update BEFORE UPDATE OF folder_id, tenant_id ON hq_templates
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM hq_template_folders WHERE id=NEW.folder_id AND tenant_id=NEW.tenant_id AND archived_at IS NULL)
+BEGIN SELECT RAISE(ABORT, 'HQ_FOLDER_SCOPE_INVALID'); END;
 
 CREATE TRIGGER hq_template_logical_archive_only
 BEFORE DELETE ON hq_templates

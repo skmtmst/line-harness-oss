@@ -31,7 +31,8 @@ export function creationStorageKey(scope: CreationScope, type: TemplateType): st
 function validAttempt(value: unknown): value is CreationAttempt {
   if (!object(value, ['requestId', 'input', 'distribute']) || !identifier(value.requestId) || typeof value.distribute !== 'boolean') return false
   const input = value.input
-  if (!object(input, ['type', 'name', 'description', 'definition']) || !['tag', 'template', 'rich_menu', 'form'].includes(String(input.type)) || !text(input.name, 200) || !input.name.trim() || !optionalText(input.description, 2000)) return false
+  if (!object(input, ['type', 'name', 'description', 'definition', 'folderId']) || !['tag', 'template', 'rich_menu', 'form'].includes(String(input.type)) || !text(input.name, 200) || !input.name.trim() || !optionalText(input.description, 2000)) return false
+  if (!(input.folderId === undefined || input.folderId === null || identifier(input.folderId))) return false
   const definition = input.definition
   if (input.type === 'tag') {
     if (!object(definition, ['schemaVersion', 'tag', 'folders']) || definition.schemaVersion !== 1 || !Array.isArray(definition.folders) || definition.folders.length > 8) return false

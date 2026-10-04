@@ -344,3 +344,42 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(count('hq_templates')).toBe(0);
   });
 });
+
+describe('V8 ひな形の分類と複製', () => {
+  test('分類を作成・変更し、別統括を拒否し、外してもひな形を残す', async () => {
+    const f = await request('/folders','POST',{name:'季節'}); expect(f.status).toBe(201);
+    expect((await request('/folders','POST',{name:'季節'})).status).toBe(409);
+    const id=f.body.data.id;
+    const changed=await request(`/folders/${id}`,'PATCH',{name:'お知らせ',expectedRevision:1}); expect(changed.status).toBe(200);
+    expect((await request(`/folders/${id}`,'PATCH',{name:'古い変更',expectedRevision:1})).status).toBe(409);
+    const t=await request('','POST',{requestId:crypto.randomUUID(),type:'tag',name:'常連',definition,folderId:id}); expect(t.status).toBe(201);
+    expect(t.body.data.template.folder_id).toBe(id);
+    expect((await request(`/folders/${id}`,'DELETE',{expectedRevision:2})).status).toBe(200);
+    expect((await request(`/${t.body.data.template.id}`)).body.data.template.folder_id).toBeNull();
+    expect((await request('/folders')).body.data).toEqual([]);
+    expect((await request('','POST',{requestId:crypto.randomUUID(),type:'tag',name:'不正',definition,folderId:id})).status).toBe(422);
+  });
+  test('専用の複製口で元の内容を残し、再送でも同じ複製を返す', async () => {
+    const t=await create(), body={name:'常連のコピー',expectedRevision:t.revision,requestId:crypto.randomUUID()};
+    const copy=await request(`/${t.id}/duplicate`,'POST',body); expect(copy.status).toBe(201);
+    expect(copy.body.data.template.id).not.toBe(t.id); expect(copy.body.data.definition).toEqual((await request(`/${t.id}`)).body.data.definition);
+    expect(await request(`/${t.id}/duplicate`,'POST',body)).toEqual(copy);
+    expect(count('hq_templates')).toBe(2);
+    expect((await request(`/${t.id}/duplicate`,'POST',{...body,expectedRevision:0})).status).toBe(409);
+  });
+});
+
+describe('HQ folders authority', () => {
+  test('separates tenants and denies viewers and read-only editors', async () => {
+    const created=await request('/folders','POST',{name:'案内'}); expect(created.status).toBe(201);
+    const id=created.body.data.id;
+    sql.exec("INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES ('other-owner','他社管理者','owner','fixture-other','tenant-b')");
+    staff={...staff,id:'other-owner',tenantId:'tenant-b'};
+    expect((await request('/folders')).body.data).toEqual([]);
+    expect((await request(`/folders/${id}`,'PATCH',{name:'他社',expectedRevision:1})).status).toBe(404);
+    staff={...staff,id:'owner',tenantId:'tenant-a',role:'staff'};
+    expect((await request('/folders')).status).toBe(403);
+    staff={...staff,role:'owner',readOnly:true};
+    expect((await request('/folders','POST',{name:'閲覧のみ'})).status).toBe(403);
+  });
+});

@@ -22,6 +22,7 @@ export interface HqTemplate {
   name: string;
   description: string | null;
   current_version_id: string | null;
+  folder_id?: string | null;
   revision: number;
   created_by: string | null;
   created_at: string;

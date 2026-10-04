@@ -2562,3 +2562,5 @@ export interface HqBannerImageQuery {
   q?: string; before?: string; limit?: number; withCounts?: boolean;
 }
 export interface HqBannerImageCounts { all: number; favorite: number; delivered: number; unused: number }
+
+export interface HqTemplateFolder { id: string; name: string; revision: number }

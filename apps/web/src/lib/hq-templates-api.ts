@@ -6,7 +6,7 @@ export type TemplateType = typeof TEMPLATE_TYPES[number]
 export type DistributionMode = 'create' | 'overwrite' | 'alias'
 export interface HqTemplate {
   id: string; name: string; description: string | null; template_type: TemplateType
-  revision: number; updated_at: string; reference_summary?: string; distributed_account_count?: number
+  folder_id?: string | null; revision: number; updated_at: string; reference_summary?: string; distributed_account_count?: number
 }
 export interface TagDefinition {
   schemaVersion: 1
@@ -66,7 +66,7 @@ export interface TemplateDefinitionByType {
 }
 export type TemplateDefinition = TemplateDefinitionByType[TemplateType]
 export type TemplateInput = {
-  [K in TemplateType]: { type: K; name: string; description?: string; definition: TemplateDefinitionByType[K] }
+  [K in TemplateType]: { type: K; name: string; description?: string; folderId?: string | null; definition: TemplateDefinitionByType[K] }
 }[TemplateType]
 export type TemplateDetail = {
   [K in TemplateType]: { template: HqTemplate & { template_type: K }; definition: TemplateDefinitionByType[K] }
@@ -164,6 +164,13 @@ export const hqTemplatesApi = {
    * 参照先に選ぶため、一覧表示とは別に全部入りの目録が要る。
    */
   list: (type?: TemplateType) => request<HqTemplate[]>(type ? `?type=${type}` : ''),
+  folders: {
+    list: () => request<import('@line-crm/shared').HqTemplateFolder[]>('/folders'),
+    create: (name: string) => request<import('@line-crm/shared').HqTemplateFolder>('/folders', 'POST', { name }),
+    update: (id: string, name: string, expectedRevision: number) => request<import('@line-crm/shared').HqTemplateFolder>(`/folders/${encodeURIComponent(id)}`, 'PATCH', { name, expectedRevision }),
+    remove: (id: string, expectedRevision: number) => request<{ id: string }>(`/folders/${encodeURIComponent(id)}`, 'DELETE', { expectedRevision }),
+  },
+  duplicate: (id: string, name: string, expectedRevision: number, requestId: string) => request<TemplateDetail>(`${idPath(id)}/duplicate`, 'POST', { name, expectedRevision, requestId }),
   accounts: () => request<HqAccount[]>('/accounts'),
   get: (id: string) => request<TemplateDetail>(idPath(id)),
   create: (input: TemplateInput, requestId: string) => request<TemplateDetail>(

@@ -504,7 +504,8 @@
     "554_meet_cancel_claim.sql",
     "555_tenant_data_retention.sql",
     "556_f13_folder_kinds.sql",
-    "564_form_versions_purge_delete.sql"
+    "564_form_versions_purge_delete.sql",
+    "570_hq_template_folders.sql"
   ],
-  "migrationCount": 505
+  "migrationCount": 506
 }

@@ -66,11 +66,12 @@ export function resolvedItems(preflight: Preflight, choices: Record<string, Dist
  * 中身は共通の器（`MenuPortal`）で最上層に出す。下に場所が無ければ
  * 上へ、右に無ければ左へ寄る。できること（編集・配布・削除）は変えない。
  */
-function TemplateRowMenu({ name, busy, onEdit, onDistribute, onRemove }: {
+function TemplateRowMenu({ name, busy, onEdit, onDistribute, onRemove, onDuplicate }: {
   name: string
   busy: boolean
   onEdit: () => void
   onDistribute: () => void
+  onDuplicate?: () => void
   onRemove: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -103,6 +104,7 @@ function TemplateRowMenu({ name, busy, onEdit, onDistribute, onRemove }: {
         <div role="menu" aria-label={`${name}の操作`} className={styles.rowMenuItems} style={{ position: 'static' }} onKeyDown={moveMenuFocus}>
           <Button disabled={busy} onClick={() => { onEdit(); close() }} aria-label={`${name}を編集`}>編集</Button>
           <Button disabled={busy} onClick={() => { onDistribute(); close() }} aria-label={`${name}を配布`}>配布</Button>
+          {onDuplicate && <Button disabled={busy} onClick={() => { onDuplicate(); close() }} aria-label={`${name}を複製`}>複製</Button>}
           <Button disabled={busy} onClick={() => { onRemove(); close() }} aria-label={`${name}を削除`}>削除する</Button>
         </div>
       </MenuPortal>
@@ -113,6 +115,18 @@ function TemplateRowMenu({ name, busy, onEdit, onDistribute, onRemove }: {
 export default function TemplateConsole({ type, useCanonicalEditors = true }: { type: TemplateType; useCanonicalEditors?: boolean }) {
   const theme = useAdminTheme()
   const [stage, setStage] = useState<Stage>('list')
+  const [folders, setFolders] = useState<import('@line-crm/shared').HqTemplateFolder[]>([])
+  const duplicateAttempts = useRef(new Map<string, string>())
+  const [folderId, setFolderId] = useState<string | null>(null)
+  const [folderFilter, setFolderFilter] = useState<string>('all')
+  const [folderName, setFolderName] = useState('')
+  const [folderLoadFailed, setFolderLoadFailed] = useState(false)
+  useEffect(() => {
+    if (theme !== 'v8') return
+    let alive = true
+    void hqTemplatesApi.folders.list().then(rows => { if (alive) setFolders(rows) }).catch(() => { if (alive) setFolderLoadFailed(true) })
+    return () => { alive = false }
+  }, [theme])
   const [templates, setTemplates] = useState<HqTemplate[]>([])
   const [accounts, setAccounts] = useState<HqAccount[]>([])
   const [detail, setDetail] = useState<TemplateDetail | null>(null)
@@ -222,7 +236,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
   const referenceOptions = (kind: TemplateType) => (catalog ?? []).filter(item => item.template_type === kind).map(item => ({ id: item.id, name: item.name }))
   const loadDetailIntoForm = (loaded: TemplateDetail) => {
     if (loaded.template.template_type !== type || loaded.definition.schemaVersion !== 1 || !definitionName(type, loaded.definition)) throw new Error('ひな形の種類または保存内容を確認できません。')
-    setDetail(loaded); setName(loaded.template.name); setDescription(loaded.template.description ?? ''); setDefinition(loaded.definition)
+    setFolderId(loaded.template.folder_id ?? null); setDetail(loaded); setName(loaded.template.name); setDescription(loaded.template.description ?? ''); setDefinition(loaded.definition)
   }
   const open = (id: string, next: Stage) => void perform(async () => {
     sessionUploads.current = []
@@ -234,7 +248,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     const preparedDefinition = definitionForName(type, sourceDefinition, sourceName.trim(), sourceDescription.trim())
     const validation = !sourceName.trim() ? 'ひな形の名前を入力してください。' : definitionError(type, preparedDefinition, creationScope.current?.tenantId)
     if (validation) throw new Error(validation)
-    const input = { type, name: sourceName.trim(), description: sourceDescription.trim(), definition: preparedDefinition } as TemplateInput
+    const input = { type, name: sourceName.trim(), description: sourceDescription.trim(), ...(theme === 'v8' ? { folderId } : {}), definition: preparedDefinition } as TemplateInput
     let saved: TemplateDetail
     let continueToAccounts = distribute
     if (detail) {
@@ -293,7 +307,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     setMessage('ひな形を保存しました。')
     if (continueToAccounts) { setSelected([]); setSearch(''); setStage('accounts') }
     // R561: 「保存して続けて作る」は新規作成のときだけ、保存済みの行を残したまま空の新規入力へ戻る。
-    else if (andAnother && isNew) { setDetail(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey(current => current + 1); setStage('edit') }
+    else if (andAnother && isNew) { setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey(current => current + 1); setStage('edit') }
     else setStage('list')
   })
   const checkStores = (ids: string[]) => void perform(async () => {
@@ -380,19 +394,24 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     {stage !== 'list' && <nav aria-label="配布の進捗"><ol className={styles.steps}>{STEPS.map((step, i) => <li key={step.stage} aria-current={step.stage === stage ? 'step' : undefined}>{i + 1} {step.label}</li>)}</ol></nav>}
     {stage === 'edit' && <p className={styles.breadcrumb}><button type="button" disabled={busy || createUncertain} onClick={toList}>ひな形一覧</button> / {detail ? '編集' : '新規作成'}</p>}
     <header className={styles.header}><div><h1>{title}</h1><p className={styles.muted}>{stage === 'list' ? LIST_DESCRIPTIONS[type] : stage === 'accounts' ? '1アカウントだけ、または複数アカウントを選択して一括配布できます' : stage === 'duplicates' ? '一括設定のあと、必要な項目だけ個別に変更できます' : stage === 'edit' ? `LINEアカウント内と同じ項目で${LABELS[type]}のひな形を作成します` : detail?.template.name}</p></div>
-      {stage === 'list' && <Button aria-label="＋ひな形を作る" variant="primary" disabled={!ready || busy} onClick={() => { createAttempt.current = null; sessionUploads.current = []; setDetail(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setStage('edit'); setError(''); setConflict(false) }}>{CREATE_LABELS[type]}</Button>}
+      {stage === 'list' && <Button aria-label="＋ひな形を作る" variant="primary" disabled={!ready || busy} onClick={() => { createAttempt.current = null; sessionUploads.current = []; setDetail(null); setFolderId(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setStage('edit'); setError(''); setConflict(false) }}>{CREATE_LABELS[type]}</Button>}
     </header>
     {error && <div role="alert" className={`${styles.notice} ${styles.error}`}><p>{error}</p>{conflict && detail && <Button disabled={busy} onClick={() => open(detail.template.id, 'edit')}>最新の内容を読み込む</Button>}</div>}
     {message && <p role="status" className={`${styles.notice} ${styles.success}`}>{message}</p>}
     {stage === 'list' && <>
       {!ready ? <section className={`${styles.panel} ${styles.empty}`}><p role="status">{busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。'}</p></section> : <>
+        {theme === 'v8' && <section className={styles.panel} aria-label="ひな形の分類">
+          <div className={styles.actions}><Button onClick={() => setFolderFilter('all')} aria-pressed={folderFilter === 'all'}>すべて</Button><Button onClick={() => setFolderFilter('none')} aria-pressed={folderFilter === 'none'}>未分類</Button>{folders.map(folder => <Button key={folder.id} onClick={() => setFolderFilter(folder.id)} aria-pressed={folderFilter === folder.id}>{folder.name}</Button>)}</div>
+          {folderLoadFailed ? <p role="alert">分類を読み込めませんでした。ページを再読み込みしてください。</p> : <div className={styles.actions}><input aria-label="分類の名前" className={styles.input} value={folderName} maxLength={100} disabled={busy} onChange={e => setFolderName(e.target.value)} /><Button disabled={busy || !folderName.trim()} onClick={() => void perform(async () => { await hqTemplatesApi.folders.create(folderName.trim()); setFolders(await hqTemplatesApi.folders.list()); setFolderName('') })}>分類を追加</Button>{folders.some(f => f.id === folderFilter) && <><Button disabled={busy || !folderName.trim()} onClick={() => void perform(async () => { const folder = folders.find(f => f.id === folderFilter)!; await hqTemplatesApi.folders.update(folder.id, folderName.trim(), folder.revision); setFolders(await hqTemplatesApi.folders.list()); setFolderName('') })}>分類の名前を変更</Button><Button disabled={busy} onClick={() => void perform(async () => { const folder = folders.find(f => f.id === folderFilter)!; await hqTemplatesApi.folders.remove(folder.id, folder.revision); setFolders(await hqTemplatesApi.folders.list()); setTemplates(await hqTemplatesApi.list(type)); setFolderFilter('all'); setMessage('分類を外しました。ひな形は未分類に残ります。') })}>分類を外す</Button></>}</div>}
+        </section>}
         <div className={styles.toolbar}><input aria-label="ひな形を検索" className={`${styles.input} ${styles.search}`} placeholder="名前で検索" value={search} onChange={e => setSearch(e.target.value)} /><span>{templates.length}件</span></div>
-        <div className={styles.panel}><table className={styles.table}><thead><tr><Th style={{ width: '28%' }}>名前</Th><Th className={styles.optional}>参照先</Th><Th className={styles.optional}>更新日時</Th><Th>配布先</Th><Th style={{ width: '12%' }}>操作</Th></tr></thead><tbody>{templates.filter(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).map(row => <tr key={row.id}><td data-label="名前"><span className={styles.name} title={row.name}>{row.name}</span><small className={styles.muted}>{LABELS[row.template_type]}</small></td><td data-label="参照先" className={styles.optional}><span className={styles.name} title={row.reference_summary}>{row.reference_summary ?? '—'}</span></td><td data-label="更新日時" className={styles.optional}>{formatDate(row.updated_at)}</td><td data-label="配布先">{row.distributed_account_count === undefined ? '—' : row.distributed_account_count ? `${row.distributed_account_count}アカウント` : '未配布'}</td><td data-label="操作"><TemplateRowMenu name={row.name} busy={busy} onEdit={() => open(row.id, 'edit')} onDistribute={() => open(row.id, 'accounts')} onRemove={() => setRemove(row)} /></td></tr>)}</tbody></table>{!templates.some(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && <p className={styles.empty}>{templates.length ? '検索に一致するひな形はありません。' : 'まだひな形がありません。最初のひな形を作成してください。'}</p>}</div>
+        <div className={styles.panel}><table className={styles.table}><thead><tr><Th style={{ width: '28%' }}>名前</Th><Th className={styles.optional}>参照先</Th><Th className={styles.optional}>更新日時</Th><Th>配布先</Th><Th style={{ width: '12%' }}>操作</Th></tr></thead><tbody>{templates.filter(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()) && (theme !== 'v8' || folderFilter === 'all' || (row.folder_id ?? 'none') === folderFilter)).map(row => <tr key={row.id}><td data-label="名前"><span className={styles.name} title={row.name}>{row.name}</span><small className={styles.muted}>{LABELS[row.template_type]}</small></td><td data-label="参照先" className={styles.optional}><span className={styles.name} title={row.reference_summary}>{row.reference_summary ?? '—'}</span></td><td data-label="更新日時" className={styles.optional}>{formatDate(row.updated_at)}</td><td data-label="配布先">{row.distributed_account_count === undefined ? '—' : row.distributed_account_count ? `${row.distributed_account_count}アカウント` : '未配布'}</td><td data-label="操作"><TemplateRowMenu name={row.name} busy={busy} onEdit={() => open(row.id, 'edit')} onDistribute={() => open(row.id, 'accounts')} onDuplicate={theme === 'v8' ? () => void perform(async () => { const key = `${row.id}:${row.revision}`; const requestId = duplicateAttempts.current.get(key) ?? crypto.randomUUID(); duplicateAttempts.current.set(key, requestId); await hqTemplatesApi.duplicate(row.id, `${row.name}のコピー`, row.revision, requestId); duplicateAttempts.current.delete(key); setTemplates(await hqTemplatesApi.list(type)); setMessage('ひな形を複製しました。') }) : undefined} onRemove={() => setRemove(row)} /></td></tr>)}</tbody></table>{!templates.some(row => row.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()) && (theme !== 'v8' || folderFilter === 'all' || (row.folder_id ?? 'none') === folderFilter)) && <p className={styles.empty}>{templates.length ? '検索に一致するひな形はありません。' : 'まだひな形がありません。最初のひな形を作成してください。'}</p>}</div>
       </>}
     </>}
     {stage === 'edit' && <>
       {/* 正規エディタ（タグ/回答フォーム）は右asideを持たないため、空の260px段を残さない。谷間帯（1280〜1400px）で入力欄が潰れるのを防ぐ。 */}
       <div className={canonicalEditorOwnsSave ? styles.stack : styles.grid}><div className={styles.stack}><section className={styles.panel}>
+        {theme === 'v8' && <label className={styles.field}><span>分類フォルダ</span><select aria-label="分類フォルダ" className={styles.input} value={folderId ?? ''} disabled={busy || createUncertain || folderLoadFailed} onChange={e => setFolderId(e.target.value || null)}><option value="">未分類</option>{folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>}
         {catalogFailed ? (
           <Notice
             tone="warn"
