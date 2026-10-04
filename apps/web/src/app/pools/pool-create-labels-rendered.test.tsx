@@ -20,7 +20,7 @@ async function openCreateModal() {
   stubFetch()
   const view = render(<PoolsPage />)
   await waitFor(() => expect(view.getByText('まだプールがありません')).toBeTruthy())
-  fireEvent.click(view.getByText('＋ プールをつくる'))
+  fireEvent.click(view.getByText('新規プール'))
   await waitFor(() => expect(view.getByRole('dialog')).toBeTruthy())
   return view
 }
