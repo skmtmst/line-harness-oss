@@ -29,6 +29,7 @@ import {
   createWebhookInteraction,
   finishWebhookInteraction,
   isOperationCapabilityStopped,
+  getAdEventMapping,
 } from '@line-crm/db';
 import {
   buildOutgoingWebhookBody,
@@ -65,6 +66,8 @@ export interface EventPayload {
   occurredAt?: string;
   friendId?: string;
   eventData?: Record<string, unknown>;
+  /** 成果地点のID。F-21 の対応表で広告イベント名を決めるときに使う。 */
+  conversionPointId?: string;
   conversionEventName?: string;
   conversionValue?: number;
   /** ISO通貨(例 USD)。無いときは円扱い。 */
@@ -149,6 +152,18 @@ export async function fireEvent(
     replayStep(execution, 'event:scoring', () => processScoring(db, eventType, payload, outgoingWebhookLineAccountId, lineAccessToken, execution)),
   ];
   const adConversion = payload.friendId ? adConversionForEvent(eventType, payload) : null;
+  if (adConversion && payload.conversionPointId) {
+    // F-21 対応表：地点ごとの広告イベント名があれば優先する。
+    // 対応が無い・読めないときは今までどおりの名前で送る。
+    try {
+      const mapping = await getAdEventMapping(db, payload.conversionPointId);
+      if (mapping) {
+        adConversion.eventName = mapping.event_name;
+      }
+    } catch {
+      // 対応表が読めなくても送信自体は止めない。
+    }
+  }
   if (payload.friendId && adConversion) {
     phase1.push(
       sendAdConversions(db, payload.friendId, adConversion.eventName, adConversion.value, {

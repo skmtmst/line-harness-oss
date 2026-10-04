@@ -250,6 +250,13 @@ CREATE TABLE ad_cost_import_runs (
   UNIQUE (ad_platform_id, day)
 );
 
+CREATE TABLE ad_event_mappings (
+  conversion_point_id TEXT PRIMARY KEY REFERENCES conversion_points(id) ON DELETE CASCADE,
+  event_name          TEXT NOT NULL,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE ad_platforms (
   id           TEXT PRIMARY KEY,
   name         TEXT NOT NULL,
