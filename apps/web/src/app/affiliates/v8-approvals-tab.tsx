@@ -498,8 +498,8 @@ export default function ApprovalsTabV8({
       ) : listState === 'empty' ? (
         <EmptyState
           icon={<ListChecks size={20} aria-hidden="true" />}
-          title="まだ成果はありません"
-          description="アフィリエイターの紹介リンクから成果が出ると、ここに認める・認めないを決める行が並びます。"
+          title={status === 'pending' ? '承認待ちの成果はありません' : status === 'approved' ? '認めた成果はありません' : '認めなかった成果はありません'}
+          description={status === 'pending' ? '新しい成果が来るとここに出ます。アフィリエイターの紹介リンクから成果が出ると、ここに認める・認めないを決める行が並びます。' : '条件を変えると出ることがあります。'}
         />
       ) : listState === 'zero' ? (
         <ZeroResultState onReset={() => { setQuery(''); setFlaggedOnly(false); setStatus('pending'); setAffiliateFilter(null); setAccountFilter(APPROVAL_FILTER_ALL); setPage(1); clearSelections() }} />

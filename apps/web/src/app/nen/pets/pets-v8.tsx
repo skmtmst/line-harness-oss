@@ -331,7 +331,7 @@ function PetsListV8({
         ) : status === 'forbidden' ? (
           <ListState kind="forbidden" />
         ) : status === 'error' ? (
-          <ListState kind="error" title="ペットを読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
+          <ListState kind="error" title="ペットを読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" action={<Button variant="secondary" onClick={() => void load()}>もう一度試す</Button>} />
         ) : data && data.items.length === 0 ? (
           filtering ? (
             <ListState

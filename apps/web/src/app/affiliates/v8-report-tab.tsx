@@ -328,8 +328,8 @@ export default function ReportTabV8({
       ) : listState === 'empty' ? (
         <EmptyState
           icon={<BarChart3 size={20} aria-hidden="true" />}
-          title="まだレポートに出せる成果がありません"
-          description="成果を認めると、アフィリエイターごと・案件ごとのまとめがここに出ます。"
+          title="この期間の成果はありません"
+          description="期間を変えると出ることがあります。成果を認めると、アフィリエイターごと・案件ごとのまとめがここに出ます。"
         />
       ) : listState === 'zero' ? (
         <ZeroResultState onReset={() => { setQuery(''); setPeriod('all') }} />
