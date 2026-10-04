@@ -400,6 +400,11 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/menus'],
   ['GET', '/api/restaurant-test/channels'],
   ['POST', '/api/restaurant-test/reservations/manual'],
+  ['POST', '/api/restaurant-test/reservations/holds'],
+  ['GET', '/api/restaurant-test/reservations/day'],
+  ['GET', '/api/restaurant-test/customers/search'],
+  ['GET', '/api/restaurant-test/customers/history'],
+  ['GET', '/api/restaurant-test/inventory/day'],
   // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
   ['GET', '/api/restaurant-test/google/connection'],
   ['GET', '/api/restaurant-test/google/reviews'],

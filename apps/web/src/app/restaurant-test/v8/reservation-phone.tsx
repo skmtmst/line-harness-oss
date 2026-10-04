@@ -1,18 +1,6 @@
 'use client'
 
-/*
- * ★V8-B 予約台帳 電話の予約を入れる（板 `rm92Y`）。
- *
- * 電話・店頭で受けた予約を台帳に入れる。空いている卓は自動で選ぶ
- * （サーバが人数に合う余剰最小の卓を確定する。口の応答が正）。
- * お客さまの特定・来店回数は台帳の記録からの名寄せで出す（新しい口は使わない）。
- *
- * 今の作りのままの所（口が無いので作らない）：
- * - 「枠だけ押さえる」：押さえの口が無い。選べない形で置く。
- * - 前日・当日の思い出し送り：予約ごとの送り分け口が無いので出さない。
- *   いますぐ送る（notifyLine・口あり）だけ出す。
- */
-import { FormEvent, useMemo, useRef, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import LinePreview from '@/components/shared/line-preview'
@@ -21,7 +9,9 @@ import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import type { RestaurantReservation } from '@/lib/restaurant-test-api'
+import { useAccount } from '@/contexts/account-context'
+import type { RestaurantCustomerHistory } from '@line-crm/shared'
+import { restaurantTestApi, type RestaurantReservation } from '@/lib/restaurant-test-api'
 import { Panel } from './shell'
 import ledger from './reservations.module.css'
 
@@ -29,6 +19,7 @@ export type PhonePreset = {
   date?: Date
   time?: string
   tableId?: string
+  hold?: boolean
 }
 
 export type PhoneTable = {
@@ -71,7 +62,8 @@ function overlaps(day: string, time: string, tableId: string, rows: RestaurantRe
   if (!Number.isFinite(start)) return false
   const end = start + STAY_MINUTES * 60_000
   return rows.some((r) => {
-    if (r.table_id !== tableId) return false
+    if (r.table_id !== tableId || ['cancelled', 'no_show'].includes(r.status)) return false
+    if (r.status === 'pending' && r.hold_expires_at && Date.parse(r.hold_expires_at) <= Date.now()) return false
     const s = new Date(r.starts_at).getTime()
     const e = new Date(r.ends_at).getTime()
     return s < end && e > start
@@ -104,8 +96,16 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
   onSaved: () => void
   onSave: (body: Record<string, unknown>) => Promise<boolean>
 }) {
+  const { selectedAccountId } = useAccount()
   const todayInput = toDateInput(new Date())
-  const [kind, setKind] = useState('customer')
+  const [kind, setKind] = useState(preset.hold ? 'hold' : 'customer')
+  const [holdMinutes, setHoldMinutes] = useState(15)
+  const [history, setHistory] = useState<RestaurantCustomerHistory | null>(null)
+  const [historyError, setHistoryError] = useState('')
+  const [dayRows, setDayRows] = useState(reservations)
+  const [dayReady, setDayReady] = useState(false)
+  const [found, setFound] = useState<Person[]>([])
+  const [searchError, setSearchError] = useState('')
   const [whoTab, setWhoTab] = useState<'line' | 'phone'>('line')
   const [search, setSearch] = useState('')
   const [person, setPerson] = useState<Person | null>(null)
@@ -126,45 +126,54 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
     || tableMode !== 'auto' || courseId !== '' || allergy !== '' || !notify
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
 
-  /* 台帳の記録からの名寄せ（電話番号・LINE UID）。 */
-  const candidates = useMemo(() => {
-    const query = search.trim()
-    if (query.length < 2) return []
-    const seen = new Map<string, Person>()
-    for (const r of reservations) {
-      const hit = r.customer_name.includes(query)
-        || (r.customer_phone || '').includes(query)
-        || (r.line_uid || '').includes(query)
-      if (!hit) continue
-      const key = r.line_uid || r.customer_phone || r.customer_name
-      if (!seen.has(key)) seen.set(key, { name: r.customer_name, phone: r.customer_phone || '', lineUid: r.line_uid || '' })
-      if (seen.size >= 8) break
-    }
-    return [...seen.values()]
-  }, [reservations, search])
-
-  const visits = useMemo(() => {
-    if (!person) return []
-    return reservations
-      .filter((r) => (person.lineUid && r.line_uid === person.lineUid)
-        || (person.phone && r.customer_phone === person.phone)
-        || r.customer_name === person.name)
-      .sort((a, b) => +new Date(b.starts_at) - +new Date(a.starts_at))
-  }, [reservations, person])
-
+  useEffect(() => {
+    let current = true
+    setDayReady(false)
+    if (!selectedAccountId || !storeId) return
+    void restaurantTestApi.reservationsDay(selectedAccountId, storeId, date).then(res => {
+      if (current) { setDayRows(res.data.reservations); setDayReady(true); setError(null) }
+    }).catch(() => { if (current) setError('この日の予約を読み込めませんでした。日付を選び直してください。') })
+    return () => { current = false }
+  }, [selectedAccountId, storeId, date])
+  useEffect(() => {
+    let current = true
+    setFound([]); setSearchError('')
+    if (!selectedAccountId || search.trim().length < 2) return
+    const timer = setTimeout(() => {
+      void restaurantTestApi.customerSearch(selectedAccountId, storeId, search.trim()).then(res => {
+        if (current) setFound(res.data.map(c => ({ name: c.name, phone: c.phone || '', lineUid: c.lineUid || '' })))
+      }).catch(() => { if (current) setSearchError('お客さまを検索できませんでした。もう一度入力してください。') })
+    }, 250)
+    return () => { current = false; clearTimeout(timer) }
+  }, [selectedAccountId, storeId, search])
+  const contactUid = person?.lineUid || ''
+  const contactPhone = person?.phone || manualPhone.trim()
+  useEffect(() => {
+    let current = true
+    setHistory(null); setHistoryError('')
+    if (!selectedAccountId || (!contactUid && !contactPhone)) return
+    const timer = setTimeout(() => {
+      void restaurantTestApi.customerHistory(selectedAccountId, storeId, { lineUid: contactUid, phone: contactPhone }).then(res => {
+        if (current) setHistory(res.data)
+      }).catch(() => { if (current) setHistoryError('来店履歴を読み込めませんでした。連絡先を確認してください。') })
+    }, 250)
+    return () => { current = false; clearTimeout(timer) }
+  }, [selectedAccountId, storeId, contactUid, contactPhone])
+  const candidates = found
+  const visits = history?.visits || []
   const lastVisit = visits[0] || null
-  const lastAllergy = visits.find((r) => r.allergy_note)?.allergy_note || null
+  const lastAllergy = visits.find(r => r.allergy_note)?.allergy_note || null
 
   /* 空いている時間（人数が入る卓が1つでも空く時間）。 */
   const freeTimes = useMemo(() => {
     const list: string[] = []
     for (let m = BUSINESS_START; m < BUSINESS_END; m += 30) {
       const label = slotLabel(m)
-      const ok = tables.some((t) => t.active && t.min <= count && t.max >= count && !overlaps(date, label, t.id, reservations))
+      const ok = tables.some((t) => t.active && t.min <= count && t.max >= count && !overlaps(date, label, t.id, dayRows))
       if (ok) list.push(label)
     }
     return list
-  }, [tables, count, date, reservations])
+  }, [tables, count, date, dayRows])
 
   const recommended = useMemo(() => recommendTable(tables, count), [tables, count])
   const endsAt = time ? addMinutes(time, STAY_MINUTES) : ''
@@ -179,7 +188,7 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
       setError('上の欄で店舗を選んでください。')
       return
     }
-    if (!name) {
+    if (kind === 'customer' && !name) {
       setError('お客さまの名前を入れてください（探すか、電話番号と一緒に入力してください）。')
       return
     }
@@ -195,11 +204,11 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
     const endsAtIso = new Date(new Date(startsAt).getTime() + STAY_MINUTES * 60_000).toISOString()
     /* 成功したら番兵を黙らせるため、保存中（busy）のまま一覧へ戻る。 */
     void onSave({
-      storeId, customerName: name, customerPhone: phone || null, lineUid: lineUid || null,
+      kind, holdMinutes, source: 'phone', storeId, customerName: name, customerPhone: phone || null, lineUid: lineUid || null,
       guestCount: count, startsAt, endsAt: endsAtIso,
       tableId: tableMode === 'auto' ? null : tableMode,
       courseId: courseId || null,
-      allergyNote: allergy.trim() || null, notifyLine: notify,
+      allergyNote: allergy.trim() || null, notifyLine: kind === 'customer' && notify,
     }).then((ok) => { if (ok) onSaved() })
   }
 
@@ -223,16 +232,16 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
               <RadioCard
                 name="ledger-phone-kind"
                 value="hold"
-                checked={false}
-                onChange={() => {}}
+                checked={kind === 'hold'}
+                onChange={setKind}
                 title="枠だけ押さえる"
                 note="電話・常連・団体のために空けておく"
-                disabled
-                disabledReason="枠を押さえる口が無いため、今は使えません"
+
               />
             </RadioCardGroup>
           </Panel>
 
+          {kind === 'hold' ? <Panel title="仮押さえの期限"><label>何分後に解除しますか<input type="number" aria-label="仮押さえの期限（分）" min={1} max={120} value={holdMinutes} onChange={e => setHoldMinutes(Number(e.target.value))} /></label><p>期限を過ぎると空き卓に戻ります。台帳には履歴が残ります。</p></Panel> : null}
           <Panel
             title="だれの予約ですか"
             description="LINEの友だちなら名前で探して結びつけます。LINE未連携の電話番号でも入れられます"
@@ -248,7 +257,8 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
                 </label>
                 {search.trim().length >= 2 && !person ? (
                   <div className="mt-2 flex flex-col gap-1">
-                    {candidates.length === 0 ? <p className={ledger.inlineNote}>台帳に見つかりません。電話番号のタブから入れられます。</p> : null}
+                    {searchError ? <p role="alert">{searchError}</p> : null}
+                    {candidates.length === 0 && !searchError ? <p className={ledger.inlineNote}>台帳に見つかりません。電話番号のタブから入れられます。</p> : null}
                     {candidates.map((c) => (
                       <button
                         key={`${c.lineUid || c.phone || c.name}`}
@@ -266,7 +276,7 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
                     <div>
                       <p className={ledger.personName}>{person.name}</p>
                       <p className={ledger.personMeta}>
-                        {person.lineUid ? 'LINE連携済み' : 'LINE未連携'}{visits.length > 0 ? `・来店${visits.length}回` : ''}
+                        {person.lineUid ? 'LINE連携済み' : 'LINE未連携'}{history ? `・来店${history.visitCount}回` : ''}
                       </p>
                     </div>
                     <Button size="compact" onClick={() => { setPerson(null); setSearch('') }}>選び直す</Button>
@@ -332,7 +342,7 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
             <Checkbox checked={notify} onCheckedChange={setNotify}>
               予約を受け付けたことを、いますぐLINEに送る
             </Checkbox>
-            <p className={ledger.fieldHelp}>日時・人数・コースを書いた案内が届きます。前日・当日の思い出し送りは、送り分けの口が無いため今は出していません。</p>
+            <p className={ledger.fieldHelp}>日時・人数・コースを書いた案内が届きます。前日・当日のご案内はLINE来店フォローで設定します。</p>
           </Panel>
           {error ? <p className={ledger.formError} role="alert">{error}</p> : null}
         </form>
@@ -344,7 +354,7 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
               <>
                 <div className={ledger.tableChips}>
                   {tables.filter((t) => t.active).map((t) => {
-                    const busyTable = overlaps(date, time, t.id, reservations)
+                    const busyTable = overlaps(date, time, t.id, dayRows)
                     const selected = tableMode === t.id
                     return (
                       <button
@@ -377,14 +387,14 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
           </section>
           <section className={ledger.sideCard} aria-label="この方について">
             <h3 className={ledger.sideCardTitle}>この方について</h3>
-            {person ? (
+            {history ? (
               <>
-                <div className={ledger.breakRow}><span>これまでの来店</span><strong>{visits.length}回</strong></div>
+                <div className={ledger.breakRow}><span>これまでの来店</span><strong>{history.visitCount}回</strong></div>
                 <div className={ledger.breakRow}><span>前回</span><strong>{lastVisit ? `${lastVisit.starts_at.slice(5, 10).replace('-', '/')}・${lastVisit.guest_count}名・${lastVisit.table_label || '未配席'}` : '—'}</strong></div>
                 <div className={ledger.breakRow}><span>アレルギー（前回）</span><strong>{lastAllergy || '—'}</strong></div>
               </>
             ) : (
-              <p className={ledger.inlineNote}>お客さまを選ぶと、来店回数と前回が出ます。</p>
+              <p className={ledger.inlineNote}>{historyError || (contactUid || contactPhone ? '来店履歴を読み込んでいます。' : 'お客さまを選ぶと、来店回数と前回が出ます。')}</p>
             )}
           </section>
         </div>
@@ -396,10 +406,10 @@ export default function ReservationPhone({ storeId, storeName, tables, courses, 
             <Button onClick={onBack}>キャンセル</Button>
             <Button
               variant="primary"
-              disabled={busy || !storeId}
+              disabled={busy || !storeId || !dayReady}
               onClick={() => formRef.current?.requestSubmit()}
             >
-              ✓ 台帳に入れる
+              {kind === 'hold' ? '枠を押さえる' : '✓ 台帳に入れる'}
             </Button>
           </>
         )}

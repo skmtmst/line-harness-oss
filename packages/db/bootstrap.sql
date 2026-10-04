@@ -6187,7 +6187,7 @@ CREATE TABLE rt_memberships (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'invited', 'suspended')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, staff_id TEXT REFERENCES staff_members(id) ON DELETE SET NULL);
 
 CREATE TABLE rt_menu_change_requests (
   id TEXT PRIMARY KEY,
@@ -6202,7 +6202,7 @@ CREATE TABLE rt_menu_change_requests (
   failure_reason TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, effective_at TEXT);
 
 CREATE TABLE rt_menu_items (
   id TEXT PRIMARY KEY,
@@ -9100,6 +9100,8 @@ CREATE INDEX idx_rt_inventory_store_time ON rt_inventory_slots(store_id, starts_
 
 CREATE UNIQUE INDEX idx_rt_manual_email_import ON rt_reservations(inbound_email_id) WHERE parser_key = 'manual_import';
 
+CREATE UNIQUE INDEX idx_rt_membership_login ON rt_memberships(organization_id,staff_id) WHERE staff_id IS NOT NULL;
+
 CREATE INDEX idx_rt_memberships_org ON rt_memberships(organization_id, store_id, role);
 
 CREATE UNIQUE INDEX idx_rt_menu_change_pending ON rt_menu_change_requests(menu_id) WHERE status IN ('pending', 'approved');
@@ -9116,6 +9118,8 @@ CREATE INDEX idx_rt_organizations_tenant
 
 CREATE UNIQUE INDEX idx_rt_organizations_tenant_unique
   ON rt_organizations(tenant_id);
+
+CREATE INDEX idx_rt_reservation_hold_expiry ON rt_reservations(hold_expires_at) WHERE status = 'pending' AND hold_expires_at IS NOT NULL;
 
 CREATE UNIQUE INDEX idx_rt_reservations_external
   ON rt_reservations(store_id, source, external_id);
@@ -9636,6 +9640,12 @@ WHEN NOT EXISTS (
 )
 BEGIN SELECT RAISE(ABORT, 'ACCOUNT_TAG_SCOPE_INVALID'); END;
 
+CREATE TRIGGER rt_inventory_reservation_delete AFTER DELETE ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE store_id IN (OLD.store_id); END;
+
+CREATE TRIGGER rt_inventory_reservation_insert AFTER INSERT ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE store_id IN (NEW.store_id); END;
+
+CREATE TRIGGER rt_inventory_reservation_update AFTER UPDATE ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE store_id IN (OLD.store_id, NEW.store_id); END;
+
 CREATE TRIGGER rt_inventory_slot_insert AFTER INSERT ON rt_inventory_slots BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = NEW.store_id AND is_active = 1), 0) WHERE id = NEW.id; END;
 
 CREATE TRIGGER rt_inventory_table_delete AFTER DELETE ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = OLD.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id = OLD.store_id; END;
@@ -9644,13 +9654,37 @@ CREATE TRIGGER rt_inventory_table_insert AFTER INSERT ON rt_tables BEGIN UPDATE 
 
 CREATE TRIGGER rt_inventory_table_update AFTER UPDATE OF max_capacity, is_active, store_id ON rt_tables BEGIN UPDATE rt_inventory_slots SET total_capacity = COALESCE((SELECT SUM(max_capacity) FROM rt_tables WHERE store_id = rt_inventory_slots.store_id AND is_active = 1), 0), version = version + 1, updated_at = datetime('now') WHERE store_id IN (OLD.store_id, NEW.store_id); END;
 
-CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status = 'pending' AND NEW.status = 'approved' BEGIN UPDATE rt_menu_items SET price = NEW.after_price, updated_at = datetime('now') WHERE id = NEW.menu_id AND store_id = NEW.store_id AND price = NEW.before_price; UPDATE rt_menu_change_requests SET status = CASE WHEN changes() = 1 THEN 'applied' ELSE 'failed' END, failure_reason = CASE WHEN changes() = 1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END, updated_at = datetime('now') WHERE id = NEW.id; END;
+CREATE TRIGGER rt_membership_login_policy AFTER UPDATE OF role,is_active,invite_status ON staff_members BEGIN UPDATE rt_memberships SET role=CASE NEW.role WHEN 'owner' THEN 'super_admin' WHEN 'admin' THEN 'store_manager' ELSE 'staff' END,status=CASE WHEN NEW.is_active=0 THEN 'suspended' WHEN NEW.invite_status='active' THEN 'active' ELSE 'invited' END,updated_at=datetime('now') WHERE staff_id=NEW.id; END;
+
+CREATE TRIGGER rt_membership_login_scope AFTER UPDATE OF account_scope ON staff_members BEGIN UPDATE rt_memberships SET store_id=CASE WHEN (SELECT account_scope FROM staff_members WHERE id=NEW.id)='all' THEN NULL ELSE COALESCE((SELECT s.id FROM rt_stores s JOIN staff_account_scopes a ON a.line_account_id=s.line_account_id WHERE a.staff_id=NEW.id AND s.organization_id=rt_memberships.organization_id AND s.id=rt_memberships.store_id LIMIT 1),(SELECT s.id FROM rt_stores s JOIN staff_account_scopes a ON a.line_account_id=s.line_account_id WHERE a.staff_id=NEW.id AND s.organization_id=rt_memberships.organization_id ORDER BY s.code LIMIT 1)) END,updated_at=datetime('now') WHERE staff_id=NEW.id; END;
+
+CREATE TRIGGER rt_membership_login_scope_add AFTER INSERT ON staff_account_scopes BEGIN UPDATE rt_memberships SET store_id=CASE WHEN (SELECT account_scope FROM staff_members WHERE id=NEW.staff_id)='all' THEN NULL ELSE COALESCE((SELECT s.id FROM rt_stores s JOIN staff_account_scopes a ON a.line_account_id=s.line_account_id WHERE a.staff_id=NEW.staff_id AND s.organization_id=rt_memberships.organization_id AND s.id=rt_memberships.store_id LIMIT 1),(SELECT s.id FROM rt_stores s JOIN staff_account_scopes a ON a.line_account_id=s.line_account_id WHERE a.staff_id=NEW.staff_id AND s.organization_id=rt_memberships.organization_id ORDER BY s.code LIMIT 1)) END,updated_at=datetime('now') WHERE staff_id=NEW.staff_id; END;
+
+CREATE TRIGGER rt_membership_login_scope_remove AFTER DELETE ON staff_account_scopes BEGIN UPDATE rt_memberships SET store_id=CASE WHEN (SELECT account_scope FROM staff_members WHERE id=OLD.staff_id)='all' THEN NULL ELSE COALESCE((SELECT s.id FROM rt_stores s JOIN staff_account_scopes a ON a.line_account_id=s.line_account_id WHERE a.staff_id=OLD.staff_id AND s.organization_id=rt_memberships.organization_id AND s.id=rt_memberships.store_id LIMIT 1),(SELECT s.id FROM rt_stores s JOIN staff_account_scopes a ON a.line_account_id=s.line_account_id WHERE a.staff_id=OLD.staff_id AND s.organization_id=rt_memberships.organization_id ORDER BY s.code LIMIT 1)) END,updated_at=datetime('now') WHERE staff_id=OLD.staff_id; END;
+
+CREATE TRIGGER rt_menu_change_apply AFTER UPDATE OF status ON rt_menu_change_requests WHEN OLD.status IN ('pending','approved') AND NEW.status='approved' AND (NEW.effective_at IS NULL OR datetime(NEW.effective_at)<=datetime('now')) BEGIN UPDATE rt_menu_items SET price=NEW.after_price,updated_at=datetime('now') WHERE id=NEW.menu_id AND store_id=NEW.store_id AND price=NEW.before_price; UPDATE rt_menu_change_requests SET status=CASE WHEN changes()=1 THEN 'applied' ELSE 'failed' END,failure_reason=CASE WHEN changes()=1 THEN NULL ELSE 'メニューが変更または削除されています。再申請してください' END,updated_at=datetime('now') WHERE id=NEW.id; END;
 
 CREATE TRIGGER rt_menu_change_review AFTER UPDATE OF status ON rt_approval_requests WHEN NEW.kind = 'menu_change' AND OLD.status = 'pending' AND NEW.status IN ('approved', 'returned') BEGIN UPDATE rt_menu_change_requests SET status = NEW.status, return_reason = CASE WHEN NEW.status = 'returned' THEN NEW.review_comment ELSE NULL END, updated_at = datetime('now') WHERE approval_id = NEW.id AND status = 'pending'; END;
 
 CREATE TRIGGER rt_menu_published_insert AFTER INSERT ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
 
 CREATE TRIGGER rt_menu_published_update AFTER UPDATE OF status ON rt_menu_items WHEN NEW.status = 'active' BEGIN UPDATE rt_menu_items SET published_once = 1 WHERE id = NEW.id; END;
+
+CREATE TRIGGER rt_reservation_hold_insert BEFORE INSERT ON rt_reservations
+WHEN NEW.table_id IS NOT NULL AND NEW.status NOT IN ('cancelled', 'no_show')
+ AND EXISTS (SELECT 1 FROM rt_reservations r WHERE r.store_id = NEW.store_id AND r.table_id = NEW.table_id
+  AND r.status NOT IN ('cancelled', 'no_show') AND datetime(r.starts_at) < datetime(NEW.ends_at) AND datetime(r.ends_at) > datetime(NEW.starts_at)
+  AND (NEW.hold_expires_at IS NOT NULL OR r.hold_expires_at IS NOT NULL)
+  AND (r.hold_expires_at IS NULL OR r.status <> 'pending' OR datetime(r.hold_expires_at) > datetime('now')))
+BEGIN SELECT RAISE(ABORT, 'restaurant_table_conflict'); END;
+
+CREATE TRIGGER rt_reservation_hold_update BEFORE UPDATE OF table_id, starts_at, ends_at, status ON rt_reservations
+WHEN NEW.table_id IS NOT NULL AND NEW.status NOT IN ('cancelled', 'no_show')
+ AND EXISTS (SELECT 1 FROM rt_reservations r WHERE r.id <> NEW.id AND r.store_id = NEW.store_id AND r.table_id = NEW.table_id
+  AND r.status NOT IN ('cancelled', 'no_show') AND datetime(r.starts_at) < datetime(NEW.ends_at) AND datetime(r.ends_at) > datetime(NEW.starts_at)
+  AND (NEW.hold_expires_at IS NOT NULL OR r.hold_expires_at IS NOT NULL)
+  AND (r.hold_expires_at IS NULL OR r.status <> 'pending' OR datetime(r.hold_expires_at) > datetime('now')))
+BEGIN SELECT RAISE(ABORT, 'restaurant_table_conflict'); END;
 
 CREATE TRIGGER trg_action_score_published_version_immutable
 BEFORE UPDATE ON action_score_rule_versions
@@ -10104,6 +10138,23 @@ WHEN NEW.current_published_version_id IS NOT NULL
    WHERE id = NEW.current_published_version_id AND scenario_id = NEW.id
  )
 BEGIN SELECT RAISE(ABORT, 'published version belongs to another scenario'); END;
+
+CREATE VIEW rt_inventory_occupancy AS SELECT i.*,
+ COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=i.store_id
+  AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now'))
+  AND datetime(r.starts_at)<datetime(i.starts_at, '+' || i.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(i.starts_at)),0) AS guest_count,
+ COALESCE((SELECT SUM(t.max_capacity) FROM rt_tables t WHERE t.store_id=i.store_id AND t.is_active=1
+  AND EXISTS (SELECT 1 FROM rt_reservations r WHERE r.table_id=t.id AND r.store_id=i.store_id
+   AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now'))
+   AND datetime(r.starts_at)<datetime(i.starts_at, '+' || i.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(i.starts_at))),0) AS occupied_seats,
+ (SELECT json_group_array(t.id) FROM rt_tables t WHERE t.store_id=i.store_id AND t.is_active=1
+  AND EXISTS (SELECT 1 FROM rt_reservations r WHERE r.table_id=t.id AND r.store_id=i.store_id
+   AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now'))
+   AND datetime(r.starts_at)<datetime(i.starts_at, '+' || i.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(i.starts_at))) AS occupied_table_ids_json,
+ COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=i.store_id AND r.table_id IS NULL
+  AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now'))
+  AND datetime(r.starts_at)<datetime(i.starts_at, '+' || i.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(i.starts_at)),0) AS unassigned_guests
+ FROM rt_inventory_slots i;
 
 -- Seed data required by tenant-aware inserts on a fresh database.
 INSERT OR IGNORE INTO tenants (id, name) VALUES
