@@ -55,20 +55,6 @@
 :global([data-theme='v8']) .analyticsContent { flex: 1; min-width: 0; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
 :global([data-theme='v8']) .analyticsAside { width: 300px; flex-shrink: 0; padding: 20px; border-left: 1px solid var(--color-divider); display: flex; flex-direction: column; gap: 12px; }
 :global([data-theme='v8']) .asideToggle { display: none; padding: 12px 24px; }
-@container v8-page (max-width: 1099px) {
-  :global([data-theme='v8']) .folders { display: none; }
-  :global([data-theme='v8']) .collapsedFolders { display: flex; align-items: center; gap: 8px; }
-  :global([data-theme='v8']) .preview, :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside { display: none; }
-  :global([data-theme='v8']) .asideToggle { display: block; }
-  :global([data-theme='v8']) .inboxList { width: 348px; }
-  :global([data-theme='v8']) .settings { flex-direction: column; gap: 16px; }
-  :global([data-theme='v8']) .settingsNav { width: 100%; flex-direction: row; flex-wrap: wrap; }
-}
-@media (max-width: 1023px) {
-  :global([data-theme='v8']) .frame:not([data-standalone]) { margin: 0; width: 100%; min-height: 0; }
-  :global([data-theme='v8']) .split, :global([data-theme='v8']) .dashboardRow { flex-direction: column; }
-  :global([data-theme='v8']) .detailSummary { width: 100%; border-right: 0; border-bottom: 1px solid var(--color-hairline); }
-}
 
 :global([data-theme='v8']) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 
@@ -128,3 +114,20 @@
 }
 :global([data-theme='v8']) [data-page-template='create'][data-has-footer] .createContent > *,
 :global([data-theme='v8']) [data-page-template='create'][data-has-footer] .preview > * { flex-shrink: 0; }
+
+/* 幅による切り替えは基本の並びより後に置く。右欄の display を再び上書きしない。 */
+@container v8-page (max-width: 1099px) {
+  :global([data-theme='v8']) .folders { display: none; }
+  :global([data-theme='v8']) .collapsedFolders { display: flex; align-items: center; gap: 8px; }
+  :global([data-theme='v8']) .preview, :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside { display: none; }
+  :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { display: none; }
+  :global([data-theme='v8']) .asideToggle { display: block; }
+  :global([data-theme='v8']) .inboxList { width: 348px; }
+  :global([data-theme='v8']) .settings { flex-direction: column; gap: 16px; }
+  :global([data-theme='v8']) .settingsNav { width: 100%; flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 1023px) {
+  :global([data-theme='v8']) .frame:not([data-standalone]) { margin: 0; width: 100%; min-height: 0; }
+  :global([data-theme='v8']) .split, :global([data-theme='v8']) .dashboardRow { flex-direction: column; }
+  :global([data-theme='v8']) .detailSummary { width: 100%; border-right: 0; border-bottom: 1px solid var(--color-hairline); }
+}

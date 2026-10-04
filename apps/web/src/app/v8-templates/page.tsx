@@ -54,7 +54,7 @@ function Preview() {
   }
   return <div className={styles.viewer} data-theme="v8" data-template-preview={kind}>
     {reference ? <div className={styles.host} dangerouslySetInnerHTML={{ __html: fixture.reference }} /> :
-      <div className={styles.shell} style={{ height: fixture.height }}><Slot html={fixture.shellLeft} /><div className={styles.shellRight}><Slot html={fixture.shellTop} /><div className={styles.board}>{template}</div></div></div>}
+      <div className={styles.shell} style={{ height: fixture.height }}><Slot html={fixture.shellLeft} /><div className={styles.shellRight}><Slot html={fixture.shellTop} /><div className={styles.board} data-template-region="shell-board">{template}</div></div></div>}
     {!capture ? <nav aria-label="確認する型" className={styles.chooser}>{Object.keys(fixtures ?? {}).map((type) => <a key={type} href={`?type=${type}${reference ? '&source=reference' : ''}`}>{type}</a>)}<a href={`?type=${kind}${reference ? '' : '&source=reference'}`}>{reference ? '実装を見る' : '正本を見る'}</a></nav> : null}
   </div>
 }

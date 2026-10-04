@@ -22,7 +22,7 @@ export function DashboardPage({ boardId, standalone, notice, stats, children, ov
 export function DashboardRow({ children, aside, asideRef, variant }: { children: ReactNode; aside?: ReactNode; asideRef?: Ref<HTMLElement>; variant?: 'trend' | 'inbox' | 'link' }) {
   return <div className={styles.dashboardRow} data-template-region="row" data-row={variant}>
     <div className={styles.dashboardCell}>{children}</div>
-    {aside ? <aside ref={asideRef} className={styles.dashboardAside}>{aside}</aside> : null}
+    {aside ? <aside ref={asideRef} className={styles.dashboardAside} data-template-region="aside">{aside}</aside> : null}
   </div>
 }
 export function DashboardColumns({ children }: { children: ReactNode[] }) {
