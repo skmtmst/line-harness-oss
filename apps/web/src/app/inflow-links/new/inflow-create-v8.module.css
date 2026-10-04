@@ -1,0 +1,284 @@
+/* 流入リンクを作る（板 KMaMk）。色・丸み・影は globals.css の名前だけ。 */
+
+.board {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-board);
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.backLink {
+  font-size: 13px;
+  color: var(--color-action);
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+.mainCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.cardSub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.fields {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.twoCol {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .twoCol {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+  margin-bottom: 4px;
+}
+
+.optional {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-ink-faint);
+}
+
+.fieldError {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+.urlBox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+  overflow: hidden;
+}
+
+.urlText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.urlNote {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--color-board-line);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+}
+
+.toggleText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.toggleTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.toggleValue {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.togglePick {
+  margin-top: 8px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sideCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.stepsCard {
+  border-left: 1px solid var(--color-board-line);
+  padding-left: 16px;
+}
+
+.stepsTitle {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.step {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+  line-height: 1.6;
+}
+
+.stepNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.stepNumNow {
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+}
+
+/* スマホの見本。右の列に置く飾りではなく、選んだメッセージの中身を見る場所。 */
+.phone {
+  width: 240px;
+  max-width: 100%;
+  margin: 4px auto 0;
+  border: 8px solid var(--color-ink);
+  border-radius: 36px;
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+.phoneHead {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-board-line);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+  text-align: center;
+}
+
+.phoneBody {
+  background: var(--color-chat-background, var(--color-canvas-sunken));
+  padding: 12px;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bubble {
+  align-self: flex-start;
+  max-width: 90%;
+  background: var(--color-canvas);
+  border-radius: 0 var(--radius-control) var(--radius-control) var(--radius-control);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.bubbleTime {
+  font-size: 10px;
+  color: var(--color-ink-faint);
+  text-align: right;
+}
