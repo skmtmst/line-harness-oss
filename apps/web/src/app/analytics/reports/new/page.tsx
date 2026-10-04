@@ -22,7 +22,8 @@ import { TextField } from '@/components/shared/text-field'
 import HelpTip from '@/components/shared/help-tip'
 import Disclosure from '@/components/shared/disclosure'
 import Chip from '@/components/shared/chip'
-import { Check } from 'lucide-react'
+import { Check, GitCompareArrows, RefreshCw } from 'lucide-react'
+import { formatDateTime } from '@/lib/format'
 import ReportHeadV8 from './report-head-v8'
 import {
   api,
@@ -500,6 +501,18 @@ function AnalyticsReportFormPage() {
   const [compareOpen, setCompareOpen] = useState(false)
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
+  const [latestBusy, setLatestBusy] = useState(false)
+  const conflictActionSeq = useRef(0)
+  const conflictBusyRef = useRef(false)
+  useEffect(() => {
+    setCompareBusy(false)
+    setLatestBusy(false)
+    conflictBusyRef.current = false
+    return () => {
+      ++conflictActionSeq.current
+      conflictBusyRef.current = false
+    }
+  }, [selectedAccountId, editId])
   // H5UoIu: 名前は必須。空のまま押したらお知らせに加えて欄の下にも出す。
   const [nameError, setNameError] = useState('')
 
@@ -647,7 +660,7 @@ function AnalyticsReportFormPage() {
         } catch (caught) {
           /*
            * G83vi: ほかの人が先に保存した（409）。入力は残したまま、
-           * 板の頭の下に琥珀色の帯を出す（V8だけ。v7 は裏側の文のまま）。
+           * 板の頭の下に注意の帯を出す。
            * 最新を取り直せたら「違いを比べる」の比べる文に使う。
            */
           if (!(caught instanceof ApiError) || caught.status !== 409) throw caught
@@ -664,7 +677,7 @@ function AnalyticsReportFormPage() {
           } catch {
             // 取り直しに失敗しても帯は出す。比べる文は出さない。
           }
-          setError(caught.message)
+          setError('')
           return
         }
         if (!isFresh()) return
@@ -778,13 +791,35 @@ function AnalyticsReportFormPage() {
     setError('')
   }
 
-  const reloadLatest = () => {
-    if (conflictLatest) {
-      applySchedule(conflictLatest)
-      return
+  const reloadLatest = async () => {
+    if (!selectedAccountId || !editing || saving || conflictBusyRef.current) return
+    conflictBusyRef.current = true
+    const actionSeq = ++conflictActionSeq.current
+    const targetSeq = switchSeqRef.current
+    const isCurrent = () => actionSeq === conflictActionSeq.current
+      && targetSeq === switchSeqRef.current
+      && accountRef.current === selectedAccountId && editIdRef.current === editId
+    setLatestBusy(true)
+    setCompareError('')
+    setError('')
+    try {
+      const response = await api.analytics.reportSchedules.list(selectedAccountId)
+      if (!isCurrent()) return
+      const found = response.success ? response.data.items.find((item) => item.id === editing.id && !item.isOneTime) : undefined
+      if (!found || !response.success) throw new Error('最新の内容を読み込めませんでした。入力は残っています。もう一度お試しください。')
+      setOptions(response.data.options)
+      applySchedule(found)
+    } catch {
+      if (!isCurrent()) return
+      const message = '最新の内容を読み込めませんでした。入力は残っています。もう一度お試しください。'
+      setError(message)
+      setCompareError(message)
+    } finally {
+      if (isCurrent()) {
+        setLatestBusy(false)
+        conflictBusyRef.current = false
+      }
     }
-    setCompareOpen(false)
-    setReloadSeq((n) => n + 1)
   }
 
   /*
@@ -794,34 +829,38 @@ function AnalyticsReportFormPage() {
    * 失敗したら窓は閉じず、その場で理由を出してもう一度押せる。
    */
   const saveOverLatest = async () => {
-    if (!selectedAccountId || !options || !editing || !updateConflict || compareBusy) return
+    if (!selectedAccountId || !options || !editing || !canManage || !updateConflict || saving || conflictBusyRef.current) return
     const built = buildReportPayload(options)
-    if (!built.ok) {
-      setCompareError(built.error)
-      return
-    }
+    if (!built.ok) { setCompareError(built.error); return }
+    conflictBusyRef.current = true
+    const actionSeq = ++conflictActionSeq.current
+    const targetSeq = switchSeqRef.current
+    const mySeq = ++saveSeqRef.current
+    latestAttemptRef.current = { seq: mySeq, key: `update:${editing.id}`, signature: JSON.stringify(built.payload) }
+    const isCurrent = () => actionSeq === conflictActionSeq.current && targetSeq === switchSeqRef.current
+      && accountRef.current === selectedAccountId && editIdRef.current === editId
+      && latestAttemptRef.current?.seq === mySeq
     setCompareBusy(true)
     setCompareError('')
     try {
       const latest = await api.analytics.reportSchedules.list(selectedAccountId)
-      const found = latest.success
-        ? latest.data.items.find((item) => item.id === editing.id)
-        : undefined
-      if (!found) {
-        setCompareError('最新の内容を読み込めませんでした。窓を閉じて「最新を読み込んで続ける」を押してください。')
+      if (!isCurrent()) return
+      const found = latest.success ? latest.data.items.find((item) => item.id === editing.id && !item.isOneTime) : undefined
+      if (!found || !latest.success) {
+        setCompareError('最新の内容を読み込めませんでした。入力は残っています。「最新を読み込んで続ける」で試し直してください。')
         return
       }
-      const mySeq = (saveSeqRef.current += 1)
-      const mySwitchSeq = switchSeqRef.current
-      const key = `update:${editing.id}`
-      const signature = JSON.stringify(built.payload)
-      latestAttemptRef.current = { seq: mySeq, key, signature }
+      // 比較を開いた後の変更は未確認なので、この押下では上書きしない。
+      if (!conflictLatest || found.updatedAt !== conflictLatest.updatedAt) {
+        setConflictLatest(found)
+        setOptions(latest.data.options)
+        setCompareError('内容がさらに変更されました。違いを確認してから、もう一度保存してください。')
+        return
+      }
       const response = await api.analytics.reportSchedules.update(selectedAccountId, editing.id, {
         ...built.payload, expectedUpdatedAt: found.updatedAt,
       })
-      if (accountRef.current !== selectedAccountId || editIdRef.current !== editId || mySwitchSeq !== switchSeqRef.current) return
-      const current = latestAttemptRef.current
-      if (current.seq !== mySeq) return
+      if (!isCurrent()) return
       if (!response.success) throw new Error(response.error)
       setEditing(response.data)
       setUpdateConflict(false)
@@ -829,27 +868,27 @@ function AnalyticsReportFormPage() {
       setCompareOpen(false)
       setBaseline(JSON.stringify([
         name, sections, savedAnalysisIds, cadence, weekday, monthDay, sendTime, periodDays,
-        staffIds.filter(Boolean),
-        emails.map((item) => item.trim()).filter(Boolean),
+        staffIds.filter(Boolean), emails.map((item) => item.trim()).filter(Boolean),
         dashboardEnabled, emailEnabled, lineEnabled, alertsEnabled, alertDrafts, extraAlertRules,
       ]))
       notifyToast(`定期レポートを更新しました。次は${nextLabel}に届きます。`)
     } catch (caught) {
+      if (!isCurrent()) return
       if (caught instanceof ApiError && caught.status === 409) {
         try {
           const retry = await api.analytics.reportSchedules.list(selectedAccountId)
-          if (retry.success) {
-            setConflictLatest(retry.data.items.find((item) => item.id === editing.id) ?? null)
-          }
-        } catch {
-          // 取り直しに失敗しても窓は閉じない。
-        }
-        setCompareError('ほかの人がさらに先に保存しました。比べ直してから、もう一度お試しください。')
+          if (!isCurrent()) return
+          if (retry.success) setConflictLatest(retry.data.items.find((item) => item.id === editing.id) ?? null)
+        } catch { /* 入力と比較画面を残す。 */ }
+        if (isCurrent()) setCompareError('ほかの人がさらに先に保存しました。比べ直してから、もう一度お試しください。')
         return
       }
       setCompareError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした')
     } finally {
-      setCompareBusy(false)
+      if (isCurrent()) {
+        setCompareBusy(false)
+        conflictBusyRef.current = false
+      }
     }
   }
 
@@ -916,7 +955,7 @@ function AnalyticsReportFormPage() {
   ])
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
     dirty: baseline !== null && signature !== baseline,
-    busy: saving,
+    busy: saving || compareBusy || latestBusy,
   })
 
   if (accountLoading || loading) return <ListState kind="loading" title="定期レポートを読み込んでいます" />
@@ -950,16 +989,14 @@ function AnalyticsReportFormPage() {
     <div className="report-v8-page" data-design-node={updateConflict ? 'G83vi' : 'H5UoIu'}>
       <ReportHeadV8 editing={Boolean(editing)} />
       {updateConflict && (
-        <div className="report-v8-conflict" role="alert">
-          <div>
-            <p className="report-v8-conflictTitle">ほかの人がこのレポートを先に保存しました</p>
-            <p className="report-v8-conflictSub">入力は残っています。相手の変更を確認してから保存してください。</p>
-          </div>
-          <div className="report-v8-conflictActions">
-            {conflictLatest && <Button variant="secondary" onClick={() => { setCompareError(''); setCompareOpen(true) }}>違いを比べる</Button>}
-            <Button variant="secondary" onClick={() => reloadLatest()}>最新を読み込んで続ける</Button>
-          </div>
-        </div>
+        <Notice tone="warn" className="report-v8-conflict" role="alert" action={<div className="report-v8-conflictActions">
+          {conflictLatest && <Button variant="secondary" disabled={saving || latestBusy || compareBusy} onClick={() => { setCompareError(''); setCompareOpen(true) }}><GitCompareArrows size={15} aria-hidden="true" />違いを比べる</Button>}
+          <Button variant="secondary" disabled={saving || latestBusy || compareBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
+        </div>}>
+          <p className="report-v8-conflictTitle">ほかの人がこのレポートを先に保存しました</p>
+          <p className="report-v8-conflictSub">入力は残っています。相手の変更を確認してから保存してください。</p>
+          {conflictLatest && <p className="report-v8-conflictSub">最新の保存時刻：<time dateTime={conflictLatest.updatedAt}>{formatDateTime(conflictLatest.updatedAt)}</time></p>}
+        </Notice>
       )}
       {!canManage && <Notice tone="info" message="運用担当は内容を確認できます。作成は統括または管理者が行います。" />}
       {error && <Notice tone="danger" message={error} onClose={() => setError('')} />}
@@ -972,7 +1009,7 @@ function AnalyticsReportFormPage() {
         </Notice>
       )}
       <div className="report-v8-columns">
-        <fieldset className="report-v8-fields" disabled={!canManage || saving}>
+        <fieldset className="report-v8-fields" disabled={!canManage || saving || compareBusy || latestBusy}>
           <legend className="sr-only">レポートの設定</legend>
           <section className="report-v8-card">
             <h2 className="report-v8-cardTitle">名前を付けます</h2>
@@ -1086,7 +1123,7 @@ function AnalyticsReportFormPage() {
         {!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
         <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>
       </>} />
-      <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy) setCompareOpen(false) }} footer={<><Button variant="secondary" disabled={compareBusy} onClick={() => reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></>} error={compareError || undefined} busy={compareBusy}>
+      <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy && !latestBusy) setCompareOpen(false) }} footer={<><Button variant="secondary" disabled={compareBusy || latestBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy || latestBusy || !canManage} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></>} error={compareError || undefined} busy={compareBusy || latestBusy}>
         <VersionCompare before={latestSummary} after={draftSummary} />
       </Dialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した定期レポート" onConfirm={confirmLeave} onCancel={cancelLeave} />

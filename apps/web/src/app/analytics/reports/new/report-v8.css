@@ -2,7 +2,7 @@
 
 /*
  * 分析レポート作成・送信設定の V8（板 H5UoIu・競合 G83vi）。
- * v7 の画素は変えない。すべての規則を `[data-theme="v8"]` の下で効かせる。
+ * V8専用。名前をこの画面の中で分けて共通の殻へ影響させない。
  */
 
 .report-v8-page {
@@ -43,11 +43,6 @@
   margin-top: 4px;
   font-size: 13px;
   color: var(--color-ink-secondary);
-}
-
-/* 共有の見出し（PageHeader）は V8 では出さない。v7 はそのまま。 */
-.report-v8-legacyHead {
-  display: none;
 }
 
 .report-v8-required {
@@ -103,12 +98,12 @@
   gap: 8px;
 }
 
-/* 見本は1列のカード並び。v7 の2列はそのまま。 */
+/* 見本は1列のカード並び。 */
 .report-v8-sectionCards {
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* 見本は2×2。v7 の4列はそのまま。 */
+/* 見本は2×2。 */
 .report-v8-scheduleGrid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -202,6 +197,10 @@
 }
 
 .report-v8-kvRow strong {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-weight: 600;
   color: var(--color-ink);
   text-align: right;

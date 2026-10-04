@@ -16,6 +16,7 @@ vi.mock('next/link', () => ({
 
 const fixture = vi.hoisted(() => ({
   editId: null as string | null,
+  accountId: 'account-a',
   pushes: [] as string[],
 }))
 vi.mock('next/navigation', () => ({
@@ -24,7 +25,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/analytics/reports/new',
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
+  useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => undefined,
@@ -54,6 +55,10 @@ const net = vi.hoisted(() => ({
   putMode: 'ok' as 'ok' | 'conflict-then-ok' | 'deferred',
   deferred: [] as Array<(value: Response) => void>,
   gets: 0,
+  getMode: 'normal' as 'normal' | 'deferred' | 'failure',
+  getDeferred: [] as Array<(value: Response) => void>,
+  latestVersion: '2026-09-01T00:00:00.000Z',
+  latestName: null as string | null,
 }))
 
 function installFetch() {
@@ -80,10 +85,12 @@ function installFetch() {
     if (url.pathname.startsWith('/api/analytics/report-schedules')) {
       // 初回の読み込みは保存済みの名前、取り直しはほかの人が変えた名前。
       net.gets += 1
-      const name = net.gets === 1 ? SCHEDULE.name : 'ほかの人が変えた名前'
+      if (net.getMode === 'failure') return new Response(JSON.stringify({ success: false, error: '取得できませんでした' }), { status: 500 })
+      if (net.getMode === 'deferred') return new Promise<Response>((resolve) => { net.getDeferred.push(resolve) })
+      const name = net.latestName ?? (net.gets === 1 ? SCHEDULE.name : 'ほかの人が変えた名前')
       return new Response(JSON.stringify({
         success: true,
-        data: { items: [{ ...SCHEDULE, name }], options: OPTIONS },
+        data: { items: [{ ...SCHEDULE, name, updatedAt: net.latestVersion }], options: OPTIONS },
       }), { status: 200 })
     }
     return new Response(JSON.stringify({ success: false, error: '未設定' }), { status: 500 })
@@ -140,11 +147,16 @@ async function click(element: HTMLElement) {
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   fixture.editId = null
+  fixture.accountId = 'account-a'
   fixture.pushes.length = 0
   net.puts.length = 0
   net.putMode = 'ok'
   net.deferred.length = 0
   net.gets = 0
+  net.getMode = 'normal'
+  net.getDeferred.length = 0
+  net.latestVersion = SCHEDULE.updatedAt
+  net.latestName = null
   installFetch()
 })
 
@@ -243,6 +255,77 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     expect(container.querySelector('[data-design-node="H5UoIu"]')).toBeTruthy()
     expect((container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('ほかの人が変えた名前')
     expect(buttonByText('変更を保存する')).toBeTruthy()
+  })
+
+  it('比較を開いた後にさらに更新されていたら、未確認の内容を上書きしない', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'conflict-then-ok'
+    await mount()
+    await settle()
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    await click(buttonByText('違いを比べる'))
+    net.latestVersion = '2026-09-05T00:00:00.000Z'
+    net.latestName = 'さらに新しい変更'
+    await click(overlayButtonByText('この内容で保存する'))
+    await settle()
+    expect(net.puts).toHaveLength(0)
+    expect(overlayText()).toContain('内容がさらに変更されました')
+    expect(overlayText()).toContain('名前: さらに新しい変更')
+    await click(overlayButtonByText('この内容で保存する'))
+    await settle()
+    expect(net.puts).toHaveLength(1)
+  })
+
+  it('最新の読み込みはその場で取り直し、失敗しても入力を消さない', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'conflict-then-ok'
+    await mount()
+    await settle()
+    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(nameField, { target: { value: '残したい入力' } }) })
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    const reads = net.gets
+    net.getMode = 'failure'
+    await click(buttonByText('最新を読み込んで続ける'))
+    await settle()
+    expect(net.gets).toBe(reads + 1)
+    expect(nameField.value).toBe('残したい入力')
+    expect(container.textContent).toContain('最新の内容を読み込めませんでした。入力は残っています')
+    net.getMode = 'normal'
+    net.latestName = 'ボタンを押した時点の最新'
+    net.latestVersion = '2026-09-06T00:00:00.000Z'
+    await click(buttonByText('最新を読み込んで続ける'))
+    await settle()
+    expect(nameField.value).toBe('ボタンを押した時点の最新')
+  })
+
+  it('比較用の取得中にアカウントを往復しても、遅い結果で保存を始めない', async () => {
+    fixture.editId = 'report-1'
+    net.putMode = 'conflict-then-ok'
+    await mount()
+    await settle()
+    await click(buttonByText('変更を保存する'))
+    await settle()
+    await click(buttonByText('違いを比べる'))
+    net.getMode = 'deferred'
+    await click(overlayButtonByText('この内容で保存する'))
+    await settle()
+    expect(net.getDeferred).toHaveLength(1)
+    net.getMode = 'normal'
+    for (const accountId of ['account-b', 'account-a']) {
+      fixture.accountId = accountId
+      await act(async () => { root.render(<><AnalyticsReportNewPage /><ToastHost /></>) })
+      await settle()
+    }
+    const nameField = container.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement
+    await act(async () => { fireEvent.change(nameField, { target: { value: '新しい入力' } }) })
+    await act(async () => { net.getDeferred.splice(0).forEach((resolve) => resolve(new Response(JSON.stringify({ success: true, data: { items: [SCHEDULE], options: OPTIONS } }), { status: 200 }))) })
+    await settle()
+    expect(net.puts).toHaveLength(0)
+    expect(nameField.value).toBe('新しい入力')
+    expect(container.textContent).not.toContain('定期レポートを更新しました')
   })
 
   it('保存中は押せない（二重押し防止）', async () => {
