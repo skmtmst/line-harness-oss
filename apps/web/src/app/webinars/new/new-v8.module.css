@@ -178,6 +178,13 @@
   font-size: 12px;
 }
 
+/* 入力欄の下に出す直し方（保存を押す前から、離れたときに1欄ずつ出す）。 */
+.fieldError {
+  margin: 4px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
 .radioRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
