@@ -393,7 +393,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="注文番号・お名前・出来事で検索"
-          aria-label="取り込みの記録を検索"
+          aria-label="取り込みの記録を探す"
         />
         <div className="w-full sm:w-64">
           <Select
@@ -423,6 +423,12 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
             setStatus(value)
           },
         }))} />
+      {status === 'failed' ? (
+        <p className="text-xs text-ink-secondary">失敗した出来事は直してから「もう一度やる」。見送ったものは「送信なし」に入ります。</p>
+      ) : null}
+      {status === 'skipped' ? (
+        <p className="text-xs text-ink-secondary">送る設定がないため送らなかった出来事です。<a href="/ec-commerce/identity-candidates" className="font-semibold text-action hover:underline">会員のつき合わせへ</a>で結びつけると、送信なしが減ります。</p>
+      ) : null}
       {listState !== 'ready' ? (
         <ListState
           kind={listState}
