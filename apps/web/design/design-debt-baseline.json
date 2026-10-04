@@ -547,7 +547,7 @@
     "arbitrary-value": 1
   },
   "app/rich-menus/new/create-v8.tsx": {
-    "unresolved-classname": 184
+    "unresolved-classname": 188
   },
   "app/rich-menus/page.tsx": {
     "arbitrary-value": 5
@@ -756,9 +756,6 @@
   },
   "app/webinars/edit/comments-v8.tsx": {
     "unresolved-classname": 18
-  },
-  "app/webinars/edit/detail-v8.tsx": {
-    "unresolved-classname": 34
   },
   "app/webinars/edit/cta-v8.tsx": {
     "unresolved-classname": 38

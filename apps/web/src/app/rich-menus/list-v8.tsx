@@ -988,11 +988,12 @@ export default function RichMenusListV8() {
   )
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node={canEdit ? 'rZEGN' : 'ZoKow'}>
       {/*
         骨格の印（data-design）は v7 の page.tsx 側が担う。ここへ別の節名を
         足すと design-structure の検査が V7＋V8 の和集合で見えてしまう。
         KPIs は V7 と同じ節名なので残す。
+        板IDは V8 の枠にだけ付ける（`rZEGN` 一覧／`ZoKow` 閲覧のみ）。
       */}
       <div>
         <div className={styles.head}>
