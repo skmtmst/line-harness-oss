@@ -123,10 +123,6 @@ const COVERED_BY_PARENT: Record<string, string> = {
   // 共有フック経由で持つ。どちらのテーマでも同じ番兵が効く。
   'app/settings/feature-settings-v8.tsx': 'app/settings/page.tsx',
   'app/settings/file-scan/file-scan-v8.tsx': 'app/settings/file-scan/page.tsx',
-  // ★V8-B 予約経路（wJYQb）。書きかけは useV8TabEdit で親へ登録し、親の番兵が守る。
-  'app/booking/menus/auto-rules-tab-v8.tsx': 'app/booking/menus/settings-v8.tsx',
-  // ★V8-B 自動で合わせるルール（nGcY1）。書きかけは onDirtyChange で親へ報告し、親の番兵が守る。
-  'app/restaurant-test/v8/store-auto-rules-tab.tsx': 'app/restaurant-test/v8/inventory.tsx',
 }
 
 /*

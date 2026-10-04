@@ -11,7 +11,9 @@
  * テーマが v7 のときはこのファイルは読まれず、従来の見た目が出る。
  */
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -37,8 +39,6 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { notifyToast } from '@/components/shared/toast'
-import AutoRulesTabV8 from './auto-rules-tab-v8'
-import { V8TabEditContext, useV8TabEdit, type V8TabEdit } from './v8-tab-edit'
 import { useAccount } from '@/contexts/account-context'
 import { canEditFeature } from '@/lib/staff-capability'
 import {
@@ -75,7 +75,6 @@ const V8_TABS = [
   { key: 'holidays', label: '休業日', node: 'KRgTQ' },
   { key: 'rules', label: '予約のルール', node: 'x1OZS6' },
   { key: 'staff', label: '担当スタッフ', node: 'VLEaj' },
-  { key: 'autoRules', label: '予約経路', node: 'wJYQb' },
 ] as const
 type V8TabKey = (typeof V8_TABS)[number]['key']
 const V8_TAB_KEYS = new Set<string>(V8_TABS.map((tab) => tab.key))
@@ -85,7 +84,6 @@ const V8_TAB_NODE: Record<V8TabKey, string> = {
   holidays: 'KRgTQ',
   rules: 'x1OZS6',
   staff: 'VLEaj',
-  autoRules: 'wJYQb',
 }
 
 const MENU_PAGE_SIZE = 6
@@ -182,6 +180,47 @@ function resourceSaveError(error: unknown): string {
     return '設備を変更する権限がありません。'
   }
   return '設備を保存できませんでした。入力内容を確かめて、もう一度お試しください。'
+}
+
+/* ==================== タブの「書きかけ」をシェルへ渡す ==================== */
+
+type V8TabEdit = {
+  dirty: boolean
+  saving: boolean
+  /** 離脱確認の題名（「○○への変更」）。 */
+  subject: string
+  saveLabel?: string
+  saveDisabled?: boolean
+  /** false のとき保存帯は出さず、離脱確認だけ使う（休業日の窓など）。 */
+  showBar?: boolean
+  onSave: () => void
+  onReset: () => void
+}
+
+const V8TabEditContext = createContext<(next: V8TabEdit | null) => void>(() => {})
+
+/**
+ * タブ内の書きかけ状態をシェルへ登録する。dirty / saving / subject の
+ * 変わったときだけ登録し直すので、描画ごとの更新でループしない。
+ */
+function useV8TabEdit(input: V8TabEdit) {
+  const register = useContext(V8TabEditContext)
+  const ref = useRef(input)
+  ref.current = input
+  const { dirty, saving, subject, saveDisabled, showBar } = input
+  useEffect(() => {
+    register({
+      dirty,
+      saving,
+      subject,
+      saveLabel: ref.current.saveLabel,
+      saveDisabled,
+      showBar: showBar ?? true,
+      onSave: () => ref.current.onSave(),
+      onReset: () => ref.current.onReset(),
+    })
+    return () => register(null)
+  }, [register, dirty, saving, subject, saveDisabled, showBar])
 }
 
 /* ==================== 小さな部品 ==================== */
@@ -622,8 +661,6 @@ export default function BookingSettingsV8({ accountId }: { accountId: string | n
                 onSaved={(next) => setSettings(next)}
                 onReload={() => void loadCore()}
               />
-            ) : tab === 'autoRules' ? (
-              <AutoRulesTabV8 accountId={accountId} canEdit={canEditSettings} />
             ) : (
               <StaffTabV8
                 accountId={accountId}

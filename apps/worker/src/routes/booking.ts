@@ -117,9 +117,6 @@ import {
 import {
   getBookingAutoAssign,
   saveBookingAutoAssign,
-  getBookingAutoRules,
-  saveBookingAutoRules,
-  type BookingAutoRules,
   getBookingChannels,
   listBookingConflicts,
   notifyBookingConflicts,
@@ -2124,38 +2121,6 @@ booking.put('/api/booking/admin/channels/settings', requirePermission(BOOKING_SE
   if (!body || typeof body.autoAssign !== 'boolean') return c.json({ error: 'invalid_auto_assign' }, 400);
   await saveBookingAutoAssign(c.env.DB, accountId, body.autoAssign);
   return c.json({ success: true, data: { autoAssign: body.autoAssign } });
-});
-
-/** F-25 人の予約の自動で合わせるルール（読む・保存する）。 */
-booking.get('/api/booking/admin/auto-rules', async (c) => {
-  const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
-  c.header('Cache-Control', 'no-store');
-  return c.json({ success: true, data: await getBookingAutoRules(c.env.DB, accountId) });
-});
-
-booking.put('/api/booking/admin/auto-rules', requirePermission(BOOKING_SETTINGS_KEY), async (c) => {
-  const accountId = await resolveAccountIdAdmin(c);
-  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
-  const body = await c.req.json<Partial<Record<keyof BookingAutoRules, unknown>>>().catch(() => null);
-  const fields: Array<keyof BookingAutoRules> = [
-    'excludeCalendarBlock', 'writeBackToCalendar', 'autoAssign', 'mergeDuplicates',
-    'conflictNotify', 'unconnectedNotify', 'dailyLimitNotify',
-  ];
-  if (!body || !fields.every((field) => typeof body[field] === 'boolean')) {
-    return c.json({ error: 'invalid_auto_rules' }, 400);
-  }
-  const rules: BookingAutoRules = {
-    excludeCalendarBlock: body.excludeCalendarBlock as boolean,
-    writeBackToCalendar: body.writeBackToCalendar as boolean,
-    autoAssign: body.autoAssign as boolean,
-    mergeDuplicates: body.mergeDuplicates as boolean,
-    conflictNotify: body.conflictNotify as boolean,
-    unconnectedNotify: body.unconnectedNotify as boolean,
-    dailyLimitNotify: body.dailyLimitNotify as boolean,
-  };
-  await saveBookingAutoRules(c.env.DB, accountId, rules);
-  return c.json({ success: true, data: rules });
 });
 
 booking.get('/api/booking/admin/conflicts', async (c) => {

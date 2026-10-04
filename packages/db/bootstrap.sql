@@ -6276,21 +6276,6 @@ CREATE TABLE rt_resource_locks (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE rt_store_auto_rules (
-  store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
-  auto_assign_seats INTEGER NOT NULL DEFAULT 1,
-  count_remaining INTEGER NOT NULL DEFAULT 1,
-  merge_duplicates INTEGER NOT NULL DEFAULT 1,
-  low_seat_threshold INTEGER NOT NULL DEFAULT 4,
-  line_action TEXT NOT NULL DEFAULT 'stop' CHECK (line_action IN ('stop', 'reduce')),
-  walkin_action TEXT NOT NULL DEFAULT 'stop' CHECK (walkin_action IN ('stop', 'reduce')),
-  close_banner INTEGER NOT NULL DEFAULT 1,
-  notify_line INTEGER NOT NULL DEFAULT 1,
-  duplicate_notify INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
 CREATE TABLE rt_stores (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES rt_organizations(id) ON DELETE CASCADE,

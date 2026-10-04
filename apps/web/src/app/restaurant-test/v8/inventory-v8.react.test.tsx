@@ -9,10 +9,6 @@ const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), updateInventory: vi.fn() 
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
-}))
 
 import { ApiError } from '@/lib/api'
 import InventoryV8 from './inventory'

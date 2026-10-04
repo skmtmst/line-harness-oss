@@ -9,7 +9,7 @@
  * 競合（ほかの担当者が先に保存・409）は黄色の帯と比べる窓で受ける。
  *
  * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
- * - タブ（予約経路の連携）：中身の板が無いので出さない（自動で合わせるルールは板 `nGcY1` として出す）。
+ * - タブ（予約経路の連携・自動で合わせるルール）：中身の板が無いので出さない。
  * - 開ける時間の曜日ごとの編集：週単位で保存する口が無いので出さない。
  *   時間帯ごとの席数は表と箱で直せる。
  * - 下の固定帯の文言：開ける時間が出せないので「配分を保存」にする。
@@ -18,20 +18,15 @@
  *   媒体ごとの受信状態の口が無いので、閉じる対象の媒体は利用者が選ぶ。
  * v7 を直す必要が出たら向こうも同じ判断を入れる（V8 完成までの二重管理）。
  */
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
-import { Tabs } from '@/components/shared/tabs'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import StoreAutoRulesTab from './store-auto-rules-tab'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import { restaurantTestApi, type RestaurantInventory } from '@/lib/restaurant-test-api'
@@ -396,67 +391,9 @@ function InventoryBoard({ ctx }: { ctx: RestaurantV8Context }) {
 }
 
 export default function InventoryV8() {
-  const [tab, setTab] = useState<'stock' | 'auto'>('stock')
-  /* 自動ルールの書きかけ。タブを外れると消えるので、移る前に確認する。 */
-  const [autoDirty, setAutoDirty] = useState(false)
-  const [switchTarget, setSwitchTarget] = useState<'stock' | 'auto' | null>(null)
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: autoDirty })
-  const reportAutoDirty = useCallback((dirty: boolean) => setAutoDirty(dirty), [])
-
-  function requestTab(next: 'stock' | 'auto') {
-    if (next === tab) return
-    if (tab === 'auto' && autoDirty) {
-      setSwitchTarget(next)
-      return
-    }
-    setTab(next)
-  }
-  function confirmSwitch() {
-    const next = switchTarget
-    setSwitchTarget(null)
-    if (!next) return
-    setAutoDirty(false)
-    setTab(next)
-  }
-
   return (
     <RestaurantShell boardId="Y8SjT2" title="予約枠・在庫" description="時間帯ごとの総枠と、媒体・LINE・当日枠の配分を確認します。">
-      {(ctx) => (
-        <>
-          <div data-design="Tabs">
-            <Tabs
-              label="予約枠・在庫の切り替え"
-              items={[
-                { label: '時間帯ごとの在庫', current: tab === 'stock', onClick: () => requestTab('stock') },
-                { label: '自動で合わせるルール', current: tab === 'auto', onClick: () => requestTab('auto') },
-              ]}
-            />
-          </div>
-          {tab === 'stock' ? (
-            <InventoryBoard ctx={ctx} />
-          ) : (
-            <div data-design-node="nGcY1">
-              <StoreAutoRulesTab storeId={ctx.store?.id ?? null} accountId={ctx.data.organization?.account_id ?? ''} onDirtyChange={reportAutoDirty} />
-            </div>
-          )}
-          <ConfirmDialog
-            open={switchTarget !== null}
-            title="自動で合わせるルールへの変更を捨てて移りますか？"
-            description="保存していない変更は消えます。"
-            confirmLabel="捨てて移る"
-            cancelLabel="編集に戻る"
-            primaryAction="cancel"
-            onCancel={() => setSwitchTarget(null)}
-            onConfirm={confirmSwitch}
-          />
-          <UnsavedLeaveDialog
-            open={leaveTarget !== null}
-            subject="自動で合わせるルールへの変更"
-            onConfirm={confirmLeave}
-            onCancel={cancelLeave}
-          />
-        </>
-      )}
+      {(ctx) => <InventoryBoard ctx={ctx} />}
     </RestaurantShell>
   )
 }

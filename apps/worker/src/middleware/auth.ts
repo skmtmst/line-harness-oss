@@ -428,8 +428,6 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
   ['PATCH', /^\/api\/restaurant-test\/reservations\/[^/]+$/],
-  // F-24 席の自動ルールの読み：担当者も見られる。保存は店主・管理者だけ。
-  ['GET', /^\/api\/restaurant-test\/stores\/[^/]+\/auto-rules$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
   ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],
