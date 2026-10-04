@@ -122,7 +122,7 @@ describe('投稿 V8', () => {
     await screen.findByText('散歩のあと', { exact: false })
     fireEvent.click(screen.getByRole('button', { name: 'こむぎの写真を見送る' }))
     expect(await screen.findByText('この写真を見送りますか？')).toBeTruthy()
-    expect(container.querySelector('[data-design-node="ujcar"]')).toBeTruthy()
+    expect(document.querySelector('[data-design-node="ujcar"]')).toBeTruthy()
     expect(screen.getByText('見送った理由')).toBeTruthy()
   })
 

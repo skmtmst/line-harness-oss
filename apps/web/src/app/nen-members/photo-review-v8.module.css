@@ -361,64 +361,6 @@
   line-height: 1.6;
 }
 
-/* ujcar この写真を見送る：真ん中の小窓。 */
-.dialogOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: var(--color-scrim);
-}
-
-.dialog {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: min(560px, 100%);
-  max-height: calc(100vh - 48px);
-  overflow-y: auto;
-  padding: 20px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
-  box-shadow: var(--shadow-overlay);
-}
-
-.dialogHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.dialogTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.dialogDesc {
-  margin: 4px 0 0;
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.dialogClose {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control, 8px);
-  background: transparent;
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
 .dialogPhoto {
   display: flex;
   align-items: center;
@@ -515,27 +457,6 @@
   color: var(--color-ink);
   font-size: 13px;
   cursor: pointer;
-}
-
-.dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding-top: 4px;
-  border-top: 1px solid var(--color-hairline);
-}
-
-.errorText {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: 12px;
-}
-
-.notice {
-  margin: 0;
-  color: var(--color-accent-deep);
-  font-size: 12px;
-  font-weight: 600;
 }
 
 /* 掲載の表の名前。 */
