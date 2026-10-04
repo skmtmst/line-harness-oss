@@ -94,6 +94,8 @@ describe('共通部品の影響範囲', () => {
       'app/common-actions/common-actions-v8.tsx',
       'app/common-actions/page.tsx',
       // N-193/N-205: 登録メディア選択窓。20件ずつのページ送りを共通へ寄せた。
+      // ★V8 登録メディア一覧（O7hUt7）。表の下に表示範囲と10/20/50のページ送りを置く。
+      'app/contents/list-v8.tsx',
       'app/contents/media-picker-dialog.tsx',
       'app/contents/media-replacement-dialog.tsx',
       'app/contents/page.tsx',

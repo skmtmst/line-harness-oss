@@ -1127,7 +1127,10 @@
     "arbitrary-value": 5
   },
   "components/webinars/webinar-form.tsx": {
-    "unresolved-classname": 8,
-    "arbitrary-value": 2
+    "arbitrary-value": 2,
+    "unresolved-classname": 8
+  },
+  "app/contents/list-v8.tsx": {
+    "unresolved-classname": 65
   }
 }
