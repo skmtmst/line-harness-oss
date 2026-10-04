@@ -19,7 +19,8 @@ describe('m17j 表の中のメニューは最上層に出す', () => {
     expect(consolePage).toContain('role="menu"')
     // できること（編集・配布・削除）は変えない。
     expect(consolePage).toContain('を編集')
-    expect(consolePage).toContain('を配布')
+    expect(consolePage).toContain('をアカウントへ配る')
+    expect(consolePage).toContain('onDistribute(); close()')
     expect(consolePage).toContain('を削除')
     // 自前の absolute メニューを戻したら赤くなる。
     expect(consolePage).not.toContain('styles.menuItems')
