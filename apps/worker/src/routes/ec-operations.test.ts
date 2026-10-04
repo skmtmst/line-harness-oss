@@ -166,3 +166,10 @@ describe('EC identity candidates and retry', () => {
     expect(hidden.status).toBe(404);
   });
 });
+
+ it('returns full revenue and independent member counts without recalculating from the page', async () => {
+  dbMocks.listEcIdentityCandidates.mockResolvedValue({items:[],total:1000,summary:{potentialRevenue:123456,withoutCandidates:7,candidateExternalCustomers:10}});
+  const response = await request('/api/ec-commerce/identity-candidates?lineAccountId=account-1&limit=1');
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({data:{items:[],summary:{potentialRevenue:123456,withoutCandidates:7}}});
+ });

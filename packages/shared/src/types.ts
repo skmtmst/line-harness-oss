@@ -2563,3 +2563,14 @@ export interface GettingStartedStep {
   reason: string | null;
   webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'; active?: boolean | null }>;
 }
+
+export interface EcIdentityCandidateSummary {
+  unmatched: number;
+  candidates: number;
+  candidateExternalCustomers: number;
+  withoutCandidates?: number;
+  duplicateSuspicions: number;
+  linked: number;
+  /** pending候補の全件合計。同一EC会員は1回、金額未取得はnull。 */
+  potentialRevenue: number | null;
+}

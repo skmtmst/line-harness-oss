@@ -4795,14 +4795,7 @@ export type EcOrderDetail = {
   }
 }
 
-export type EcIdentityCandidateSummary = {
-  unmatched: number
-  candidates: number
-  candidateExternalCustomers: number
-  duplicateSuspicions: number
-  linked: number
-  potentialRevenue: number | null
-}
+export type EcIdentityCandidateSummary = import('@line-crm/shared').EcIdentityCandidateSummary
 
 export type EcIdentityCandidateOperationsList = {
   items: Array<{
