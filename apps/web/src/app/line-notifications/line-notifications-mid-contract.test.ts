@@ -66,7 +66,9 @@ describe('点検・軽: LINE通知の画面契約(#580)', () => {
     expect(PAGE).toContain("tab === 'customer'")
     expect(PAGE).toContain('needCustomer')
     expect(PAGE).toContain('? api.lineNotifications.definitions(selectedAccountId)')
-    expect(PAGE).toContain('? api.lineNotifications.metrics(selectedAccountId)')
+    // 板 g3iDs：LINE上の表示数は出さないので集計は取らない。行は送信履歴の数だけ。
+    expect(PAGE).not.toContain('api.lineNotifications.metrics(selectedAccountId)')
+    expect(PAGE).toContain('? api.lineNotifications.sendCounts(selectedAccountId)')
     expect(PAGE).toContain('[selectedAccountId, tab]')
   })
 
