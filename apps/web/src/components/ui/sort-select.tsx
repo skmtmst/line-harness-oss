@@ -1,6 +1,7 @@
 'use client'
 
 import Select, { type SelectOption } from '@/components/shared/select'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
  * 一覧ツールバーの並び替え（監査 #668）。
@@ -27,6 +28,21 @@ export default function SortSelect({
   /** 板 `apLqS` は「並び：」。他は今のまま。 */
   label?: string
 }) {
+  const theme = useAdminTheme()
+  // ★V8（c4n9Kr）：「並び：〇〇」を1つの箱の中に出す（箱の外に見出しを置かない）。v7 は今のまま。
+  if (theme === 'v8') {
+    const name = label.replace(/：$/, '') || '並び順'
+    return (
+      <Select
+        value={value}
+        onChange={onChange}
+        aria-label={name}
+        label={name}
+        options={options}
+        className="w-auto max-w-full"
+      />
+    )
+  }
   return (
     <label className={['flex min-w-0 items-center gap-2', className].filter(Boolean).join(' ')}>
       <span className="text-ink-faint text-xs whitespace-nowrap">{label}</span>
