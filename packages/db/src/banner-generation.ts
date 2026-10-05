@@ -21,9 +21,65 @@ export const BANNER_PERSON_OPTIONS = ['with', 'without'] as const;
 export type BannerPersonOption = (typeof BANNER_PERSON_OPTIONS)[number];
 
 export const BANNER_IMAGE_SOURCES = ['generated', 'upload', 'edited'] as const;
-export type BannerReferenceMode = 'edit' | 'inspire';
-
 export type BannerImageSource = (typeof BANNER_IMAGE_SOURCES)[number];
+
+/**
+ * 参照画像の使い方（承認済み ★BG-C `cOgWE`）。画像ごとに1つ選ぶ。
+ * - `edit`    土台にする（構図と配色を残し、文字や背景だけ変える）
+ * - `parts`   素材を一部使う（ロゴや商品だけ取り込んで組み立てる）
+ * - `inspire` 雰囲気を参考にする（色とトーンだけ引き継ぐ）
+ */
+export const BANNER_REFERENCE_MODES = ['edit', 'parts', 'inspire'] as const;
+export type BannerReferenceMode = (typeof BANNER_REFERENCE_MODES)[number];
+
+/** 参照画像は1回の生成で最大3枚（承認済み ★BG-C `cOgWE`）。 */
+export const BANNER_MAX_REFERENCE_IMAGES = 3;
+
+/** 参照画像1枚とその使い方。 */
+export interface BannerReference {
+  imageId: string;
+  mode: BannerReferenceMode;
+}
+
+export function isBannerReferenceMode(value: unknown): value is BannerReferenceMode {
+  return typeof value === 'string' && (BANNER_REFERENCE_MODES as readonly string[]).includes(value);
+}
+
+/**
+ * DB の列から参照画像の一覧を組み立てる。
+ * 新しい `reference_images`（JSON）を優先し、無ければ古い1枚組の列から作る。
+ */
+export function bannerReferencesFromRow(row: {
+  reference_images?: string | null;
+  reference_image_id?: string | null;
+  reference_mode?: string | null;
+}): BannerReference[] {
+  if (row.reference_images) {
+    try {
+      const parsed = JSON.parse(row.reference_images) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter(
+            (entry): entry is BannerReference =>
+              !!entry &&
+              typeof entry === 'object' &&
+              typeof (entry as BannerReference).imageId === 'string' &&
+              !!(entry as BannerReference).imageId &&
+              isBannerReferenceMode((entry as BannerReference).mode),
+          )
+          .slice(0, BANNER_MAX_REFERENCE_IMAGES);
+      }
+    } catch {
+      // 読めない中身は無かったものとして扱う（古い列へ落ちる）。
+    }
+  }
+  if (row.reference_image_id) {
+    return [
+      { imageId: row.reference_image_id, mode: isBannerReferenceMode(row.reference_mode) ? row.reference_mode : 'inspire' },
+    ];
+  }
+  return [];
+}
 
 export interface BannerProject {
   id: string;
@@ -52,8 +108,10 @@ export interface BannerGeneration {
   api_size: string;
   quality: BannerQuality;
   text_lines: string;
+  base_color: string | null;
   main_color: string | null;
   sub_color: string | null;
+  accent_color: string | null;
   person_option: BannerPersonOption;
   custom_prompt: string;
   free_prompt: string;
@@ -67,6 +125,8 @@ export interface BannerGeneration {
   error_message: string | null;
   reference_image_id?: string | null;
   reference_mode?: BannerReferenceMode | null;
+  /** 参照画像の一覧（最大3枚）。`[{"imageId":"…","mode":"edit"}]` の JSON 文字。 */
+  reference_images?: string | null;
   created_by: string | null;
   created_at: string;
   started_at: string | null;
@@ -209,8 +269,10 @@ export async function createBannerGeneration(
     apiSize: string;
     quality: BannerQuality;
     textLines: string[];
+    baseColor: string | null;
     mainColor: string | null;
     subColor: string | null;
+    accentColor: string | null;
     personOption: BannerPersonOption;
     customPrompt: string;
     freePrompt: string;
@@ -219,20 +281,22 @@ export async function createBannerGeneration(
     modelName: string | null;
     requestedCount: number;
     unitsPerImage: number;
-    referenceImageId?: string | null;
-    referenceMode?: BannerReferenceMode | null;
+    /** 参照画像（最大3枚・画像ごとに使い方）。無ければ空配列。 */
+    references?: BannerReference[] | null;
     createdBy?: string | null;
   },
 ): Promise<BannerGeneration> {
   const id = crypto.randomUUID();
+  const references = (input.references ?? []).slice(0, BANNER_MAX_REFERENCE_IMAGES);
   await db
     .prepare(
       `INSERT INTO banner_generations
          (id, tenant_id, project_id, status, mode, preset_key, aspect_ratio, api_size, quality,
-          text_lines, main_color, sub_color, person_option, custom_prompt, free_prompt, final_prompt,
+          text_lines, base_color, main_color, sub_color, accent_color,
+          person_option, custom_prompt, free_prompt, final_prompt,
           engine, model_name, requested_count, done_count, failed_count, units_per_image,
-          error_message, reference_image_id, reference_mode, created_by, created_at)
-       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?)`,
+          error_message, reference_image_id, reference_mode, reference_images, created_by, created_at)
+       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -244,8 +308,10 @@ export async function createBannerGeneration(
       input.apiSize,
       input.quality,
       JSON.stringify(input.textLines),
+      input.baseColor,
       input.mainColor,
       input.subColor,
+      input.accentColor,
       input.personOption,
       input.customPrompt,
       input.freePrompt,
@@ -254,8 +320,10 @@ export async function createBannerGeneration(
       input.modelName,
       input.requestedCount,
       input.unitsPerImage,
-      input.referenceImageId ?? null,
-      input.referenceImageId ? (input.referenceMode ?? 'inspire') : null,
+      // 1枚目は古い列にも入れる（前の版で作った生成と同じ形で読めるようにする）。
+      references[0]?.imageId ?? null,
+      references[0]?.mode ?? null,
+      references.length ? JSON.stringify(references) : null,
       input.createdBy ?? null,
       jstNow(),
     )
@@ -462,14 +530,17 @@ export async function listBannerImages(
               m.uploaded_by AS m_uploaded_by, m.created_at AS m_created_at,
               g.id AS g_id, g.status AS g_status, g.mode AS g_mode, g.preset_key AS g_preset_key,
               g.aspect_ratio AS g_aspect_ratio, g.api_size AS g_api_size, g.quality AS g_quality,
-              g.text_lines AS g_text_lines, g.main_color AS g_main_color, g.sub_color AS g_sub_color,
+              g.text_lines AS g_text_lines, g.base_color AS g_base_color,
+              g.main_color AS g_main_color, g.sub_color AS g_sub_color, g.accent_color AS g_accent_color,
               g.person_option AS g_person_option, g.custom_prompt AS g_custom_prompt,
               g.free_prompt AS g_free_prompt, g.final_prompt AS g_final_prompt, g.engine AS g_engine,
               g.model_name AS g_model_name, g.requested_count AS g_requested_count,
               g.done_count AS g_done_count, g.failed_count AS g_failed_count,
               g.units_per_image AS g_units_per_image, g.error_message AS g_error_message,
               g.created_by AS g_created_by, g.created_at AS g_created_at, g.started_at AS g_started_at,
-              g.finished_at AS g_finished_at, g.tenant_id AS g_tenant_id, g.project_id AS g_project_id,
+              g.finished_at AS g_finished_at, g.reference_images AS g_reference_images,
+              g.reference_image_id AS g_reference_image_id, g.reference_mode AS g_reference_mode,
+              g.tenant_id AS g_tenant_id, g.project_id AS g_project_id,
               (SELECT GROUP_CONCAT(d.line_account_id) FROM banner_image_deliveries d
                 WHERE d.banner_image_id = i.id) AS delivered_ids
          FROM banner_images i
@@ -511,14 +582,17 @@ async function listBannerImagesById(
               m.uploaded_by AS m_uploaded_by, m.created_at AS m_created_at,
               g.id AS g_id, g.status AS g_status, g.mode AS g_mode, g.preset_key AS g_preset_key,
               g.aspect_ratio AS g_aspect_ratio, g.api_size AS g_api_size, g.quality AS g_quality,
-              g.text_lines AS g_text_lines, g.main_color AS g_main_color, g.sub_color AS g_sub_color,
+              g.text_lines AS g_text_lines, g.base_color AS g_base_color,
+              g.main_color AS g_main_color, g.sub_color AS g_sub_color, g.accent_color AS g_accent_color,
               g.person_option AS g_person_option, g.custom_prompt AS g_custom_prompt,
               g.free_prompt AS g_free_prompt, g.final_prompt AS g_final_prompt, g.engine AS g_engine,
               g.model_name AS g_model_name, g.requested_count AS g_requested_count,
               g.done_count AS g_done_count, g.failed_count AS g_failed_count,
               g.units_per_image AS g_units_per_image, g.error_message AS g_error_message,
               g.created_by AS g_created_by, g.created_at AS g_created_at, g.started_at AS g_started_at,
-              g.finished_at AS g_finished_at, g.tenant_id AS g_tenant_id, g.project_id AS g_project_id,
+              g.finished_at AS g_finished_at, g.reference_images AS g_reference_images,
+              g.reference_image_id AS g_reference_image_id, g.reference_mode AS g_reference_mode,
+              g.tenant_id AS g_tenant_id, g.project_id AS g_project_id,
               (SELECT GROUP_CONCAT(d.line_account_id) FROM banner_image_deliveries d
                 WHERE d.banner_image_id = i.id) AS delivered_ids
          FROM banner_images i

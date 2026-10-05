@@ -1,29 +1,35 @@
 'use client'
 
-import { Images, Plus, Sparkles, Upload, X } from 'lucide-react'
-import { useId, useRef, type ReactNode } from 'react'
+import { ChevronDown, Images, Plus, Sparkles, Upload, X } from 'lucide-react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import ColorWell from '@/components/shared/color-well'
 import HelpTip from '@/components/shared/help-tip'
 import LimitState from './limit-state'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import {
+  BANNER_MAX_REFERENCE_IMAGES,
+  BANNER_REFERENCE_MODES,
+  BANNER_REFERENCE_MODE_DESCRIPTION,
+  BANNER_REFERENCE_MODE_LABEL,
+  COLOR_ROLES,
   CROP_POSITION_OPTIONS,
   CUSTOM_PROMPT_MAX,
   FREE_PROMPT_MAX,
-  MAIN_COLOR_SWATCHES,
-  SUB_COLOR_SWATCHES,
   TEXT_LINE_LENGTH_MAX,
   TEXT_LINE_MAX,
   groupPresets,
-  isHexColor,
-  presetOptionLabel,
+  presetCardLabel,
+  presetSizeLabel,
   tileCaption,
+  type BannerColorRoleKey,
   type BannerCropPosition,
   type BannerGenerationInput,
   type BannerImage,
   type BannerPreset,
+  type BannerReferenceMode,
   type BannerUsage,
 } from '@/lib/hq-banners'
 
@@ -41,7 +47,7 @@ export default function GenerationPanel({
   value,
   onChange,
   disabled,
-  reference,
+  referenceImages,
   onPickReference,
   onUploadReference,
   referenceBusy,
@@ -53,9 +59,9 @@ export default function GenerationPanel({
   value: BannerGenerationInput
   onChange: (next: BannerGenerationInput) => void
   disabled?: boolean
-  /** 選んでいる参照画像（`value.referenceImageId` の実体）。無ければ null。 */
-  reference: BannerImage | null
-  /** 「ライブラリから選ぶ」。親が 35-2-B のダイアログを開く。 */
+  /** 選んでいる参照画像の実体（`value.references` の画像）。無ければ空。 */
+  referenceImages: BannerImage[]
+  /** 「ライブラリから選ぶ」。親が ★BG-C `cOgWE` のダイアログを開く。 */
   onPickReference: () => void
   /** 「ファイルを選ぶ」。親がプロジェクトへ取り込んでから参照にする。 */
   onUploadReference: (file: File) => void
@@ -69,9 +75,6 @@ export default function GenerationPanel({
   const set = <K extends keyof BannerGenerationInput>(key: K, next: BannerGenerationInput[K]) =>
     onChange({ ...value, [key]: next })
 
-  const presetOptions = groupPresets(presets).flatMap((group) =>
-    group.items.map((p) => ({ value: p.key, label: `${group.label}｜${presetOptionLabel(p)}` })),
-  )
   const selectedPreset = presets.find((p) => p.key === value.presetKey)
 
   return (
@@ -107,19 +110,13 @@ export default function GenerationPanel({
       <div className="border-t border-hairline" />
 
       <div data-design-node="E8oZc" className="flex flex-col gap-4 p-4">
-        <Field label="用途" note="LINE と SNS の規格から選ぶ" htmlFor={`${uid}-preset`}>
-          <Select
-            aria-label="用途"
-            size="full"
-            id={`${uid}-preset`}
-            className="w-full"
-            value={value.presetKey}
-            disabled={disabled}
-            onChange={(value) => set('presetKey', value)}
-            options={value.presetKey ? presetOptions : [{ value: '', label: '用途を選んでください' }, ...presetOptions]}
-          />
-          {selectedPreset ? <p className="text-micro text-ink-faint">{selectedPreset.note}</p> : null}
-        </Field>
+        <OutputSize
+          name={`${uid}-preset`}
+          presets={presets}
+          value={value.presetKey}
+          disabled={disabled}
+          onSelect={(key) => set('presetKey', key)}
+        />
 
         {selectedPreset ? (
           <Field
@@ -148,32 +145,59 @@ export default function GenerationPanel({
           </Field>
         ) : null}
 
-        <Field label="参照画像" note="任意・元にする画像を1枚">
-          <div data-design-node="jZi2W" className="flex flex-col gap-2">
-            {reference ? (
-              <>
-                <div data-design-node="hGpey" className="flex items-center gap-3 rounded-control border border-hairline bg-surface-pearl px-3 py-2.5">
+        {/*
+          参照画像（承認済み ★BG-B `L1ax1Y`）。最大 3 枚で、1 枚ずつ使い方を決める。
+          使い方の意味は下の説明（★BG-B `R6MBHf`）に出し、選ぶ前から読めるようにする。
+        */}
+        <Field label="参照画像" note={`任意・最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚`}>
+          <div data-design-node="L1ax1Y" className="flex flex-col gap-2">
+            {value.references.map((entry, index) => {
+              const image = referenceImages.find((candidate) => candidate.id === entry.imageId) ?? null
+              const name = image ? referenceTitle(image) : `${index + 1}枚目`
+              return (
+                <div
+                  key={entry.imageId}
+                  data-design-node="hGpey"
+                  className="flex flex-wrap items-center gap-3 rounded-control border border-hairline bg-surface-pearl px-3 py-2.5"
+                >
                   {/* 統括の画像は Worker から配信されるので next/image の最適化は使わない（image-tile と同じ） */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={reference.media.url} alt="" className="h-14 w-14 shrink-0 rounded-mini bg-step-idle object-cover" />
+                  {image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={image.media.url} alt="" className="h-12 w-12 shrink-0 rounded-mini bg-step-idle object-cover" />
+                  ) : (
+                    <span className="h-12 w-12 shrink-0 rounded-mini bg-step-idle" />
+                  )}
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <p className="truncate text-label font-medium text-ink">{referenceTitle(reference)}</p>
-                    <p className="truncate text-micro text-ink-faint">{tileCaption(reference, presets)}</p>
+                    <p className="truncate text-label font-medium text-ink">{name}</p>
+                    <p className="truncate text-micro text-ink-faint">{image ? tileCaption(image, presets) : `${index + 1}枚目`}</p>
                   </div>
-                  <Button disabled={disabled || referenceBusy} onClick={() => set('referenceImageId', null)}>
+                  <Select
+                    aria-label={`${name}の使い方`}
+                    className="w-44"
+                    value={entry.mode}
+                    disabled={disabled || referenceBusy}
+                    onChange={(next) =>
+                      set(
+                        'references',
+                        value.references.map((other) =>
+                          other.imageId === entry.imageId ? { ...other, mode: next as BannerReferenceMode } : other,
+                        ),
+                      )
+                    }
+                    options={BANNER_REFERENCE_MODES.map((mode) => ({ value: mode, label: BANNER_REFERENCE_MODE_LABEL[mode] }))}
+                  />
+                  <Button
+                    disabled={disabled || referenceBusy}
+                    aria-label={`${name}を外す`}
+                    onClick={() => set('references', value.references.filter((other) => other.imageId !== entry.imageId))}
+                  >
                     外す
                   </Button>
                 </div>
-                <fieldset data-design-node="RPm7W" className="grid grid-cols-2 gap-1.5" disabled={disabled}>
-                  <legend className="sr-only">参照画像の使い方</legend>
-                  <SegmentOption name={`${uid}-ref`} value="edit" checked={value.referenceMode === 'edit'} onSelect={() => set('referenceMode', 'edit')} label="土台に描き直す" />
-                  <SegmentOption name={`${uid}-ref`} value="inspire" checked={value.referenceMode === 'inspire'} onSelect={() => set('referenceMode', 'inspire')} label="雰囲気を参考にする" />
-                </fieldset>
-                <p className="text-micro text-ink-faint">
-                  描き直す: 構図と配色を保ったまま、文字や背景を指示で変えます。参考にする: 色やトーンだけ引き継いで新しく作ります。
-                </p>
-              </>
-            ) : (
+              )
+            })}
+
+            {value.references.length < BANNER_MAX_REFERENCE_IMAGES ? (
               <>
                 <div className="grid grid-cols-2 gap-2">
                   <Button disabled={disabled || referenceBusy} onClick={onPickReference} className="w-full">
@@ -196,9 +220,31 @@ export default function GenerationPanel({
                     }}
                   />
                 </div>
-                <p className="text-micro text-ink-faint">ライブラリの画像か、手元の画像（PNG・JPEG・WebP、10MB まで）を 1 枚選べます。</p>
+                {value.references.length === 0 ? (
+                  <p className="text-micro text-ink-faint">
+                    {`ライブラリの画像か、手元の画像（PNG・JPEG・WebP、10MB まで）を ${BANNER_MAX_REFERENCE_IMAGES} 枚まで選べます。`}
+                  </p>
+                ) : null}
               </>
+            ) : (
+              <p className="text-micro text-ink-faint">
+                {`参照画像は ${BANNER_MAX_REFERENCE_IMAGES} 枚までです。入れ替えるときは、どれかを外してください。`}
+              </p>
             )}
+
+            {/* 使い方の説明（★BG-B `R6MBHf`）。3 つの違いをここで読み切れるようにする。 */}
+            <div data-design-node="R6MBHf" className="flex flex-col gap-1 rounded-control bg-canvas-sunken p-3">
+              <p className="text-micro font-medium text-ink">{`使い方は ${BANNER_REFERENCE_MODES.length} つから選べます`}</p>
+              {/* 行の間は正規の 4px 段で取る（#704：半端な段を新規で増やさない）。 */}
+              <ul className="flex flex-col gap-1">
+                {BANNER_REFERENCE_MODES.map((mode) => (
+                  <li key={mode} className="text-micro text-ink-faint">
+                    <span className="font-medium text-ink-secondary">{BANNER_REFERENCE_MODE_LABEL[mode]}</span>
+                    ：{BANNER_REFERENCE_MODE_DESCRIPTION[mode]}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </Field>
 
@@ -249,25 +295,7 @@ export default function GenerationPanel({
               </div>
             </Field>
 
-            <div className="grid grid-cols-2 gap-3">
-              <ColorPicker
-                name={`${uid}-main`}
-                label="メインカラー"
-                swatches={MAIN_COLOR_SWATCHES}
-                value={value.mainColor}
-                onChange={(v) => set('mainColor', v)}
-                disabled={disabled}
-              />
-              <ColorPicker
-                name={`${uid}-sub`}
-                label="サブカラー"
-                note="任意"
-                swatches={SUB_COLOR_SWATCHES}
-                value={value.subColor}
-                onChange={(v) => set('subColor', v)}
-                disabled={disabled}
-              />
-            </div>
+            <ColorRoles value={value} onPick={(key, next) => set(key, next)} disabled={disabled} />
 
             <Field label="人物">
               <fieldset className="grid grid-cols-2 gap-1.5" disabled={disabled}>
@@ -277,7 +305,8 @@ export default function GenerationPanel({
               </fieldset>
             </Field>
 
-            <Field label="追加の指示" note="任意" htmlFor={`${uid}-custom`}>
+            {/* ★BG-B `dT1xq`: 任意であることと上限を同じ行に出す */}
+            <Field label="追加の指示" note={`任意・${CUSTOM_PROMPT_MAX}文字まで`} htmlFor={`${uid}-custom`}>
               <TextArea
                 id={`${uid}-custom`}
                 rows={2}
@@ -425,6 +454,69 @@ export function CropPreview({ preset, crop }: { preset: BannerPreset; crop: Bann
   )
 }
 
+/**
+ * 出力サイズ。Pencil ★BG-B `xy4EW`。
+ *
+ * LINE の規格を2列のカードで並べ、選んだカードを淡い緑にする（共通のラジオカード）。
+ * Instagram・X・OGP などは普段使わないので、最初は畳んで「ほかの用途から選ぶ」の
+ * 1行だけ置く。畳んだ中に選択中の規格が入っている場合（「同じ設定でもう一度」など）は
+ * 開いた状態で出す。選べない選択肢は描かない（`docs/v6-common-rules.md` §5-5）。
+ */
+function OutputSize({
+  name,
+  presets,
+  value,
+  disabled,
+  onSelect,
+}: {
+  name: string
+  presets: BannerPreset[]
+  value: string
+  disabled?: boolean
+  onSelect: (key: string) => void
+}) {
+  const [opened, setOpened] = useState(false)
+  const groups = groupPresets(presets)
+  const line = groups.find((g) => g.group === 'line')?.items ?? []
+  const others = groups.find((g) => g.group === 'sns')?.items ?? []
+  const showOthers = opened || others.some((p) => p.key === value)
+
+  return (
+    <div data-design-node="xy4EW" className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-label font-medium text-ink">出力サイズ</span>
+        <span className="text-micro text-ink-faint">LINEの規格から選ぶ</span>
+      </div>
+      <RadioCardGroup legend="出力サイズ" className="grid grid-cols-2 gap-2">
+        {[...line, ...(showOthers ? others : [])].map((preset) => (
+          <RadioCard
+            key={preset.key}
+            name={name}
+            value={preset.key}
+            checked={value === preset.key}
+            disabled={disabled}
+            onChange={onSelect}
+            title={presetCardLabel(preset)}
+            note={presetSizeLabel(preset)}
+          />
+        ))}
+      </RadioCardGroup>
+      {showOthers ? null : (
+        <Button
+          variant="secondary"
+          size="compact"
+          className="w-full justify-center"
+          disabled={disabled}
+          onClick={() => setOpened(true)}
+        >
+          <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
+          ほかの用途から選ぶ（Instagram・X・OGPなど）
+        </Button>
+      )}
+    </div>
+  )
+}
+
 /** モード切替の1つ。Pencil `h9nAp5`。共通の選ぶ部品で出す。 */
 function ModeOption({ name, value, checked, disabled, onSelect, label }: { name: string; value: string; checked: boolean; disabled?: boolean; onSelect: () => void; label: string }) {
   return (
@@ -439,59 +531,52 @@ function SegmentOption({ name, value, checked, onSelect, label }: { name: string
   )
 }
 
-/** 色の見本＋HEX。Pencil `l69Th` / `l6UwE`。見本を押すか、HEXを直接書く。 */
-function ColorPicker({
-  name,
-  label,
-  note,
-  swatches,
+/**
+ * 色の4つの役割。Pencil ★BG-B `KkTNS`。
+ *
+ * ベース＝背景、メイン＝主役、サブ＝差し色、強調＝目立たせたい文字。
+ * 色そのものは共通の「色を選ぶ」（★BG-2 `P8ZUj`）で選ぶ。
+ */
+export function ColorRoles({
   value,
-  onChange,
+  onPick,
   disabled,
 }: {
-  name: string
-  label: string
-  note?: string
-  swatches: readonly string[]
-  value: string | null
-  onChange: (next: string | null) => void
+  value: BannerGenerationInput
+  onPick: (key: BannerColorRoleKey, next: string | null) => void
   disabled?: boolean
 }) {
-  const invalid = value !== null && value !== '' && !isHexColor(value)
+  // いま使っている色を「このデザインの色」として見せ、役割どうしで使い回せるようにする。
+  const used = Array.from(new Set(COLOR_ROLES.map((role) => value[role.key]).filter((c): c is string => Boolean(c))))
   return (
-    <fieldset className="flex flex-col gap-1.5" disabled={disabled}>
-      <legend className="flex w-full items-baseline justify-between gap-2">
-        <span className="text-label font-medium text-ink">{label}</span>
-        {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
-      </legend>
-      <div className="flex flex-wrap gap-1.5">
-        {swatches.map((hex) => {
-          const checked = (value ?? '').toUpperCase() === hex
-          return (
-            <RadioCard
-              key={hex}
-              name={name}
-              value={hex}
-              checked={checked}
-              onChange={() => onChange(hex)}
-              title={hex}
-              note={<span aria-hidden="true" style={{ backgroundColor: hex }} className="border-hairline inline-block h-4 w-4 rounded-pill border" />}
-            />
-          )
-        })}
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-label font-medium text-ink">カラー</span>
+        <span className="text-micro text-ink-faint">4つの役割で指定します</span>
       </div>
-      <TextField
-        aria-label={`${label} のHEX`}
-        value={value ?? ''}
-        placeholder="#RRGGBB"
-        maxLength={7}
-        invalid={invalid}
-        onChange={(event) => {
-          const raw = event.target.value.trim()
-          onChange(raw === '' ? null : raw.startsWith('#') ? raw.toUpperCase() : `#${raw.toUpperCase()}`)
-        }}
-        className="w-full"
-      />
-    </fieldset>
+      <div className="grid grid-cols-2 gap-3">
+        {COLOR_ROLES.map((role) => (
+          <div key={role.key} className="flex flex-col gap-1.5">
+            <span className="text-label font-medium text-ink">{role.label}</span>
+            <ColorWell
+              block
+              label={role.label}
+              value={value[role.key] ?? null}
+              fallback={role.sample}
+              savedColors={used}
+              disabled={disabled}
+              onChange={(next) => onPick(role.key, next)}
+            />
+          </div>
+        ))}
+      </div>
+      {/* 補足（Pencil `pQlYK`）。色の役割の意味を言葉で置いておく。 */}
+      <div className="rounded-mini bg-canvas-sunken p-3">
+        <p className="text-label font-semibold text-ink">色の決め方</p>
+        <p className="mt-1 text-micro text-ink-secondary">
+          色をタップすると、好きな色を選べる画面が開きます。画面の中の色をそのまま拾うスポイトも使えます。ベースは背景、メインは主役、サブは差し色、強調は特に目立たせたい文字に使います。
+        </p>
+      </div>
+    </div>
   )
 }
