@@ -184,7 +184,7 @@ YouTube Studioへアップロードし、公開設定は**「限定公開（Unli
 
 申請を出すまでに次が必要。**この書類だけでは申請できない。**
 
-済んだもの（2026-10-04時点）
+済んだもの（2026-10-05時点）
 
 | # | やったこと | 結果 |
 | --- | --- | --- |
@@ -193,13 +193,13 @@ YouTube Studioへアップロードし、公開設定は**「限定公開（Unli
 | 3 | apex `musubo.jp` のDNSと本番配備 | 完了（5ページ公開済み） |
 | 4 | Google Search Console で `musubo.jp` の所有権確認 | 完了 |
 | 5 | `/auth/branding` の確認と公開 | 完了 |
+| 6 | プライバシーポリシー第6項・利用規約第3項を実装どおり（読み取り5件・書き込み4件）に書き換え、施行日を `2026-10-04` にする | 完了（Claude実装） |
+| 7 | 更新した `musubo.jp` を本番へ再配備し、privacy/terms の本文と施行日が反映されたことを確認する | 完了（2026-10-05・Codex配備。`/`・`/privacy/`・`/terms/`・`/legal/`・`/contact/` が200、施行日 `2026-10-04`、`noindex` なし、`sitemap.xml` に `<loc>` 5件） |
 
 残り
 
 | # | やること | 担当 |
 | --- | --- | --- |
-| 6 | プライバシーポリシー第6項・利用規約第3項を実装どおり（読み取り5件・書き込み4件）に書き換え、施行日を `2026-10-04` にする | Claude（実装済み） |
-| 7 | 更新した `musubo.jp` を本番へ再配備し、privacy/terms の本文と施行日が反映されたことを確認する | Codex（Jev経由で依頼） |
 | 8 | 本番用のOAuthクライアントを作る。リダイレクトURIは**1行だけ**（`https://api.musubo.jp/api/restaurant-test/google/oauth/callback`）。スプレッドシート連携のコールバックは**登録しない**（下の注を参照）。IDもシークレットも申請書類・チャットに貼らず、`pnpm exec wrangler secret put GOOGLE_BUSINESS_OAUTH_CLIENT_ID` と `… _SECRET` で本人のターミナルから入れる。手順は `docs/manuals/google-business-oauth-setup.md` 6章 | 利用者（Claudeが画面を案内） |
 | 9 | 本番Worker設定：`apps/worker/wrangler.toml` に `RESTAURANT_TEST_ENABLED="true"` ／ `GOOGLE_BUSINESS_WRITE_ENABLED="true"` | Claude（実装済み） |
 | 9-2 | 本番管理画面のビルド値：`.github/workflows/deploy-cloudflare-admin.yml` の `NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'` | Claude（実装済み） |
@@ -220,4 +220,4 @@ YouTube Studioへアップロードし、公開設定は**「限定公開（Unli
   - Sheets連携を実運用で使うときは、専用のOAuthクライアントを別に作り、`spreadsheets` の同意画面登録と申請理由は**この審査が通ったあとに別途**行う（同意画面のスコープはGoogleプロジェクト単位のため）。
   - 検証環境は審査対象ではないので現状のままでよい。詳細は `docs/manuals/google-business-oauth-setup.md` 6章。
 - **28日で消す処理は定期実行（6時間ごと）に入っている**（`apps/worker/src/services/google-business-retention.ts`、登録は `apps/worker/src/index.ts`）。定期実行の設定があるのは本番だけ（`apps/worker/wrangler.staging.toml` には `[triggers]` を置いていない）ので、公開文書に書いた「28日後に削除」が実際に動くのは #9-3 の再配備後。解除時の即時削除は定期実行に依存せず、その場で動く。
-- #7・#8・#9-3 が終わるまで #10 の撮影はできない。
+- #8・#9-3 が終わるまで #10 の撮影はできない（#7は2026-10-05に完了）。
