@@ -3174,9 +3174,10 @@ export const SCENARIO_SIMULATION = {
 
 export const SCENARIO_RUNS = {
   summary: { active: 116, paused: 0, completed: 312, delivering: 18 },
+  /* 板 `X4STXS`（配信結果）の参加中の友だちの先頭2人。 */
   subscriptions: [
-    { id: 'scenario-sub-1', friendId: 'friend-1', friendName: '高橋 直人', status: 'active', currentStepOrder: 2, startedAt: '2026-09-05T01:00:00.000Z', nextDeliveryAt: '2026-09-06T11:00:00.000Z', updatedAt: '2026-09-05T01:00:00.000Z' },
-    { id: 'scenario-sub-2', friendId: 'friend-2', friendName: '前田 さくら', status: 'completed', currentStepOrder: 4, startedAt: '2026-08-28T01:00:00.000Z', nextDeliveryAt: null, updatedAt: '2026-09-04T11:00:00.000Z' },
+    { id: 'scenario-sub-1', friendId: 'friend-1', friendName: '中村 彩', status: 'active', currentStepOrder: 2, startedAt: '2026-09-05T01:00:00.000Z', nextDeliveryAt: '2026-09-06T11:00:00.000Z', updatedAt: '2026-09-05T01:00:00.000Z' },
+    { id: 'scenario-sub-2', friendId: 'friend-2', friendName: '木村 亮', status: 'completed', currentStepOrder: 4, startedAt: '2026-08-28T01:00:00.000Z', nextDeliveryAt: null, updatedAt: '2026-09-04T11:00:00.000Z' },
   ],
   pagination: { total: 428, limit: 20, cursor: '', nextCursor: null },
   testSends: [{ id: 'scenario-test-1', friendId: 'friend-1', friendName: '高橋 直人', sentAt: '2026-09-07T00:05:00.000Z', messageCount: 4 }],
