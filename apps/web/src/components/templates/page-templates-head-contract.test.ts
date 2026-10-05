@@ -115,17 +115,11 @@ describe('型の見出し（379板の絵）', () => {
     expect(css).toMatch(/\.preview \{[^}]*width:\s*var\(--tpl-preview-narrow-width\)/s)
   })
 
-  it('保存の帯は板の幅いっぱい・高さ60の式（12/24・間8・追従・浮かせなし）', () => {
+  it('保存の帯は採用 A-1 の浮いた帯（下から12・左右24の余白。オーナー 2026-10-04 採用。sticky-bar-contract が形を固定）', () => {
     const footer = css.match(/\.footer \{[^}]*\}/s)
     expect(footer, '型の保存の帯がありません').toBeTruthy()
-    expect(footer![0]).not.toMatch(/margin:\s*12px 24px/)
-    expect(footer![0]).toMatch(/bottom:\s*0/)
-    const bar = readFileSync(join(HERE, '..', 'shared', 'sticky-bar.module.css'), 'utf8')
-    expect(bar).toMatch(/\[data-theme='v8'\] \.bar \{[^}]*padding:\s*var\(--tpl-footer-pad-block\) var\(--tpl-footer-pad-side\)/s)
-    expect(bar).toMatch(/\[data-theme='v8'\] \.bar \{[^}]*gap:\s*var\(--tpl-footer-gap\)/s)
-    expect(bar).toMatch(/\[data-theme='v8'\] \.bar \{[^}]*border-top:\s*1px solid var\(--color-hairline\)/s)
-    expect(bar).toMatch(/\[data-theme='v8'\] \.bar \{[^}]*box-shadow:\s*var\(--shadow-bar-line\)/s)
-    expect(bar).toMatch(/\[data-theme='v8'\] \.bar \{[^}]*border-radius:\s*var\(--radius-none\)/s)
+    expect(footer![0]).toMatch(/bottom:\s*12px/)
+    expect(footer![0]).toMatch(/margin:\s*12px 24px/)
   })
 
   it('設定はメニュー208・内側16/12・中身24/28・間16', () => {

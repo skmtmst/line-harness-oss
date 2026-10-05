@@ -53,7 +53,7 @@
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] { flex-wrap: nowrap; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .steps { flex-basis: auto; order: 0; margin-inline: auto; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .actions { order: 0; margin-left: 0; }
-:global([data-theme='v8']) .footer { position: sticky; bottom: 0; z-index: 20; margin: 0; }
+:global([data-theme='v8']) .footer { position: sticky; bottom: 12px; z-index: 20; margin: 12px 24px; } /* 採用 A-1 浮いた下の帯（オーナー 2026-10-04） */
 :global([data-theme='v8']) .detailSummary { width: 320px; padding: 20px 24px; border-right: 1px solid var(--color-hairline); flex-shrink: 0; }
 :global([data-theme='v8']) .detailContent { padding: 20px 28px; display: flex; flex-direction: column; gap: var(--tpl-detail-content-gap); flex: 1; min-width: 0; }
 :global([data-theme='v8']) .inbox { display: flex; flex: 1; min-height: 0; min-width: 0; }
@@ -166,7 +166,7 @@
 :global([data-theme='v8']) [data-page-template='detail'] .headingText { gap: var(--tpl-detail-title-gap); }
 :global([data-theme='v8']) [data-page-template='detail'] .description { font-size: var(--tpl-detail-desc-size); line-height: var(--tpl-detail-desc-lh); }
 /* ★V8 作る型の手順の帯（Pencil A0pDt「作る手順」：高さ20・丸20・字12/17・丸と字の間6・線24・間8）。部品 Stepper の v7 の枠・余白を型の中だけ外す（司令塔 2026-10-05）。 */
-:global([data-theme='v8']) .steps :global([data-part='stepper']) { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+:global([data-theme='v8']) .steps :global([data-part='stepper']) { margin: 0; padding: 0; border: 0; border-radius: var(--radius-none); background: transparent; }
 :global([data-theme='v8']) .steps :global([data-part='stepper']) > ol { column-gap: var(--tpl-steps-gap); row-gap: 4px; }
 :global([data-theme='v8']) .steps :global([data-part='stepper']) li { flex: 0 0 auto; gap: var(--tpl-steps-gap); }
 :global([data-theme='v8']) .steps :global([data-part='stepper']) li > span:not([aria-hidden]), :global([data-theme='v8']) .steps :global([data-part='stepper']) li > button { gap: var(--tpl-steps-dot-gap); }
