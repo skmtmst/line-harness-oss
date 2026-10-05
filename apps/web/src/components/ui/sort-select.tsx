@@ -39,7 +39,7 @@ export default function SortSelect({
         aria-label={name}
         label={name}
         options={options}
-        className={['w-auto max-w-full', className].filter(Boolean).join(' ')}
+        className="w-auto max-w-full"
       />
     )
   }
