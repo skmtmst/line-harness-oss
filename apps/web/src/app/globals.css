@@ -592,6 +592,9 @@
   --tpl-large-title-size: 22px; --tpl-large-title-lh: 33px; --tpl-large-gap: 16px;
   --tpl-create-title-size: 22px; --tpl-create-title-lh: 32px;
   --tpl-create-desc-size: 12px; --tpl-create-desc-lh: 17px;
+  /* 作る画面の右の列の箱（K7HWG「右の箱 設定内容」）と、本文の小さい文字の行の高さ */
+  --tpl-side-card-pad: 16px; --tpl-side-card-gap: 4px; --tpl-side-row-gap: 3px; --tpl-side-row-pad: 9px;
+  --tpl-side-title-lh: 19px; --tpl-text-sm-lh: 17px; --tpl-side-note-pad: 12px 14px; --tpl-label-tag-gap: 6px;
   --tpl-create-head-pad-top: 20px; --tpl-create-head-pad-side: 24px; --tpl-create-head-pad-bottom: 16px;
   --tpl-create-head-gap: 8px;
   --tpl-detail-head-pad-top: 20px; --tpl-detail-head-pad-side: 24px; --tpl-detail-head-pad-bottom: 16px;
