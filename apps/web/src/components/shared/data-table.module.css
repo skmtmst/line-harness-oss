@@ -36,6 +36,11 @@
   height: 64px;
 }
 
+/* 名前＋説明の2行の行を選ぶ指定。v7 では今までの64pxのまま。 */
+.rowDouble {
+  height: 64px;
+}
+
 /* ★V7：選んでいる行は薄い緑の地。色だけでなく aria-selected でも伝える。 */
 .rowSelected {
   background: var(--color-accent-soft);
@@ -130,6 +135,16 @@
 
 [data-theme='v8'] .rowComfortable {
   height: 56px;
+}
+
+/*
+ * ★V8「表の行・2行の指定」（`Tr density="double"`）。
+ * 名前＋説明の行＝86px。tr の高さは最小値として働くので、
+ * 行の高さは上下の余白＋中身で決まり、中身が増えれば伸びる。
+ * 固定 height で潰さない。
+ */
+[data-theme='v8'] .rowDouble {
+  height: 86px;
 }
 
 [data-theme='v8'] .row + .row .bodyCell {

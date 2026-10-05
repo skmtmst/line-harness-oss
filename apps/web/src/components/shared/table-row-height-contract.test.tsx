@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'data-table.module.css'), 'utf8')
+const tsx = readFileSync(join(HERE, 'table.tsx'), 'utf8')
 
 /*
  * ★V8「表の行」（JpOg0・apLqS・axFrW計測）。1行の行＝60px、
@@ -27,5 +28,12 @@ describe('表の行の高さ（JpOg0）', () => {
 
   it('既定（v7）の58pxは変えない', () => {
     expect(css).toMatch(/^\.row \{[^}]*height:\s*58px/m)
+  })
+
+  it('Tr の density で1行・2行を選べる（single＝60・double＝86）', () => {
+    expect(tsx).toMatch(/density\?:[^;]*'single'[^;]*'double'/)
+    expect(tsx).toMatch(/density === 'double' && shell\.rowDouble/)
+    expect(css).toMatch(/\[data-theme='v8'\] \.rowDouble \{[^}]*height:\s*86px/s)
+    expect(css).toMatch(/^\.rowDouble \{[^}]*height:\s*64px/m)
   })
 })
