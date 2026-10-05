@@ -54,7 +54,7 @@
   padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom);
   background: var(--color-canvas);
   border: 0;
-  outline: none;
+  outline-color: transparent;
 }
 
 [data-theme='v8'] .heading {

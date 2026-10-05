@@ -46,9 +46,10 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     expect(css).not.toMatch(/^\.accountPill \{[^}]*flex-shrink/m)
   })
 
-  it('板の頭：HTML の題と説明の間は 2px', () => {
+  it('板の頭：既定の間は 4・compact は EnlYo どおり 2', () => {
     const css = read('./page-header.module.css')
-    expect(css).toMatch(/\[data-theme='v8'\] \.heading \{[^}]*gap:\s*2px/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.heading \{[^}]*gap:\s*var\(--tpl-head-gap\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.header\[data-header-size='compact'\] \.heading \{[^}]*gap:\s*var\(--tpl-compact-gap\)/s)
     // v7 の 5 は変えない。
     expect(css).toMatch(/\.heading \{[^}]*gap:\s*5px/s)
   })
