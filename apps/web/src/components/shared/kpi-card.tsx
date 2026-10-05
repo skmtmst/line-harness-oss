@@ -164,7 +164,7 @@ export default function KpiCard({
             {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
           </span>
           {hasTip ? (
-            <HelpTip label={descriptionLabel ?? `${helpLabel ?? title}の説明`}>
+            <HelpTip label={descriptionLabel ?? `${helpLabel ?? title}の説明`} className={styles.tip}>
               {tip}
               {helpHref ? <a href={helpHref}>{helpHrefLabel ?? 'くわしく'}</a> : null}
             </HelpTip>
