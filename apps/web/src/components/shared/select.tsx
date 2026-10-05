@@ -2,7 +2,7 @@
 
 import { ArrowUpDown, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useRef, useState } from 'react'
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import MenuPortal from './menu-portal'
 import styles from './select.module.css'
 
@@ -35,6 +35,11 @@ export interface SelectProps {
    * （x6QsVz の並び替えどおり）。v8 だけで枠を消す。
    */
   treatment?: 'box' | 'text'
+  /**
+   * 箱の先頭の図柄（v19Ivv のよく使う絞り込みの栞どおり）。
+   * 渡さなければ出ない。
+   */
+  icon?: ReactNode
 }
 
 /** Pencil V5 `rpot9` / `Gfsb4` を正本にした単一選択。 */
@@ -48,6 +53,7 @@ export default function Select({
   label,
   name,
   onChange,
+  icon,
   options,
   size = 'standard',
   value,
@@ -138,6 +144,11 @@ export default function Select({
       >
         {treatment === 'text' ? (
           <ArrowUpDown className={styles.directionIcon} aria-hidden="true" />
+        ) : null}
+        {icon ? (
+          <span className={styles.leadingIcon} aria-hidden="true">
+            {icon}
+          </span>
         ) : null}
         {/* 省略表示（…）のとき、ホバーで全文を確認できる（#640）。 */}
         <span className={styles.value} title={selected?.label ?? undefined}>

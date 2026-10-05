@@ -286,3 +286,23 @@
   flex: none;
   color: var(--color-ink-secondary);
 }
+
+/*
+ * 箱の先頭の図柄（v19Ivv のよく使う絞り込みの栞）。
+ * 渡さないときは出ない。v7 は変えない。
+ */
+.leadingIcon {
+  display: none;
+}
+
+[data-theme='v8'] .leadingIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--color-ink);
+}
+
+[data-theme='v8'] .leadingIcon svg {
+  width: 15px;
+  height: 15px;
+}

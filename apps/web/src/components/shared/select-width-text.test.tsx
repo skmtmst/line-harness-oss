@@ -39,6 +39,26 @@ describe('選ぶ欄の幅と枠なし', () => {
     expect(root.style.width).toBe('')
   })
 
+  it('icon を渡すと箱の先頭に図柄が出る（v19Ivv の栞）', () => {
+    const { container } = render(
+      <Select
+        aria-label="よく使う絞り込み"
+        value="all"
+        onChange={() => {}}
+        options={OPTIONS}
+        icon={<svg aria-hidden="true"><circle cx="4" cy="4" r="3" /></svg>}
+      />,
+    )
+    expect(container.querySelector('[class*="leadingIcon"]')).not.toBeNull()
+  })
+
+  it('icon を渡さなければ図柄は出ない', () => {
+    const { container } = render(
+      <Select aria-label="タグ" value="new" onChange={() => {}} options={OPTIONS} />,
+    )
+    expect(container.querySelector('[class*="leadingIcon"]')).toBeNull()
+  })
+
   it('treatment="text" で上下矢印が出る（箱は v8 の CSS で消える）', () => {
     const { container } = render(
       <Select aria-label="並び順" value="new" onChange={() => {}} options={OPTIONS} treatment="text" />,
