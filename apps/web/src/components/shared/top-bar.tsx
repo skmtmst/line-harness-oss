@@ -58,11 +58,6 @@ export interface TopBarProps {
    */
   crumbs?: { label: string; href?: string }[] | null
   className?: string
-  /**
-   * G6 移し替え：「前の見た目に戻す」。渡したときだけ出す。
-   * 呼び出し側が V8 のときだけ渡す（v7 の絵は変えない）。
-   */
-  onRevertTheme?: () => void
 }
 
 /**
@@ -88,7 +83,6 @@ export default function TopBar({
   chromeVariant = 'default',
   menuCollapsed = false,
   crumbs,
-  onRevertTheme,
   className,
 }: TopBarProps) {
   const classes = [styles.root, className].filter(Boolean).join(' ')
@@ -263,16 +257,6 @@ export default function TopBar({
               : <span className={styles.role}>{roleLabel}</span>}
           </span>
         </div>
-
-        {/*
-          ★V8 殻合わせ：『前の見た目に戻す』は名前の横に小さく残す。
-          v7 には出さない（onRevertTheme は V8 のときだけ渡る）。
-        */}
-        {onRevertTheme ? (
-          <button type="button" className={styles.revert} onClick={onRevertTheme}>
-            前の見た目に戻す
-          </button>
-        ) : null}
 
         {/* v7 の区切り線は残す（V8 では消す決まり）。 */}
         <span className={`${styles.separator} v7-only`} aria-hidden="true" />

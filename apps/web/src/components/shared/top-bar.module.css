@@ -64,36 +64,12 @@
   background: var(--color-canvas-sunken);
 }
 
-/*
- * G6 移し替え：「前の見た目に戻す」（V8 のときだけ出す）。
- * 目立たせない文字ボタン。押せることが分かるよう乗せたら下線。
- */
-.revert {
-  flex-shrink: 0;
-  background: none;
-  border: 0;
-  padding: 0 4px;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 500;
-  line-height: 36px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.revert:hover {
-  color: var(--color-ink);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 .logout:hover {
   border-color: var(--color-accent);
 }
 
 .manual:focus-visible,
-.logout:focus-visible,
-.revert:focus-visible {
+.logout:focus-visible {
   outline: 2px solid var(--color-status-info);
   outline-offset: 2px;
 }
@@ -581,21 +557,6 @@
   background: none;
   color: var(--color-action);
   text-decoration: underline;
-}
-
-/*
- * 『前の見た目に戻す』は名前の横に小さく残す（絵の指示）。
- * v7 には出さない（tsx 側で V8 のときだけ渡る）。
- */
-[data-theme='v8'] .revert {
-  color: var(--color-ink-faint);
-  font-size: var(--text-nano);
-  line-height: 1.2;
-  padding: 0 2px;
-}
-
-[data-theme='v8'] .revert:hover {
-  color: var(--color-ink-secondary);
 }
 
 [data-theme='v8'] .root { padding: 0 8px; gap: 10px; }
