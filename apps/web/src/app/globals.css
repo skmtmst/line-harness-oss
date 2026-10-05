@@ -605,6 +605,7 @@
   --tpl-identity-lh: 19px; --tpl-create-head-row-gap: 8px; --tpl-detail-head-row-gap: 6px;
   --tpl-detail-title-gap: 6px; --tpl-detail-desc-size: 12px; --tpl-detail-desc-lh: 17px;
   --tpl-thead-h: 40px;
+  --tpl-row-name-size: 13px; --tpl-row-name-lh: 19px; --tpl-row-sub-gap: 3px; --tpl-row-sub-size: 11px; --tpl-row-sub-lh: 16px;
   --tpl-steps-gap: 8px; --tpl-steps-dot: 20px; --tpl-steps-dot-gap: 6px; --tpl-steps-text-size: 12px; --tpl-steps-text-lh: 17px;
   --tpl-footer-pad-block: 12px; --tpl-footer-pad-side: 24px; --tpl-footer-gap: 8px;
   --tpl-settings-nav-width: 208px; --tpl-settings-nav-pad-block: 16px; --tpl-settings-nav-pad-side: 12px;
