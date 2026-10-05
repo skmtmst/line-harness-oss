@@ -258,13 +258,13 @@
   grid-template-columns: none;
   gap: 0;
   border: 1px solid var(--color-hairline);
-  border-radius: 0;
+  border-radius: var(--radius-none);
   background: var(--color-canvas);
 }
 /* 子孫まで消す：折りたたみ（KpiCollapse）は後ろのマスを包み div で囲うため。 */
 [data-theme='v8'] .strip[data-kpi-presentation='band'] .card {
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-none);
   outline-color: transparent;
 }
 [data-theme='v8'] .strip[data-kpi-presentation='band'] > * + * {

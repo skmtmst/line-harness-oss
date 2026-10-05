@@ -27,7 +27,7 @@ describe('数の帯（Pp3nS）', () => {
     expect(strip, 'v8 の帯の指定がありません').toBeTruthy()
     expect(strip![0]).toMatch(/gap:\s*0/)
     expect(strip![0]).toMatch(/border:\s*1px solid var\(--color-hairline\)/)
-    expect(strip![0]).toMatch(/border-radius:\s*0/)
+    expect(strip![0]).toMatch(/border-radius:\s*var\(--radius-none\)/)
     expect(css).toMatch(
       /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] > \* \+ \* \{[^}]*border-left:\s*1px solid var\(--color-hairline\)/s,
     )

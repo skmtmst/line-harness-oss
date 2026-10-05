@@ -395,7 +395,7 @@ export function ChoiceCard({
       type="button"
       onClick={onClick}
       aria-pressed={selected}
-      className={`rounded-card border p-3 text-left transition-colors ${
+      className={`${styles.choice} rounded-card border p-3 text-left transition-colors ${
         selected ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
       }`}
     >
