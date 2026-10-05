@@ -101,8 +101,7 @@ describe('ダッシュボードV4の初期表示', () => {
     const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
     expect(source).not.toContain("import Header from '@/components/layout/header'")
     expect(source).not.toContain('<Header')
-    // ★V8（d8X09・小分け2）: 板の題は型（DashboardTemplate の board head）が持ち、Pencil との重ね合わせで 4px超0 を確認済み。ページ独自の見出しは置かない。
-    expect(source).toContain('<DashboardTemplate')
+    expect(source).not.toContain('title="ダッシュボード"')
     expect(source).not.toContain('<h1')
     expect(source).toContain('V6 `vUXKb/vwcM6`')
     expect(source).toContain('ダッシュボード編集')

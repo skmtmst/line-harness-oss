@@ -625,7 +625,3 @@
     width: 100%;
   }
 }
-
-/* タグの内容だけ。板・段・列・ページ送りの余白は ListPage が持つ。 */
-.templateStats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-@container v8-page (max-width: 560px) { .templateStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
