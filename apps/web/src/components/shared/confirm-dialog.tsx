@@ -16,6 +16,11 @@ interface ConfirmDialogProps {
    * destructive（赤い題・ボタン）とは独立に使える。
    */
   warning?: boolean
+  /**
+   * 説明文を桃箱で囲む（YZ57z 解除。題は箱の外・説明だけ箱の中）。
+   * destructive（赤い題・ボタン）とは独立に使える。
+   */
+  dangerBand?: boolean
   busy?: boolean
   error?: string
   /**
@@ -55,6 +60,7 @@ export default function ConfirmDialog({
   cancelLabel = 'キャンセル',
   destructive = false,
   warning = false,
+  dangerBand = false,
   busy = false,
   error,
   children,
@@ -83,7 +89,7 @@ export default function ConfirmDialog({
       title={title}
       description={description}
       tone={destructive ? 'destructive' : 'default'}
-      descriptionBand={warning ? 'warning' : undefined}
+      descriptionBand={dangerBand ? 'danger' : warning ? 'warning' : undefined}
       confirmLabel={confirmLabel}
       cancelLabel={cancelLabel}
       busy={busy}

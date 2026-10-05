@@ -190,6 +190,25 @@
   line-height: 17px;
 }
 
+/*
+ * 桃の呼びかけ（YZ57z 解除：説明文だけを桃箱で囲む。題は箱の外）。
+ * 板どおり地 #fdecea≒--color-danger-bg（#fce9e7）・文 #b42318≒--color-danger
+ * （#b3261e）・角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
+ * v7 は変えない。VsSyu 式（箱なし）の既定の破壊的トーンはそのまま。
+ */
+[data-theme='v8'] .calloutDanger {
+  border-color: var(--color-danger-bg);
+  border-radius: var(--radius-segment);
+  background: var(--color-danger-bg);
+  padding: 10px 12px;
+}
+
+[data-theme='v8'] .calloutDanger .description {
+  color: var(--color-danger);
+  font-size: 11px;
+  line-height: 17px;
+}
+
 .callout .title {
   font-size: var(--text-body);
 }
