@@ -164,10 +164,10 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
 
   it('取消後は再開だけを表示し、再開には取消後の版番号を渡す', async () => {
     await render()
-    await click('取消')
+    await click('取り消す')
     expect(apiMock.cancel).toHaveBeenCalledWith('reminder-1', 'registration-1', 4)
     expect(host.textContent).toContain('取消済み')
-    await click('再開')
+    await click('再開する')
     expect(apiMock.resume).toHaveBeenCalledWith('reminder-1', 'registration-1', 5)
     expect(host.textContent).toContain('未送信分だけを次の配信処理で組み直します。')
   })

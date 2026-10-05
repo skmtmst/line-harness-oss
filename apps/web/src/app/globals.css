@@ -605,6 +605,9 @@
   --tpl-identity-lh: 19px; --tpl-create-head-row-gap: 8px; --tpl-detail-head-row-gap: 6px;
   --tpl-detail-title-gap: 6px; --tpl-detail-desc-size: 12px; --tpl-detail-desc-lh: 17px;
   --tpl-thead-h: 40px;
+  /* @theme の中だけに置くと Tailwind が使われていない値として落とす（CSS Modules だけが読む）。V8 で部品の線が消えないよう、ここにも置く（司令塔 2026-10-06） */
+  --color-toggle-off: #c9ced6; --color-star-on: #fbbf24; --color-star-on-edge: #f59e0b;
+  --tpl-cell-gap-half: 8px;
   --tpl-row-name-size: 13px; --tpl-row-name-lh: 19px; --tpl-row-sub-gap: 3px; --tpl-row-sub-size: 11px; --tpl-row-sub-lh: 16px;
   --tpl-steps-gap: 8px; --tpl-steps-dot: 20px; --tpl-steps-dot-gap: 6px; --tpl-steps-text-size: 12px; --tpl-steps-text-lh: 17px;
   --tpl-footer-pad-block: 12px; --tpl-footer-pad-side: 24px; --tpl-footer-gap: 8px;

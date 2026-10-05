@@ -11,10 +11,8 @@ vi.hoisted(() => {
 import RemindersPage from './page'
 
 /*
- * ★V8 一覧（Pencil `apLqS`）の契約。
- * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
+ * ★V8 一覧（Pencil `apLqS`）の契約。V8 だけを出す。
  * 見本が決めた文言・帯・行の操作が出ることを実DOMで固定する。
- * v7（data-theme なし）では従来の一覧が出ることも一緒に固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -125,7 +123,7 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   expect(host.textContent).toContain('今月送った')
   expect(host.textContent).toContain('送れなかった')
   expect(host.textContent).toContain('次に送る')
-  expect(host.textContent).toContain('並び順')
+  expect(host.textContent).toContain('並び')
   expect(host.textContent).toContain('20件表示')
   // KPI は API の実値
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('2')

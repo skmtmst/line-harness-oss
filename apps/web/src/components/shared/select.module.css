@@ -256,3 +256,5 @@
 [data-theme='v8'] .invalid .trigger { outline-color: var(--color-danger); }
 [data-theme='v8'] .chevron { flex-basis: 14px; }
 }
+/* ★V8 表示件数の選ぶ欄は幅96（c4n9Kr「選ぶ 表示件数」）。司令塔 2026-10-06 */
+[data-theme='v8'] .pageSize { width: 96px; min-width: 96px; }
