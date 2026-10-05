@@ -114,8 +114,18 @@
   border-radius: 0;
 }
 
+/*
+ * ★V8「表の行」（JpOg0・apLqS・axFrW計測）。1行の行＝60px、
+ * 名前＋説明の2行の行＝86px。tr の高さは最小値として働くので、
+ * 中身が増えれば伸びる。2行の判定は中身（.sub/.memo）で自動。
+ */
 [data-theme='v8'] .row {
-  height: 52px;
+  height: 60px;
+}
+
+[data-theme='v8'] .row:has(.sub:not([hidden])),
+[data-theme='v8'] .row:has(.memo:not([hidden])) {
+  height: 86px;
 }
 
 [data-theme='v8'] .rowComfortable {
