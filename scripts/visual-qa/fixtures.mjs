@@ -3864,7 +3864,7 @@ export const AUTO_REPLIES = [
 const autoReplyRun = (id, friendName, occurredAt, inputPreview, status, detail, overrides = {}) => ({
   id,
   ownerKind: 'auto_reply',
-  ownerId: 'rule-a',
+  ownerId: 'ar-2',
   lineAccountId: 'visual-qa-account',
   occurredAt,
   subject: friendName,
@@ -3875,8 +3875,8 @@ const autoReplyRun = (id, friendName, occurredAt, inputPreview, status, detail, 
   detail,
   durationMs: 800,
   canRetry: false,
-  autoReplyId: 'rule-a',
-  autoReplyName: '予約問い合わせ',
+  autoReplyId: 'ar-2',
+  autoReplyName: '予約変更のお問い合わせ',
   friendId: `friend-${id}`,
   friendName,
   messageKind: 'text',
@@ -3890,9 +3890,11 @@ const autoReplyRun = (id, friendName, occurredAt, inputPreview, status, detail, 
   ...overrides,
 })
 
-/** 機能8 `t7UtYQ`。本番の AutoReplyRunsResponse と同じ器。 */
+/* 板 `nWmLg`（実行結果）。開くID（`ar-2`）と名前を合わせないと画面が
+ * 読み込み中のままになる。帯の数（214回・累計1842・36件・3件・0.8秒）は
+ * 既に絵と一致。 */
 export const AUTO_REPLY_RUNS = {
-  rule: { id: 'rule-a', name: '予約問い合わせ', isActive: true, priorityPosition: 1 },
+  rule: { id: 'ar-2', name: '予約変更のお問い合わせ', isActive: true, priorityPosition: 2 },
   summary: {
     monthHits: 214,
     totalHits: 1_842,
@@ -3907,13 +3909,16 @@ export const AUTO_REPLY_RUNS = {
     { trigger: '日程変更', count: 54, share: 0.252 },
     { trigger: 'キャンセル', count: 32, share: 0.15 },
   ],
+  /* 板 `nWmLg` の実行の記録5行。行ったことは絵の文言そのまま（実装は
+   * 中身が無いときだけ `detail` を出す）。見送りは `skipped` で数える。 */
   items: [
-    autoReplyRun('1', 'Kenta Kawano', '2026-08-25T10:32:00+09:00', '予約を変更したい', 'succeeded', '返信とタグ追加が完了しました', { actionSummary: { executed: 1 } }),
-    autoReplyRun('2', 'Masato S.', '2026-08-25T10:28:00+09:00', '予約の確認', 'succeeded', '返信と担当通知が完了しました', { actionSummary: { executed: 1 }, matchedKeyword: '予約の確認' }),
-    autoReplyRun('3', '菅野 亮', '2026-08-25T10:21:00+09:00', '予約キャンセル', 'pending', '担当者へ引き継ぎました', { replyStatus: 'not_attempted', domainStatus: 'actions_running', matchedKeyword: 'キャンセル' }),
-    autoReplyRun('4', '山田 太郎', '2026-08-25T10:14:00+09:00', '予約', 'failed', 'LINEへの返信を受け付けてもらえませんでした', { durationMs: 1_200, actionSummary: { failed: 1 } }),
+    autoReplyRun('1', 'Kenta Kawano', '2026-08-25T10:32:00+09:00', '予約を変更したい', 'succeeded', '返信＋対応マーク「予約変更」', { replyStatus: 'sent', durationMs: 600 }),
+    autoReplyRun('2', 'Masato S.', '2026-08-25T10:28:00+09:00', '予約の確認', 'succeeded', '返信＋対応マーク「予約変更」', { replyStatus: 'sent', durationMs: 700, matchedKeyword: '予約の確認' }),
+    autoReplyRun('3', '菅野 亮', '2026-08-25T10:21:00+09:00', '予約キャンセル', 'pending', '返信＋担当者へ引き継ぎ', { replyStatus: 'not_attempted', domainStatus: 'actions_running', durationMs: 900, matchedKeyword: 'キャンセル' }),
+    autoReplyRun('4', '山田 太郎', '2026-08-25T10:14:00+09:00', '予約', 'permanent_failed', '返信は届いた・担当者へ知らせられなかった', { durationMs: 1_200 }),
+    autoReplyRun('5', '坂本 真人', '2026-08-25T10:02:00+09:00', '日程変更したい', 'skipped', '上のルール「営業時間外の自動返信」が先に動いた', { replyStatus: 'not_attempted', domainStatus: 'skipped', durationMs: null, matchedKeyword: '日程変更' }),
   ],
-  pagination: { total: 4, limit: 20, offset: 0 },
+  pagination: { total: 214, limit: 20, offset: 0 },
 }
 
 /** 機能8の公開フロー。設計 g46ja / Yj6CQ / e6iJG と同じ1件を通す。 */
