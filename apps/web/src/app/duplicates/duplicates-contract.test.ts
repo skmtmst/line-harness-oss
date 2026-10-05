@@ -103,3 +103,21 @@ describe('集計失敗でも候補一覧を残す（R598）', () => {
     expect(PAGE.indexOf('{data ? (')).toBeGreaterThan(-1)
   })
 })
+
+/**
+ * hn6Y8（B）：板の呼び方にそろえる。見直し・探す・比べて決める。
+ */
+describe('重複検出の板どおりの呼び方（hn6Y8）', () => {
+  const V8 = readFileSync(join(HERE, 'duplicates-v8.tsx'), 'utf8')
+  it('再検出は「もう一度見直す」', () => {
+    expect(V8).toContain('もう一度見直す')
+    expect(V8).not.toContain('重複を再検出')
+  })
+  it('検索は「名前・メール・電話で探す」', () => {
+    expect(V8).toContain('名前・メール・電話で探す')
+    expect(V8).not.toContain('名前・メール・電話で検索')
+  })
+  it('行の導線は「比べて決める」', () => {
+    expect(V8).toContain('比べて決める')
+  })
+})

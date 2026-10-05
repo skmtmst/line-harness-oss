@@ -2230,6 +2230,34 @@ function PublishStep({
       {canOperate ? <PublishProgressSection groupId={group.id} onRetry={submit} /> : null}
       {/* N-151: 公開の履歴・失敗だけの再試行・LINEとの照合修復。 */}
       {canOperate ? <PublishHistorySection groupId={group.id} onChanged={onChanged} /> : null}
+      {/*
+       * hKr8f: 切替のつながり。V8だけ出す（v7 UMiJ9 は変えない）。
+       * いまの状態は実データだけ出す
+       * （出る人数・今月押された回数の口は無いので載せない）。
+       */}
+      {v8 ? (
+      <section aria-label="切替のつながり" className="border-hairline bg-canvas rounded-card mt-5 border p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-ink text-sm font-bold">切替のつながり</h2>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => router.push(`/rich-menus/connections?id=${encodeURIComponent(group.id)}`)}
+            >
+              切替のつながりを見る
+            </Button>
+            <Button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} title="メニューの編集に戻ります">
+              編集する
+            </Button>
+          </div>
+        </div>
+        <p className="text-ink-secondary mt-3 text-xs leading-5">
+          いまの状態：{group.status === 'published' ? '公開中' : '下書き'}
+          ・出す相手 {isDefaultForAll ? 'すべての友だち（既定）' : targetingEnabled ? '出し分け条件に合う友だち' : 'すべての友だち'}
+        </p>
+      </section>
+      ) : null}
       {/* N-156: staff は公開・保存を押せない（サーバ側も 403 で止める）。 */}
       <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2">{canOperate ? <><Button onClick={onSave} disabled={saving || publishing}>下書きを保存する</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)} busy={publishing} busyLabel="公開中…">{mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></> : <span className="text-ink-faint text-xs">閲覧のみ（公開・保存は管理者の操作です）</span>}</div></div>} />
     </>)
