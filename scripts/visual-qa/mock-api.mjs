@@ -2974,8 +2974,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           approval: {
             ...BROADCAST_APPROVAL_STATE.approval,
             status: 'approved',
-            decidedByStaffId: 'staff-approver',
-            decidedAt: '2026-09-25T21:02:00+09:00',
+            approverStaffId: 'staff-sasaki-approver',
+            decidedByStaffId: 'staff-sasaki-approver',
+            decidedAt: '2026-08-19T10:00:00+09:00',
           },
         },
       }

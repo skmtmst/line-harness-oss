@@ -3377,6 +3377,7 @@ export const BROADCAST_APPROVAL_CONFIG = {
 /** 二者承認（m12a）。承認を頼める相手。自分は除いてある。 */
 export const BROADCAST_APPROVAL_CANDIDATES = [
   { id: 'staff-approver', name: '佐藤 美咲', role: 'admin', canApprove: true },
+  { id: 'staff-sasaki-approver', name: '佐々木 亮太', role: 'admin', canApprove: true },
 ]
 
 /** 二者承認（m12a）。承認待ちの配信の今の状態と判定。 */
