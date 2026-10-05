@@ -49,27 +49,6 @@
 }
 
 /* 手順の下の一行。「いま何をしているか」を置く。 */
-.subline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-}
-.sublineName {
-  color: var(--color-ink);
-  font-weight: 600;
-}
-.sublineBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 10px;
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-}
 
 .cols {
   display: grid;

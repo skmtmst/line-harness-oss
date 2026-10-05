@@ -1148,7 +1148,8 @@ function AutoReplyWizardV8Inner() {
         : undefined,
   }))
 
-  const statusBadge = lifecycleStatus === 'draft' ? '下書き' : isActive ? '有効' : '停止中'
+  // 絵（A0pDt ほか）：まだ有効にしていない下書きは「停止中として作っています」。
+  const statusBadge = isActive ? '有効' : '停止中'
 
   const previewContent = (<>
           {step === 'basic' && (
@@ -1365,16 +1366,11 @@ function AutoReplyWizardV8Inner() {
   )
 
   return (
-    <CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={<>{autoReplyId ? 'ルールを編集' : 'ルールを作る'}</>} description={<>
+    <CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={<>{autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'}</>} description={<>
           {step === 'basic' ? (
             'いまは停止中として作ります。最後の「確認」で有効にします。'
           ) : (
-            <>
-              <span>
-                ルール名：<span className={styles.sublineName}>{thisRuleName}</span>
-              </span>
-              <span className={styles.sublineBadge}>{statusBadge}として作っています</span>
-            </>
+            `ルール名：${thisRuleName}・${statusBadge}として作っています`
           )}
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
           <ArrowLeft size={14} aria-hidden="true" />
