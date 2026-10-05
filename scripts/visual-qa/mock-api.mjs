@@ -1086,38 +1086,42 @@ const ANALYTICS_SAVED = [
 
 /*
  * 承認待ちは V8 の板（`nJlxX`・`OylSV`）の 5 件にそろえる。
- * 重複の疑い3件は残す（板にも出る）。
+ * 要確認の2件（3・5行目）は重複の疑いで札が出る。
  */
 const PENDING_APPROVALS = [
-  ['木村 亮', '合同会社ノース', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, true],
-  ['大西 健一', '合同会社ノース', 'ao-4', '資料請求', '資料請求', 1500, true],
-  ['岡本 遥', '旧パートナーA（停止中）', 'ao-1', '体験の申し込み', '体験の申し込み', 3000, true],
-  ['高橋 直人', '田中 明', 'ao-2', '定期便のお申し込み', 'ECの定期が確定したとき', 5000, false],
-  ['石田 未来', '田中 明', 'ao-4', '資料請求', '資料請求', 6000, false],
-].map(([friendName, affiliateName, offerId, offerName, conversionPointName, value, duplicateFlag], index) => ({
+  // 友だち, 紹介した人, 紹介人ID, アカウント, 案件, 成果地点, 成果額, 報酬, 成果日時, 要確認
+  ['佐藤 美咲', '田中 明', 'af-1', '然 本店', '定期便の初回', '定期便が確定', 4980, 2000, '2026-09-30T14:12:00+09:00', false],
+  ['鈴木 健', '合同会社ノース', 'af-2', '然 本店', '夏の紹介キャンペーン', '商品を買った', 12800, 1280, '2026-09-30T11:05:00+09:00', false],
+  ['高橋 まい', '山口 商店', 'af-5', '然 渋谷店', '定期便の初回', '定期便が確定', 4980, 1000, '2026-09-29T18:40:00+09:00', true],
+  ['伊藤 翔', '木村 亮', 'af-3', '然 本店', '定期便の初回', '定期便が確定', 4980, 1500, '2026-09-29T10:21:00+09:00', false],
+  ['渡辺 ゆか', '田中 明', 'af-1', '然 本店', '夏の紹介キャンペーン', '商品を買った', 6400, 2000, '2026-09-28T20:02:00+09:00', true],
+].map(([friendName, affiliateName, affiliateId, lineAccountName, offerName, conversionPointName, value, rewardAmount, createdAt, duplicateFlag], index) => ({
   eventId: `cv-p-${index + 1}`,
-  createdAt: `2026-09-0${Math.min(index + 1, 6)}T${String(8 + index).padStart(2, '0')}:12:00+09:00`,
+  createdAt,
   friendId: `friend-${index + 1}`,
   friendName,
-  affiliateId: `af-${(index % 6) + 1}`,
+  affiliateId,
   affiliateName,
-  offerId,
+  lineAccountName,
+  offerId: 'ao-2',
   offerName,
   offerRewardMiles: 0,
   conversionPointName,
   value,
+  rewardAmount,
   approvalStatus: 'pending',
   duplicateFlag,
 }))
 
-/* 今月認めた数は V8 の板（`OylSV`）の 33 件にそろえる。 */
+/* 今月認めた数は V8 の板（`OylSV`）の 33 件・合計 ¥70,400 にそろえる。
+ * 起きた日は今月（10月）で持つ。今月より前だと帯の数に入らない。 */
 const APPROVED_APPROVALS = Array.from({ length: 33 }, (_, index) => {
   const offerIndex = index < 18 ? 1 : index < 26 ? 2 : index < 31 ? 3 : 4
-  const rewards = [0, 3000, 5000, 100, 1500]
+  const rewards = [0, 2000, 3000, 1500, 1450]
   const names = ['', '体験の申し込み', '定期便のお申し込み', '友だち追加', '資料請求']
   return {
     eventId: `cv-a-${index + 1}`,
-    createdAt: `2026-09-0${(index % 6) + 1}T10:00:00+09:00`,
+    createdAt: `2026-10-0${(index % 4) + 1}T10:00:00+09:00`,
     friendId: `approved-friend-${index + 1}`,
     friendName: `承認済みの友だち ${index + 1}`,
     affiliateId: `af-${(index % 6) + 1}`,
@@ -1132,9 +1136,24 @@ const APPROVED_APPROVALS = Array.from({ length: 33 }, (_, index) => {
   }
 })
 
-const REJECTED_APPROVALS = Array.from({ length: 8 }, (_, index) => ({
-  ...PENDING_APPROVALS[index],
+/* 今月認めなかった数は V8 の板（`OylSV`）の 2 件にそろえる。 */
+const REJECTED_APPROVALS = [
+  ['テスト注文 花子', '田中 明', 'af-1', '2026-10-02T11:00:00+09:00'],
+  ['テスト注文 太郎', '合同会社ノース', 'af-2', '2026-10-01T15:00:00+09:00'],
+].map(([friendName, affiliateName, affiliateId, createdAt], index) => ({
   eventId: `cv-r-${index + 1}`,
+  createdAt,
+  friendId: `rejected-friend-${index + 1}`,
+  friendName,
+  affiliateId,
+  affiliateName,
+  lineAccountName: '然 本店',
+  offerId: 'ao-2',
+  offerName: '定期便の初回',
+  offerRewardMiles: 0,
+  conversionPointName: '定期便が確定',
+  value: 4980,
+  rewardAmount: 0,
   approvalStatus: 'rejected',
   duplicateFlag: false,
 }))
