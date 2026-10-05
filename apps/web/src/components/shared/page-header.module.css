@@ -61,4 +61,21 @@
 [data-theme='v8'] .heading {
   gap: 4px;
 }
+
+[data-theme='v8'] .header {
+  gap: 12px; padding: 20px 24px; background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+}
+[data-theme='v8'] .heading { flex: 1; gap: 2px; }
+[data-theme='v8'] .heading > nav { display: none; }
+[data-theme='v8'] .title { display: block; font-size: 20px; line-height: 27px; }
+[data-theme='v8'] .description { line-height: 20px; }
+[data-theme='v8'] .actions { gap: 12px; }
+
+
+[data-theme='v8'] .title, [data-theme='v8'] .description { width: fit-content; }
+[data-theme='v8'] .actions button { border: 0; }
+[data-theme='v8'] .actions button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+[data-theme='v8'] .actions button[class*="button_primary"]:not(:focus-visible) { outline-color: transparent; }
+
 }

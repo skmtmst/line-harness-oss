@@ -10,18 +10,18 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
  * 画面に出る件数・金額などの中身は対象外（API の実データを出す）。
  */
 describe('V8 寸法契約（見本との突き合わせ）', () => {
-  it('表の行：名前・補足の行間は 1.35（行 52 前後・上下 9・左右 20 に収める）', () => {
+  it('表の行：HTML の名前 18px・補足 16px の行間', () => {
     const css = read('./data-table.module.css')
-    expect(css).toMatch(/\[data-theme='v8'\] \.name \{[^}]*line-height:\s*1\.35/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.sub \{[^}]*line-height:\s*1\.35/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.memo \{[^}]*line-height:\s*1\.35/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.name \{[^}]*line-height:\s*18px/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.sub \{[^}]*line-height:\s*16px/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.memo \{[^}]*line-height:\s*16px/s)
     // v7（52 の前身 58px の行）は変えない。
     expect(css).not.toMatch(/^\.name \{[^}]*line-height/m)
   })
 
   it('数の帯（小）：上下 10・左右 16・題と数の間 4・数 22', () => {
     const css = read('./kpi-card.module.css')
-    const cell = css.match(/\[data-theme='v8'\] \.strip > \.card \{([^}]*)\}/s)?.[1]
+    const cell = css.match(/\[data-theme='v8'\] \.card\[data-kpi-density='compact'\] \{([^}]*)\}/s)?.[1]
     expect(cell).toBeDefined()
     expect(cell).toMatch(/padding:\s*10px 16px/)
     expect(cell).toMatch(/gap:\s*4px/)
@@ -46,9 +46,9 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     expect(css).not.toMatch(/^\.accountPill \{[^}]*flex-shrink/m)
   })
 
-  it('余白の段：板の頭の題と説明の間は正規5段の 4', () => {
+  it('板の頭：HTML の題と説明の間は 2px', () => {
     const css = read('./page-header.module.css')
-    expect(css).toMatch(/\[data-theme='v8'\] \.heading \{[^}]*gap:\s*4px/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.heading \{[^}]*gap:\s*2px/s)
     // v7 の 5 は変えない。
     expect(css).toMatch(/\.heading \{[^}]*gap:\s*5px/s)
   })

@@ -7,7 +7,7 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import Progress from './progress'
+import Progress, { ProgressBar } from './progress'
 
 afterEach(() => cleanup())
 
@@ -88,4 +88,17 @@ describe('処理の進み（★V7 xiHO8）', () => {
     rerender(<Progress state="active" title="送っています" percent={-5} />)
     expect(screen.getByRole('progressbar', { name: '送っています' }).getAttribute('aria-valuenow')).toBe('0')
   })
+})
+
+
+it('単独の進みの棒は範囲外や非数の値を収め、読み上げ名と割合を持つ', () => {
+  const { rerender } = render(<ProgressBar value={120} label="配信の進み" />)
+  const bar = screen.getByRole('progressbar', { name: '配信の進み' })
+  expect(bar.getAttribute('aria-valuenow')).toBe('100')
+  rerender(<ProgressBar value={-5} label="配信の進み" />)
+  expect(bar.getAttribute('aria-valuenow')).toBe('0')
+  rerender(<ProgressBar value={Number.NaN} label="配信の進み" />)
+  expect(bar.getAttribute('aria-valuenow')).toBe('0')
+  rerender(<ProgressBar value={62.5} label="配信の進み" />)
+  expect(bar.getAttribute('aria-valuenow')).toBe('62.5')
 })

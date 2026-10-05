@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
+import styles from './skeleton.module.css'
 
 /*
  * 骨組み（★V7 仕上げ `z97zZN` §3）。
@@ -202,4 +203,17 @@ export function useDelayedShow(active: boolean, delayMs = SHOW_DELAY_MS): boolea
     return () => clearTimeout(timer)
   }, [active, delayMs])
   return visible
+}
+
+/** 正本 jr5Nl：一覧の顔と4列の骨。幅は置き場所に従う。 */
+export function SkeletonRow({ className }: { className?: string }) {
+  return (
+    <div className={[styles.row, className].filter(Boolean).join(' ')} aria-hidden="true">
+      <Skeleton circle width={32} height={32} className={styles.face} />
+      <Skeleton height={10} className={styles.flexBone} />
+      <Skeleton width={70} height={10} className={styles.bone} />
+      <Skeleton height={10} className={styles.flexBone} />
+      <Skeleton width={50} height={10} className={styles.bone} />
+    </div>
+  )
 }

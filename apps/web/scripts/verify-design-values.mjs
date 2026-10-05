@@ -530,9 +530,14 @@ function verifyV8Parts(lines, failures) {
         } else {
           const bw = declaration(body, 'border-width')
           const short = declaration(body, 'border')
+          const borderWidth = toNum(resolveVars(bw ?? (short ?? '').split(/\s+/)[0] ?? '', v8VarsCache))
+          // V8 の正本と部品は内側の outline でも枠を描く。
+          const outline = resolveVars(declaration(body, 'outline') ?? '', v8VarsCache)
+          const outlineWidth = /\bnone\b/.test(outline) ? 0 : toNum(resolveVars(declaration(body, 'outline-width') ?? outline, v8VarsCache))
+          const paintedWidths = [borderWidth, outlineWidth].filter((width) => width !== null)
           check('sw', [{
             want: toNum(outer.sw),
-            got: toNum(resolveVars(bw ?? (short ?? '').split(/\s+/)[0] ?? '', v8VarsCache)),
+            got: paintedWidths.length ? Math.max(...paintedWidths) : null,
           }])
         }
       }
@@ -542,7 +547,15 @@ function verifyV8Parts(lines, failures) {
       const body = v8EffectiveBody(css, spec.textCls ?? spec.cls)
       check('fs', [{ want: toNum(textNode.fs), got: toNum(resolveVars(declaration(body, 'font-size') ?? '', v8VarsCache)) }])
       check('fw', [{ want: toNum(textNode.fw), got: toNum(resolveVars(declaration(body, 'font-weight') ?? '', v8VarsCache)) }])
-      check('lh', [{ want: toNum(textNode.lh), got: toNum(resolveVars(declaration(body, 'line-height') ?? '', v8VarsCache)) }])
+      const rawLineHeight = resolveVars(declaration(body, 'line-height') ?? '', v8VarsCache)
+      const lineHeight = toNum(rawLineHeight)
+      const fontSize = toNum(resolveVars(declaration(body, 'font-size') ?? '', v8VarsCache))
+      // Pencil の倍率は HTML 書き出し時に px の整数へ丸められる。
+      // CSS の倍率と px を同じ行箱の単位にそろえて比較する。
+      check('lh', [{
+        want: textNode.lh === undefined ? null : Math.round(toNum(textNode.lh) * toNum(textNode.fs)),
+        got: lineHeight === null ? null : /px$/.test(rawLineHeight) ? lineHeight : fontSize === null ? null : Math.round(lineHeight * fontSize),
+      }])
     }
 
     if (rows.length === 0) uncovered.push(`${entry.name}（${spec.id}）：比べられる宣言がありません`)

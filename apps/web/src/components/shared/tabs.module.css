@@ -175,4 +175,12 @@
     height: auto;
   }
 }
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .list { height: auto; align-items: flex-start; }
+[data-theme='v8'] .items { align-items: flex-start; }
+[data-theme='v8'] .tab { height: auto; padding: 0 0 12px; border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .current { border-bottom: 2px solid var(--color-ink); }
+[data-theme='v8'] .items[data-sliding='true'] .current { border-bottom-color: transparent; }
+[data-theme='v8'] .indicator { border-radius: 0; }
 }

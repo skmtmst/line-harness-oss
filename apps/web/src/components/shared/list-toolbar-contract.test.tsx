@@ -94,6 +94,26 @@ describe('ListToolbar 一覧の上の道具の並び（★V7 Xn1Mz）', () => {
     expect(src).toContain('<SearchField')
   })
 
+  it('V8 道具の1段（c4n9Kr）：探す欄は幅280で縮まない（狭い板は帯ごと折り返す）', () => {
+    /*
+     * 正本 c4n9Kr の検索は width:280px・flex-shrink:0。
+     * 中の文（flex:1）が伸び縮みし、外の箱は縮まない。
+     * 白い板 1100〜1200 でも右端がはみ出さないよう、
+     * 帯全体の flex-wrap で下へ折り返す（探す欄を潰さない）。
+     * v7 の 320・下限240 は変えない。
+     */
+    const css = read('list-toolbar.module.css')
+    const v8Rule = css.match(/\[data-theme='v8'\]\s*\.row1\s*>\s*\.search\s*{[^}]*}/s)
+    expect(v8Rule, 'V8 の探す欄の幅指定がありません').toBeTruthy()
+    expect(v8Rule![0]).toContain('280px')
+    // 縮ませない（flex:none＝flex-shrink:0。min-width:0・flex:1 方式に戻さない）。
+    expect(v8Rule![0]).toMatch(/flex:\s*none/)
+    expect(v8Rule![0]).not.toContain('min-width: 0')
+    expect(v8Rule![0]).not.toMatch(/flex:\s*1(?![\d.])/)
+    // 狭い板では帯ごと折り返す。
+    expect(css).toMatch(/\[data-theme='v8'\]\s*\.toolbar\s*{[^}]*flex-wrap:\s*wrap/s)
+  })
+
   it('日付の範囲の入力はListToolbarの中で狭くそろえる（1440で2行目に収める）', () => {
     /*
      * 一斉配信の2行目で日付2つが各208px（w-52）あり、1440pxで

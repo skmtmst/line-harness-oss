@@ -153,4 +153,9 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+[data-theme='v8'] .track { height: 6px; border-radius: 3px; }
+[data-theme='v8'] .fill,
+[data-theme='v8'] .indeterminate { border-radius: 3px; }
+
 }

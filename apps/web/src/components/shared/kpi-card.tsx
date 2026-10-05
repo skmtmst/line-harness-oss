@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { ArrowRight, ChartNoAxesColumn } from 'lucide-react'
 import React from 'react'
 import type { ReactNode } from 'react'
 import HelpTip from './help-tip'
@@ -10,6 +11,11 @@ import { formatNumber } from '@/lib/format'
 
 export type KpiCardProps = {
   title: string
+  icon?: ReactNode
+  /** V8: 数の右に出す増減の札。 */
+  delta?: ReactNode
+  /** V8: 指標の操作。呼び出し側が使える操作だけ渡す。 */
+  menu?: ReactNode
   /**
    * 取れないときは「—」を表示する（D021）。
    * null だけでなく undefined・NaN も「—」にする。呼び出し側が
@@ -62,6 +68,9 @@ export type KpiCardProps = {
   loading?: boolean
   /** 対象画面にV6がある場合はv6、配信予定を強調するカードはbroadcastを使う。 */
   variant?: 'v5' | 'v6' | 'broadcast'
+  /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
+  presentation?: 'card' | 'band' | 'cell'
+  density?: 'compact' | 'comfortable'
   className?: string
   hidden?: boolean
   id?: string
@@ -84,6 +93,9 @@ export type SummaryCardProps = KpiCardProps
  */
 export default function KpiCard({
   title,
+  icon,
+  delta,
+  menu,
   value,
   unit,
   detail,
@@ -100,6 +112,8 @@ export default function KpiCard({
   action,
   loading = false,
   variant = 'v6',
+  presentation = 'card',
+  density = 'comfortable',
   className,
   valueTone = 'default',
   valueText,
@@ -128,6 +142,8 @@ export default function KpiCard({
   return (
     <div
       className={classes}
+      data-kpi-presentation={presentation}
+      data-kpi-density={density}
       aria-busy={loading || undefined}
       data-design-version={variant}
       {...cardProps}
@@ -141,7 +157,12 @@ export default function KpiCard({
           className={[styles.label, labelVariantClass].filter(Boolean).join(' ')}
           title={title || undefined}
         >
-          {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
+          <span className={`${styles.icon} v8-only`} aria-hidden="true">
+            {icon ?? <ChartNoAxesColumn size={14} />}
+          </span>
+          <span className={styles.labelText}>
+            {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
+          </span>
           {hasTip ? (
             <HelpTip label={descriptionLabel ?? `${helpLabel ?? title}の説明`}>
               {tip}
@@ -149,15 +170,17 @@ export default function KpiCard({
             </HelpTip>
           ) : null}
         </p>
+        {menu ? <span className={`${styles.menu} v8-only`}>{menu}</span> : null}
         {badge ? (
           <span className={[styles.badge, styles[`badge_${badgeTone}`]].filter(Boolean).join(' ')}>{badge}</span>
         ) : action ? (
-          <Link href={action.href} className={styles.link}>
+          <Link href={action.href} className={`${styles.link} v7-only`}>
             {action.label}
           </Link>
         ) : null}
       </div>
 
+      <div className={styles.valueRow}>
       {loading ? (
         <div className={styles.skeleton} aria-hidden="true" />
       ) : (
@@ -170,17 +193,25 @@ export default function KpiCard({
             .filter(Boolean)
             .join(' ')}
         >
-          {valueText !== undefined ? valueText : isCountableValue(value) ? formatNumber(value) : '—'}
-          {valueText !== undefined ? null : unit}
+          <span data-kpi-number className={styles.number}>{valueText !== undefined ? valueText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
+          {valueText !== undefined ? null : <span className={styles.unit}>{unit}</span>}
         </p>
       )}
 
+      {delta ? <span className={`${styles.delta} v8-only`}>{delta}</span> : null}
+      </div>
+
       <p className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>
-        {detail}
+        <span className={styles.detailText}>{detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
             {retryLabel ?? 'もう一度読み込む'}
           </button>
+        ) : null}
+        {action ? (
+          <Link href={action.href} className={`${styles.link} v8-only`}>
+            <span>{action.label}</span><ArrowRight size={12} aria-hidden="true" />
+          </Link>
         ) : null}
       </p>
     </div>

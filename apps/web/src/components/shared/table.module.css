@@ -109,4 +109,11 @@
   font-size: var(--text-caption);
   font-weight: 500;
 }
+
+[data-theme='v8'] .headRow .cell { line-height: 18px; }
+[data-theme='v8'] .headRow[data-table-layout='columns'] {
+  display: flex; align-items: center; gap: 16px; height: auto; padding: 13px 20px;
+}
+[data-theme='v8'] .headRow[data-table-layout='columns'] .cell { display: block; padding: 0; flex-shrink: 0; }
+
 }

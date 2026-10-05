@@ -2,7 +2,7 @@
 
 import React, { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import Button from './button'
 import IconButton from './icon-button'
 import { useOverlayFocus, useV8Leave } from './overlay-utils'
@@ -10,6 +10,12 @@ import styles from './dialog.module.css'
 
 export type DialogProps = {
   open: boolean
+  /** V8 の幅。v7 の寸法は維持する。 */
+  size?: 'medium' | 'large'
+  /** 手順の帯。本文のスクロールから独立させる。 */
+  steps?: ReactNode
+  /** 操作の左に出す現在の手順など。 */
+  footerLead?: ReactNode
   title: string
   description?: string
   tone?: 'default' | 'destructive'
@@ -47,6 +53,9 @@ export type DialogProps = {
 /** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
 export default function Dialog({
   open,
+  size = 'medium',
+  steps,
+  footerLead,
   title,
   description,
   tone = 'default',
@@ -121,6 +130,7 @@ export default function Dialog({
       aria-busy={busy || undefined}
       tabIndex={-1}
       data-closing={leaving || undefined}
+      data-size={size}
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >
@@ -133,8 +143,10 @@ export default function Dialog({
           <X aria-hidden="true" size={18} />
         </IconButton>
       </div>
+      {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content}>{children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      <div className={styles.footer}>
       {footer ?? (onConfirm ? (
         /*
          * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま
@@ -144,7 +156,9 @@ export default function Dialog({
          * に一本化する（UI-25）。
          */
         <div className={styles.actions}>
+          {footerLead ? <span className={styles.footerLead}>{footerLead}</span> : null}
           <Button
+            data-dialog-action={primaryAction === 'cancel' ? 'primary' : 'secondary'}
             variant={primaryAction === 'cancel' ? 'primary' : undefined}
             className={styles.designButton}
             ref={primaryAction === 'cancel' ? cancelRef : undefined}
@@ -154,6 +168,7 @@ export default function Dialog({
             {cancelLabel}
           </Button>
           <Button
+            data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             className={styles.designButton}
             onClick={onConfirm}
@@ -163,6 +178,7 @@ export default function Dialog({
           </Button>
         </div>
       ) : null)}
+      </div>
     </div>
   )
 
@@ -175,4 +191,19 @@ export default function Dialog({
     </div>
   )
   return mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay
+}
+
+/** q3DPdz の手順。済みは戻れるボタン、現在は aria-current で伝える。 */
+export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: boolean; current?: boolean; onSelect?: () => void }> }) {
+  return <nav aria-label="手順" className={styles.stepItems}>
+    {steps.map((step, index) => <React.Fragment key={step.label}>
+      {index > 0 ? <span className={styles.stepLine} aria-hidden="true" /> : null}
+      <button type="button" className={styles.stepItem} onClick={step.onSelect} disabled={!step.onSelect} aria-current={step.current ? 'step' : undefined}>
+        <span className={`${styles.stepCircle} ${step.done ? styles.stepDone : step.current ? styles.stepCurrent : ''}`}>
+          {step.done ? <Check size={12} aria-hidden="true" /> : index + 1}
+        </span>
+        <span>{step.label}</span>
+      </button>
+    </React.Fragment>)}
+  </nav>
 }

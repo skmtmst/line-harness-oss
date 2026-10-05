@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Tag } from 'lucide-react'
 import styles from './radio-card.module.css'
 
 /**
@@ -71,6 +72,14 @@ export interface RadioCardProps {
    */
   onClick?: () => void
   className?: string
+  /** V8 の上段に出す印。省略時はタグ。v7 では非表示。 */
+  icon?: ReactNode
+  /**
+   * 選ぶカードの形。既定は箱（fNPdg/r3xz1W）。
+   * `'row'` は箱なしの行（BHEl9 の素のラジオ行：丸 18・文字 13）。
+   * 画面の絵で行で並んでいる選択肢に使う。箱の合格は変えない。
+   */
+  variant?: 'card' | 'row'
 }
 
 export default function RadioCard({
@@ -85,18 +94,22 @@ export default function RadioCard({
   invalid = false,
   onClick,
   className,
+  icon,
+  variant = 'card',
 }: RadioCardProps) {
   return (
     <label
       className={[
-        styles.card,
+        variant === 'row' ? styles.row : styles.card,
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,
         invalid ? styles.invalid : null,
         className,
       ].filter(Boolean).join(' ')}
+      data-variant={variant}
       onClick={disabled ? undefined : onClick}
     >
+      <span className={styles.topIcon} aria-hidden="true">{icon ?? <Tag size={16} />}</span>
       <input
         type="radio"
         className={styles.radio}
