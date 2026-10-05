@@ -372,8 +372,10 @@ export const LIST_STATS = {
   marks: { total: 4, inUse: 4, unanswered: 23, inProgress: 19, resolved: 186, changedLast7: 74 },
   searches: { total: 5, limit: 50 },
   templates: { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0, clickRate: null },
-  // 設計 `TC1b1` の帯: シナリオ9件（稼働中8）/ 購読中1,028人 / 読了済728人 / 今週342通
-  scenarios: { total: 9, active: 8, subscribers: 1028, completed: 728, sentThisWeek: 342 },
+  // 板 `axFrW` の帯: シナリオ5件（稼働中3・停止中2）/ 購読中1,028人 / 読了済728人 / 今週342通
+  scenarios: { total: 5, active: 3, subscribers: 1028, completed: 728, sentThisWeek: 342 },
+  // 板 `I3L41O` の帯: 公開中5件（下書き2）/ 今月712件（先月640）/ 完了74% / 後処理の未完2件
+  forms: { published: 5, draft: 2, monthlySubmits: 712, prevMonthSubmits: 640, monthlyCompletionRate: 74, pendingPostActions: 2 },
   // 設計 `M1EXwB` の帯: リマインダ9件（有効7）/ 送信予定124通 / 今月386通 / 失敗2通
   reminders: { total: 9, active: 7, waiting: 124, sentThisMonth: 386, failed: 2 },
 }
@@ -402,13 +404,17 @@ export const OPERATORS = [
  * 設計の5行（時刻／経過時間、一時停止／別シナリオへ／1つ前を再開、
  * 稼働中／停止中／下書き）をどれも確かめられなかった。
  */
+/* V8 板 `axFrW`（シナリオ配信一覧）の5行を上から順に並べた。
+ * 行の補足は「送り方・通数・フォルダ名」で、実装が `deliveryMode`・
+ * `stepCount`・フォルダ名から組み立てる。説明文は一覧には出ないが、
+ * 行を開いた板（詳細パネル）に出るため絵の文言で持つ。 */
 export const FRIEND_SCENARIOS = [
   // 名前, 説明, 配信方式, 購読中, 読了, 登録日, 終了後, 稼働
   ['新規登録7日間フォロー', '登録直後から7日間の初回案内', 'absolute_time', 428, 312, '2026-08-16', 'pause', true],
   ['商品購入後サポート', '購入1日後から使い方を案内', 'elapsed', 316, 201, '2026-08-18', 'move', true],
-  ['予約前日・当日案内', '予約日を基準に前日と当日へ配信', 'absolute_time', 164, 98, '2026-08-20', 'pause', true],
-  ['休眠ユーザー復帰', '90日反応がない友だちへ再案内', 'relative', 0, 0, '2026-08-22', 'resume_previous', false],
-  ['会員更新リマインド', '更新月の14日前からお知らせ', 'elapsed', 83, 51, '2026-08-23', 'pause', false],
+  ['予約前日・当日案内', '予約日の前日・当日に案内', 'absolute_time', 284, 215, '2026-08-20', 'pause', true],
+  ['休眠ユーザー復帰', '60日やりとりが無い人へ', 'relative', 0, 0, '2026-08-22', 'resume_previous', false],
+  ['会員更新リマインド', '更新日の7日前と前日', 'absolute_time', 0, 0, '2026-08-23', 'pause', false],
 ].map(([name, description, deliveryMode, subscriberCount, completedCount, day, onCompleteMode, isActive], index) => ({
   id: `scenario-${index}`,
   name: String(name),
@@ -420,34 +426,37 @@ export const FRIEND_SCENARIOS = [
   deliveryMode: String(deliveryMode),
   allowConcurrent: true,
   displayOrder: index,
+  // 絵のフォルダ分け：初回案内2・購入後1・予約フォロー1・未分類1。
   folderId: [
     'scenario-folder-onboarding',
     'scenario-folder-purchase',
     'scenario-folder-booking',
     'scenario-folder-onboarding',
-    'scenario-folder-purchase',
+    null,
   ][index] ?? null,
   audienceCondition: null,
   onCompleteMode: String(onCompleteMode),
   onCompleteScenarioId: null,
   subscriberCount: Number(subscriberCount),
   completedCount: Number(completedCount),
-  stepCount: index === 0 ? 4 : 3,
+  // 絵の通数：4・3・3・4・2（上から順）。
+  stepCount: [4, 3, 3, 4, 2][index] ?? 3,
   createdAt: `${day}T00:00:00.000Z`,
   updatedAt: `${day}T00:00:00.000Z`,
 }))
 
-/** シナリオ一覧 `TC1b1` の3分類。中身の件数は FRIEND_SCENARIOS から数える。 */
+/** シナリオ一覧 `axFrW` の3分類。件数は絵のとおり（初回案内2・購入後1・予約フォロー1）。未分類1件は mock-api が `unfiledCount` で返す。 */
 export const SCENARIO_FOLDERS = [
-  ['scenario-folder-onboarding', '初回案内', '#2563EB'],
-  ['scenario-folder-purchase', '購入後', '#10B981'],
-  ['scenario-folder-booking', '予約フォロー', '#F59E0B'],
-].map(([id, name, color], index) => ({
+  ['scenario-folder-onboarding', '初回案内', '#2563EB', 2],
+  ['scenario-folder-purchase', '購入後', '#10B981', 1],
+  ['scenario-folder-booking', '予約フォロー', '#F59E0B', 1],
+].map(([id, name, color, itemCount], index) => ({
   id: String(id),
   kind: 'scenario',
   name: String(name),
   parentId: null,
   displayOrder: index,
+  itemCount: Number(itemCount),
   color: String(color),
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-01T00:00:00.000Z',
@@ -896,11 +905,12 @@ export const FORM_DELETE_IMPACT_FIXTURES = {
   },
 }
 
-/** 回答フォームのフォルダ。設計 `EMBIK` の総数18件と内訳。 */
+/* 回答フォームのフォルダ。板 `I3L41O` の総数18件と内訳（来店・予約6・
+ * 資料請求4・アンケート5・未分類3）。一覧は `itemCount` を見て数を出す。 */
 export const FORM_FOLDERS = [
-  { id: 'form-folder-visit', kind: 'form', name: '01_来店・予約', parentId: null, displayOrder: 0, color: null, formCount: 6, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'form-folder-request', kind: 'form', name: '02_資料請求', parentId: null, displayOrder: 1, color: null, formCount: 5, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'form-folder-survey', kind: 'form', name: '03_アンケート', parentId: null, displayOrder: 2, color: null, formCount: 4, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'form-folder-visit', kind: 'form', name: '来店・予約', parentId: null, displayOrder: 0, color: null, formCount: 6, itemCount: 6, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'form-folder-request', kind: 'form', name: '資料請求', parentId: null, displayOrder: 1, color: null, formCount: 4, itemCount: 4, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'form-folder-survey', kind: 'form', name: 'アンケート', parentId: null, displayOrder: 2, color: null, formCount: 5, itemCount: 5, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
 ]
 
 const FORM_BASE_LAYOUT = {
@@ -916,12 +926,13 @@ const FORM_BASE_LAYOUT = {
   },
 }
 
-const formRow = (id, name, description, folderId, isActive, submitCount, monthly, lastSubmittedAt, updatedAt, destinationSummary) => ({
+const formRow = (id, name, description, folderId, isActive, submitCount, monthly, lastSubmittedAt, updatedAt, destinationSummary, pendingPostActionCount = 0) => ({
   id, lineAccountId: 'visual-qa-account', name, description, folderId,
   fields: [], layout: FORM_BASE_LAYOUT, onSubmitTagId: null, onSubmitScenarioId: null,
   onSubmitMessageType: null, onSubmitMessageContent: null, onSubmitWebhookUrl: null,
   onSubmitWebhookHeaders: null, onSubmitWebhookFailMessage: null,
   saveToMetadata: destinationSummary.friendFieldCount > 0, isActive, status: 'active', archivedAt: null,
+  pendingPostActionCount,
   revision: 1, submitCount,
   monthlySubmitCount: monthly.submitCount,
   monthlyOpenCount: monthly.openCount,
@@ -932,12 +943,15 @@ const formRow = (id, name, description, folderId, isActive, submitCount, monthly
   destinationSummary,
 })
 
-/** 回答フォーム一覧。設計 `EMBIK` に見えている6行。今月の数は日本時間の1日から。 */
+/* 板 `I3L41O` の5行を上から順に並べた。保存先は絵のとおり「友だち情報 N」
+ * だけ（タグの内訳は付けない）。来店アンケートには後処理の未完2の札が
+ * 付く。帯の数（公開中5・下書き2・今月712・先月640・完了74%・未完2）は
+ * `LIST_STATS.forms` が返す。 */
 export const FORMS = [
-  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, { submitCount: 186, openCount: 248, rate: 75 }, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 2 }),
-  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, { submitCount: 402, openCount: 536, rate: 75 }, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 1 }),
+  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, { submitCount: 186, openCount: 248, rate: 75 }, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 0 }, 2),
+  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, { submitCount: 402, openCount: 536, rate: 75 }, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 0 }),
   formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, { submitCount: 12, openCount: 20, rate: 60 }, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', { friendFieldCount: 1, tagCount: 0 }),
-  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, { submitCount: 88, openCount: 110, rate: 80 }, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
+  formRow('form-4', 'イベント申込（10月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, { submitCount: 88, openCount: 110, rate: 80 }, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
   formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, { submitCount: 0, openCount: 0, rate: null }, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
   { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, { submitCount: 0, openCount: 5, rate: 0 }, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
   /* NEN-07: NEN配信「口コミのお願い」がつなぐフォーム。編集画面の選択肢と
@@ -1399,13 +1413,17 @@ export const NEN_BIRTHDAY_COUPON = {
   validityDays: 31,
   updatedAt: '2026-08-25T10:00:00+09:00',
 }
-/** 機能14 共通情報。設計の3フォルダと先頭6件を固定する。 */
+/* V8 板 `FM94M`（共通情報一覧）の7件に合わせた分け方。お店の情報4・
+ * 案内文の型1・キャンペーン2・未分類0。件数は絵のとおり。 */
 export const COMMON_VAR_FOLDERS = [
-  { id: 'cvf-store', kind: 'common_var', name: '01_お店の情報', parentId: null, displayOrder: 0, color: '#2563EB', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'cvf-guides', kind: 'common_var', name: '02_案内文の型', parentId: null, displayOrder: 1, color: '#10B981', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'cvf-campaign', kind: 'common_var', name: '03_キャンペーン', parentId: null, displayOrder: 2, color: '#F59E0B', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'cvf-store', kind: 'common_var', name: 'お店の情報', parentId: null, displayOrder: 0, color: '#2563EB', itemCount: 4, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'cvf-guides', kind: 'common_var', name: '案内文の型', parentId: null, displayOrder: 1, color: '#10B981', itemCount: 1, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'cvf-campaign', kind: 'common_var', name: 'キャンペーン', parentId: null, displayOrder: 2, color: '#F59E0B', itemCount: 2, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
 ]
 
+/* 板 `FM94M` の7行を上から順に並べた。帯の数（7件・下書き1・差し込み
+ * 43か所・空のまま1件・期限が近い1件）はこの7件から計算される。`state`
+ * が無い行は使用中、期限つきの使用中は「M/dまで」の札になる。 */
 export const COMMON_VARS = [
   {
     id: 'common-var-delete-target', lineAccountId: 'visual-qa-account', folderId: 'cvf-store',
@@ -1415,9 +1433,17 @@ export const COMMON_VARS = [
   },
   {
     id: 'common-var-hours', lineAccountId: 'visual-qa-account', folderId: 'cvf-store',
-    name: '営業時間', varKey: 'shop_hours', type: 'text', value: '平日 10:00〜19:00／土日祝 休み',
+    name: '営業時間', varKey: 'shop_hours', type: 'text', value: '平日 10:00〜19:00',
     createdAt: '2026-07-01T10:00:00.000+09:00', updatedAt: '2026-08-12T10:00:00.000+09:00',
     nextSchedule: null, pendingScheduleCount: 0, usageCount: 8,
+  },
+  {
+    /* 期限つき。札は「10/7まで」、期限が近い帯に1件数えられる。 */
+    id: 'common-var-campaign', lineAccountId: 'visual-qa-account', folderId: 'cvf-campaign',
+    name: '今月のキャンペーン', varKey: 'monthly_campaign', type: 'text', value: '夏の20%オフ',
+    validUntil: '2026-10-07T23:59:59+09:00',
+    createdAt: '2026-08-01T10:00:00.000+09:00', updatedAt: '2026-08-22T10:00:00.000+09:00',
+    nextSchedule: { effectiveFrom: '2026-09-30T15:00:00.000+09:00', value: '' }, pendingScheduleCount: 1, usageCount: 7,
   },
   {
     id: 'common-var-phone', lineAccountId: 'visual-qa-account', folderId: 'cvf-store',
@@ -1426,28 +1452,25 @@ export const COMMON_VARS = [
     nextSchedule: null, pendingScheduleCount: 0, usageCount: 7,
   },
   {
-    id: 'common-var-campaign', lineAccountId: 'visual-qa-account', folderId: 'cvf-campaign',
-    name: '今月のキャンペーン', varKey: 'monthly_campaign', type: 'text', value: '夏の20%オフ（8/25〜9/30）',
-    createdAt: '2026-08-01T10:00:00.000+09:00', updatedAt: '2026-08-22T10:00:00.000+09:00',
-    nextSchedule: { effectiveFrom: '2026-09-30T15:00:00.000+09:00', value: '' }, pendingScheduleCount: 1, usageCount: 7,
+    /* 空のまま使われている1件（空欄のまま送られます → 直す）。 */
+    id: 'common-var-contact', lineAccountId: 'visual-qa-account', folderId: 'cvf-guides',
+    name: '問い合わせ先', varKey: 'contact', type: 'text', value: '',
+    createdAt: '2026-06-10T10:00:00.000+09:00', updatedAt: '2026-06-10T10:00:00.000+09:00',
+    nextSchedule: null, pendingScheduleCount: 0, usageCount: 2,
+  },
+  {
+    /* 下書き。使っている所は「なし」。 */
+    id: 'common-var-delete-safe', lineAccountId: 'visual-qa-account', folderId: 'cvf-campaign',
+    name: '臨時のお知らせ', varKey: 'temporary_notice', type: 'text', value: '本日は17時まで',
+    state: 'draft',
+    createdAt: '2026-09-01T10:00:00.000+09:00', updatedAt: '2026-09-01T10:00:00.000+09:00',
+    nextSchedule: null, pendingScheduleCount: 0, usageCount: 0,
   },
   {
     id: 'common-var-address', lineAccountId: 'visual-qa-account', folderId: 'cvf-store',
     name: '住所', varKey: 'address', type: 'text', value: '東京都渋谷区〇〇 1-2-3',
     createdAt: '2026-06-01T10:00:00.000+09:00', updatedAt: '2026-07-20T10:00:00.000+09:00',
     nextSchedule: null, pendingScheduleCount: 0, usageCount: 4,
-  },
-  {
-    id: 'common-var-contact', lineAccountId: 'visual-qa-account', folderId: 'cvf-guides',
-    name: '問い合わせ窓口', varKey: 'contact', type: 'text', value: '',
-    createdAt: '2026-06-10T10:00:00.000+09:00', updatedAt: '2026-06-10T10:00:00.000+09:00',
-    nextSchedule: null, pendingScheduleCount: 0, usageCount: 2,
-  },
-  {
-    id: 'common-var-delete-safe', lineAccountId: 'visual-qa-account', folderId: 'cvf-guides',
-    name: '臨時のお知らせ', varKey: 'temporary_notice', type: 'text', value: '本日は17時まで営業します',
-    createdAt: '2026-09-01T10:00:00.000+09:00', updatedAt: '2026-09-01T10:00:00.000+09:00',
-    nextSchedule: null, pendingScheduleCount: 0, usageCount: 0,
   },
 ]
 
@@ -2618,40 +2641,40 @@ const RUN_BASE = {
 
 export const REMINDER_RUNS = {
   reminder: {
-    id: 'reminder-1', name: '予約前日のお知らせ', isActive: true,
+    id: 'reminder-1', name: '予約前日のご案内', isActive: true,
     /** V8詳細（rbAig）はこの3つで「いまの状態」の札と操作を分ける。 */
     lifecycleStatus: 'published', stopConditions: null, hasPublishedVersion: true,
   },
   summary: {
+    /* 板 `loVfW` の「いまの状態」：登録者186人・124通・今月386通・失敗2通。 */
     sent: 1126, scheduled: 398, stopped: 28, errors: 2,
-    targetCount: 398, nextScheduledAt: '2026-08-24T09:00:00+09:00',
+    targetCount: 186, nextScheduledAt: '2026-08-24T09:00:00+09:00',
     /* V8詳細の「いまの状態」。`getReminderDeliveryRunSummary` の追加列と同じ意味。 */
     sentThisMonth: 386, scheduledNext7Days: 124,
   },
+  /* 板 `rbAig`（概要）の通知2通。送った212通・失敗1通と174通・1通。
+   * 届き方の見本は1通目の本文（`renderReminderBodySample` が読む）。 */
   steps: [
     {
       id: 'step-1', stepNumber: 1, offsetMinutes: -1440, messageType: 'text',
-      messageContent: '明日のご予約のお知らせです。お待ちしております。',
+      messageContent: '明日10月2日(木)14:00からのご相談の案内です。時間になったら下のURLから参加してください。https://meet.google.com/abc-defg-hij',
       /** LINEは友だち単位の既読を返さない。**0%を作らない。** */
-      sent: 128, openRate: null, errors: 3,
+      sent: 212, openRate: null, errors: 1,
     },
     {
       id: 'step-2', stepNumber: 2, offsetMinutes: -60, messageType: 'text',
-      messageContent: '1時間後にお会いできるのを楽しみにしています。',
-      sent: 361, openRate: null, errors: 0,
-    },
-    {
-      id: 'step-3', stepNumber: 3, offsetMinutes: 0, messageType: 'text',
-      messageContent: '当日のご案内',
-      sent: 383, openRate: null, errors: 1,
+      messageContent: 'まもなく開始です。参加URLをもう一度お送りします。https://meet.google.com/abc-defg-hij',
+      sent: 174, openRate: null, errors: 1,
     },
   ],
+  /* 板 `rbAig` の最近の実行3行と、通知ごとの「次に送る」（`planned` の
+   * 2件。概要は手順番号ごとの最早を拾う）。 */
   items: [
     {
-      ...RUN_BASE, id: 'run-1', friendId: 'friend-kyohei', friendName: 'Kyohei Yamamoto',
-      stepNumber: 1, scheduledAt: '2026-08-19T09:00:00+09:00',
-      startedAt: '2026-08-19T09:00:02+09:00', completedAt: '2026-08-19T09:00:03+09:00',
-      occurredAt: '2026-08-19T09:00:03+09:00', subject: 'Kyohei Yamamoto',
+      ...RUN_BASE, id: 'run-1', friendId: 'friend-hanako', friendName: '佐藤 花子',
+      stepNumber: 1, scheduledAt: '2026-09-30T18:00:00+09:00',
+      startedAt: '2026-09-30T18:00:02+09:00', completedAt: '2026-09-30T18:00:03+09:00',
+      occurredAt: '2026-09-30T18:00:03+09:00', subject: '佐藤 花子',
       status: 'succeeded', domainStatus: 'succeeded', detail: '1通目',
       durationMs: 1200, attemptCount: 1, nextRetryAt: null,
       lastErrorCode: null, lastErrorMessage: null,
@@ -2659,10 +2682,21 @@ export const REMINDER_RUNS = {
       canRetry: false,
     },
     {
-      ...RUN_BASE, id: 'run-2', friendId: 'friend-masato', friendName: 'Masato.S',
-      stepNumber: 1, scheduledAt: '2026-08-20T09:00:00+09:00',
-      startedAt: null, completedAt: null,
-      occurredAt: '2026-08-20T09:00:00+09:00', subject: 'Masato.S',
+      ...RUN_BASE, id: 'run-2', friendId: 'friend-ichiro', friendName: '鈴木 一郎',
+      stepNumber: 1, scheduledAt: '2026-09-30T18:00:00+09:00',
+      startedAt: '2026-09-30T18:00:02+09:00', completedAt: '2026-09-30T18:00:03+09:00',
+      occurredAt: '2026-09-30T18:00:03+09:00', subject: '鈴木 一郎',
+      status: 'failed', domainStatus: 'permanent_failed', detail: '1通目',
+      durationMs: 900, attemptCount: 1, nextRetryAt: null,
+      lastErrorCode: '400', lastErrorMessage: 'LINEが受け付けませんでした',
+      lineRequestId: null, messageLogId: null,
+      canRetry: true,
+    },
+    {
+      ...RUN_BASE, id: 'run-3', friendId: 'friend-misaki', friendName: '高橋 美咲',
+      stepNumber: 2, scheduledAt: '2026-09-30T13:00:00+09:00',
+      startedAt: '2026-09-30T13:00:02+09:00', completedAt: '2026-09-30T13:00:03+09:00',
+      occurredAt: '2026-09-30T13:00:03+09:00', subject: '高橋 美咲',
       status: 'succeeded', domainStatus: 'succeeded', detail: '2通目',
       durationMs: 900, attemptCount: 1, nextRetryAt: null,
       lastErrorCode: null, lastErrorMessage: null,
@@ -2670,18 +2704,29 @@ export const REMINDER_RUNS = {
       canRetry: false,
     },
     {
-      ...RUN_BASE, id: 'run-3', friendId: 'friend-kenta', friendName: 'Kenta Kawano(Obama)',
-      stepNumber: 1, scheduledAt: '2026-08-19T09:00:00+09:00',
-      startedAt: '2026-08-19T09:00:02+09:00', completedAt: null,
-      occurredAt: '2026-08-19T09:00:02+09:00', subject: 'Kenta Kawano(Obama)',
-      status: 'pending', domainStatus: 'retry_wait', detail: '一時的にLINEへ届きませんでした',
-      durationMs: null, attemptCount: 2, nextRetryAt: '2026-08-19T09:30:00+09:00',
-      lastErrorCode: '429', lastErrorMessage: '一時的にLINEへ届きませんでした',
+      ...RUN_BASE, id: 'run-4', friendId: 'friend-hanako', friendName: '佐藤 花子',
+      stepNumber: 1, scheduledAt: '2026-10-01T18:00:00+09:00',
+      startedAt: null, completedAt: null,
+      occurredAt: '2026-10-01T18:00:00+09:00', subject: '佐藤 花子',
+      status: 'planned', domainStatus: 'planned', detail: '1通目',
+      durationMs: null, attemptCount: 0, nextRetryAt: null,
+      lastErrorCode: null, lastErrorMessage: null,
       lineRequestId: null, messageLogId: null,
-      canRetry: true,
+      canRetry: false,
+    },
+    {
+      ...RUN_BASE, id: 'run-5', friendId: 'friend-misaki', friendName: '高橋 美咲',
+      stepNumber: 2, scheduledAt: '2026-10-02T13:00:00+09:00',
+      startedAt: null, completedAt: null,
+      occurredAt: '2026-10-02T13:00:00+09:00', subject: '高橋 美咲',
+      status: 'planned', domainStatus: 'planned', detail: '2通目',
+      durationMs: null, attemptCount: 0, nextRetryAt: null,
+      lastErrorCode: null, lastErrorMessage: null,
+      lineRequestId: null, messageLogId: null,
+      canRetry: false,
     },
   ],
-  pagination: { total: 3, limit: 20, offset: 0 },
+  pagination: { total: 5, limit: 20, offset: 0 },
 }
 
 // V6 3-1-D `IAf7j`（友だち一括操作）。画面側はこの契約をそのまま使う。
@@ -3419,21 +3464,30 @@ export const BROADCAST_FOLDERS = [
 }))
 
 /**
- * 機能7 リマインダ。設計 `M1EXwB` の5行そのまま。
+ * 機能7 リマインダ。V8 板 `apLqS`（リマインダ一覧）の9件そのまま。
+ * フォルダは絵のとおり予約3・契約更新2・イベント2・未分類2（「フォロー」
+ * というフォルダは絵に無い）。未分類の2件は `folderId: null` で返し、
+ * 件数は mock-api が `unfiledCount: 2` で返す。
  *
  * **`Reminder` の型に照らして書く。** 設計の言葉（「予約日時の1日前」）は
  * 見出しであって項目名ではない。`triggerType` は
  * `'manual' | 'booking' | 'event' | 'friend_field'` の4つしかなく、
  * ここに設計の日本語をそのまま入れると画面は既定値のまま描かれ、
- * **5行とも同じきっかけで撮れてしまう**（機能4で一度やった）。
+ * **行が同じきっかけで撮れてしまう**（機能4で一度やった）。
+ * 基準日の言い回しは `baseDateSummary`、時刻の言い回しは
+ * `timingSummary` に書く（実装はそのままつなげて出す）。
  */
 export const REMINDER_FOLDERS = [
-  { id: 'rf-booking', kind: 'reminder', name: '予約', parentId: null, displayOrder: 1, color: '#2563eb', itemCount: 3, listTotal: 9 },
+  { id: 'rf-booking', kind: 'reminder', name: '予約', parentId: null, displayOrder: 1, color: '#2563eb', itemCount: 3 },
   { id: 'rf-contract', kind: 'reminder', name: '契約更新', parentId: null, displayOrder: 2, color: '#d97706', itemCount: 2 },
   { id: 'rf-event', kind: 'reminder', name: 'イベント', parentId: null, displayOrder: 3, color: '#7c3aed', itemCount: 2 },
-  { id: 'rf-follow', kind: 'reminder', name: 'フォロー', parentId: null, displayOrder: 4, color: '#059669', itemCount: 4 },
 ]
 
+/* 板 `apLqS` の9行を上から順に並べた（`displayOrder` が並び）。
+ * 「次に送る」の日付は絵の `10/1（水）18:00` の形になるよう、曜日が合う
+ * 2025年の同じ月日で持つ（実装は曜日を日付から計算する）。下書き・停止中
+ * の行は実装が「—」で出すので `plannedDeliveries` と `nextScheduledAt` は
+ * 空でも絵と同じになるが、他画面（詳細・編集）が読むため値は入れてある。 */
 export const REMINDERS = [
   {
     id: 'reminder-1', name: '予約前日のご案内', description: '予約日時の1日前',
@@ -3441,16 +3495,18 @@ export const REMINDERS = [
     triggerOffsetMinutes: -1440, sendAtTime: '18:00', targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
     folderId: 'rf-booking', stepCount: 1, displayOrder: 1,
-    lifecycleStatus: 'published', timingSummary: '1日前 18:00 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 42, lastSentAt: '2026-08-22T09:00:00.000Z',
-    createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T09:00:00.000Z',
+    lifecycleStatus: 'published', timingSummary: '1日前 18:00 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 42, nextScheduledAt: '2025-10-01T18:00:00+09:00', lastSentAt: '2026-08-22T09:00:00.000Z',
+    createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-09-28T10:00:00+09:00',
   },
   {
+    /* 絵の2行目には「失敗 2」の札が付く。 */
     id: 'reminder-2', name: '予約1時間前のご案内', description: '予約日時の1時間前',
     isActive: true, triggerType: 'booking', deliveryMode: 'countdown',
     triggerOffsetMinutes: -60, sendAtTime: null, targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
     folderId: 'rf-booking', stepCount: 1, displayOrder: 2,
-    lifecycleStatus: 'published', timingSummary: '1時間前 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 39, lastSentAt: '2026-08-22T13:00:00.000Z',
+    hasFailure: true, failedCount: 2,
+    lifecycleStatus: 'published', timingSummary: '1時間前 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 39, nextScheduledAt: '2025-10-01T13:00:00+09:00', lastSentAt: '2026-08-22T13:00:00.000Z',
     createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T11:00:00.000Z',
   },
   {
@@ -3459,30 +3515,68 @@ export const REMINDERS = [
     triggerOffsetMinutes: -43200, sendAtTime: '10:00', targetTagId: null,
     triggerFieldId: 'field-contract-end', repeatYearly: false,
     folderId: 'rf-contract', stepCount: 2, displayOrder: 3,
-    lifecycleStatus: 'published', timingSummary: '30日前 10:00 ／ テキスト 2通', baseDateSummary: '契約終了日', plannedDeliveries: 18, lastSentAt: '2026-08-21T01:00:00.000Z',
+    lifecycleStatus: 'published', timingSummary: '30日前 10:00 ／ テキスト 2通', baseDateSummary: '契約終了日（友だち情報欄）', plannedDeliveries: 18, nextScheduledAt: '2025-10-03T10:00:00+09:00', lastSentAt: '2026-08-21T01:00:00.000Z',
     createdAt: '2026-05-11T00:00:00.000Z', updatedAt: '2026-08-21T01:00:00.000Z',
   },
   {
-    /* 下書き。**0通なので「最終送信」は空。** ここを「—」ではなく空で
-       出すか、設計どおり空欄にするかは実装側の決めごと。 */
-    id: 'reminder-4', name: 'イベント当日案内', description: 'イベント当日',
+    /* 未分類（`folderId: null`）。絵の4行目。毎年くり返す誕生日。 */
+    id: 'reminder-6', name: 'お誕生日のお祝い', description: '誕生日の当日',
+    isActive: true, triggerType: 'friend_field', deliveryMode: 'time',
+    triggerOffsetMinutes: 0, sendAtTime: '10:00', targetTagId: null,
+    triggerFieldId: 'field-birthday', repeatYearly: true,
+    folderId: null, stepCount: 1, displayOrder: 4,
+    lifecycleStatus: 'published', timingSummary: '当日 10:00 ／ テキスト 1通', baseDateSummary: '誕生日（毎年くり返す）', plannedDeliveries: 7, nextScheduledAt: '2025-10-05T10:00:00+09:00', lastSentAt: null,
+    createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    /* 下書き。実装は「これから送る」「次に送る」を「—」で出す。 */
+    id: 'reminder-4', name: 'イベント当日のご案内', description: 'イベント当日',
     isActive: false, triggerType: 'event', deliveryMode: 'time',
     triggerOffsetMinutes: 0, sendAtTime: '09:00', targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
-    folderId: 'rf-event', stepCount: 1, displayOrder: 4,
-    lifecycleStatus: 'draft', timingSummary: '当日 09:00 ／ テキスト 1通', baseDateSummary: 'イベント当日', plannedDeliveries: 0, lastSentAt: null,
+    folderId: 'rf-event', stepCount: 1, displayOrder: 5,
+    lifecycleStatus: 'draft', timingSummary: '当日 09:00 ／ テキスト 1通', baseDateSummary: 'イベントの予約日時', plannedDeliveries: 0, nextScheduledAt: null, lastSentAt: null,
     createdAt: '2026-08-10T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z',
   },
   {
-    /* 停止中。設計は「下書き」と別の札で描いている。実装の `isActive` は
-       真偽値ひとつなので、**下書きと停止中を描き分けられない。** */
+    /* 停止中。絵に「フォロー」フォルダは無いので未分類（`folderId: null`）。
+       実装は `lifecycleStatus: 'stopped'` を「停止中」の札で出す。 */
     id: 'reminder-5', name: '未返信3日後フォロー', description: '最終送信の3日後',
     isActive: false, triggerType: 'manual', deliveryMode: 'time',
     triggerOffsetMinutes: 4320, sendAtTime: '12:00', targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
-    folderId: 'rf-follow', stepCount: 1, displayOrder: 5,
-    lifecycleStatus: 'stopped', timingSummary: '3日後 12:00 ／ テキスト 1通', baseDateSummary: '最終送信日', plannedDeliveries: 25, lastSentAt: '2026-08-19T03:00:00.000Z',
+    folderId: null, stepCount: 1, displayOrder: 6,
+    lifecycleStatus: 'stopped', timingSummary: '3日後 12:00 ／ テキスト 1通', baseDateSummary: '最終送信日', plannedDeliveries: 25, nextScheduledAt: null, lastSentAt: '2026-08-19T03:00:00.000Z',
     createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-19T03:00:00.000Z',
+  },
+  {
+    /* 以下3件はフォルダの数（予約3・契約更新2・イベント2）を絵に合わせる
+       ための分。絵の見切れの下にいるとして `displayOrder` を後ろに置く。 */
+    id: 'reminder-7', name: '来店後のお礼', description: '来店の3日後',
+    isActive: true, triggerType: 'booking', deliveryMode: 'time',
+    triggerOffsetMinutes: 4320, sendAtTime: '18:00', targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-booking', stepCount: 1, displayOrder: 7,
+    lifecycleStatus: 'published', timingSummary: '3日後 18:00 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 5, nextScheduledAt: '2025-10-07T18:00:00+09:00', lastSentAt: null,
+    createdAt: '2026-08-15T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    id: 'reminder-8', name: '契約更新7日前', description: '契約終了の7日前',
+    isActive: true, triggerType: 'friend_field', deliveryMode: 'time',
+    triggerOffsetMinutes: -10080, sendAtTime: '10:00', targetTagId: null,
+    triggerFieldId: 'field-contract-end', repeatYearly: false,
+    folderId: 'rf-contract', stepCount: 1, displayOrder: 8,
+    lifecycleStatus: 'published', timingSummary: '7日前 10:00 ／ テキスト 1通', baseDateSummary: '契約終了日（友だち情報欄）', plannedDeliveries: 11, nextScheduledAt: '2025-10-06T10:00:00+09:00', lastSentAt: null,
+    createdAt: '2026-08-12T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    id: 'reminder-9', name: 'イベント前日のご案内', description: 'イベントの前日',
+    isActive: true, triggerType: 'event', deliveryMode: 'time',
+    triggerOffsetMinutes: -1440, sendAtTime: '09:00', targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-event', stepCount: 1, displayOrder: 9,
+    lifecycleStatus: 'published', timingSummary: '1日前 09:00 ／ テキスト 1通', baseDateSummary: 'イベントの予約日時', plannedDeliveries: 9, nextScheduledAt: '2025-10-06T09:00:00+09:00', lastSentAt: null,
+    createdAt: '2026-08-11T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
   },
 ]
 
@@ -3698,11 +3792,14 @@ export const FRIEND_FIELD_MIGRATION_PREVIEW = {
  * 狭いほうに合わせて書くと、優先順位も曜日も当たり回数も空のまま撮れて、
  * **設計の一覧と比べるものが何も無くなる。**
  */
+/* V8 板 `uE9gf`（自動応答一覧）の5件に合わせた分け方。お問い合わせ2・
+ * 予約1・営業時間外1・未分類1（「キーワード」というフォルダは絵に無い）。
+ * 未分類の1件は `folderId: null` で返し、件数は mock-api が
+ * `unfiledCount` で返す。 */
 export const AUTO_REPLY_FOLDERS = [
-  { id: 'arf-inquiry', kind: 'auto_reply', name: 'お問い合わせ', parentId: null, displayOrder: 1, color: '#2563eb', itemCount: 5, listTotal: 14, activeTotal: 10, monthlyTotal: 682 },
-  { id: 'arf-booking', kind: 'auto_reply', name: '予約', parentId: null, displayOrder: 2, color: '#059669', itemCount: 4 },
-  { id: 'arf-keyword', kind: 'auto_reply', name: 'キーワード', parentId: null, displayOrder: 3, color: '#d97706', itemCount: 3 },
-  { id: 'arf-afterhours', kind: 'auto_reply', name: '営業時間外', parentId: null, displayOrder: 4, color: '#7c3aed', itemCount: 4 },
+  { id: 'arf-inquiry', kind: 'auto_reply', name: 'お問い合わせ', parentId: null, displayOrder: 1, color: '#2563eb', itemCount: 2 },
+  { id: 'arf-booking', kind: 'auto_reply', name: '予約', parentId: null, displayOrder: 2, color: '#059669', itemCount: 1 },
+  { id: 'arf-afterhours', kind: 'auto_reply', name: '営業時間外', parentId: null, displayOrder: 3, color: '#7c3aed', itemCount: 1 },
 ]
 
 const AR_BASE = {
@@ -3721,7 +3818,7 @@ export const AUTO_REPLIES = [
     activeFrom: '21:00', activeUntil: '09:00',
     responseWeekdays: [0, 1, 2, 3, 4, 5, 6], respondToAll: true,
     actions: [{ actionType: 'support_mark' }],
-    keywords: [], hits: { period: 214, total: 1893 },
+    keywords: [], hits: { period: 214, total: 1842 },
     actionExecutionCount: 86, conflictAttentionCount: 1,
     createdAt: '2026-03-04T00:00:00.000Z',
   },
@@ -3731,7 +3828,7 @@ export const AUTO_REPLIES = [
     isActive: true, priority: 2, folderId: 'arf-booking', templateId: 'template-1',
     keywords: [{ keyword: '予約変更', matchType: 'contains' }, { keyword: '日程変更', matchType: 'contains' }, { keyword: 'キャンセル', matchType: 'contains' }],
     actions: [{ actionType: 'support_mark' }],
-    hits: { period: 186, total: 942 }, actionExecutionCount: 64, conflictAttentionCount: 1,
+    hits: { period: 128, total: 902 }, actionExecutionCount: 64, conflictAttentionCount: 1,
     createdAt: '2026-04-18T00:00:00.000Z',
   },
   {
@@ -3740,7 +3837,7 @@ export const AUTO_REPLIES = [
     isActive: true, priority: 3, folderId: 'arf-inquiry',
     keywords: [{ keyword: '商品', matchType: 'contains' }, { keyword: '価格', matchType: 'contains' }, { keyword: '在庫', matchType: 'contains' }, { keyword: 'サイズ', matchType: 'contains' }, { keyword: '送料', matchType: 'contains' }],
     actions: [{ actionType: 'tag' }],
-    hits: { period: 152, total: 733 }, actionExecutionCount: 64, conflictAttentionCount: 1,
+    hits: { period: 210, total: 1235 }, actionExecutionCount: 64, conflictAttentionCount: 1,
     createdAt: '2026-05-06T00:00:00.000Z',
   },
   {
@@ -3748,17 +3845,17 @@ export const AUTO_REPLIES = [
        「まだ動かしていない」は違うので、0で撮れることが要る。 */
     ...AR_BASE, id: 'ar-4', name: 'キャンセル受付', keyword: 'キャンセル', matchType: 'contains',
     responseType: 'text', responseContent: 'キャンセルを承りました。',
-    isActive: false, priority: 4, folderId: 'arf-booking',
-    keywords: [{ keyword: 'キャンセル', matchType: 'contains' }, { keyword: '取り消し', matchType: 'contains' }],
+    isActive: false, priority: 4, folderId: 'arf-inquiry',
+    keywords: [{ keyword: 'キャンセル', matchType: 'contains' }, { keyword: '取消', matchType: 'contains' }],
     actions: [], hits: { period: 0, total: 0 }, actionExecutionCount: 0, conflictAttentionCount: 0,
     createdAt: '2026-08-12T00:00:00.000Z',
   },
   {
     ...AR_BASE, id: 'ar-5', name: '旧キーワードルール', keyword: '営業時間', matchType: 'exact',
     responseType: 'text', responseContent: '平日 09:00〜18:00 です。',
-    isActive: false, priority: 5, folderId: 'arf-keyword',
+    isActive: false, priority: 5, folderId: null,
     keywords: [{ keyword: '営業時間', matchType: 'exact' }],
-    actions: [], hits: { period: 0, total: 411 }, actionExecutionCount: 0, conflictAttentionCount: 0,
+    actions: [], hits: { period: 0, total: 0 }, actionExecutionCount: 0, conflictAttentionCount: 0,
     createdAt: '2026-01-20T00:00:00.000Z',
   },
 ]
@@ -4086,29 +4183,34 @@ export const INCOMING_WEBHOOK_DETAILS = {
   **`refCode` は運用者が決めてURLに出す符号**なので、値は設計の `summer-ig` などを使う。
   出してはいけないのは列名のほう（`v6-no-internal-ids.test.ts` が見張っている）。
 */
+/* 板 `xbHxg`（流入と計測一覧）の6行。フォルダは広告1・SNS1・店頭1・
+ * 未分類3（紹介と紙の分類は絵に無いので `genre: null`）。メール署名は
+ * 未登録（`orphan` の行）のため経路自体を持たない。動きが未設定の2件は
+ * Google広告とチラシ（タグもシナリオも無い行）。 */
 export const ENTRY_ROUTES = [
   { id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿', tagId: 'tag-vip', scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-25T00:12:00.000Z' },
-  { id: 'er-2', refCode: 'tanaka01', genre: '紹介', name: '紹介リンク 田中 明', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
+  { id: 'er-2', refCode: 'ref-tanaka', genre: null, name: '紹介リンク 田中 明', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
   { id: 'er-3', refCode: 'shop-pop', genre: '店頭', name: '店頭POPのQRコード', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-25T02:30:00.000Z' },
-  { id: 'er-4', refCode: 'g-ads-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
-  { id: 'er-5', refCode: 'mail-sign', genre: 'メール', name: 'メール署名', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-02-14T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z' },
-  { id: 'er-6', refCode: 'flyer-spring', genre: '紙', name: 'チラシ（2026春）', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, stoppedAt: '2026-06-30T00:00:00.000Z', stoppedReason: '春の配布が終わった', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
+  { id: 'er-4', refCode: 'ad-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
+  { id: 'er-6', refCode: 'flyer-26s', genre: null, name: 'チラシ計測リンク（2026春）', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, stoppedAt: '2026-06-30T00:00:00.000Z', stoppedReason: '春の配布が終わった', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
 ]
 
-/** 機能18。設計画像と同じ通常状態を、実データを使わずに撮るための固定値。 */
+/* 板 `xbHxg` の6行。友だち追加の合計は115人（帯の数と一致）。店頭と
+ * チラシのクリックは絵のとおり空（`—` で出す）。メール署名は未登録の行
+ * のため集計だけにいる。 */
 export const INFLOW_SUMMARY = {
   routes: [
-    { refCode: 'summer-ig', name: '夏のInstagram投稿', friendCount: 86, clickCount: 1240, latestAt: '2026-08-25T09:12:00.000Z' },
-    { refCode: 'tanaka01', name: '紹介リンク 田中 明', friendCount: 58, clickCount: 820, latestAt: '2026-08-24T18:40:00.000Z' },
-    { refCode: 'shop-pop', name: '店頭POPのQRコード', friendCount: 124, clickCount: 640, latestAt: '2026-08-25T11:30:00.000Z' },
-    { refCode: 'g-ads-summer', name: 'Google広告 夏キャンペーン', friendCount: 142, clickCount: 3120, latestAt: '2026-08-25T08:04:00.000Z' },
-    { refCode: 'mail-sign', name: 'メール署名', friendCount: 12, clickCount: 210, latestAt: '2026-08-19T16:02:00.000Z' },
-    { refCode: 'flyer-spring', name: 'チラシ（2026春）', friendCount: 12, clickCount: 12, latestAt: '2026-06-28T14:10:00.000Z' },
+    { refCode: 'ad-summer', name: 'Google広告 夏キャンペーン', friendCount: 42, clickCount: 1204, latestAt: '2026-09-30T14:12:00+09:00' },
+    { refCode: 'summer-ig', name: '夏のInstagram投稿', friendCount: 31, clickCount: 880, latestAt: '2026-09-30T09:40:00+09:00' },
+    { refCode: 'shop-pop', name: '店頭POPのQRコード', friendCount: 27, clickCount: null, latestAt: '2026-09-29T18:40:00+09:00' },
+    { refCode: 'mail-sign', name: 'メール署名', friendCount: 3, clickCount: 96, latestAt: '2026-09-26T11:02:00+09:00' },
+    { refCode: 'ref-tanaka', name: '紹介リンク 田中 明', friendCount: 12, clickCount: 230, latestAt: '2026-09-29T10:21:00+09:00' },
+    { refCode: 'flyer-26s', name: 'チラシ計測リンク（2026春）', friendCount: 0, clickCount: null, latestAt: '2026-05-31T18:00:00+09:00' },
   ],
-  totalFriends: 312,
+  totalFriends: 115,
   friendsWithRef: 289,
   friendsWithoutRef: 23,
-  routeTotal: 24,
+  routeTotal: 6,
   totalClicks: 8420,
   averageAddRate: 6.4,
 }
@@ -4145,7 +4247,7 @@ export const AD_PLATFORMS = [
  * 通貨は円（JPYは最小単位が円そのもの）。日時は固定。
  */
 export const AD_COST_ROWS = [
-  { sourceLabel: 'Google広告', adPlatformId: 'ad-google', entryRouteId: 'g-ads-summer', source: 'import', totals: [{ currency: 'JPY', amountMinor: 54000 }], friendAdds: 45, costPerFriendMinor: 1200, lastImportedAt: '2026-10-01T06:00:00+09:00' },
+  { sourceLabel: 'Google広告', adPlatformId: 'ad-google', entryRouteId: 'ad-summer', source: 'import', totals: [{ currency: 'JPY', amountMinor: 54000 }], friendAdds: 45, costPerFriendMinor: 1200, lastImportedAt: '2026-10-01T06:00:00+09:00' },
   { sourceLabel: 'Meta広告', adPlatformId: 'ad-meta', entryRouteId: 'summer-ig', source: 'import', totals: [{ currency: 'JPY', amountMinor: 32000 }], friendAdds: 28, costPerFriendMinor: 1143, lastImportedAt: '2026-10-01T06:00:00+09:00' },
 ]
 
@@ -7276,18 +7378,37 @@ export const OPERATION_SEND_PATHS = {
   ],
 }
 
-/** リマインダの登録者。本物は `GET /api/reminders/:id/registrants` の配列。 */
+/* 板 `loVfW`（登録者を管理）の186人。先頭3人は絵のとおり、有効180・
+ * 取消済み6で数（`items.length` と `status` から数える）。本物は
+ * `GET /api/reminders/:id/registrants` の配列。 */
+const REMINDER_REGISTRANT_BASE = [
+  ['山田 太郎', 'active', 'manual'],
+  ['佐藤 花子', 'active', 'form'],
+  ['鈴木 一郎', 'active', 'manual'],
+]
+const REMINDER_REGISTRANT_NAMES = [
+  '高橋 直人', '前田 さくら', '木村 亮太', '中村 美咲', '林 翔太', '小林 葵',
+  '加藤 蓮', '吉田 陽菜', '森田 健一', '石井 さくら', '藤田 大輔', '岡田 結衣',
+]
 export const REMINDER_REGISTRANTS = [
-  {
-    id: 'reminder-enrollment-1', friendId: 'friend-1', friendName: '高橋 直人', targetDate: '2026-09-10',
-    status: 'active', reminderVersionId: 'reminder-version-1', sourceKind: 'manual',
+  ...REMINDER_REGISTRANT_BASE.map(([friendName, status, sourceKind], index) => ({
+    id: `reminder-enrollment-${index + 1}`, friendId: `friend-reg-${index + 1}`, friendName, targetDate: '2026-09-10',
+    status, reminderVersionId: 'reminder-version-1', sourceKind,
     createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-01T09:00:00+09:00',
     cancelledAt: null, lockVersion: 1,
-  },
-  {
-    id: 'reminder-enrollment-2', friendId: 'friend-2', friendName: '前田 さくら', targetDate: '2026-09-12',
-    status: 'active', reminderVersionId: 'reminder-version-1', sourceKind: 'form',
-    createdAt: '2026-09-02T09:00:00+09:00', updatedAt: '2026-09-02T09:00:00+09:00',
-    cancelledAt: null, lockVersion: 1,
-  },
+  })),
+  ...Array.from({ length: 183 }, (_, index) => {
+    const number = index + 4
+    // 末尾6人は取消済み（186人中 有効180・取消6）。
+    const cancelled = number > 180
+    return {
+      id: `reminder-enrollment-${number}`, friendId: `friend-reg-${number}`,
+      friendName: `${REMINDER_REGISTRANT_NAMES[index % REMINDER_REGISTRANT_NAMES.length]}${Math.floor(index / REMINDER_REGISTRANT_NAMES.length) + 1}`,
+      targetDate: '2026-09-10',
+      status: cancelled ? 'cancelled' : 'active', reminderVersionId: 'reminder-version-1',
+      sourceKind: number % 2 === 0 ? 'form' : 'manual',
+      createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-01T09:00:00+09:00',
+      cancelledAt: cancelled ? '2026-09-15T09:00:00+09:00' : null, lockVersion: 1,
+    }
+  }),
 ]
