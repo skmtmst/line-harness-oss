@@ -43,6 +43,27 @@
 [data-theme='v8'] .row { padding: 7px 10px; gap: 8px; border-radius: 8px; }
 [data-theme='v8'] .row .select { padding: 0; }
 [data-theme='v8'] .menu { width: 14px; height: 14px; flex-shrink: 0; }
+/*
+ * I3L41O（部品正本 faSbC も同じ）：「…」は選んだ行だけが場所を取る。
+ * 選んでいない行に箱を置くと件数が絵より左へ22ずれる（14の箱＋8の隙間）。
+ * 選んでいない行の箱は重ねて出し、触る・キーボード・開いている間だけ見せる。
+ * 場所を取らないので件数は動かない。触れない端末では常に出す。
+ */
+[data-theme='v8'] .row:not([data-active]) .menu {
+  position: absolute; right: 10px; top: 50%; translate: 0 -50%;
+  opacity: 0; pointer-events: none;
+}
+[data-theme='v8'] .row:not([data-active]):hover .menu,
+[data-theme='v8'] .row:not([data-active]):focus-within .menu,
+[data-theme='v8'] .row:not([data-active])[data-menu-open] .menu {
+  opacity: 1; pointer-events: auto;
+}
+@media (hover: none) {
+  [data-theme='v8'] .row:not([data-active]) .menu { opacity: 1; pointer-events: auto; }
+}
+/* 選んだ行の場所取り（操作なしの行用。絵では選んだ行に「…」がある）。v7 では出さない。 */
+.menuSlot { display: none; }
+[data-theme='v8'] .menuSlot { display: block; width: 14px; height: 14px; flex-shrink: 0; }
 [data-theme='v8'] .menuButton { position: absolute; left: -9px; top: -9px; width: 32px; height: 32px; opacity: 1; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 [data-theme='v8'] .row .select { min-height: 0; height: auto; }
 }
