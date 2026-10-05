@@ -173,9 +173,5 @@
 :global([data-theme='v8']) .steps :global([data-part='stepper']) li > span:not([aria-hidden]) > span:first-child, :global([data-theme='v8']) .steps :global([data-part='stepper']) li > button > span:first-child { width: var(--tpl-steps-dot); height: var(--tpl-steps-dot); font-size: 11px; }
 :global([data-theme='v8']) .steps :global([data-part='stepper']) li span span { font-size: var(--tpl-steps-text-size); line-height: var(--tpl-steps-text-lh); }
 :global([data-theme='v8']) [data-page-template='create'] .steps { min-height: 0; }
-/* ★V8 作る型の頭の並び（A0pDt・K7HWG：戻る → 題 → 手順の帯 → 説明の行 12px）。題の下に説明を出さず、手順の帯の下へ（司令塔 2026-10-06） */
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText { display: contents; }
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .titleRow { flex-basis: 100%; order: 1; }
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { order: 2; }
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .description { flex-basis: 100%; order: 3; }
-:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 1; }
+/* ★V8 フォルダの列：上の「作る」ボタンの下からフォルダの題まで18（apLqS フォルダの列：間2＋14＋2） */
+:global([data-theme='v8']) .folders > :global(a) + * , :global([data-theme='v8']) .folders > :global(button) + * { margin-top: 16px; }

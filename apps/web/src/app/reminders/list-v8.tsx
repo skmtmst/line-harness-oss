@@ -1,5 +1,9 @@
 'use client'
 
+
+import { ListPageBody } from '@/components/templates'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 /*
  * ★V8 リマインダの一覧（Pencil「★V8 画面の地図」のリマインダの行：
  * 一覧 `apLqS`、行の「…」は `SkY9V`、一時停止は `RwVo5`、削除は `VsSyu`、
@@ -20,8 +24,11 @@ import {
   AlertCircle,
   Bell,
   CalendarClock,
+  CircleCheck,
   Folder as FolderIcon,
   MoreHorizontal,
+  Pause,
+  Pencil,
   Play,
   Search as SearchIcon,
   Send,
@@ -38,9 +45,10 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
-import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
@@ -50,8 +58,8 @@ import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
-import { Th } from '@/components/shared/table'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table'
 import { runUndoable } from '@/lib/undoable'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
@@ -70,6 +78,13 @@ const SORT_OPTIONS = [
   { value: 'name', label: '名前順' },
 ]
 const STATUS_CHIPS = ['有効', '下書き', '停止中', '失敗あり'] as const
+/* 板 `apLqS`：札には状態の図柄を付ける（有効=丸チェック・下書き=鉛筆・停止中=一時停止・失敗あり=三角注意）。 */
+const STATUS_CHIP_ICONS = {
+  '有効': <CircleCheck size={14} aria-hidden="true" />,
+  '下書き': <Pencil size={14} aria-hidden="true" />,
+  '停止中': <Pause size={14} aria-hidden="true" />,
+  '失敗あり': <TriangleAlert size={14} aria-hidden="true" />,
+} as const
 
 interface ReminderRow {
   id: string
@@ -166,7 +181,8 @@ export default function RemindersListV8() {
   const [folderFilter, setFolderFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [perPage, setPerPage] = useState(20)
-  const [sort, setSort] = useState('order')
+  // apLqS・Iffil の一覧は、次に送る予定が近いものから確認する。
+  const [sort, setSort] = useState('next')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -710,47 +726,19 @@ export default function RemindersListV8() {
     </>
   )
 
+  /* 板 `RrYYJ`「読み込み中」：見出しなしの骨4行。 */
   const loadingSkeleton = (
-    <table className={styles.table}>
-      <colgroup>
-        {canEdit && <col style={{ width: 40 }} />}
-        <col style={{ width: 44 }} />
-        <col />
-        <col style={{ width: 96 }} />
-        <col style={{ width: 112 }} />
-        <col style={{ width: 128 }} />
-        <col style={{ width: 44 }} />
-      </colgroup>
-      <thead>
-        <tr>
-          {canEdit && <Th aria-label="選択" />}
-          {tableHeadCells}
-        </tr>
-      </thead>
-      <tbody>
-        {[0, 1, 2, 3, 4].map((n) => (
-          <tr key={n}>
-            {canEdit && <td className={styles.selectCell} />}
-            <td className={styles.gripCell} />
-            <td>
-              <Skeleton width={220} height={16} />
-              <span style={{ display: 'block', height: 4 }} aria-hidden="true" />
-              <Skeleton width={160} height={12} />
-            </td>
-            <td>
-              <Skeleton width={64} height={24} className="rounded-pill" />
-            </td>
-            <td className={styles.countCell}>
-              <Skeleton width={56} height={16} />
-            </td>
-            <td>
-              <Skeleton width={96} height={16} />
-            </td>
-            <td />
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className={styles.skeletonRows} aria-label="読み込み中">
+      {[0, 1, 2, 3].map((n) => (
+        <div key={n} className={styles.skeletonRow} data-skeleton aria-hidden="true">
+          <span className={styles.skeletonDot} />
+          <span className={styles.skeletonBar} />
+          <span className={styles.skeletonBar} />
+          <span className={styles.skeletonBar} />
+          <span className={styles.skeletonBar} />
+        </div>
+      ))}
+    </div>
   )
 
   const table =
@@ -761,7 +749,7 @@ export default function RemindersListV8() {
     ) : reminderList.error ? (
       <div className={styles.stateCard} data-design-node="RrYYJ">
         <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
-          <AlertCircle size={18} aria-hidden="true" />
+          <AlertCircle size={16} aria-hidden="true" />
         </span>
         <p className={styles.stateTitle}>リマインダを読み込めませんでした</p>
         <p className={styles.stateDesc}>
@@ -773,7 +761,7 @@ export default function RemindersListV8() {
       filterActive ? (
         <div className={styles.stateCard} data-design-node="RrYYJ">
           <span className={styles.stateIcon}>
-            <SearchIcon size={18} aria-hidden="true" />
+            <SearchIcon size={16} aria-hidden="true" />
           </span>
           <p className={styles.stateTitle}>条件に合うリマインダはありません</p>
           <p className={styles.stateDesc}>
@@ -794,7 +782,7 @@ export default function RemindersListV8() {
       ) : (
         <div className={styles.stateCard} data-design-node="RrYYJ">
           <span className={styles.stateIcon}>
-            <Bell size={18} aria-hidden="true" />
+            <Bell size={16} aria-hidden="true" />
           </span>
           <p className={styles.stateTitle}>まだリマインダはありません</p>
           <p className={styles.stateDesc}>
@@ -814,18 +802,19 @@ export default function RemindersListV8() {
           {moveNotice}
         </span>
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
+          <DataTable>
             <colgroup>
-              {canEdit && <col style={{ width: 64 }} />}
-              <col style={{ width: 62 }} />
+              {/* ★V8 列の幅＝絵の中身の幅＋欄の間16（左右8ずつ）。端の列は端の24も足す（apLqS：選ぶ16・並べ替え14・状態80・予定90・次120・操作28） */}
+              {canEdit && <col style={{ width: 16 + 24 + 8 }} />}
+              <col style={{ width: 14 + 16 }} />
               <col />
-              <col style={{ width: 128 }} />
-              <col style={{ width: 138 }} />
-              <col style={{ width: 168 }} />
-              <col style={{ width: 76 }} />
+              <col style={{ width: 80 + 16 }} />
+              <col style={{ width: 90 + 16 }} />
+              <col style={{ width: 120 + 16 }} />
+              <col style={{ width: 28 + 8 + 24 }} />
             </colgroup>
             <thead>
-              <tr>
+              <TableHeadRow>
                 {canEdit && (
                   <Th className={styles.selectCell} aria-label="選択">
                     <Checkbox
@@ -837,7 +826,7 @@ export default function RemindersListV8() {
                   </Th>
                 )}
                 {tableHeadCells}
-              </tr>
+              </TableHeadRow>
             </thead>
             <tbody>
               {reminders.map((row) => {
@@ -851,7 +840,7 @@ export default function RemindersListV8() {
                 const nextSend =
                   view.status === 'active' ? formatNextSend(row.nextScheduledAt) : '—'
                 return (
-                  <tr
+                  <Tr interactive
                     key={row.id}
                     className={styles.rowClick}
                     tabIndex={0}
@@ -865,15 +854,15 @@ export default function RemindersListV8() {
                     }}
                   >
                     {canEdit && (
-                      <td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
+                      <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(row.id)}
                           onCheckedChange={() => toggleOne(row.id)}
                           aria-label={`${row.name}を選択`}
                         />
-                      </td>
+                      </Td>
                     )}
-                    <td
+                    <Td
                       className={styles.gripCell}
                       onClick={(event) => event.stopPropagation()}
                       draggable={canEdit}
@@ -890,9 +879,9 @@ export default function RemindersListV8() {
                       >
                         <span aria-hidden>⠿</span>
                       </ReorderGrip>
-                    </td>
-                    <td>
-                      <div className={styles.nameRow}>
+                    </Td>
+                    <NameCell
+                      name={<div className={styles.nameRow}>
                         <Link
                           href={detailHref(row.id)}
                           title={row.name}
@@ -920,13 +909,13 @@ export default function RemindersListV8() {
                             失敗{row.failedCount != null && row.failedCount > 0 ? ` ${row.failedCount}` : ''}
                           </button>
                         ) : null}
-                      </div>
-                      <p className={styles.cellSub} title={view.subtitle}>
+                      </div>}
+                      sub={<span title={view.subtitle}>
                         <CalendarClock size={11} aria-hidden="true" className={styles.cellSubIcon} />
                         {view.subtitle}
-                      </p>
-                    </td>
-                    <td>
+                      </span>}
+                    />
+                    <Td>
                       <span
                         className={`${styles.statePill} ${
                           view.status === 'active' ? styles.statePillActive : styles.statePillStopped
@@ -935,14 +924,14 @@ export default function RemindersListV8() {
                         <span className={styles.stateDot} aria-hidden="true" />
                         {view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'}
                       </span>
-                    </td>
-                    <td className={styles.countCell}>
+                    </Td>
+                    <Td className={styles.countCell}>
                       <div className={styles.countMain}>{planned}</div>
-                    </td>
-                    <td className={styles.countCell}>
+                    </Td>
+                    <Td className={styles.countCell}>
                       <div className={styles.countMain}>{nextSend}</div>
-                    </td>
-                    <td className={styles.menuCell} onClick={(event) => event.stopPropagation()} data-design-node={openMenuId === row.id ? 'SkY9V' : undefined}>
+                    </Td>
+                    <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()} data-design-node={openMenuId === row.id ? 'SkY9V' : undefined}>
                       <ContextMenu
                         label={`リマインダ「${row.name}」の操作`}
                         items={rowContextItems(row)}
@@ -966,12 +955,12 @@ export default function RemindersListV8() {
                         ariaLabel={`リマインダ「${row.name}」の操作`}
                         items={rowMenuItems(row)}
                       />
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 )
               })}
             </tbody>
-          </table>
+          </DataTable>
         </div>
 
         {/* 行の詳細パネル（V8「サクサク感」C①・E）。一覧は左に見えたまま。 */}
@@ -1097,46 +1086,24 @@ export default function RemindersListV8() {
     )
 
   return (
-    <div className={styles.board} data-design-node={narrow ? 'Iffil' : 'apLqS'}>
-      <div data-design="Head">
-        <div className={styles.head}>
-          <div className={styles.headText}>
-            <h2 className={styles.headTitle}>リマインダ</h2>
-            <p className={styles.headDescription}>
-              予約日時・誕生日・契約終了日などの「基準日」を決めて、その前や後に自動で送ります。
-            </p>
-          </div>
-        </div>
-      </div>
+    <PageFrame kind="list" boardId={narrow ? 'Iffil' : 'apLqS'}>
+      <PageHeading headingSize="regular" title={<>リマインダ</>} description={<>
+            予約日時・誕生日・契約終了日などの「基準日」を決めて、その前や後に自動で送ります。
+          </>}  />
 
       {/* 見るだけの人への帯（`a5C1p`）。操作は押せない形のまま置く。 */}
       {role !== null && !canEdit && (
-        <p className="border-info bg-info-bg text-ink rounded-control border px-3 py-2 text-sm" data-design-node="a5C1p">
+        <p className="border-info bg-info-bg text-ink rounded-control border px-3.5 py-2.5 text-label" data-design-node="a5C1p">
           閲覧のみで見ています。変える操作は管理者に頼んでください。
         </p>
       )}
 
-      {/* 数の帯 4つ。 */}
-      <div data-design="KPIs" className={styles.kpis}>
+      {/* 数の帯 4つ。並びと間は共有の帯（KpiStrip）に任せ、画面CSSで書かない。 */}
+      <KpiBand data-design="KPIs">
         {kpis.map((kpi) => (
-          <div key={kpi.title} className={styles.kpi}>
-            <span className={styles.kpiLabel}>
-              <kpi.icon size={13} aria-hidden="true" />
-              {kpi.title}
-            </span>
-            <p className={styles.kpiValue}>
-              {kpi.value === null ? '—' : formatNumber(kpi.value)}
-              <span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span>
-            </p>
-            <p className={styles.kpiDetail}>{kpi.detail}</p>
-            {kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? (
-              <button type="button" className={styles.kpiLink} onClick={kpi.link}>
-                失敗を見る →
-              </button>
-            ) : null}
-          </div>
+          <KpiCard key={kpi.title} presentation="band" title={kpi.title} icon={<kpi.icon size={14} aria-hidden="true" />} value={kpi.value} unit={kpi.value == null ? '' : kpi.unit} detail={kpi.detail} onRetry={kpi.link && !statsFailed && kpi.value !== null && kpi.value > 0 ? kpi.link : undefined} retryLabel="失敗を見る →" />
         ))}
-      </div>
+      </KpiBand>
 
       {folderDialogOpen && (
         <FolderAddDialog
@@ -1262,9 +1229,7 @@ export default function RemindersListV8() {
         </div>
       </ConfirmDialog>
 
-      <div data-design="Body" className={styles.split}>
-        {/* 左のフォルダの列。いちばん上は「リマインダを作る」。 */}
-        <div className={styles.folderCol}>
+      <ListPageBody folders={<>
           {canEdit ? (
             <Button href="/reminders/new" variant="primary" className="v8-folder-create w-full">
               ＋ リマインダを作る
@@ -1298,50 +1263,53 @@ export default function RemindersListV8() {
               </p>
             ) : null}
           </FolderPanel>
-        </div>
-
-        <div className={styles.listCol}>
-          {/* 道具の段：検索・札 4 つ・右に並び順と件数。狭い板では「作る」とフォルダ選びがここへ畳まれる。 */}
-          <div className={styles.toolbar}>
-            {canEdit ? (
-              <Button href="/reminders/new" variant="primary" className={styles.toolbarCreate}>
-                ＋ リマインダを作る
-              </Button>
-            ) : (
-              <Button type="button" variant="primary" className={styles.toolbarCreate} disabled>
-                ＋ リマインダを作る
-              </Button>
-            )}
-            <div className={styles.folderSelectWrap}>
-              <Select
-                aria-label="フォルダ"
-                value={folderFilter}
-                onChange={setFolderFilter}
-                options={folderSelectOptions}
-              />
+        </>}
+        collapsedFolders={<>
+          {canEdit ? (
+            <Button href="/reminders/new" variant="primary">
+              ＋ リマインダを作る
+            </Button>
+          ) : (
+            <Button type="button" variant="primary" disabled>
+              ＋ リマインダを作る
+            </Button>
+          )}
+          <Select
+            aria-label="フォルダ"
+            value={folderFilter}
+            onChange={setFolderFilter}
+            options={folderSelectOptions}
+          />
+        </>}
+        toolbar={<>
+          {/* 道具の段は型の toolbar 枠に渡す（中身だけ渡す）。 */}
+          <ListToolbar
+            search={{
+              placeholder: '名前・内容で探す',
+              width: 200,
+              value: nameQuery,
+              onChange: (value) => setNameQuery(clampSearchQuery(value)),
+            }}
+            actions={<>
+            <div role="group" aria-label="状態で絞り込む">
+              {STATUS_CHIPS.map((status) => (
+                <FilterChip
+                  key={status}
+                  selected={statusFilter === status}
+                  onChange={() => setStatusFilter(statusFilter === status ? '' : status)}
+                  icon={STATUS_CHIP_ICONS[status]}
+                >
+                  {status}
+                </FilterChip>
+              ))}
             </div>
-            <div className={styles.searchWrap}>
-              <SearchField
-                aria-label="名前・内容で探す"
-                placeholder="名前・内容で探す"
-                value={nameQuery}
-                onChange={(value) => setNameQuery(clampSearchQuery(value))}
-                onClear={() => setNameQuery('')}
-              />
-            </div>
-            {STATUS_CHIPS.map((status) => (
-              <FilterChip
-                key={status}
-                selected={statusFilter === status}
-                onChange={() => setStatusFilter(statusFilter === status ? '' : status)}
-              >
-                {status}
-              </FilterChip>
-            ))}
-            <span className={styles.toolbarSpacer} />
-            <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} />
-            <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} />
-          </div>
+            </>}
+            trailing={<>
+              <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} label="並び：" />
+              <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} label={null} />
+            </>}
+          />
+        </>}>
 
           {filterActive && reminderList.loaded && (
             <p className={styles.folderNote} style={{ fontVariantNumeric: 'tabular-nums' }}>
@@ -1358,8 +1326,7 @@ export default function RemindersListV8() {
           )}
 
           {table}
-        </div>
-      </div>
-    </div>
+        </ListPageBody>
+    </PageFrame>
   )
 }

@@ -187,3 +187,7 @@
 [data-theme='v8'] .sub svg { flex: none; width: 12px; height: 12px; }
 [data-theme='v8'] .sub > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 [data-theme='v8'] .sub svg { display: inline-block; }
+/* ★V8 表の横の余白（Pencil の行：左右24・欄の間16）。各セルの左右24（欄の間48）を、欄の間16＝左右8・端だけ24 にする（司令塔 2026-10-06） */
+[data-theme='v8'] .bodyCell { padding-inline: var(--tpl-cell-gap-half); }
+[data-theme='v8'] .bodyCell:first-child { padding-left: var(--tpl-row-pad-side); }
+[data-theme='v8'] .bodyCell:last-child { padding-right: var(--tpl-row-pad-side); }
