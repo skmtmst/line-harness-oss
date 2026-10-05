@@ -3718,7 +3718,7 @@ export const REMINDER_PREVIEW = {
     { stableStepId: 'hour-before', stepNumber: 2, scheduledAt: '2026-08-25T01:00:00.000Z', label: '1時間前のお知らせ', state: 'scheduled' },
     { stableStepId: 'same-day', stepNumber: 3, scheduledAt: '2026-08-25T00:00:00.000Z', label: '当日のご案内', state: 'scheduled' },
   ],
-  summary: { audience: 398, next7Days: 426, next30Days: 1194, duplicateCount: 2 },
+  summary: { audience: 398, next7Days: 124, next30Days: 1194, duplicateCount: 2 },
 }
 
 /** 機能7のテスト送信（`POST /api/reminders/:id/test-send` の固定の返事）。 */
@@ -3731,7 +3731,7 @@ export const REMINDER_TEST_SEND = {
 export const REMINDER_PUBLISH = {
   reminderId: 'reminder-3', versionId: 'reminder-3-draft-v3', versionNumber: 3,
   publishedAt: '2026-09-06T09:00:00.000Z', audience: 398,
-  plannedDeliveries: 1194, nextScheduledAt: '2026-08-24T09:00:00.000Z',
+  plannedDeliveries: 1194, nextScheduledAt: '2025-10-01T09:00:00.000Z',
 }
 
 /**
