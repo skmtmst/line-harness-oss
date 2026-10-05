@@ -20,6 +20,8 @@ export type ListToolbarSearch = {
   width?: number
   /** 検索中。渡すと虫眼鏡の代わりに回る印が出る。 */
   loading?: boolean
+  /** 箱の右端の近道の印（例 '⌘K'）。渡すと探す欄へ飛べる。v8 だけ。 */
+  shortcut?: string
 }
 
 /**
@@ -70,6 +72,7 @@ export default function ListToolbar({
           onClear={() => search.onChange('')}
           maxLength={search.maxLength}
           loading={search.loading}
+          shortcut={search.shortcut}
           className={styles.search}
         />
         {actions}
