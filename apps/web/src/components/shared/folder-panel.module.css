@@ -3,8 +3,8 @@
 /* faSbC: V7 の箱は既存の utility、V8 は右に一本だけの線。 */
 [data-theme='v8'] .panel {
   display: flex; flex-direction: column; gap: 2px;
-  width: 224.5px; min-height: 612px; height: auto; flex-shrink: 0;
-  padding: 16px 12px; border: 0; border-right: 1px solid var(--color-hairline);
+  width: var(--tpl-folder-width); min-height: 0; height: auto; flex-shrink: 0; align-self: stretch;
+  padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border: 0; border-right: 1px solid var(--color-hairline);
   border-radius: 0; background: var(--color-canvas); box-shadow: none;
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', sans-serif;
 }
@@ -49,3 +49,6 @@
 
 /* controls のボタンの輪郭を継承せず、layout 正本の文字操作を保つ。 */
 @layer components { [data-theme='v8'] .panel .add:not(:focus-visible) { outline: none; } }
+
+/* ★V8 型のフォルダの列（[data-template-region=folders]）の中では、列が余白と線を持つので部品は二重に持たない（司令塔 2026-10-05） */
+:global([data-theme='v8']) :global([data-template-region='folders']) .panel { padding: 0; border-right: 0; width: auto; }
