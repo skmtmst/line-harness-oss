@@ -4162,29 +4162,34 @@ export const INCOMING_WEBHOOK_DETAILS = {
   **`refCode` は運用者が決めてURLに出す符号**なので、値は設計の `summer-ig` などを使う。
   出してはいけないのは列名のほう（`v6-no-internal-ids.test.ts` が見張っている）。
 */
+/* 板 `xbHxg`（流入と計測一覧）の6行。フォルダは広告1・SNS1・店頭1・
+ * 未分類3（紹介と紙の分類は絵に無いので `genre: null`）。メール署名は
+ * 未登録（`orphan` の行）のため経路自体を持たない。動きが未設定の2件は
+ * Google広告とチラシ（タグもシナリオも無い行）。 */
 export const ENTRY_ROUTES = [
   { id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿', tagId: 'tag-vip', scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-25T00:12:00.000Z' },
-  { id: 'er-2', refCode: 'tanaka01', genre: '紹介', name: '紹介リンク 田中 明', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
+  { id: 'er-2', refCode: 'ref-tanaka', genre: null, name: '紹介リンク 田中 明', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
   { id: 'er-3', refCode: 'shop-pop', genre: '店頭', name: '店頭POPのQRコード', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-25T02:30:00.000Z' },
-  { id: 'er-4', refCode: 'g-ads-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
-  { id: 'er-5', refCode: 'mail-sign', genre: 'メール', name: 'メール署名', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-02-14T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z' },
-  { id: 'er-6', refCode: 'flyer-spring', genre: '紙', name: 'チラシ（2026春）', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, stoppedAt: '2026-06-30T00:00:00.000Z', stoppedReason: '春の配布が終わった', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
+  { id: 'er-4', refCode: 'ad-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
+  { id: 'er-6', refCode: 'flyer-26s', genre: null, name: 'チラシ計測リンク（2026春）', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, stoppedAt: '2026-06-30T00:00:00.000Z', stoppedReason: '春の配布が終わった', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
 ]
 
-/** 機能18。設計画像と同じ通常状態を、実データを使わずに撮るための固定値。 */
+/* 板 `xbHxg` の6行。友だち追加の合計は115人（帯の数と一致）。店頭と
+ * チラシのクリックは絵のとおり空（`—` で出す）。メール署名は未登録の行
+ * のため集計だけにいる。 */
 export const INFLOW_SUMMARY = {
   routes: [
-    { refCode: 'summer-ig', name: '夏のInstagram投稿', friendCount: 86, clickCount: 1240, latestAt: '2026-08-25T09:12:00.000Z' },
-    { refCode: 'tanaka01', name: '紹介リンク 田中 明', friendCount: 58, clickCount: 820, latestAt: '2026-08-24T18:40:00.000Z' },
-    { refCode: 'shop-pop', name: '店頭POPのQRコード', friendCount: 124, clickCount: 640, latestAt: '2026-08-25T11:30:00.000Z' },
-    { refCode: 'g-ads-summer', name: 'Google広告 夏キャンペーン', friendCount: 142, clickCount: 3120, latestAt: '2026-08-25T08:04:00.000Z' },
-    { refCode: 'mail-sign', name: 'メール署名', friendCount: 12, clickCount: 210, latestAt: '2026-08-19T16:02:00.000Z' },
-    { refCode: 'flyer-spring', name: 'チラシ（2026春）', friendCount: 12, clickCount: 12, latestAt: '2026-06-28T14:10:00.000Z' },
+    { refCode: 'ad-summer', name: 'Google広告 夏キャンペーン', friendCount: 42, clickCount: 1204, latestAt: '2026-09-30T14:12:00+09:00' },
+    { refCode: 'summer-ig', name: '夏のInstagram投稿', friendCount: 31, clickCount: 880, latestAt: '2026-09-30T09:40:00+09:00' },
+    { refCode: 'shop-pop', name: '店頭POPのQRコード', friendCount: 27, clickCount: null, latestAt: '2026-09-29T18:40:00+09:00' },
+    { refCode: 'mail-sign', name: 'メール署名', friendCount: 3, clickCount: 96, latestAt: '2026-09-26T11:02:00+09:00' },
+    { refCode: 'ref-tanaka', name: '紹介リンク 田中 明', friendCount: 12, clickCount: 230, latestAt: '2026-09-29T10:21:00+09:00' },
+    { refCode: 'flyer-26s', name: 'チラシ計測リンク（2026春）', friendCount: 0, clickCount: null, latestAt: '2026-05-31T18:00:00+09:00' },
   ],
-  totalFriends: 312,
+  totalFriends: 115,
   friendsWithRef: 289,
   friendsWithoutRef: 23,
-  routeTotal: 24,
+  routeTotal: 6,
   totalClicks: 8420,
   averageAddRate: 6.4,
 }
@@ -4221,7 +4226,7 @@ export const AD_PLATFORMS = [
  * 通貨は円（JPYは最小単位が円そのもの）。日時は固定。
  */
 export const AD_COST_ROWS = [
-  { sourceLabel: 'Google広告', adPlatformId: 'ad-google', entryRouteId: 'g-ads-summer', source: 'import', totals: [{ currency: 'JPY', amountMinor: 54000 }], friendAdds: 45, costPerFriendMinor: 1200, lastImportedAt: '2026-10-01T06:00:00+09:00' },
+  { sourceLabel: 'Google広告', adPlatformId: 'ad-google', entryRouteId: 'ad-summer', source: 'import', totals: [{ currency: 'JPY', amountMinor: 54000 }], friendAdds: 45, costPerFriendMinor: 1200, lastImportedAt: '2026-10-01T06:00:00+09:00' },
   { sourceLabel: 'Meta広告', adPlatformId: 'ad-meta', entryRouteId: 'summer-ig', source: 'import', totals: [{ currency: 'JPY', amountMinor: 32000 }], friendAdds: 28, costPerFriendMinor: 1143, lastImportedAt: '2026-10-01T06:00:00+09:00' },
 ]
 
