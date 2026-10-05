@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Upload, X } from 'lucide-react'
+import { Check, Upload } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -171,10 +171,6 @@ export default function ReferencePickerDialog({
     setPicks((cur) => cur.map((reference) => (reference.imageId === imageId ? { ...reference, mode } : reference)))
   }
 
-  const remove = (imageId: string) => {
-    setPicks((cur) => cur.filter((reference) => reference.imageId !== imageId))
-  }
-
   return (
     <Dialog
       open={open}
@@ -317,7 +313,9 @@ export default function ReferencePickerDialog({
                   <img src={image.media.url} alt="" className="h-7 w-7 shrink-0 rounded-mini object-cover" loading="lazy" />
                   <span className="w-36 truncate text-caption font-semibold text-ink">{referenceName(image)}</span>
                   {/* 使い方は 3 択を行の中に並べて直接選ぶ（★BG-C `B3hdL4`「ルール3択」）。
-                      素の radio は使わず、共通の RadioCard の行版で出す。 */}
+                      素の radio は使わず、共通の RadioCard の行版で出す。
+                      外す操作は承認デザインの行に描かれていないので置かない。
+                      画像タイルを押し直す toggle() で選択解除できる（既存動作）。 */}
                   <RadioCardGroup
                     legend={`${referenceName(image)}の使い方`}
                     className="flex flex-wrap items-center gap-5"
@@ -334,10 +332,6 @@ export default function ReferencePickerDialog({
                       />
                     ))}
                   </RadioCardGroup>
-                  <span className="flex-1" />
-                  <Button onClick={() => remove(reference.imageId)} aria-label={`${referenceName(image)}を外す`}>
-                    <X aria-hidden="true" className="h-4 w-4" />
-                  </Button>
                 </li>
               ))}
             </ul>

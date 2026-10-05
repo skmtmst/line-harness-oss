@@ -122,8 +122,8 @@ describe('参照画像を選ぶ（★BG-C `cOgWE`）', () => {
     fireEvent.click(screen.getByRole('button', { name: 'この 1 枚を使う' }))
     expect(picked[1].references).toEqual([{ imageId: 'img-1', mode: 'edit' }])
 
-    // 外すと使い方の行ごと消え、確定できなくなる
-    fireEvent.click(screen.getByRole('button', { name: 'haruを外す' }))
+    // 外すのは専用ボタンではなく画像タイルの再クリック（承認デザインの行に外すボタンは無い）
+    fireEvent.click(screen.getByRole('option', { name: /haru/ }))
     expect(document.querySelector('[data-design-node="JOi8G"]')).toBeNull()
     expect((screen.getByRole('button', { name: 'この画像を使う' }) as HTMLButtonElement).disabled).toBe(true)
   })
