@@ -45,11 +45,11 @@
 :global([data-theme='v8']) .preview { width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
 :global([data-theme='v8']) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); border-bottom: 1px solid var(--color-hairline); flex-wrap: wrap; }
 :global([data-theme='v8']) [data-page-template='detail'] .heading { padding: var(--tpl-detail-head-pad-top) var(--tpl-detail-head-pad-side) var(--tpl-detail-head-pad-bottom); gap: var(--tpl-detail-head-gap); flex-wrap: wrap; }
-:global([data-theme='v8']) [data-page-template='create'] .heading > .identity,
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .identity,
 :global([data-theme='v8']) [data-page-template='detail'] .heading > .identity { flex-basis: 100%; }
 /* 作る型の手順は題と説明の下の行。FU2aU の同行版は stepsPlacement="inline" で残す。 */
-:global([data-theme='v8']) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 3; margin-inline: 0; }
-:global([data-theme='v8']) [data-page-template='create'] .heading > .actions { order: 2; margin-left: auto; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { flex-basis: 100%; order: 3; margin-inline: 0; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 2; margin-left: auto; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] { flex-wrap: nowrap; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .steps { flex-basis: auto; order: 0; margin-inline: auto; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .actions { order: 0; margin-left: 0; }
@@ -173,3 +173,14 @@
 :global([data-theme='v8']) .steps :global([data-part='stepper']) li > span:not([aria-hidden]) > span:first-child, :global([data-theme='v8']) .steps :global([data-part='stepper']) li > button > span:first-child { width: var(--tpl-steps-dot); height: var(--tpl-steps-dot); font-size: 11px; }
 :global([data-theme='v8']) .steps :global([data-part='stepper']) li span span { font-size: var(--tpl-steps-text-size); line-height: var(--tpl-steps-text-lh); }
 :global([data-theme='v8']) [data-page-template='create'] .steps { min-height: 0; }
+<<<<<<< ours
+=======
+/* ★V8 フォルダの列：上の「作る」ボタンの下からフォルダの題まで18（apLqS フォルダの列：間2＋14＋2） */
+:global([data-theme='v8']) .folders > :global(a) + * , :global([data-theme='v8']) .folders > :global(button) + * { margin-top: 16px; }
+/* ★V8 作る型の頭の並び（A0pDt・K7HWG：戻る → 題 → 手順の帯 → 説明の行 12px）。題の下に説明を出さず、手順の帯の下へ（司令塔 2026-10-06） */
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText { display: contents; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .titleRow { flex-basis: 100%; order: 1; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { order: 2; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .description { flex-basis: 100%; order: 3; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 1; }
+>>>>>>> theirs
