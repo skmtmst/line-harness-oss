@@ -2641,13 +2641,14 @@ const RUN_BASE = {
 
 export const REMINDER_RUNS = {
   reminder: {
-    id: 'reminder-1', name: '予約前日のお知らせ', isActive: true,
+    id: 'reminder-1', name: '予約前日のご案内', isActive: true,
     /** V8詳細（rbAig）はこの3つで「いまの状態」の札と操作を分ける。 */
     lifecycleStatus: 'published', stopConditions: null, hasPublishedVersion: true,
   },
   summary: {
+    /* 板 `loVfW` の「いまの状態」：登録者186人・124通・今月386通・失敗2通。 */
     sent: 1126, scheduled: 398, stopped: 28, errors: 2,
-    targetCount: 398, nextScheduledAt: '2026-08-24T09:00:00+09:00',
+    targetCount: 186, nextScheduledAt: '2026-08-24T09:00:00+09:00',
     /* V8詳細の「いまの状態」。`getReminderDeliveryRunSummary` の追加列と同じ意味。 */
     sentThisMonth: 386, scheduledNext7Days: 124,
   },
@@ -7351,18 +7352,37 @@ export const OPERATION_SEND_PATHS = {
   ],
 }
 
-/** リマインダの登録者。本物は `GET /api/reminders/:id/registrants` の配列。 */
+/* 板 `loVfW`（登録者を管理）の186人。先頭3人は絵のとおり、有効180・
+ * 取消済み6で数（`items.length` と `status` から数える）。本物は
+ * `GET /api/reminders/:id/registrants` の配列。 */
+const REMINDER_REGISTRANT_BASE = [
+  ['山田 太郎', 'active', 'manual'],
+  ['佐藤 花子', 'active', 'form'],
+  ['鈴木 一郎', 'active', 'manual'],
+]
+const REMINDER_REGISTRANT_NAMES = [
+  '高橋 直人', '前田 さくら', '木村 亮太', '中村 美咲', '林 翔太', '小林 葵',
+  '加藤 蓮', '吉田 陽菜', '森田 健一', '石井 さくら', '藤田 大輔', '岡田 結衣',
+]
 export const REMINDER_REGISTRANTS = [
-  {
-    id: 'reminder-enrollment-1', friendId: 'friend-1', friendName: '高橋 直人', targetDate: '2026-09-10',
-    status: 'active', reminderVersionId: 'reminder-version-1', sourceKind: 'manual',
+  ...REMINDER_REGISTRANT_BASE.map(([friendName, status, sourceKind], index) => ({
+    id: `reminder-enrollment-${index + 1}`, friendId: `friend-reg-${index + 1}`, friendName, targetDate: '2026-09-10',
+    status, reminderVersionId: 'reminder-version-1', sourceKind,
     createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-01T09:00:00+09:00',
     cancelledAt: null, lockVersion: 1,
-  },
-  {
-    id: 'reminder-enrollment-2', friendId: 'friend-2', friendName: '前田 さくら', targetDate: '2026-09-12',
-    status: 'active', reminderVersionId: 'reminder-version-1', sourceKind: 'form',
-    createdAt: '2026-09-02T09:00:00+09:00', updatedAt: '2026-09-02T09:00:00+09:00',
-    cancelledAt: null, lockVersion: 1,
-  },
+  })),
+  ...Array.from({ length: 183 }, (_, index) => {
+    const number = index + 4
+    // 末尾6人は取消済み（186人中 有効180・取消6）。
+    const cancelled = number > 180
+    return {
+      id: `reminder-enrollment-${number}`, friendId: `friend-reg-${number}`,
+      friendName: `${REMINDER_REGISTRANT_NAMES[index % REMINDER_REGISTRANT_NAMES.length]}${Math.floor(index / REMINDER_REGISTRANT_NAMES.length) + 1}`,
+      targetDate: '2026-09-10',
+      status: cancelled ? 'cancelled' : 'active', reminderVersionId: 'reminder-version-1',
+      sourceKind: number % 2 === 0 ? 'form' : 'manual',
+      createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-01T09:00:00+09:00',
+      cancelledAt: cancelled ? '2026-09-15T09:00:00+09:00' : null, lockVersion: 1,
+    }
+  }),
 ]
