@@ -1003,12 +1003,12 @@ export const FORM_DETAIL = {
     options: {
       thanksUrl: 'https://example.co.jp/thanks',
       thanksText: 'ありがとうございました。またのご来店をお待ちしています。',
-      restorePrevious: true, pageTitle: '来店アンケート', submitLabel: '送信する',
+      restorePrevious: true, pageTitle: '来店アンケート｜然', submitLabel: '送る',
       prevLabel: '前へ', nextLabel: '次へ', sectionHeader: 'name',
-      confirmDialog: { enabled: false, text: 'この内容で送信しますか？', okLabel: '送信する', cancelLabel: '戻る' },
-      deadline: { enabled: true, endsAt: '2026-09-30T23:59', message: '受付は終了しました。ありがとうございました。' },
+      confirmDialog: { enabled: true, text: 'この内容で送信しますか？', okLabel: '送信する', cancelLabel: '戻る' },
+      deadline: { enabled: true, endsAt: '2026-09-30T23:59', message: '受付は終了しました。またのご来店をお待ちしています' },
       oncePerFriend: { enabled: true, message: 'このフォームには回答済みです。' },
-      totalLimit: { enabled: false },
+      totalLimit: { enabled: true, max: 300 },
       afterActions: [
         { kind: 'tag', op: 'add', tagIds: ['tag-visit-survey-answered'] },
         { kind: 'reminder', reminderId: 'reminder-next-visit' },
