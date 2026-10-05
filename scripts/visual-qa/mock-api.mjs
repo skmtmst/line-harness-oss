@@ -2688,10 +2688,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: BROADCAST_FOLDERS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'scenario') {
-    return { success: true, data: SCENARIO_FOLDERS }
+    // 板 `axFrW`：未分類は `folderId: null` の1件（会員更新リマインド）。
+    return { success: true, data: SCENARIO_FOLDERS, unfiledCount: FRIEND_SCENARIOS.filter((scenario) => !scenario.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'reminder') {
-    return { success: true, data: REMINDER_FOLDERS }
+    // 板 `apLqS`：未分類は `folderId: null` の2件（お誕生日のお祝い・未返信3日後フォロー）。
+    return { success: true, data: REMINDER_FOLDERS, unfiledCount: REMINDERS.filter((reminder) => !reminder.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'friend_field') {
     return { success: true, data: FRIEND_FIELD_FOLDERS }
@@ -2701,10 +2703,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: query.get('withUsage') === '1' ? FRIEND_ATTRIBUTE_FIELDS : FRIEND_FIELDS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
-    return { success: true, data: AUTO_REPLY_FOLDERS }
+    // 板 `uE9gf`：未分類は `folderId: null` の1件（旧キーワードルール）。
+    return { success: true, data: AUTO_REPLY_FOLDERS, unfiledCount: AUTO_REPLIES.filter((rule) => !rule.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'common_var') {
-    return { success: true, data: commonVarFolders }
+    // 板 `FM94M`：未分類は0件。
+    return { success: true, data: commonVarFolders, unfiledCount: COMMON_VARS.filter((variable) => !variable.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'media') {
     return { success: true, data: mediaFolders }
