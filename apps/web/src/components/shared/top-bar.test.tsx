@@ -80,6 +80,11 @@ describe('V8 の帯は絵どおり（殻合わせ）', () => {
     expect(textBase).toMatch(/display:\s*contents/)
   })
 
+  it('パンくずは「ホーム › 画面名」1回だけ（先頭のホームは重ねない）', () => {
+    expect(source).toContain("crumb.label !== 'ホーム'")
+    expect(source).not.toContain('crumbs == null && current')
+  })
+
   it('『前の見た目に戻す』は帯に無い（オーナー指示で廃止）', () => {
     expect(source).not.toContain('前の見た目に戻す')
     expect(source).not.toContain('onRevertTheme')

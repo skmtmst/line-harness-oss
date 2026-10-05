@@ -18,8 +18,9 @@ import type { ReactNode } from 'react'
  * 上の帯のパンくずの手前の段（★V8）。
  *
  * `ホーム › 一斉配信`・`一斉配信 › 新商品発売のお知らせ` のように、
- * 画面名の前に「どこから来たか」を1段だけ置く。渡さない画面は
- * 従来どおり選んでいるアカウント名が出る。v7 では描かない。
+ * 画面名の前に「どこから来たか」を1段だけ置く。先頭の「ホーム」は
+ * 帯が自分で出すので渡さない。渡さない画面はアカウント名を出さず
+ * 題だけにする（絵の指示）。v7 では描かない。
  */
 export interface PageCrumb {
   label: string
@@ -31,7 +32,7 @@ export interface PageChrome {
   title: string | null
   /** true のとき、本文の max-width を外す。受信箱のような全画面レイアウト用。 */
   fullWidth: boolean
-  /** ★V8 パンくずの手前の段。null なら既定（選んでいるアカウント名）。 */
+  /** ★V8 パンくずの手前の段。null なら題だけ（アカウント名は出さない）。 */
   crumbs: PageCrumb[] | null
 }
 

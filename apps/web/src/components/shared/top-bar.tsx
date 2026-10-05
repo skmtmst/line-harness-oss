@@ -145,23 +145,21 @@ export default function TopBar({
               従来どおり選んでいるアカウント名。未選択（統括の一覧など）
               では「店舗を選択」と出さず、画面名だけにする。
             */}
-            {crumbs && crumbs.length > 0 ? (
-              crumbs.map((crumb) => (
-                <span key={crumb.label} className={styles.crumbFromWrap}>
-                  {crumb.href ? (
-                    <Link href={crumb.href} className={styles.crumbFromLink}>{crumb.label}</Link>
-                  ) : (
-                    <span className={styles.crumbFrom}>{crumb.label}</span>
-                  )}
-                  <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
-                </span>
-              ))
-            ) : crumbs == null && current ? (
-              <>
-                <span className={styles.crumbFrom}>{current.label}</span>
+            {/*
+              手前の段。帯は「ホーム ›」を自分で出すので、画面が渡した
+              先頭の「ホーム」は重ねない（`ホーム › ホーム › 画面名` になる）。
+              何も渡さない画面はアカウント名を出さず題だけにする（絵の指示）。
+            */}
+            {(crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').map((crumb) => (
+              <span key={crumb.label} className={styles.crumbFromWrap}>
+                {crumb.href ? (
+                  <Link href={crumb.href} className={styles.crumbFromLink}>{crumb.label}</Link>
+                ) : (
+                  <span className={styles.crumbFrom}>{crumb.label}</span>
+                )}
                 <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
-              </>
-            ) : null}
+              </span>
+            ))}
             <h1 className={styles.crumbCurrent} title={title}>{title}</h1>
           </nav>
         </div>
