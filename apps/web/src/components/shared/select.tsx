@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowUpDown, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
@@ -25,6 +25,16 @@ export interface SelectProps {
   options: SelectOption[]
   size?: 'standard' | 'page-size' | 'full'
   value: string
+  /**
+   * 箱の幅（px）。渡すと size の幅を上書きする
+   * （x6QsVz の絞り込み欄 122〜136 など板ごとの絵幅）。
+   */
+  width?: number
+  /**
+   * 見せ方。既定 'box' は枠の箱。'text' は枠なし文字＋上下矢印
+   * （x6QsVz の並び替えどおり）。v8 だけで枠を消す。
+   */
+  treatment?: 'box' | 'text'
 }
 
 /** Pencil V5 `rpot9` / `Gfsb4` を正本にした単一選択。 */
@@ -41,6 +51,8 @@ export default function Select({
   options,
   size = 'standard',
   value,
+  width,
+  treatment = 'box',
 }: SelectProps) {
   const generatedId = useId()
   const buttonId = id ?? `${generatedId}-button`
@@ -103,6 +115,7 @@ export default function Select({
       ]
         .filter(Boolean)
         .join(' ')}
+      style={width ? { width: `${width}px`, minWidth: `${width}px` } : undefined}
       onBlur={(event) => {
         if (!rootRef.current?.contains(event.relatedTarget)) setOpen(false)
       }}
@@ -113,7 +126,7 @@ export default function Select({
         ref={triggerRef}
         id={buttonId}
         type="button"
-        className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger}`}
+        className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : ''}`}
         aria-label={ariaLabel}
         aria-controls={listboxId}
         aria-expanded={open}
@@ -123,6 +136,9 @@ export default function Select({
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onButtonKeyDown}
       >
+        {treatment === 'text' ? (
+          <ArrowUpDown className={styles.directionIcon} aria-hidden="true" />
+        ) : null}
         {/* 省略表示（…）のとき、ホバーで全文を確認できる（#640）。 */}
         <span className={styles.value} title={selected?.label ?? undefined}>
           {label ? `${label}：` : ''}{selected?.label ?? ''}
