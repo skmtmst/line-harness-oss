@@ -1,5 +1,6 @@
 'use client'
 
+import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import '@/app/ops/readonly-v8.css'
 import PageHeader from '@/components/shared/page-header'
@@ -89,12 +90,12 @@ export default function KnowledgeList() {
   if (editing) return <KnowledgeEditor key={editing.id} article={editing} fullPage onClose={() => setEditing(null)} onSaved={() => void load()} />
   return <div className={`${styles.page} ${v8.page}`} data-design-node="h114s">
     <PageHeader breadcrumb={[]} title="ナレッジ" description="解決した問い合わせを自動確認し、根拠が揃ったものだけ下書きにします。AI の返信に使うのは承認済みの記事だけです。" />
-    <div className={v8.metrics} aria-label="このページの記事の状況">
+    <KpiBand gridClassName={v8.metrics} aria-label="このページの記事の状況">
       <KpiCard variant="v6" title="承認済み" value={loaded && !error ? rows.filter(row => knowledgeState(row).label === '承認済み').length : null} unit="件" detail="AI の返信に使う" help="このページの件数です。全件の集計ではありません。" loading={!loaded} />
       <KpiCard variant="v6" title="承認待ち" value={loaded && !error ? rows.filter(row => row.reviewState === 'pending').length : null} unit="件" detail="根拠が揃った下書き" help="このページの件数です。全件の集計ではありません。" loading={!loaded} />
       <KpiCard variant="v6" title="要確認" value={loaded && !error ? rows.filter(row => row.reviewState === 'needs_review').length : null} unit="件" detail="運営の回答がない" help="このページの件数です。全件の集計ではありません。" loading={!loaded} />
       <KpiCard variant="v6" title="使われた回数" value={loaded && !error ? rows.reduce((sum, row) => sum + row.usedCount, 0) : null} unit="回" detail="" help="このページの記事の累計です。今月の集計は読み込めません。" loading={!loaded} />
-    </div>
+    </KpiBand>
     <div className={styles.filters}>
       <div className={styles.search}><Search aria-hidden="true" /><TextField aria-label="タイトル・質問・キーワードで検索"
         placeholder="タイトル・質問・キーワードで検索" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} maxLength={200} /></div>

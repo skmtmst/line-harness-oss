@@ -236,10 +236,20 @@
   font-size: 22px; line-height: 28px;
 }
 .strip { min-width: 0; }
+/* 数の帯の v8 指定は層の外（ファイル末尾）に置く。 */
+[data-theme='v8'] .link { display: inline-flex; align-items: center; gap: 4px; }
+[data-theme='v8'] .menu { margin-left: auto; display: inline-flex; flex-shrink: 0; }
+}
+
 /*
  * 数の帯（Pp3nS・全画面共通）。マス3〜4個を1本の帯にまとめ、
  * マスどうしは隙間0・1px の縦線で区切る。角丸は帯の外側だけにし、
  * マス自体は角を持たない（2板の計測で外側の角も0）。
+ *
+ * 層の外に置く：呼び出し側が渡す並べ方（grid・gap などのユーティリティ）は
+ * ユーティリティ層に属し、部品層の中の指定より常に勝つ。帯の隙間0・
+ * 1列化を効かせるため、ここだけ層の外（どの層より強い）に置く。
+ * v7 には効かない（すべて data-theme v8 限定）。
  */
 [data-theme='v8'] .strip[data-kpi-presentation='band'] {
   display: grid;
@@ -251,12 +261,13 @@
   border-radius: 0;
   background: var(--color-canvas);
 }
-[data-theme='v8'] .strip[data-kpi-presentation='band'] > .card {
+/* 子孫まで消す：折りたたみ（KpiCollapse）は後ろのマスを包み div で囲うため。 */
+[data-theme='v8'] .strip[data-kpi-presentation='band'] .card {
   border: 0;
   border-radius: 0;
   outline-color: transparent;
 }
-[data-theme='v8'] .strip[data-kpi-presentation='band'] > .card + .card {
+[data-theme='v8'] .strip[data-kpi-presentation='band'] > * + * {
   border-left: 1px solid var(--color-hairline);
 }
 [data-theme='v8'] .strip[data-kpi-presentation='band'] .number {
@@ -268,12 +279,9 @@
     grid-auto-flow: row;
     grid-template-columns: minmax(0, 1fr);
   }
-  [data-theme='v8'] .strip[data-kpi-presentation='band'] > .card + .card {
+  [data-theme='v8'] .strip[data-kpi-presentation='band'] > * + * {
     border-left: 0;
     border-top: 1px solid var(--color-hairline);
   }
 }
 [data-theme='v8'] .card[data-kpi-presentation='cell'] { border-radius: 0; }
-[data-theme='v8'] .link { display: inline-flex; align-items: center; gap: 4px; }
-[data-theme='v8'] .menu { margin-left: auto; display: inline-flex; flex-shrink: 0; }
-}

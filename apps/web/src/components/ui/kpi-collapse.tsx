@@ -2,6 +2,7 @@
 
 import { Children, useState, type ReactElement, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import kpiStyles from '@/components/shared/kpi-card.module.css'
 
 /**
  * KPIの折りたたみ（UI監査 #975 U060）。
@@ -50,7 +51,7 @@ export default function KpiCollapse({
         付け足す方式だと、`className` を受け取らないカード（R171 の
         Metric など）は隠せず4枚とも残ってしまう。
       */}
-      <div className={gridClassName}>
+      <div className={`${kpiStyles.strip} ${gridClassName}`} data-kpi-strip data-kpi-presentation="band">
         {head}
         {tail.map((item, tailIndex) => (
           <div

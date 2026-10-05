@@ -29,7 +29,7 @@ describe('数の帯（Pp3nS）', () => {
     expect(strip![0]).toMatch(/border:\s*1px solid var\(--color-hairline\)/)
     expect(strip![0]).toMatch(/border-radius:\s*0/)
     expect(css).toMatch(
-      /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] > \.card \+ \.card \{[^}]*border-left:\s*1px solid var\(--color-hairline\)/s,
+      /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] > \* \+ \* \{[^}]*border-left:\s*1px solid var\(--color-hairline\)/s,
     )
     expect(css).toMatch(
       /\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] \.number \{[^}]*font-size:\s*22px/s,
@@ -46,5 +46,21 @@ describe('数の帯（Pp3nS）', () => {
     expect(source).toContain('data-kpi-strip')
     expect(source).toContain('data-kpi-presentation="band"')
     expect(source).toContain('gridClassName')
+  })
+
+  it('帯の指定は層の外にある（ユーティリティ層の gap 等に勝つ）', () => {
+    const css = read('kpi-card.module.css')
+    const marker = 'どの層より強い'
+    expect(css).toContain(marker)
+    const unlayered = css.split(marker)[1] ?? ''
+    expect(unlayered).toContain("[data-theme='v8'] .strip[data-kpi-presentation='band']")
+    expect(unlayered).not.toContain('@layer')
+  })
+
+  it('折りたたみ（KpiCollapse）とナレッジ一覧も帯として出す', () => {
+    const collapse = readFileSync(join(HERE, '..', 'ui', 'kpi-collapse.tsx'), 'utf8')
+    expect(collapse).toContain('data-kpi-presentation="band"')
+    const knowledge = readFileSync(join(HERE, '..', 'ops', 'knowledge-list.tsx'), 'utf8')
+    expect(knowledge).toContain('<KpiBand')
   })
 })
