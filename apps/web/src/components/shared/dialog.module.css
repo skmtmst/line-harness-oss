@@ -167,15 +167,27 @@
   color: var(--color-status-danger);
 }
 
-/* 琥珀の呼びかけ（CFAyf 送受信を止める：説明文を帯で囲む）。v7 は変えない。 */
+/*
+ * 琥珀の呼びかけ（CFAyf 送受信を止める・YZ57z 解除：説明文を帯で囲む）。
+ * v7 は変えない。地はトークン表の warn-soft（#fdf3e1。板 CFAyf #fff4e0
+ * とほぼ同じ。--color-warning-bg #faf0dc は濃すぎるため使わない）。
+ * 板どおり角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
+ */
 [data-theme='v8'] .calloutWarning {
-  border-color: var(--color-warning-bg);
-  background: var(--color-warning-bg);
+  border-color: var(--color-status-warn-soft);
+  border-radius: var(--radius-segment);
+  background: var(--color-status-warn-soft);
+  padding: 10px 12px;
 }
 
 [data-theme='v8'] .calloutWarning .title,
 [data-theme='v8'] .calloutWarning .description {
   color: var(--color-warning);
+}
+
+[data-theme='v8'] .calloutWarning .description {
+  font-size: 11px;
+  line-height: 17px;
 }
 
 .callout .title {

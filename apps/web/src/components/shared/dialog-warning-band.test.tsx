@@ -45,7 +45,14 @@ describe('ダイアログの琥珀帯', () => {
   })
 
   it('琥珀帯は v8 だけで琥珀色（v7 は変えない）', () => {
-    expect(css).toMatch(/\[data-theme='v8'\] \.calloutWarning\s*\{[^}]*background:\s*var\(--color-warning-bg\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.calloutWarning\s*\{[^}]*background:\s*var\(--color-status-warn-soft\)/s)
     expect(css).toMatch(/\[data-theme='v8'\] \.calloutWarning \.description \{[^}]*color:\s*var\(--color-warning\)/s)
+  })
+
+  it('琥珀帯は板どおり角丸 8・内側 10/12・文 11px/17px（CFAyf・YZ57z）', () => {
+    expect(css).toMatch(/\[data-theme='v8'\] \.calloutWarning\s*\{[^}]*border-radius:\s*var\(--radius-segment\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.calloutWarning\s*\{[^}]*padding:\s*10px 12px/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.calloutWarning \.description\s*\{[^}]*font-size:\s*11px/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.calloutWarning \.description\s*\{[^}]*line-height:\s*17px/s)
   })
 })
