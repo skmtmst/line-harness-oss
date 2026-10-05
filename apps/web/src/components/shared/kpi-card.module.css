@@ -201,7 +201,7 @@
 [data-theme='v8'] .head { width: 100%; gap: 8px; min-height: 24px; }
 [data-theme='v8'] .label {
   display: flex; align-items: center; min-width: 0; gap: 8px;
-  color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 20px;
+  color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 1.5;
 }
 [data-theme='v8'] .labelText {
   display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

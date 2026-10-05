@@ -592,6 +592,18 @@
 }
 
 /*
+ * V8 の文字の行の高さ（WHY-DIFFS §6）。絵は 1.5 か既定（Noto Sans JP で
+ * 約1.45）。caption（12px→18）・label（13px→19.5）・body（14px→21）を
+ * 1.5 にそろえ、1行ごとの 2〜3px のずれが下へ溜まらないようにする。
+ * :root の値（v7）は変えない。
+ */
+[data-theme="v8"] {
+  --text-caption--line-height: 1.5;
+  --text-label--line-height: 1.5;
+  --text-body--line-height: 1.5;
+}
+
+/*
  * ★V8 LINEプレビューのスマホ（夕15・cfVyj）：LINE アプリの画面の写しの値。
  * 管理画面のテーマ色とは別物なので `--v8-line-*` で分ける。値は Pencil の
  * 実寸の写しで、直値はここだけに置く。部品側（line-preview.module.css）は
