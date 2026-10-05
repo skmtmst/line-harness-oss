@@ -70,6 +70,12 @@ export interface RadioCardProps {
    * 「テンプレートを選択」のように、再選択で別画面を開き直す選択肢だけに使う。
    */
   onClick?: () => void
+  /**
+   * 行の中に丸とラベルだけを並べる形。カードの枠・背景・内余白を外す。
+   * 1 行の中に 3 択を収める設計（★BG-C `B3hdL4`「ルール3択」）で使う。
+   * 中身の作りは同じなので、読み上げ・キー操作はカード形とまったく同じ。
+   */
+  inline?: boolean
   className?: string
 }
 
@@ -84,12 +90,14 @@ export default function RadioCard({
   disabledReason,
   invalid = false,
   onClick,
+  inline = false,
   className,
 }: RadioCardProps) {
   return (
     <label
       className={[
         styles.card,
+        inline ? styles.inline : null,
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,
         invalid ? styles.invalid : null,

@@ -4,6 +4,7 @@
  * - 外枠に cOgWE を付ける
  * - 並ぶ画像に名前と寸法を添える
  * - 複数選べる（選んだ順に「1枚目」）。選んだ画像は `JOi8G` で 1 枚ずつ使い方を決める
+ *   （使い方は `B3hdL4`「ルール3択」のとおり行の中の 3 つのラジオから直接選ぶ）
  * - 「この N 枚を使う」で、使い方つきの参照と画像の実体を返す
  * 絞り方・取り込みの動きは変えない。
  */
@@ -103,9 +104,11 @@ describe('参照画像を選ぶ（★BG-C `cOgWE`）', () => {
     // 選んだ順が分かる
     expect(await screen.findByText('1枚目')).toBeTruthy()
     expect(document.querySelector('[data-design-node="JOi8G"]')).toBeTruthy()
-    // 既定は「雰囲気を参考にする」（生成パネルと同じ共通の選ぶ欄）
-    const usage = screen.getByRole('button', { name: 'haruの使い方' })
-    expect(usage.textContent).toContain('雰囲気を参考にする')
+    // 既定は「雰囲気を参考にする」。3 択を行に並べて直接選ぶ（★BG-C `B3hdL4`）
+    expect(screen.getByRole('group', { name: 'haruの使い方' })).toBeTruthy()
+    expect((screen.getByRole('radio', { name: '雰囲気を参考にする' }) as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByRole('radio', { name: '土台にする' }) as HTMLInputElement).checked).toBe(false)
+    expect(screen.getByRole('radio', { name: '素材を一部使う' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'この 1 枚を使う' }))
     expect(picked).toHaveLength(1)
@@ -113,10 +116,9 @@ describe('参照画像を選ぶ（★BG-C `cOgWE`）', () => {
     expect(picked[0].images.map((entry) => entry.id)).toEqual(['img-1'])
 
     // 使い方は 1 枚ずつ変えられる
-    fireEvent.click(usage)
+    fireEvent.click(screen.getByRole('radio', { name: '土台にする' }))
     await flush(2)
-    fireEvent.click(screen.getByRole('button', { name: '土台にする' }))
-    await flush(2)
+    expect((screen.getByRole('radio', { name: '土台にする' }) as HTMLInputElement).checked).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'この 1 枚を使う' }))
     expect(picked[1].references).toEqual([{ imageId: 'img-1', mode: 'edit' }])
 

@@ -188,4 +188,30 @@
 [data-theme='v8'] .invalid .radio {
   border-color: var(--color-status-danger);
 }
+
+/* ★BG-C `B3hdL4`「ルール3択」：行の中に丸とラベルだけを並べる形。
+   カードの枠・背景・内余白を外して行の高さに収める。列の作りは .card のまま。
+   丸みは枠と背景を外すので見えなくなる（打ち消さない）。
+   `[data-theme='v8'] .card` より強い指定にするため .card.inline で書く。 */
+.card.inline,
+[data-theme='v8'] .card.inline {
+  align-items: center;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.card.inline:hover,
+[data-theme='v8'] .card.inline:hover {
+  background: none;
+}
+
+.card.inline.checked,
+.card.inline.checked:hover,
+[data-theme='v8'] .card.inline.checked,
+[data-theme='v8'] .card.inline.checked:hover {
+  border: 0;
+  background: none;
+}
 }

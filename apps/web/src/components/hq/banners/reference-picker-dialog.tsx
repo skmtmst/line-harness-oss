@@ -1,13 +1,13 @@
 'use client'
 
 import { Check, Upload, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import SearchField from '@/components/shared/search-field'
-import Select from '@/components/shared/select'
 import { api } from '@/lib/api'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import {
@@ -55,6 +55,8 @@ export default function ReferencePickerDialog({
 }) {
   const theme = useAdminTheme()
   const v8 = theme === 'v8'
+  /** 画像ごとのラジオ群を別の群として扱わせるための接頭辞。 */
+  const uid = useId()
   const [images, setImages] = useState<BannerImage[] | null>(null)
   const [nextBefore, setNextBefore] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -314,14 +316,24 @@ export default function ReferencePickerDialog({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={image.media.url} alt="" className="h-7 w-7 shrink-0 rounded-mini object-cover" loading="lazy" />
                   <span className="w-36 truncate text-caption font-semibold text-ink">{referenceName(image)}</span>
-                  {/* 使い方は生成パネルと同じ共通の選ぶ欄で出す（素の radio は使わない） */}
-                  <Select
-                    aria-label={`${referenceName(image)}の使い方`}
-                    className="w-44"
-                    value={reference.mode}
-                    onChange={(next) => setUsage(reference.imageId, next as BannerReferenceMode)}
-                    options={BANNER_REFERENCE_MODES.map((mode) => ({ value: mode, label: BANNER_REFERENCE_MODE_LABEL[mode] }))}
-                  />
+                  {/* 使い方は 3 択を行の中に並べて直接選ぶ（★BG-C `B3hdL4`「ルール3択」）。
+                      素の radio は使わず、共通の RadioCard の行版で出す。 */}
+                  <RadioCardGroup
+                    legend={`${referenceName(image)}の使い方`}
+                    className="flex flex-wrap items-center gap-5"
+                  >
+                    {BANNER_REFERENCE_MODES.map((mode) => (
+                      <RadioCard
+                        key={mode}
+                        inline
+                        name={`${uid}-usage-${reference.imageId}`}
+                        value={mode}
+                        checked={reference.mode === mode}
+                        onChange={(next) => setUsage(reference.imageId, next as BannerReferenceMode)}
+                        title={BANNER_REFERENCE_MODE_LABEL[mode]}
+                      />
+                    ))}
+                  </RadioCardGroup>
                   <span className="flex-1" />
                   <Button onClick={() => remove(reference.imageId)} aria-label={`${referenceName(image)}を外す`}>
                     <X aria-hidden="true" className="h-4 w-4" />
