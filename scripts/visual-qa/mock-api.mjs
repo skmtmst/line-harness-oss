@@ -2707,7 +2707,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: AUTO_REPLY_FOLDERS, unfiledCount: AUTO_REPLIES.filter((rule) => !rule.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'common_var') {
-    return { success: true, data: commonVarFolders }
+    // 板 `FM94M`：未分類は0件。
+    return { success: true, data: commonVarFolders, unfiledCount: COMMON_VARS.filter((variable) => !variable.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'media') {
     return { success: true, data: mediaFolders }

@@ -1406,13 +1406,17 @@ export const NEN_BIRTHDAY_COUPON = {
   validityDays: 31,
   updatedAt: '2026-08-25T10:00:00+09:00',
 }
-/** 機能14 共通情報。設計の3フォルダと先頭6件を固定する。 */
+/* V8 板 `FM94M`（共通情報一覧）の7件に合わせた分け方。お店の情報4・
+ * 案内文の型1・キャンペーン2・未分類0。件数は絵のとおり。 */
 export const COMMON_VAR_FOLDERS = [
-  { id: 'cvf-store', kind: 'common_var', name: '01_お店の情報', parentId: null, displayOrder: 0, color: '#2563EB', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'cvf-guides', kind: 'common_var', name: '02_案内文の型', parentId: null, displayOrder: 1, color: '#10B981', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'cvf-campaign', kind: 'common_var', name: '03_キャンペーン', parentId: null, displayOrder: 2, color: '#F59E0B', createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'cvf-store', kind: 'common_var', name: 'お店の情報', parentId: null, displayOrder: 0, color: '#2563EB', itemCount: 4, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'cvf-guides', kind: 'common_var', name: '案内文の型', parentId: null, displayOrder: 1, color: '#10B981', itemCount: 1, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'cvf-campaign', kind: 'common_var', name: 'キャンペーン', parentId: null, displayOrder: 2, color: '#F59E0B', itemCount: 2, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
 ]
 
+/* 板 `FM94M` の7行を上から順に並べた。帯の数（7件・下書き1・差し込み
+ * 43か所・空のまま1件・期限が近い1件）はこの7件から計算される。`state`
+ * が無い行は使用中、期限つきの使用中は「M/dまで」の札になる。 */
 export const COMMON_VARS = [
   {
     id: 'common-var-delete-target', lineAccountId: 'visual-qa-account', folderId: 'cvf-store',
@@ -1422,9 +1426,17 @@ export const COMMON_VARS = [
   },
   {
     id: 'common-var-hours', lineAccountId: 'visual-qa-account', folderId: 'cvf-store',
-    name: '営業時間', varKey: 'shop_hours', type: 'text', value: '平日 10:00〜19:00／土日祝 休み',
+    name: '営業時間', varKey: 'shop_hours', type: 'text', value: '平日 10:00〜19:00',
     createdAt: '2026-07-01T10:00:00.000+09:00', updatedAt: '2026-08-12T10:00:00.000+09:00',
     nextSchedule: null, pendingScheduleCount: 0, usageCount: 8,
+  },
+  {
+    /* 期限つき。札は「10/7まで」、期限が近い帯に1件数えられる。 */
+    id: 'common-var-campaign', lineAccountId: 'visual-qa-account', folderId: 'cvf-campaign',
+    name: '今月のキャンペーン', varKey: 'monthly_campaign', type: 'text', value: '夏の20%オフ',
+    validUntil: '2026-10-07T23:59:59+09:00',
+    createdAt: '2026-08-01T10:00:00.000+09:00', updatedAt: '2026-08-22T10:00:00.000+09:00',
+    nextSchedule: { effectiveFrom: '2026-09-30T15:00:00.000+09:00', value: '' }, pendingScheduleCount: 1, usageCount: 7,
   },
   {
     id: 'common-var-phone', lineAccountId: 'visual-qa-account', folderId: 'cvf-store',
@@ -1433,28 +1445,25 @@ export const COMMON_VARS = [
     nextSchedule: null, pendingScheduleCount: 0, usageCount: 7,
   },
   {
-    id: 'common-var-campaign', lineAccountId: 'visual-qa-account', folderId: 'cvf-campaign',
-    name: '今月のキャンペーン', varKey: 'monthly_campaign', type: 'text', value: '夏の20%オフ（8/25〜9/30）',
-    createdAt: '2026-08-01T10:00:00.000+09:00', updatedAt: '2026-08-22T10:00:00.000+09:00',
-    nextSchedule: { effectiveFrom: '2026-09-30T15:00:00.000+09:00', value: '' }, pendingScheduleCount: 1, usageCount: 7,
+    /* 空のまま使われている1件（空欄のまま送られます → 直す）。 */
+    id: 'common-var-contact', lineAccountId: 'visual-qa-account', folderId: 'cvf-guides',
+    name: '問い合わせ先', varKey: 'contact', type: 'text', value: '',
+    createdAt: '2026-06-10T10:00:00.000+09:00', updatedAt: '2026-06-10T10:00:00.000+09:00',
+    nextSchedule: null, pendingScheduleCount: 0, usageCount: 2,
+  },
+  {
+    /* 下書き。使っている所は「なし」。 */
+    id: 'common-var-delete-safe', lineAccountId: 'visual-qa-account', folderId: 'cvf-campaign',
+    name: '臨時のお知らせ', varKey: 'temporary_notice', type: 'text', value: '本日は17時まで',
+    state: 'draft',
+    createdAt: '2026-09-01T10:00:00.000+09:00', updatedAt: '2026-09-01T10:00:00.000+09:00',
+    nextSchedule: null, pendingScheduleCount: 0, usageCount: 0,
   },
   {
     id: 'common-var-address', lineAccountId: 'visual-qa-account', folderId: 'cvf-store',
     name: '住所', varKey: 'address', type: 'text', value: '東京都渋谷区〇〇 1-2-3',
     createdAt: '2026-06-01T10:00:00.000+09:00', updatedAt: '2026-07-20T10:00:00.000+09:00',
     nextSchedule: null, pendingScheduleCount: 0, usageCount: 4,
-  },
-  {
-    id: 'common-var-contact', lineAccountId: 'visual-qa-account', folderId: 'cvf-guides',
-    name: '問い合わせ窓口', varKey: 'contact', type: 'text', value: '',
-    createdAt: '2026-06-10T10:00:00.000+09:00', updatedAt: '2026-06-10T10:00:00.000+09:00',
-    nextSchedule: null, pendingScheduleCount: 0, usageCount: 2,
-  },
-  {
-    id: 'common-var-delete-safe', lineAccountId: 'visual-qa-account', folderId: 'cvf-guides',
-    name: '臨時のお知らせ', varKey: 'temporary_notice', type: 'text', value: '本日は17時まで営業します',
-    createdAt: '2026-09-01T10:00:00.000+09:00', updatedAt: '2026-09-01T10:00:00.000+09:00',
-    nextSchedule: null, pendingScheduleCount: 0, usageCount: 0,
   },
 ]
 
