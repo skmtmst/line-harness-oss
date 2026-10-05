@@ -46,6 +46,43 @@ describe('一覧の型の寸法（LIST-TEMPLATE-SPEC）', () => {
     expect(shared('pagination.module.css')).toMatch(/\[data-theme='v8'\] \.pagination \{[^}]*padding:\s*10px 20px/s)
   })
 
+  it('道具の段は64の式（上下14・左右24・間8・中身36。直書きなし）', () => {
+    const toolbar = shared('list-toolbar.module.css')
+    expect(toolbar).toMatch(/\[data-theme='v8'\] \.toolbar \{[^}]*padding:\s*var\(--tpl-toolbar-pad-block\) var\(--tpl-toolbar-pad-side\)/s)
+    expect(toolbar).toMatch(/\[data-theme='v8'\] \.toolbar \{[^}]*gap:\s*var\(--tpl-toolbar-gap\)/s)
+    expect(toolbar).not.toMatch(/\[data-theme='v8'\] \.toolbar \{[^}]*padding:\s*14px 24px/s)
+  })
+
+  it('フォルダの列は幅200・内側16/12・高さは板に伸ばす（固定の高さなし）', () => {
+    const panel = shared('folder-panel.module.css')
+    expect(panel).toMatch(/\[data-theme='v8'\] \.panel \{[^}]*width:\s*var\(--tpl-folder-width\)/s)
+    expect(panel).toMatch(/\[data-theme='v8'\] \.panel \{[^}]*padding:\s*var\(--tpl-folder-pad-block\) var\(--tpl-folder-pad-side\)/s)
+    expect(panel).toMatch(/\[data-theme='v8'\] \.panel \{[^}]*align-self:\s*stretch/s)
+    expect(panel).not.toMatch(/\[data-theme='v8'\] \.panel \{[^}]*min-height:\s*612px/s)
+    expect(panel).not.toMatch(/width:\s*224\.5px/)
+    expect(css).toMatch(/\.folders \{[^}]*padding:\s*var\(--tpl-folder-pad-block\) var\(--tpl-folder-pad-side\)/s)
+  })
+
+  it('帯116の式（マス16/20・上24・間8・数22/26・間8・下18）', () => {
+    const kpi = shared('kpi-card.module.css')
+    expect(kpi).toMatch(/\[data-theme='v8'\] \.strip \.card \{[^}]*padding:\s*var\(--tpl-band-cell-pad-block\) var\(--tpl-band-cell-pad-side\)/s)
+    expect(kpi).toMatch(/\[data-theme='v8'\] \.head \{[^}]*min-height:\s*24px/s)
+    expect(kpi).toMatch(/\[data-theme='v8'\] \.strip \.number \{[^}]*line-height:\s*var\(--tpl-band-number-lh\)/s)
+    expect(kpi).toMatch(/\[data-theme='v8'\] \.detail \{[^}]*line-height:\s*18px/s)
+  })
+
+  it('寸法の変数の値（LIST-TEMPLATE-SPECどおり）', () => {
+    const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8')
+    expect(globals).toMatch(/--tpl-folder-width:\s*200px/)
+    expect(globals).toMatch(/--tpl-folder-pad-block:\s*16px/)
+    expect(globals).toMatch(/--tpl-folder-pad-side:\s*12px/)
+    expect(globals).toMatch(/--tpl-toolbar-pad-block:\s*14px/)
+    expect(globals).toMatch(/--tpl-toolbar-pad-side:\s*24px/)
+    expect(globals).toMatch(/--tpl-band-cell-pad-block:\s*16px/)
+    expect(globals).toMatch(/--tpl-band-cell-pad-side:\s*20px/)
+    expect(globals).toMatch(/--tpl-band-number-lh:\s*26px/)
+  })
+
   it('帯の CSS（kpi-band-v8.css）は残す・数は変数で22', () => {
     const band = readFileSync(join(HERE, '..', 'shared', 'kpi-band-v8.css'), 'utf8')
     expect(band).toMatch(/\[data-theme='v8'\] \[data-kpi-strip\]\[data-kpi-presentation='band'\] \{[^}]*display:\s*grid/s)

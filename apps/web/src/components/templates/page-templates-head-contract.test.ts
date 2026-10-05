@@ -28,6 +28,24 @@ describe('型の見出し（379板の絵）', () => {
       ['--tpl-page-pad-block', '10px'], ['--tpl-page-pad-side', '24px'],
       ['--tpl-band-number-size', '22px'], ['--tpl-band-number-lh', '26px'],
       ['--tpl-band-cell-pad-block', '16px'], ['--tpl-band-cell-pad-side', '20px'], ['--tpl-band-cell-gap', '8px'],
+      ['--tpl-create-head-pad-top', '20px'], ['--tpl-create-head-pad-side', '24px'], ['--tpl-create-head-pad-bottom', '16px'],
+      ['--tpl-create-head-gap', '8px'],
+      ['--tpl-detail-head-pad-top', '20px'], ['--tpl-detail-head-pad-side', '24px'], ['--tpl-detail-head-pad-bottom', '16px'],
+      ['--tpl-detail-head-gap', '12px'], ['--tpl-detail-actions-gap', '6px'], ['--tpl-detail-tabs-pad-bottom', '12px'],
+      ['--tpl-create-content-pad-block', '24px'], ['--tpl-create-content-pad-side', '28px'], ['--tpl-create-content-gap', '16px'],
+      ['--tpl-section-pad', '20px'], ['--tpl-section-gap', '14px'],
+      ['--tpl-preview-pad', '24px'], ['--tpl-preview-narrow-width', '280px'],
+      ['--tpl-detail-content-gap', '20px'],
+      ['--tpl-footer-pad-block', '12px'], ['--tpl-footer-pad-side', '24px'], ['--tpl-footer-gap', '8px'],
+      ['--tpl-settings-nav-width', '208px'], ['--tpl-settings-nav-pad-block', '16px'], ['--tpl-settings-nav-pad-side', '12px'],
+      ['--tpl-settings-content-pad-block', '24px'], ['--tpl-settings-content-pad-side', '28px'], ['--tpl-settings-content-gap', '16px'],
+      ['--tpl-settings-gap', '16px'],
+      ['--tpl-inbox-list-width', '372px'], ['--tpl-inbox-summary-width', '260px'],
+      ['--tpl-inbox-summary-pad', '20px'], ['--tpl-inbox-summary-gap', '16px'],
+      ['--tpl-conv-head-pad-block', '12px'], ['--tpl-conv-head-pad-side', '20px'], ['--tpl-conv-head-gap', '8px'],
+      ['--tpl-conv-messages-pad-block', '20px'], ['--tpl-conv-messages-pad-side', '24px'], ['--tpl-conv-messages-gap', '12px'],
+      ['--tpl-composer-pad-top', '12px'], ['--tpl-composer-pad-side', '20px'], ['--tpl-composer-pad-bottom', '16px'],
+      ['--tpl-composer-gap', '8px'],
     ] as const) {
       expect(vars![0]).toMatch(new RegExp(`${name}:\\s*${value}`))
     }
@@ -71,6 +89,62 @@ describe('型の見出し（379板の絵）', () => {
     }
     expect(globals).toMatch(/--text-caption--line-height:\s*1\.6/)
     expect(globals).toMatch(/--text-body--line-height:\s*1\.7/)
+  })
+
+  it('作る型の頭は20/24/16・間8・手順は下の行（FU2aU の同行版は inline で残す）', () => {
+    expect(css).toMatch(/\[data-page-template='create'\] \.heading \{[^}]*padding:\s*var\(--tpl-create-head-pad-top\) var\(--tpl-create-head-pad-side\) var\(--tpl-create-head-pad-bottom\)/s)
+    expect(css).toMatch(/\[data-page-template='create'\] \.heading \{[^}]*gap:\s*var\(--tpl-create-head-gap\)/s)
+    expect(css).toMatch(/\[data-page-template='create'\] \.heading > \.steps \{[^}]*flex-basis:\s*100%/s)
+    expect(css).toMatch(/data-steps-placement='inline'/)
+    expect(css).not.toMatch(/\[data-page-template='create'\] \.heading \{[^}]*padding-block:\s*16px/s)
+  })
+
+  it('詳細の頭は20/24/16・間12・操作の間6・タブは下の行', () => {
+    expect(css).toMatch(/\[data-page-template='detail'\] \.heading \{[^}]*padding:\s*var\(--tpl-detail-head-pad-top\) var\(--tpl-detail-head-pad-side\) var\(--tpl-detail-head-pad-bottom\)/s)
+    expect(css).toMatch(/\[data-page-template='detail'\] \.actions \{[^}]*gap:\s*var\(--tpl-detail-actions-gap\)/s)
+    expect(css).toMatch(/\[data-page-template='detail'\] \.tabs \{[^}]*padding-bottom:\s*var\(--tpl-detail-tabs-pad-bottom\)/s)
+    expect(css).toMatch(/\.detailContent \{[^}]*gap:\s*var\(--tpl-detail-content-gap\)/s)
+  })
+
+  it('作る・詳細の中身と右の列は変数だけ（左24/28・間16・右24・900の板は280）', () => {
+    expect(css).toMatch(/\.createContent \{[^}]*padding:\s*var\(--tpl-create-content-pad-block\) var\(--tpl-create-content-pad-side\)/s)
+    expect(css).toMatch(/\.createContent \{[^}]*gap:\s*var\(--tpl-create-content-gap\)/s)
+    expect(css).toMatch(/\.section \{[^}]*padding:\s*var\(--tpl-section-pad\)/s)
+    expect(css).toMatch(/\.section \{[^}]*gap:\s*var\(--tpl-section-gap\)/s)
+    expect(css).toMatch(/\.preview \{[^}]*padding:\s*var\(--tpl-preview-pad\)/s)
+    expect(css).toMatch(/\.preview \{[^}]*width:\s*var\(--tpl-preview-narrow-width\)/s)
+  })
+
+  it('保存の帯は板の幅いっぱい・高さ60の式（12/24・間8・追従・浮かせなし）', () => {
+    const footer = css.match(/\.footer \{[^}]*\}/s)
+    expect(footer, '型の保存の帯がありません').toBeTruthy()
+    expect(footer![0]).not.toMatch(/margin:\s*12px 24px/)
+    expect(footer![0]).toMatch(/bottom:\s*0/)
+    const bar = readFileSync(join(HERE, '..', 'shared', 'sticky-bar.module.css'), 'utf8')
+    expect(bar).toMatch(/\[data-theme='v8'\] \.bar \{[^}]*padding:\s*var\(--tpl-footer-pad-block\) var\(--tpl-footer-pad-side\)/s)
+    expect(bar).toMatch(/\[data-theme='v8'\] \.bar \{[^}]*gap:\s*var\(--tpl-footer-gap\)/s)
+    expect(bar).toMatch(/\[data-theme='v8'\] \.bar \{[^}]*border-top:\s*1px solid var\(--color-hairline\)/s)
+    expect(bar).toMatch(/\[data-theme='v8'\] \.bar \{[^}]*box-shadow:\s*var\(--shadow-bar-line\)/s)
+    expect(bar).toMatch(/\[data-theme='v8'\] \.bar \{[^}]*border-radius:\s*var\(--radius-none\)/s)
+  })
+
+  it('設定はメニュー208・内側16/12・中身24/28・間16', () => {
+    expect(css).toMatch(/\.settingsNav \{[^}]*width:\s*var\(--tpl-settings-nav-width\)/s)
+    expect(css).toMatch(/\.settingsNav \{[^}]*padding:\s*var\(--tpl-settings-nav-pad-block\) var\(--tpl-settings-nav-pad-side\)/s)
+    expect(css).toMatch(/\.settingsContent \{[^}]*padding:\s*var\(--tpl-settings-content-pad-block\) var\(--tpl-settings-content-pad-side\)/s)
+    expect(css).toMatch(/\.settingsContent \{[^}]*gap:\s*var\(--tpl-settings-content-gap\)/s)
+    expect(css).toMatch(/\.settings \{[^}]*gap:\s*var\(--tpl-settings-gap\)/s)
+  })
+
+  it('受信箱は列372・会話・要点260・会話の頭と書く欄は変数', () => {
+    expect(css).toMatch(/\.inboxList \{[^}]*width:\s*var\(--tpl-inbox-list-width\)/s)
+    expect(css).toMatch(/\.inboxSummary \{[^}]*width:\s*var\(--tpl-inbox-summary-width\)/s)
+    expect(css).toMatch(/\.inboxSummary \{[^}]*padding:\s*var\(--tpl-inbox-summary-pad\)/s)
+    expect(css).toMatch(/\.inboxSummary \{[^}]*gap:\s*var\(--tpl-inbox-summary-gap\)/s)
+    expect(css).toMatch(/\.conversationHeader \{[^}]*padding:\s*var\(--tpl-conv-head-pad-block\) var\(--tpl-conv-head-pad-side\)/s)
+    expect(css).toMatch(/\.messages \{[^}]*padding:\s*var\(--tpl-conv-messages-pad-block\) var\(--tpl-conv-messages-pad-side\)/s)
+    expect(css).toMatch(/\.messages \{[^}]*gap:\s*var\(--tpl-conv-messages-gap\)/s)
+    expect(css).toMatch(/\.composer \{[^}]*padding:\s*var\(--tpl-composer-pad-top\) var\(--tpl-composer-pad-side\) var\(--tpl-composer-pad-bottom\)/s)
   })
 
   it('large の説明に絵に無い 12/18 を使わない', () => {
