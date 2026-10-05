@@ -32,10 +32,20 @@
  * ふんわり影にする。角丸と並び（削除は左端・操作は中央）はそのまま。
  * v7 は今までどおり。
  */
+/*
+ * 保存の帯（TEMPLATE-SPEC-OTHERS ⑤）：板の幅いっぱい・高さ60
+ * （内側 12/24・間8・中身36）。上に線＋上向きの影で板から切り分ける。
+ * v7 の浮かせ（下12・角丸・影）は変えない。
+ */
 [data-theme='v8'] .bar {
-  bottom: 12px;
+  bottom: 0;
+  min-height: 0;
+  gap: var(--tpl-footer-gap);
+  padding: var(--tpl-footer-pad-block) var(--tpl-footer-pad-side);
   border: 0;
-  box-shadow: var(--shadow-bar-float);
+  border-top: 1px solid var(--color-hairline);
+  border-radius: var(--radius-none);
+  box-shadow: var(--shadow-bar-line);
 }
 
 /* 左端。削除と、あれば状態の文字。 */

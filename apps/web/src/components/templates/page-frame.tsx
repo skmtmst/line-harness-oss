@@ -11,12 +11,14 @@ export interface PageHeadingProps {
   identity?: ReactNode
   actions?: ReactNode
   steps?: ReactNode
+  /** 作る型の手順の置き方。既定は題と説明の下の行。FU2aU の同行版は 'inline'。 */
+  stepsPlacement?: 'below' | 'inline'
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, description, help, identity, actions, steps, headingSize }: PageHeadingProps) {
-  return <header className={styles.heading} data-template-region="heading" data-heading-size={headingSize} data-has-steps={!!steps || undefined}>
-    {identity}
+export function PageHeading({ title, description, help, identity, actions, steps, headingSize, stepsPlacement = 'below' }: PageHeadingProps) {
+  return <header className={styles.heading} data-template-region="heading" data-heading-size={headingSize} data-has-steps={!!steps || undefined} data-steps-placement={stepsPlacement}>
+    {identity ? <div className={styles.identity}>{identity}</div> : null}
     <div className={styles.headingText}>
       <div className={styles.titleRow}><h2 className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</h2>
         {help ? <HelpTip label={typeof title === 'string' ? `${title}の説明` : '画面の説明'}>{help}</HelpTip> : null}
