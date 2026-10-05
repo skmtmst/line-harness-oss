@@ -3045,6 +3045,7 @@ export const SCENARIO_STEPS = [
     id: 'step-0', scenarioId: 'scenario-0', stepOrder: 1, delayMinutes: 0,
     offsetDays: 0, offsetMinutes: null, deliveryTime: '10:00', templateId: null,
     onReachTagId: null, afterSend: 'continue', messageType: 'text',
+    /* 板 `PMLkX` の1通目の題。 */
     messageContent: '{{name}}さん、ご登録ありがとうございます。\n7日間でサービスの使い方を順番にご案内します。',
     targetCondition: {
       operator: 'AND',
@@ -3060,7 +3061,8 @@ export const SCENARIO_STEPS = [
   {
     id: 'step-1', scenarioId: 'scenario-0', stepOrder: 2, delayMinutes: 1440,
     offsetDays: 1, offsetMinutes: null, deliveryTime: '20:00', templateId: null,
-    onReachTagId: null, afterSend: 'continue', messageType: 'image',
+    onReachTagId: null, afterSend: 'continue', messageType: 'carousel',
+    /* 板 `PMLkX` の2通目の札はカルーセル。 */
     messageContent: '最初に確認してほしい3つのポイント',
     targetCondition: {
       operator: 'AND',
@@ -3072,7 +3074,7 @@ export const SCENARIO_STEPS = [
   },
   {
     id: 'step-2', scenarioId: 'scenario-0', stepOrder: 3, delayMinutes: 4320,
-    offsetDays: 3, offsetMinutes: null, deliveryTime: '20:00', templateId: null,
+    offsetDays: 3, offsetMinutes: null, deliveryTime: '10:00', templateId: null,
     onReachTagId: null, afterSend: 'pause', messageType: 'text',
     messageContent: '使い方で迷っていることはありますか？',
     targetCondition: {
@@ -3095,9 +3097,10 @@ export const SCENARIO_STEPS = [
   },
   {
     id: 'step-3', scenarioId: 'scenario-0', stepOrder: 4, delayMinutes: 10080,
-    offsetDays: 7, offsetMinutes: null, deliveryTime: '20:00', templateId: 'template-0',
+    offsetDays: 7, offsetMinutes: null, deliveryTime: '10:00', templateId: 'template-0',
     onReachTagId: null, afterSend: 'pause', messageType: 'text',
-    messageContent: '7日間フォロー完了のお知らせ',
+    /* 板 `PMLkX` の4通目の題（テンプレート名は実装が別口で付ける）。 */
+    messageContent: '初回限定のご案内',
     targetCondition: null, question: null, isDraft: false,
     createdAt: '2026-08-16T00:00:00.000Z',
   },
@@ -3130,6 +3133,24 @@ export const SCENARIO_ACTIONS = [
     repeatOnRefire: false, complete: true,
   },
 ]
+
+/* 板 `PMLkX` の開始のきっかけの箱（友だち追加のとき）。無いと箱が
+ * 「呼ばれたときだけ」になる。 */
+export const SCENARIO_TRIGGERS = [
+  { id: 'trigger-1', kind: 'friend_add', tagId: null },
+]
+
+/* 板 `PMLkX` の通ごとの届く日時の例（時刻の下の青い行）。取れないと
+ * 出ない。実装は `deliveryAtLabel` をそのまま出す。 */
+export const SCENARIO_PREVIEW = {
+  startAt: '2026-10-01T14:00:00+09:00',
+  steps: [
+    { stepOrder: 1, deliveryAt: '2026-10-01T14:00:00+09:00', deliveryAtLabel: '10月1日（木）14:00（すぐ）', messageType: 'text', messageContent: '{{name}}さん、ご登録ありがとうございます。' },
+    { stepOrder: 2, deliveryAt: '2026-10-02T20:00:00+09:00', deliveryAtLabel: '10月2日（金）20:00', messageType: 'carousel', messageContent: '最初に確認してほしい3つのポイント' },
+    { stepOrder: 3, deliveryAt: '2026-10-04T10:00:00+09:00', deliveryAtLabel: '10月4日（日）10:00', messageType: 'text', messageContent: '使い方で迷っていることはありますか？' },
+    { stepOrder: 4, deliveryAt: '2026-10-08T10:00:00+09:00', deliveryAtLabel: '10月8日（木）10:00', messageType: 'text', messageContent: '初回限定のご案内' },
+  ],
+}
 
 /** `hz9ti` を開き直したときに読み返すV6下書き。 */
 export const SCENARIO_DRAFT = {
