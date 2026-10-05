@@ -7072,6 +7072,55 @@ export const WEBINAR_PARTICIPANTS = {
  *   3. 差し込みの目印を読み取れず、**保存後の文を作れない**行
  *   4. 上限を超えて、**保存を止める**行
  */
+/* 板 `AYc6O`（営業時間の編集・変える前に影響を見る）。8か所のうち先頭
+ * 3件は絵のとおり、残り5件は「ほか5か所を見る」の中に畳まれる。 */
+export function commonVarChangeImpactHours(nextValue) {
+  const currentValue = '平日 10:00〜19:00'
+  const rows = [
+    ['template', 'テンプレート', '店舗のご案内', '使われています', '営業時間は平日 10:00〜19:00です。'],
+    ['broadcast', '一斉配信', '10月のお知らせ（10/3送信）', '配信予約中', '平日 10:00〜19:00…'],
+    ['auto_reply', '自動応答', '営業時間外の自動返信', '有効', '受付は平日 10:00〜19:00です。'],
+    ['template', 'テンプレート', '初めてのご来店案内', '使われています', '営業時間は平日 10:00〜19:00です。'],
+    ['template', 'テンプレート', '予約確認のご連絡', '使われています', '営業時間は平日 10:00〜19:00です。'],
+    ['template', 'テンプレート', '定休日のお知らせ', '使われています', '営業時間は平日 10:00〜19:00です。'],
+    ['template', 'テンプレート', '年末年始のご案内', '使われています', '営業時間は平日 10:00〜19:00です。'],
+    ['template', 'テンプレート', '移転のお知らせ', '使われています', '営業時間は平日 10:00〜19:00です。'],
+  ]
+  const items = rows.map(([kind, kindLabel, name, status, currentPreview]) => ({
+    kind, kindLabel, name, status,
+    blocksDeletion: true,
+    changesOnSave: true,
+    previewAvailable: true,
+    currentPreview,
+    nextPreview: currentPreview.replaceAll(currentValue, nextValue),
+    currentCharacterCount: currentPreview.length,
+    nextCharacterCount: currentPreview.replaceAll(currentValue, nextValue).length,
+    characterLimit: 5000,
+    exceedsCharacterLimit: false,
+    errors: [],
+    warnings: [],
+  }))
+  return {
+    variable: {
+      id: 'common-var-hours', name: '営業時間', varKey: 'shop_hours',
+      currentValue, nextValue,
+    },
+    total: 8,
+    blockingTotal: 8,
+    historicalTotal: 0,
+    unscopedFormTotal: 0,
+    canDelete: false,
+    byKind: { template: 6, broadcast: 1, scenario: 0, reminder: 0, auto_reply: 1, form: 0, automation: 0, friend_add: 0, common_action: 0 },
+    items,
+    unavailableReferences: [],
+    checkedAt: '2026-09-07T10:00:00.000+09:00',
+    errorTotal: 0,
+    warningTotal: 0,
+    canSave: true,
+    recommendedAction: 'save',
+  }
+}
+
 export function commonVarChangeImpact(nextValue) {
   const items = COMMON_VAR_DELETE_IMPACT.items.map((item, index) => {
     const nextPreview = item.currentPreview.replaceAll('株式会社NEN', nextValue)

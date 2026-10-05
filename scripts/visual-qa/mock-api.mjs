@@ -36,6 +36,7 @@ import {
   COMMON_VAR_DELETE_IMPACT,
   COMMON_VAR_SCHEDULES,
   commonVarChangeImpact,
+  commonVarChangeImpactHours,
   COMMON_VAR_DELETE_IMPACT_EMPTY,
   COMMON_VAR_REPLACEMENT_CANDIDATES,
   COMMON_VAR_REPLACEMENT_PREVIEW,
@@ -4991,14 +4992,19 @@ const server = createServer((req, res) => {
       「口はあるのに画面が壊れている」ように見える絵が撮れてしまう。
     */
     if (method === 'POST' && /^\/api\/common-vars\/[^/]+\/impact-preview$/.test(url.pathname)) {
+      // 板 `AYc6O`：営業時間は8か所の専用データを返す（会社名15か所と別）。
+      const impactVarId = /^\/api\/common-vars\/([^/]+)\/impact-preview$/.exec(url.pathname)[1]
       let raw = ''
       req.on('data', (chunk) => { raw += chunk })
       req.on('end', () => {
         let nextValue = ''
         try { nextValue = JSON.parse(raw || '{}').nextValue ?? '' } catch { nextValue = '' }
+        const value = typeof nextValue === 'string' ? nextValue : ''
         res.writeHead(200).end(JSON.stringify({
           success: true,
-          data: commonVarChangeImpact(typeof nextValue === 'string' ? nextValue : ''),
+          data: impactVarId === 'common-var-hours'
+            ? commonVarChangeImpactHours(value)
+            : commonVarChangeImpact(value),
         }))
       })
       return
