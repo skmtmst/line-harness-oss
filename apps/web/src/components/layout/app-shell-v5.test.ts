@@ -91,7 +91,8 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
   it('ダッシュボードの画面名はV6共通トップバーだけに置く', () => {
     expect(dashboard).not.toContain("import Header from '@/components/layout/header'")
     expect(dashboard).not.toContain('<Header')
-    expect(dashboard).not.toContain('title="ダッシュボード"')
+    // ★V8（d8X09・小分け2）: 板の題は型（DashboardTemplate の board head）が持ち、Pencil との重ね合わせで 4px超0 を確認済み。ページ独自の見出しは置かない。
+    expect(dashboard).toContain('<DashboardTemplate')
     expect(dashboard).toContain('V6 `vUXKb/vwcM6`')
     expect(dashboard).toContain('ダッシュボード編集')
     expect(pendingInbox).toContain('h-[61px]')
