@@ -13,7 +13,7 @@ export function InboxPage({ boardId, standalone, heading, list, conversationHead
     <div className={styles.inbox} data-template-region="body">
       <div className={styles.inboxList} data-template-region="list">{list}</div>
       <div className={styles.conversation} data-template-region="conversation">
-        {conversationHeader}<div className={styles.messages}>{children}</div><div className={styles.composer}>{composer}</div>
+        {conversationHeader ? <div className={styles.conversationHeader} data-template-region="conversation-header">{conversationHeader}</div> : null}<div className={styles.messages}>{children}</div><div className={styles.composer}>{composer}</div>
       </div>
       {summary ? <aside className={styles.inboxSummary} data-template-region="summary">{summary}</aside> : null}
     </div>
