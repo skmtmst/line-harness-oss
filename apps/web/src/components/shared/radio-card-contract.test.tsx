@@ -82,6 +82,23 @@ describe('ラジオカード（DEEP-02）', () => {
     render(<RadioCard name="g" value="x" checked={false} onChange={() => {}} title="対象" invalid />)
     expect(screen.getByRole('radio').getAttribute('aria-invalid')).toBe('true')
   })
+
+  it('icon={null} で上段の図柄なし（j8p3yj の絵どおり題＋説明のみ）', () => {
+    const { container } = render(
+      <RadioCard name="g" value="x" checked={false} onChange={() => {}} title="対象" note="説明" icon={null} />,
+    )
+    // 上段の図柄（aria-hidden の飾り span）が出ない。題と説明は残る。
+    expect(container.querySelector('span[aria-hidden="true"]')).toBeNull()
+    expect(screen.getByText('対象')).toBeTruthy()
+    expect(screen.getByText('説明')).toBeTruthy()
+  })
+
+  it('既定はタグの図柄が出る（箱 fNPdg/r3xz1W の合格は不変）', () => {
+    const { container } = render(
+      <RadioCard name="g" value="x" checked={false} onChange={() => {}} title="対象" />,
+    )
+    expect(container.querySelector('span[aria-hidden="true"] svg')).not.toBeNull()
+  })
 })
 
 describe('選ぶカードの行型（BHEl9・変わり形）', () => {
