@@ -1,5 +1,6 @@
 'use client'
 
+import { CreatePage } from '@/components/templates'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -30,14 +31,17 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { findConditionDraftIssue, type SegmentCondition } from '@/lib/segment-condition'
 import Stepper, { type StepperStep } from '@/components/shared/stepper'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import { TextField, TextArea } from '@/components/shared/text-field'
+import SearchField from '@/components/shared/search-field'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import Notice from '@/components/shared/notice'
-import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
@@ -259,7 +263,7 @@ export const STARTER_TEMPLATES: Array<{
   {
     key: 'off-hours',
     name: '営業時間外の自動返信',
-    lines: ['毎日21:00〜09:00に受信', 'テキストで返す', '担当者へ通知（通知先を選択）'],
+    lines: ['毎日 21:00〜09:00 に受信', 'テキストで返す', '＋担当者へ知らせる'],
     apply: (form) => ({
       ...form,
       ruleName: '営業時間外の自動返信',
@@ -275,7 +279,7 @@ export const STARTER_TEMPLATES: Array<{
   {
     key: 'booking-change',
     name: '予約変更の受付',
-    lines: ['「予約変更」「日程変更」を含む', 'テンプレートで返す', '担当者へ通知・タグ付け（対象を選択）'],
+    lines: ['「予約変更」「日程変更」を含む', 'テンプレートで返す', '＋担当者へ知らせる・タグを付ける'],
     apply: (form) => ({
       ...form,
       ruleName: '予約変更の受付',
@@ -292,7 +296,7 @@ export const STARTER_TEMPLATES: Array<{
   {
     key: 'faq',
     name: 'よくある質問への回答',
-    lines: ['「営業時間」「場所」「料金」を含む', 'テンプレートで返す', 'タグ付け（対象を選択）'],
+    lines: ['「営業時間」「場所」「料金」を含む', 'テンプレートで返す', '＋タグを付ける'],
     apply: (form) => ({
       ...form,
       ruleName: 'よくある質問への回答',
@@ -412,6 +416,7 @@ function AutoReplyWizardV8Inner() {
   const savedSnapshotRef = useRef(JSON.stringify(EMPTY_FORM))
   // 編集の競合（`UGrd2`：409）。入力は捨てず、比べる・読み込むを選んでもらう。
   const [saveConflict, setSaveConflict] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [compareTarget, setCompareTarget] = useState<WizardForm | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
@@ -1143,32 +1148,285 @@ function AutoReplyWizardV8Inner() {
         : undefined,
   }))
 
-  const statusBadge = lifecycleStatus === 'draft' ? '下書き' : isActive ? '有効' : '停止中'
+  // 絵（A0pDt ほか）：まだ有効にしていない下書きは「停止中として作っています」。
+  const statusBadge = isActive ? '有効' : '停止中'
+
+  const previewContent = (<>
+          {step === 'basic' && (
+            <Card padding="roomy" layout="vertical" className={styles.sideCard}>
+              <h2 className={styles.sideTitle}>設定内容</h2>
+              <dl className={styles.kvList}>
+                <div className={styles.kvRow}>
+                  <dt className="text-ink-faint text-xs">状態</dt>
+                  <dd className={styles.kvVal}>停止中</dd>
+                </div>
+                <div className={styles.kvRow}>
+                  <dt className="text-ink-faint text-xs">動く順番</dt>
+                  <dd className={styles.kvVal}>{myIndex >= 0 ? myPositionLabel : `いちばん下（${orderedRules.length + 1}番目）`}</dd>
+                </div>
+                <div className={styles.kvRow}>
+                  <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
+                  <dd className={styles.kvVal}>手順4で確かめる</dd>
+                </div>
+              </dl>
+            </Card>
+          )}
+          {step === 'basic' && (
+            <p className={styles.sideNote}>
+              LINEでの見え方は、届けるメッセージを決める手順から右に出ます。
+            </p>
+          )}
+
+          {step === 'trigger' && (
+            <>
+              <Card padding="roomy" layout="vertical" className={styles.sideCard}>
+                <h2 className={styles.sideTitle}>保存したあとに、過去28日で当たった数が出ます</h2>
+                <p className={styles.hint}>
+                  いまの作りでは、保存する前の条件は数えられません。保存すると、このルールが動いた回数がここに出ます。
+                </p>
+                <dl className={styles.kvList}>
+                  <div className={styles.kvRow}>
+                    <dt className="text-ink-faint text-xs">当たった受信（過去28日）</dt>
+                    <dd className={styles.kvVal}>
+                      {matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件`}
+                    </dd>
+                  </div>
+                </dl>
+              </Card>
+              <LinePreview accountName="公式アカウント">
+                <div className={styles.talkStack}>
+                  <p className={styles.bubbleIn}>
+                    {effectiveKeywords[0]?.keyword.trim()
+                      ? `${effectiveKeywords[0].keyword.trim()}（例）`
+                      : '届いたメッセージ'}
+                  </p>
+                  <p className={styles.bubbleMeta}>届いた側の見え方</p>
+                </div>
+              </LinePreview>
+            </>
+          )}
+
+          {step === 'response' && (
+            <>
+              <Card padding="roomy" layout="vertical" className={styles.sideCard}>
+                <h2 className={styles.sideTitle}>送るものの確認</h2>
+                <dl className={styles.kvList}>
+                  <div className={styles.kvRow}>
+                    <dt className="text-ink-faint text-xs">返すもの</dt>
+                    <dd className={styles.kvVal}>
+                      {form.mode === 'silent'
+                        ? '返信しない'
+                        : form.mode === 'template'
+                          ? selectedTemplate?.name ?? 'テンプレート'
+                          : form.mode === 'inline-flex'
+                            ? 'カード'
+                            : form.mode === 'inline-image'
+                              ? '画像'
+                              : `テキスト${form.responseContent ? ` ${formatNumber(form.responseContent.length)}字` : ''}`}
+                    </dd>
+                  </div>
+                  <div className={styles.kvRow}>
+                    <dt className="text-ink-faint text-xs">後の処理</dt>
+                    <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : 'なし'}</dd>
+                  </div>
+                  {(() => {
+                    const used = INSERT_CHIPS.filter((chip) => form.responseContent.includes(chip.token))
+                    if (form.mode !== 'inline-text' || used.length === 0) return null
+                    return (
+                      <div className={styles.kvRow}>
+                        <dt className="text-ink-faint text-xs">差し込み</dt>
+                        <dd className={styles.kvVal}>{used.map((chip) => chip.label === '名前' ? '名前（無いときは「お客さま」）' : chip.label).join('・')}</dd>
+                      </div>
+                    )
+                  })()}
+                </dl>
+              </Card>
+              <LinePreview accountName="公式アカウント">
+                <div className={styles.talkStack}>
+                  {form.mode === 'inline-image' && imageContent ? (
+                    <img
+                      src={imageContent.previewImageUrl}
+                      alt="返信画像のプレビュー"
+                      className={styles.bubbleIn}
+                      style={{ padding: 0, overflow: 'hidden' }}
+                    />
+                  ) : (
+                    <p className={styles.bubbleReply}>{replyPreviewText}</p>
+                  )}
+                  <p className={styles.bubbleMeta}>返す側の見え方</p>
+                </div>
+              </LinePreview>
+            </>
+          )}
+
+          {step === 'priority' && (
+            <>
+              <Card padding="roomy" layout="vertical" className={styles.sideCard}>
+                <div className={styles.cardHeading}>
+                  <h2 className={styles.sideTitle}>重なりを1件ずつ確かめる</h2>
+                  <p className={styles.cardNote}>すべてにチェックを付けるまで、⑤で有効にできません。</p>
+                </div>
+                {conflicts.length === 0 ? (
+                  <p className={styles.hint}>同時に当たるルールはありません。</p>
+                ) : (
+                  conflicts.map((conflict) => {
+                    const tone = autoReplyId ? conflictTone(conflict, autoReplyId) : { label: '', losing: false }
+                    return (
+                      <div key={conflict.autoReplyId} className={styles.conflictRow}>
+                        <Checkbox
+                          checked={acknowledged.has(conflict.autoReplyId)}
+                          onCheckedChange={(on) =>
+                            setAcknowledged((current) => {
+                              const next = new Set(current)
+                              if (on) next.add(conflict.autoReplyId)
+                              else next.delete(conflict.autoReplyId)
+                              return next
+                            })
+                          }
+                          aria-label={`「${conflict.name}」を確かめた`}
+                        />
+                        <div className={styles.conflictBody}>
+                          <p className={styles.conflictName}>{conflict.name}</p>
+                          <p className={styles.conflictNote}>
+                            <span className={styles.conflictCertainty}>{tone.label}</span>
+                            {conflict.reason ? ` — ${conflict.reason}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+                <dl className={styles.kvList}>
+                  <div className={styles.kvRow}>
+                    <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
+                    <dd className={styles.kvVal}>{conflicts.length > 0 ? `${conflicts.length}つ` : 'なし'}</dd>
+                  </div>
+                  <div className={styles.kvRow}>
+                    <dt className="text-ink-faint text-xs">当たる受信（過去28日）</dt>
+                    <dd className={styles.kvVal}>
+                      {matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件`}
+                    </dd>
+                  </div>
+                  <div className={styles.kvRow}>
+                    <dt className="text-ink-faint text-xs">試した結果</dt>
+                    <dd className={styles.kvVal}>
+                      {dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません'}
+                    </dd>
+                  </div>
+                </dl>
+              </Card>
+              <LinePreview accountName="公式アカウント">
+                <div className={styles.talkStack}>
+                  {testMessage.trim() ? <p className={styles.bubbleIn}>{testMessage.trim()}</p> : null}
+                  <p className={styles.bubbleReply}>
+                    {dryRun?.winner?.responseContent || replyPreviewText}
+                  </p>
+                  {dryRun?.winner && dryRun.winner.autoReplyId !== autoReplyId ? (
+                    <p className={styles.bubbleMeta}>「{dryRun.winner.name}」が返します</p>
+                  ) : (
+                    <p className={styles.bubbleMeta}>このルールが返します</p>
+                  )}
+                </div>
+              </LinePreview>
+            </>
+          )}
+
+          {step === 'confirm' && (
+            <>
+              <Card padding="roomy" layout="vertical" className={styles.sideCard}>
+                <h2 className={styles.sideTitle}>設定内容</h2>
+                <dl className={styles.kvList}>
+                  <div className={styles.kvRow}>
+                    <dt className="text-ink-faint text-xs">状態</dt>
+                    <dd className={styles.kvVal}>
+                      {isActive ? '有効のまま更新' : '停止中 → 有効にします'}
+                    </dd>
+                  </div>
+                  <div className={styles.kvRow}>
+                    <dt className="text-ink-faint text-xs">動く順番</dt>
+                    <dd className={styles.kvVal}>{myPositionLabel}</dd>
+                  </div>
+                  <div className={styles.kvRow}>
+                    <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
+                    <dd className={styles.kvVal}>
+                      {conflicts.length > 0 ? `${conflicts.length}つ` : 'なし'}
+                    </dd>
+                  </div>
+                </dl>
+              </Card>
+              <LinePreview accountName="公式アカウント">
+                <div className={styles.talkStack}>
+                  <p className={styles.bubbleReply}>{replyPreviewText}</p>
+                  <p className={styles.bubbleMeta}>返す側の見え方</p>
+                </div>
+              </LinePreview>
+            </>
+          )}
+        </>
+  )
 
   return (
-    <div className={styles.page} data-design-node={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]}>
-      <Link href="/auto-replies" className={styles.backLink}>
-        <ArrowLeft size={14} aria-hidden="true" />
-        自動応答へ
-      </Link>
-      <div className={styles.headText}>
-        <h1 className={styles.headTitle}>{autoReplyId ? 'ルールを編集' : 'ルールを作る'}</h1>
-      </div>
-
-      <Stepper label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />
-
-      <p className={styles.subline}>
-        {step === 'basic' ? (
-          'いまは停止中として作ります。最後の「確認」で有効にします。'
-        ) : (
+    <CreatePage boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={<>{autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'}</>} description={<>
+          {step === 'basic' ? (
+            'いまは停止中として作ります。最後の「確認」で有効にします。'
+          ) : (
+            `ルール名：${thisRuleName}・${statusBadge}として作っています`
+          )}
+        </>} identity={<Link href="/auto-replies" className={styles.backLink}>
+          <ArrowLeft size={14} aria-hidden="true" />
+          自動応答へ
+        </Link>} steps={<Stepper label="自動応答を作る進み方" steps={stepperSteps} currentKey={step} />} preview={previewContent} previewToggle={<Button onClick={() => setPreviewOpen(true)}>設定内容とLINEプレビューを見る</Button>} footerActions={
           <>
-            <span>
-              ルール名：<span className={styles.sublineName}>{thisRuleName}</span>
-            </span>
-            <span className={styles.sublineBadge}>{statusBadge}として作っています</span>
+            <Button
+              type="button"
+              onClick={() => guarded(() => router.push('/auto-replies'))}
+              disabled={saving}
+            >
+              キャンセル
+            </Button>
+            <Button
+              type="button"
+              onClick={() =>
+                void saveDraftNow().then((saved) => {
+                  if (saved || autoReplyId) setSaveNotice('下書きを保存しました')
+                })
+              }
+              disabled={saving}
+              busy={saving}
+              busyLabel="保存中…"
+              done={saveDone}
+            >
+              {step === 'confirm' ? '下書きのまま保存' : '下書きとして保存'}
+            </Button>
+            {step !== 'confirm' ? (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => void goNext()}
+                disabled={saving}
+                busy={saving}
+                busyLabel="進んでいます…"
+              >
+                次へ：{STEP_LABELS_V8[STEP_ORDER[STEP_ORDER.indexOf(step) + 1]]}
+                <ChevronRight size={14} aria-hidden="true" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => void publish()}
+                disabled={!publishReady || saving}
+                busy={saving}
+                busyLabel="有効にしています…"
+                done={saveDone}
+              >
+                <Power size={14} aria-hidden="true" />
+                {wasPublished || isActive ? 'この内容で更新する' : '有効にする'}
+              </Button>
+            )}
           </>
-        )}
-      </p>
+        } status={dirty ? '下書きに未保存の変更があります' : undefined}>
+
 
       {saveConflict && (
         <div className="border-accent bg-accent-soft rounded-card flex flex-wrap items-center gap-3 border p-4" data-design-node="UGrd2" role="alert">
@@ -1198,21 +1456,21 @@ function AutoReplyWizardV8Inner() {
         />
       ) : null}
 
-      <div className={styles.cols}>
-        <div className={styles.main}>
+
           {step === 'basic' && (
             <>
-              <section className={styles.card}>
-                <h2 className={styles.cardTitle}>名前とフォルダ</h2>
-                <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
+                <div className={styles.cardHeading}>
+                  <h2 className={styles.cardTitle}>名前とフォルダ</h2>
+                  <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
+                </div>
                 <div className={styles.fieldPair}>
                   <div className={styles.field}>
                     <label htmlFor="wiz-name" className={styles.label}>
                       ルール名
                     </label>
-                    <input
+                    <TextField
                       id="wiz-name"
-                      className={styles.input}
                       value={form.ruleName}
                       onChange={(e) => patch({ ruleName: e.target.value })}
                       placeholder="例：予約の日程変更"
@@ -1236,33 +1494,34 @@ function AutoReplyWizardV8Inner() {
                 </div>
                 <div className={styles.field}>
                   <label htmlFor="wiz-memo" className={styles.label}>
-                    社内メモ <span className={styles.labelOptional}>（任意）</span>
+                    社内メモ<span className={styles.labelOptional}>任意</span>
                   </label>
-                  <input
+                  <TextField
                     id="wiz-memo"
-                    className={styles.input}
                     value={form.internalMemo}
                     onChange={(e) => patch({ internalMemo: e.target.value })}
                     placeholder="例：キャンペーン中だけ使う"
                   />
                 </div>
-              </section>
+              </Card>
 
               <Notice tone="info">
                 新しく作るルールは、一覧のいちばん下（最後に見る順番）に足されます。順番は手順4「優先順位」で確かめます。
               </Notice>
 
-              <section className={styles.card}>
-                <h2 className={styles.cardTitle}>ひな形から作る（任意）</h2>
-                <p className={styles.cardNote}>選ぶと、条件と返信がまとめて入ります。あとから全部変えられます。</p>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
+                <div className={styles.cardHeading}>
+                  <h2 className={styles.cardTitle}>ひな形から作る（任意）</h2>
+                  <p className={styles.cardNote}>選ぶと、条件と返信がまとめて入ります。あとから全部変えられます。</p>
+                </div>
                 <div className={styles.tplGrid}>
                   {STARTER_TEMPLATES.map((tpl) => (
-                    <div key={tpl.key} className={styles.tplCard}>
+                    <Card key={tpl.key} padding="default" layout="vertical" className={styles.tplLayout}>
                       <p className={styles.tplName}>{tpl.name}</p>
                       {tpl.lines.map((line) => (
                         <p key={line} className={styles.tplDesc}>{line}</p>
                       ))}
-                      <Button
+                      <div className={styles.tplActions}><Button
                         type="button"
                         onClick={() => {
                           setForm((current) => tpl.apply(current))
@@ -1270,20 +1529,20 @@ function AutoReplyWizardV8Inner() {
                         }}
                       >
                         このひな形を使う
-                      </Button>
-                    </div>
+                      </Button></div>
+                    </Card>
                   ))}
                 </div>
                 <div className={styles.tplFoot}>
                   <Button href="/templates">ひな形を管理</Button>
                 </div>
-              </section>
+              </Card>
             </>
           )}
 
           {step === 'trigger' && (
             <>
-              <section className={styles.card}>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
                 <h2 className={styles.cardTitle}>1. どのメッセージに反応するか</h2>
                 <RadioCardGroup legend="反応するメッセージ" className={styles.radioPair}>
                   <RadioCard
@@ -1458,9 +1717,9 @@ function AutoReplyWizardV8Inner() {
                     </Checkbox>
                   </div>
                 </div>
-              </section>
+              </Card>
 
-              <section className={styles.card}>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
                 <h2 className={styles.cardTitle}>2. いつ反応するか</h2>
                 <div className={styles.field}>
                   <span className={styles.label}>曜日</span>
@@ -1570,9 +1829,9 @@ function AutoReplyWizardV8Inner() {
                     </div>
                   )}
                 </div>
-              </section>
+              </Card>
 
-              <section className={styles.card}>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
                 <h2 className={styles.cardTitle}>3. 誰に反応するか</h2>
                 <RadioCardGroup legend="反応する相手" className={styles.radioPair}>
                   <RadioCard
@@ -1601,13 +1860,13 @@ function AutoReplyWizardV8Inner() {
                 ) : (
                   <p className={styles.hint}>条件を入れないと、全員に反応します。</p>
                 )}
-              </section>
+              </Card>
             </>
           )}
 
           {step === 'response' && (
             <>
-              <section className={styles.card}>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
                 <h2 className={styles.cardTitle}>返すもの</h2>
                 <div className={styles.chips} role="group" aria-label="返すもの">
                   {(
@@ -1636,9 +1895,8 @@ function AutoReplyWizardV8Inner() {
                     <label htmlFor="wiz-content" className={styles.label}>
                       返す文
                     </label>
-                    <textarea
+                    <TextArea
                       id="wiz-content"
-                      className={styles.textarea}
                       value={form.responseContent}
                       onChange={(e) => patch({ responseContent: e.target.value })}
                       placeholder="例：予約の変更を承りました。担当者が確認次第ご連絡します。"
@@ -1690,9 +1948,8 @@ function AutoReplyWizardV8Inner() {
                     <label htmlFor="wiz-flex" className={styles.label}>
                       カードの内容（JSON）
                     </label>
-                    <textarea
+                    <TextArea
                       id="wiz-flex"
-                      className={styles.textarea}
                       value={form.responseContent}
                       onChange={(e) => patch({ responseContent: e.target.value })}
                       placeholder='{"type":"bubble", ...}'
@@ -1725,11 +1982,13 @@ function AutoReplyWizardV8Inner() {
                     返信は送りません。下の「返したあとに行うこと」で決めた処理だけが動きます。
                   </p>
                 )}
-              </section>
+              </Card>
 
-              <section className={styles.card}>
-                <h2 className={styles.cardTitle}>返したあとに行うこと</h2>
-                <p className={styles.cardNote}>上から順に動きます。失敗したときの動きも決められます。</p>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
+                <div className={styles.cardHeading}>
+                  <h2 className={styles.cardTitle}>返したあとに行うこと</h2>
+                  <p className={styles.cardNote}>上から順に動きます。失敗したときの動きも決められます。</p>
+                </div>
                 <InlineActionList
                   actions={form.actions}
                   onChange={(next) => patch({ actions: next })}
@@ -1738,9 +1997,9 @@ function AutoReplyWizardV8Inner() {
                 <p className={styles.hint}>
                   例：タグを付ける・担当者へ知らせる・シナリオを始める。何もなければ空のままで構いません。
                 </p>
-              </section>
+              </Card>
 
-              <section className={styles.card}>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
                 <h2 className={styles.cardTitle}>細かい決まり</h2>
                 <div className={styles.toggleRow}>
                   <div className={styles.toggleText}>
@@ -1762,7 +2021,7 @@ function AutoReplyWizardV8Inner() {
                   </div>
                   <div className={styles.toggleExtra}>
                     {form.cooldownOn && (
-                      <input
+                      <TextField
                         type="number"
                         className={styles.toggleNum}
                         aria-label="あける時間（分）"
@@ -1823,7 +2082,7 @@ function AutoReplyWizardV8Inner() {
                     />
                   </RadioCardGroup>
                 </div>
-              </section>
+              </Card>
             </>
           )}
 
@@ -1833,9 +2092,11 @@ function AutoReplyWizardV8Inner() {
                 上のルールから順に見て、最初に当たった1つだけが動きます。このルールより上に、同じ受信に当たるルールがあると、このルールは動きません。
               </Notice>
 
-              <section className={styles.card}>
-                <h2 className={styles.cardTitle}>動く順番</h2>
-                <p className={styles.cardNote}>黄色は、このルールと同じ受信に当たるルールです（過去28日の受信で確かめました）。</p>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
+                <div className={styles.cardHeading}>
+                  <h2 className={styles.cardTitle}>動く順番</h2>
+                  <p className={styles.cardNote}>黄色は、このルールと同じ受信に当たるルールです（過去28日の受信で確かめました）。</p>
+                </div>
                 {priorityState === 'error' ? (
                   <p className={styles.hint}>
                     ルールの並びを読み込めませんでした。
@@ -1917,23 +2178,21 @@ function AutoReplyWizardV8Inner() {
                     {priorityState === 'loading' && <li className={styles.hint}>読み込んでいます…</li>}
                   </ol>
                 )}
-              </section>
+              </Card>
 
-              <section className={styles.card}>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
                 <h2 className={styles.cardTitle}>試しに送ってみる</h2>
                 <div className={styles.field}>
                   <label htmlFor="wiz-test-friend" className={styles.label}>
                     送信者
                   </label>
                   <div className={styles.chips}>
-                    <input
-                      type="search"
-                      className={styles.chipInput}
+                    <SearchField
                       placeholder="名前で探す"
                       value={friendQuery}
-                      onChange={(e) => {
-                        setFriendQuery(e.target.value)
-                        void searchFriends(e.target.value)
+                      onChange={(value) => {
+                        setFriendQuery(value)
+                        void searchFriends(value)
                       }}
                       aria-label="友だちを名前で探す"
                     />
@@ -1961,9 +2220,8 @@ function AutoReplyWizardV8Inner() {
                   <label htmlFor="wiz-test-message" className={styles.label}>
                     届いたメッセージ
                   </label>
-                  <input
+                  <TextField
                     id="wiz-test-message"
-                    className={styles.input}
                     value={testMessage}
                     onChange={(e) => setTestMessage(e.target.value)}
                     placeholder={effectiveKeywords[0]?.keyword.trim() || '例：予約変更したいです'}
@@ -2012,13 +2270,13 @@ function AutoReplyWizardV8Inner() {
                     ) : null}
                   </div>
                 )}
-              </section>
+              </Card>
             </>
           )}
 
           {step === 'confirm' && (
             <>
-              <section className={styles.card}>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
                 <h2 className={styles.cardTitle}>設定の確認</h2>
                 <div>
                   <SummaryRow label="名前・フォルダ" onEdit={() => goToStep('basic')}>
@@ -2082,9 +2340,9 @@ function AutoReplyWizardV8Inner() {
                     {myPositionLabel}
                   </SummaryRow>
                 </div>
-              </section>
+              </Card>
 
-              <section className={styles.card}>
+              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
                 <h2 className={styles.cardTitle}>有効にする前の確認</h2>
                 {confirmState === 'loading' && <p className={styles.hint}>確かめています…</p>}
                 {confirmState === 'error' && (
@@ -2122,269 +2380,13 @@ function AutoReplyWizardV8Inner() {
                       </div>
                     )
                   })}
-              </section>
-            </>
-          )}
-        </div>
-
-        {/* ===== 右の列：いまの状態と LINEの見え方 ===== */}
-        <div className={styles.side}>
-          {step === 'basic' && (
-            <section className={styles.card}>
-              <h2 className={styles.cardTitle}>設定内容</h2>
-              <dl className={styles.kvList}>
-                <div className={styles.kvRow}>
-                  <dt className="text-ink-faint text-xs">状態</dt>
-                  <dd className={styles.kvVal}>停止中として作ります</dd>
-                </div>
-                <div className={styles.kvRow}>
-                  <dt className="text-ink-faint text-xs">動く順番</dt>
-                  <dd className={styles.kvVal}>いちばん下（足されます）</dd>
-                </div>
-                <div className={styles.kvRow}>
-                  <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
-                  <dd className={styles.kvVal}>手順4で確かめます</dd>
-                </div>
-              </dl>
-              <p className={styles.hint}>
-                LINEでの見え方は、届けるメッセージを決める手順から右に出ます。
-              </p>
-            </section>
-          )}
-
-          {step === 'trigger' && (
-            <>
-              <section className={styles.card}>
-                <h2 className={styles.cardTitle}>保存したあとに、過去28日で当たった数が出ます</h2>
-                <p className={styles.hint}>
-                  いまの作りでは、保存する前の条件は数えられません。保存すると、このルールが動いた回数がここに出ます。
-                </p>
-                <dl className={styles.kvList}>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">当たった受信（過去28日）</dt>
-                    <dd className={styles.kvVal}>
-                      {matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件`}
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-              <LinePreview accountName="公式アカウント">
-                <div className={styles.talkStack}>
-                  <p className={styles.bubbleIn}>
-                    {effectiveKeywords[0]?.keyword.trim()
-                      ? `${effectiveKeywords[0].keyword.trim()}（例）`
-                      : '届いたメッセージ'}
-                  </p>
-                  <p className={styles.bubbleMeta}>届いた側の見え方</p>
-                </div>
-              </LinePreview>
+              </Card>
             </>
           )}
 
-          {step === 'response' && (
-            <>
-              <section className={styles.card}>
-                <h2 className={styles.cardTitle}>送るものの確認</h2>
-                <dl className={styles.kvList}>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">返すもの</dt>
-                    <dd className={styles.kvVal}>
-                      {form.mode === 'silent'
-                        ? '返信しない'
-                        : form.mode === 'template'
-                          ? selectedTemplate?.name ?? 'テンプレート'
-                          : form.mode === 'inline-flex'
-                            ? 'カード'
-                            : form.mode === 'inline-image'
-                              ? '画像'
-                              : `テキスト${form.responseContent ? ` ${formatNumber(form.responseContent.length)}字` : ''}`}
-                    </dd>
-                  </div>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">後の処理</dt>
-                    <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : 'なし'}</dd>
-                  </div>
-                </dl>
-              </section>
-              <LinePreview accountName="公式アカウント">
-                <div className={styles.talkStack}>
-                  {form.mode === 'inline-image' && imageContent ? (
-                    <img
-                      src={imageContent.previewImageUrl}
-                      alt="返信画像のプレビュー"
-                      className={styles.bubbleIn}
-                      style={{ padding: 0, overflow: 'hidden' }}
-                    />
-                  ) : (
-                    <p className={styles.bubbleReply}>{replyPreviewText}</p>
-                  )}
-                  <p className={styles.bubbleMeta}>返す側の見え方</p>
-                </div>
-              </LinePreview>
-            </>
-          )}
-
-          {step === 'priority' && (
-            <>
-              <section className={styles.card}>
-                <h2 className={styles.cardTitle}>重なりを1件ずつ確かめる</h2>
-                <p className={styles.cardNote}>すべてにチェックを付けるまで、⑤で有効にできません。</p>
-                {conflicts.length === 0 ? (
-                  <p className={styles.hint}>同時に当たるルールはありません。</p>
-                ) : (
-                  conflicts.map((conflict) => {
-                    const tone = autoReplyId ? conflictTone(conflict, autoReplyId) : { label: '', losing: false }
-                    return (
-                      <div key={conflict.autoReplyId} className={styles.conflictRow}>
-                        <Checkbox
-                          checked={acknowledged.has(conflict.autoReplyId)}
-                          onCheckedChange={(on) =>
-                            setAcknowledged((current) => {
-                              const next = new Set(current)
-                              if (on) next.add(conflict.autoReplyId)
-                              else next.delete(conflict.autoReplyId)
-                              return next
-                            })
-                          }
-                          aria-label={`「${conflict.name}」を確かめた`}
-                        />
-                        <div className={styles.conflictBody}>
-                          <p className={styles.conflictName}>{conflict.name}</p>
-                          <p className={styles.conflictNote}>
-                            <span className={styles.conflictCertainty}>{tone.label}</span>
-                            {conflict.reason ? ` — ${conflict.reason}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
-                <dl className={styles.kvList}>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
-                    <dd className={styles.kvVal}>{conflicts.length > 0 ? `${conflicts.length}つ` : 'なし'}</dd>
-                  </div>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">当たる受信（過去28日）</dt>
-                    <dd className={styles.kvVal}>
-                      {matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件`}
-                    </dd>
-                  </div>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">試した結果</dt>
-                    <dd className={styles.kvVal}>
-                      {dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません'}
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-              <LinePreview accountName="公式アカウント">
-                <div className={styles.talkStack}>
-                  {testMessage.trim() ? <p className={styles.bubbleIn}>{testMessage.trim()}</p> : null}
-                  <p className={styles.bubbleReply}>
-                    {dryRun?.winner?.responseContent || replyPreviewText}
-                  </p>
-                  {dryRun?.winner && dryRun.winner.autoReplyId !== autoReplyId ? (
-                    <p className={styles.bubbleMeta}>「{dryRun.winner.name}」が返します</p>
-                  ) : (
-                    <p className={styles.bubbleMeta}>このルールが返します</p>
-                  )}
-                </div>
-              </LinePreview>
-            </>
-          )}
-
-          {step === 'confirm' && (
-            <>
-              <section className={styles.card}>
-                <h2 className={styles.cardTitle}>設定内容</h2>
-                <dl className={styles.kvList}>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">状態</dt>
-                    <dd className={styles.kvVal}>
-                      {isActive ? '有効のまま更新' : '停止中 → 有効にします'}
-                    </dd>
-                  </div>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">動く順番</dt>
-                    <dd className={styles.kvVal}>{myPositionLabel}</dd>
-                  </div>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
-                    <dd className={styles.kvVal}>
-                      {conflicts.length > 0 ? `${conflicts.length}つ` : 'なし'}
-                    </dd>
-                  </div>
-                </dl>
-              </section>
-              <LinePreview accountName="公式アカウント">
-                <div className={styles.talkStack}>
-                  <p className={styles.bubbleReply}>{replyPreviewText}</p>
-                  <p className={styles.bubbleMeta}>返す側の見え方</p>
-                </div>
-              </LinePreview>
-            </>
-          )}
-        </div>
-      </div>
 
       {/* ===== 下の帯 ===== */}
-      <StickyBar
-        destructive={
-          <Button
-            type="button"
-            onClick={() => guarded(() => router.push('/auto-replies'))}
-            disabled={saving}
-          >
-            キャンセル
-          </Button>
-        }
-        status={dirty ? '下書きに未保存の変更があります' : undefined}
-        actions={
-          <>
-            <Button
-              type="button"
-              onClick={() =>
-                void saveDraftNow().then((saved) => {
-                  if (saved || autoReplyId) setSaveNotice('下書きを保存しました')
-                })
-              }
-              disabled={saving}
-              busy={saving}
-              busyLabel="保存中…"
-              done={saveDone}
-            >
-              {step === 'confirm' ? '下書きのまま保存' : '下書きとして保存'}
-            </Button>
-            {step !== 'confirm' ? (
-              <Button
-                type="button"
-                variant="primary"
-                onClick={() => void goNext()}
-                disabled={saving}
-                busy={saving}
-                busyLabel="進んでいます…"
-              >
-                次へ：{STEP_LABELS_V8[STEP_ORDER[STEP_ORDER.indexOf(step) + 1]]}
-                <ChevronRight size={14} aria-hidden="true" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="primary"
-                onClick={() => void publish()}
-                disabled={!publishReady || saving}
-                busy={saving}
-                busyLabel="有効にしています…"
-                done={saveDone}
-              >
-                <Power size={14} aria-hidden="true" />
-                {wasPublished || isActive ? 'この内容で更新する' : '有効にする'}
-              </Button>
-            )}
-          </>
-        }
-      />
+
 
       <ConfirmDialog
         open={compareTarget !== null || compareError !== ''}
@@ -2416,6 +2418,11 @@ function AutoReplyWizardV8Inner() {
         })()}
       </ConfirmDialog>
 
+      <Dialog open={previewOpen} title="設定内容とLINEプレビュー" onCancel={() => setPreviewOpen(false)}
+        footer={<Button onClick={() => setPreviewOpen(false)}>閉じる</Button>}>
+        {previewContent}
+      </Dialog>
+
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
         subject="自動応答の変更"
@@ -2427,7 +2434,7 @@ function AutoReplyWizardV8Inner() {
           return saved !== null
         }}
       />
-    </div>
+    </CreatePage>
   )
 }
 
@@ -2461,8 +2468,7 @@ function KeywordInput({ onAdd }: { onAdd: (word: string) => void }) {
     }
   }
   return (
-    <input
-      className={styles.chipInput}
+    <TextField
       value={value}
       placeholder="言葉を入れて Enter"
       aria-label="反応する言葉を足す"

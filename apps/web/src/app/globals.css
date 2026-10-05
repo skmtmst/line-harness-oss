@@ -591,7 +591,10 @@
   --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 20px; --tpl-band-cell-gap: 8px;
   --tpl-large-title-size: 22px; --tpl-large-title-lh: 33px; --tpl-large-gap: 16px;
   --tpl-create-title-size: 22px; --tpl-create-title-lh: 32px;
-  --tpl-create-desc-size: 12px; --tpl-create-desc-lh: 18px;
+  --tpl-create-desc-size: 12px; --tpl-create-desc-lh: 17px;
+  /* 作る画面の右の列の箱（K7HWG「右の箱 設定内容」）と、本文の小さい文字の行の高さ */
+  --tpl-side-card-pad: 16px; --tpl-side-card-gap: 4px; --tpl-side-row-gap: 3px; --tpl-side-row-pad: 9px;
+  --tpl-side-title-lh: 19px; --tpl-text-sm-lh: 17px; --tpl-side-note-pad: 12px 14px; --tpl-label-tag-gap: 6px;
   --tpl-create-head-pad-top: 20px; --tpl-create-head-pad-side: 24px; --tpl-create-head-pad-bottom: 16px;
   --tpl-create-head-gap: 8px;
   --tpl-detail-head-pad-top: 20px; --tpl-detail-head-pad-side: 24px; --tpl-detail-head-pad-bottom: 16px;
@@ -602,7 +605,7 @@
   --tpl-preview-content-width: 331px; --tpl-preview-narrow-content-width: 231px;
   --tpl-detail-content-gap: 20px;
   /* 戻るリンク（13px・高さ19）と題の間：作る8・詳細6。詳細の説明は 12px/17（X4STXS）。表の見出しは高さ40（H1O0a）。 */
-  --tpl-identity-lh: 19px; --tpl-create-head-row-gap: 8px; --tpl-detail-head-row-gap: 6px;
+  --tpl-identity-lh: 19px; --tpl-identity-color: var(--color-action); --tpl-identity-weight: 600; --tpl-create-head-row-gap: 8px; --tpl-detail-head-row-gap: 6px;
   --tpl-detail-title-gap: 6px; --tpl-detail-desc-size: 12px; --tpl-detail-desc-lh: 17px;
   --tpl-thead-h: 40px;
   /* @theme の中だけに置くと Tailwind が使われていない値として落とす（CSS Modules だけが読む）。V8 で部品の線が消えないよう、ここにも置く（司令塔 2026-10-06） */
