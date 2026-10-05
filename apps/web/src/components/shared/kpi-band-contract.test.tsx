@@ -68,4 +68,15 @@ describe('数の帯（Pp3nS）', () => {
     const knowledge = readFileSync(join(HERE, '..', 'ops', 'knowledge-list.tsx'), 'utf8')
     expect(knowledge).toContain('<KpiBand')
   })
+
+  it('包みなし（strip＋KpiCard直並べ）もv8では横一列・隙間0', () => {
+    const css = read('kpi-card.module.css')
+    const bare = css.match(/\[data-theme='v8'\] \.strip \{[^}]*\}/s)
+    expect(bare, '包みなしstripの横並びがありません').toBeTruthy()
+    expect(bare![0]).toMatch(/display:\s*grid/)
+    expect(bare![0]).toMatch(/grid-auto-flow:\s*column/)
+    expect(bare![0]).toMatch(/grid-auto-columns:\s*minmax\(0,\s*1fr\)/)
+    expect(bare![0]).toMatch(/gap:\s*var\(--tpl-band-gap\)/)
+    expect(bare![0]).not.toMatch(/grid-template-columns/)
+  })
 })
