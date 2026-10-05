@@ -248,12 +248,12 @@
   grid-template-columns: none;
   gap: 0;
   border: 1px solid var(--color-hairline);
-  border-radius: 0;
+  border-radius: var(--radius-none);
   background: var(--color-canvas);
 }
 [data-theme='v8'] .strip[data-kpi-presentation='band'] > .card {
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-none);
   outline-color: transparent;
 }
 [data-theme='v8'] .strip[data-kpi-presentation='band'] > .card + .card {
