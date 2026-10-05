@@ -290,6 +290,14 @@ export default function ColorWell({
             role="slider"
             tabIndex={0}
             aria-label="鮮やかさと明るさ"
+            /*
+             * 面は横に鮮やかさ・縦に明るさの2方向。読み上げには両方を
+             * `aria-valuetext` で伝えるが、`slider` は数値も必須なので
+             * 横方向（鮮やかさ）を `aria-valuenow` に出す。
+             */
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(hsv.s)}
             aria-valuetext={`鮮やかさ ${Math.round(hsv.s)}％・明るさ ${Math.round(hsv.v)}％`}
             style={{
               background: `linear-gradient(to top, #000000, rgba(0,0,0,0)), linear-gradient(to right, #ffffff, rgba(255,255,255,0)), hsl(${hsv.h} 100% 50%)`,

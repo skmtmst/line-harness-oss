@@ -505,8 +505,8 @@
     "555_tenant_data_retention.sql",
     "556_f13_folder_kinds.sql",
     "564_form_versions_purge_delete.sql",
-    "565_banner_color_roles.sql",
-    "566_banner_reference_images.sql"
+    "579_banner_color_roles.sql",
+    "580_banner_reference_images.sql"
   ],
   "migrationCount": 507
 }
