@@ -2703,7 +2703,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: query.get('withUsage') === '1' ? FRIEND_ATTRIBUTE_FIELDS : FRIEND_FIELDS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
-    return { success: true, data: AUTO_REPLY_FOLDERS }
+    // 板 `uE9gf`：未分類は `folderId: null` の1件（旧キーワードルール）。
+    return { success: true, data: AUTO_REPLY_FOLDERS, unfiledCount: AUTO_REPLIES.filter((rule) => !rule.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'common_var') {
     return { success: true, data: commonVarFolders }

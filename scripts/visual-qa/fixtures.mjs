@@ -3754,11 +3754,14 @@ export const FRIEND_FIELD_MIGRATION_PREVIEW = {
  * 狭いほうに合わせて書くと、優先順位も曜日も当たり回数も空のまま撮れて、
  * **設計の一覧と比べるものが何も無くなる。**
  */
+/* V8 板 `uE9gf`（自動応答一覧）の5件に合わせた分け方。お問い合わせ2・
+ * 予約1・営業時間外1・未分類1（「キーワード」というフォルダは絵に無い）。
+ * 未分類の1件は `folderId: null` で返し、件数は mock-api が
+ * `unfiledCount` で返す。 */
 export const AUTO_REPLY_FOLDERS = [
-  { id: 'arf-inquiry', kind: 'auto_reply', name: 'お問い合わせ', parentId: null, displayOrder: 1, color: '#2563eb', itemCount: 5, listTotal: 14, activeTotal: 10, monthlyTotal: 682 },
-  { id: 'arf-booking', kind: 'auto_reply', name: '予約', parentId: null, displayOrder: 2, color: '#059669', itemCount: 4 },
-  { id: 'arf-keyword', kind: 'auto_reply', name: 'キーワード', parentId: null, displayOrder: 3, color: '#d97706', itemCount: 3 },
-  { id: 'arf-afterhours', kind: 'auto_reply', name: '営業時間外', parentId: null, displayOrder: 4, color: '#7c3aed', itemCount: 4 },
+  { id: 'arf-inquiry', kind: 'auto_reply', name: 'お問い合わせ', parentId: null, displayOrder: 1, color: '#2563eb', itemCount: 2 },
+  { id: 'arf-booking', kind: 'auto_reply', name: '予約', parentId: null, displayOrder: 2, color: '#059669', itemCount: 1 },
+  { id: 'arf-afterhours', kind: 'auto_reply', name: '営業時間外', parentId: null, displayOrder: 3, color: '#7c3aed', itemCount: 1 },
 ]
 
 const AR_BASE = {
@@ -3777,7 +3780,7 @@ export const AUTO_REPLIES = [
     activeFrom: '21:00', activeUntil: '09:00',
     responseWeekdays: [0, 1, 2, 3, 4, 5, 6], respondToAll: true,
     actions: [{ actionType: 'support_mark' }],
-    keywords: [], hits: { period: 214, total: 1893 },
+    keywords: [], hits: { period: 214, total: 1842 },
     actionExecutionCount: 86, conflictAttentionCount: 1,
     createdAt: '2026-03-04T00:00:00.000Z',
   },
@@ -3787,7 +3790,7 @@ export const AUTO_REPLIES = [
     isActive: true, priority: 2, folderId: 'arf-booking', templateId: 'template-1',
     keywords: [{ keyword: '予約変更', matchType: 'contains' }, { keyword: '日程変更', matchType: 'contains' }, { keyword: 'キャンセル', matchType: 'contains' }],
     actions: [{ actionType: 'support_mark' }],
-    hits: { period: 186, total: 942 }, actionExecutionCount: 64, conflictAttentionCount: 1,
+    hits: { period: 128, total: 902 }, actionExecutionCount: 64, conflictAttentionCount: 1,
     createdAt: '2026-04-18T00:00:00.000Z',
   },
   {
@@ -3796,7 +3799,7 @@ export const AUTO_REPLIES = [
     isActive: true, priority: 3, folderId: 'arf-inquiry',
     keywords: [{ keyword: '商品', matchType: 'contains' }, { keyword: '価格', matchType: 'contains' }, { keyword: '在庫', matchType: 'contains' }, { keyword: 'サイズ', matchType: 'contains' }, { keyword: '送料', matchType: 'contains' }],
     actions: [{ actionType: 'tag' }],
-    hits: { period: 152, total: 733 }, actionExecutionCount: 64, conflictAttentionCount: 1,
+    hits: { period: 210, total: 1235 }, actionExecutionCount: 64, conflictAttentionCount: 1,
     createdAt: '2026-05-06T00:00:00.000Z',
   },
   {
@@ -3804,17 +3807,17 @@ export const AUTO_REPLIES = [
        「まだ動かしていない」は違うので、0で撮れることが要る。 */
     ...AR_BASE, id: 'ar-4', name: 'キャンセル受付', keyword: 'キャンセル', matchType: 'contains',
     responseType: 'text', responseContent: 'キャンセルを承りました。',
-    isActive: false, priority: 4, folderId: 'arf-booking',
-    keywords: [{ keyword: 'キャンセル', matchType: 'contains' }, { keyword: '取り消し', matchType: 'contains' }],
+    isActive: false, priority: 4, folderId: 'arf-inquiry',
+    keywords: [{ keyword: 'キャンセル', matchType: 'contains' }, { keyword: '取消', matchType: 'contains' }],
     actions: [], hits: { period: 0, total: 0 }, actionExecutionCount: 0, conflictAttentionCount: 0,
     createdAt: '2026-08-12T00:00:00.000Z',
   },
   {
     ...AR_BASE, id: 'ar-5', name: '旧キーワードルール', keyword: '営業時間', matchType: 'exact',
     responseType: 'text', responseContent: '平日 09:00〜18:00 です。',
-    isActive: false, priority: 5, folderId: 'arf-keyword',
+    isActive: false, priority: 5, folderId: null,
     keywords: [{ keyword: '営業時間', matchType: 'exact' }],
-    actions: [], hits: { period: 0, total: 411 }, actionExecutionCount: 0, conflictAttentionCount: 0,
+    actions: [], hits: { period: 0, total: 0 }, actionExecutionCount: 0, conflictAttentionCount: 0,
     createdAt: '2026-01-20T00:00:00.000Z',
   },
 ]
