@@ -3,7 +3,6 @@
 import HqSettingsNav from '@/app/hq/hq-settings-nav-v8'
 import ReadonlyHeader from '@/app/hq/readonly-header-v8'
 import '@/app/hq/readonly-v8.css'
-import OperatorHistory from '@/components/hq/operator-history'
 import { useEffect, useState, type FormEvent } from 'react'
 import Button from '@/components/shared/button'
 import NoteBar from '@/components/shared/note-bar'
@@ -15,7 +14,7 @@ import { api } from '@/lib/api'
 import './hq-settings-v8.css'
 
 /**
- * 統括の情報。統括名の変更と、運営による操作の確認。
+ * 統括の情報。統括名の変更。
  * 旧「統括設定」の転送先（/hq/members?tab=tenant）はこの画面へ移した。
  */
 export default function HqSettingsPage() {
@@ -36,7 +35,7 @@ export default function HqSettingsPage() {
 
   return (
     <div data-design-node="K7HYu" className="flex flex-col gap-4">
-      <ReadonlyHeader title="統括の情報" description="統括の名前と、運営による操作を確認します。" />
+      <ReadonlyHeader title="統括の情報" description="統括の名前を確認します。" />
       <div className="hq-settings-v8">
         <HqSettingsNav active="info" />
         <div className="hq-settings-v8__main">
@@ -112,7 +111,8 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
         {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
         {saved ? <p className="text-label text-accent-deep" role="status">保存しました。</p> : null}
       </form>}
-      <OperatorHistory />
+      {/* 「運営による操作」は契約先には出さない（2026-10-06 利用者指定）。
+          記録は残り続けるので、また見せるときは <OperatorHistory /> を戻すだけでよい。 */}
       <div className="sticky bottom-0 z-10">
         <StickyBar
           status={canEdit ? undefined : '統括名の変更は管理者だけができます'}
