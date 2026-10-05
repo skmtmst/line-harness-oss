@@ -26,6 +26,8 @@ describe('型の見出し（379板の絵）', () => {
       ['--tpl-toolbar-pad-block', '14px'], ['--tpl-toolbar-pad-side', '24px'], ['--tpl-toolbar-gap', '8px'],
       ['--tpl-folder-width', '200px'],
       ['--tpl-page-pad-block', '10px'], ['--tpl-page-pad-side', '24px'],
+      ['--tpl-band-number-size', '22px'], ['--tpl-band-number-lh', '28px'],
+      ['--tpl-band-cell-pad-block', '16px'], ['--tpl-band-cell-pad-side', '20px'], ['--tpl-band-cell-gap', '8px'],
     ] as const) {
       expect(vars![0]).toMatch(new RegExp(`${name}:\\s*${value}`))
     }
@@ -38,8 +40,8 @@ describe('型の見出し（379板の絵）', () => {
     expect(css).toMatch(/\.headingText \{[^}]*gap:\s*var\(--tpl-head-gap\)/s)
     expect(css).toMatch(/\.description \{[^}]*font-size:\s*var\(--tpl-desc-size\)/s)
     expect(css).toMatch(/\.description \{[^}]*line-height:\s*var\(--tpl-desc-lh\)/s)
-    expect(css).toMatch(/\.heading \{[^}]*padding:\s*var\(--tpl-head-pad-top\) var\(--tpl-head-pad-side\)/s)
-    expect(css).toMatch(/\[data-page-template='list'\] > \.heading \{[^}]*padding-bottom:\s*var\(--tpl-head-pad-bottom\)/s)
+    expect(css).toMatch(/\.heading \{[^}]*padding:\s*var\(--tpl-head-pad-top\) var\(--tpl-head-pad-side\) var\(--tpl-head-pad-bottom\)/s)
+    expect(css).not.toMatch(/> \.heading \{[^}]*padding-bottom/s)
   })
 
   it('compact は部品どおり（題20/27・間2・説明13/20）', () => {
@@ -55,7 +57,7 @@ describe('型の見出し（379板の絵）', () => {
   })
 
   it('一覧の頭は下余白12・帯は頭の直下（頭の高さ87）', () => {
-    expect(css).toMatch(/\[data-page-template='list'\] > \.heading \{[^}]*padding-bottom:\s*var\(--tpl-head-pad-bottom\)/s)
+    expect(css).toMatch(/\.heading \{[^}]*padding:\s*var\(--tpl-head-pad-top\) var\(--tpl-head-pad-side\) var\(--tpl-head-pad-bottom\)/s)
     expect(css).toMatch(/\[data-page-template='list'\] \.stats \{[^}]*border-top:\s*0/s)
     const stats = css.match(/\[data-page-template='list'\] \.stats \{[^}]*\}/)
     expect(stats, '一覧の帯の枠がありません').toBeTruthy()
