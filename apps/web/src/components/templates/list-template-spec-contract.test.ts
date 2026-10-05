@@ -38,7 +38,7 @@ describe('一覧の型の寸法（LIST-TEMPLATE-SPEC）', () => {
     expect(strip, '帯の指定がありません').toBeTruthy()
     expect(strip![0]).toMatch(/border-block:\s*1px solid var\(--color-hairline\)/)
     expect(strip![0]).not.toMatch(/border:\s*1px solid/)
-    expect(kpi).toMatch(/\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] \.number \{[^}]*font-size:\s*22px/s)
+    expect(kpi).toMatch(/\[data-theme='v8'\] \.strip\[data-kpi-presentation='band'\] \.number \{[^}]*font-size:\s*var\(--tpl-band-number-size\)/s)
   })
 
   it('下は上下10・左右24（型の枠。部品の根は部品の絵どおり10/20）', () => {

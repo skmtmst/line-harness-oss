@@ -186,9 +186,17 @@
 .unit, .labelText, .number { display: contents; }
 [data-theme='v8'] .card {
   justify-content: flex-start; min-width: 0; min-height: 0;
-  gap: 8px; padding: 16px 20px; border: 0; border-radius: 12px;
+  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: 12px;
   outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
   background: var(--color-canvas); box-shadow: none;
+}
+/* 包みを使わない組み方（画面が strip＋KpiCard を直に並べる所）も、
+   数の大きさ・マスの余白は帯と同じ変数で絵どおりにする。 */
+[data-theme='v8'] .strip .card {
+  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side);
+}
+[data-theme='v8'] .strip .number {
+  font-size: var(--tpl-band-number-size); line-height: var(--tpl-band-number-lh);
 }
 [data-theme='v8'] .head { width: 100%; gap: 8px; min-height: 24px; }
 [data-theme='v8'] .label {
@@ -233,7 +241,7 @@
   padding: 10px 16px; gap: 4px;
 }
 [data-theme='v8'] .card[data-kpi-density='compact'] .number {
-  font-size: 22px; line-height: 28px;
+  font-size: var(--tpl-band-number-size); line-height: var(--tpl-band-number-lh);
 }
 .strip { min-width: 0; }
 /* 数の帯の v8 指定は層の外（ファイル末尾）に置く。 */
@@ -272,8 +280,8 @@
   border-left: 1px solid var(--color-hairline);
 }
 [data-theme='v8'] .strip[data-kpi-presentation='band'] .number {
-  font-size: 22px;
-  line-height: 28px;
+  font-size: var(--tpl-band-number-size);
+  line-height: var(--tpl-band-number-lh);
 }
 @media (max-width: 639px) {
   [data-theme='v8'] .strip[data-kpi-presentation='band'] {
