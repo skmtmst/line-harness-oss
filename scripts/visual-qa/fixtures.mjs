@@ -3272,7 +3272,9 @@ export const BROADCASTS = [
   id: `broadcast-${index}`,
   title: String(title),
   messageType: String(messageType),
-  messageContent: `${title}の本文です。`,
+  messageContent: index === 1
+    ? 'まだご購入いただいていない方へ。今なら初回20%オフでお試しいただけます。'
+    : `${title}の本文です。`,
   targetType: String(targetType),
   targetTagId: targetType === 'tag' ? 'tag-0' : null,
   status: String(status),
