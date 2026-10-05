@@ -181,3 +181,9 @@
 [data-theme='v8'] .rowSelected { background: var(--color-accent-soft); }
 [data-theme='v8'] .rowInteractive:hover:not(.rowSelected) { background: var(--color-table-head); }
 }
+/* ★V8 一覧の行の「名前＋下の説明」（apLqS 行：名前 13/600 高さ19 → 間3 → 説明 11 高さ16、行 62）。説明の中の印で行を押し上げない（司令塔 2026-10-05） */
+[data-theme='v8'] .name { font-size: var(--tpl-row-name-size); font-weight: 600; line-height: var(--tpl-row-name-lh); }
+[data-theme='v8'] .sub { display: flex; align-items: center; gap: 6px; margin-top: var(--tpl-row-sub-gap); font-size: var(--tpl-row-sub-size); line-height: var(--tpl-row-sub-lh); min-height: 0; }
+[data-theme='v8'] .sub svg { flex: none; width: 12px; height: 12px; }
+[data-theme='v8'] .sub > span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+[data-theme='v8'] .sub svg { display: inline-block; }

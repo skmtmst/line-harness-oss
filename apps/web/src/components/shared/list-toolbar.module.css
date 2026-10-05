@@ -152,3 +152,7 @@
    */
 
 }
+/* ★V8 型の道具の枠（[data-template-region=toolbar]）の中では、枠が余白を持つので部品は二重に持たない。並び・件数（trailing）は右端（c4n9Kr：右寄せ）。司令塔 2026-10-05 */
+[data-theme='v8'] :global([data-template-region='toolbar']) .toolbar { padding: 0; flex: 1; min-width: 0; }
+[data-theme='v8'] .trailing { margin-left: auto; display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+[data-theme='v8'] .toolbar [role='group'] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }

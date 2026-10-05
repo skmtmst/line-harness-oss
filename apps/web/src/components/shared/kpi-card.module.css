@@ -296,3 +296,5 @@
 [data-theme='v8'] .card[data-kpi-presentation='cell'] { border-radius: 0; }
 
 /* 印なしの帯の横並びは kpi-band-v8.css（層なしCSS）に置く。 */
+/* ★V8 数のマスの下の段（Pp3nS「下」：高さ18・右に行き先）。行き先のボタンが押せる高さ32で段を押し広げない（司令塔 2026-10-05） */
+[data-theme='v8'] .detail .retry { min-height: 0; height: auto; padding: 0; line-height: 18px; margin-left: auto; }
