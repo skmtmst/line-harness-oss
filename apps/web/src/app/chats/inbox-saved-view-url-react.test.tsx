@@ -207,7 +207,7 @@ function chatsListQueries(): URLSearchParams[] {
 /** 「保存した検索」ドロップダウンを開く。 */
 async function openSavedViews() {
   const toggle = [...host.querySelectorAll('button')].find(
-    (button) => button.textContent?.trim() === '保存した検索',
+    (button) => button.getAttribute('aria-label') === '保存した検索',
   )
   expect(toggle).toBeTruthy()
   await act(async () => { toggle!.click() })

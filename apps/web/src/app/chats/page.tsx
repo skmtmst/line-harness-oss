@@ -19,7 +19,9 @@ import {
 import { buildSupportEmailInboxQuery } from './support-email-query'
 import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
 import { withRequestTimeout } from '@/lib/request-timeout'
-import { INBOX_INFO_PANEL_MIN_VIEWPORT } from './inbox-layout'
+import { INBOX_INFO_PANEL_MIN_WIDTH } from './inbox-layout'
+import styles from './inbox-v8.module.css'
+import Select from '@/components/shared/select'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import { unreadLookup } from '@/components/chats/assignee-unread'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
@@ -44,7 +46,7 @@ import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
-import { CheckCircle2, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, SlidersHorizontal, Star, X } from 'lucide-react'
+import { Bookmark, CheckCircle2, Filter, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, SlidersHorizontal, Star, X } from 'lucide-react'
 
 type Chat = ChatListItem
 
@@ -147,7 +149,7 @@ function StickerMessageImage({ content }: { content: string }) {
           <button
             type="button"
             onClick={() => { setFailed(false); setRetryKey((key) => key + 1) }}
-            className="text-action text-[11px] font-semibold underline underline-offset-2"
+            className="text-action text-micro font-semibold underline underline-offset-2"
           >
             画像を読み込み直す
           </button>
@@ -481,8 +483,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    */
   const [wideInfoPanel, setWideInfoPanel] = useState(false)
   const [friendInfoChoice, setFriendInfoChoice] = useState<boolean | null>(null)
+  const panesRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const media = window.matchMedia(`(min-width: ${INBOX_INFO_PANEL_MIN_VIEWPORT}px)`)
+    const panel = panesRef.current
+    if (panel && typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(([entry]) => setWideInfoPanel(entry.contentRect.width >= INBOX_INFO_PANEL_MIN_WIDTH))
+      observer.observe(panel)
+      return () => observer.disconnect()
+    }
+    const media = window.matchMedia('(min-width: 1440px)')
     const sync = () => setWideInfoPanel(media.matches)
     sync()
     media.addEventListener('change', sync)
@@ -2357,37 +2366,37 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         </div>
       )}
 
-      <section
+
+
+      <div
+        ref={panesRef}
+        data-design="Panes" data-design-node="M0393"
+        className={`relative flex min-h-[560px] overflow-hidden bg-canvas ${styles.panes}`}
+      >
+        {/* Left Panel: Chat List */}
+        {/* 設計 `ListPane` 360px。 */}
+        {/*
+          顧客情報を開いている間は一覧を 288px に留める(#982 LAY-01)。
+          以前は 2xl で 420px へ急拡大し、一覧+トーク+顧客情報の3列が
+          1536px でちょうど収まらなくなっていた。顧客情報を閉じた
+          2列だけのときだけ 420px へ広げる。
+        */}
+        {/* 狭い画面では、開いている間は一覧を隠して中央を広く使う。
+            メールを開いたときも同じ。ここが LINE だけを見ていたので、
+            メールを開いても一覧が残って中央が半分のままだった。 */}
+        <div
+          data-inbox-v4="conversation-list"
+          className={`bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden border-hairline w-full lg:w-[340px] ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
+        >
+          {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
+
+                <section
         data-design="Filters"
         data-inbox-v4="quick-filters"
-        className="relative flex min-h-10 flex-wrap items-center gap-2"
+        className="relative flex flex-wrap items-center gap-1.5 border-b border-hairline p-3"
         aria-label="受信箱のクイック絞り込み"
       >
-        {[
-          { key: 'all' as const, label: 'すべて', title: undefined },
-          { key: 'reply' as const, label: '要返信', title: '対応状況が「未対応」の会話' },
-          /*
-           * INBOX-10: ここで数えるのは対応期限ではなく、未対応のまま
-           * 最後のやり取りから1時間以上たった会話。「期限超過」と書くと
-           * 設定した期限の超過に読めるため、実態に合う名前にする。
-           *
-           * m22c: 右の操作（絞り込み・保存した検索・対応ルール）と同じ
-           * 高さ32にそろえる。行の中で高さが違うと、同じ1行でも上端が
-           * ずれて2行に見える（見た目の自動点検 k=5）。
-           */
-          { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話' },
-        ].map((filter) => (
-          <Button variant="secondary" className={`v7:h-8 shrink-0 items-center whitespace-nowrap rounded-pill border px-3 text-xs font-semibold transition-colors ${
-              quickFilter === filter.key
-                ? 'border-accent-deep bg-accent-soft text-accent-deep'
-                : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
-            }`} key={filter.key} type="button" onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }} aria-pressed={quickFilter === filter.key} title={filter.title}>
-            {filter.label}
-            {/* 件数がまだ無い時は「—」を出さない（★V7：意味の無い記号を置かない）。 */}
-            {quickCountsNow ? <span className="ml-1 tabular-nums">{quickCountsNow[filter.key]}</span> : null}
-          </Button>
-        ))}
-        <span className="ml-auto" />
+        <div className="flex w-full items-center gap-2"><h2 className="mr-auto text-lg font-semibold">受信箱</h2>
         {/*
           設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
           右から420pxのパネルが出る（`bXyEA`）。
@@ -2396,8 +2405,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <Button type="button" size="compact" className="v8:h-9" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
-          絞り込み
+        <Button type="button" size="compact" className="h-8 w-8 p-0" aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+          <Filter aria-hidden size={16} />
         </Button>
         {/*
           INBOX-11: メニューは「保存した検索」ボタンではなく、画面幅いっぱいの
@@ -2410,14 +2419,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           <Button
             type="button"
             size="compact"
-            className="v8:h-9"
+            className="h-8 w-8 p-0" aria-label="保存した検索" title="保存した検索"
             onClick={() => {
               setSavedViewsOpen((open) => !open)
               setSavedViewError('')
             }}
             aria-expanded={savedViewsOpen}
           >
-            保存した検索
+            <Bookmark aria-hidden size={16} />
           </Button>
           {savedViewsOpen && (
             <div className="border-hairline absolute top-full right-0 z-40 mt-1.5 max-h-[min(70dvh,32rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-card border bg-canvas p-4 shadow-float">
@@ -2442,7 +2451,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         名前だけだと、`未対応・期限超過` と `河野担当の未対応` の
                         どちらを押せばいいのかが、名前の付け方頼みになる。
                       */}
-                      <span className="text-ink-faint mt-0.5 block truncate text-[11px] font-normal">
+                      <span className="text-ink-faint mt-0.5 block truncate text-micro font-normal">
                         {savedViewSummary(normalizeSavedViewConditions(view.conditions), operatorNames)}
                       </span>
                     </button>
@@ -2505,10 +2514,34 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           )}
         </div>
         {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
-        <Button href="/tags?tab=marks" size="compact" className="shrink-0 v8:h-9">
+        <Button href="/tags?tab=marks" aria-label="対応ルール" title="対応ルール" size="compact" className="shrink-0 h-8 w-8 p-0">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6" /></svg>
-          対応ルール
         </Button>
+        </div>
+        {[
+          { key: 'all' as const, label: 'すべて', title: undefined },
+          { key: 'reply' as const, label: '要返信', title: '対応状況が「未対応」の会話' },
+          /*
+           * INBOX-10: ここで数えるのは対応期限ではなく、未対応のまま
+           * 最後のやり取りから1時間以上たった会話。「期限超過」と書くと
+           * 設定した期限の超過に読めるため、実態に合う名前にする。
+           *
+           * m22c: 右の操作（絞り込み・保存した検索・対応ルール）と同じ
+           * 高さ32にそろえる。行の中で高さが違うと、同じ1行でも上端が
+           * ずれて2行に見える（見た目の自動点検 k=5）。
+           */
+          { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話' },
+        ].map((filter) => (
+          <Button variant="secondary" className={`h-8 shrink-0 items-center whitespace-nowrap rounded-pill border px-2 text-xs font-semibold transition-colors ${
+              quickFilter === filter.key
+                ? 'border-accent-deep bg-accent-soft text-accent-deep'
+                : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
+            }`} key={filter.key} type="button" onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }} aria-pressed={quickFilter === filter.key} title={filter.title}>
+            {filter.label}
+            {/* 件数がまだ無い時は「—」を出さない（★V7：意味の無い記号を置かない）。 */}
+            {quickCountsNow ? <span className="ml-1 tabular-nums">{quickCountsNow[filter.key]}</span> : null}
+          </Button>
+        ))}
         <SavedViewDialog
           open={saveDialogOpen}
           initialValue={{
@@ -2562,30 +2595,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           onClose={() => setFilterOpen(false)}
         />
       </section>
-
-      <div
-        data-design="Panes"
-        className="border-hairline bg-canvas shadow-card relative flex h-[calc(100vh-196px)] min-h-[560px] overflow-hidden rounded-card border"
-      >
-        {/* Left Panel: Chat List */}
-        {/* 設計 `ListPane` 360px。 */}
-        {/*
-          顧客情報を開いている間は一覧を 288px に留める(#982 LAY-01)。
-          以前は 2xl で 420px へ急拡大し、一覧+トーク+顧客情報の3列が
-          1536px でちょうど収まらなくなっていた。顧客情報を閉じた
-          2列だけのときだけ 420px へ広げる。
-        */}
-        {/* 狭い画面では、開いている間は一覧を隠して中央を広く使う。
-            メールを開いたときも同じ。ここが LINE だけを見ていたので、
-            メールを開いても一覧が残って中央が半分のままだった。 */}
-        <div
-          data-inbox-v4="conversation-list"
-          className={`bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden border-hairline ${showFriendInfo ? 'lg:w-72' : 'lg:w-[330px] 2xl:w-[420px]'} ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
-        >
-          {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
-
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
-          <div className="border-b border-hairline p-3">
+          <div className="border-b border-hairline p-4">
             <div className="relative">
               <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-faint" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
               <input
@@ -2602,7 +2613,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
               プルダウンが自分で名乗るため、外の字は置かない。
             */}
-            <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-ink-secondary">
+            <label className="mt-3 inline-flex w-[calc(50%-4px)] items-center text-micro font-semibold text-ink-secondary">
               <span className="min-w-0 flex-1">
                 {/*
                   未読数は集計の口から渡す。**画面に見えている行から数えない**
@@ -2620,28 +2631,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 />
               </span>
             </label>
-            <div className="mt-2 flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
-              {CHANNELS.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => router.push(buildInboxUrl(item.key, null))}
-                  aria-label={item.label}
-                  title={item.label}
-                  aria-pressed={channel === item.key}
-                  className={`inline-flex shrink-0 items-center justify-center rounded-mini px-1.5 py-1.5 text-[11px] font-semibold whitespace-nowrap ${channel === item.key ? 'bg-accent-soft text-accent-deep' : 'text-ink hover:bg-shell'}`}
-                >
-                  {item.key === 'line' && <ChannelBadge channel="line" />}
-                  {item.key === 'email' && <ChannelBadge channel="email" />}
-                  {item.key === 'all' && item.label}
-                </button>
-              ))}
-              <span
-                data-inbox-sort="fixed"
-                className="text-ink-secondary ml-auto shrink-0 text-[11px] font-semibold whitespace-nowrap"
-              >
-                並び順：未対応が先・新しい順
-              </span>
+            <div className="ml-2 inline-block w-[calc(50%-4px)] min-w-0 align-bottom">
+              <Select aria-label="受信経路で絞り込む" value={channel} onChange={(value) => router.push(buildInboxUrl(value as 'all' | 'line' | 'email', null))} options={CHANNELS.map((item) => ({value:item.key,label:`経路：${item.label}`}))} />
             </div>
           </div>
 
@@ -2685,6 +2676,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
           </div>
 
+          <p data-inbox-sort="fixed" className="border-b border-hairline px-3 pb-3 text-micro text-ink-secondary">並び順：未読が先・新しい順</p>
           {/* Chat List */}
           <div className="flex-1 overflow-y-auto">
             <>
@@ -2866,7 +2858,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       onClick={() => handleSelectChat(chat.id)}
                       className={`w-full px-3 py-3 text-left transition-colors ${
                         isSelected
-                          ? 'bg-accent-soft'
+                          ? 'bg-shell'
                           /* 板 `M0393`：未対応は顔の赤い点＋太字で、行の地は塗らない。 */
                           : 'hover:bg-shell'
                       }`}
@@ -2874,7 +2866,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <div className="flex items-start gap-3">
                         <div className="relative shrink-0">
                           {/* ★V7 友だちの顔：画像が読めない時も色つきの頭文字。 */}
-                          <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={40} />
+                          <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={32} />
                           {chat.isUnread && (
                             <span className="border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2" aria-label="未読" />
                           )}
@@ -3153,11 +3145,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     **同じ場所に同じ1つのボタン**を置く。閉じる口が右パネルの
                     中にしか無いと、閉じたあと戻す口を別の場所で探すことになる。
                   */}
-                  <Button variant="secondary" className="v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 text-xs text-action" type="button" data-inbox-v6="customer-info-toggle" onClick={() => setShowFriendInfo((current) => !current)} aria-expanded={showFriendInfo}>
+                  <Button variant="secondary" className="h-9 w-9 shrink-0 p-0 text-action" type="button" data-inbox-v6="customer-info-toggle" onClick={() => setShowFriendInfo((current) => !current)} aria-expanded={showFriendInfo}>
                     {showFriendInfo
                       ? <PanelRightClose aria-hidden="true" size={14} />
                       : <PanelRightOpen aria-hidden="true" size={14} />}
-                    {showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'}
+                    <span className="sr-only">{showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'}</span>
                   </Button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -3171,8 +3163,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
               {/* Messages — LINE-style chat bubbles */}
               <div className="relative flex min-h-0 flex-1 flex-col">
-              {/* 板 `M0393`：会話の地は #fafafb（LINE青の地は使わない）。 */}
-              <div ref={messagesScrollRef} className="flex-1 space-y-2 overflow-y-auto p-4" style={{ backgroundColor: 'var(--color-table-head)' }}>
+              {/* 板 `M0393`：会話の地は surface-pearl（LINE青の地は使わない）。 */}
+              <div ref={messagesScrollRef} className="flex-1 space-y-2 overflow-y-auto p-4" style={{ backgroundColor: 'var(--color-surface-pearl)' }}>
                 {/*
                   古い履歴の続き。直近100件だけ読んでいる会話で出す。
                   押すと今見えている最古の1件より古い分を上に足す。
@@ -3225,13 +3217,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         <div key={msg.id}>
                           {showDateSep && (
                             <div className="my-3 flex justify-center">
-                              <span className="bg-ink/20 text-on-accent/85 rounded-pill px-2.5 py-0.5 text-[11px]">
+                              <span className="bg-ink/20 text-on-accent/85 rounded-pill px-2.5 py-0.5 text-micro">
                                 {formatYmdSlash(msg.createdAt)}
                               </span>
                             </div>
                           )}
                           <div className="my-2 flex items-center justify-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-[11px] font-semibold text-action shadow-card">
+                            <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-micro font-semibold text-action shadow-card">
                               <Link2 aria-hidden="true" size={13} />
                               シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始
                             </span>
@@ -3246,7 +3238,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         {showDateSep && (
                           <div className="flex justify-center my-3">
                             {/* 板 `M0393`：日付の区切りは白い札＋濃い文字。 */}
-                            <span className="text-[11px] text-ink-secondary bg-canvas border border-hairline px-2.5 py-0.5 rounded-pill">
+                            <span className="text-micro text-ink-secondary bg-canvas border border-hairline px-2.5 py-0.5 rounded-pill">
                               {formatYmdSlash(msg.createdAt)}
                             </span>
                           </div>
@@ -3325,14 +3317,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                 />
                               ) : (
                                 <div
-                                  className="border-canvas flex h-9 w-9 items-center justify-center rounded-pill border-2 bg-accent-soft text-[12px] font-bold text-accent-deep"
+                                  className="border-canvas flex h-9 w-9 items-center justify-center rounded-pill border-2 bg-accent-soft text-xs font-bold text-accent-deep"
                                   title={selectedAccount?.displayName ?? selectedAccount?.name ?? '送信アカウント'}
                                 >
                                   {(selectedAccount?.displayName ?? selectedAccount?.name ?? '送').charAt(0)}
                                 </div>
                               )}
                               <div
-                                className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-pill border px-2 py-0.5 text-[10px] font-semibold shadow-card"
+                                className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-pill border px-2 py-0.5 text-nano font-semibold shadow-card"
                                 title={msg.sentByStaffName ?? '担当者情報なし'}
                               >
                                 <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-pill text-micro font-medium">
@@ -3401,30 +3393,31 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 <div className="mb-2 flex items-center gap-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
-                    <Button variant="secondary" className="v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowTemplatePicker(true)}>
+                    <Button variant="secondary" className="h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowTemplatePicker(true)}>
                       <FileText aria-hidden="true" size={14} />
                       テンプレートを選択
                     </Button>
-                    <Button variant="secondary" className="v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowComposerOptions((v) => !v)}>
+                    <Button variant="secondary" className="h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => setShowComposerOptions((v) => !v)}>
                       <SlidersHorizontal aria-hidden="true" size={14} />
                       {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
                     </Button>
-                    <Button variant="secondary" className="v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading} title="画像を選ぶ" aria-label="画像を選ぶ">
-                      <ImageIcon aria-hidden="true" size={14} />
-                      画像
-                    </Button>
+
                     {/*
                       設計 `B7CER8` は、開いている間このボタン自体が
                       琥珀色に変わる。窓が上に出るので、どのボタンから出た窓
                       なのかが分かる印が要る。
                     */}
-                    <Button variant="secondary" className={`v7:h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-xs font-semibold ${
+                    <Button variant="secondary" className={`h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-xs font-semibold ${
                         showMemoEditor
                           ? 'border-status-warn bg-status-warn-soft text-status-warn-deep'
                           : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
                       }`} type="button" data-inbox-v6="internal-memo-toggle" onClick={() => setShowMemoEditor((current) => !current)} aria-expanded={showMemoEditor}>
                       <NotebookPen aria-hidden="true" size={14} />
                       内部メモ
+                    </Button>
+                    <Button variant="secondary" className="h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action" type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading} title="画像を選ぶ" aria-label="画像を選ぶ">
+                      <ImageIcon aria-hidden="true" size={14} />
+                      画像
                     </Button>
                   </div>
                 </div>
@@ -3859,7 +3852,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             <div
               aria-hidden="true"
               onMouseDown={() => setShowFriendInfo(false)}
-              className="bg-scrim fixed inset-0 z-[60] 2xl:hidden"
+              className={`bg-scrim fixed inset-0 z-[60] ${wideInfoPanel ? 'hidden' : ''}`}
             />
             <aside
               ref={customerPanelRef}
@@ -3868,14 +3861,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               aria-modal={wideInfoPanel ? undefined : true}
               aria-label="顧客情報"
               tabIndex={-1}
-              className="fixed inset-y-0 right-0 z-[70] h-full w-[340px] max-w-full shrink-0 overflow-hidden bg-canvas shadow-overlay focus:outline-none 2xl:relative 2xl:z-auto 2xl:w-[300px] 2xl:shadow-none"
+              className={`h-full max-w-full shrink-0 overflow-hidden bg-canvas focus:outline-none ${wideInfoPanel ? 'relative z-auto w-[260px] border-l border-hairline' : 'fixed inset-y-0 right-0 z-[70] w-[340px] shadow-overlay'}`}
             >
             {/*
               重なりの中にも閉じるボタンを置く。上部のボタンだけだと、
               重なりが上部を覆っている画面幅で閉じられなくなる。
               実際そうなっていた。
             */}
-            <Button variant="secondary" className="absolute top-[17px] right-3 z-10 v7:h-8 w-8 items-center justify-center text-ink-faint whitespace-normal" type="button" onClick={() => setShowFriendInfo(false)} aria-label="顧客情報を閉じる">
+            <Button variant="secondary" className="absolute top-[17px] right-3 z-10 h-8 w-8 items-center justify-center text-ink-faint whitespace-normal" type="button" onClick={() => setShowFriendInfo(false)} aria-label="顧客情報を閉じる">
               <X aria-hidden="true" className="h-4 w-4" />
             </Button>
             {selectedThreadId ? (
@@ -3897,10 +3890,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <div className="flex-1 overflow-y-auto divide-y divide-hairline">
                       <section className="flex flex-col items-center px-5 py-5 text-center">
                         <div className="bg-canvas-sunken border-hairline flex h-14 w-14 items-center justify-center rounded-pill border">
-                          <span className="text-ink-secondary text-[11px] font-bold">MAIL</span>
+                          <span className="text-ink-secondary text-micro font-bold">MAIL</span>
                         </div>
                         <p className="text-ink mt-2 max-w-full truncate text-sm font-bold">{mail?.customerName ?? '—'}</p>
-                        <p className="text-ink-faint mt-0.5 max-w-full break-all text-[11px]">
+                        <p className="text-ink-faint mt-0.5 max-w-full break-all text-micro">
                           {mail?.customerIdentifier ?? 'メールアドレス未登録'}
                         </p>
                       </section>
@@ -3936,6 +3929,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             ) : (
             <FriendInfoSidebar
               friendId={activeFriendId}
+              accountId={selectedAccountId ?? undefined}
+              chatId={chatDetail && chatDetail.id === selectedChatId ? chatDetail.id : null}
+              revision={chatDetail && chatDetail.id === selectedChatId ? chatDetail.revision : undefined}
+              operators={operators}
+              operatorId={chatDetail && chatDetail.id === selectedChatId ? chatDetail.operatorId : null}
+              onChatChanged={() => {
+                if (selectedChatId) void loadChatDetail(selectedChatId)
+                void loadChats()
+              }}
               operatorName={
                 chatDetail?.operatorId
                   ? operators.find((operator) => operator.id === chatDetail.operatorId)?.name ?? null
@@ -3946,15 +3948,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   ? { status: chatDetail.status, notes: chatDetail.notes }
                   : undefined
               }
-              chatId={chatDetail && chatDetail.id === selectedChatId ? chatDetail.id : null}
-              revision={chatDetail && chatDetail.id === selectedChatId ? chatDetail.revision : undefined}
-              operators={operators}
-              operatorId={chatDetail && chatDetail.id === selectedChatId ? chatDetail.operatorId : null}
-              accountId={selectedAccountId || null}
-              onChatChanged={() => {
-                if (selectedChatId) void loadChatDetail(selectedChatId)
-                void loadChats()
-              }}
             />
             )}
             </aside>

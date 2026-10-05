@@ -14,6 +14,7 @@ import Button from '@/components/shared/button'
 
 interface Props {
   accountId: string
+  initialTimezone?: string
   initialName: string
   initialChannelId: string
   initialLoginChannelId: string | null
@@ -52,6 +53,7 @@ export default function AccountEditModal({
   initialCapacityWarnAt = null,
   initialIconUrl = null,
   initialSection = 'basic',
+  initialTimezone,
   onClose,
   onSaved,
 }: Props) {
@@ -75,6 +77,7 @@ export default function AccountEditModal({
     initialCapacityWarnAt == null ? '' : String(initialCapacityWarnAt),
   )
   const [iconUrl, setIconUrl] = useState(initialIconUrl ?? '')
+  const [timezone, setTimezone] = useState(initialTimezone ?? 'Asia/Tokyo')
   const [saving, setSaving] = useState(false)
   const modalTitleId = useId()
   const [error, setError] = useState('')
@@ -104,6 +107,7 @@ export default function AccountEditModal({
     // like fields means "no change", not "clear it" — there's no UI affordance
     // to clear credentials, and accidentally clearing them would break prod.
     const payload: Parameters<typeof api.lineAccounts.update>[1] = {}
+    if (initialTimezone !== undefined && timezone !== initialTimezone) payload.timezone = timezone
     if (state.name !== initialName) payload.name = state.name
     if (state.channelAccessToken.trim() !== '') {
       payload.channelAccessToken = state.channelAccessToken.trim()
@@ -219,6 +223,12 @@ export default function AccountEditModal({
             />
           </div>
 
+          {initialTimezone !== undefined && initialSection === 'basic' && (
+            <label className="block text-xs font-medium text-ink-secondary">
+              タイムゾーン
+              <input aria-label="タイムゾーン" value={timezone} onChange={(e) => setTimezone(e.target.value)} required className="mt-1 w-full rounded-control border border-hairline px-3 py-2 text-sm" />
+            </label>
+          )}
           <AccountFormSections
             state={state}
             update={update}

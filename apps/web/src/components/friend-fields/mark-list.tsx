@@ -442,7 +442,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
         <div>
           {/* 960px以上は表。それ未満は縦に重ねたカード（#1014 ATTR-14）。 */}
           <table className="hidden w-full table-fixed text-sm md:table">
-            <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
+            <thead className="border-b border-hairline bg-canvas-sunken text-micro text-ink-faint">
               <tr>
                 <Th className="w-12 px-3 py-3">順番</Th>
                 <Th className="w-[15%] px-3 py-3">マーク</Th>

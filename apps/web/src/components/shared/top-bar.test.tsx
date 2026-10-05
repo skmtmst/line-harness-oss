@@ -80,8 +80,22 @@ describe('V8 の帯は絵どおり（殻合わせ）', () => {
     expect(textBase).toMatch(/display:\s*contents/)
   })
 
-  it('『前の見た目に戻す』は名前の横に小さく（v7 に出さない）', () => {
-    expect(source).toContain('前の見た目に戻す')
-    expect(css).toMatch(/\[data-theme='v8'\] \.revert \{[^}]*font-size:\s*var\(--text-nano\)/s)
+  it('パンくずは「ホーム › 画面名」1回だけ（先頭のホームは重ねない）', () => {
+    expect(source).toContain("crumb.label !== 'ホーム'")
+    expect(source).not.toContain('crumbs == null && current')
+  })
+
+  it('切替の札は箱の中に小さい字＋名前（外の見出しは畳む）', () => {
+    expect(source).toContain('>LINEアカウント<')
+    expect(css).toMatch(/\[data-theme='v8'\] \.accountField > span:first-child \{[^}]*display:\s*none/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.accountPill \{[^}]*height:\s*36px/s)
+  })
+
+  it('『前の見た目に戻す』は帯に無い（オーナー指示で廃止）', () => {
+    expect(source).not.toContain('前の見た目に戻す')
+    expect(source).not.toContain('onRevertTheme')
+    expect(css).not.toContain('.revert')
+    expect(appTopBar).not.toContain('onRevertTheme')
+    expect(appTopBar).not.toContain("applyAdminTheme('v7')")
   })
 })

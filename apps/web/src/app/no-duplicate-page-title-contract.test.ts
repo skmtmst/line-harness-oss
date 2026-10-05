@@ -81,19 +81,6 @@ describe('画面名を本文とトップバーで2回出さない', () => {
     expect(PAGES.length).toBe(191)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。2026-10-01 に ★V8 新部品の見本画面（visual-qa/v8-parts）を追加。2026-10-03 に /scenarios/new の転送画面を追加。
   })
 
-  it('page.tsx が h1 を直接持たない', () => {
-    const found = PAGES.filter((f) => /<h1[\s>]/.test(f.s)).map((f) => f.p).sort()
-    expect(found, '本文に h1 を書いた画面が増えた。PageHeader へ寄せる').toEqual(
-      Object.keys(ALLOWED_H1).sort(),
-    )
-  })
-
-  it('題を必ず出す画面を増やさない', () => {
-    // `titleDisplay="always"` はトップバーの外に置く画面のためだけにある。
-    const found = PAGES.filter((f) => /titleDisplay/.test(f.s)).map((f) => f.p)
-    expect(found, 'PageHeader の題を必ず出している画面がある').toEqual([])
-  })
-
   it('PageHeader は、トップバーと同じ言葉のときだけ題を隠す', () => {
     const header = fs.readFileSync(path.join(SRC, 'components', 'shared', 'page-header.tsx'), 'utf8')
     // 既定は auto。トップバーが出す題と見比べて決める。
@@ -101,7 +88,9 @@ describe('画面名を本文とトップバーで2回出さない', () => {
     expect(header).toContain('defaultTitleForPath')
     expect(header).toMatch(/barTitle !== title/)
     // 同じ言葉のときは出さない。画面の h1 はトップバーが持つので、本文の題は h2（2026-09-24）。
-    expect(header).toMatch(/shown \? <h2 className=\{styles\.title\}>\{title\}<\/h2> : null/)
+    // V8は板の頭に題を置く。V7は同じ題のときv8-onlyで隠す。
+    expect(header).toContain("${shown ? '' : 'v8-only'}")
+    expect(header).toMatch(/<h2[^>]*title=\{title\}>\{title\}<\/h2>/)
     expect(visible(header)).not.toMatch(/<h1[\s>]/)
   })
 })

@@ -272,7 +272,7 @@ function ProjectInner() {
 
   const duplicate = async () => {
     if (!project) return
-    setBusyAction('複製')
+    setBusyAction('複製する')
     setActionError('')
     try {
       const res = await api.hqBanners.projects.duplicate(project.id)
@@ -483,7 +483,7 @@ function ProjectInner() {
         </Button>
         <Button onClick={() => void duplicate()} disabled={busy}>
           <Copy aria-hidden="true" className="h-4 w-4" />
-          複製
+          複製する
         </Button>
         <Button onClick={() => setFormOpen(true)} disabled={busy}>
           <Pencil aria-hidden="true" className="h-4 w-4" />
@@ -574,6 +574,8 @@ function ProjectInner() {
             onPickReference={openPicker}
             onUploadReference={(file) => void uploadReference(file)}
             referenceBusy={referenceBusy}
+            usage={usage}
+            onReloadUsage={loadUsage}
           />
         </div>
       </div>
@@ -592,7 +594,7 @@ function ProjectInner() {
           actions={
             running ? (
               <>
-                <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">残りをやめる
+                <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">生成をやめる
                 </Button>
                 <Button variant="primary" disabled>
                   <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />

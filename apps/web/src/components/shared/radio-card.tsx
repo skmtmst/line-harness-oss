@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Tag } from 'lucide-react'
 import styles from './radio-card.module.css'
 
 /**
@@ -70,13 +71,15 @@ export interface RadioCardProps {
    * 「テンプレートを選択」のように、再選択で別画面を開き直す選択肢だけに使う。
    */
   onClick?: () => void
-  /**
-   * 行の中に丸とラベルだけを並べる形。カードの枠・背景・内余白を外す。
-   * 1 行の中に 3 択を収める設計（★BG-C `B3hdL4`「ルール3択」）で使う。
-   * 中身の作りは同じなので、読み上げ・キー操作はカード形とまったく同じ。
-   */
-  inline?: boolean
   className?: string
+  /** V8 の上段に出す印。省略時はタグ。v7 では非表示。 */
+  icon?: ReactNode
+  /**
+   * 選ぶカードの形。既定は箱（fNPdg/r3xz1W）。
+   * `'row'` は箱なしの行（BHEl9 の素のラジオ行：丸 18・文字 13）。
+   * 画面の絵で行で並んでいる選択肢に使う。箱の合格は変えない。
+   */
+  variant?: 'card' | 'row'
 }
 
 export default function RadioCard({
@@ -90,21 +93,23 @@ export default function RadioCard({
   disabledReason,
   invalid = false,
   onClick,
-  inline = false,
   className,
+  icon,
+  variant = 'card',
 }: RadioCardProps) {
   return (
     <label
       className={[
-        styles.card,
-        inline ? styles.inline : null,
+        variant === 'row' ? styles.row : styles.card,
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,
         invalid ? styles.invalid : null,
         className,
       ].filter(Boolean).join(' ')}
+      data-variant={variant}
       onClick={disabled ? undefined : onClick}
     >
+      <span className={styles.topIcon} aria-hidden="true">{icon ?? <Tag size={16} />}</span>
       <input
         type="radio"
         className={styles.radio}

@@ -12,6 +12,19 @@
   container-type: inline-size;
 }
 
+/* 板 `Q5lOCc`：閲覧のみの帯。数の帯の上。 */
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 /* 見出しブロック：画面名＋一行の説明。 */
 .head {
   display: flex;
@@ -202,6 +215,7 @@
   min-width: 160px;
 }
 
+/* 見るだけの人への帯（`Q5lOCc`）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
 /* 操作の失敗の帯。 */
 .errorBand {
   display: flex;
@@ -270,6 +284,12 @@
 
 .rowClick td {
   transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
+/* 消える行は 150ms で薄くなる（V8 の動き §8）。 */
+.rowClick[data-leaving='true'] {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease-out);
 }
 
 .rowClick:hover td {

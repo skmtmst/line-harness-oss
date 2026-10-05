@@ -9,6 +9,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Notice from '@/components/shared/notice'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -453,7 +454,7 @@ export default function NotificationRunList({
   return (
     <section className="space-y-4" data-design-node={nodeId} data-list-state={listState} aria-label={title}>
       {mode === 'failures' ? (
-        <div data-ro-kpis="true" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiBand data-ro-kpis="true" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={summaryDetail('この7日')} loading={visibleState === 'loading'} />
           <KpiCard title="ブロック" value={kpiValue(failureBreakdown.blocked)} unit="件" detail={summaryDetail('対応不要')} loading={visibleState === 'loading'} />
           <KpiCard title="メールで送った" value={kpiValue(failureBreakdown.emailed)} unit="件" detail={summaryDetail('LINE未ログイン')} loading={visibleState === 'loading'} />
@@ -464,7 +465,7 @@ export default function NotificationRunList({
             detail={summaryDetail(failureBreakdown.nextRetryAt ? formatJst(failureBreakdown.nextRetryAt) : '予定あり')}
             loading={visibleState === 'loading'}
           />
-        </div>
+        </KpiBand>
       ) : null}
 
       {visibleNotice ? <Notice tone={visibleNotice.tone === 'success' ? 'success' : 'danger'}>{visibleNotice.text}</Notice> : null}

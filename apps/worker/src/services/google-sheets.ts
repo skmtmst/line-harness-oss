@@ -32,6 +32,12 @@ export const GOOGLE_SHEETS_SCOPES = [
   'email',
 ] as const;
 
+/**
+ * 接続時に必ず許可されていないといけないスコープ。
+ * `openid` / `email` は表示用なので必須にしない。
+ */
+export const GOOGLE_SHEETS_REQUIRED_SCOPES = ['https://www.googleapis.com/auth/spreadsheets'] as const;
+
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const PAGE_SIZE = 500;
 /** 書き込みと書き込みの間の待機。Sheets API の分あたり上限に余裕を持たせる。 */
@@ -362,7 +368,12 @@ export async function sheetsAccessToken(
   const refreshToken = await decryptCredential(integration.refresh_token_enc, key);
   const client = sheetsOauthClient(env, 'https://localhost/unused');
   if (!client) throw new GoogleBusinessError('unavailable', null, 'google_sheets_oauth_not_configured');
-  const tokens = await refreshAccessToken({ client, refreshToken, fetch: fetchFn });
+  const tokens = await refreshAccessToken({
+    client,
+    refreshToken,
+    fetch: fetchFn,
+    requiredScopes: GOOGLE_SHEETS_REQUIRED_SCOPES,
+  });
   return tokens.accessToken;
 }
 

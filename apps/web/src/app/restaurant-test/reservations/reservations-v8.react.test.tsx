@@ -69,7 +69,7 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  vi.stubGlobal('fetch', async () => json({ success: true, data: snapshot }))
+  vi.stubGlobal('fetch', async (url: string) => json({ success: true, data: String(url).includes('/reservations/day') ? { date: '2026-10-04', reservations: snapshot.reservations } : snapshot }))
 })
 
 afterEach(() => {
@@ -133,4 +133,14 @@ test('v7 では従来の台帳が出て V8 の板は出ない', async () => {
   expect(text()).toContain('今後の予約')
   expect(host.querySelector('[data-design-node="l9NlC0"]')).toBeNull()
   expect(host.querySelector('[data-design-node="Z3FoM"]')).toBeNull()
+})
+
+test('V8の枠だけ押さえる操作は有効で、期限を入力できる', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  click('枠を押さえる')
+  await act(async () => {})
+  expect(host.querySelector('[aria-label="仮押さえの期限（分）"]')).not.toBeNull()
+  const option = host.querySelector('input[value="hold"]') as HTMLInputElement
+  expect(option?.disabled).toBe(false)
 })

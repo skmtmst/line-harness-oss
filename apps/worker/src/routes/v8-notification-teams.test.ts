@@ -1,0 +1,20 @@
+import { Hono } from 'hono';
+import { expect,it,vi } from 'vitest';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import type { Env } from '../index.js';
+vi.mock('../services/account-access.js',()=>({canAccessAllLineAccounts:vi.fn(async(_db,_staff,ids)=>ids.every((id:string)=>id==='a'))}));
+import { notificationTeams } from './notification-teams.js';
+import { operatorRecipients } from '../services/operator-notification-dispatch.js';
+it('enforces scope, role, valid membership and version conflict',async()=>{
+ const {raw,db}=createTestD1();
+ raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','a','A','token','secret');
+ INSERT INTO staff_members(id,name,email,api_key,role,is_active) VALUES('s','Staff','s@example.test','s-key','staff',1);`);
+ let role:'owner'|'staff'='owner';const app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staff',{id:'o',name:'Owner',role,readOnly:false});await next()});app.route('/',notificationTeams);
+ const request=(method:string,path:string,body:unknown)=>app.request(path,{method,headers:{'content-type':'application/json'},body:JSON.stringify(body)},{DB:db});
+ const input={lineAccountId:'a',name:'Ops',staffIds:['s']};const created=await request('POST','/api/notifications/teams',input);expect(created.status).toBe(201);const team=(await created.json() as {data:{id:string}}).data;
+ expect((await request('PUT',`/api/notifications/teams/${team.id}`,{...input,expectedVersion:9})).status).toBe(409);
+ expect((await request('POST','/api/notifications/teams',{...input,staffIds:['missing']})).status).toBe(422);
+ expect((await request('POST','/api/notifications/teams',{...input,lineAccountId:'b'})).status).toBe(403);
+ expect(await operatorRecipients(db,'a',[])).toEqual([]);
+ role='staff';expect((await request('POST','/api/notifications/teams',input)).status).toBe(403);
+});

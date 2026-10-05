@@ -6,19 +6,18 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
 /**
- * LINE接続を含む6項目の判定と本文は、同じサーバー結果を正本にする。
- * ブラウザ側で別々のAPIを読み直して本文だけ「正常」に変えると、
- * 保存済みバッジと説明が再び食い違うため、summary/statusを同時に採用する。
+ * 9項目の判定は、同じサーバー結果を正本にする。
+ * ブラウザ側で別々のAPIを読み直して判定だけ「正常」に変えると、
+ * 保存済みバッジと説明が再び食い違うため、statusを同時に採用する。
  */
-describe('運用状態の本文とバッジは同じサーバー結果を使う', () => {
-  it('6種類のサーバーキーを画面の項目へ対応づける', () => {
+describe('運用状態の判定は同じサーバー結果を使う', () => {
+  it('9種類のサーバーキーを画面の項目へ対応づける', () => {
     expect(PAGE).toContain("line_connection: 'line'")
     expect(PAGE).toContain("message_quota: 'quota'")
     expect(PAGE).toContain("friend_change: 'friends'")
   })
 
-  it('同じ結果から本文・判定・観測時刻を採用する', () => {
-    expect(PAGE).toContain("'サーバーに確認記録がありません'")
+  it('同じ結果から判定・観測時刻を採用する', () => {
     expect(PAGE).toContain("(result?.status ?? 'unknown')")
     expect(PAGE).toContain('observedAt: result?.observedAt ?? snapshot.lastCheckedAt')
   })
@@ -29,17 +28,19 @@ describe('運用状態の本文とバッジは同じサーバー結果を使う'
 
   /*
    * A32-01: 期限切れ(stale)の実行結果は、項目ごとの判定にも使わない。
-   * 全体バナーだけでなく各行も「未確認」へ倒し、本文には古い結果である
-   * ことを明示する（古い「正常」が残って健全と読み違える事故を防ぐ）。
+   * 板 Y4LkX1 どおり「古い確認」の札にし、一度も確かめていない
+   * （結果が無い）「未確認」とは分ける（古い「正常」が残って健全と
+   * 読み違える事故を防ぐ）。
    */
-  it('期限切れの実行は項目の判定を未確認へ倒し、古い結果と明示する', () => {
-    expect(PAGE).toContain("const stale = snapshot.overallStatus === 'stale'")
-    expect(PAGE).toContain("severity: stale ? 'unknown' : (result?.status ?? 'unknown')")
-    expect(PAGE).toContain('古い結果です（再確認待ち）')
+  it('期限切れの実行は項目の判定を古い確認にし、未確認と分ける', () => {
+    expect(PAGE).toContain("const snapshotStale = snapshot.overallStatus === 'stale'")
+    expect(PAGE).toContain("label: '古い確認'")
+    expect(PAGE).toContain('STALE_ITEM_AFTER_MS = 10 * 60 * 1000')
   })
 
-  it('期限切れのときは過去の「次回予定」を案内しない', () => {
-    expect(PAGE).toContain("'期限切れ（再確認待ち）'")
+  it('期限切れの帯では自動確認の停止を疑い、確かめ直しへ誘導する', () => {
+    expect(PAGE).toContain('前回の確認結果が期限切れです')
     expect(PAGE).toContain('自動確認が止まっている可能性があります')
+    expect(PAGE).toContain('いますぐ確かめる')
   })
 })

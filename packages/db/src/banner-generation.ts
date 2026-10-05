@@ -463,6 +463,7 @@ export interface BannerImageListFilter {
   projectId?: string;
   favoriteOnly?: boolean;
   presetKey?: string;
+  shape?: 'square' | 'landscape' | 'portrait' | 'rich_menu';
   /** テキスト行・プロンプト・追加指示の部分一致。 */
   query?: string;
   limit?: number;
@@ -470,11 +471,7 @@ export interface BannerImageListFilter {
   before?: string;
 }
 
-/** 画像一覧。media と生成条件を一緒に返す。 */
-export async function listBannerImages(
-  db: D1Database,
-  filter: BannerImageListFilter,
-): Promise<BannerImageWithDetail[]> {
+function bannerImageConditions(filter: BannerImageListFilter) {
   const conditions = ['i.tenant_id = ?', 'i.deleted_at IS NULL'];
   const values: unknown[] = [filter.tenantId];
   if (filter.projectId) { conditions.push('i.project_id = ?'); values.push(filter.projectId); }
@@ -484,11 +481,42 @@ export async function listBannerImages(
   )`);
   if (filter.presetKey) { conditions.push('g.preset_key = ?'); values.push(filter.presetKey); }
   if (filter.query) {
-    conditions.push('(g.text_lines LIKE ? OR g.final_prompt LIKE ? OR g.custom_prompt LIKE ? OR g.free_prompt LIKE ? OR m.filename LIKE ?)');
+    conditions.push('(g.text_lines LIKE ? OR g.final_prompt LIKE ? OR g.custom_prompt LIKE ? OR g.free_prompt LIKE ? OR m.filename LIKE ? OR p.name LIKE ?)');
     const like = `%${filter.query}%`;
-    values.push(like, like, like, like, like);
+    values.push(like, like, like, like, like, like);
   }
-  if (filter.before) { conditions.push('i.created_at < ?'); values.push(filter.before); }
+  if (filter.shape === 'rich_menu') conditions.push("g.preset_key LIKE 'line_rich_menu%'");
+  else if (filter.shape) {
+    conditions.push("g.preset_key NOT LIKE 'line_rich_menu%' AND g.api_size = ?");
+    values.push(filter.shape === 'square' ? '1024x1024' : filter.shape === 'landscape' ? '1536x1024' : '1024x1536');
+  }
+  return { conditions, values };
+}
+
+export async function countBannerImages(db: D1Database, filter: BannerImageListFilter) {
+  const { conditions, values } = bannerImageConditions({ ...filter, favoriteOnly: false, delivered: undefined });
+  const row = await db.prepare(`SELECT COUNT(*) AS all_count, COALESCE(SUM(i.is_favorite),0) AS favorite,
+    COALESCE(SUM(EXISTS(SELECT 1 FROM banner_image_deliveries d WHERE d.banner_image_id=i.id)),0) AS delivered
+    FROM banner_images i JOIN media m ON m.id=i.media_id
+    JOIN banner_projects p ON p.id=i.project_id AND p.tenant_id=i.tenant_id
+    LEFT JOIN banner_generations g ON g.id=i.generation_id
+    WHERE ${conditions.join(' AND ')}`).bind(...values).first<{ all_count: number; favorite: number; delivered: number }>();
+  return { all: row?.all_count ?? 0, favorite: row?.favorite ?? 0, delivered: row?.delivered ?? 0, unused: (row?.all_count ?? 0) - (row?.delivered ?? 0) };
+}
+
+/** 画像一覧。media と生成条件を一緒に返す。 */
+export async function listBannerImages(
+  db: D1Database,
+  filter: BannerImageListFilter,
+): Promise<BannerImageWithDetail[]> {
+  const { conditions, values } = bannerImageConditions(filter);
+  if (filter.before) {
+    if (filter.before.startsWith('{')) {
+      const cursor = JSON.parse(filter.before) as { at: string; id: string };
+      conditions.push('(i.created_at < ? OR (i.created_at = ? AND i.id < ?))');
+      values.push(cursor.at, cursor.at, cursor.id);
+    } else { conditions.push('i.created_at < ?'); values.push(filter.before); }
+  }
   const limit = Math.min(Math.max(filter.limit ?? 30, 1), 100);
   values.push(limit);
 
@@ -518,8 +546,9 @@ export async function listBannerImages(
          FROM banner_images i
          JOIN media m ON m.id = i.media_id
          LEFT JOIN banner_generations g ON g.id = i.generation_id
+         JOIN banner_projects p ON p.id = i.project_id AND p.tenant_id = i.tenant_id
         WHERE ${conditions.join(' AND ')}
-        ORDER BY i.created_at DESC, i.sequence DESC
+        ORDER BY i.created_at DESC, i.id DESC
         LIMIT ?`,
     )
     .bind(...values)
@@ -569,6 +598,7 @@ async function listBannerImagesById(
          FROM banner_images i
          JOIN media m ON m.id = i.media_id
          LEFT JOIN banner_generations g ON g.id = i.generation_id
+         JOIN banner_projects p ON p.id = i.project_id AND p.tenant_id = i.tenant_id
         WHERE i.tenant_id = ? AND i.id IN (${placeholders})`,
     )
     .bind(tenantId, ...ids)

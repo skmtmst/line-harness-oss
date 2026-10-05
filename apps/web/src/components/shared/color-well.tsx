@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { ChevronDown, Pipette } from 'lucide-react'
 import styles from './color-well.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /** よく使う色の見本（8×3）。Pencil ★BG-2 `d6PU4a` の色グリッドと同じ並び。 */
 const DEFAULT_COLORS = [
@@ -90,6 +91,14 @@ function normalizeHex(input: string): string | null {
   return `#${text.toLowerCase()}`
 }
 
+/** V8 正本の「よく使う色」（8×3）。v8 の画面ではこちらを並べる。 */
+const V8_COLORS = [
+  '#0f172a', '#475569', '#94a3b8', '#64748b', '#cbd5e1', '#f1f5f9',
+  '#ef4444', '#f97316', '#fbbf24', '#16a34a', '#06c755', '#087a3e',
+  '#84cc16', '#22d3ee', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef',
+  '#ec4899', '#f43f5e', '#fda4af', '#1d1d1f', '#626a73', '#dadde2',
+]
+
 /**
  * 色を選ぶ（Pencil ★V8 `KVkPg` ／開いた状態 ★BG-2 `P8ZUj`・`d6PU4a`）。
  *
@@ -104,7 +113,7 @@ function normalizeHex(input: string): string | null {
 export default function ColorWell({
   value,
   onChange,
-  colors = DEFAULT_COLORS,
+  colors,
   label = '色を選ぶ',
   disabled = false,
   allowAlpha = true,
@@ -134,6 +143,8 @@ export default function ColorWell({
   /** 指定なしのときにピッカーを開く色（★BG-B の役割ごとの見本の色）。 */
   fallback?: string
 }) {
+  const theme = useAdminTheme()
+  const palette = colors ?? (theme === 'v8' ? V8_COLORS : DEFAULT_COLORS)
   const [open, setOpen] = useState(false)
   const initial = parseValue(value ?? fallback)
   const [hsv, setHsv] = useState<Hsv>(initial.hsv)
@@ -407,9 +418,10 @@ export default function ColorWell({
               <span className={styles.hexMark} aria-hidden="true">
                 #
               </span>
+              {/* v8 は正本どおり大文字で見せる。入力中の文字は hexText のまま持つ。 */}
               <input
                 className={styles.hexInput}
-                value={hexText}
+                value={theme === 'v8' ? hexText.toUpperCase() : hexText}
                 aria-label="色を十六進で入力"
                 onChange={(event) => setHexText(event.target.value.replace(/^#/, ''))}
                 onKeyDown={(event) => {
@@ -437,11 +449,14 @@ export default function ColorWell({
                 </span>
               </label>
             ) : null}
-            {hasDropper ? (
+            {/* v8 は正本どおりスポイトを必ず置き、対応していないブラウザでは押せない形で出す。 */}
+            {hasDropper || theme === 'v8' ? (
               <button
                 type="button"
                 className={styles.dropper}
                 aria-label="画面の色をすくう"
+                disabled={!hasDropper}
+                title={!hasDropper ? 'このブラウザはスポイトに対応していません' : undefined}
                 onClick={() => void pickWithDropper()}
               >
                 <Pipette size={15} aria-hidden="true" />
@@ -455,7 +470,7 @@ export default function ColorWell({
           <div className={styles.group}>
             <span className={styles.headingText}>よく使う色</span>
             <div className={styles.grid} role="listbox" aria-label="よく使う色">
-              {colors.map((color) => (
+              {palette.map((color) => (
                 <button
                   key={color}
                   type="button"

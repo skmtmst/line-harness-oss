@@ -2,8 +2,10 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/lib/api'
+import { AdEventMappings } from './ad-event-mappings'
 import type { AdConversionLog, AdPlatform } from '@/lib/api'
-import type { EntryRoute } from '@line-crm/shared'
+import type { EntryRoute, AdConversionCostSummary } from '@line-crm/shared'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -16,11 +18,15 @@ import DateField from '@/components/shared/date-field'
 import { TextField } from '@/components/shared/text-field'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { formatNumber } from '@/lib/format'
+import AdConnectionDialog from './ad-connection-dialog'
 
 type AdView = 'metrics' | 'connections' | 'history'
 
 /** #514-6: 送信履歴を一度に描く件数。これを超えるぶんはページ送りで見る。 */
 const LOG_PAGE_SIZE = 20
+
+const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
+const referralUrl = (refCode: string) => `${WORKER_BASE.replace(/\/$/, '')}/r/${encodeURIComponent(refCode)}`
 
 const PROVIDERS = [
   { key: 'meta', label: 'Meta広告', clickId: 'fbclid' },
@@ -211,12 +217,17 @@ export default function AdIntegration({
   // #514-13: 失敗理由は口の errorMessage を開いて見せる(「理由を見る」を効かせる)。
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
   // #818: 広告費の台帳。取込分と手入力分を同じ一覧で見せる。
+  const theme = useAdminTheme()
+  const [conversionCost, setConversionCost] = useState<AdConversionCostSummary | null>(null)
   const [costRows, setCostRows] = useState<AdCostRow[]>([])
   const [costPlatforms, setCostPlatforms] = useState<AdCostPlatformStatus[]>([])
   const [costFailed, setCostFailed] = useState(false)
   // R275: 手で入れた費用を1行ずつ持つ。間違えた記録はここから取消す。
   const [manualEntries, setManualEntries] = useState<ManualCostEntry[]>([])
   const [canManage, setCanManage] = useState(false)
+  const [canConnect, setCanConnect] = useState(false)
+  const [connectionTarget, setConnectionTarget] = useState<(typeof PROVIDERS)[number] | null>(null)
+  useEffect(() => { setConnectionTarget(null); setCanConnect(false) }, [selectedAccountId])
   const [cancelTarget, setCancelTarget] = useState<ManualCostEntry | null>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [cancelBusy, setCancelBusy] = useState(false)
@@ -240,6 +251,7 @@ export default function AdIntegration({
       setLogs([])
       setLogTotal(0)
       setLogSummary(null)
+      setConversionCost(null)
       setCostRows([])
       setCostPlatforms([])
       setFailed(false)
@@ -265,12 +277,14 @@ export default function AdIntegration({
       setLogTotal(logResponse.data.total)
       setLogSummary(logResponse.data.summary ?? null)
       if (costResponse.success) {
+        setConversionCost(costResponse.data.conversionCost ?? null)
         setCostRows(costResponse.data.rows ?? [])
         setCostPlatforms(costResponse.data.platforms ?? [])
         setManualEntries(costResponse.data.manualEntries ?? [])
         setCostFailed(false)
       } else {
-        setCostRows([])
+        setConversionCost(null)
+      setCostRows([])
         setCostPlatforms([])
         setManualEntries([])
         setCostFailed(true)
@@ -301,6 +315,7 @@ export default function AdIntegration({
     void api.staff.me().then((response) => {
       if (!active) return
       setCanManage(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
+      setCanConnect(response.success && response.data.role === 'owner')
     }).catch(() => undefined)
     return () => { active = false }
   }, [selectedAccountId])
@@ -573,6 +588,8 @@ export default function AdIntegration({
           <Button href="/inflow-links?tab=connections&view=history">送信履歴を見る</Button>
         </div>
 
+        {theme === 'v8' && connectionTarget && selectedAccountId && <AdConnectionDialog key={`${selectedAccountId}:${connectionTarget.key}`} provider={connectionTarget} platform={platforms.find(p=>p.name===connectionTarget.key)} accountId={selectedAccountId} onClose={()=>setConnectionTarget(null)} onSaved={load}/>}
+        {theme === 'v8' && importError && <p role="alert">{importError}</p>}
         <Notice tone="info">
           広告をつながなくても流入リンクの計測は使えます。つなぐと、成果を広告側へ安全に返せるようになります。
         </Notice>
@@ -606,10 +623,10 @@ export default function AdIntegration({
                       まだ接続されていません。
                     </p>
                   )}
-                  {/*
-                    #514-13: 設定・接続の操作画面は無い。効かないボタンは出さず、
-                    状態の文だけにする。
-                  */}
+                  {theme === 'v8' && <div className="mt-3 flex gap-2">
+                    {canConnect && <Button variant="secondary" onClick={()=>setConnectionTarget(provider)}>{platform ? '設定・つなぎ直す' : 'つなぐ'}</Button>}
+                    {canManage && platform?.isActive && <Button variant="secondary" disabled={importingId!==null} onClick={()=>void runImportNow(platform.id)}>再読み込み</Button>}
+                  </div>}
                   <div className="mt-3 flex items-center justify-between gap-2 text-xs text-ink-faint">
                     <span>{active ? (synced ? `${synced} に同期` : '同期日時は取得できません') : platform?.config.connection_error === '権限が足りません' ? 'もう一度つなぎ直してください' : '接続すると成果を返せます'}</span>
                   </div>
@@ -629,11 +646,11 @@ export default function AdIntegration({
             左がうちの成果地点、右が広告側の名前です。対応が付いていないものは返せません。
           </p>
           <div className="mt-3">
-            <ListState
+            {theme === 'v8' ? <AdEventMappings key={selectedAccountId} accountId={selectedAccountId} canWrite={canManage} /> : <ListState
               kind="empty"
               title="対応表はまだ表示できません"
               description="成果地点と広告側の名前の対応を取れていないため、件数は表示しません。対応が取れたらここに並びます。"
-            />
+            />}
           </div>
         </section>
         </div>
@@ -678,23 +695,49 @@ export default function AdIntegration({
   const linkedJpyCost = linkedJpyRows.reduce((sum, row) => sum + (row.totals.find((total) => total.currency === 'JPY')?.amountMinor ?? 0), 0)
   const avgCostPerFriend = linkedFriendAdds > 0 ? Math.round(linkedJpyCost / linkedFriendAdds) : null
 
+  /*
+   * qSTVR: 行の媒体と計測リンク（どちらも実データ）。結びつきが無い行は
+   * 測ったふりをせず「—」にする。リンク先は一覧と同じ紹介URLの形。
+   */
+  const platformLabelForCostRow = (row: AdCostRow): string => {
+    if (!row.adPlatformId) return '—'
+    const platform = platforms.find((item) => item.name === row.adPlatformId)
+    if (platform) return platformLabel(platform)
+    const status = costPlatforms.find((item) => item.id === row.adPlatformId || item.name === row.adPlatformId)
+    return status?.displayName ?? status?.name ?? '—'
+  }
+  const measuredLinkForCostRow = (row: AdCostRow): ReactNode => {
+    if (!row.entryRouteId) return '—'
+    const route = entryRoutes.find((item) => item.id === row.entryRouteId)
+    if (!route) return '—'
+    const url = referralUrl(route.refCode)
+    return <a href={url} className="text-action underline" title={url}>{route.refCode}</a>
+  }
+
   return (
-    <div className="space-y-4" data-design-node="v0HaI">
+    <div className="space-y-4" data-design-node="qSTVR">
       <Notice tone="info">
-        広告の管理画面では「クリック数」までしか分かりません。ここでは、かかった費用と友だち追加がつながって見えます。
+        広告をつなぐと毎日自動で費用を取り込みます。取り込めない分（チラシや看板など）は「費用を手で入れる」から足せます。
       </Notice>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="つないだ広告" value={connected.length} detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
         <Metric
           label="この30日の広告費"
           value={totalCostByCurrency.size > 0
             ? <span className="flex flex-wrap gap-x-2">{[...totalCostByCurrency].map(([currency, amount]) => <span key={currency}>{formatMinor(amount, currency)}</span>)}</span>
             : '—'}
-          detail={totalCostByCurrency.size > 0 ? '取込分と手入力分の合計です' : 'まだ費用の記録がありません'}
+          detail={totalCostByCurrency.size > 0 ? '選んだ LINE アカウントの分だけ。取込分と手入力分の合計です' : 'まだ費用の記録がありません'}
         />
-        <Metric label="友だち1人あたり" value={avgCostPerFriend} detail="経路がある円の費用だけを合計し、同じ経路の追加人数は1回だけ数えます。経路なし・追加0人・他通貨は計算に含めません" prefix="¥" />
-        <Metric label="成果1件あたり" value={null} detail="認めた成果の件数は未接続のため表示できません" prefix="¥" />
+        <Metric label="つないだ広告" value={connected.length} detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
+        <Metric
+          label="友だち1人あたり"
+          value={avgCostPerFriend}
+          detail={linkedFriendAdds > 0
+            ? `友だち追加 ${formatNumber(linkedFriendAdds)} 人。経路がある円の費用だけを合計し、同じ経路の追加人数は1回だけ数えます`
+            : '経路がある円の費用だけを合計し、同じ経路の追加人数は1回だけ数えます。経路なし・追加0人・他通貨は計算に含めません'}
+          prefix="¥"
+        />
+        <Metric label="成果1件あたり" value={theme === 'v8' ? conversionCost?.costPerConversionMinor ?? null : null} detail={theme === 'v8' ? (conversionCost ? `同じ期間の確定成果 ${conversionCost.confirmedConversionCount}件。取消・承認待ちは除きます。円以外が混ざると計算しません。` : '成果の件数を取得できません') : '認めた成果の件数は未接続のため表示できません'} prefix="¥" />
       </div>
 
       {/*
@@ -705,6 +748,8 @@ export default function AdIntegration({
         {PROVIDERS.map((provider) => {
           const platform = platforms.find((item) => item.name === provider.key)
           const synced = platform ? syncLabel(platform) : null
+          const importStatus = costPlatforms.find((item) => item.name === provider.key)
+          const lastImport = importStatus?.lastSuccessAt ?? null
           return (
             <div key={provider.key} className="rounded-card border border-hairline bg-canvas p-4">
               <div className="flex items-center justify-between gap-2">
@@ -713,10 +758,15 @@ export default function AdIntegration({
                   <p className="text-xs text-ink-faint">
                     {platform?.isActive
                       ? synced
-                        ? `つながっています ／ ${synced} に取り込みました`
-                        : 'つながっています ／ 取り込み日時は取得できません'
+                        ? `つないでいる ／ ${synced} に取り込みました`
+                        : 'つないでいる ／ 取り込み日時は取得できません'
                       : 'つないでいません'}
                   </p>
+                  {platform?.isActive && lastImport ? (
+                    <p className="mt-0.5 text-xs text-ink-faint">
+                      {`最後の取り込み ${shortDateTime(lastImport)}・毎日自動`}
+                    </p>
+                  ) : null}
                 </div>
                 <span className="whitespace-nowrap font-bold text-ink" title={platform ? `月額予算: ${platformCost(platform)}` : undefined}>
                   {platformCost(platform)}
@@ -731,7 +781,7 @@ export default function AdIntegration({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-3">
           <div>
             <h3 className="text-sm font-bold text-ink">流入元ごとの費用</h3>
-            <p className="mt-1 text-xs text-ink-faint">取り込んだ費用と手入力の分です。取れない日は「—」になります。</p>
+            <p className="mt-1 text-xs text-ink-faint">取り込んだ費用と手入力の分です。取れない日は「—」になります。秘密の鍵は画面に表示しません。中継リンクを通った人だけ広告と結びつきます。</p>
           </div>
           <Button variant="secondary" onClick={openManualEntry}>費用を手で入れる</Button>
         </div>
@@ -749,12 +799,15 @@ export default function AdIntegration({
             description="広告をつなぐと毎日自動で取り込みます。取り込めない分は「費用を手で入れる」から足せます。"
           />
         ) : (
-          <table className="w-full table-fixed text-xs">
+          <div className="overflow-x-auto" data-scroll-x>
+          <table className="w-full min-w-[760px] table-fixed text-xs">
             <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
               <TableHeadRow>
                 <Th>流入元</Th>
+                <Th>媒体</Th>
+                <Th>計測リンク</Th>
+                <Th align="right">この30日の費用</Th>
                 <Th align="right">友だち追加</Th>
-                <Th align="right">費用</Th>
                 <Th align="right">1人あたり</Th>
                 <Th>取り込み</Th>
               </TableHeadRow>
@@ -768,10 +821,16 @@ export default function AdIntegration({
                       <span className="ml-2 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-semibold text-ink-faint">手入力</span>
                     )}
                   </td>
+                  <td className="truncate px-4 py-3 text-ink-secondary">
+                    {row.source === 'manual' ? '—' : platformLabelForCostRow(row)}
+                  </td>
+                  <td className="truncate px-4 py-3 text-ink-secondary">
+                    {measuredLinkForCostRow(row)}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-ink">{formatCostTotals(row.totals)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
                     {row.friendAdds == null ? '—' : `${formatNumber(row.friendAdds)}人`}
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-ink">{formatCostTotals(row.totals)}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
                     {row.costPerFriendMinor == null ? '—' : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
                   </td>
@@ -782,6 +841,7 @@ export default function AdIntegration({
               ))}
             </tbody>
           </table>
+          </div>
         )}
         {/*
           R275: 手で入れた費用は1行ずつ出す。間違えて入れた分は理由を付けて

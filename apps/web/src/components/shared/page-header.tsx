@@ -69,7 +69,7 @@ export default function PageHeader({
     <div className={[styles.header, className].filter(Boolean).join(' ')}>
       <div className={styles.heading}>
         <Breadcrumb items={breadcrumb} />
-        {shown ? <h2 className={styles.title}>{title}</h2> : null}
+        <h2 className={`${styles.title} ${shown ? '' : 'v8-only'}`} title={title}>{title}</h2>
         <p className={styles.description}>{description}</p>
       </div>
       {actions ? <div className={styles.actions}>{actions}</div> : null}

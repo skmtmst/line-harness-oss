@@ -75,6 +75,8 @@ describe('狭い幅で操作が隠れない', () => {
   })
 
   it('メッセージの段の列は狭い幅でも縮む', () => {
-    expect(FORM).toContain('min-w-0 space-y-5')
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'broadcast-form-v8.module.css'), 'utf8')
+    expect(css).toContain('.input { min-width: 0;')
+    expect(css).toContain('@container broadcast-create (width < 1100px)')
   })
 })

@@ -13,6 +13,7 @@ import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { describeSavedCondition, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
@@ -240,12 +241,12 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
 
   return (
     <div data-design-node="QKx8Q">
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <KpiBand>
         <KpiCard title="保存した条件" value={kpis.total} unit="件" detail="上限50件" loading={loading} variant="v6" />
         <KpiCard title="配信で使用中" value={kpis.usedInBroadcasts} unit="件" detail="変更時は影響確認" loading={loading} variant="v6" />
         <KpiCard title="該当者0人" value={kpis.zeroMatches} unit="件" detail="条件の見直し候補" loading={loading} variant="v6" />
         <KpiCard title="今月の呼び出し" value={kpis.callsThisMonth} unit="回" detail={kpis.callsThisMonth === null ? '呼び出し記録は未接続' : '配信・自動処理'} loading={loading} variant="v6" />
-      </div>
+      </KpiBand>
 
       {/*
         ATTR-23: 細かい仕様（AND/OR・演算子の数・軸の数）はここに並べず、
@@ -366,7 +367,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
             それ未満は縦に重ねたカード（ATTR-14）。
           */}
           <table className="hidden w-full table-fixed text-sm md:table">
-            <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
+            <thead className="border-b border-hairline bg-canvas-sunken text-micro text-ink-faint">
               <TableHeadRow>
                 <Th className="w-[16%] px-3 py-3">条件名 ／ 所有・範囲・参照・版</Th>
                 <Th className="w-1/4 px-3 py-3">条件の要約</Th>
@@ -417,12 +418,12 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                     <span className="truncate font-bold text-ink" title={search.name}>{search.name}</span>
                   )}
                   {!search.lineAccountId && (
-                    <span className="rounded-pill bg-warning-bg px-2 py-0.5 text-[10px] text-warning">
+                    <span className="rounded-pill bg-warning-bg px-2 py-0.5 text-nano text-warning">
                       対象アカウント未割り当て
                     </span>
                   )}
                   </div>
-                  <p className="mt-1 truncate text-[11px] text-ink-faint" title={`${search.isShared ? '全員' : '自分だけ'}・${selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・ライブ参照・v${search.revision ?? 1}`}>
+                  <p className="mt-1 truncate text-micro text-ink-faint" title={`${search.isShared ? '全員' : '自分だけ'}・${selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・ライブ参照・v${search.revision ?? 1}`}>
                     {search.isShared ? '全員' : '自分だけ'}・{selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・ライブ参照・v{search.revision ?? 1}
                   </p>
                 </td>
@@ -436,7 +437,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   {search.matchCount === null || search.matchCount === undefined ? '—' : `${formatNumber(search.matchCount)}人`}
                 </td>
                 <td className="px-3 py-3 align-top">
-                  <span className={`rounded-pill px-2 py-0.5 text-[11px] ${search.isShared ? 'bg-action-soft text-action' : 'bg-canvas-sunken text-ink-secondary'}`}>
+                  <span className={`rounded-pill px-2 py-0.5 text-micro ${search.isShared ? 'bg-action-soft text-action' : 'bg-canvas-sunken text-ink-secondary'}`}>
                     {search.isShared ? '全員' : '自分だけ'}
                   </span>
                 </td>
@@ -499,7 +500,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                       ) : (
                         <span className="block truncate font-bold text-ink" title={search.name}>{search.name}</span>
                       )}
-                      <p className="mt-0.5 text-[11px] text-ink-faint">
+                      <p className="mt-0.5 text-micro text-ink-faint">
                         {search.isShared ? '全員' : '自分だけ'}・{selectedAccount?.name ?? search.lineAccountId ?? '対象未設定'}・v{search.revision ?? 1}
                       </p>
                       <p className="mt-1 text-xs leading-5 text-ink-secondary">

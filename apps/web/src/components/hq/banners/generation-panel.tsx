@@ -5,6 +5,7 @@ import { useId, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import ColorWell from '@/components/shared/color-well'
 import HelpTip from '@/components/shared/help-tip'
+import LimitState from './limit-state'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -29,6 +30,7 @@ import {
   type BannerImage,
   type BannerPreset,
   type BannerReferenceMode,
+  type BannerUsage,
 } from '@/lib/hq-banners'
 
 /**
@@ -49,6 +51,8 @@ export default function GenerationPanel({
   onPickReference,
   onUploadReference,
   referenceBusy,
+  usage,
+  onReloadUsage,
 }: {
   presets: BannerPreset[]
   maxCount: number
@@ -62,6 +66,9 @@ export default function GenerationPanel({
   /** 「ファイルを選ぶ」。親がプロジェクトへ取り込んでから参照にする。 */
   onUploadReference: (file: File) => void
   referenceBusy?: boolean
+  /** 上限の帯（板 zOpMG）。上限のときだけ出す。 */
+  usage?: BannerUsage | null
+  onReloadUsage?: () => void
 }) {
   const uid = useId()
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -228,7 +235,8 @@ export default function GenerationPanel({
             {/* 使い方の説明（★BG-B `R6MBHf`）。3 つの違いをここで読み切れるようにする。 */}
             <div data-design-node="R6MBHf" className="flex flex-col gap-1 rounded-control bg-canvas-sunken p-3">
               <p className="text-micro font-medium text-ink">{`使い方は ${BANNER_REFERENCE_MODES.length} つから選べます`}</p>
-              <ul className="flex flex-col gap-0.5">
+              {/* 行の間は正規の 4px 段で取る（#704：半端な段を新規で増やさない）。 */}
+              <ul className="flex flex-col gap-1">
                 {BANNER_REFERENCE_MODES.map((mode) => (
                   <li key={mode} className="text-micro text-ink-faint">
                     <span className="font-medium text-ink-secondary">{BANNER_REFERENCE_MODE_LABEL[mode]}</span>
@@ -342,8 +350,38 @@ export default function GenerationPanel({
             ))}
           </fieldset>
         </Field>
+
+        <UsageBars usage={usage ?? null} />
+
+        <LimitState usage={usage ?? null} onReload={onReloadUsage} compact />
       </div>
     </aside>
+  )
+}
+
+/** パネル内の利用量の棒（板 iMnph）。空きがあるときだけ出す。上限のときは下の帯が出る。 */
+function UsageBars({ usage }: { usage: BannerUsage | null }) {
+  if (!usage) return null
+  if (usage.blocked || usage.paused || usage.month.remaining <= 0 || usage.today.remaining <= 0) return null
+  const rows = [
+    { label: '今月', bucket: usage.month },
+    { label: '今日', bucket: usage.today },
+  ]
+  return (
+    <div data-design-node="iMnph-usage" className="flex flex-col gap-1.5">
+      {rows.map(({ label, bucket }) => {
+        const pct = bucket.limit > 0 ? Math.max(0, Math.min(100, (bucket.remaining / bucket.limit) * 100)) : 0
+        return (
+          <div key={label} className="flex items-center gap-2">
+            <span className="w-8 shrink-0 text-micro text-ink-secondary">{label}</span>
+            <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-pill bg-hairline">
+              <span className="block h-full rounded-pill bg-success" style={{ width: `${pct}%` }} />
+            </span>
+            <span className="shrink-0 text-micro text-ink-secondary">残り{bucket.remaining}/{bucket.limit}枚</span>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

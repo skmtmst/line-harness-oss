@@ -10,8 +10,6 @@ import { MENU_SECTIONS } from '@/lib/menu'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useManualHref } from '@/lib/use-manual-href'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import { applyAdminTheme } from '@/components/theme-preview-switch'
 
 /**
  * 共通トップバーを、いまの画面の値へつなぐ層。
@@ -35,13 +33,13 @@ export function defaultTitleForPath(pathname: string): string {
 }
 
 /**
- * 権限の呼び名。**`owner` は「統括」**。
+ * 権限の呼び名。言葉の表（GLOSSARY.md）どおり **`owner` は「オーナー」**。
  *
- * 「オーナー」ではない。V6 の設計（Pencil `cBSCb`）が「統括」で、
- * 画面にもともと浮いていた「統括」ボタンは、この印へ畳んだ。
+ * V6 の設計（Pencil `cBSCb`）が「統括」だったが、2026-10-01 のオーナー決定で
+ * 「オーナー」にそろえた。「統括」は組織と統括コンソールの名前だけに使う。
  */
 const ROLE_LABELS: Record<string, string> = {
-  owner: '統括',
+  owner: 'オーナー',
   admin: '管理者',
   viewer: '閲覧のみ',
   staff: 'スタッフ',
@@ -125,12 +123,6 @@ export default function AppTopBar() {
   const logout = () => logoutAndGoToLogin()
 
   /*
-   * G6 移し替え：V8 のときだけ「前の見た目に戻す」を出す。
-   * 効き方は設定画面の切り替えと同じ（このブラウザに残して覚える）。
-   */
-  const revertTheme = useAdminTheme() === 'v8' ? () => applyAdminTheme('v7') : undefined
-
-  /*
    * ★V8：帯の探す欄は V8 の外側から外した（オーナー決定 2026-10-01）。
    * `?q=` の受け口自体は友だち一覧が持ち続ける。
    */
@@ -173,7 +165,6 @@ export default function AppTopBar() {
       onRoleClick={canReturnToHq ? returnToHq : undefined}
       userName={staffName}
       onLogout={logout}
-      onRevertTheme={revertTheme}
       notificationUnreadCount={notificationUnread}
       v8Chrome
       crumbs={crumbs}

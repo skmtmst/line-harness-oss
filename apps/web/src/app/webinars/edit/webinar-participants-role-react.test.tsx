@@ -194,7 +194,7 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     await flush()
 
     expect(host.textContent).toContain('オーナーと管理者だけが確認できます')
-    expect(host.textContent).not.toContain('参加者をCSVで書き出す')
+    expect(host.textContent).not.toContain('CSVで書き出す')
     expect(host.textContent).not.toContain(FRIEND_NAME)
     // staff が辿っても 403 になるCSVへの導線(dead link)はDOMに存在しない。
     expect(csvLinks()).toEqual([])
@@ -235,13 +235,13 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     await render()
     await flush()
 
-    expect(host.textContent).toContain('参加者管理')
+    expect(host.querySelector('[data-design-node="uNsEy"]')).not.toBeNull()
     expect(host.textContent).toContain(FRIEND_NAME)
-    expect(host.textContent).toContain('参加者をCSVで書き出す')
+    expect(host.textContent).toContain('CSVで書き出す')
     // 直リンクのaタグは無く、押すと認証付きで取る（#1053）。
     expect(csvLinks()).toEqual([])
     const callsBefore = net.calls.length
-    await act(async () => { csvButton('参加者をCSVで書き出す')!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await act(async () => { csvButton('CSVで書き出す')!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
     await flush()
     expect(net.calls.slice(callsBefore).some((call) => call.includes('/api/webinars/webinar-1/participants.csv'))).toBe(true)
   })

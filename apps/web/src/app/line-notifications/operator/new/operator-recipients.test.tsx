@@ -27,7 +27,7 @@ vi.mock('@/lib/api', () => ({
   ApiError: class extends Error {
     status?: number
   },
-  api: { lineNotifications: { operatorRules: { previewRecipients: (...args: unknown[]) => apiMocks.previewRecipients(...args) } } },
+  api: { notifications: { teams: { list: async () => ({ success: true, data: [] }) } }, lineNotifications: { operatorRules: { previewRecipients: (...args: unknown[]) => apiMocks.previewRecipients(...args) } } },
 }))
 
 import Page from './page'

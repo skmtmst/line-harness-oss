@@ -178,7 +178,7 @@ export default function ReferencePickerDialog({
       description={
         v8
           ? `ライブラリから最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚選べます。選んだ画像は、下で 1 枚ずつ使い方を決められます。`
-          : `ライブラリから最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚選びます。`
+          : `ライブラリから最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚選びます。生成した画像や取り込んだ画像がここに並びます。手元のファイルを選ぶこともできます。`
       }
       onCancel={onClose}
       error={error || undefined}
@@ -282,17 +282,10 @@ export default function ReferencePickerDialog({
                       </span>
                     ) : null}
                   </span>
-                  {v8 ? (
-                    <>
-                      <span className="truncate text-caption font-semibold text-ink">{referenceName(image)}</span>
-                      <span className="truncate text-nano text-ink-faint tabular-nums">{referenceSize(image, presets)}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="truncate text-caption font-semibold text-ink">{projectNames.get(image.projectId) ?? '—'} #{image.sequence}</span>
-                      <span className="truncate text-nano text-ink-faint">{tileCaption(image, presets)}</span>
-                    </>
-                  )}
+                  <>
+                    <span className="truncate text-caption font-semibold text-ink">{referenceName(image)}</span>
+                    <span className="truncate text-nano text-ink-faint tabular-nums">{referenceSize(image, presets)}</span>
+                  </>
                 </button>
               )
             })}
@@ -323,7 +316,7 @@ export default function ReferencePickerDialog({
                     {BANNER_REFERENCE_MODES.map((mode) => (
                       <RadioCard
                         key={mode}
-                        inline
+                        variant="row"
                         name={`${uid}-usage-${reference.imageId}`}
                         value={mode}
                         checked={reference.mode === mode}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useId, useState } from 'react'
+import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
@@ -17,6 +18,11 @@ export interface ReferralQrRoute {
    * `null` は未登録 ref など有効・無効の概念が無い行で、従来どおり出す。
    */
   isActive: boolean | null
+  /**
+   * entry_routes の ID。あるときだけ印刷用 PDF を出せる（板 `GtI4Y`）。
+   * 未登録 ref には ID が無いので PNG だけになる。
+   */
+  id?: string
 }
 
 /**
@@ -34,6 +40,7 @@ export default function ReferralQrModal({
   onClose: () => void
 }) {
   const [copied, setCopied] = useState(false)
+  const [pdfState, setPdfState] = useState<'idle' | 'working' | 'failed'>('idle')
   const titleId = useId()
   const panelRef = useOverlayFocus(true, onClose)
   const stopped = route.isActive === false
@@ -45,9 +52,32 @@ export default function ReferralQrModal({
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
+  /*
+   * 印刷用PDFはサーバーで作る（板 `GtI4Y`）。止めた経路は409で断られる。
+   * ID の無い未登録 ref では出さない（PNG だけになる）。
+   */
+  const downloadPdf = async () => {
+    if (!route.id || stopped) return
+    setPdfState('working')
+    try {
+      const blob = await api.entryRoutes.qrPdf(route.id)
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = objectUrl
+      anchor.download = `qr-${route.refCode}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(objectUrl)
+      setPdfState('idle')
+    } catch {
+      setPdfState('failed')
+    }
+  }
   return (
+    <div data-design-node="GtI4Y" className="contents">
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-card bg-canvas p-6 shadow-overlay">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} data-design-node="GtI4Y" className="w-full max-w-md rounded-card bg-canvas p-6 shadow-overlay">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-medium text-ink-faint">リファラルリンク・QRコード</p>
@@ -72,12 +102,13 @@ export default function ReferralQrModal({
               {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}
               <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-card border border-hairline bg-canvas p-2" />
               <Button variant="primary" href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 w-full">
-                QRコードをダウンロード
+                PNGを保存
               </Button>
             </div>
           </>
         )}
       </div>
+    </div>
     </div>
   )
 }

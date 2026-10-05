@@ -344,3 +344,85 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     expect(count('hq_templates')).toBe(0);
   });
 });
+
+describe('V8 ひな形の分類と複製', () => {
+  test('分類を作成・変更し、別統括を拒否し、外してもひな形を残す', async () => {
+    const f = await request('/folders','POST',{name:'季節'}); expect(f.status).toBe(201);
+    expect((await request('/folders','POST',{name:'季節'})).status).toBe(409);
+    const id=f.body.data.id;
+    const changed=await request(`/folders/${id}`,'PATCH',{name:'お知らせ',expectedRevision:1}); expect(changed.status).toBe(200);
+    expect((await request(`/folders/${id}`,'PATCH',{name:'古い変更',expectedRevision:1})).status).toBe(409);
+    const t=await request('','POST',{requestId:crypto.randomUUID(),type:'tag',name:'常連',definition,folderId:id}); expect(t.status).toBe(201);
+    expect(t.body.data.template.folder_id).toBe(id);
+    expect((await request(`/folders/${id}`,'DELETE',{expectedRevision:2})).status).toBe(200);
+    expect((await request(`/${t.body.data.template.id}`)).body.data.template.folder_id).toBeNull();
+    expect((await request('/folders')).body.data).toEqual([]);
+    expect((await request('','POST',{requestId:crypto.randomUUID(),type:'tag',name:'不正',definition,folderId:id})).status).toBe(422);
+  });
+  test('専用の複製口で元の内容を残し、再送でも同じ複製を返す', async () => {
+    const t=await create(), body={name:'常連のコピー',expectedRevision:t.revision,requestId:crypto.randomUUID()};
+    const copy=await request(`/${t.id}/duplicate`,'POST',body); expect(copy.status).toBe(201);
+    expect(copy.body.data.template.id).not.toBe(t.id); expect(copy.body.data.definition).toEqual((await request(`/${t.id}`)).body.data.definition);
+    expect(await request(`/${t.id}/duplicate`,'POST',body)).toEqual(copy);
+    expect(count('hq_templates')).toBe(2);
+    expect((await request(`/${t.id}/duplicate`,'POST',{...body,expectedRevision:0})).status).toBe(409);
+  });
+});
+
+describe('HQ folders authority', () => {
+  test('separates tenants and denies viewers and read-only editors', async () => {
+    const created=await request('/folders','POST',{name:'案内'}); expect(created.status).toBe(201);
+    const id=created.body.data.id;
+    sql.exec("INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES ('other-owner','他社管理者','owner','fixture-other','tenant-b')");
+    staff={...staff,id:'other-owner',tenantId:'tenant-b'};
+    expect((await request('/folders')).body.data).toEqual([]);
+    expect((await request(`/folders/${id}`,'PATCH',{name:'他社',expectedRevision:1})).status).toBe(404);
+    staff={...staff,id:'owner',tenantId:'tenant-a',role:'staff'};
+    expect((await request('/folders')).status).toBe(403);
+    staff={...staff,role:'owner',readOnly:true};
+    expect((await request('/folders','POST',{name:'閲覧のみ'})).status).toBe(403);
+  });
+});
+
+describe('V8 scenario templates',()=>{
+  const scenario={schemaVersion:1,scenario:{name:'3日間の案内',description:null},steps:[{id:'step-1',delayMinutes:0,messageType:'text',messageContent:'ようこそ'},{id:'step-2',delayMinutes:1440,messageType:'text',messageContent:'二日目の案内'}]};
+  test('save/replay/list, distribute inactive drafts, retry once and reject stale contents',async()=>{
+    const body={type:'scenario',name:'案内',definition:scenario,requestId:crypto.randomUUID()};
+    const first=await request('','POST',body);expect(first.status,JSON.stringify(first.body)).toBe(201);
+    expect(first.body.data.template.template_type).toBe('scenario');expect(await request('','POST',body)).toEqual(first);
+    expect((await request('?type=scenario')).body.data).toHaveLength(1);expect((await request('?type=template')).body.data).toHaveLength(0);
+    const id=first.body.data.template.id,p=await preflight(id,['a1','a2']);
+    const sent=await execute(id,p);expect(sent.status).toBe(200);expect(sent.body.data.status).toBe('completed');
+    expect((await execute(id,p)).body.data).toEqual(sent.body.data);
+    const targets=sql.prepare('SELECT id,is_active FROM scenarios').all() as {id:string;is_active:number}[];
+    expect(targets).toHaveLength(2);expect(targets.every(s=>s.is_active===0)).toBe(true);expect(count('scenario_steps')).toBe(4);
+    expect(count('friend_scenarios')).toBe(0);
+    const second=await preflight(id,['a1']);sql.prepare("UPDATE scenario_steps SET message_content='変更済み' WHERE scenario_id=? AND step_order=0").run(targets[0].id);
+    const conflict=await execute(id,second);expect(conflict.body.data.stores[0].status).toBe('version_conflict');
+  });
+  test('active duplicate offers alias only and invalid steps cannot save',async()=>{
+    sql.exec("INSERT INTO scenarios(id,name,trigger_type,is_active,line_account_id) VALUES ('active','3日間の案内','manual',1,'a1')");
+    const created=await request('','POST',{type:'scenario',name:'案内',definition:scenario,requestId:crypto.randomUUID()});
+    const p=await preflight(created.body.data.template.id,['a1']);expect(p.stores[0].items[0].allowedModes).toEqual(['alias']);
+    expect((await execute(created.body.data.template.id,p,selections(p,'overwrite'))).body.data.stores[0].status).toBe('failed');
+    const fresh=await preflight(created.body.data.template.id,['a1']);expect((await execute(created.body.data.template.id,fresh,selections(fresh,'alias'))).body.data.status).toBe('completed');
+    expect(sql.prepare("SELECT is_active FROM scenarios WHERE id='active'").get()).toEqual({is_active:1});
+    expect((await request('','POST',{type:'scenario',name:'不正',definition:{...scenario,steps:[{...scenario.steps[0],delayMinutes:-1}]},requestId:crypto.randomUUID()})).status).toBe(422);
+  });
+});
+
+describe('V8 account wording',()=>{
+ test('preflight stores each wording, distribution and retry use it while source stays unchanged',async()=>{
+  const source={schemaVersion:1,template:{id:'hq-authored-message',name:'ご案内',category:'general',messageType:'text',messageContent:'原本の案内',carouselActionsJson:null,carouselTapLimitMode:'none',carouselTapLimitText:null,questionJson:null,questionStatus:'draft'},media:[]};
+  const created=await request('','POST',{type:'template',name:'ご案内',definition:source,requestId:crypto.randomUUID()});
+  expect(created.status).toBe(201);const id=created.body.data.template.id;
+  const checked=await request(`/${id}/preflight`,'POST',{accountIds:['a1','a2'],textOverrides:[{accountId:'a1',text:'本店の案内'},{accountId:'a2',text:'支店の案内'}]});
+  expect(checked.status,JSON.stringify(checked.body)).toBe(200);expect(checked.body.data.stores[0].textOverride).toBe('本店の案内');
+  expect(()=>sql.prepare('UPDATE hq_template_preflights SET text_override=? WHERE id=?').run('後から変更',sql.prepare('SELECT id FROM hq_template_preflights LIMIT 1').pluck().get())).toThrow('HQ_TEXT_OVERRIDE_IMMUTABLE');
+  const sent=await execute(id,checked.body.data);expect(sent.status,JSON.stringify(sent.body)).toBe(200);expect(sent.body.data.status).toBe('completed');
+  expect(sql.prepare('SELECT line_account_id,message_content FROM templates ORDER BY line_account_id').all()).toEqual([{line_account_id:'a1',message_content:'本店の案内'},{line_account_id:'a2',message_content:'支店の案内'}]);
+  expect((await execute(id,checked.body.data)).body.data).toEqual(sent.body.data);expect(count('templates')).toBe(2);
+  expect((await request(`/${id}`)).body.data.definition.template.messageContent).toBe('原本の案内');
+  for(const textOverrides of [[{accountId:'b1',text:'範囲外'}],[{accountId:'a1',text:''}],[{accountId:'a1',text:'1'},{accountId:'a1',text:'2'}]]) expect((await request(`/${id}/preflight`,'POST',{accountIds:['a1'],textOverrides})).status).toBe(422);
+ });
+});

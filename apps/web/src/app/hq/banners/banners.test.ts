@@ -41,8 +41,8 @@ describe('統括 バナー生成', () => {
     expect(projectPage).not.toContain('<Header')
   })
 
-  it('L 一覧型の帯の順: タブ行 → 数値カード帯 → 案内帯 → 一覧本体', () => {
-    const order = ['<BannerTabs', '<BannerKpis', '<BannerNote', '<ProjectsSection']
+  it('V8（板 B9ZAr・W5Wxr）の帯の順: 数値カード帯 → 案内帯 → タブ行 → 一覧本体（操作と見るは左列）', () => {
+    const order = ['<BannerKpis', '<BannerNote', '<BannerTabs', '<ProjectsSection']
     const positions = order.map((needle) => listPage.indexOf(needle))
     expect(positions.every((p) => p >= 0)).toBe(true)
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)
@@ -72,7 +72,7 @@ describe('統括 バナー生成', () => {
   it('保存・実行は下部追従バーにしか置かない', () => {
     expect(projectPage).toContain('<StickyBar')
     expect(projectPage).toContain('生成する（{input.count}枚）')
-    expect(projectPage).toContain('残りをやめる')
+    expect(projectPage).toContain('生成をやめる')
     expect(projectPage).toContain('条件をクリア')
     expect(panel).not.toMatch(/生成する/)
   })
@@ -163,11 +163,14 @@ describe('統括 バナー生成', () => {
 
   it('参照画像を選ぶ（★BG-C `cOgWE`）: 複数選択して使い方つきで返す', () => {
     const picker = read('../../../components/hq/banners/reference-picker-dialog.tsx')
+    // 板IDは承認時に ★V8 `UcBQ5` から ★BG-C `cOgWE` へ改名した（同じダイアログ）
     expect(picker).toContain('designNode="cOgWE"')
     expect(picker).toContain('aria-multiselectable="true"')
     expect(picker).toContain('data-design-node="JOi8G"')
     expect(picker).toContain('選んだ画像の使い方')
     expect(picker).toContain('枚を使う')
+    expect(picker).toContain('この画像を使う')
+    expect(picker).toContain('ファイルを選ぶ')
     // 手元のファイルはプロジェクトへ取り込んでから参照にする（ライブラリにも残る）
     expect(projectPage).toContain('const uploadReference = async (file: File)')
     expect(projectPage).toContain('if (uploaded) addReference(uploaded)')

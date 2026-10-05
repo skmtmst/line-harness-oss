@@ -40,7 +40,7 @@ export default {
   },
   legal: {
     approved: true,
-    effectiveDate: "2026-10-03",
+    effectiveDate: "2026-10-04",
     retentionDays: DATA_RETENTION_DAYS,
     retention: `解約または無料体験の終了から${DATA_RETENTION_DAYS}日間はお客様のデータを保存し、その後に削除します。${DATA_RETENTION_DAYS}日の間にご連絡いただければ、それより早い削除にも対応します。`,
     overseasProcessing:

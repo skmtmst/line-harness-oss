@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => ({
   getFriendByLineUserIdForAccount: vi.fn(),
+  getPublicationThirtyDayViews: vi.fn(async () => new Map()),
   // 重複と報酬の決まりは本物でなく通す（重複なし・5pt固定）。
   // 本物は nen-photo-duplicate-reward-817.test.ts で見る。
   findRewardedAdoptedDuplicate: vi.fn(async () => null),

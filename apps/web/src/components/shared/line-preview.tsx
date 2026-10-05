@@ -146,3 +146,41 @@ export default function LinePreview({
     </section>
   )
 }
+
+/** cfVyj の受信メッセージ。日時・送り主・本文をそのまま渡す。 */
+export function LinePreviewMessage({ accountName, avatar, time, children }: {
+  accountName: string; avatar: ReactNode; time: string; children: ReactNode
+}) {
+  return <div className={styles.messageRow}>
+    <span className={styles.senderAvatar}>{avatar}</span>
+    <div className={styles.senderBody}>
+      <span className={styles.senderName}>{accountName}</span>
+      <div className={styles.bubbleRow}>
+        <div className={styles.bubble}>
+          <svg className={styles.tail} viewBox="0 0 10 8" aria-hidden="true"><path d="M8 0 0 6 10 8Z" fill="currentColor" /></svg>
+          <div className={styles.bubbleBody}><span className={styles.bubbleText}>{children}</span></div>
+        </div>
+        <span className={styles.messageTime}>{time}</span>
+      </div>
+    </div>
+  </div>
+}
+
+/** cfVyj の商品カード。操作は必ず呼び出し側から渡す。 */
+export function LinePreviewCard({ imageUrl, title, description, price, time, actions }: {
+  imageUrl: string; title: string; description: string; price: string; time: string;
+  actions: Array<{ label: string; onClick: () => void; secondary?: boolean }>
+}) {
+  return <div className={styles.cardRow}>
+    <div className={styles.productCard}>
+      <div className={styles.productImage} role="img" aria-label={title} style={{ backgroundImage: `url(${JSON.stringify(imageUrl)})` }} />
+      <div className={styles.productCopy}>
+        <span className={styles.productTitle}>{title}</span>
+        <span className={styles.productDescription}>{description}</span>
+        <span className={styles.priceRow}><span className={styles.price}>{price}</span><span className={styles.tax}>税込</span></span>
+      </div>
+      {actions.map(action => <button key={action.label} type="button" className={`${styles.productAction} ${action.secondary ? styles.secondaryAction : ''}`} onClick={action.onClick}>{action.label}</button>)}
+    </div>
+    <span className={styles.messageTime}>{time}</span>
+  </div>
+}

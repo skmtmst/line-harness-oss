@@ -4,6 +4,8 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const NOTIFICATION_SCREEN = fs.readFileSync(path.join(__dirname, 'notifications-v8.tsx'), 'utf8')
+const CTA = fs.readFileSync(path.join(__dirname, 'cta-v8.tsx'), 'utf8')
 const NOTIFICATIONS = fs.readFileSync(
   path.join(__dirname, '..', '..', '..', 'components', 'webinars', 'webinar-notifications.tsx'),
   'utf8',
@@ -15,21 +17,22 @@ describe('V6 ウェビナー通知・CTAの取得一本化の契約', () => {
     expect(PAGE).not.toContain('webinarApi.notifications(')
     expect(NOTIFICATIONS.match(/webinarApi\.notifications\(/g)).toHaveLength(1)
     expect(NOTIFICATIONS).toContain('onLoaded?.({ settings:')
-    expect(PAGE).toContain('<WebinarNotifications key={notifAttempt} webinarId={webinarId}')
-    expect(PAGE).toContain('onLoaded={handleNotificationsLoaded}')
+    expect(NOTIFICATION_SCREEN).toContain('<WebinarNotifications webinarId={webinarId}')
+    expect(NOTIFICATION_SCREEN).toContain('onLoaded={handleLoaded}')
     /* 段を畳まないので、未保存の印と保存操作を親の固定バーへ渡す。 */
-    expect(PAGE).toContain('onDirtyChange={onDirtyChange}')
-    expect(PAGE).toContain('registerSave={registerSave}')
+    expect(NOTIFICATION_SCREEN).toContain('onDirtyChange={setNotificationDirty}')
+    expect(NOTIFICATION_SCREEN).toContain('registerSave={registerNotificationSave}')
   })
 
   it('CTAの取得口は子の編集タブの1か所だけ', () => {
-    expect(PAGE.match(/webinarApi\.ctas\(/g)).toHaveLength(1)
-    expect(PAGE).toContain('onCtasLoaded?.(res.data)')
-    expect(PAGE).toContain('<CtasTab webinarId={webinarId} durationSeconds={durationSeconds} forms={forms} formsState={registrationFormState} onRetryForms={loadRegistrationForms} onCtasLoaded={handleCtasLoaded} />')
+    expect(PAGE).not.toContain('webinarApi.ctas(')
+    expect(CTA.match(/webinarApi\.ctas\(/g)).toHaveLength(1)
+    expect(CTA).toContain('onCtasReport?.(res.data)')
+    expect(PAGE).toContain('onCtasReport={handleCtasReport}')
   })
 
   it('保存したら取り直しのGETを挟まず親へ流す', () => {
-    expect(PAGE).toContain('onCtasLoaded?.(sorted)')
+    expect(CTA).toContain('onCtasReport?.(next)')
     expect(NOTIFICATIONS).toContain('await load()')
   })
 })

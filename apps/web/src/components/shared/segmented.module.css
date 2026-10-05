@@ -76,4 +76,8 @@
 [data-theme='v8'] .item {
   transition: color var(--motion-fast) var(--motion-ease-out);
 }
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .root { background: var(--color-shell); box-shadow: none; }
+[data-theme='v8'] .item { line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 }

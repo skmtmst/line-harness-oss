@@ -168,7 +168,7 @@ export default function LiffDateTimePreview({
                       >
                         <span className="text-xs">{formatLiffWeekday(date)}</span>
                         <span className="text-sm font-bold whitespace-nowrap">{formatLiffMonthDay(date)}</span>
-                        {!open && <span className="text-[11px]">満席</span>}
+                        {!open && <span className="text-micro">満席</span>}
                       </button>
                     )
                   })}
@@ -270,7 +270,7 @@ function CalendarPreview({
                 }`}
               >
                 <span className="font-bold">{Number(date.slice(8, 10))}</span>
-                <span className="flex h-4 items-center text-[11px] leading-none">
+                <span className="flex h-4 items-center text-micro leading-none">
                   {open ? (
                     <span className={active ? 'text-on-accent' : 'text-accent-deep'}>●</span>
                   ) : isClosed ? (

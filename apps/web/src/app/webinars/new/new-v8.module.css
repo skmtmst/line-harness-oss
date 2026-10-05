@@ -103,8 +103,10 @@
 /* 本体2列：左の設定・右の見え方（幅 340〜380・左に細い線）。 */
 .body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 0;
+  margin: 0 -24px;
+  border-top: 1px solid var(--color-hairline);
   align-items: start;
   min-width: 0;
 }
@@ -116,11 +118,12 @@
   min-width: 0;
 }
 
+/* 板 `j7PP04`「段」：余白 20（四方）。選ぶカード・選ぶ欄は共通部品（M10）。 */
 .card {
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
-  padding: 20px 24px;
+  padding: 20px;
 }
 
 .cardTitle {
@@ -194,7 +197,7 @@
 .previewCol {
   min-width: 0;
   border-left: 1px solid var(--color-hairline);
-  padding-left: 24px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -237,3 +240,6 @@
     padding-top: 16px;
   }
 }
+
+.form { padding: 24px 28px; }
+@container (max-width: 1052px) { .previewCol { display: none; } }

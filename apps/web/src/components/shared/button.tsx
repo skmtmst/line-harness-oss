@@ -15,7 +15,7 @@ type CommonProps = {
    * `#976` U077/U084: 危険操作は共通ボタンの1役割として持ち、
    * 画面ごとの直書き赤（濃さがバラバラだった）を1本にする。
    */
-  variant?: 'primary' | 'secondary' | 'danger'
+  variant?: 'primary' | 'secondary' | 'danger' | 'text'
   /**
    * `compact` は一覧の行内・絞り込み行など、32px級の操作と高さを
    * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は

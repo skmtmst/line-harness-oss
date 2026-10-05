@@ -5,8 +5,9 @@
  * 1152 は `KdFRI`、状態別は `rRk0C`、閲覧のみは `v9JWQ`）。
  *
  * データの口は v7（tabs.tsx の AffiliatorsTab）と同じ。ここでは見せ方だけを
- * V8-B の板に合わせる。フォルダの列はアフィリエイターに割り当てる API が
- * 無いので描かない（DEVIN-QUESTIONS に記録）。
+ * V8-B の板に合わせる。板 `nJlxX`・`v9JWQ` の左のフォルダの棚（数・
+ * 未分類・フォルダを追加）は、アフィリエイターを分ける API が無いので
+ * 描かない。止めた日・1件ごとの固定額も同じ理由で出さない。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -19,6 +20,7 @@ import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import Pagination from '@/components/shared/pagination'
 import { MoreAction } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifyToast } from '@/components/shared/toast'
@@ -37,7 +39,7 @@ import { type ConfirmedState } from './offer-kpi'
 import { currentAffiliateSettlementPeriod } from './payment-tab'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError, BulkBar } from './v8-shared'
 import AffiliateDrawerV8 from './v8-drawer'
-import styles from './list-v8.module.css'
+import './list-v8.css'
 
 const PAGE_SIZES = [20, 50, 100]
 
@@ -62,6 +64,18 @@ function planText(row: AffiliateItem): string {
   if (!row.isActive) return '止めている'
   if (row.commissionRate > 0) return `売上の ${row.commissionRate}%`
   return '報酬なし（計測のみ）'
+}
+
+/** 締めの月の1つ前の集計期間（日本時間の月初〜月末）。 */
+export function previousAffiliateSettlementPeriod(periodFrom: string): { periodFrom: string; periodTo: string } {
+  const JST_MS = 9 * 60 * 60 * 1000
+  const wall = new Date(new Date(periodFrom).getTime() + JST_MS)
+  const year = wall.getUTCFullYear()
+  const month = wall.getUTCMonth()
+  return {
+    periodFrom: new Date(Date.UTC(year, month - 1, 1) - JST_MS).toISOString(),
+    periodTo: new Date(Date.UTC(year, month, 1) - JST_MS - 1).toISOString(),
+  }
 }
 
 export default function AffiliatesTabV8({
@@ -92,6 +106,7 @@ export default function AffiliatesTabV8({
   const [paymentTotal, setPaymentTotal] = useState<number | null>(null)
   const [paymentState, setPaymentState] = useState<ConfirmedState>('loading')
   const [monthlyConversions, setMonthlyConversions] = useState<number | null>(null)
+  const [monthlyDelta, setMonthlyDelta] = useState<number | null>(null)
   const [monthlyState, setMonthlyState] = useState<ConfirmedState>('loading')
 
   // ── 見せ方 ────────────────────────────────────────────────────────────────
@@ -221,19 +236,28 @@ export default function AffiliatesTabV8({
   const loadMonthly = useCallback(async () => {
     setMonthlyState('loading')
     try {
-      const res = await api.affiliates.allReport({
-        startDate: settlementPeriod.periodFrom,
-        endDate: settlementPeriod.periodTo,
-      })
+      const prev = previousAffiliateSettlementPeriod(settlementPeriod.periodFrom)
+      const [res, prevRes] = await Promise.all([
+        api.affiliates.allReport({
+          startDate: settlementPeriod.periodFrom,
+          endDate: settlementPeriod.periodTo,
+        }),
+        api.affiliates.allReport({
+          startDate: prev.periodFrom,
+          endDate: prev.periodTo,
+        }),
+      ])
       if (!res.success) throw new Error('monthly report failed')
-      setMonthlyConversions(
-        (res.data as unknown as Array<{ totalConversions: number }>)
-          .reduce((sum, row) => sum + row.totalConversions, 0),
-      )
+      const total = (arr: unknown) => (arr as Array<{ totalConversions: number }>)
+        .reduce((sum, row) => sum + row.totalConversions, 0)
+      const current = total(res.data)
+      setMonthlyConversions(current)
+      setMonthlyDelta(prevRes.success ? current - total(prevRes.data) : null)
       setMonthlyState('ready')
     } catch {
       if (!cancelledRef.current) {
         setMonthlyConversions(null)
+        setMonthlyDelta(null)
         setMonthlyState('error')
       }
     }
@@ -392,13 +416,16 @@ export default function AffiliatesTabV8({
           label="今月の成果"
           value={monthlyState === 'ready' ? monthlyConversions : null}
           unit="件"
-          sub={monthlyState === 'ready' ? '今月に起きた成果' : monthlyState === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
+          sub={monthlyState === 'ready'
+            ? (monthlyDelta == null
+              ? '今月に起きた成果'
+              : monthlyDelta === 0 ? '先月と同じ' : `先月より${monthlyDelta > 0 ? '+' : '−'}${formatNumber(Math.abs(monthlyDelta))}`)
+            : monthlyState === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
           info="今月（日本時間）に記録された成果の数です。認める・認めないに関わらず記録された分を数えます。"
         />
         <KpiCell
           label="今月の報酬"
-          value={paymentState === 'ready' ? paymentTotal : null}
-          unit="円"
+          value={paymentState === 'ready' && paymentTotal != null ? formatYen(paymentTotal) : null}
           sub={paymentState === 'ready' ? `承認待ち ${formatNumber(pendingCount)}件は入っていない` : paymentState === 'loading' ? '読み込んでいます' : '読み込めませんでした'}
           info="今回の締めで払う見込みの合計です。承認待ちの成果は確定していないので含みません。"
         />
@@ -417,7 +444,7 @@ export default function AffiliatesTabV8({
         </NoticeBar>
       ) : null}
 
-      <div className={styles.tools}>
+      <div className="af-list-tools">
         <Button
           type="button"
           variant="primary"
@@ -433,7 +460,7 @@ export default function AffiliatesTabV8({
           value={query}
           onChange={(value) => { setQuery(value); setPage(1) }}
           onClear={() => { setQuery(''); setPage(1) }}
-          className={styles.toolsSearch}
+          className="af-list-toolsSearch"
         />
         <FilterChip
           selected={filters.includes('active')}
@@ -455,7 +482,7 @@ export default function AffiliatesTabV8({
         >
           報酬あり
         </FilterChip>
-        <span className={styles.toolsSpacer} />
+        <span className="af-list-toolsSpacer" />
         <Select
           aria-label="よく使う絞り込み"
           value=""
@@ -495,12 +522,18 @@ export default function AffiliatesTabV8({
       ) : listState === 'zero' ? (
         <ZeroResultState onReset={resetConditions} />
       ) : (
-        <div className={styles.tableWrap}>
-          <div className={styles.tableScroll}>
-            <table className={styles.table}>
+        <div className="af-list-tableWrap">
+          <div className="af-list-tableScroll">
+            <table className={`af-list-table af-list-affiliateTable`}>
+              <colgroup>
+                <col className="af-list-checkColumn" /><col />
+                <col className="af-list-metricColumn" /><col className="af-list-metricColumn" />
+                <col className="af-list-metricColumn" /><col className="af-list-rewardColumn" />
+                <col className="af-list-actionsColumn" />
+              </colgroup>
               <thead>
                 <tr>
-                  <th className={styles.cellCheck}>
+                  <th className="af-list-cellCheck">
                     <Checkbox
                       aria-label="このページの全員を選ぶ"
                       checked={allChecked}
@@ -518,17 +551,17 @@ export default function AffiliatesTabV8({
                     />
                   </th>
                   <th>アフィリエイター</th>
-                  <th className={styles.numRight}>紹介リンク</th>
-                  <th className={styles.numRight}>友だち追加</th>
-                  <th className={styles.numRight}>成果</th>
-                  <th className={styles.numRight}>報酬</th>
-                  <th className={styles.numRight}>操作</th>
+                  <th className="af-list-numRight">紹介リンク</th>
+                  <th className="af-list-numRight">友だち追加</th>
+                  <th className="af-list-numRight">成果</th>
+                  <th className="af-list-numRight">報酬</th>
+                  <th className="af-list-numRight">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {pagedRows.map((row) => (
                   <tr key={row.id}>
-                    <td className={styles.cellCheck}>
+                    <td className="af-list-cellCheck">
                       <Checkbox
                         aria-label={`${row.name}を選ぶ`}
                         checked={selected.has(row.id)}
@@ -544,24 +577,24 @@ export default function AffiliatesTabV8({
                       />
                     </td>
                     <td>
-                      <div className={styles.personCell}>
-                        <button type="button" className={styles.personName} title={row.name} onClick={() => openDrawer(row.id, false)}>
+                      <div className="af-list-personCell">
+                        <button type="button" className="af-list-personName" title={row.name} onClick={() => openDrawer(row.id, false)}>
                           {row.name}
                         </button>
-                        <span className={styles.personCode} title={row.code}>{row.code}</span>
-                        <span className={styles.personPlan}>{planText(row)}</span>
-                        <span className={`${styles.statusBadge} ${row.isActive ? styles.statusOk : styles.statusNeutral}`}>
-                          <span className={styles.statusDot} aria-hidden="true" />
+                        <span className="af-list-personCode" title={row.code}>{row.code}</span>
+                        <span className="af-list-personPlan">{planText(row)}</span>
+                        <span className={`af-list-statusBadge ${row.isActive ? 'af-list-statusOk' : 'af-list-statusNeutral'}`}>
+                          <span className="af-list-statusDot" aria-hidden="true" />
                           {row.isActive ? '計測中' : '停止中'}
                         </span>
                       </div>
                     </td>
-                    <td className={styles.numRight}>{formatNumber(row.linkCount)}本</td>
-                    <td className={styles.numRight}>{formatNumber(row.friendAdds)}人</td>
-                    <td className={styles.numRight}><strong>{formatNumber(row.totalConversions)}件</strong></td>
-                    <td className={styles.numRight}><strong>{formatYen(row.rewardAmount)}</strong></td>
+                    <td className="af-list-numRight">{formatNumber(row.linkCount)}本</td>
+                    <td className="af-list-numRight">{formatNumber(row.friendAdds)}人</td>
+                    <td className="af-list-numRight"><strong>{formatNumber(row.totalConversions)}件</strong></td>
+                    <td className="af-list-numRight"><strong>{formatYen(row.rewardAmount)}</strong></td>
                     <td>
-                      <div className={styles.rowActions}>
+                      <div className="af-list-rowActions">
                         <Button type="button" onClick={() => openDrawer(row.id, false)}>
                           成果を見る
                         </Button>
@@ -603,7 +636,18 @@ export default function AffiliatesTabV8({
         </div>
       )}
 
-      <p className={styles.footNote}>
+      {listState === 'ready' ? (
+        <div className="pageFoot">
+          <p className="pageCount">
+            {shownRows.length === rows.length
+              ? `全 ${formatNumber(rows.length)}件`
+              : `${formatNumber(shownRows.length)}件 / 全 ${formatNumber(rows.length)}件`}
+          </p>
+          {pageCount > 1 ? <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} /> : null}
+        </div>
+      ) : null}
+
+      <p className="af-list-footNote">
         行の「…」から 成果を見る・紹介リンクをコピー・編集・紹介を止める。止めると、その人の紹介リンクからの成果を数えなくなります。
       </p>
 

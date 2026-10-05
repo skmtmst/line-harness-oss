@@ -1,0 +1,8 @@
+@layer properties, theme, base, components, utilities;
+.ops-tenants-page { min-width: 0; container-type: inline-size; }
+.ops-tenants-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.ops-tenants-metrics > div { min-width: 0; padding: 16px 20px; border-radius: var(--radius-none); box-shadow: none; }
+.ops-tenants-page table { table-layout: fixed; width: 100%; }
+.ops-tenants-page th, .ops-tenants-page td { padding: 12px 14px; font-size: 12px; }
+.ops-tenants-page th { white-space: nowrap; }
+@container (max-width: 1000px) { .ops-tenants-page th, .ops-tenants-page td { padding-inline: 8px; } .ops-tenants-page th:first-child { width: 26%; } }

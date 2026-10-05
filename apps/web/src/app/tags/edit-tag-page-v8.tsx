@@ -12,10 +12,14 @@ import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, describeSaveFailure, type TagDefinition, type TagDependencies } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import TargetMissing from '@/components/shared/target-missing'
 import Notice from '@/components/shared/notice'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import TagEditorV8 from './tag-editor-v8'
+import { describeTagDiff } from './edit/tag-conflict-diff'
 import {
   ArchivedTagEditor,
   DeleteDialog,
@@ -39,6 +43,20 @@ export default function EditTagPageV8() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [tagMissing, setTagMissing] = useState(false)
+  /*
+   * 閲覧のみ（`fkGUR`）は一覧と同じ境目——役割が取れるまでは
+   * 押せる見た目にしておく（最後の守りはサーバの 403）。
+   */
+  const staffRole = useStaffRole()
+  const canEdit = staffRole === null || canManageRole(staffRole)
+  /*
+   * 編集の競合（`xn95q`）。入力は捨てず、比べる・読み込むを
+   * 選んでもらう（reminders の k32cn と同じ形）。
+   */
+  const [conflictValues, setConflictValues] = useState<TagEditorValues | null>(null)
+  const [compareTarget, setCompareTarget] = useState<TagDefinition | null>(null)
+  const [compareBusy, setCompareBusy] = useState(false)
+  const [compareError, setCompareError] = useState('')
   /* 削除確認に出す参照件数。取れていないのに開いたら削除は押せない。 */
   const [dependencies, setDependencies] = useState<TagDependencies | null>(null)
   const [dependenciesStatus, setDependenciesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -116,9 +134,39 @@ export default function EditTagPageV8() {
       }
       await load()
     } catch (reason) {
-      setError(describeSaveFailure(reason))
+      // 409 は競合の帯へ出す（`xn95q`）。入力中の値は残す。
+      if (reason instanceof ApiError && reason.status === 409) {
+        setConflictValues(values)
+      } else {
+        setError(describeSaveFailure(reason))
+      }
     } finally {
       setSaving(false)
+    }
+  }
+
+  // `xn95q`「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
+  const reloadAfterConflict = async () => {
+    setCompareTarget(null)
+    setCompareError('')
+    setConflictValues(null)
+    setError('')
+    await load()
+  }
+
+  // `xn95q`「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
+  const openCompare = async () => {
+    if (compareBusy || !tagId || !selectedAccountId) return
+    setCompareBusy(true)
+    setCompareError('')
+    try {
+      const detail = await api.tags.definition(tagId, selectedAccountId)
+      if (!detail.success) throw new Error(detail.error)
+      setCompareTarget(detail.data)
+    } catch {
+      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+    } finally {
+      setCompareBusy(false)
     }
   }
 
@@ -187,12 +235,38 @@ export default function EditTagPageV8() {
 
   return (
     <>
+      {!canEdit ? (
+        <div className="border-accent bg-accent-soft rounded-card flex flex-wrap items-center gap-3 border p-4" data-design-node="fkGUR" role="note">
+          <p className="text-ink min-w-0 flex-1 text-sm">
+            閲覧のみで見ています。変える操作は管理者に頼んでください。
+          </p>
+        </div>
+      ) : null}
+      {conflictValues ? (
+        <div className="border-accent bg-accent-soft rounded-card flex flex-wrap items-center gap-3 border p-4" data-design-node="xn95q" role="alert">
+          <p className="text-ink min-w-0 flex-1 text-sm">
+            ほかの人が先に保存しました。
+            <span className="text-ink-secondary mt-0.5 block text-xs">
+              あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。
+            </span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
+              {compareBusy ? '比べています...' : '違いを比べる'}
+            </Button>
+            <Button type="button" variant="primary" onClick={() => void reloadAfterConflict()}>
+              最新を読み込んで続ける
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <TagEditorV8
         key={`${tag.id}:${tag.version ?? 1}`}
         mode="edit"
         groups={groups}
         tag={tag}
         accountId={selectedAccountId}
+        readOnly={!canEdit}
         initialApplyToExisting={retroactiveReference}
         initialRetroactiveOpen={retroactiveReference}
         referenceRetroactiveState={retroactiveReference}
@@ -208,6 +282,37 @@ export default function EditTagPageV8() {
         onDelete={() => setDeleteOpen(true)}
       />
       {deleteOpen && <DeleteDialog tag={tag} dependencies={dependencies} dependenciesStatus={dependenciesStatus} deleting={deleting} onCancel={() => setDeleteOpen(false)} onDelete={() => void remove()} />}
+      <ConfirmDialog
+        open={compareTarget !== null || compareError !== ''}
+        title="最新の保存と比べる"
+        description="あなたの入力と、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
+        confirmLabel="最新を読み込んで続ける"
+        busy={compareBusy}
+        error={compareError || undefined}
+        onConfirm={() => void reloadAfterConflict()}
+        onCancel={() => {
+          setCompareTarget(null)
+          setCompareError('')
+        }}
+      >
+        {compareTarget && conflictValues ? (
+          (() => {
+            const lines = describeTagDiff(conflictValues, compareTarget)
+            return lines.length === 0 ? (
+              <p className="text-ink-secondary mt-3 text-sm">違いは見つかりませんでした。そのまま読み込めます。</p>
+            ) : (
+              <ul className="mt-3 space-y-1.5 text-sm">
+                {lines.map((line, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <span aria-hidden className="text-accent-deep font-bold">・</span>
+                    <span className="text-ink">{line}</span>
+                  </li>
+                ))}
+              </ul>
+            )
+          })()
+        ) : null}
+      </ConfirmDialog>
     </>
   )
 }

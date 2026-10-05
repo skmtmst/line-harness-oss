@@ -189,29 +189,74 @@
   border-color: var(--color-status-danger);
 }
 
-/* ★BG-C `B3hdL4`「ルール3択」：行の中に丸とラベルだけを並べる形。
-   カードの枠・背景・内余白を外して行の高さに収める。列の作りは .card のまま。
-   丸みは枠と背景を外すので見えなくなる（打ち消さない）。
-   `[data-theme='v8'] .card` より強い指定にするため .card.inline で書く。 */
-.card.inline,
-[data-theme='v8'] .card.inline {
+}
+
+/* 正本 fNPdg / r3xz1W。v7 の行配置はそのまま。 */
+.topIcon { display: none; }
+[data-theme='v8'] .card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  height: auto;
+  min-height: 98px;
+  padding: 14px;
+  border: 0;
+  border-radius: 12px;
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+  background: var(--color-canvas);
+  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+}
+[data-theme='v8'] .topIcon { display: flex; height: 16px; width: 100%; color: var(--color-ink-secondary); }
+[data-theme='v8'] .topIcon svg { width: 16px; height: 16px; flex-shrink: 0; }
+[data-theme='v8'] .checked .topIcon { color: var(--color-accent-deep); }
+[data-theme='v8'] .body { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+[data-theme='v8'] .title { font-size: 13px; line-height: 20px; font-weight: 600; }
+[data-theme='v8'] .note { font-size: 12px; line-height: 18px; color: var(--color-ink-secondary); }
+[data-theme='v8'] .radio {
+  position: absolute; top: 14px; right: 14px;
+  width: 16px; height: 16px; margin: 0; border: 0;
+  outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px;
+  background: var(--color-canvas); box-shadow: none;
+}
+[data-theme='v8'] .radio:checked { background: var(--color-canvas); outline: 5px solid var(--color-accent-deep); outline-offset: -2.5px; box-shadow: none; }
+[data-theme='v8'] .radio:focus-visible { outline: 2px solid var(--color-action); outline-offset: 3px; }
+[data-theme='v8'] .checked, [data-theme='v8'] .checked:hover { background: var(--color-accent-soft); outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
+[data-theme='v8'] .disabled { background: var(--color-canvas-sunken); outline-color: var(--color-ink-disabled); }
+[data-theme='v8'] .disabled .radio { outline-color: var(--color-ink-disabled); }
+[data-theme='v8'] .invalid, [data-theme='v8'] .invalid .radio { outline-color: var(--color-status-danger); }
+
+[data-theme='v8'] .radio { border-radius: 999px; }
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .card { -webkit-font-smoothing: auto; }
+
+/*
+ * 変わり形：行（BHEl9 の素のラジオ行）。箱・選んだ面・上段の印なし。
+ * 丸 18・文字 13/400・間 8・縦は中身の高さ（fit-content）。
+ * 丸の輪郭（1.5px・選ぶと 5px の濃い緑）は v8 の .radio のまま。
+ * 箱（fNPdg/r3xz1W）の合格は変えない。
+ */
+.row {
+  display: flex;
+  flex-direction: row;
   align-items: center;
-  min-height: 0;
+  gap: 8px;
+  min-width: 0;
   padding: 0;
   border: 0;
-  background: none;
+  background: transparent;
+  cursor: pointer;
 }
-
-.card.inline:hover,
-[data-theme='v8'] .card.inline:hover {
-  background: none;
-}
-
-.card.inline.checked,
-.card.inline.checked:hover,
-[data-theme='v8'] .card.inline.checked,
-[data-theme='v8'] .card.inline.checked:hover {
-  border: 0;
-  background: none;
-}
-}
+.row:hover { background: transparent; }
+.row.checked, .row.checked:hover { border-color: transparent; background: transparent; }
+.row.disabled { background: transparent; }
+.row.invalid { border-color: transparent; }
+.row .topIcon { display: none; }
+.row .title { font-size: 13px; font-weight: 400; line-height: 20px; }
+[data-theme='v8'] .row .body { gap: 2px; }
+[data-theme='v8'] .row .radio { position: static; width: 18px; height: 18px; margin: 0; }
+[data-theme='v8'] .row:active { filter: none; }
+[data-theme='v8'] .row { -webkit-font-smoothing: auto; }

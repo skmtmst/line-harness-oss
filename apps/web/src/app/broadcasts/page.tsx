@@ -850,7 +850,7 @@ function BroadcastList() {
                           {broadcast.title}
                         </a>
                         {isDedup && (
-                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded-mini text-[10px] font-medium bg-info-bg text-info">
+                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded-mini text-nano font-medium bg-info-bg text-info">
                             複数アカウント
                           </span>
                         )}

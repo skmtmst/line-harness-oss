@@ -12,6 +12,9 @@ import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import AutomationListV8 from './list-v8'
+import AutomationTemplatesV8 from './templates-v8'
 import AutomationTemplateGallery from '@/components/automations/automation-template-gallery'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import Chip from '@/components/shared/chip'
@@ -198,7 +201,7 @@ function AutomationRowActions({
       {canManage ? (
         <>
           {/* #942 N-352: 編集・複製・保管を行から直接開けるようにする。 */}
-          <Button onClick={onEdit} disabled={busy} variant="secondary" size="compact" className="whitespace-nowrap">編集する</Button>
+          <Button onClick={onEdit} disabled={busy} variant="secondary" size="compact" className="whitespace-nowrap">編集</Button>
           <IconButton
             aria-label={`${automation.name}のその他操作`}
             aria-expanded={menuOpen}
@@ -278,6 +281,7 @@ export default function AutomationsPage() {
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const tab = useMergedTab(MERGED_TABS)
+  const theme = useAdminTheme()
   usePageTitle(tab === 'templates' ? '見本から作る' : 'オートメーション')
   const canManageAutomations = useCanManageAutomations()
   /* 監査 R128: 正本表に登録があるときだけ出す。無ければボタン自体を出さない。 */
@@ -510,6 +514,13 @@ export default function AutomationsPage() {
     }
   }
 
+  /*
+   * ★V8 切替（`LWQXd`・`c7dxp`）。全部のフックの後ろで枝分けするので、
+   * フックの順番は v7 と同じ。v7 の見た目は1画素も変えない。
+   */
+  if (theme === 'v8' && tab === 'templates') return <AutomationTemplatesV8 />
+  if (theme === 'v8') return <AutomationListV8 />
+
   if (tab === 'templates') {
     const activeCount = loadStatus === 'ready' ? automations.filter((item) => item.isActive).length : null
     const stoppedCount = loadStatus === 'ready' ? automations.filter((item) => !item.isActive).length : null
@@ -630,27 +641,27 @@ export default function AutomationsPage() {
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">動いているもの</p>
-          <p className="text-ink mt-1 text-2xl font-bold">
+        <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
+          <p className="text-xs font-medium text-ink">動いているもの</p>
+          <p className="text-ink mt-1 text-metric font-semibold">
             {/* 監査6 #674: 数字の見せ方は MetricValue に寄せる */}
             <MetricValue value={activeCount} unit="本" />
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">稼働中 {activeCount ?? '—'}本・止めているもの {stoppedCount ?? '—'}本</p>
         </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">今月の実行（この30日）</p>
-          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={automaticRuns ?? null} unit="回" /></p>
+        <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
+          <p className="text-xs font-medium text-ink">今月の実行（この30日）</p>
+          <p className="text-ink mt-1 text-metric font-semibold"><MetricValue value={automaticRuns ?? null} unit="回" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">分析の「使われ方」と同じ集計</p>
         </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">失敗した</p>
-          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={failedRuns ?? null} unit="回" /></p>
+        <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
+          <p className="text-xs font-medium text-ink">失敗した</p>
+          <p className="text-ink mt-1 text-metric font-semibold"><MetricValue value={failedRuns ?? null} unit="回" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">部分成功を含む・この30日</p>
         </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">減らせた手作業</p>
-          <p className="text-ink mt-1 text-2xl font-bold"><MetricValue value={estimatedHoursSaved} prefix="およそ" unit="時間" /></p>
+        <div className="bg-canvas rounded-card border-hairline border px-5 py-4">
+          <p className="text-xs font-medium text-ink">減らせた手作業</p>
+          <p className="text-ink mt-1 text-metric font-semibold"><MetricValue value={estimatedHoursSaved} prefix="およそ" unit="時間" /></p>
           <p className="text-ink-faint mt-0.5 text-xs">1回30秒として計算しています</p>
         </div>
       </KpiCollapse>
@@ -725,13 +736,15 @@ export default function AutomationsPage() {
             title={automations.length === 0
               ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
               : '条件に合うオートメーションはありません。'}
-            description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
-            action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : undefined}
+            description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。見本から作ると、よくある決めごと（友だち追加のお礼など）がすぐ始められます。' : '検索や絞り込みの条件を外すと、すべて出ます。'}
+            action={automations.length === 0
+              ? (tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : undefined)
+              : <Button variant="secondary" onClick={() => { setSearchQuery(''); setPage(1) }}>条件を外す</Button>}
           />
         </div>
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
-          <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
+          <div style={{ paddingBlock: 13 }} className="grid grid-cols-6 gap-3 bg-table-head px-5 text-xs font-semibold text-ink-secondary">
             <span>きっかけ</span><span>だれに（条件）</span><span>すること</span><span>この30日</span><span>状態</span><span aria-hidden />
           </div>
           {pagedAutomations.map((automation) => (
@@ -744,7 +757,7 @@ export default function AutomationsPage() {
               <p className="truncate text-ink-secondary" title={automation.actions.map((action) => automationActionLabel(action.type)).join('、')}>{automation.actions.map((action) => automationActionLabel(action.type)).join('、') || '処理なし'}</p>
               <div>
                 <span className="text-ink tabular-nums">{formatNumber(automation.executionCount30d)}回</span>
-                {automation.failureCount30d > 0 ? <span className="text-danger block text-[11px]">失敗が{automation.failureCount30d}回</span> : null}
+                {automation.failureCount30d > 0 ? <span className="text-danger block text-micro">失敗が{automation.failureCount30d}回</span> : null}
               </div>
               {/* #670 25: 状態は他画面と同じ札(Chip)で出す。素テキストだと列の中で浮く。 */}
               <span><Chip tone={automation.isActive ? 'ok' : 'neutral'}>{automation.isActive ? '動いています' : '止めています'}</Chip></span>

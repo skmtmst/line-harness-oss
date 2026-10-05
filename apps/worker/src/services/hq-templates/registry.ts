@@ -1,3 +1,4 @@
+import { unsupportedHqTemplateAdapter } from './contract.js';
 import type { HqTemplateAdapter, HqTemplateType, HqTemplateAuthority } from './contract.js';
 import { formHqTemplateAdapter } from './form.js';
 import { richMenuHqTemplateAdapter } from './rich-menu.js';
@@ -11,6 +12,7 @@ export const hqTemplateAdapterRegistry: HqTemplateAdapterRegistry = Object.freez
   template: templateHqTemplateAdapter,
   rich_menu: richMenuHqTemplateAdapter,
   form: formHqTemplateAdapter,
+  scenario: unsupportedHqTemplateAdapter('scenario'),
 });
 
 export function getHqTemplateAdapter(type: HqTemplateType, binding?: { db: D1Database; authority: HqTemplateAuthority }): HqTemplateAdapter {

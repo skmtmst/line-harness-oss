@@ -16,6 +16,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import {
   api,
@@ -36,7 +37,6 @@ import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-i
 import { onlyWhenVisible } from '@/lib/visible-polling'
 import OtpInput from '@/components/shared/otp-input'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
-import { operationControlSummary } from './control-summary'
 import EmergencyControlV8, { type EmergencyControlV8Handle } from './control-v8'
 import {
   CAPABILITY_LABEL as RESTORE_DRIFT_CAPABILITY_LABEL,
@@ -51,10 +51,11 @@ import releaseLog from '@/generated/release-log-summary.json'
 import { useAccount } from '@/contexts/account-context'
 import { collectRecentUpdates, RECENT_UPDATES_LIMIT, releaseEntryCount, type UpdateRelease } from './update-history'
 
+/** 板 Y4LkX1 の並び。健全性チェック・更新履歴・緊急コントロール。 */
 const TABS = [
   { key: 'health', label: '健全性チェック' },
-  { key: 'control', label: '緊急コントロール' },
   { key: 'history', label: '更新履歴' },
+  { key: 'control', label: '緊急コントロール' },
 ]
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
@@ -243,26 +244,38 @@ type HealthCheckId = 'line' | 'quota' | 'api' | 'webhook' | 'delivery' | 'friend
 
 interface HealthCheckItem {
   id: HealthCheckId
-  label: string
-  detail: string
+  /** 板 Y4LkX1 の1段目の言葉。 */
+  title: string
+  /** 板の2段目の言葉。LINEだけはアカウントの実数を入れる。 */
+  sub: string
   severity: OperationSeverity
-  icon: string
-  description: string
+  /** 板の「判定の見方」の言葉。 */
   threshold: string
   href: string
   observedAt: string | null
+  /**
+   * 前回の確認が古い（A32-01）。
+   *
+   * 古い「正常」を現在の判定として出さない。板どおり「古い確認」の
+   * 札にし、一度も確かめていない（結果が無い）「未確認」とは分ける。
+   */
+  stale: boolean
 }
 
-const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon' | 'description' | 'threshold' | 'href'>> = [
-  { id: 'line', label: 'LINE接続', icon: 'L', description: 'LINEのアカウントとつながっているか', threshold: '応答がない状態が5分つづくと「エラー」', href: '/accounts' },
-  { id: 'quota', label: '月間配信数', icon: '↗', description: 'LINEとHarness両方の上限に近づいていないか（送れる数は少ない方）', threshold: '80%で「注意」・95%・予定分の超過で「エラー」', href: '/broadcasts' },
-  { id: 'api', label: 'API・外部連携', icon: '↔', description: '管理画面とEC連携が動いているか', threshold: '応答なし・取り込み0件で「注意」', href: '/ec-commerce' },
-  { id: 'webhook', label: 'Webhook', icon: 'W', description: '合言葉が入り、送信が通っているか', threshold: '合言葉なしが1本でもあれば「注意」', href: '/webhooks' },
-  { id: 'delivery', label: '配信処理', icon: '▷', description: '予約した配信が時刻どおりに出ているか', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/broadcasts/reserved' },
-  { id: 'friends', label: '友だち変化', icon: '人', description: '急に減っていないか（同曜日・28日の基準と比較）', threshold: '1日で5%以上・10人以上減ると「注意」', href: '/friends' },
-  { id: 'infra', label: '裏の仕組み', icon: '▣', description: 'データの置き場（DB・保管庫・順番待ち）へ読み書きできるか', threshold: '遅い・失敗が3回続くと「エラー」', href: '/emergency?tab=health' },
-  { id: 'credential', label: '鍵の期限', icon: '鍵', description: 'LINEの鍵の期限が近づいていないか', threshold: '14日前で「注意」・期限切れで「エラー」', href: '/accounts' },
-  { id: 'monitoring', label: '見張り自体', icon: '◎', description: '5分ごとの確認が動いているか', threshold: '10分止まると「エラー」', href: '/emergency?tab=health' },
+/**
+ * 板 Y4LkX1 の9行。並びも板どおりにする。
+ * 見出し・補足・判定の見方の言葉は板が正本。
+ */
+const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'title' | 'sub' | 'threshold' | 'href'>> = [
+  { id: 'line', title: 'LINE のアカウントとつながっているか', sub: 'アカウント', threshold: '10分止まると「エラー」', href: '/accounts' },
+  { id: 'monitoring', title: '5分ごとの確認が動いているか', sub: '自動確認', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/emergency?tab=health' },
+  { id: 'api', title: 'API・外部連携', sub: 'EC連携・外部連携', threshold: '取り込みの失敗が続くと「注意」', href: '/ec-commerce' },
+  { id: 'quota', title: '送れる数の上限', sub: 'LINE と musubo の両方', threshold: '80%で「注意」・95%・予定分の超過で「エラー」', href: '/broadcasts' },
+  { id: 'friends', title: '友だちの急な減り', sub: 'この1日', threshold: '1日で5%以上・10人以上減ると「注意」', href: '/friends' },
+  { id: 'webhook', title: 'Webhook が届いているか', sub: 'LINE からの受け取り', threshold: '受け取りの失敗が続くと「注意」', href: '/webhooks' },
+  { id: 'delivery', title: '配信が送れているか', sub: '予約・自動の配信', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/broadcasts/reserved' },
+  { id: 'infra', title: '裏の仕組み', sub: 'DB・保管庫・順番待ち', threshold: '10分より古いと「古い確認」・一度も確かめていなければ「未確認」', href: '/emergency?tab=health' },
+  { id: 'credential', title: '鍵・証明書の期限', sub: 'アクセストークンなど', threshold: '14日前で「注意」・期限切れで「エラー」', href: '/accounts' },
 ]
 
 /** 常時描画する確認項目の数。案内の文言はここから作り、数だけ書き換えない。 */
@@ -280,16 +293,66 @@ const HEALTH_CHECK_ID: Record<OperationHealthCheckKey, HealthCheckId> = {
   credential_expiry: 'credential',
 }
 
-const severityStyle: Record<OperationSeverity, { label: string; badge: string; panel: string }> = {
-  normal: { label: '正常', badge: 'bg-success-bg text-success', panel: 'border-success bg-success-bg' },
-  warning: { label: '注意', badge: 'bg-warning-bg text-warning', panel: 'border-warning bg-warning-bg' },
-  danger: { label: 'エラー', badge: 'bg-danger-bg text-danger', panel: 'border-danger bg-danger-bg' },
-  unknown: { label: '未確認', badge: 'bg-canvas-sunken text-ink-faint', panel: 'border-hairline bg-canvas-sunken' },
+/** 板の帯のつながる先用。口のキーへ戻す。 */
+const CHECK_KEY_BY_ID = Object.fromEntries(
+  Object.entries(HEALTH_CHECK_ID).map(([key, id]) => [id, key]),
+) as Record<HealthCheckId, OperationHealthCheckKey>
+
+const severityStyle: Record<OperationSeverity, { label: string; badge: string }> = {
+  normal: { label: '正常', badge: 'bg-success-bg text-success' },
+  warning: { label: '注意', badge: 'bg-warning-bg text-warning' },
+  danger: { label: 'エラー', badge: 'bg-danger-bg text-danger' },
+  unknown: { label: '未確認', badge: 'bg-canvas-sunken text-ink-faint' },
 }
 
-function StatusPill({ severity }: { severity: OperationSeverity }) {
-  const style = severityStyle[severity]
-  return <span className={`inline-flex items-center rounded-pill px-2.5 py-1 text-xs font-medium ${style.badge}`}>{style.label}</span>
+/** 板 Y4LkX1 の札。板どおり、点（●）と文字の両方で伝える。 */
+const STALE_STYLE = { label: '古い確認', badge: 'bg-canvas-sunken text-ink-faint' }
+
+function StatusPill({ severity, stale = false }: { severity: OperationSeverity; stale?: boolean }) {
+  const style = stale ? STALE_STYLE : severityStyle[severity]
+  return <span className={`inline-flex items-center gap-1 rounded-pill px-2.5 py-1 text-xs font-medium ${style.badge}`}><span aria-hidden="true">●</span>{style.label}</span>
+}
+
+/** 板の「10分より古いと『古い確認』」。時刻が読めないものは古いと言わない。 */
+const STALE_ITEM_AFTER_MS = 10 * 60 * 1000
+
+function isOldCheck(observedAt: string | null | undefined, now = Date.now()): boolean {
+  if (!observedAt) return false
+  const time = Date.parse(observedAt)
+  if (Number.isNaN(time)) return false
+  return now - time > STALE_ITEM_AFTER_MS
+}
+
+/** 板の「最後の確認」。`10:15` の形。10分以上前なら `9:58（17分前）` と添える。 */
+function formatCheckedAt(iso: string | null | undefined, now = Date.now()): string {
+  if (!iso) return '—'
+  const time = Date.parse(iso)
+  if (Number.isNaN(time)) return '—'
+  const clock = new Date(time).toLocaleTimeString('ja-JP', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Tokyo' })
+  const minutes = Math.round((now - time) / 60000)
+  if (minutes < 10) return clock
+  return `${clock}（${minutes >= 60 ? `${Math.round(minutes / 60)}時間前` : `${minutes}分前`}）`
+}
+
+/** 板の帯の「最後の確認 9/30 10:15」。 */
+function formatMonthDayTime(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const time = Date.parse(iso)
+  if (Number.isNaN(time)) return ''
+  const date = new Date(time).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })
+  const clock = new Date(time).toLocaleTimeString('ja-JP', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Tokyo' })
+  return `${date} ${clock}`
+}
+
+/** 板の異常の1行の「（10/2 10:15〜）」。 */
+function formatDetectedSince(iso: string | null | undefined): string {
+  const text = formatMonthDayTime(iso)
+  return text ? `（${text}〜）` : ''
+}
+
+/** 板のLINE行の補足。実数が取れれば「アカウントN件」。数は作らない。 */
+function lineSub(accountCount: number | null | undefined): string {
+  return typeof accountCount === 'number' ? `アカウント${accountCount}件` : 'アカウント'
 }
 
 function mostSevere(items: HealthCheckItem[]): OperationSeverity {
@@ -302,7 +365,7 @@ function mostSevere(items: HealthCheckItem[]): OperationSeverity {
 function SummaryCard({ label, value, note }: { label: string; value: string; note: string }) {
   return (
     <div className="border-hairline rounded-card border bg-canvas p-4">
-      <p className="text-ink-faint text-[11px] font-semibold">{label}</p>
+      <p className="text-ink-faint text-micro font-semibold">{label}</p>
       <p className="text-ink mt-1 text-base font-bold">{value}</p>
       <p className="text-ink-faint mt-1 text-xs">{note}</p>
     </div>
@@ -425,8 +488,10 @@ function OperationAlertsPanel({
   if (failed) return <Notice tone="warn">異常の受領・通知記録を取得できませんでした。異常なしとは扱いません。時間をおいて読み直してください。</Notice>
   // ★V7: 緑は「正常」の札だけに使う。異常なしの案内は枠なしの info の小さい帯にする。
   if (alerts.length === 0) return <NoteBar tone="info">異常の記録はありません。健全性チェックで新しい異常が見つかると、ここで担当者と通知結果を確認できます。</NoteBar>
-  return <section className="border-hairline rounded-card overflow-hidden border bg-canvas" aria-label="異常の受領と通知">
-    <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">異常の対応履歴と通知</h2><p className="mt-1 text-xs text-ink-faint">同じ異常はまとめます。悪化・解消・再発は履歴と通知に残ります。</p></div>
+  // 板 Y4LkX1 の「開いている異常 N件」のカード。1行目（札・内容・いつから）と
+  // 受領・再送の押し口が板。お客さまへの影響・担当・直し方は運用に要るので残す。
+  return <section className="border-hairline rounded-card overflow-hidden border bg-canvas" aria-label="開いている異常">
+    <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">{`開いている異常 ${alerts.length}件`}</h2></div>
     <div className="divide-y divide-hairline">{alerts.map((alert) => {
       const busy = busyId === alert.id
       const lastEvent = alert.events[0]
@@ -440,8 +505,10 @@ function OperationAlertsPanel({
             ? '通知を送っています。'
             : `${alert.notification.sent}件の通知を送信しました。`
       const response = ALERT_RESPONSE_FIRST[alert.checkKey]
+      const checkTitle = CHECK_DEFINITIONS.find((item) => HEALTH_CHECK_ID[alert.checkKey] === item.id)?.title ?? alert.checkKey
       return <div key={alert.id} className="space-y-3 px-4 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><StatusPill severity={alert.severity} /><p className="text-sm font-semibold text-ink">{CHECK_DEFINITIONS.find((item) => HEALTH_CHECK_ID[alert.checkKey] === item.id)?.label ?? alert.checkKey}</p>{alert.status === 'acknowledged' && <span className="rounded-pill bg-info-bg px-2 py-1 text-xs font-medium text-info">受領済み</span>}{alert.status === 'resolved' && <span className="rounded-pill bg-success-bg px-2 py-1 text-xs font-medium text-success">解消済み</span>}</div><p className="mt-2 text-xs text-ink-secondary">{alert.summary}</p><p className="mt-1 text-xs text-ink-faint">{lastEvent ? `${ALERT_ACTION_LABEL[lastEvent.action]}：${formatOperationDate(lastEvent.createdAt)}` : formatOperationDate(alert.lastDetectedAt)}</p></div><p className={`text-xs font-medium ${alert.notification.failed + alert.notification.unconfigured > 0 ? 'text-danger' : 'text-ink-faint'}`}>{notification}</p></div>
+        <div className="flex flex-wrap items-center gap-2"><StatusPill severity={alert.severity} /><p className="text-sm font-semibold text-ink">{`${checkTitle}：${alert.summary}${formatDetectedSince(alert.firstDetectedAt)}`}</p>{alert.status === 'acknowledged' && <span className="rounded-pill bg-info-bg px-2 py-1 text-xs font-medium text-info">受領済み</span>}{alert.status === 'resolved' && <span className="rounded-pill bg-success-bg px-2 py-1 text-xs font-medium text-success">解消済み</span>}</div>
+        <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-ink-faint">{lastEvent ? `${ALERT_ACTION_LABEL[lastEvent.action]}：${formatOperationDate(lastEvent.createdAt)}` : formatOperationDate(alert.lastDetectedAt)}</p></div><p className={`text-xs font-medium ${alert.notification.failed + alert.notification.unconfigured > 0 ? 'text-danger' : 'text-ink-faint'}`}>{notification}</p></div>
         {/* #1050: お客さまへの影響→担当→直し方を、通知の内訳より先に出す。 */}
         {alert.status !== 'resolved' && response && <dl className="rounded-control grid gap-3 bg-canvas-sunken px-4 py-3 text-xs sm:grid-cols-3">
           <div><dt className="font-medium text-ink-faint">お客さまへの影響</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{alert.severity === 'unknown' ? 'この項目はまだ確認できていないため、影響の有無も未確認です。' : response.impact}</dd></div>
@@ -460,30 +527,39 @@ function HealthPanel({
   manualRunRequest,
   onSeverity,
   onManualRunSettled,
+  accountCount = null,
 }: {
   accountId: string | null
   manualRunRequest: number
   onSeverity: (severity: OperationSeverity) => void
   onManualRunSettled?: () => void
+  /** 板のLINE行の補足「アカウントN件」の実数。取れなければ null。 */
+  accountCount?: number | null
 }) {
   const [checks, setChecks] = useState<HealthCheckItem[]>(() =>
-    CHECK_DEFINITIONS.map((item) => ({ ...item, detail: '確認しています…', severity: 'unknown', observedAt: null })),
+    CHECK_DEFINITIONS.map((item) => ({
+      ...item,
+      sub: item.id === 'line' ? lineSub(accountCount) : item.sub,
+      severity: 'unknown',
+      observedAt: null,
+      stale: false,
+    })),
   )
   /**
-   * 初回と2回目以降を分ける(#518 中2)。
+   * 初回だけ `loading` を立てる(#518 中2)。
    *
-   * 以前は5分ごとの自動更新のたびに `loading` が立ち、バナーと概要が
-   * 「確認できない項目があります」へ瞬間的に変わっていた(オオカミ少年化)。
-   * 2回目以降は `refreshing` にして、前回の結果を表示したままにする。
+   * 以前は5分ごとの自動更新のたびに `loading` が立ち、帯が「確認中」へ
+   * 瞬間的に変わっていた(オオカミ少年化)。2回目以降は立てず、
+   * 前回の結果を表示したままにする。
    */
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const hasLoaded = useRef(false)
   const [checkedAt, setCheckedAt] = useState<string | null>(null)
-  const [nextCheckedAt, setNextCheckedAt] = useState<string | null>(null)
   const [snapshotStatus, setSnapshotStatus] = useState<OperationHealthSnapshot['overallStatus']>('unknown')
-  const [controlSummary, setControlSummary] = useState({ value: '確認中', note: '停止状態を確認しています' })
   const [alerts, setAlerts] = useState<OperationAlert[]>([])
+  /** 板の下の3枚（止めた回数・いちばん長かった停止・いまの版）。更新履歴と同じ口。 */
+  const [stats, setStats] = useState<{ stops: string; longest: string; version: string } | null>(null)
+  const [statsNote, setStatsNote] = useState('この30日')
   const [alertsFailed, setAlertsFailed] = useState(false)
   const [alertBusyId, setAlertBusyId] = useState<string | null>(null)
   const [alertNotice, setAlertNotice] = useState<ControlMessage | null>(null)
@@ -495,54 +571,88 @@ function HealthPanel({
     const results = snapshot.latestRun?.results ?? []
     /*
      * A32-01: 前回の実行が期限切れ(stale)のとき、古い実測を現在の判定として
-     * 出さない。各項目の判定は「未確認」へ倒し、本文には古い結果であることを
-     * 明示して残す(古い「正常」が残って現在の健全と読み違えるのを防ぐ)。
+     * 出さない。板どおり「古い確認」の札にし、一度も確かめていない
+     * （結果が無い）「未確認」とは分ける(古い「正常」が残って現在の健全と
+     * 読み違えるのを防ぐ)。
      */
-    const stale = snapshot.overallStatus === 'stale'
+    const snapshotStale = snapshot.overallStatus === 'stale'
     setChecks(CHECK_DEFINITIONS.map((definition) => {
       const result = results.find((item) => HEALTH_CHECK_ID[item.checkKey] === definition.id)
+      // 10分より古い観測も「古い確認」。時刻が読めないものは古いと言わない。
+      const stale = Boolean(result) && (snapshotStale || isOldCheck(result?.observedAt ?? snapshot.lastCheckedAt))
       return {
         ...definition,
-        detail: result
-          ? stale ? `古い結果です（再確認待ち）: ${result.summary}` : result.summary
-          : 'サーバーに確認記録がありません',
-        severity: stale ? 'unknown' : (result?.status ?? 'unknown'),
+        sub: definition.id === 'line' ? lineSub(accountCount) : definition.sub,
+        severity: (result?.status ?? 'unknown'),
         observedAt: result?.observedAt ?? snapshot.lastCheckedAt,
+        stale,
       }
     }))
     setCheckedAt(snapshot.lastCheckedAt)
-    setNextCheckedAt(snapshot.nextCheckAt)
     setSnapshotStatus(snapshot.overallStatus)
+  }, [accountCount])
+
+  /** 板の下の3枚。止めた回数・いちばん長かった停止はこの30日で数える。 */
+  const loadStats = useCallback(async () => {
+    try {
+      const response = await api.operations.history(HISTORY_FETCH_LIMIT)
+      if (!response.success || !Array.isArray(response.data)) {
+        setStats(null)
+        setStatsNote('取得できませんでした')
+        return
+      }
+      const entries = response.data as OperationHistoryEntry[]
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000
+      const recent = entries.filter((item) =>
+        item.historyKind !== 'deployment'
+        && !Number.isNaN(Date.parse(item.createdAt))
+        && Date.parse(item.createdAt) >= cutoff)
+      const longest = recent.reduce((found, item) => {
+        if (!item.stoppedAt || !item.resolvedAt) return found
+        return Math.max(found, Math.round((Date.parse(item.resolvedAt) - Date.parse(item.stoppedAt)) / 60000))
+      }, 0)
+      const deployments = entries.filter((item) => item.historyKind === 'deployment' && item.deployment)
+      const releases = (releaseLog as { releases?: UpdateRelease[] }).releases ?? []
+      const version = deployments.find((item) => item.deployment?.phase === 'succeeded' && item.deployment.version)?.deployment?.version
+        ?? releases.find((item) => item.released)?.version
+        ?? '—'
+      setStats({
+        stops: `${recent.length}回`,
+        longest: longest > 0 ? formatMinutesRough(longest) : '—',
+        version,
+      })
+      setStatsNote('この30日')
+    } catch {
+      setStats(null)
+      setStatsNote('取得できませんでした')
+    }
   }, [])
 
   const load = useCallback(async (manual: boolean) => {
     const requestedAccountId = accountId
     const generation = ++alertRequestGeneration.current
-    if (hasLoaded.current) setRefreshing(true)
-    else setLoading(true)
+    // 2回目以降は `loading` を立てず、前回の結果を表示したままにする(#518 中2)。
+    if (!hasLoaded.current) setLoading(true)
     if (!accountId) {
       setChecks(CHECK_DEFINITIONS.map((definition) => ({
         ...definition,
-        detail: '上のバーでLINEアカウントを選択してください',
+        sub: definition.id === 'line' ? lineSub(accountCount) : definition.sub,
         severity: 'unknown',
         observedAt: null,
+        stale: false,
       })))
       setCheckedAt(null)
-      setNextCheckedAt(null)
       setSnapshotStatus('unknown')
-      setControlSummary({ value: '未確認', note: 'LINEアカウントを選択してください' })
       setAlerts([])
       setAlertsFailed(false)
       setLoading(false)
-      setRefreshing(false)
       hasLoaded.current = true
       if (manual) onManualRunSettled?.()
       return
     }
     try {
-      const [response, preview, alertResponse] = await Promise.all([
+      const [response, alertResponse] = await Promise.all([
         manual ? api.operations.runHealth(accountId) : api.operations.health(accountId),
-        api.operations.preview(accountId).catch(() => null),
         api.operations.alerts(accountId, true).catch(() => null),
       ])
       if (generation !== alertRequestGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
@@ -555,32 +665,27 @@ function HealthPanel({
         setAlerts([])
         setAlertsFailed(true)
       }
-      setControlSummary(preview?.success
-        ? operationControlSummary(preview.data.control)
-        : { value: '未確認', note: '停止状態を取得できませんでした' })
     } catch {
       if (generation !== alertRequestGeneration.current || requestedAccountId !== currentAccountIdRef.current) return
       setChecks(CHECK_DEFINITIONS.map((definition) => ({
         ...definition,
-        detail: 'サーバーの確認記録を取得できませんでした',
+        sub: definition.id === 'line' ? lineSub(accountCount) : definition.sub,
         severity: 'unknown',
         observedAt: null,
+        stale: false,
       })))
       setCheckedAt(null)
-      setNextCheckedAt(null)
       setSnapshotStatus('unknown')
-      setControlSummary({ value: '未確認', note: '停止状態を取得できませんでした' })
       setAlerts([])
       setAlertsFailed(true)
     } finally {
       if (generation === alertRequestGeneration.current && requestedAccountId === currentAccountIdRef.current) {
         setLoading(false)
-        setRefreshing(false)
         hasLoaded.current = true
       }
       if (manual) onManualRunSettled?.()
     }
-  }, [accountId, applySnapshot, onManualRunSettled])
+  }, [accountId, accountCount, applySnapshot, onManualRunSettled])
 
   useEffect(() => {
     setAlertBusyId(null)
@@ -607,22 +712,46 @@ function HealthPanel({
     return () => window.clearInterval(timer)
   }, [load])
 
+  // 板の下の3枚も、開いたときと確かめ直しのたびに取り直す。
+  useEffect(() => { void loadStats() }, [loadStats, manualRunRequest])
+
   const displayedSeverity = loading || snapshotStatus === 'stale' ? 'unknown' : mostSevere(checks)
   // A32-01: 期限切れ(stale)は「取得失敗」と「実測の異常」のどちらでもない第3の状態。
-  const isStale = !loading && snapshotStatus === 'stale'
-  const isNormal = displayedSeverity === 'normal'
-  const resultTitle = isNormal ? '異常なし' : displayedSeverity === 'warning' ? '注意' : displayedSeverity === 'danger' ? 'エラー' : '確認できない項目があります'
-  const resultDescription = isNormal
-    ? `${CHECK_COUNT}項目を確認し、現在、確認できる異常はありません。`
-    : displayedSeverity === 'warning'
-      ? '注意が必要な項目があります。チェック結果を確認してください。'
-      : displayedSeverity === 'danger'
-        ? '対応が必要な項目があります。チェック結果を確認してください。'
-        : isStale
-          ? '前回の確認結果が期限切れです。自動確認が止まっている可能性があります。「いますぐ確かめる」で再確認してください。'
-          : '取得できない項目があります。時間をおいて再確認してください。'
-  const statusIcon = isNormal ? '✓' : '!'
-  const statusIconClass = isNormal ? 'text-success' : displayedSeverity === 'warning' ? 'text-warning' : displayedSeverity === 'danger' ? 'text-danger' : 'text-ink-faint'
+  const snapshotStale = !loading && snapshotStatus === 'stale'
+  const staleItems = checks.filter((check) => check.stale)
+  const dangers = checks.filter((check) => check.severity === 'danger' && !check.stale)
+  const warnings = checks.filter((check) => check.severity === 'warning' && !check.stale)
+  const allNormal = !loading && checks.length > 0 && checks.every((check) => check.severity === 'normal' && !check.stale)
+  /** 板の帯のつながる先。一番悪い項目の画面へ。 */
+  const worst = dangers[0] ?? warnings[0] ?? null
+  const checkedText = formatMonthDayTime(checkedAt)
+
+  /** 板 Y4LkX1 の上の帯「全体の状態」。数は実測だけ。取れないときに作らない。 */
+  const banner: { tone: 'info' | 'success' | 'warn' | 'danger'; title: string; body: string } = loading
+    ? { tone: 'info', title: '全体の状態：確認中', body: '最新の状態を読み込んでいます。' }
+    : worst
+      ? {
+        tone: worst.severity === 'danger' ? 'danger' : 'warn',
+        title: `全体の状態：${worst.severity === 'danger' ? 'エラー' : '注意'}${(worst.severity === 'danger' ? dangers : warnings).length}件`,
+        body: `${ALERT_RESPONSE_FIRST[CHECK_KEY_BY_ID[worst.id]].impact}${checkedText ? `最後の確認 ${checkedText}（5分ごとに自動確認）` : ''}`,
+      }
+      : allNormal
+        ? {
+          tone: 'success',
+          title: '全体の状態：正常',
+          body: `${CHECK_COUNT}つの項目はすべて正常です。${checkedText ? `最後の確認 ${checkedText}（5分ごとに自動確認）` : ''}`,
+        }
+        : staleItems.length > 0 || snapshotStale
+          ? {
+            tone: 'warn',
+            title: '全体の状態：未確認',
+            body: '前回の確認結果が期限切れです。自動確認が止まっている可能性があります。「いますぐ確かめる」で確かめ直してください。',
+          }
+          : {
+            tone: 'info',
+            title: '全体の状態：未確認',
+            body: 'まだ確認できていない項目があります。時間をおいて確かめ直してください。',
+          }
 
   const acknowledgeAlert = useCallback(async (alert: OperationAlert, note: string) => {
     if (!accountId) return
@@ -666,60 +795,85 @@ function HealthPanel({
   // や自動更新のたびに送ると、親の表示が警告へちらつく。
   useEffect(() => { if (hasLoaded.current) onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
 
+  // 解消した異常はここに出さない。開いている（未受領・受領済み）だけ見る。
+  const openAlerts = alerts.filter((alert) => alert.status !== 'resolved')
+
   return (
-    <div className="space-y-4" data-design="V3 Health">
-      <div data-ro-kpis="true" className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : refreshing ? '更新中' : isStale ? '期限切れ（再確認待ち）' : '最新結果'} />
-        <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
-        <SummaryCard label="緊急停止状態" value={controlSummary.value} note={controlSummary.note} />
-      </div>
-      <Notice tone="info">
-        LINEとのつながりや配信の詰まりを、5分ごとに自動で確かめています。
+    <div className="space-y-4">
+      <Notice
+        tone={banner.tone}
+        action={worst ? <Link href={worst.href} className="font-bold whitespace-nowrap text-action hover:underline focus-visible:underline">{`${worst.title}を開く →`}</Link> : undefined}
+      >
+        <p className="font-bold">{banner.title}</p>
+        <p className="mt-1">{banner.body}</p>
       </Notice>
-      <div className="rounded-card border-hairline flex flex-wrap items-center gap-3 border bg-canvas px-4 py-3">
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-pill bg-canvas text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-bold text-ink">{loading ? '確認しています…' : `${resultTitle}。${isNormal ? `${CHECK_COUNT}項目のすべてが正常です。` : ''}`}</p>
-          <p className="mt-0.5 text-xs text-ink-faint">
-            {loading ? '最新の状態を読み込んでいます。' : `${resultDescription}${isStale ? '' : ` 次は${formatOperationDate(nextCheckedAt)}に自動で確かめます。`}`}
-          </p>
-        </div>
-        <Button variant="danger" className="min-h-9 items-center px-3 text-xs hover:opacity-90 border-0 h-auto whitespace-normal" href="/emergency?tab=control">緊急停止を確認</Button>
-      </div>
+      {!accountId && !loading && (
+        <NoteBar tone="info">上のバーでLINEアカウントを選択してください。アカウントを選ぶと9つの項目を確かめます。</NoteBar>
+      )}
       {alertNotice && <div className={`rounded-control px-4 py-3 text-xs font-medium ${alertNotice.tone === 'success' ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'}`} role="status">{alertNotice.text}</div>}
-      <OperationAlertsPanel alerts={alerts} failed={alertsFailed} busyId={alertBusyId} onAcknowledge={acknowledgeAlert} onRetry={retryAlertNotifications} />
-      <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
-        <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-ink">チェック結果</h2><p className="mt-0.5 text-xs text-ink-faint">{`${CHECK_COUNT}項目を常に表示し、確認内容と最新結果を示します`}</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-xs font-bold">5分ごと</span></div>
-        <div className="hidden grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint lg:grid">
-          <span>確認する項目</span><span>結果</span><span>いまの数字</span><span>目安</span><span>最後の確認</span><span>操作</span>
-        </div>
-        <div className="divide-y divide-hairline">
-          {checks.map((check) => {
-            const style = severityStyle[check.severity]
-            const iconClass = check.severity === 'normal' ? 'bg-success-bg text-success' : check.severity === 'warning' ? 'bg-warning-bg text-warning' : check.severity === 'danger' ? 'bg-danger-bg text-danger' : 'bg-canvas-sunken text-ink-faint'
-            return (
-              <div key={check.id} className={`grid gap-3 px-4 py-4 lg:grid-cols-6 lg:items-center ${check.severity === 'normal' ? 'bg-canvas' : style.panel}`}>
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-pill text-xs font-medium ${iconClass}`}>{check.icon}</span>
-                  <div className="min-w-0"><p className="text-sm font-semibold text-ink">{check.label}</p><p className="mt-1 text-xs text-ink-faint">{check.description}</p></div>
+      <OperationAlertsPanel alerts={openAlerts} failed={alertsFailed} busyId={alertBusyId} onAcknowledge={acknowledgeAlert} onRetry={retryAlertNotifications} />
+      <section className="border-hairline rounded-card overflow-hidden border bg-canvas" aria-label="チェック結果">
+        {/*
+          U042: スマホでは札と時刻が先に見えるカードにし、
+          判定の見方は開いて確認する形にする。
+        */}
+        <ul className="divide-hairline divide-y md:hidden">
+          {checks.map((check) => (
+            <li key={check.id} className="p-4">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-ink text-sm font-semibold">{check.title}</p>
+                  <p className="text-ink-faint mt-0.5 text-xs">{check.sub}</p>
                 </div>
-                <StatusPill severity={check.severity} />
-                <p className="text-xs leading-relaxed text-ink-secondary">{check.detail}</p>
-                <p className="text-xs leading-relaxed text-ink-faint">{check.threshold}</p>
-                <p className="text-xs text-ink-faint">{formatOperationDate(check.observedAt)}</p>
-                <Button variant="secondary" className="min-h-9 items-center justify-center px-3 text-xs text-ink-secondary h-auto whitespace-normal" href={check.href}>中身を見る</Button>
+                <div className="shrink-0"><StatusPill severity={check.severity} stale={check.stale} /></div>
               </div>
-            )
-          })}
+              <dl className="mt-2 space-y-1 text-xs">
+                <div className="flex justify-between gap-3"><dt className="text-ink-faint">最後の確認</dt><dd className="text-ink-secondary tabular-nums">{formatCheckedAt(check.observedAt)}</dd></div>
+              </dl>
+              <details className="mt-2">
+                <summary className="text-ink-secondary cursor-pointer text-xs font-semibold">判定の見方を見る</summary>
+                <p className="text-ink-faint mt-1 text-xs leading-relaxed">{check.threshold}</p>
+              </details>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full">
+            <thead>
+              <TableHeadRow>
+                <Th className="pl-5">確かめていること</Th>
+                <Th>判定</Th>
+                <Th>最後の確認</Th>
+                <Th className="pr-5">判定の見方</Th>
+              </TableHeadRow>
+            </thead>
+            <tbody>
+              {checks.map((check) => (
+                <tr key={check.id} className="border-hairline border-t align-top">
+                  <td className="py-3 pr-4 pl-5">
+                    <p className="text-ink text-sm font-semibold">{check.title}</p>
+                    <p className="text-ink-faint mt-0.5 text-xs">{check.sub}</p>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <StatusPill severity={check.severity} stale={check.stale} />
+                  </td>
+                  <td className="text-ink-secondary px-4 py-3 text-sm whitespace-nowrap tabular-nums">
+                    {formatCheckedAt(check.observedAt)}
+                  </td>
+                  <td className="text-ink-faint py-3 pr-5 pl-4 text-xs leading-relaxed">
+                    {check.threshold}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="判定の見方">
-        {([
-          ['正常', '目安の中に入っています', 'normal'],
-          ['注意', '目安をこえました。見てください', 'warning'],
-          ['エラー', '動いていません。止めるか直してください', 'danger'],
-          ['未確認', '確かめられませんでした', 'unknown'],
-        ] as const).map(([label, note, severity]) => <div key={label} className="border-hairline rounded-control border px-4 py-3"><StatusPill severity={severity} /><p className="text-ink-faint mt-1 text-xs">{note}</p></div>)}
+      {/* 板の下の3枚。更新履歴と同じ口から、この30日で数える。 */}
+      <div data-ro-kpis="true" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <SummaryCard label="止めた回数" value={stats?.stops ?? '—'} note={statsNote} />
+        <SummaryCard label="いちばん長かった停止" value={stats?.longest ?? '—'} note={statsNote} />
+        <SummaryCard label="いまの版" value={stats?.version ?? '—'} note={stats ? '反映済み' : statsNote} />
       </div>
     </div>
   )
@@ -1361,11 +1515,11 @@ function HistoryPanel() {
         <div className="min-w-0 flex-1 space-y-4">
           <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
             <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">止めた・戻した記録</h2><p className="mt-0.5 text-xs text-ink-faint">だれが・いつ・何を・なぜ。サーバーに追記して残します</p>{unreadableEntries.length > 0 ? <p className="mt-1 text-xs font-semibold text-warning">日付が読めない記録が{unreadableEntries.length}件あり、期間の絞り込みから外しています。履歴なしとは扱いません。</p> : null}</div>
-            {state === 'loading' ? <p className="p-8 text-center text-xs text-ink-faint">記録を読み込んでいます…</p> : state === 'error' ? <p className="bg-warning-bg px-4 py-4 text-xs font-medium text-warning">緊急操作の履歴を取得できませんでした。履歴なしとは扱いません。</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">この期間の記録はありません。</p> : <><div className="hidden grid-cols-[170px_1.2fr_1fr_1fr_100px] gap-3 bg-canvas-sunken px-4 py-3 text-[11px] font-semibold text-ink-faint md:grid"><span>いつ・だれが</span><span>止めたもの</span><span>対象</span><span>理由</span><span>戻した</span></div><div className="divide-y divide-hairline">{entries.map((entry) => <div key={entry.id} className="grid gap-3 px-4 py-4 md:grid-cols-[170px_1.2fr_1fr_1fr_100px] md:items-center"><div><time className="text-sm font-semibold text-ink">{formatOperationDate(entry.createdAt)}</time><p className="mt-1 truncate text-xs text-ink-faint" title={entry.actorId}>{entry.actorId}</p></div><p className="text-xs font-medium text-ink-secondary">{entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}</p><p className="text-xs text-ink-secondary">{entry.lineAccountId ?? 'すべてのアカウント'}</p><div><p className="text-xs font-medium text-ink-secondary">{entry.reason}</p>{entry.detail && <p className="mt-1 text-xs text-ink-faint">{entry.detail}</p>}</div><p className={`text-xs font-medium ${entry.resolvedAt ? 'text-success' : entry.status === 'failed' ? 'text-danger' : 'text-ink-faint'}`}>{entry.resolvedAt ? formatOperationDate(entry.resolvedAt) : entry.status === 'failed' ? '失敗' : '停止中'}</p></div>)}</div></>}
+            {state === 'loading' ? <p className="p-8 text-center text-xs text-ink-faint">記録を読み込んでいます…</p> : state === 'error' ? <p className="bg-warning-bg px-4 py-4 text-xs font-medium text-warning">緊急操作の履歴を取得できませんでした。履歴なしとは扱いません。</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">この期間の記録はありません。</p> : <><div className="hidden grid-cols-[170px_1.2fr_1fr_1fr_100px] gap-3 bg-canvas-sunken px-4 py-3 text-micro font-semibold text-ink-faint md:grid"><span>いつ・だれが</span><span>止めたもの</span><span>対象</span><span>理由</span><span>戻した</span></div><div className="divide-y divide-hairline">{entries.map((entry) => <div key={entry.id} className="grid gap-3 px-4 py-4 md:grid-cols-[170px_1.2fr_1fr_1fr_100px] md:items-center"><div><time className="text-sm font-semibold text-ink">{formatOperationDate(entry.createdAt)}</time><p className="mt-1 truncate text-xs text-ink-faint" title={entry.actorId}>{entry.actorId}</p></div><p className="text-xs font-medium text-ink-secondary">{entry.capabilities.map((capability) => CAPABILITY_LABEL[capability]).join('・')}</p><p className="text-xs text-ink-secondary">{entry.lineAccountId ?? 'すべてのアカウント'}</p><div><p className="text-xs font-medium text-ink-secondary">{entry.reason}</p>{entry.detail && <p className="mt-1 text-xs text-ink-faint">{entry.detail}</p>}</div><p className={`text-xs font-medium ${entry.resolvedAt ? 'text-success' : entry.status === 'failed' ? 'text-danger' : 'text-ink-faint'}`}>{entry.resolvedAt ? formatOperationDate(entry.resolvedAt) : entry.status === 'failed' ? '失敗' : '停止中'}</p></div>)}</div></>}
           </section>
           <section className="border-hairline rounded-card overflow-hidden border bg-canvas">
             <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">管理画面の更新</h2><p className="mt-0.5 text-xs text-ink-faint">管理画面へ入った変更のうち、新しい{RECENT_UPDATES_LIMIT}件を表示します</p></div>
-            {recentUpdates.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">更新の記録はありません。</p> : <div className="divide-y divide-hairline">{recentUpdates.map((entry, index) => <div key={`${entry.version}-${entry.pr ?? index}-${entry.at ?? index}`} className="grid gap-2 px-4 py-3 md:grid-cols-[140px_minmax(0,1fr)_90px] md:items-center"><div><time className="text-xs font-medium text-ink-secondary">{formatOperationDate(entry.at ?? entry.released)}</time><p className="mt-1 text-[11px] text-ink-faint">{entry.version}</p></div><p className="line-clamp-2 text-xs leading-relaxed text-ink-secondary" title={entry.text}>{entry.text}</p><p className="text-xs font-medium text-ink-faint">{entry.by ?? '自動'}{entry.pr ? ` #${entry.pr}` : ''}</p></div>)}</div>}
+            {recentUpdates.length === 0 ? <p className="p-8 text-center text-xs text-ink-faint">更新の記録はありません。</p> : <div className="divide-y divide-hairline">{recentUpdates.map((entry, index) => <div key={`${entry.version}-${entry.pr ?? index}-${entry.at ?? index}`} className="grid gap-2 px-4 py-3 md:grid-cols-[140px_minmax(0,1fr)_90px] md:items-center"><div><time className="text-xs font-medium text-ink-secondary">{formatOperationDate(entry.at ?? entry.released)}</time><p className="mt-1 text-micro text-ink-faint">{entry.version}</p></div><p className="line-clamp-2 text-xs leading-relaxed text-ink-secondary" title={entry.text}>{entry.text}</p><p className="text-xs font-medium text-ink-faint">{entry.by ?? '自動'}{entry.pr ? ` #${entry.pr}` : ''}</p></div>)}</div>}
             {(hiddenUpdateCount > 0 || pendingUpdateCount > 0) && <div className="border-hairline space-y-1 border-t px-4 py-3 text-xs text-ink-faint">
               {hiddenUpdateCount > 0 && <p>続きが{hiddenUpdateCount}件あります。この欄では新しい{RECENT_UPDATES_LIMIT}件までを表示します。</p>}
               {pendingUpdateCount > 0 && <p>まだ画面に入っていない変更が{pendingUpdateCount}件あります。更新回数には含めていません。</p>}
@@ -1444,11 +1598,11 @@ function EmergencyPageInner() {
       : 'エラー、緊急停止、システム更新、設定変更を時間順に確認できます。'
   const controlV8Ref = useRef<EmergencyControlV8Handle>(null)
   const headerAction = tab === 'health'
-    ? <Button variant="primary" className="min-h-9 px-3 text-xs hover:brightness-90 disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy}>{manualBusy ? '↻ 確認中…' : '↻ いますぐ確かめる'}</Button>
+    ? <Button variant="secondary" className="min-h-9 px-3 text-xs hover:brightness-90 disabled:opacity-50 border-0 h-auto whitespace-normal" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy}>{manualBusy ? '↻ 確認中…' : '↻ いますぐ確かめる'}</Button>
     : tab === 'control' && theme === 'v8'
       ? <Button variant="danger" type="button" onClick={() => controlV8Ref.current?.openStop()}>緊急停止する</Button>
       : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
-  return <div className={`flex flex-col gap-4 ${tab === 'control' ? '' : 'v8-ro-notifications-page'}`} data-design-node={theme === 'v8' ? (tab === 'health' ? 'Y4LkX1' : tab === 'history' ? 'I2V65v' : tab === 'control' ? 'OHwbU' : undefined) : undefined}>{theme === 'v8' && tab !== 'control' && <ReadonlyHeaderV8 title="運用状態" description="自動確認の結果と、止めた・戻した記録、管理画面の更新を確認します。" />}<OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-semibold text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-semibold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} />}{tab === 'control' && (theme === 'v8'
+  return <div className={`flex flex-col gap-4 ${tab === 'control' ? '' : 'v8-ro-notifications-page'}`} data-design-node={tab === 'health' ? 'Y4LkX1' : tab === 'history' ? 'I2V65v' : tab === 'control' ? 'OHwbU' : undefined}>{tab !== 'control' && <ReadonlyHeaderV8 title="運用状態" description="自動確認の結果と、止めた・戻した記録、管理画面の更新を確認します。" />}<OperationPageHeader description={tab === 'history' ? '' : description} action={headerAction} />{accountsFailed ? <div className="bg-warning-bg flex flex-wrap items-center justify-between gap-2 rounded-control px-4 py-3 text-xs font-semibold text-warning" role="alert"><p>アカウント一覧を取得できませんでした。個別のアカウントを選べず、全体が対象になります。</p><button type="button" onClick={() => loadAccounts()} className="rounded-control border border-warning px-3 py-1.5 font-semibold hover:opacity-80">もう一度読む</button></div> : null}<MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel accountId={selectedAccountId} manualRunRequest={manualRunRequest} onSeverity={setSeverity} onManualRunSettled={settleManualRun} accountCount={accountsFailed ? null : accounts.length} />}{tab === 'control' && (theme === 'v8'
             /*
              * ★V8-B: data-theme="v8" のときだけ新しい制御タブ（`OHwbU`）を出す。
              * v7 の見た目は EmergencyControlPanel のまま変えない。

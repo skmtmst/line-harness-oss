@@ -391,11 +391,11 @@ function TemplateDetailInner() {
             <section className="bg-canvas rounded-card border-hairline border p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-ink text-sm font-semibold">本文</p>
-                <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-[11px]">
+                <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-micro">
                   {messageTypeText(template.messageType)}
                 </span>
                 {template.category && (
-                  <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-[11px]">
+                  <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-micro">
                     {template.category}
                   </span>
                 )}

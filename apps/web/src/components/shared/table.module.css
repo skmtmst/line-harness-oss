@@ -97,16 +97,24 @@
  * V8 では白い板の中に直接置く（箱の中に箱を作らない）。
  */
 [data-theme='v8'] .headRow {
-  height: 44px;
+  /* 高さは中身で決まる（上下12＋中身16＝40）。固定で潰さない。 */
+  height: auto;
   border-top: 1px solid var(--color-divider);
   border-bottom: 1px solid var(--color-divider);
   background: var(--color-table-head);
 }
 
 [data-theme='v8'] .headRow .cell {
-  padding: 13px 20px;
+  padding: var(--tpl-thead-pad-block) var(--tpl-thead-pad-side);
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   font-weight: 500;
 }
+
+[data-theme='v8'] .headRow .cell { line-height: var(--tpl-thead-lh); }
+[data-theme='v8'] .headRow[data-table-layout='columns'] {
+  display: flex; align-items: center; gap: 16px; height: auto; padding: 13px 20px;
+}
+[data-theme='v8'] .headRow[data-table-layout='columns'] .cell { display: block; padding: 0; flex-shrink: 0; }
+
 }

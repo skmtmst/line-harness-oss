@@ -144,6 +144,19 @@ export type AuthenticatedStaff = {
   tenantStatus?: TenantStatus;
   /** 機能オフ middleware が一覧処理へ渡す、このリクエストだけの追加絞り込み。 */
   featureEnabledLineAccountIds?: string[];
+  /**
+   * どの資格情報で入ったか。'session' は管理画面から人がログインした状態、
+   * 'api-key' は長期間使える鍵（env の API_KEY / LEGACY_API_KEY、スタッフ個別の
+   * APIキー）をプログラムから提示した状態。
+   *
+   * Googleビジネスのルートはこれを見て 'api-key' を拒む。Google Business Profile
+   * APIのポリシー（https://developers.google.com/my-business/content/policies 、
+   * 2026-08-28更新）が「End users of your Business Profile APIs need to manually
+   * sign in to use it.」「You cannot provide indirect access to your Business
+   * Profile project.」と定めているため、鍵1本で外部スクリプトからGoogleへ
+   * 書ける経路を残せない。
+   */
+  credential?: 'session' | 'api-key';
 };
 
 function toAuthenticatedStaff(staff: {
@@ -229,7 +242,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/dashboard', '/'],
   ['/api/getting-started', '/getting-started'],
   ['/api/conversions', '/conversions'], ['/api/measurement-sites', '/conversions'], ['/api/scoring', '/scoring'], ['/api/scoring-rules', '/scoring'],
-  ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
+  ['/api/ad-platforms/mappings', '/inflow-links'], ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
   ['/api/mileage', '/mileage'], ['/api/action-scores', '/mileage'],
   ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
   ['/api/automation-templates', '/automations'], ['/api/automation-drafts', '/automations'],
@@ -281,6 +294,7 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   // 公開の撤回・掲載先の変更は審査権限ではなく掲載管理の上位権限（#931 N-311）。
   // 一覧の表示（GET publications）は審査と同じ閲覧権限のままにする。
   [/^\/api\/nen-members\/photos\/publications\/[^/]+\/(?:withdraw|placements)(?:\/|$)/, 'photo.publication.manage'],
+  [/^\/api\/nen-members\/photos\/(?:publications\/order|[^/]+\/publish)(?:\/|$)/, 'photo.publication.manage'],
   [/^\/api\/nen-members\/photos(?:\/|$)/, 'photo.submission.view'],
   [/^\/api\/friends\/[^/]+\/messages(?:\/|$)/, '/chats'],
   [/^\/api\/friends\/[^/]+\/fields(?:\/|$)/, '/tags'],
@@ -400,6 +414,11 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/menus'],
   ['GET', '/api/restaurant-test/channels'],
   ['POST', '/api/restaurant-test/reservations/manual'],
+  ['POST', '/api/restaurant-test/reservations/holds'],
+  ['GET', '/api/restaurant-test/reservations/day'],
+  ['GET', '/api/restaurant-test/customers/search'],
+  ['GET', '/api/restaurant-test/customers/history'],
+  ['GET', '/api/restaurant-test/inventory/day'],
   // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
   ['GET', '/api/restaurant-test/google/connection'],
   ['GET', '/api/restaurant-test/google/reviews'],
@@ -535,7 +554,7 @@ export async function authenticateAdminSession(
   if (!token) return null;
   const staff = await getStaffByAdminSession(c.env.DB, await sha256Hex(token), new Date().toISOString());
   if (!staff) return null;
-  return toAuthenticatedStaff(staff);
+  return { ...toAuthenticatedStaff(staff), credential: 'session' };
 }
 
 async function authenticateCookieToken(
@@ -569,12 +588,12 @@ export async function authenticateApiToken(
 
   const staff = await getStaffByApiKey(c.env.DB, token);
   if (staff) {
-    return toAuthenticatedStaff(staff);
+    return { ...toAuthenticatedStaff(staff), credential: 'api-key' };
   }
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
   if (token === c.env.API_KEY) {
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active' };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
 
   // Legacy fallback: LEGACY_API_KEY accepted during rotation grace period.
@@ -588,7 +607,7 @@ export async function authenticateApiToken(
     token === c.env.LEGACY_API_KEY
   ) {
     console.log('[auth] accept_via=LEGACY_API_KEY');
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active' };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
 
   return null;

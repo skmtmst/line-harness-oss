@@ -1,10 +1,9 @@
 'use client'
 
 import '@/app/hq/readonly-v8.css'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import { Archive, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import FilterChip from '@/components/shared/filter-chip'
@@ -14,6 +13,7 @@ import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import { api, ApiError } from '@/lib/api'
 import type { BannerImage, BannerProject, BannerUsage } from '@/lib/hq-banners'
+import BannerSideNav, { type BannerChrome } from './banner-side-nav-v8'
 import LimitState from './limit-state'
 import ProjectCard from './project-card'
 import ProjectFormDialog from './project-form-dialog'
@@ -37,15 +37,17 @@ const SORT_OPTIONS: Array<{ value: Sort; label: string }> = [
 export default function ProjectsSection({
   usage,
   onChanged,
-  headerActions,
+  onChrome,
+  archivedCount,
 }: {
   usage: BannerUsage | null
   /** 作成・アーカイブなどで数が変わったとき。数値カード帯を読み直してもらう。 */
   onChanged: () => void
-  /** タブ行の右端に置く操作を、親へ渡す。 */
-  headerActions: (actions: ReactNode) => void
+  /** 板の左列（操作＋見る）に置く中身を、親へ渡す。 */
+  onChrome?: (chrome: BannerChrome) => void
+  /** アーカイブ済みの件数（数値カード帯の出どころ。まだ分からないときは出さない）。 */
+  archivedCount?: number | null
 }) {
-  const theme = useAdminTheme()
   const router = useRouter()
   const [projects, setProjects] = useState<BannerProject[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, BannerImage[]>>({})
@@ -137,20 +139,30 @@ export default function ProjectsSection({
     setFilter('all')
   }, [])
 
+  const favoriteCount = projects.filter((p) => p.isFavorite).length
+  const runningCount = projects.filter((p) => p.runningCount > 0).length
+  const activeKey = archivedMode ? 'archived' : filter
+
   useEffect(() => {
-    headerActions(
-      <>
-        <Button variant="primary" onClick={() => setFormOpen(true)}>
+    onChrome?.({
+      action: (
+        <Button variant="primary" onClick={() => setFormOpen(true)} className="w-full">
           <Plus aria-hidden="true" className="h-4 w-4" />
           プロジェクトを作る
         </Button>
-        <Button onClick={() => setArchivedMode((v) => !v)} aria-pressed={archivedMode}>
-          <Archive aria-hidden="true" className="h-4 w-4" />
-          {archivedMode ? '進行中を見る' : 'アーカイブを見る'}
-        </Button>
-      </>,
-    )
-  }, [archivedMode, headerActions])
+      ),
+      nav: status === 'ready' ? (
+        <BannerSideNav
+          items={[
+            { key: 'all', label: 'すべて', count: archivedMode ? null : projects.length, selected: activeKey === 'all', onSelect: () => { setFilter('all'); setArchivedMode(false) } },
+            { key: 'favorite', label: 'お気に入り', count: archivedMode ? null : favoriteCount, selected: activeKey === 'favorite', onSelect: () => { setFilter('favorite'); setArchivedMode(false) } },
+            { key: 'running', label: '生成中', count: archivedMode ? null : runningCount, selected: activeKey === 'running', onSelect: () => { setFilter('running'); setArchivedMode(false) } },
+            { key: 'archived', label: 'アーカイブ', count: archivedCount ?? null, selected: activeKey === 'archived', onSelect: () => setArchivedMode(true) },
+          ]}
+        />
+      ) : null,
+    })
+  }, [onChrome, status, projects, favoriteCount, runningCount, activeKey, archivedMode, filter, archivedCount])
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -184,7 +196,7 @@ export default function ProjectsSection({
           />
         </div>
         <div className="flex flex-wrap items-center gap-2 p-4">
-          <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>{theme === 'v8' ? '使用中' : 'すべて'}</FilterChip>
+          <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
           <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り</FilterChip>
           <FilterChip selected={filter === 'running'} onChange={(on) => setFilter(on ? 'running' : 'all')}>生成中</FilterChip>
           <label className="flex items-center gap-2 text-caption text-ink-faint">

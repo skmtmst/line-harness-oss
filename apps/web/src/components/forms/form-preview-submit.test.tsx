@@ -25,3 +25,30 @@ describe('回答プレビューの送信口', () => {
     expect(view.getByText('送信する')).toBeTruthy()
   })
 })
+
+describe('F-11 回答プレビューの5段階評価・住所', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('評価は★5つを出す', () => {
+    const layout = emptyLayout()
+    layout.sections[0].blocks = [
+      { id: 'b1', kind: 'input', type: 'rating', name: 's', label: '満足度', defaultValue: '4' },
+    ]
+    const view = render(<FormPreview layout={layout} sectionIndex={0} />)
+    expect(view.getByText('満足度')).toBeTruthy()
+    // ★5つの塊が1つある（初期値の数だけ塗るのは見た目のため数えない）
+    expect(view.container.textContent).toContain('★★★★★')
+  })
+
+  it('住所は郵便番号と住所の箱を出す', () => {
+    const layout = emptyLayout()
+    layout.sections[0].blocks = [
+      { id: 'b1', kind: 'input', type: 'address', name: 'a', label: '住所' },
+    ]
+    const view = render(<FormPreview layout={layout} sectionIndex={0} />)
+    expect(view.getByText('住所')).toBeTruthy()
+    expect(view.container.textContent).toContain('___-____')
+  })
+})

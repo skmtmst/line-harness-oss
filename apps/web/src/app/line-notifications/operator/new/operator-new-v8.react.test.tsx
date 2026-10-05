@@ -137,3 +137,31 @@ test('staff では閲覧のみの帯が出て保存の押し口が押せない',
     .find((button) => button.textContent?.includes('運用者へのお知らせを公開'))
   expect(publishButton?.hasAttribute('disabled')).toBe(true)
 })
+
+
+test('選んだスタッフでチームを作り、保存する通知の条件へチームIDを渡す', async () => {
+  const saved: Array<{url:string;body:Record<string,unknown>}> = []
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (url.includes('recipients-preview')) return response({success:true,data:recipientsData})
+    if (url.includes('/api/notifications/teams')) {
+      if (init?.method === 'POST') {
+        const body = JSON.parse(String(init.body)); saved.push({url,body})
+        return response({success:true,data:{id:'team-1',lineAccountId:'account-a',name:body.name,staffIds:body.staffIds,version:1,archivedAt:null}})
+      }
+      return response({success:true,data:[]})
+    }
+    saved.push({url,body:JSON.parse(String(init?.body))})
+    return response({success:true,data:{id:'rule-1',version:1}})
+  }))
+  await renderPage()
+  const input = host!.querySelector<HTMLInputElement>('[aria-label="チーム名"]')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'対応チーム')
+    input.dispatchEvent(new Event('input',{bubbles:true}))
+  })
+  await act(async () => { Array.from(host!.querySelectorAll('button')).find(button=>button.textContent==='チームを作る')!.click() })
+  expect(saved[0].body).toMatchObject({name:'対応チーム',staffIds:['sato','suzuki','tanaka']})
+  await act(async () => { Array.from(host!.querySelectorAll('button')).find(button=>button.textContent?.includes('下書き'))!.click() })
+  expect(saved.at(-1)?.body).toMatchObject({conditions:{teamId:'team-1',recipientType:'team'}})
+})

@@ -8,6 +8,7 @@ import {
 } from '@line-crm/shared';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { createAutomationActionExecutors } from './automation-action-executors';
+import { EVENT_TRIGGER_TYPES, SCHEDULE_TRIGGER_TYPES } from './automation-triggers';
 import {
   createAutomationDraftFromTemplate,
   updateAutomationDraft,
@@ -16,7 +17,7 @@ import {
 /*
  * #734: 下書きで選べるきっかけ・処理は、共有の正本と実行門で集合として一致する。
  * 共有の一覧は本物で import し、相手側(下書きunion・実行門・実行器)は
- * 実装を読む。文字列の有無だけ見る試験は置かない。
+ * 実装を読む。実行門は実際の集合を使い、配列の展開も含めて照合する。
  *
  * - S1: 共有のきっかけ10種 = 下書きunionの10種(過不足なし)
  * - S2: 共有の処理4種 = 下書きunionの4種(過不足なし)
@@ -30,25 +31,12 @@ function draftSource(): string {
   return readFileSync(join(import.meta.dirname, 'automation-drafts.ts'), 'utf8');
 }
 
-function gateSource(): string {
-  return readFileSync(join(import.meta.dirname, 'automation-triggers.ts'), 'utf8');
-}
-
 /** `| 'a'` 形式の共用体から値だけを抜く。 */
 function unionMembers(source: string, typeName: string): string[] {
   const block = new RegExp(`export type ${typeName} =([\\s\\S]*?);`).exec(source);
   if (!block) throw new Error(`${typeName} が見つかりません`);
   const members = [...block[1].matchAll(/'([^']+)'/g)].map((found) => found[1]);
   if (members.length === 0) throw new Error(`${typeName} から値を拾えません`);
-  return [...new Set(members)];
-}
-
-/** `new Set([...])` の中身を抜く。 */
-function setMembers(source: string, constName: string): string[] {
-  const block = new RegExp(`const ${constName} = new Set\\(\\[([\\s\\S]*?)\\]\\)`).exec(source);
-  if (!block) throw new Error(`${constName} が見つかりません`);
-  const members = [...block[1].matchAll(/'([^']+)'/g)].map((found) => found[1]);
-  if (members.length === 0) throw new Error(`${constName} から値を拾えません`);
   return [...new Set(members)];
 }
 
@@ -120,8 +108,8 @@ describe('下書きの選択可能一覧(#734)', () => {
 
   it('S3: 共有のきっかけ ⊆ 実行門(出来事門+定期門)', () => {
     const gates = new Set([
-      ...setMembers(gateSource(), 'EVENT_TRIGGER_TYPES'),
-      ...setMembers(gateSource(), 'SCHEDULE_TRIGGER_TYPES'),
+      ...EVENT_TRIGGER_TYPES,
+      ...SCHEDULE_TRIGGER_TYPES,
     ]);
     for (const option of AUTOMATION_DRAFT_TRIGGER_OPTIONS) {
       expect(gates.has(option.value), `門に無いきっかけ: ${option.value}`).toBe(true);

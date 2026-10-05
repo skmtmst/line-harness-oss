@@ -136,4 +136,19 @@
   [data-theme='v8'] .trailing {
     order: 4;
   }
+
+[data-theme='v8'] .toolbar { margin-bottom: 0; }
+[data-theme='v8'] .row1 > .search { width: 280px; max-width: 100%; flex: none; }
+
+
+[data-theme='v8'] .toolbar button:not(:focus-visible):not([class*='ghost']) { border: 0; }
+[data-theme='v8'] .trailing button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+  /*
+   * ★V8「道具の1段」（c4n9Kr）：探す欄は幅 280px・縮まない
+   * （flex-shrink: 0）。中の文だけが flex:1 で伸び縮みする。
+   * 白い板が狭い幅（1100〜1200）では帯全体の flex-wrap で
+   * 下へ折り返すので、右端がはみ出さない。
+   * 繰り返す1行の形（幅・枠・高さ）を守り、行数は問わない。
+   */
+
 }

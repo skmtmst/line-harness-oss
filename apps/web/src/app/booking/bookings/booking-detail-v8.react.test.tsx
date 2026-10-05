@@ -99,6 +99,20 @@ describe('予約の詳細のV8（AjZhH）', () => {
     }
   })
 
+  it('来店回数の読み込み中は文字を出さず骨組みにする', async () => {
+    let resolveLoad!: (value: { booking: { historyTotal: number } }) => void
+    apiMocks.getBooking.mockReturnValueOnce(new Promise((resolve) => { resolveLoad = resolve }))
+    render()
+    await act(async () => undefined)
+    // 「読み込んでいます」の文字は置かず、入れ物が読み込み中と伝える。
+    expect(document.body.textContent).not.toContain('読み込んでいます')
+    const dd = [...document.querySelectorAll('dd')].find((el) => el.textContent?.includes('回') || el.getAttribute('aria-busy') === 'true')
+    expect(dd?.getAttribute('aria-busy')).toBe('true')
+    await act(async () => { resolveLoad({ booking: { historyTotal: 5 } }) })
+    await act(async () => undefined)
+    expect(document.body.textContent).toContain('5回')
+  })
+
   it('取り消すを押すと取消の口へ渡す', async () => {
     const { onCancel } = render()
     await act(async () => undefined)

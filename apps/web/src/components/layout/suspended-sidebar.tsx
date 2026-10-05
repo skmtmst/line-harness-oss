@@ -35,7 +35,7 @@ export default function SuspendedSidebar() {
         <div className={styles.identityRule} />
         <nav className={styles.nav}>
           <div className={styles.section}>
-            <div className={styles.sectionHeading}>統括</div>
+            <div className={styles.sectionHeading}>統括コンソール</div>
             <Link href="/hq/support" className={`${styles.item} ${styles.active}`} aria-current="page">
               <LifeBuoy aria-hidden="true" className="h-[18px] w-[18px] shrink-0" />
               <span>お問い合わせ</span>

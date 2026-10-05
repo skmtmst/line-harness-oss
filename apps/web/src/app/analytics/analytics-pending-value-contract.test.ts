@@ -43,7 +43,7 @@ describe('分析は、集計できていない値を0と書かない', () => {
       .toContain("metric.state === 'available' || metric.state === 'partial'")
   })
 
-  for (const title of ['増えた友だち', '減った友だち', '差し引き', '現在つながっている']) {
+  for (const title of ['増えた', '減った', '差し引き']) {
     it(`「${title}」の帯は metric.value を直に描かない`, () => {
       const card = kpiCard(title)
       expect(card, '帯が見つからない').not.toBe('')
@@ -62,7 +62,7 @@ describe('分析は、集計できていない値を0と書かない', () => {
     expect(PAGE).toContain(
       "const daysShown = overview.state === 'available' || overview.state === 'partial'",
     )
-    expect(PAGE).toContain('{!daysShown ?')
+    expect(PAGE).toContain('{daysShown ?')
   })
 
   it('表の桁も state を見る', () => {

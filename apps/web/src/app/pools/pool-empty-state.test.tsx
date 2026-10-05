@@ -30,7 +30,7 @@ describe('プール管理の空状態', () => {
 
     await waitFor(() => expect(view.getByText('まだプールがありません')).toBeTruthy())
     // 緑の作成口は空状態の中の1つだけ。右上と重複しない。
-    expect(view.getAllByText('＋ プールをつくる')).toHaveLength(1)
+    expect(view.getAllByText('新規プール')).toHaveLength(1)
     // 「0 プール」の件数表示は空状態と重複するので出さない。
     expect(view.queryByText('0 プール')).toBeNull()
   })
@@ -59,8 +59,8 @@ describe('プール管理の空状態', () => {
     const view = render(<PoolsPage />)
 
     await waitFor(() => expect(view.getByText('メインプール')).toBeTruthy())
-    expect(view.getByText('1 プール')).toBeTruthy()
-    expect(view.getByText('＋ プールをつくる')).toBeTruthy()
+    expect(view.queryByText('1 プール')).toBeNull()
+    expect(view.getByText('新規プール')).toBeTruthy()
     expect(view.queryByText('まだプールがありません')).toBeNull()
   })
 })

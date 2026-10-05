@@ -1,12 +1,22 @@
-import { readFileSync } from 'node:fs'
+// @vitest-environment happy-dom
+import { readFileSync as readRawSource } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
+import React from 'react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import ChannelsTabV8 from './channels-tab-v8'
+
+vi.mock('@/components/shared/toast', () => ({ notifyToast: vi.fn() }))
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const ROOT = join(process.cwd(), 'src', 'app', 'booking', 'menus')
 const LIST = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
 const CREATE = readFileSync(join(ROOT, 'new', 'page.tsx'), 'utf8')
 const SETTINGS_V8 = readFileSync(join(ROOT, 'settings-v8.tsx'), 'utf8')
+// タブの中身は settings-tabs/ に分かれている（見た目・動きは同じ）。
+const SETTINGS_MENUS_TAB = readFileSync(join(ROOT, 'settings-tabs', 'menus-tab.tsx'), 'utf8')
 const SETTINGS_CSS = readFileSync(join(ROOT, 'settings-v8.module.css'), 'utf8')
 
 describe('V6 予約設定', () => {
@@ -63,7 +73,8 @@ describe('V6 予約設定', () => {
   })
 
   it('表示している一覧操作は実際に使える', () => {
-    expect(LIST).not.toContain('準備中')
+    // 分割先のコメントは画面の文言ではない。
+    expect(LIST.replace(/^\s*\/\/.*$/gm, '')).not.toContain('準備中')
     expect(LIST).toContain('bookingApi.getSettings(accountId)')
     expect(LIST).toContain('<Pagination page={page} pageCount={pageCount}')
     expect(LIST).toContain("label: m.is_active ? '止める' : '再開'")
@@ -134,9 +145,11 @@ describe('V6 予約設定', () => {
   })
 
   it('日時の表示は予約設定内の共通整形を使う', () => {
-    expect(LIST).toContain("from '../lib/format-time'")
-    expect(LIST).not.toContain('function bookingWindowEnd(')
-    expect(LIST).not.toContain('function businessHourSummary(')
+    // readUiSource は共通整形の定義まで読むので、入口だけを検査する。
+    const entry = readRawSource(join(ROOT, 'page.tsx'), 'utf8')
+    expect(entry).toContain("from '../lib/format-time'")
+    expect(entry).not.toContain('function bookingWindowEnd(')
+    expect(entry).not.toContain('function businessHourSummary(')
   })
 
   it('営業時間の要約で存在しない末尾を断言しない', () => {
@@ -144,8 +157,9 @@ describe('V6 予約設定', () => {
   })
 
   it('C9fv7A: 閲覧のみは帯と押せない作るボタンと目印を出す', () => {
-    expect(SETTINGS_V8).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
-    expect(SETTINGS_V8).toContain('<Button variant="primary" disabled')
+    // 閲覧のみの帯と押せない作るボタンはメニュータブの中にある。
+    expect(SETTINGS_MENUS_TAB).toContain('閲覧のみで見ています。変える操作は管理者に頼んでください。')
+    expect(SETTINGS_MENUS_TAB).toContain('<Button variant="primary" disabled')
     expect(SETTINGS_V8).toContain("tab === 'menus' && !canEditMenus ? 'C9fv7A'")
   })
 
@@ -159,6 +173,72 @@ describe('V6 予約設定', () => {
     expect(SETTINGS_V8).toContain('setPhoneOpen(true)')
     expect(SETTINGS_V8).toContain('お客さまに見える画面を確かめる')
     expect(SETTINGS_CSS).toMatch(/\.sidePhoneButton\s*\{[^}]*display:\s*flex/)
+  })
+
+  it('ZyDd6: 予約経路タブは経路の口から表を作る', () => {
+    expect(SETTINGS_V8).toContain("{ key: 'channels', label: '予約経路', node: 'ZyDd6' }")
+    expect(SETTINGS_V8).toContain('/api/booking/admin/channels?account_id=')
+    expect(SETTINGS_V8).toContain('スタッフの Google カレンダー')
+    expect(SETTINGS_V8).toContain('data-design-node="wJYQb"')
+  })
+
+  it('wJYQb: 指名なしの自動割り当てだけを保存できる決まりにする', () => {
+    expect(SETTINGS_V8).toContain('/api/booking/admin/channels/settings?account_id=')
+    expect(SETTINGS_V8).toContain('指名なしの予約は、その時間に空いているスタッフへ自動で割り当て')
+  })
+})
+
+describe('wJYQb 自動割り当ての保存・権限・失敗', () => {
+  function installChannels(saveStatus = 200) {
+    const requests: Array<{ accountId: string | null; body: unknown }> = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input))
+      const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
+        status, headers: { 'Content-Type': 'application/json' },
+      })
+      if (url.pathname === '/api/booking/admin/channels/settings') {
+        requests.push({ accountId: url.searchParams.get('account_id'), body: JSON.parse(String(init?.body)) })
+        expect(init?.method).toBe('PUT')
+        return saveStatus === 200 ? json({ ok: true }) : json({ error: 'test failure' }, saveStatus)
+      }
+      if (url.pathname === '/api/booking/admin/channels') {
+        return json({ success: true, data: { timeZone: 'Asia/Tokyo', staff: [], channels: [], autoAssign: true } })
+      }
+      if (url.pathname === '/api/booking/admin/conflicts') return json({ success: true, data: { conflicts: [] } })
+      throw new Error(`Unexpected API: ${url.pathname}`)
+    }))
+    return requests
+  }
+
+  it('取得済みの設定を表示し、選んだアカウントへ変更を保存する', async () => {
+    const requests = installChannels()
+    render(React.createElement(ChannelsTabV8, { accountId: 'account-a', canEdit: true }))
+    const toggle = await screen.findByRole('switch')
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    await act(async () => { toggle.click() })
+    expect(requests).toEqual([{ accountId: 'account-a', body: { autoAssign: false } }])
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('閲覧のみでは保存を送らず、現在の設定は読める', async () => {
+    const requests = installChannels()
+    render(React.createElement(ChannelsTabV8, { accountId: 'account-a', canEdit: false }))
+    const toggle = await screen.findByRole('switch')
+    expect(toggle.closest('fieldset')?.disabled).toBe(true)
+    await act(async () => { toggle.click() })
+    expect(requests).toEqual([])
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('保存に失敗したら設定を変えず、失敗を知らせて再操作を許す', async () => {
+    const requests = installChannels(503)
+    render(React.createElement(ChannelsTabV8, { accountId: 'account-a', canEdit: true }))
+    const toggle = await screen.findByRole('switch')
+    await act(async () => { toggle.click() })
+    expect(requests).toHaveLength(1)
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(toggle.closest('fieldset')?.disabled).toBe(false)
   })
 })
 

@@ -151,6 +151,9 @@ async function render() {
     await Promise.resolve()
     await Promise.resolve()
   })
+  await act(async () => {
+    for (const button of host.querySelectorAll<HTMLButtonElement>('button[aria-expanded="false"]')) button.click()
+  })
 }
 
 async function settle() {
@@ -192,7 +195,7 @@ describe('N-448 全任意機能の利用状況バッジ', () => {
     // 計測できない機能は 0 にせず未計測＋理由。
     const analytics = rows.find((row) => rowText(row).includes('分析'))
     expect(analytics && rowText(analytics)).toContain('未計測')
-    expect(analytics && rowText(analytics)).toContain('画面の閲覧は計測していません')
+    expect(analytics?.querySelector('[title*="画面の閲覧は計測していません"]')).not.toBeNull()
     expect(analytics && rowText(analytics)).not.toContain('90日で 0')
     // 集計に失敗した機能は取得失敗＋読み直し。
     const forms = rows.find((row) => rowText(row).includes('フォーム'))

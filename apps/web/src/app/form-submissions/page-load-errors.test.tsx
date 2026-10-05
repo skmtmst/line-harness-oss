@@ -90,6 +90,8 @@ function mockFoldersOk() {
 }
 
 beforeEach(() => {
+  // V8だけ見る（v7側は触らない）。この印でV8を出す。
+  document.documentElement.dataset.theme = 'v8'
   const storage = new MemoryStorage()
   storage.setItem('lh_staff_role', 'admin')
   vi.stubGlobal('localStorage', storage)
@@ -128,18 +130,19 @@ describe('R602: フォーム取得の失敗は403と503で言い分ける', () =
     })
     await mount()
     expect(host.textContent).toContain('見る権限がありません')
-    expect(host.textContent).toContain('管理者に')
+    expect(host.textContent).toContain('オーナーか管理者に追加を依頼')
     expect(retryButtons()).toHaveLength(0)
     expect(host.textContent).not.toContain('箱フォーム')
   })
 
   it('429は混み合いの案内と再試行を出す', async () => {
     fetchApi.mockImplementation(async (url: string) => {
-      if (url.startsWith('/api/forms?')) throw new ApiError(429, 'Too Many Requests')
+      if (url.startsWith('/api/forms?')) throw new ApiError(429, 'Too Many Requests', undefined, undefined, undefined, 30)
       throw new Error(`unexpected fetch: ${url}`)
     })
     await mount()
     expect(host.textContent).toContain('混み合っています')
+    expect(host.textContent).toContain('30秒ほど待ってから')
     expect(retryButtons()).toHaveLength(1)
   })
 

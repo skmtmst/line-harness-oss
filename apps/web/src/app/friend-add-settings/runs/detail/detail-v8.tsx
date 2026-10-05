@@ -14,6 +14,7 @@ import { AlertCircle, Check, MessageCircle, RotateCcw, Settings2, XCircle } from
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { api, type FriendAddRunDetail } from '@/lib/api'
@@ -97,6 +98,8 @@ function FriendAddRunDetailV8Inner() {
   const [missing, setMissing] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [notice, setNotice] = useState('')
+  /* 失敗処理の再試行は押した直後に動かさない。確認の窓で読み合わせてから動かす。 */
+  const [retryConfirmOpen, setRetryConfirmOpen] = useState(false)
   const requestSequence = useRef(0)
 
   const load = useCallback(async () => {
@@ -143,6 +146,7 @@ function FriendAddRunDetailV8Inner() {
     if (!selectedAccountId || !detail || retrying) return
     setRetrying(true)
     setNotice('')
+    setRetryConfirmOpen(false)
     try {
       const response = await api.friendAddRules.retryRun(selectedAccountId, detail.id)
       if (!response.success) {
@@ -287,7 +291,7 @@ function FriendAddRunDetailV8Inner() {
           </section>
           {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
           {failed.length === 0 && detail.status === 'failed' ? (
-            <Button variant="primary" disabled={retrying} busy={retrying} busyLabel="再試行中…" onClick={() => void retry()}>
+            <Button variant="primary" disabled={retrying} busy={retrying} busyLabel="再試行中…" onClick={() => setRetryConfirmOpen(true)}>
               失敗した処理をもう一度
             </Button>
           ) : null}
@@ -344,6 +348,17 @@ function FriendAddRunDetailV8Inner() {
           <p className={styles.statusNote}>{runStatus.label}・{runAction}</p>
         </aside>
       </div>
+      {retryConfirmOpen ? (
+        <ConfirmDialog
+          open
+          title="失敗した処理をもう一度行いますか？"
+          description="届かなかった処理だけをもう一度行います。相手には新しく届きます。"
+          confirmLabel="もう一度行う"
+          busy={retrying}
+          onConfirm={() => void retry()}
+          onCancel={() => setRetryConfirmOpen(false)}
+        />
+      ) : null}
     </div>
   )
 }

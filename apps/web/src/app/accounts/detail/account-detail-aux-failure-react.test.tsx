@@ -21,8 +21,10 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('id=child-a'),
+  usePathname: () => '/accounts/detail',
+  useRouter: () => ({ push: vi.fn() }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({}) }))
 
 const CHILD = {
   id: 'child-a', channelId: '2007000009', name: '子アカウント',

@@ -157,7 +157,8 @@ describe('A-8 friends tenant scope', () => {
     expect(await response.json()).toEqual({
       success: true,
       data: {
-        active: 0, total: 0, blockedByThem: 0, hiddenByUs: 0,
+        active: 0,
+        activeLastMonth: null, activeMonthDelta: null, activeComparisonDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), total: 0, blockedByThem: 0, hiddenByUs: 0,
         unanswered: 0, resolved: 0, addedThisMonth: 0, addedLastMonth: 0,
       },
     });

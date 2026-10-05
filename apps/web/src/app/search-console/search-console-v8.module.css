@@ -1,0 +1,25 @@
+
+.board { min-width: 0; container-type: inline-size; container-name: search-board; }
+.board > header { border-bottom: 1px solid var(--color-hairline); }
+.content { padding: 16px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; min-width: 0; }
+.board > .toolbar { padding: 16px 24px; }
+.property { width: 300px; max-width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.property label { font-size: 12px; font-weight: 500; }
+.settings { margin-left: auto; }
+.chart, .ranking, .devices { min-width: 0; padding: 16px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); }
+.chart h2, .devices h2 { font-size: 14px; font-weight: 600; }
+.trend { margin-top: 18px; }
+.bars { height: 110px; display: flex; align-items: flex-end; gap: 5px; }
+.bars > div { height: 100%; flex: 1; min-width: 0; display: flex; align-items: flex-end; }
+.bars span { display: block; width: 100%; background: var(--color-accent); border-radius: var(--radius-chart-dot) var(--radius-chart-dot) var(--radius-none) var(--radius-none); }
+.axis { display: flex; justify-content: space-between; gap: 8px; color: var(--color-ink-secondary); font-size: 10px; margin-top: 12px; }
+.results { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 200px; align-items: start; gap: 12px; }
+.sectionHead { margin-bottom: 12px; }
+.ranking table { width: 100%; table-layout: fixed; }
+.ranking th, .ranking td { padding: 10px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.devices ul { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.devices li { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.devices strong { font-weight: 600; }
+@container search-board (max-width: 1099px) { .results { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .devices { grid-column: 1 / -1; } }
+@container search-board (max-width: 650px) { .results { grid-template-columns: minmax(0, 1fr); } }

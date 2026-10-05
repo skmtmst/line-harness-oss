@@ -1,0 +1,362 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B サイトスクリプト（板 `XjOte`）。
+ *
+ * v7 のサイトスクリプト（`site-script.tsx`）とは別の見せ方。
+ * 取ってくる口・サイトの追加と直し・止めると再開・コードのコピーは
+ * v7 と同じ。口に無い所（サイトごとの最後に届いた日時）は作らない。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headBack {
+  margin: 0;
+}
+
+.headBackLink {
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.headBackLink:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 本体：左に作業の列、右に届き具合の列。 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 16px;
+  align-items: start;
+}
+
+.mainCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.railCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 段のカード。 */
+.card {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.cardNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 表。 */
+.tableWrap {
+  margin-top: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.table {
+  width: 100%;
+  min-width: 640px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th.numeric,
+.table td.numeric {
+  text-align: right;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.cellMain {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellEllipsis {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellMuted {
+  color: var(--color-ink-faint);
+}
+
+.cellValue {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 状態の札。 */
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statePillDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.statePillActive {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.statePillMuted {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+/* コードの黒い箱。 */
+.codeBox {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  font-family: var(--font-num);
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.codeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ドメインの箱。 */
+.domainBox {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.8;
+  white-space: pre-line;
+}
+
+/* 案内の見本。 */
+.consentMock {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas-sunken);
+}
+
+.consentMockRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 12px;
+}
+
+.consentMockButtons {
+  display: flex;
+  gap: 8px;
+}
+
+.consentMockNo {
+  padding: 6px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.consentMockYes {
+  padding: 6px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 定義の行。 */
+.defList {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.defRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+.defRow + .defRow {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.defValue {
+  color: var(--color-ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.defValueAccent {
+  color: var(--color-accent-deep);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cardLink {
+  color: var(--color-action);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.cardLink:hover {
+  text-decoration: underline;
+}
+
+/* 番号つきの説明。 */
+.howList {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.howList li + li {
+  margin-top: 8px;
+}
+
+/* ===== 板が 1100px を切ったら右の列を下へ ===== */
+@container (max-width: 1099px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

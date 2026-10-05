@@ -128,6 +128,7 @@ function GoogleBusinessInner() {
       'error:location_mismatch': { tone: 'danger', text: '選んだ店舗をGoogleで確認できなかったため保存しませんでした。店舗一覧をもう一度読み込んでから選び直してください。' },
       'error:no_locations': { tone: 'danger', text: 'このGoogleアカウントで管理できる店舗が見つかりませんでした。店舗を管理しているGoogleアカウントでログインしてください。' },
       'error:oauth_not_configured': { tone: 'danger', text: 'この環境にはGoogle接続の設定がありません。' },
+      'error:no_permission': { tone: 'danger', text: 'Googleの許可画面で「ビジネス情報の管理」の許可が外れていたため、接続していません。もう一度「Googleアカウントを接続」から進み、この許可を付けたままにしてください。' },
     }
     setBanner(messages[result] ?? { tone: 'danger', text: 'Googleとの接続に失敗しました。あとでもう一度お試しください。' })
     const next = new URLSearchParams(searchParams.toString())
@@ -415,7 +416,7 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
         <h2 className="text-metric leading-relaxed font-bold">設定</h2>
         <p className="text-ink-secondary text-sm leading-relaxed">このLINEアカウントに接続しているGoogleアカウントを確認できます。</p>
       </header>
-      {connection.status === 'expired' ? <NoteBar tone="danger" className="mb-4">Googleとの接続を確認してください。認可が切れています。店舗を管理するGoogleアカウントで再接続してください。保存中の下書きは残っています。</NoteBar> : null}
+      {connection.status === 'expired' ? <NoteBar tone="danger" className="mb-4">Googleとの接続を確認してください。認可が切れています。店舗を管理するGoogleアカウントで再接続してください。保存中の返信の下書きはいま残っていますが、Googleから取得した口コミは最終更新から30日以内に削除するため、再接続しないままだと下書きも一緒に消えます。</NoteBar> : null}
       {connection.status === 'no_permission' ? <NoteBar tone="danger" className="mb-4">この店舗を操作する権限がありません。接続済み店舗の管理権限をGoogle側で確認してください。</NoteBar> : null}
       <div className="flex justify-center pt-4 sm:pt-8">
         <section className="border-hairline bg-canvas flex w-full flex-col gap-5 rounded-card border p-5 sm:p-8" style={{ maxWidth: 680 }} aria-labelledby="google-connected-title">
@@ -439,7 +440,7 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
             <Button className="v7:min-h-11" variant="danger" onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>接続を解除</Button>
           </div>
           <div className="border-hairline border-t pt-5">
-            <p className="text-ink-secondary text-label leading-relaxed">認可が切れた場合は、店舗を管理するGoogleアカウントで再接続してください。接続解除後は口コミの同期とGoogleへの返信を止めますが、取得済みの口コミと下書きは残ります。</p>
+            <p className="text-ink-secondary text-label leading-relaxed">認可が切れた場合は、店舗を管理するGoogleアカウントで再接続してください。接続を解除すると、Googleへの返信と同期を止め、Googleから取得した口コミ・プロフィール・指標の保存分を削除します。だれがいつ何をGoogleへ送ったかの記録だけ残ります。</p>
             {!canManage ? <p className="text-ink-faint mt-3 text-xs">Googleアカウントの接続は、統括の管理者へ依頼してください。</p> : null}
           </div>
         </section>
@@ -447,7 +448,7 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
       <ConfirmDialog
         open={confirmDisconnect}
         title="Googleアカウントの接続を解除しますか？"
-        description="解除すると、口コミの同期とGoogleへの返信を止めます。取得済みの口コミ・下書き・記録は残ります。もう一度使うには再接続が必要です。"
+        description="解除すると、Google側の許可を取り消し、保存しているトークンと、Googleから取得した口コミ・プロフィール・指標・取り込んだ投稿を削除します。返信の下書きも消えます。だれがいつ何をGoogleへ送ったかの記録だけ残ります。この操作は取り消せません。もう一度使うには再接続が必要です。"
         confirmLabel="接続を解除する"
         destructive
         busy={busy}

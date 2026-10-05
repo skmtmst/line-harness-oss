@@ -583,7 +583,7 @@ function CarouselEditorInner() {
                           vars={actionOptions.vars}
                         />
                         {action.actions.length === 0 && (
-                          <p className="text-warning text-[11px]">
+                          <p className="text-warning text-micro">
                             何も設定されていません。押されても何も起きません。
                           </p>
                         )}

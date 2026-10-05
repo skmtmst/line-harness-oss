@@ -1,3 +1,5 @@
+> **廃止（2026-10-05）**：見た目の根拠として使わない。管理画面の見た目は V8 だけで、決まりは `docs/v8-design-rules.md`。この文書は v7 の分岐の片付けと一緒に消す。
+
 # NodeTerm で AI を 3 役に分けて回す設計(2026-09-03)
 
 司令塔を Fable 5.1、デザインを Claude(Opus 5)、実装を Codex にし、互いの作業が重ならないようにする。道具は NodeTerm(https://github.com/eneskirca/nodeterm)。正本は変えない: **GitHub の Issue と PR が正本、NodeTerm はそれを見て動かす場所、Slack は見える化**(AGENTS.md「Slack と Codex の共同開発運用」のとおり)。

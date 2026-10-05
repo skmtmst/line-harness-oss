@@ -119,12 +119,13 @@ export function sourceFiles(dir = SRC) {
  * `className` の中身から、静的に読めるクラス名をすべて集める。
  * 読めない部分があったときは `unresolved` を立てる。
  */
-function readClassName(node) {
+function readClassName(node, cssModules = new Map(), staticBindings = new Map()) {
   const classes = []
   let unresolved = false
 
   const visit = (n) => {
-    if (!n) return
+    if (!n || n.kind === ts.SyntaxKind.NullKeyword || n.kind === ts.SyntaxKind.FalseKeyword
+      || (ts.isIdentifier(n) && n.text === 'undefined')) return
     if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) {
       classes.push(...n.text.split(/\s+/).filter(Boolean))
       return
@@ -156,6 +157,17 @@ function readClassName(node) {
       unresolved = true
       return
     }
+    // CSS Modules の実在する札は静的に解決できる。存在しない札や変数は
+    // 引き続き未解決として数え、Tailwind の動的組み立ても除外しない。
+    if (ts.isPropertyAccessExpression(n) && ts.isIdentifier(n.expression)
+      && cssModules.get(n.expression.text)?.has(n.name.text)) return
+    if (ts.isElementAccessExpression(n) && ts.isIdentifier(n.expression)
+      && n.argumentExpression && ts.isStringLiteral(n.argumentExpression)
+      && cssModules.get(n.expression.text)?.has(n.argumentExpression.text)) return
+    if (ts.isIdentifier(n) && staticBindings.has(n.text)) {
+      visit(staticBindings.get(n.text))
+      return
+    }
     if (ts.isIdentifier(n) || ts.isPropertyAccessExpression(n)) {
       unresolved = true
       return
@@ -172,6 +184,8 @@ function readClassName(node) {
  *
  * 試験から合成したソースを渡せるように切り出してある。
  */
+const staticExportCache = new Map()
+
 export function analyzeSource(full, text, parts) {
   const counts = {}
   const bump = (_file, key) => {
@@ -182,6 +196,41 @@ export function analyzeSource(full, text, parts) {
     const source = ts.createSourceFile(full, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
     // 名前ではなく import の行き先で共通部品を見分ける。
     const partNames = localPartNames(full, source, parts)
+    const cssModules = new Map()
+    const staticBindings = new Map()
+    // 共有されている文字列定数だけを解決する。入力や関数の結果は追わない。
+    for (const statement of source.statements) {
+      if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)
+        || !statement.importClause?.namedBindings || !ts.isNamedImports(statement.importClause.namedBindings)) continue
+      const target = resolveImport(full, statement.moduleSpecifier.text)
+      if (!target || !/\.tsx?$/.test(target)) continue
+      let imported = staticExportCache.get(target)
+      if (!imported) {
+        imported = ts.createSourceFile(target, readFileSync(target, 'utf8'), ts.ScriptTarget.Latest, true)
+        staticExportCache.set(target, imported)
+      }
+      for (const declaration of imported.statements) {
+        if (!ts.isVariableStatement(declaration) || !(declaration.declarationList.flags & ts.NodeFlags.Const)
+          || !declaration.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue
+        for (const binding of declaration.declarationList.declarations) {
+          if (!ts.isIdentifier(binding.name) || !binding.initializer
+            || !(ts.isStringLiteral(binding.initializer) || ts.isNoSubstitutionTemplateLiteral(binding.initializer))) continue
+          for (const specifier of statement.importClause.namedBindings.elements) {
+            if ((specifier.propertyName ?? specifier.name).text === binding.name.text)
+              staticBindings.set(specifier.name.text, binding.initializer)
+          }
+        }
+      }
+    }
+    for (const statement of source.statements) {
+      if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)
+        || !statement.moduleSpecifier.text.endsWith('.module.css') || !statement.importClause?.name) continue
+      const target = resolveImport(full, statement.moduleSpecifier.text)
+      if (!target) continue
+      const css = readFileSync(target, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+      const names = new Set([...css.matchAll(/\.([A-Za-z_][\w-]*)/g)].map((match) => match[1]))
+      cssModules.set(statement.importClause.name.text, names)
+    }
 
     const walk = (node) => {
       if (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node)) {
@@ -189,7 +238,7 @@ export function analyzeSource(full, text, parts) {
         const attr = node.attributes.properties.find(
           (p) => ts.isJsxAttribute(p) && p.name.getText() === 'className',
         )
-        const read = attr?.initializer ? readClassName(attr.initializer) : { classes: [], unresolved: false }
+        const read = attr?.initializer ? readClassName(attr.initializer, cssModules, staticBindings) : { classes: [], unresolved: false }
 
         // 静的に読めない className。数に入らないぶん、別の指標として数える。
         if (read.unresolved) bump(file, 'unresolved-classname')

@@ -45,6 +45,7 @@ import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
@@ -315,6 +316,9 @@ export default function TemplatesListV8() {
    */
   const [canMutateTemplates] = useState(() =>
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  // 1152の板（`L7zA7C`）。折り畳みはCSSのコンテナ問い合わせが担い、
+  // ここでは板IDだけを切り替える。
+  const narrow = useNarrowViewport()
 
   const [activeSection, setActiveSection] = useState<Section>('message')
   const [templates, setTemplates] = useState<Template[]>([])
@@ -1014,7 +1018,7 @@ export default function TemplatesListV8() {
   /* ===== 一覧の中身（`susGP`：読込中・読み込めない・空・0件を分ける） ===== */
   const sectionWord = activeSection === 'question' ? '質問のテンプレート' : 'メッセージのテンプレート'
   const listBody = accountLoading || view === 'loading' ? (
-    <div className={styles.skeletonRows} aria-label="読み込み中">
+    <div className={styles.skeletonRows} aria-label="読み込み中" data-design-node="susGP">
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className={styles.skeletonRow}>
           <span className={styles.skeletonDot} />
@@ -1036,7 +1040,7 @@ export default function TemplatesListV8() {
       </p>
     </div>
   ) : view === 'forbidden' || view === 'error' ? (
-    <div className={styles.stateCard}>
+    <div className={styles.stateCard} data-design-node="susGP">
       <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
         <TriangleAlert size={18} aria-hidden="true" />
       </span>
@@ -1054,7 +1058,7 @@ export default function TemplatesListV8() {
     </div>
   ) : filteredTemplates.length === 0 ? (
     filterActive ? (
-      <div className={styles.stateCard}>
+      <div className={styles.stateCard} data-design-node="susGP">
         <span className={styles.stateIcon}>
           <SearchIcon size={18} aria-hidden="true" />
         </span>
@@ -1068,7 +1072,7 @@ export default function TemplatesListV8() {
         </Button>
       </div>
     ) : (
-      <div className={styles.stateCard}>
+      <div className={styles.stateCard} data-design-node="susGP">
         <span className={styles.stateIcon}>
           <FileText size={18} aria-hidden="true" />
         </span>
@@ -1282,7 +1286,7 @@ export default function TemplatesListV8() {
 
       <div className={styles.pagerRow}>
         <span className={styles.pagerCount}>
-          {filteredTemplates.length === 0 ? 0 : (safePage - 1) * pageSize + 1}〜{Math.min(safePage * pageSize, filteredTemplates.length)} / {formatNumber(filteredTemplates.length)}件
+          {formatNumber(filteredTemplates.length)}件中 {filteredTemplates.length === 0 ? 0 : (safePage - 1) * pageSize + 1}〜{Math.min(safePage * pageSize, filteredTemplates.length)}件
         </span>
         {pageCount > 1 ? (
           <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} />
@@ -1294,7 +1298,7 @@ export default function TemplatesListV8() {
   const isTemplateSection = activeSection === 'message' || activeSection === 'question'
 
   return (
-    <div className={styles.board} data-design-node="L7zA7C">
+    <div className={styles.board} data-design-node={narrow ? 'L7zA7C' : undefined}>
       {/*
         骨格の印（data-design）は v7 の page.tsx 側が担う。ここへ別の節名を
         足すと、設計と画面の対を調べる design-structure の検査が
@@ -1309,6 +1313,14 @@ export default function TemplatesListV8() {
           </p>
         </div>
       </div>
+      {!canMutateTemplates ? (
+        <p className={styles.readonlyBand} data-design-node="hEDTK">
+          閲覧のみで見ています。変える操作は管理者に頼んでください。
+        </p>
+      ) : null}
+
+      {/* 見るだけの人への帯（`hEDTK`）。操作は押せない形のまま置く。 */}
+
 
       {/* 種類のタブ（件数つき）。資産タブはそれぞれの素材一覧を出す。 */}
       <Tabs
@@ -1632,6 +1644,7 @@ export default function TemplatesListV8() {
 
       {/* 削除の確認窓（`V6JFnd`：使っていないテンプレート）。 */}
       <ConfirmDialog
+        designNode="V6JFnd"
         open={pendingDelete !== null}
         title={`テンプレート「${pendingDelete?.item.name ?? ''}」を削除しますか？`}
         description={templateDeleteDescription(pendingDelete?.item.usageCount ?? 0)}

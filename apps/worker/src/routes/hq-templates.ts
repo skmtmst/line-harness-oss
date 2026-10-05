@@ -1,3 +1,5 @@
+import { listTemplateFolders, saveTemplateFolder, deleteTemplateFolder, duplicateTemplate } from '../services/hq-templates/folders.js';
+import { listMessageReferences } from '../services/hq-templates/message-card-references.js';
 import { deleteHqImage, uploadHqImage } from '../services/hq-templates/authoring-media.js';
 import { TemplateHqTemplateError } from '../services/hq-templates/template.js';
 import { Hono, type Context } from 'hono';
@@ -24,9 +26,11 @@ async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
   return auth.authority;
 }
 const reasons: Record<string, string> = {
+  CARD_REFERENCE_UNAVAILABLE: '配り先に同じ名前のフォーム・シナリオが1件だけあるか、フォーム用のLIFFが設定されているか確認してください',
   INVALID_REQUEST_ID: '作成依頼の識別情報を確認してください',
   IDEMPOTENCY_CONFLICT: '同じ作成依頼の内容が変わっています。元の内容で再確認してください',
   CREATE_RECEIPT_UNAVAILABLE: '作成済みの記録を確認できません。一覧から状態を確認してください',
+  FOLDER_NAME_CONFLICT: '同じ名前の分類があります',
   FORBIDDEN: '統括の編集権限が必要です', NOT_FOUND: '対象が見つかりません', INVALID_IMAGE: '画像の指定を確認してください',
   UNSUPPORTED: 'この種類のひな形はまだ利用できません',
   VERSION_CONFLICT: '編集がありました。もう一度確認してください',
@@ -78,11 +82,17 @@ hqTemplates.delete('/api/hq/templates/media', async c => {
   }
 });
 hqTemplates.get('/api/hq/templates/accounts', async c => c.json({ success: true, data: await listTemplateAccounts(dbFor(c.env), await authority(c)) }));
+hqTemplates.get('/api/hq/templates/message-references', async c => c.json({ success: true, data: await listMessageReferences(dbFor(c.env), await authority(c)) }));
 hqTemplates.get('/api/hq/templates', async c => {
   const type = c.req.query('type');
   if (type && !HQ_TEMPLATE_TYPES.includes(type as HqTemplateType)) throw new HqTemplateError('INVALID_TYPE');
   return c.json({ success: true, data: await listTemplates(dbFor(c.env), await authority(c), type as HqTemplateType | undefined) });
 });
+hqTemplates.get('/api/hq/templates/folders', async c => c.json({ success:true, data:await listTemplateFolders(dbFor(c.env),await authority(c)) }));
+hqTemplates.post('/api/hq/templates/folders', async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c)) },201));
+hqTemplates.patch('/api/hq/templates/folders/:id', async c => c.json({ success:true, data:await saveTemplateFolder(dbFor(c.env),await authority(c),await body(c),c.req.param('id')) }));
+hqTemplates.delete('/api/hq/templates/folders/:id', async c => c.json({ success:true, data:await deleteTemplateFolder(dbFor(c.env),await authority(c),c.req.param('id'),(await body(c)).expectedRevision) }));
+hqTemplates.post('/api/hq/templates/:id/duplicate', async c => c.json({ success:true, data:await duplicateTemplate(dbFor(c.env),await authority(c),c.req.param('id'),await body(c)) },201));
 hqTemplates.get('/api/hq/templates/:id', async c => c.json({ success: true, data: await templateDetail(dbFor(c.env), await authority(c), c.req.param('id')) }));
 hqTemplates.post('/api/hq/templates', async c => {
   const auth = await authority(c), input = await body(c), headerKey = c.req.header('Idempotency-Key');
@@ -104,7 +114,7 @@ hqTemplates.delete('/api/hq/templates/:id', async c => {
 hqTemplates.post('/api/hq/templates/:id/preflight', async c => {
   const input = await body(c);
   if (!Array.isArray(input.accountIds) || input.accountIds.some(v => typeof v !== 'string')) throw new HqTemplateError('INVALID_ACCOUNTS');
-  return c.json({ success: true, data: await preflightDistribution(dbFor(c.env), await authority(c), c.req.param('id'), input.accountIds as string[], c.env.IMAGES) });
+  return c.json({ success: true, data: await preflightDistribution(dbFor(c.env), await authority(c), c.req.param('id'), input.accountIds as string[], c.env.IMAGES, input.textOverrides) });
 });
 hqTemplates.post('/api/hq/templates/:id/distribute', async c => {
   const input = await body(c);

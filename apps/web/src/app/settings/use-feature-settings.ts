@@ -111,6 +111,8 @@ export function useFeatureSettings() {
   /** GET で受けた版。保存時に送り返し、競合(409)を検出する。 */
   const [settingsVersion, setSettingsVersion] = useState(0)
   const [error, setError] = useState('')
+  /** ★V8 `ziYCN`：ほかの管理者が先に保存した。編集中身は残して帯で知らせる。 */
+  const [conflict, setConflict] = useState(false)
   /*
    * 監査 D019: 読み込みに失敗したら初期値のスイッチ一覧を本物の設定の
    * ように出さない。失敗の印だけにして、偽の設定を触らせない。
@@ -477,6 +479,7 @@ export function useFeatureSettings() {
         setItemOrder(currentOrder)
       }
       setReason('')
+      setConflict(false)
       notifyToast('機能設定を保存しました。サイドメニューにも反映されています。')
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
       return true
@@ -502,6 +505,7 @@ export function useFeatureSettings() {
       // 読み込めていないときの409は競合ではなく本当の理由にする（D019）。
       if (error instanceof ApiError && error.status === 409) {
         await reloadSaved()
+        setConflict(true)
         setError(loadFailed
           ? featureSettingsSaveConflictMessage({ loadFailed, loadForbidden: loadErrorStatus === 403 })
           : FEATURE_SETTINGS_CONFLICT_MESSAGE)
@@ -596,6 +600,9 @@ export function useFeatureSettings() {
     saving,
     error,
     setError,
+    conflict,
+    setConflict,
+    reloadSaved,
     loadFailed,
     loadErrorStatus,
     reason,

@@ -430,6 +430,34 @@ describe('画像ライブラリと店舗への受け渡し', () => {
     expect((await call('GET', '/api/hq/banners/images?delivered=yes')).status).toBe(400);
   });
 
+  it('全件を検索し、同時刻の画像を漏らさず次ページへ進み、分類の総数を返す', async () => {
+    const { project, image } = await generatedImage();
+    for (let i = 0; i < 3; i++) {
+      expect((await call('POST', `/api/hq/banners/projects/${project.id}/uploads`, {
+        filename: `extra-${i}.png`, data: `data:image/png;base64,${toB64(PNG)}`,
+      })).status).toBe(201);
+    }
+    testDb.raw.prepare("UPDATE banner_images SET created_at='2026-10-04T10:00:00Z'").run();
+    await call('PATCH', `/api/hq/banners/images/${image.id}`, { isFavorite: true });
+    const ids: string[] = [];
+    let before: string | null = null;
+    for (let i = 0; i < 5; i++) {
+      const response = await call('GET', `/api/hq/banners/images?limit=1&withCounts=1${before ? `&before=${encodeURIComponent(before)}` : ''}`);
+      expect(response.status).toBe(200);
+      const page = await response.json<{ data: {id:string}[]; nextBefore:string|null; counts: { all: number; favorite: number } }>();
+      expect(page.counts).toMatchObject({ all: 4, favorite: 1 });
+      ids.push(...page.data.map(x => x.id)); before = page.nextBefore;
+      if (!before) break;
+    }
+    expect(ids).toHaveLength(4); expect(new Set(ids).size).toBe(4);
+    const byProject = await call('GET', `/api/hq/banners/images?q=${encodeURIComponent('春のキャンペーン')}&withCounts=1&limit=1`);
+    expect(await byProject.json()).toMatchObject({ counts: { all: 4 } });
+    const shaped = await call('GET', '/api/hq/banners/images?shape=square');
+    expect((await shaped.json<{data:{id:string}[]}>()).data.map(x => x.id)).toEqual([image.id]);
+    expect((await call('GET', '/api/hq/banners/images?shape=bad')).status).toBe(400);
+    expect((await call('GET', '/api/hq/banners/images?before=%7Bbad')).status).toBe(400);
+  });
+
   it('形式の合わないファイルは取り込まない', async () => {
     const { project } = await generatedImage();
     const res = await call('POST', `/api/hq/banners/projects/${project.id}/uploads`, {

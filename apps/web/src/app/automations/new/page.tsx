@@ -1,7 +1,9 @@
 'use client'
 
 import Select from '@/components/shared/select'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { NewAutomationV8 } from './new-v8'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Automation } from '@line-crm/shared'
@@ -757,7 +759,23 @@ function ResourcePickRow(props: {
   )
 }
 
+/*
+ * ★V8-B の切り替え。v8 の器は別ファイル（new-v8.tsx）に置き、
+ * v7 の器・動きはこの下の V7 のまま残す。
+ */
 export default function NewAutomationPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') {
+    return (
+      <Suspense fallback={null}>
+        <NewAutomationV8 chrome="create" />
+      </Suspense>
+    )
+  }
+  return <NewAutomationPageV7 />
+}
+
+function NewAutomationPageV7() {
   usePageTitle('ルールを作る')
   const router = useRouter()
   const { selectedAccountId } = useAccount()

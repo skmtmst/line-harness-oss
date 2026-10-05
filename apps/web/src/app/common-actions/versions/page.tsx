@@ -17,6 +17,8 @@ import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { CommonActionVersionsV8 } from '../common-action-versions-v8'
 import { useManualHref } from '@/lib/use-manual-href'
 
 /* 監査 R468: 処理名と版の変わり方は version-diff.ts に集める。 */
@@ -570,7 +572,13 @@ function CommonActionVersionsInner() {
   )
 }
 
+/*
+ * ★V8-B の切り替え。v8 の器は別ファイル
+ * （common-action-versions-v8.tsx）に置き、v7 の器・動きはそのまま残す。
+ */
 export default function CommonActionVersionsPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <CommonActionVersionsV8 />
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">版と利用先を読み込んでいます</div>}>
       <CommonActionVersionsInner />

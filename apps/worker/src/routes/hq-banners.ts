@@ -18,6 +18,7 @@ import {
   countRecentFailedBannerGenerations,
   listBannerGenerations,
   listBannerImages,
+  countBannerImages,
   listBannerProjects,
   recordBannerUsage,
   touchBannerProject,
@@ -716,23 +717,34 @@ hqBanners.get('/api/hq/banners/images', async (c) => {
     if (delivered !== undefined && delivered !== '1' && delivered !== '0') {
       return c.json({ success: false, error: 'delivered は 1 または 0 を指定してください' }, 400);
     }
+    const shape = c.req.query('shape');
+    if (shape && !['square', 'landscape', 'portrait', 'rich_menu'].includes(shape)) return c.json({ success: false, error: '用途の指定を確認してください' }, 400);
+    const before = c.req.query('before')?.trim() || undefined;
+    if (before?.startsWith('{')) {
+      try { const cursor = JSON.parse(before); if (typeof cursor.at !== 'string' || typeof cursor.id !== 'string' || !cursor.id || !Number.isFinite(Date.parse(cursor.at))) throw new Error(); }
+      catch { return c.json({ success: false, error: '読み込み位置を確認してください' }, 400); }
+    }
     const limitRaw = Number(c.req.query('limit') ?? '30');
-    const items = await listBannerImages(c.env.DB, {
+    const filter = {
       tenantId,
       delivered: delivered === undefined ? undefined : delivered === '1',
+      shape: shape as 'square' | 'landscape' | 'portrait' | 'rich_menu' | undefined,
       projectId: c.req.query('projectId')?.trim() || undefined,
       favoriteOnly: c.req.query('favorite') === '1',
       presetKey: c.req.query('preset')?.trim() || undefined,
       query: c.req.query('q')?.trim() || undefined,
-      before: c.req.query('before')?.trim() || undefined,
-      limit: Number.isFinite(limitRaw) ? limitRaw : 30,
-    });
+      before,
+      limit: Number.isFinite(limitRaw) ? Math.min(100, Math.max(1, Math.floor(limitRaw))) : 30,
+    };
+    const items = await listBannerImages(c.env.DB, filter);
+    const counts = c.req.query('withCounts') === '1' ? await countBannerImages(c.env.DB, filter) : undefined;
     const base = workerUrl(c);
     const last = items[items.length - 1];
     return c.json({
       success: true,
       data: items.map((i) => serializeImage(i, base)),
-      nextBefore: items.length >= Math.min(Math.max(limitRaw || 30, 1), 100) && last ? last.created_at : null,
+      counts,
+      nextBefore: items.length >= filter.limit && last ? JSON.stringify({ at: last.created_at, id: last.id }) : null,
     });
   } catch (err) {
     console.error('GET /api/hq/banners/images error:', err);

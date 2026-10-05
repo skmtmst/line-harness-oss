@@ -82,8 +82,8 @@ describe('Issue #637 h1は1画面に1つ', () => {
  * - /nen-members … 監査は「h1:投稿」を不一致と記録したが、現行ナビも
  *   「投稿」。V6-22 は写真審査（投稿）画面であり、監査時点の
  *   「会員」想定は旧定義。現行ナビ名を正として固定する。
- * - /affiliates … 旧URL。実体は /conversions?tab=affiliates。
- *   ナビ「成果とアフィリエイト」に合わせ、タブ側の画面名を渡す。
+ * - /affiliates … V8では独立した「成果とアフィリエイト」の画面。
+ *   旧 /conversions?tab=affiliates から移動しても画面名を一致させる。
  */
 describe('Issue #637 画面名とナビ名の一致', () => {
   it('ナビ項目名が監査対象ルートに対して正しい', () => {
@@ -94,7 +94,7 @@ describe('Issue #637 画面名とナビ名の一致', () => {
     expect(menuLabel('/ec-commerce')).toBe('EC連携')
   })
 
-  it('/conversions は開いているタブの名前を上部バーへ渡す', () => {
+  it('独立したコンバージョンと成果・アフィリエイトが上部バーへ画面名を渡す', () => {
     // アフィリエイト系タブ（旧 /affiliates の実体）
     expect(conversionsTabTitle('affiliates')).toBe('成果とアフィリエイト')
     expect(conversionsTabTitle('offers')).toBe('成果とアフィリエイト')
@@ -106,6 +106,11 @@ describe('Issue #637 画面名とナビ名の一致', () => {
     expect(conversionsTabTitle('unknown')).toBe('コンバージョン')
 
     const src = read('app/conversions/page.tsx')
-    expect(src).toContain('usePageTitle(conversionsTabTitle(tab))')
+    expect(src).toContain("usePageTitle('コンバージョン')")
+    expect(src).toContain('router.replace(target)')
+    expect(src).toContain('`/affiliates?${params.toString()}`')
+    const affiliates = read('app/affiliates/affiliates-v8.tsx')
+    expect(affiliates).toContain('usePageTitle(TITLE_BY_TAB[tab])')
+    expect(affiliates).toContain("affiliates: '成果とアフィリエイト'")
   })
 })

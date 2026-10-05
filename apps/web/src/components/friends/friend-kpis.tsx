@@ -1,15 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import KpiCard from '@/components/shared/kpi-card'
-import kpiStyles from '@/components/shared/kpi-card.module.css'
+import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
 
-/** Pencil ★V6（`zZMNG`）の上部カード。数え方は既存APIのままにする。 */
+/** Pencil ★V8（`ywJ5H`）の上部カード。数え方は既存APIのままにする。 */
 export default function FriendKpis() {
+  const theme = useAdminTheme()
   const { selectedAccountId } = useAccount()
   const [stats, setStats] = useState<FriendStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -52,20 +54,22 @@ export default function FriendKpis() {
 
   const diff = stats ? stats.addedThisMonth - stats.addedLastMonth : 0
 
+  /* 板 `x6QsVz`：増減の札は前月との差（+12）。割合の札は置かない。 */
+  const diffLabel = `${diff >= 0 ? '+' : ''}${diff}`
   const cards = [
     {
-      title: '有効友だち',
+      title: '有効な友だち',
       value: stats?.active ?? null,
       unit: '人',
-      detail: stats ? `総友だち ${formatNumber(stats.total)}人` : '—',
-      badge: stats?.total ? `${Math.round((stats.active / stats.total) * 100)}%` : undefined,
+      detail: stats ? (theme !== 'v8' ? `総友だち ${formatNumber(stats.total)}人` : stats.activeMonthDelta == null ? `総友だち ${formatNumber(stats.total)}人・前月の記録なし` : `前月末 ${formatNumber(stats.activeLastMonth ?? 0)}人（${stats.activeMonthDelta >= 0 ? '+' : ''}${formatNumber(stats.activeMonthDelta)}）`) : '—',
+      badge: undefined,
     },
     {
       title: 'ブロック・非表示',
       value: stats ? stats.blockedByThem + stats.hiddenByUs : null,
       unit: '人',
-      detail: stats ? `相手から ${stats.blockedByThem} ・ 自分から ${stats.hiddenByUs}` : '—',
-      badge: stats?.total ? `${Math.round(((stats.blockedByThem + stats.hiddenByUs) / stats.total) * 100)}%` : undefined,
+      detail: stats ? `相手から ${stats.blockedByThem}・自分から ${stats.hiddenByUs}` : '—',
+      badge: undefined,
       badgeTone: 'neutral' as const,
     },
     {
@@ -73,25 +77,25 @@ export default function FriendKpis() {
       value: stats?.unanswered ?? null,
       unit: '人',
       detail: stats ? `対応済み ${stats.resolved}` : '—',
-      badge: stats ? '要確認' : undefined,
-      badgeTone: 'danger' as const,
+      badge: stats && stats.unanswered > 0 ? '要確認' : undefined,
+      badgeTone: 'warning' as const,
     },
     {
       title: '今月の追加',
       value: stats?.addedThisMonth ?? null,
       unit: '人',
-      // 前月比は「先月まるごと」との比較。月初は必ずマイナスに見えるので、
-      // その旨を添える。数字だけ出すと減ったように読める。
-      detail: stats ? `前月 ${stats.addedLastMonth}人（${diff >= 0 ? '+' : ''}${diff}）` : '—',
-      badge: stats ? `${diff >= 0 ? '+' : ''}${stats.addedThisMonth}` : undefined,
+      detail: stats ? `前月 ${stats.addedLastMonth}人` : '—',
+      badge: stats ? diffLabel : undefined,
+      badgeTone: diff < 0 ? 'neutral' as const : 'accent' as const,
+      help: '今月の月初から現在までの追加人数を、前月の1か月全体と比べています。',
     },
   ]
 
   return (
-    <div data-design="V6FriendKpis" data-design-node="zZMNG">
+    <div data-design="V8FriendKpis" data-design-node="ywJ5H">
       {failed && !loading ? (
         <Notice
-          tone="danger"
+          tone="info"
           className="mb-3.5"
           action={(
             <button
@@ -106,16 +110,12 @@ export default function FriendKpis() {
           友だち集計を読み込めませんでした。
         </Notice>
       ) : null}
-      {/*
-        ★V8（夕10・夕11）：一覧型では枠線付きのカードのまま（数の帯は
-        分析型だけ）。v7 はこれまでの詰めた形（cardV6Tight）、v8 は
-        cardV6 の実寸（16/20・間8・高122）を使う。
-      */}
-      <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
+      <KpiBand gridClassName="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
         {cards.map((card) => (
-          <KpiCard key={card.title} {...card} loading={loading} variant="v6" className={kpiStyles.cardV6Tight} />
+          // 数の帯は1本にまとめる（Pp3nS）。v8 の見た目だけ変わり v7 は不変。
+          <KpiCard key={card.title} {...card} loading={loading} variant="v6" presentation="band" />
         ))}
-      </div>
+      </KpiBand>
     </div>
   )
 }
