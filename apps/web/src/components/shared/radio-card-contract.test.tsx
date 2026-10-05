@@ -101,6 +101,43 @@ describe('ラジオカード（DEEP-02）', () => {
   })
 })
 
+describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () => {
+  const css = () =>
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'radio-card.module.css'), 'utf8')
+
+  it('箱は高さ98・内側14・間8・角丸12（オン・オフ共通）', () => {
+    const blocks = [...css().matchAll(/\[data-theme='v8'\]\s*\.card\s*\{[^}]*\}/gs)].map((m) => m[0])
+    expect(blocks.length, 'v8 の箱の指定がありません').toBeGreaterThan(0)
+    // 値は複数の v8 ブロックに分かれる。どれかにあればよい（後勝ちで打ち消しなし）。
+    for (const re of [/min-height:\s*98px/, /padding:\s*14px/, /gap:\s*8px/, /border-radius:\s*12px/]) {
+      expect(blocks.some((b) => re.test(b)), `${re} が v8 の箱にありません`).toBe(true)
+    }
+  })
+
+  it('オンは淡緑の地面＋1.5px の濃い緑の枠・題13/600/20・説明12/18（fNPdg）', () => {
+    const c = css()
+    expect(c).toMatch(/\[data-theme='v8'\]\s*\.checked[^{]*\{[^}]*outline:\s*1\.5px solid var\(--color-accent-deep\)/s)
+    const titles = [...c.matchAll(/\[data-theme='v8'\]\s*\.title\s*\{[^}]*\}/gs)].map((m) => m[0])
+    expect(titles.length, 'v8 の題の指定がありません').toBeGreaterThan(0)
+    const title = titles[titles.length - 1]
+    expect(title).toMatch(/font-size:\s*13px/)
+    expect(title).toMatch(/line-height:\s*20px/)
+    expect(title).toMatch(/font-weight:\s*600/)
+    const notes = [...c.matchAll(/\[data-theme='v8'\]\s*\.note\s*\{[^}]*\}/gs)].map((m) => m[0])
+    expect(notes.length, 'v8 の説明の指定がありません').toBeGreaterThan(0)
+    const note = notes[notes.length - 1]
+    expect(note).toMatch(/font-size:\s*12px/)
+    expect(note).toMatch(/line-height:\s*18px/)
+    // 選んだ印タグは濃い緑（#087a3e）。
+    expect(c).toMatch(/\[data-theme='v8'\]\s*\.checked \.topIcon\s*\{[^}]*color:\s*var\(--color-accent-deep\)/s)
+  })
+
+  it('オフは白地＋1px の hairline 枠・丸の輪郭 control-border（r3xz1W）', () => {
+    const c = css()
+    expect(c).toMatch(/\[data-theme='v8'\]\s*\.card\s*\{[^}]*outline:\s*1px solid var\(--color-hairline\)/s)
+  })
+})
+
 describe('選ぶカードの行型（BHEl9・変わり形）', () => {
   it('箱なしの行で、本物の input[type=radio] のまま選べる', () => {
     const onChange = vi.fn()
