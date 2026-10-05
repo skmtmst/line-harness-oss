@@ -12,6 +12,13 @@ const DEFAULT_COLORS = [
   '#ec4899', '#f43f5e', '#64748b', '#1d1d1f', '#ffffff', '#9ca3af', '#d1d5db', '#f5f5f7',
 ]
 
+/*
+ * ピッカー本体の幅（`color-well.module.css` の `.pop` と同じ）と、画面の端に
+ * 残す余白。開く向きを決めるときだけ使う。幅を変えるときは両方そろえる。
+ */
+const POP_WIDTH = 288
+const POP_MARGIN = 8
+
 const HEX6 = /^#[0-9a-fA-F]{6}$/
 const HEX8 = /^#[0-9a-fA-F]{8}$/
 
@@ -152,6 +159,7 @@ export default function ColorWell({
   const [hexText, setHexText] = useState((value ?? fallback).replace(/^#/, '').slice(0, 6))
   const emitted = useRef<string | null>(value ?? null)
   const rootRef = useRef<HTMLSpanElement | null>(null)
+  const [alignEnd, setAlignEnd] = useState(false)
   const hasDropper = typeof window !== 'undefined' && 'EyeDropper' in window
 
   // 呼び出し元が外から色を変えたときだけ、面と入力を作り直す。
@@ -267,7 +275,23 @@ export default function ColorWell({
         aria-expanded={open}
         aria-haspopup="dialog"
         disabled={disabled}
-        onClick={() => setOpen((isOpen) => !isOpen)}
+        onClick={() => {
+          if (open) {
+            setOpen(false)
+            return
+          }
+          /*
+            2列に並べた右側（メインカラー・強調カラー）だと、左そろえのままでは
+            ピッカーが画面の右へはみ出す。横スクロールも出ないので、承認した
+            ★BG-2 `P8ZUj` の一番右の見本・透け具合の欄・「この色にする」が
+            押せなくなる。入る幅が無いときだけ右そろえにして、承認どおり全体が
+            見える状態に戻す（ピッカーの中身・大きさは変えない）。
+          */
+          const left = rootRef.current?.getBoundingClientRect().left ?? 0
+          const room = document.documentElement.clientWidth - left
+          setAlignEnd(room < POP_WIDTH + POP_MARGIN)
+          setOpen(true)
+        }}
       >
         <span
           className={value ? styles.swatch : `${styles.swatch} ${styles.swatchEmpty}`}
@@ -282,7 +306,11 @@ export default function ColorWell({
         <ChevronDown size={14} aria-hidden="true" className={styles.caret} />
       </button>
       {open ? (
-        <div className={styles.pop} role="dialog" aria-label={label}>
+        <div
+          className={alignEnd ? `${styles.pop} ${styles.popEnd}` : styles.pop}
+          role="dialog"
+          aria-label={label}
+        >
           {/*
             色の種類の見出し。承認した見た目（★BG-2 `P8ZUj`）には「単色／
             グラデーション」の2つのタブが並ぶが、グラデーションはまだ扱えない
