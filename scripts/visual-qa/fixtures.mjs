@@ -3419,21 +3419,30 @@ export const BROADCAST_FOLDERS = [
 }))
 
 /**
- * 機能7 リマインダ。設計 `M1EXwB` の5行そのまま。
+ * 機能7 リマインダ。V8 板 `apLqS`（リマインダ一覧）の9件そのまま。
+ * フォルダは絵のとおり予約3・契約更新2・イベント2・未分類2（「フォロー」
+ * というフォルダは絵に無い）。未分類の2件は `folderId: null` で返し、
+ * 件数は mock-api が `unfiledCount: 2` で返す。
  *
  * **`Reminder` の型に照らして書く。** 設計の言葉（「予約日時の1日前」）は
  * 見出しであって項目名ではない。`triggerType` は
  * `'manual' | 'booking' | 'event' | 'friend_field'` の4つしかなく、
  * ここに設計の日本語をそのまま入れると画面は既定値のまま描かれ、
- * **5行とも同じきっかけで撮れてしまう**（機能4で一度やった）。
+ * **行が同じきっかけで撮れてしまう**（機能4で一度やった）。
+ * 基準日の言い回しは `baseDateSummary`、時刻の言い回しは
+ * `timingSummary` に書く（実装はそのままつなげて出す）。
  */
 export const REMINDER_FOLDERS = [
-  { id: 'rf-booking', kind: 'reminder', name: '予約', parentId: null, displayOrder: 1, color: '#2563eb', itemCount: 3, listTotal: 9 },
+  { id: 'rf-booking', kind: 'reminder', name: '予約', parentId: null, displayOrder: 1, color: '#2563eb', itemCount: 3 },
   { id: 'rf-contract', kind: 'reminder', name: '契約更新', parentId: null, displayOrder: 2, color: '#d97706', itemCount: 2 },
   { id: 'rf-event', kind: 'reminder', name: 'イベント', parentId: null, displayOrder: 3, color: '#7c3aed', itemCount: 2 },
-  { id: 'rf-follow', kind: 'reminder', name: 'フォロー', parentId: null, displayOrder: 4, color: '#059669', itemCount: 4 },
 ]
 
+/* 板 `apLqS` の9行を上から順に並べた（`displayOrder` が並び）。
+ * 「次に送る」の日付は絵の `10/1（水）18:00` の形になるよう、曜日が合う
+ * 2025年の同じ月日で持つ（実装は曜日を日付から計算する）。下書き・停止中
+ * の行は実装が「—」で出すので `plannedDeliveries` と `nextScheduledAt` は
+ * 空でも絵と同じになるが、他画面（詳細・編集）が読むため値は入れてある。 */
 export const REMINDERS = [
   {
     id: 'reminder-1', name: '予約前日のご案内', description: '予約日時の1日前',
@@ -3441,16 +3450,18 @@ export const REMINDERS = [
     triggerOffsetMinutes: -1440, sendAtTime: '18:00', targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
     folderId: 'rf-booking', stepCount: 1, displayOrder: 1,
-    lifecycleStatus: 'published', timingSummary: '1日前 18:00 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 42, lastSentAt: '2026-08-22T09:00:00.000Z',
+    lifecycleStatus: 'published', timingSummary: '1日前 18:00 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 42, nextScheduledAt: '2025-10-01T18:00:00+09:00', lastSentAt: '2026-08-22T09:00:00.000Z',
     createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T09:00:00.000Z',
   },
   {
+    /* 絵の2行目には「失敗 2」の札が付く。 */
     id: 'reminder-2', name: '予約1時間前のご案内', description: '予約日時の1時間前',
     isActive: true, triggerType: 'booking', deliveryMode: 'countdown',
     triggerOffsetMinutes: -60, sendAtTime: null, targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
     folderId: 'rf-booking', stepCount: 1, displayOrder: 2,
-    lifecycleStatus: 'published', timingSummary: '1時間前 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 39, lastSentAt: '2026-08-22T13:00:00.000Z',
+    hasFailure: true, failedCount: 2,
+    lifecycleStatus: 'published', timingSummary: '1時間前 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 39, nextScheduledAt: '2025-10-01T13:00:00+09:00', lastSentAt: '2026-08-22T13:00:00.000Z',
     createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T11:00:00.000Z',
   },
   {
@@ -3459,30 +3470,68 @@ export const REMINDERS = [
     triggerOffsetMinutes: -43200, sendAtTime: '10:00', targetTagId: null,
     triggerFieldId: 'field-contract-end', repeatYearly: false,
     folderId: 'rf-contract', stepCount: 2, displayOrder: 3,
-    lifecycleStatus: 'published', timingSummary: '30日前 10:00 ／ テキスト 2通', baseDateSummary: '契約終了日', plannedDeliveries: 18, lastSentAt: '2026-08-21T01:00:00.000Z',
+    lifecycleStatus: 'published', timingSummary: '30日前 10:00 ／ テキスト 2通', baseDateSummary: '契約終了日（友だち情報欄）', plannedDeliveries: 18, nextScheduledAt: '2025-10-03T10:00:00+09:00', lastSentAt: '2026-08-21T01:00:00.000Z',
     createdAt: '2026-05-11T00:00:00.000Z', updatedAt: '2026-08-21T01:00:00.000Z',
   },
   {
-    /* 下書き。**0通なので「最終送信」は空。** ここを「—」ではなく空で
-       出すか、設計どおり空欄にするかは実装側の決めごと。 */
-    id: 'reminder-4', name: 'イベント当日案内', description: 'イベント当日',
+    /* 未分類（`folderId: null`）。絵の4行目。毎年くり返す誕生日。 */
+    id: 'reminder-6', name: 'お誕生日のお祝い', description: '誕生日の当日',
+    isActive: true, triggerType: 'friend_field', deliveryMode: 'time',
+    triggerOffsetMinutes: 0, sendAtTime: '10:00', targetTagId: null,
+    triggerFieldId: 'field-birthday', repeatYearly: true,
+    folderId: null, stepCount: 1, displayOrder: 4,
+    lifecycleStatus: 'published', timingSummary: '当日 10:00 ／ テキスト 1通', baseDateSummary: '誕生日（毎年くり返す）', plannedDeliveries: 7, nextScheduledAt: '2025-10-05T10:00:00+09:00', lastSentAt: null,
+    createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    /* 下書き。実装は「これから送る」「次に送る」を「—」で出す。 */
+    id: 'reminder-4', name: 'イベント当日のご案内', description: 'イベント当日',
     isActive: false, triggerType: 'event', deliveryMode: 'time',
     triggerOffsetMinutes: 0, sendAtTime: '09:00', targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
-    folderId: 'rf-event', stepCount: 1, displayOrder: 4,
-    lifecycleStatus: 'draft', timingSummary: '当日 09:00 ／ テキスト 1通', baseDateSummary: 'イベント当日', plannedDeliveries: 0, lastSentAt: null,
+    folderId: 'rf-event', stepCount: 1, displayOrder: 5,
+    lifecycleStatus: 'draft', timingSummary: '当日 09:00 ／ テキスト 1通', baseDateSummary: 'イベントの予約日時', plannedDeliveries: 0, nextScheduledAt: null, lastSentAt: null,
     createdAt: '2026-08-10T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z',
   },
   {
-    /* 停止中。設計は「下書き」と別の札で描いている。実装の `isActive` は
-       真偽値ひとつなので、**下書きと停止中を描き分けられない。** */
+    /* 停止中。絵に「フォロー」フォルダは無いので未分類（`folderId: null`）。
+       実装は `lifecycleStatus: 'stopped'` を「停止中」の札で出す。 */
     id: 'reminder-5', name: '未返信3日後フォロー', description: '最終送信の3日後',
     isActive: false, triggerType: 'manual', deliveryMode: 'time',
     triggerOffsetMinutes: 4320, sendAtTime: '12:00', targetTagId: null,
     triggerFieldId: null, repeatYearly: false,
-    folderId: 'rf-follow', stepCount: 1, displayOrder: 5,
-    lifecycleStatus: 'stopped', timingSummary: '3日後 12:00 ／ テキスト 1通', baseDateSummary: '最終送信日', plannedDeliveries: 25, lastSentAt: '2026-08-19T03:00:00.000Z',
+    folderId: null, stepCount: 1, displayOrder: 6,
+    lifecycleStatus: 'stopped', timingSummary: '3日後 12:00 ／ テキスト 1通', baseDateSummary: '最終送信日', plannedDeliveries: 25, nextScheduledAt: null, lastSentAt: '2026-08-19T03:00:00.000Z',
     createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-19T03:00:00.000Z',
+  },
+  {
+    /* 以下3件はフォルダの数（予約3・契約更新2・イベント2）を絵に合わせる
+       ための分。絵の見切れの下にいるとして `displayOrder` を後ろに置く。 */
+    id: 'reminder-7', name: '来店後のお礼', description: '来店の3日後',
+    isActive: true, triggerType: 'booking', deliveryMode: 'time',
+    triggerOffsetMinutes: 4320, sendAtTime: '18:00', targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-booking', stepCount: 1, displayOrder: 7,
+    lifecycleStatus: 'published', timingSummary: '3日後 18:00 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 5, nextScheduledAt: '2025-10-07T18:00:00+09:00', lastSentAt: null,
+    createdAt: '2026-08-15T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    id: 'reminder-8', name: '契約更新7日前', description: '契約終了の7日前',
+    isActive: true, triggerType: 'friend_field', deliveryMode: 'time',
+    triggerOffsetMinutes: -10080, sendAtTime: '10:00', targetTagId: null,
+    triggerFieldId: 'field-contract-end', repeatYearly: false,
+    folderId: 'rf-contract', stepCount: 1, displayOrder: 8,
+    lifecycleStatus: 'published', timingSummary: '7日前 10:00 ／ テキスト 1通', baseDateSummary: '契約終了日（友だち情報欄）', plannedDeliveries: 11, nextScheduledAt: '2025-10-06T10:00:00+09:00', lastSentAt: null,
+    createdAt: '2026-08-12T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    id: 'reminder-9', name: 'イベント前日のご案内', description: 'イベントの前日',
+    isActive: true, triggerType: 'event', deliveryMode: 'time',
+    triggerOffsetMinutes: -1440, sendAtTime: '09:00', targetTagId: null,
+    triggerFieldId: null, repeatYearly: false,
+    folderId: 'rf-event', stepCount: 1, displayOrder: 9,
+    lifecycleStatus: 'published', timingSummary: '1日前 09:00 ／ テキスト 1通', baseDateSummary: 'イベントの予約日時', plannedDeliveries: 9, nextScheduledAt: '2025-10-06T09:00:00+09:00', lastSentAt: null,
+    createdAt: '2026-08-11T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
   },
 ]
 

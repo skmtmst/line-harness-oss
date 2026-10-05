@@ -2691,7 +2691,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: SCENARIO_FOLDERS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'reminder') {
-    return { success: true, data: REMINDER_FOLDERS }
+    // 板 `apLqS`：未分類は `folderId: null` の2件（お誕生日のお祝い・未返信3日後フォロー）。
+    return { success: true, data: REMINDER_FOLDERS, unfiledCount: REMINDERS.filter((reminder) => !reminder.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'friend_field') {
     return { success: true, data: FRIEND_FIELD_FOLDERS }
