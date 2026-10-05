@@ -51,7 +51,7 @@ import {
   FILE_SCAN_ITEMS,
   FILE_SCAN_CONFIG,
   FRIEND_ADD_RUNS,
-  AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
+  AUTO_REPLIES, AUTO_REPLY_NEW_DRAFT, AUTO_REPLY_NEW_LIVE, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
   BROADCASTS, BROADCAST_FOLDERS, BROADCAST_INSIGHTS, BROADCAST_LIST_META,
@@ -2741,6 +2741,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  if (pathname === '/api/auto-replies/ar-new/draft') return { success: true, data: AUTO_REPLY_NEW_DRAFT }
+  if (pathname === '/api/auto-replies/ar-new') return { success: true, data: AUTO_REPLY_NEW_LIVE }
   if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {
     return { success: true, data: AUTO_REPLY_PUBLISH_DRAFT }
   }
