@@ -87,11 +87,16 @@ export default function ListKpis({
       }))
 
   return (
-    <div className={`mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4 ${kpiStyles.strip}`} data-kpi-strip>
+    <div
+      className={`mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4 ${kpiStyles.strip}`}
+      data-kpi-strip
+      data-kpi-presentation="band"
+    >
       {cards.map((card, i) => (
         // key は props に混ぜない。混ぜて spread すると React が
         // 「key を spread で渡すな」と毎回警告を出す。
-        <KpiCard key={card.title || i} {...card} loading={loading} variant={variant} />
+        // 数の帯は1本にまとめる（Pp3nS）。v8 の見た目だけ変わり v7 は不変。
+        <KpiCard key={card.title || i} {...card} loading={loading} variant={variant} presentation="band" />
       ))}
     </div>
   )

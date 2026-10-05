@@ -236,6 +236,43 @@
   font-size: 22px; line-height: 28px;
 }
 .strip { min-width: 0; }
+/*
+ * 数の帯（Pp3nS・全画面共通）。マス3〜4個を1本の帯にまとめ、
+ * マスどうしは隙間0・1px の縦線で区切る。角丸は帯の外側だけにし、
+ * マス自体は角を持たない（2板の計測で外側の角も0）。
+ */
+[data-theme='v8'] .strip[data-kpi-presentation='band'] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-columns: none;
+  gap: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: 0;
+  background: var(--color-canvas);
+}
+[data-theme='v8'] .strip[data-kpi-presentation='band'] > .card {
+  border: 0;
+  border-radius: 0;
+  outline-color: transparent;
+}
+[data-theme='v8'] .strip[data-kpi-presentation='band'] > .card + .card {
+  border-left: 1px solid var(--color-hairline);
+}
+[data-theme='v8'] .strip[data-kpi-presentation='band'] .number {
+  font-size: 22px;
+  line-height: 28px;
+}
+@media (max-width: 639px) {
+  [data-theme='v8'] .strip[data-kpi-presentation='band'] {
+    grid-auto-flow: row;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-theme='v8'] .strip[data-kpi-presentation='band'] > .card + .card {
+    border-left: 0;
+    border-top: 1px solid var(--color-hairline);
+  }
+}
 [data-theme='v8'] .card[data-kpi-presentation='cell'] { border-radius: 0; }
 [data-theme='v8'] .link { display: inline-flex; align-items: center; gap: 4px; }
 [data-theme='v8'] .menu { margin-left: auto; display: inline-flex; flex-shrink: 0; }
