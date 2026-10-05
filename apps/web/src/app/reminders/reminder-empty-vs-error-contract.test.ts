@@ -24,7 +24,7 @@ const LIST_STATE = readFileSync(
  */
 describe('リマインダ一覧の空と失敗', () => {
   it('一覧のフォルダ欄を共通パネルの統一幅で表示する', () => {
-    expect(LIST).toContain('styles.split')
+    expect(LIST).toContain('<ListPageBody folders=')
     expect(LIST).toContain('FolderPanel')
     expect(LIST).toContain('setFolderDialogOpen(true)')
     expect(LIST).not.toContain('lg:grid-cols-[13rem_minmax(0,1fr)]')

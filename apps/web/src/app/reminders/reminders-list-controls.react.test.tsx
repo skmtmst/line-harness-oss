@@ -127,17 +127,29 @@ describe('一覧の操作が実クエリへつながる (N-072)', () => {
     expect(latest).toContain('page=1')
   })
 
-  it('並び順を変えると sort を変えて取り直す', async () => {
+  it('次の送信が近い順で開き、並び順を変えると sort を変えて取り直す', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
-    expect(listCalls().at(-1)).toContain('sort=order')
+    expect(listCalls().at(-1)).toContain('sort=next')
 
-    changeSelect('並び順', 'created')
+    changeSelect('並び', 'created')
     await flush()
 
     const latest = listCalls().at(-1) ?? ''
     expect(latest).toContain('sort=created')
     expect(latest).toContain('page=1')
+  })
+
+  it('状態の札4つは図柄付き（apLqS）', async () => {
+    await act(async () => { root.render(<RemindersPage />) })
+    await flush()
+    for (const label of ['有効', '下書き', '停止中', '失敗あり']) {
+      const chip = Array.from(host.querySelectorAll('button')).find(
+        (button) => button.textContent?.trim() === label,
+      )
+      expect(chip, `${label} の札が見つかりません`).toBeTruthy()
+      expect(chip?.querySelector('svg'), `${label} の札に図柄がありません`).toBeTruthy()
+    }
   })
 
   it('実データに対応しない「基準日」の日付入力は置かない', async () => {

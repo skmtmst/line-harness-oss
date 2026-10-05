@@ -5,9 +5,10 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-/* 完全切り替え：v7 の page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+/* 完全切り替え：v7 の page.tsx は捨て、V8 の new-v8.tsx と basics-form-v8.tsx を見る。 */
 const LIST = read('list-v8.tsx')
-const CREATE = read('new', 'page.tsx')
+const CREATE = read('new', 'new-v8.tsx')
+const BASICS = read('basics-form-v8.tsx')
 const API = read('..', '..', 'lib', 'api.ts')
 
 /**
@@ -23,16 +24,19 @@ const API = read('..', '..', 'lib', 'api.ts')
 describe('リマインダのフォルダ', () => {
   it('作る画面が、止まった「準備中」の欄を持たない', () => {
     expect(CREATE).not.toContain('フォルダ分けは準備中です')
-    expect(CREATE).not.toContain('<select disabled')
+    expect(BASICS).not.toContain('フォルダ分けは準備中です')
+    expect(BASICS).not.toContain('<select disabled')
   })
 
   it('作る画面がフォルダを読み、選んだものを保存に乗せる', () => {
-    expect(CREATE).toContain("api.folders.list('reminder')")
-    expect(CREATE).toContain('folderId: folderId || null')
+    expect(BASICS).toContain("api.folders.list('reminder')")
+    expect(CREATE).toContain('folderId: value.folderId || null')
   })
 
-  it('フォルダが1つも無いときは、そう書く（空の選択肢だけ出さない）', () => {
-    expect(CREATE).toContain('フォルダはまだありません')
+  it('フォルダが1つも無いときは未分類で作れ、読み込み失敗は選び直せる', () => {
+    expect(BASICS).toContain('未分類')
+    expect(BASICS).toContain('フォルダを読み込めませんでした')
+    expect(BASICS).toContain('再読み込み')
   })
 
   it('一覧と受け口は前から folderId を通していた（画面だけが遅れていた）', () => {
