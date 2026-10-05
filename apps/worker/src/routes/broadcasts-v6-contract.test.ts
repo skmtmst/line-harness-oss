@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index';
 import type { AuthenticatedStaff } from '../middleware/auth';
@@ -179,6 +179,10 @@ describe('V6 broadcast data contracts', () => {
   });
 
   it('一覧とKPIは担当テナントだけを集計し、statsを配信IDとして扱わない', async () => {
+    // 種の送信日（9/7）が集計の期間から外れないよう、時計を固定する（日付が進むと落ちていた）。
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-08T00:00:00.000Z'));
+    onTestFinished(() => { vi.useRealTimers(); });
     seedBroadcast(testDb, 'own-broadcast', { total_count: 12, success_count: 10 });
     seedBroadcast(testDb, 'other-broadcast', {
       line_account_id: 'account-2', total_count: 100, success_count: 99,
