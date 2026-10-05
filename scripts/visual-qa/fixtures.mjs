@@ -2652,30 +2652,29 @@ export const REMINDER_RUNS = {
     /* V8詳細の「いまの状態」。`getReminderDeliveryRunSummary` の追加列と同じ意味。 */
     sentThisMonth: 386, scheduledNext7Days: 124,
   },
+  /* 板 `rbAig`（概要）の通知2通。送った212通・失敗1通と174通・1通。
+   * 届き方の見本は1通目の本文（`renderReminderBodySample` が読む）。 */
   steps: [
     {
       id: 'step-1', stepNumber: 1, offsetMinutes: -1440, messageType: 'text',
-      messageContent: '明日のご予約のお知らせです。お待ちしております。',
+      messageContent: '明日10月2日(木)14:00からのご相談の案内です。時間になったら下のURLから参加してください。https://meet.google.com/abc-defg-hij',
       /** LINEは友だち単位の既読を返さない。**0%を作らない。** */
-      sent: 128, openRate: null, errors: 3,
+      sent: 212, openRate: null, errors: 1,
     },
     {
       id: 'step-2', stepNumber: 2, offsetMinutes: -60, messageType: 'text',
-      messageContent: '1時間後にお会いできるのを楽しみにしています。',
-      sent: 361, openRate: null, errors: 0,
-    },
-    {
-      id: 'step-3', stepNumber: 3, offsetMinutes: 0, messageType: 'text',
-      messageContent: '当日のご案内',
-      sent: 383, openRate: null, errors: 1,
+      messageContent: 'まもなく開始です。参加URLをもう一度お送りします。https://meet.google.com/abc-defg-hij',
+      sent: 174, openRate: null, errors: 1,
     },
   ],
+  /* 板 `rbAig` の最近の実行3行と、通知ごとの「次に送る」（`planned` の
+   * 2件。概要は手順番号ごとの最早を拾う）。 */
   items: [
     {
-      ...RUN_BASE, id: 'run-1', friendId: 'friend-kyohei', friendName: 'Kyohei Yamamoto',
-      stepNumber: 1, scheduledAt: '2026-08-19T09:00:00+09:00',
-      startedAt: '2026-08-19T09:00:02+09:00', completedAt: '2026-08-19T09:00:03+09:00',
-      occurredAt: '2026-08-19T09:00:03+09:00', subject: 'Kyohei Yamamoto',
+      ...RUN_BASE, id: 'run-1', friendId: 'friend-hanako', friendName: '佐藤 花子',
+      stepNumber: 1, scheduledAt: '2026-09-30T18:00:00+09:00',
+      startedAt: '2026-09-30T18:00:02+09:00', completedAt: '2026-09-30T18:00:03+09:00',
+      occurredAt: '2026-09-30T18:00:03+09:00', subject: '佐藤 花子',
       status: 'succeeded', domainStatus: 'succeeded', detail: '1通目',
       durationMs: 1200, attemptCount: 1, nextRetryAt: null,
       lastErrorCode: null, lastErrorMessage: null,
@@ -2683,10 +2682,21 @@ export const REMINDER_RUNS = {
       canRetry: false,
     },
     {
-      ...RUN_BASE, id: 'run-2', friendId: 'friend-masato', friendName: 'Masato.S',
-      stepNumber: 1, scheduledAt: '2026-08-20T09:00:00+09:00',
-      startedAt: null, completedAt: null,
-      occurredAt: '2026-08-20T09:00:00+09:00', subject: 'Masato.S',
+      ...RUN_BASE, id: 'run-2', friendId: 'friend-ichiro', friendName: '鈴木 一郎',
+      stepNumber: 1, scheduledAt: '2026-09-30T18:00:00+09:00',
+      startedAt: '2026-09-30T18:00:02+09:00', completedAt: '2026-09-30T18:00:03+09:00',
+      occurredAt: '2026-09-30T18:00:03+09:00', subject: '鈴木 一郎',
+      status: 'failed', domainStatus: 'permanent_failed', detail: '1通目',
+      durationMs: 900, attemptCount: 1, nextRetryAt: null,
+      lastErrorCode: '400', lastErrorMessage: 'LINEが受け付けませんでした',
+      lineRequestId: null, messageLogId: null,
+      canRetry: true,
+    },
+    {
+      ...RUN_BASE, id: 'run-3', friendId: 'friend-misaki', friendName: '高橋 美咲',
+      stepNumber: 2, scheduledAt: '2026-09-30T13:00:00+09:00',
+      startedAt: '2026-09-30T13:00:02+09:00', completedAt: '2026-09-30T13:00:03+09:00',
+      occurredAt: '2026-09-30T13:00:03+09:00', subject: '高橋 美咲',
       status: 'succeeded', domainStatus: 'succeeded', detail: '2通目',
       durationMs: 900, attemptCount: 1, nextRetryAt: null,
       lastErrorCode: null, lastErrorMessage: null,
@@ -2694,18 +2704,29 @@ export const REMINDER_RUNS = {
       canRetry: false,
     },
     {
-      ...RUN_BASE, id: 'run-3', friendId: 'friend-kenta', friendName: 'Kenta Kawano(Obama)',
-      stepNumber: 1, scheduledAt: '2026-08-19T09:00:00+09:00',
-      startedAt: '2026-08-19T09:00:02+09:00', completedAt: null,
-      occurredAt: '2026-08-19T09:00:02+09:00', subject: 'Kenta Kawano(Obama)',
-      status: 'pending', domainStatus: 'retry_wait', detail: '一時的にLINEへ届きませんでした',
-      durationMs: null, attemptCount: 2, nextRetryAt: '2026-08-19T09:30:00+09:00',
-      lastErrorCode: '429', lastErrorMessage: '一時的にLINEへ届きませんでした',
+      ...RUN_BASE, id: 'run-4', friendId: 'friend-hanako', friendName: '佐藤 花子',
+      stepNumber: 1, scheduledAt: '2026-10-01T18:00:00+09:00',
+      startedAt: null, completedAt: null,
+      occurredAt: '2026-10-01T18:00:00+09:00', subject: '佐藤 花子',
+      status: 'planned', domainStatus: 'planned', detail: '1通目',
+      durationMs: null, attemptCount: 0, nextRetryAt: null,
+      lastErrorCode: null, lastErrorMessage: null,
       lineRequestId: null, messageLogId: null,
-      canRetry: true,
+      canRetry: false,
+    },
+    {
+      ...RUN_BASE, id: 'run-5', friendId: 'friend-misaki', friendName: '高橋 美咲',
+      stepNumber: 2, scheduledAt: '2026-10-02T13:00:00+09:00',
+      startedAt: null, completedAt: null,
+      occurredAt: '2026-10-02T13:00:00+09:00', subject: '高橋 美咲',
+      status: 'planned', domainStatus: 'planned', detail: '2通目',
+      durationMs: null, attemptCount: 0, nextRetryAt: null,
+      lastErrorCode: null, lastErrorMessage: null,
+      lineRequestId: null, messageLogId: null,
+      canRetry: false,
     },
   ],
-  pagination: { total: 3, limit: 20, offset: 0 },
+  pagination: { total: 5, limit: 20, offset: 0 },
 }
 
 // V6 3-1-D `IAf7j`（友だち一括操作）。画面側はこの契約をそのまま使う。
@@ -3475,7 +3496,7 @@ export const REMINDERS = [
     triggerFieldId: null, repeatYearly: false,
     folderId: 'rf-booking', stepCount: 1, displayOrder: 1,
     lifecycleStatus: 'published', timingSummary: '1日前 18:00 ／ テキスト 1通', baseDateSummary: '予約日時', plannedDeliveries: 42, nextScheduledAt: '2025-10-01T18:00:00+09:00', lastSentAt: '2026-08-22T09:00:00.000Z',
-    createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-08-22T09:00:00.000Z',
+    createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-09-28T10:00:00+09:00',
   },
   {
     /* 絵の2行目には「失敗 2」の札が付く。 */
