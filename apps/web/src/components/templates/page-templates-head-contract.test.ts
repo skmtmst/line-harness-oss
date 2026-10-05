@@ -36,6 +36,14 @@ describe('型の見出し（379板の絵）', () => {
     expect(css).not.toMatch(/heading-size='regular'\] \.headingText \{[^}]*gap:\s*2px/s)
   })
 
+  it('一覧の頭は下余白12・帯は頭の直下（頭の高さ87）', () => {
+    expect(css).toMatch(/\[data-page-template='list'\] > \.heading \{[^}]*padding-bottom:\s*12px/s)
+    expect(css).toMatch(/\[data-page-template='list'\] \.stats \{[^}]*border-top:\s*0/s)
+    const stats = css.match(/\[data-page-template='list'\] \.stats \{[^}]*\}/)
+    expect(stats, '一覧の帯の枠がありません').toBeTruthy()
+    expect(stats![0]).not.toMatch(/margin|padding-top/)
+  })
+
   it('large の説明に絵に無い 12/18 を使わない', () => {
     const large = css.match(/heading-size='large'\] \.description \{[^}]*\}/)
     expect(large, 'large の説明がありません').toBeTruthy()
