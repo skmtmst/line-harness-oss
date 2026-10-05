@@ -28,6 +28,8 @@ import MultiSelect from '@/components/shared/multi-select'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
+import KpiCard from '@/components/shared/kpi-card'
+import { ListPageBody, ListPagePagination } from '@/components/templates/list-page'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
@@ -575,19 +577,9 @@ export default function TagsTabV8({
   return (
     <>
       {/* 数の帯（設計の4枚。「付けている友だち」「今月付けた回数」「整理の候補」）。 */}
-      <div data-design="KPIs" className={styles.kpis}>
-        {kpis.map((kpi) => (
-          <div key={kpi.title} className={styles.kpi}>
-            <span className={styles.kpiLabel}><kpi.icon size={13} aria-hidden="true" />{kpi.title}</span>
-            <p className={styles.kpiValue}>{kpi.value ?? '—'}<span className={styles.kpiUnit}>{kpi.value === null ? '' : kpi.unit}</span></p>
-            <p className={styles.kpiDetail}>{kpi.detail}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className={styles.split}>
-        {/* 左のフォルダの列。いちばん上は「タグを作る」、列の下に「フォルダを追加」。 */}
-        <div className={styles.folderCol}>
+      <ListPageBody
+        stats={<div data-design="KPIs" className={styles.templateStats}>{kpis.map(({ icon: Icon, ...kpi }) => <KpiCard key={kpi.title} {...kpi} />)}</div>}
+        folders={<>
           {status === 'forbidden' ? null : canEdit ? (
             <Button href="/tags/new" variant="primary" className="w-full">＋ タグを作る</Button>
           ) : (
@@ -612,20 +604,16 @@ export default function TagsTabV8({
                 </button>
               </p>
             ) : null}
-          </FolderPanel>
-        </div>
-
-        <div className={styles.listCol}>
-          {/* 道具の段：検索・選ぶ欄 2 つ・右に「よく使う絞り込み」。狭い板では「タグを作る」とフォルダ選びがここへ畳まれる。 */}
-          <div className={styles.toolbar}>
+          </FolderPanel></>}
+        collapsedFolders={<>
             {status === 'forbidden' ? null : (
               canEdit ? (
-                <Button href="/tags/new" variant="primary" className={styles.toolbarCreate}>＋ タグを作る</Button>
+                <Button href="/tags/new" variant="primary">＋ タグを作る</Button>
               ) : (
-                <Button type="button" variant="primary" className={styles.toolbarCreate} disabled>＋ タグを作る</Button>
+                <Button type="button" variant="primary" disabled>＋ タグを作る</Button>
               )
             )}
-            <div className={styles.folderSelectWrap}>
+            <div>
               <Select
                 aria-label="フォルダ"
                 value={folder}
@@ -633,7 +621,8 @@ export default function TagsTabV8({
                 options={folderSelectOptions}
               />
             </div>
-            <div className={styles.searchWrap}>
+</>}
+        toolbar={<>            <div className={styles.searchWrap}>
               <SearchField
                 aria-label="タグ名・用途で検索"
                 placeholder="タグ名・用途で検索"
@@ -665,9 +654,8 @@ export default function TagsTabV8({
                 placeholder="よく使う"
                 values={quick}
               />
-            </span>
-          </div>
-
+            </span></>}
+      >
           {actionError ? (
             <p role="alert" className={styles.errorBand}>
               {actionError}
@@ -829,7 +817,7 @@ export default function TagsTabV8({
               </div>
 
               {/* 件数とページ送り。表示件数はこの段の右に置く。 */}
-              <div className={styles.pagerRow}>
+              <ListPagePagination>
                 <span className={styles.pagerCount}>
                   {filtered.length}件中 {filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, filtered.length)}件
                 </span>
@@ -854,11 +842,10 @@ export default function TagsTabV8({
                     ariaLabel="タグのページ送り"
                   />
                 </div>
-              </div>
+              </ListPagePagination>
             </DelayedSkeleton>
           )}
-        </div>
-      </div>
+      </ListPageBody>
 
       {/* 行の詳細パネル（C①）。フォルダの入力中はそちらを出す。 */}
       {folderDialog ? null : (

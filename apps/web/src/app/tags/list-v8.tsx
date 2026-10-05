@@ -25,6 +25,7 @@ import FieldsTabV8 from './fields-tab-v8'
 import MarksTabV8 from './marks-v8'
 import SearchesTabV8 from './searches-v8'
 import styles from './list-v8.module.css'
+import { ListPage } from '@/components/templates/list-page'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -88,6 +89,22 @@ export default function TagsListV8({
   const currentTabFeature = TAB_FEATURE[tab]
   const currentTabBlocked =
     !fixture && !!currentTabFeature && visibility.status === 'ready' && !visibility.enabled(currentTabFeature)
+
+  if (tab === 'tags' && !currentTabBlocked) {
+    return <ListPage
+      boardId={narrow ? 'aPeD8' : 'I1E7Bt'}
+      title="友だち属性"
+      headingSize="large"
+      description="タグ・友だち情報欄・対応マーク・保存した検索をここで管理します。"
+      actions={<Button type="button" disabled={!canEdit} onClick={() => setCsvOpen(true)}>CSVで一括登録する</Button>}
+      tabs={<Tabs items={TABS.filter(([key]) => tabEnabled(key)).map(([key, label]) => ({
+        label, current: tab === key,
+        onClick: () => (fixture ? setFixtureTab(key) : router.replace(key === 'tags' ? '/tags' : `/tags?tab=${key}`)),
+      }))} />}
+    >
+      <TagsTabV8 accountId={accountId} fixture={fixture} canEdit={canEdit} csvOpen={csvOpen} onCsvClose={() => setCsvOpen(false)} />
+    </ListPage>
+  }
 
   return (
     <div className={styles.board} data-design-node={narrow ? 'aPeD8' : 'I1E7Bt'}>

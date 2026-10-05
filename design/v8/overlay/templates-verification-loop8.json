@@ -1,0 +1,78 @@
+{
+  "loop": 8,
+  "verifiedAtJST": "2026-10-05 03:06",
+  "testedCommit": "81f492d8eb3ead226e7797906c066cd3bbe705b4",
+  "status": "CONTINUE",
+  "sourceHashes": {
+    "components-NbomF.html": "c0027b531927e28e3c5108a73bf18a185b90ad49a05953710c066fcbb12a9bfa",
+    "components-x6BDY.html": "91e9a3b3612d021fd077a6755174bc7c28b162b056c2283b6533722af3f84ea1",
+    "d8X09.html": "2894269e478de6c5aad42cc951d9cfc3e8a911401f4d7eed018c3e38adcf3e54",
+    "I1E7Bt.html": "f3ea7f46f656b612af4f330ad999806716d8fd8c8bd695e2de7236af48dceb73"
+  },
+  "sourcesChangedSincePrevious": false,
+  "capturedGeometryIdenticalToPrevious": true,
+  "environment": {
+    "url": "http://localhost:4319/v8-templates",
+    "browser": "Chrome via Browser plugin",
+    "captureViewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "responsiveWidths": [
+      1152,
+      1280,
+      1440,
+      1920
+    ],
+    "api": "http://127.0.0.1:8788",
+    "build": "production static export"
+  },
+  "comparison": {
+    "passed": 4,
+    "total": 8,
+    "over4px": 290,
+    "unmatched": 1
+  },
+  "checks": {
+    "doctorLocal": "PASS",
+    "vitest": {
+      "files": 8,
+      "tests": 31,
+      "status": "PASS",
+      "api": "http://worker.test"
+    },
+    "typecheck": "PASS",
+    "productionBuild": "PASS",
+    "responsive": {
+      "cases": 32,
+      "status": "PASS"
+    },
+    "boardMap": {
+      "count": 496,
+      "sameOrder": true,
+      "duplicates": 0
+    },
+    "pageIdentity": "PASS",
+    "notBlank": "PASS",
+    "frameworkOverlay": "PASS",
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "referenceSwitch": "PASS"
+  },
+  "remainingGate": "Pencil/source updates pending owner permission; see templates-source-conflicts.md",
+  "notRerun": [
+    "V7 screenshot regression",
+    "representative screen screenshots"
+  ],
+  "testWarnings": [
+    "worker.test name resolution in legacy tag tests",
+    "act environment in legacy tag list tests"
+  ],
+  "externalActions": {
+    "push": false,
+    "merge": false,
+    "deploy": false,
+    "db": false,
+    "slack": false
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "loop": 9,
+  "verifiedAtJST": "2026-10-05 03:19",
+  "testedCommit": "e39e1e0fa2eddd52dcbedbaa5b17d04bd9938a54",
+  "buildBaseCommit": "8e3fea695",
+  "buildWorkingTreeMatchesTestedCommit": true,
+  "testedCodeHashes": {
+    "apps/web/src/components/templates/create-page.tsx": "ca313397f1dbea2fcac3fd838ec65afdcce75405a8988c4d4ea2c06ba9fa44a6",
+    "apps/web/src/components/templates/page-templates.module.css": "43ea3aed7187ed376530459de8d282b7bbc161ae763cea14e5dc8e57abc25248"
+  },
+  "status": "CONTINUE",
+  "sourceHashes": {
+    "components-NbomF.html": "c0027b531927e28e3c5108a73bf18a185b90ad49a05953710c066fcbb12a9bfa",
+    "components-x6BDY.html": "91e9a3b3612d021fd077a6755174bc7c28b162b056c2283b6533722af3f84ea1",
+    "d8X09.html": "2894269e478de6c5aad42cc951d9cfc3e8a911401f4d7eed018c3e38adcf3e54",
+    "I1E7Bt.html": "f3ea7f46f656b612af4f330ad999806716d8fd8c8bd695e2de7236af48dceb73"
+  },
+  "sourcesChangedSincePrevious": false,
+  "environment": {
+    "url": "http://localhost:4319/v8-templates",
+    "browser": "Chrome via Browser plugin",
+    "captureViewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "responsiveWidths": [
+      1152,
+      1280,
+      1440,
+      1920
+    ],
+    "api": "http://127.0.0.1:8788",
+    "build": "production static export"
+  },
+  "comparison": {
+    "passed": 4,
+    "total": 8,
+    "over4px": 248,
+    "unmatched": 1,
+    "createBefore": 44,
+    "createAfter": 2
+  },
+  "checks": {
+    "doctorLocal": "PASS",
+    "vitest": {
+      "files": 1,
+      "tests": 3,
+      "status": "PASS",
+      "api": "http://worker.test"
+    },
+    "typecheck": "PASS",
+    "productionBuild": "PASS",
+    "responsive": {
+      "cases": 32,
+      "status": "PASS"
+    },
+    "boardMap": {
+      "count": 496,
+      "sameOrder": true,
+      "duplicates": 0
+    },
+    "footerScroll": {
+      "scrolledPx": 344,
+      "contentWidthPx": 315,
+      "contentInsidePreview": true,
+      "horizontalScrolling": false,
+      "footerTop": 802,
+      "footerBottom": 874,
+      "footerMoved": false
+    },
+    "consoleErrors": 0,
+    "consoleWarnings": 0
+  },
+  "remainingGate": "正本4点のHTML未更新。Pencilの担当者による更新・再書き出し、または明示的な所有範囲の例外許可が必要。",
+  "notRerun": [
+    "V7 screenshot regression",
+    "representative screen screenshots",
+    "representative behavioral tests (loop 8 results retained)"
+  ],
+  "externalActions": {
+    "push": false,
+    "merge": false,
+    "deploy": false,
+    "db": false,
+    "slack": false
+  }
+}

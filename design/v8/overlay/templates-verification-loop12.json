@@ -1,0 +1,77 @@
+{
+  "loop": 12,
+  "auditedAtJST": "2026-10-05 03:42",
+  "startCommit": "3e3a9442c71e59d38295fd162b1ceef1802a21e6",
+  "status": "CONTINUE",
+  "sourceHashes": {
+    "components-NbomF.html": "c0027b531927e28e3c5108a73bf18a185b90ad49a05953710c066fcbb12a9bfa",
+    "components-x6BDY.html": "91e9a3b3612d021fd077a6755174bc7c28b162b056c2283b6533722af3f84ea1",
+    "d8X09.html": "2894269e478de6c5aad42cc951d9cfc3e8a911401f4d7eed018c3e38adcf3e54",
+    "I1E7Bt.html": "f3ea7f46f656b612af4f330ad999806716d8fd8c8bd695e2de7236af48dceb73"
+  },
+  "sourceHashesMatchFixture": true,
+  "sourcesChangedSinceLoop11": false,
+  "testedCodeHashes": {
+    "apps/web/src/components/templates/create-page.tsx": "ca313397f1dbea2fcac3fd838ec65afdcce75405a8988c4d4ea2c06ba9fa44a6",
+    "apps/web/src/components/templates/page-templates.module.css": "43ea3aed7187ed376530459de8d282b7bbc161ae763cea14e5dc8e57abc25248",
+    "scripts/v8-templates/capture.mjs": "6c602b52820a29fa90532efdbb5f88687d69c184f1154b49e92de3601a0376da",
+    "scripts/v8-templates/compare.py": "409fc310e836fca099f4fae299c6a42ed5c73f0e14870b493ed5b4bd06e4073a",
+    "scripts/v8-templates/responsive.mjs": "3d635adfef2c48e7247d59422c8fea09dde7bcbbb8c7adcff06fd640c17aa977"
+  },
+  "testedCodeChangedSinceLoop11": false,
+  "pencilInspection": {
+    "method": "local JSON read only; no layout recomputation",
+    "path": "/Users/kentakenta/Downloads/LINE-Harness-V8.pen",
+    "fileHash": "80d92a895a55db179dbd5c4b4b5bf99e207782aa6b9f38a694be078829bedb85",
+    "findings": {
+      "Cu78y": "width remains fill_container; no 720px limit",
+      "zT2lj": "full-width footer with [12,24] padding; actions on right",
+      "y0C9j": "width remains 300; padding remains 20",
+      "iychL": "board override contains heading and body; no save footer"
+    }
+  },
+  "checksThisLoop": {
+    "doctorLocal": "PASS",
+    "boardMap": {
+      "count": 496,
+      "sameOrder": true,
+      "duplicates": 0
+    },
+    "sourceAndTestedCodeHashes": "PASS"
+  },
+  "retainedVisualEvidence": {
+    "loop": 11,
+    "record": "templates-verification-loop11.json",
+    "passed": 4,
+    "total": 8,
+    "over4px": 248,
+    "unmatched": 1,
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    }
+  },
+  "notRerun": [
+    "screenshots and overlays",
+    "responsive 64 cases",
+    "vitest",
+    "typecheck",
+    "production build",
+    "Pencil bounds"
+  ],
+  "reasonNotRerun": "No change to tested code or reference HTML. Loop 11 results are retained, not counted as new passes.",
+  "reviewableNextStep": "templates-source-repair-plan.md",
+  "permission": "Pencil/HTML repair ownership question pending; shared components remain outside scope",
+  "externalActions": {
+    "push": false,
+    "merge": false,
+    "rebase": false,
+    "stash": false,
+    "deploy": false,
+    "db": false,
+    "slack": false,
+    "pencilMutation": false,
+    "referenceHtmlMutation": false,
+    "sharedComponentMutation": false
+  }
+}

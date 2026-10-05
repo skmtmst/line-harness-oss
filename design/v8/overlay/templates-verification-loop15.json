@@ -1,0 +1,95 @@
+{
+  "loop": 15,
+  "verifiedAtJST": "2026-10-05 04:03",
+  "status": "ALL_PASS",
+  "buildBaseCommit": "380817287e14f762fe0caaf07a18b0306b5b9963",
+  "sourceHashes": {
+    "components-NbomF.html": "c0027b531927e28e3c5108a73bf18a185b90ad49a05953710c066fcbb12a9bfa",
+    "components-x6BDY.html": "98a840cdcfb5684ddfdbe59736a30d9846bcc4da5945d3ce0623ba213884052a",
+    "d8X09.html": "2894269e478de6c5aad42cc951d9cfc3e8a911401f4d7eed018c3e38adcf3e54",
+    "I1E7Bt.html": "f3ea7f46f656b612af4f330ad999806716d8fd8c8bd695e2de7236af48dceb73"
+  },
+  "sourceHashesMatchFixture": true,
+  "testedCodeHashes": {
+    "apps/web/src/components/templates/page-templates.module.css": "80a72bf90fcaa90b5f534e0ed3b9d83331b3b827cd4f1028cb684e2a607eaeba",
+    "apps/web/src/app/v8-templates/preview.module.css": "6db7c7a056b7f2d6902c163a95a48fdf955276c9441f08e07fe6322f889aa2b0",
+    "apps/web/src/app/v8-templates/reference-fixtures.json": "4a77f12b5a24322e5a09379d771fd9e1b2ca6b89283bb12988b02cdd484036a7",
+    "scripts/v8-templates/compare.py": "c97e4eca45ca1eb9e37d6abb14714153ac8ac7a3a1e403382c894c06e54becf4",
+    "scripts/v8-templates/footer.mjs": "17c88610489b6fc8fd5791e79271957c3080836eccd541abe4bd823e2662baaf",
+    "apps/web/src/components/shared/sticky-bar.tsx": "482819abf71832886d6edf35bc695210a4fe3c03878ae320330223093665f4de",
+    "apps/web/src/components/shared/sticky-bar.module.css": "65895ded40130d42aa302bf65ae88b2c9b1c97fc2ae2e9e6388bd70c133c8496"
+  },
+  "comparison": {
+    "passed": 8,
+    "total": 8,
+    "over4px": 0,
+    "unmatched": 0,
+    "comparedContainers": 1615,
+    "maxEdgeDelta": 4.0
+  },
+  "authority": "templates-authority-1005.md：司令塔2026-10-05 04時",
+  "exclusions": {
+    "create": {
+      "left": 240,
+      "top": 890,
+      "right": 1428,
+      "bottom": 1000
+    },
+    "settings": {
+      "left": 240,
+      "top": 890,
+      "right": 1428,
+      "bottom": 1000
+    }
+  },
+  "checks": {
+    "doctorLocal": "PASS",
+    "vitest": {
+      "files": 1,
+      "tests": 3,
+      "api": "http://worker.test",
+      "status": "PASS"
+    },
+    "typecheck": "PASS",
+    "productionBuild": "PASS",
+    "diffCheck": "PASS",
+    "responsive": {
+      "cases": 64,
+      "failures": 0
+    },
+    "stickyBarPartCheck": {
+      "cases": 16,
+      "failures": 0,
+      "artifact": "template-footer-check.json",
+      "canonicalSource": "components/shared/sticky-bar"
+    },
+    "negativeControl": "9pxの頭の左右ずれはCONTINUE。保存帯の別検証がない場合もCONTINUE。",
+    "boardMap": {
+      "count": 496,
+      "sameOrder": true,
+      "duplicates": 0
+    },
+    "visualInspection": "8例の50%重ね合わせを一覧で目視。設定の原画像とフォルダ付き一覧の重ね合わせも実寸で確認。",
+    "browserLogs": {
+      "errors": 3,
+      "message": "A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received",
+      "note": "ブラウザのメッセージ通信のエラー。発生後も本番ページ表示・矩形測定・縦送りは正常。アプリ由来と断定しない。"
+    }
+  },
+  "notRerun": [
+    "V7 screenshot regression (only V8 template CSS and isolated preview changed)",
+    "representative behavioral tests and screenshots (retained prior evidence; representative code unchanged)"
+  ],
+  "externalActions": {
+    "push": false,
+    "merge": false,
+    "rebase": false,
+    "stash": false,
+    "deploy": false,
+    "db": false,
+    "slack": false,
+    "pencilMutation": false,
+    "referenceHtmlMutation": false,
+    "sharedComponentMutation": false
+  }
+}

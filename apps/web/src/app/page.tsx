@@ -35,6 +35,7 @@ import {
   type DashboardPreferences,
 } from '@/components/dashboard/dashboard-preference-defaults'
 import Card, { CardHeader } from '@/components/shared/card'
+import { DashboardPage as DashboardTemplate, DashboardRow } from '@/components/templates/dashboard-page'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
@@ -1639,6 +1640,157 @@ function DashboardPageInner() {
   const healthLabel = displayedHealthRisk === 'normal' ? '正常稼働' : displayedHealthRisk === 'warning' ? '要確認' : displayedHealthRisk === 'danger' ? '障害あり' : '状態確認中'
   const healthClass = displayedHealthRisk === 'danger' ? 'text-danger' : displayedHealthRisk === 'warning' ? 'text-warning' : displayedHealthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
 
+  const mainCards = preferences.main.map((item) => {
+            /*
+             * 非表示にしても件数取得を止めないよう、OFFのときはその場所へ
+             * 畳んだままマウントを維持する。受信箱は上部の小カードの件数・
+             * 最長待ちの供給源でもあり、アンマウントすると小カードが「—」に
+             * 戻る（DASH-21）。
+             */
+            if (item.id === 'shipment') {
+              return (
+                /*
+                 * 表示ONなら0件でもカードを出す。空のときは
+                 * パネル側が1行の空表示を出す。件数は取り続けるので、
+                 * OFFのときは隠すだけでマウントは保つ（受信箱と同じ形）。
+                 */
+                <div key={item.id} data-design="Shipment" className={item.visible ? '' : 'hidden'} aria-hidden={!item.visible}>
+                  {/*
+                    選択中アカウントの出荷だけを数える（IDEA-01）。
+                    小カード「出荷予定」と遷移先 /ec-commerce は同じアカウント範囲。
+                  */}
+                  <ShipmentPanel
+                    accountId={selectedAccountId}
+                    onSummaryChange={handleShipmentSummary}
+                  />
+                </div>
+              )
+            }
+            if (item.id === 'pending-inbox') {
+              return (
+                <div key={item.id} className={item.visible ? '' : 'hidden'} aria-hidden={!item.visible}>
+                  {/*
+                    上部の小カードの MAIL 件数・最長待ちはこのカードの取得結果から
+                    取る（DASH-21）。失敗も一緒に知らせ、0件と取り違えない。
+                  */}
+                  <PendingInboxCard onSummaryChange={handleInboxSummary} />
+                </div>
+              )
+            }
+            if (!item.visible) return null
+            return <div key={item.id}>{renderMainCard(item.id)}</div>
+          })
+  const editor = <>{isV8
+        ? (editorOpen ? <DashboardEditorDynamic
+          open={editorOpen}
+          preferences={preferences}
+          saving={preferenceSaving}
+          saveError={preferenceSaveError?.message ?? null}
+          saveConflict={preferenceSaveError?.conflict ?? false}
+          onReloadPreferences={reloadPreferences}
+          onCancel={closeEditor}
+          onApply={applyPreferences}
+          onReset={resetPreferences}
+        /> : null)
+        : <DashboardEditor
+          open={editorOpen}
+          preferences={preferences}
+          saving={preferenceSaving}
+          saveError={preferenceSaveError?.message ?? null}
+          saveConflict={preferenceSaveError?.conflict ?? false}
+          onReloadPreferences={reloadPreferences}
+          onCancel={closeEditor}
+          onApply={applyPreferences}
+          onReset={resetPreferences}
+        />}</>
+
+  const headerActions = <>
+    <Button onClick={openEditor}>
+      <EditIcon />ダッシュボード編集
+    </Button>
+    <div className="flex flex-wrap items-center justify-end gap-2.5">
+      <DashboardFreshness freshness={data?.freshness} asOf={data?.asOf} />
+      <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-pill bg-current" />{healthLabel}</span>
+      <div className="flex gap-2">
+        {PERIODS.map((item) => (
+          <Button variant="primary" className={(`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`) + ' h-auto whitespace-normal'} key={item.key} type="button" onClick={() => selectPeriod(item.key)} aria-pressed={period === item.key}>{item.label}</Button>
+        ))}
+      </div>
+      {/* 選択中のLINEアカウントの通知だけを表示し、未取得を0件に見せない。 */}
+      <div className="relative" ref={notificationBellRef}>
+        <IconButton
+          aria-label={unreadNotificationCount > 0 ? `通知、未読${unreadNotificationCount}件` : '通知'}
+          aria-expanded={notificationsOpen}
+          onClick={() => {
+            if (!notificationsOpen) void loadNotificationCenter()
+            setNotificationsOpen((current) => !current)
+          }}
+        >
+          <BellIcon />
+        </IconButton>
+        {unreadNotificationCount > 0 ? (
+          <span
+            aria-hidden="true"
+            className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-pill px-1 text-center text-xs leading-5 font-medium tabular-nums"
+          >{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
+        ) : null}
+        <NotificationPanel
+          open={notificationsOpen}
+          items={notificationItems}
+          filters={notificationFilters}
+          activeFilter={notificationFilter}
+          unreadCount={unreadNotificationCount}
+          loading={notificationAccountId === selectedAccountId && notificationLoading}
+          error={notificationAccountId === selectedAccountId && notificationError ? notificationError : undefined}
+          onFilterChange={(id) => {
+            if (id === 'all' || id === 'error' || id === 'update') setNotificationFilter(id)
+          }}
+          onMarkAllRead={() => { void markAllNotificationsRead() }}
+          onClose={() => setNotificationsOpen(false)}
+          onViewAll={() => {
+            /* パネル内は先頭100件まで。全件は通知一覧画面へ送る。 */
+            setNotificationsOpen(false)
+            router.push('/notifications')
+          }}
+          onOpenSettings={() => {
+            setNotificationsOpen(false)
+            router.push('/line-notifications')
+          }}
+          getAnchor={() => notificationBellRef.current}
+        />
+      </div>
+    </div>
+
+  </>
+  if (isV8) {
+    const rightCards = visibleRight.map((item) => <div key={item.id}>{renderRightCard(item.id)}</div>)
+    return <DashboardTemplate
+      boardId="d8X09"
+      title="ダッシュボード"
+      description="今日やることと、配信・友だちの状況を確認します。"
+      actions={headerActions}
+      notice={<>
+        <GettingStartedBand accountId={selectedAccountId} />
+        {error && (
+          <div className="bg-canvas border-hairline rounded-card mb-5 flex flex-wrap items-center gap-3 border p-4 text-sm" role="alert">
+            <span className="text-ink min-w-0 flex-1">{error}</span>
+            <Button type="button" variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>
+          </div>
+        )}
+        {data?.partialFailures?.length ? (
+          <p className="text-ink-secondary text-xs" role="status">
+            一部のデータを{STATE_TEXT.error}（{data.partialFailures.join('、')}）。0件としては表示していません。
+          </p>
+        ) : null}
+      </>}
+      stats={visibleToday.length > 0 ? <KpiCollapse gridClassName="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">{visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}</KpiCollapse> : null}
+      overlays={editor}
+    >
+      {mainCards.map((card, index) => card || rightCards[index] ? <DashboardRow key={preferences.main[index].id} aside={rightCards[index]} asideRef={index === 0 ? asideRef : undefined}>{card}</DashboardRow> : null)}
+      {rightCards.slice(mainCards.length).map((card) => <DashboardRow key={card.key}>{card}</DashboardRow>)}
+    </DashboardTemplate>
+  }
+
   return (
     /*
      * ★V7 仕上げ `z97zZN` §1: 最初に開いたときだけ、段ごとに下から8px・
@@ -1652,63 +1804,7 @@ function DashboardPageInner() {
         閉じた・全部終わった・取れなかったときは何も描かない。
       */}
       <GettingStartedBand accountId={selectedAccountId} />
-      <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
-        <Button onClick={openEditor}>
-          <EditIcon />ダッシュボード編集
-        </Button>
-        <div className="flex flex-wrap items-center justify-end gap-2.5">
-          <DashboardFreshness freshness={data?.freshness} asOf={data?.asOf} />
-          <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-pill bg-current" />{healthLabel}</span>
-          <div className="flex gap-2">
-            {PERIODS.map((item) => (
-              <Button variant="primary" className={(`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`) + ' h-auto whitespace-normal'} key={item.key} type="button" onClick={() => selectPeriod(item.key)} aria-pressed={period === item.key}>{item.label}</Button>
-            ))}
-          </div>
-          {/* 選択中のLINEアカウントの通知だけを表示し、未取得を0件に見せない。 */}
-          <div className="relative" ref={notificationBellRef}>
-            <IconButton
-              aria-label={unreadNotificationCount > 0 ? `通知、未読${unreadNotificationCount}件` : '通知'}
-              aria-expanded={notificationsOpen}
-              onClick={() => {
-                if (!notificationsOpen) void loadNotificationCenter()
-                setNotificationsOpen((current) => !current)
-              }}
-            >
-              <BellIcon />
-            </IconButton>
-            {unreadNotificationCount > 0 ? (
-              <span
-                aria-hidden="true"
-                className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-pill px-1 text-center text-xs leading-5 font-medium tabular-nums"
-              >{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
-            ) : null}
-            <NotificationPanel
-              open={notificationsOpen}
-              items={notificationItems}
-              filters={notificationFilters}
-              activeFilter={notificationFilter}
-              unreadCount={unreadNotificationCount}
-              loading={notificationAccountId === selectedAccountId && notificationLoading}
-              error={notificationAccountId === selectedAccountId && notificationError ? notificationError : undefined}
-              onFilterChange={(id) => {
-                if (id === 'all' || id === 'error' || id === 'update') setNotificationFilter(id)
-              }}
-              onMarkAllRead={() => { void markAllNotificationsRead() }}
-              onClose={() => setNotificationsOpen(false)}
-              onViewAll={() => {
-                /* パネル内は先頭100件まで。全件は通知一覧画面へ送る。 */
-                setNotificationsOpen(false)
-                router.push('/notifications')
-              }}
-              onOpenSettings={() => {
-                setNotificationsOpen(false)
-                router.push('/line-notifications')
-              }}
-              getAnchor={() => notificationBellRef.current}
-            />
-          </div>
-        </div>
-      </div>
+      <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">{headerActions}</div>
 
       {/*
         ★V7 `x63W5x`：ページ全体の失敗はピンクの箱ではなく、中立のカードで出す。
@@ -1748,46 +1844,7 @@ function DashboardPageInner() {
             先頭に居続けた。非表示にしても件数取得を止めないよう、OFFのときは
             その場所へ畳んだままマウントを維持する。
           */}
-          {preferences.main.map((item) => {
-            /*
-             * 非表示にしても件数取得を止めないよう、OFFのときはその場所へ
-             * 畳んだままマウントを維持する。受信箱は上部の小カードの件数・
-             * 最長待ちの供給源でもあり、アンマウントすると小カードが「—」に
-             * 戻る（DASH-21）。
-             */
-            if (item.id === 'shipment') {
-              return (
-                /*
-                 * 表示ONなら0件でもカードを出す。空のときは
-                 * パネル側が1行の空表示を出す。件数は取り続けるので、
-                 * OFFのときは隠すだけでマウントは保つ（受信箱と同じ形）。
-                 */
-                <div key={item.id} data-design="Shipment" className={item.visible ? '' : 'hidden'} aria-hidden={!item.visible}>
-                  {/*
-                    選択中アカウントの出荷だけを数える（IDEA-01）。
-                    小カード「出荷予定」と遷移先 /ec-commerce は同じアカウント範囲。
-                  */}
-                  <ShipmentPanel
-                    accountId={selectedAccountId}
-                    onSummaryChange={handleShipmentSummary}
-                  />
-                </div>
-              )
-            }
-            if (item.id === 'pending-inbox') {
-              return (
-                <div key={item.id} className={item.visible ? '' : 'hidden'} aria-hidden={!item.visible}>
-                  {/*
-                    上部の小カードの MAIL 件数・最長待ちはこのカードの取得結果から
-                    取る（DASH-21）。失敗も一緒に知らせ、0件と取り違えない。
-                  */}
-                  <PendingInboxCard onSummaryChange={handleInboxSummary} />
-                </div>
-              )
-            }
-            if (!item.visible) return null
-            return <div key={item.id}>{renderMainCard(item.id)}</div>
-          })}
+          {mainCards}
         </div>
         <aside ref={asideRef} className="min-w-0 space-y-3.5">
           {visibleRight.map((item) => <div key={item.id}>{renderRightCard(item.id)}</div>)}
@@ -1798,29 +1855,7 @@ function DashboardPageInner() {
         V8 だけ：編集パネル（dnd-kit を含む）は開くまで読まない。
         v7 は今までどおり静的に読む（動きを変えない）。
       */}
-      {isV8
-        ? (editorOpen ? <DashboardEditorDynamic
-          open={editorOpen}
-          preferences={preferences}
-          saving={preferenceSaving}
-          saveError={preferenceSaveError?.message ?? null}
-          saveConflict={preferenceSaveError?.conflict ?? false}
-          onReloadPreferences={reloadPreferences}
-          onCancel={closeEditor}
-          onApply={applyPreferences}
-          onReset={resetPreferences}
-        /> : null)
-        : <DashboardEditor
-          open={editorOpen}
-          preferences={preferences}
-          saving={preferenceSaving}
-          saveError={preferenceSaveError?.message ?? null}
-          saveConflict={preferenceSaveError?.conflict ?? false}
-          onReloadPreferences={reloadPreferences}
-          onCancel={closeEditor}
-          onApply={applyPreferences}
-          onReset={resetPreferences}
-        />}
+      {editor}
     </div>
   )
 }
