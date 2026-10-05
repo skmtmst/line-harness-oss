@@ -1480,8 +1480,21 @@ function visualQaWriteBody(method, pathname) {
     const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
     return { ...REMINDER_DRAFT, reminderId: draftId || REMINDER_DRAFT.reminderId }
   }
-  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/validate$/.test(pathname)) return REMINDER_VALIDATE
-  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/audience$/.test(pathname)) return REMINDER_AUDIENCE
+  if (method === 'POST' && pathname === '/api/reminders/drafts') {
+    return { reminderId: 'reminder-new', versionId: 'reminder-new-draft-v1', versionNumber: 1 }
+  }
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/validate$/.test(pathname)) {
+    if (decodeURIComponent(pathname.split('/')[3] ?? '') === 'reminder-new') {
+      return { ...REMINDER_VALIDATE, audience: { matched: 172, excluded: 14 } }
+    }
+    return REMINDER_VALIDATE
+  }
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/audience$/.test(pathname)) {
+    if (decodeURIComponent(pathname.split('/')[3] ?? '') === 'reminder-new') {
+      return { ...REMINDER_AUDIENCE, matched: 172, excluded: 14 }
+    }
+    return REMINDER_AUDIENCE
+  }
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/preview$/.test(pathname)) return REMINDER_PREVIEW
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/test-send$/.test(pathname)) return REMINDER_TEST_SEND
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/publish$/.test(pathname)) return REMINDER_PUBLISH

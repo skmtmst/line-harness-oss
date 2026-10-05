@@ -981,7 +981,7 @@ export const FORM_DETAIL = {
     version: 2,
     header: [{ id: 'form-header-image', kind: 'image', mediaUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400"><rect width="1200" height="400" fill="%23eaf5ee"/></svg>', size: 'full' }],
     sections: [{
-      id: 'form-section-visit', name: '来店アンケート', blocks: [
+      id: 'form-section-visit', name: '来店について', blocks: [
         { id: 'form-heading', kind: 'heading', text: 'ご来店ありがとうございました', level: 1 },
         { id: 'form-intro', kind: 'text', text: '30秒で終わります' },
         { id: 'form-name', kind: 'input', type: 'text', name: 'real_name', label: 'お名前（漢字）', required: true, destinations: { realName: true } },
@@ -999,6 +999,9 @@ export const FORM_DETAIL = {
         { id: 'form-next-visit', kind: 'input', type: 'date', name: 'next_visit', label: '次回来店の希望日', destinations: { friendFieldIds: ['friend-field-next-visit'] } },
         { id: 'form-button', kind: 'button', label: '送信する', url: 'https://example.co.jp/thanks', style: 'default' },
       ],
+    }, {
+      /* 2ページ目の押す先のタブ。中身は絵に見えないため空にしておく。 */
+      id: 'form-section-next', name: '次回について', blocks: [],
     }],
     options: {
       thanksUrl: 'https://example.co.jp/thanks',
