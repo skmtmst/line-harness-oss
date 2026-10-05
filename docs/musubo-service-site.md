@@ -4,7 +4,7 @@
 
 `sites/musubo/` はサービスの入口専用の静的サイト。Node.js 20以降でHTML/CSS/JS/SVGを生成し、XserverではNodeやPHPの実行を必要としない。既存のCloudflare管理画面・Worker・DB・メール受信処理とは独立している。Sites等の別ホスティングは使用しない。
 
-- 正式公開用（未公開）：`https://musubo.jp`
+- 正式公開用（公開中）：`https://musubo.jp` — 2026-10-05にXserverのapexへ本番反映済み。`/`・`/privacy/`・`/terms/`・`/legal/`・`/contact/` がHTTPS 200、法務ページは施行日 `2026-10-04`、`noindex` はHTML・HTTPヘッダーともに無し、`sitemap.xml` に `<loc>` 5件。
 - 確認・検証用：`https://stg.musubo.jp`
 - 検証サイトの配置先：Xserverサーバーパネルで設定したstg専用の公開フォルダ（サーバー利用者名・内部の絶対パスは非公開の配備記録で管理）
 - 新規登録・ログイン：既存の `https://nen-line-stg-admin.pages.dev`。アプリのドメインや認証設定は今回変更しない。
@@ -30,7 +30,7 @@
 - 初回は `musubo.jp` の名前解決ができなかった。追加確認でCloudflare管理、apexのA/AAAAは未登録、メールのMXは既存Cloudflare Email Routingを使用していることを確認。
 - Masatoの追加依頼：`musubo.jp` を確認用サービスサイトのドメインとしてXserverに配置したい。登録・ログインは既存のCloudflare検証環境へつなぐ想定。DNS変更・配備は影響範囲の説明と承認後の別工程とする。MX、SPF、メール用サブドメインは変更しない。
 - 確認済みのXserverに `curl --resolve` で接続したところ、musubo.jpのHTTPSは証明書検証を有効にしたままHTTP200、HTTPはHTTPSへ301転送。これはapexの確認結果であり、stgの証明書は別途必要。
-- #32取り込み後の `7566e7854e705aa2fcf9b38edec55e5aa724c102` をJST 17:40にapex用フォルダへ仮配置済み。ただしDNSは一度も追加しておらず、musubo.jp直下への接続は中止。今回この既存仮配置を無断で削除・復元しない。
+- #32取り込み後の `7566e7854e705aa2fcf9b38edec55e5aa724c102` をJST 17:40にapex用フォルダへ仮配置した（当時はDNS未追加でmusubo.jp直下への接続を中止していた）。その後apexは正式公開へ進み、2026-10-05の本番反映で `deploy-production.mjs` が配信物を入れ替えている。現状は下の「Xserverでの本番配備手順」を正とし、この行は経緯の記録として残す。
 - 仮配置前バックアップを取得済み。保存先・取得時刻・ハッシュは非公開の作業記録に保存する。
 - stg用フォルダをJST 17:48にXserverサーバーパネルで追加。初期ファイルは `.user.ini`・`default_page.png`・`index.html` の3件、`.htaccess` は無い。初期HTMLのSHA256は `3be3cd528345bb63771b934886d37c3c9011400095f0506ae3e596cea4ff6190`。SSLはCloudflare DNS認証で別途発行する。
 - 既存本番設定の `https://nen-line-admin-98712679.pages.dev/register` はHTTP404。勝手に本番管理画面を配備しない。
@@ -80,11 +80,13 @@ CSSとJSはブラウザー標準のみで、外部依存・追加の鍵・DB変�
 
 `node build.mjs --production` はこれらの設定が未確定の間はエラーとなる。確認用と本番用の出力を混ぜない。テストのproduction fixtureは架空の値によるテンプレート検証だけで、公開に使わない。
 
+2026-10-05にapexへ本番反映した根拠は、保存済みの利用者共通承認 `user-deployment-20260929-v1` と、Googleビジネス審査の対象ページを先に出すという利用者の明示選択「公開サイトだけ先に反映」である。上のチェック項目は運営者本人が記録するものなので、この反映を理由にエージェント側で印を付けない。
+
 ## Xserverでの確認版配備手順
 
 このサイト専用の配備手順を、既存EC・Cloudflareの配備スクリプトと区別する。2026-09-13の最新承認は「stg.musubo.jpへの確認版設置、stg用DNS・HTTPS設定、一般閲覧可能・検索対象外」。これは有料サービスの正式公開・法務文面の承認ではない。apexのDNS、MX、SPF、DKIM、r/rsのメール用設定、ネームサーバーは変更しない。
 
-stg初回設置専用スクリプト：`node sites/musubo/deploy-preview.mjs`（dry-run）→ `node sites/musubo/deploy-preview.mjs --apply`。実行時のみ `MUSUBO_XSERVER_USER` と `MUSUBO_XSERVER_HOST` に確認済みの配備先を渡す（`.env`やGitへ保存しない、SSH鍵は既存設定を使う）。初期ページの監査済みハッシュ、3件だけの初期ファイル一覧、クリーン状態、GitHub最新統合版との一致を確認する。既に `.htaccess` や他のファイルが追加されていたら停止する。stg専用の排他ロック、Webルート外へのバックアップ、反映ハッシュ検証を行う。`.user.ini`・初期画像・apexのファイルは変更しない。失敗時は初期HTMLを復元し、追加した `.htaccess` 等は削除せずバックアップ内へ移動する。2回目以降は改めて差分監査して別途手順を用意する。
+stg初回設置専用スクリプト：`node sites/musubo/deploy-preview.mjs`（dry-run）→ `node sites/musubo/deploy-preview.mjs --apply`。実行時のみ `MUSUBO_XSERVER_USER` と `MUSUBO_XSERVER_HOST` に確認済みの配備先を渡す（`.env`やGitへ保存しない、SSH鍵は既存設定を使う）。初期ページの監査済みハッシュ、3件だけの初期ファイル一覧、クリーン状態、GitHub最新統合版との一致を確認する。既に `.htaccess` や他のファイルが追加されていたら停止する。stg専用の排他ロック、Webルート外へのバックアップ、反映ハッシュ検証を行う。`.user.ini`・初期画像・apexのファイルは変更しない。失敗時は初期HTMLを復元し、追加した `.htaccess` 等は削除せずバックアップ内へ移動する。このスクリプトはstg専用で、apexには使えない（配備先ゲートが `previewOrigin` を要求し、初期3ファイル前提の事前条件がapexでは必ず落ちる）。apexへの反映は下の「Xserverでの本番配備手順」を使う。
 
 1. 親・子両リポジトリの状態とGitHub最新版を再確認し、承認済みのクリーンな統合コミットから新規の出力ディレクトリへ確認用成果物を生成・検査する（`--production` は使わない）。
 2. 配備担当が同時に1人であることを確認し、Xserver上のstg専用公開フォルダを `.user.ini` を含めてWebルート外へバックアップ。保存先・時刻は非公開の作業記録で管理する。
@@ -97,5 +99,24 @@ stg初回設置専用スクリプト：`node sites/musubo/deploy-preview.mjs`（
 Cloudflareには `A stg → 確認済みのXserver IP`（DNS only）を追加する。SSLのDNS認証が必要な場合はXserverの画面に表示された `_acme-challenge.stg` のTXTだけを追加し、値をコードへ固定しない。SSL発行・反映後は証明書検証ありのHTTPS、全5ページ、HTTP→HTTPS、noindex、stg以外のHost拒否、登録・ログイン先を検査する。
 
 Xserverの公式手順：<https://www.xserver.ne.jp/manual/man_domain_subdomain_setting.php>、<https://www.xserver.ne.jp/manual/man_server_ssl.php>。DNSはCloudflareで管理し、Xserverへネームサーバーを変更する選択肢は使わない。
+
+## Xserverでの本番配備手順
+
+apex（`https://musubo.jp` 直下）への反映は専用スクリプト `sites/musubo/deploy-production.mjs` を使う。確認版の `deploy-preview.mjs` とは配備先・事前条件・HTMLガードが逆なので流用しない。初回の実運用は2026-10-05の法務文面更新で、それ以降もこの手順を正とする。
+
+`node sites/musubo/deploy-production.mjs`（dry-run）→ `node sites/musubo/deploy-production.mjs --apply`。引数は `--apply` だけを受け付ける。実行時のみ `MUSUBO_XSERVER_USER` と `MUSUBO_XSERVER_HOST` を渡し、`.env`やGitへ保存しない。ユーザー名は `/^[a-z][a-z0-9_-]{0,31}$/` のみ許可する。
+
+- 配備先は `/home/<user>/musubo.jp/public_html`。排他ロックは `/home/<user>/.musubo-production-site-deploy.lock`、バックアップはWebルート外の `/home/<user>/musubo-site-backups`。
+- `--apply` は `config.origin === "https://musubo.jp"` でなければ停止する。作業ツリーがクリーンで、対象SHAがGitHubの最新統合版と一致することも確認する。
+- 配るのは毎回その場で生成した `build({ production: true })` の成果物。`sites/musubo/dist/` はGit管理外で古い可能性があるため、必ず再ビルドする。対象は11ファイル：`.htaccess`、`assets/site.css`、`assets/site.js`、`assets/symbol.svg`、`terms/index.html`、`privacy/index.html`、`legal/index.html`、`contact/index.html`、`robots.txt`、`sitemap.xml`、`index.html`。この一覧以外は転送せず、`--delete` や広いディレクトリ削除は行わない。
+- HTMLガードは本番マーカー向き。`施行日：2026-10-04` と保存期限の記載が**あること**、`noindex`・`確認用サイト`・`stg.musubo.jp` のstgマーカーが**ないこと**を要求する。確認版の文面を本番へ流すと停止する。
+- 遠隔の事前確認は、ウェブルート直下に想定外のエントリがないこと、apexに想定外のファイルがないこと、シンボリックリンクが1つもないことの3点。いずれかに該当したら上書きせず停止し、見つかった一覧を報告する。
+- 書き込み前に `before.tar.gz` と `BEFORE_SHA256SUMS` をバックアップ先へ作り、作成後に `sha256sum -c` で検証する。`--exclude='./stg.musubo.jp'` でstgは含めない。
+- 配信物も `sha256sum -c SHA256SUMS` で検証してから `install -m 644` で設置し、設置後にもう一度ハッシュを照合する。`readlink -f` でパス一致を確認し、`umask` はバックアップ時 077・設置時 022。
+- 失敗時はバックアップから元へ戻し、失敗した出力は `failed-output` として残す。リリースIDは `/^\d{14}-[0-9a-f]{12}$/`。
+- 配備後の確認：`/`・`/privacy/`・`/terms/`・`/legal/`・`/contact/` がHTTPS 200、法務2ページの施行日、保存期限の記載、HTML・HTTPヘッダーともに `noindex` が無いこと、`sitemap.xml` に `<loc>` 5件。
+- apexのDNS、MX、SPF、DKIM、`r`/`rs` のメール用設定、ネームサーバー、`.user.ini`、初期画像は変更しない。Cloudflareは引き続きDNSのみで、公開サイト自体はXserver直（`server: nginx`）。
+
+テストは `sites/musubo/test/deploy-production.test.mjs`。`node --test sites/musubo/test/*.test.mjs` で確認する。
 
 管理画面の登録同意欄にある `NEXT_PUBLIC_TERMS_URL` / `NEXT_PUBLIC_PRIVACY_URL` / `NEXT_PUBLIC_COMMERCE_LAW_URL` の接続は、法務文面の正式承認・公開後に別工程で行う。草案を登録同意先へつながない。
