@@ -195,7 +195,11 @@ export default function TopBar({
             */}
             {roleLabel ? (
               <span className={styles.pillText}>
-                <span className={`${styles.pillRole} v8-only`}>{chromeVariant === 'shell' ? 'LINEアカウント' : roleLabel}</span>
+                {/*
+                  札の中の小さい字は「LINEアカウント」で固定（絵の指示）。
+                  v8-only の行なので v7 の札は変わらない。
+                */}
+                <span className={`${styles.pillRole} v8-only`}>LINEアカウント</span>
                 <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
               </span>
             ) : (
