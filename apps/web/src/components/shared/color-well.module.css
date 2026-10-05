@@ -105,6 +105,16 @@
   animation: color-well-pop var(--motion-fast) var(--motion-ease-out);
 }
 
+/*
+ * 2列に並べた右側で、左そろえのままだと画面の右へはみ出す（横スクロールも
+ * 出ないので、はみ出した所は押せない）。入る幅が無いときだけ `color-well.tsx`
+ * がこれを足して、コントロールの右端にそろえる。大きさ・中身は `.pop` のまま。
+ */
+.popEnd {
+  right: 0;
+  left: auto;
+}
+
 @keyframes color-well-pop {
   from {
     opacity: 0;
