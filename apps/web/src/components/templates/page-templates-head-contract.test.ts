@@ -9,7 +9,8 @@ const css = readFileSync(join(HERE, 'page-templates.module.css'), 'utf8')
 /*
  * 型の見出しの既定は379板の絵どおり。
  * 題 22px/700/行32・間 4px・説明 13px/行19・上の余白 20。
- * 小さい「部品どおり」（EnlYo）は regular の変わり形に残す。
+ * 小さい「部品どおり」（EnlYo）は compact の変わり形に残す。
+ * regular と未指定は既定（22/32）と同じにする。
  * v7 には効かない（すべて data-theme v8 限定）。
  */
 describe('型の見出し（379板の絵）', () => {
@@ -23,11 +24,16 @@ describe('型の見出し（379板の絵）', () => {
     expect(css).toMatch(/\.heading \{[^}]*padding:\s*20px 24px/s)
   })
 
-  it('regular は部品どおり（題20/27・間2・説明13/20）', () => {
-    expect(css).toMatch(/heading-size='regular'.*?\.title \{[^}]*font-size:\s*20px/s)
-    expect(css).toMatch(/heading-size='regular'.*?\.title \{[^}]*line-height:\s*27px/s)
-    expect(css).toMatch(/heading-size='regular'.*?\.headingText \{[^}]*gap:\s*2px/s)
-    expect(css).toMatch(/heading-size='regular'.*?\.description \{[^}]*line-height:\s*20px/s)
+  it('compact は部品どおり（題20/27・間2・説明13/20）', () => {
+    expect(css).toMatch(/heading-size='compact'.*?\.title \{[^}]*font-size:\s*20px/s)
+    expect(css).toMatch(/heading-size='compact'.*?\.title \{[^}]*line-height:\s*27px/s)
+    expect(css).toMatch(/heading-size='compact'.*?\.headingText \{[^}]*gap:\s*2px/s)
+    expect(css).toMatch(/heading-size='compact'.*?\.description \{[^}]*line-height:\s*20px/s)
+  })
+
+  it('regular は既定と同じ（小さい題20pxの指定を持たない）', () => {
+    expect(css).not.toMatch(/heading-size='regular'\] \.title \{[^}]*font-size:\s*20px/s)
+    expect(css).not.toMatch(/heading-size='regular'\] \.headingText \{[^}]*gap:\s*2px/s)
   })
 
   it('large の説明に絵に無い 12/18 を使わない', () => {

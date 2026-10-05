@@ -4,7 +4,8 @@ import styles from './page-templates.module.css'
 
 export interface PageHeadingProps {
   title: ReactNode
-  headingSize?: 'regular' | 'large'
+  /** regular と未指定は既定（22/32）。compact は部品どおりの小さい見出し。 */
+  headingSize?: 'regular' | 'compact' | 'large'
   description?: ReactNode
   help?: ReactNode
   identity?: ReactNode

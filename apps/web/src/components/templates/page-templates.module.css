@@ -16,10 +16,10 @@
 :global([data-theme='v8']) .titleRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
 :global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 22px; font-weight: 700; line-height: 32px; }
 :global([data-theme='v8']) .description { color: var(--color-ink-secondary); font-size: 13px; line-height: 19px; }
-/* 部品どおりの小さい見出し（EnlYo：題20/27・間2・説明13/20）。x6QsVz・NtCE3 だけが使う。 */
-:global([data-theme='v8']) .heading[data-heading-size='regular'] .headingText { gap: 2px; }
-:global([data-theme='v8']) .heading[data-heading-size='regular'] .title { font-size: 20px; font-weight: 600; line-height: 27px; }
-:global([data-theme='v8']) .heading[data-heading-size='regular'] .description { font-size: 13px; line-height: 20px; }
+/* 部品どおりの小さい見出し（EnlYo：題20/27・間2・説明13/20）。compact を渡した画面だけが使う。regular は既定（22/32）と同じ。 */
+:global([data-theme='v8']) .heading[data-heading-size='compact'] .headingText { gap: 2px; }
+:global([data-theme='v8']) .heading[data-heading-size='compact'] .title { font-size: 20px; font-weight: 600; line-height: 27px; }
+:global([data-theme='v8']) .heading[data-heading-size='compact'] .description { font-size: 13px; line-height: 20px; }
 :global([data-theme='v8']) .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
 :global([data-theme='v8']) .steps { min-width: 0; display: flex; align-items: center; gap: 14px; }
 :global([data-theme='v8']) .tabs { padding: 0 24px; flex-shrink: 0; }
