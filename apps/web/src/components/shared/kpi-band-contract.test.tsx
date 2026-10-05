@@ -78,10 +78,10 @@ describe('数の帯（Pp3nS）', () => {
     expect(label![0]).toMatch(/line-height:\s*1\.5/)
   })
 
-  it('包みなし（strip＋KpiCard直並べ）もv8では横一列・隙間0', () => {
-    const css = read('kpi-card.module.css')
-    const bare = css.match(/\[data-theme='v8'\] \.strip \{[^}]*\}/s)
-    expect(bare, '包みなしstripの横並びがありません').toBeTruthy()
+  it('印なしの帯（data-kpi-strip）もv8では横一列・隙間0', () => {
+    const css = read('kpi-band-v8.css')
+    const bare = css.match(/\[data-theme='v8'\] \[data-kpi-strip\] \{[^}]*\}/s)
+    expect(bare, 'data-kpi-strip の横並びがありません').toBeTruthy()
     expect(bare![0]).toMatch(/display:\s*grid/)
     expect(bare![0]).toMatch(/grid-auto-flow:\s*column/)
     expect(bare![0]).toMatch(/grid-auto-columns:\s*minmax\(0,\s*1fr\)/)

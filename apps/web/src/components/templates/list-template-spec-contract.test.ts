@@ -46,9 +46,11 @@ describe('一覧の型の寸法（LIST-TEMPLATE-SPEC）', () => {
     expect(shared('pagination.module.css')).toMatch(/\[data-theme='v8'\] \.pagination \{[^}]*padding:\s*10px 20px/s)
   })
 
-  it('古い帯 CSS（kpi-band-v8.css）は消えている', () => {
-    expect(() => readFileSync(join(HERE, '..', 'shared', 'kpi-band-v8.css'), 'utf8')).toThrow()
+  it('帯の CSS（kpi-band-v8.css）は残す・数は変数で22', () => {
+    const band = readFileSync(join(HERE, '..', 'shared', 'kpi-band-v8.css'), 'utf8')
+    expect(band).toMatch(/\[data-theme='v8'\] \[data-kpi-strip\]\[data-kpi-presentation='band'\] \{[^}]*display:\s*grid/s)
+    expect(band).toMatch(/\[data-kpi-strip\]\[data-kpi-presentation='band'\] \[data-kpi-number\] \{[^}]*font-size:\s*var\(--tpl-band-number-size\)/s)
     const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8')
-    expect(globals).not.toMatch(/kpi-band-v8/)
+    expect(globals).toMatch(/@import "\.\.\/components\/shared\/kpi-band-v8\.css"/)
   })
 })

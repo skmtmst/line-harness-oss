@@ -295,16 +295,4 @@
 }
 [data-theme='v8'] .card[data-kpi-presentation='cell'] { border-radius: 0; }
 
-/*
- * 包みなしの組み方（画面が strip＋KpiCard を直に並べる所）も v8 では横一列：
- * 4マスなら4列・隙間0。呼び出し側の列数指定（repeat(4,…)・grid-cols-3）は
- * 生きる（ここでは列の型を決めない）。印つきの帯の指定（上の層の外の
- * ブロック）より弱いので、帯の印がある所は帯の並び方が勝つ。
- * v7 には効かない（すべて data-theme v8 限定）。
- */
-[data-theme='v8'] .strip {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: var(--tpl-band-gap);
-}
+/* 印なしの帯の横並びは kpi-band-v8.css（層なしCSS）に置く。 */

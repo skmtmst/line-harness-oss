@@ -26,7 +26,7 @@ describe('型の見出し（379板の絵）', () => {
       ['--tpl-toolbar-pad-block', '14px'], ['--tpl-toolbar-pad-side', '24px'], ['--tpl-toolbar-gap', '8px'],
       ['--tpl-folder-width', '200px'],
       ['--tpl-page-pad-block', '10px'], ['--tpl-page-pad-side', '24px'],
-      ['--tpl-band-number-size', '22px'], ['--tpl-band-number-lh', '28px'],
+      ['--tpl-band-number-size', '22px'], ['--tpl-band-number-lh', '26px'],
       ['--tpl-band-cell-pad-block', '16px'], ['--tpl-band-cell-pad-side', '20px'], ['--tpl-band-cell-gap', '8px'],
     ] as const) {
       expect(vars![0]).toMatch(new RegExp(`${name}:\\s*${value}`))
