@@ -49,3 +49,6 @@
 
 /* controls のボタンの輪郭を継承せず、layout 正本の文字操作を保つ。 */
 @layer components { [data-theme='v8'] .panel .add:not(:focus-visible) { outline: none; } }
+
+/* ★V8 型のフォルダの列（[data-template-region=folders]）の中では、列が余白と線を持つので部品は二重に持たない（司令塔 2026-10-05） */
+:global([data-theme='v8']) :global([data-template-region='folders']) .panel { padding: 0; border-right: 0; width: auto; }

@@ -112,6 +112,8 @@
 }
 
 [data-theme='v8'] .headRow .cell { line-height: var(--tpl-thead-lh); }
+/* 見出しの行は高さ40（H1O0a）。選ぶ箱（押せる範囲24）があっても行を押し広げない。 */
+[data-theme='v8'] .headRow .cell { height: var(--tpl-thead-h); padding-block: 0; }
 [data-theme='v8'] .headRow[data-table-layout='columns'] {
   display: flex; align-items: center; gap: 16px; height: auto; padding: 13px 20px;
 }

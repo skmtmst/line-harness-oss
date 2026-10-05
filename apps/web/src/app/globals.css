@@ -590,7 +590,7 @@
   --tpl-band-number-size: 22px; --tpl-band-number-lh: 26px;
   --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 20px; --tpl-band-cell-gap: 8px;
   --tpl-large-title-size: 22px; --tpl-large-title-lh: 33px; --tpl-large-gap: 16px;
-  --tpl-create-title-size: 18px; --tpl-create-title-lh: 24px;
+  --tpl-create-title-size: 22px; --tpl-create-title-lh: 32px;
   --tpl-create-desc-size: 12px; --tpl-create-desc-lh: 18px;
   --tpl-create-head-pad-top: 20px; --tpl-create-head-pad-side: 24px; --tpl-create-head-pad-bottom: 16px;
   --tpl-create-head-gap: 8px;
@@ -601,6 +601,11 @@
   --tpl-preview-pad: 24px; --tpl-preview-narrow-width: 280px;
   --tpl-preview-content-width: 331px; --tpl-preview-narrow-content-width: 231px;
   --tpl-detail-content-gap: 20px;
+  /* 戻るリンク（13px・高さ19）と題の間：作る8・詳細6。詳細の説明は 12px/17（X4STXS）。表の見出しは高さ40（H1O0a）。 */
+  --tpl-identity-lh: 19px; --tpl-create-head-row-gap: 8px; --tpl-detail-head-row-gap: 6px;
+  --tpl-detail-title-gap: 6px; --tpl-detail-desc-size: 12px; --tpl-detail-desc-lh: 17px;
+  --tpl-thead-h: 40px;
+  --tpl-steps-gap: 8px; --tpl-steps-dot: 20px; --tpl-steps-dot-gap: 6px; --tpl-steps-text-size: 12px; --tpl-steps-text-lh: 17px;
   --tpl-footer-pad-block: 12px; --tpl-footer-pad-side: 24px; --tpl-footer-gap: 8px;
   --tpl-settings-nav-width: 208px; --tpl-settings-nav-pad-block: 16px; --tpl-settings-nav-pad-side: 12px;
   --tpl-settings-content-pad-block: 24px; --tpl-settings-content-pad-side: 28px; --tpl-settings-content-gap: 16px;
