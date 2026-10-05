@@ -19,6 +19,11 @@ export type DialogProps = {
   title: string
   description?: string
   tone?: 'default' | 'destructive'
+  /**
+   * 説明文を帯で囲む。'warning' は琥珀帯（CFAyf 送受信を止める）。
+   * tone（題・ボタンの色）とは独立。渡さなければ帯なし。
+   */
+  descriptionBand?: 'warning'
   busy?: boolean
   error?: string
   confirmLabel?: string
@@ -59,6 +64,7 @@ export default function Dialog({
   title,
   description,
   tone = 'default',
+  descriptionBand,
   busy = false,
   error,
   confirmLabel = '保存する',
@@ -136,7 +142,7 @@ export default function Dialog({
     >
       <div className={styles.headerRow}>
         <div className={styles.headerContent}>
-          {tone === 'destructive' && !confirmation ? <div className={styles.callout} data-qa-dialog-callout>{heading}</div> : heading}
+          {(tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
         </div>
         {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
         <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={onCancel} disabled={busy}>

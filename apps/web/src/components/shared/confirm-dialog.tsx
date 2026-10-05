@@ -11,6 +11,11 @@ interface ConfirmDialogProps {
   confirmLabel?: string
   cancelLabel?: string
   destructive?: boolean
+  /**
+   * 説明文を琥珀帯で囲む（CFAyf 送受信を止める）。
+   * destructive（赤い題・ボタン）とは独立に使える。
+   */
+  warning?: boolean
   busy?: boolean
   error?: string
   /**
@@ -49,6 +54,7 @@ export default function ConfirmDialog({
   confirmLabel = '実行する',
   cancelLabel = 'キャンセル',
   destructive = false,
+  warning = false,
   busy = false,
   error,
   children,
@@ -77,6 +83,7 @@ export default function ConfirmDialog({
       title={title}
       description={description}
       tone={destructive ? 'destructive' : 'default'}
+      descriptionBand={warning ? 'warning' : undefined}
       confirmLabel={confirmLabel}
       cancelLabel={cancelLabel}
       busy={busy}

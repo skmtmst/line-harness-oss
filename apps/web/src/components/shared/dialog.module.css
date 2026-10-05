@@ -167,6 +167,17 @@
   color: var(--color-status-danger);
 }
 
+/* 琥珀の呼びかけ（CFAyf 送受信を止める：説明文を帯で囲む）。v7 は変えない。 */
+[data-theme='v8'] .calloutWarning {
+  border-color: var(--color-warning-bg);
+  background: var(--color-warning-bg);
+}
+
+[data-theme='v8'] .calloutWarning .title,
+[data-theme='v8'] .calloutWarning .description {
+  color: var(--color-warning);
+}
+
 .callout .title {
   font-size: var(--text-body);
 }
