@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'page-templates.module.css'), 'utf8')
+/* 変数の定義場所は app/globals.css の [data-theme="v8"]（module の pure 検査に当たらない層）。 */
+const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8')
 
 /*
  * 型の見出しの既定は379板の絵どおり。
@@ -15,7 +17,7 @@ const css = readFileSync(join(HERE, 'page-templates.module.css'), 'utf8')
  */
 describe('型の見出し（379板の絵）', () => {
   it('寸法は先頭の変数に1か所まとめ・値は絵どおり', () => {
-    const vars = css.match(/:global\(\[data-theme='v8'\]\) \{[^}]*--tpl-head-pad-top[^}]*\}/s)
+    const vars = globals.match(/\[data-theme="v8"\] \{[^}]*--tpl-head-pad-top[^}]*\}/s)
     expect(vars, '変数の一覧がありません').toBeTruthy()
     for (const [name, value] of [
       ['--tpl-head-pad-top', '20px'], ['--tpl-head-pad-side', '24px'], ['--tpl-head-pad-bottom', '12px'],
