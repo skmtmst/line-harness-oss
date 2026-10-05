@@ -32,6 +32,7 @@ import {
   type GoogleOAuthClient,
 } from '../services/google-business.js';
 import {
+  GOOGLE_SHEETS_REQUIRED_SCOPES,
   GOOGLE_SHEETS_SCOPES,
   MANUAL_SYNC_BUDGET_MS,
   fetchSpreadsheetTitle,
@@ -355,6 +356,8 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
   try {
     const tokens = await exchangeAuthorizationCode({
       client, code, codeVerifier: await decryptCredential(stateRow.code_verifier_enc, key), fetch,
+      // 同意画面でスプレッドシートの許可を外されたままの接続を、ここで止める。
+      requiredScopes: GOOGLE_SHEETS_REQUIRED_SCOPES,
     });
     const email = await fetchAccountEmail({ fetch, accessToken: tokens.accessToken });
     const existing = lineAccountId ? await integrationFor(c, lineAccountId) : null;

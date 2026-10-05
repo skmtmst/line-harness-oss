@@ -144,6 +144,19 @@ export type AuthenticatedStaff = {
   tenantStatus?: TenantStatus;
   /** 機能オフ middleware が一覧処理へ渡す、このリクエストだけの追加絞り込み。 */
   featureEnabledLineAccountIds?: string[];
+  /**
+   * どの資格情報で入ったか。'session' は管理画面から人がログインした状態、
+   * 'api-key' は長期間使える鍵（env の API_KEY / LEGACY_API_KEY、スタッフ個別の
+   * APIキー）をプログラムから提示した状態。
+   *
+   * Googleビジネスのルートはこれを見て 'api-key' を拒む。Google Business Profile
+   * APIのポリシー（https://developers.google.com/my-business/content/policies 、
+   * 2026-08-28更新）が「End users of your Business Profile APIs need to manually
+   * sign in to use it.」「You cannot provide indirect access to your Business
+   * Profile project.」と定めているため、鍵1本で外部スクリプトからGoogleへ
+   * 書ける経路を残せない。
+   */
+  credential?: 'session' | 'api-key';
 };
 
 function toAuthenticatedStaff(staff: {
@@ -532,7 +545,7 @@ export async function authenticateAdminSession(
   if (!token) return null;
   const staff = await getStaffByAdminSession(c.env.DB, await sha256Hex(token), new Date().toISOString());
   if (!staff) return null;
-  return toAuthenticatedStaff(staff);
+  return { ...toAuthenticatedStaff(staff), credential: 'session' };
 }
 
 async function authenticateCookieToken(
@@ -566,12 +579,12 @@ export async function authenticateApiToken(
 
   const staff = await getStaffByApiKey(c.env.DB, token);
   if (staff) {
-    return toAuthenticatedStaff(staff);
+    return { ...toAuthenticatedStaff(staff), credential: 'api-key' };
   }
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
   if (token === c.env.API_KEY) {
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active' };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
 
   // Legacy fallback: LEGACY_API_KEY accepted during rotation grace period.
@@ -585,7 +598,7 @@ export async function authenticateApiToken(
     token === c.env.LEGACY_API_KEY
   ) {
     console.log('[auth] accept_via=LEGACY_API_KEY');
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active' };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
 
   return null;

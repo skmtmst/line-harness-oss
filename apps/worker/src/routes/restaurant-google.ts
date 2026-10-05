@@ -4,7 +4,8 @@
  * - 1店舗（rt_stores）＝1 LINE公式アカウント（rt_stores.line_account_id）＝1 Googleロケーション。
  * - 店舗は必ず account_id → rt_stores.line_account_id と担当者の統括（tenant）で引く。組織IDだけで信用しない。
  * - Googleとの通信は services/google-business.ts に閉じ込め、この層はDBと権限だけを扱う。
- * - Googleへの書き込みは GOOGLE_BUSINESS_WRITE_ENABLED=true の環境でしか行わない（検証・本番の環境分離）。
+ * - Googleへの書き込みは GOOGLE_BUSINESS_WRITE_ENABLED=true の環境でしか行わない（環境ごとのスイッチ。
+ *   2026-10-04からGoogleの機密スコープ審査のため実運用でも有効。自動送信はせず、確認画面で本人が押したときだけ送る）。
  * - トークンは暗号化して保存し、応答・ログに平文を出さない。
  */
 import { Hono } from 'hono';
@@ -17,7 +18,9 @@ import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
+import { deleteGoogleContentForStore } from '../services/google-business-retention.js';
 import {
+  GOOGLE_BUSINESS_REQUIRED_SCOPES,
   GoogleBusinessError,
   buildAuthorizeUrl,
   buildReplyDraftPrompt,
@@ -397,7 +400,13 @@ export async function accessTokenForConnection(env: Env['Bindings'], connection:
   const client = oauthClientForEnv(env);
   if (!client) throw new GoogleBusinessError('unavailable', null, 'google_oauth_not_configured');
   try {
-    const tokens = await refreshAccessToken({ client, refreshToken: await decryptCredential(connection.refresh_token_enc, key), fetch });
+    const tokens = await refreshAccessToken({
+      client,
+      refreshToken: await decryptCredential(connection.refresh_token_enc, key),
+      fetch,
+      // 連携後にGoogle側で「ビジネス情報の管理」だけ取り消された場合も、ここで接続を止める。
+      requiredScopes: GOOGLE_BUSINESS_REQUIRED_SCOPES,
+    });
     await dbFor(env, connection.store_id)
       .prepare(
         `UPDATE rt_google_connections
@@ -416,6 +425,9 @@ export async function accessTokenForConnection(env: Env['Bindings'], connection:
   } catch (error) {
     if (error instanceof GoogleBusinessError && error.kind === 'auth_expired') {
       await setConnectionStatusForEnv(env, connection.store_id, 'expired', 'auth_expired');
+    }
+    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') {
+      await setConnectionStatusForEnv(env, connection.store_id, 'no_permission', 'no_permission');
     }
     throw error;
   }
@@ -470,6 +482,19 @@ async function reviewFor(c: Context<Env>, storeId: string, id: string): Promise<
 
 export const googleAccessGuard: MiddlewareHandler<Env> = async (c, next) => {
   if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
+  // 長期間使えるAPIキーでは通さない。管理画面に人がログインした状態だけを受ける。
+  //
+  // Google Business Profile APIのポリシー
+  // （https://developers.google.com/my-business/content/policies 、2026-08-28更新）は
+  // 「End users of your Business Profile APIs need to manually sign in to use it.」
+  // 「They're not allowed automatic access to make manual or programmatic changes to
+  // their accounts.」「You cannot provide indirect access to your Business Profile
+  // project.」と定めている。APIキー1本をお客様のスクリプトやバッチに渡せば、
+  // musuboの承認済みプロジェクトを間接的に使わせたことになるため、
+  // Googleを触るルートだけはこの入口を閉じる。ほかのAPIのキー運用は変えない。
+  if (c.get('staff')?.credential === 'api-key') {
+    return fail(c, 403, 'Googleビジネスの操作は管理画面にログインしてから行ってください');
+  }
   const requestedTenant = c.req.query('tenant_id');
   if (requestedTenant && requestedTenant !== staffTenantId(c)) {
     return fail(c, 403, 'この統括を操作する権限がありません');
@@ -622,7 +647,14 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
   const key = c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;
   const db = dbFor(c.env, store.id);
   try {
-    const tokens = await exchangeAuthorizationCode({ client, code, codeVerifier: await decryptCredential(stateRow.code_verifier_enc, key), fetch });
+    const tokens = await exchangeAuthorizationCode({
+      client,
+      code,
+      codeVerifier: await decryptCredential(stateRow.code_verifier_enc, key),
+      fetch,
+      // 同意画面で「ビジネス情報の管理」のチェックを外されたままの接続を、ここで止める。
+      requiredScopes: GOOGLE_BUSINESS_REQUIRED_SCOPES,
+    });
     const options: RequestOptions = { fetch, accessToken: tokens.accessToken };
     const email = await fetchAccountEmail(options);
     const locations = await listManageableLocations(options);
@@ -769,17 +801,26 @@ restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectio
   } catch {
     revoked = false;
   }
-  // 履歴（口コミ・下書き・記録）は残す。止めるのは同期と書き込みだけ。
-  await dbFor(c.env, store.id)
+  // 解除したらGoogleから受け取ったものは残さない。公開中の個人情報の取扱い第6項が
+  // 「接続を解除した場合は保存している連携情報を削除します」と約束しているため、
+  // トークンだけでなく口コミ本文・プロフィール・指標・取り込み投稿・接続した
+  // Googleアカウントのメール・店舗名まで消す。
+  // 残すのは rt_google_write_log の操作記録（誰がいつ何を送ったか。送信前の
+  // スナップショットは消す）と、解除済みという接続行そのもの。
+  const db = dbFor(c.env, store.id);
+  await db
     .prepare(
       `UPDATE rt_google_connections
        SET refresh_token_enc = NULL, access_token_enc = NULL, access_token_expires_at = NULL,
+           google_account_email = NULL, location_name = NULL, location_title = NULL, location_maps_url = NULL,
+           average_rating = NULL, total_review_count = NULL,
+           last_synced_at = NULL, last_metrics_synced_at = NULL, last_sync_error = NULL,
            status = 'disconnected', disconnected_at = ?, updated_at = ?
        WHERE store_id = ?`,
     )
     .bind(nowIso(), nowIso(), store.id)
     .run();
-  await dbFor(c.env, store.id).prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
+  await deleteGoogleContentForStore(db, store.id);
   await writeLog(c, store.id, { kind: 'disconnect', targetName: connection.location_name, result: revoked ? 'accepted' : 'unknown', error: revoked ? null : 'revoke_failed' });
   auditLog(c, 'restaurant.google.disconnect', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
   return c.json({ success: true, revoked, connection: publicConnection(await connectionFor(c, store.id)) });

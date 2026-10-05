@@ -13,6 +13,12 @@ export const GOOGLE_BUSINESS_SCOPES = [
   'email',
 ] as const;
 
+/**
+ * 接続時に必ず許可されていないといけないスコープ。
+ * `openid` / `email` は表示用（どのGoogleアカウントで繋いだかの表示）なので必須にしない。
+ */
+export const GOOGLE_BUSINESS_REQUIRED_SCOPES = ['https://www.googleapis.com/auth/business.manage'] as const;
+
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
@@ -141,7 +147,11 @@ export function buildAuthorizeUrl(input: {
   url.searchParams.set('code_challenge_method', 'S256');
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
-  url.searchParams.set('include_granted_scopes', 'true');
+  // `include_granted_scopes` は付けない。
+  // Googleビジネス用とSheets用で同じOAuthクライアントを使う環境があり（sheetsOauthClient の予備）、
+  // 付けると「以前そのクライアントへ許可した別のスコープ」まで含んだトークンが返る。
+  // 申請文では business.manage / openid / email だけを使うと説明しているので、
+  // 保存するトークンもその都度要求したスコープだけに揃える。
   if (input.loginHint) url.searchParams.set('login_hint', input.loginHint);
   return url.toString();
 }
@@ -152,7 +162,26 @@ interface TokenResponse {
   access_token?: string;
   refresh_token?: string;
   expires_in?: number;
+  /** Googleが実際に許可したスコープ（空白区切り）。同意画面で権限ごとに外せるため検証する。 */
+  scope?: string;
   error?: string;
+}
+
+/**
+ * Googleが実際に許可したスコープを検証する。
+ *
+ * 同意画面では権限ごとにチェックを外せる（granular consent）。business.manage を外したまま
+ * 戻ってくると接続自体は成功したように見えて、その後のGoogle呼び出しが全部403になる。
+ * 接続の時点で止めて、利用者に許可のやり直しを案内するための検証。
+ *
+ * Googleが `scope` を返さない場合は検証しない（必須の応答項目ではないため）。
+ * スコープ名そのものは秘密値ではないが、例外メッセージには固定の符号だけを入れる。
+ */
+export function assertGrantedScopes(granted: string | undefined, required: readonly string[]): void {
+  if (!granted) return;
+  const grantedSet = new Set(granted.split(' ').filter(Boolean));
+  const missing = required.filter((scope) => !grantedSet.has(scope));
+  if (missing.length > 0) throw new GoogleBusinessError('no_permission', null, 'google_scope_not_granted');
 }
 
 async function postForm(fetchFn: FetchLike, url: string, form: Record<string, string>): Promise<Response> {
@@ -188,6 +217,8 @@ export async function exchangeAuthorizationCode(input: {
   codeVerifier: string;
   fetch: FetchLike;
   nowMs?: number;
+  /** 渡すと、Googleが許可したスコープにこれが含まれているかを検証する。 */
+  requiredScopes?: readonly string[];
 }): Promise<GoogleTokenSet> {
   const response = await postForm(input.fetch, TOKEN_URL, {
     grant_type: 'authorization_code',
@@ -201,7 +232,9 @@ export async function exchangeAuthorizationCode(input: {
     const error = await readTokenError(response);
     throw new GoogleBusinessError(error === 'invalid_grant' ? 'auth_expired' : 'invalid_request', response.status, `google_token_${error}`);
   }
-  return tokenSetFrom((await response.json()) as TokenResponse, null, input.nowMs ?? Date.now());
+  const payload = (await response.json()) as TokenResponse;
+  if (input.requiredScopes) assertGrantedScopes(payload.scope, input.requiredScopes);
+  return tokenSetFrom(payload, null, input.nowMs ?? Date.now());
 }
 
 export async function refreshAccessToken(input: {
@@ -209,6 +242,8 @@ export async function refreshAccessToken(input: {
   refreshToken: string;
   fetch: FetchLike;
   nowMs?: number;
+  /** 渡すと、Googleが許可したスコープにこれが含まれているかを検証する。 */
+  requiredScopes?: readonly string[];
 }): Promise<GoogleTokenSet> {
   const response = await postForm(input.fetch, TOKEN_URL, {
     grant_type: 'refresh_token',
@@ -220,7 +255,9 @@ export async function refreshAccessToken(input: {
     const error = await readTokenError(response);
     throw new GoogleBusinessError(error === 'invalid_grant' ? 'auth_expired' : 'unavailable', response.status, `google_token_${error}`);
   }
-  return tokenSetFrom((await response.json()) as TokenResponse, input.refreshToken, input.nowMs ?? Date.now());
+  const payload = (await response.json()) as TokenResponse;
+  if (input.requiredScopes) assertGrantedScopes(payload.scope, input.requiredScopes);
+  return tokenSetFrom(payload, input.refreshToken, input.nowMs ?? Date.now());
 }
 
 /** 接続解除時にGoogle側の許可も取り消す。失敗しても解除自体は進めるので、結果だけ返す。 */

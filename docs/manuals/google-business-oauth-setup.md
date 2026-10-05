@@ -109,6 +109,63 @@ GOOGLE_BUSINESS_WRITE_ENABLED = "false"
 5. 口コミを1件開き、「AIで下書きを作る」→ 文章を直す → 「下書き保存」（ここまではGoogleに何も送らない）
 6. 公開のテストをする日：`GOOGLE_BUSINESS_WRITE_ENABLED="true"` にして再配備 → 「返信内容を確認」→ チェックを入れて「この内容で返信する」→ Googleの管理画面で返信が見えることを確認 → 必要ならGoogle側で返信を削除
 
+## 6. 実運用環境のクライアントを作る（2026-10-04 追加）
+
+Googleの機密スコープ審査のデモ動画は `admin.musubo.jp`（実運用）で撮る。そのため実運用でも
+Googleビジネス機能を有効にしている。検証用クライアントは**流用しない**。
+
+1. 「クライアント」ページで**新しいクライアントを作成**。名前は `musubo LINE管理 本番環境`
+2. 承認済みのリダイレクトURIは、次の**1行だけ**にする
+   ```
+   https://api.musubo.jp/api/restaurant-test/google/oauth/callback
+   ```
+   スプレッドシート連携のコールバック
+   （`https://api.musubo.jp/api/integrations/google-sheets/oauth/callback`）は
+   **このクライアントに登録しない。** 理由は下の「Googleスプレッドシート連携との兼ね合い」を参照。
+3. **クライアントIDもシークレットも、設定ファイル・チャット・Issue・PRには書かない。**
+   実運用環境では両方をWorkerのシークレットとして本人のターミナルから入れる。
+   （検証環境はIDを `[vars]` に置いているが、実運用では値を会話に出さずに済む
+   シークレット登録のほうを使う。コード側は `env` から読むので動きは同じ）
+
+   ```
+   pnpm exec wrangler secret put GOOGLE_BUSINESS_OAUTH_CLIENT_ID
+   pnpm exec wrangler secret put GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET
+   ```
+
+4. `apps/worker/wrangler.toml` 側は `RESTAURANT_TEST_ENABLED = "true"` と
+   `GOOGLE_BUSINESS_WRITE_ENABLED = "true"`（設定済み）。
+5. 管理画面の左メニュー「Googleビジネス」は**ビルド時の値**で出る。
+   `.github/workflows/deploy-cloudflare-admin.yml` の
+   `NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'`（設定済み）で管理画面を**再ビルド・再配備**
+   しないと、APIだけ有効で画面が無い状態になる。
+6. 「対象」ページ（`/auth/audience`）の公開ステータスが「テスト」のままだと7日で認可が切れる。
+   審査提出後、通ったら「アプリを公開」にする。
+
+### Googleスプレッドシート連携との兼ね合い
+
+`apps/worker/src/services/google-sheets.ts:113-135` は `GOOGLE_SHEETS_OAUTH_CLIENT_ID` /
+`..._SECRET` が無いとき、**Googleビジネス側のクライアントへ自動で切り替える**
+（IDとシークレットは必ず同じ組で使う実装）。実運用には現在Sheets用の値を入れていない。
+
+このため、手順3でビジネス用のクライアントを入れると、スプレッドシート連携の画面は
+「設定済み」と表示される。**手順2でSheetsのコールバックURLを登録しないのは、この経路で
+審査対象のクライアントが `https://www.googleapis.com/auth/spreadsheets`（機密スコープ）を
+要求できる状態を作らないため。** 登録が無ければ、Googleは同意画面を出す前に
+`redirect_uri_mismatch` で止めるので、審査を通したクライアントが申請した3つ以外の
+スコープを取得することはない。申請文
+（`docs/manuals/google-business-verification-application.md` 2章）の
+「要求するスコープは3つだけ」という説明は、この登録状態に依存している。
+
+- 実運用でスプレッドシート連携の画面を開くと「設定済み」と出るが、接続を押すと
+  `redirect_uri_mismatch` になる。これは上記のとおり**意図した状態**で、不具合ではない。
+  この画面を開けるのは全店スコープの統括管理者だけ。
+- Sheets連携を実運用で使う日が来たら、専用の `GOOGLE_SHEETS_OAUTH_CLIENT_ID` /
+  `..._SECRET` を**別のクライアントとして**作り、Sheetsのコールバックはそちらにだけ登録する。
+  同意画面に登録するスコープはGoogleプロジェクト単位なので、`spreadsheets` を足すときは
+  Googleビジネスの審査が通ったあとに、追加するスコープの申請理由も用意して行う。
+- 検証環境（`wrangler.staging.toml`）は審査対象ではないため、現在の共用のままでよい。
+  手順は `docs/manuals/google-sheets-oauth-setup.md`。
+
 ## 困ったとき
 - 「この環境にはGoogle接続の設定がありません」→ 手順4のクライアントID／シークレットが未設定
 - Googleの画面で「アクセスをブロック：このアプリのリクエストは無効です／エラー400: redirect_uri_mismatch」→ 手順3-5のURIが1文字でも違う。上の表の `WORKER_PUBLIC_URL` と見比べてコピーし直す。Workerの公開URLを変えたときは、ここも必ず合わせて直す

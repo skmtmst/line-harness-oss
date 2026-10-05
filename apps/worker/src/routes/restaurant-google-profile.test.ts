@@ -13,11 +13,37 @@ type MockStaff = {
   tenant_id?: string | null;
 };
 
-const authMocks = vi.hoisted(() => ({
-  getStaffByApiKey: vi.fn(async (): Promise<MockStaff | null> => null),
-  getStaffByAdminSession: vi.fn(async (): Promise<MockStaff | null> => null),
-  lineAccounts: [] as Array<Record<string, unknown>>,
-}));
+/*
+ * Googleのルートは長期APIキーでは通さない（restaurant-google.ts の googleAccessGuard）。
+ * Google Business Profile APIのポリシーが「End users of your Business Profile APIs need
+ * to manually sign in to use it.」と定めているため、このファイルのテストも本番と同じ
+ * 「管理画面に人がログインした状態」＝管理セッションで呼ぶ。
+ *
+ * 管理セッションは生のトークンではなくハッシュで引き当てるので、登録したトークンを
+ * 順に照合して返す。
+ */
+const authMocks = vi.hoisted(() => {
+  const sessions = new Map<string, unknown>();
+  async function sha256Hex(value: string): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  return {
+    sessions,
+    getStaffByApiKey: vi.fn(async (): Promise<unknown> => null),
+    getStaffByAdminSession: vi.fn(async (_db: unknown, tokenHash: string): Promise<unknown> => {
+      for (const [token, staff] of sessions) if ((await sha256Hex(token)) === tokenHash) return staff;
+      return null;
+    }),
+    lineAccounts: [] as Array<Record<string, unknown>>,
+  };
+});
+
+/** 管理画面にログインしたオーナー。既定のテスト利用者。 */
+const OWNER_SESSION: MockStaff = {
+  id: 'owner-1', name: 'オーナー', role: 'owner', access_level: 'full',
+  permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1,
+};
 
 vi.mock('@line-crm/db', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
@@ -30,7 +56,7 @@ vi.mock('@line-crm/db', async () => {
   };
 });
 
-const { authMiddleware } = await import('../middleware/auth.js');
+const { authMiddleware, ADMIN_SESSION_BEARER_PREFIX } = await import('../middleware/auth.js');
 const { restaurantGoogle } = await import('./restaurant-google.js');
 const { restaurantGoogleProfile } = await import('./restaurant-google-profile.js');
 const { encryptCredential } = await import('@line-crm/db');
@@ -107,8 +133,9 @@ function app() {
   return instance;
 }
 
+/** 管理セッションで呼ぶ。token は useStaffRole / OWNER_SESSION で登録したセッショントークン。 */
 function call(path: string, init: { method?: string; body?: unknown; token?: string } = {}) {
-  const headers: Record<string, string> = { Authorization: `Bearer ${init.token ?? 'owner-key'}` };
+  const headers: Record<string, string> = { Authorization: `Bearer ${ADMIN_SESSION_BEARER_PREFIX}${init.token ?? 'owner-session'}` };
   if (init.body !== undefined) headers['Content-Type'] = 'application/json';
   return app().request(`${path}${path.includes('?') ? '&' : '?'}account_id=account-2`, { method: init.method ?? (init.body === undefined ? 'GET' : 'POST'), headers, body: init.body === undefined ? undefined : JSON.stringify(init.body) }, env);
 }
@@ -117,7 +144,7 @@ function useStaffRole(role: 'admin' | 'staff'): void {
   testDb.raw
     .prepare(`INSERT OR REPLACE INTO staff_members (id, name, role, api_key, tenant_id, account_scope, can_access_descendant_accounts, is_active) VALUES (?, ?, ?, ?, ?, 'all', 1, 1)`)
     .run(`${role}-1`, role, role, `${role}-key`, TENANT);
-  authMocks.getStaffByApiKey.mockResolvedValue({ id: `${role}-1`, name: role, role, access_level: 'full', permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1 });
+  authMocks.sessions.set(`${role}-session`, { id: `${role}-1`, name: role, role, access_level: 'full', permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1 });
 }
 
 function patchCalls() {
@@ -140,7 +167,8 @@ beforeEach(async () => {
   logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   authMocks.getStaffByApiKey.mockReset();
   authMocks.getStaffByApiKey.mockResolvedValue(null);
-  authMocks.getStaffByAdminSession.mockReset();
+  authMocks.sessions.clear();
+  authMocks.sessions.set('owner-session', OWNER_SESSION);
   authMocks.lineAccounts = [
     { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
     { id: 'account-2', name: '渋谷店', is_active: 1, channel_access_token: 'token-2' },
@@ -422,21 +450,21 @@ describe('Googleビジネス：変更の送信（GB-12 / GB-15）', () => {
 
   it('権限：担当者は閲覧・変更案まで、送信は 403。取り消しは draft だけ', async () => {
     useStaffRole('staff');
-    expect((await call('/api/restaurant-test/google/profile', { token: 'staff-key' })).status).toBe(200);
-    const r = await propose({ source: 'shortcut', shortcut: 'close_today' }, 'staff-key');
+    expect((await call('/api/restaurant-test/google/profile', { token: 'staff-session' })).status).toBe(200);
+    const r = await propose({ source: 'shortcut', shortcut: 'close_today' }, 'staff-session');
     expect(r.status).toBe(200);
-    const s = await send(r.json.change!.id, 'staff-key');
+    const s = await send(r.json.change!.id, 'staff-session');
     expect(s.status).toBe(403);
     expect(patchCalls()).toHaveLength(0);
-    const cancel = await call(`/api/restaurant-test/google/changes/${r.json.change!.id}/cancel`, { body: {}, token: 'staff-key' });
+    const cancel = await call(`/api/restaurant-test/google/changes/${r.json.change!.id}/cancel`, { body: {}, token: 'staff-session' });
     expect(cancel.status).toBe(200);
     expect(((await cancel.json()) as { change: { status: string } }).change.status).toBe('cancelled');
 
     useStaffRole('admin');
-    const r2 = await propose({ source: 'shortcut', shortcut: 'close_today' }, 'admin-key');
-    const s2 = await send(r2.json.change!.id, 'admin-key');
+    const r2 = await propose({ source: 'shortcut', shortcut: 'close_today' }, 'admin-session');
+    const s2 = await send(r2.json.change!.id, 'admin-session');
     expect(s2.status).toBe(200);
-    const cancel2 = await call(`/api/restaurant-test/google/changes/${r2.json.change!.id}/cancel`, { body: {}, token: 'admin-key' });
+    const cancel2 = await call(`/api/restaurant-test/google/changes/${r2.json.change!.id}/cancel`, { body: {}, token: 'admin-session' });
     expect(cancel2.status).toBe(409);
   });
 });

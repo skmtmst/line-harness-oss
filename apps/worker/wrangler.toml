@@ -45,10 +45,16 @@ crons = ["*/5 * * * *", "1-56/5 * * * *", "0 */6 * * *"]
 
 [vars]
 DEPLOY_ENV = "production"
+# Googleの機密スコープ審査（デモ動画の撮影と本番運用）のため本番でも有効。
+# 'true' で左メニューの「Googleビジネス」と /restaurant-test 配下のAPIが動く。
+# 管理画面の NEXT_PUBLIC_RESTAURANT_TEST_ENABLED と必ず同じ値にする。
 RESTAURANT_TEST_ENABLED = "true"
-# 実店舗のGoogleビジネスプロフィールへ、口コミ返信と投稿を本当に公開する。
+# 実店舗のGoogleビジネスプロフィールへ、口コミ返信・店舗情報・写真・投稿を本当に公開する。
 # 利用者が2026-09-29に本番での公開を選んだため有効にした。
+# 書き込みは確認画面＋owner/adminの権限が前提で、自動送信はしない。
 # 無効に戻すと、表示と下書きの保存はそのまま使えて、公開操作だけ403になる。
+# クライアントIDとシークレットは [vars] に書かず、本番Workerのシークレットとして登録する
+# （GOOGLE_BUSINESS_OAUTH_CLIENT_ID / GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET）。
 GOOGLE_BUSINESS_WRITE_ENABLED = "true"
 WORKER_NAME = "nen-line"
 ADMIN_PAGES_PROJECT = "nen-line-admin-98712679"
