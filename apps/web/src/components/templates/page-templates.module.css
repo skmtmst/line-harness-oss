@@ -1,6 +1,28 @@
 /* 正本: NbomF / x6BDY / d8X09 / I1E7Bt。外側の白い板は AppShell が持つ。
    既存 AppShell の本文余白を型の入口で相殺し、各段が必要な余白を持つ。
    このファイルは V8 以外へ見た目を適用しない。 */
+
+/*
+ * 一覧の型の寸法（design/v8/LIST-TEMPLATE-SPEC.md・絵 apLqS）。
+ * 寸法・文字・間はここに1か所にまとめ、型の中では変数だけを使う。
+ * data-theme v8 の根に置くので、表・帯・ページ送りの部品 CSS からも見える。
+ */
+:global([data-theme='v8']) {
+  --tpl-head-pad-top: 20px; --tpl-head-pad-side: 24px; --tpl-head-pad-bottom: 12px;
+  --tpl-title-size: 22px; --tpl-title-weight: 700; --tpl-title-lh: 32px;
+  --tpl-head-gap: 4px; --tpl-desc-size: 13px; --tpl-desc-lh: 19px;
+  --tpl-compact-title-size: 20px; --tpl-compact-title-weight: 600; --tpl-compact-title-lh: 27px;
+  --tpl-compact-gap: 2px; --tpl-compact-desc-lh: 20px;
+  --tpl-folder-width: 200px;
+  --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
+  --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
+  --tpl-thead-pad-block: 12px; --tpl-thead-pad-side: 24px; --tpl-thead-lh: 16px;
+  --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
+  --tpl-band-gap: 0;
+  --tpl-large-title-size: 22px; --tpl-large-title-lh: 33px; --tpl-large-gap: 16px;
+  --tpl-create-title-size: 18px; --tpl-create-title-lh: 24px;
+  --tpl-create-desc-size: 12px; --tpl-create-desc-lh: 18px;
+}
 :global([data-theme='v8']) .frame {
   display: flex; flex-direction: column; min-width: 0;
   width: calc(100% + 48px); margin: -20px -24px -28px;
@@ -10,16 +32,16 @@
 :global([data-theme='v8']) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
 :global([data-theme='v8']) .heading {
   display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
-  padding: 20px 24px; flex-shrink: 0;
+  padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side); flex-shrink: 0;
 }
-:global([data-theme='v8']) .headingText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+:global([data-theme='v8']) .headingText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
 :global([data-theme='v8']) .titleRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
-:global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 22px; font-weight: 700; line-height: 32px; }
-:global([data-theme='v8']) .description { color: var(--color-ink-secondary); font-size: 13px; line-height: 19px; }
+:global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
+:global([data-theme='v8']) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
 /* 部品どおりの小さい見出し（EnlYo：題20/27・間2・説明13/20）。compact を渡した画面だけが使う。regular は既定（22/32）と同じ。 */
-:global([data-theme='v8']) .heading[data-heading-size='compact'] .headingText { gap: 2px; }
-:global([data-theme='v8']) .heading[data-heading-size='compact'] .title { font-size: 20px; font-weight: 600; line-height: 27px; }
-:global([data-theme='v8']) .heading[data-heading-size='compact'] .description { font-size: 13px; line-height: 20px; }
+:global([data-theme='v8']) .heading[data-heading-size='compact'] .headingText { gap: var(--tpl-compact-gap); }
+:global([data-theme='v8']) .heading[data-heading-size='compact'] .title { font-size: var(--tpl-compact-title-size); font-weight: var(--tpl-compact-title-weight); line-height: var(--tpl-compact-title-lh); }
+:global([data-theme='v8']) .heading[data-heading-size='compact'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-compact-desc-lh); }
 :global([data-theme='v8']) .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
 :global([data-theme='v8']) .steps { min-width: 0; display: flex; align-items: center; gap: 14px; }
 :global([data-theme='v8']) .tabs { padding: 0 24px; flex-shrink: 0; }
@@ -28,13 +50,13 @@
 :global([data-theme='v8']) .section { padding: 18px 24px; min-width: 0; border-bottom: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .split { display: flex; flex: 1; min-width: 0; }
 :global([data-theme='v8']) .main { min-width: 0; flex: 1; }
-:global([data-theme='v8']) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 24px; }
+:global([data-theme='v8']) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
 :global([data-theme='v8']) .content { min-width: 0; }
-:global([data-theme='v8']) .pagination { padding: 10px 20px; }
-:global([data-theme='v8']) .folders { width: 200px; flex-shrink: 0; padding: 16px 12px; border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: 2px; }
+:global([data-theme='v8']) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
+:global([data-theme='v8']) .folders { width: var(--tpl-folder-width); flex-shrink: 0; padding: 16px 12px; border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: 2px; }
 :global([data-theme='v8']) .collapsedFolders { display: none; }
 :global([data-theme='v8']) .listBody { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-:global([data-theme='v8']) [data-page-template='list'] > .heading { padding-bottom: 12px; }
+:global([data-theme='v8']) [data-page-template='list'] > .heading { padding-bottom: var(--tpl-head-pad-bottom); }
 :global([data-theme='v8']) [data-page-template='dashboard'] > .heading { padding-bottom: 16px; }
 :global([data-theme='v8']) .dashboardRow { display: flex; min-width: 0; border-bottom: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .dashboardCell { min-width: 0; flex: 1; padding: 18px 24px; }
@@ -68,9 +90,9 @@
 
 :global([data-theme='v8']) [data-page-template='list'] .stats { border-top: 0; }
 
-:global([data-theme='v8']) .heading[data-heading-size='large'] .title { font-size: 22px; line-height: 33px; }
-:global([data-theme='v8']) [data-page-template='create'] .title { font-size: 18px; line-height: 24px; }
-:global([data-theme='v8']) [data-page-template='create'] .description { font-size: 12px; line-height: 18px; }
+:global([data-theme='v8']) .heading[data-heading-size='large'] .title { font-size: var(--tpl-large-title-size); line-height: var(--tpl-large-title-lh); }
+:global([data-theme='v8']) [data-page-template='create'] .title { font-size: var(--tpl-create-title-size); line-height: var(--tpl-create-title-lh); }
+:global([data-theme='v8']) [data-page-template='create'] .description { font-size: var(--tpl-create-desc-size); line-height: var(--tpl-create-desc-lh); }
 :global([data-theme='v8']) [data-page-template='create'] .actions { gap: 14px; }
 :global([data-theme='v8']) [data-page-template='detail'] .tabs { border-bottom: 1px solid var(--color-hairline); }
 :global([data-theme='v8']) .dashboardColumns { min-height: 200px; }
@@ -83,9 +105,9 @@
 :global([data-theme='v8']) [data-page-template='create'] > .heading .steps { margin-inline: auto; }
 :global([data-theme='v8']) .preview { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 :global([data-theme='v8']) .detailSummary { display: flex; flex-direction: column; gap: 18px; }
-:global([data-theme='v8']) .heading[data-heading-size='large'] { gap: 16px; }
-:global([data-theme='v8']) .heading[data-heading-size='large'] .headingText { gap: 4px; }
-:global([data-theme='v8']) .heading[data-heading-size='large'] .description { font-size: 13px; line-height: 19px; }
+:global([data-theme='v8']) .heading[data-heading-size='large'] { gap: var(--tpl-large-gap); }
+:global([data-theme='v8']) .heading[data-heading-size='large'] .headingText { gap: var(--tpl-head-gap); }
+:global([data-theme='v8']) .heading[data-heading-size='large'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
 :global([data-theme='v8']) .dashboardRow { flex-shrink: 0; }
 
 @container v8-page (min-width: 1100px) {

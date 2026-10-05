@@ -256,8 +256,9 @@
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   grid-template-columns: none;
-  gap: 0;
-  border: 1px solid var(--color-hairline);
+  gap: var(--tpl-band-gap);
+  /* 絵どおり上下の線だけ（左右の枠なし）。 */
+  border-block: 1px solid var(--color-hairline);
   border-radius: var(--radius-none);
   background: var(--color-canvas);
 }
