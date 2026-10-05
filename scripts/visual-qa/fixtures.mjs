@@ -4729,33 +4729,33 @@ export const MILEAGE_HISTORY = {
   どこからも使われていない 2」の内訳が撮れる6件。
 */
 export const CONVERSION_POINTS = [
-  { id: 'cp-1', name: '商品を買った', eventType: 'ec_order_confirmed', value: 1587, measureMethod: 'webhook', targetUrl: null, countRepeat: true, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
-  { id: 'cp-2', name: '体験申込フォームの送信', eventType: 'form_submitted', value: 12000, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
-  { id: 'cp-3', name: '予約が入った', eventType: 'reservation_confirmed', value: 1816, measureMethod: 'webhook', targetUrl: null, countRepeat: true, attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
-  { id: 'cp-4', name: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', value: 8217, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-02-20T00:00:00.000Z' },
-  { id: 'cp-5', name: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', value: null, measureMethod: 'webhook', targetUrl: null, countRepeat: false, attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-03-05T00:00:00.000Z' },
-  { /* どこからも使われていない1件。 */ id: 'cp-6', name: '資料をダウンロードした', eventType: 'url_reach', value: null, measureMethod: 'url_reach', targetUrl: 'https://example.com/download', countRepeat: false, attributionDays: 90, lineAccountId: null, isActive: false, createdAt: '2025-12-01T00:00:00.000Z' },
+  { id: 'cp-1', name: '商品を買った', eventType: 'ec_order_confirmed', value: 1587, measureMethod: 'webhook', targetUrl: null, countRepeat: true, deduplicationMode: 'every', deduplicationWindowDays: null, valueMode: 'source', attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
+  { id: 'cp-4', name: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', value: 3000, measureMethod: 'webhook', targetUrl: null, countRepeat: false, deduplicationMode: 'once_per_friend', deduplicationWindowDays: null, valueMode: 'fixed', attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-02-20T00:00:00.000Z' },
+  { id: 'cp-3', name: '予約が入った', eventType: 'reservation_confirmed', value: null, measureMethod: 'webhook', targetUrl: null, countRepeat: true, deduplicationMode: 'window', deduplicationWindowDays: 30, valueMode: 'none', attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
+  { id: 'cp-2', name: '体験申込フォームの送信', eventType: 'form_submitted', value: null, measureMethod: 'webhook', targetUrl: null, countRepeat: false, deduplicationMode: 'once_per_friend', deduplicationWindowDays: null, valueMode: 'none', attributionDays: 90, lineAccountId: null, isActive: true, createdAt: '2026-01-10T00:00:00.000Z' },
+  { id: 'cp-5', name: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', value: null, measureMethod: 'webhook', targetUrl: null, countRepeat: false, deduplicationMode: 'once_per_friend', deduplicationWindowDays: null, valueMode: 'none', attributionDays: 30, lineAccountId: null, isActive: true, createdAt: '2026-03-05T00:00:00.000Z' },
+  { id: 'cp-6', name: '資料をダウンロードした', eventType: 'url_reach', value: null, measureMethod: 'url_reach', targetUrl: 'https://example.com/download', countRepeat: false, deduplicationMode: 'once_per_friend', deduplicationWindowDays: null, valueMode: 'none', attributionDays: 90, lineAccountId: null, isActive: false, createdAt: '2025-12-01T00:00:00.000Z' },
 ]
 
 /*
-  成果地点レポート。現期間486件・1,284,000円、直前期間412件・
-  1,092,000円を固定し、一覧・レポート・作成前の同種集計が同じ数字を読む。
+  成果地点レポート。現期間148件・466,000円、直前期間127件・
+  435,000円を固定し、一覧・レポート・作成前の同種集計が同じ数字を読む。
 */
 export const CONVERSION_REPORT_CURRENT = [
-  { conversionPointId: 'cp-1', conversionPointName: '商品を買った', eventType: 'ec_order_confirmed', totalCount: 386, totalValue: 612400 },
-  { conversionPointId: 'cp-2', conversionPointName: '体験申込フォームの送信', eventType: 'form_submitted', totalCount: 42, totalValue: 504000 },
-  { conversionPointId: 'cp-3', conversionPointName: '予約が入った', eventType: 'reservation_confirmed', totalCount: 38, totalValue: 69000 },
-  { conversionPointId: 'cp-4', conversionPointName: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', totalCount: 12, totalValue: 98600 },
-  { conversionPointId: 'cp-5', conversionPointName: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', totalCount: 8, totalValue: 0 },
+  { conversionPointId: 'cp-1', conversionPointName: '商品を買った', eventType: 'ec_order_confirmed', totalCount: 52, totalValue: 412000 },
+  { conversionPointId: 'cp-4', conversionPointName: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', totalCount: 18, totalValue: 54000 },
+  { conversionPointId: 'cp-3', conversionPointName: '予約が入った', eventType: 'reservation_confirmed', totalCount: 41, totalValue: 0 },
+  { conversionPointId: 'cp-2', conversionPointName: '体験申込フォームの送信', eventType: 'form_submitted', totalCount: 23, totalValue: 0 },
+  { conversionPointId: 'cp-5', conversionPointName: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', totalCount: 14, totalValue: 0 },
   { conversionPointId: 'cp-6', conversionPointName: '資料をダウンロードした', eventType: 'url_reach', totalCount: 0, totalValue: 0 },
 ]
 
 export const CONVERSION_REPORT_PREVIOUS = [
-  { conversionPointId: 'cp-1', conversionPointName: '商品を買った', eventType: 'ec_order_confirmed', totalCount: 341, totalValue: 630000 },
-  { conversionPointId: 'cp-2', conversionPointName: '体験申込フォームの送信', eventType: 'form_submitted', totalCount: 26, totalValue: 312000 },
-  { conversionPointId: 'cp-3', conversionPointName: '予約が入った', eventType: 'reservation_confirmed', totalCount: 33, totalValue: 60000 },
-  { conversionPointId: 'cp-4', conversionPointName: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', totalCount: 12, totalValue: 90000 },
-  { conversionPointId: 'cp-5', conversionPointName: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', totalCount: 0, totalValue: 0 },
+  { conversionPointId: 'cp-1', conversionPointName: '商品を買った', eventType: 'ec_order_confirmed', totalCount: 44, totalValue: 390000 },
+  { conversionPointId: 'cp-4', conversionPointName: '初回の定期便が確定', eventType: 'ec_subscription_confirmed', totalCount: 15, totalValue: 45000 },
+  { conversionPointId: 'cp-3', conversionPointName: '予約が入った', eventType: 'reservation_confirmed', totalCount: 35, totalValue: 0 },
+  { conversionPointId: 'cp-2', conversionPointName: '体験申込フォームの送信', eventType: 'form_submitted', totalCount: 20, totalValue: 0 },
+  { conversionPointId: 'cp-5', conversionPointName: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', totalCount: 13, totalValue: 0 },
   { conversionPointId: 'cp-6', conversionPointName: '資料をダウンロードした', eventType: 'url_reach', totalCount: 0, totalValue: 0 },
 ]
 
@@ -4777,7 +4777,7 @@ const CONVERSION_PREVIOUS_RANGE = {
 }
 
 const CONVERSION_USAGE_COUNTS = new Map([
-  ['cp-1', 2], ['cp-2', 3], ['cp-3', 2], ['cp-4', 2], ['cp-5', 2], ['cp-6', 0],
+  ['cp-1', 3], ['cp-4', 1], ['cp-3', 1], ['cp-2', 1], ['cp-5', 0], ['cp-6', 1],
 ])
 
 const CONVERSION_CURRENT_BY_ID = new Map(CONVERSION_REPORT_CURRENT.map((row) => [row.conversionPointId, row]))
@@ -4794,18 +4794,21 @@ export const CONVERSION_DEFINITIONS = {
       measureMethod: point.measureMethod,
       targetUrl: point.targetUrl,
       countRepeat: point.countRepeat,
+      deduplicationMode: point.deduplicationMode,
+      deduplicationWindowDays: point.deduplicationWindowDays,
+      valueMode: point.valueMode,
       attributionDays: point.attributionDays,
       lineAccountId: point.lineAccountId,
       status: point.isActive ? 'active' : 'stopped',
       version: 1,
       usageCount: CONVERSION_USAGE_COUNTS.get(point.id) ?? 0,
       usageNames: {
-        'cp-1': ['オートメーション「購入後フォロー」', '分析「売上レポート」'],
-        'cp-2': ['回答フォーム「体験申込」', 'シナリオ「申込後の案内」', '分析「フォーム成果」'],
-        'cp-3': ['予約「来店後のお礼」', '分析「予約成果」'],
-        'cp-4': ['NEN配信「定期便のご案内」', '分析「定期便成果」'],
-        'cp-5': ['ウェビナー「活用講座」', '分析「視聴成果」'],
-        'cp-6': [],
+        'cp-1': ['ファネル 2', 'アフィリエイト 1', 'マイル「商品を買った」'],
+        'cp-4': ['アフィリエイト 1'],
+        'cp-3': ['オートメーション 1'],
+        'cp-2': ['ファネル 1'],
+        'cp-5': [],
+        'cp-6': ['アフィリエイト 1'],
       }[point.id] ?? [],
       metrics: {
         recordedCount: current?.totalCount ?? 0,
@@ -4817,12 +4820,12 @@ export const CONVERSION_DEFINITIONS = {
         cancellationCount: null,
         cancellationValue: null,
       },
-      stoppedAt: point.isActive ? null : '2026-08-20T09:00:00.000Z',
+      stoppedAt: point.isActive ? null : '2026-09-20T09:00:00.000Z',
       createdAt: point.createdAt,
-      updatedAt: point.isActive ? '2026-08-25T09:00:00.000Z' : '2026-08-20T09:00:00.000Z',
+      updatedAt: point.isActive ? '2026-08-25T09:00:00.000Z' : '2026-09-20T09:00:00.000Z',
     }
   }),
-  stateCounts: { active: 5, draft: 0, stopped: 1, invalid: 0, sourceStopped: 0 },
+  stateCounts: { active: 5, draft: 0, stopped: 1, invalid: 0, sourceStopped: 0, unused: 1 },
   range: CONVERSION_RANGE,
   pagination: { total: 6, limit: 20, cursor: '0', nextCursor: null },
 }
@@ -4845,7 +4848,7 @@ export const CONVERSION_DEFINITION_PREVIEW = {
 /* 機能19 d8d3Mz: 利用先、停止影響、差し替え候補、物理削除可否。 */
 export const CONVERSION_DEFINITION_DELETE_IMPACT = {
   definition: {
-    ...CONVERSION_DEFINITIONS.items[1],
+    ...CONVERSION_DEFINITIONS.items[3],
     sourceConfig: { triggerKind: 'form' },
     deduplicationMode: 'once_per_friend',
     deduplicationWindowDays: null,
@@ -4862,7 +4865,7 @@ export const CONVERSION_DEFINITION_DELETE_IMPACT = {
     { id: 'conversion-usage-reply', conversionPointId: 'cp-2', definitionVersion: 1, lineAccountId: 'visual-qa-account', refKind: 'auto_reply', refId: 'reply-thanks', refVersionId: 'v2', usageName: '自動応答「申し込みありがとうございます」' },
     { id: 'conversion-usage-analysis', conversionPointId: 'cp-2', definitionVersion: 1, lineAccountId: 'visual-qa-account', refKind: 'analytics', refId: 'conversion-trend', refVersionId: null, usageName: '分析「成果のうつり変わり」' },
   ],
-  eventCount: 486,
+  eventCount: 23,
   canDelete: false,
   stopImpact: { affectedUsageCount: 3, preservesPastEvents: true, preservesUsages: true },
   replacementCandidates: [
@@ -4876,53 +4879,53 @@ export const CONVERSION_DEFINITION_DELETE_IMPACT = {
   地点別の合計も一覧KPIの486件と一致する（商品386、申込42、予約38、定期12、視聴8）。
 */
 const CONVERSION_DAILY_COUNTS = [
-  ['2026-07-27', 10, 1, 1, 0, 0],
-  ['2026-07-28', 11, 1, 1, 0, 0],
-  ['2026-07-29', 12, 1, 1, 0, 0],
-  ['2026-07-30', 9, 1, 1, 0, 0],
-  ['2026-07-31', 10, 1, 1, 1, 0],
-  ['2026-08-01', 11, 1, 1, 0, 0],
-  ['2026-08-02', 12, 1, 1, 1, 1],
-  ['2026-08-03', 10, 1, 1, 0, 0],
-  ['2026-08-04', 11, 1, 1, 0, 0],
-  ['2026-08-05', 12, 1, 1, 1, 0],
-  ['2026-08-06', 13, 1, 1, 0, 0],
-  ['2026-08-07', 10, 1, 1, 0, 1],
-  ['2026-08-08', 11, 1, 1, 1, 0],
-  ['2026-08-09', 12, 1, 1, 0, 0],
-  ['2026-08-10', 13, 1, 1, 0, 0],
-  ['2026-08-11', 14, 1, 1, 1, 0],
-  ['2026-08-12', 16, 1, 1, 0, 0],
-  ['2026-08-13', 30, 6, 4, 2, 2],
-  ['2026-08-14', 15, 2, 2, 1, 0],
-  ['2026-08-15', 14, 2, 2, 0, 0],
-  ['2026-08-16', 13, 2, 1, 0, 1],
-  ['2026-08-17', 12, 1, 1, 1, 0],
-  ['2026-08-18', 11, 1, 1, 0, 0],
-  ['2026-08-19', 10, 1, 1, 0, 0],
-  ['2026-08-20', 13, 2, 2, 1, 0],
-  ['2026-08-21', 14, 2, 2, 0, 1],
-  ['2026-08-22', 15, 2, 2, 1, 0],
-  ['2026-08-23', 16, 1, 1, 0, 1],
-  ['2026-08-24', 12, 1, 1, 1, 0],
-  ['2026-08-25', 14, 2, 1, 0, 1],
+  ['2026-07-27', 2, 0, 1, 1, 0, 0],
+  ['2026-07-28', 2, 2, 0, 0, 1, 0],
+  ['2026-07-29', 2, 0, 2, 0, 0, 0],
+  ['2026-07-30', 2, 1, 1, 1, 1, 0],
+  ['2026-07-31', 1, 0, 1, 0, 0, 0],
+  ['2026-08-01', 2, 0, 2, 2, 0, 0],
+  ['2026-08-02', 2, 1, 1, 0, 0, 0],
+  ['2026-08-03', 1, 0, 1, 1, 0, 0],
+  ['2026-08-04', 1, 2, 0, 0, 1, 0],
+  ['2026-08-05', 1, 0, 1, 2, 0, 0],
+  ['2026-08-06', 1, 1, 1, 1, 1, 0],
+  ['2026-08-07', 2, 0, 2, 0, 0, 0],
+  ['2026-08-08', 2, 0, 2, 2, 1, 0],
+  ['2026-08-09', 2, 0, 1, 0, 0, 0],
+  ['2026-08-10', 2, 0, 2, 2, 0, 0],
+  ['2026-08-11', 1, 2, 0, 0, 1, 0],
+  ['2026-08-12', 2, 0, 1, 1, 0, 0],
+  ['2026-08-13', 8, 3, 6, 3, 2, 0],
+  ['2026-08-14', 1, 0, 1, 0, 0, 0],
+  ['2026-08-15', 2, 0, 1, 2, 2, 0],
+  ['2026-08-16', 2, 0, 2, 0, 0, 0],
+  ['2026-08-17', 2, 0, 2, 1, 0, 0],
+  ['2026-08-18', 1, 2, 0, 0, 0, 0],
+  ['2026-08-19', 0, 0, 2, 1, 0, 0],
+  ['2026-08-20', 1, 2, 2, 0, 2, 0],
+  ['2026-08-21', 1, 0, 2, 0, 0, 0],
+  ['2026-08-22', 1, 0, 2, 2, 2, 0],
+  ['2026-08-23', 2, 0, 1, 0, 0, 0],
+  ['2026-08-24', 2, 0, 1, 1, 0, 0],
+  ['2026-08-25', 1, 2, 0, 0, 0, 0],
 ]
 
-const CONVERSION_DAILY_VALUES = [1587, 12000, 1816, 8217, 0]
-const CONVERSION_DAILY_FINAL_ADJUSTMENTS = [182, 0, 8, 4, 0]
+const CONVERSION_DAILY_VALUES = [7923, 3000, 0, 0, 0, 0]
+const CONVERSION_DAILY_FINAL_ADJUSTMENTS = [0, 0, 0, 0, 0, 0]
 
 export const CONVERSION_DEFINITION_REPORT = {
   range: CONVERSION_RANGE,
   previousRange: CONVERSION_PREVIOUS_RANGE,
   kpis: {
-    recordedCount: 486,
+    recordedCount: 148,
     reversedCount: null,
-    netCount: 486,
-    netValue: 1_284_000,
-    averageNetValue: 2641.98,
-    previousNetCount: 412,
-    previousNetValue: 1_092_000,
-    countChangeRate: 17.96,
+    netCount: 148,
+    netValue: 466_000,
+    averageNetValue: 3148.65,
+    previousNetCount: 127,
+    previousNetValue: 435_000,
+    countChangeRate: 16.54,
     reversalState: 'unavailable',
     reversalReason: '取消イベント台帳はまだ接続されていません',
     cancellationCount: null,
@@ -4931,11 +4934,11 @@ export const CONVERSION_DEFINITION_REPORT = {
       conversionPointId: 'cp-1',
       conversionPointName: '商品を買った',
       sourceType: 'ec_order_confirmed',
-      netCount: 386,
-      netValue: 612_400,
-      previousNetCount: 341,
-      previousNetValue: 630_000,
-      countChange: 45,
+      netCount: 52,
+      netValue: 412_000,
+      previousNetCount: 44,
+      previousNetValue: 390_000,
+      countChange: 8,
     },
   },
   daily: CONVERSION_DAILY_COUNTS.flatMap(([day, ...counts]) => counts.map((netCount, index) => ({
@@ -4961,24 +4964,23 @@ export const CONVERSION_DEFINITION_REPORT = {
       cancellationValue: null,
       routes: {
         'cp-1': [
-          { routeKey: 'nen-regular', label: 'NEN配信「定期便のご案内」', attributionState: 'attributed', netCount: 200, netValue: 520000, audience: null, conversionRate: null },
-          { routeKey: 'google-summer', label: 'Google広告 夏キャンペーン', attributionState: 'attributed', netCount: 110, netValue: 336000, audience: null, conversionRate: null },
-          { routeKey: 'unattributed', label: '未帰属', attributionState: 'unattributed', netCount: 76, netValue: 90000, audience: null, conversionRate: null },
+          { routeKey: 'nen-regular', label: 'NEN配信「定期便のご案内」', attributionState: 'attributed', netCount: 30, netValue: 240000, audience: null, conversionRate: null },
+          { routeKey: 'google-summer', label: 'Google広告 夏キャンペーン', attributionState: 'attributed', netCount: 14, netValue: 112000, audience: null, conversionRate: null },
+          { routeKey: 'unattributed', label: '未帰属', attributionState: 'unattributed', netCount: 8, netValue: 60000, audience: null, conversionRate: null },
         ],
-        'cp-2': [{ routeKey: 'google-summer', label: 'Google広告 夏キャンペーン', attributionState: 'attributed', netCount: 42, netValue: 504000, audience: null, conversionRate: null }],
-        'cp-3': [{ routeKey: 'rich-menu-booking', label: 'リッチメニュー「予約する」', attributionState: 'attributed', netCount: 38, netValue: 69000, audience: null, conversionRate: null }],
-        'cp-4': [{ routeKey: 'nen-regular', label: 'NEN配信「定期便のご案内」', attributionState: 'attributed', netCount: 12, netValue: 98600, audience: null, conversionRate: null }],
-        'cp-5': [{ routeKey: 'rich-menu-booking', label: 'リッチメニュー「予約する」', attributionState: 'attributed', netCount: 8, netValue: 0, audience: null, conversionRate: null }],
+        'cp-4': [{ routeKey: 'nen-regular', label: 'NEN配信「定期便のご案内」', attributionState: 'attributed', netCount: 18, netValue: 54000, audience: null, conversionRate: null }],
+        'cp-3': [{ routeKey: 'rich-menu-booking', label: 'リッチメニュー「予約する」', attributionState: 'attributed', netCount: 41, netValue: 0, audience: null, conversionRate: null }],
+        'cp-2': [{ routeKey: 'google-summer', label: 'Google広告 夏キャンペーン', attributionState: 'attributed', netCount: 23, netValue: 0, audience: null, conversionRate: null }],
+        'cp-5': [{ routeKey: 'rich-menu-booking', label: 'リッチメニュー「予約する」', attributionState: 'attributed', netCount: 14, netValue: 0, audience: null, conversionRate: null }],
         'cp-6': [],
       }[current.conversionPointId] ?? [],
     }
   }),
   byRoute: [
-    { routeKey: 'nen-regular', label: 'NEN配信「定期便のご案内」', attributionState: 'attributed', netCount: 200, netValue: 520_000, audience: null, conversionRate: null },
-    { routeKey: 'google-summer', label: 'Google広告 夏キャンペーン', attributionState: 'attributed', netCount: 110, netValue: 336_000, audience: null, conversionRate: null },
-    { routeKey: 'rich-menu-booking', label: 'リッチメニュー「予約する」', attributionState: 'attributed', netCount: 80, netValue: 158_000, audience: null, conversionRate: null },
-    { routeKey: 'affiliate-north', label: '紹介リンク 合同会社ノース', attributionState: 'attributed', netCount: 60, netValue: 180_000, audience: null, conversionRate: null },
-    { routeKey: 'unattributed', label: '未帰属', attributionState: 'unattributed', netCount: 36, netValue: 90_000, audience: null, conversionRate: null },
+    { routeKey: 'nen-regular', label: 'NEN配信「定期便のご案内」', attributionState: 'attributed', netCount: 48, netValue: 294_000, audience: null, conversionRate: null },
+    { routeKey: 'google-summer', label: 'Google広告 夏キャンペーン', attributionState: 'attributed', netCount: 37, netValue: 112_000, audience: null, conversionRate: null },
+    { routeKey: 'rich-menu-booking', label: 'リッチメニュー「予約する」', attributionState: 'attributed', netCount: 55, netValue: 0, audience: null, conversionRate: null },
+    { routeKey: 'unattributed', label: '未帰属', attributionState: 'unattributed', netCount: 8, netValue: 60_000, audience: null, conversionRate: null },
   ],
 }
 

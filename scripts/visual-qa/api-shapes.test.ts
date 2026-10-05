@@ -231,8 +231,8 @@ describe('成果地点の画面確認データ', () => {
       (sum, row) => ({ count: sum.count + row.totalCount, value: sum.value + row.totalValue }),
       { count: 0, value: 0 },
     );
-    expect(total(CONVERSION_REPORT_CURRENT)).toEqual({ count: 486, value: 1284000 });
-    expect(total(CONVERSION_REPORT_PREVIOUS)).toEqual({ count: 412, value: 1092000 });
+    expect(total(CONVERSION_REPORT_CURRENT)).toEqual({ count: 148, value: 466000 });
+    expect(total(CONVERSION_REPORT_PREVIOUS)).toEqual({ count: 127, value: 435000 });
   });
 
   it('新規作成の購入欄に、注文確定の既存実績を表示できる', () => {
@@ -242,7 +242,7 @@ describe('成果地点の画面確認データ', () => {
     const report = CONVERSION_REPORT_CURRENT.find((row: { conversionPointId: string }) => (
       row.conversionPointId === purchase?.id
     ));
-    expect(report).toMatchObject({ totalCount: 386, totalValue: 612400 });
+    expect(report).toMatchObject({ totalCount: 52, totalValue: 412000 });
   });
 });
 
