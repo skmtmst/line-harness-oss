@@ -3243,7 +3243,7 @@ export const SCENARIO_RUNS = {
  * 合わせる。5行目までが絵に見えている行。 */
 export const BROADCASTS = [
   // 題, 種別, 対象, 状態, 予定, 対象数, 成功数, フォルダ
-  ['8月キャンペーンのお知らせ', 'image', 'all', 'scheduled', '2026-08-24T01:00:00.000Z', 0, 0, 'bf-campaign'],
+  ['8月キャンペーンのお知らせ', 'image', 'all', 'scheduled', '2026-08-24T01:00:00.000Z', 1248, 0, 'bf-campaign'],
   ['未購入者フォロー', 'text', 'segment', 'draft', null, 18, 0, 'bf-ec'],
   ['新商品発売のお知らせ', 'carousel', 'tag', 'sent', '2026-08-20T03:00:00.000Z', 624, 624, 'bf-campaign'],
   ['予約空き枠のご案内', 'text', 'tag', 'sent', '2026-08-18T09:30:00.000Z', 203, 203, 'bf-ec'],
