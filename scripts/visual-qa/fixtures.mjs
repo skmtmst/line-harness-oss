@@ -3208,26 +3208,38 @@ export const SCENARIO_RUNS = {
   steps: SCENARIO_STEPS.map((step, index) => ({ id: step.id, stepOrder: step.stepOrder, delivered: [428, 412, 386, 351][index], opened: { value: null, state: 'unavailable', reason: '開封計測は現在利用できません' }, clicked: { value: [42, 38, 31, 24][index], state: 'available', reason: null }, failed: { value: [2, 1, 1, 0][index], state: 'available', reason: null } })),
 }
 
-/**
- * 一斉配信の一覧。設計 `★ V6 6-1` `q76C35` の5行そのまま。
- *
- * **状態を1通りしか入れないと、状態ごとの見え方を確かめられない。**
- * 設計は 予約済み・下書き（未設定）・送信済み・停止中 の4通りが並ぶが、
- * **「停止中」は型に無い**（draft / scheduled / sending / sent の4つ）。
- */
+/* 一斉配信の一覧。板 `NtCE3` の先頭5行を上から順に並べ、残り19件で
+ * 総数24・札の数（予約中4・下書き3・承認待ち1・送信済み15・エラー1）・
+ * フォルダの数（予約配信6・キャンペーン8・EC・フォロー5・未分類5）に
+ * 合わせる。5行目までが絵に見えている行。 */
 export const BROADCASTS = [
-  // 題, 種別, 対象, 状態, 予定, 対象数, 成功数
-  ['8月キャンペーンのお知らせ', 'image', 'all', 'scheduled', '2026-08-24T01:00:00.000Z', 0, 0],
-  ['未購入者フォロー', 'text', 'segment', 'draft', null, 18, 0],
-  ['新商品発売のお知らせ', 'carousel', 'tag', 'sent', '2026-08-20T03:00:00.000Z', 624, 624],
-  ['予約空き枠のご案内', 'text', 'tag', 'sent', '2026-08-18T09:30:00.000Z', 203, 203],
-  /*
-    設計の5行目は「停止中／停止済み」だが、**その状態が型に無い**
-    （`BroadcastStatus` は draft / scheduled / sending / sent の4つ）。
-    近いものが無いので下書きで置き、突き合わせ文書に差として書いた。
-  */
-  ['重要なお知らせ', 'text', 'all', 'draft', '2026-08-17T00:00:00.000Z', 0, 0],
-].map(([title, messageType, targetType, status, scheduledAt, totalCount, successCount], index) => ({
+  // 題, 種別, 対象, 状態, 予定, 対象数, 成功数, フォルダ
+  ['8月キャンペーンのお知らせ', 'image', 'all', 'scheduled', '2026-08-24T01:00:00.000Z', 0, 0, 'bf-campaign'],
+  ['未購入者フォロー', 'text', 'segment', 'draft', null, 18, 0, 'bf-ec'],
+  ['新商品発売のお知らせ', 'carousel', 'tag', 'sent', '2026-08-20T03:00:00.000Z', 624, 624, 'bf-campaign'],
+  ['予約空き枠のご案内', 'text', 'tag', 'sent', '2026-08-18T09:30:00.000Z', 203, 203, 'bf-ec'],
+  ['重要なお知らせ', 'text', 'all', 'draft', '2026-08-17T00:00:00.000Z', 0, 0, null],
+  // 以下19件は数の帯・札・フォルダの数を絵に合わせるための分。
+  ['9月キャンペーン予告', 'image', 'all', 'scheduled', '2026-09-10T01:00:00.000Z', 0, 0, 'bf-reserved'],
+  ['定休日のお知らせ', 'text', 'all', 'scheduled', '2026-09-07T01:00:00.000Z', 0, 0, 'bf-reserved'],
+  ['新メニューのご案内', 'text', 'tag', 'scheduled', '2026-09-05T01:00:00.000Z', 0, 0, 'bf-reserved'],
+  ['季節のおすすめ', 'image', 'tag', 'scheduled', '2026-09-03T01:00:00.000Z', 0, 0, 'bf-reserved'],
+  ['秋の味覚特集', 'carousel', 'all', 'draft', null, 0, 0, 'bf-campaign'],
+  ['7月キャンペーン報告', 'image', 'all', 'sent', '2026-08-15T01:00:00.000Z', 512, 510, 'bf-campaign'],
+  ['夏休みのお知らせ', 'text', 'all', 'sent', '2026-08-12T01:00:00.000Z', 480, 478, null],
+  ['お盆期間の営業案内', 'text', 'segment', 'sent', '2026-08-10T01:00:00.000Z', 350, 348, 'bf-ec'],
+  ['新商品モニター募集', 'text', 'tag', 'sent', '2026-08-08T01:00:00.000Z', 290, 289, 'bf-campaign'],
+  ['会員限定セール', 'image', 'tag', 'sent', '2026-08-05T01:00:00.000Z', 610, 605, 'bf-campaign'],
+  ['ポイント2倍デー', 'text', 'all', 'sent', '2026-08-01T01:00:00.000Z', 540, 538, 'bf-reserved'],
+  ['雨の日クーポン', 'text', 'segment', 'sent', '2026-07-28T01:00:00.000Z', 180, 179, 'bf-ec'],
+  ['土用の丑の日', 'image', 'all', 'sent', '2026-07-25T01:00:00.000Z', 420, 418, 'bf-campaign'],
+  ['七夕のお願い', 'text', 'all', 'sent', '2026-07-07T01:00:00.000Z', 390, 388, null],
+  ['父の日の贈り物', 'carousel', 'tag', 'sent', '2026-06-20T01:00:00.000Z', 310, 309, 'bf-campaign'],
+  ['梅雨の晴れ間クーポン', 'text', 'all', 'sent', '2026-06-10T01:00:00.000Z', 260, 259, null],
+  ['衣替えセール', 'image', 'tag', 'sent', '2026-06-01T01:00:00.000Z', 330, 328, 'bf-ec'],
+  ['5周年ありがとう', 'text', 'all', 'sent', '2026-05-20T01:00:00.000Z', 600, 598, null],
+  ['ゴールデンウィーク', 'image', 'all', 'failed', '2026-05-01T01:00:00.000Z', 450, 0, 'bf-reserved'],
+].map(([title, messageType, targetType, status, scheduledAt, totalCount, successCount, folderId], index) => ({
   id: `broadcast-${index}`,
   title: String(title),
   messageType: String(messageType),
@@ -3240,7 +3252,7 @@ export const BROADCASTS = [
   totalCount: Number(totalCount),
   successCount: Number(successCount),
   lineAccountId: 'visual-qa-account',
-  folderId: ['bf-campaign', 'bf-ec', 'bf-campaign', 'bf-ec', null][index] ?? null,
+  folderId: folderId ?? null,
   measureOpens: true,
   internalMemo: index === 1 ? '購入前に離脱した方へ、商品の選び方を案内する' : null,
   draftStep: index === 1 ? 'audience' : null,
@@ -3257,7 +3269,7 @@ export const BROADCASTS = [
   // 10の状態（#816）。承認待ちは承認の軸が先（deriveBroadcastDisplayStatus
   // と同じ）。0行目は status が予約済みでも「承認待ち」で見せる。
   displayStatus: index === 0 ? 'pending_approval' : String(status),
-  displayStatusLabel: { draft: '下書き', pending_approval: '承認待ち', scheduled: '予約済み', sent: '送信済み' }[index === 0 ? 'pending_approval' : status] ?? String(status),
+  displayStatusLabel: { draft: '下書き', pending_approval: '承認待ち', scheduled: '予約済み', sent: '送信済み', failed: 'エラー' }[index === 0 ? 'pending_approval' : status] ?? String(status),
   ledger: status === 'sent'
     ? {
       sent: Number(successCount), failed: 0, failedTemporary: 0, failedPermanent: 0,
@@ -3312,7 +3324,8 @@ export const BROADCAST_LIST_META = {
    * 合計は pagination.total と同じ24にそろえる——数が合わないと
    * 絵の見比べで「札とページ送りで数が違う」に見える。
    */
-  statusCounts: { all: 24, scheduled: 6, draft: 5, pending_approval: 2, sent: 9, partial_failed: 1, failed: 1 },
+  /* 板 `NtCE3` の札の数。エラーは失敗系の合計で1になる。 */
+  statusCounts: { all: 24, scheduled: 4, draft: 3, pending_approval: 1, sent: 15, partial_failed: 0, failed: 1 },
 }
 
 /** 機能6。予約完了画面に出すSlack通知設定。 */
@@ -3470,16 +3483,19 @@ export const BROADCAST_INSIGHTS = {
 }
 
 /** 一斉配信のフォルダ操作 `xkRDb` を開くための固定データ。 */
+/* 一斉配信のフォルダ。板 `NtCE3` の数（予約配信6・キャンペーン8・
+ * EC・フォロー5・未分類5）。未分類の件数は mock-api が数えて返す。 */
 export const BROADCAST_FOLDERS = [
-  ['bf-reserved', '予約配信', '#3B82F6'],
-  ['bf-campaign', 'キャンペーン', '#10B981'],
-  ['bf-ec', 'EC・フォロー', '#F59E0B'],
-].map(([id, name, color], index) => ({
+  ['bf-reserved', '予約配信', '#3B82F6', 6],
+  ['bf-campaign', 'キャンペーン', '#10B981', 8],
+  ['bf-ec', 'EC・フォロー', '#F59E0B', 5],
+].map(([id, name, color, itemCount], index) => ({
   id: String(id),
   kind: 'broadcast',
   name: String(name),
   parentId: null,
   displayOrder: index,
+  itemCount: Number(itemCount),
   color: String(color),
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-01T00:00:00.000Z',

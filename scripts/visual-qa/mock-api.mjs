@@ -2686,7 +2686,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: TEMPLATE_FOLDERS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'broadcast') {
-    return { success: true, data: BROADCAST_FOLDERS }
+    // 板 `NtCE3`：未分類は `folderId: null` の5件。
+    return { success: true, data: BROADCAST_FOLDERS, unfiledCount: BROADCASTS.filter((broadcast) => !broadcast.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'scenario') {
     // 板 `axFrW`：未分類は `folderId: null` の1件（会員更新リマインド）。
