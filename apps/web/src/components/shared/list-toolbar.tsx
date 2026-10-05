@@ -1,4 +1,5 @@
 'use client'
+import type React from 'react'
 
 import type { ReactNode } from 'react'
 import SearchField from './search-field'
@@ -15,6 +16,8 @@ export type ListToolbarSearch = {
   label?: string
   /** 入力の上限（貼り付けの制限）。渡さないときは付けない。 */
   maxLength?: number
+  /** ★V8 探す欄の幅（板ごとの絵の幅。例：リマインダ apLqS は 200）。渡さないときは部品の 280。 */
+  width?: number
   /** 検索中。渡すと虫眼鏡の代わりに回る印が出る。 */
   loading?: boolean
 }
@@ -50,7 +53,7 @@ export default function ListToolbar({
 }) {
   const label = search.label ?? search.placeholder
   return (
-    <div className={styles.toolbar}>
+    <div className={styles.toolbar} style={search.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
       <div className={styles.row1}>
         <SearchField
           placeholder={search.placeholder}

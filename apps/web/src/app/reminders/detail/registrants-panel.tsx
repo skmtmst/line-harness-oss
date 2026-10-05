@@ -9,6 +9,10 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import DateTimeField from '@/components/shared/date-time-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import FilterChip from '@/components/shared/filter-chip'
+import ListToolbar from '@/components/shared/list-toolbar'
+import Pagination from '@/components/shared/pagination'
+import PageSizeSelect from '@/components/ui/page-size-select'
 import { formatDateTime } from '@/lib/format'
 
 
@@ -55,6 +59,11 @@ export function ReminderRegistrantsPanel({ reminderId }: { reminderId: string })
   const [error, setError] = useState('')
   const [actioningId, setActioningId] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  /** 板 `loVfW`：友だちの名前で探す・状態の札・20件表示。手元で絞る。 */
+  const [nameQuery, setNameQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'cancelled'>('all')
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(20)
 
   const load = useCallback(async () => {
     if (!reminderId) {
@@ -128,22 +137,57 @@ export function ReminderRegistrantsPanel({ reminderId }: { reminderId: string })
     } finally { setActioningId(null) }
   }
 
+  const cancelledCount = items.filter((item) => item.status === 'cancelled').length
+  const query = nameQuery.trim()
+  const filtered = items.filter((item) => (
+    (statusFilter === 'all' || item.status === statusFilter)
+    && (query === '' || (item.friendName || '').includes(query))
+  ))
+  const pageCount = Math.max(1, Math.ceil(filtered.length / perPage))
+  const safePage = Math.min(page, pageCount)
+  const shown = filtered.slice((safePage - 1) * perPage, safePage * perPage)
+
   return <section className="space-y-4" aria-label="登録者を管理">
     {notice ? <NoteBar tone="info">{notice}</NoteBar> : null}
     <Card padding="default"><CardHeader title="登録者を管理" meta={`登録 ${items.length}件 / 有効 ${activeCount}件`} /><p className="text-ink-faint mt-1 text-sm">基準日の変更・取消・再開を行えます。送信済みの履歴は消えません。</p></Card>
-    {loading ? <ListState kind="loading" /> : error ? <ListState kind="error" title="登録者を表示できませんでした" description={error} onRetry={() => void load()} /> : items.length === 0 ? <ListState kind="empty" emptyPreset="readonly" title="登録者はいません" description="このリマインダに登録すると、ここで基準日と状態を管理できます。" /> : (
+    {loading ? <ListState kind="loading" /> : error ? <ListState kind="error" title="登録者を表示できませんでした" description={error} onRetry={() => void load()} /> : items.length === 0 ? <ListState kind="empty" emptyPreset="readonly" title="登録者はいません" description="このリマインダに登録すると、ここで基準日と状態を管理できます。" /> : (<>
+      <ListToolbar
+        search={{
+          placeholder: '友だちの名前で探す',
+          value: nameQuery,
+          onChange: (value) => { setNameQuery(value); setPage(1) },
+        }}
+        filters={<div role="group" aria-label="状態で絞り込む">
+          <FilterChip
+            selected={statusFilter === 'active'}
+            onChange={() => { setStatusFilter(statusFilter === 'active' ? 'all' : 'active'); setPage(1) }}
+            count={activeCount}
+          >
+            有効
+          </FilterChip>
+          <FilterChip
+            selected={statusFilter === 'cancelled'}
+            onChange={() => { setStatusFilter(statusFilter === 'cancelled' ? 'all' : 'cancelled'); setPage(1) }}
+            count={cancelledCount}
+          >
+            取消済み
+          </FilterChip>
+        </div>}
+        trailing={<PageSizeSelect value={perPage} onChange={(value) => { setPerPage(value); setPage(1) }} label={null} />}
+      />
       <DataTable><thead><TableHeadRow><Th>友だち</Th><Th>基準日</Th><Th>状態</Th><Th>登録</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody>
-        {items.map((item) => <Tr key={item.id}>
+        {shown.map((item) => <Tr key={item.id}>
           <Td>{item.friendName || '名前未設定'}</Td>
           <Td><DateTimeField aria-label={`${item.friendName || '登録者'}の基準日`} value={draftDates[item.id] ?? ''} disabled={item.status !== 'active' || actioningId === item.id} onChange={(v) => setDraftDates((current) => ({ ...current, [item.id]: v }))} /></Td>
           <Td>{item.status === 'active' ? '有効' : item.status === 'cancelled' ? '取消済み' : item.status}</Td>
           <Td>{formatDate(item.createdAt)}</Td>
           <Td align="right"><div className="flex flex-wrap justify-end gap-2">
-            {item.status === 'active' ? <><Button size="field" disabled={actioningId === item.id} onClick={() => void saveDate(item)}>基準日を保存する</Button><Button size="field" variant="secondary" disabled={actioningId === item.id} onClick={() => void changeStatus(item, 'cancel')}>取消</Button></> : null}
-            {item.status === 'cancelled' ? <Button size="field" disabled={actioningId === item.id} onClick={() => void changeStatus(item, 'resume')}>再開</Button> : null}
+            {item.status === 'active' ? <><Button size="field" disabled={actioningId === item.id} onClick={() => void saveDate(item)}>基準日を保存する</Button><Button size="field" variant="secondary" disabled={actioningId === item.id} onClick={() => void changeStatus(item, 'cancel')}>取り消す</Button></> : null}
+            {item.status === 'cancelled' ? <Button size="field" disabled={actioningId === item.id} onClick={() => void changeStatus(item, 'resume')}>再開する</Button> : null}
           </div></Td>
         </Tr>)}
       </tbody></DataTable>
-    )}
+      <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} summary={<>全{filtered.length}件中 {(safePage - 1) * perPage + 1}–{Math.min(safePage * perPage, filtered.length)}件を表示</>} />
+    </>)}
   </section>
 }

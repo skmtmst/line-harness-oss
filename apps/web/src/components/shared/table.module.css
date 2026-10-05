@@ -120,3 +120,7 @@
 [data-theme='v8'] .headRow[data-table-layout='columns'] .cell { display: block; padding: 0; flex-shrink: 0; }
 
 }
+/* ★V8 見出しの行も行と同じ横の余白（端24・欄の間16） */
+[data-theme='v8'] .headRow .cell { padding-inline: var(--tpl-cell-gap-half); }
+[data-theme='v8'] .headRow .cell:first-child { padding-left: var(--tpl-thead-pad-side); }
+[data-theme='v8'] .headRow .cell:last-child { padding-right: var(--tpl-thead-pad-side); }
