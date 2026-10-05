@@ -1,0 +1,69 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * 作成画面の頭を作る画面の絵（d9xoI・w9zY5・FU2aU）に寄せる。
+ *
+ * 絵の板の頭は「内側 20/24/16・戻る13/600・題22・説明12・
+ * 下に hairline 1px」の縦並び。既存の頭（パンくず12・題30・
+ * 説明14・高さ76）は v7 のまま残し、上書きは [data-theme="v8"] だけ。
+ * 既定の指定は空にして、v7 の描画を 1px も変えない。
+ */
+.head {
+}
+
+.crumb {
+}
+
+[data-theme="v8"] .head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--color-hairline);
+  margin-bottom: 24px;
+}
+
+/* 絵の頭は題22。Header の高さ76・下余白24は作る頭では使わない。 */
+[data-theme="v8"] .head > header {
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+[data-theme="v8"] .head h1 {
+  font-size: 22px;
+  line-height: 33px;
+}
+
+[data-theme="v8"] .head p {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* 戻る行は絵の「← 親へ」（13/600・操作色）。題との間は頭の gap 6。 */
+[data-theme="v8"] .crumb {
+  margin-bottom: 0;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+[data-theme="v8"] .crumb a {
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+[data-theme="v8"] .crumb a::before {
+  content: "← ";
+}
+
+/* 今の題は頭にそのまま出すので、絵にない「/ 今の題」は v8 で畳む。 */
+[data-theme="v8"] .crumb > span {
+  display: none;
+}
+
+/* 択一の札（ChoiceCard）は自前で button を描くので、他の部品と
+ * 同じ輪郭（2px・action 色・外側に余白）をキーボードのときだけ出す。 */
+.choice:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+}

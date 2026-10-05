@@ -231,3 +231,31 @@
 
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .card { -webkit-font-smoothing: auto; }
+
+/*
+ * 変わり形：行（BHEl9 の素のラジオ行）。箱・選んだ面・上段の印なし。
+ * 丸 18・文字 13/400・間 8・縦は中身の高さ（fit-content）。
+ * 丸の輪郭（1.5px・選ぶと 5px の濃い緑）は v8 の .radio のまま。
+ * 箱（fNPdg/r3xz1W）の合格は変えない。
+ */
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.row:hover { background: transparent; }
+.row.checked, .row.checked:hover { border-color: transparent; background: transparent; }
+.row.disabled { background: transparent; }
+.row.invalid { border-color: transparent; }
+.row .topIcon { display: none; }
+.row .title { font-size: 13px; font-weight: 400; line-height: 20px; }
+[data-theme='v8'] .row .body { gap: 2px; }
+[data-theme='v8'] .row .radio { position: static; width: 18px; height: 18px; margin: 0; }
+[data-theme='v8'] .row:active { filter: none; }
+[data-theme='v8'] .row { -webkit-font-smoothing: auto; }

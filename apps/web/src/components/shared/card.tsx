@@ -5,7 +5,7 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
   children: ReactNode
   layout?: 'block' | 'vertical'
   overflow?: 'visible' | 'hidden'
-  padding?: 'none' | 'default' | 'roomy'
+  padding?: 'none' | 'default' | 'roomy' | 'spacious'
 }
 
 /** Pencil V5のダッシュボードカードを正本にした共通の面。 */
@@ -23,6 +23,7 @@ export default function Card({
     overflow === 'hidden' ? styles.overflowHidden : null,
     padding === 'default' ? styles.paddingDefault : null,
     padding === 'roomy' ? styles.paddingRoomy : null,
+    padding === 'spacious' ? styles.paddingSpacious : null,
     className,
   ]
     .filter(Boolean)

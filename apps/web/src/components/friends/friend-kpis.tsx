@@ -110,9 +110,14 @@ export default function FriendKpis() {
           友だち集計を読み込めませんでした。
         </Notice>
       ) : null}
-      <div data-kpi-strip className={`grid grid-cols-2 gap-3.5 xl:grid-cols-4 ${kpiStyles.strip}`}>
+      <div
+        data-kpi-strip
+        data-kpi-presentation="band"
+        className={`grid grid-cols-2 gap-3.5 xl:grid-cols-4 ${kpiStyles.strip}`}
+      >
         {cards.map((card) => (
-          <KpiCard key={card.title} {...card} loading={loading} variant="v6" />
+          // 数の帯は1本にまとめる（Pp3nS）。v8 の見た目だけ変わり v7 は不変。
+          <KpiCard key={card.title} {...card} loading={loading} variant="v6" presentation="band" />
         ))}
       </div>
     </div>

@@ -64,36 +64,12 @@
   background: var(--color-canvas-sunken);
 }
 
-/*
- * G6 移し替え：「前の見た目に戻す」（V8 のときだけ出す）。
- * 目立たせない文字ボタン。押せることが分かるよう乗せたら下線。
- */
-.revert {
-  flex-shrink: 0;
-  background: none;
-  border: 0;
-  padding: 0 4px;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 500;
-  line-height: 36px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.revert:hover {
-  color: var(--color-ink);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 .logout:hover {
   border-color: var(--color-accent);
 }
 
 .manual:focus-visible,
-.logout:focus-visible,
-.revert:focus-visible {
+.logout:focus-visible {
   outline: 2px solid var(--color-status-info);
   outline-offset: 2px;
 }
@@ -583,21 +559,6 @@
   text-decoration: underline;
 }
 
-/*
- * 『前の見た目に戻す』は名前の横に小さく残す（絵の指示）。
- * v7 には出さない（tsx 側で V8 のときだけ渡る）。
- */
-[data-theme='v8'] .revert {
-  color: var(--color-ink-faint);
-  font-size: var(--text-nano);
-  line-height: 1.2;
-  padding: 0 2px;
-}
-
-[data-theme='v8'] .revert:hover {
-  color: var(--color-ink-secondary);
-}
-
 [data-theme='v8'] .root { padding: 0 8px; gap: 10px; }
 [data-theme='v8'] .iconButton:not(:focus-visible) { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
 
@@ -608,12 +569,13 @@
 [data-theme='v8'] .root[data-v8-chrome='shell'] .crumbHome > svg { display: block; width: 14px; height: 14px; }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .crumbCurrent { font-size: 13px; font-weight: 500; line-height: 20px; }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .v8Left > .iconButton { width: 32px; height: 32px; border-radius: 8px; background: transparent; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .accountField > span:first-child { display: none; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .accountPill { height: 36px; min-height: 36px; padding: 0 10px 0 6px; gap: 8px; border: 0; border-radius: 10px; outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .accountMark { width: 24px; height: 24px; border-radius: 7px; font-size: 11px; font-weight: 700; line-height: 17px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .pillText { gap: 0; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .pillRole { font-size: 10px; font-weight: 400; line-height: 12px; }
-[data-theme='v8'] .root[data-v8-chrome='shell'] .accountName { font-size: 13px; font-weight: 600; line-height: 17px; }
+/* 切替の札は箱の中に小さい字＋名前の2行（絵の指示）。外の見出しは畳む。 */
+[data-theme='v8'] .accountField > span:first-child { display: none; }
+[data-theme='v8'] .accountPill { height: 36px; min-height: 36px; padding: 0 10px 0 6px; gap: 8px; border: 0; border-radius: 10px; outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+[data-theme='v8'] .accountMark { width: 24px; height: 24px; border-radius: 7px; font-size: 11px; font-weight: 700; line-height: 17px; }
+[data-theme='v8'] .pillText { gap: 0; }
+[data-theme='v8'] .pillRole { font-size: 10px; font-weight: 400; line-height: 12px; }
+[data-theme='v8'] .accountName { font-size: 13px; font-weight: 600; line-height: 17px; }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .bellBadge { background: var(--color-status-danger); width: 18px; height: 18px; min-width: 18px; left: 22px; right: auto; top: -4px; padding: 0; outline: 2px solid var(--color-shell); outline-offset: -1px; font-size: 10px; font-weight: 700; line-height: 10px; }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .identity { height: 36px; padding: 0 10px 0 4px; gap: 8px; }
 [data-theme='v8'] .root[data-v8-chrome='shell'] .avatar { width: 28px; height: 28px; border-radius: 999px; background: var(--color-status-info-soft); color: var(--color-action); font-size: 11px; font-weight: 600; line-height: 17px; }

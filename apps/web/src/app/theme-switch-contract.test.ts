@@ -57,13 +57,13 @@ describe('テーマの切り替え（V8 移行②）', () => {
     expect(prod).not.toContain('NEXT_PUBLIC_ADMIN_THEME')
   })
 
-  it('G6：上バーに「前の見た目に戻す」があり、V8 のときだけ渡す', () => {
+  it('上バーに「前の見た目に戻す」は無い（オーナー指示で廃止）。既定は環境のまま', () => {
     const topBar = readFileSync(join(WEB, 'src', 'components', 'shared', 'top-bar.tsx'), 'utf8')
     const appTopBar = readFileSync(join(WEB, 'src', 'components', 'shell', 'app-top-bar.tsx'), 'utf8')
-    expect(topBar).toContain('前の見た目に戻す')
-    expect(topBar).toContain('onRevertTheme')
-    expect(appTopBar).toContain("applyAdminTheme('v7')")
-    expect(appTopBar).toContain("=== 'v8'")
+    expect(topBar).not.toContain('前の見た目に戻す')
+    expect(topBar).not.toContain('onRevertTheme')
+    expect(appTopBar).not.toContain('onRevertTheme')
+    expect(appTopBar).not.toContain("applyAdminTheme('v7')")
   })
 
   // 画面列挙でリポジトリを走査するため CI の遅い環境でも間に合う余裕を持つ。
