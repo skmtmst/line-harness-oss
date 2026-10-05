@@ -13,7 +13,7 @@ describe('共通フォルダ欄', () => {
     expect(PANEL).toContain('onAddFolder?: () => void')
     expect(PANEL).toContain("addFolderLabel = 'フォルダを追加する'")
     expect(PANEL.indexOf('{rows.map')).toBeLessThan(PANEL.indexOf('onClick={onAddFolder}'))
-    expect(PANEL).toContain('className="w-full"')
+    expect(PANEL).toContain('styles.add')
   })
 
   it('分類の呼び名が異なる画面は見出しを指定できる', () => {

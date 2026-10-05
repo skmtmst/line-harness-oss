@@ -88,7 +88,9 @@ describe('画面名を本文とトップバーで2回出さない', () => {
     expect(header).toContain('defaultTitleForPath')
     expect(header).toMatch(/barTitle !== title/)
     // 同じ言葉のときは出さない。画面の h1 はトップバーが持つので、本文の題は h2（2026-09-24）。
-    expect(header).toMatch(/shown \? <h2 className=\{styles\.title\}>\{title\}<\/h2> : null/)
+    // V8は板の頭に題を置く。V7は同じ題のときv8-onlyで隠す。
+    expect(header).toContain("${shown ? '' : 'v8-only'}")
+    expect(header).toMatch(/<h2[^>]*title=\{title\}>\{title\}<\/h2>/)
     expect(visible(header)).not.toMatch(/<h1[\s>]/)
   })
 })

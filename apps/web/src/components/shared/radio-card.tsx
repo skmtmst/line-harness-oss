@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Tag } from 'lucide-react'
 import styles from './radio-card.module.css'
 
 /**
@@ -71,6 +72,8 @@ export interface RadioCardProps {
    */
   onClick?: () => void
   className?: string
+  /** V8 の上段に出す印。省略時はタグ。v7 では非表示。 */
+  icon?: ReactNode
 }
 
 export default function RadioCard({
@@ -85,6 +88,7 @@ export default function RadioCard({
   invalid = false,
   onClick,
   className,
+  icon,
 }: RadioCardProps) {
   return (
     <label
@@ -97,6 +101,7 @@ export default function RadioCard({
       ].filter(Boolean).join(' ')}
       onClick={disabled ? undefined : onClick}
     >
+      <span className={styles.topIcon} aria-hidden="true">{icon ?? <Tag size={16} />}</span>
       <input
         type="radio"
         className={styles.radio}

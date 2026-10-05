@@ -129,4 +129,15 @@
 [data-theme='v8'] .control[aria-invalid='true'] {
   border-color: var(--color-danger);
 }
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .input { height: 36px; border: 0; padding: 0 12px; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; box-shadow: var(--shadow-board); line-height: 21px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .input[aria-invalid='true'] { outline-color: var(--color-danger); }
+[data-theme='v8'] .input:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .field { display: flex; flex-direction: column; gap: 6px; }
+[data-theme='v8'] .labelRow { margin-bottom: 0; gap: 6px; }
+[data-theme='v8'] .label { line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .input { gap: 0; }
 }

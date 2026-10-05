@@ -81,4 +81,21 @@
   background: currentColor;
   content: '';
 }
+
+/* Exported V8 states: exact geometry and palette; v7 stays above. */
+[data-theme='v8'] .badge {
+  flex-shrink: 0;
+  justify-content: flex-start;
+  border-radius: 999px;
+  font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 18px;
+}
+[data-theme='v8'] .badge::before { border-radius: 50%; }
+[data-theme='v8'] .neutral { background: var(--color-v8-pill-off); color: var(--color-ink-secondary); }
+[data-theme='v8'] .info { background: var(--color-status-info-soft); color: #0b63ce; }
+[data-theme='v8'] .warning { background: var(--color-status-warn-soft); color: #94600a; }
+[data-theme='v8'] .success { background: var(--color-success-bg); color: var(--color-success); }
+[data-theme='v8'] .danger { background: var(--color-status-danger-soft); color: var(--color-danger); }
+
 }

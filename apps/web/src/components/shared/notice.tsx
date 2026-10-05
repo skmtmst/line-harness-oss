@@ -1,7 +1,7 @@
 'use client'
 
 import type { HTMLAttributes, ReactNode } from 'react'
-import { CircleAlert, CircleCheck, CircleHelp, TriangleAlert, X } from 'lucide-react'
+import { CircleAlert, CircleCheck, CircleHelp, Info, TriangleAlert, X } from 'lucide-react'
 import HelpTip from './help-tip'
 import styles from './notice.module.css'
 
@@ -92,7 +92,8 @@ export default function Notice({
       data-design-part="notice"
       data-design-node={node}
     >
-      <Icon className={styles.icon} aria-hidden="true" size={16} />
+      <Icon className={[styles.icon, canonical === 'info' ? styles.infoIconV7 : ''].join(' ')} aria-hidden="true" size={16} />
+      {canonical === 'info' ? <Info className={`${styles.icon} ${styles.infoIconV8}`} aria-hidden="true" size={16} /> : null}
       <span className={styles.message}>
         {children ?? message}
         {hasHelp ? (

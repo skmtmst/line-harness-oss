@@ -3,12 +3,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Pipette } from 'lucide-react'
 import styles from './color-well.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /** よく使う色の見本（8×3）。macOS カラーウェルの格子に倣う。 */
 const DEFAULT_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#16a34a', '#06c755',
   '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
   '#ec4899', '#f43f5e', '#64748b', '#1d1d1f', '#ffffff', '#9ca3af', '#d1d5db', '#f5f5f7',
+]
+
+const V8_COLORS = [
+  '#0f172a', '#475569', '#94a3b8', '#64748b', '#cbd5e1', '#f1f5f9',
+  '#ef4444', '#f97316', '#fbbf24', '#16a34a', '#06c755', '#087a3e',
+  '#84cc16', '#22d3ee', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef',
+  '#ec4899', '#f43f5e', '#fda4af', '#1d1d1f', '#626a73', '#dadde2',
 ]
 
 const HEX = /^#?[0-9a-fA-F]{6}$/
@@ -23,7 +31,7 @@ const HEX = /^#?[0-9a-fA-F]{6}$/
 export default function ColorWell({
   value,
   onChange,
-  colors = DEFAULT_COLORS,
+  colors,
   label = '色を選ぶ',
   disabled = false,
 }: {
@@ -35,6 +43,8 @@ export default function ColorWell({
   label?: string
   disabled?: boolean
 }) {
+  const theme = useAdminTheme()
+  const palette = colors ?? (theme === 'v8' ? V8_COLORS : DEFAULT_COLORS)
   const [open, setOpen] = useState(false)
   const [hex, setHex] = useState(value)
   const rootRef = useRef<HTMLSpanElement | null>(null)
@@ -92,7 +102,7 @@ export default function ColorWell({
       {open ? (
         <div className={styles.pop} role="dialog" aria-label={label}>
           <div className={styles.grid} role="listbox" aria-label="よく使う色">
-            {colors.map((color) => (
+            {palette.map((color) => (
               <button
                 key={color}
                 type="button"
@@ -106,8 +116,8 @@ export default function ColorWell({
             ))}
           </div>
           <div className={styles.row}>
-            {hasDropper ? (
-              <button type="button" className={styles.dropper} aria-label="画面の色をすくう" onClick={() => void pickWithDropper()}>
+            {hasDropper || theme === 'v8' ? (
+              <button type="button" className={styles.dropper} aria-label="画面の色をすくう" disabled={!hasDropper} title={!hasDropper ? 'このブラウザはスポイトに対応していません' : undefined} onClick={() => void pickWithDropper()}>
                 <Pipette size={14} aria-hidden="true" />
               </button>
             ) : null}
@@ -115,7 +125,7 @@ export default function ColorWell({
               <span className={styles.hexMark}>#</span>
               <input
                 className={styles.hexInput}
-                value={hex.replace(/^#/, '')}
+                value={theme === 'v8' ? hex.replace(/^#/, '').toUpperCase() : hex.replace(/^#/, '')}
                 aria-label="色を十六進で入力"
                 onChange={(event) => setHex(event.target.value)}
                 onKeyDown={(event) => {

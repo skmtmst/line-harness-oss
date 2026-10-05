@@ -38,6 +38,6 @@ describe('KpiCardの見出しのはみ出し（G3）', () => {
 
   it('V8 の題は「…」で受ける（折り返さない・v7 は変えない）', () => {
     const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'kpi-card.module.css'), 'utf8')
-    expect(css).toMatch(/\[data-theme='v8'\] \.label \{[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.labelText \{[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s)
   })
 })
