@@ -36,11 +36,6 @@
   height: 64px;
 }
 
-/* 名前＋説明の2行の行を選ぶ指定。v7 では今までの64pxのまま。 */
-.rowDouble {
-  height: 64px;
-}
-
 /* ★V7：選んでいる行は薄い緑の地。色だけでなく aria-selected でも伝える。 */
 .rowSelected {
   background: var(--color-accent-soft);
@@ -120,31 +115,16 @@
 }
 
 /*
- * ★V8「表の行」（JpOg0・apLqS・axFrW計測）。1行の行＝60px、
- * 名前＋説明の2行の行＝86px。tr の高さは最小値として働くので、
- * 中身が増えれば伸びる。2行の判定は中身（.sub/.memo）で自動。
+ * ★V8「表の行」（apLqS 計測の訂正：2行の行は 62px）。
+ * 行の高さは上下の余白12＋中身で決まる（下の bodyCell を見る）。
+ * tr の高さは最小値。60/86 の切り替えは測り違いだったので使わない。
  */
 [data-theme='v8'] .row {
-  height: 60px;
-}
-
-[data-theme='v8'] .row:has(.sub:not([hidden])),
-[data-theme='v8'] .row:has(.memo:not([hidden])) {
-  height: 86px;
+  height: 52px;
 }
 
 [data-theme='v8'] .rowComfortable {
   height: 56px;
-}
-
-/*
- * ★V8「表の行・2行の指定」（`Tr density="double"`）。
- * 名前＋説明の行＝86px。tr の高さは最小値として働くので、
- * 行の高さは上下の余白＋中身で決まり、中身が増えれば伸びる。
- * 固定 height で潰さない。
- */
-[data-theme='v8'] .rowDouble {
-  height: 86px;
 }
 
 [data-theme='v8'] .row + .row .bodyCell {
