@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/header'
+import styles from './create-page.module.css'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -229,22 +230,29 @@ export default function CreatePage({
     </>
   )
 
+  /*
+   * 絵の板の頭は戻る行を頭の内側に持つ。外側の素の div に入れるだけなので
+   * v7 の描画は変わらない（順番も箱も同じ）。
+   */
+  const crumb = (
+    <nav data-design="Crumb" className={`${styles.crumb} text-ink-faint mb-2 text-xs`}>
+      <Link href={parent[1]} className="hover:underline">
+        {parent[0]}
+      </Link>
+      <span className="mx-1.5">/</span>
+      <span>{title}</span>
+    </nav>
+  )
+
   return (
     <VariantContext.Provider value={variant}>
     <div data-design-node={designNode} data-create-variant={variant}>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
-        <Link href={parent[1]} className="hover:underline">
-          {parent[0]}
-        </Link>
-        <span className="mx-1.5">/</span>
-        <span>{title}</span>
-      </nav>
-
       {showHeader ? (
-        <div data-design="Head">
+        <div data-design="Head" className={styles.head}>
+          {crumb}
           <Header title={title} description={description} />
         </div>
-      ) : null}
+      ) : crumb}
 
       <div data-design="Body" className={aside ? 'flex flex-col gap-4 xl:flex-row' : undefined}>
         <div
