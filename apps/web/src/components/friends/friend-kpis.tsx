@@ -5,7 +5,7 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import KpiCard from '@/components/shared/kpi-card'
-import kpiStyles from '@/components/shared/kpi-card.module.css'
+import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
 
@@ -110,16 +110,12 @@ export default function FriendKpis() {
           友だち集計を読み込めませんでした。
         </Notice>
       ) : null}
-      <div
-        data-kpi-strip
-        data-kpi-presentation="band"
-        className={`grid grid-cols-2 gap-3.5 xl:grid-cols-4 ${kpiStyles.strip}`}
-      >
+      <KpiBand gridClassName="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
         {cards.map((card) => (
           // 数の帯は1本にまとめる（Pp3nS）。v8 の見た目だけ変わり v7 は不変。
           <KpiCard key={card.title} {...card} loading={loading} variant="v6" presentation="band" />
         ))}
-      </div>
+      </KpiBand>
     </div>
   )
 }

@@ -13,10 +13,9 @@ const readFriends = (name: string) =>
  * マスどうしは隙間0・1px の縦線で区切る。角丸は帯の外側だけ。
  */
 describe('数の帯（Pp3nS）', () => {
-  it('ListKpis と FriendKpis は帯として出す', () => {
-    expect(read('list-kpis.tsx')).toContain('data-kpi-presentation="band"')
-    expect(read('list-kpis.tsx')).toContain('presentation="band"')
-    expect(readFriends('friend-kpis.tsx')).toContain('data-kpi-presentation="band"')
+  it('ListKpis と FriendKpis は包み（KpiBand）で帯として出す', () => {
+    expect(read('list-kpis.tsx')).toContain('<KpiBand')
+    expect(readFriends('friend-kpis.tsx')).toContain('<KpiBand')
     expect(readFriends('friend-kpis.tsx')).toContain('presentation="band"')
   })
 
@@ -40,5 +39,12 @@ describe('数の帯（Pp3nS）', () => {
   it('既定（v7）のカードの角は変えない', () => {
     const css = read('kpi-card.module.css')
     expect(css).toMatch(/\.card \{[^}]*border-radius:\s*var\(--radius-card\)/s)
+  })
+
+  it('包み（KpiBand）は帯の印を持ち、並べ方は呼び出し側のまま', () => {
+    const source = read('kpi-band.tsx')
+    expect(source).toContain('data-kpi-strip')
+    expect(source).toContain('data-kpi-presentation="band"')
+    expect(source).toContain('gridClassName')
   })
 })
