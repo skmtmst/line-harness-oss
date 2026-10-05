@@ -72,7 +72,10 @@ export interface RadioCardProps {
    */
   onClick?: () => void
   className?: string
-  /** V8 の上段に出す印。省略時はタグ。v7 では非表示。 */
+  /**
+   * V8 の上段に出す印。省略時はタグ。v7 では非表示。
+   * `null` を渡すと図柄なし（j8p3yj の絵どおり題＋説明のみ）。
+   */
   icon?: ReactNode
   /**
    * 選ぶカードの形。既定は箱（fNPdg/r3xz1W）。
@@ -109,7 +112,9 @@ export default function RadioCard({
       data-variant={variant}
       onClick={disabled ? undefined : onClick}
     >
-      <span className={styles.topIcon} aria-hidden="true">{icon ?? <Tag size={16} />}</span>
+      {icon === null ? null : (
+        <span className={styles.topIcon} aria-hidden="true">{icon ?? <Tag size={16} />}</span>
+      )}
       <input
         type="radio"
         className={styles.radio}
