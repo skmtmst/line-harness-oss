@@ -1,22 +1,35 @@
 'use client'
 
 import { Check, Upload } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import SearchField from '@/components/shared/search-field'
-import StatusBadge from '@/components/shared/status-badge'
 import { api } from '@/lib/api'
-import { imageMatchesQuery, type BannerImage, type BannerPreset, type BannerProject, type BannerReferenceMode } from '@/lib/hq-banners'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import {
+  BANNER_MAX_REFERENCE_IMAGES,
+  BANNER_REFERENCE_MODES,
+  BANNER_REFERENCE_MODE_LABEL,
+  imageMatchesQuery,
+  tileCaption,
+  type BannerImage,
+  type BannerPreset,
+  type BannerProject,
+  type BannerReference,
+  type BannerReferenceMode,
+} from '@/lib/hq-banners'
 
 type Scope = 'all' | 'favorite' | 'project'
 
 /**
- * 参照画像をライブラリから選ぶ。★V8 `UcBQ5`。
+ * 参照画像をライブラリから選ぶ。承認済み ★BG-C `cOgWE`（旧 ★V8 `UcBQ5`）。
  *
- * 1 枚だけ選ぶ。タイルを押すと選ばれ、使い方と一緒に「この画像を使う」で決まる。
+ * 最大 3 枚まで選べる。タイルを押すと選ばれ、下の「選んだ画像の使い方」で
+ * 1 枚ずつ使い方（土台にする／素材を一部使う／雰囲気を参考にする）を決める。
  * 手元のファイルは下の「ファイルを選ぶ」から（親がプロジェクトへ取り込んで参照にする）。
  */
 export default function ReferencePickerDialog({
@@ -24,8 +37,7 @@ export default function ReferencePickerDialog({
   projectId,
   presets,
   projects,
-  selectedId,
-  initialUsage,
+  selected,
   onClose,
   onPick,
   onUpload,
@@ -34,22 +46,25 @@ export default function ReferencePickerDialog({
   projectId: string
   presets: BannerPreset[]
   projects: BannerProject[]
-  selectedId: string | null
-  /** 開いたときの使い方（親の入力の値）。無ければ「雰囲気を参考にする」。 */
-  initialUsage?: BannerReferenceMode | null
+  /** いま参照にしている画像と使い方（親の入力の値）。開いたときの初期選択になる。 */
+  selected: BannerReference[]
   onClose: () => void
-  onPick: (image: BannerImage, usage: BannerReferenceMode) => void
+  /** 選び終わったとき。使い方つきの参照と、その画像の実体（親が手元に置く）を渡す。 */
+  onPick: (references: BannerReference[], images: BannerImage[]) => void
   onUpload: (file: File) => void
 }) {
+  const theme = useAdminTheme()
+  const v8 = theme === 'v8'
+  /** 画像ごとのラジオ群を別の群として扱わせるための接頭辞。 */
+  const uid = useId()
   const [images, setImages] = useState<BannerImage[] | null>(null)
   const [nextBefore, setNextBefore] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [scope, setScope] = useState<Scope>('all')
   const [query, setQuery] = useState('')
-  const [picked, setPicked] = useState<BannerImage | null>(null)
-  /** 参照画像の使い方（UcBQ5）。選ぶときに親の入力へ一緒に入れる。 */
-  const [usage, setUsage] = useState<BannerReferenceMode>('inspire')
+  /** 選んだ画像と使い方。並び順はプロンプトの「N枚目」と同じ。 */
+  const [picks, setPicks] = useState<BannerReference[]>([])
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -57,7 +72,6 @@ export default function ReferencePickerDialog({
     let cancelled = false
     setLoading(true)
     setError('')
-    setPicked(null)
     void api.hqBanners.images
       .list({ limit: 60 })
       .then((res) => {
@@ -77,10 +91,10 @@ export default function ReferencePickerDialog({
     }
   }, [open])
 
-  // 開くたび使い方を親の値に戻す（取ってくる処理とは分ける）。
+  // 開くたび、親がいま参照にしている画像と使い方に戻す（取ってくる処理とは分ける）。
   useEffect(() => {
-    if (open) setUsage(initialUsage ?? 'inspire')
-  }, [open, initialUsage])
+    if (open) setPicks(selected.slice(0, BANNER_MAX_REFERENCE_IMAGES).map((reference) => ({ ...reference })))
+  }, [open, selected])
 
   const loadMore = async () => {
     if (!nextBefore || loading) return
@@ -104,21 +118,21 @@ export default function ReferencePickerDialog({
   }, [])
 
   /**
- * 参照画像の名前と寸法（UcBQ5）。名前はファイル名から拡張子を落とし、
- * 寸法は用途の指定寸法、無ければ画像自体の大きさを使う。
- */
-function referenceName(image: BannerImage): string {
-  return image.media.filename.replace(/\.[a-z0-9]+$/i, '') || '画像'
-}
+   * 参照画像の名前と寸法（`cOgWE`）。名前はファイル名から拡張子を落とし、
+   * 寸法は用途の指定寸法、無ければ画像自体の大きさを使う。
+   */
+  function referenceName(image: BannerImage): string {
+    return image.media.filename.replace(/\.[a-z0-9]+$/i, '') || '画像'
+  }
 
-function referenceSize(image: BannerImage, presets: BannerPreset[]): string {
-  const preset = image.generation ? presets.find((p) => p.key === image.generation?.presetKey) : null
-  const width = preset?.targetWidth ?? image.media.width
-  const height = preset?.targetHeight ?? image.media.height
-  return width && height ? `${width}×${height}` : '—'
-}
+  function referenceSize(image: BannerImage, list: BannerPreset[]): string {
+    const preset = image.generation ? list.find((p) => p.key === image.generation?.presetKey) : null
+    const width = preset?.targetWidth ?? image.media.width
+    const height = preset?.targetHeight ?? image.media.height
+    return width && height ? `${width}×${height}` : '—'
+  }
 
-const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects])
+  const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects])
   const visible = useMemo(() => {
     const list = images ?? []
     return list.filter((image) => {
@@ -128,16 +142,47 @@ const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])),
     })
   }, [images, scope, projectId, query, projectNames])
 
-  const current = picked ?? (selectedId ? (images ?? []).find((i) => i.id === selectedId) ?? null : null)
+  /** 選んだ画像の実体。読み込んだ一覧から引く（並び順は選んだ順）。 */
+  const pickedImages = useMemo(() => {
+    const byId = new Map((images ?? []).map((image) => [image.id, image]))
+    return picks
+      .map((reference) => {
+        const image = byId.get(reference.imageId)
+        return image ? { reference, image } : null
+      })
+      .filter((entry): entry is { reference: BannerReference; image: BannerImage } => entry !== null)
+  }, [images, picks])
+
+  const full = picks.length >= BANNER_MAX_REFERENCE_IMAGES
+
+  /** タイルを押したとき。選んでいれば外し、選んでいなければ 3 枚までで足す。 */
+  const toggle = (image: BannerImage) => {
+    setPicks((cur) => {
+      if (cur.some((reference) => reference.imageId === image.id)) {
+        return cur.filter((reference) => reference.imageId !== image.id)
+      }
+      if (cur.length >= BANNER_MAX_REFERENCE_IMAGES) return cur
+      // 既定は「雰囲気を参考にする」。1 枚ずつ下の行で変えられる。
+      return [...cur, { imageId: image.id, mode: 'inspire' as BannerReferenceMode }]
+    })
+  }
+
+  const setUsage = (imageId: string, mode: BannerReferenceMode) => {
+    setPicks((cur) => cur.map((reference) => (reference.imageId === imageId ? { ...reference, mode } : reference)))
+  }
 
   return (
     <Dialog
       open={open}
       title="参照画像を選ぶ"
-      description="ライブラリから 1 枚選びます。生成した画像や取り込んだ画像がここに並びます。手元のファイルを選ぶこともできます。"
+      description={
+        v8
+          ? `ライブラリから最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚選べます。選んだ画像は、下で 1 枚ずつ使い方を決められます。`
+          : `ライブラリから最大 ${BANNER_MAX_REFERENCE_IMAGES} 枚選びます。生成した画像や取り込んだ画像がここに並びます。手元のファイルを選ぶこともできます。`
+      }
       onCancel={onClose}
       error={error || undefined}
-      designNode="UcBQ5"
+      designNode="cOgWE"
       footer={
         <div className="flex w-full flex-wrap items-center gap-2">
           <Button onClick={() => fileRef.current?.click()}>
@@ -158,21 +203,27 @@ const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])),
           />
           <span className="flex-1" />
           <Button onClick={onClose}>キャンセル</Button>
-          <Button variant="primary" disabled={!current} onClick={() => current && onPick(current, usage)}>
+          <Button
+            variant="primary"
+            disabled={picks.length === 0}
+            onClick={() => onPick(picks, pickedImages.map(({ image }) => image))}
+          >
             <Check aria-hidden="true" className="h-4 w-4" />
-            この画像を使う
+            {picks.length === 0 ? 'この画像を使う' : `この ${picks.length} 枚を使う`}
           </Button>
         </div>
       }
     >
       <div className="flex flex-col gap-3">
+        {/* 絞り込み行（`cOgWE`）。チップが左、検索が右。 */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-60 flex-1">
+          <FilterChip selected={scope === 'all'} onChange={() => setScope('all')}>すべて</FilterChip>
+          <FilterChip selected={scope === 'project'} onChange={() => setScope('project')}>このプロジェクト</FilterChip>
+          <FilterChip selected={scope === 'favorite'} onChange={() => setScope('favorite')}>お気に入り</FilterChip>
+          <span className="flex-1" />
+          <div className="w-60 max-w-full">
             <SearchField value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="画像名・プロジェクト名で検索" aria-label="参照画像を検索" />
           </div>
-          <FilterChip selected={scope === 'all'} onChange={() => setScope('all')}>すべて</FilterChip>
-          <FilterChip selected={scope === 'favorite'} onChange={() => setScope('favorite')}>お気に入り</FilterChip>
-          <FilterChip selected={scope === 'project'} onChange={() => setScope('project')}>このプロジェクト</FilterChip>
         </div>
 
         {images === null ? (
@@ -194,22 +245,30 @@ const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])),
             )}
           </>
         ) : (
-          <>
-          <div data-design-node="exeSo" role="listbox" aria-label="参照にする画像" className="grid max-h-160 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4">
+          <div
+            data-design-node="exeSo"
+            role="listbox"
+            aria-label="参照にする画像"
+            aria-multiselectable="true"
+            className="grid max-h-160 grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4"
+          >
             {visible.map((image) => {
-              const selected = current?.id === image.id
+              const index = picks.findIndex((reference) => reference.imageId === image.id)
+              const selectedTile = index >= 0
               return (
                 <button
                   key={image.id}
                   type="button"
                   role="option"
-                  aria-selected={selected}
-                  onClick={() => setPicked(image)}
-                  className="flex flex-col gap-1.5 text-left"
+                  aria-selected={selectedTile}
+                  // 3 枚そろったら、選んでいないタイルは押しても増えないので触れない形にする。
+                  disabled={!selectedTile && full}
+                  onClick={() => toggle(image)}
+                  className="flex flex-col gap-1.5 text-left disabled:opacity-50"
                 >
                   <span
                     className={
-                      selected
+                      selectedTile
                         ? 'relative block aspect-square w-full overflow-hidden rounded-control border-2 border-accent bg-step-idle'
                         : 'relative block aspect-square w-full overflow-hidden rounded-control border border-hairline bg-step-idle'
                     }
@@ -217,9 +276,9 @@ const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])),
                     {/* 統括の画像は Worker から配信されるので next/image の最適化は使わない（image-tile と同じ） */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={image.media.url} alt="" className="h-full w-full object-cover" loading="lazy" />
-                    {selected ? (
+                    {selectedTile ? (
                       <span className="absolute bottom-2 left-2 rounded-pill bg-accent-deep px-2 py-0.5 text-nano font-semibold text-on-accent">
-                        選んだ
+                        {`${index + 1}枚目`}
                       </span>
                     ) : null}
                   </span>
@@ -231,28 +290,47 @@ const projectNames = useMemo(() => new Map(projects.map((p) => [p.id, p.name])),
               )
             })}
           </div>
-          <div className="rounded-control bg-canvas-sunken p-3">
-              <p className="px-1 text-label font-medium text-ink">参照画像の使い方</p>
-              <ul className="mt-1 flex flex-col">
-                {(
-                  [
-                    { value: 'inspire', label: '雰囲気を参考にする' },
-                    { value: 'edit', label: '土台に描き直す' },
-                  ] as { value: BannerReferenceMode; label: string }[]
-                ).map((option) => (
-                  <li key={option.value} className="flex min-h-11 items-center justify-between gap-2">
-                    <span className="text-caption text-ink">{option.label}</span>
-                    {usage === option.value ? (
-                      <StatusBadge tone="success">選択中</StatusBadge>
-                    ) : (
-                      <Button onClick={() => setUsage(option.value)}>この使い方にする</Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </>
         )}
+
+        {/* 選んだ画像の使い方（`JOi8G`）。1 枚ずつ決める。選んでいないときは出さない。 */}
+        {pickedImages.length > 0 ? (
+          <div data-design-node="JOi8G" className="flex flex-col gap-2 rounded-control bg-canvas-sunken p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-label font-medium text-ink">選んだ画像の使い方</span>
+              <span className="text-micro text-ink-faint">画像ごとに決めます・あとから生成パネルでも変えられます</span>
+            </div>
+            <ul className="flex flex-col gap-2">
+              {pickedImages.map(({ reference, image }) => (
+                <li key={reference.imageId} className="flex flex-wrap items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={image.media.url} alt="" className="h-7 w-7 shrink-0 rounded-mini object-cover" loading="lazy" />
+                  <span className="w-36 truncate text-caption font-semibold text-ink">{referenceName(image)}</span>
+                  {/* 使い方は 3 択を行の中に並べて直接選ぶ（★BG-C `B3hdL4`「ルール3択」）。
+                      素の radio は使わず、共通の RadioCard の行版で出す。
+                      外す操作は承認デザインの行に描かれていないので置かない。
+                      画像タイルを押し直す toggle() で選択解除できる（既存動作）。 */}
+                  <RadioCardGroup
+                    legend={`${referenceName(image)}の使い方`}
+                    className="flex flex-wrap items-center gap-5"
+                  >
+                    {BANNER_REFERENCE_MODES.map((mode) => (
+                      <RadioCard
+                        key={mode}
+                        variant="row"
+                        name={`${uid}-usage-${reference.imageId}`}
+                        value={mode}
+                        checked={reference.mode === mode}
+                        onChange={(next) => setUsage(reference.imageId, next as BannerReferenceMode)}
+                        title={BANNER_REFERENCE_MODE_LABEL[mode]}
+                      />
+                    ))}
+                  </RadioCardGroup>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         {nextBefore ? (
           <div className="flex justify-center">
             <Button onClick={() => void loadMore()} disabled={loading} busy={loading} busyLabel="読み込んでいます…">続きを読み込む

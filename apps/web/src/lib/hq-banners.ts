@@ -67,8 +67,36 @@ export interface BannerProject {
 export type BannerGenerationStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled'
 export type BannerMode = 'banner' | 'free'
 export type BannerPersonOption = 'with' | 'without'
-/** 参照画像の使い方（★V6 35-2）。edit=土台に描き直す、inspire=雰囲気を参考にする。 */
-export type BannerReferenceMode = 'edit' | 'inspire'
+/**
+ * 参照画像の使い方（★V6 35-2・承認済み ★BG-C `cOgWE`）。
+ * edit=土台にする、parts=素材を一部使う、inspire=雰囲気を参考にする。
+ */
+export type BannerReferenceMode = 'edit' | 'parts' | 'inspire'
+
+/** 参照画像は最大3枚（承認済み ★BG-C `cOgWE`）。 */
+export const BANNER_MAX_REFERENCE_IMAGES = 3
+
+/** 画像1枚とその使い方の組。順番はプロンプトの「N枚目」と同じ。 */
+export interface BannerReference {
+  imageId: string
+  mode: BannerReferenceMode
+}
+
+/** 使い方の表示名（★BG-B `L1ax1Y` / ★BG-C `cOgWE` の文言）。 */
+export const BANNER_REFERENCE_MODE_LABEL: Record<BannerReferenceMode, string> = {
+  edit: '土台にする',
+  parts: '素材を一部使う',
+  inspire: '雰囲気を参考にする',
+}
+
+/** 使い方の説明（★BG-B `R6MBHf` の文言）。 */
+export const BANNER_REFERENCE_MODE_DESCRIPTION: Record<BannerReferenceMode, string> = {
+  edit: '構図と配色をそのまま残し、文字や背景だけを指示どおりに変えます。',
+  parts: 'ロゴや商品など、その画像の一部だけを取り込んで新しく組み立てます。',
+  inspire: '色とトーンだけを引き継ぎ、構図は写さずに新しく作ります。',
+}
+
+export const BANNER_REFERENCE_MODES: BannerReferenceMode[] = ['edit', 'parts', 'inspire']
 
 export interface BannerGeneration {
   id: string
@@ -80,8 +108,12 @@ export interface BannerGeneration {
   apiSize: string
   quality: string
   textLines: string[]
+  /** 背景に敷く色（Pencil ★BG-B `KkTNS` ベースカラー）。 */
+  baseColor: string | null
   mainColor: string | null
   subColor: string | null
+  /** 目立たせたい文字の色（同 強調カラー）。 */
+  accentColor: string | null
   personOption: BannerPersonOption
   customPrompt: string | null
   freePrompt: string | null
@@ -93,8 +125,8 @@ export interface BannerGeneration {
   failedCount: number
   unitsPerImage: number
   errorMessage: string | null
-  referenceImageId?: string | null
-  referenceMode?: BannerReferenceMode | null
+  /** 参照画像（最大3枚）。古い生成は1枚組から作られる。 */
+  references?: BannerReference[] | null
   createdBy: string | null
   createdAt: string
   startedAt: string | null
@@ -169,15 +201,16 @@ export interface BannerGenerationInput {
   /** 切り抜きの位置。run のときに送り、条件の登録ではサーバーが無視する。 */
   cropPosition: BannerCropPosition
   textLines: string[]
+  baseColor: string | null
   mainColor: string | null
   subColor: string | null
+  accentColor: string | null
   personOption: BannerPersonOption
   customPrompt: string
   freePrompt: string
   count: number
-  /** 参照画像（ライブラリの画像 ID）。無ければ null。 */
-  referenceImageId: string | null
-  referenceMode: BannerReferenceMode
+  /** 参照画像（ライブラリの画像 ID と使い方）。最大3枚。無ければ空。 */
+  references: BannerReference[]
 }
 
 /** 生成パネルの初期値。用途は一覧の先頭を画面側で入れる。 */
@@ -186,27 +219,44 @@ export const EMPTY_GENERATION_INPUT: BannerGenerationInput = {
   presetKey: '',
   cropPosition: 'center',
   textLines: [''],
+  baseColor: null,
   mainColor: null,
   subColor: null,
+  accentColor: null,
   personOption: 'without',
   customPrompt: '',
   freePrompt: '',
   count: 1,
-  referenceImageId: null,
-  referenceMode: 'edit',
+  references: [],
 }
 
-/** 見本の色。Pencil 35-2 `h5eMj` / `fRYho` のとおり。 */
-export const MAIN_COLOR_SWATCHES = ['#D7263D', '#06C755', '#175CD3', '#F5C56B', '#1D1D1F'] as const
-export const SUB_COLOR_SWATCHES = ['#FFFFFF', '#F5F5F7', '#FFE8B0', '#FFD6DB', '#1D1D1F'] as const
+/** 色を入れる4つの欄。 */
+export type BannerColorRoleKey = 'baseColor' | 'mainColor' | 'subColor' | 'accentColor'
+
+/**
+ * 色の4つの役割（Pencil ★BG-B `KkTNS`）。
+ * 見本の色と説明は承認した版のとおり。
+ */
+export const COLOR_ROLES: readonly {
+  key: BannerColorRoleKey
+  label: string
+  /** 何も選んでいないときにピッカーが開く色（承認した見本の色）。 */
+  sample: string
+}[] = [
+  { key: 'baseColor', label: 'ベースカラー', sample: '#FFFFFF' },
+  { key: 'mainColor', label: 'メインカラー', sample: '#D7263D' },
+  { key: 'subColor', label: 'サブカラー', sample: '#F3E9DC' },
+  { key: 'accentColor', label: '強調カラー', sample: '#FFD400' },
+]
 
 export const TEXT_LINE_MAX = 6
 export const TEXT_LINE_LENGTH_MAX = 40
 export const CUSTOM_PROMPT_MAX = 600
 export const FREE_PROMPT_MAX = 1200
 
+/** `#RRGGBB`。すけ具合つき（`#RRGGBBAA`）も受ける。 */
 export function isHexColor(value: string): boolean {
-  return /^#[0-9A-Fa-f]{6}$/.test(value)
+  return /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(value)
 }
 
 /**
@@ -221,19 +271,28 @@ export function validateGenerationInput(
   if (!Number.isInteger(input.count) || input.count < 1 || input.count > maxCount) {
     return `枚数は 1〜${maxCount}枚で選んでください`
   }
+  // 参照画像は最大3枚で、同じ画像は選べない（★BG-C `cOgWE`）。
+  if (input.references.length > BANNER_MAX_REFERENCE_IMAGES) {
+    return `参照画像は${BANNER_MAX_REFERENCE_IMAGES}枚までにしてください`
+  }
+  if (new Set(input.references.map((reference) => reference.imageId)).size !== input.references.length) {
+    return '同じ画像を2回選べません'
+  }
   if (input.mode === 'banner') {
     const lines = input.textLines.map((line) => line.trim()).filter(Boolean)
-    // 「土台に描き直す」は指示だけでも成り立つ（文字を入れない差し替えもある）。
-    const editing = Boolean(input.referenceImageId) && input.referenceMode === 'edit'
-    if (lines.length === 0 && !(editing && input.customPrompt.trim())) {
-      return editing ? '描き直しの指示（追加の指示）か、画像に入れるテキストを入力してください' : '画像に入れるテキストを1行以上入力してください'
+    // 「土台にする」は指示だけでも成り立つ（文字を入れない差し替えもある）。
+    const editing = input.references.some((reference) => reference.mode === 'edit')
+    if (lines.length === 0 && !editing && !input.customPrompt.trim()) {
+      return '画像に入れるテキストか、追加の指示を入力してください'
     }
     if (lines.length > TEXT_LINE_MAX) return `テキストは${TEXT_LINE_MAX}行までです`
     if (lines.some((line) => line.length > TEXT_LINE_LENGTH_MAX)) {
       return `テキストは1行${TEXT_LINE_LENGTH_MAX}文字までです`
     }
-    if (input.mainColor && !isHexColor(input.mainColor)) return 'メインカラーは #RRGGBB の形で入力してください'
-    if (input.subColor && !isHexColor(input.subColor)) return 'サブカラーは #RRGGBB の形で入力してください'
+    for (const role of COLOR_ROLES) {
+      const color = input[role.key]
+      if (color && !isHexColor(color)) return `${role.label}は #RRGGBB の形で入力してください`
+    }
     if (input.customPrompt.length > CUSTOM_PROMPT_MAX) return `追加の指示は${CUSTOM_PROMPT_MAX}文字までです`
   } else {
     if (!input.freePrompt.trim()) return '作りたい画像の説明を入力してください'
@@ -338,7 +397,7 @@ export function formatLabel(mimeType: string): string {
   return sub.toUpperCase().replace('JPG', 'JPEG')
 }
 
-/** 用途プルダウンの見出し。LINE と SNS を分けて並べる。 */
+/** 用途の見出し。LINE と SNS（ほかの用途）を分けて並べる。 */
 export function groupPresets(presets: BannerPreset[]): Array<{ group: BannerPresetGroup; label: string; items: BannerPreset[] }> {
   return [
     { group: 'line' as const, label: 'LINE', items: presets.filter((p) => p.group === 'line') },
@@ -349,6 +408,19 @@ export function groupPresets(presets: BannerPreset[]): Array<{ group: BannerPres
 /** 「リッチメッセージ（1040×1040）」 */
 export function presetOptionLabel(preset: BannerPreset): string {
   return `${preset.label}（${preset.targetWidth}×${preset.targetHeight}）`
+}
+
+/**
+ * 出力サイズのカードの名前（★BG-B `xy4EW`）。
+ * 「LINE」はカードの見出し（出力サイズ／LINEの規格から選ぶ）で分かるので、頭の「LINE 」は落とす。
+ */
+export function presetCardLabel(preset: BannerPreset): string {
+  return preset.group === 'line' ? preset.label.replace(/^LINE /, '') : preset.label
+}
+
+/** 出力サイズのカードの寸法「1040 × 1040」（★BG-B `xy4EW`）。 */
+export function presetSizeLabel(preset: BannerPreset): string {
+  return `${preset.targetWidth} × ${preset.targetHeight}`
 }
 
 /**
@@ -398,13 +470,22 @@ export function generationConditionRows(
     rows.push({ label: 'テキスト', value: g.textLines.map((line, i) => `${i + 1}. ${line}`).join('\n') || '（文字なし）' })
     rows.push({
       label: '色',
-      value: [g.mainColor ? `メイン ${g.mainColor}` : null, g.subColor ? `サブ ${g.subColor}` : null].filter(Boolean).join('・') || '指定なし',
+      value:
+        COLOR_ROLES.map((role) => (g[role.key] ? `${role.label.replace('カラー', '')} ${g[role.key]}` : null))
+          .filter(Boolean)
+          .join('・') || '指定なし',
     })
     rows.push({ label: '人物', value: g.personOption === 'with' ? '入れる' : '入れない' })
     rows.push({ label: '追加の指示', value: g.customPrompt || '（なし）' })
   }
-  if (g.referenceImageId) {
-    rows.push({ label: '参照画像', value: g.referenceMode === 'edit' ? '土台に描き直す' : '雰囲気を参考にする' })
+  const references = g.references ?? []
+  if (references.length > 0) {
+    // 1枚なら使い方だけ、複数なら枚数と使い方を並べる（★BG-C `cOgWE`）。
+    const usages = references.map((reference) => BANNER_REFERENCE_MODE_LABEL[reference.mode] ?? reference.mode)
+    rows.push({
+      label: '参照画像',
+      value: references.length === 1 ? usages[0] : `${references.length}枚（${usages.join('・')}）`,
+    })
   }
   rows.push({ label: '作成', value: shortDateTime(image.createdAt) })
   return rows
@@ -418,14 +499,15 @@ export function inputFromGeneration(g: BannerGeneration): BannerGenerationInput 
     // 切り抜き位置は保存していないので中央に戻す（R120・migration 不要のため）。
     cropPosition: 'center',
     textLines: g.textLines.length > 0 ? [...g.textLines] : [''],
+    baseColor: g.baseColor,
     mainColor: g.mainColor,
     subColor: g.subColor,
+    accentColor: g.accentColor,
     personOption: g.personOption,
     customPrompt: g.customPrompt ?? '',
     freePrompt: g.freePrompt ?? '',
     count: 1,
-    referenceImageId: g.referenceImageId ?? null,
-    referenceMode: g.referenceMode ?? 'edit',
+    references: (g.references ?? []).map((reference) => ({ ...reference })),
   }
 }
 

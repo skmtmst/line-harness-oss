@@ -516,7 +516,9 @@
     "575_photo_publication_daily_views.sql",
     "576_v8_event_venue_address.sql",
     "577_v8_site_receipt.sql",
-    "578_v8_photo_publication_rewards.sql"
+    "578_v8_photo_publication_rewards.sql",
+    "579_banner_color_roles.sql",
+    "580_banner_reference_images.sql"
   ],
-  "migrationCount": 517
+  "migrationCount": 519
 }

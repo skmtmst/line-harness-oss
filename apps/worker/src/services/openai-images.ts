@@ -24,6 +24,11 @@ export interface OpenAIImageRequest {
    * 「土台に描き直す」も「雰囲気を参考にする」も同じ入口で、違いはプロンプトで伝える。
    */
   referenceImage?: OpenAIReferenceImage;
+  /**
+   * 参照画像が複数のとき（最大3枚・承認済み ★BG-C `cOgWE`）。
+   * 1枚のときは `referenceImage` と同じ扱いになる。順番はプロンプトの「N枚目」と合わせる。
+   */
+  referenceImages?: OpenAIReferenceImage[];
   /** テストで差し替えるため。 */
   fetchImpl?: typeof fetch;
   /** OpenAI の応答を待つ上限（ミリ秒）。 */
@@ -105,7 +110,13 @@ export async function generateOpenAIImage(request: OpenAIImageRequest): Promise<
   let url = OPENAI_IMAGES_URL;
   let body: BodyInit;
   const headers: Record<string, string> = { Authorization: `Bearer ${request.apiKey}` };
-  if (request.referenceImage) {
+  const referenceImages =
+    request.referenceImages && request.referenceImages.length
+      ? request.referenceImages
+      : request.referenceImage
+        ? [request.referenceImage]
+        : [];
+  if (referenceImages.length) {
     // edits は JSON ではなく multipart。Content-Type は fetch が boundary 付きで付けるので書かない。
     url = OPENAI_IMAGE_EDITS_URL;
     const form = new FormData();
@@ -116,11 +127,15 @@ export async function generateOpenAIImage(request: OpenAIImageRequest): Promise<
     form.set('quality', request.quality);
     form.set('output_format', 'jpeg');
     form.set('output_compression', compression);
-    form.set(
-      'image',
-      new Blob([request.referenceImage.bytes as unknown as ArrayBuffer], { type: request.referenceImage.mimeType }),
-      request.referenceImage.filename,
-    );
+    // 1枚なら `image`、複数なら `image[]` を枚数分。順番はプロンプトの「N枚目」と同じ。
+    const field = referenceImages.length === 1 ? 'image' : 'image[]';
+    for (const reference of referenceImages) {
+      form.append(
+        field,
+        new Blob([reference.bytes as unknown as ArrayBuffer], { type: reference.mimeType }),
+        reference.filename,
+      );
+    }
     body = form;
   } else {
     headers['Content-Type'] = 'application/json';

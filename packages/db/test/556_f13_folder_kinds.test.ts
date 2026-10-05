@@ -249,5 +249,8 @@ describe('556_f13_folder_kinds の子のひも付け(#1269)', () => {
       `SELECT folder_id FROM _556_folders_backup_tags WHERE id = 'tag1'`,
     ).get() as { folder_id: string | null };
     expect(kept.folder_id).toBe('fo-tag');
-  });
+    // この試験だけは 556 抜きの土台を作り直すため、移行を全部当て直す（使い回しが
+    // 効かない）。CI の 4vCPU・fork 2本では既定の 5 秒に収まらないので、他の重い
+    // 移行の試験と同じ 30 秒に合わせる。手元では 2 秒弱で終わる。
+  }, 30000);
 });
