@@ -1644,11 +1644,11 @@ export const MEDIA_FOLDERS = [
 ]
 
 export const MEDIA_QUOTA = {
-  usageBytes: 2576980378,
+  usageBytes: 3435973837,
   reservedBytes: 0,
   limitBytes: 10737418240,
-  remainingBytes: 8160437862,
-  usageRate: 0.24,
+  remainingBytes: 7301444403,
+  usageRate: 0.32,
   state: 'normal',
 }
 
@@ -1656,71 +1656,98 @@ const mediaPreview = (color) => `data:image/svg+xml,<svg xmlns="http://www.w3.or
 
 export const MEDIA_ITEMS = [
   {
-    id: 'media-delete-target', lineAccountId: 'visual-qa-account', folderId: 'media-product',
-    kind: 'image', filename: '夏の定番セット.jpg', mimeType: 'image/jpeg',
-    sizeBytes: 348160, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#e7f7ef'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-18T09:00:00.000Z', usageCount: 3,
+    id: 'media-autumn-new', lineAccountId: 'visual-qa-account', folderId: 'media-product',
+    kind: 'image', filename: '秋の新商品.jpg', mimeType: 'image/jpeg',
+    sizeBytes: 1258291, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#e7f7ef'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-19T09:00:00.000Z', usageCount: 3,
   },
   {
     id: 'media-banner', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
     kind: 'image', filename: '会員証バナー.png', mimeType: 'image/png',
-    sizeBytes: 839680, width: 2500, height: 1686, durationMs: null,
-    url: mediaPreview('#d9efe3'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-17T09:00:00.000Z', usageCount: 2,
+    sizeBytes: 430080, width: 2500, height: 1686, durationMs: null,
+    url: mediaPreview('#d9efe3'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-18T09:00:00.000Z', usageCount: 1,
   },
   {
-    id: 'media-store-video', lineAccountId: 'visual-qa-account', folderId: 'media-video',
-    kind: 'video', filename: '店内のようす.mp4', mimeType: 'video/mp4',
-    sizeBytes: 88080384, width: null, height: null, durationMs: 164000,
-    url: mediaPreview('#eef0f2'), uploadedBy: '佐々木', uploadedByName: '佐々木', createdAt: '2026-08-16T09:00:00.000Z', usageCount: 1,
+    id: 'media-guide-video', lineAccountId: 'visual-qa-account', folderId: 'media-video',
+    kind: 'video', filename: '使い方ガイド.mp4', mimeType: 'video/mp4',
+    sizeBytes: 39845888, width: null, height: null, durationMs: 215000,
+    url: mediaPreview('#e8ebef'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-17T09:00:00.000Z', usageCount: 1,
+  },
+  {
+    id: 'media-delete-safe', lineAccountId: 'visual-qa-account', folderId: null,
+    kind: 'file', filename: 'メニュー表.pdf', mimeType: 'application/pdf',
+    sizeBytes: 2202009, width: null, height: null, durationMs: null,
+    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '田中', uploadedByName: '田中', createdAt: '2026-08-16T09:00:00.000Z', usageCount: 0,
+  },
+  {
+    id: 'media-staff', lineAccountId: 'visual-qa-account', folderId: 'media-product',
+    kind: 'image', filename: 'スタッフ紹介.jpg', mimeType: 'image/jpeg',
+    sizeBytes: 880640, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#efe5dc'), uploadedBy: '佐々木', uploadedByName: '佐々木', createdAt: '2026-08-15T09:00:00.000Z', usageCount: 1,
+  },
+  {
+    id: 'media-replacement', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
+    kind: 'image', filename: '休業のお知らせ.png', mimeType: 'image/png',
+    sizeBytes: 317440, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#f1e8e8'), uploadedBy: '田中', uploadedByName: '田中', createdAt: '2026-08-14T09:00:00.000Z', usageCount: 0,
+  },
+  {
+    id: 'media-delete-target', lineAccountId: 'visual-qa-account', folderId: 'media-product',
+    kind: 'image', filename: '夏の定番セット.jpg', mimeType: 'image/jpeg',
+    sizeBytes: 1468006, width: 1024, height: 678, durationMs: null,
+    url: mediaPreview('#e7f7ef'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-13T09:00:00.000Z', usageCount: 3,
+  },
+  {
+    id: 'media-price-list', lineAccountId: 'visual-qa-account', folderId: null,
+    kind: 'file', filename: '価格表_2026.pdf', mimeType: 'application/pdf',
+    sizeBytes: 901120, width: null, height: null, durationMs: null,
+    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-12T09:00:00.000Z', usageCount: 1,
   },
   {
     id: 'media-coupon', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
     kind: 'image', filename: '誕生月クーポン.png', mimeType: 'image/png',
     sizeBytes: 215040, width: 1029, height: 1029, durationMs: null,
-    url: mediaPreview('#f3ece1'), uploadedBy: '田中', uploadedByName: '田中', createdAt: '2026-08-15T09:00:00.000Z', usageCount: 1,
-  },
-  {
-    id: 'media-delete-safe', lineAccountId: 'visual-qa-account', folderId: null,
-    kind: 'file', filename: 'メニュー表.pdf', mimeType: 'application/pdf',
-    sizeBytes: 1258291, width: null, height: null, durationMs: null,
-    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '田中', uploadedByName: '田中', createdAt: '2026-08-14T09:00:00.000Z', usageCount: 0,
+    url: mediaPreview('#f3ece1'), uploadedBy: '田中', uploadedByName: '田中', createdAt: '2026-08-11T09:00:00.000Z', usageCount: 1,
   },
   {
     id: 'media-pamphlet', lineAccountId: 'visual-qa-account', folderId: 'media-product',
     kind: 'image', filename: '定期便パンフ.jpg', mimeType: 'image/jpeg',
     sizeBytes: 491520, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#e4eee8'), uploadedBy: '佐々木', uploadedByName: '佐々木', createdAt: '2026-08-13T09:00:00.000Z', usageCount: 5,
+    url: mediaPreview('#e4eee8'), uploadedBy: '佐々木', uploadedByName: '佐々木', createdAt: '2026-08-10T09:00:00.000Z', usageCount: 5,
   },
   {
-    id: 'media-staff', lineAccountId: 'visual-qa-account', folderId: 'media-product',
-    kind: 'image', filename: 'スタッフ紹介.jpg', mimeType: 'image/jpeg',
-    sizeBytes: 399360, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#efe5dc'), uploadedBy: '佐々木', uploadedByName: '佐々木', createdAt: '2026-08-12T09:00:00.000Z', usageCount: 0,
+    id: 'media-store-video', lineAccountId: 'visual-qa-account', folderId: 'media-video',
+    kind: 'video', filename: '店内のようす.mp4', mimeType: 'video/mp4',
+    sizeBytes: 88080384, width: null, height: null, durationMs: 164000,
+    url: mediaPreview('#eef0f2'), uploadedBy: '佐々木', uploadedByName: '佐々木', createdAt: '2026-08-09T09:00:00.000Z', usageCount: 1,
   },
-  {
-    id: 'media-guide-video', lineAccountId: 'visual-qa-account', folderId: 'media-video',
-    kind: 'video', filename: '使い方ガイド.mp4', mimeType: 'video/mp4',
-    sizeBytes: 20761804, width: null, height: null, durationMs: 215000,
-    url: mediaPreview('#e8ebef'), uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-11T09:00:00.000Z', usageCount: 2,
-  },
-  {
-    id: 'media-replacement', lineAccountId: 'visual-qa-account', folderId: 'media-banner',
-    kind: 'image', filename: '休業のお知らせ.png', mimeType: 'image/png',
-    sizeBytes: 122880, width: 1024, height: 678, durationMs: null,
-    url: mediaPreview('#f1e8e8'), uploadedBy: '田中', uploadedByName: '田中', createdAt: '2026-08-10T09:00:00.000Z', usageCount: 0,
-  },
-  {
-    id: 'media-price-list', lineAccountId: 'visual-qa-account', folderId: null,
-    kind: 'file', filename: '価格表_2026.pdf', mimeType: 'application/pdf',
-    sizeBytes: 655360, width: null, height: null, durationMs: null,
-    url: 'data:application/pdf;base64,JVBERi0xLjQ=', uploadedBy: '川野 健太', uploadedByName: '川野 健太', createdAt: '2026-08-09T09:00:00.000Z', usageCount: 1,
-  },
-  ...Array.from({ length: 176 }, (_, index) => ({
-    id: `media-archive-${index + 1}`,
+  ...Array.from({ length: 175 }, (_, index) => {
+    const folderId = index < 60 ? 'media-product' : index < 95 ? 'media-banner' : index < 105 ? 'media-video' : null
+    const kind = index < 95 ? 'image' : index < 105 ? 'video' : index < 135 ? 'file' : 'image'
+    const ext = kind === 'image' ? 'jpg' : kind === 'video' ? 'mp4' : 'pdf'
+    return {
+      id: `media-filler-${index + 1}`,
+      lineAccountId: 'visual-qa-account',
+      folderId,
+      kind,
+      filename: `保管_${kind === 'image' ? '画像' : kind === 'video' ? '動画' : '資料'}_${String(index + 1).padStart(3, '0')}.${ext}`,
+      mimeType: kind === 'image' ? 'image/jpeg' : kind === 'video' ? 'video/mp4' : 'application/pdf',
+      sizeBytes: kind === 'image' ? 204800 : kind === 'video' ? 22020096 : 1048576,
+      width: kind === 'image' ? 1024 : null,
+      height: kind === 'image' ? 678 : null,
+      durationMs: kind === 'video' ? 120000 : null,
+      url: kind === 'file' ? 'data:application/pdf;base64,JVBERi0xLjQ=' : mediaPreview('#eef0f2'),
+      uploadedBy: '川野 健太', uploadedByName: '川野 健太',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      usageCount: index < 22 ? 0 : ((index % 3) + 1),
+    }
+  }),
+  ...Array.from({ length: 11 }, (_, index) => ({
+    id: `media-archived-${index + 1}`,
     lineAccountId: 'visual-qa-account',
-    folderId: index < 81 ? 'media-product' : index < 124 ? 'media-banner' : index < 134 ? 'media-video' : null,
+    folderId: null,
     kind: 'image',
-    filename: `保管画像_${String(index + 1).padStart(3, '0')}.jpg`,
+    filename: `退避画像_${String(index + 1).padStart(2, '0')}.jpg`,
     mimeType: 'image/jpeg',
     sizeBytes: 204800,
     width: 1024,
@@ -1730,6 +1757,8 @@ export const MEDIA_ITEMS = [
     uploadedBy: '川野 健太', uploadedByName: '川野 健太',
     createdAt: '2026-01-01T00:00:00.000Z',
     usageCount: 0,
+    archivedAt: '2026-08-20T00:00:00.000Z',
+    archiveReason: '使わなくなったため退避',
   })),
 ]
 

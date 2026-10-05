@@ -2732,7 +2732,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: commonVarFolders, unfiledCount: COMMON_VARS.filter((variable) => !variable.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'media') {
-    return { success: true, data: mediaFolders }
+    const visibleMedia = MEDIA_ITEMS.filter((item) => item.archivedAt == null)
+    return {
+      success: true,
+      data: mediaFolders.map((folder) => ({
+        ...folder,
+        itemCount: visibleMedia.filter((item) => item.folderId === folder.id).length,
+      })),
+      unfiledCount: visibleMedia.filter((item) => item.folderId == null).length,
+    }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'webinar') {
     const accountId = query.get('account_id')
@@ -4425,8 +4433,10 @@ const server = createServer((req, res) => {
     const folderId = url.searchParams.get('folderId')
     const excludeId = url.searchParams.get('excludeId')
     const sort = url.searchParams.get('sort') || 'newest'
+    const archived = url.searchParams.get('archived')
     const filtered = MEDIA_ITEMS.filter((item) =>
-      (!kind || item.kind === kind)
+      (archived === 'only' ? item.archivedAt != null : archived === 'all' ? true : item.archivedAt == null)
+      && (!kind || item.kind === kind)
       && (!excludeId || item.id !== excludeId)
       && (!query || item.filename.toLowerCase().includes(query))
       && (!folderId || (folderId === '__ungrouped__' ? item.folderId == null : item.folderId === folderId))
