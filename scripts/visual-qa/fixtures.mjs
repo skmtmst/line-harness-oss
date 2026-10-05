@@ -3386,9 +3386,9 @@ export const BROADCAST_APPROVAL_CANDIDATES = [
 export const BROADCAST_APPROVAL_STATE = {
   approval: {
     status: 'pending',
-    requestedByStaffId: 'staff-sender',
+    requestedByStaffId: 'staff-approver',
     requestedAt: '2026-09-25T20:10:00+09:00',
-    approverStaffId: 'staff-approver',
+    approverStaffId: 'staff-sasaki-approver',
     note: '秋の案内です。10時までに見てください',
     decidedByStaffId: null,
     decidedAt: null,
