@@ -50,13 +50,17 @@ describe('作る型の頭（v8・作成画面の絵）', () => {
     expect(rule![0]).toMatch(/border-bottom:\s*1px solid var\(--color-hairline\)/)
   })
 
-  it('v8 の頭は Header の高さ76・下余白を使わない（題22・説明12）', () => {
+  it('v8 の頭は Header の高さ76・下余白を使わない（題22/700・説明12/500・行の高さは通常）', () => {
     const header = css.match(/\[data-theme="v8"\]\s*\.head\s*>\s*header\s*{[^}]*}/s)
     expect(header, 'v8 の header リセットがありません').toBeTruthy()
     expect(header![0]).toMatch(/min-height:\s*0/)
     expect(header![0]).toMatch(/margin-bottom:\s*0/)
     expect(css).toMatch(/\[data-theme="v8"\]\s*\.head h1\s*{[^}]*font-size:\s*22px/s)
+    expect(css).toMatch(/\[data-theme="v8"\]\s*\.head h1\s*{[^}]*font-weight:\s*700/s)
+    expect(css).toMatch(/\[data-theme="v8"\]\s*\.head h1\s*{[^}]*line-height:\s*normal/s)
     expect(css).toMatch(/\[data-theme="v8"\]\s*\.head p\s*{[^}]*font-size:\s*12px/s)
+    expect(css).toMatch(/\[data-theme="v8"\]\s*\.head p\s*{[^}]*font-weight:\s*500/s)
+    expect(css).toMatch(/\[data-theme="v8"\]\s*\.head p\s*{[^}]*line-height:\s*normal/s)
   })
 
   it('v8 の戻る行は 13・操作色・「/ 今の題」を畳む', () => {

@@ -41,6 +41,11 @@ describe('数の帯（Pp3nS）', () => {
     expect(css).toMatch(/\.card \{[^}]*border-radius:\s*var\(--radius-card\)/s)
   })
 
+  it('v8 の単位（件・通）は 12px', () => {
+    const css = read('kpi-card.module.css')
+    expect(css).toMatch(/\[data-theme='v8'\] \.unit \{[^}]*font-size:\s*12px/s)
+  })
+
   it('包み（KpiBand）は帯の印を持ち、並べ方は呼び出し側のまま', () => {
     const source = read('kpi-band.tsx')
     expect(source).toContain('data-kpi-strip')

@@ -217,7 +217,7 @@
 }
 [data-theme='v8'] .unit {
   display: inline; margin: 0; font-family: var(--font-sans);
-  color: var(--color-ink-secondary); font-size: 13px; font-weight: 400;
+  color: var(--color-ink-secondary); font-size: 12px; font-weight: 400;
   line-height: 20px; letter-spacing: 0;
 }
 [data-theme='v8'] .detail {

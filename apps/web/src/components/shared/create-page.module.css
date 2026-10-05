@@ -23,7 +23,7 @@
   margin-bottom: 24px;
 }
 
-/* 絵の頭は題22。Header の高さ76・下余白24は作る頭では使わない。 */
+/* 絵の頭は題22/700・説明12/500・行の高さは通常。Header の高さ76・下余白24は作る頭では使わない。 */
 [data-theme="v8"] .head > header {
   min-height: 0;
   margin-bottom: 0;
@@ -31,12 +31,14 @@
 
 [data-theme="v8"] .head h1 {
   font-size: 22px;
-  line-height: 33px;
+  font-weight: 700;
+  line-height: normal;
 }
 
 [data-theme="v8"] .head p {
   font-size: 12px;
-  line-height: 18px;
+  font-weight: 500;
+  line-height: normal;
 }
 
 /* 戻る行は絵の「← 親へ」（13/600・操作色）。題との間は頭の gap 6。 */
