@@ -5344,22 +5344,30 @@ export const BOOKING_RESOURCES = [
 ]
 
 /** 予約スタッフ。設計 `tksPc` の押し口「佐々木」を含む。 */
+/* 予約設定の担当スタッフ。板 `ooufy` の列の順（佐々木・高田・中川）。 */
 export const BOOKING_STAFF = [
   { id: 'bs-1', name: '佐々木 亮太', display_name: '佐々木', role: 'トリマー', profile_image_url: null, bio: '小型犬が得意です。', sort_order: 1, is_designation_optional: 0, is_active: 1 },
-  { id: 'bs-2', name: '中川 由美', display_name: '中川', role: '受付', profile_image_url: null, bio: null, sort_order: 2, is_designation_optional: 1, is_active: 1 },
-  { id: 'bs-3', name: '高田 誠', display_name: '高田', role: 'トリマー', profile_image_url: null, bio: null, sort_order: 3, is_designation_optional: 0, is_active: 1 },
+  { id: 'bs-3', name: '高田 誠', display_name: '高田', role: 'トリマー', profile_image_url: null, bio: null, sort_order: 2, is_designation_optional: 0, is_active: 1 },
+  { id: 'bs-2', name: '中川 由美', display_name: '中川', role: '受付', profile_image_url: null, bio: null, sort_order: 3, is_designation_optional: 1, is_active: 1 },
 ]
 
-/** 機能28のメニュー×担当表。スタッフごとの動的URLへ同じ形で返す。 */
+/* 機能28のメニュー×担当表。板 `ooufy` の升目どおり（佐々木と高田が4件、
+ * 中川は無し）。佐々木×トリミング（小型犬）だけ上書き（120分・9400円）で、
+ * 歯みがき教室は誰も担当しない（0人の注意書きが出る）。 */
+const BOOKING_STAFF_OFFERED = {
+  'bs-1': ['bm-1', 'bm-2', 'bm-3', 'bm-5'],
+  'bs-3': ['bm-1', 'bm-2', 'bm-3', 'bm-5'],
+  'bs-2': [],
+}
 export const BOOKING_STAFF_MENUS = Object.fromEntries(
-  BOOKING_STAFF.map((staff, staffIndex) => [
+  BOOKING_STAFF.map((staff) => [
     staff.id,
-    BOOKING_MENUS.map((menu, menuIndex) => ({
+    BOOKING_MENUS.map((menu) => ({
       menu_id: menu.id,
       name: menu.name,
-      is_offered: staffIndex === 0 ? Number(menuIndex < 5) : Number(menuIndex % 3 === staffIndex - 1),
-      override_duration_minutes: staffIndex === 1 && menuIndex === 2 ? 50 : null,
-      override_price: staffIndex === 1 && menuIndex === 2 ? 4000 : null,
+      is_offered: Number((BOOKING_STAFF_OFFERED[staff.id] ?? []).includes(menu.id)),
+      override_duration_minutes: staff.id === 'bs-1' && menu.id === 'bm-1' ? 120 : null,
+      override_price: staff.id === 'bs-1' && menu.id === 'bm-1' ? 9400 : null,
     })),
   ]),
 )
