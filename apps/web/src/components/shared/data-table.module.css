@@ -114,6 +114,11 @@
   border-radius: 0;
 }
 
+/*
+ * ★V8「表の行」（apLqS 計測の訂正：2行の行は 62px）。
+ * 行の高さは上下の余白12＋中身で決まる（下の bodyCell を見る）。
+ * tr の高さは最小値。60/86 の切り替えは測り違いだったので使わない。
+ */
 [data-theme='v8'] .row {
   height: 52px;
 }
@@ -127,7 +132,7 @@
 }
 
 [data-theme='v8'] .bodyCell {
-  padding: 9px 20px;
+  padding: var(--tpl-row-pad-block) var(--tpl-row-pad-side);
 }
 
 [data-theme='v8'] .name {
@@ -162,7 +167,7 @@
 }
 [data-theme='v8'] .row + .row .bodyCell { border-top: 0; }
 [data-theme='v8'] .name { line-height: 18px; }
-[data-theme='v8'] .sub { margin-top: 0; line-height: 16px; }
+[data-theme='v8'] .sub { margin-top: var(--tpl-sub-gap); line-height: 16px; }
 [data-theme='v8'] .memo { line-height: 16px; }
 [data-theme='v8'] .row[data-table-layout='columns'] {
   display: flex; align-items: center; gap: 16px; height: auto;

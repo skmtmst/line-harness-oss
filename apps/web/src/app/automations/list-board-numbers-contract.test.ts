@@ -1,7 +1,7 @@
 /**
  * オートメーション一覧 (1152板 En14p) と実装の数字突き合わせ契約。
  * 板: padding 20・gap 12 / KPI見出し 13px #131118 粗500 / KPI数字 22px #131118 粗600
- *     表の見出し padding:13px 20px 13px 粗600 #3d3d3d 地 #fafafb。
+ *     表の見出し 上下12・左右24（--tpl-thead-*） 粗600 secondary 地 table-head。
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -32,10 +32,10 @@ describe("automations 一覧の板の数字", () => {
     for (const c of cards) expect(c).toContain("px-5 py-4");
   });
 
-  it("V8表の見出しは共通Thで左右20・上下13・secondary・地table-headを使う", () => {
+  it("V8表の見出しは共通Thで左右24・上下12・secondary・地table-headを使う", () => {
     expect(LIST).toContain('<TableHeadRow>');
     expect(LIST).toContain('<Th>ルール</Th>');
     expect(TABLE_CSS).toMatch(/\[data-theme='v8'\] \.headRow \{[^}]*background: var\(--color-table-head\)/s);
-    expect(TABLE_CSS).toMatch(/\[data-theme='v8'\] \.headRow \.cell \{[^}]*padding: 13px 20px;[^}]*color: var\(--color-ink-secondary\)/s);
+    expect(TABLE_CSS).toMatch(/\[data-theme='v8'\] \.headRow \.cell \{[^}]*padding:\s*var\(--tpl-thead-pad-block\) var\(--tpl-thead-pad-side\)[^}]*color: var\(--color-ink-secondary\)/s);
   });
 });

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import type { UserRowData } from './user-row'
 import { api } from '@/lib/api'
 import { createLatestRequestGuard } from './summary-request-guard'
@@ -63,40 +64,42 @@ export default function SummaryBar({ rows = [] }: { rows?: UserRowData[] }) {
 
   return (
     <div
-      className="grid grid-cols-2 gap-4 sm:grid-cols-3"
       data-design-node="r7eSi"
       data-users-summary="v6"
       data-summary-state={status}
     >
-      <KpiCard
-        title="統合ユーザー"
-        value={stats?.uniquePeople ?? null}
-        unit="人"
-        detail={detailOf('重複を1人にまとめた数')}
-        loading={loading}
-      />
-      <KpiCard
-        title="紐付く友だち"
-        value={stats?.totalFollowing ?? null}
-        unit="件"
-        detail={detailOf('各アカウントの友だち登録')}
-        loading={loading}
-      />
-      {/*
-        friendDups は行ベースの「余分な登録行数」(SUM(row_cnt - 1))。
-        1人が3アカウントに居れば +2 と数える。通数でも金額でもない。
-      */}
-      <KpiCard
-        title="UID連携済み"
-        value={status === 'ready' ? linkedUidCount : null}
-        unit="人"
-        detail={detailOf('このページでUID確認済み')}
-        loading={loading}
-      />
-      {/*
-        「重複配信の削減」は未接続の機能のため、カードごと出さない。
-        通数・接続後の断り書きは、つながってから足す。
-      */}
+      {/* 数の帯は1本にまとめる（Pp3nS）。並べ方は従来のまま渡す。 */}
+      <KpiBand gridClassName="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <KpiCard
+          title="統合ユーザー"
+          value={stats?.uniquePeople ?? null}
+          unit="人"
+          detail={detailOf('重複を1人にまとめた数')}
+          loading={loading}
+        />
+        <KpiCard
+          title="紐付く友だち"
+          value={stats?.totalFollowing ?? null}
+          unit="件"
+          detail={detailOf('各アカウントの友だち登録')}
+          loading={loading}
+        />
+        {/*
+          friendDups は行ベースの「余分な登録行数」(SUM(row_cnt - 1))。
+          1人が3アカウントに居れば +2 と数える。通数でも金額でもない。
+        */}
+        <KpiCard
+          title="UID連携済み"
+          value={status === 'ready' ? linkedUidCount : null}
+          unit="人"
+          detail={detailOf('このページでUID確認済み')}
+          loading={loading}
+        />
+        {/*
+          「重複配信の削減」は未接続の機能のため、カードごと出さない。
+          通数・接続後の断り書きは、つながってから足す。
+        */}
+      </KpiBand>
     </div>
   )
 }

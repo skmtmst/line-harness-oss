@@ -1,4 +1,16 @@
 /* 枠を外すのは明示的に帯を選んだ部品だけ。画面ごとのカードは保持する。 */
+/*
+ * 印なしの帯（presentation の印がない data-kpi-strip）も v8 では横一列：
+ * 4マスなら4列・隙間0。呼び出し側の列数指定は生きる（列の型は決めない）。
+ * 先頭に置く：印つきの帯・カード並べ（下の強い指定）が勝ち、狭幅の
+ * 畳み方（下の決まり）も効く。v7 には効かない。
+ */
+[data-theme='v8'] [data-kpi-strip] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--tpl-band-gap);
+}
 [data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] {
   display: grid;
   grid-auto-flow: column;
@@ -42,4 +54,12 @@
   }
 }
 
-[data-theme='v8'] [data-kpi-strip][data-kpi-density='compact'] [data-kpi-number] { font-size: 22px; line-height: 28px; }
+/* 帯の数は絵どおり 22px（--tpl- の変数で1か所管理）。 */
+[data-theme='v8'] [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-number] {
+  font-size: var(--tpl-band-number-size);
+  line-height: var(--tpl-band-number-lh);
+}
+[data-theme='v8'] [data-kpi-strip][data-kpi-density='compact'] [data-kpi-number] {
+  font-size: var(--tpl-band-number-size);
+  line-height: var(--tpl-band-number-lh);
+}

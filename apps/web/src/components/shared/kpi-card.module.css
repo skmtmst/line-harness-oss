@@ -186,14 +186,22 @@
 .unit, .labelText, .number { display: contents; }
 [data-theme='v8'] .card {
   justify-content: flex-start; min-width: 0; min-height: 0;
-  gap: 8px; padding: 16px 20px; border: 0; border-radius: 12px;
+  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: 12px;
   outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
   background: var(--color-canvas); box-shadow: none;
+}
+/* 包みを使わない組み方（画面が strip＋KpiCard を直に並べる所）も、
+   数の大きさ・マスの余白は帯と同じ変数で絵どおりにする。 */
+[data-theme='v8'] .strip .card {
+  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side);
+}
+[data-theme='v8'] .strip .number {
+  font-size: var(--tpl-band-number-size); line-height: var(--tpl-band-number-lh);
 }
 [data-theme='v8'] .head { width: 100%; gap: 8px; min-height: 24px; }
 [data-theme='v8'] .label {
   display: flex; align-items: center; min-width: 0; gap: 8px;
-  color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 20px;
+  color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 1.5;
 }
 [data-theme='v8'] .labelText {
   display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -217,7 +225,7 @@
 }
 [data-theme='v8'] .unit {
   display: inline; margin: 0; font-family: var(--font-sans);
-  color: var(--color-ink-secondary); font-size: 13px; font-weight: 400;
+  color: var(--color-ink-secondary); font-size: 12px; font-weight: 400;
   line-height: 20px; letter-spacing: 0;
 }
 [data-theme='v8'] .detail {
@@ -233,47 +241,58 @@
   padding: 10px 16px; gap: 4px;
 }
 [data-theme='v8'] .card[data-kpi-density='compact'] .number {
-  font-size: 22px; line-height: 28px;
+  font-size: var(--tpl-band-number-size); line-height: var(--tpl-band-number-lh);
 }
 .strip { min-width: 0; }
+/* 数の帯の v8 指定は層の外（ファイル末尾）に置く。 */
+[data-theme='v8'] .link { display: inline-flex; align-items: center; gap: 4px; }
+[data-theme='v8'] .menu { margin-left: auto; display: inline-flex; flex-shrink: 0; }
+}
+
 /*
  * 数の帯（Pp3nS・全画面共通）。マス3〜4個を1本の帯にまとめ、
  * マスどうしは隙間0・1px の縦線で区切る。角丸は帯の外側だけにし、
  * マス自体は角を持たない（2板の計測で外側の角も0）。
+ *
+ * 層の外に置く：呼び出し側が渡す並べ方（grid・gap などのユーティリティ）は
+ * ユーティリティ層に属し、部品層の中の指定より常に勝つ。帯の隙間0・
+ * 1列化を効かせるため、ここだけ層の外（どの層より強い）に置く。
+ * v7 には効かない（すべて data-theme v8 限定）。
  */
 [data-theme='v8'] .strip[data-kpi-presentation='band'] {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   grid-template-columns: none;
-  gap: 0;
-  border: 1px solid var(--color-hairline);
+  gap: var(--tpl-band-gap);
+  /* 絵どおり上下の線だけ（左右の枠なし）。 */
+  border-block: 1px solid var(--color-hairline);
   border-radius: var(--radius-none);
   background: var(--color-canvas);
 }
-[data-theme='v8'] .strip[data-kpi-presentation='band'] > .card {
+/* 子孫まで消す：折りたたみ（KpiCollapse）は後ろのマスを包み div で囲うため。 */
+[data-theme='v8'] .strip[data-kpi-presentation='band'] .card {
   border: 0;
   border-radius: var(--radius-none);
   outline-color: transparent;
 }
-[data-theme='v8'] .strip[data-kpi-presentation='band'] > .card + .card {
+[data-theme='v8'] .strip[data-kpi-presentation='band'] > * + * {
   border-left: 1px solid var(--color-hairline);
 }
 [data-theme='v8'] .strip[data-kpi-presentation='band'] .number {
-  font-size: 22px;
-  line-height: 28px;
+  font-size: var(--tpl-band-number-size);
+  line-height: var(--tpl-band-number-lh);
 }
 @media (max-width: 639px) {
   [data-theme='v8'] .strip[data-kpi-presentation='band'] {
     grid-auto-flow: row;
     grid-template-columns: minmax(0, 1fr);
   }
-  [data-theme='v8'] .strip[data-kpi-presentation='band'] > .card + .card {
+  [data-theme='v8'] .strip[data-kpi-presentation='band'] > * + * {
     border-left: 0;
     border-top: 1px solid var(--color-hairline);
   }
 }
 [data-theme='v8'] .card[data-kpi-presentation='cell'] { border-radius: 0; }
-[data-theme='v8'] .link { display: inline-flex; align-items: center; gap: 4px; }
-[data-theme='v8'] .menu { margin-left: auto; display: inline-flex; flex-shrink: 0; }
-}
+
+/* 印なしの帯の横並びは kpi-band-v8.css（層なしCSS）に置く。 */
