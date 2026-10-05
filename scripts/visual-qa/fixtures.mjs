@@ -372,8 +372,8 @@ export const LIST_STATS = {
   marks: { total: 4, inUse: 4, unanswered: 23, inProgress: 19, resolved: 186, changedLast7: 74 },
   searches: { total: 5, limit: 50 },
   templates: { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0, clickRate: null },
-  // 設計 `TC1b1` の帯: シナリオ9件（稼働中8）/ 購読中1,028人 / 読了済728人 / 今週342通
-  scenarios: { total: 9, active: 8, subscribers: 1028, completed: 728, sentThisWeek: 342 },
+  // 板 `axFrW` の帯: シナリオ5件（稼働中3・停止中2）/ 購読中1,028人 / 読了済728人 / 今週342通
+  scenarios: { total: 5, active: 3, subscribers: 1028, completed: 728, sentThisWeek: 342 },
   // 設計 `M1EXwB` の帯: リマインダ9件（有効7）/ 送信予定124通 / 今月386通 / 失敗2通
   reminders: { total: 9, active: 7, waiting: 124, sentThisMonth: 386, failed: 2 },
 }
@@ -402,13 +402,17 @@ export const OPERATORS = [
  * 設計の5行（時刻／経過時間、一時停止／別シナリオへ／1つ前を再開、
  * 稼働中／停止中／下書き）をどれも確かめられなかった。
  */
+/* V8 板 `axFrW`（シナリオ配信一覧）の5行を上から順に並べた。
+ * 行の補足は「送り方・通数・フォルダ名」で、実装が `deliveryMode`・
+ * `stepCount`・フォルダ名から組み立てる。説明文は一覧には出ないが、
+ * 行を開いた板（詳細パネル）に出るため絵の文言で持つ。 */
 export const FRIEND_SCENARIOS = [
   // 名前, 説明, 配信方式, 購読中, 読了, 登録日, 終了後, 稼働
   ['新規登録7日間フォロー', '登録直後から7日間の初回案内', 'absolute_time', 428, 312, '2026-08-16', 'pause', true],
   ['商品購入後サポート', '購入1日後から使い方を案内', 'elapsed', 316, 201, '2026-08-18', 'move', true],
-  ['予約前日・当日案内', '予約日を基準に前日と当日へ配信', 'absolute_time', 164, 98, '2026-08-20', 'pause', true],
-  ['休眠ユーザー復帰', '90日反応がない友だちへ再案内', 'relative', 0, 0, '2026-08-22', 'resume_previous', false],
-  ['会員更新リマインド', '更新月の14日前からお知らせ', 'elapsed', 83, 51, '2026-08-23', 'pause', false],
+  ['予約前日・当日案内', '予約日の前日・当日に案内', 'absolute_time', 284, 215, '2026-08-20', 'pause', true],
+  ['休眠ユーザー復帰', '60日やりとりが無い人へ', 'relative', 0, 0, '2026-08-22', 'resume_previous', false],
+  ['会員更新リマインド', '更新日の7日前と前日', 'absolute_time', 0, 0, '2026-08-23', 'pause', false],
 ].map(([name, description, deliveryMode, subscriberCount, completedCount, day, onCompleteMode, isActive], index) => ({
   id: `scenario-${index}`,
   name: String(name),
@@ -420,34 +424,37 @@ export const FRIEND_SCENARIOS = [
   deliveryMode: String(deliveryMode),
   allowConcurrent: true,
   displayOrder: index,
+  // 絵のフォルダ分け：初回案内2・購入後1・予約フォロー1・未分類1。
   folderId: [
     'scenario-folder-onboarding',
     'scenario-folder-purchase',
     'scenario-folder-booking',
     'scenario-folder-onboarding',
-    'scenario-folder-purchase',
+    null,
   ][index] ?? null,
   audienceCondition: null,
   onCompleteMode: String(onCompleteMode),
   onCompleteScenarioId: null,
   subscriberCount: Number(subscriberCount),
   completedCount: Number(completedCount),
-  stepCount: index === 0 ? 4 : 3,
+  // 絵の通数：4・3・3・4・2（上から順）。
+  stepCount: [4, 3, 3, 4, 2][index] ?? 3,
   createdAt: `${day}T00:00:00.000Z`,
   updatedAt: `${day}T00:00:00.000Z`,
 }))
 
-/** シナリオ一覧 `TC1b1` の3分類。中身の件数は FRIEND_SCENARIOS から数える。 */
+/** シナリオ一覧 `axFrW` の3分類。件数は絵のとおり（初回案内2・購入後1・予約フォロー1）。未分類1件は mock-api が `unfiledCount` で返す。 */
 export const SCENARIO_FOLDERS = [
-  ['scenario-folder-onboarding', '初回案内', '#2563EB'],
-  ['scenario-folder-purchase', '購入後', '#10B981'],
-  ['scenario-folder-booking', '予約フォロー', '#F59E0B'],
-].map(([id, name, color], index) => ({
+  ['scenario-folder-onboarding', '初回案内', '#2563EB', 2],
+  ['scenario-folder-purchase', '購入後', '#10B981', 1],
+  ['scenario-folder-booking', '予約フォロー', '#F59E0B', 1],
+].map(([id, name, color, itemCount], index) => ({
   id: String(id),
   kind: 'scenario',
   name: String(name),
   parentId: null,
   displayOrder: index,
+  itemCount: Number(itemCount),
   color: String(color),
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-01T00:00:00.000Z',

@@ -2688,7 +2688,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: BROADCAST_FOLDERS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'scenario') {
-    return { success: true, data: SCENARIO_FOLDERS }
+    // 板 `axFrW`：未分類は `folderId: null` の1件（会員更新リマインド）。
+    return { success: true, data: SCENARIO_FOLDERS, unfiledCount: FRIEND_SCENARIOS.filter((scenario) => !scenario.folderId).length }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'reminder') {
     // 板 `apLqS`：未分類は `folderId: null` の2件（お誕生日のお祝い・未返信3日後フォロー）。
