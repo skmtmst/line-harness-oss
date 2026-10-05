@@ -579,7 +579,7 @@
   --tpl-head-gap: 4px; --tpl-desc-size: 13px; --tpl-desc-lh: 19px;
   --tpl-compact-title-size: 20px; --tpl-compact-title-weight: 600; --tpl-compact-title-lh: 27px;
   --tpl-compact-gap: 2px; --tpl-compact-desc-lh: 20px;
-  --tpl-folder-width: 200px;
+  --tpl-folder-width: 200px; --tpl-folder-pad-block: 16px; --tpl-folder-pad-side: 12px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
   --tpl-thead-pad-block: 12px; --tpl-thead-pad-side: 24px; --tpl-thead-lh: 16px;

@@ -115,8 +115,8 @@
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    padding: 14px 24px;
+    gap: var(--tpl-toolbar-gap);
+    padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side);
   }
 
   [data-theme='v8'] .row1,
