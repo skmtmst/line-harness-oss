@@ -1,7 +1,17 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+/*
+ * ★V8 友だち属性：保存した検索の編集（一から書いた画面・2026-10-07）。Pencil `AqDWN`。
+ *
+ * 型は「作る」（CreatePage）：頭（戻る・条件名・人数と共有と使っている所）→ 左に「名前と共有」「条件」
+ * 「友だち一覧での見せ方」、右に「当てはまる人」「使っている所」、下の帯（削除は左端・中央にキャンセル／複製して保存する／保存する）。
+ * 動き（読み込み・切り替え時の捨て方・人数の数え直し・保存前の検査・複製・削除・未保存の確認）は
+ * 今の画面（app/tags/search-editor-v8）と同じ。条件の部品と検査はそこから写した。
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { ArrowLeft, Copy, Info, Plus, RefreshCw, Save, Users, X } from 'lucide-react'
 import {
   isSavedSearchOpAllowed,
   isSavedSearchValueOptionalOp,
@@ -19,27 +29,23 @@ import type {
 import { api, ApiError, type SavedSearchDetail, type SavedSearchMatchPreview } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { useAccount } from '@/contexts/account-context'
-import FeatureGate from '@/components/feature-gate'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import Breadcrumb from '@/components/layout/breadcrumb'
-import StickyBar from '@/components/shared/sticky-bar'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { CreatePage } from '@/components/templates'
 import TargetMissing from '@/components/shared/target-missing'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
-import { optionsWithCurrent } from './reference-options'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
-import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { formatDateTime } from '@/lib/format'
-import SearchEditorV8 from '@/v8/tag-edit/search-edit'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import { optionsWithCurrent, usageRowsOf, headUsageText } from './search-model'
+import styles from './search-edit.module.css'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -96,12 +102,6 @@ function dateRangeOf(condition: SavedSearchCondition): { from: string; to: strin
   if (condition.op === 'before') return { from: '', to: single }
   return { from: single, to: '' }
 }
-const USAGE_KIND_LABELS = {
-  broadcast: '一斉配信',
-  automation: 'オートメーション',
-  scenario: 'シナリオ',
-  other: 'そのほか',
-} as const
 
 /*
   保存前の検査は実行側と同じ演算子表で合わせる（ATTR-13）。
@@ -158,10 +158,7 @@ function normalizeForEdit(search: SavedSearch): SavedSearchConditions {
 /*
  * R185: 日付の範囲・前後を1つの編集欄で扱う。友だち画面は「以降」
  * （after＋日付1つ）で保存するため、文字列の値も範囲へ読み替える。
- * 以前は between の形だけを想定し、「以降」が空の範囲になって
- * 日付必須エラーで保存できなかった。
  * R183: 逆転期間は欄の下で知らせる（保存前の検査でも断る）。
- * ATTR-16: 390pxでは開始/終了を縦に積み、それぞれラベルを付ける。
  */
 function DateRangeEditor({
   condition,
@@ -179,51 +176,38 @@ function DateRangeEditor({
   }
   const setFrom = (v: string) => {
     if (op === 'after') onChange({ ...condition, op: 'after', value: v })
-    else if (op === 'before') onChange({ ...condition, op: 'between', value: { from: v, to } })
     else onChange({ ...condition, op: 'between', value: { from: v, to } })
   }
   const setTo = (v: string) => {
     if (op === 'before') onChange({ ...condition, op: 'before', value: v })
-    else if (op === 'after') onChange({ ...condition, op: 'between', value: { from, to: v } })
     else onChange({ ...condition, op: 'between', value: { from, to: v } })
   }
   const reversed = Boolean(from && to && from > to)
   return (
-    <div className="min-w-0 flex-1">
-      <div className="flex min-w-0 flex-wrap items-end gap-2">
-        <Select
-          aria-label="日付の比べ方"
-          value={op}
-          onChange={setOp}
-          options={[
-            { value: 'between', label: '期間' },
-            { value: 'after', label: '以降' },
-            { value: 'before', label: '以前' },
-          ]}
-          className="w-28"
-        />
-        <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
+    <div className={styles.grow}>
+      <div className={styles.dateRow}>
+        <Select aria-label="日付の比べ方" value={op} onChange={setOp} options={[{ value: 'between', label: '期間' }, { value: 'after', label: '以降' }, { value: 'before', label: '以前' }]} width={120} />
+        <label className={styles.dateLabel}>
           {op === 'before' ? '終了日' : '開始日'}
-          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} className="mt-1" />
+          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} />
         </label>
         {op === 'between' ? (
           <>
-            <span className="pb-2 text-ink-faint" aria-hidden="true">〜</span>
-            <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
+            <span className={styles.dateDash} aria-hidden="true">〜</span>
+            <label className={styles.dateLabel}>
               終了日
-              <DateField aria-label="終了日" value={to} onChange={setTo} className="mt-1" />
+              <DateField aria-label="終了日" value={to} onChange={setTo} />
             </label>
           </>
         ) : null}
       </div>
-      {reversed ? (
-        <p role="alert" className="mt-1 text-xs text-danger">開始日が終了日より後になっています。入れ替えてください。</p>
-      ) : null}
+      {reversed ? <p role="alert" className={styles.errorText}>開始日が終了日より後になっています。入れ替えてください。</p> : null}
     </div>
   )
 }
 
-function ConditionEditor({
+/** ★V8: 条件の中身の選ぶ欄・値。行の外に「かつ／または」と × を置く。 */
+function ConditionControls({
   condition,
   tags,
   marks,
@@ -233,7 +217,6 @@ function ConditionEditor({
   operators,
   referenceErrors,
   onChange,
-  onDelete,
 }: {
   condition: SavedSearchCondition
   tags: Tag[]
@@ -244,7 +227,6 @@ function ConditionEditor({
   operators: Array<{ id: string; name: string }>
   referenceErrors: { marks: boolean; scenarios: boolean; fields: boolean; forms: boolean; operators: boolean }
   onChange: (next: SavedSearchCondition) => void
-  onDelete: () => void
 }) {
   const changeKind = (kind: SavedSearchConditionKind) => {
     if (kind === 'tag') onChange({ kind, op: 'includes', value: tags[0]?.id ?? '' })
@@ -263,13 +245,13 @@ function ConditionEditor({
   const rawValue = typeof condition.value === 'string' ? condition.value : ''
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-control border border-hairline bg-canvas p-2">
-      <Select aria-label="条件の種類" value={EDITABLE_KINDS.some((item) => item.value === condition.kind) ? condition.kind : ''} onChange={(value) => changeKind(value as SavedSearchConditionKind)} options={[{ value: '', label: '種類を選ぶ', disabled: true }, ...EDITABLE_KINDS]} className="w-36" />
+    <>
+      <Select aria-label="条件の種類" value={EDITABLE_KINDS.some((item) => item.value === condition.kind) ? condition.kind : ''} onChange={(value) => changeKind(value as SavedSearchConditionKind)} options={[{ value: '', label: '種類を選ぶ', disabled: true }, ...EDITABLE_KINDS]} width={140} />
 
       {condition.kind === 'tag' ? (
         <>
-          <Select aria-label="タグの比較" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'includes', label: '次を含む' }, { value: 'excludes', label: '次を含まない' }]} className="w-32" />
-          <Select aria-label="タグ" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className="min-w-44 flex-1" />
+          <Select aria-label="タグの比較" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'includes', label: 'を含む' }, { value: 'excludes', label: 'を含まない' }]} width={120} />
+          <Select aria-label="タグ" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className={styles.grow} />
         </>
       ) : condition.kind === 'field' ? (
         <>
@@ -282,9 +264,9 @@ function ConditionEditor({
               fields.map((field) => ({ value: field.fieldKey, label: field.name })),
               condition.key ?? '',
               '選択済みの友だち情報',
-              referenceErrors.fields ? '友だち情報を取得できません' : fields.length ? '友だち情報を選ぶ' : '友だち情報がありません',
+              referenceErrors.fields ? '友だち情報を読み込めませんでした' : fields.length ? '友だち情報を選ぶ' : '友だち情報がありません',
             )}
-            className="min-w-44 flex-1"
+            className={styles.grow}
           />
           {/*
             実行側が解釈できるものだけを選べるようにする（ATTR-13）。
@@ -307,12 +289,12 @@ function ConditionEditor({
               { value: 'exists', label: '登録あり' },
               { value: 'not_exists', label: '登録なし' },
             ]}
-            className="w-32"
+            width={120}
           />
           {isSavedSearchValueOptionalOp(condition.op) ? (
-            <span className="min-w-0 flex-1 text-xs text-ink-faint">値の有無だけで絞ります。入力は不要です。</span>
+            <span className={styles.growNote}>値の有無だけで絞ります。入力は不要です。</span>
           ) : (
-            <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値" className="min-w-40 flex-1" />
+            <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値" className={styles.grow} />
           )}
         </>
       ) : condition.kind === 'mark' ? (
@@ -325,9 +307,9 @@ function ConditionEditor({
             marks.map((mark) => ({ value: mark.id, label: mark.name })),
             rawValue,
             '選択済みの対応マーク',
-            referenceErrors.marks ? '対応マークを取得できません' : marks.length ? '対応マークを選ぶ' : '対応マークがありません',
+            referenceErrors.marks ? '対応マークを読み込めませんでした' : marks.length ? '対応マークを選ぶ' : '対応マークがありません',
           )}
-          className="min-w-44 flex-1"
+          className={styles.grow}
         />
       ) : condition.kind === 'scenario' ? (
         <Select
@@ -339,14 +321,14 @@ function ConditionEditor({
             scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
             rawValue,
             '選択済みのシナリオ',
-            referenceErrors.scenarios ? 'シナリオを取得できません' : scenarios.length ? 'シナリオを選ぶ' : 'シナリオがありません',
+            referenceErrors.scenarios ? 'シナリオを読み込めませんでした' : scenarios.length ? 'シナリオを選ぶ' : 'シナリオがありません',
           )}
-          className="min-w-44 flex-1"
+          className={styles.grow}
         />
       ) : condition.kind === 'following' ? (
-        <Select aria-label="友だち状態" value={condition.value === false ? 'false' : 'true'} onChange={(value) => onChange({ ...condition, value: value === 'true' })} options={[{ value: 'true', label: '友だち中' }, { value: 'false', label: 'ブロック済み' }]} className="min-w-44 flex-1" />
+        <Select aria-label="友だち状態" value={condition.value === false ? 'false' : 'true'} onChange={(value) => onChange({ ...condition, value: value === 'true' })} options={[{ value: 'true', label: '友だち中' }, { value: 'false', label: 'ブロック済み' }]} className={styles.grow} />
       ) : condition.kind === 'chat_status' ? (
-        <Select aria-label="対応状況" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: '対応状況を選ぶ' }, { value: 'unread', label: '未対応' }, { value: 'in_progress', label: '対応中' }, { value: 'on_hold', label: '保留' }, { value: 'resolved', label: '対応済み' }]} className="min-w-44 flex-1" />
+        <Select aria-label="対応状況" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: '対応状況を選ぶ' }, { value: 'unread', label: '未対応' }, { value: 'in_progress', label: '対応中' }, { value: 'on_hold', label: '保留' }, { value: 'resolved', label: '対応済み' }]} className={styles.grow} />
       ) : condition.kind === 'assignee' ? (
         <>
           <Select
@@ -354,7 +336,7 @@ function ConditionEditor({
             value={condition.op === 'ne' ? 'ne' : 'eq'}
             onChange={(op) => onChange({ ...condition, op })}
             options={[{ value: 'eq', label: '次の担当' }, { value: 'ne', label: '次以外' }]}
-            className="w-32"
+            width={120}
           />
           <Select
             aria-label="担当"
@@ -365,9 +347,9 @@ function ConditionEditor({
               operators.map((operator) => ({ value: operator.id, label: operator.name })),
               rawValue,
               '選択済みの担当者',
-              referenceErrors.operators ? '担当者を取得できません' : operators.length ? '担当者を選ぶ' : '担当者がいません',
+              referenceErrors.operators ? '担当者を読み込めませんでした' : operators.length ? '担当者を選ぶ' : '担当者がいません',
             )}
-            className="min-w-44 flex-1"
+            className={styles.grow}
           />
         </>
       ) : condition.kind === 'form' ? (
@@ -377,7 +359,7 @@ function ConditionEditor({
             value={canonicalExistenceOp(condition.op)}
             onChange={(op) => onChange({ ...condition, op })}
             options={[{ value: 'exists', label: '回答がある' }, { value: 'not_exists', label: '回答がない' }]}
-            className="w-32"
+            width={120}
           />
           <Select
             aria-label="回答フォーム"
@@ -388,9 +370,9 @@ function ConditionEditor({
               forms.map((form) => ({ value: form.id, label: form.name })),
               rawValue,
               '選択済みの回答フォーム',
-              referenceErrors.forms ? '回答フォームを取得できません' : 'すべての回答フォーム',
+              referenceErrors.forms ? '回答フォームを読み込めませんでした' : 'すべての回答フォーム',
             )}
-            className="min-w-44 flex-1"
+            className={styles.grow}
           />
         </>
       ) : condition.kind === 'purchase' ? (
@@ -400,9 +382,9 @@ function ConditionEditor({
             value={canonicalExistenceOp(condition.op)}
             onChange={(op) => onChange({ ...condition, op })}
             options={[{ value: 'exists', label: '購入がある' }, { value: 'not_exists', label: '購入がない' }]}
-            className="w-32"
+            width={120}
           />
-          <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="空欄はすべての購入" aria-label="購入イベントの種類（空欄可）" className="min-w-40 flex-1" />
+          <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="空欄はすべての購入" aria-label="購入イベントの種類（空欄可）" className={styles.grow} />
         </>
       ) : condition.kind === 'common_event' ? (
         <>
@@ -411,9 +393,9 @@ function ConditionEditor({
             value={canonicalExistenceOp(condition.op)}
             onChange={(op) => onChange({ ...condition, op })}
             options={[{ value: 'exists', label: '発生がある' }, { value: 'not_exists', label: '発生がない' }]}
-            className="w-32"
+            width={120}
           />
-          <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="イベント種別（例：conversion）" aria-label="イベント種別" className="min-w-40 flex-1" />
+          <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="イベント種別（例：conversion）" aria-label="イベント種別" className={styles.grow} />
         </>
       ) : condition.kind === 'memo' ? (
         <>
@@ -427,12 +409,12 @@ function ConditionEditor({
               { value: 'eq', label: '等しい' },
               { value: 'contains', label: '含む' },
             ]}
-            className="w-32"
+            width={120}
           />
           {isSavedSearchValueOptionalOp(condition.op) ? (
-            <span className="min-w-0 flex-1 text-xs text-ink-faint">有無だけで絞ります。入力は不要です。</span>
+            <span className={styles.growNote}>有無だけで絞ります。入力は不要です。</span>
           ) : (
-            <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="メモの内容" aria-label="メモの内容" className="min-w-40 flex-1" />
+            <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="メモの内容" aria-label="メモの内容" className={styles.grow} />
           )}
         </>
       ) : EXISTENCE_KINDS.has(condition.kind) ? (
@@ -441,23 +423,21 @@ function ConditionEditor({
           value={canonicalExistenceOp(condition.op)}
           onChange={(op) => onChange({ ...condition, op })}
           options={[{ value: 'exists', label: 'ある' }, { value: 'not_exists', label: 'ない' }]}
-          className="w-32"
+          width={120}
         />
       ) : DATE_RANGE_KINDS.has(condition.kind) ? (
         <DateRangeEditor condition={condition} onChange={onChange} />
       ) : (
-        <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値を入力" className="min-w-44 flex-1" />
+        <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値を入力" className={styles.grow} />
       )}
-
-      <Button type="button" onClick={onDelete}>削除する</Button>
-    </div>
+    </>
   )
 }
 
-function ConditionGroup({
-  title,
-  operator,
-  items,
+/** 条件1行：つなぎ（最初／かつ／または）・種類140・比べ方120・値・×（28角）。 */
+function ConditionRow({
+  label,
+  condition,
   tags,
   marks,
   scenarios,
@@ -466,10 +446,10 @@ function ConditionGroup({
   operators,
   referenceErrors,
   onChange,
+  onDelete,
 }: {
-  title: string
-  operator: 'AND' | 'OR'
-  items: SavedSearchCondition[]
+  label: '最初' | 'かつ' | 'または'
+  condition: SavedSearchCondition
   tags: Tag[]
   marks: SupportMark[]
   scenarios: Scenario[]
@@ -477,40 +457,21 @@ function ConditionGroup({
   forms: Array<{ id: string; name: string }>
   operators: Array<{ id: string; name: string }>
   referenceErrors: { marks: boolean; scenarios: boolean; fields: boolean; forms: boolean; operators: boolean }
-  onChange: (next: SavedSearchCondition[]) => void
+  onChange: (next: SavedSearchCondition) => void
+  onDelete: () => void
 }) {
   return (
-    <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
-      <h2 className="text-base font-bold text-ink">{title}（{operator}）</h2>
-      {items.length === 0 ? <p className="mt-2 text-xs text-ink-faint">条件はまだありません。必要な場合だけ追加します。</p> : null}
-      <div className="mt-3 space-y-2">
-        {/*
-          行のキーは位置で固定する。種類＋添字にすると、種類を変えた
-          行が作り直されて入力内容・フォーカスが飛ぶ。保存する条件の
-          形は変えていない(並び替え操作は無い)。
-        */}
-        {items.map((condition, index) => (
-          <ConditionEditor
-            key={`condition-${index}`}
-            condition={condition}
-            tags={tags}
-            marks={marks}
-            scenarios={scenarios}
-            fields={fields}
-            forms={forms}
-            operators={operators}
-            referenceErrors={referenceErrors}
-            onChange={(next) => onChange(items.map((item, itemIndex) => itemIndex === index ? next : item))}
-            onDelete={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))}
-          />
-        ))}
-      </div>
-      <Button type="button" onClick={() => onChange([...items, defaultCondition(tags)])} className="mt-3">＋ {operator}条件を追加する</Button>
-    </section>
+    <div className={styles.conditionRow}>
+      <span className={label === '最初' ? styles.opFirst : label === 'かつ' ? styles.opAnd : styles.opOr}>{label}</span>
+      <ConditionControls condition={condition} tags={tags} marks={marks} scenarios={scenarios} fields={fields} forms={forms} operators={operators} referenceErrors={referenceErrors} onChange={onChange} />
+      <button type="button" aria-label="この条件を削除する" title="この条件を削除する" onClick={onDelete} className={styles.conditionRemove}>
+        <X size={14} aria-hidden="true" />
+      </button>
+    </div>
   )
 }
 
-function SavedSearchEditInner() {
+export default function SavedSearchEditV8() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -545,7 +506,8 @@ function SavedSearchEditInner() {
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
 
-  usePageTitle('保存した検索を編集')
+  usePageTitle(original?.name ?? '保存した検索を編集')
+  usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '友だち属性', href: '/tags' }, { label: '保存した検索', href: '/tags?tab=searches' }])
 
   /*
     ATTR-12: 再計算の連打・条件変更・アカウント切替で、古い計算結果が
@@ -802,7 +764,9 @@ function SavedSearchEditInner() {
     }
   }
 
-  if (loading) return <p className="text-sm text-ink-faint">読み込んでいます</p>
+  if (loading) {
+    return <p className={styles.loading} role="status">読み込み中…</p>
+  }
   if (!id) {
     return (
       <TargetMissing
@@ -814,7 +778,7 @@ function SavedSearchEditInner() {
       />
     )
   }
-  if (!selectedAccountId) return <p className="rounded-card border border-hairline bg-canvas p-5 text-sm text-ink-secondary">上部でLINE公式アカウントを選んでください。</p>
+  if (!selectedAccountId) return <Notice tone="warn">上部でLINE公式アカウントを選んでください。</Notice>
   /* #975 U069: 見つからないときも行き止まりにしない。一覧へ戻る道を出す。 */
   if (!original && (searchMissing || !error)) {
     return (
@@ -839,153 +803,169 @@ function SavedSearchEditInner() {
     )
   }
 
-  return (
-    <div data-design-node="XBkiQ">
-      {/* R177: 長い条件名で戻るボタンが右へ押し出される同じ構図。パンくずを縮め、ボタンは残す。 */}
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <Breadcrumb items={[{ label: '保存した検索', href: '/tags?tab=searches' }, { label: original.name }]} />
+  const allConditions = conditions.all ?? []
+  const anyConditions = conditions.any ?? []
+  const usageRows = usageRowsOf(original.usedIn)
+  const hasLive = original.usedIn?.some((usage) => usage.mode === 'live') ?? false
+  const inUse = (original.usedIn?.length ?? 0) > 0
+  const countNote = previewError || preview?.error
+    ? '人数をまだ数えていません。数え直してください。'
+    : preview?.calculatedAt
+      ? `${formatDateTime(preview.calculatedAt)} に数えた数（LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人）。数え直している間は古い数を出しません`
+      : '保存した条件でまだ数えていません。数え直すと出ます'
+  const deleteReason = original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使っている所を確かめられないため削除できません' : original.usedIn.length > 0 ? `使っている所があるため削除できません（${original.usedIn.length}件）` : '削除できるか確かめられません'
+
+  const side = (
+    <div className={styles.side}>
+      <div className={styles.sideHead}><h2 className={styles.sideTitle}>当てはまる人</h2></div>
+      <p className={styles.count}>
+        {previewCount === null ? <span className={styles.countNum}>—</span> : <span className={styles.countNum}>{previewCount.toLocaleString('ja-JP')}</span>}
+        <span className={styles.countUnit}>人</span>
+      </p>
+      {previewError ? <p role="alert" className={styles.errorText}>{previewError}</p> : null}
+      {previewStale ? (
+        <div className={styles.staleBox} role="status">
+          <p className={styles.staleTitle}>条件を変えました。上の人数は変える前の条件のもので、変えたあとの条件はまだ数えていません。</p>
+          <p className={styles.staleLine}>{`変える前：${beforeSummary.length ? beforeSummary.join('・') : '条件なし'}`}</p>
+          <p className={styles.staleLine}>{`変えたあと：${afterSummary.length ? afterSummary.join('・') : '条件なし'}`}</p>
         </div>
-        <Button href="/tags?tab=searches" className="shrink-0">保存した検索へ</Button>
+      ) : <p className={styles.countNote}>{countNote}</p>}
+      <div className={styles.sideButtons}>
+        <Button type="button" onClick={() => void recount()}><RefreshCw size={14} aria-hidden="true" />数え直す</Button>
+        <Button href={`/friends?savedSearch=${encodeURIComponent(id)}`}><Users size={14} aria-hidden="true" />当てはまる人を見る</Button>
       </div>
-
-      {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
-
-      {/*
-        ATTR-16: グリッド子は `min-w-0` で縮める。無いと中身の最小幅が
-        そのまま段の最小幅になり、390pxで右端が画面の外へ出る。
-      */}
-      <div className="grid min-w-0 gap-4 xl:grid-cols-4">
-        <div className="min-w-0 space-y-4 xl:col-span-3">
-          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
-            <h2 className="text-base font-bold text-ink">条件名・説明</h2>
-            <div className="mt-3 grid gap-3">
-              <div>
-                <TextInput value={name} maxLength={80} onChange={(event) => setName(event.target.value)} className="max-w-xl" aria-label="条件名" />
-                {/* IDEA-04: 同名の検索がすでにあるとき、保存する前に知らせる。 */}
-                <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" />
-              </div>
-              <TextInput value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" className="max-w-xl" aria-label="説明" />
-            </div>
-            <RadioCardGroup legend="共有範囲" className="mt-4">
-              <RadioCard name="saved-search-share" value="shared" checked={isShared} onChange={() => setIsShared(true)} title="全員" note="他の担当者からも使えます" />
-              <RadioCard name="saved-search-share" value="private" checked={!isShared} onChange={() => setIsShared(false)} title="自分だけ" />
-            </RadioCardGroup>
-              {/*
-                設計 `XBkiQ`：共有範囲を選ぶ場所で、上限と「共有すると何が
-                起きるか」を先に言う。50件に近づいてから初めて知る、という
-                順番にしない。件数は一覧の取得結果そのものなので、読めて
-                いないときは数を出さずに上限だけ書く。
-              */}
-              <p className="mt-2 text-xs leading-5 text-ink-faint">
-                {savedCount === null
-                  ? '保存できるのは50件までです。'
-                  : `保存できるのは50件までです（いま${savedCount}件）。`}
-                共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。
-              </p>
-            {/* IDEA-04: 条件の保存は「保存した検索」。印ならタグ・値なら情報欄という違いを、編集の場所でも確認できるようにする。 */}
-            <div className="mt-4"><AttributeKindGuide current="search" /></div>
-          </section>
-
-          <ConditionGroup title="すべて満たす" operator="AND" items={conditions.all ?? []} tags={tags} marks={marks} scenarios={scenarios} fields={fields} forms={forms} operators={operators} referenceErrors={referenceErrors} onChange={(all) => patchConditions({ ...conditions, all })} />
-          <ConditionGroup title="いずれか1つ以上満たす" operator="OR" items={conditions.any ?? []} tags={tags} marks={marks} scenarios={scenarios} fields={fields} forms={forms} operators={operators} referenceErrors={referenceErrors} onChange={(any) => patchConditions({ ...conditions, any })} />
-        </div>
-
-        <aside className="min-w-0 space-y-4">
-          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
-            <h2 className="text-base font-bold text-ink">該当プレビュー</h2>
-            {/* 監査6 #674: 24px超の数字は字詰め（large → tracking -0.02em）と単位小を MetricValue で揃える */}
-            <p className="mt-3 text-3xl font-bold text-ink"><MetricValue value={previewCount} unit="人" large /></p>
-            {/*
-              IDEA-04: 人数をいつ・どの条件で計ったかを出す。
-              条件を変えたあとは、出ている人数が「変更前の条件」のもので
-              「変更後の条件」は未計算だと分かるようにする。取れていない
-              ときは計算時点を出さない（推定で埋めない）。
-            */}
-            <p className="mt-1 text-micro text-ink-faint">
-              {previewError || preview?.error
-                ? '未計算'
-                : preview?.calculatedAt
-                  ? `${formatDateTime(preview.calculatedAt)}に計算`
-                  : '未計算'}
-            </p>
-            {previewError ? (
-              <p role="alert" className="mt-2 text-xs text-danger">{previewError}</p>
-            ) : previewStale ? (
-              <Notice tone="warn" className="mt-2">
-                <p className="text-xs font-semibold">条件を変更しました。上の人数は変更前の条件のもので、変更後の条件は未計算です。</p>
-                <p className="mt-1 text-xs"><span className="font-semibold">変更前：</span>{beforeSummary.length ? beforeSummary.join('・') : '条件なし'}</p>
-                <p className="mt-1 text-xs"><span className="font-semibold">変更後：</span>{afterSummary.length ? afterSummary.join('・') : '条件なし'}</p>
-              </Notice>
-            ) : (
-              <p className="mt-2 text-xs text-ink-faint">{preview ? `LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人` : '保存済み条件で集計'}</p>
-            )}
-            <div className="mt-3 flex flex-wrap gap-2"><Button type="button" onClick={() => void recount()}>人数を再計算</Button><Button href={`/friends?savedSearch=${encodeURIComponent(id)}`} variant="primary">該当者を確認</Button></div>
-          </section>
-
-          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
-            <h2 className="text-base font-bold text-ink">使うときの参照の仕方</h2>
-            <div className="mt-3 space-y-2 text-sm text-ink-secondary"><p><strong className="text-ink">ライブ参照</strong>　使うたびに条件で数え直し、人の出入りを反映します。</p><p><strong className="text-ink">固定</strong>　保存した時点の人を使い、あとから条件を変えても対象は変えません。</p></div>
-            <Notice tone="warn" className="mt-3">{original.usedIn?.some((usage) => usage.mode === 'live') ? 'ライブ参照の使用先は、条件を変えると次回実行から対象が変わります。' : '現在、ライブ参照の使用先はありません。'}</Notice>
-          </section>
-
-          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
-            <h2 className="text-base font-bold text-ink">この条件の使用先</h2>
-            {original.usedIn === undefined ? (
-              <p className="mt-3 text-sm text-ink-faint">—</p>
-            ) : original.usedIn.length === 0 ? (
-              <p className="mt-3 text-sm font-semibold text-ink-secondary">使用先はありません</p>
-            ) : (
-              <ul className="mt-3 space-y-2 text-sm text-ink-secondary">
-                {original.usedIn.map((usage) => (
-                  <li key={`${usage.kind}:${usage.id}`} className="rounded-control bg-status-warn-soft p-2">
-                    <span className="font-bold">{USAGE_KIND_LABELS[usage.kind]}</span>
-                    <span className="ml-1">{usage.name}</span>
-                    <span className="ml-1 text-xs text-ink-faint">{usage.mode === 'live' ? '条件を自動反映' : '固定した条件'}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="mt-2 text-xs leading-5 text-ink-faint">使用先がある検索は、先に参照を外すまで削除できません。</p>
-          </section>
-
-          <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
-            <h2 className="text-base font-bold text-ink">一覧での表示</h2>
-            <label className="mt-3 block text-xs font-semibold text-ink-faint">並び順
-              {/* R188: 一覧の実装は友だち追加日順。最終接触と書くと運用者の意図とずれる。 */}
-              <Select aria-label="並び順" value={conditions.list?.sort ?? 'recent'} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, sort: value as 'recent' | 'oldest' } })} options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]} size="full" className="mt-1" />
-            </label>
-            <label className="mt-3 block text-xs font-semibold text-ink-faint">表示件数
-              <Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} size="full" className="mt-1" />
-            </label>
-            <p className="mt-3 rounded-control border border-hairline bg-surface-pearl p-2 text-xs text-ink-secondary">表示列：{conditions.list?.columns?.join('・') || '名前・タグ・担当者'}</p>
-          </section>
-        </aside>
+      <div className={styles.sideHead}>
+        <h2 className={styles.sideTitle}>使っている所</h2>
+        <HelpTip label="使っている所の説明">ライブ参照：使うたびに条件で数え直し、人の出入りを反映します。固定：保存した時点の人を使い、あとから条件を変えても対象は変えません。</HelpTip>
       </div>
-
-      <StickyBar
-        destructive={<Button variant="danger" className="px-4 py-2 font-bold border-0 h-auto whitespace-normal" type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'}>この条件を削除する</Button>}
-        actions={(
-          <>
-            <Button href="/tags?tab=searches">キャンセル</Button>
-            <Button type="button" disabled={saving} onClick={() => void duplicate()}>複製して保存する</Button>
-            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}>保存する</Button>
-          </>
-        )}
-      />
-      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使用先が無いことをサーバーで確認済みです。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
-      <UnsavedLeaveDialog
-        open={leaveTarget !== null}
-        subject="検索条件への変更"
-        busy={saving}
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <dl className={styles.useList}>
+        {usageRows.map((usage) => (
+          <div key={usage.label} className={styles.useRow}>
+            <dt>{usage.label}</dt>
+            <dd title={usage.value}>{usage.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className={styles.infoBand}>
+        <Info size={16} aria-hidden="true" className={styles.infoIcon} />
+        <span>{hasLive ? '条件を変えると、上の配信の宛先も変わります。' : inUse ? '固定で使っている所は、条件を変えても宛先は変わりません。' : '使っている所はないので、条件を変えてもほかに影響しません。'}{inUse ? '使っている間は削除できません。' : ''}</span>
+      </p>
     </div>
   )
-}
 
-export default function SavedSearchEditPage() {
-  const theme = useAdminTheme()
-  return <FeatureGate feature="saved_searches"><Suspense fallback={<p className="text-sm text-ink-faint">読み込んでいます</p>}>{theme === 'v8' ? <SearchEditorV8 /> : <SavedSearchEditInner />}</Suspense></FeatureGate>
+  return (
+    <div className={styles.page}>
+      <CreatePage
+        title={original.name}
+        identity={<Link href="/tags?tab=searches" className={styles.backLink}><ArrowLeft size={14} aria-hidden="true" />保存した検索へ</Link>}
+        description={[
+          previewCount === null ? '人数はまだ数えていません' : `${previewCount.toLocaleString('ja-JP')}人が当てはまる`,
+          original.isShared ? '全員に共有' : '自分だけ',
+          headUsageText(original.usedIn),
+        ].join('・')}
+        preview={side}
+        destructive={(
+          <Button variant="danger" type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={deleteReason}>削除する</Button>
+        )}
+        status={dirty ? '変更内容を確かめて保存してください' : undefined}
+        footerActions={(
+          <>
+            <Button href="/tags?tab=searches">キャンセル</Button>
+            <Button type="button" disabled={saving} onClick={() => void duplicate()}><Copy size={14} aria-hidden="true" />複製して保存する</Button>
+            <Button type="button" variant="primary" disabled={saving || !dirty} onClick={() => void save()} busy={saving}><Save size={14} aria-hidden="true" />保存する</Button>
+          </>
+        )}
+      >
+        {error ? <Notice tone="danger" message={error} /> : null}
+        <section className={styles.card} aria-label="名前と共有">
+          <h2 className={styles.cardTitle}>名前と共有</h2>
+          <label className={styles.field}>
+            <span className={styles.labelStrong}>条件名</span>
+            <TextInput value={name} maxLength={80} onChange={(event) => setName(event.target.value)} aria-label="条件名" className={styles.input} />
+            {/* IDEA-04：同名の検索がすでにあるとき、保存する前に知らせる。 */}
+            <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.labelStrong}>説明</span>
+            <TextInput value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} />
+          </label>
+          <div className={styles.field}>
+            <span className={styles.labelRow}>
+              <span className={styles.label}>共有</span>
+              {/* 設計 XBkiQ：共有を選ぶ場所で、上限と共有すると何が起きるかを先に言う。 */}
+              <HelpTip label="共有の説明">{`${savedCount === null ? '保存できるのは50件までです。' : `保存できるのは50件までです（いま${savedCount}件）。`}共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。`}</HelpTip>
+            </span>
+            <div className={styles.seg} role="radiogroup" aria-label="共有">
+              <button type="button" role="radio" aria-checked={isShared} className={isShared ? styles.segOn : styles.segBtn} onClick={() => setIsShared(true)}>全員</button>
+              <button type="button" role="radio" aria-checked={!isShared} className={!isShared ? styles.segOn : styles.segBtn} onClick={() => setIsShared(false)}>自分だけ</button>
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.card} aria-label="条件">
+          <div className={styles.cardTitles}>
+            <h2 className={styles.cardTitle}>条件</h2>
+            <p className={styles.cardNote}>「かつ」はすべて満たす人、「または」はどれかを満たす人に当てはまります。</p>
+          </div>
+          {allConditions.length === 0 && anyConditions.length === 0 ? <p className={styles.hint}>条件はまだありません。下のボタンで足します。</p> : null}
+          {allConditions.map((condition, index) => (
+            <ConditionRow
+              key={`all-${index}`}
+              label={index === 0 ? '最初' : 'かつ'}
+              condition={condition}
+              tags={tags}
+              marks={marks}
+              scenarios={scenarios}
+              fields={fields}
+              forms={forms}
+              operators={operators}
+              referenceErrors={referenceErrors}
+              onChange={(next) => patchConditions({ ...conditions, all: allConditions.map((item, i) => i === index ? next : item) })}
+              onDelete={() => patchConditions({ ...conditions, all: allConditions.filter((_, i) => i !== index) })}
+            />
+          ))}
+          {anyConditions.map((condition, index) => (
+            <ConditionRow
+              key={`any-${index}`}
+              label={allConditions.length === 0 && index === 0 ? '最初' : 'または'}
+              condition={condition}
+              tags={tags}
+              marks={marks}
+              scenarios={scenarios}
+              fields={fields}
+              forms={forms}
+              operators={operators}
+              referenceErrors={referenceErrors}
+              onChange={(next) => patchConditions({ ...conditions, any: anyConditions.map((item, i) => i === index ? next : item) })}
+              onDelete={() => patchConditions({ ...conditions, any: anyConditions.filter((_, i) => i !== index) })}
+            />
+          ))}
+          <div className={styles.addButtons}>
+            <button type="button" className={styles.ghostButton} onClick={() => patchConditions({ ...conditions, all: [...allConditions, defaultCondition(tags)] })}><Plus size={14} aria-hidden="true" />かつの条件を足す</button>
+            <button type="button" className={styles.ghostButton} onClick={() => patchConditions({ ...conditions, any: [...anyConditions, defaultCondition(tags)] })}><Plus size={14} aria-hidden="true" />またはの条件を足す</button>
+          </div>
+        </section>
+
+        <section className={styles.card} aria-label="友だち一覧での見せ方">
+          <h2 className={styles.cardTitle}>友だち一覧での見せ方</h2>
+          <div className={styles.listRow}>
+            <div className={styles.field}>
+              <span className={styles.label}>並び順</span>
+              {/* R188：一覧の実装は友だち追加日順。最終接触と書くと運用者の意図とずれる。 */}
+              <Select aria-label="並び順" value={conditions.list?.sort ?? 'recent'} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, sort: value as 'recent' | 'oldest' } })} options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]} width={220} />
+            </div>
+            <div className={styles.field}>
+              <span className={styles.label}>表示件数</span>
+              <Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件` }))} width={120} />
+            </div>
+          </div>
+          <p className={styles.hint}>{`表示列：${conditions.list?.columns?.join('・') || '名前・タグ・担当者'}`}</p>
+        </section>
+        {/* IDEA-04：印ならタグ・値なら情報欄・条件の保存は保存した検索、という違いを編集の場所でも確かめられる。 */}
+        <AttributeKindGuide current="search" />
+      </CreatePage>
+      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使っている所が無いことをサーバーで確かめてあります。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="検索条件への変更" busy={saving} onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </div>
+  )
 }
