@@ -76,7 +76,6 @@ import styles from './list.module.css'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
-const READONLY_REASON = '閲覧のみのため、この操作はできません'
 
 /** 1ページに出す件数の選択肢（表示は PageSizeSelect が「N件表示」にする）。 */
 const PAGE_SIZE_OPTIONS = [20, 50, 100]
@@ -617,8 +616,6 @@ export default function ScenariosListV8() {
       onSelect={setFolderFilter}
       onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
       addFolderLabel="フォルダを追加"
-      addFolderDisabled={!canEdit}
-      addFolderTitle={!canEdit ? READONLY_REASON : undefined}
       rows={folderRows}
     >
       <p className={styles.folderNote}>フォルダを消しても、中のシナリオは未分類に残ります</p>
@@ -667,12 +664,11 @@ export default function ScenariosListV8() {
 
   /* ===== 行の「…」の中身（★V8：複製・配信結果・削除） ===== */
 
-  const rowMenuItems = (s: ScenarioRow): ActionMenuItem[] => [
+  // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見る項目（配信結果）だけ残す。
+  const rowMenuItems = (s: ScenarioRow): ActionMenuItem[] => ([
     {
       id: 'duplicate',
       label: '複製する',
-      disabled: !canEdit,
-      disabledReason: canEdit ? undefined : READONLY_REASON,
       onSelect: () => openDuplicate(s),
     },
     {
@@ -688,14 +684,12 @@ export default function ScenariosListV8() {
       label: '削除する',
       tone: 'danger',
       dividerBefore: true,
-      disabled: !canEdit,
-      disabledReason: canEdit ? undefined : READONLY_REASON,
       onSelect: () => {
         setDeleteError('')
         setDeleteTarget(s)
       },
     },
-  ]
+  ] as ActionMenuItem[]).filter((item) => canEdit || item.id === 'results')
 
   /** 一覧の行→詳細はつながる移り変わりで開く。 */
   const goDetail = (id: string) => {
@@ -840,12 +834,12 @@ export default function ScenariosListV8() {
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  <Checkbox
+                  {canEdit && <Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのシナリオをすべて選択"
-                  />
+                  />}
                 </Th>
                 {tableHeadCells}
               </TableHeadRow>
@@ -880,11 +874,11 @@ export default function ScenariosListV8() {
                     }}
                   >
                     <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
-                      <Checkbox
+                      {canEdit && <Checkbox
                         checked={selectedIds.has(s.id)}
                         onCheckedChange={() => toggleOne(s.id)}
                         aria-label={`${s.name}を選択`}
-                      />
+                      />}
                     </Td>
                     <Td
                       className={styles.gripCell}
@@ -893,16 +887,15 @@ export default function ScenariosListV8() {
                       onDragStart={() => setDragId(s.id)}
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={() => dropOn(s.id)}
-                      title="上下に動かして並び替え"
+                      title={canEdit ? '上下に動かして並び替え' : undefined}
                     >
-                      <ReorderGrip
+                      {/* 閲覧のみ：つまみは置かない（列の幅は残る） */}
+                      {canEdit && <ReorderGrip
                         label={s.name}
-                        disabled={!canEdit}
-                        disabledReason={READONLY_REASON}
                         onMove={(direction) => keyboardMove(s.id, direction)}
                       >
                         <span aria-hidden>⠿</span>
-                      </ReorderGrip>
+                      </ReorderGrip>}
                     </Td>
                     <NameCell
                       name={
@@ -971,14 +964,14 @@ export default function ScenariosListV8() {
         </div>
 
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
-        {selectedCount > 0 ? (
+        {canEdit && selectedCount > 0 ? (
           <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
             <span className={styles.bulkCount}>{selectedCount}件を選択中</span>
             <Button
               type="button"
               variant="secondary"
-              disabled={!canEdit || stoppableIds.length === 0}
-              title={!canEdit ? READONLY_REASON : stoppableIds.length === 0 ? '稼働中のシナリオが選ばれていません' : undefined}
+              disabled={stoppableIds.length === 0}
+              title={stoppableIds.length === 0 ? '稼働中のシナリオが選ばれていません' : undefined}
               onClick={() => runBulkToggle(false, stoppableIds)}
             >
               <Square size={13} aria-hidden="true" />
@@ -987,8 +980,8 @@ export default function ScenariosListV8() {
             <Button
               type="button"
               variant="secondary"
-              disabled={!canEdit || resumableIds.length === 0}
-              title={!canEdit ? READONLY_REASON : resumableIds.length === 0 ? '停止中のシナリオが選ばれていません' : undefined}
+              disabled={resumableIds.length === 0}
+              title={resumableIds.length === 0 ? '停止中のシナリオが選ばれていません' : undefined}
               onClick={() => runBulkToggle(true, resumableIds)}
             >
               <Play size={13} aria-hidden="true" />
@@ -997,8 +990,6 @@ export default function ScenariosListV8() {
             <Button
               type="button"
               variant="secondary"
-              disabled={!canEdit}
-              title={!canEdit ? READONLY_REASON : undefined}
               onClick={() => openMove([...selectedIds])}
             >
               <FolderIcon size={13} aria-hidden="true" />
@@ -1080,13 +1071,12 @@ export default function ScenariosListV8() {
     </div>
   )
 
-  const createButton = (full: boolean) => (
+  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
+  const createButton = (full: boolean) => !canEdit ? null : (
     <Button
       type="button"
       variant="primary"
       className={full ? 'v8-folder-create w-full' : undefined}
-      disabled={!canEdit}
-      title={!canEdit ? READONLY_REASON : undefined}
       onClick={handleCreate}
     >
       <Plus size={15} aria-hidden="true" />
@@ -1223,12 +1213,11 @@ export default function ScenariosListV8() {
                 >
                   配信結果を見る
                 </Button>
-                <Button variant="secondary" disabled={!canEdit} onClick={() => openDuplicate(panelRow)}>
+                {canEdit && <Button variant="secondary" onClick={() => openDuplicate(panelRow)}>
                   複製する
-                </Button>
-                <Button
+                </Button>}
+                {canEdit && <Button
                   variant="secondary"
-                  disabled={!canEdit}
                   onClick={() => {
                     setDeleteError('')
                     setDeleteTarget(panelRow)
@@ -1236,7 +1225,7 @@ export default function ScenariosListV8() {
                   }}
                 >
                   削除する
-                </Button>
+                </Button>}
               </>
             }
           >
@@ -1367,7 +1356,8 @@ export default function ScenariosListV8() {
         </Dialog>
       </>}
       folders={<>
-        {createButton(true)}
+        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
+        {createButton(true) ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         {folderPanel}
       </>}
       collapsedFolders={narrow ? undefined : <>{createButton(false)}{folderSelect}</>}

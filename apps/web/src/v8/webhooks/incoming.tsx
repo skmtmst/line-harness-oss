@@ -587,7 +587,10 @@ export default function WebhooksIncomingV8() {
       <>
         <div className={styles.titleRow}>
           <h2 className={styles.title}>
-            <InlineEdit value={selected.name} label="受け取り口の名前" onSave={renameInlet} disabled={!canManage} />
+            {/* 閲覧のみ：名前を変える鉛筆は置かず、名前だけ見せる（2026-10-06 オーナー決定） */}
+            {canManage
+              ? <InlineEdit value={selected.name} label="受け取り口の名前" onSave={renameInlet} />
+              : selected.name}
           </h2>
           <span className={styles.pill} data-tone={toggling ? 'neutral' : selected.isActive ? 'active' : 'neutral'}>
             <span className={styles.pillDot} aria-hidden="true" />

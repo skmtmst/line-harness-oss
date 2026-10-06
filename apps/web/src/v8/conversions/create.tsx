@@ -152,6 +152,11 @@ function ConversionCreate() {
   const initialName = useSearchParams().get('name') ?? ''
   const role = useStaffRole()
   const canEdit = canManageRole(role)
+  /*
+   * 閲覧のみと分かったら、押せない入力の欄は置かず閲覧のみの帯だけを出す（2026-10-06 オーナー決定）。
+   * 作る画面なので、閲覧のみの人に見せる中身は無い。役割を読むまでは今までどおり欄を出す（保存は役割が分かってから）。
+   */
+  const viewerOnly = role !== null && !canEdit
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState(initialName)
   const [triggerKind, setTriggerKind] = useState<TriggerKind>('order')
@@ -472,7 +477,7 @@ function ConversionCreate() {
                 <Checkbox
                   checked={all > 0 && chosen === all}
                   indeterminate={chosen > 0 && chosen < all}
-                  disabled={!canEdit || result.state !== 'ok' || all === 0}
+                  disabled={result.state !== 'ok' || all === 0}
                   onCheckedChange={(next) => toggleUsageGroup(group.kind, next)}
                 >{group.label}</Checkbox>
                 {result.state === 'error' ? (
@@ -536,14 +541,16 @@ function ConversionCreate() {
        * （previewToggle：頭と本文の間の段）に渡し、帯があるときだけ広い幅でも見せる（create.module.css）。
        */
       previewToggle={conflictBand}
-      preview={previewColumn}
+      preview={viewerOnly ? undefined : previewColumn}
       footerActions={footerActions}
     >
-      {!canEdit && role !== null ? (
+      {viewerOnly ? (
         <div className={styles.viewerBand} role="status">閲覧のみで見ています。作る操作は管理者に頼んでください。</div>
       ) : null}
       {savedNotice ? <Notice tone="success">{savedNotice}</Notice> : null}
       {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
+
+      {viewerOnly ? null : (<>
 
       <section className={styles.card} aria-labelledby="cv-new-what">
         <div className={styles.cardHead}>
@@ -558,7 +565,6 @@ function ConversionCreate() {
             value={name}
             maxLength={120}
             placeholder="商品を買った"
-            disabled={!canEdit}
             onChange={(event) => setName(event.target.value)}
           />
         </label>
@@ -575,7 +581,6 @@ function ConversionCreate() {
               size="full"
               aria-label="できごと"
               value={eventType}
-              disabled={!canEdit}
               options={TRIGGER_CHOICES.map((choice) => ({ value: choice.eventType, label: `${choice.label}（${choice.note}）` }))}
               onChange={selectTrigger}
             />
@@ -591,7 +596,6 @@ function ConversionCreate() {
               value={targetUrl}
               maxLength={2000}
               placeholder="https://example.com/thanks"
-              disabled={!canEdit}
               onChange={(event) => setTargetUrl(event.target.value)}
             />
           </label>
@@ -616,7 +620,6 @@ function ConversionCreate() {
             name="conversion-create-dedup"
             value="once_per_friend"
             checked={deduplicationMode === 'once_per_friend'}
-            disabled={!canEdit}
             onChange={() => setDeduplicationMode('once_per_friend')}
             title="1人1回だけ"
             note="はじめての人だけを数えます"
@@ -626,7 +629,6 @@ function ConversionCreate() {
             name="conversion-create-dedup"
             value="window"
             checked={deduplicationMode === 'window'}
-            disabled={!canEdit}
             onChange={() => setDeduplicationMode('window')}
             title="30日に1回まで"
             note="短い間にくり返し起きるものに"
@@ -636,7 +638,6 @@ function ConversionCreate() {
             name="conversion-create-dedup"
             value="every"
             checked={deduplicationMode === 'every'}
-            disabled={!canEdit}
             onChange={() => setDeduplicationMode('every')}
             title="何回でも"
             note="買うたびに数えます。売上を追うときに"
@@ -658,7 +659,6 @@ function ConversionCreate() {
                 size="full"
                 aria-label="金額の出し方"
                 value={valueMode}
-                disabled={!canEdit}
                 options={origin.valueModes.map((mode) => ({ value: mode, label: VALUE_MODE_LABELS[mode] }))}
                 onChange={(next) => {
                   setValueMode(next as ConversionValueMode)
@@ -674,7 +674,6 @@ function ConversionCreate() {
                 size="full"
                 aria-label="取り消されたとき"
                 value={reversalPolicy}
-                disabled={!canEdit}
                 options={REVERSAL_OPTIONS}
                 onChange={(next) => setReversalPolicy(next as ConversionReversalPolicy)}
               />
@@ -691,7 +690,6 @@ function ConversionCreate() {
               inputMode="numeric"
               value={value}
               placeholder="0"
-              disabled={!canEdit}
               onChange={(event) => setValue(event.target.value)}
             />
           </label>
@@ -711,7 +709,6 @@ function ConversionCreate() {
             value={exclusionMemo}
             maxLength={500}
             placeholder="例：テスト用の注文は条件で除いています"
-            disabled={!canEdit}
             onChange={(event) => setExclusionMemo(event.target.value)}
           />
         </label>
@@ -733,7 +730,6 @@ function ConversionCreate() {
         <Checkbox
           checked={saveAsDraft}
           onCheckedChange={setSaveAsDraft}
-          disabled={!canEdit}
           description="一覧の「下書き」に入ります。数えはじめるには一覧から公開します。"
         >まだ計測せず、下書きとして保存する</Checkbox>
         <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
@@ -746,7 +742,6 @@ function ConversionCreate() {
                 inputMode="numeric"
                 value={attributionDays}
                 placeholder="90"
-                disabled={!canEdit}
                 onChange={(event) => setAttributionDays(event.target.value)}
               />
               <span className={styles.fieldNote}>空欄なら既定の90日です。</span>
@@ -758,6 +753,7 @@ function ConversionCreate() {
           </div>
         </Disclosure>
       </section>
+      </>)}
 
       <Dialog
         open={usagePickerOpen}

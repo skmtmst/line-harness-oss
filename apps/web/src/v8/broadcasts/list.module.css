@@ -345,3 +345,6 @@
 .stateIconError { background: var(--color-danger-bg); color: var(--color-danger); }
 .stateTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 600; }
 .stateDesc { margin: 0; color: var(--color-ink-faint); font-size: var(--text-label); }
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-h); }
