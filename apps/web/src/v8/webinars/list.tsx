@@ -43,6 +43,7 @@ import Select from '@/components/shared/select'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
@@ -705,6 +706,13 @@ function WebinarList() {
   const go = (href: string) => router.push(href)
 
   /* ===== フォルダ ===== */
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。 */
+  const folderDotOf = (w: WebinarListItem): FolderDotFolder | null => {
+    if (!w.folderId) return null
+    const folder = folders.find((f) => f.id === w.folderId)
+    if (folder) return { name: folder.name, color: folder.color }
+    return w.folderName ? { name: w.folderName } : null
+  }
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: panelGrand, icon: <Inbox size={15} aria-hidden="true" /> },
     /*
@@ -864,15 +872,17 @@ function WebinarList() {
                   >
                     <Td className={styles.colName}>
                       <ContextMenu label={`「${w.title}」の操作`} items={toContextItems(menuItems)}>
-                        <button
-                          type="button"
-                          className={styles.nameButton}
-                          title={w.title}
-                          aria-label={`「${w.title}」の詳細を見る`}
-                          onClick={(event) => { event.stopPropagation(); openDetail(w.id) }}
-                        >
-                          {w.title}
-                        </button>
+                        <FolderDotName folder={folderDotOf(w)}>
+                          <button
+                            type="button"
+                            className={styles.nameButton}
+                            title={w.title}
+                            aria-label={`「${w.title}」の詳細を見る`}
+                            onClick={(event) => { event.stopPropagation(); openDetail(w.id) }}
+                          >
+                            {w.title}
+                          </button>
+                        </FolderDotName>
                       </ContextMenu>
                       <span className={styles.slug} title={publicPath(w)}>{publicPath(w)}</span>
                     </Td>

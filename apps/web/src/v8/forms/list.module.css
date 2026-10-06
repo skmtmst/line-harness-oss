@@ -202,6 +202,8 @@
   display: block;
   min-width: 0;
   overflow: hidden;
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 I3L41O の説明の行）。 */
+  padding-inline-start: var(--tpl-folder-dot-indent);
   color: var(--color-ink-faint);
   text-overflow: ellipsis;
   white-space: nowrap;
