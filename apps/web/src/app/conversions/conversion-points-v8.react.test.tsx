@@ -194,12 +194,13 @@ test('v8 の下では Pencil r6dJFy の新しい一覧に切り替わる', async
   })
   // 見出しと右のボタン
   expect(host.textContent).toContain('コンバージョン')
-  expect(host.textContent).toContain('CSVで書き出す')
+  expect(host.textContent).toContain('CSV で書き出す')
   // 数の帯は表の行の合計（52件・¥412,000）と一致する
   expect(host.textContent).toContain('この30日の成果')
   expect(host.textContent).toContain('52')
   expect(host.textContent).toContain('¥412,000')
-  expect(host.textContent).toContain('どこからも使われていない')
+  // 狭い試験環境では 1152 の板（BygrU）の言葉「使われていない」になる
+  expect(host.textContent).toContain('使われていない')
   // 行の中身（名前・状態・数・金額・使う場所・操作）
   expect(host.textContent).toContain('商品を買った')
   expect(host.textContent).toContain('動いている')
@@ -252,7 +253,7 @@ test('v8 で行を選ぶと詳細の小窓が出て、止める小窓は理由�
   expect(stopBodies).toEqual([expect.objectContaining({ reason: '計測の仕方を変えるため', expectedVersion: 3 })])
 })
 
-test('v8 の閲覧のみでは帯が出て作る操作が押せない形になる', async () => {
+test('v8 の閲覧のみでは帯が出て、作る操作は置かない（押せない形でも置かない・2026-10-06 オーナー）', async () => {
   staffRole = 'viewer'
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<ConversionsPage />))
@@ -260,9 +261,11 @@ test('v8 の閲覧のみでは帯が出て作る操作が押せない形にな�
   await eventually(() => {
     expect(host.querySelector('[data-design-node="r6dJFy"]')).toBeTruthy()
   })
-  expect(host.textContent).toContain('閲覧のみで見ています')
-  const createButton = host.querySelector('button[disabled][title="この操作にはオーナーか管理者の権限が要ります"]')
-  expect(createButton?.textContent).toContain('成果地点を作る')
-  await act(async () => { (createButton as HTMLButtonElement).click() })
+  await eventually(() => {
+    expect(host.textContent).toContain('閲覧のみで見ています')
+  })
+  const createLinks = [...host.querySelectorAll('a, button')].filter((element) => element.textContent?.includes('成果地点を作る'))
+  expect(createLinks).toEqual([])
+  expect(host.querySelector('button[disabled][title="この操作にはオーナーか管理者の権限が要ります"]')).toBeNull()
   expect(posted).toEqual([])
 })

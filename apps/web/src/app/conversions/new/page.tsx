@@ -41,7 +41,7 @@ import ConditionBuilder, { findConditionDraftIssue, pruneCondition } from '@/com
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { originInfoOf } from '../origin-labels'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import ConversionCreateV8 from './conversion-create-v8'
+import ConversionCreateV8 from '@/v8/conversions/create'
 import { useAccount } from '@/contexts/account-context'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
 import { formatNumber } from '@/lib/format'
@@ -159,7 +159,17 @@ function ConversionSection({ label, help, children }: { label: string; help?: Re
   </Card>
 }
 
+/*
+ * 入口：★V8 は src/v8 に一から書いた作る画面（j8p3yj・cXqlS）。v7 の画面は下のまま。
+ * 先に分けるので、V8 のときに v7 の画面の読み込み（同名の確認・使う場所の候補）は走らない。
+ */
 export default function NewConversionPointPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <ConversionCreateV8 />
+  return <NewConversionPointPageV7 />
+}
+
+function NewConversionPointPageV7() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [triggerKind, setTriggerKind] = useState<TriggerKind>('order')
@@ -369,12 +379,6 @@ export default function NewConversionPointPage() {
     selectedUsageKeys.size > 0
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
-
-  // ★V8-B 成果地点を作る（`j8p3yj`・競合 `cXqlS`）。
-  const theme = useAdminTheme()
-  if (theme === 'v8') {
-    return <ConversionCreateV8 />
-  }
 
   return (
     <div className={styles.root}>
