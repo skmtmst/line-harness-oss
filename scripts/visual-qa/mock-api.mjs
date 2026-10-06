@@ -754,16 +754,17 @@ const DASHBOARD_TREND = [
 
 /**
  * 指標カード用の7日推移。設計 `vUXKb` は全日とも有効友だち398人で、
- * 8/13だけ登録1人・流入元「検索」1人。旧グラフ用の active=4 は流用しない。
+ * 日付と数は ★V8 WQmep の絵の7日（9/24〜9/30）。旧グラフ用の active=4 は流用しない。
  */
 const DASHBOARD_METRIC_TREND = [
-  ['2026-08-13', 1, 0, 398, [{ name: '検索', count: 1 }]],
-  ['2026-08-14', 0, 0, 398, []],
-  ['2026-08-15', 0, 0, 398, []],
-  ['2026-08-16', 0, 0, 398, []],
-  ['2026-08-17', 0, 0, 398, []],
-  ['2026-08-18', 0, 0, 398, []],
-  ['2026-08-19', 0, 0, 398, []],
+  /* ★V8 ダッシュボード（WQmep）の絵の7日：9/24〜9/30、登録 2・1・3・5・4・2・6、ブロック 0・1・0・1・0・2・1。 */
+  ['2026-09-24', 2, 0, 398, [{ name: '検索', count: 2 }]],
+  ['2026-09-25', 1, 1, 398, []],
+  ['2026-09-26', 3, 0, 398, []],
+  ['2026-09-27', 5, 1, 398, []],
+  ['2026-09-28', 4, 0, 398, []],
+  ['2026-09-29', 2, 2, 398, []],
+  ['2026-09-30', 6, 1, 398, []],
 ].map(([date, added, blocked, active, sources]) => ({
   date, added, blocked, active, estimated: false, sources,
 }))
@@ -780,7 +781,8 @@ const DASHBOARD_PREFERENCES = {
     today: ['today-inbox', 'today-photo-review', 'today-bookings', 'today-shipments']
       .map((id) => ({ id, visible: true })),
     main: [
-      ...['shipment', 'pending-inbox', 'friend-trend', 'friend-add'].map((id) => ({ id, visible: true })),
+      /* 段の並びは ★V8 WQmep の絵（推移 → 受信 → 追加リンク）。 */
+      ...['shipment', 'friend-trend', 'pending-inbox', 'friend-add'].map((id) => ({ id, visible: true })),
       ...['scenario-status', 'uid-migration'].map((id) => ({ id, visible: false })),
     ],
     right: [

@@ -678,3 +678,5 @@ shared-button-importer v8/conversions/list.tsx
 shared-button-importer v8/conversions/dialogs.tsx
 shared-button-importer v8/conversions/create.tsx
 shared-button-importer v8/inflow-links/new/create.tsx
+shared-button-importer v8/dashboard/dashboard.tsx
+shared-button-importer v8/dashboard/friend-add.tsx
