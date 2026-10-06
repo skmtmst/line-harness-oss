@@ -71,7 +71,7 @@ import {
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
   OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_AUDIENCE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, SCENARIO_TRIGGERS, SCENARIO_PREVIEW, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
-  RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
+  RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
   TAG_ARCHIVE_RESULT,
   TAG_IMPORT_SAMPLE_ROWS, tagImportPreview, tagImportResult, REMINDER_RUNS,
@@ -2737,6 +2737,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // 機能4は利用人数つきの一覧を要求する。他機能の選択肢は従来データを保つ。
     return { success: true, data: query.get('withUsage') === '1' ? FRIEND_ATTRIBUTE_FIELDS : FRIEND_FIELDS }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'rich_menu') {
+    // 板 `rZEGN`：通常・会員向け・キャンペーン＋未分類（各1件）。
+    return { success: true, data: RICH_MENU_FOLDERS, unfiledCount: RICH_MENU_GROUPS.filter((group) => !group.folderId).length }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
     // 板 `uE9gf`：未分類は `folderId: null` の1件（旧キーワードルール）。
     return { success: true, data: AUTO_REPLY_FOLDERS, unfiledCount: AUTO_REPLIES.filter((rule) => !rule.folderId).length }
@@ -3879,6 +3883,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const impact = richMenuDeleteImpact[1] === RICH_MENU_DELETE_IMPACT_EMPTY.group.id
       ? RICH_MENU_DELETE_IMPACT_EMPTY
       : RICH_MENU_DELETE_IMPACT
+    // 一覧のどの行の「削除」から開いても、その行の影響として返す（板 `yOyCg` は一覧の先頭行で開く）。
+    const asked = RICH_MENU_GROUPS.find((group) => group.id === richMenuDeleteImpact[1])
+    if (asked && impact === RICH_MENU_DELETE_IMPACT && asked.id !== impact.group.id) {
+      // 既定（全員）でない行に「既定になっている」は付けない。
+      const blockers = impact.blockers.filter((key) => key !== 'default_for_all' || asked.isDefaultForAll)
+      return {
+        success: true,
+        data: {
+          ...impact,
+          group: { ...impact.group, id: asked.id, name: asked.name, status: asked.status },
+          lineResources: { ...impact.lineResources, isDefaultForAll: Boolean(asked.isDefaultForAll) },
+          blockers,
+        },
+      }
+    }
     return { success: true, data: impact }
   }
   if (pathname === '/api/rich-menu-groups') {

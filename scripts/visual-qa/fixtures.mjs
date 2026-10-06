@@ -1908,18 +1908,11 @@ export const RICH_MENU_DELETE_IMPACT = {
   },
   // #430/#1206: 削除影響でも一覧と同じ固定の割当人数を返す。
   currentAudience: { value: 8140, state: 'available', reason: null },
+  // 全員の既定を消すので、出し分けに当たらない友だちに出るメニューは無い（板 `yOyCg`）。
   nextDisplay: {
     guaranteedGroupId: null,
     reason: 'friend_specific_rules',
-    candidates: [
-      {
-        groupId: 'rich-menu-next',
-        name: '通常メニュー',
-        targetingPriority: 20,
-        isTargetingEnabled: false,
-        isDefaultForAll: true,
-      },
-    ],
+    candidates: [],
   },
   incomingSwitches: [
     {
@@ -1937,13 +1930,14 @@ export const RICH_MENU_DELETE_IMPACT = {
     { kind: 'automation', ownerId: 'automation-visual', ownerName: '来店後の自動案内' },
     { kind: 'common_action', ownerId: 'common-action-visual', ownerName: 'フォローを始める' },
   ],
+  // 一覧の「通常メニュー（会員向け）」は全員の既定（isDefaultForAll）なので、既定も消せない理由に入る（板 `yOyCg`）。
   lineResources: {
     pageCount: 2,
     pagesWithLineRichMenuId: 2,
-    isDefaultForAll: false,
+    isDefaultForAll: true,
     publishing: false,
   },
-  blockers: ['published', 'line_resources', 'incoming_switches', 'operational_references'],
+  blockers: ['default_for_all', 'published', 'line_resources', 'incoming_switches', 'operational_references'],
   canDelete: false,
   recommendedAction: 'unpublish',
 }
@@ -2031,21 +2025,32 @@ const RICH_MENU_BASE = {
   updatedAt: '2026-08-20T00:00:00.000Z',
 }
 
+/* 板 `rZEGN` のフォルダの列（通常・会員向け・キャンペーン＋未分類、各1件）。 */
+export const RICH_MENU_FOLDERS = [
+  { id: 'rich-menu-folder-normal', kind: 'rich_menu', name: '通常', parentId: null, displayOrder: 1, color: '#2563eb' },
+  { id: 'rich-menu-folder-members', kind: 'rich_menu', name: '会員向け', parentId: null, displayOrder: 2, color: '#16a34a' },
+  { id: 'rich-menu-folder-store', kind: 'rich_menu', name: 'キャンペーン', parentId: null, displayOrder: 3, color: '#d97706' },
+]
+
+/* 並びは板 `rZEGN` の上から（出し分けの「会員ランク上位」→ 既定の「通常メニュー」）。 */
 export const RICH_MENU_GROUPS = [
   {
     ...RICH_MENU_BASE,
     id: 'rich-menu-target',
     name: '通常メニュー（会員向け）',
     isDefaultForAll: true,
-    targetingPriority: 0,
+    targetingPriority: 1,
     targetingEnabled: false,
     targetingCondition: null,
-    displayOrder: 0,
+    folderId: 'rich-menu-folder-normal',
+    displayOrder: 1,
   },
   {
     ...RICH_MENU_BASE,
     id: 'rmg-1',
     name: '会員ランク上位',
+    targetingPriority: 0,
+    displayOrder: 0,
     monthlyStats: {
       from: '2026-08-01', to: '2026-08-31', taps: 3210,
       uniqueAudience: { value: 8140, state: 'available', reason: null },
@@ -2054,6 +2059,22 @@ export const RICH_MENU_GROUPS = [
       operator: 'AND',
       rules: [{ type: 'tag_exists', value: 'tag-0' }],
     }),
+  },
+  {
+    ...RICH_MENU_BASE,
+    id: 'rmg-autumn',
+    name: '秋のキャンペーン',
+    size: 'compact',
+    status: 'draft',
+    publishingAt: '2026-10-05T00:00:00.000+09:00',
+    isDefaultForAll: true,
+    targetingPriority: 2,
+    targetingEnabled: false,
+    targetingCondition: null,
+    folderId: 'rich-menu-folder-store',
+    displayOrder: 2,
+    pageCount: 1,
+    defaultPageAreaCount: 2,
   },
   {
     ...RICH_MENU_BASE,
@@ -2135,7 +2156,6 @@ export const RICH_MENU_TAP_STATS = {
   byGroup: [
     { groupId: 'rich-menu-target', taps: 12480 },
     { groupId: 'rmg-1', taps: 3210 },
-    { groupId: 'rmg-2', taps: 0 },
   ],
   total: 15690,
 }
