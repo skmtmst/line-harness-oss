@@ -1417,7 +1417,7 @@ const SHAPES = {
     // 保存した分析（bglah）の定期レポート2件：動いている・止めている。
     items: [
       {
-        id: 'report-weekly-friends', lineAccountId: 'visual-qa-account', name: '毎週の友だちの増減', sections: ['friends'], savedAnalysisIds: ['saved-1'],
+        id: 'report-weekly-friends', lineAccountId: 'visual-qa-account', name: '毎週の友だちの増減', sections: ['friends', 'reactions', 'routes'], savedAnalysisIds: ['saved-1'],
         cadence: 'weekly', weekday: 1, monthDay: null, sendTime: '9:00', timeZone: 'Asia/Tokyo', periodDays: 7,
         recipients: [{ kind: 'staff', staffId: 'staff-owner' }], channels: ['email'], alertRules: [],
         status: 'active', isOneTime: false, nextRunAt: '2026-10-06T09:00:00+09:00', createdBy: 'staff-owner', createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-01T09:00:00+09:00',
@@ -1433,6 +1433,7 @@ const SHAPES = {
     options: {
       timeZone: 'Asia/Tokyo',
       savedAnalyses: [
+        { id: 'saved-1', name: '定期便 × 流入経路', kind: 'cross' },
         { id: 'saved-route', name: '経路別の成果', kind: 'cross' },
       ],
       recipients: [

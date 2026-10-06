@@ -78,7 +78,7 @@ async function flush() {
 }
 
 function nameBox(): HTMLInputElement {
-  const label = Array.from(host.querySelectorAll('label')).find((item) => item.textContent?.includes('レポートの名前'))
+  const label = Array.from(host.querySelectorAll('label')).find((item) => item.textContent?.trim().startsWith('名前'))
   const box = label?.querySelector('input')
   if (!box) throw new Error('レポート名の入力欄が見つかりません')
   return box as HTMLInputElement
