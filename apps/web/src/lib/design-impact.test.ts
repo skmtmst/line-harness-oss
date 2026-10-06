@@ -241,6 +241,13 @@ describe('共通部品の影響範囲', () => {
       'v8/auto-replies/list.tsx',
       // ★V8 ウェビナーの一覧（UyUMw）。新しい置き場（src/v8）に一から書いた。
       'v8/webinars/list.tsx',
+      // ★V8 マイル（OC0gy・S35pO・CJlf4・oRbJi・IRPw8・R6kIG）。src/v8 に一から書いた。
+      'v8/mileage/earning-rules.tsx',
+      'v8/mileage/rewards.tsx',
+      'v8/mileage/balances.tsx',
+      'v8/mileage/history.tsx',
+      'v8/mileage/score.tsx',
+      'v8/mileage/friend-detail.tsx',
     ].sort())
   })
 

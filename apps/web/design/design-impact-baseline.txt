@@ -509,3 +509,13 @@ shared-button-importer v8/rich-menus/external-import.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
 shared-button-importer v8/webinars/list.tsx
+shared-button-importer v8/mileage/frame.tsx
+shared-button-importer v8/mileage/parts.tsx
+shared-button-importer v8/mileage/earning-rules.tsx
+shared-button-importer v8/mileage/rewards.tsx
+shared-button-importer v8/mileage/balances.tsx
+shared-button-importer v8/mileage/history.tsx
+shared-button-importer v8/mileage/score.tsx
+shared-button-importer v8/mileage/reward-edit.tsx
+shared-button-importer v8/mileage/friend-detail.tsx
+shared-button-importer v8/mileage/adjust-dialog.tsx

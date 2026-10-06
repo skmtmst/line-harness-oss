@@ -47,7 +47,7 @@ function readWithParts(file: string, depth = 0, seen = new Set<string>()): strin
     return ''
   }
   let combined = source
-  for (const m of source.matchAll(/from '@\/(components|app|lib)\/([^']+)'/g)) {
+  for (const m of source.matchAll(/from '@\/(components|app|lib|v8)\/([^']+)'/g)) {
     const base = path.join(SRC, m[1], m[2])
     for (const ext of ['.tsx', '.ts', '/index.tsx']) {
       if (fs.existsSync(base + ext)) {
