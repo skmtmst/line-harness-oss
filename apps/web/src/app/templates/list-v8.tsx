@@ -15,6 +15,7 @@
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
 import { RovingTbody } from '@/components/shared/row-roving'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
@@ -357,6 +358,7 @@ export default function TemplatesListV8() {
   const [pickerOpen, setPickerOpen] = useState(false)
 
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
+  const deferredDelete = useDeferredDelete()
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   /** 使っている所があるので削除できない窓（`Z0g3si`）。中身は usage 口で取る。 */
@@ -551,8 +553,10 @@ export default function TemplatesListV8() {
     if (savedFilter === 'used' && !(t.usageCount > 0)) return []
     if (savedFilter === 'draft-changes' && !(t.hasDraft && t.publishedAt != null)) return []
     if (savedFilter === 'draft-only' && t.publishedAt != null) return []
+    // 消して「元に戻す」を待っている行は出さない（動きの点検 17 番）。
+    if (deferredDelete.isHidden(t.id)) return []
     return [t]
-  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, chips, savedFilter])
+  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, chips, savedFilter, deferredDelete])
 
   const filterActive = Boolean(
     normalizedTemplateQuery
@@ -730,11 +734,32 @@ export default function TemplatesListV8() {
     }
   }
 
-  // 押しただけでは消さない。窓を開くだけ。使用中なら「使っている所」の窓へ。
+  /*
+   * 使用中なら「使っている所」の窓へ。どこでも使われていない（0か所と分かっている）なら、
+   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
+   * 使っている数が分からないときは、今までどおり確かめの窓。
+   */
   const handleDelete = (t: Template) => {
     setDeleteError('')
     if (t.usageCount > 0) {
       setBlockedDelete({ item: t, accountId: selectedAccountId })
+      return
+    }
+    if (t.usageCount === 0) {
+      if (activeId === t.id) setActiveId(null)
+      setSelectedIds((current) => {
+        if (!current.has(t.id)) return current
+        const next = new Set(current)
+        next.delete(t.id)
+        return next
+      })
+      deferredDelete.schedule({
+        ids: [t.id],
+        message: `テンプレート「${t.name}」を削除しました`,
+        commit: () => api.templates.delete(t.id),
+        onCommitted: () => Promise.all([load(), loadFolders()]),
+        failureMessage: 'テンプレートを削除できませんでした。もう一度お試しください。',
+      })
       return
     }
     setPendingDelete({ item: t, accountId: selectedAccountId })

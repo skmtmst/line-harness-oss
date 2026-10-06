@@ -2,6 +2,7 @@
 
 
 import { RovingTbody } from '@/components/shared/row-roving'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { ListPageBody } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -204,6 +205,7 @@ export default function RemindersListV8() {
   /* 窓・まとめての帯の状態。 */
   const [pauseTarget, setPauseTarget] = useState<ReminderRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ReminderRow | null>(null)
+  const deferredDelete = useDeferredDelete()
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
@@ -303,7 +305,11 @@ export default function RemindersListV8() {
     sort,
     page: reminderList.page,
   })
-  const reminders = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : reminderList.items
+  const listedReminders = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : reminderList.items
+  // 消して「元に戻す」を待っている行は出さない（動きの点検 17 番）。
+  const reminders = deferredDelete.hiddenCount > 0
+    ? listedReminders.filter((row) => !deferredDelete.isHidden(row.id))
+    : listedReminders
   const detailHref = (id: string) => `/reminders/detail?id=${encodeURIComponent(id)}`
   const filterActive = Boolean(nameQuery.trim() || folderFilter || statusFilter)
 
@@ -353,6 +359,35 @@ export default function RemindersListV8() {
   const runResume = (row: ReminderRow) => runToggle(row, true)
 
   /* ===== 削除 ===== */
+
+  /*
+   * 下書きのまま一度も予定を作っていないリマインダは、消しても誰にも影響しない。
+   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
+   * 公開済み・止めたもの（登録者や予定が消える）は、今までどおり確かめの窓（VsSyu）。
+   */
+  const requestDelete = (row: ReminderRow) => {
+    setDeleteError('')
+    if (statusKeyOf(row) !== 'draft' || (row.plannedDeliveries ?? 0) > 0) {
+      setDeleteTarget(row)
+      return
+    }
+    setSelectedIds((current) => {
+      if (!current.has(row.id)) return current
+      const next = new Set(current)
+      next.delete(row.id)
+      return next
+    })
+    deferredDelete.schedule({
+      ids: [row.id],
+      message: `リマインダ「${row.name}」を削除しました`,
+      commit: () => api.reminders.delete(row.id),
+      onCommitted: () => {
+        reminderList.retry()
+        void loadStats()
+      },
+      failureMessage: 'リマインダを削除できませんでした。もう一度お試しください。',
+    })
+  }
 
   const deleteStillListed =
     deleteTarget !== null && reminders.some((row) => row.id === deleteTarget.id)
@@ -711,10 +746,7 @@ export default function RemindersListV8() {
         dividerBefore: true,
         disabled: !canEdit,
         disabledReason: canEdit ? undefined : readonlyReason,
-        onSelect: () => {
-          setDeleteError('')
-          setDeleteTarget(row)
-        },
+        onSelect: () => requestDelete(row),
       },
     ]
   }
@@ -1026,9 +1058,8 @@ export default function RemindersListV8() {
                       variant="secondary"
                       disabled={!canEdit}
                       onClick={() => {
-                        setDeleteError('')
-                        setDeleteTarget(panelRow)
                         setPanelId(null)
+                        requestDelete(panelRow)
                       }}
                     >
                       削除する
