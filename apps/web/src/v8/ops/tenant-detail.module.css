@@ -1,0 +1,86 @@
+/* 運営の契約先の詳細 V8（Oub6x・停止の窓 okXoi）。値は --tpl-op-*。 */
+
+.kvs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-panel-gap);
+  margin: 0;
+}
+
+.kv {
+  display: flex;
+  height: var(--tpl-op-dt-kv-h);
+  align-items: center;
+  gap: var(--tpl-op-row-gap);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.kv dt {
+  width: var(--tpl-op-dt-key-w);
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.kv dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toggleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+}
+
+.accountRow {
+  height: var(--tpl-op-mem-self-h);
+}
+
+.col90 {
+  width: var(--tpl-op-mem-state-w);
+}
+
+.col80 {
+  width: var(--tpl-op-ann-state-w);
+}
+
+.colAt {
+  width: var(--tpl-op-dt-at-w);
+}
+
+.colWhat {
+  width: var(--tpl-op-dt-what-w);
+}
+
+.colMail {
+  width: var(--tpl-op-mem-mail-w);
+}
+
+.dangerNote {
+  margin: 0;
+  border-radius: var(--tpl-op-caution-radius);
+  background: var(--color-status-danger-soft);
+  padding: var(--tpl-op-note-pad);
+  color: var(--color-danger);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-op-note-lh);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-auth-field-gap);
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-op-auth-label-lh);
+}

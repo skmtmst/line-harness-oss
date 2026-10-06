@@ -215,38 +215,77 @@ const OPS_TENANTS = [
   {
     id: 'visual-tenant-1', name: '検証商事', status: 'active', featurePacks: [],
     plan_key: 'standard', plan_status: 'active', trial_ends_at: null,
-    current_period_ends_at: '2026-10-01T00:00:00+09:00',
+    current_period_ends_at: '2027-03-31T00:00:00+09:00',
     created_at: '2026-04-01T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
-    account_count: 2, staff_count: 5, last_login_at: '2026-09-07T08:00:00+09:00',
+    account_count: 2, staff_count: 5, last_login_at: '2026-10-02T08:00:00+09:00',
   },
   {
-    id: 'visual-tenant-2', name: '見本物産', status: 'active', featurePacks: [],
-    plan_key: null, plan_status: 'trialing', trial_ends_at: '2026-09-14T00:00:00+09:00',
+    id: 'visual-tenant-4', name: '見本サロン', status: 'active', featurePacks: [],
+    plan_key: 'pro', plan_status: 'past_due', trial_ends_at: null,
+    current_period_ends_at: '2026-10-12T00:00:00+09:00',
+    created_at: '2026-06-12T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 2, staff_count: 3, last_login_at: '2026-10-01T10:00:00+09:00',
+  },
+  {
+    id: 'visual-tenant-5', name: '見本牧場', status: 'active', featurePacks: [],
+    plan_key: 'light', plan_status: 'active', trial_ends_at: null,
+    current_period_ends_at: '2026-10-20T00:00:00+09:00',
+    created_at: '2026-08-20T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 1, staff_count: 1, last_login_at: '2026-09-29T10:00:00+09:00',
+  },
+  {
+    id: 'visual-tenant-2', name: '見本物産', status: 'active', featurePacks: ['restaurant'],
+    plan_key: null, plan_status: 'trialing', trial_ends_at: '2026-10-04T00:00:00+09:00',
     current_period_ends_at: null,
-    created_at: '2026-08-20T10:00:00+09:00', updated_at: '2026-09-02T10:00:00+09:00',
-    account_count: 1, staff_count: 2, last_login_at: '2026-09-06T10:00:00+09:00',
+    created_at: '2026-09-20T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 1, staff_count: 2, last_login_at: '2026-10-02T10:00:00+09:00',
+  },
+  {
+    id: 'visual-tenant-6', name: '見本食堂', status: 'active', featurePacks: ['restaurant'],
+    plan_key: 'light', plan_status: 'active', trial_ends_at: null,
+    current_period_ends_at: '2026-10-01T00:00:00+09:00',
+    created_at: '2026-09-01T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 1, staff_count: 1, last_login_at: '2026-09-30T10:00:00+09:00',
   },
   {
     id: 'visual-tenant-3', name: 'サンプル商店', status: 'suspended', featurePacks: [],
-    plan_key: 'light', plan_status: 'past_due', trial_ends_at: null,
-    current_period_ends_at: '2026-09-01T00:00:00+09:00',
-    created_at: '2026-02-01T10:00:00+09:00', updated_at: '2026-08-20T10:00:00+09:00',
-    account_count: 1, staff_count: 1, last_login_at: '2026-08-10T10:00:00+09:00',
+    plan_key: null, plan_status: 'canceled', trial_ends_at: null,
+    current_period_ends_at: null,
+    created_at: '2025-12-01T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 0, staff_count: 1, last_login_at: '2026-06-10T10:00:00+09:00',
   },
 ]
-const OPS_TENANT_SUMMARY = { active: 1, trialing: 1, suspended: 1, pastDue: 1 }
+const OPS_TENANT_SUMMARY = { active: 3, trialing: 1, suspended: 1, pastDue: 1 }
 const OPS_AUDIT = [
   {
     id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
     tenant_id: 'visual-tenant-1', tenant_name: '検証商事',
-    action: 'tenant.status.change', reason: '検証用の記録', detail: '{"from":"suspended","to":"active"}',
-    ip: null, visible_to_tenant: 1, created_at: '2026-09-05T10:00:00+09:00',
+    action: 'impersonation.start', reason: '問い合わせの確認', detail: null,
+    ip: null, visible_to_tenant: 1, created_at: '2026-10-01T15:20:00+09:00',
   },
   {
     id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    tenant_id: 'visual-tenant-3', tenant_name: 'サンプル商店',
+    action: 'tenant.status.change', reason: '検証用の記録', detail: '{"from":"active","to":"suspended"}',
+    ip: null, visible_to_tenant: 1, created_at: '2026-09-30T09:12:00+09:00',
+  },
+  {
+    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '見本 次郎',
+    tenant_id: 'visual-tenant-2', tenant_name: '見本物産',
+    action: 'impersonation.write', reason: '初期設定の代行（本人の依頼）', detail: null,
+    ip: null, visible_to_tenant: 1, created_at: '2026-09-28T18:40:00+09:00',
+  },
+  {
+    id: 'visual-audit-4', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    tenant_id: 'visual-tenant-1', tenant_name: '検証商事',
+    action: 'pii.reveal', reason: '請求先の確認（本人の依頼）', detail: null,
+    ip: null, visible_to_tenant: 1, created_at: '2026-09-12T10:02:00+09:00',
+  },
+  {
+    id: 'visual-audit-5', staff_id: 'visual-ops-member', staff_name: '見本 次郎',
     tenant_id: null, tenant_name: null,
-    action: 'ticket.view', reason: null, detail: '{"ticketNo":1}',
-    ip: null, visible_to_tenant: 0, created_at: '2026-09-06T10:00:00+09:00',
+    action: 'member.invite', reason: '見本 花子 を招待', detail: null,
+    ip: null, visible_to_tenant: 0, created_at: '2026-09-05T11:30:00+09:00',
   },
 ]
 const OPS_MEMBERS = [
@@ -257,6 +296,12 @@ const OPS_MEMBERS = [
     lastLoginAt: '2026-09-07T08:00:00+09:00', createdAt: '2026-04-01T10:00:00+09:00',
   },
   {
+    staffId: 'visual-ops-member', name: '見本 次郎', email: null, isActive: true,
+    totpEnabled: true, lineLinked: false, inviteStatus: 'accepted', activationState: 'active',
+    invitedAt: '2026-05-01T10:00:00+09:00', approvedBy: '検証 太郎',
+    lastLoginAt: '2026-10-01T22:40:00+09:00', createdAt: '2026-05-01T10:00:00+09:00',
+  },
+  {
     staffId: 'visual-ops-invited', name: '見本 花子', email: null, isActive: true,
     totpEnabled: false, lineLinked: false, inviteStatus: 'sent', activationState: 'invited',
     invitedAt: '2026-09-06T10:00:00+09:00', approvedBy: '検証 太郎',
@@ -264,25 +309,25 @@ const OPS_MEMBERS = [
   },
 ]
 const OPS_MEMBER_SUMMARY = {
-  members: 1, invited: 1, awaitingTotp: 0, totpEnabled: 1,
-  impersonationsThisMonth: 0, writeImpersonationsThisMonth: 0, piiRevealsThisMonth: 0,
+  members: 3, invited: 1, awaitingTotp: 0, totpEnabled: 2,
+  impersonationsThisMonth: 1, writeImpersonationsThisMonth: 0, piiRevealsThisMonth: 0,
 }
 const OPS_DASHBOARD = {
   period: 'month',
   periodLabel: '2026年9月',
   pricing: 'list_price',
   lastSyncedAt: null,
-  ai: { callsThisMonth: 12, draftsThisMonth: 9, articlesActive: 3 },
+  ai: { callsThisMonth: 312, draftsThisMonth: 9, articlesActive: 3 },
   plans: [
     { key: 'light', label: 'ライト', monthlyYen: 9800 },
     { key: 'standard', label: 'スタンダード', monthlyYen: 29800 },
     { key: 'pro', label: 'プロ', monthlyYen: 59800 },
   ],
   kpis: {
-    revenueThisMonth: 129200, revenueDelta: 9800, refundsThisMonth: 0,
-    contractMonthlyTotal: 129200, filledByListPriceCount: 2, active: 4,
-    byPlan: { light: 1, standard: 2, pro: 1 },
-    trialing: 2, newInPeriod: 1, newTrialsInPeriod: 1,
+    revenueThisMonth: 39600, revenueDelta: 9800, refundsThisMonth: 0,
+    contractMonthlyTotal: 99400, filledByListPriceCount: 2, active: 3,
+    byPlan: { light: 1, standard: 1, pro: 1 },
+    trialing: 1, newInPeriod: 1, newTrialsInPeriod: 1,
     churnInPeriod: 0, churnRate: 0,
   },
   revenueByMonth: [
@@ -291,7 +336,8 @@ const OPS_DASHBOARD = {
     { month: '2026-06', label: '6月', yen: 109200, current: false },
     { month: '2026-07', label: '7月', yen: 119400, current: false },
     { month: '2026-08', label: '8月', yen: 119400, current: false },
-    { month: '2026-09', label: '9月', yen: 129200, current: true },
+    { month: '2026-09', label: '9月', yen: 119400, current: false },
+    { month: '2026-10', label: '10月', yen: 129200, current: true },
   ],
   planShare: {
     total: 6,
@@ -302,8 +348,8 @@ const OPS_DASHBOARD = {
       { key: 'trial', label: 'トライアル', count: 2, percent: 33 },
     ],
   },
-  alerts: { pastDue: 1, trialEndingSoon: 1, lineTokenExpiring: 0, unansweredTickets: 2 },
-  tickets: { newCount: 2, inProgressCount: 1, avgFirstReplyMinutes: 95, closedInPeriod: 5 },
+  alerts: { pastDue: 1, trialEndingSoon: 1, lineTokenExpiring: 2, unansweredTickets: 2 },
+  tickets: { newCount: 2, inProgressCount: 3, avgFirstReplyMinutes: 144, closedInPeriod: 5 },
   lineRegistration: { registered: 8, total: 10, unregisteredCount: 2 },
   usage: [
     {
@@ -328,44 +374,90 @@ const OPS_LINE_UNREGISTERED = {
   ],
 }
 const OPS_SUPPORT_SUMMARY = {
-  byStage: { all: 3, new: 1, in_progress: 1, waiting: 0, resolved: 1, closed: 0 },
+  byStage: { all: 5, new: 2, in_progress: 3, waiting: 1, resolved: 12, closed: 40 },
   kpis: {
-    untouched: 1, untouchedFromLine: 0,
+    untouched: 2, untouchedFromLine: 1,
     avgFirstReplyMinutes: 95, prevAvgFirstReplyMinutes: 120,
     resolutionRate: 80, prevResolutionRate: 75,
     avgResolutionMinutes: 300, prevAvgResolutionMinutes: 360,
   },
 }
+/* 運営のお問い合わせ（V8 P0jhqO）の並び：優先度順に5件。名前は作り物。 */
 const OPS_SUPPORT_TICKETS = [
   {
-    id: 'visual-ticket-1', ticketNo: 1, ticketLabel: 'No.1',
+    id: 'visual-ticket-1', ticketNo: 1042, ticketLabel: '#1042',
+    tenantId: 'visual-tenant-1', tenantName: '検証商事',
+    tenantPlanKey: 'standard', tenantPlanStatus: 'active', tenantStatus: 'active',
+    staffId: 'visual-staff-1', staffName: '検証 一郎', staffRole: 'owner', staffEmailRegistered: true,
+    kind: 'bug', kindLabel: '不具合',
+    subject: 'LINE の Webhook が遅れる', subjectAuto: false,
+    body: '画面確認用の問い合わせ本文。朝から知らせが遅れて届きます。',
+    attachments: [],
+    stage: 'in_progress', stageLabel: '対応中', priority: 'high', priorityLabel: '高',
+    channel: 'admin', channelLabel: '管理画面',
+    assigneeStaffId: null, replyCount: 1, firstRepliedAt: null,
+    lastMessageAt: '2026-09-30T11:00:00+09:00', resolvedAt: null, closedAt: null,
+    createdAt: '2026-09-30T11:00:00+09:00', updatedAt: '2026-09-30T11:00:00+09:00',
+  },
+  {
+    id: 'visual-ticket-2', ticketNo: 1045, ticketLabel: '#1045',
     tenantId: 'visual-tenant-1', tenantName: '検証商事',
     tenantPlanKey: 'standard', tenantPlanStatus: 'active', tenantStatus: 'active',
     staffId: 'visual-staff-1', staffName: '検証 一郎', staffRole: 'owner', staffEmailRegistered: true,
     kind: 'usage', kindLabel: '使い方',
-    subject: '検証用の問い合わせ', subjectAuto: false,
-    body: '画面確認用の問い合わせ本文。',
+    subject: 'バナー生成で日本語が崩れる', subjectAuto: false,
+    body: '画面確認用の問い合わせ本文。朝から知らせが遅れて届きます。',
     attachments: [],
-    stage: 'new', stageLabel: '新規', priority: 'high', priorityLabel: '高',
+    stage: 'new', stageLabel: '新規', priority: 'medium', priorityLabel: '中',
     channel: 'admin', channelLabel: '管理画面',
-    assigneeStaffId: null, replyCount: 0, firstRepliedAt: null,
-    lastMessageAt: '2026-09-06T10:00:00+09:00', resolvedAt: null, closedAt: null,
-    createdAt: '2026-09-06T10:00:00+09:00', updatedAt: '2026-09-06T10:00:00+09:00',
+    assigneeStaffId: null, replyCount: 1, firstRepliedAt: null,
+    lastMessageAt: '2026-10-01T10:00:00+09:00', resolvedAt: null, closedAt: null,
+    createdAt: '2026-10-01T10:00:00+09:00', updatedAt: '2026-10-01T10:00:00+09:00',
   },
   {
-    id: 'visual-ticket-2', ticketNo: 2, ticketLabel: 'No.2',
+    id: 'visual-ticket-3', ticketNo: 1046, ticketLabel: '#1046',
+    tenantId: 'visual-tenant-5', tenantName: '見本牧場',
+    tenantPlanKey: 'light', tenantPlanStatus: 'active', tenantStatus: 'active',
+    staffId: 'visual-staff-1', staffName: '検証 一郎', staffRole: 'owner', staffEmailRegistered: true,
+    kind: 'billing', kindLabel: '料金・請求',
+    subject: '年払いへの切り替え', subjectAuto: false,
+    body: '画面確認用の問い合わせ本文。朝から知らせが遅れて届きます。',
+    attachments: [],
+    stage: 'new', stageLabel: '新規', priority: 'low', priorityLabel: '低',
+    channel: 'line', channelLabel: 'LINE',
+    assigneeStaffId: null, replyCount: 1, firstRepliedAt: null,
+    lastMessageAt: '2026-10-01T12:00:00+09:00', resolvedAt: null, closedAt: null,
+    createdAt: '2026-10-01T12:00:00+09:00', updatedAt: '2026-10-01T12:00:00+09:00',
+  },
+  {
+    id: 'visual-ticket-4', ticketNo: 1039, ticketLabel: '#1039',
     tenantId: 'visual-tenant-2', tenantName: '見本物産',
-    tenantPlanKey: null, tenantPlanStatus: 'trialing', tenantStatus: 'active',
-    staffId: null, staffName: '—', staffRole: null, staffEmailRegistered: false,
-    kind: 'bug', kindLabel: '不具合',
-    subject: '検証用の対応中の問い合わせ', subjectAuto: true,
-    body: '画面確認用の対応中の問い合わせ本文。',
+    tenantPlanKey: null, tenantPlanStatus: 'active', tenantStatus: 'active',
+    staffId: 'visual-staff-1', staffName: '検証 一郎', staffRole: 'owner', staffEmailRegistered: true,
+    kind: 'usage', kindLabel: '使い方',
+    subject: '予約台帳に卓を足したい', subjectAuto: false,
+    body: '画面確認用の問い合わせ本文。朝から知らせが遅れて届きます。',
     attachments: [],
     stage: 'in_progress', stageLabel: '対応中', priority: 'medium', priorityLabel: '中',
-    channel: 'line', channelLabel: 'LINE',
-    assigneeStaffId: 'visual-qa-ops', replyCount: 1, firstRepliedAt: '2026-09-05T11:00:00+09:00',
-    lastMessageAt: '2026-09-05T12:00:00+09:00', resolvedAt: null, closedAt: null,
-    createdAt: '2026-09-05T10:00:00+09:00', updatedAt: '2026-09-05T12:00:00+09:00',
+    channel: 'admin', channelLabel: '管理画面',
+    assigneeStaffId: null, replyCount: 1, firstRepliedAt: null,
+    lastMessageAt: '2026-09-28T10:00:00+09:00', resolvedAt: null, closedAt: null,
+    createdAt: '2026-09-28T10:00:00+09:00', updatedAt: '2026-09-28T10:00:00+09:00',
+  },
+  {
+    id: 'visual-ticket-5', ticketNo: 1031, ticketLabel: '#1031',
+    tenantId: 'visual-tenant-4', tenantName: '見本サロン',
+    tenantPlanKey: 'pro', tenantPlanStatus: 'active', tenantStatus: 'active',
+    staffId: 'visual-staff-1', staffName: '検証 一郎', staffRole: 'owner', staffEmailRegistered: true,
+    kind: 'billing', kindLabel: '料金・請求',
+    subject: '請求書の宛名変更', subjectAuto: false,
+    body: '画面確認用の問い合わせ本文。朝から知らせが遅れて届きます。',
+    attachments: [],
+    stage: 'in_progress', stageLabel: '対応中', priority: 'low', priorityLabel: '低',
+    channel: 'admin', channelLabel: '管理画面',
+    assigneeStaffId: null, replyCount: 1, firstRepliedAt: null,
+    lastMessageAt: '2026-09-25T10:00:00+09:00', resolvedAt: null, closedAt: null,
+    createdAt: '2026-09-25T10:00:00+09:00', updatedAt: '2026-09-25T10:00:00+09:00',
   },
 ]
 const OPS_SUPPORT_DETAIL = {
@@ -373,20 +465,18 @@ const OPS_SUPPORT_DETAIL = {
   tenant: { accountCount: 2, staffCount: 5, staffWithLine: 3, pastTickets: 2, pastOpen: 1 },
   messages: [
     {
-      id: 'visual-msg-1', authorKind: 'tenant', authorName: '検証 一郎',
-      body: '画面確認用の問い合わせ本文。', attachments: [],
-      aiAssisted: false, deliveredVia: ['admin'],
-      createdAt: '2026-09-06T10:00:00+09:00',
-    },
-    {
       id: 'visual-msg-2', authorKind: 'ops', authorName: '検証 太郎',
-      body: '画面確認用の返信文。', attachments: [],
+      body: '確認しました。受け口の処理を直しました。今朝以降はいかがでしょうか。', attachments: [],
       aiAssisted: false, deliveredVia: ['admin'],
-      createdAt: '2026-09-06T11:00:00+09:00',
+      createdAt: '2026-09-30T13:12:00+09:00',
     },
   ],
-  draft: null,
-  ai: { available: false },
+  // 絵は AI の下書きがある形（作り直す・下書きを保存する・返信する）。
+  draft: {
+    body: 'ご確認ありがとうございます。10/1 以降の受け口の記録では遅れは出ていません。',
+    aiGenerated: true, generatedAt: '2026-10-01T09:00:00+09:00', updatedAt: '2026-10-01T09:00:00+09:00', references: [],
+  },
+  ai: { available: true },
   knowledge: { article: null, job: null },
 }
 /**
@@ -436,28 +526,83 @@ const HQ_SUPPORT_DETAIL = {
 const OPS_KNOWLEDGE = [
   {
     id: 'visual-article-1', version: 1,
-    title: '検証用の手順書', question: '画面確認用の質問文。', answer: '画面確認用の回答文。',
-    kind: 'usage', keywords: ['検証', '手順'],
+    title: 'Webhook の通知が遅れるとき', question: '画面確認用の質問文。', answer: '画面確認用の回答文。',
+    kind: 'bug', keywords: ['検証', '手順'],
     sourceRequestId: 'visual-ticket-1', ticketNo: 1, sourceCurrent: true,
     articleKind: 'verified',
     reviewState: 'approved', status: 'active', reviewReason: '',
-    evidence: [], usedCount: 3, helpfulCount: 2, unhelpfulCount: 0,
-    updatedAt: '2026-09-05T10:00:00+09:00',
+    evidence: [], usedCount: 12, helpfulCount: 9, unhelpfulCount: 0,
+    updatedAt: '2026-10-01T10:00:00+09:00',
+  },
+  {
+    id: 'visual-article-3', version: 1,
+    title: 'バナー生成で日本語が崩れる', question: 'バナーの文字が崩れたり、別の字になったりします。', answer: '日本語の文字は崩れることがあります。文字は短くし、仕上がりを確かめてください。',
+    kind: 'usage', keywords: ['バナー', '文字化け', '日本語', '生成'],
+    sourceRequestId: 'visual-ticket-1', ticketNo: 1045, sourceCurrent: true,
+    articleKind: 'answer_example',
+    reviewState: 'pending', status: 'disabled', reviewReason: '',
+    evidence: [
+      { messageId: 'visual-msg-1', createdAt: '2026-10-02T10:00:00+09:00', authorKind: 'ops', quote: '文字を短くして作り直してください', role: 'answer' },
+    ],
+    usedCount: 0, helpfulCount: 0, unhelpfulCount: 0,
+    updatedAt: '2026-10-02T10:00:00+09:00',
+  },
+  {
+    id: 'visual-article-4', version: 1,
+    title: '年払いへの切り替え方法', question: '画面確認用の質問文。', answer: '画面確認用の回答文。',
+    kind: 'billing', keywords: ['料金'],
+    sourceRequestId: 'visual-ticket-1', ticketNo: 3, sourceCurrent: true,
+    articleKind: 'verified',
+    reviewState: 'approved', status: 'active', reviewReason: '',
+    evidence: [], usedCount: 8, helpfulCount: 7, unhelpfulCount: 0,
+    updatedAt: '2026-09-21T10:00:00+09:00',
   },
   {
     id: 'visual-article-2', version: 2,
     title: '検証用の回答例', question: '画面確認用の質問文その2。', answer: '画面確認用の回答文その2。',
-    kind: 'bug', keywords: ['検証'],
+    kind: 'usage', keywords: ['検証'],
     sourceRequestId: 'visual-ticket-2', ticketNo: 2, sourceCurrent: false,
     articleKind: 'answer_example',
     reviewState: 'needs_review', status: 'active', reviewReason: '',
-    evidence: [], usedCount: 1, helpfulCount: 0, unhelpfulCount: 1,
-    updatedAt: '2026-09-04T10:00:00+09:00',
+    evidence: [], usedCount: 0, helpfulCount: 0, unhelpfulCount: 1,
+    updatedAt: '2026-09-30T10:00:00+09:00',
+  },
+  {
+    id: 'visual-article-5', version: 1,
+    title: '請求書の宛名変更', question: '画面確認用の質問文。', answer: '画面確認用の回答文。',
+    kind: 'billing', keywords: ['請求'],
+    sourceRequestId: 'visual-ticket-2', ticketNo: 4, sourceCurrent: true,
+    articleKind: 'answer_example',
+    reviewState: 'dismissed', status: 'disabled', reviewReason: '',
+    evidence: [], usedCount: 0, helpfulCount: 0, unhelpfulCount: 0,
+    updatedAt: '2026-09-12T10:00:00+09:00',
   },
 ]
 const OPS_ANNOUNCEMENTS = [
   {
-    id: 'visual-announcement-1', subject: '検証用のお知らせ', body: '画面確認用のお知らせ本文。',
+    id: 'visual-announcement-sent', subject: '9/20 深夜のメンテナンス', body: '画面確認用のお知らせ本文。',
+    audienceKind: 'all', audiencePlans: [], audienceTenantIds: [], audienceLabel: 'すべて',
+    channels: ['screen', 'email'], channelLabels: ['画面', 'メール'],
+    status: 'sent', statusLabel: '配信済み',
+    publishAt: null, sentAt: '2026-09-18T10:00:00+09:00',
+    recipientsTotal: 6, lineSent: 0, lineFailed: 0, mailSent: 6, mailFailed: 0,
+    screenRead: 5, screenTotal: 6, lastError: null,
+    createdByName: '検証 太郎',
+    createdAt: '2026-09-17T10:00:00+09:00', updatedAt: '2026-09-18T10:00:00+09:00',
+  },
+  {
+    id: 'visual-announcement-scheduled', subject: '10月の新機能のお知らせ', body: '10/12（月）2:00〜4:00 に管理画面が使えなくなります。配信は止まりません。',
+    audienceKind: 'plan', audiencePlans: ['standard', 'pro'], audienceTenantIds: [], audienceLabel: 'プラン別',
+    channels: ['screen', 'email'], channelLabels: ['画面', 'メール'],
+    status: 'scheduled', statusLabel: '予約',
+    publishAt: '2026-10-05T10:00:00+09:00', sentAt: null,
+    recipientsTotal: 0, lineSent: 0, lineFailed: 0, mailSent: 0, mailFailed: 0,
+    screenRead: 0, screenTotal: 0, lastError: null,
+    createdByName: '検証 太郎',
+    createdAt: '2026-10-01T10:00:00+09:00', updatedAt: '2026-10-01T10:00:00+09:00',
+  },
+  {
+    id: 'visual-announcement-1', subject: '検証用のお知らせ（下書き）', body: '画面確認用のお知らせ本文。',
     audienceKind: 'all', audiencePlans: [], audienceTenantIds: [], audienceLabel: 'すべて',
     channels: ['screen'], channelLabels: ['画面'],
     status: 'draft', statusLabel: '下書き',
@@ -2075,6 +2220,19 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 運営コンソール（`/ops/*`）。画面側は変えない。見本データは上の `OPS_*`。
    * 更新系は従来どおり405で、撮影では読みの画面だけを見る。
    */
+  /*
+   * 運営の入口（V8 の 2要素認証 qod6X・招待 tVaUh）。QR の用意と招待の確認だけ
+   * 固定で返す。キーは作り物（RFC の見本の値）で、本物の秘密ではない。
+   */
+  if (method === 'POST' && /^\/api\/staff\/[^/]+\/two-factor\/setup$/.test(pathname)) {
+    return {
+      success: true,
+      data: { provisioningUri: 'otpauth://totp/musubo:visual-qa?secret=JBSWY3DPEHPK3PXP&issuer=musubo', manualKey: 'JBSW Y3DP EHPK 3PXP' },
+    }
+  }
+  if (method === 'GET' && pathname === '/api/auth/ops-invite/check') {
+    return { success: true, data: { email: 'invited@example.com', name: '', needsPassword: true } }
+  }
   if (method === 'GET' && pathname === '/api/ops/me') {
     return { success: true, data: OPS_ME }
   }
@@ -2093,20 +2251,22 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         success: true,
         data: {
           tenant: { ...tenant, id: tenant.id },
+          // 絵（Oub6x）の店舗の並び：4つつながっていて、1つはアーカイブ。
           accounts: [
-            {
-              id: 'visual-qa-account', name: '画面確認アカウント', is_active: 1,
-              archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 231,
-            },
+            { id: 'visual-qa-account', name: '画面確認アカウント', is_active: 1, archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 1284 },
+            { id: 'visual-qa-account-2', name: '見本アカウント 2', is_active: 1, archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 612 },
+            { id: 'visual-qa-account-3', name: '見本アカウント 3', is_active: 1, archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 14 },
+            { id: 'visual-qa-account-4', name: '見本アカウント 4', is_active: 1, archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 238 },
+            { id: 'visual-qa-account-5', name: '見本アカウント 5', is_active: 0, archived_at: '2026-08-01T10:00:00+09:00', updated_at: '2026-08-01T10:00:00+09:00', friend_count: 0 },
           ],
           members: [
             {
-              id: 'visual-staff-1', name: '検証 一郎', email: null, role: 'owner',
+              id: 'visual-staff-1', name: '検証 一郎', email: 'owner@example.com', role: 'owner',
               access_level: 'admin', is_active: 1, invite_status: 'accepted',
               last_login_at: '2026-09-07T08:00:00+09:00',
             },
           ],
-          audit: OPS_AUDIT,
+          audit: OPS_AUDIT.filter((row) => row.tenant_id === tenant.id),
         },
       }
     }
@@ -2152,7 +2312,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       success: true,
       data: OPS_ANNOUNCEMENTS,
       linked: OPS_NOTICE_LINE.linked,
-      noticeLineConfigured: true,
+      // 絵（tQ2MJ）は契約者専用LINE が未設定の形（作る欄に琥珀の帯が出る）。
+      noticeLineConfigured: false,
     }
   }
   if (method === 'GET' && pathname === '/api/ops/notice-line-account') {
@@ -4944,6 +5105,16 @@ const server = createServer((req, res) => {
       || (method === 'DELETE' && url.pathname === `/api/forms/${FORM_DETAIL.id}`)
     )
     if (formWriteRequest) {
+      res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
+      return
+    }
+    // 運営のお知らせ（V8 tQ2MJ・TJUUl）の宛先の見込み。数えるだけで何も変えない。
+    if (method === 'POST' && url.pathname === '/api/ops/announcements/preview') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { tenants: 18, staff: 18, lineLinked: 11, withEmail: 18 } }))
+      return
+    }
+    // 運営の 2要素認証（V8 qod6X）の QR の用意。読みだけの見本を返す。
+    if (method === 'POST' && /^\/api\/staff\/[^/]+\/two-factor\/setup$/.test(url.pathname)) {
       res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
       return
     }

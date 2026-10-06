@@ -15,6 +15,7 @@ import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { formatNumber } from '@/lib/format'
+import OpsAuditV8 from '@/v8/ops/audit'
 
 /** 監査ログ。★V6 37-8 `oEzZz`。 */
 
@@ -58,6 +59,11 @@ function v8ShortDateTime(value: string | null | undefined): string {
 }
 
 export default function OpsAuditPage() {
+  // ★V8 は src/v8/ops/audit.tsx。v7 は下のまま。
+  return useAdminTheme() === 'v8' ? <OpsAuditV8 /> : <OpsAuditV7 />
+}
+
+function OpsAuditV7() {
   const theme = useAdminTheme()
   const isV8 = theme === 'v8'
   const [rows, setRows] = useState<OpsAuditRow[]>([])
