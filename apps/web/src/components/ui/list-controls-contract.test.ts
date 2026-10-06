@@ -48,8 +48,8 @@ const PAGE_SIZE_SELECT_USERS: Array<[string, string]> = [
  * 幅の実数（320・下限240）は ListToolbar の契約テストで守る。
  */
 const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
-  // 板 `apLqS`：検索 → 札 → 並び → 件数（ListToolbar は使わない）。
-  ['リマインダ', REMINDERS_V8, ['<ListToolbar', '<FilterChip', '<SortSelect', '<PageSizeSelect']],
+  // 板 `apLqS`：検索 → 札 → 並び → 件数。部品は変数にまとめ（1152 の Iffil と共用）、広い板の道具の段で並べる。
+  ['リマインダ', REMINDERS_V8, ['<ListToolbar', '{statusChips}', '{sortSelect}', '{perPageSelect}']],
   ['自動応答', '../../app/auto-replies/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
   ['ウェビナー', '../../app/webinars/page.tsx', ['<SearchField', '<FilterChip', '<SortSelect', '<PageSizeSelect']],
   ['共通情報', '../../app/contents/vars/page.tsx', ['data-search-row', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
