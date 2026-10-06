@@ -704,6 +704,8 @@ describe('Googleビジネス：口コミ', () => {
       { mode: 'shorter', base: 'あ'.repeat(40), first: 'い'.repeat(39), second: 'う'.repeat(38) },
       // 丁寧にするのに元より長くなっていない。
       { mode: 'polite', base: 'あ'.repeat(400), first: 'い'.repeat(400), second: 'う'.repeat(400) },
+      // 元が長い（目安の上限4096字）ため、ほぼ無変化（1字増）でも目安の壁を超えず素通りしてしまっていた不具合の再現。
+      { mode: 'polite', base: 'あ'.repeat(4090), first: 'い'.repeat(4091), second: 'う'.repeat(4092) },
       // 作り直し自体が失敗したときも、不十分な1回目を保存しない。
       { mode: 'shorter', base: 'あ'.repeat(130), first: 'い'.repeat(100), second: null },
     ];

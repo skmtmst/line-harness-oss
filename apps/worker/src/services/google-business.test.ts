@@ -295,6 +295,13 @@ describe('Google Business reviews', () => {
     expect(replyDraftRewriteFellShort('shorter', 'あ'.repeat(40), 'あ'.repeat(28))).toBe(false);
   });
 
+  it('元が長い（目安の上限4096字付近）ときも、ほぼ無変化の長文化は不十分と判定する（3000字→3001字、4090字→4091字）', () => {
+    // target は上限4096字で頭打ちになるため target*0.7=2867 の壁は3001字でも超えてしまい、
+    // 比率（元の1.3倍）で必ず不十分と判定できることを確認する。
+    expect(replyDraftRewriteFellShort('polite', 'あ'.repeat(3000), 'あ'.repeat(3001))).toBe(true);
+    expect(replyDraftRewriteFellShort('polite', 'あ'.repeat(4090), 'あ'.repeat(4091))).toBe(true);
+  });
+
   it('再試行の採用は「変化が大きい方」を比べて決める', () => {
     const base = 'あ'.repeat(130);
     // 短くする：1回目(100字)より厳しめ再試行(60字)の方が大きく短くなっている→再試行を採用すべき。

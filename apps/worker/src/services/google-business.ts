@@ -655,7 +655,12 @@ export function replyDraftRewriteFellShort(mode: 'new' | 'shorter' | 'polite', b
   if (mode === 'polite') {
     if (b.length <= a.length) return true;
     const target = replyDraftTargetLength('polite', a.length);
-    return b.length < target * 0.7;
+    if (b.length < target * 0.7) return true;
+    // 元の文章が長いと目安の上限（REPLY_MAX_LENGTH=4096字）で頭打ちになり、target*0.7 の
+    // 壁が元の長さ自体より低くなる（例：4090字→4091字のほぼ無変化でも target*0.7=2867 は
+    // 元の長さより小さく、壁を越えて素通りする）。頭打ちに埋もれないよう、元の長さに対する
+    // 比率でも必ず長くなっていることを求める。
+    return b.length < a.length * 1.3;
   }
   return false;
 }
