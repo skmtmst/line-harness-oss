@@ -617,6 +617,24 @@
   --tpl-bc-col-status: 126px; --tpl-bc-col-audience: 186px; --tpl-bc-col-date: 176px; --tpl-bc-col-result: 246px; --tpl-bc-col-menu: 56px;
   --tpl-bc-badge-gap: 5px; --tpl-bc-badge-pad: 2px 8px; --tpl-bc-menu-size: 28px; --tpl-bc-pager-lh: 21px; --tpl-bc-state-pad: 28px 24px; --tpl-bc-state-icon: 32px;
   --tpl-title-size: 22px; --tpl-title-weight: 700; --tpl-title-lh: 32px;
+  /* ウェビナーの編集・参加者・分析・コメント演出（j7PP04・VWNaA・LPOe7・Q0Jrk・pvimJ・E7iAYs・XCUNf・uNsEy・z2dgw・Omqd4）。 */
+  --tpl-wc-back-gap: 4px; --tpl-wc-head-gap: 12px; --tpl-wc-tab-gap: 24px; --tpl-wc-tab-line: 2px; --tpl-wc-tab-lh: 19px; --tpl-wc-tab-pad-bottom: 8px;
+  --tpl-wc-step-line-w: 24px; --tpl-wc-step-line-h: 2px; --tpl-wc-step-no-size: 11px; --tpl-wc-stats-notice-pad: 12px 24px; --tpl-wc-state-pad: 32px 24px;
+  --tpl-wc-saved-w: 153px; --tpl-wc-saved-pad-left: 35px; --tpl-wc-saved-icon-left: 14px; --tpl-wc-col-when: 110px; --tpl-wc-col-watch: 130px; --tpl-wc-col-detail: 120px; --tpl-wc-foot-pad: 12px 0;
+  --tpl-wc-card-radius: 12px; --tpl-wc-card-gap: 14px; --tpl-wc-field-gap: 6px; --tpl-wc-label-lh: 20px; --tpl-wc-pair-gap: 12px; --tpl-wc-control-h: 36px;
+  --tpl-wc-input-pad: 0 12px; --tpl-wc-input-radius: 10px; --tpl-wc-list-row-h: 54px; --tpl-wc-list-row-pad: 9px 0;
+  --tpl-wc-an-gap: 12px; --tpl-wc-an-pad: 16px 24px 24px; --tpl-wc-an-card-gap: 10px; --tpl-wc-an-card-pad: 20px; --tpl-wc-an-text-lh: 18px; --tpl-wc-an-row-gap: 12px;
+  --tpl-wc-an-label-w: 110px; --tpl-wc-an-bar-h: 22px; --tpl-wc-an-bar-radius: 4px; --tpl-wc-an-value-w: 56px; --tpl-wc-an-drop-w: 44px;
+  --tpl-wc-an-chart-h: 200px; --tpl-wc-an-chart-radius: 8px; --tpl-wc-an-plot-inset: 20px 36px 30px 24px; --tpl-wc-an-line-w: 2px; --tpl-wc-an-cta-line: #b45309; --tpl-wc-an-cta-text: #8a3c00; --tpl-wc-an-axis-small: 10px;
+  --tpl-wc-cm-gap: 16px; --tpl-wc-cm-head-gap: 2px; --tpl-wc-cm-head-pad: 10px 16px; --tpl-wc-cm-col-sec: 80px; --tpl-wc-cm-col-name: 120px; --tpl-wc-cm-col-body: 360px;
+  --tpl-wc-cm-cell-radius: 6px; --tpl-wc-cm-cell-hover: inset 0 -1px 0 var(--color-control-border); --tpl-wc-cm-side-w: 340px; --tpl-wc-cm-side-pad: 16px; --tpl-wc-cm-side-title-lh: 20px;
+  --tpl-wc-cm-screen-gap: 4px; --tpl-wc-cm-screen-h: 180px; --tpl-wc-cm-screen-pad: 10px;
+  --tpl-wc-nt-count-size: 18px; --tpl-wc-nt-count-lh: 26px; --tpl-wc-nt-row-gap: 16px; --tpl-wc-nt-row-pad: 9px 0; --tpl-wc-nt-label-w: 170px; --tpl-wc-nt-underline: 4px;
+  --tpl-wc-nt-time-w: 84px; --tpl-wc-nt-time-pad: 0 10px; --tpl-wc-nt-small-w: 58px; --tpl-wc-nt-after-label-w: 120px; --tpl-wc-nt-policy-w: 176px;
+  --tpl-wc-vd-row-radius: 10px; --tpl-wc-vd-thumb-w: 96px; --tpl-wc-vd-thumb-h: 54px; --tpl-wc-vd-thumb-radius: 6px; --tpl-wc-vd-stage-gap: 6px; --tpl-wc-vd-stage-pad: 3px 8px;
+  --tpl-wc-vd-head-pad: 8px 16px; --tpl-wc-vd-row-pad: 9px 16px; --tpl-wc-vd-player-h: 186px; --tpl-wc-rv-player-h: 188px; --tpl-wc-ct-player-h: 150px; --tpl-wc-vd-col-when: 150px; --tpl-wc-vd-col-cap: 100px; --tpl-wc-vd-col-count: 80px;
+  --tpl-wc-ct-time-w: 56px; --tpl-wc-ct-toggle-gap: 10px; --tpl-wc-ct-band-pad: 14px 16px; --tpl-wc-ct-preview-gap: 8px; --tpl-wc-ct-card-gap: 4px; --tpl-wc-ct-button-pad: 7px 12px;
+  --tpl-wc-rv-band-pad: 10px 12px; --tpl-wc-rv-summary-gap: 14px;
   --tpl-head-gap: 4px; --tpl-desc-size: 13px; --tpl-desc-lh: 19px;
   /* リマインダの作る②〜⑤・詳細（YChR6・r1l0bT・T0nis・hjNpJ・k32cn・rbAig・loVfW・RwVo5）。 */
   --tpl-rm-back-size: 13px; --tpl-rm-label-size: 13px; --tpl-rm-label-lh: 19px; --tpl-rm-note-size: 12px; --tpl-rm-note-lh: 17px; --tpl-rm-small-size: 11px; --tpl-rm-small-lh: 16px; --tpl-rm-tiny-size: 10px; --tpl-rm-tiny-lh: 13px; --tpl-rm-body-size: 14px; --tpl-rm-title-lh: 22px; --tpl-rm-form-title-lh: 1.4; --tpl-rm-form-note-lh: 1.3; --tpl-rm-loose-lh: 1.5; --tpl-rm-rule-lh: 22px;

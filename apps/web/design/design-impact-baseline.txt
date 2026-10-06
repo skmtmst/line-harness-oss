@@ -628,6 +628,17 @@ shared-button-importer v8/reminders/basics-form.tsx
 shared-button-importer v8/reminders/detail.tsx
 shared-button-importer v8/reminders/edit.tsx
 shared-button-importer v8/reminders/ui.tsx
+shared-button-importer v8/webinar-edit/analytics.tsx
+shared-button-importer v8/webinar-edit/basic-form.tsx
+shared-button-importer v8/webinar-edit/basic.tsx
+shared-button-importer v8/webinar-edit/comments.tsx
+shared-button-importer v8/webinar-edit/cta.tsx
+shared-button-importer v8/webinar-edit/edit.tsx
+shared-button-importer v8/webinar-edit/new.tsx
+shared-button-importer v8/webinar-edit/notifications.tsx
+shared-button-importer v8/webinar-edit/participants.tsx
+shared-button-importer v8/webinar-edit/review.tsx
+shared-button-importer v8/webinar-edit/video.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx

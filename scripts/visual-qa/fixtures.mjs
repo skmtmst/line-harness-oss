@@ -7418,13 +7418,13 @@ export const WEBINAR_OVERVIEW = {
 export const WEBINAR_NOTIFICATIONS = {
   settings: {
     webinarId: 'webinar-1', version: 3,
-    registrationEnabled: true, dayBeforeEnabled: true, dayBeforeTime: '20:00',
-    hourBeforeEnabled: true, hourBeforeMinutes: 60, startEnabled: true,
-    missedEnabled: true, missedTime: '10:00', missedWindowDays: 7, completedEnabled: true,
+    registrationEnabled: true, dayBeforeEnabled: true, dayBeforeTime: '19:00',
+    hourBeforeEnabled: true, hourBeforeMinutes: 15, startEnabled: true,
+    missedEnabled: false, missedTime: '10:00', missedWindowDays: 3, completedEnabled: true,
     updatedAt: '2026-08-25T02:00:00.000Z',
   },
   overview: {
-    total: 184, pending: 32, sent: 149, failed: 3, skipped: 0, cancelled: 0,
+    total: 455, pending: 32, sent: 412, failed: 3, skipped: 8, cancelled: 0,
     audience: { people: 184, bookings: 184, definition: 'active_registrations' },
   },
 }
@@ -7439,37 +7439,47 @@ export const WEBINAR_VIDEO_ASSET = {
   createdAt: '2026-09-20T00:00:00+09:00', updatedAt: '2026-09-20T01:00:00+09:00',
 }
 
+/* 板 Q0Jrk：12:00 の申し込みカード（回答フォーム）と、40:00 の資料（URL）。 */
 export const WEBINAR_CTAS = [{
-  id: 'webinar-cta-1', atSeconds: 1_920, kind: 'form',
-  title: '個別相談を予約する', body: '資料の確認や個別相談をご案内します。',
-  buttonLabel: '個別相談を予約する', autoOpen: false, formId: 'form-1', url: null,
+  id: 'webinar-cta-1', atSeconds: 720, kind: 'form',
+  title: '個別導入診断、受付中です', body: 'この配信を見ている方限定・枠が少なめです',
+  buttonLabel: '無料で診断を受ける', autoOpen: true, formId: 'form-1', url: null,
+}, {
+  id: 'webinar-cta-2', atSeconds: 2_400, kind: 'url',
+  title: '資料をダウンロード', body: null,
+  buttonLabel: '資料を受け取る', autoOpen: false, formId: null, url: 'https://example.com/nen-guide.pdf',
 }]
 
 export const WEBINAR_ACTIONS = [
-  { id: 'webinar-action-1', trigger: 'completed', actionType: 'add_tag', config: { tagId: '配信済み' }, position: 0, version: 2 },
-  { id: 'webinar-action-2', trigger: 'completed', actionType: 'start_scenario', config: { scenarioId: '相談シナリオ' }, position: 1, version: 2 },
+  { id: 'webinar-action-1', trigger: 'completed', actionType: 'add_tag', config: { tagId: '視聴完了' }, position: 0, version: 2 },
+  { id: 'webinar-action-2', trigger: 'cta_clicked', actionType: 'start_scenario', config: { scenarioId: '相談のご案内' }, position: 1, version: 2 },
 ]
 
+/* 板 Omqd4：流すコメント5件（マイナスは開始前の待機ルーム）。 */
 export const WEBINAR_COMMENTS = [
-  { id: 'webinar-comment-1', webinarId: 'webinar-1', atSeconds: 120, authorName: 'スタッフ', body: '本日はご参加ありがとうございます。' },
-  { id: 'webinar-comment-2', webinarId: 'webinar-1', atSeconds: 900, authorName: 'スタッフ', body: 'ご質問はLINEからお送りください。' },
-]
+  [-60, '田中', 'こんばんは、楽しみです'],
+  [-30, 'さくら', '音声きこえます'],
+  [45, 'まさ', 'わかりやすい！'],
+  [370, 'ゆか', 'この画面、うちでも使えそう'],
+  [740, '田中', '診断うけてみます'],
+].map(([atSeconds, authorName, body], index) => ({ id: `webinar-comment-${index + 1}`, webinarId: 'webinar-1', atSeconds, authorName, body }))
 
 /** 機能10の編集・公開・運用画面だけが読む固定応答。 */
 export const WEBINAR_EDITOR = {
   version: 4,
   deliveryKind: 'on_demand',
+  ctaCount: 2,
   viewingCondition: { kind: 'registered', label: '申込済みの友だち' },
   publicDescription: 'LINE活用の基本から、申込後の自動フォローまでを実演します。',
   registrationFormId: 'form-1',
   notificationMessages: {
     registration: 'お申し込みありがとうございます。視聴ページはこちらです。',
-    dayBefore: 'ウェビナーは明日20:00からです。',
+    dayBefore: '明日 20:00 から「NEN活用スタートセミナー」です。\n▶ こちらから入れます',
     hourBefore: '開始まであと1時間です。',
   },
   notificationTest: { status: 'passed', sent: 1, failed: 0, testedAt: '2026-09-07T04:30:00.000Z' },
   actionPolicy: {
-    templateBody: 'ご視聴ありがとうございました。個別相談はこちらからご予約ください。',
+    templateBody: '最後までご視聴ありがとうございました。',
     missingResultPolicy: 'escalate',
   },
   publicPage: {
@@ -7496,33 +7506,37 @@ export const WEBINAR_EDITOR = {
 
 export const WEBINAR_PUBLISH_VALIDATION = {
   version: 4,
+  /* 板 XCUNf：8つのうち公開ページの確認だけがまだ（7/8）。 */
   checks: [
-    ['video_ready', '動画・公開が設定されています', '動画を配信できます'],
-    ['form_active', '申込フォームが公開中です', 'ウェビナー申込フォーム'],
-    ['cta_range', 'CTAの表示時刻とURLが有効です', '動画の長さ以内で確認済みです'],
-    ['notification_test', '通知のテスト送信が成功しています', '最後のテスト送信は成功です'],
-    ['public_page_test', '公開ページを確認済みです', 'LIFFの公開ページを確認しました'],
-    ['notification_duplicates', '通知の重複がありません', '同じ通知は1回だけ送ります'],
-    ['action_dependencies', '視聴後アクションの参照先が有効です', '2件のアクションを確認しました'],
-  ].map(([key, label, detail]) => ({ key, label, detail, status: 'passed' })),
-  blockers: [], warnings: [],
+    ['video_ready', '動画の準備ができている', null, 'passed'],
+    ['form_active', '申込フォームが公開中', null, 'passed'],
+    ['cta_range', 'CTA の時刻とリンク', null, 'passed'],
+    ['schedule', '配信枠が1件以上', '3件', 'passed'],
+    ['notification_test', '通知のテスト送信', '10/2 18:40', 'passed'],
+    ['public_page_test', '公開ページを確かめた', 'ページをテストしてください', 'failed'],
+    ['notification_duplicates', '通知が重なっていない', null, 'passed'],
+    ['action_dependencies', 'アクションの参照先がある', null, 'passed'],
+  ].map(([key, label, detail, status]) => ({ key, label, detail, status })),
+  blockers: ['公開ページをまだ確かめていません。'], warnings: [],
 }
 
 export const WEBINAR_ANALYTICS = {
   summary: {
-    reservations: 184, viewers: 142, registeredAndJoined: 128, watched5m: 128,
-    watched15m: 112, completed: 96, avgWatchedSeconds: 1_722, ctaClicks: 52, formSubmissions: 18,
+    reservations: 124, viewers: 100, registeredAndJoined: 100, watched5m: 92,
+    watched15m: 81, completed: 71, avgWatchedSeconds: 372, ctaClicks: 23, formSubmissions: 9,
   },
   daily: [],
+  /* 板 uNsEy の5人（視聴完了・途中で離れた・入場のみ・申込のみ・視聴完了）。 */
   participants: [
-    ['friend-1', 'Kenta Kawano', 2_538, '2026-08-25T10:32:00+09:00', true, true],
-    ['friend-2', 'Masato S.', 1_980, '2026-08-25T10:28:00+09:00', true, false],
-    ['friend-3', '菅野 亮', 1_240, '2026-08-25T10:21:00+09:00', false, false],
-    ['friend-4', '山田 太郎', 0, '2026-08-25T10:14:00+09:00', false, false],
-  ].map(([friendId, friendName, maxWatchedSeconds, latestJoinedAt, cta, form]) => ({
-    friendId, friendName, pictureUrl: null, sessions: 1,
+    ['friend-1', 'Kenta Kawano', 2_538, '2026-09-30T10:12:00+09:00', true, false, 2, true],
+    ['friend-2', 'Masato S.', 1_066, '2026-09-30T09:40:00+09:00', false, false, 1, false],
+    ['friend-3', '菅野 亮', 0, '2026-09-29T21:18:00+09:00', false, false, 1, true],
+    ['friend-4', '山田 太郎', 0, null, false, false, 0, true],
+    ['friend-5', '坂本 真人', 2_436, '2026-09-29T12:05:00+09:00', false, true, 1, true],
+  ].map(([friendId, friendName, maxWatchedSeconds, latestJoinedAt, cta, form, sessions, registered]) => ({
+    friendId, friendName, pictureUrl: null, sessions,
     firstJoinedAt: latestJoinedAt, latestJoinedAt, maxWatchedSeconds,
-    ctaClickedAt: cta ? latestJoinedAt : null, registered: true,
+    ctaClickedAt: cta ? latestJoinedAt : null, registered,
     formSubmittedAt: form ? latestJoinedAt : null,
   })),
   sessions: [], dropoff: [],
@@ -7547,7 +7561,7 @@ export const WEBINAR_ANALYTICS = {
   },
   startedViewers: 112,
   heartbeatRejects: 2,
-  ctaAtSeconds: 1_500,
+  ctaAtSeconds: 720,
   measurement: { state: 'available', reason: null },
   formFunnel: {
     ctaImpressions: 96, ctaClicks: 52, formOpens: 41, formStarts: 32,
@@ -7558,9 +7572,10 @@ export const WEBINAR_ANALYTICS = {
 export const WEBINAR_PARTICIPANTS = {
   items: WEBINAR_ANALYTICS.participants.map((participant, index) => ({
     ...participant,
-    actionStatus: index === 3 ? 'failed' : 'completed',
-    errorDetail: index === 3 ? '視聴結果を取得できませんでした' : null,
-    staffIntegrationStatus: index === 3 ? 'needs_attention' : 'completed',
+    actionStatus: 'completed',
+    errorDetail: null,
+    staffIntegrationStatus: 'completed',
+    classification: ['completed', 'dropped_off', 'dropped_off', 'unviewed', 'completed'][index],
   })),
   nextCursor: null,
 }
