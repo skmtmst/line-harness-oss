@@ -68,10 +68,22 @@
   --color-liff-dot-few: #b26b00;
   /* 満席の字。今は押せない薄字と同じ。型ごとに替える。 */
   --color-liff-full: #c3c8cf;
+  /* 行の高さ。板 (Pencil) の文字はすべて line-height: normal (Noto Sans JP の字の高さ)。
+   * Tailwind の text-xs〜text-4xl が持つ行の高さを板に合わせる。 */
+  --text-xs--line-height: normal;
+  --text-sm--line-height: normal;
+  --text-base--line-height: normal;
+  --text-lg--line-height: normal;
+  --text-xl--line-height: normal;
+  --text-2xl--line-height: normal;
+  --text-3xl--line-height: normal;
+  --text-4xl--line-height: normal;
 }
 
 /* 角丸の素。今の値 (10・箱は14) を既定にし、型ごとに替える。 */
 :root {
+  /* 上の LIFF の帯の中の高さ (下の線 1px を足して 44)。 */
+  --liff-header-h: 43px;
   --liff-radius: 10px;
   --liff-radius-lg: 14px;
 }
@@ -83,12 +95,18 @@
 
 body {
   margin: 0;
+  line-height: normal;
   background: var(--color-canvas);
   color: var(--color-ink);
-  /* ★V8: 日本語は Noto Sans JP、英数字は Inter (Inter に日本語
-   * グリフが無いので、かなと漢字は自動で Noto Sans JP に落ちる)。 */
-  font-family: "Inter", "Noto Sans JP", system-ui, -apple-system,
+  /* ★V8: 地の文は Noto Sans JP (板の書き出しと同じ。行の高さも Noto の
+   * 字の高さで決まる)。日付・時刻・マイルなど数字だけの所は .liff-num で Inter。 */
+  font-family: "Noto Sans JP", "Inter", system-ui, -apple-system,
     BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+}
+
+/* 数字だけの所 (日付の数字・時刻・マイル)。板では Inter。 */
+.liff-num {
+  font-family: "Inter", "Noto Sans JP", sans-serif;
 }
 
 /* 読み込み中は中身の形 (LoadingView の骨組み) を出す。回る印は使わない。 */
