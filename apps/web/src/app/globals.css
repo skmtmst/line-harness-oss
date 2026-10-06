@@ -589,6 +589,10 @@
   --tpl-thead-pad-block: 12px; --tpl-thead-pad-side: 24px; --tpl-thead-lh: 16px;
   --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
   --tpl-band-gap: 0;
+  /* 自動応答の一覧（uE9gf・Q5lOCc・WPrd5）。 */
+  --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: 64px; --tpl-ar-narrow-head-h: 34px;
+  --tpl-badge-h: 22px; --tpl-badge-dot: 6px;
+  --tpl-ro-band-pad: 10px 14px; --tpl-ro-band-gap: 10px; --tpl-ro-band-radius: 10px; --tpl-ro-band-lh: 20px; --tpl-ro-band-after: 8px;
   --tpl-band-number-size: 22px; --tpl-band-number-lh: 26px;
   --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 20px; --tpl-band-cell-gap: 8px;
   --tpl-large-title-size: 22px; --tpl-large-title-lh: 33px; --tpl-large-gap: 16px;
