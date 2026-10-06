@@ -2329,8 +2329,10 @@
     },
     "/contents/vars": {
       "node": "WuKzU",
-      "name": "V6 14-1 共通情報",
-      "sections": [],
+      "name": "V6 14-1 共通情報（一覧の数の帯は★V8 FM94M）",
+      "sections": [
+        "KPIs"
+      ],
       "parts": [
         "新しいフォルダ",
         "共通情報を作る",
