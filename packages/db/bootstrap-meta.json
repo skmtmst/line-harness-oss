@@ -518,7 +518,8 @@
     "577_v8_site_receipt.sql",
     "578_v8_photo_publication_rewards.sql",
     "579_banner_color_roles.sql",
-    "580_banner_reference_images.sql"
+    "580_banner_reference_images.sql",
+    "581_banner_emphasis_lines.sql"
   ],
-  "migrationCount": 519
+  "migrationCount": 520
 }
