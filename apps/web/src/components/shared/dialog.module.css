@@ -301,6 +301,8 @@
 
 [data-theme='v8'] .overlay[data-closing] {
   animation: dialog-v8-overlay-leave var(--motion-exit) var(--motion-ease-out) forwards;
+  /* 消えていく間は下の画面を押せるようにする（薄い膜が押下を食べない）。 */
+  pointer-events: none;
 }
 
 [data-theme='v8'] .panel[data-closing] {

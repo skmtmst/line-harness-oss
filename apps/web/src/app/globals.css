@@ -1052,8 +1052,13 @@ aside[aria-label="フォルダ"] .shadow-lg {
   transform-origin: top right;
 }
 
-/* モーダルは中央から。最前面の影（★V7 段3）で浮かせる。 */
-[data-design-part="dialog"] {
+/*
+ * モーダルは中央から。最前面の影（★V7 段3）で浮かせる。
+ * V8 は窓の部品（dialog.module.css）が開く・閉じる動きを持つので、ここは当てない。
+ * 部品の CSS は層の中・ここは層の外なので、当てるとこちらが必ず勝ち、
+ * 閉じる逆再生の代わりに開く動きがもう一度走ってちらついていた（動きの点検 1 番）。
+ */
+:root:not([data-theme="v8"]) [data-design-part="dialog"] {
   animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
 }
 
