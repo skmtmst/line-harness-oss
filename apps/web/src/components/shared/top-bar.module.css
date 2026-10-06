@@ -571,6 +571,8 @@
 [data-theme='v8'] .root[data-v8-chrome='shell'] .v8Left > .iconButton { width: 32px; height: 32px; border-radius: 8px; background: transparent; }
 /* 切替の札は箱の中に小さい字＋名前の2行（絵の指示）。外の見出しは畳む。 */
 [data-theme='v8'] .accountField > span:first-child { display: none; }
+/* 1439 以下の v7 の決まり（見出しの span を画面外へ）が V8 では札そのものに当たり、幅 0 に潰れていた。札は戻す（1152 の絵にも札がある）。 */
+[data-theme='v8'] .accountField > .accountPill { position: relative; width: auto; height: 36px; overflow: visible; clip: auto; white-space: nowrap; }
 [data-theme='v8'] .accountPill { height: 36px; min-height: 36px; padding: 0 10px 0 6px; gap: 8px; border: 0; border-radius: 10px; outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
 [data-theme='v8'] .accountMark { width: 24px; height: 24px; border-radius: 7px; font-size: 11px; font-weight: 700; line-height: 17px; }
 [data-theme='v8'] .pillText { gap: 0; }
