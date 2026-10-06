@@ -1,7 +1,12 @@
 # 分析（V8）の動き
 
 入口：`app/analytics/page.tsx`（V8 のときだけ `src/v8/analytics/analytics.tsx`、それ以外は今の画面 `AnalyticsInner`）。
-ファネルの作る・編集フォーム（`FunnelForm`）と結果の保存欄（`SaveAnalysisAction`）だけは、入口が今の部品を `slots` で渡す（src/v8 から @/app を読めないため。フォームは絵の板の外の状態）。
+ファネルの作る・直すの窓は `funnel-form.tsx`（絵 `VDPz5`。今の `FunnelForm` の動きを写して一から書いた。入口の page.tsx が `slots.renderFunnelForm` で渡す）。結果の保存欄（`SaveAnalysisAction`）だけは、入口が今の部品を `slots` で渡す（src/v8 から @/app を読めないため）。
+
+### ファネルを作る・直す（`funnel-form.tsx`）
+- 保存の形は今と同じ（`v6Funnels.create`・直すは `createVersion` で新版。副条件 match・segment・comparisonGroups は元の版から残す）。段は2つ以上10個まで。
+- 「何をしたら」は種類と相手を1つの選ぶ欄にまとめる：友だち追加・成果「名前」（`conversions.definitions` の止めていない成果地点）・予約が確定した・購入が確定した・メッセージを受信した・フォーム「名前」（`forms.list`）・タグ「名前」（`tags.list`）。相手の一覧が読めなくても、「ほかの条件（IDで決める）」で今までどおり種類とIDを入れられる（情報欄・サイトのページ・リンク・オートメーションもここ）。
+- 今と違うところ：新しく作るときの1段目の既定を「タグが付いた」から「友だち追加」に（絵どおり。IDの入力が要らない）。段を外すは段の名前の題の右の「外す」（3段以上のとき）。
 
 | 見かた | 絵 | 新しい画面 |
 |---|---|---|
