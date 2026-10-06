@@ -313,6 +313,10 @@
 
 /* まとめての帯の内側（選択中に表の下へ出る）。 */
 .bulkRow {
+  /* 長い一覧でも画面の下に付いてくる（動きの点検 12 番）。表が短ければ今までどおり表のすぐ下。 */
+  position: sticky;
+  bottom: 12px;
+  z-index: 10;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
