@@ -5454,9 +5454,9 @@ export const BOOKING_MENUS = [
   { id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 105, buffer_after_minutes: 15, base_price: 8400, price_mode: 'fixed', version: 1, sort_order: 1, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 3, effectiveBookingRules: bookingMenuRules(60, 24) },
   { id: 'bm-2', name: 'トリミング（中型犬）', category_label: 'トリミング', description: 'シャンプー・カット・爪切り', duration_minutes: 150, buffer_after_minutes: 15, base_price: 12600, price_mode: 'fixed', version: 1, sort_order: 2, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 24, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(60, 24) },
   { id: 'bm-3', name: 'シャンプーのみ', category_label: 'トリミング', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 4200, price_mode: 'fixed', version: 1, sort_order: 3, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 60, cutoff_hours_before: 12, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 1, effectiveBookingRules: bookingMenuRules(60, 12) },
-  { id: 'bm-4', name: '爪切り', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, price_mode: 'fixed', version: 1, sort_order: 4, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 2) },
-  { id: 'bm-5', name: '初回相談', category_label: '相談', description: 'はじめての方向け', duration_minutes: 30, buffer_after_minutes: 0, base_price: 0, price_mode: 'free', version: 1, sort_order: 5, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 12, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(60, 12) },
-  { id: 'bm-6', name: '歯みがき教室', category_label: 'お手入れ', description: null, duration_minutes: 60, buffer_after_minutes: 5, base_price: 2800, price_mode: 'fixed', version: 1, sort_order: 6, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 30, cutoff_hours_before: 6, cancel_deadline_hours_before: null, assigned_staff: [], booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 6) },
+  { id: 'bm-4', name: '爪切り', category_label: 'お手入れ', description: null, duration_minutes: 15, buffer_after_minutes: 5, base_price: 1200, price_mode: 'fixed', version: 1, sort_order: 6, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 2) },
+  { id: 'bm-5', name: '初回相談', category_label: '相談', description: 'はじめての方向け', duration_minutes: 30, buffer_after_minutes: 0, base_price: 0, price_mode: 'free', version: 1, sort_order: 4, is_active: 1, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 12, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(60, 12) },
+  { id: 'bm-6', name: '歯みがき教室', category_label: 'お手入れ', description: null, duration_minutes: 60, buffer_after_minutes: 5, base_price: 2800, price_mode: 'fixed', version: 1, sort_order: 5, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: 30, cutoff_hours_before: 6, cancel_deadline_hours_before: null, assigned_staff: [], booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 6) },
   { id: 'bm-7', name: '足裏ケア', category_label: 'お手入れ', description: null, duration_minutes: 20, buffer_after_minutes: 5, base_price: 1800, price_mode: 'fixed', version: 1, sort_order: 7, is_active: 1, auto_tag_id: null, concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2, cancel_deadline_hours_before: null, assigned_staff: BOOKING_MENU_ASSIGNED_STAFF, booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(30, 2) },
   { id: 'bm-8', name: '夏の毛刈り（終了）', category_label: '季節', description: null, duration_minutes: 60, buffer_after_minutes: 10, base_price: 6000, price_mode: 'fixed', version: 1, sort_order: 8, is_active: 0, auto_tag_id: null, concurrent_capacity: 1, booking_window_days: null, cutoff_hours_before: null, cancel_deadline_hours_before: null, assigned_staff: [], booking_count_30_days: 0, effectiveBookingRules: bookingMenuRules(null, null) },
 ]
@@ -5469,36 +5469,25 @@ export const BOOKING_SETTINGS = {
   maxActiveBookingsPerFriend: 2, approvalMode: 'manual', holdMinutes: 15, slotGranularityMinutes: 15,
   liffDateView: 'list',
   menuCount: 8, activeMenuCount: 6, inactiveMenuCount: 2,
+  /* 週の営業時間は保存済み（V8 受付枠 yRPxl は「まだ保存していません」の帯なしの絵）。 */
+  businessHoursConfigured: true,
   businessHours: [
     { weekday: 0, intervals: [{ start: '10:00', end: '17:00', capacity: 2 }] },
     { weekday: 1, intervals: [{ start: '09:00', end: '12:00', capacity: 3 }, { start: '13:00', end: '19:00', capacity: 3 }] },
     { weekday: 2, intervals: [{ start: '09:00', end: '12:00', capacity: 3 }, { start: '13:00', end: '19:00', capacity: 3 }] },
     { weekday: 3, intervals: [] },
     { weekday: 4, intervals: [{ start: '09:00', end: '12:00', capacity: 3 }, { start: '13:00', end: '19:00', capacity: 3 }] },
-    { weekday: 5, intervals: [{ start: '09:00', end: '20:00', capacity: 4 }] },
+    { weekday: 5, intervals: [{ start: '09:00', end: '19:00', capacity: 3 }] },
     { weekday: 6, intervals: [{ start: '09:00', end: '18:00', capacity: 2 }] },
   ],
+  /* 臨時休業（V8 休業日 KRgTQ の「10/13（火）・10/14（水） 店舗の改装」）。 */
   exceptions: [
     {
-      id: 'booking-exception-obon', lineAccountId: 'visual-qa-account',
+      id: 'booking-exception-renovation', lineAccountId: 'visual-qa-account',
       scopeKind: 'store', scopeId: null, date: null,
-      dateFrom: '2026-08-13', dateTo: '2026-08-16', kind: 'closed', intervals: [],
-      reason: 'お盆休み', note: 'お盆休み', version: 1,
-      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
-    },
-    {
-      id: 'booking-exception-holiday', lineAccountId: 'visual-qa-account',
-      scopeKind: 'store', scopeId: null, date: '2026-09-23',
-      dateFrom: '2026-09-23', dateTo: '2026-09-23', kind: 'closed', intervals: [],
-      reason: '祝日のため休業', note: '祝日のため休業', version: 1,
-      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
-    },
-    {
-      id: 'booking-exception-new-year', lineAccountId: 'visual-qa-account',
-      scopeKind: 'store', scopeId: null, date: null,
-      dateFrom: '2026-12-29', dateTo: '2027-01-03', kind: 'closed', intervals: [],
-      reason: '年末年始休業', note: '年末年始休業', version: 1,
-      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+      dateFrom: '2026-10-13', dateTo: '2026-10-14', kind: 'closed', intervals: [],
+      reason: '店舗の改装', note: '店舗の改装', version: 1,
+      createdAt: '2026-09-20T00:00:00.000Z', updatedAt: '2026-09-20T00:00:00.000Z',
     },
   ],
   updatedAt: '2026-08-22T09:20:00.000Z',
@@ -5507,13 +5496,13 @@ export const BOOKING_SETTINGS = {
 /** 機能28 tksPc 用の店舗資源。実APIの resources 契約と同じ形で返す。 */
 export const BOOKING_RESOURCES = [
   {
-    id: 'resource-room-a', name: 'トリミングルームA', type: 'room', capacity: 1, isActive: true,
+    id: 'resource-room-a', name: 'トリミング台', type: '台', capacity: 2, isActive: true,
     version: 1,
     businessHours: BOOKING_SETTINGS.businessHours, exceptions: BOOKING_SETTINGS.exceptions,
     usage: { menuCount: 2, bookingCount: 5, exceptionCount: 1, referenced: true },
   },
   {
-    id: 'resource-room-b', name: 'トリミングルームB', type: 'room', capacity: 1, isActive: true,
+    id: 'resource-room-b', name: 'シャンプー台', type: '台', capacity: 1, isActive: true,
     version: 1,
     businessHours: BOOKING_SETTINGS.businessHours, exceptions: [],
     usage: { menuCount: 0, bookingCount: 0, exceptionCount: 0, referenced: false },
@@ -5677,6 +5666,25 @@ export const BOOKING_EXCEPTIONS = {
       intervals: [], reason: '研修のため', note: null, version: 1,
       createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
     },
+  ],
+}
+
+/* 予約経路の連携（V8 予約設定 ZyDd6 のスタッフの Google カレンダーと予約経路）。 */
+export const BOOKING_CHANNELS = {
+  timeZone: 'Asia/Tokyo',
+  autoAssign: true,
+  staff: [
+    { staffId: 'bs-ch-1', displayName: '高田 誠', status: 'connected', externalEventsThisWeek: 12, lastReadAt: '2026-10-02T09:40:00.000Z', readError: null },
+    { staffId: 'bs-ch-2', displayName: '中川 由美', status: 'connected', externalEventsThisWeek: 8, lastReadAt: '2026-10-02T09:40:00.000Z', readError: null },
+    { staffId: 'bs-ch-3', displayName: '佐野 直人', status: 'not_connected', externalEventsThisWeek: null, lastReadAt: null, readError: null },
+    { staffId: 'bs-ch-4', displayName: '森 涼太', status: 'expired', externalEventsThisWeek: null, lastReadAt: '2026-09-28T01:02:00.000Z', readError: null },
+  ],
+  channels: [
+    { key: 'line', status: 'active', todayCount: 14 },
+    { key: 'hot_pepper_beauty', status: 'confirm', todayCount: null },
+    { key: 'google_reserve', status: 'preparing', todayCount: null },
+    { key: 'epark', status: 'preparing', todayCount: null },
+    { key: 'manual', status: 'active', todayCount: 3 },
   ],
 }
 
