@@ -255,6 +255,8 @@ describe('共通部品の影響範囲', () => {
       'v8/webhooks/interactions.tsx',
       // ★V8 コンバージョンの一覧（r6dJFy）。新しい置き場（src/v8）に一から書いた。
       'v8/conversions/list.tsx',
+      // ★V8 ダッシュボード（WQmep）。対応が必要な受信の表の下にページ送り（v7 と同じ）。
+      'v8/dashboard/inbox.tsx',
     ].sort())
   })
 
