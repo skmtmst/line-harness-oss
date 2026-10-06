@@ -1,0 +1,270 @@
+/* 回答フォームの編集（★V8）。値は globals.css の [data-theme="v8"] の --tpl-fe-* に置く。 */
+
+/* ---------- 型への差し込み（この画面だけ） ---------- */
+
+/* 1152 の板（ITBAB）：右の列の余白と中身の幅。型の値をこの画面の中だけ替える。 */
+:global([data-page-template='create']):has(.root) {
+  --tpl-preview-narrow-width: var(--tpl-fe-rail-narrow-w);
+  --tpl-preview-narrow-content-width: var(--tpl-fe-rail-narrow-content-w);
+}
+/* 1152 の板（ITBAB）では右の列の余白が 16。狭い幅の判定は画面（useNarrowViewport）が板の印で渡す。 */
+:global([data-page-template='create'][data-design-node='ITBAB']):has(.root) { --tpl-preview-pad: var(--tpl-fe-rail-narrow-pad); }
+
+/* 競合の帯（J1pdB）は左右の列の上に横いっぱい。型の「狭い板の切り替え」の置き場を借りて、そこだけ出す。 */
+:global([data-theme='v8'] [data-page-template='create']) > div:has(> .bandSlot) { display: block; padding: 0; }
+.bandSlot { padding: var(--tpl-fe-band-slot-pad); }
+.conflictBand {
+  display: flex; align-items: center; gap: var(--tpl-fe-band-gap);
+  padding: var(--tpl-fe-band-pad); border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft); box-shadow: var(--tpl-fe-ring-warning);
+}
+.conflictIcon { flex: none; color: var(--color-warning); }
+.conflictText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-fe-head-gap); }
+.conflictTitle { font-size: var(--tpl-fe-band-title-size); font-weight: 600; line-height: var(--tpl-fe-band-title-lh); color: var(--color-ink); }
+.conflictDesc { font-size: var(--tpl-fe-body-size); line-height: var(--tpl-fe-body-lh); color: var(--color-ink-secondary); }
+
+.root { display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap-outer); min-width: 0; }
+.loading { color: var(--color-ink-faint); font-size: var(--tpl-fe-body-size); }
+
+.backLink { display: inline-flex; align-items: center; gap: var(--tpl-fe-icon-gap); }
+
+
+/* ---------- 段（カード） ---------- */
+
+.card {
+  display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap); min-width: 0;
+  padding: var(--tpl-fe-card-pad); border-radius: var(--tpl-fe-card-radius);
+  box-shadow: var(--tpl-fe-ring); background: var(--color-canvas);
+}
+.cardHead { display: flex; align-items: flex-start; gap: var(--tpl-fe-row-gap); }
+.cardHeadText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-fe-head-gap); }
+.cardTitle { margin: 0; font-size: var(--tpl-fe-title-size); font-weight: 700; line-height: var(--tpl-fe-title-lh); color: var(--color-ink); }
+.cardNote { margin: 0; font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-note-lh); color: var(--color-ink-faint); }
+.emptyBlocks { margin: 0; padding: var(--tpl-fe-empty-pad); text-align: center; font-size: var(--tpl-fe-body-size); color: var(--color-ink-faint); border-radius: var(--radius-control); box-shadow: var(--tpl-fe-ring); }
+
+.field { display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); min-width: 0; }
+.fieldLabel { font-size: var(--tpl-fe-body-size); font-weight: 500; line-height: var(--tpl-fe-label-lh); color: var(--color-ink); margin: 0; }
+.fieldLabelPlain { font-size: var(--tpl-fe-body-size); line-height: var(--tpl-fe-body-lh); color: var(--color-ink); margin: 0; }
+.subLabel { margin: 0; font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
+.fieldError { margin: 0; font-size: var(--tpl-fe-note-size); color: var(--color-danger); }
+
+/* ---------- ページ ---------- */
+
+.pageChips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-fe-chip-gap); min-height: var(--tpl-fe-control-h); }
+.pageChip {
+  padding: var(--tpl-fe-chip-pad); border-radius: var(--radius-pill); border: 0; cursor: pointer;
+  font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); white-space: nowrap;
+  color: var(--color-ink-secondary); background: var(--color-canvas); box-shadow: var(--tpl-fe-ring);
+}
+.pageChip[data-current] { color: var(--color-canvas); background: var(--color-ink); box-shadow: none; }
+
+/* ---------- ブロックの行 ---------- */
+
+.blockRow {
+  display: flex; align-items: center; gap: var(--tpl-fe-row-gap); min-width: 0;
+  padding: var(--tpl-fe-row-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-fe-ring);
+}
+:global([data-theme='v8']) .grip { width: var(--tpl-fe-grip-w); height: var(--tpl-fe-more-h); min-height: 0; flex: none; }
+.blockOpen { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--tpl-fe-row-gap); padding: 0; border: 0; background: none; cursor: pointer; text-align: left; }
+.blockIcon {
+  flex: none; width: var(--tpl-fe-icon-box); height: var(--tpl-fe-icon-box); display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--tpl-fe-icon-radius); background: var(--color-surface-pearl); color: var(--color-ink-secondary);
+}
+.blockText { min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-fe-head-gap); }
+.blockTitle { font-size: var(--tpl-fe-body-size); font-weight: 600; line-height: var(--tpl-fe-body-lh); color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.blockKind { font-size: var(--tpl-fe-small-size); line-height: var(--tpl-fe-small-lh); color: var(--color-ink-faint); }
+
+.blockOpenCard {
+  display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); min-width: 0;
+  padding: var(--tpl-fe-open-pad); border-radius: var(--tpl-fe-card-radius); box-shadow: var(--tpl-fe-ring-open);
+}
+.openHead { display: flex; align-items: center; gap: var(--tpl-fe-open-head-gap); min-height: var(--tpl-fe-more-h); }
+.openType { font-size: var(--tpl-fe-note-size); font-weight: 700; line-height: var(--tpl-fe-note-lh); color: var(--color-accent-deep); white-space: nowrap; }
+.newBadge { padding: var(--tpl-fe-badge-pad); border-radius: var(--radius-pill); background: var(--color-accent-deep); color: var(--color-canvas); font-size: var(--tpl-fe-badge-size); font-weight: 700; line-height: var(--tpl-fe-badge-lh); }
+.spacer { flex: 1; }
+.required { display: inline-flex; align-items: center; gap: var(--tpl-fe-open-head-gap); }
+.requiredLabel { font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
+.openFoot { display: flex; justify-content: flex-end; }
+
+.choiceRow { display: flex; align-items: center; gap: var(--tpl-fe-open-head-gap); min-height: var(--tpl-fe-control-h); }
+.choiceInput { flex: 1; min-width: 0; height: var(--tpl-fe-choice-h); }
+.choiceRemove { flex: none; width: var(--tpl-fe-control-h); height: var(--tpl-fe-control-h); display: inline-flex; align-items: center; justify-content: center; border: 0; background: none; border-radius: var(--radius-control); color: var(--color-ink-secondary); cursor: pointer; }
+.choiceRemove:disabled { opacity: 0.4; cursor: not-allowed; }
+.saveTo { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); min-width: 0; }
+.saveTo > .fieldLabel { font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); white-space: nowrap; }
+.saveSelect { display: inline-flex; min-width: 0; max-width: 100%; }
+.saveSelect :global(*) { max-width: 100%; }
+
+.bookingRow { display: grid; grid-template-columns: var(--tpl-fe-booking-cols); gap: var(--tpl-fe-save-gap); }
+.bookingRow .field { gap: var(--tpl-fe-open-gap); }
+.bookingRow .fieldLabel { font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
+.bookingRule { margin: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-fe-save-gap); min-height: var(--tpl-fe-toggle-h); font-size: var(--tpl-fe-body-size); line-height: var(--tpl-fe-body-lh); color: var(--color-ink); }
+.bookingRuleValue { font-size: var(--tpl-fe-note-size); color: var(--color-ink-faint); }
+.bookingInfo { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); padding: var(--tpl-fe-info-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); }
+.bookingInfoIcon { flex: none; color: var(--color-accent-deep); }
+.bookingInfoText { flex: 1; min-width: 0; margin: 0; font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-info-lh); color: var(--color-ink-secondary); }
+.bookingLink { flex: none; display: inline-flex; align-items: center; gap: var(--tpl-fe-icon-gap); padding: var(--tpl-fe-button-pad); height: var(--tpl-fe-control-h); font-size: var(--tpl-fe-body-size); font-weight: 600; color: var(--color-ink-secondary); white-space: nowrap; }
+.decoRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-fe-save-gap); }
+
+/* ---------- ブロックを足す ---------- */
+
+.addBox { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); padding: var(--tpl-fe-add-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); }
+.addTitle { margin: 0; font-size: var(--tpl-fe-note-size); font-weight: 700; line-height: var(--tpl-fe-note-lh); color: var(--color-ink); }
+.addGroup { display: flex; flex-direction: column; gap: var(--tpl-fe-chip-gap); }
+.addGroupTitle { margin: 0; font-size: var(--tpl-fe-small-size); font-weight: 700; line-height: var(--tpl-fe-small-lh); color: var(--color-ink-secondary); }
+.addCards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-fe-chip-gap); }
+.addCard {
+  height: var(--tpl-fe-add-card-h); display: flex; flex-direction: column; justify-content: center; gap: var(--tpl-fe-add-card-gap);
+  padding: var(--tpl-fe-add-card-pad); border: 0; border-radius: var(--radius-control); background: var(--color-canvas);
+  box-shadow: var(--tpl-fe-ring); cursor: pointer; text-align: left; min-width: 0;
+}
+.addCard[data-fresh] { background: var(--color-accent-soft); box-shadow: var(--tpl-fe-ring-accent); }
+.addCardTop { display: flex; align-items: center; gap: var(--tpl-fe-icon-gap); color: var(--color-ink-secondary); }
+.addCardLabel { font-size: var(--tpl-fe-note-size); font-weight: 700; line-height: var(--tpl-fe-note-lh); color: var(--color-ink); white-space: nowrap; }
+.addCardHint { font-size: var(--tpl-fe-tiny-size); line-height: var(--tpl-fe-tiny-lh); color: var(--color-ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- 答え終わったあと ---------- */
+
+.endingRow { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); }
+.endingLabel { font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); white-space: nowrap; }
+.actionRow {
+  display: flex; align-items: center; gap: var(--tpl-fe-row-gap); min-width: 0;
+  padding: var(--tpl-fe-row-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-fe-ring);
+}
+.actionNum { flex: none; font-size: var(--tpl-fe-note-size); font-weight: 700; color: var(--color-ink-faint); }
+.actionText { flex: 1; min-width: 0; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; font-size: var(--tpl-fe-body-size); font-weight: 600; line-height: var(--tpl-fe-body-lh); color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adders { display: flex; flex-wrap: wrap; gap: var(--tpl-fe-chip-gap); }
+
+/* ---------- 受付と見た目 ---------- */
+
+.periodRow { display: flex; align-items: flex-end; gap: var(--tpl-fe-save-gap); }
+:global([data-theme='v8']) .periodRow :global(button) { height: var(--tpl-fe-control-h); min-height: 0; }
+.periodRow > .field { flex: 1; }
+.periodRow .fieldLabel { font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
+.periodSep { height: var(--tpl-fe-control-h); display: inline-flex; align-items: center; font-size: var(--tpl-fe-body-size); color: var(--color-ink-faint); }
+.readonlyBox { height: var(--tpl-fe-control-h); display: flex; align-items: center; padding: var(--tpl-fe-input-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-fe-ring-control); font-size: var(--tpl-fe-body-size); color: var(--color-ink); background: var(--color-surface-pearl); }
+.toggleRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-fe-save-gap); min-height: var(--tpl-fe-toggle-h); font-size: var(--tpl-fe-body-size); line-height: var(--tpl-fe-body-lh); color: var(--color-ink); }
+.limitRow { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); }
+.limitInput { width: var(--tpl-fe-limit-w); }
+.subBox + .subBox { margin-top: calc(var(--tpl-fe-open-gap) - var(--tpl-fe-card-gap)); }
+.tight { display: flex; flex-direction: column; gap: var(--tpl-fe-words-gap); }
+.subBox { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); padding: var(--tpl-fe-open-pad); border-radius: var(--tpl-fe-card-radius); box-shadow: var(--tpl-fe-ring); }
+.subTitle { margin: 0; font-size: var(--tpl-fe-sub-title-size); font-weight: 700; line-height: var(--tpl-fe-sub-title-lh); color: var(--color-ink); }
+.wells { display: flex; flex-direction: column; gap: var(--tpl-fe-wells-gap); }
+.well { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); font-size: var(--tpl-fe-note-size); color: var(--color-ink-faint); }
+.wellLabel { white-space: nowrap; }
+.inlineButtons { display: flex; flex-wrap: wrap; gap: var(--tpl-fe-chip-gap); }
+.selectLike {
+  height: var(--tpl-fe-control-h); display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-fe-icon-gap);
+  padding: var(--tpl-fe-select-pad); border: 0; border-radius: var(--radius-control); background: var(--color-canvas);
+  box-shadow: var(--tpl-fe-ring-control); cursor: pointer; font-size: var(--tpl-fe-body-size); font-weight: 500; color: var(--color-ink); text-align: left;
+}
+.wordsHead, .wordsRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tpl-fe-words-gap); }
+.wordsHead { font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
+.dialogFields { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); }
+
+/* ---------- 右の列 ---------- */
+
+.rail { display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap); width: 100%; }
+.previewOpen { display: none; }
+.urlBox { display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); padding: var(--tpl-fe-open-pad); border-radius: var(--tpl-fe-card-radius); box-shadow: var(--tpl-fe-ring); background: var(--color-canvas); }
+.urlTitle { margin: 0; font-size: var(--tpl-fe-body-size); font-weight: 700; line-height: var(--tpl-fe-body-lh); color: var(--color-ink); }
+.urlRow { display: flex; align-items: center; gap: var(--tpl-fe-field-gap); }
+.urlValue {
+  flex: 1; min-width: 0; height: var(--tpl-fe-choice-h); display: flex; align-items: center; padding: var(--tpl-fe-url-pad);
+  border-radius: var(--radius-control); background: var(--color-surface-pearl); font-size: var(--tpl-fe-small-size); color: var(--color-ink-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.urlNote { margin: 0; font-size: var(--tpl-fe-small-size); line-height: var(--tpl-fe-small-lh); color: var(--color-ink-faint); }
+.urlTest { display: flex; }
+.testNarrow { display: none; }
+.urlError { margin: 0; font-size: var(--tpl-fe-note-size); color: var(--color-danger); white-space: pre-wrap; }
+.urlLink { font-size: var(--tpl-fe-note-size); color: var(--color-action); word-break: break-all; }
+.phoneArea { display: flex; justify-content: center; }
+.phoneDialog { display: flex; justify-content: center; }
+
+@container v8-page (max-width: 1099px) {
+  .previewOpen { display: inline-flex; width: 100%; }
+  .phoneArea { display: none; }
+  .testWide { display: none; }
+  .testNarrow { display: inline; }
+  .urlValue { white-space: normal; height: auto; min-height: var(--tpl-fe-choice-h); }
+  .addCards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bookingRow { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- 公開の確かめ（Z9wXm） ---------- */
+
+.changes { display: flex; flex-direction: column; gap: var(--tpl-fe-change-gap); padding: var(--tpl-fe-changes-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); }
+.changesTitle { margin: 0; font-size: var(--tpl-fe-note-size); font-weight: 700; color: var(--color-ink); }
+.changeLine { margin: 0; font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
+.changeLine[data-kind='add'] { color: var(--color-accent-deep); }
+.changeLine[data-kind='remove'] { color: var(--color-danger); }
+.publishBody { width: 100%; display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap); }
+.publishActions { display: flex; justify-content: center; gap: var(--tpl-fe-words-gap); }
+.publishNotes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--tpl-fe-head-gap); font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
+
+/* ---------- スマホ ---------- */
+
+.phoneWrap { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-fe-card-gap); width: 100%; }
+.phoneTitle { margin: 0; font-size: var(--tpl-fe-title-size); font-weight: 600; line-height: var(--tpl-fe-phone-title-lh); color: var(--color-ink); }
+.phone {
+  align-self: center; width: var(--tpl-fe-phone-w); height: var(--tpl-fe-phone-h); padding: var(--tpl-fe-phone-pad);
+  border-radius: var(--tpl-fe-phone-radius); background: var(--tpl-fe-phone-body); box-shadow: var(--tpl-fe-phone-frame-ring);
+  display: flex; flex-direction: column;
+}
+.phoneScreen { flex: 1; min-height: 0; display: flex; flex-direction: column; border-radius: var(--tpl-fe-phone-screen-radius); overflow: hidden; background: var(--color-canvas); }
+.phoneStatus { flex: none; height: var(--tpl-fe-phone-bar-h); display: flex; align-items: flex-start; padding: var(--tpl-fe-phone-status-pad); gap: var(--tpl-fe-icon-gap); }
+.phoneClock { flex: 1; font-size: var(--tpl-fe-title-size); font-weight: 600; line-height: var(--tpl-fe-phone-clock-lh); color: var(--tpl-fe-phone-black); }
+.phoneIsland { width: var(--tpl-fe-phone-island-w); height: var(--tpl-fe-phone-island-h); border-radius: var(--radius-pill); background: var(--tpl-fe-phone-black); }
+.phoneIcons { flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: var(--tpl-fe-phone-icon-gap); color: var(--tpl-fe-phone-black); }
+.phoneHead { flex: none; height: var(--tpl-fe-phone-bar-h); display: flex; align-items: center; gap: var(--tpl-fe-row-gap); padding: var(--tpl-fe-phone-head-pad); color: var(--color-ink); }
+.phoneName { flex: 1; min-width: 0; font-size: var(--tpl-fe-sub-title-size); font-weight: 700; line-height: var(--tpl-fe-phone-name-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phoneForm { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); padding: var(--tpl-fe-phone-form-pad); }
+.phoneEmpty { margin: 0; font-size: var(--tpl-fe-small-size); color: var(--color-ink-faint); }
+.phoneImage { flex: none; display: block; width: 100%; height: var(--tpl-fe-phone-image-h); object-fit: cover; border-radius: var(--tpl-fe-phone-r); background: var(--tpl-fe-phone-image-bg); }
+.phoneHeading { margin: 0; font-size: var(--tpl-fe-title-size); font-weight: 700; line-height: var(--tpl-fe-title-lh); color: var(--color-ink); }
+.phoneHeading[data-level='3'] { font-size: var(--tpl-fe-body-size); }
+.phoneText { margin: 0; font-size: var(--tpl-fe-small-size); line-height: var(--tpl-fe-small-lh); color: var(--tpl-fe-phone-sub); white-space: pre-wrap; }
+.phoneButton { flex: none; height: var(--tpl-fe-phone-next-h); display: flex; align-items: center; justify-content: center; border-radius: var(--tpl-fe-phone-r); box-shadow: none; outline: 1px solid var(--fe-phone-main, var(--color-accent)); outline-offset: -1px; color: var(--fe-phone-main, var(--color-accent)); font-size: var(--tpl-fe-body-size); font-weight: 700; }
+.phoneProgress { flex: none; display: flex; gap: var(--tpl-fe-phone-progress-gap); }
+.phoneProgress > span { flex: 1; height: var(--tpl-fe-phone-progress-h); border-radius: var(--tpl-fe-phone-progress-r); background: var(--tpl-fe-phone-track); }
+.phoneProgress > span[data-done] { background: var(--fe-phone-main, var(--color-accent)); }
+.phoneQ[data-kind='booking'] { gap: var(--tpl-fe-open-gap); }
+.phoneQ { flex: none; display: flex; flex-direction: column; gap: var(--tpl-fe-field-gap); }
+.phoneQTitle { display: flex; align-items: center; gap: var(--tpl-fe-phone-progress-gap); font-size: var(--tpl-fe-phone-q-size); font-weight: 700; line-height: var(--tpl-fe-note-lh); color: var(--color-ink); }
+.phoneRequired { font-size: var(--tpl-fe-badge-size); font-weight: 700; color: var(--color-danger); }
+.phoneChoice { display: flex; align-items: center; gap: var(--tpl-fe-field-gap); padding: var(--tpl-fe-phone-choice-pad); border-radius: var(--tpl-fe-phone-choice-r); box-shadow: var(--tpl-fe-ring-phone); font-size: var(--tpl-fe-small-size); line-height: var(--tpl-fe-small-lh); color: var(--color-ink); }
+.phoneChoice[data-on] { box-shadow: none; outline: 1px solid var(--fe-phone-main, var(--color-accent)); outline-offset: -1px; }
+.phoneDot { flex: none; width: var(--tpl-fe-phone-dot); height: var(--tpl-fe-phone-dot); border-radius: var(--radius-pill); box-shadow: var(--tpl-fe-ring-dot); }
+.phoneChoice[data-kind='checkbox'] .phoneDot { border-radius: var(--tpl-fe-phone-check-r); }
+.phoneChoice[data-on] .phoneDot { box-shadow: none; border: var(--tpl-fe-phone-dot-on) solid var(--fe-phone-main, var(--color-accent)); }
+.phoneStars { display: flex; gap: var(--tpl-fe-phone-progress-gap); color: var(--color-star-on-edge); }
+.phoneStars > svg:not([data-on]) { color: var(--tpl-fe-phone-dot-line); }
+.phoneMenuName { font-size: var(--tpl-fe-phone-menu-size); line-height: var(--tpl-fe-phone-menu-lh); color: var(--tpl-fe-phone-sub); }
+.phoneDays { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--tpl-fe-phone-day-gap); }
+.phoneDay { display: flex; flex-direction: column; align-items: center; padding: var(--tpl-fe-phone-day-pad); border-radius: var(--tpl-fe-phone-r); box-shadow: var(--tpl-fe-ring-phone); }
+.phoneDay[data-on] { background: var(--color-accent-soft); box-shadow: none; outline: var(--tpl-fe-open-line) solid var(--fe-phone-main, var(--color-accent)); outline-offset: calc(0px - var(--tpl-fe-open-line)); color: var(--fe-phone-main, var(--color-accent)); }
+.phoneDayWeek { font-size: var(--tpl-fe-badge-size); line-height: var(--tpl-fe-badge-lh); color: var(--tpl-fe-phone-sub); }
+.phoneDayNum { font-size: var(--tpl-fe-body-size); font-weight: 700; line-height: var(--tpl-fe-phone-day-lh); }
+.phoneTimes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tpl-fe-phone-time-gap); }
+.phoneTime { height: var(--tpl-fe-phone-time-h); display: flex; align-items: center; justify-content: center; border-radius: var(--tpl-fe-phone-choice-r); box-shadow: var(--tpl-fe-ring-phone); font-size: var(--tpl-fe-small-size); font-weight: 500; color: var(--color-ink); }
+.phoneTime[data-off] { color: var(--tpl-fe-phone-dot-line); background: var(--tpl-fe-phone-track); box-shadow: none; }
+.phoneTime[data-on] { background: var(--fe-phone-main, var(--color-accent)); color: var(--color-canvas); font-weight: 700; box-shadow: none; }
+.phonePicked { font-size: var(--tpl-fe-phone-picked-size); font-weight: 600; line-height: var(--tpl-fe-phone-menu-lh); color: var(--fe-phone-main, var(--color-accent)); }
+.phoneInput { min-height: var(--tpl-fe-phone-input-h); border-radius: var(--tpl-fe-phone-choice-r); box-shadow: var(--tpl-fe-ring-phone); }
+.phoneInput[data-tall] { min-height: var(--tpl-fe-phone-textarea-h); }
+.phoneSpacer { flex: 1; }
+.phoneNext { flex: none; height: var(--tpl-fe-phone-next-h); display: flex; align-items: center; justify-content: center; border-radius: var(--tpl-fe-phone-r); background: var(--fe-phone-main, var(--color-accent)); color: var(--color-canvas); font-size: var(--tpl-fe-body-size); font-weight: 700; }
+.phoneMenu { flex: none; height: var(--tpl-fe-phone-menu-h); display: flex; align-items: center; justify-content: center; gap: var(--tpl-fe-phone-progress-gap); font-size: var(--tpl-fe-small-size); font-weight: 600; color: var(--tpl-fe-phone-menu-color); box-shadow: var(--tpl-fe-line-top); }
+.phoneHome { flex: none; height: var(--tpl-fe-phone-home-h); display: flex; justify-content: center; }
+.phoneHome > span { width: var(--tpl-fe-phone-home-w); height: var(--tpl-fe-phone-home-line); border-radius: var(--tpl-fe-phone-home-r); background: var(--tpl-fe-phone-home-color); }
+.tabs { display: flex; flex-direction: column; gap: var(--tpl-fe-tabs-gap); }
+.status { margin: 0; font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-note-lh); color: var(--color-ink-faint); }
+/* 絵のタブは文字の行 19・下の余白 12（型のタブより 1 低い）。 */
+:global([data-theme='v8']) .tabs :global([role='tab']), :global([data-theme='v8']) .tabs :global([role='tab'] *) { line-height: var(--tpl-fe-body-lh); }
+:global([data-theme='v8']) .tabs :global([role='tablist']), :global([data-theme='v8']) .tabs :global([role='tab']) { height: var(--tpl-fe-tabs-h); }
+/* 行の「…」は絵どおり 28 角の枠付き（共通の「…」をこの画面の中だけ小さく）。 */
+:global([data-theme='v8']) .more :global(button) { min-height: 0; min-width: 0; width: var(--tpl-fe-more-h); height: var(--tpl-fe-more-h); border-radius: var(--radius-control); box-shadow: var(--tpl-fe-ring); background: var(--color-canvas); }
+/* 行の中の押せる文字は行の高さを増やさない（全体の押せる大きさの決まりは行そのものが満たす）。 */
+:global([data-theme='v8']) .actionText, :global([data-theme='v8']) .blockOpen { min-height: 0; }
