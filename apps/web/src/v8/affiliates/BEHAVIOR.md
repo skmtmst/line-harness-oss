@@ -49,6 +49,7 @@ src/v8 は `@/app` を import できないので、必要なものを `display.t
 
 ## 案件（offers.tsx）
 - 呼ぶ口：`affiliateOffers.list`・`lineAccounts.list`・`tags.list`・`scenarios.list`・承認の全件読み（承認待ち・認めた）・`affiliates.allReport`（今月の成果）。
+- 動きが変わるところ：「確定」と「平均報酬」は認めた成果の報酬額で数える（今までは成果額＝注文の金額で数えていた）。
 - フォルダの列：成果が出たときの動き（タグ・シナリオ・マイル・未設定）で分けた見え方（今と同じ）。
 - 行の右端：編集・状態の札・「…」（編集・決まり・公開を止める／公開する・複製）。
 - 動きが変わるところ：公開を止める／公開する（`affiliateOffers.update({isActive})`）と複製（下書きで `create`）を「…」に足した。

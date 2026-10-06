@@ -181,7 +181,7 @@ export default function OffersTab() {
   const scenarioMap = useMemo(() => new Map(scenarios.map((sc) => [sc.id, sc.name])), [scenarios])
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts])
 
-  /* 案件ごとの 紹介している人・成果・確定した報酬（認めた成果の金額）。 */
+  /* 案件ごとの 紹介している人・成果・確定した報酬（認めた成果の報酬額の合計）。 */
   const offerStats = useMemo(() => {
     const result = new Map<string, { people: Set<string>; conversions: number; reward: number }>()
     for (const item of approvals) {
@@ -189,7 +189,7 @@ export default function OffersTab() {
       const current = result.get(item.offerId) ?? { people: new Set<string>(), conversions: 0, reward: 0 }
       current.people.add(item.affiliateId)
       current.conversions += 1
-      if (item.approvalStatus === 'approved') current.reward += item.value ?? 0
+      if (item.approvalStatus === 'approved') current.reward += item.rewardAmount ?? 0
       result.set(item.offerId, current)
     }
     return result
@@ -200,7 +200,7 @@ export default function OffersTab() {
     return approvals.filter((item) => item.approvalStatus === 'approved' && jstMonthKey(item.createdAt) === month)
   }, [approvals])
   const averageReward = approvedThisMonth.length > 0
-    ? Math.round(approvedThisMonth.reduce((sum, item) => sum + (item.value ?? 0), 0) / approvedThisMonth.length)
+    ? Math.round(approvedThisMonth.reduce((sum, item) => sum + (item.rewardAmount ?? 0), 0) / approvedThisMonth.length)
     : null
 
   const foldered = useMemo(() => offers.filter(FOLDERS.find((f) => f.key === folder)?.match ?? (() => true)), [offers, folder])
