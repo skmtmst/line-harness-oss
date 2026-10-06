@@ -2723,7 +2723,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/folders' && query.get('kind') === 'form') {
     // R25: 作った箱も同じプロセス内では返す（webinar と同じ流儀）。
-    return { success: true, data: formFolders }
+    // 板 `I3L41O`：未分類は3件（すべて18＝来店・予約6＋資料請求4＋アンケート5＋未分類3）。
+    return { success: true, data: formFolders, unfiledCount: 3 }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
     return { success: true, data: TEMPLATE_FOLDERS }
@@ -3234,7 +3235,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (formDeleteImpact) {
     const data = formDeleteImpact[1] === 'form-empty'
       ? FORM_DELETE_IMPACT_FIXTURES.delete
-      : FORM_DELETE_IMPACT_FIXTURES.archive
+      : formDeleteImpact[1] === 'form-3'
+        ? FORM_DELETE_IMPACT_FIXTURES.archiveSurvey
+        : FORM_DELETE_IMPACT_FIXTURES.archive
     return { success: true, data }
   }
   if (pathname === '/api/friends/bulk-runs/friend-bulk-run-1') {
