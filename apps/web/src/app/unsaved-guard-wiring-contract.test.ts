@@ -93,6 +93,10 @@ const GUARDED = [
   'app/templates/questions/new/page.tsx',
   'app/webhooks/new/page.tsx',
   'v8/webhooks/create.tsx',
+  'v8/conversions/create.tsx',
+  'v8/form-edit/edit.tsx',
+  'v8/friend-add/editor.tsx',
+  'v8/inflow-links/new/create.tsx',
   'app/webinars/edit/page.tsx',
   'app/webinars/new/new-v8.tsx',
   'app/webinars/new/page.tsx',
@@ -250,6 +254,10 @@ const EXEMPTIONS: Record<string, string> = {
   'app/webinars/list-v8.tsx':
     '★V8-B のウェビナー一覧（UyUMw）。一覧と絞り込みが中心で、フォルダの追加・変更・削除とアーカイブは押した直後に確認窓か即時保存で確定する。フォルダ名の入力は閉じると戻る窓の中だけなので、この画面に残る下書きを持たない',
   /* ★V8 の新しい画面（src/v8）。古い画面ファイルの理由をそのまま写した（2026-10-06）。 */
+  'v8/broadcasts/list.tsx':
+    '★V8 の一斉配信一覧（l5V9a）。一覧と絞り込みが中心。フォルダ・並び替え・保存した検索など一覧上の操作は押した直後に即時保存し、配信の作成は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
+  'v8/conversions/list.tsx':
+    '★V8 のコンバージョンの一覧（r6dJFy）。探す欄・絞り込み・件数表示は一覧上の操作で下書きを持たない。止める小窓の理由欄は閉じると戻る小窓内の入力',
   'v8/scenarios/list.tsx':
     '★V8 のシナリオ一覧（axFrW）。一覧上の操作（停止・再開・フォルダ移動・並び替え・複製・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。複製窓の名前欄は閉じると戻るダイアログ内の入力',
   'v8/auto-replies/list.tsx':
