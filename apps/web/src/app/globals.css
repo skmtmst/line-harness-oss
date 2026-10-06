@@ -964,6 +964,18 @@
   --tpl-cell-gap-half: 8px;
   --tpl-narrow-folder-w: 150px; /* 1152 の一覧の道具の段のフォルダ選び（Iffil） */
   --tpl-row-name-size: 13px; --tpl-row-name-lh: 19px; --tpl-row-sub-gap: 3px; --tpl-row-sub-size: 11px; --tpl-row-sub-lh: 16px;
+  /* 作っていない画面の一式（運営 ログイン2段目 tOPeY ほか）。 */
+  --tpl-ms-otp-page-pad: 32px 16px; --tpl-ms-otp-card-w: 420px; --tpl-ms-otp-card-pad: 28px; --tpl-ms-otp-card-gap: 14px; --tpl-ms-otp-card-radius: 16px; --tpl-ms-otp-card-shadow: 0 4px 16px rgb(29 29 31 / 8%);
+  --tpl-ms-otp-title-size: 20px; --tpl-ms-otp-title-lh: 29px; --tpl-ms-otp-desc-size: 12px; --tpl-ms-otp-desc-lh: 19px; --tpl-ms-otp-label-size: 13px; --tpl-ms-otp-label-lh: 20px; --tpl-ms-otp-field-gap: 6px;
+  --tpl-ms-otp-btn-h: 36px; --tpl-ms-otp-icon: 15px; --tpl-ms-otp-foot-size: 11px; --tpl-ms-otp-foot-lh: 16px;
+  --tpl-ms-key-gap: 14px; --tpl-ms-key-box-pad: 10px 12px; --tpl-ms-key-box-radius: 8px; --tpl-ms-key-row-gap: 8px; --tpl-ms-key-note-lh: 17px; --tpl-ms-key-token-size: 12px; --tpl-ms-key-btn-h: 36px;
+  --tpl-ms-key-head-pad: 24px 24px 0; --tpl-ms-key-title-size: 17px; --tpl-ms-key-title-lh: 25px; --tpl-ms-key-content-pad: 14px 24px 0; --tpl-ms-key-foot-margin: 14px 24px 24px;
+  --tpl-ms-key-body-gap: 12px; --tpl-ms-key-micro-lh: 16px; --tpl-ms-key-info-gap: 10px; --tpl-ms-key-info-pad: 10px 14px; --tpl-ms-key-info-lh: 20px; --tpl-ms-key-col-gap: 12px; --tpl-ms-key-head-row-pad: 10px 16px;
+  --tpl-ms-key-row-h: 72px; --tpl-ms-key-row-pad: 12px 16px 0; --tpl-ms-key-cell-lh: 17px; --tpl-ms-key-col-name: 200px; --tpl-ms-key-col-created: 100px; --tpl-ms-key-col-used: 120px; --tpl-ms-key-col-state: 100px; --tpl-ms-key-col-ops: 180px;
+  --tpl-ms-key-pill-gap: 5px; --tpl-ms-key-pill-pad: 2px 8px; --tpl-ms-key-pill-lh: 18px; --tpl-ms-key-field-gap: 6px; --tpl-ms-key-input-pad: 0 12px; --tpl-ms-key-check-gap: 8px 16px;
+  --tpl-ms-fn-field-gap: 6px; --tpl-ms-fn-input-shadow: 0 1px 2px rgb(29 29 31 / 4%); --tpl-ms-fn-input-lh: 21px; --tpl-ms-fn-remove-gap: 2px;
+  --tpl-ms-qc-head-pad: 24px 24px 0; --tpl-ms-qc-close-inset: 18px; --tpl-ms-qc-title-size: 18px; --tpl-ms-qc-title-lh: 26px; --tpl-ms-qc-chipbox-pad: 8px 10px; --tpl-ms-qc-chip-gap: 4px; --tpl-ms-qc-chip-pad: 6px 12px; --tpl-ms-qc-input-min: 120px; --tpl-ms-qc-textarea-h: 96px; --tpl-ms-qc-foot-margin: 14px 24px 24px; --tpl-ms-qc-text-btn-pad: 0 14px; --tpl-ms-qc-balance-w: 96px; --tpl-ms-qc-chip-x: 14px; --tpl-ms-qc-chip-x-inset: 2px;
+  --tpl-ms-qs-textarea-h: 110px; --tpl-ms-qs-approval-w: 266px; --tpl-ms-qs-approval-lh: 19px; --tpl-ms-qs-when-h: 31px; --tpl-ms-focus-w: 2px; --tpl-ms-focus-offset: -2px;
   --tpl-steps-gap: 8px; --tpl-steps-dot: 20px; --tpl-steps-dot-gap: 6px; --tpl-steps-text-size: 12px; --tpl-steps-text-lh: 17px;
   /* ダッシュボード（WQmep）：数の帯・右の列・グラフ・表・友だち追加リンク・最近の動き。 */
   --tpl-db-num-size: 28px; --tpl-db-num-lh: 32px; --tpl-db-unit-size: 13px; --tpl-db-unit-lh: 20px; --tpl-db-cell-pad: 16px 20px; --tpl-db-cell-gap: 8px;

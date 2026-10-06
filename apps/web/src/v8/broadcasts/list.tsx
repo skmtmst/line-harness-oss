@@ -59,6 +59,7 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { runOptimistic } from '@/lib/undoable'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
@@ -159,6 +160,8 @@ export default function BroadcastListV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const { selectedAccountId } = useAccount()
+  /* かんたんに送る（板 `P6vbxn`）の窓。 */
+  const [quickSendOpen, setQuickSendOpen] = useState(false)
   const staffRole = useStaffRole()
   const narrow = useNarrowViewport()
   /*
@@ -1107,9 +1110,17 @@ export default function BroadcastListV8() {
           anchorRef={createAnchorRef}
           ariaLabel="配信の作り方"
           items={[
+            /* 絵 `Xr6eu`：文字1通を全員かタグで、1画面で送る（板 `P6vbxn`）。 */
+            { id: 'create-quick', label: 'かんたんに送る', onSelect: () => { setCreateMenuOpen(false); setQuickSendOpen(true) } },
             { id: 'create-new', label: '新しく作る', onSelect: () => openCreate(false) },
             { id: 'create-template', label: 'テンプレートから作る', onSelect: () => openCreate(true) },
           ]}
+        />
+        <QuickSendV8
+          open={quickSendOpen}
+          accountId={selectedAccountId || null}
+          onClose={() => setQuickSendOpen(false)}
+          onSent={() => void loadList(0)}
         />
         {folderDialogOpen && (
           <FolderAddDialog

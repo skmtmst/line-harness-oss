@@ -7,6 +7,7 @@ import ConversionReportV8 from './conversion-report-v8'
 
 import ReadonlyHeaderV8 from './readonly-header-v8'
 import AnalyticsV8, { type AnalyticsSlotsV8 } from '@/v8/analytics/analytics'
+import FunnelFormV8 from '@/v8/analytics/funnel-form'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import Select from '@/components/shared/select'
 import SegmentedControl from '@/components/shared/segmented'
@@ -3302,7 +3303,8 @@ function AnalyticsInner() {
  */
 /* 新しい分析（V8）へ渡す今の部品：ファネルの作る・編集フォームと、結果の保存欄。 */
 const ANALYTICS_V8_SLOTS: AnalyticsSlotsV8 = {
-  renderFunnelForm: ({ accountId, edit, presetConversion, onCancel, onCreated }) => <FunnelForm accountId={accountId} edit={edit} presetConversion={presetConversion} onCancel={onCancel} onCreated={onCreated} />,
+  // ★V8 のファネルを作る・直すは src/v8 の窓（板 `VDPz5`）。v7 は下の FunnelForm のまま。
+  renderFunnelForm: ({ accountId, edit, presetConversion, onCancel, onCreated }) => <FunnelFormV8 accountId={accountId} edit={edit} presetConversion={presetConversion} onCancel={onCancel} onCreated={onCreated} />,
   renderSave: ({ accountId, sourceKind, sourceResultId, defaultName }) => <SaveAnalysisAction accountId={accountId} sourceKind={sourceKind} sourceResultId={sourceResultId} defaultName={defaultName} />,
   funnelStepKindsLabel: FUNNEL_STEP_KIND_OPTIONS.map((item) => item.label).join('・'),
 }

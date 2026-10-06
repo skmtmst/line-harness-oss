@@ -508,6 +508,7 @@ shared-button-importer v8/tags/list.tsx
 shared-button-importer v8/tags/tags-tab.tsx
 shared-button-importer v8/templates/list.tsx
 shared-button-importer v8/broadcasts/list.tsx
+shared-button-importer v8/broadcasts/quick-send.tsx
 shared-button-importer v8/forms/list.tsx
 shared-button-importer v8/form-edit/after-tab.tsx
 shared-button-importer v8/form-edit/appearance-tab.tsx
@@ -535,7 +536,10 @@ shared-button-importer v8/template-edit/asset.tsx
 shared-button-importer v8/template-edit/media-picker.tsx
 shared-button-importer v8/template-edit/message.tsx
 shared-button-importer v8/webhooks/samples.tsx
+shared-button-importer v8/webhooks/api-tokens.tsx
 shared-button-importer v8/webhooks/sheets.tsx
+shared-button-importer v8/analytics/funnel-form.tsx
+shared-button-importer v8/login/two-factor-ops.tsx
 shared-button-importer v8/scenarios/list.tsx
 shared-button-importer v8/webinars/list.tsx
 shared-button-importer v8/mileage/frame.tsx

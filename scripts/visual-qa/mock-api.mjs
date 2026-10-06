@@ -1836,6 +1836,10 @@ const SHAPES = {
  * 画面確認だけで完結する、保存を伴わない固定の返事。
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
+const VISUAL_QA_API_TOKENS = [
+  { id: 'apitok-1', name: '予約システム連携', tokenPrefix: 'lh_live_3Fa9', scopes: ['tags:read', 'tags:write'], createdBy: 'visual-qa-owner', lastUsedAt: '2026-09-30T01:02:00.000Z', rotatedFromId: null, createdAt: '2026-06-02T00:00:00.000Z', revokedAt: null },
+  { id: 'apitok-2', name: '売上の集計', tokenPrefix: 'lh_live_8Kd2', scopes: ['tags:read'], createdBy: 'visual-qa-owner', lastUsedAt: '2026-09-29T14:00:00.000Z', rotatedFromId: null, createdAt: '2026-04-18T00:00:00.000Z', revokedAt: null },
+]
 
 /* ★V8 L48eY：本移行と照合が終わった UID 移行の履歴。 */
 const UID_MIGRATION_DONE = {
@@ -1849,6 +1853,14 @@ const UID_MIGRATION_DONE = {
 }
 
 function visualQaWriteBody(method, pathname) {
+  /* 自動応答のかんたんに作る（板 G4GejG）：作った下書き。重なりは ar-quick の口が返す。 */
+  if (method === 'POST' && pathname === '/api/auto-replies/drafts') {
+    return { autoReplyId: 'ar-quick', versionId: 'arv-quick', versionNumber: 1, status: 'draft', settings: null, lastTestStatus: null, lastTestedAt: null, publishedAt: null }
+  }
+  /* 外部連携の API 接続：発行した直後の窓（板 UkZLi）。平文の鍵は発行の返事にだけ1回乗る。 */
+  if (method === 'POST' && pathname === '/api/webhooks/api-tokens') {
+    return { id: 'apitok-new', name: '在庫システム', tokenPrefix: 'lh_live_7Kq2', scopes: ['tags:read', 'tags:write'], createdBy: 'visual-qa-owner', lastUsedAt: null, rotatedFromId: null, createdAt: '2026-10-05T01:00:00.000Z', revokedAt: null, token: 'lh_live_7Kq2mZ9xW4pR8vN3tY6bH1cJ5dF3f9a' }
+  }
   if (method === 'POST' && (pathname === '/api/notifications/operator-rules/recipients-preview' || pathname === '/api/line-notifications/operator-rules/recipients-preview')) {
     /*
      * 本物は両方の名で同じ候補を返す（`notifications.ts`）。
@@ -3478,6 +3490,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {
     return { success: true, data: AUTO_REPLY_PUBLISH_DRAFT }
   }
+  // かんたんに作る（G4GejG）の下書きは「営業時間外の自動返信」1件と重なる（絵の帯）。
+  if (pathname === '/api/auto-replies/ar-quick/conflicts') return { success: true, data: { conflicts: AUTO_REPLY_NEW_CONFLICTS.filter((c) => c.autoReplyId === 'ar-1'), source: 'draft' } }
   if (/^\/api\/auto-replies\/[^/]+\/conflicts$/.test(pathname)) {
     return { success: true, data: { conflicts: AUTO_REPLY_PUBLISH_CONFLICTS } }
   }
@@ -3934,6 +3948,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null } }
   }
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
+  // 外部連携の API 接続（板 ralAc・UkZLi）。止めた鍵は一覧に出ないので、使っている2本だけ。
+  if (pathname === '/api/webhooks/api-tokens') return { success: true, data: VISUAL_QA_API_TOKENS }
   const incomingUnmatched = /^\/api\/webhooks\/incoming\/([^/]+)\/unmatched$/.exec(pathname)
   if (incomingUnmatched) {
     // 人が見つからなかった届物（絵 gW0F2）。詳細のある口だけ2件。口は配列と total を返す。
