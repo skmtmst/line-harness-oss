@@ -1926,10 +1926,8 @@ export const RICH_MENU_DELETE_IMPACT = {
       targetPageName: 'フォロー',
     },
   ],
-  operationalReferences: [
-    { kind: 'automation', ownerId: 'automation-visual', ownerName: '来店後の自動案内' },
-    { kind: 'common_action', ownerId: 'common-action-visual', ownerName: 'フォローを始める' },
-  ],
+  // 絵 `yOyCg` の消せない理由は3行（既定・LINE登録・切替先）。オートメーション等から使われている行は出さない。
+  operationalReferences: [],
   // 一覧の「通常メニュー（会員向け）」は全員の既定（isDefaultForAll）なので、既定も消せない理由に入る（板 `yOyCg`）。
   lineResources: {
     pageCount: 2,
@@ -1937,7 +1935,7 @@ export const RICH_MENU_DELETE_IMPACT = {
     isDefaultForAll: true,
     publishing: false,
   },
-  blockers: ['default_for_all', 'published', 'line_resources', 'incoming_switches', 'operational_references'],
+  blockers: ['default_for_all', 'published', 'line_resources', 'incoming_switches'],
   canDelete: false,
   recommendedAction: 'unpublish',
 }
