@@ -687,6 +687,23 @@
   --tpl-settings-nav-width: 208px; --tpl-settings-nav-pad-block: 16px; --tpl-settings-nav-pad-side: 12px;
   /* 設定の中のメニュー（設定の板 ihjfd ほか 8 枚）。 */
   --tpl-setnav-w: 200px; --tpl-setnav-pad: 16px 12px; --tpl-setnav-gap: 2px; --tpl-setnav-item-pad: 8px 10px; --tpl-setnav-item-gap: 8px; --tpl-setnav-radius: 8px; --tpl-setnav-child-indent: 22px; --tpl-setnav-band-pad: 8px 16px;
+  /* 設定 A（はじめの設定 xuJ7D・LINEアカウント V7vn3・プール管理 u3iab3・ログインユーザー nku0f ほか）。 */
+  --tpl-sa-content-pad: 16px 24px 24px 0; --tpl-sa-gap: 14px; --tpl-sa-card-pad: 16px; --tpl-sa-card-gap: 6px; --tpl-sa-pair-gap: 16px;
+  --tpl-sa-progress-pad: 14px 18px; --tpl-sa-progress-gap: 12px; --tpl-sa-progress-size: 18px; --tpl-sa-bar-h: 8px; --tpl-sa-bar-radius: 4px;
+  --tpl-sa-step-pad: 14px 18px; --tpl-sa-step-gap: 14px; --tpl-sa-mark: 28px; --tpl-sa-mark-line: 1.5px; --tpl-sa-step-text-gap: 2px; --tpl-sa-title-lh: 20px; --tpl-sa-sub-lh: 16px; --tpl-sa-card-title-lh: 20px; --tpl-sa-card-line-lh: 17px;
+  --tpl-sa-pool-pad: 18px; --tpl-sa-pool-gap: 10px; --tpl-sa-pool-name-size: 15px; --tpl-sa-pool-name-lh: 22px; --tpl-sa-pool-slug-lh: 16px; --tpl-sa-row-pad: 8px 12px; --tpl-sa-row-gap: 8px; --tpl-sa-row-radius: 8px; --tpl-sa-url-lh: 15px; --tpl-sa-label-lh: 16px; --tpl-sa-link-lh: 17px; --tpl-sa-member-name-lh: 17px;
+  --tpl-sa-notice-pad: 10px 14px; --tpl-sa-notice-gap: 10px; --tpl-sa-notice-lh: 20px; --tpl-sa-notice-radius: 10px;
+  --tpl-sa-kpi-gap: 12px; --tpl-sa-kpi-pad: 14px; --tpl-sa-kpi-inner-gap: 4px; --tpl-sa-kpi-value-size: 20px; --tpl-sa-kpi-value-lh: 24px; --tpl-sa-search-w: 260px; --tpl-sa-tool-gap: 8px; --tpl-sa-head-actions-gap: 12px;
+  --tpl-sa-staff-head-pad: 20px 24px 13px; --tpl-sa-staff-head-gap: 8px; --tpl-sa-staff-desc-lh: 17px; --tpl-sa-staff-tab-gap: 24px; --tpl-sa-staff-tab-pad: 12px; --tpl-sa-staff-tab-line: 2px; --tpl-sa-band-pad: 0 24px 8px;
+  --tpl-sa-staff-main-pad: 24px 28px 24px 11px; --tpl-sa-staff-main-gap: 16px; --tpl-sa-staff-aside-w: 380px; --tpl-sa-staff-aside-pad: 24px; --tpl-sa-staff-aside-gap: 14px;
+  --tpl-sa-staff-search-w: 220px; --tpl-sa-staff-search-w-narrow: 200px; --tpl-sa-staff-invite-w: 128px; --tpl-sa-control-h: 36px; --tpl-sa-staff-select-w: 150px;
+  --tpl-sa-staff-card-pad: 20px; --tpl-sa-staff-card-gap: 12px; --tpl-sa-staff-sub-lh: 17px; --tpl-sa-staff-row-pad: 11px 8px; --tpl-sa-staff-col-gap: 12px;
+  --tpl-sa-staff-scope-w: 102px; --tpl-sa-staff-role-w: 84px; --tpl-sa-staff-last-w: 72px; --tpl-sa-staff-menu-w: 28px; --tpl-sa-staff-scope-w-narrow: 160px; --tpl-sa-staff-last-w-narrow: 147px;
+  --tpl-sa-staff-avatar: 30px; --tpl-sa-staff-avatar-gap: 10px; --tpl-sa-staff-name-lh: 19px; --tpl-sa-staff-text-gap: 1px; --tpl-sa-chip-pad: 2px 8px;
+  --tpl-sa-staff-example-pad: 10px 0; --tpl-sa-staff-example-gap: 4px; --tpl-sa-staff-line-lh: 18px; --tpl-sa-staff-guide-pad: 11px 0; --tpl-sa-staff-guide-card-gap: 2px; --tpl-sa-staff-guide-note-gap: 17px; --tpl-sa-chip-h: 36px; --tpl-sa-chip-pad-x: 10px; --tpl-sa-focus-w: 2px; --tpl-sa-qr-dark: #0f172a; --tpl-sa-qr-light: #ffffff; --tpl-sa-modal-max-h: 90vh; --tpl-sa-scope-side-w: 390px; --tpl-sa-qr: 220px;
+  --tpl-sa-ring: inset 0 0 0 1px var(--color-hairline); --tpl-sa-ring-ink: inset 0 0 0 1px var(--color-ink); --tpl-sa-ring-mark: inset 0 0 0 var(--tpl-sa-mark-line) var(--color-hairline);
+  --tpl-sa-line-top: inset 0 1px 0 var(--color-hairline); --tpl-sa-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-sa-line-bottom-soft: inset 0 -1px 0 var(--color-divider); --tpl-sa-line-left: inset 1px 0 0 var(--color-hairline); --tpl-sa-staff-guide-gap: 10px; --tpl-sa-staff-guide-chip-w: 80px;
+  --tpl-sa-acc-head-pad: 9px 16px; --tpl-sa-acc-row-pad: 10px 16px; --tpl-sa-acc-gap: 14px; --tpl-sa-acc-conn-w: 120px; --tpl-sa-acc-hook-w: 100px; --tpl-sa-acc-friends-w: 80px; --tpl-sa-acc-friends-pad: 12px; --tpl-sa-acc-default-w: 56px; --tpl-sa-acc-parent-w: 120px; --tpl-sa-acc-menu-w: 36px;
   --tpl-settings-content-pad-block: 24px; --tpl-settings-content-pad-side: 28px; --tpl-settings-content-gap: 16px;
   --tpl-settings-gap: 16px;
   --tpl-inbox-list-width: 372px; --tpl-inbox-summary-width: 260px;

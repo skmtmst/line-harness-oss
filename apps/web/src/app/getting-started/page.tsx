@@ -22,6 +22,8 @@ import {
 } from './getting-started-view'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
 import styles from './getting-started.module.css'
+import { useSettingsTheme } from '@/lib/use-settings-theme'
+import GettingStartedV8 from '@/v8/settings/getting-started/getting-started'
 
 /**
  * 設計板 xuJ7D「はじめの設定」。6段の順路。
@@ -29,7 +31,7 @@ import styles from './getting-started.module.css'
  * 板の骨組み（進み具合の帯・6行・下の2枚）だけを出す。段の状態・権限・
  * 行き先は口を正本にし、初期セット（段2）は機能設定の実物で確かめる。
  */
-export default function GettingStartedPage() {
+function GettingStartedPageV7() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [steps, setSteps] = useState<StepResult[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -166,4 +168,10 @@ function StepRow({ step }: { step: StepResult }) {
       </div>
     </li>
   )
+}
+
+/** ★V8：data-theme="v8" のときだけ新しい画面（src/v8/settings/getting-started）を出す。 */
+export default function GettingStartedPage() {
+  const theme = useSettingsTheme()
+  return theme === 'v8' ? <GettingStartedV8 /> : <GettingStartedPageV7 />
 }
