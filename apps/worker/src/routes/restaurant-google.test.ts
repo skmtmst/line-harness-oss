@@ -624,6 +624,17 @@ describe('Googleビジネス：口コミ', () => {
     expect(missing.status).toBe(404);
   });
 
+  it('並び替え：編集された口コミは編集後の日時で新しい側に並ぶ', async () => {
+    await seedReviews();
+    // 2026-09-22 に投稿された口コミが 2026-09-30 に書き直された状態。
+    testDb.raw.prepare('UPDATE rt_google_reviews SET update_time = ? WHERE review_name = ?').run('2026-09-30T05:00:00Z', `${LOCATION}/reviews/r2`);
+    const list = (await (await call('/api/restaurant-test/google/reviews?account_id=account-2&filter=all')).json()) as { reviews: Array<{ reviewName: string; createTime: string | null; updateTime: string | null }> };
+    expect(list.reviews.map((r) => r.reviewName)).toEqual([`${LOCATION}/reviews/r2`, `${LOCATION}/reviews/r1`, `${LOCATION}/reviews/r3`]);
+    expect(list.reviews[0]).toMatchObject({ createTime: '2026-09-22T01:00:00Z', updateTime: '2026-09-30T05:00:00Z' });
+    const oldest = (await (await call('/api/restaurant-test/google/reviews?account_id=account-2&filter=all&order=oldest')).json()) as { reviews: Array<{ reviewName: string }> };
+    expect(oldest.reviews.map((r) => r.reviewName)).toEqual([`${LOCATION}/reviews/r3`, `${LOCATION}/reviews/r1`, `${LOCATION}/reviews/r2`]);
+  });
+
   function reviewIdOf(reviewId: string): string {
     return (testDb.raw.prepare('SELECT id FROM rt_google_reviews WHERE review_name = ?').get(`${LOCATION}/reviews/${reviewId}`) as { id: string }).id;
   }
@@ -633,13 +644,32 @@ describe('Googleビジネス：口コミ', () => {
     const run = vi.fn(async () => ({ response: 'お客様、このたびはご来店ありがとうございます。' }));
     env.AI = { run } as unknown as Ai;
     useStaffRole('staff');
-    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: { mode: 'shorter' }, token: 'staff-session' });
+    const response = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: { mode: 'new' }, token: 'staff-session' });
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ draft: 'お客様、このたびはご来店ありがとうございます。', aiGenerated: true, mode: 'shorter' });
+    expect(await response.json()).toMatchObject({ draft: 'お客様、このたびはご来店ありがとうございます。', aiGenerated: true, mode: 'new' });
     const payload = JSON.stringify(run.mock.calls[0]);
     expect(payload).toContain('季節の定食');
     expect(payload).not.toContain('Aki');
     expect(testDb.raw.prepare('SELECT reply_status, reply_draft_ai_generated FROM rt_google_reviews WHERE review_name = ?').get(`${LOCATION}/reviews/r1`)).toEqual({ reply_status: 'draft', reply_draft_ai_generated: 1 });
+  });
+
+  it('短くする：画面で直した文章を元に書き直す。元の文章が無ければ 400', async () => {
+    await seedReviews();
+    const run = vi.fn(async () => ({ response: 'ご来店ありがとうございます。またお待ちしております。' }));
+    env.AI = { run } as unknown as Ai;
+    const id = reviewIdOf('r1');
+    // 保存前の画面の文章がそのまま書き換えの元になる。
+    const baseText = 'このたびはご来店いただき、またうれしいお言葉まで頂戴し、心より御礼申し上げます。季節の定食は毎月内容を変えてご用意しておりますので、またのご来店をお待ちしております。';
+    const response = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: 'shorter', baseText } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ mode: 'shorter' });
+    const payload = JSON.stringify(run.mock.calls[0]);
+    expect(payload).toContain('元の返信文（これを書き直す）');
+    expect(payload).toContain('大きく短く書き直');
+    expect(payload).toContain(`元の返信文（${baseText.length}文字）より必ず短くする`);
+    const empty = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: 'polite', baseText: '   ' } });
+    expect(empty.status).toBe(400);
+    expect(await empty.json()).toMatchObject({ code: 'draft_required' });
   });
 
   it('AI下書き：AI が無い環境は 503、返信済みの口コミは 409', async () => {
