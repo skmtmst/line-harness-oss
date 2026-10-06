@@ -545,3 +545,8 @@ shared-button-importer v8/events/application-preview.tsx
 shared-button-importer v8/events/change-review.tsx
 shared-button-importer v8/events/bookings.tsx
 shared-button-importer v8/form-responses/responses.tsx
+shared-button-importer v8/events/list.tsx
+shared-button-importer v8/contents/list.tsx
+shared-button-importer v8/contents/media-detail-dialog.tsx
+shared-button-importer v8/contents/media-replacement-dialog.tsx
+shared-button-importer v8/contents/media-upload-dialog.tsx
