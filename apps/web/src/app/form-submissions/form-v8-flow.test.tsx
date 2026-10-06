@@ -236,7 +236,8 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
     renderNode(<FormSubmissionsPage />)
     await flush()
     await screen.findByText('流れのフォーム')
-    const creates = screen.getAllByRole('button', { name: '＋ フォームを作る' })
+    // 一覧は src/v8/forms/list（「＋」は印。読み上げ名は「フォームを作る」）。
+    const creates = screen.getAllByRole('button', { name: 'フォームを作る' })
     expect(creates.length).toBeGreaterThan(0)
     fireEvent.click(creates[0])
     await waitFor(() => expect(formsCreateDraft).toHaveBeenCalledTimes(1))
