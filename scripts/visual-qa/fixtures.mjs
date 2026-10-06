@@ -4815,40 +4815,45 @@ const mileageEarningRule = ({
   id, name, eventType, source, amount, initialStatus = 'available', granted,
   excluded = 0, status = 'published', expiresAfterDays = 365,
   cancellationEventTypes = [], targetConditions = null, sortOrder,
+  grantedMiles = granted * amount, validUntil = null, draftVersion = 3,
+  publishedVersion = status === 'published' ? draftVersion : null,
 }) => {
   const definition = {
     name, eventType, source, amount, initialStatus,
-    validFrom: null, validUntil: null, expiresAfterDays,
+    validFrom: null, validUntil, expiresAfterDays,
     cancellationEventTypes, targetConditions, sortOrder,
   }
   return {
     id,
     published: {
       name, eventType, source, amount, initialStatus,
-      validFrom: null, validUntil: null, status,
+      validFrom: null, validUntil, status,
       updatedAt: '2026-08-25T00:00:00.000Z',
     },
     draft: definition,
-    draftVersion: 3,
+    draftVersion,
+    publishedVersion,
     draftUpdatedAt: '2026-08-25T00:00:00.000Z',
-    metrics30d: { eligible: granted + excluded, granted, excluded },
+    metrics30d: { eligible: granted + excluded, granted, grantedMiles, excluded },
   }
 }
 
-/** 機能17の公開版・下書き版・直近30日集計を同じ行で返す新契約。 */
+/*
+  機能17の公開版・下書き版・直近30日集計を同じ行で返す新契約。
+  並びと数は V8 たまる決めごと `OC0gy` の表（6行。誕生日だけ止めている下書き）。
+  有効期間は「1年・12/31」（1年で消える・12/31 まで）。
+*/
+const RULE_UNTIL = '2026-12-31T00:00:00+09:00'
 export const MILEAGE_EARNING_RULES = {
   items: [
-    mileageEarningRule({ id: 'mer-1', name: '友だち登録してくれた', eventType: 'friend_added', source: 'line', amount: 100, granted: 62, excluded: 3, sortOrder: 1 }),
-    mileageEarningRule({ id: 'mer-2', name: 'LINEでメッセージを送ってくれた', eventType: 'message_received', source: 'line', amount: 5, granted: 964, excluded: 12, sortOrder: 2 }),
-    mileageEarningRule({ id: 'mer-3', name: '紹介の成果が認められた', eventType: 'affiliate_conversion_approved', source: 'affiliate', amount: 500, granted: 7, excluded: 1, sortOrder: 3 }),
-    mileageEarningRule({ id: 'mer-4', name: '予約してくれた', eventType: 'booking_created', source: 'booking', amount: 300, granted: 8, cancellationEventTypes: ['booking_cancelled'], sortOrder: 4 }),
-    mileageEarningRule({ id: 'mer-5', name: '配信のリンクを押した', eventType: 'broadcast_link_clicked', source: 'broadcast', amount: 10, granted: 214, excluded: 9, sortOrder: 5 }),
-    mileageEarningRule({ id: 'mer-6', name: '回答フォームに答えた', eventType: 'form_submitted', source: 'form', amount: 100, granted: 18, excluded: 2, sortOrder: 6 }),
-    mileageEarningRule({ id: 'mer-7', name: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', source: 'webinar', amount: 200, granted: 8, sortOrder: 7 }),
-    mileageEarningRule({ id: 'mer-8', name: 'Instagramから戻ってきた', eventType: 'inflow_return', source: 'instagram', amount: 50, granted: 0, status: 'stopped', sortOrder: 8 }),
-    mileageEarningRule({ id: 'mer-9', name: '旧キャンペーン（終了）', eventType: 'campaign_2025', source: null, amount: 1000, granted: 0, status: 'stopped', expiresAfterDays: null, sortOrder: 9 }),
+    mileageEarningRule({ id: 'mer-1', name: '友だち追加', eventType: 'friend_added', source: 'line', amount: 100, granted: 124, grantedMiles: 12400, excluded: 0, sortOrder: 1, validUntil: RULE_UNTIL }),
+    mileageEarningRule({ id: 'mer-2', name: '商品を買った', eventType: 'purchase_completed', source: 'stripe', amount: 1, initialStatus: 'pending', granted: 182, grantedMiles: 18200, excluded: 4, sortOrder: 2, validUntil: RULE_UNTIL, draftVersion: 5 }),
+    mileageEarningRule({ id: 'mer-3', name: '紹介した', eventType: 'friend_registered', source: 'tag_referral', amount: 300, granted: 12, grantedMiles: 3600, excluded: 1, sortOrder: 3, validUntil: RULE_UNTIL, draftVersion: 2 }),
+    mileageEarningRule({ id: 'mer-4', name: '回答フォームに答えた', eventType: 'form_submitted', source: 'form', amount: 50, granted: 38, grantedMiles: 1900, excluded: 12, sortOrder: 4, validUntil: RULE_UNTIL, draftVersion: 1 }),
+    mileageEarningRule({ id: 'mer-5', name: '予約した', eventType: 'booking_created', source: 'booking', amount: 100, initialStatus: 'pending', granted: 47, grantedMiles: 4700, excluded: 3, cancellationEventTypes: ['booking_cancelled'], sortOrder: 5, validUntil: RULE_UNTIL, draftVersion: 2 }),
+    mileageEarningRule({ id: 'mer-6', name: '誕生日', eventType: 'birthday', source: null, amount: 200, granted: 0, status: 'stopped', sortOrder: 6, validUntil: RULE_UNTIL, draftVersion: 2 }),
   ],
-  pagination: { total: 9, limit: 20, offset: 0 },
+  pagination: { total: 6, limit: 20, offset: 0 },
   unassignedLegacyCount: 0,
   measuredAt: '2026-08-25T01:00:00.000Z',
 }
