@@ -7527,7 +7527,9 @@ export const NEN_RANK_SETTINGS = {
   ],
   rules: {
     yearStartMonth: 1, applyOnReach: 'immediate', keepUntil: 'next_year_end', countOrders: 'paid',
-    version: 3, syncStatus: 'synced', syncError: null, syncedAt: '2026-09-07T09:00:00+09:00', updatedAt: '2026-09-07T09:00:00+09:00',
+    version: 3, syncStatus: 'synced', syncError: null,
+    /* 板 fb9NJ・e5yBLx・dEv6G の「最後に送った日時 9/30 10:12」。 */
+    syncedAt: '2026-09-30T10:12:00+09:00', updatedAt: '2026-09-30T10:12:00+09:00',
   },
   /* 板 `zQ5vY`（ライフタイム）の節目の3行。称号・特典・到達人数を絵に合わせる。
    * `最上位` の小さい札は今の画面に無い（画面担当へ）。 */
