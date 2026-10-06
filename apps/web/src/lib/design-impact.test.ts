@@ -241,6 +241,8 @@ describe('共通部品の影響範囲', () => {
       'v8/auto-replies/list.tsx',
       // ★V8 共通情報の一覧（FM94M）。新しい置き場（src/v8）に一から書いた。
       'v8/common-vars/list.tsx',
+      // ★V8 ウェビナーの一覧（UyUMw）。新しい置き場（src/v8）に一から書いた。
+      'v8/webinars/list.tsx',
     ].sort())
   })
 
