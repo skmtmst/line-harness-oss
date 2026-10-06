@@ -76,4 +76,20 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     fireEvent.click(option.querySelector('button')!)
     await waitFor(() => expect(fixture.listReviews).toHaveBeenCalledWith('account-1', expect.objectContaining({ filter: 'unreplied' })))
   })
+
+  it('受信列は編集後の日時を表示する（投稿2023年・編集2026年9月の口コミで2023年と出さない）', async () => {
+    fixture.listReviews.mockResolvedValue({
+      success: true,
+      reviews: [{ ...reviews[0], id: 'r3', createTime: '2023-11-11T11:08:00+09:00', updateTime: '2026-09-20T14:30:00+09:00' }],
+      total: 1,
+      page: 1,
+      perPage: 20,
+    })
+    render(<GoogleV8 />)
+    await screen.findByPlaceholderText('口コミを探す')
+    await screen.findByText('佐藤 S.')
+    const board = document.querySelector('[data-design-node="j0Wcg"]')!
+    expect(board.textContent).not.toContain('2023年')
+    expect(board.textContent).toContain('9月20日')
+  })
 })

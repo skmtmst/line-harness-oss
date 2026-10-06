@@ -4417,10 +4417,14 @@ export const OUTGOING_WEBHOOKS = [
     createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
   },
   {
-    /* 2ページ目の1本。設計の先頭5件へ割り込まないよう、送信実績は0件。 */
+    /*
+      2ページ目の1本。設計の先頭5件へ割り込まないよう、送信実績は0件。
+      V8 の一覧（ZSbFY）は名前順で先頭に来るので、絵の1行目と同じ
+      「友だちになった・タグが付いた」を送る形にする。
+    */
     id: 'owh-chatwork', name: 'Chatwork ／ 店舗連絡',
     url: 'https://api.chatwork.com/v2/rooms/000000/messages',
-    eventTypes: ['booking.created'], hasSecret: true, isActive: true,
+    eventTypes: ['friend_add', 'tag_change'], hasSecret: true, isActive: true,
     maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
     deliverySummary: {
       periodDays: 30, total: 0, succeeded: 0, failed: 0, pending: 0,
@@ -4433,60 +4437,76 @@ export const OUTGOING_WEBHOOKS = [
 /** 機能26。外部送信は行わず、本番APIと同じ成功の器だけを返す。 */
 export const OUTGOING_WEBHOOK_TEST_RESULT = { delivered: true, responseStatus: 204 }
 
-/** 受け取る口。設計 `M0Gb7` の3本。 */
+/**
+ * 受け取る口。V8 の絵 `gW0F2` の3本（申込フォーム・ネットショップの注文・旧予約システム）。
+ * id は前と同じ（詳細・試しの見本が id で引くため）。
+ */
 export const INCOMING_WEBHOOKS = [
   {
-    id: 'iwh-booking', name: '予約サービスから', sourceType: 'booking',
+    id: 'iwh-booking', name: '申込フォーム', sourceType: 'form',
     hasSecret: true, isActive: true,
     createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
   },
   {
-    id: 'iwh-survey', name: 'アンケートツールから', sourceType: 'form',
+    id: 'iwh-survey', name: 'ネットショップの注文', sourceType: 'ec',
     hasSecret: true, isActive: true,
     createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
   },
   {
-    id: 'iwh-accounting', name: '会計ソフトから', sourceType: 'payment',
+    id: 'iwh-accounting', name: '旧予約システム', sourceType: 'booking',
     hasSecret: false, isActive: false,
-    createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+    createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-31T00:00:00.000Z',
   },
 ]
 
-/** 受け取り口1件。本文は構造だけ残し、値をすべてマスクする。 */
+/**
+ * 受け取り口1件。本文は構造だけ残し、値をすべてマスクする。
+ * 絵 `gW0F2`：メールアドレスで探す・見つからないときは友だち候補を作る・
+ * 届いたらすること2つ・人が見つからなかった届物2件。
+ */
 export const INCOMING_WEBHOOK_DETAILS = {
   'iwh-booking': {
     ...INCOMING_WEBHOOKS[0],
     version: 3,
     identityMatching: {
       methods: [{ kind: 'verified_email', path: '$.email' }],
-      onNotFound: 'do_nothing',
+      onNotFound: 'create_candidate',
     },
     actions: [
-      { refKind: 'tag', refId: 'tag-external-booking', refVersionId: null, displayName: '外部予約あり' },
-      { refKind: 'template', refId: 'template-booking-received', refVersionId: 'template-booking-received-v2', displayName: 'ご予約を承りました' },
+      { refKind: 'tag', refId: 'tag-form-entry', refVersionId: null, displayName: 'フォーム申込' },
+      { refKind: 'automation', refId: 'au-entry-thanks', refVersionId: null, displayName: '申込のお礼' },
     ],
     actionExecution: {
       state: 'connected',
       reason: null,
     },
-    latestSample: {
-      receivedAt: '2026-08-25T01:12:00.000Z',
-      fields: [
-        { path: '$.email', type: 'string', maskedValue: '••••' },
-        { path: '$.booked_at', type: 'string', maskedValue: '••••' },
-        { path: '$.menu', type: 'string', maskedValue: '••••' },
-        { path: '$.staff', type: 'string', maskedValue: '••••' },
-      ],
-      truncated: false,
-    },
+    latestSample: null,
     templateFields: [
       { path: '$.email', type: 'string', token: '{{payload.email}}' },
-      { path: '$.booked_at', type: 'string', token: '{{payload.booked_at}}' },
-      { path: '$.menu', type: 'string', token: '{{payload.menu}}' },
-      { path: '$.staff', type: 'string', token: '{{payload.staff}}' },
+      { path: '$.form', type: 'string', token: '{{payload.form}}' },
     ],
+    pendingUnmatched: 2,
+    previousSecretUsableUntil: null,
   },
 }
+
+/** 人が見つからなかった届物（絵 `gW0F2` の2行）。値は伏せた形だけ。 */
+export const INCOMING_WEBHOOK_UNMATCHED = [
+  {
+    id: 'iwu-1', kind: 'candidate', status: 'pending',
+    identityAttempts: [{ kind: 'verified_email', path: '$.email', value: 'm.sakamoto@…' }],
+    maskedShape: null,
+    candidates: [{ friendId: 'friend-1', displayName: '坂本 真人' }],
+    resolvedFriendId: null, resolvedAt: null, receivedAt: '2026-09-30T00:31:00.000Z',
+  },
+  {
+    id: 'iwu-2', kind: 'unmatched', status: 'pending',
+    identityAttempts: [{ kind: 'verified_phone', path: '$.tel', value: '090-****-1234' }],
+    maskedShape: null,
+    candidates: [],
+    resolvedFriendId: null, resolvedAt: null, receivedAt: '2026-09-29T09:02:00.000Z',
+  },
+]
 
 /*
   流入経路。設計 `Q4bkTg` の6本そのまま。
