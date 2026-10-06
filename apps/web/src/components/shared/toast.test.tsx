@@ -1,7 +1,11 @@
 // @vitest-environment happy-dom
-/* 保存の知らせ（Toast）。★V7 共通部品その2 §2。右下・4秒・role=status。 */
+/*
+ * 保存の知らせ（Toast）。★V7 共通部品その2 §2。右下・4秒。
+ * 読み上げは置き場所の入れ物（role=status「知らせ」）が最初から受け持ち、
+ * 1件ずつは role を持たない（動きの点検 14 番）。知らせは文で探す。
+ */
 import React from 'react'
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ToastHost, { clearToastsForTest, notifyToast, Toast } from './toast'
 
@@ -16,35 +20,46 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+/** 読み上げの入れ物（置き場所）。 */
+const host = () => screen.getByRole('status', { name: '知らせ' })
+/** 文で知らせ1件を探す（1件の箱を返す）。 */
+const toastByText = (text: string | RegExp) => {
+  const node = within(host()).queryByText(text)
+  return node ? (node.closest('[data-toast]') as HTMLElement) : null
+}
+
 describe('保存の知らせ（Toast）', () => {
   it('notifyToast で右下の置き場所に出る（role=status）', () => {
-    const { container } = render(<ToastHost />)
+    render(<ToastHost />)
     act(() => {
       notifyToast('タグを保存しました')
     })
-    const status = container.querySelector('[role="status"]')!
-    expect(status.textContent).toContain('タグを保存しました')
+    expect(within(host()).getByText('タグを保存しました')).toBeTruthy()
   })
 
   it('4秒で消える', () => {
     vi.useFakeTimers()
-    const { container } = render(<ToastHost />)
+    render(<ToastHost />)
     act(() => {
       notifyToast('タグを保存しました')
     })
-    expect(container.querySelector('[role="status"]')).not.toBeNull()
+    expect(toastByText('タグを保存しました')).not.toBeNull()
     act(() => {
-      vi.advanceTimersByTime(4000)
+      vi.advanceTimersByTime(3999)
     })
-    expect(container.querySelector('[role="status"]')).toBeNull()
+    expect(toastByText('タグを保存しました')).not.toBeNull()
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(toastByText('タグを保存しました')).toBeNull()
   })
 
   it('できなかった知らせも同じ置き場所に出る', () => {
-    const { container } = render(<ToastHost />)
+    render(<ToastHost />)
     act(() => {
       notifyToast('保存できませんでした。もう一度お試しください', { tone: 'error' })
     })
-    expect(container.querySelector('[role="status"]')!.textContent).toContain('保存できませんでした')
+    expect(within(host()).getByText(/保存できませんでした/)).toBeTruthy()
   })
 
   it('取り消せる操作は「元に戻す」を1つ付ける', () => {
@@ -65,66 +80,64 @@ describe('保存の知らせ（Toast）', () => {
   })
 
   it('3件までに絞る（古いものから捨てる）', () => {
-    const { container } = render(<ToastHost />)
+    render(<ToastHost />)
     act(() => {
       notifyToast('1件目')
       notifyToast('2件目')
       notifyToast('3件目')
       notifyToast('4件目')
     })
-    const bodies = [...container.querySelectorAll('[role="status"]')].map((el) => el.textContent)
-    expect(bodies).toHaveLength(3)
-    expect(bodies.join('')).not.toContain('1件目')
-    expect(bodies.join('')).toContain('4件目')
+    const bodies = within(host()).getAllByText(/件目$/).map((el) => el.textContent)
+    expect(bodies).toEqual(['2件目', '3件目', '4件目'])
   })
 })
 
 describe('元に戻す（★V7 sTJsh §4）', () => {
   it('「元に戻す」付きは5秒残る（通常の4秒より長い）', () => {
     vi.useFakeTimers()
-    const { container } = render(<ToastHost />)
+    render(<ToastHost />)
     act(() => {
       notifyToast('外しました', { actionLabel: '元に戻す', onAction: vi.fn() })
     })
     act(() => {
       vi.advanceTimersByTime(4000)
     })
-    expect(container.querySelector('[role="status"]')).not.toBeNull()
+    expect(toastByText('外しました')).not.toBeNull()
     act(() => {
       vi.advanceTimersByTime(1000)
     })
-    expect(container.querySelector('[role="status"]')).toBeNull()
+    expect(toastByText('外しました')).toBeNull()
   })
 
   it('マウスを乗せている間は消えるまでの時間が止まる', () => {
     vi.useFakeTimers()
-    const { container } = render(<ToastHost />)
+    render(<ToastHost />)
     act(() => {
       notifyToast('外しました', { actionLabel: '元に戻す', onAction: vi.fn() })
     })
-    const status = container.querySelector('[role="status"]')!
+    const status = toastByText('外しました')!
     act(() => {
       vi.advanceTimersByTime(2000)
       fireEvent.pointerEnter(status)
       // 乗せたまま5秒以上置いても消えない
       vi.advanceTimersByTime(6000)
     })
-    expect(container.querySelector('[role="status"]')).not.toBeNull()
+    expect(toastByText('外しました')).not.toBeNull()
     act(() => {
       fireEvent.pointerLeave(status)
       // 残りの3秒で消える
       vi.advanceTimersByTime(2999)
     })
-    expect(container.querySelector('[role="status"]')).not.toBeNull()
+    expect(toastByText('外しました')).not.toBeNull()
     act(() => {
       vi.advanceTimersByTime(1)
     })
-    expect(container.querySelector('[role="status"]')).toBeNull()
+    expect(toastByText('外しました')).toBeNull()
   })
 
   it('⌘Z で直前の「元に戻す」を実行する', () => {
     const onAction = vi.fn()
-    const { container } = render(<ToastHost />)
+    render(<ToastHost />)
     act(() => {
       notifyToast('外しました', { actionLabel: '元に戻す', onAction })
     })
@@ -132,7 +145,7 @@ describe('元に戻す（★V7 sTJsh §4）', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true }))
     })
     expect(onAction).toHaveBeenCalledTimes(1)
-    expect(container.querySelector('[role="status"]')).toBeNull()
+    expect(toastByText('外しました')).toBeNull()
   })
 
   it('⌘Z は一番新しい「元に戻す」だけに効く', () => {
@@ -151,13 +164,13 @@ describe('元に戻す（★V7 sTJsh §4）', () => {
   })
 
   it('戻せる知らせが無いとき ⌘Z は何もしない', () => {
-    const { container } = render(<ToastHost />)
+    render(<ToastHost />)
     act(() => {
       notifyToast('保存しました')
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true }))
     })
     // 知らせは残り、取り消しも起きない
-    expect(container.querySelector('[role="status"]')).not.toBeNull()
+    expect(toastByText('保存しました')).not.toBeNull()
   })
 
   it('入力欄の中では ⌘Z は文字の取り消しに譲る', () => {
@@ -176,6 +189,28 @@ describe('元に戻す（★V7 sTJsh §4）', () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }))
     })
     expect(onAction).not.toHaveBeenCalled()
-    expect(container.querySelector('[role="status"]')).not.toBeNull()
+    expect(toastByText('外しました')).not.toBeNull()
+  })
+})
+
+describe('読み上げの入れ物（動きの点検 14 番）', () => {
+  it('知らせが無いときも入れ物（role=status・aria-live=polite）を最初から置く', () => {
+    render(<ToastHost />)
+    const region = host()
+    expect(region.getAttribute('aria-live')).toBe('polite')
+    // 足された1件だけを読む（全体を読み直さない）
+    expect(region.getAttribute('aria-atomic')).toBe('false')
+    expect(region.children).toHaveLength(0)
+  })
+
+  it('1件ずつには role・aria-live を付けない（入れ物と二重に読まない）', () => {
+    render(<ToastHost />)
+    act(() => {
+      notifyToast('タグを保存しました')
+    })
+    const item = toastByText('タグを保存しました')!
+    expect(item.getAttribute('role')).toBeNull()
+    expect(item.getAttribute('aria-live')).toBeNull()
+    expect(screen.getAllByRole('status')).toHaveLength(1)
   })
 })

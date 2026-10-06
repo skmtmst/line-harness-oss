@@ -223,11 +223,16 @@ export function Toast({
 }) {
   const Icon = item.tone === 'success' ? CircleCheck : CircleAlert
   const dismiss = onDismiss ?? (item.id !== undefined ? () => dismissToast(item.id as number) : undefined)
+  /*
+   * 1件ずつには role・aria-live を持たせない（動きの点検 14 番）。
+   * 読み上げは置き場所（ToastHost）の入れ物が最初から受け持つ。
+   * 1件ずつに付けると、入れ物と二重に読まれたり、入れ物ごと後から
+   * 差し込まれて最初の1件が読まれなかったりする。
+   */
   return (
     <div
       className={styles.toast}
-      role="status"
-      aria-live="polite"
+      data-toast=""
       onPointerEnter={item.id !== undefined ? () => pauseToast(item.id as number, 'pointer') : undefined}
       onPointerLeave={item.id !== undefined ? () => resumeToast(item.id as number, 'pointer') : undefined}
       onFocus={
@@ -300,9 +305,14 @@ export default function ToastHost() {
       resumeAllLifecycles()
     }
   }, [])
-  if (live.length === 0) return null
+  /*
+   * 読み上げの入れ物は空でも最初から置いておく（動きの点検 14 番）。
+   * 入れ物ごと後から差し込むと、読み上げ側が見張り始める前に中身が入り、
+   * 最初の知らせが読まれないことがある。role=status は全体を読み直す
+   * （aria-atomic=true が既定）ので、足された1件だけを読むよう false にする。
+   */
   return (
-    <div className={styles.host} aria-live="polite">
+    <div className={styles.host} role="status" aria-live="polite" aria-atomic="false" aria-label="知らせ">
       {live.map((item) => (
         <Toast key={item.id} item={item} />
       ))}
