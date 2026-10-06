@@ -7777,3 +7777,51 @@ export const REMINDER_REGISTRANTS = [
     }
   }),
 ]
+
+/*
+ * 板 `AYc6O`・`C67dE`・`piWhz`（共通情報「営業時間」の編集）。撮影は
+ * `/contents/vars/edit?id=common-var-hours`。使っている場所は影響の8件と同じ。
+ * 期間外は「代わりの値を出す」、決めた日の予定が1件（10/1 から 18:00 まで）。
+ */
+const COMMON_VAR_HOURS_IMPACT = commonVarChangeImpactHours('平日 10:00〜19:00')
+export const COMMON_VAR_HOURS_DELETE_IMPACT = {
+  variable: { id: 'common-var-hours', name: '営業時間', varKey: 'shop_hours' },
+  total: 8,
+  blockingTotal: 8,
+  historicalTotal: 0,
+  unscopedFormTotal: 0,
+  canDelete: false,
+  byKind: COMMON_VAR_HOURS_IMPACT.byKind,
+  unavailableReferences: [],
+  items: COMMON_VAR_HOURS_IMPACT.items.map(({ kind, kindLabel, name, status, blocksDeletion, currentPreview }) => ({
+    kind, kindLabel, name, status, blocksDeletion, currentPreview,
+  })),
+  checkedAt: '2026-09-07T10:00:00.000+09:00',
+}
+export const COMMON_VAR_HOURS_DETAIL = {
+  ...COMMON_VARS.find((variable) => variable.id === 'common-var-hours'),
+  memo: '',
+  version: 2,
+  archivedAt: null,
+  status: 'active',
+  validFrom: null,
+  validUntil: null,
+  expiryBehavior: 'fallback',
+  fallbackValue: 'お問い合わせください',
+  usageByKind: COMMON_VAR_HOURS_DELETE_IMPACT.byKind,
+  usages: COMMON_VAR_HOURS_DELETE_IMPACT.items,
+  usagePage: { total: 8, shown: 8, hasMore: false, unavailableCount: 0 },
+  history: [
+    {
+      id: 'common-var-hours-version-2', version: 2, name: '営業時間', value: '平日 10:00〜19:00', memo: '',
+      changeReason: '夏の営業時間', actorId: 'staff-2', actorName: '高田 誠', createdAt: '2026-09-01T10:00:00.000+09:00',
+    },
+    {
+      id: 'common-var-hours-version-1', version: 1, name: '営業時間', value: '平日 10:00〜20:00', memo: '',
+      changeReason: '初回登録', actorId: 'staff-3', actorName: '中川 由美', createdAt: '2026-04-01T09:00:00.000+09:00',
+    },
+  ],
+}
+export const COMMON_VAR_HOURS_SCHEDULES = [
+  { id: 'common-var-hours-schedule-1', varId: 'common-var-hours', effectiveFrom: '2026-10-01T00:00', value: '平日 10:00〜18:00', appliedAt: null },
+]
