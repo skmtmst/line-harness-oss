@@ -2645,7 +2645,8 @@ CREATE TABLE form_submit_claims (
   effect_stats TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  expires_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL, step_completed_at_json TEXT NOT NULL DEFAULT '{}'
+  CHECK (json_valid(step_completed_at_json) AND json_type(step_completed_at_json) = 'object'),
   PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key)
 );
 

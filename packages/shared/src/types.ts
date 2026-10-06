@@ -2744,3 +2744,26 @@ export interface DashboardActivityItem {
   occurredAt: string;
   href: string;
 }
+
+export interface FormSubmissionPostActions {
+  state: 'completed' | 'failed' | 'in_progress' | 'untracked';
+  pending: string[];
+  /** 記録された済み工程。過去の記録で日時が不明ならnull。 */
+  completed: Array<{ step: string; completedAt: string | null }>;
+}
+export interface FormSubmissionDetail {
+  id: string;
+  formId: string;
+  formVersionId: string | null;
+  friendId: string | null;
+  friendName: string | null;
+  data: Record<string, unknown>;
+  destinationWrite: {
+    status: 'pending' | 'succeeded' | 'partial' | 'failed' | 'not_requested' | 'unknown';
+    attempted: number | null;
+    succeeded: number | null;
+    failed: number | null;
+  };
+  postActions: FormSubmissionPostActions | null;
+  createdAt: string;
+}

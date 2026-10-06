@@ -1,3 +1,4 @@
+import type { FormSubmissionPostActions } from '@line-crm/shared';
 import { Hono, type Context } from 'hono';
 import {
   getForms,
@@ -473,12 +474,7 @@ function serializePublicForm(row: DbForm) {
  * 送信は予約(claim)に工程を記録しながら進む。その記録と「あるべき工程」
  * を見比べて、失敗・中断で残った工程を運用者へ見せる。
  */
-interface SubmissionPostActions {
-  /** completed=全部完了 / failed=未完あり / in_progress=処理中 / untracked=記録なし */
-  state: 'completed' | 'failed' | 'in_progress' | 'untracked';
-  /** 未完の工程名。layout の内側の工程は `layout:<id>`。 */
-  pending: string[];
-}
+type SubmissionPostActions = FormSubmissionPostActions;
 
 function serializeSubmission(
   row: DbFormSubmission & { friend_name?: string | null },
@@ -571,12 +567,21 @@ async function describeSubmissionPostActions(
     layout: string | null;
   },
 ): Promise<SubmissionPostActions> {
-  if (!claim) return { state: 'untracked', pending: [] };
+  if (!claim) return { state: 'untracked', pending: [], completed: [] };
+  const steps = new Set(readFormSubmitClaimSteps(claim));
+  let times: Record<string, unknown> = {};
+  try {
+    const parsed: unknown = JSON.parse(claim.step_completed_at_json ?? '{}');
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) times = parsed as Record<string, unknown>;
+  } catch { /* 旧記録の日時は不明のまま返す。 */ }
+  const completed = [...steps].map(step => ({ step,
+    completedAt: typeof times[step] === 'string' && Number.isFinite(Date.parse(times[step] as string))
+      ? times[step] as string : null,
+  }));
   // 完了済みの予約は未完を計算しない。この機能より前の完了分には
   // layout の内側の工程記録が無く、あるべき工程との差分で「未完」に
   // 見えてしまうため。
-  if (claim.status === 'completed') return { state: 'completed', pending: [] };
-  const steps = new Set(readFormSubmitClaimSteps(claim));
+  if (claim.status === 'completed') return { state: 'completed', pending: [], completed };
   let webhook: { passed: boolean; data: unknown } | null = null;
   try {
     webhook = claim.webhook
@@ -589,7 +594,7 @@ async function describeSubmissionPostActions(
   delete answers._webhookResult;
   const layout = config.layout ? parseLayout(config.layout) : null;
   const expected = expectedSubmitStepNames({ config, layout, answers, webhook });
-  return { state: claim.status, pending: expected.filter((step) => !steps.has(step)) };
+  return { state: claim.status, pending: expected.filter((step) => !steps.has(step)), completed };
 }
 
 /**
@@ -1669,9 +1674,26 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
   }
 });
 
-// POST /api/forms/:id/submissions/:submissionId/retry-effects
-// N-168: 完了しなかった後処理だけを、回答の予約(claim)の工程記録に沿って
-// 再実行する。記録済みの工程は飛ばすので、完了済みを二重実行しない。
+// 回答詳細を、一覧と同じ版・後処理の情報で読む。
+forms.get('/api/forms/:id/submissions/:submissionId', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const formId = c.req.param('id');
+    if (!await canUseFormFromAccount(c, formId, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const form = await getFormById(c.env.DB, formId);
+    const submission = await getFormSubmissionById(c.env.DB, c.req.param('submissionId'));
+    if (!form || !submission || submission.form_id !== formId || submission.is_test) {
+      return c.json({ success: false, error: '回答が見つかりません' }, 404);
+    }
+    const actions = await describePostActionsForSubmissions(c.env.DB, [submission], form);
+    return c.json({ success: true, data: serializeSubmission(submission, actions.get(submission.id)) });
+  } catch {
+    console.error('フォーム回答の詳細を取得できませんでした');
+    return c.json({ success: false, error: 'フォーム回答の詳細を取得できませんでした' }, 500);
+  }
+});
+
 forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', async (c) => {
   try {
     const formId = c.req.param('id');
@@ -1703,7 +1725,7 @@ forms.post('/api/forms/:id/submissions/:submissionId/retry-effects', async (c) =
         data: {
           complete: true,
           pendingEffects: [],
-          submission: serializeSubmission(submission, { state: 'completed', pending: [] }),
+          submission: serializeSubmission(submission, await describeSubmissionPostActions(submission, claim, form)),
         },
       });
     }

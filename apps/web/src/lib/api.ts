@@ -33,6 +33,7 @@ import type {
   FriendUpcomingItem,
   FriendSummary,
   DashboardActivityItem,
+  FormSubmissionDetail,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
   FriendAddEventRoutingStatus,
@@ -7412,6 +7413,17 @@ export const api = {
   },
   /** 回答フォーム。 */
   forms: {
+    submission: (formId: string, submissionId: string, accountId: string) =>
+      fetchApi<ApiResponse<FormSubmissionDetail>>(
+        `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string } = {}) => {
+      const query = new URLSearchParams({ account_id: accountId, page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
+      if (params.query) query.set('q', params.query)
+      return fetchApi<ApiResponse<{ items: FormSubmissionDetail[]; total: number; page: number; limit: number }>>(
+        `/api/forms/${encodeURIComponent(formId)}/submissions?${query}`,
+      )
+    },
     list: (accountId: string) =>
       fetchApi<ApiResponse<Array<{ id: string; name: string; description: string | null; isActive: boolean }>>>(
         `/api/forms?account_id=${encodeURIComponent(accountId)}`,
