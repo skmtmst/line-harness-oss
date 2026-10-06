@@ -1054,14 +1054,24 @@ const ANALYTICS_FUNNEL_RUN = {
   dataCutoffAt: '2026-09-03T02:40:00.000Z',
   state: 'available',
   stateReason: null,
+  // 比較する条件は流入経路（Instagram・店頭QR）の2群。
   groups: [{
-    key: 'all', label: 'すべての経路', entrants: 1404, completed: 96,
+    key: 'instagram', label: 'Instagram', entrants: 1284, completed: 23,
     steps: [
-      { stepOrder: 1, label: '友だちになった', reached: 1404, conversionFromPrevious: null, droppedAfter: 0, inProgressAfter: 0, averageSecondsFromPrevious: null, medianSecondsFromPrevious: null },
-      { stepOrder: 2, label: '1回でも反応した', reached: 886, conversionFromPrevious: 0.631, droppedAfter: 518, inProgressAfter: 0, averageSecondsFromPrevious: 86400, medianSecondsFromPrevious: 72000 },
-      { stepOrder: 3, label: 'フォームに答えた', reached: 412, conversionFromPrevious: 0.465, droppedAfter: 474, inProgressAfter: 0, averageSecondsFromPrevious: 172800, medianSecondsFromPrevious: 151200 },
-      { stepOrder: 4, label: '予約か購入をした', reached: 238, conversionFromPrevious: 0.578, droppedAfter: 174, inProgressAfter: 0, averageSecondsFromPrevious: 259200, medianSecondsFromPrevious: 216000 },
-      { stepOrder: 5, label: 'くり返し買った', reached: 96, conversionFromPrevious: 0.403, droppedAfter: 142, inProgressAfter: 0, averageSecondsFromPrevious: 604800, medianSecondsFromPrevious: 518400 },
+      { stepOrder: 1, label: '友だち追加', reached: 1284, conversionFromPrevious: null, droppedAfter: 644, inProgressAfter: 0, averageSecondsFromPrevious: null, medianSecondsFromPrevious: null },
+      { stepOrder: 2, label: 'リンクを踏んだ', reached: 640, conversionFromPrevious: 0.498, droppedAfter: 428, inProgressAfter: 0, averageSecondsFromPrevious: 172800, medianSecondsFromPrevious: 144000 },
+      { stepOrder: 3, label: 'フォームに答えた', reached: 212, conversionFromPrevious: 0.331, droppedAfter: 151, inProgressAfter: 0, averageSecondsFromPrevious: 259200, medianSecondsFromPrevious: 216000 },
+      { stepOrder: 4, label: '予約が確定した', reached: 61, conversionFromPrevious: 0.288, droppedAfter: 38, inProgressAfter: 0, averageSecondsFromPrevious: 345600, medianSecondsFromPrevious: 288000 },
+      { stepOrder: 5, label: '購入が確定した', reached: 23, conversionFromPrevious: 0.377, droppedAfter: 0, inProgressAfter: 0, averageSecondsFromPrevious: 432000, medianSecondsFromPrevious: 360000 },
+    ],
+  }, {
+    key: 'store-qr', label: '店頭QR', entrants: 300, completed: 66,
+    steps: [
+      { stepOrder: 1, label: '友だち追加', reached: 300, conversionFromPrevious: null, droppedAfter: 120, inProgressAfter: 0, averageSecondsFromPrevious: null, medianSecondsFromPrevious: null },
+      { stepOrder: 2, label: 'リンクを踏んだ', reached: 180, conversionFromPrevious: 0.6, droppedAfter: 80, inProgressAfter: 0, averageSecondsFromPrevious: 172800, medianSecondsFromPrevious: 144000 },
+      { stepOrder: 3, label: 'フォームに答えた', reached: 100, conversionFromPrevious: 0.556, droppedAfter: 20, inProgressAfter: 0, averageSecondsFromPrevious: 259200, medianSecondsFromPrevious: 216000 },
+      { stepOrder: 4, label: '予約が確定した', reached: 80, conversionFromPrevious: 0.8, droppedAfter: 14, inProgressAfter: 0, averageSecondsFromPrevious: 345600, medianSecondsFromPrevious: 288000 },
+      { stepOrder: 5, label: '購入が確定した', reached: 66, conversionFromPrevious: 0.825, droppedAfter: 0, inProgressAfter: 0, averageSecondsFromPrevious: 432000, medianSecondsFromPrevious: 360000 },
     ],
   }],
 }
@@ -2307,7 +2317,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return {
       success: true,
       data: [{
-        id: 'visual-funnel-1', name: '友だちになってからの5段', windowDays: 30,
+        // 絵（DkRDE）のファネル。status が無いと「使えるファネルがありません」になって撮れなかった。
+        id: 'visual-funnel-1', name: '友だち追加から購入まで', windowDays: 30, status: 'active',
         createdAt: '2026-06-01T09:00:00+09:00',
         currentVersion: { id: 'visual-funnel-version-1', versionNumber: 3, createdAt: '2026-08-20T09:00:00+09:00' },
         migrationState: 'ready',
