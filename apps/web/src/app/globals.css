@@ -582,6 +582,15 @@
   --tpl-title-size: 22px; --tpl-title-weight: 700; --tpl-title-lh: 32px;
   --tpl-head-gap: 4px; --tpl-desc-size: 13px; --tpl-desc-lh: 19px;
   --tpl-compact-title-size: 20px; --tpl-compact-title-weight: 600; --tpl-compact-title-lh: 27px;
+  /* 回答フォームの一覧（I3L41O・GrnO4・JV2oR・GVizd）。 */
+  --tpl-fm-note-lh: 17px; --tpl-fm-text-button-gap: 6px; --tpl-fm-band-gap: 10px; --tpl-fm-band-pad: 10px 14px; --tpl-fm-band-lh: 20px;
+  --tpl-fm-search-w: 200px; --tpl-fm-sort-w: 160px; --tpl-fm-narrow-row-gap: 8px; --tpl-fm-folder-w: 150px;
+  --tpl-fm-col-dest: 136px; --tpl-fm-col-status: 96px; --tpl-fm-col-answers: 126px; --tpl-fm-col-url: 100px; --tpl-fm-col-menu: 60px;
+  --tpl-fm-name-gap: 8px; --tpl-fm-cell-lh: 17px; --tpl-fm-dot: 6px; --tpl-fm-pill-gap: 5px; --tpl-fm-badge-pad: 2px 8px; --tpl-fm-badge-lh: 18px;
+  --tpl-fm-answer-lh: 19px; --tpl-fm-answer-gap: 2px; --tpl-fm-answer-sub-lh: 16px; --tpl-fm-url-gap: 6px; --tpl-fm-control-h: 36px; --tpl-fm-url-pad: 0 14px; --tpl-fm-url-lh: 20px;
+  --tpl-fm-skeleton-bar: 12px; --tpl-fm-pager-pad: 10px 20px; --tpl-fm-pager-lh: 21px; --tpl-fm-state-pad: 28px 24px; --tpl-fm-state-icon: 32px;
+  --tpl-fm-panel-gap: 16px; --tpl-fm-panel-label-gap: 4px; --tpl-fm-input-pad: 0 12px; --tpl-fm-swatch: 28px; --tpl-fm-radio-gap: 4px;
+  --tpl-fm-option-gap: 2px; --tpl-fm-option-pad: 14px; --tpl-fm-option-outline: 1.5px; --tpl-fm-menu-size: 28px; --tpl-fm-band-after: 8px; --tpl-fm-narrow-after: -2px; --tpl-fm-dialog-actions-pad: 0 24px 24px; --tpl-fm-focus-ring: 2px;
   --tpl-compact-gap: 2px; --tpl-compact-desc-lh: 20px;
   --tpl-folder-width: 200px; --tpl-folder-pad-block: 16px; --tpl-folder-pad-side: 12px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
@@ -593,6 +602,10 @@
   --tpl-wb-num-pad-end: 8px; --tpl-wb-pill-pad: 2px 8px; --tpl-wb-pill-gap: 5px; --tpl-wb-pill-lh: 18px;
   --tpl-wb-foot-pad: 12px 24px; --tpl-wb-ro-gap: 12px; --tpl-wb-notice-after: 6px; --tpl-wb-target-pad: 10px 12px; --tpl-wb-after-gap: 16px;
   --tpl-thead-pad-block: 12px; --tpl-thead-pad-side: 24px; --tpl-thead-lh: 16px;
+  /* シナリオ配信の一覧（axFrW・wjfLe・X0QrW0・Al4Ek）。 */
+  --tpl-scn-col-select: 48px; --tpl-scn-col-grip: 30px; --tpl-scn-col-name: 608px; --tpl-scn-col-count: 146px; --tpl-scn-col-state: 96px; --tpl-scn-col-menu: 60px;
+  --tpl-scn-row-h: 61px; --tpl-scn-saved-w: 151px; --tpl-scn-saved-icon-w: 48px; --tpl-scn-folder-w: 150px; --tpl-scn-skeleton-gap: 4px; --tpl-scn-sub-gap: 2px; --tpl-scn-count-gap: 1px; --tpl-scn-narrow-head-h: 34px;
+  --tpl-scn-dup-gap: 14px; --tpl-scn-dup-field-gap: 6px; --tpl-scn-dup-box-pad: 12px; --tpl-scn-dup-box-gap: 4px; --tpl-scn-dup-note-pad: 10px 14px; --tpl-scn-dup-note-gap: 10px;
   --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
   /* リッチメニューの一覧（rZEGN・Y9ASp・ZoKow・yOyCg）。 */
   --tpl-rml-col-order: 60px; --tpl-rml-col-thumb: 80px; --tpl-rml-col-audience: 146px; --tpl-rml-col-state: 96px; --tpl-rml-col-count: 106px; --tpl-rml-col-menu: 60px; --tpl-rml-row-h: 67px; --tpl-rml-alone-shift: 11px;
