@@ -157,6 +157,22 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     expect(document.body.textContent).toContain('申し込みが少ない')
   })
 
+  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）', async () => {
+    fetchApi.mockImplementation(async (url: string) => {
+      if (url.includes('filter=pending')) return { items: [], total: 0 }
+      return { ...listPayload(), items: [item({ id: 'e1', folderId: 'ef-class' }), item({ id: 'e2', name: '冬のしつけ教室', folderId: null })], total: 2 }
+    })
+    foldersList.mockResolvedValue({ success: true, data: [{ id: 'ef-class', kind: 'event', name: '教室', parentId: null, displayOrder: 0, color: '#2f6fde', itemCount: 1 }], unfiledCount: 1 })
+    await renderList()
+    const filed = document.querySelector('tr[data-row-id="e1"]')?.querySelectorAll('[data-folder-dot]') ?? []
+    expect(filed).toHaveLength(1)
+    expect(filed[0].getAttribute('data-folder-dot')).toBe('filed')
+    expect(filed[0].getAttribute('aria-label')).toBe('フォルダ：教室')
+    const unfiled = document.querySelector('tr[data-row-id="e2"]')?.querySelectorAll('[data-folder-dot]') ?? []
+    expect(unfiled).toHaveLength(1)
+    expect(unfiled[0].getAttribute('data-folder-dot')).toBe('unfiled')
+  })
+
   it('行の「…」に中身・申込者・プレビュー・削除がそろう', async () => {
     await renderList()
     const menuButton = document.querySelector<HTMLElement>('button[aria-label$="の操作"]')

@@ -14957,6 +14957,8 @@ export interface EventListItem {
   is_published: number;
   /** U: 保存する状態（下書き・公開中・一時停止・終了・中止）。旧応答には無いため optional。 */
   lifecycle_status?: EventLifecycleStatus | null;
+  /** 入っているフォルダ（kind=event）。一覧の応答が folder_id から足す。旧応答には無いため optional。 */
+  folderId?: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
