@@ -18,6 +18,7 @@ import SearchField from '@/components/shared/search-field'
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
+import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -478,6 +479,9 @@ export default function AutoRepliesListV8() {
     })
   }
   const selectedCount = selectedIds.size
+  /* 選んでいる間は Esc で選択を外す（動きの点検 12 番）。 */
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+  useEscapeToClearSelection(selectedCount > 0, clearSelection)
   const selectedRules = rules.filter((r) => selectedIds.has(r.id))
   const stoppableIds = selectedRules.filter((r) => r.isActive).map((r) => r.id)
   const resumableIds = selectedRules.filter((r) => !r.isActive && r.lifecycleStatus !== 'draft').map((r) => r.id)
@@ -1415,7 +1419,7 @@ export default function AutoRepliesListV8() {
       {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
       {selectedCount > 0 ? (
         <div className={styles.bulkRow} style={{ padding: '10px 14px' }} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount}>{selectedCount}件を選択中</span>
+          <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount}件を選択中</span>
           <Button
             type="button"
             variant="secondary"

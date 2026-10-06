@@ -84,13 +84,21 @@ export function useOverlayFocus(
   return containerRef
 }
 
+/**
+ * 動きの変数（--motion-*）の長さを ms で読む。JS のタイマーを CSS の動きと
+ * 同じ長さにそろえるため（数字を JS に直書きしない。動きの点検 18 番）。
+ */
+export function motionMs(name: string, fallback: number): number {
+  if (typeof window === 'undefined' || typeof getComputedStyle !== 'function') return fallback
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  const value = parseFloat(raw)
+  if (!Number.isFinite(value) || value <= 0) return fallback
+  return raw.endsWith('ms') ? value : raw.endsWith('s') ? value * 1000 : value
+}
+
 /** 閉じる動きの長さ（--motion-exit）。読めなければ 150ms。 */
 function exitMs(): number {
-  if (typeof window === 'undefined' || typeof getComputedStyle !== 'function') return 150
-  const raw = getComputedStyle(document.documentElement).getPropertyValue('--motion-exit').trim()
-  const value = parseFloat(raw)
-  if (!Number.isFinite(value) || value <= 0) return 150
-  return raw.endsWith('ms') ? value : raw.endsWith('s') ? value * 1000 : value
+  return motionMs('--motion-exit', 150)
 }
 
 function prefersReducedMotion(): boolean {

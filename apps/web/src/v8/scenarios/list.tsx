@@ -12,6 +12,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
+import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -394,6 +395,9 @@ export default function ScenariosListV8() {
 
   const allOnPageSelected = scenarios.length > 0 && scenarios.every((s) => selectedIds.has(s.id))
   const selectedCount = selectedIds.size
+  /* 選んでいる間は Esc で選択を外す（動きの点検 12 番）。 */
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+  useEscapeToClearSelection(selectedCount > 0, clearSelection)
   const selectedRows = scenarios.filter((s) => selectedIds.has(s.id))
   const stoppableIds = selectedRows.filter((s) => s.isActive).map((s) => s.id)
   const resumableIds = selectedRows.filter((s) => !s.isActive).map((s) => s.id)
@@ -981,7 +985,7 @@ export default function ScenariosListV8() {
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
         {selectedCount > 0 ? (
           <div className={styles.bulkRow} role="region" aria-label="選択中のまとめ操作">
-            <span className={styles.bulkCount}>{selectedCount}件を選択中</span>
+            <span className={styles.bulkCount} aria-live="polite" aria-atomic="true">{selectedCount}件を選択中</span>
             <Button
               type="button"
               variant="secondary"
