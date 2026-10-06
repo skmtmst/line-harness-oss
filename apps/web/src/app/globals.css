@@ -620,6 +620,7 @@
   --tpl-bks-ph-seg-pad: 3px; --tpl-bks-ph-seg-h: 32px; --tpl-bks-ph-seg-lh: 17px; --tpl-bks-ph-week-gap: 5px; --tpl-bks-ph-day-pad: 8px 0; --tpl-bks-ph-day-gap: 2px; --tpl-bks-ph-dow-lh: 14px; --tpl-bks-ph-num-size: 16px; --tpl-bks-ph-num-lh: 19px; --tpl-bks-ph-state-size: 9px; --tpl-bks-ph-state-lh: 13px; --tpl-bks-ph-nav: 16px;
   --tpl-bks-ph-label-lh: 20px; --tpl-bks-ph-slot-h: 44px; --tpl-bks-ph-slot-gap: 8px; --tpl-bks-ph-slot-size: 15px; --tpl-bks-ph-slot-lh: 18px;
   --tpl-bks-ph-foot-pad: 12px 16px 30px; --tpl-bks-ph-foot-gap: 8px; --tpl-bks-ph-pick-lh: 19px; --tpl-bks-ph-cta-h: 48px; --tpl-bks-ph-cta-size: 15px; --tpl-bks-ph-cta-lh: 22px; --tpl-bks-ph-back-lh: 17px;
+  --tpl-rsv-facts-gap: 6px; --tpl-rsv-facts-pad: 10px 12px; --tpl-rsv-facts-radius: 8px; --tpl-rsv-fact-lh: 17px; --tpl-rsv-allergy: #b42318;
   --tpl-an-hours-gap: 10px; --tpl-an-hours-pad: 16px; --tpl-an-hours-title-lh: 20px; --tpl-an-hour-gap: 4px; --tpl-an-hours-h: 90px; --tpl-an-tick-size: 9px; --tpl-an-tick-lh: 13px;
   --tpl-an-flow-w: 300px; --tpl-an-flow-gap: 10px; --tpl-an-flow-pad: 16px; --tpl-an-flow-track-h: 8px; --tpl-an-flow-track-radius: 4px; --tpl-an-routes-split-gap: 12px; --tpl-an-routes-main-gap: 8px; --tpl-an-link-gap: 4px; --tpl-an-link-lh: 18px;
   --tpl-an-search-w: 300px; --tpl-an-select-w: 150px; --tpl-an-col-170: 170px; --tpl-an-col-90: 90px; --tpl-an-note-box-pad: 10px 12px; --tpl-an-pill-gap: 5px; --tpl-an-pill-pad: 2px 8px; --tpl-an-pill-dot: 6px;

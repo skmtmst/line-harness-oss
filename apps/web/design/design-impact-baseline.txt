@@ -553,6 +553,7 @@ shared-button-importer v8/restaurant/reservations/phone.tsx
 shared-button-importer v8/restaurant/reservations/reservations.tsx
 shared-button-importer v8/restaurant/reservations/today.tsx
 shared-button-importer v8/restaurant/tables/tables.tsx
+shared-button-importer v8/restaurant-reservations/detail-dialog.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx
