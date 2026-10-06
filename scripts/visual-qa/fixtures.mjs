@@ -1446,11 +1446,12 @@ export const COMMON_VARS = [
     name: '今月のキャンペーン', varKey: 'monthly_campaign', type: 'text', value: '夏の20%オフ',
     validUntil: '2026-10-07T23:59:59+09:00',
     createdAt: '2026-08-01T10:00:00.000+09:00', updatedAt: '2026-08-22T10:00:00.000+09:00',
-    nextSchedule: { effectiveFrom: '2026-09-30T15:00:00.000+09:00', value: '' }, pendingScheduleCount: 1, usageCount: 7,
+    /* 板 Hhl9M（止める窓）は決めた日の切り替えの注意を出さない絵なので、予約は持たない。 */
+    nextSchedule: null, pendingScheduleCount: 0, usageCount: 7,
   },
   {
     id: 'common-var-phone', lineAccountId: 'visual-qa-account', folderId: 'cvf-store',
-    name: '電話番号', varKey: 'phone_number', type: 'text', value: '03-1234-5678',
+    name: '電話番号', varKey: 'phone', type: 'text', value: '03-1234-5678',
     createdAt: '2026-06-01T10:00:00.000+09:00', updatedAt: '2026-07-20T10:00:00.000+09:00',
     nextSchedule: null, pendingScheduleCount: 0, usageCount: 7,
   },
@@ -1464,7 +1465,7 @@ export const COMMON_VARS = [
   {
     /* 下書き。使っている所は「なし」。 */
     id: 'common-var-delete-safe', lineAccountId: 'visual-qa-account', folderId: 'cvf-campaign',
-    name: '臨時のお知らせ', varKey: 'temporary_notice', type: 'text', value: '本日は17時まで',
+    name: '臨時のお知らせ', varKey: 'temp_notice', type: 'text', value: '本日は17時まで',
     state: 'draft',
     createdAt: '2026-09-01T10:00:00.000+09:00', updatedAt: '2026-09-01T10:00:00.000+09:00',
     nextSchedule: null, pendingScheduleCount: 0, usageCount: 0,
@@ -1473,7 +1474,9 @@ export const COMMON_VARS = [
     id: 'common-var-address', lineAccountId: 'visual-qa-account', folderId: 'cvf-store',
     name: '住所', varKey: 'address', type: 'text', value: '東京都渋谷区〇〇 1-2-3',
     createdAt: '2026-06-01T10:00:00.000+09:00', updatedAt: '2026-07-20T10:00:00.000+09:00',
-    nextSchedule: null, pendingScheduleCount: 0, usageCount: 4,
+    /* 板 FM94M の7件目（絵の6行の下に隠れている）。使っている所を「未取得」にして
+     * 並び（使われている数が多い順）の最後へ回す。4か所にすると5行目に割り込む。 */
+    nextSchedule: null, pendingScheduleCount: 0,
   },
 ]
 
@@ -1523,7 +1526,7 @@ export const COMMON_VAR_DELETE_IMPACT = {
 }
 
 export const COMMON_VAR_DELETE_IMPACT_EMPTY = {
-  variable: { id: 'common-var-delete-safe', name: '臨時のお知らせ', varKey: 'temporary_notice' },
+  variable: { id: 'common-var-delete-safe', name: '臨時のお知らせ', varKey: 'temp_notice' },
   total: 0,
   blockingTotal: 0,
   historicalTotal: 0,
@@ -1632,6 +1635,74 @@ export const COMMON_VAR_REPLACEMENT_RESULT = {
   remainingUsageCount: 0,
   verification: 'verified',
   completedAt: '2026-09-07T10:01:00.000+09:00',
+}
+
+/*
+ * V8 板 `xxKtW`（共通情報の削除の窓）：「電話番号」は7か所で使われていて、まだ消せない。
+ * 使っている所の上2つ・ほか5か所、差し替え先の候補は「問い合わせ先」が先頭。
+ */
+const COMMON_VAR_PHONE = COMMON_VARS.find((variable) => variable.id === 'common-var-phone')
+const COMMON_VAR_CONTACT = COMMON_VARS.find((variable) => variable.id === 'common-var-contact')
+export const COMMON_VAR_DELETE_IMPACT_PHONE = {
+  variable: { id: COMMON_VAR_PHONE.id, name: COMMON_VAR_PHONE.name, varKey: COMMON_VAR_PHONE.varKey },
+  total: 7,
+  blockingTotal: 7,
+  historicalTotal: 0,
+  unscopedFormTotal: 0,
+  canDelete: false,
+  byKind: { template: 5, broadcast: 0, scenario: 0, reminder: 0, auto_reply: 2, form: 0, automation: 0, friend_add: 0, common_action: 0 },
+  items: [
+    { kind: 'template', kindLabel: 'テンプレート', name: '店舗のご案内', status: '公開中', href: '/templates/edit?id=template-store-guide', blocksDeletion: true, currentPreview: 'お電話は 03-1234-5678 まで。' },
+    { kind: 'auto_reply', kindLabel: '自動応答', name: '営業時間外の自動返信', status: '動いている', href: '/auto-replies/edit?id=auto-reply-after-hours', blocksDeletion: true, currentPreview: '急ぎの方は 03-1234-5678 へ。' },
+    { kind: 'template', kindLabel: 'テンプレート', name: 'ご予約の確認', status: '公開中', href: '/templates/edit?id=template-booking-confirm', blocksDeletion: true, currentPreview: '変更は 03-1234-5678 まで。' },
+    { kind: 'template', kindLabel: 'テンプレート', name: '定期便 初回のご案内', status: '公開中', href: '/templates/edit?id=template-first-delivery', blocksDeletion: true, currentPreview: 'ご不明な点は 03-1234-5678 まで。' },
+    { kind: 'template', kindLabel: 'テンプレート', name: '商品到着のお知らせ', status: '下書き', href: '/templates/edit?id=template-delivered', blocksDeletion: true, currentPreview: 'お問い合わせは 03-1234-5678 まで。' },
+    { kind: 'auto_reply', kindLabel: '自動応答', name: '電話番号を聞かれたとき', status: '動いている', href: '/auto-replies/edit?id=auto-reply-phone', blocksDeletion: true, currentPreview: '03-1234-5678 です。' },
+    { kind: 'template', kindLabel: 'テンプレート', name: '再開のごあいさつ', status: '下書き', href: '/templates/edit?id=template-restart', blocksDeletion: true, currentPreview: '03-1234-5678 までお気軽に。' },
+  ],
+  unavailableReferences: [],
+  checkedAt: '2026-09-07T10:00:00.000+09:00',
+  recommendedAction: 'review_references',
+}
+
+export const COMMON_VAR_REPLACEMENT_CANDIDATES_PHONE = {
+  source: { id: COMMON_VAR_PHONE.id, name: COMMON_VAR_PHONE.name, type: COMMON_VAR_PHONE.type, version: 1 },
+  candidates: [COMMON_VAR_CONTACT, ...COMMON_VARS.filter((variable) => variable.id !== COMMON_VAR_PHONE.id && variable.id !== COMMON_VAR_CONTACT.id)]
+    .map((variable) => ({ id: variable.id, name: variable.name, varKey: variable.varKey, type: variable.type, value: variable.value, version: 1 })),
+}
+
+export const COMMON_VAR_REPLACEMENT_PREVIEW_PHONE = {
+  source: COMMON_VAR_REPLACEMENT_CANDIDATES_PHONE.source,
+  replacement: { id: COMMON_VAR_CONTACT.id, name: COMMON_VAR_CONTACT.name, type: COMMON_VAR_CONTACT.type, version: 1 },
+  usageTotal: 7,
+  replaceableTotal: 7,
+  blockedTotal: 0,
+  historicalTotal: 0,
+  unscopedFormTotal: 0,
+  byKind: COMMON_VAR_DELETE_IMPACT_PHONE.byKind,
+  canReplace: true,
+  revision: 'b7d0c6a1e2f34c5d8e9fa0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1',
+  checkedAt: '2026-09-07T10:00:00.000+09:00',
+}
+
+/*
+ * V8 板 `Hhl9M`（共通情報の止める窓）：「今月のキャンペーン」は予約中の一斉配信に差し込まれている。
+ * 止めると送られなくなる、の帯を出すための使用先。
+ */
+export const COMMON_VAR_DELETE_IMPACT_CAMPAIGN = {
+  variable: { id: 'common-var-campaign', name: '今月のキャンペーン', varKey: 'monthly_campaign' },
+  total: 7,
+  blockingTotal: 7,
+  historicalTotal: 0,
+  unscopedFormTotal: 0,
+  canDelete: false,
+  byKind: { template: 6, broadcast: 1, scenario: 0, reminder: 0, auto_reply: 0, form: 0, automation: 0, friend_add: 0, common_action: 0 },
+  items: [
+    { kind: 'broadcast', kindLabel: '一斉配信', name: '10月のお知らせ', status: '配信予約中', href: '/broadcasts/edit?id=broadcast-october', blocksDeletion: true, currentPreview: '夏の20%オフは今月末まで。' },
+  ],
+  unavailableReferences: [],
+  checkedAt: '2026-09-07T10:00:00.000+09:00',
+  recommendedAction: 'review_references',
 }
 
 /**
