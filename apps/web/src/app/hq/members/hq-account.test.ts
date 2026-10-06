@@ -39,6 +39,20 @@ describe('統括の左下アカウントメニュー', () => {
     expect(menu).not.toContain("addEventListener('mousedown'")
   })
 
+  /*
+   * 狭い画面（1152px）の脇メニューの中でメニューを開いて Esc を押すと、
+   * 脇メニューまで閉じて焦点がハンバーガーへ奪われていた。
+   * 脇メニュー側（sidebar.tsx）も同じ document の Escape を聞いているため、
+   * こちらは捕捉（capture）で先に受け取り、そこで伝播を止める。
+   */
+  it('Esc は捕捉で先に受け取り伝播を止めるので、脇メニューは閉じない', () => {
+    expect(menu).toContain("document.addEventListener('keydown', onKey, true)")
+    expect(menu).toContain("document.removeEventListener('keydown', onKey, true)")
+    expect(menu).toContain('event.stopPropagation()')
+    // 脇メニュー側は Esc で閉じたあとハンバーガーへ焦点を戻す作りのまま。
+    expect(sidebar).toContain('menuButtonRef.current?.focus()')
+  })
+
   it('開いたメニューは最上層の器に出し、運営コンソールと同じ整え方にする（承認 s6kZt/wmfIZ）', () => {
     expect(menu).toContain('<MenuPortal')
     expect(menu).toContain("getAnchor={() => triggerRef.current}")

@@ -70,18 +70,32 @@ export default function HqAccountMenu() {
 
   // 画面が変わったら閉じる。外を押したときは器（`MenuPortal`）が閉じる。
   useEffect(() => setOpen(false), [pathname])
-  // Esc は押したボタンへフォーカスを戻すので、ここでも受ける。
+  /*
+   * Esc は押したボタンへフォーカスを戻すので、ここでも受ける。
+   * 受け取りは捕捉（capture）にして、ここで伝播を止める。
+   *
+   * ★本番ポートの再検証（幅1152px）で見つかった不具合の直し。
+   * 狭い画面の脇メニュー（`components/layout/sidebar.tsx`）も同じ
+   * `document` の Escape を聞いている。素のまま（bubble）で受けると
+   * 先に登録済みの脇メニュー側が先に動き、
+   * ・脇メニュー自体も閉じる
+   * ・閉じたあとの後始末でハンバーガーへ焦点を奪う
+   * ため、ここで戻した焦点が上書きされていた。
+   * 捕捉は bubble より必ず先に動くので、ここで止めればアカウント
+   * メニューだけが閉じ、脇メニューは開いたまま・焦点はこのボタンに残る。
+   */
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.stopPropagation()
         setOpen(false)
         triggerRef.current?.focus()
       }
     }
-    document.addEventListener('keydown', onKey)
+    document.addEventListener('keydown', onKey, true)
     return () => {
-      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('keydown', onKey, true)
     }
   }, [open])
 
