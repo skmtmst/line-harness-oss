@@ -1,6 +1,8 @@
 /*
  * ★V8 アフィリエイターの詳細の引き出し（Pencil `tnTn9`）。右から 620・余白 24・段の間 16。
  * 寸法は globals.css の --tpl-af-dr-*。
+ * ファイル名を drawer.module.css にしない。ビルド後の組の名前が共通の右面（drawer_*）と同じになり、
+ * 設計値の照合（verify-design-values）がこちらの値を共通部品の値として読んでしまう。
  */
 .backdrop {
   position: fixed;

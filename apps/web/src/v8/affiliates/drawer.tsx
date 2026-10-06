@@ -35,7 +35,7 @@ import {
 } from './display'
 import { AffiliatePaymentConfirmDialog } from './dialogs'
 import { StatusPill } from './parts'
-import styles from './drawer.module.css'
+import styles from './affiliate-drawer.module.css'
 
 const JOURNEY_PAGE_SIZE = 30
 
