@@ -241,6 +241,8 @@ describe('共通部品の影響範囲', () => {
       'v8/auto-replies/list.tsx',
       // ★V8-B 流入と計測の一覧（xbHxg）。新しい置き場（src/v8）に一から書いた。
       'v8/inflow-links/list.tsx',
+      // ★V8 ウェビナーの一覧（UyUMw）。新しい置き場（src/v8）に一から書いた。
+      'v8/webinars/list.tsx',
     ].sort())
   })
 
