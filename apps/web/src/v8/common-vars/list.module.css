@@ -505,11 +505,13 @@
   font-size: var(--text-label);
 }
 
-/* 窓の中身（Hhl9M・xxKtW）。 */
+/* 窓の中身（Hhl9M・xxKtW）。横いっぱい。下の帯は線なし（絵どおり）。 */
 .dialogBody {
   display: flex;
+  align-self: stretch;
   flex-direction: column;
   gap: var(--tpl-cv-dialog-gap);
+  width: 100%;
 }
 
 .splitFooter {
@@ -518,6 +520,7 @@
   align-items: center;
   gap: var(--tpl-toolbar-gap);
   width: 100%;
+  padding: var(--tpl-cv-dialog-actions-pad);
 }
 
 .footerEnd {
@@ -531,6 +534,7 @@
   justify-content: center;
   gap: var(--tpl-toolbar-gap);
   width: 100%;
+  padding: var(--tpl-cv-dialog-actions-pad);
 }
 
 .dialogLead {

@@ -961,9 +961,8 @@ function CommonVarsListInner() {
       label: folder.name,
       count: folder.itemCount ?? null,
       color: folder.color,
-      /* 絵（FM94M）は選んだ行にだけ「…」。名前の変更・削除は、選んだフォルダの「…」から。 */
-      onEdit: canWrite && folder.id === folderFilter ? () => setEditingFolder(folder) : undefined,
-      onDelete: canWrite && folder.id === folderFilter ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
+      onEdit: canWrite ? () => setEditingFolder(folder) : undefined,
+      onDelete: canWrite ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
       deleteNote: '削除しても、入っていた共通情報は未分類として残ります。',
     })),
     { id: UNGROUPED, label: '未分類', count: unfiledCount },

@@ -597,7 +597,7 @@
   --tpl-cv-pill-gap: 5px; --tpl-cv-pill-pad: 2px 8px; --tpl-cv-pill-lh: 18px; --tpl-cv-dot: 6px; --tpl-cv-row-menu: 28px;
   --tpl-cv-bulk-pad: 10px 24px; --tpl-cv-pager-pad: 10px 20px; --tpl-cv-pager-lh: 20px;
   --tpl-cv-skeleton-gap: 16px; --tpl-cv-skeleton-pad: 14px 24px; --tpl-cv-skeleton-dot: 32px; --tpl-cv-skeleton-bar: 10px; --tpl-cv-state-pad: 28px 24px; --tpl-cv-state-icon: 32px;
-  --tpl-cv-dialog-gap: 12px; --tpl-cv-dialog-lh: 22px; --tpl-cv-field-gap: 6px; --tpl-cv-control-h: 36px; --tpl-cv-input-pad: 0 12px; --tpl-cv-usage-pad: 9px 0;
+  --tpl-cv-dialog-gap: 12px; --tpl-cv-dialog-lh: 22px; --tpl-cv-field-gap: 6px; --tpl-cv-control-h: 36px; --tpl-cv-input-pad: 0 12px; --tpl-cv-usage-pad: 9px 0; --tpl-cv-dialog-actions-pad: 14px 24px;
   --tpl-cv-choice-gap: 10px; --tpl-cv-choice-mark: 16px; --tpl-cv-choice-ring: 4px;
   --tpl-band-gap: 0;
   /* 自動応答の一覧（uE9gf・Q5lOCc・WPrd5）。 */
