@@ -245,6 +245,10 @@ describe('共通部品の影響範囲', () => {
       'v8/scenarios/list.tsx',
       // ★V8 ウェビナーの一覧（UyUMw）。新しい置き場（src/v8）に一から書いた。
       'v8/webinars/list.tsx',
+      // ★V8 外部連携の送る一覧（ZSbFY）。新しい置き場（src/v8）に一から書いた。
+      'v8/webhooks/outgoing.tsx',
+      // ★V8 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りを置く。
+      'v8/webhooks/interactions.tsx',
     ].sort())
   })
 
