@@ -3,6 +3,7 @@
 
 import { ListPageBody } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
+import SearchField from '@/components/shared/search-field'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 /*
  * ★V8 リマインダの一覧（Pencil「★V8 画面の地図」のリマインダの行：
@@ -30,6 +31,7 @@ import {
   Pause,
   Pencil,
   Play,
+  Plus,
   Search as SearchIcon,
   Send,
   Square,
@@ -1085,6 +1087,31 @@ export default function RemindersListV8() {
       </>
     )
 
+  const folderSelect = (
+    <Select
+      aria-label="フォルダ"
+      value={folderFilter}
+      onChange={setFolderFilter}
+      options={folderSelectOptions}
+    />
+  )
+  const statusChips = (
+    <div role="group" aria-label="状態で絞り込む">
+      {STATUS_CHIPS.map((status) => (
+        <FilterChip
+          key={status}
+          selected={statusFilter === status}
+          onChange={() => setStatusFilter(statusFilter === status ? '' : status)}
+          icon={STATUS_CHIP_ICONS[status]}
+        >
+          {status}
+        </FilterChip>
+      ))}
+    </div>
+  )
+  const sortSelect = <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} label="並び：" />
+  const perPageSelect = <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} label={null} />
+
   return (
     <PageFrame kind="list" boardId={narrow ? 'Iffil' : 'apLqS'}>
       <PageHeading headingSize="regular" title={<>リマインダ</>} description={<>
@@ -1264,7 +1291,7 @@ export default function RemindersListV8() {
             ) : null}
           </FolderPanel>
         </>}
-        collapsedFolders={<>
+        collapsedFolders={narrow ? undefined : <>
           {canEdit ? (
             <Button href="/reminders/new" variant="primary">
               ＋ リマインダを作る
@@ -1274,14 +1301,9 @@ export default function RemindersListV8() {
               ＋ リマインダを作る
             </Button>
           )}
-          <Select
-            aria-label="フォルダ"
-            value={folderFilter}
-            onChange={setFolderFilter}
-            options={folderSelectOptions}
-          />
+          {folderSelect}
         </>}
-        toolbar={<>
+        toolbar={!narrow ? <>
           {/* 道具の段は型の toolbar 枠に渡す（中身だけ渡す）。 */}
           <ListToolbar
             search={{
@@ -1290,26 +1312,40 @@ export default function RemindersListV8() {
               value: nameQuery,
               onChange: (value) => setNameQuery(clampSearchQuery(value)),
             }}
-            actions={<>
-            <div role="group" aria-label="状態で絞り込む">
-              {STATUS_CHIPS.map((status) => (
-                <FilterChip
-                  key={status}
-                  selected={statusFilter === status}
-                  onChange={() => setStatusFilter(statusFilter === status ? '' : status)}
-                  icon={STATUS_CHIP_ICONS[status]}
-                >
-                  {status}
-                </FilterChip>
-              ))}
-            </div>
-            </>}
+            actions={<>{statusChips}</>}
             trailing={<>
-              <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} label="並び：" />
-              <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} label={null} />
+              {sortSelect}
+              {perPageSelect}
             </>}
           />
-        </>}>
+        </> : (
+          /* 1152 の板（Iffil）：1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び」。部品と動きは広い板と同じ。 */
+          <div className={styles.narrowTools}>
+            <div className={styles.narrowRow}>
+              {canEdit ? (
+                <Button href="/reminders/new" variant="primary"><Plus size={15} aria-hidden="true" />リマインダを作る</Button>
+              ) : (
+                <Button type="button" variant="primary" disabled><Plus size={15} aria-hidden="true" />リマインダを作る</Button>
+              )}
+              <div className={styles.narrowFolder}>{folderSelect}</div>
+              <div className={styles.narrowSearch}>
+                <SearchField
+                  placeholder="名前・内容で探す"
+                  aria-label="名前・内容で探す"
+                  value={nameQuery}
+                  onChange={(value) => setNameQuery(clampSearchQuery(value))}
+                  onClear={() => setNameQuery('')}
+                />
+              </div>
+              <span className={styles.narrowSpacer} aria-hidden="true" />
+              {perPageSelect}
+            </div>
+            <div className={styles.narrowRow}>
+              {statusChips}
+              {sortSelect}
+            </div>
+          </div>
+        )}>
 
           {filterActive && reminderList.loaded && (
             <p className={styles.folderNote} style={{ fontVariantNumeric: 'tabular-nums' }}>
