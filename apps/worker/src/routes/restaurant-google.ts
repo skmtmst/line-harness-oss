@@ -25,6 +25,7 @@ import {
   GoogleBusinessError,
   buildAuthorizeUrl,
   buildReplyDraftPrompt,
+  replyDraftRewriteChangeScore,
   replyDraftRewriteFellShort,
   codeChallengeFor,
   createCodeVerifier,
@@ -1104,9 +1105,13 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
   try {
     text = await generateOnce(false);
     // 1回目で目に見えて変わらなかったときだけ、条件を厳しくして作り直す。
+    // 再試行しても目安に届かないことがあるが、その場合でも変化が大きい方を必ず採用し、
+    // 不十分な1回目の結果をそのまま成功として保存しない。
     if (replyDraftRewriteFellShort(mode, base, text)) {
       const retried = await generateOnce(true).catch(() => '');
-      if (retried && !replyDraftRewriteFellShort(mode, base, retried)) text = retried;
+      if (retried && replyDraftRewriteChangeScore(mode, base, retried) > replyDraftRewriteChangeScore(mode, base, text)) {
+        text = retried;
+      }
     }
   } catch (error) {
     console.error('[restaurant-google] AI draft failed', { code: error instanceof GoogleAiTimeout ? 'timeout' : 'provider_failure' });

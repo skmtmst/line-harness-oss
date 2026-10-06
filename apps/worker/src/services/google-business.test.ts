@@ -10,6 +10,7 @@ import {
   listAllReviews,
   listManageableLocations,
   refreshAccessToken,
+  replyDraftRewriteChangeScore,
   replyDraftRewriteFellShort,
   replyDraftTargetLength,
   updateReviewReply,
@@ -260,7 +261,9 @@ describe('Google Business reviews', () => {
     expect(replyDraftTargetLength('shorter', 400)).toBe(110);
     expect(replyDraftTargetLength('polite', 130)).toBe(260);
     expect(replyDraftTargetLength('polite', 60)).toBe(180);
-    expect(replyDraftTargetLength('polite', 400)).toBe(300);
+    // 元の文章（400字）より必ず長い目安にする。固定の上限（旧300字）で元より短くなってはいけない。
+    expect(replyDraftTargetLength('polite', 400)).toBe(800);
+    expect(replyDraftTargetLength('polite', 400)).toBeGreaterThan(400);
     expect(replyDraftTargetLength('new', 0)).toBe(250);
   });
 
@@ -272,5 +275,24 @@ describe('Google Business reviews', () => {
     expect(replyDraftRewriteFellShort('polite', base, 'あ'.repeat(105))).toBe(true);
     expect(replyDraftRewriteFellShort('polite', base, 'あ'.repeat(250))).toBe(false);
     expect(replyDraftRewriteFellShort('new', base, 'あ'.repeat(10))).toBe(false);
+  });
+
+  it('目安に近づいていない緩い縮み・無変化は作り直し対象にする（130字→100字、40字→40字）', () => {
+    // 目安は約5割（65字）。130字→100字（77%）は一見短くなっているが目安から遠く、不十分。
+    expect(replyDraftRewriteFellShort('shorter', 'あ'.repeat(130), 'あ'.repeat(100))).toBe(true);
+    // 短い元文章では目安の下限（40字）が元の長さと同じになるが、無変化（40→40）は必ず不十分。
+    expect(replyDraftRewriteFellShort('shorter', 'あ'.repeat(40), 'あ'.repeat(40))).toBe(true);
+    // 長さが同じ・長くなった場合も必ず不十分。
+    expect(replyDraftRewriteFellShort('shorter', 'あ'.repeat(100), 'あ'.repeat(120))).toBe(true);
+  });
+
+  it('再試行の採用は「変化が大きい方」を比べて決める', () => {
+    const base = 'あ'.repeat(130);
+    // 短くする：1回目(100字)より厳しめ再試行(60字)の方が大きく短くなっている→再試行を採用すべき。
+    expect(replyDraftRewriteChangeScore('shorter', base, 'あ'.repeat(100))).toBe(30);
+    expect(replyDraftRewriteChangeScore('shorter', base, 'あ'.repeat(60))).toBe(70);
+    // 丁寧にする：1回目(140字)より厳しめ再試行(200字)の方が大きく長くなっている→再試行を採用すべき。
+    expect(replyDraftRewriteChangeScore('polite', base, 'あ'.repeat(140))).toBe(10);
+    expect(replyDraftRewriteChangeScore('polite', base, 'あ'.repeat(200))).toBe(70);
   });
 });

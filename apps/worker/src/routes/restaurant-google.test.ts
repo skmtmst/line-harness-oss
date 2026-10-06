@@ -672,6 +672,39 @@ describe('Googleビジネス：口コミ', () => {
     expect(await empty.json()).toMatchObject({ code: 'draft_required' });
   });
 
+  it('短くする：1回目が足りなければ作り直し、変化が大きい方を採用する', async () => {
+    await seedReviews();
+    const baseText = 'あ'.repeat(130);
+    // 1回目は100字（元の77%）で足りず、厳しめの作り直しで70字まで短くなる。
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ response: 'い'.repeat(100) })
+      .mockResolvedValueOnce({ response: 'う'.repeat(70) });
+    env.AI = { run } as unknown as Ai;
+    const id = reviewIdOf('r1');
+    const response = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: 'shorter', baseText } });
+    expect(response.status).toBe(200);
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(await response.json()).toMatchObject({ draft: 'う'.repeat(70) });
+    expect(testDb.raw.prepare('SELECT reply_draft FROM rt_google_reviews WHERE id = ?').get(id)).toEqual({ reply_draft: 'う'.repeat(70) });
+  });
+
+  it('短くする：作り直しても足りないときは、より大きく変わった方を残す', async () => {
+    await seedReviews();
+    const baseText = 'あ'.repeat(130);
+    // どちらも目安（65字）に届かないが、1回目（100字）の方が変化が大きいのでそれを残す。
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ response: 'い'.repeat(100) })
+      .mockResolvedValueOnce({ response: 'う'.repeat(120) });
+    env.AI = { run } as unknown as Ai;
+    const id = reviewIdOf('r1');
+    const response = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: 'shorter', baseText } });
+    expect(response.status).toBe(200);
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(await response.json()).toMatchObject({ draft: 'い'.repeat(100) });
+  });
+
   it('AI下書き：AI が無い環境は 503、返信済みの口コミは 409', async () => {
     await seedReviews();
     const unavailable = await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`, { body: {} });

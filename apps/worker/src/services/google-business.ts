@@ -569,7 +569,14 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
  */
 export function replyDraftTargetLength(mode: 'new' | 'shorter' | 'polite', baseLength: number, strict = false): number {
   if (mode === 'shorter') return clamp(baseLength * (strict ? 0.35 : 0.5), 40, strict ? 80 : 110);
-  if (mode === 'polite') return clamp(baseLength * (strict ? 2.5 : 2), strict ? 220 : 180, 300);
+  if (mode === 'polite') {
+    // 元の文章より必ず長くなる目安にする。上限を固定すると、長い元文章（例：400字）に
+    // それより短い目安（300字）を指示してしまい「必ず長くする」という指示と矛盾するため、
+    // 上限は REPLY_MAX_LENGTH（投稿できる最大文字数）までとし、下限だけを固定する。
+    const ratio = strict ? 2.5 : 2;
+    const margin = strict ? 100 : 60;
+    return clamp(Math.max(baseLength * ratio, baseLength + margin), strict ? 220 : 180, REPLY_MAX_LENGTH);
+  }
   return 250;
 }
 
@@ -626,12 +633,38 @@ export function buildReplyDraftPrompt(input: {
   return { system, user };
 }
 
-/** 書き換えの結果が目に見えて変わったか。変わっていなければ1回だけ厳しめに作り直す。 */
+/**
+ * 書き換えの結果が目に見えて変わったか。変わっていなければ1回だけ厳しめに作り直す。
+ * 「短くする」は元より短くなっていない時点で必ず不十分とし、さらに目安文字数から大きく
+ * 外れている（元の長さをあまり落とせていない）場合も不十分とする。「丁寧にする」は逆に、
+ * 元より長くなっていない時点で必ず不十分とする。
+ */
 export function replyDraftRewriteFellShort(mode: 'new' | 'shorter' | 'polite', base: string, result: string): boolean {
   const a = base.trim();
   const b = result.trim();
   if (!a || !b) return false;
-  if (mode === 'shorter') return b.length > Math.max(40, Math.floor(a.length * 0.8));
-  if (mode === 'polite') return b === a || b.length < Math.floor(a.length * 1.2);
+  if (mode === 'shorter') {
+    if (b.length >= a.length) return true;
+    const target = replyDraftTargetLength('shorter', a.length);
+    return b.length > target * 1.3;
+  }
+  if (mode === 'polite') {
+    if (b.length <= a.length) return true;
+    const target = replyDraftTargetLength('polite', a.length);
+    return b.length < target * 0.7;
+  }
   return false;
+}
+
+/**
+ * 書き換え2回分（1回目・厳しめ再試行）のどちらが「変化が大きいか」を比べるための得点。
+ * 再試行しても目安に届かないことがあるが、その場合でも必ず変化が大きい方を採用し、
+ * 不十分な1回目の結果をそのまま成功として保存しないようにする。
+ */
+export function replyDraftRewriteChangeScore(mode: 'new' | 'shorter' | 'polite', base: string, result: string): number {
+  const a = base.trim().length;
+  const b = result.trim().length;
+  if (mode === 'shorter') return a - b;
+  if (mode === 'polite') return b - a;
+  return 0;
 }
