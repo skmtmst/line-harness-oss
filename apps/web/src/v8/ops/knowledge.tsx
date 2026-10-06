@@ -12,6 +12,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import kpiStyles from '@/components/shared/kpi-card.module.css'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -126,7 +127,7 @@ export default function OpsKnowledgeV8() {
             <Select aria-label="記事の種類" value={articleKind} onChange={(value) => { setArticleKind(value); setOffset(0) }} options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} />
           </div>
           <span className={styles.spacer} />
-          <span className={styles.count}>{ready ? `${total}件` : '—'}</span>
+          <span className={styles.count}>{ready && total > 0 ? <ListRange total={total} first={offset + 1} last={Math.min(offset + rows.length, total)} /> : ready ? '0件' : '—'}</span>
         </div>
 
         {actionError ? <p role="alert" className={parts.alert}>{actionError}</p> : null}
