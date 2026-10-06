@@ -328,14 +328,14 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
                 <p className="text-ink-faint text-label leading-relaxed">未接続</p>
               </div>
             </div>
-            <p className="text-ink-secondary whitespace-pre-line text-sm leading-relaxed">店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。</p>
+            <p className="text-ink-secondary whitespace-pre-line text-sm leading-relaxed">{'店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。'}</p>
             {!data.oauthConfigured ? <NoteBar tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</NoteBar> : null}
             {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
             <div>
               <Button className="v7:min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage || !data.oauthConfigured}><Link2 size={17} />Googleアカウントを接続</Button>
             </div>
             <div className="border-hairline border-t pt-5">
-              <p className="text-ink-secondary text-label whitespace-pre-line leading-relaxed">初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。\n接続後は、このLINEアカウントの店舗だけを表示します。</p>
+              <p className="text-ink-secondary text-label whitespace-pre-line leading-relaxed">{'初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。\n接続後は、このLINEアカウントの店舗だけを表示します。'}</p>
               {!canManage ? <p className="text-ink-faint mt-3 text-xs">Googleアカウントの接続は、統括の管理者へ依頼してください。</p> : null}
             </div>
           </section>
