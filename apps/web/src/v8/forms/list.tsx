@@ -8,7 +8,7 @@
  * （app/form-submissions/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
-import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -55,6 +55,7 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import { withViewTransition } from '@/components/shared/view-transition'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { notifyToast } from '@/components/shared/toast'
@@ -1326,17 +1327,26 @@ export default function FormsListV8() {
     )
   }
 
-  /* 右クリックでも「…」と同じ項目（行のどこでも）。管理者確認では出さない。 */
+  /*
+   * 右クリックでも「…」と同じ項目（行のどこでも）。管理者確認では出さない。
+   * 項目は押した瞬間の行から作る（itemsFor）。state に入れた行から作ると、
+   * 1回目は空で開かず、2回目は前に押した行の中身が出ていた。
+   */
   const contextForm = visibleForms.find((form) => form.id === contextId) ?? null
+  const rowIdOf = (event: ReactMouseEvent) =>
+    (event.target as HTMLElement | null)?.closest?.('tr[data-row-id]')?.getAttribute('data-row-id') ?? null
   const listContent = reviewMode || !selectedAccountId || loading || loadError || visibleForms.length === 0 ? listBody : (
     <ContextMenu
       label={contextForm ? `「${displayFormName(contextForm.name)}」の操作` : '回答フォームの操作'}
       items={contextForm ? toContextMenuItems(rowMenuItems(contextForm)) : []}
       shouldOpen={(event) => {
-        const row = (event.target as HTMLElement | null)?.closest?.('tr[data-row-id]')
-        const id = row?.getAttribute('data-row-id') ?? null
+        const id = rowIdOf(event)
         setContextId(id)
         return Boolean(id)
+      }}
+      itemsFor={(event) => {
+        const form = visibleForms.find((item) => item.id === rowIdOf(event))
+        return form ? toContextMenuItems(rowMenuItems(form)) : []
       }}
     >
       {listBody}
@@ -1345,19 +1355,24 @@ export default function FormsListV8() {
 
   /* ページ送り（絵：左に件数、右に頁）。1ページに収まるときは件数だけ。 */
   const showPager = !loading && !loadError && visibleForms.length > 0
-  const pagerSummary = pageCount > 1
-    ? `${formatNumber(listTotal)}件中 ${pageStart + 1}〜${Math.min(pageStart + visibleForms.length, listTotal)}件`
-    : `${formatNumber(listTotal)}件`
   const listPager = !showPager ? null : pageCount > 1 ? (
     <Pagination
       page={visiblePage}
       pageCount={pageCount}
       onPageChange={(next) => updateListState({ page: next })}
       ariaLabel="回答フォームのページ送り"
-      summary={<span className={styles.pagerCount}>{pagerSummary}</span>}
+      summary={(
+        <ListRange
+          bare
+          className={styles.pagerCount}
+          total={listTotal}
+          first={pageStart + 1}
+          last={Math.min(pageStart + visibleForms.length, listTotal)}
+        />
+      )}
     />
   ) : (
-    <p className={styles.pagerSolo}>{pagerSummary}</p>
+    <p className={styles.pagerSolo}>{`${formatNumber(listTotal)}件`}</p>
   )
 
   /* 閲覧のみの帯（`JV2oR`）。見出しの下・数の帯の上。 */
