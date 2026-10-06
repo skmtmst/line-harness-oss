@@ -1,0 +1,308 @@
+/*
+ * ★V8 流入リンクを作る（KMaMk・競合 vWJEm・競合の比べ E14GFm）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
+ * ここは段のカード（枠1・角12・余白20・間14）と、右の列（進む順・スマホ）の中身だけ。
+ */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-compact-gap);
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-back-lh);
+}
+.backLink:hover {
+  text-decoration: underline;
+}
+
+/* 競合の帯（vWJEm）：頭と本文の間の段（余白 12/24）に置き、広い幅でも見せる。 */
+:global([data-theme='v8'] [data-page-template='create']) > :global(div):has(> .conflictBand) {
+  display: block;
+}
+.conflictBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-conflict-gap);
+  padding: var(--tpl-cn-conflict-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+}
+.conflictIcon {
+  flex-shrink: 0;
+  color: var(--color-status-warn-deep);
+}
+.conflictText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+  min-width: 0;
+}
+.conflictTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-name-lh);
+}
+.conflictNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+
+/* 段のカード。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-card-gap);
+  padding: var(--tpl-cn-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-cn-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-cn-card-title-lh);
+}
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+.field {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-cn-field-gap);
+  min-width: 0;
+}
+.fieldRow {
+  display: flex;
+  gap: var(--tpl-cn-field-row-gap);
+}
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-field-gap);
+}
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-cn-label-lh);
+}
+.optional {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-cn-main-lh);
+}
+.pickLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-cn-main-lh);
+}
+.input {
+  width: 100%;
+  min-width: 0;
+  height: var(--tpl-cn-control-h);
+  padding: var(--tpl-cn-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+.fieldError {
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+/* 友だちになったときにすること：つまみ・題と中身・「変える／決める」の行（枠1・角10・余白 10/12・間12）。 */
+.actionItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-field-gap);
+}
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-field-row-gap);
+  padding: var(--tpl-cn-action-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+.actionText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+  min-width: 0;
+}
+.actionTitle {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-name-lh);
+}
+.actionValue {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.actionPick {
+  padding: var(--tpl-cn-action-pick-pad);
+}
+
+/* 発行される URL：薄い地の箱（角8・余白 10/12・間8）。右に小さく「発行するとできます」。 */
+.urlBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-ops-gap);
+  padding: var(--tpl-cn-url-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+}
+.urlIcon {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+}
+.urlText {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-cn-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.urlNote {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-cn-sub-lh);
+}
+
+/* 右の列：題 → 進む順の箱 → スマホ。 */
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-side-gap);
+  width: 100%;
+}
+.sideTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-preview-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-preview-title-lh);
+}
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-ops-gap);
+  margin: 0;
+  padding: var(--tpl-cn-steps-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  list-style: none;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-step-gap);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+.stepNum {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-cn-step-num);
+  height: var(--tpl-cn-step-num);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+.stepNumNow {
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+}
+/* スマホの題「LINEでの見え方」は、この画面では進む順の題が兼ねるので出さない（読み上げ名は残る）。 */
+.phoneBox > section > p:first-child {
+  display: none;
+}
+
+/* 違いを比べる窓（E14GFm）：違う項目だけの表（項目・いまの入力・保存されている内容）と、上書きできない理由の箱。 */
+.compareLead {
+  margin: var(--tpl-cn-compare-lead-margin);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+.compareTable {
+  width: 100%;
+  margin-top: var(--tpl-cn-compare-gap);
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+.compareTable th,
+.compareTable td {
+  padding: var(--tpl-cn-compare-cell-pad);
+  padding-left: 0;
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-weight: 400;
+  text-align: left;
+  vertical-align: top;
+}
+.compareTable thead th {
+  padding: var(--tpl-cn-compare-head-pad);
+  padding-left: 0;
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+.compareTable .compareLabelCol {
+  width: var(--tpl-cn-compare-label-w);
+  padding-left: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+.compareTable .compareSaved {
+  color: var(--color-status-warn-deep);
+}
+.compareNote {
+  margin: var(--tpl-cn-compare-note-margin);
+  padding: var(--tpl-cn-compare-note-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-cn-sub-lh);
+}

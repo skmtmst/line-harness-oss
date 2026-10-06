@@ -619,6 +619,19 @@
   --tpl-folder-width: 200px; --tpl-folder-pad-block: 16px; --tpl-folder-pad-side: 12px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
+  /* コンバージョン・流入の作成（r6dJFy・BygrU・WSGvo・j8p3yj・cXqlS・KMaMk・E14GFm・vWJEm）。 */
+  --tpl-cn-tools-indent: 24px; --tpl-cn-toolbar-row-gap: 14px; --tpl-cn-tools-after: -6px; --tpl-cn-notice-after: 11px; --tpl-cn-search-w: 240px; --tpl-cn-sort-w: 160px; --tpl-cn-saved-w: 154px; --tpl-cn-saved-pad-start: 36px; --tpl-cn-saved-icon-left: 14px;
+  --tpl-cn-table-margin: 0 24px; --tpl-cn-table-radius: 12px; --tpl-cn-table-ring: inset 0 0 0 1px var(--color-hairline);
+  --tpl-cn-col-gap: 16px; --tpl-cn-head-h: 44px; --tpl-cn-head-pad: 13px 20px; --tpl-cn-row-pad: 9px 20px; --tpl-cn-row-h: 62px; --tpl-cn-cell-gap: 3px;
+  --tpl-cn-col-trigger: 190px; --tpl-cn-col-count: 72px; --tpl-cn-col-value: 90px; --tpl-cn-num-pad-end: 8px; --tpl-cn-col-usage: 150px; --tpl-cn-col-ops: 150px;
+  --tpl-cn-name-lh: 19px; --tpl-cn-main-lh: 17px; --tpl-cn-sub-lh: 16px; --tpl-cn-pill-pad: 2px 8px; --tpl-cn-pill-gap: 5px; --tpl-cn-pill-lh: 18px;
+  --tpl-cn-ops-gap: 8px; --tpl-cn-ops-space-w: 120px; --tpl-cn-create-after: 16px; --tpl-cn-create-w: 140px; --tpl-cn-control-h: 36px; --tpl-cn-input-pad: 0 12px; --tpl-cn-field-gap: 6px; --tpl-cn-secret-pad: 10px 12px;
+  --tpl-cn-panels-margin: 0 24px; --tpl-cn-panel-gap: 16px; --tpl-cn-panel-pad: 16px; --tpl-cn-panel-inner-gap: 12px; --tpl-cn-panel-ring: inset 0 0 0 1px var(--color-hairline); --tpl-cn-panel-title-lh: 21px; --tpl-cn-panel-text-lh: 20px;
+  --tpl-cn-foot-pad: 12px 48px; --tpl-cn-foot-pad-narrow: 12px 24px; --tpl-cn-narrow-notice-after: 3px; --tpl-cn-ro-margin: 12px 24px; --tpl-cn-stats-notice-pad: 0 24px 12px; --tpl-cn-skeleton-h: 12px;
+  --tpl-cn-back-lh: 19px; --tpl-cn-conflict-gap: 12px; --tpl-cn-conflict-margin: 0; --tpl-cn-conflict-pad: 12px 16px;
+  --tpl-cn-card-gap: 14px; --tpl-cn-card-pad: 20px; --tpl-cn-card-title-size: 15px; --tpl-cn-card-title-lh: 22px; --tpl-cn-label-lh: 20px; --tpl-cn-field-row-gap: 12px;
+  --tpl-cn-side-gap: 14px; --tpl-cn-side-card-gap: 6px; --tpl-cn-side-title-lh: 20px; --tpl-cn-side-row-pad: 6px 0; --tpl-cn-list-indent: 18px; --tpl-cn-choice-pad: 12px 10px; --tpl-cn-choice-gap: 4px;
+  --tpl-cn-action-pad: 10px 12px; --tpl-cn-action-pick-pad: 0 12px; --tpl-cn-url-pad: 10px 12px; --tpl-cn-steps-pad: 12px 14px; --tpl-cn-step-gap: 10px; --tpl-cn-step-num: 22px; --tpl-cn-compare-cell-pad: 15px 10px; --tpl-cn-compare-head-pad: 14px 10px; --tpl-cn-compare-label-w: 122px; --tpl-cn-compare-gap: -6px; --tpl-cn-compare-lead-margin: -19px 0 0; --tpl-cn-compare-note-margin: 21px 0 -13px; --tpl-cn-compare-note-pad: 12px;
   /* ウェビナーの一覧（UyUMw・uBMuB・jiNg0）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16）。 */
   --tpl-wb-search-w: 240px; --tpl-wb-saved-w: 154px; --tpl-wb-sort-w: 124px;
   --tpl-wb-col-gap: 16px; --tpl-wb-head-h: 44px; --tpl-wb-head-pad: 13px 20px; --tpl-wb-row-pad: 9px 20px; --tpl-wb-row-h: 56px;
