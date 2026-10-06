@@ -286,6 +286,15 @@ describe('Google Business reviews', () => {
     expect(replyDraftRewriteFellShort('shorter', 'あ'.repeat(100), 'あ'.repeat(120))).toBe(true);
   });
 
+  it('元が短い（目安の下限40字付近）ときも、ほぼ無変化の短縮は不十分と判定する（40字→39字）', () => {
+    // target は下限40字に揃うため target*1.3=52 の壁は39字でも超えず、
+    // 比率（元の7割=28字）で必ず不十分と判定できることを確認する。
+    expect(replyDraftRewriteFellShort('shorter', 'あ'.repeat(40), 'あ'.repeat(39))).toBe(true);
+    expect(replyDraftRewriteFellShort('shorter', 'あ'.repeat(40), 'あ'.repeat(30))).toBe(true);
+    // 7割（28字）以下まで縮めれば十分とする。
+    expect(replyDraftRewriteFellShort('shorter', 'あ'.repeat(40), 'あ'.repeat(28))).toBe(false);
+  });
+
   it('再試行の採用は「変化が大きい方」を比べて決める', () => {
     const base = 'あ'.repeat(130);
     // 短くする：1回目(100字)より厳しめ再試行(60字)の方が大きく短くなっている→再試行を採用すべき。

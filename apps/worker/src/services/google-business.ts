@@ -646,7 +646,11 @@ export function replyDraftRewriteFellShort(mode: 'new' | 'shorter' | 'polite', b
   if (mode === 'shorter') {
     if (b.length >= a.length) return true;
     const target = replyDraftTargetLength('shorter', a.length);
-    return b.length > target * 1.3;
+    if (b.length > target * 1.3) return true;
+    // 元の文章が短いと目安の下限（40字）が元の長さに近づき、target*1.3 による判定が
+    // 効かなくなる（例：40字→39字のほぼ無変化でも target*1.3=52 を超えず素通りする）。
+    // 下限に埋もれないよう、元の長さに対する比率でも必ず短くなっていることを求める。
+    return b.length > a.length * 0.7;
   }
   if (mode === 'polite') {
     if (b.length <= a.length) return true;

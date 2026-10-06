@@ -700,6 +700,8 @@ describe('Googleビジネス：口コミ', () => {
       { mode: 'shorter', base: 'あ'.repeat(130), first: 'い'.repeat(100), second: 'う'.repeat(120) },
       // 短くするのに元と同じ長さのまま。
       { mode: 'shorter', base: 'あ'.repeat(40), first: 'い'.repeat(40), second: 'う'.repeat(40) },
+      // 元が短い（目安の下限40字）ため、ほぼ無変化（1字減）でも目安の壁を超えず素通りしてしまっていた不具合の再現。
+      { mode: 'shorter', base: 'あ'.repeat(40), first: 'い'.repeat(39), second: 'う'.repeat(38) },
       // 丁寧にするのに元より長くなっていない。
       { mode: 'polite', base: 'あ'.repeat(400), first: 'い'.repeat(400), second: 'う'.repeat(400) },
       // 作り直し自体が失敗したときも、不十分な1回目を保存しない。
