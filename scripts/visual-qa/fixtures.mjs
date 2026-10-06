@@ -2382,6 +2382,9 @@ export const TEMPLATES = (() => {
         totalSendCount: sendCounts[n]?.[1] ?? 0,
         createdAt: '2026-01-13T00:00:00.000Z',
         updatedAt: n === 0 ? '2026-08-22T09:20:00.000Z' : '2026-01-13T00:00:00.000Z',
+        /* 公開の札（設計 v19Ivv：公開中・未公開の変更・下書きだけ）。本物の口は公開日時と下書きの有無を返す。 */
+        publishedAt: n === 4 ? null : '2026-01-13T00:00:00.000Z',
+        hasDraft: n === 1 || n === 4,
       })
       n += 1
     }

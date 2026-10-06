@@ -2545,6 +2545,26 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 区切り形だけを読むので、ここも同じ分け方にする。ずれていると
    * `items` が undefined になって画面ごと落ちる。
    */
+  /* テンプレートの種類タブの件数（設計 v19Ivv：カルーセル4・リッチメッセージ3・クーポン2・リサーチ1）。無いとタブの幅が変わる。 */
+  if (pathname === '/api/broadcast-message-assets/counts') {
+    return { success: true, data: { card_message: 4, rich_message: 3, coupon: 2, research: 1 } }
+  }
+  /* テンプレートの使っている所（設計 Z0g3si：一斉配信・自動応答から先に並ぶ）。無いと削除できない窓が空になる。 */
+  if (/^\/api\/templates\/[^/]+\/usages$/.test(pathname)) {
+    return {
+      success: true,
+      data: {
+        broadcasts: [{ broadcastId: 'bc-1', title: '9月の予約リマインド', status: 'scheduled', scheduledAt: '2026-09-30T09:00:00+09:00', templateVersionNumber: 2, referenceMode: 'fixed' }],
+        autoReplies: [{ id: 'ar-2', keyword: '予約変更のお問い合わせ', lineAccountId: null, templateVersion: null }],
+        scenarioSteps: [{ scenarioId: 'scenario-1', scenarioName: '予約フォロー', stepId: 'step-1', stepOrder: 1, templateVersion: null }],
+        reminderSteps: [{ reminderId: 'reminder-1', reminderName: '来店前日（あおい）', stepId: 'rstep-1' }],
+        reminderEnrollments: [],
+        automations: [],
+        richMenuAreas: [],
+        trackedLinks: [],
+      },
+    }
+  }
   if (pathname === '/api/templates') {
     if (query.has('page') || query.has('limit')) {
       const q = query.get('q')?.toLowerCase()
@@ -2716,7 +2736,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: formFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
-    return { success: true, data: TEMPLATE_FOLDERS }
+    // 本物の口はフォルダごとの件数（itemCount）と未分類の件数（unfiledCount）も返す。無いとフォルダの脇の数が出ない。
+    return {
+      success: true,
+      data: TEMPLATE_FOLDERS.map((folder) => ({ ...folder, itemCount: folder.templateCount })),
+      unfiledCount: TEMPLATES.filter((item) => item.folderId === null).length,
+    }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'broadcast') {
     // 板 `NtCE3`：未分類は `folderId: null` の5件。
