@@ -1,3 +1,5 @@
+import { getBookingSyncRules, saveBookingSyncRules, validateBookingSyncRules, listBookingSyncNotices } from '@line-crm/db';
+import { evaluateBookingSyncNotices } from '../services/booking-sync-rules.js';
 // Booking feature HTTP routes.
 //
 // LIFF-facing endpoints live under /api/liff/booking/* (auth-bypassed by
@@ -130,13 +132,16 @@ const booking = new Hono<Env>();
 booking.use('*', async (c, next) => {
   await next();
   const path = c.req.path;
-  const mutation = (c.req.method === 'POST' || c.req.method === 'PATCH') && (
+  const mutation = (c.req.method === 'PUT' && path === '/api/booking/admin/sync-rules') || (c.req.method === 'POST' || c.req.method === 'PATCH') && (
     path === '/api/liff/booking/requests' || path === '/api/booking/admin/bookings'
     || /^\/api\/booking\/admin\/(bookings|requests)\/[^/]+(\/reassign)?$/.test(path));
   if (!mutation || c.res.status < 200 || c.res.status >= 300) return;
   try {
     const accountId = path.startsWith('/api/liff/') ? await resolveAccountIdFromLiff(c) : await resolveAccountIdAdmin(c);
-    if (accountId) await notifyBookingConflicts(c.env.DB, accountId);
+    if (accountId) {
+      await evaluateBookingSyncNotices(c.env,accountId);
+      await notifyBookingConflicts(c.env.DB, accountId);
+    }
   } catch {
     console.warn('booking_conflict_notification_failed');
   }
@@ -2247,7 +2252,33 @@ booking.put('/api/booking/admin/channels/settings', requirePermission(BOOKING_SE
 booking.get('/api/booking/admin/conflicts', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
-  return c.json({ success: true, data: { conflicts: await listBookingConflicts(c.env.DB, accountId) } });
+  return c.json({ success: true, data: { conflicts: await listBookingConflicts(c.env.DB, accountId), notifyConflicts:(await getBookingSyncRules(c.env.DB,accountId)).notifyConflicts } });
+});
+
+booking.get('/api/booking/admin/sync-rules',async c=>{
+  const accountId=await resolveAccountIdAdmin(c);if(!accountId)return c.json({error:'missing_account_id'},400);
+  c.header('Cache-Control','no-store');
+  return c.json({success:true,data:await getBookingSyncRules(c.env.DB,accountId)});
+});
+booking.put('/api/booking/admin/sync-rules',requirePermission(BOOKING_SETTINGS_KEY),async c=>{
+  const accountId=await resolveAccountIdAdmin(c);if(!accountId)return c.json({error:'missing_account_id'},400);
+  const body=await c.req.json().catch(()=>null);
+  if(!validateBookingSyncRules(body))return c.json({success:false,error:'ルールと読み込んだ版を確認してください'},400);
+  if(!await saveBookingSyncRules(c.env.DB,accountId,body))return c.json({success:false,error:'ほかの担当者が先に保存しました',currentVersion:(await getBookingSyncRules(c.env.DB,accountId)).version},409);
+  return c.json({success:true,data:await getBookingSyncRules(c.env.DB,accountId)});
+});
+booking.get('/api/booking/admin/sync-notices',async c=>{
+  const accountId=await resolveAccountIdAdmin(c);if(!accountId)return c.json({error:'missing_account_id'},400);
+  c.header('Cache-Control','no-store');
+  return c.json({success:true,data:await listBookingSyncNotices(c.env.DB,accountId)});
+});
+booking.post('/api/booking/admin/sync-notices/:id/done',requireRole('owner','admin','staff'),async c=>{
+  const accountId=await resolveAccountIdAdmin(c);if(!accountId)return c.json({error:'missing_account_id'},400);
+  const notice=await c.env.DB.prepare('SELECT status FROM booking_sync_notices WHERE id=? AND line_account_id=?').bind(c.req.param('id'),accountId).first<{status:string}>();
+  if(!notice)return c.json({success:false,error:'知らせがありません'},404);
+  if(notice.status==='resolved')return c.json({success:false,error:'すでに条件が解消した知らせです'},409);
+  await c.env.DB.prepare("UPDATE booking_sync_notices SET status='done',updated_at=datetime('now') WHERE id=? AND line_account_id=? AND status='open'").bind(c.req.param('id'),accountId).run();
+  return c.json({success:true,data:{id:c.req.param('id'),status:'done'}});
 });
 
 booking.get('/api/booking/admin/settings', async (c) => {
