@@ -725,6 +725,8 @@
   --tpl-fr-mig-col-date: 150px; --tpl-fr-mig-col-kind: 102px; --tpl-fr-mig-col-state: 108px; --tpl-fr-mig-col-action: 118px;
   --tpl-fr-uid-step-h: 24px; --tpl-fr-uid-step-dot: 20px; --tpl-fr-uid-step-line: 16px; --tpl-fr-uid-step-line-gap: 6px;
   --tpl-fr-uid-col-uid: 410px; --tpl-fr-uid-col-decide: 178px; --tpl-fr-uid-col-state: 122px; --tpl-fr-uid-thead-h: 50px; --tpl-fr-uid-run-h: 62px; --tpl-fr-uid-bullet-indent: 20px; --tpl-fr-uid-band-pad: 14px; --tpl-fr-uid-lines-pad-bottom: 14px; --tpl-fr-uid-head-btn-pull: -4px; --tpl-fr-uid-ring: 1.5px;
+  --tpl-fr-mp-rail-w: 364px; --tpl-fr-mp-rail-pad: 24px; --tpl-fr-mp-rail-gap: 14px; --tpl-fr-mp-values-pull: -16px; --tpl-fr-mp-value-h: 39px;
+  --tpl-fr-mp-col-account-wide: 360px; --tpl-fr-mp-col-account: 320px; --tpl-fr-mp-col-name: 152px; --tpl-fr-mp-col-date: 123px;
   --tpl-fr-cmp-history-date: 259px; --tpl-fr-cmp-col-item: 160px; --tpl-fr-cmp-col-use: 208px; --tpl-fr-cmp-card-min: 220px; --tpl-fr-cmp-attr-label-n: 82px;
 }
 
