@@ -115,7 +115,7 @@
 }
 .stepDone, .stepCurrent { color: var(--color-ink); }
 .stepDone .stepDot { background: var(--color-accent-deep); box-shadow: none; color: var(--color-on-accent); }
-.stepCurrent .stepDot { box-shadow: inset 0 0 0 1.5px var(--color-accent-deep); color: var(--color-accent-deep); }
+.stepCurrent .stepDot { box-shadow: inset 0 0 0 var(--tpl-fr-uid-ring) var(--color-accent-deep); color: var(--color-accent-deep); }
 .stepLabel { line-height: var(--tpl-fr-desc-lh); }
 
 .cards4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-fr-stack-gap); }
