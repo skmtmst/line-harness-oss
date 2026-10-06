@@ -1794,7 +1794,15 @@ const RAW = {
   '/api/booking/admin/customer-context': { customer: BOOKING_CUSTOMER_CONTEXT },
   '/api/booking/admin/reminder-preview': BOOKING_REMINDER_PREVIEW,
   '/api/booking/admin/alternatives': BOOKING_CONFLICT_ALTERNATIVES,
-  '/api/events/admin/events': { items: ADMIN_EVENTS },
+  /* 一覧の数の帯（e2ekFu）は応答の全体集計 summary を読む。無いとページの行から数えて、過ぎた回だけだと 0 になる。 */
+  '/api/events/admin/events': {
+    items: ADMIN_EVENTS,
+    total: ADMIN_EVENTS.length,
+    summary: {
+      upcoming_slots: 9, upcoming_active: 29, upcoming_capacity: 60, fill_rate: 48, nearly_full: 1, low_applications: 1,
+      nearest_upcoming_starts_at: '2026-10-12T05:00:00.000Z', nearest_low_starts_at: '2026-10-05T02:00:00.000Z',
+    },
+  },
   // 予約メニューの帯は `requests` から件数を出す。包むと `.filter` で落ちる。
   // 撮影用は BOOKING_REQUESTS(実APIと同じ器。動的な絞り込みは下の分岐が受ける)。
   '/api/booking/admin/requests': { requests: BOOKING_REQUESTS, total: BOOKING_REQUESTS.length, limit: 50, offset: 0 },
