@@ -25,7 +25,7 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
 import { formatDateTime, formatNumber, formatYmd } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import BroadcastListV8 from './list-v8'
+import BroadcastListV8 from '@/v8/broadcasts/list'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
