@@ -7,7 +7,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import BroadcastsPage from './list-v8'
+import BroadcastsPage from '@/v8/broadcasts/list'
 
 /*
  * V8「サクサク感」C①・D・E：一斉配信一覧の行パネル。

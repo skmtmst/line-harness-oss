@@ -14,8 +14,10 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
  * （予約・イベント・ウェビナー・回答フォームは M6 の担当。ここでは触らない）
  */
 const WIRED = [
-  'app/webhooks/new/new-v8.tsx',
-  'app/contents/vars/new/new-v8.tsx',
+  // 外部連携を作るの入口は V8 のとき src/v8/webhooks/create.tsx（古い new-v8.tsx はもう描かれない）。
+  'v8/webhooks/create.tsx',
+  // 共通情報を作るの入口は src/v8/common-vars-edit/new.tsx（古い new-v8.tsx はもう描かれない）。
+  'v8/common-vars-edit/new.tsx',
 ]
 
 describe('V8 の blur 検証の配線（間違えない・怖くない）', () => {

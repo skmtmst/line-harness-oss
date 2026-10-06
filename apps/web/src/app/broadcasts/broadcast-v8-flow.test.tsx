@@ -79,7 +79,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin' }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'admin', canManageRole: (role: string | null | undefined) => role === 'owner' || role === 'admin' }))
 vi.mock('@/lib/staff-capability', () => ({ canEditFeature: () => true }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -111,7 +111,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 })
 
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
-import BroadcastListV8 from './list-v8'
+import BroadcastListV8 from '@/v8/broadcasts/list'
 import BroadcastDetailPage from './detail/page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -162,9 +162,12 @@ describe('V8 一斉配信の通し', () => {
     await mount(<BroadcastListV8 />)
     await screen.findByText('はじめの配信')
 
-    // 作る入口を押すと作る面が出る。
+    // 作る入口（「配信を作る ▾」→「新しく作る」）を押すと作る面が出る。
     await act(async () => {
-      fireEvent.click(screen.getAllByRole('button', { name: '＋ 配信を作る' })[0])
+      fireEvent.click(screen.getAllByRole('button', { name: '配信を作る' })[0])
+    })
+    await act(async () => {
+      fireEvent.click(await screen.findByRole('menuitem', { name: '新しく作る' }))
     })
     await screen.findByPlaceholderText('例：8月キャンペーンのお知らせ')
 
