@@ -45,7 +45,6 @@ const GUARDED = [
   'app/form-submissions/edit/page.tsx',
   'app/friend-add-settings/editor-v8.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',
-  'app/inflow-links/new/inflow-create-v8.tsx',
   'app/inflow-links/new/page.tsx',
   'app/line-notifications/operator/new/page.tsx',
   'app/line-notifications/operator/new/operator-new-v8.tsx',
@@ -60,7 +59,6 @@ const GUARDED = [
   'app/nen-campaigns/columns/new/column-new-v8.tsx',
   'app/nen-campaigns/columns/new/page.tsx',
   'app/nen-campaigns/edit/campaign-editor-v8.tsx',
-  'app/nen-campaigns/edit/campaign-editor.tsx',
   'app/nen-campaigns/edit/page.tsx',
   'app/nen-campaigns/page.tsx',
   'app/nen/members/lifetime-tab.tsx',
@@ -93,13 +91,11 @@ const GUARDED = [
   'app/templates/carousel/page.tsx',
   'app/templates/editor-v8.tsx',
   'app/templates/questions/new/page.tsx',
-  'app/webhooks/new/new-v8.tsx',
   'app/webhooks/new/page.tsx',
-  'app/webhooks/new/new-v8.tsx',
+  'v8/webhooks/create.tsx',
   'app/webinars/edit/page.tsx',
   'app/webinars/new/new-v8.tsx',
   'app/webinars/new/page.tsx',
-  'components/accounts/account-ordering.tsx',
   'components/broadcasts/broadcast-form.tsx',
   'components/events/event-form.tsx',
   'components/events/event-wizard.tsx',
@@ -199,8 +195,6 @@ const EXEMPTIONS: Record<string, string> = {
     '重なりの共通部品。初回フォーカスの寄せ先を呼出側で選べるだけで、編集を持たない',
   'components/shared/button.tsx':
     'ボタンの共通部品。開いた直後の標的用の ref を受けられるだけで、編集を持たない',
-  'app/nen-members/photo-reward-policy.tsx':
-    '棚（Drawer）の中の小さな操作。閉じると入力は戻る仕様で、画面離脱ガードの対象外。保存中・戻し中は棚を閉じられない',
   'app/pools/new/pool-new-v8.tsx':
     'new/page.tsx（hq 未判定）と同じ画面の★V8版。作る前の一時入力だけで下書きを持たないため、番兵の要否は元の画面と一緒に決める',
   'app/form-submissions/page.tsx':
@@ -227,12 +221,6 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 の保存した検索一覧。詳細パネルの検索名はその場書き換えでEnter確定の即時保存、削除は確認窓で確定し、画面に残る下書きを持たない',
   'app/tags/fields-tab-v8.tsx':
     '★V8 の友だち情報欄一覧。詳細パネルの項目名はその場書き換えでEnter確定の即時保存、削除・フォルダ操作は確認窓か即時保存で確定し、画面に残る下書きを持たない',
-  'app/scenarios/list-v8.tsx':
-    '★V8 のシナリオ一覧（axFrW）。一覧上の操作（停止・再開・フォルダ移動・並び替え・複製・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。複製窓の名前欄は閉じると戻るダイアログ内の入力',
-  'app/auto-replies/list-v8.tsx':
-    '★V8 の自動応答一覧（uE9gf）。一覧上の操作（停止・再開・フォルダ移動・並び替え・複製・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。止める窓の理由欄は閉じると戻るダイアログ内の入力',
-  'app/form-submissions/list-v8.tsx':
-    '★V8 の回答フォーム一覧（I3L41O）。一覧上の操作（受付を止める・複製・削除・フォルダ移動）は押した直後に確認窓か即時保存で確定し、作る操作は下書きを作って編集画面へ渡すため、この画面に残る下書きを持たない。複製窓の名前欄は閉じると戻るダイアログ内の入力',
   'app/booking/menus/page.tsx':
     '予約メニュー編集窓（Dialog）内の dirty。×・Esc・背景・キャンセルは窓内の破棄確認に集め、閉じると入力は戻る仕様で画面離脱ガードの対象外',
   'app/booking/staff/shifts/staff-detail-v8.tsx':
@@ -261,12 +249,43 @@ const EXEMPTIONS: Record<string, string> = {
     '★V8 のイベント予約者（gHmNK）。承認・キャンセル・待ち順の操作は確認窓で確定して即時保存し、お知らせ送信も「送る」で即時送信する。窓内の理由欄は閉じると戻るダイアログ内の入力で、画面に残る下書きを持たない',
   'app/webinars/list-v8.tsx':
     '★V8-B のウェビナー一覧（UyUMw）。一覧と絞り込みが中心で、フォルダの追加・変更・削除とアーカイブは押した直後に確認窓か即時保存で確定する。フォルダ名の入力は閉じると戻る窓の中だけなので、この画面に残る下書きを持たない',
-  'app/rich-menus/list-v8.tsx':
-    '★V8 のリッチメニュー一覧（rZEGN）。一覧上の操作（並び替え・複製・削除・表示先変更）は押した直後に確認窓か即時保存で確定し、この画面に残る下書きを持たない。名前のその場編集は Enter で即時保存し Esc・ぶれでやめるため離脱で失う下書きを持たない',
-  'app/webhooks/_components/webhooks-v8-incoming.tsx':
-    '★V8-B 外部連携・こちらで受け取る（gW0F2）。作る窓・合言葉窓・試す窓の入力は閉じると戻る窓の中だけで、保存は窓の中の「作る」「更新する」で確定する。一覧上の操作（動かす・止める・結び付ける・確認した・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない',
-  'app/broadcasts/quick-send-dialog.tsx':
-    '★V8 のすぐ送る窓（P6vbxn）。dirty は窓の中だけで、閉じると入力は戻る仕様で画面離脱ガードの対象外。送る操作は確認窓で確定して即時送信する',
+  /* ★V8 の新しい画面（src/v8）。古い画面ファイルの理由をそのまま写した（2026-10-06）。 */
+  'v8/scenarios/list.tsx':
+    '★V8 のシナリオ一覧（axFrW）。一覧上の操作（停止・再開・フォルダ移動・並び替え・複製・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。複製窓の名前欄は閉じると戻るダイアログ内の入力',
+  'v8/auto-replies/list.tsx':
+    '★V8 の自動応答一覧（uE9gf）。一覧上の操作（停止・再開・フォルダ移動・並び替え・複製・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。止める窓の理由欄は閉じると戻るダイアログ内の入力',
+  'v8/forms/list.tsx':
+    '★V8 の回答フォーム一覧（I3L41O）。一覧上の操作（受付を止める・複製・削除・フォルダ移動）は押した直後に確認窓か即時保存で確定し、作る操作は下書きを作って編集画面へ渡すため、この画面に残る下書きを持たない。複製・名前の入力は閉じると戻る右のパネル・窓の中だけ',
+  'v8/webinars/list.tsx':
+    '★V8 のウェビナー一覧（UyUMw）。一覧と絞り込みが中心で、フォルダの追加・変更・削除とアーカイブは押した直後に確認窓か即時保存で確定する。フォルダ名の入力は閉じると戻る窓の中だけなので、この画面に残る下書きを持たない',
+  'v8/webhooks/incoming.tsx':
+    '★V8 外部連携・こちらで受け取る（gW0F2）。作る窓・合言葉窓・試す窓の入力は閉じると戻る窓の中だけで、保存は窓の中の「作る」「更新する」で確定する。一覧上の操作（動かす・止める・結び付ける・確認した・削除）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない',
+  'v8/webhooks/outgoing.tsx':
+    '★V8 外部連携・こちらから送る。一覧上の操作（動かす・止める）は押した直後に即時保存し、窓の中の入力は閉じると戻る。画面に残る下書きを持たない',
+  'v8/analytics/cross.tsx':
+    '★V8 分析のクロス集計。選ぶ欄は集計の条件で、結果の枡から対象者を作って友だち一覧・配信へ渡すだけ。保存する編集画面ではなく、画面に残る下書きを持たない',
+  'v8/analytics/funnel.tsx':
+    '★V8 分析のファネル。選ぶ欄は見る条件で、結果から対象者を作って友だち一覧・配信へ渡すだけ。保存する編集画面ではなく、画面に残る下書きを持たない',
+}
+
+/*
+ * もう描かれない古い画面ファイル（入口は src/v8 の新しい画面か、別の画面を出す）。
+ * ファイルは切り替えの日まで残るので、探すと見つかる。見張っても意味が無いので探す対象から外す。
+ * 切り替えの日にファイルと一緒にここから消す（2026-10-06 に GUARDED・EXEMPTIONS・UNTRIAGED から移した）。
+ */
+const NOT_RENDERED: Record<string, string> = {
+  'app/scenarios/list-v8.tsx': '入口は src/v8/scenarios/list.tsx',
+  'app/auto-replies/list-v8.tsx': '入口は V8 のとき src/v8/auto-replies/list.tsx',
+  'app/form-submissions/list-v8.tsx': '入口は src/v8/forms/list.tsx',
+  'app/rich-menus/list-v8.tsx': '入口は V8 のとき src/v8/rich-menus/list.tsx',
+  'app/webhooks/new/new-v8.tsx': '入口は V8 のとき src/v8/webhooks/create.tsx',
+  'app/webhooks/incoming-v8.tsx': '入口は V8 のとき src/v8/webhooks/incoming.tsx',
+  'app/webhooks/_components/webhooks-v8-incoming.tsx': '入口は V8 のとき src/v8/webhooks/incoming.tsx',
+  'app/inflow-links/new/inflow-create-v8.tsx': 'どの入口からも読まれていない',
+  'app/nen-campaigns/edit/campaign-editor.tsx': 'どの入口からも読まれていない（V8 は campaign-editor-v8.tsx）',
+  'app/nen-members/photo-reward-policy.tsx': 'どの入口からも読まれていない',
+  'app/broadcasts/quick-send-dialog.tsx': 'どの入口からも読まれていない',
+  'components/accounts/account-ordering.tsx': 'どの入口からも読まれていない',
 }
 
 /*
@@ -341,8 +360,6 @@ const UNTRIAGED: Record<string, string> = {
     's2: テンプレート編集の本体（app/templates/edit から載る）。V6R-S2-a（board#1066）で付ける',
   'app/webhooks/edit/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/webhooks/incoming-v8.tsx':
-    '★V8-B 外部連携のこちらで受け取る（gW0F2）。受け取り口の作る・直す・試すは確認窓（Dialog）の中で完結し、窓を閉じれば捨てられる小さな操作のため、画面離脱の番兵は要らない。一覧の開始・停止は押した直後に即時保存する',
   'app/webhooks/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/accounts/account-edit-modal.tsx':
@@ -363,6 +380,12 @@ const UNTRIAGED: Record<string, string> = {
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
 }
 
+/*
+ * 探す場所。V8 の新しい画面は src/v8 に一から書く（2026-10-06〜）。入口が `@/v8/...` を
+ * 出すようになったので、ここも探す。古い画面ファイル（もう描かれないもの）は表から外した。
+ */
+const SCAN_ROOTS = ['app', 'components', 'v8'] as const
+
 function* tsxFiles(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name)
@@ -376,10 +399,12 @@ function* tsxFiles(dir: string): Generator<string> {
 
 function dirtyTrackingFiles(): string[] {
   const found: string[] = []
-  for (const root of ['app', 'components']) {
+  for (const root of SCAN_ROOTS) {
     for (const path of tsxFiles(join(SRC, root))) {
+      const file = path.slice(SRC.length + 1)
+      if (file in NOT_RENDERED) continue
       if (DIRTY_SIGNATURE.test(readFileSync(path, 'utf8'))) {
-        found.push(path.slice(SRC.length + 1))
+        found.push(file)
       }
     }
   }
@@ -388,8 +413,9 @@ function dirtyTrackingFiles(): string[] {
 
 function editorFiles(): string[] {
   const found: string[] = []
-  for (const root of ['app', 'components']) {
+  for (const root of SCAN_ROOTS) {
     for (const path of tsxFiles(join(SRC, root))) {
+      if (path.slice(SRC.length + 1) in NOT_RENDERED) continue
       const source = readFileSync(path, 'utf8')
       if (DIRTY_SIGNATURE.test(source)) continue
       if (!EDITOR_SAVE_SIGNATURE.test(source)) continue
@@ -444,6 +470,9 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
     }
     for (const [file, reason] of Object.entries(EXEMPTIONS)) {
       expect(reason.length, `${file} の対象外理由`).toBeGreaterThan(0)
+    }
+    for (const file of Object.keys(NOT_RENDERED)) {
+      expect(() => readFileSync(join(SRC, file), 'utf8'), `${file} は消えたので NOT_RENDERED から消す`).not.toThrow()
     }
   })
 
