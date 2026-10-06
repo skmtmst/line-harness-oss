@@ -504,7 +504,13 @@ shared-button-importer lib/unsaved-leave-dialog.tsx
 shared-button-importer app/inflow-links/ad-connection-dialog.tsx
 shared-button-importer app/inflow-links/ad-event-mappings.tsx
 shared-button-importer components/events/event-application-preview.tsx
+shared-button-importer v8/broadcasts/list.tsx
 shared-button-importer v8/forms/list.tsx
+shared-button-importer v8/form-edit/after-tab.tsx
+shared-button-importer v8/form-edit/appearance-tab.tsx
+shared-button-importer v8/form-edit/content-tab.tsx
+shared-button-importer v8/form-edit/edit.tsx
+shared-button-importer v8/form-edit/media-picker.tsx
 shared-button-importer v8/rich-menus/list.tsx
 shared-button-importer v8/rich-menus/external-import.tsx
 shared-button-importer v8/auto-replies/list.tsx
@@ -527,6 +533,8 @@ shared-button-importer v8/mileage/score.tsx
 shared-button-importer v8/mileage/reward-edit.tsx
 shared-button-importer v8/mileage/friend-detail.tsx
 shared-button-importer v8/mileage/adjust-dialog.tsx
+shared-button-importer v8/friend-add/list.tsx
+shared-button-importer v8/friend-add/editor.tsx
 shared-button-importer v8/notifications/list.tsx
 shared-button-importer v8/analytics/analytics.tsx
 shared-button-importer v8/analytics/reactions.tsx
@@ -538,3 +546,7 @@ shared-button-importer v8/analytics/saved.tsx
 shared-button-importer v8/analytics/funnel.tsx
 shared-button-importer v8/analytics/cross.tsx
 shared-button-importer v8/analytics/search-console.tsx
+shared-button-importer v8/conversions/list.tsx
+shared-button-importer v8/conversions/dialogs.tsx
+shared-button-importer v8/conversions/create.tsx
+shared-button-importer v8/inflow-links/new/create.tsx
