@@ -4964,7 +4964,7 @@ const CONVERSION_PREVIOUS_RANGE = {
 }
 
 const CONVERSION_USAGE_COUNTS = new Map([
-  ['cp-1', 3], ['cp-4', 1], ['cp-3', 1], ['cp-2', 1], ['cp-5', 0], ['cp-6', 1],
+  ['cp-1', 3], ['cp-4', 2], ['cp-3', 1], ['cp-2', 1], ['cp-5', 0], ['cp-6', 1],
 ])
 
 const CONVERSION_CURRENT_BY_ID = new Map(CONVERSION_REPORT_CURRENT.map((row) => [row.conversionPointId, row]))
@@ -4987,11 +4987,17 @@ export const CONVERSION_DEFINITIONS = {
       attributionDays: point.attributionDays,
       lineAccountId: point.lineAccountId,
       status: point.isActive ? 'active' : 'stopped',
+      // 一覧の状態の札・取り消しの決め方・受け口（本物の口と同じ形。V8 の一覧 r6dJFy が読む）。
+      state: point.isActive ? 'active' : 'stopped',
+      stateReason: null,
+      sourceConfig: {},
+      reversalPolicy: point.eventType === 'ec_order_confirmed' ? 'source_cancelled' : 'manual',
+      ingest: { configured: point.measureMethod === 'webhook', disabledAt: null },
       version: 1,
       usageCount: CONVERSION_USAGE_COUNTS.get(point.id) ?? 0,
       usageNames: {
         'cp-1': ['ファネル 2', 'アフィリエイト 1', 'マイル「商品を買った」'],
-        'cp-4': ['アフィリエイト 1'],
+        'cp-4': ['アフィリエイト 1', '広告への送信'],
         'cp-3': ['オートメーション 1'],
         'cp-2': ['ファネル 1'],
         'cp-5': [],
@@ -5021,6 +5027,9 @@ export const CONVERSION_DEFINITIONS = {
 export const CONVERSION_DEFINITION_PREVIEW = {
   range: CONVERSION_RANGE,
   matchedCount: 386,
+  // 条件に合う人数と、数えない条件で除いた件数（V8 の作る画面 j8p3yj の右の列が読む）。
+  uniqueFriendCount: 47,
+  excludedCount: 3,
   estimatedCount: 214,
   estimatedValue: 402800,
   duplicateExcludedCount: 172,
