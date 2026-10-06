@@ -264,6 +264,9 @@ describe('共通部品の影響範囲', () => {
       'v8/friends/migrations/uid.tsx',
       // ★V8 コンバージョンの一覧（r6dJFy）。新しい置き場（src/v8）に一から書いた。
       'v8/conversions/list.tsx',
+      // ★V8 流入と計測の詳細（Q5le3）。来た友だちの表と注文の明細（写し）の下にページ送り。
+      'v8/inflow-links/detail.tsx',
+      'v8/inflow-links/ref-orders.tsx',
     ].sort())
   })
 
