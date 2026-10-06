@@ -1,0 +1,505 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B 運用状態の緊急コントロール（板 `OHwbU`）。
+ *
+ * v7 の制御タブ（`page.tsx` 内の EmergencyControlPanel）とは別の部品として持つ。
+ * データの口・確認の言葉・本人確認・二重押し防止・競合の戻し方は同じ。
+ * 違いは置き場と見せ方だけ——上に4枚の数の帯、何を止めますか・
+ * 止めるアカウントのカード、止めているときの赤い帯、止めるとどうなるか・
+ * 止めたあとにすること、止めた・戻した記録の表。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+/* 閲覧のみの帯。数の帯の上。 */
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 数の帯：4つのマスを区切り線で並べる。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 16px;
+}
+
+.kpi + .kpi {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpiHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kpiTile {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-tile-sm);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+}
+
+.kpiLabel {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiValueDanger {
+  color: var(--color-danger);
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.kpiDetail {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card {
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.cardNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 止める対象の行：左にチェック、右に実測の影響。 */
+.targetRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.targetRow:first-of-type {
+  margin-top: 12px;
+}
+
+.targetImpact {
+  flex-shrink: 0;
+  max-width: 45%;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  text-align: right;
+}
+
+.accountRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.accountField {
+  min-width: 240px;
+  flex: 1 1 auto;
+  max-width: 420px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 理由・補足（本体）。窓の中と同じ Select＋複数行入力。 */
+.detailBlock {
+  margin-top: 12px;
+}
+
+.detailHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detailHead .fieldLabel {
+  margin-bottom: 4px;
+}
+
+.detailCounter {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.detailTextarea {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+/* 下に張り付く操作帯。選択の概要・初期値に戻す・止める。 */
+.stickyBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-float);
+}
+
+.stickySummary {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stickyActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stickyCancel {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.stickyCancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* つながる先。 */
+.relatedLink {
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+/* 止めているときの赤い帯。 */
+.stoppedBand {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-status-danger-soft);
+}
+
+.stoppedTitle {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stoppedLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: 8px;
+}
+
+.stoppedText {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.stoppedDot {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.stoppedNote {
+  margin: 8px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 止めるとどうなるか・止めたあとにすること。 */
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.infoList {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+/* 記録の表。 */
+.tableWrap {
+  overflow-x: auto;
+  margin-top: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.table {
+  width: 100%;
+  min-width: 760px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.cellTruncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tableNote {
+  margin: 12px 0 0;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 止められない理由・競合・結果の帯。 */
+.feedbackBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.feedbackWarn {
+  background: var(--color-status-warn-soft);
+  color: var(--color-ink);
+}
+
+.feedbackDanger {
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+}
+
+.feedbackSuccess {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+
+/* 確認の窓の中身。 */
+.confirmTargets {
+  margin: 12px 0 0;
+  padding: 12px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-danger-soft);
+}
+
+.confirmTargetRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-hairline);
+  font-size: 13px;
+}
+
+.confirmTargetRow:first-child {
+  border-top: 0;
+}
+
+.confirmReason {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.dialogField {
+  display: block;
+  margin-top: 12px;
+}
+
+.dialogLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dialogInput {
+  width: 100%;
+  max-width: 280px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.dialogHint {
+  margin: 8px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dialogError {
+  margin: 8px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 板が狭いときは数の帯を2列に、説明の2枚を1列に。 */
+@container (max-width: 1099px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi:nth-child(3) {
+    border-left: 0;
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .infoGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container (max-width: 560px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpi + .kpi {
+    border-left: 0;
+    border-top: 1px solid var(--color-hairline);
+  }
+}

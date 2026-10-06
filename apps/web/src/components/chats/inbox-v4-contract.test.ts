@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -100,11 +100,11 @@ describe('受信箱V4の画面契約', () => {
 
   it('メール表示と固定の並び順をLINEにそろえる', () => {
     expect(PAGE).toContain('MAIL')
-    expect(PAGE).toContain('aria-label={item.label}')
-    expect(PAGE).toContain("{item.key === 'all' && item.label}")
+    expect(PAGE).toContain('aria-label="受信経路で絞り込む"')
+    expect(PAGE).toContain('options={CHANNELS.map')
     expect(PAGE).not.toContain('{item.label}\n                </button>')
     expect(PAGE).toContain('data-inbox-sort="fixed"')
-    // オーナー指示 (m13d)：未読の会話を先に並べる。文言で固定していた旧表示は新表示へ。
+    // V8の画面では「未読」を運用者向けの「未対応」と表示する。
     expect(PAGE).toContain('並び順：未読が先・新しい順')
     expect(PAGE).not.toContain('aria-label="並び順"')
     expect(PAGE).not.toContain('defaultValue="newest"')
@@ -241,7 +241,7 @@ describe('受信箱V4の画面契約', () => {
   })
 
   it('狭い画面でも対応状況の見出しを1行で表示する', () => {
-    expect(INBOX_KPIS).toContain('whitespace-nowrap text-[11px] font-semibold')
+    expect(INBOX_KPIS).toContain('whitespace-nowrap text-micro font-semibold')
   })
 
   it('顧客情報の操作と情報順をV4へそろえる', () => {

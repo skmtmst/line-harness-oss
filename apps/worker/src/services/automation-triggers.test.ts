@@ -4,6 +4,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import type { ActionDefinition, AutomationActionExecutor } from './automation-engine';
 import {
   dispatchAutomationEvent,
+  EC_TRIGGER_EVENT_TYPES,
   processOverdueSupportMarkTriggers,
   processScheduledAutomationTriggers,
 } from './automation-triggers';
@@ -294,9 +295,10 @@ describe('V6オートメーションのきっかけ接続', () => {
   });
 
   it('EC受信の全11種をきっかけとして受け付ける', async () => {
-    const { EC_EVENT_TYPES } = await import('@line-crm/shared');
-    expect(EC_EVENT_TYPES).toHaveLength(11);
-    for (const eventType of EC_EVENT_TYPES) {
+    // 掲載の閲覧数はきっかけにしない（受信口の種類が増えても11のまま）。
+    expect(EC_TRIGGER_EVENT_TYPES).toHaveLength(11);
+    expect(EC_TRIGGER_EVENT_TYPES).not.toContain('ec.site.publication_viewed');
+    for (const eventType of EC_TRIGGER_EVENT_TYPES) {
       const items = await dispatchAutomationEvent(testDb.db, {
         lineAccountId: 'account-1', eventType, sourceEventId: `ec-${eventType}`,
         friendId: 'friend-1', eventData: {},

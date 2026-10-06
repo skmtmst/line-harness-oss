@@ -15,6 +15,8 @@ import { isForbiddenOrRateLimited, loadFailureCopy, loadFailureNotice } from '@/
 import ListState from '@/components/shared/list-state'
 import { describeSaveFailure } from '@/lib/api'
 import { canEditFeature } from '@/lib/staff-capability'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import AssignMatrixV8 from './assign-v8'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
@@ -427,7 +429,7 @@ function MenuStaffMatrixContent() {
                         </span>
                       )}
                       {s.is_designation_optional === 1 && (
-                        <span className="text-ink-faint block text-[10px] font-normal">
+                        <span className="text-ink-faint block text-nano font-normal">
                           指名なし
                         </span>
                       )}
@@ -449,11 +451,11 @@ function MenuStaffMatrixContent() {
                       <p className="text-ink font-medium">{m.name}</p>
                       <p className="mt-1">
                         {m.is_active ? (
-                          <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-[10px]">
+                          <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-nano">
                             公開中
                           </span>
                         ) : (
-                          <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-[10px]">
+                          <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-nano">
                             非公開
                           </span>
                         )}
@@ -495,8 +497,8 @@ function MenuStaffMatrixContent() {
                                   aria-label={`${s.display_name || s.name} の ${m.name} の所要時間`}
                                   className="border-hairline rounded-control h-8 w-14 border px-1.5 text-xs tabular-nums"
                                 />
-                                <span className="text-ink-faint text-[10px]">分</span>
-                                <span className="text-ink-faint text-[10px]">・¥</span>
+                                <span className="text-ink-faint text-nano">分</span>
+                                <span className="text-ink-faint text-nano">・¥</span>
                                 <input
                                   type="number"
                                   min={0}
@@ -514,7 +516,7 @@ function MenuStaffMatrixContent() {
                                 />
                               </div>
                               {overridden && (
-                                <span className="bg-warning-bg text-warning rounded-pill mt-1 inline-block px-1.5 py-0.5 text-[10px]">
+                                <span className="bg-warning-bg text-warning rounded-pill mt-1 inline-block px-1.5 py-0.5 text-nano">
                                   上書きあり
                                 </span>
                               )}
@@ -603,7 +605,17 @@ function Kpi({
 export default function MenuStaffMatrix() {
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <MenuStaffMatrixContent />
+      <MenuStaffMatrixEntry />
     </Suspense>
   )
+}
+
+/**
+ * 見た目テーマが v8 のときは新しい「担当メニューをまとめて決める」
+ * （assign-v8.tsx、板 ooufy）、v7 では従来の割当表をそのまま出す。
+ */
+function MenuStaffMatrixEntry() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <AssignMatrixV8 />
+  return <MenuStaffMatrixContent />
 }

@@ -181,7 +181,11 @@ describe('登録メディアの退避と復帰（N-201）', () => {
   it('既定の一覧は退避済みを外し、「アーカイブ済み」棚だけ archived=only で読む', async () => {
     await renderPage()
     await waitForText(MEDIA.filename)
-    expect(fixture.listCalls.every((call) => call.params?.archived === undefined)).toBe(true)
+    // O7hUt7: 数の tile が limit=1 の数え読みを2口足す（未使用・アーカイブ）。
+    // 一覧本体の読み分けの約束は tile を除いて見る。
+    const listReads = fixture.listCalls.filter((call) => call.params?.limit !== 1)
+    expect(listReads.length).toBeGreaterThan(0)
+    expect(listReads.every((call) => call.params?.archived === undefined)).toBe(true)
 
     await clickChip('アーカイブ済み')
     expect(fixture.listCalls.at(-1)?.params?.archived).toBe('only')

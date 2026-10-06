@@ -79,7 +79,7 @@ function elapsed(iso: string): string {
 function ChannelBadge({ channel }: { channel: InboxItem['channel'] }) {
   return (
     <span
-      className={`mr-2 rounded-pill px-1.5 py-0.5 text-[10px] font-medium ${
+      className={`mr-2 rounded-pill px-1.5 py-0.5 text-nano font-medium ${
         channel === 'email'
           ? 'bg-canvas-sunken text-ink-secondary'
           : 'bg-accent-soft text-accent-deep'

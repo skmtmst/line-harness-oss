@@ -14,6 +14,10 @@ import { api, ApiError, type SupportMarkArchiveImpact, type SupportMarkListItem 
 import type { ListStats } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import InlineEdit from '@/components/shared/inline-edit'
+import { withViewTransition } from '@/components/shared/view-transition'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
@@ -23,6 +27,9 @@ import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { mergeVisibleOrder, movableIds } from '@/components/friend-fields/reorder-utils'
 import { ArchiveMarkDialog, autoRuleLabel, isUsed, usageLabel } from '@/components/friend-fields/mark-list'
 import { STATE_TEXT } from '@/components/shared/not-connected'
+import { notifyToast } from '@/components/shared/toast'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
 
 type MarkRow = SupportMarkListItem
@@ -50,6 +57,12 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /*
+   * 行の詳細パネル（C①）。URL に ?mark=<id> を残す。
+   * 行を押すとつながる移り変わり（D・E）で右から出て、↑↓で前・次へ。
+   */
+  const [activeMarkId, setActiveMarkId] = useDetailPanelUrl('mark')
+  const openMarkDetail = (id: string) => withViewTransition(() => setActiveMarkId(id))
 
   /* アカウント切替のあとに届いた古い応答で一覧を上書きしない（ATTR-01）。 */
   const gateRef = useRef(createResponseGate())
@@ -125,6 +138,9 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
   const pages = Math.max(1, Math.ceil(visible.length / pageSize))
   const currentPage = Math.min(page, pages)
   const pageItems = visible.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  /* 詳細パネルに出す行（一覧全体から探すので、URL直打ちでも開く）。前・次は見えている行の中。 */
+  const activeMark = items.find((mark) => mark.id === activeMarkId) ?? null
+  const activeMarkIndex = pageItems.findIndex((mark) => mark.id === activeMarkId)
   useEffect(() => setPage(1), [query, usage, pageSize])
 
   /*
@@ -143,8 +159,14 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
       await load()
     } catch (reason) {
       setItems(previous)
-      setActionError(reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした')
+      const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
+      setActionError(message)
       setRetryOrder(next)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void applyOrder(next) },
+      })
     }
   }
 
@@ -229,6 +251,19 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
       setDeleting(false)
     }
   }
+
+  /*
+   * 右クリックのメニュー（C③）。行の「…」と同じ操作
+   * （編集・保管する）。押せない理由もそのまま渡す。
+   */
+  const markContextItems = (mark: MarkRow): ContextMenuItem[] =>
+    rowMenuItems(mark).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
 
   const rowMenuItems = (mark: MarkRow): ActionMenuItem[] => {
     const readonly = !canEdit
@@ -326,18 +361,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
           </p>
         ) : null}
 
-        {status === 'loading' ? (
-          <div className={styles.skeletonRows} role="status">
-            <span className="sr-only">読み込んでいます</span>
-            {[0, 1, 2, 3].map((row) => (
-              <div key={row} className={styles.skeletonRow}>
-                <span className={styles.skeletonDot} />
-                <span className={styles.skeletonBar} />
-                <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-              </div>
-            ))}
-          </div>
-        ) : status === 'forbidden' ? (
+        {status === 'forbidden' ? (
           <div className={styles.stateCard}>
             <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
               <AlertCircle size={20} aria-hidden="true" />
@@ -371,7 +395,7 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
             ) : null}
           </div>
         ) : (
-          <>
+          <DelayedSkeleton loading={status === 'loading'} skeleton={<TagRowsSkeleton rows={4} narrow={[120]} />}>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
@@ -393,12 +417,12 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
                         key={mark.id}
                         className={styles.rowClick}
                         tabIndex={0}
-                        onClick={() => router.push(editHref)}
+                        onClick={() => openMarkDetail(mark.id)}
                         onKeyDown={(event) => {
                           if (event.target !== event.currentTarget) return
                           if (event.key === 'Enter') {
                             event.preventDefault()
-                            router.push(editHref)
+                            openMarkDetail(mark.id)
                           }
                         }}
                       >
@@ -420,15 +444,17 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
                           />
                         </td>
                         <td>
-                          <Link
-                            href={editHref}
-                            className={styles.markPill}
-                            style={{ backgroundColor: `${mark.color}1A`, color: mark.color }}
-                            title={mark.name}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <span>{mark.name}</span>
-                          </Link>
+                          <ContextMenu label={`対応マーク「${mark.name}」の操作`} items={markContextItems(mark)}>
+                            <Link
+                              href={editHref}
+                              className={styles.markPill}
+                              style={{ backgroundColor: `${mark.color}1A`, color: mark.color }}
+                              title={mark.name}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <span>{mark.name}</span>
+                            </Link>
+                          </ContextMenu>
                         </td>
                         <td className={styles.cellText} style={{ fontVariantNumeric: 'tabular-nums' }}>{mark.friendCount}人</td>
                         <td className={styles.cellText}>{mark.isDefault ? '新着時の初期値' : '—'}</td>
@@ -501,9 +527,66 @@ export default function MarksTabV8({ accountId, canEdit }: { accountId: string |
               <h2 className={styles.safetyNoteTitle}>受信時自動変更・保管・初期値の安全確認</h2>
               <p className={styles.safetyNoteBody}>「受信時に変更」の設定は追加・編集画面で確認できます。保管時は影響人数と置き換え先を表示し、初期値は保管できません。</p>
             </section>
-          </>
+          </DelayedSkeleton>
         )}
       </div>
+
+      {/* 行の詳細パネル（C①）。名前はその場で直せる（C②）。確認の窓（保管）は残す。 */}
+      <DetailPanel
+        open={activeMark !== null}
+        title={activeMark?.name ?? ''}
+        description={activeMark ? `${activeMark.friendCount}人・${autoRuleLabel(activeMark)}` : undefined}
+        onClose={() => setActiveMarkId(null)}
+        hasPrev={activeMarkIndex > 0}
+        hasNext={activeMarkIndex >= 0 && activeMarkIndex < pageItems.length - 1}
+        onPrev={activeMarkIndex > 0 ? () => setActiveMarkId(pageItems[activeMarkIndex - 1].id) : undefined}
+        onNext={activeMarkIndex >= 0 && activeMarkIndex < pageItems.length - 1 ? () => setActiveMarkId(pageItems[activeMarkIndex + 1].id) : undefined}
+        footer={activeMark ? (
+          <Button href={`/tags/marks/edit?id=${encodeURIComponent(activeMark.id)}`}>編集する</Button>
+        ) : undefined}
+      >
+        {activeMark ? (
+          <dl>
+            <div>
+              <dt className={styles.cellMuted}>マーク名</dt>
+              <dd>
+                <InlineEdit
+                  label="マーク名"
+                  value={activeMark.name}
+                  maxLength={30}
+                  disabled={!canEdit || !accountId}
+                  onSave={async (next) => {
+                    if (!accountId) throw new Error('no account')
+                    // R513: 読んだときの版を送る。先に変えていたら409で止める（編集画面と同じ）。
+                    const res = await api.supportMarks.update(activeMark.id, accountId, {
+                      name: next,
+                      ...(typeof activeMark.version === 'number' ? { expectedVersion: activeMark.version } : {}),
+                    })
+                    if (!res.success) throw new Error(res.error)
+                    void load()
+                  }}
+                />
+              </dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>使用中</dt>
+              <dd className={styles.cellText}>{activeMark.friendCount}人</dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>初期値</dt>
+              <dd className={styles.cellText}>{activeMark.isDefault ? '新着時の初期値' : '—'}</dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>自動変更</dt>
+              <dd className={styles.cellText}>{autoRuleLabel(activeMark)}</dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>表示先</dt>
+              <dd className={styles.cellText}>{usageLabel(activeMark)}</dd>
+            </div>
+          </dl>
+        ) : null}
+      </DetailPanel>
 
       {pendingDelete ? (
         <ArchiveMarkDialog

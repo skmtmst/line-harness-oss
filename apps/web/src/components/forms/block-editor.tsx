@@ -39,6 +39,9 @@ export const BLOCK_MENU: { kind: string; type?: FormInputType; label: string; gr
   { kind: 'input', type: 'file', label: 'ファイル', group: '入力' },
   { kind: 'input', type: 'date', label: '日付', group: '入力' },
   { kind: 'input', type: 'prefecture', label: '都道府県', group: '入力' },
+  { kind: 'input', type: 'rating', label: '5段階評価', group: '入力' },
+  { kind: 'input', type: 'address', label: '住所', group: '入力' },
+  { kind: 'input', type: 'booking', label: '予約を入れる', group: '入力' },
 ]
 
 const INPUT_TYPE_LABEL: Record<FormInputType, string> = {
@@ -50,6 +53,10 @@ const INPUT_TYPE_LABEL: Record<FormInputType, string> = {
   file: 'ファイル',
   date: '日付',
   prefecture: '都道府県',
+  // F11で shared の FormInputType に足された種類。名称は shared の型注釈に合わせる。
+  address: '住所',
+  rating: '5段階評価',
+  booking: '予約を入れる',
 }
 
 const FORMATS: { value: FormInputFormat; label: string }[] = [
@@ -131,7 +138,7 @@ export default function BlockEditor({
           <span className="bg-accent-deep text-on-accent rounded-control inline-block px-2 py-0.5 text-xs font-medium tabular-nums">
             {index + 1}
           </span>
-          <span className="text-ink-faint mt-1 block text-[11px] leading-tight whitespace-nowrap">
+          <span className="text-ink-faint mt-1 block text-micro leading-tight whitespace-nowrap">
             {blockTypeLabel(block)}
           </span>
         </div>
@@ -326,6 +333,89 @@ export default function BlockEditor({
                     />
                   </label>
                 )}
+
+                {block.type === 'booking' && (
+                  <div className="flex-1 space-y-3" data-design-node="ijxur">
+                    <label className="block">
+                      <span className="text-ink-secondary mb-1 block text-xs font-medium">
+                        予約メニュー
+                      </span>
+                      <Select
+                        aria-label="予約メニュー"
+                        value={block.booking?.menuId ?? ''}
+                        onChange={(value) =>
+                          patchInput({
+                            booking: {
+                              menuId: value,
+                              staffId: null,
+                              daysAhead: block.booking?.daysAhead ?? 14,
+                            },
+                          })
+                        }
+                        options={[
+                          { value: '', label: '選んでください' },
+                          ...(refs.bookingMenus ?? []).map((menu) => ({
+                            value: menu.id,
+                            label: `${menu.name}・${menu.durationMinutes}分`,
+                          })),
+                        ]}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-ink-secondary mb-1 block text-xs font-medium">
+                        担当
+                      </span>
+                      <Select
+                        aria-label="担当"
+                        value={block.booking?.staffId ?? ''}
+                        disabled={!block.booking?.menuId}
+                        onChange={(value) =>
+                          patchInput({
+                            booking: {
+                              menuId: block.booking?.menuId ?? '',
+                              staffId: value === '' ? null : value,
+                              daysAhead: block.booking?.daysAhead ?? 14,
+                            },
+                          })
+                        }
+                        options={[
+                          { value: '', label: 'だれでも' },
+                          ...(block.booking?.menuId
+                            ? (refs.bookingMenuStaff?.[block.booking.menuId] ?? [])
+                            : []
+                          ).map((staff) => ({ value: staff.id, label: staff.name })),
+                        ]}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-ink-secondary mb-1 block text-xs font-medium">
+                        選べる期間（今日から）
+                      </span>
+                      <Select
+                        aria-label="選べる期間"
+                        value={String(block.booking?.daysAhead ?? 14)}
+                        onChange={(value) =>
+                          patchInput({
+                            booking: {
+                              menuId: block.booking?.menuId ?? '',
+                              staffId: block.booking?.staffId ?? null,
+                              daysAhead: Number(value),
+                            },
+                          })
+                        }
+                        options={[
+                          { value: '7', label: '7日' },
+                          { value: '14', label: '14日' },
+                          { value: '30', label: '30日' },
+                          { value: '60', label: '60日' },
+                        ]}
+                      />
+                    </label>
+                    <p className="text-ink-faint text-xs">
+                      予約は「未承認」で入り、店が承認します。公開にはメニューが必要です。
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* 回答の登録先 */}
@@ -497,6 +587,31 @@ export default function BlockEditor({
                       ]}
                     />
                   </label>
+                ) : block.type === 'rating' ? (
+                  // F-11：5段階評価の初期値。1〜5のちょうどの数だけ
+                  // （"3.0" は保存・平均の数え方と合わないため入れない）。
+                  <label className="block">
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
+                    <Select
+                      aria-label="初期値"
+                      value={block.defaultValue ?? ''}
+                      onChange={(value) => patchInput({ defaultValue: value })}
+                      options={[
+                        { value: '', label: '— 入れない —' },
+                        { value: '1', label: '★1' },
+                        { value: '2', label: '★2' },
+                        { value: '3', label: '★3' },
+                        { value: '4', label: '★4' },
+                        { value: '5', label: '★5' },
+                      ]}
+                    />
+                  </label>
+                ) : block.type === 'address' ? (
+                  // F-11：住所の初期値は入れない。文字列の初期値を置くと
+                  // 回答側で文字列が入り、検証で弾かれてしまうため。
+                  <p className="text-ink-faint text-xs">
+                    初期値は入れられません。お客さまが郵便番号から入力します。
+                  </p>
                 ) : (
                   <label className="block">
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>

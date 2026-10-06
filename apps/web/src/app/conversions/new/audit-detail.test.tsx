@@ -177,6 +177,19 @@ describe('DETAIL-17 集計対象は画面上部のアカウントに固定', () 
   })
 })
 
+async function clickTrigger(value: string) {
+  const labels: Record<string, string> = {
+    order: '注文が確定した', form: 'フォームが送信された', booking: '予約が確定した',
+    page: 'ページを見た', video: '動画を見終えた', tag: 'タグが付いた',
+  }
+  const trigger = host.querySelector('#cv-trigger')
+  expect(trigger).not.toBeNull()
+  await act(async () => { fireEvent.click(trigger!) })
+  const option = [...document.body.querySelectorAll('[role="option"] button')].find((item) => item.textContent?.includes(labels[value]))
+  expect(option).toBeTruthy()
+  await act(async () => { fireEvent.click(option!) })
+}
+
 describe('R40/R41 数えない条件と起点の説明', () => {
   it('数えない条件は共通部品で選び、メモ欄は別にある', async () => {
     await render()
@@ -190,11 +203,7 @@ describe('R40/R41 数えない条件と起点の説明', () => {
 
   it('タグ起点を選ぶと対象がタグの説明になり、注文の言葉が出ない', async () => {
     await render()
-    const tagRadio = host.querySelector('input[name="conversion-trigger"][value="tag"]')
-    expect(tagRadio).not.toBeNull()
-    await act(async () => {
-      fireEvent.click(tagRadio!)
-    })
+    await clickTrigger('tag')
     expect(host.textContent).toContain('どのタグが付いても')
     expect(host.textContent).not.toContain('すべての注文')
   })
@@ -238,13 +247,6 @@ describe('起点に合わない金額の出し方は選べない', () => {
     return values
   }
 
-  function clickTrigger(value: string) {
-    const radio = host.querySelector(`input[name="conversion-trigger"][value="${value}"]`)
-    expect(radio).not.toBeNull()
-    return act(async () => {
-      fireEvent.click(radio!)
-    })
-  }
 
   it('タグ起点に切り替えると注文の金額から既定へ戻り、知らせる', async () => {
     await render()

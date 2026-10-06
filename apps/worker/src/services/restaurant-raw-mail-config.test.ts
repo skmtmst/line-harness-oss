@@ -25,12 +25,32 @@ describe('予約メール原文の環境分離', () => {
     expect(staging).toMatch(/^RESTAURANT_INTAKE_DOMAIN = "rs\.musubo\.jp"$/m);
   });
 
-  it('飲食店テストは検証だけを明示的に有効にする', () => {
+  // Googleの機密スコープ審査（デモ動画と実運用）のため、飲食店向けは両環境で有効。
+  // ここで守るのは「APIと画面のフラグがずれていないこと」。片方だけ有効だと
+  // 画面はあるのにAPIが404、またはAPIはあるのに画面が無い状態になる。
+  it('飲食店向けのフラグはAPIと管理画面で同じ値にする', () => {
+    const repoRoot = join(workerRoot, '../..');
+    const production = readFileSync(join(workerRoot, 'wrangler.toml'), 'utf8');
+    const staging = readFileSync(join(workerRoot, 'wrangler.staging.toml'), 'utf8');
+    const adminWorkflow = readFileSync(join(repoRoot, '.github/workflows/deploy-cloudflare-admin.yml'), 'utf8');
+    const stagingWorkflow = readFileSync(join(repoRoot, '.github/workflows/deploy-cloudflare-staging.yml'), 'utf8');
+
+    expect(production).toMatch(/^RESTAURANT_TEST_ENABLED = "true"$/m);
+    expect(staging).toMatch(/^RESTAURANT_TEST_ENABLED = "true"$/m);
+    expect(adminWorkflow).toMatch(/^\s*NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'$/m);
+    expect(stagingWorkflow).toMatch(/^\s*NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'$/m);
+  });
+
+  // 予約メール原文の取り込みは検証だけ。ここは環境を分けたままにする。
+  it('Googleへの書き込みは環境ごとのスイッチで切り替える', () => {
     const production = readFileSync(join(workerRoot, 'wrangler.toml'), 'utf8');
     const staging = readFileSync(join(workerRoot, 'wrangler.staging.toml'), 'utf8');
 
-    expect(production).toMatch(/^RESTAURANT_TEST_ENABLED = "false"$/m);
-    expect(staging).toMatch(/^RESTAURANT_TEST_ENABLED = "true"$/m);
+    expect(production).toMatch(/^GOOGLE_BUSINESS_WRITE_ENABLED = "(true|false)"$/m);
+    expect(staging).toMatch(/^GOOGLE_BUSINESS_WRITE_ENABLED = "(true|false)"$/m);
+    // 認可に使う値は設定ファイルに置かず、環境ごとのシークレットとして登録する。
+    expect(production).not.toMatch(/^GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET\s*=/m);
+    expect(staging).not.toMatch(/^GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET\s*=/m);
   });
 
   it('メール原文をメモリ展開せず、rawSize付きストリームでR2へ渡す', () => {

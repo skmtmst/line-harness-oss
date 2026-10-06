@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import StaffDetail from './staff-detail'
+import StaffDetailV8, { OwnShiftEntryV8 } from './staff-detail-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import LiffDateTimePreview, { type LiffPreviewStatus } from './liff-preview'
 import {
   ApiError,
@@ -271,12 +273,29 @@ export default function StaffShiftsPage() {
 // 店舗設定の閲覧権限が無い人がここへ来ても、権限外の画面ではなく自分の画面へ着く。
 function StaffShiftsPageContent() {
   const staffId = useSearchParams().get('staff_id') ?? ''
+  const theme = useAdminTheme()
   const [isStaffRole] = useState(() =>
     typeof window !== 'undefined' && window.localStorage.getItem('lh_staff_role') === 'staff')
   usePageTitle('予約設定')
+  if (theme === 'v8') {
+    // ★V8：板 d5fmnM（管理者）・E3YDK（本人）・wvGke（ひも付けなし）。
+    // 管理者が staff_id 無しで来たときは「受付枠」タブ（いつもの店の時間）へ送る。
+    if (staffId) return <StaffDetailV8 staffId={staffId} />
+    if (isStaffRole) return <OwnShiftEntryV8 />
+    return <StoreShiftsRedirectV8 />
+  }
   if (staffId) return <StaffDetail staffId={staffId} />
   if (isStaffRole) return <OwnShiftEntry />
   return <StoreShiftsView />
+}
+
+/** ★V8 では店舗の受付枠は予約設定の「受付枠」タブが同じ中身。 */
+function StoreShiftsRedirectV8() {
+  const router = useRouter()
+  useEffect(() => {
+    router.replace('/booking/menus?tab=hours')
+  }, [router])
+  return null
 }
 
 // 自分に紐づく予約スタッフを /staff/me で解決し、自分の勤務画面へ送る。
@@ -1193,7 +1212,7 @@ function StoreShiftsView() {
       <ConfirmDialog
         open={deleteTarget !== null}
         title="この休業日を消しますか？"
-        description="消すと、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
+        description="削除すると、その期間は曜日の決めごとどおりの受付に戻ります。すでに入っている予約はそのまま残ります。"
         confirmLabel="休業日を削除する"
         destructive
         busy={exceptionBusy}

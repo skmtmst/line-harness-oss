@@ -21,6 +21,12 @@ import { readExclusionCondition, readExclusionMemo, readExclusionView, type Excl
 import { findConditionDraftIssue, pruneCondition } from '@/components/shared/condition-builder'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import KpiCard from '@/components/shared/kpi-card'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import styles from './list-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import ConversionPointsV8 from './conversion-points-v8'
+import ConversionListV8 from '@/v8/conversions/list'
+import { ConversionDetailDialog, ConversionEditDialog, ConversionReversalDialog } from './_components/conversion-dialogs'
 
 /**
  * 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。
@@ -206,12 +212,9 @@ function ingestionEventLabel(event: ConversionIngestionEvent): string {
   return reason ? `${base}（${reason}）` : base
 }
 
-import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { useMergedTab } from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { conversionsTabTitle } from './conversions-tab-title'
-import { useSearchParams } from 'next/navigation'
-import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
-import AffiliatePaymentTab from '@/app/affiliates/payment-tab'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import MobileTableCards from '@/components/shared/mobile-table-cards'
@@ -255,19 +258,6 @@ function downloadCsvBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(href)
 }
 
-function rangeLabel(days: number): string {
-  const { from, to } = definitionRange(days)
-  const format = (value: string) => {
-    const [, month, day] = value.split('-')
-    return `${Number(month)}/${Number(day)}`
-  }
-  return `この${days}日（${format(from)}〜${format(to)}）`
-}
-
-/**
- * R41: 起点の説明は対応表(origin-labels)が正本。ここでは URL 到達だけ
- * 対象URLを添える。タグ起点で「EC連携」と出ていた取り違えを直す。
- */
 function sourceTriggerLabel(point: Pick<ConversionDefinitionListItem, 'measureMethod' | 'sourceType' | 'targetUrl'>): string {
   if (point.measureMethod === 'url_reach') {
     return point.targetUrl ? `サイトの「${point.targetUrl}」に到達` : '指定したページに到達'
@@ -320,7 +310,7 @@ const SORT_OPTIONS: Array<{ value: PointSort; label: string }> = [
   { value: 'name', label: '成果地点名順' },
 ]
 
-const PAGE_SIZE = 6
+const DEFAULT_PAGE_SIZE = 20
 
 /**
  * 画面の並びと言葉を、口の並びに写す(#513 M3)。
@@ -336,12 +326,13 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
   'name': 'name_asc',
 }
 
-function ConversionsPageInner({ accountId }: { accountId: string | null }) {
+function ConversionsPageInner({ accountId, v8 }: { accountId: string | null; v8: boolean }) {
   /*
    * N-264: 作成画面が `?highlight=<作った行のID>` で戻ってくる。
    * 読み込んだ一覧の中でその行を見つけ、帯を出し・その頁へ移し・
    * 行を目立たせて、どれが作ったばかりの行か分かるようにする。
    */
+  const router = useRouter()
   const highlightId = useSearchParams().get('highlight')
   const highlightRowRef = useRef<HTMLTableRowElement | null>(null)
   const [definitions, setDefinitions] = useState<ConversionDefinitionList | null>(null)
@@ -353,6 +344,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [sort, setSort] = useState<PointSort>('cv-desc')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [loadFailed, setLoadFailed] = useState(false)
   /**
    * R596: 集計だけの失敗は一覧と分けて持つ。集計が読めなくても一覧は
@@ -402,6 +394,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [detailTarget, setDetailTarget] = useState<ConversionDefinitionListItem | null>(null)
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState('')
+  const [stopReason, setStopReason] = useState('')
   /*
    * 編集（新版化）。開いたときの版を控えて、送るときにそのまま渡す（N-252）。
    * 別の人が先に直していたら口が409を返すので、勝手に上書きしない。
@@ -418,7 +411,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * N-270: 外部受信の操作状態。平文の鍵は発行の応答でだけ返るため、
    * 一度だけ表示して閉じると二度と見えない。
    */
-  const [ingestBusy, setIngestBusy] = useState('')
+  const [ingestBusy, setIngestBusy] = useState<'' | 'issue' | 'toggle'>('')
   const [issuedSecret, setIssuedSecret] = useState('')
   const [ingestError, setIngestError] = useState('')
   const [ingestEvents, setIngestEvents] = useState<ConversionIngestionEvent[]>([])
@@ -439,6 +432,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [reversalBusy, setReversalBusy] = useState(false)
   const [reversalError, setReversalError] = useState('')
   const [canReverse, setCanReverse] = useState(false)
+  const [permissionState, setPermissionState] = useState<'loading' | 'ready' | 'failed'>('loading')
 
   /**
    * 一覧は検索・並びを口へ渡し、続く頁をすべて読む(#513 M2・M3)。
@@ -549,6 +543,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * 失敗は握りつぶさず、窓の中に運用者の言葉で出す。
    */
   const openEdit = (target: ConversionDefinitionListItem) => {
+    if (!canReverse) return
     setDetailTarget(null)
     setEditTarget(target)
     const form = toEditForm(target)
@@ -576,7 +571,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * 上書きせずに読み直しを促す。
    */
   const submitEdit = async () => {
-    if (!editTarget || !editForm || editSaving) return
+    if (!editTarget || !editForm || editSaving || !canReverse) return
     const name = editForm.name.trim()
     if (!name) {
       setEditError('名前を入れてください')
@@ -696,7 +691,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     void api.staff.me().then((response) => {
       if (!active) return
       setCanReverse(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
-    }).catch(() => undefined)
+      setPermissionState(response.success && typeof response.data.role === 'string' ? 'ready' : 'failed')
+    }).catch(() => { if (active) { setCanReverse(false); setPermissionState('failed') } })
     return () => { active = false }
   }, [])
 
@@ -745,7 +741,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
 
   /** N-268: 下書きを計測中へ。開いた時点の版を渡す。 */
   const publishDraft = async (target: ConversionDefinitionListItem) => {
-    if (publishing) return
+    if (publishing || !canReverse) return
     setPublishing(true)
     setIngestError('')
     try {
@@ -762,7 +758,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
 
   /** N-270: 受信鍵の発行・再発行。平文はこの応答でだけ返る。 */
   const issueIngest = async (target: ConversionDefinitionListItem) => {
-    if (ingestBusy) return
+    if (ingestBusy || !canReverse) return
     setIngestBusy('issue')
     setIngestError('')
     try {
@@ -779,7 +775,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
 
   /** N-270: 受け口の停止・再開。止めても鍵は残る。 */
   const toggleIngest = async (target: ConversionDefinitionListItem) => {
-    if (ingestBusy) return
+    if (ingestBusy || !canReverse) return
     setIngestBusy('toggle')
     setIngestError('')
     try {
@@ -797,12 +793,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     }
   }
 
-  const openStop = async (target: ConversionDefinitionListItem) => {
+  const openStop = async (target: ConversionDefinitionListItem, action: 'stop' | 'replace' | 'delete' = 'stop') => {
+    if (!canReverse) return
+    setStopReason('')
     setDetailTarget(null)
     setStopTarget(target)
     setStopImpact(null)
     setStopError('')
-    setStopAction('stop')
+    setStopAction(action)
     setReplacementId('')
     setStopImpactLoading(true)
     try {
@@ -823,10 +821,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    * 理由を出す。閉じて開き直すと `openStop` が影響を読み直す。
    */
   const runStop = async () => {
-    if (!stopTarget || stopping) return
+    if (!stopTarget || stopping || !canReverse) return
     if (stopImpactLoading) return
     if (!stopImpact) {
       setStopError('利用先と停止の影響を読み込めませんでした。画面を閉じて、もう一度お試しください。')
+      return
+    }
+    if (!stopReason.trim()) {
+      setStopError('止める・差し替える・削除する理由を入力してください')
       return
     }
     setStopping(true)
@@ -839,17 +841,17 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               replacementId: replacement.id,
               expectedVersion: stopImpact.definition.version,
               replacementExpectedVersion: replacement.version,
-              reason: '管理画面で利用先を差し替え',
+              reason: stopReason.trim(),
             })
           : { success: false as const, error: '差し替え先を選んでください' }
         : stopAction === 'delete'
           ? await api.conversions.deleteDefinition(stopTarget.id, {
               expectedVersion: stopImpact.definition.version,
-              reason: '未使用の成果地点を削除',
+              reason: stopReason.trim(),
             })
           : await api.conversions.stopDefinition(stopTarget.id, {
               expectedVersion: stopImpact.definition.version,
-              reason: '管理画面で計測を停止',
+              reason: stopReason.trim(),
             })
       if (!res.success) throw new Error(res.error)
       setStopTarget(null)
@@ -909,10 +911,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     })
   }, [points, status])
 
-  const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
+  const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
   const current = useMemo(
-    () => shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [page, shown],
+    () => shown.slice((page - 1) * pageSize, page * pageSize),
+    [page, pageSize, shown],
   )
 
   useEffect(() => {
@@ -929,27 +931,155 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   useEffect(() => {
     if (!highlightedPoint) return
     const index = shown.findIndex((point) => point.id === highlightedPoint.id)
-    if (index >= 0) setPage(Math.floor(index / PAGE_SIZE) + 1)
-  }, [highlightedPoint, shown])
+    if (index >= 0) setPage(Math.floor(index / pageSize) + 1)
+  }, [highlightedPoint, pageSize, shown])
 
   useEffect(() => {
     highlightRowRef.current?.scrollIntoView({ block: 'center' })
   }, [highlightedPoint, current])
 
+  const pointActions = (point: ConversionDefinitionListItem): ActionMenuItem[] => [
+    { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
+    { id: 'usage', label: '使われている場所を見る', onSelect: () => setDetailTarget(point) },
+    ...(canReverse ? [
+      { id: 'add-usage', label: '使う場所を足す', external: true, onSelect: () => router.push(`/analytics?tab=funnel&conversionPointId=${encodeURIComponent(point.id)}&conversionPointName=${encodeURIComponent(point.name)}`) },
+      ...(point.status !== 'stopped' ? [
+        { id: 'edit', label: '編集する', onSelect: () => openEdit(point) },
+        { id: 'stop', label: '止める・差し替える・削除する', onSelect: () => { void openStop(point) } },
+      ] : []),
+    ] : []),
+  ]
+
+  // 共用の窓への受け渡し（v7 の描画と V8 で同じものを使う）。
+  const detailDialogProps = {
+    detailTarget,
+    setDetailTarget,
+    publishing,
+    publishDraft: (target: ConversionDefinitionListItem) => void publishDraft(target),
+    openEdit,
+    openStop: (target: ConversionDefinitionListItem) => void openStop(target),
+    issueIngest: (target: ConversionDefinitionListItem) => void issueIngest(target),
+    toggleIngest: (target: ConversionDefinitionListItem) => void toggleIngest(target),
+    ingestBusy,
+    ingestError,
+    issuedSecret,
+    ingestEvents,
+    definitionEvents,
+    eventsFailed,
+    canReverse,
+    openReversal,
+  }
+  const reversalDialogProps = {
+    reversalTarget,
+    reversalKind,
+    reversalBusy,
+    reversalError,
+    reversalReason,
+    setReversalTarget,
+    setReversalReason,
+    submitReversal: () => void submitReversal(),
+  }
+  const editDialogProps = {
+    editTarget,
+    setEditTarget,
+    editForm,
+    setEditForm,
+    editValueModeNotice,
+    setEditValueModeNotice,
+    editSaving,
+    editError,
+    submitEdit: () => void submitEdit(),
+  }
+
+  // ★V8-B コンバージョンの一覧（`r6dJFy`）。止める窓は表の下の小窓で、
+  // 共用の止める窓（`ConversionStopDialog`）は V8 では開かない。
+  if (v8) {
+    return (
+      <>
+        <ConversionPointsV8
+          model={{
+            loading,
+            loadFailed,
+            points,
+            shown,
+            total: definitions?.pagination.total ?? null,
+            stateCounts: definitions?.stateCounts ?? null,
+            listTruncated,
+            query,
+            onQueryChange: (value) => {
+              setQuery(value)
+              setPage(1)
+            },
+            status,
+            onStatusChange: (value) => {
+              setStatus(value)
+              setPage(1)
+            },
+            onReload: () => void load(),
+            onExportCsv: () => void exportCsv(),
+            exporting,
+            exportError,
+            highlightedId: highlightId,
+            publishing,
+            onOpenDetail: (point) => setDetailTarget(point),
+            onOpenEdit: openEdit,
+            onOpenStop: (point, action) => void openStop(point, action),
+            onPublishDraft: (point) => void publishDraft(point),
+            stopTarget,
+            stopImpact,
+            stopImpactLoading,
+            stopAction,
+            onStopActionChange: setStopAction,
+            replacementId,
+            onReplacementIdChange: setReplacementId,
+            stopReason,
+            onStopReasonChange: setStopReason,
+            stopping,
+            stopError,
+            onConfirmStop: () => void runStop(),
+            onCancelStop: () => {
+              if (stopping) return
+              setStopTarget(null)
+              setStopImpact(null)
+              setStopError('')
+              setStopReason('')
+            },
+            detailDialog: detailDialogProps,
+            editDialog: editDialogProps,
+            reversalDialog: reversalDialogProps,
+            onIssueIngest: (point) => void issueIngest(point),
+            onToggleIngest: (point) => void toggleIngest(point),
+            ingestBusy,
+            ingestError,
+            issuedSecret,
+            onClearIssuedSecret: () => setIssuedSecret(''),
+          }}
+        />
+        <ConversionDetailDialog {...detailDialogProps} />
+        <ConversionReversalDialog {...reversalDialogProps} />
+        <ConversionEditDialog {...editDialogProps} />
+      </>
+    )
+  }
+
   return (
-    <div data-conversion-points-design="v6" className="flex flex-col gap-4">
+    <div data-conversion-points-design="v8" className={styles.root}>
+      <div className={styles.heading}>
+        <div><h2>コンバージョン</h2><p>成果として数えるできごと（成果地点）を決めます。配信・流入・アフィリエイトの成果は、ここの数え方で集計します。</p></div>
+        <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています">CSVで書き出す</Button>
+      </div>
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          title="決めてある成果地点"
+          title="成果地点"
           value={definitions?.pagination.total ?? null}
-          unit="個"
+          unit="件"
           /*
            * R595: 一覧が読めないときは値が「—」になる。3段目まで
            * 「読み込み中」のままだと直っているように見えるので、由来を書く。
            */
-          detail={definitions ? `動いているもの ${definitions.stateCounts.active}個` : loadFailed ? '一覧を読み込めませんでした' : '読み込み中'}
+          detail={definitions ? `動いている ${definitions.stateCounts.active}・止めている ${definitions.stateCounts.stopped}` : loadFailed ? '一覧を読み込めませんでした' : '読み込み中'}
           loading={loading}
         />
         <KpiCard
@@ -973,7 +1103,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           loading={loading}
         />
         <KpiCard
-          title="金額がついた成果"
+          title="この30日の金額"
           value={summaryReport ? kpi.currentValue : null}
           unit="円"
           /*
@@ -986,27 +1116,27 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           loading={loading}
         />
         <KpiCard
-          title="1件も起きていない"
+          title="どこからも使われていない"
           value={definitions ? kpi.unusedCount : null}
-          unit="個"
+          unit="件"
           badge={kpi.unusedCount > 0 ? '確認' : undefined}
           badgeTone={kpi.unusedCount > 0 ? 'neutral' : 'accent'}
-          detail={loadFailed ? '一覧を読み込めませんでした' : '決めたのに使われていません'}
+          detail={loadFailed ? '一覧を読み込めませんでした' : '配信・流入・アフィリエイトで未使用'}
           loading={loading}
         />
       </KpiCollapse>
 
-      <Notice tone="info" message="成果地点は「数え方の決めごと」です。ここで決めたものを、案件・自動応答・分析などから呼び出して使います。" className="mb-4" />
+      <Notice tone="info" message={canReverse
+        ? '成果地点は、配信・流入リンク・アフィリエイトの成果を数えるときに使います。止めると、使っている所でも数えなくなります。'
+        : permissionState === 'loading' ? '操作権限を確認しています。確認が終わるまで、管理操作を止めています。'
+        : permissionState === 'failed' ? '操作権限を確認できないため、安全のため管理操作を止めています。'
+        : '閲覧のみで見ています。成果地点を作る・変える・止める操作は管理者だけができます。'} />
 
       {highlightedPoint ? (
         <Notice tone="info" message={`「${highlightedPoint.name}」を保存しました。色の付いた行です。`} className="mb-4" />
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button href="/conversions/new" variant="primary">＋ 成果地点を作る</Button>
-        <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています">CSVで書き出す
-        </Button>
-      </div>
+      {canReverse ? <div><Button href="/conversions/new" variant="primary">成果地点を作る</Button></div> : null}
       {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
 
       {/*
@@ -1015,7 +1145,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       */}
       <ListToolbar
         search={{
-          placeholder: '成果地点の名前で検索',
+          placeholder: '成果地点の名前で探す',
           value: query,
           onChange: (value) => {
             setQuery(value)
@@ -1054,7 +1184,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         }
         trailing={
           <>
-            <p className="text-ink-secondary text-sm tabular-nums">{rangeLabel(30)}</p>
+            <Select size="page-size" aria-label="表示件数" value={String(pageSize)} options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]} onChange={(value) => { setPageSize(Number(value)); setPage(1) }} />
             <Select
               aria-label="並び順"
               value={sort}
@@ -1093,11 +1223,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       ) : shown.length === 0 ? (
         <ListState
           kind="empty"
-          title={query ? '条件に合う成果地点はありません' : 'まだ成果地点がありません'}
+          title={query || status !== 'all' ? '条件に合う成果地点はありません' : 'まだ成果地点がありません'}
           description={
-            query
-              ? '検索の言葉を変えてください。'
-              : '上の「＋ 成果地点を作る」から登録すると、ここに出ます。'
+            query || status !== 'all'
+              ? '検索の言葉や状態を変えてください。'
+              : canReverse ? '上の「成果地点を作る」から登録すると、ここに出ます。' : '成果地点は管理者が作成できます。'
           }
         />
       ) : (
@@ -1111,10 +1241,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           items={current.map((point) => ({
             id: point.id,
             name: point.name,
-            status: point.state !== 'active' && STATE_LABELS[point.state] ? (
+            status: STATE_LABELS[point.state] ? (
               <span
                 className={`inline-block rounded-mini px-1.5 py-0.5 text-xs font-semibold ${
-                  point.state === 'draft' ? 'bg-info-bg text-info'
+                  point.state === 'active' ? 'bg-success-bg text-success' : point.state === 'draft' ? 'bg-info-bg text-info'
                     : point.state === 'invalid' || point.state === 'sourceStopped' ? 'bg-warning-bg text-warning'
                     : 'bg-canvas-sunken text-ink-faint'
                 }`}
@@ -1125,14 +1255,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             ) : undefined,
             summary: sourceTriggerLabel(point),
             metric: `この30日 ${formatNumber(point.metrics.netCount)}件`,
-            primaryAction: (
+            primaryAction: canReverse ? (
               <Button
                 href={`/analytics?tab=funnel&conversionPointId=${encodeURIComponent(point.id)}&conversionPointName=${encodeURIComponent(point.name)}`}
                 variant="secondary"
               >
                 使う場所を足す
               </Button>
-            ),
+            ) : undefined,
             /*
              * R280: 開閉は行ごとの共通 RowActions に任せる。以前は画面全体の
              * `pointMenuId` をスマホカードとPC表で共有していたため、隠れて
@@ -1140,9 +1270,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
              */
             moreAction: (
               <RowActions
-                menuItems={[
-                  { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
-                ]}
+                menuItems={pointActions(point)}
                 subjectName={point.name}
               />
             ),
@@ -1158,12 +1286,12 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   列幅は見出し側で決める。table-fixed では先頭行の幅だけが効き、
                   行側の td の幅指定は効かない。1440pxで足りるよう配り直す。
                 */}
-                <Th className="w-1/6">成果地点</Th>
-                <Th className="w-1/4">何が起きたら数えるか</Th>
-                <Th align="right" className="w-28">この30日</Th>
-                <Th align="right" className="w-24">金額</Th>
-                <Th className="w-1/4">使われている場所</Th>
-                <Th align="right" className="w-52">操作</Th>
+                <Th className={styles.nameColumn}>成果地点</Th>
+                <Th className={styles.triggerColumn}>何が起きたら数えるか</Th>
+                <Th align="right" className={styles.countColumn}>この30日</Th>
+                <Th align="right" className={styles.valueColumn}>金額</Th>
+                <Th>使われている場所</Th>
+                <Th align="right" className="w-40">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
@@ -1178,17 +1306,17 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   className={`${point.id === highlightId ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'} cursor-pointer`}
                   onClick={() => setDetailTarget(point)}
                 >
-                  <td className="text-ink w-1/6 px-4 py-3 text-sm font-medium">
-                    <span className="line-clamp-2" title={point.name}>{point.name}</span>
+                  <td className="text-ink px-4 py-3 text-sm font-medium">
+                    <span className="block truncate" title={point.name}>{point.name}</span>
                     {/* 辞書に無い種別は中身のない印を出さない。具体的な種別だけ添える。 */}
                     {EVENT_TYPE_LABELS[point.sourceType] ? (
                       <p className="text-ink-faint mt-0.5 text-xs">{EVENT_TYPE_LABELS[point.sourceType]}</p>
                     ) : null}
                     {/* 状態名が無いときは空の札を出さない。口が state を返さない行で灰色の空札が出ていた。 */}
-                    {point.state !== 'active' && STATE_LABELS[point.state] ? (
+                    {STATE_LABELS[point.state] ? (
                       <p
                         className={`mt-1 inline-block rounded-mini px-1.5 py-0.5 text-xs font-semibold ${
-                          point.state === 'draft' ? 'bg-info-bg text-info'
+                          point.state === 'active' ? 'bg-success-bg text-success' : point.state === 'draft' ? 'bg-info-bg text-info'
                             : point.state === 'invalid' || point.state === 'sourceStopped' ? 'bg-warning-bg text-warning'
                             : 'bg-canvas-sunken text-ink-faint'
                         }`}
@@ -1198,8 +1326,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       </p>
                     ) : null}
                   </td>
-                  <td className="text-ink-secondary w-1/4 px-4 py-3 text-sm">
-                    <span className="line-clamp-2" title={sourceTriggerLabel(point)}>{sourceTriggerLabel(point)}</span>
+                  <td className="text-ink-secondary px-4 py-3 text-sm">
+                    <span className="block truncate" title={sourceTriggerLabel(point)}>{sourceTriggerLabel(point)}</span>
                     <p className="text-ink-faint mt-0.5 truncate text-xs" title={`${measureLabel(point.measureMethod)}・${deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}`}>
                       {measureLabel(point.measureMethod)}・{deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays)}
                     </p>
@@ -1213,9 +1341,9 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       : `¥${formatNumber(point.metrics.netValue)}`}
                   </td>
                   <td className={point.usageCount === 0
-                    ? 'text-warning w-1/4 px-4 py-3 text-sm'
-                    : 'text-ink-secondary w-1/4 px-4 py-3 text-sm'}>
-                    <span className="line-clamp-2" title={usageLabel(point)}>{usageLabel(point)}</span>
+                    ? 'text-warning px-4 py-3 text-sm'
+                    : 'text-ink-secondary px-4 py-3 text-sm'}>
+                    <span className="block truncate" title={usageLabel(point)}>{usageLabel(point)}</span>
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                     {/*
@@ -1227,16 +1355,15 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       body へ出てメニューが2つに見えた。
                     */}
                     <div className="relative flex items-center justify-end gap-2">
-                      <Button
+                      {canReverse ? <Button
                         href={`/analytics?tab=funnel&conversionPointId=${encodeURIComponent(point.id)}&conversionPointName=${encodeURIComponent(point.name)}`}
+                        size="field"
                         variant="secondary"
                       >
                         使う場所を足す
-                      </Button>
+                      </Button> : null}
                       <RowActions
-                        menuItems={[
-                          { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
-                        ]}
+                        menuItems={pointActions(point)}
                         subjectName={point.name}
                       />
                     </div>
@@ -1262,8 +1389,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               className="tabular-nums"
               label="成果地点"
               total={definitions.pagination.total}
-              first={shown.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}
-              last={Math.min(page * PAGE_SIZE, shown.length)}
+              first={shown.length === 0 ? 0 : (page - 1) * pageSize + 1}
+              last={Math.min(page * pageSize, shown.length)}
             />
           )}
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
@@ -1275,7 +1402,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         title={detailTarget?.name ?? ''}
         description="この成果地点の数え方と利用状況です。"
         onCancel={() => setDetailTarget(null)}
-        footer={detailTarget ? (
+        footer={detailTarget && canReverse ? (
           <div className="flex justify-end gap-2">
             {detailTarget.state === 'draft' ? (
               <Button
@@ -1429,7 +1556,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       : '受け口は動いています。鍵は発行済みです。'
                     : 'まだ鍵を発行していません。発行すると連携先へ渡す鍵が一度だけ表示されます。'}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                {canReverse ? <div className="mt-2 flex flex-wrap gap-2">
                   <Button
                     disabled={ingestBusy !== '' || detailTarget.state !== 'active'}
                     onClick={() => void issueIngest(detailTarget)}
@@ -1444,8 +1571,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       {detailTarget.ingest.disabledAt ? '受け口を再開する' : '受け口を止める'}
                     </Button>
                   ) : null}
-                </div>
-                {issuedSecret ? (
+                </div> : null}
+                {issuedSecret && canReverse ? (
                   <Notice tone="info" className="mt-2">
                     新しい鍵: <code className="break-all">{issuedSecret}</code><br />
                     この表示は一度だけです。連携先へ渡して保管してください。
@@ -1655,7 +1782,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
 
       <ConfirmDialog
         open={stopTarget !== null}
-        designNode="d8d3Mz"
+        designNode="r6dJFy"
         title={stopTarget
           ? stopAction === 'delete'
             ? `「${stopTarget.name}」を削除しますか？`
@@ -1702,6 +1829,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               </div>
             </section>
 
+            <div><label htmlFor="cv-stop-reason" className="text-ink text-sm font-medium">理由（必須）</label><TextField id="cv-stop-reason" disabled={stopping} required value={stopReason} onChange={(event) => setStopReason(event.target.value)} placeholder="例：計測の仕方を変えるため" className="mt-2 w-full" /></div>
             <section className="bg-canvas-sunken rounded-control px-4 py-3">
               <p className="text-ink-secondary text-sm">
                 これまでに数えた{' '}
@@ -1771,379 +1899,21 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   )
 }
 
-/**
- * レポートのタブ。
- *
- * 成果地点ごとの件数と金額をそのまま出す。一覧の表にもCV数はあるが、
- * あちらは「どう数えるか」を確かめる画面で、こちらは「いくらになったか」を
- * 見る画面なので、金額を主にしている。
- */
-function ReportTab({ accountId }: { accountId: string | null }) {
-  const [report, setReport] = useState<ConversionDefinitionReport | null>(null)
-  const [periodDays, setPeriodDays] = useState(30)
-  const [loading, setLoading] = useState(true)
-  const [loadFailed, setLoadFailed] = useState(false)
-  const [exporting, setExporting] = useState(false)
-  const [exportError, setExportError] = useState('')
-  /** 失敗時の「もう一度読む」用。一覧タブと同じ導線(#513 L6)。 */
-  const [reloadSeq, setReloadSeq] = useState(0)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setLoadFailed(false)
-    setReport(null)
-    void api.conversions.definitionReport({
-      ...definitionRange(periodDays), lineAccountId: accountId ?? undefined,
-    })
-      .then((response) => {
-        if (cancelled) return
-        if (response.success && Array.isArray(response.data.byDefinition)
-          && Array.isArray(response.data.daily) && Array.isArray(response.data.byRoute)) {
-          setReport(response.data)
-        } else {
-          setLoadFailed(true)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setLoadFailed(true)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [accountId, periodDays, reloadSeq])
-
-  const exportCsv = async () => {
-    if (exporting) return
-    setExporting(true)
-    setExportError('')
-    try {
-      const blob = await api.conversions.exportDefinitions({
-        ...definitionRange(periodDays), lineAccountId: accountId ?? undefined,
-      })
-      downloadCsvBlob(blob, `conversion-report-${definitionRange(1).to}.csv`)
-    } catch {
-      setExportError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
-    } finally {
-      setExporting(false)
-    }
-  }
-
-  const daily = useMemo(() => {
-    if (!report) return { names: [], days: [], max: 1 }
-    const names = report.byDefinition.slice(0, 3).map((row) => row.conversionPointName)
-    const byDay = new Map<string, Map<string, number>>()
-    for (const row of report.daily) {
-      const values = byDay.get(row.day) ?? new Map<string, number>()
-      values.set(row.conversionPointName, (values.get(row.conversionPointName) ?? 0) + row.netCount)
-      byDay.set(row.day, values)
-    }
-    const days = [...byDay].map(([day, values]) => {
-      const first = values.get(names[0] ?? '') ?? 0
-      const second = values.get(names[1] ?? '') ?? 0
-      const third = values.get(names[2] ?? '') ?? 0
-      const total = [...values.values()].reduce((sum, value) => sum + value, 0)
-      return { day, first, second, third, other: Math.max(0, total - first - second - third), total }
-    }).toSorted((left, right) => left.day.localeCompare(right.day))
-    return { names, days, max: Math.max(1, ...days.map((row) => row.total)) }
-  }, [report])
-
-  if (loading) {
-    return <ListState kind="loading" title="成果レポートを読み込んでいます" />
-  }
-
-  if (loadFailed) {
-    return (
-      <ListState
-        kind="error"
-        title="成果レポートを読み込めませんでした"
-        description="成果地点の一覧はそのまま使えます。時間を置いて、このタブを開き直してください。"
-        action={
-          <Button variant="secondary" onClick={() => setReloadSeq((current) => current + 1)}>
-            成果レポートを再読み込み
-          </Button>
-        }
-      />
-    )
-  }
-
-  if (!report) return null
-
-  /*
-   * 「いちばん伸びた」は口の `kpis.fastestGrowing`(増分数順)をそのまま使う。
-   * 画面で率順に再計算すると、口の選び方と食い違う(#513 L7)。
-   */
-  const fastest = report.kpis.fastestGrowing
-  const fastestRate = fastest && fastest.previousNetCount > 0
-    ? Math.round((fastest.countChange / fastest.previousNetCount) * 100)
-    : fastest?.netCount ? 100 : 0
-  const previousAverage = report.kpis.previousNetCount > 0
-    ? Math.round(report.kpis.previousNetValue / report.kpis.previousNetCount)
-    : null
-  const topRoute = report.byRoute[0]
-
-  return (
-    <div className="space-y-4" data-conversion-report-design="v6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Select
-          aria-label="集計期間"
-          label="期間"
-          value={String(periodDays)}
-          options={[
-            { value: '7', label: 'この7日' },
-            { value: '30', label: 'この30日' },
-            { value: '90', label: 'この90日' },
-          ]}
-          onChange={(value) => setPeriodDays(Number(value))}
-        />
-        <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています">成果地点の一覧をCSVで書き出す
-        </Button>
-      </div>
-      {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
-
-      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiCard
-          title={`この${periodDays}日の成果`}
-          value={report.kpis.netCount}
-          unit="件"
-          badge={report.kpis.countChangeRate == null
-            ? undefined
-            : `${report.kpis.countChangeRate > 0 ? '+' : ''}${report.kpis.countChangeRate}%`}
-          detail={`前の${periodDays}日 ${formatNumber(report.kpis.previousNetCount)}件`}
-        />
-        <KpiCard
-          title="金額"
-          value={report.kpis.netValue}
-          unit="円"
-          detail={`前の${periodDays}日 ¥${formatNumber(report.kpis.previousNetValue)}`}
-        />
-        <KpiCard
-          title="1件あたり"
-          value={report.kpis.averageNetValue === null ? null : Math.round(report.kpis.averageNetValue)}
-          unit="円"
-          detail={previousAverage === null ? `前の${periodDays}日は成果なし` : `前の${periodDays}日 ¥${formatNumber(previousAverage)}`}
-        />
-        <KpiCard
-          title="いちばん伸びた"
-          value={fastest ? fastestRate : 0}
-          unit="%"
-          badge={fastest && fastestRate > 0 ? `+${fastestRate}%` : undefined}
-          detail={fastest
-            ? `${fastest.conversionPointName} ${formatNumber(fastest.netCount)}件（前の${periodDays}日 ${formatNumber(fastest.previousNetCount)}件）`
-            : '比較できる成果はありません'}
-        />
-      </KpiCollapse>
-
-      <Notice tone="info" message="成果地点ごとの件数と、どこから来たかです。数え方は「成果地点」で決めます。件数と金額は、取り消された成果を除いた数です。" />
-
-      <section className="bg-canvas rounded-card border-hairline border p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-ink text-base font-bold">日ごとの成果（この{periodDays}日）</h2>
-            <p className="text-ink-faint mt-1 text-xs">棒の色は成果地点です。日ごとの実績を積み上げています。</p>
-          </div>
-          {daily && daily.names.length > 0 ? (
-            <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint" aria-label="棒の色と成果地点の対応">
-              {daily.names.map((name, index) => (
-                <li key={name} className="flex items-center gap-1">
-                  <span aria-hidden="true" className={`inline-block h-2.5 w-2.5 rounded-mini ${index === 0 ? 'bg-success' : index === 1 ? 'bg-action' : index === 2 ? 'bg-info' : 'bg-canvas-sunken'}`} />
-                  {name}
-                </li>
-              ))}
-              <li className="flex items-center gap-1">
-                <span aria-hidden="true" className="bg-canvas-sunken inline-block h-2.5 w-2.5 rounded-mini" />
-                そのほか
-              </li>
-            </ul>
-          ) : null}
-        </div>
-        {daily && daily.days.length > 0 ? (
-          <div className="mt-4 flex h-40 items-end gap-1" aria-label="日ごとの成果グラフ">
-            {daily.days.map((day, index) => (
-              <div key={day.day} className="flex h-full min-w-0 flex-1 flex-col justify-end">
-                <div
-                  className="flex w-full flex-col-reverse overflow-hidden rounded-mini"
-                  style={{ height: `${Math.max(4, Math.round((day.total / daily.max) * 100))}%` }}
-                  title={`${day.day} ${day.total}件`}
-                >
-                  {day.first > 0 ? <span className="bg-success" style={{ flexGrow: day.first }} /> : null}
-                  {day.second > 0 ? <span className="bg-action" style={{ flexGrow: day.second }} /> : null}
-                  {day.third > 0 ? <span className="bg-info" style={{ flexGrow: day.third }} /> : null}
-                  {day.other > 0 ? <span className="bg-canvas-sunken" style={{ flexGrow: day.other }} /> : null}
-                </div>
-                {(index === 0 || index === daily.days.length - 1 || index % 5 === 0) ? (
-                  <span className="text-ink-faint mt-1 truncate text-center text-xs">{day.day.slice(5).replace('-', '/')}</span>
-                ) : <span className="mt-1 text-xs">&nbsp;</span>}
-              </div>
-            ))}
-          </div>
-        ) : <p className="text-ink-faint mt-4 text-sm">この期間には日ごとの成果がありません。</p>}
-        {/*
-         * N-266: 棒グラフだけでは値が読み取れない（色と高さに依存する）。
-         * 同じデータの表を畳んで置き、スクリーンリーダーと数値確認の両方を
-         * カバーする。
-         */}
-        {daily && daily.days.length > 0 ? (
-          <details className="mt-4">
-            <summary className="text-ink-secondary cursor-pointer text-sm font-semibold">
-              日ごとの成果を表で見る
-            </summary>
-            <table className="mt-2 w-full text-sm">
-              <thead>
-                <TableHeadRow>
-                  <Th>日付</Th>
-                  <Th align="right">成果件数</Th>
-                  <Th align="right">金額</Th>
-                  <Th>成果地点の内訳</Th>
-                </TableHeadRow>
-              </thead>
-              <tbody className="divide-hairline divide-y">
-                {report.daily
-                  .reduce<Array<{ day: string; count: number; value: number; points: string[] }>>((all, row) => {
-                    const existing = all.find((item) => item.day === row.day)
-                    const label = `${row.conversionPointName} ${row.netCount}件`
-                    if (existing) {
-                      existing.count += row.netCount
-                      existing.value += row.netValue
-                      existing.points.push(label)
-                    } else {
-                      all.push({ day: row.day, count: row.netCount, value: row.netValue, points: [label] })
-                    }
-                    return all
-                  }, [])
-                  .map((row) => (
-                    <tr key={row.day}>
-                      <td className="text-ink px-4 py-2 tabular-nums">{row.day}</td>
-                      <td className="text-ink px-4 py-2 text-right tabular-nums">{formatNumber(row.count)}件</td>
-                      <td className="text-ink-secondary px-4 py-2 text-right tabular-nums">¥{formatNumber(row.value)}</td>
-                      <td className="text-ink-secondary px-4 py-2 text-xs">{row.points.join('・')}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </details>
-        ) : null}
-      </section>
-
-      {report.byDefinition.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="この期間には成果がありません"
-          description="期間を変えるか、成果地点の計測状況を確認してください。"
-        />
-      ) : (
-        <div data-design="Table" className="bg-canvas rounded-card border-hairline border">
-          <table className="w-full table-fixed">
-            <thead>
-              <TableHeadRow>
-                <Th>成果地点</Th>
-                <Th align="right">この期間</Th>
-                <Th align="right">前の期間</Th>
-                <Th align="right">増減</Th>
-                <Th>いちばん多い経路</Th>
-                <Th align="right">操作</Th>
-              </TableHeadRow>
-            </thead>
-            <tbody className="divide-hairline divide-y">
-              {report.byDefinition.filter((row) => row.netCount > 0 || row.previousNetCount > 0).map((row) => {
-                const changeRate = row.previousNetCount > 0
-                  ? Math.round((row.countChange / row.previousNetCount) * 100)
-                  : row.netCount > 0 ? 100 : 0
-                return (
-                  <tr key={row.conversionPointId} className="hover:bg-canvas-sunken">
-                    <td className="text-ink px-4 py-3 text-sm font-medium">
-                      <span className="block truncate" title={row.conversionPointName}>{row.conversionPointName}</span>
-                      {EVENT_TYPE_LABELS[row.sourceType] ? (
-                        <p className="text-ink-faint mt-0.5 text-xs">{EVENT_TYPE_LABELS[row.sourceType]}</p>
-                      ) : null}
-                    </td>
-                    <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
-                      {formatNumber(row.netCount)}件
-                    </td>
-                    <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                      {formatNumber(row.previousNetCount)}件
-                    </td>
-                    <td className={changeRate > 0
-                      ? 'text-success px-4 py-3 text-right text-sm font-semibold tabular-nums'
-                      : 'text-ink-secondary px-4 py-3 text-right text-sm tabular-nums'}>
-                      {changeRate > 0 ? '+' : changeRate === 0 ? '±' : ''}{changeRate}%
-                    </td>
-                    <td className="text-ink-secondary px-4 py-3 text-sm">
-                      {row.routes?.length ? row.routes.slice(0, 2).map((route) => (
-                        <span key={route.routeKey} className="mr-2 inline-block">
-                          {route.label} {route.netCount}件
-                          {route.conversionRate !== null && route.audience !== null
-                            ? <span className="text-ink-faint">（{route.audience}人中 {route.conversionRate}%）</span>
-                            : <span className="text-ink-faint">（母数の記録なし）</span>}
-                        </span>
-                      )) : (topRoute ? `全体では ${topRoute.label}` : '経路の記録はありません')}
-                      <p className="text-ink-faint mt-1 text-xs">取消: {row.cancellationCount == null ? '台帳未接続' : `${row.cancellationCount}件・¥${formatNumber((row.cancellationValue ?? 0))}`}</p>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button href="/conversions?tab=points">中身を見る</Button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
+const AFFILIATE_TABS = new Set(['affiliates', 'offers', 'approvals', 'payment', 'report'])
 
 function ConversionsPageHost() {
   const tab = useMergedTab(MERGED_TABS, 'tab', DEFAULT_TAB)
+  const params = useSearchParams()
   const { selectedAccountId } = useAccount()
-  /*
-    R291: 紹介者の停止前確認からの `?affiliate=`。承認待ちは成果承認タブで
-    この紹介者に絞り、リンクは紹介者タブでこの紹介者の内訳を開く。
-  */
-  const affiliateFocus = useSearchParams().get('affiliate')
-  // タブごとの画面名をトップバーの h1 へ出す（Issue #637）。
-  usePageTitle(conversionsTabTitle(tab))
-  /**
-   * タブごとのV6実Node。5タブすべてを埋める。
-   *
-   * `points` と `report` が抜けていて `data-design-node={undefined}` が
-   * そのまま出ていた。設計側の並びは `design-structure.json` の
-   * `/conversions` に "PouPn GH8VL n5VVTb ZrpKn GUxsj" として記録がある。
-   *
-   * **`d8d3Mz` は「19-1-C 成果地点の削除確認」の重ね画面**であって、
-   * 一覧のNodeではない（`docs/v6-requirements/v6-19-conversion-requirements-draft.md`）。
-   * 一覧に付けると、削除確認の画面とNodeが二重になる。
-   */
-  const nodeByTab: Record<string, string | undefined> = {
-    affiliates: 'PouPn',
-    offers: 'GH8VL',
-    approvals: 'n5VVTb',
-    points: 'ZrpKn',
-    report: 'GUxsj',
-  }
-  return (
-    <div data-design-node={nodeByTab[tab]}>
-      <MergedTabs
-        basePath="/conversions"
-        paramName="tab"
-        tabs={MERGED_TABS}
-        active={tab}
-        defaultKey={DEFAULT_TAB}
-        label="成果とアフィリエイト・コンバージョンの画面"
-      />
-      {tab === 'points' && <ConversionsPageInner accountId={selectedAccountId} />}
-      {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} focusAffiliateId={affiliateFocus} />}
-      {tab === 'offers' && <OffersTab />}
-      {tab === 'approvals' && <ApprovalQueue focusAffiliateId={affiliateFocus} />}
-      {tab === 'report' && <ReportTab accountId={selectedAccountId} />}
-      {tab === 'payment' && (selectedAccountId
-        ? <AffiliatePaymentTab accountId={selectedAccountId} />
-        : <p className="text-ink-secondary p-8 text-center text-sm">上のバーからLINEアカウントを選んでください。</p>)}
-    </div>
-  )
+  const router = useRouter()
+  const theme = useAdminTheme()
+  usePageTitle('コンバージョン')
+  const target = AFFILIATE_TABS.has(tab) ? `/affiliates?${params.toString()}` : null
+  useEffect(() => { if (target) router.replace(target) }, [target, router])
+  if (target) return <ListState kind="loading" title="成果とアフィリエイトへ移動しています" />
+  // ★V8 は src/v8 に一から書いた一覧（r6dJFy・BygrU・WSGvo）。v7 は今のまま。
+  if (theme === 'v8') return <ConversionListV8 accountId={selectedAccountId} />
+  return <div data-design-node="r6dJFy"><ConversionsPageInner accountId={selectedAccountId} v8={false} /></div>
 }
 
 export default function ConversionsPage() {

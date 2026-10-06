@@ -305,7 +305,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="例：然-NEN- はじめての定期便セミナー"
+            placeholder="例：はじめての定期便セミナー"
             className={inputClass}
           />
         </div>
@@ -416,7 +416,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                 <label className="text-xs text-ink-faint">間隔<Select aria-label="間隔" value={String(bulkInterval)} onChange={(value) => setBulkInterval(Number(value))} options={[{ value: '30', label: '30分' }, { value: '60', label: '60分' }, { value: '120', label: '120分' }]} /></label>
                 <button type="button" onClick={applyDailySchedule} className="rounded-control bg-ink px-4 py-2 text-sm font-semibold text-on-accent hover:brightness-92">毎日の枠を置き換える</button>
               </div>
-              <p className="mt-2 text-[11px] text-ink-faint">下の保存ボタンを押すまでは本番へ反映されません。</p>
+              <p className="mt-2 text-micro text-ink-faint">下の保存ボタンを押すまでは本番へ反映されません。</p>
             </div>
             <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
         {rules.map((r, i) => (

@@ -17,6 +17,8 @@ import RadioCard from '@/components/shared/radio-card'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import NewCommonVarV8 from '@/v8/common-vars-edit/new'
 
 /**
  * 共通情報の登録。
@@ -731,11 +733,20 @@ function NewCommonVarInner() {
   )
 }
 
+/*
+ * ★V8: data-theme="v8" のときだけ新しい登録画面（`p82v9`）を出す。
+ * v7 の見た目は NewCommonVarInner のまま変えない。
+ */
+function NewCommonVarPageSwitch() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <NewCommonVarV8 /> : <NewCommonVarInner />
+}
+
 export default function NewCommonVarPage() {
   // 直URLでも共通情報オフのaccountには画面を出さない。
   return (
     <FeatureGate feature="common_vars">
-      <NewCommonVarInner />
+      <NewCommonVarPageSwitch />
     </FeatureGate>
   )
 }

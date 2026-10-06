@@ -14,6 +14,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import type { FeatureKey } from '@/lib/feature-settings'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
@@ -71,6 +72,11 @@ export default function TagsListV8({
    */
   const staffRole = useStaffRole()
   const canEdit = staffRole === null || canManageRole(staffRole)
+  /*
+   * 狭い幅（1152）の板は `aPeD8`。畳み込み自体は入れ物の問い合わせが
+   * 担い、ここでは板 ID だけを替える（auto-replies・reminders と同じ）。
+   */
+  const narrow = useNarrowViewport()
 
   // fixture は試験用の固定表示なので機能設定を読みに行かない。
   const visibility = useFeatureVisibility(fixture ? null : accountId)
@@ -84,7 +90,7 @@ export default function TagsListV8({
     !fixture && !!currentTabFeature && visibility.status === 'ready' && !visibility.enabled(currentTabFeature)
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node={narrow ? 'aPeD8' : 'I1E7Bt'}>
       <div data-design="Head">
         <div className={styles.head}>
           <div className={styles.headText}>

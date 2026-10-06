@@ -52,7 +52,8 @@ const registrant = {
   updatedAt: '2026-09-01T00:00:00.000Z', cancelledAt: null, lockVersion: 4,
 }
 const detailSource = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const listSource = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
+/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+const listSource = fs.readFileSync(path.join(__dirname, '..', 'list-v8.tsx'), 'utf8')
 
 let host: HTMLDivElement
 let root: Root
@@ -147,9 +148,9 @@ async function pickTargetDate(label: string, iso: string) {
 describe('リマインダ詳細の登録者管理 (#868)', () => {
   it('正本URLはstatic exportで再読込できるdetail?idに統一し、動的URLを作らない', () => {
     expect(detailSource).toContain('`/reminders/detail?id=${encodeURIComponent(reminderId)}`')
-    expect(listSource).toContain('`/reminders/detail?id=${encodeURIComponent(reminder.id)}`')
+    expect(listSource).toContain('`/reminders/detail?id=${encodeURIComponent(id)}`')
     expect(detailSource).not.toContain('`/reminders/${encodeURIComponent(reminderId)}`')
-    expect(listSource).not.toContain('`/reminders/${encodeURIComponent(reminder.id)}`')
+    expect(listSource).not.toContain('`/reminders/${encodeURIComponent(')
   })
 
   it('直URLの登録者一覧から基準日を保存し、リマインダID・版番号を実APIへ渡す', async () => {
@@ -163,10 +164,10 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
 
   it('取消後は再開だけを表示し、再開には取消後の版番号を渡す', async () => {
     await render()
-    await click('取消')
+    await click('取り消す')
     expect(apiMock.cancel).toHaveBeenCalledWith('reminder-1', 'registration-1', 4)
     expect(host.textContent).toContain('取消済み')
-    await click('再開')
+    await click('再開する')
     expect(apiMock.resume).toHaveBeenCalledWith('reminder-1', 'registration-1', 5)
     expect(host.textContent).toContain('未送信分だけを次の配信処理で組み直します。')
   })

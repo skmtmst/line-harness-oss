@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index';
 import type { AuthenticatedStaff } from '../middleware/auth';
@@ -27,6 +27,15 @@ function json(method: string, body: unknown) {
   return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
 }
 
+/*
+ * この試験の作り物（sent_at / created_at / scheduled_at）は 2026-09-07 を基準に
+ * 書かれている。KPI の delivered・failed は直近28日（`jstDateString(-27)` 以降）
+ * だけを数えるため、時計を固定しないと 2026-10-05 以降は作り物が窓から外れて
+ * delivered が 0 になり、実行した日によって合否が変わる。
+ * 時計を基準日に固定して、日付に依らず同じ結果にする（他試験と同じ `toFake: ['Date']`）。
+ */
+const NOW = new Date('2026-09-07T12:00:00.000Z');
+
 function seedBroadcast(db: SqliteD1, id: string, overrides: Record<string, unknown> = {}): void {
   const row: Record<string, unknown> = {
     id,
@@ -52,6 +61,8 @@ describe('V6 broadcast data contracts', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
     testDb = createTestD1();
     testDb.raw.prepare("INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1'), ('tenant-2', '統括2')").run();
     testDb.raw.prepare(`
@@ -71,6 +82,7 @@ describe('V6 broadcast data contracts', () => {
   afterEach(() => {
     testDb.raw.close();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('更新口もLINE送信口と同じ最大5通を受け、6通目を拒否する', async () => {
@@ -179,6 +191,10 @@ describe('V6 broadcast data contracts', () => {
   });
 
   it('一覧とKPIは担当テナントだけを集計し、statsを配信IDとして扱わない', async () => {
+    // 種の送信日（9/7）が集計の期間から外れないよう、時計を固定する（日付が進むと落ちていた）。
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-08T00:00:00.000Z'));
+    onTestFinished(() => { vi.useRealTimers(); });
     seedBroadcast(testDb, 'own-broadcast', { total_count: 12, success_count: 10 });
     seedBroadcast(testDb, 'other-broadcast', {
       line_account_id: 'account-2', total_count: 100, success_count: 99,

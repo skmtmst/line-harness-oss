@@ -5,9 +5,15 @@
 
 ## 0. 用意するもの
 - Google Cloud コンソール https://console.cloud.google.com/ にログインできるGoogleアカウント（対象プロジェクトのオーナーまたは編集者）
-- 検証環境のURL（`apps/worker/wrangler.staging.toml` の `WORKER_PUBLIC_URL` / `ADMIN_PUBLIC_URL`）：
-  - Worker：`https://nen-line-stg.skmtmst.workers.dev`
-  - 管理画面：`https://nen-line-stg-admin.pages.dev`
+- 各環境のURL（`apps/worker/wrangler*.toml` の `WORKER_PUBLIC_URL` / `ADMIN_PUBLIC_URL`）：
+
+  | 環境 | Worker（`WORKER_PUBLIC_URL`） | 管理画面 |
+  | --- | --- | --- |
+  | 検証 | `https://stg-api.musubo.jp` | `https://stg-admin.musubo.jp` |
+  | 本番 | `https://api.musubo.jp` | `https://admin.musubo.jp` |
+
+  リダイレクトURIはこの `WORKER_PUBLIC_URL` だけを使う（コードもここから組み立てる）。
+  `*.workers.dev` や `*.pages.dev` で管理画面を開いた場合も、送られるURIは上の表のまま変わらない。
 
 ## 1. APIを有効にする（3つ）
 1. 画面上部の検索窓に「APIとサービス」と入れて開く → 左メニュー「ライブラリ」
@@ -17,25 +23,66 @@
    - **Google My Business API**（口コミ用。表示名が「My Business API」の場合もある）
 3. すでに「管理」と出ていれば有効済み
 
-## 2. OAuth同意画面を確認する
-1. 「APIとサービス」→「OAuth同意画面」
-2. **ユーザーの種類**：「外部」
-3. **公開ステータス**：いまは「テスト」のままで進める。テストのままだと許可の有効期限が**7日**で切れ、7日ごとに「再接続」が必要になる（仕様）。本番前に「本番環境に公開」へ切り替え、Googleの審査を受ける
-4. 「テストユーザー」に、**店舗を管理しているGoogleアカウント**を追加する
-5. 「スコープ」に次の3つが入っているか確認。無ければ「スコープを追加または削除」から追加
-   - `.../auth/business.manage`
+## 2. 同意画面（Google 認証プラットフォーム）を確認する
+
+**「APIとサービス」の中に「OAuth同意画面」というメニューはもう無い。** Googleが場所を変えて、**「Google 認証プラットフォーム」**（Google Auth Platform）という別のメニューに分かれた。左メニューの「APIとサービス」→「OAuth 同意画面」を探しても見つからないので、下のURLを直接開くのが一番早い。
+
+| 見たいもの | 直接開くURL |
+| --- | --- |
+| 全体の状態 | `https://console.cloud.google.com/auth/overview` |
+| アプリ名・ロゴ・各URL | `https://console.cloud.google.com/auth/branding` |
+| 公開ステータス（テスト／本番）とテストユーザー | `https://console.cloud.google.com/auth/audience` |
+| OAuthクライアント（手順3） | `https://console.cloud.google.com/auth/clients` |
+| スコープ | `https://console.cloud.google.com/auth/scopes` |
+| 審査の申請・デモ動画の提出 | `https://console.cloud.google.com/auth/verification` |
+
+どのページでも、先に**上部のプロジェクト名**が目的の環境（検証用／本番用）になっているか確認する。
+
+1. **「対象」ページ**（`/auth/audience`）を開く
+   - **ユーザーの種類**：「外部」
+   - **公開ステータス**：ここに「テスト」と出ていて、**「アプリを公開」**ボタンがある。公開ステータスを変える操作はこのページだけで、ブランディングやスコープのページには無い
+   - **本番環境は必ず公開（本番環境）にする。** 「テスト」のままだと許可の有効期限が**7日**で切れ、7日ごとにお店の人が「再接続」をしないとGoogle連携が止まる（Googleの仕様で、こちらのコードでは回避できない）
+   - 検証環境は「テスト」のままでよい。そのかわり7日ごとに再接続が必要になるのは想定どおり
+   - 「テストユーザー」に、**店舗を管理しているGoogleアカウント**を追加する（テストのままの環境で使う）
+2. **「データアクセス」ページ**（`/auth/scopes`）で、次の3つが入っているか確認。無ければ「スコープを追加または削除」から追加
+   - `.../auth/business.manage` ← これは**機密スコープ**なので、本番公開にはGoogleの審査が必要（手順2-5）
    - `openid`
    - `.../auth/userinfo.email`
 
+### 2-5. 本番を公開するときの審査（機密スコープの確認）
+
+`business.manage` は機密スコープなので、**「アプリを公開」を押しただけでは終わらない**。Googleの確認（審査）を通さないと、同意画面に「このアプリは確認されていません」の警告が出たままになり、利用者は合計100人までに制限される。順番はこうなる。
+
+1. **先にホームページとプライバシーポリシーを用意する**
+   - ホームページは誰でも見られること（ログインの中は不可）。Playストアの掲載ページやSNSページは認められない
+   - プライバシーポリシーは**ホームページと同じドメイン**に置き、Googleのユーザーデータをどう使い・保存し・共有するかを書く
+2. **Google Search Console** で、そのドメインの所有権を確認しておく（Cloudプロジェクトのオーナー／編集者のGoogleアカウントで行う）
+3. **「ブランディング」ページ**（`/auth/branding`）で、アプリ名・ロゴ・サポートメール・デベロッパーの連絡先・ホームページURI・プライバシーポリシーURIを入れて保存する（この時点では「下書き」）
+4. 同じページの**「ブランド設定を確認」**を押す。自動審査は通常数分。審査中はブランディングを編集できない（直すには「キャンセル」）
+5. 「公開準備完了」になったら**「ブランド設定を公開」**を押す。※この確認結果は**7日で期限切れ**になるので、通ったらすぐ公開する
+6. **「確認センター」ページ**（`/auth/verification`）を開く（ブランディングを公開していないと、ここからデータアクセスの確認を申請できない）
+   - 要求するスコープを全部宣言する
+   - **機密スコープごとに「なぜ必要か」「なぜもっと狭いスコープでは足りないか」**を具体的に書く（例：お店のGoogleビジネス情報と口コミを読み、管理画面から返信を投稿するため）
+   - **デモ動画のYouTubeリンク**を出す。YouTube Studioにアップロードし、公開設定は**「限定公開（Unlisted）」**。動画の中で、英語表示でのOAuth許可の流れ、同意画面にアプリ名が正しく出ること、ブラウザのアドレスバーにOAuthクライアントIDが写っていること、各機密スコープで何ができるようになるかを実演する
+   - アプリの機能を説明したドキュメントのリンクを最大3件まで入れられる
+7. 機密スコープの審査は**通常3〜5営業日**。Googleから追加の質問が来ることがあるので、「デベロッパーの連絡先」とサポート用メールの受信箱を見ておく。進行状況は「ブランディング」または「確認センター」で確認できる
+
+**値（クライアントIDやシークレット）はチャット・Issue・PRに貼らないこと。**
+
 ## 3. OAuthクライアントを作る（検証用）
-1. 「APIとサービス」→「認証情報」→「認証情報を作成」→「OAuth クライアント ID」
+1. **「クライアント」ページ**（`https://console.cloud.google.com/auth/clients`）→「クライアントを作成」。「APIとサービス」→「認証情報」から入っても同じクライアント一覧に着く
 2. **アプリケーションの種類**：「ウェブ アプリケーション」
 3. **名前**：`musubo LINE管理 検証環境`（本番用は別に作る。混ぜない）
 4. **承認済みのJavaScript生成元**：空でよい
-5. **承認済みのリダイレクトURI**に、次の1行を**そのまま**追加
-   ```
-   https://nen-line-stg.skmtmst.workers.dev/api/restaurant-test/google/oauth/callback
-   ```
+5. **承認済みのリダイレクトURI**に、使う環境の1行を**そのまま**追加
+   - 検証環境用のクライアント
+     ```
+     https://stg-api.musubo.jp/api/restaurant-test/google/oauth/callback
+     ```
+   - 本番環境用のクライアント（別に作る）
+     ```
+     https://api.musubo.jp/api/restaurant-test/google/oauth/callback
+     ```
 6. 「作成」→ 表示された**クライアントID**と**クライアントシークレット**を控える（「認証情報」から再表示できる）
 
 ## 4. 検証環境のWorkerに値を入れる
@@ -62,8 +109,72 @@ GOOGLE_BUSINESS_WRITE_ENABLED = "false"
 5. 口コミを1件開き、「AIで下書きを作る」→ 文章を直す → 「下書き保存」（ここまではGoogleに何も送らない）
 6. 公開のテストをする日：`GOOGLE_BUSINESS_WRITE_ENABLED="true"` にして再配備 → 「返信内容を確認」→ チェックを入れて「この内容で返信する」→ Googleの管理画面で返信が見えることを確認 → 必要ならGoogle側で返信を削除
 
+## 6. 実運用環境のクライアントを作る（2026-10-04 追加）
+
+Googleの機密スコープ審査のデモ動画は `admin.musubo.jp`（実運用）で撮る。そのため実運用でも
+Googleビジネス機能を有効にしている。検証用クライアントは**流用しない**。
+
+1. 「クライアント」ページで**新しいクライアントを作成**。名前は `musubo LINE管理 本番環境`
+2. 承認済みのリダイレクトURIは、次の**1行だけ**にする
+   ```
+   https://api.musubo.jp/api/restaurant-test/google/oauth/callback
+   ```
+   スプレッドシート連携のコールバック
+   （`https://api.musubo.jp/api/integrations/google-sheets/oauth/callback`）は
+   **このクライアントに登録しない。** 理由は下の「Googleスプレッドシート連携との兼ね合い」を参照。
+3. **クライアントIDもシークレットも、設定ファイル・チャット・Issue・PRには書かない。**
+   実運用環境では両方をWorkerのシークレットとして本人のターミナルから入れる。
+   （検証環境はIDを `[vars]` に置いているが、実運用では値を会話に出さずに済む
+   シークレット登録のほうを使う。コード側は `env` から読むので動きは同じ）
+
+   ```
+   pnpm exec wrangler secret put GOOGLE_BUSINESS_OAUTH_CLIENT_ID
+   pnpm exec wrangler secret put GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET
+   ```
+
+4. `apps/worker/wrangler.toml` 側は `RESTAURANT_TEST_ENABLED = "true"` と
+   `GOOGLE_BUSINESS_WRITE_ENABLED = "true"`（設定済み）。
+5. 管理画面の左メニュー「Googleビジネス」は**ビルド時の値**で出る。
+   `.github/workflows/deploy-cloudflare-admin.yml` の
+   `NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'`（設定済み）で管理画面を**再ビルド・再配備**
+   しないと、APIだけ有効で画面が無い状態になる。
+6. 「対象」ページ（`/auth/audience`）の公開ステータスが「テスト」のままだと7日で認可が切れる。
+   審査提出後、通ったら「アプリを公開」にする。
+
+### Googleスプレッドシート連携との兼ね合い
+
+`apps/worker/src/services/google-sheets.ts:113-135` は `GOOGLE_SHEETS_OAUTH_CLIENT_ID` /
+`..._SECRET` が無いとき、**Googleビジネス側のクライアントへ自動で切り替える**
+（IDとシークレットは必ず同じ組で使う実装）。実運用には現在Sheets用の値を入れていない。
+
+このため、手順3でビジネス用のクライアントを入れると、スプレッドシート連携の画面は
+「設定済み」と表示される。**手順2でSheetsのコールバックURLを登録しないのは、この経路で
+審査対象のクライアントが `https://www.googleapis.com/auth/spreadsheets`（機密スコープ）を
+要求できる状態を作らないため。** 登録が無ければ、Googleは同意画面を出す前に
+`redirect_uri_mismatch` で止めるので、審査を通したクライアントが申請した3つ以外の
+スコープを取得することはない。申請文
+（`docs/manuals/google-business-verification-application.md` 2章）の
+「要求するスコープは3つだけ」という説明は、この登録状態に依存している。
+
+- 実運用でスプレッドシート連携の画面を開くと「設定済み」と出るが、接続を押すと
+  `redirect_uri_mismatch` になる。これは上記のとおり**意図した状態**で、不具合ではない。
+  この画面を開けるのは全店スコープの統括管理者だけ。
+- Sheets連携を実運用で使う日が来たら、専用の `GOOGLE_SHEETS_OAUTH_CLIENT_ID` /
+  `..._SECRET` を**別のクライアントとして**作り、Sheetsのコールバックはそちらにだけ登録する。
+  同意画面に登録するスコープはGoogleプロジェクト単位なので、`spreadsheets` を足すときは
+  Googleビジネスの審査が通ったあとに、追加するスコープの申請理由も用意して行う。
+- 検証環境（`wrangler.staging.toml`）は審査対象ではないため、現在の共用のままでよい。
+  手順は `docs/manuals/google-sheets-oauth-setup.md`。
+
 ## 困ったとき
 - 「この環境にはGoogle接続の設定がありません」→ 手順4のクライアントID／シークレットが未設定
-- Googleの画面で「redirect_uri_mismatch」→ 手順3-5のURIが1文字でも違う。コピーし直す
-- 「アクセスをブロック：このアプリは確認されていません」→ 手順2-4のテストユーザーに、ログインしたアカウントが入っていない
-- 「認可切れ」が7日ごとに出る → 手順2-3のとおり仕様。本番前に公開ステータスを変える
+- Googleの画面で「アクセスをブロック：このアプリのリクエストは無効です／エラー400: redirect_uri_mismatch」→ 手順3-5のURIが1文字でも違う。上の表の `WORKER_PUBLIC_URL` と見比べてコピーし直す。Workerの公開URLを変えたときは、ここも必ず合わせて直す
+- 「アクセスをブロック：このアプリは確認されていません」→ 「対象」ページ（`/auth/audience`）のテストユーザーに、ログインしたアカウントが入っていない
+- 「認可切れ」が7日ごとに出る → 手順2-1のとおり、公開ステータスが「テスト」のときのGoogleの仕様。本番環境では「対象」ページで「アプリを公開」にし、手順2-5の審査まで通しておくこと
+- 「OAuth同意画面」のメニューが見つからない → Googleが「Google 認証プラットフォーム」へ移した。手順2の表のURLを直接開く
+
+## 認可を切らさないための仕組み（実装済み）
+- リダイレクトURIは環境ごとの `WORKER_PUBLIC_URL` に固定している。管理画面を `*.pages.dev` で開いても、独自ドメインで開いても、Googleへ送るURIは1つだけ（`redirect_uri_mismatch` が起きない）
+- 6時間ごとの `google business token keepalive` が、リフレッシュトークンを持つ接続を全部使って更新する。場所を選ぶ前の店舗や、Googleビジネス機能を一時的にoffにしている店舗も対象。Googleの「長く使われないトークンは無効化」を避けるため
+- それでも切れた場合（お店の人がGoogle側で許可を取り消した、パスワードを変えた等）は、画面に「再接続してください」が出る。口コミの下書きなど保存済みのデータは消えない
+- **残る失効要因は公開ステータス「テスト」の7日だけ。本番では「対象」ページで公開にし、手順2-5の審査まで通すこと**

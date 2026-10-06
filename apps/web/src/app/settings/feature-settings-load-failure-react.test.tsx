@@ -50,6 +50,8 @@ function featureResponse() {
 beforeEach(() => {
   fixture.accountId = 'account-a'
   fixture.mode = 'ok'
+  // V8だけ見る（v7側は触らない）。SettingsPage はこの印でV8を出す。
+  document.documentElement.dataset.theme = 'v8'
   clearFeatureSettingsCache()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('localStorage', {
@@ -101,7 +103,7 @@ function switches(): number {
 }
 
 function retryButton(): HTMLButtonElement | undefined {
-  return [...host.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'もう一度読み込む') as HTMLButtonElement | undefined
+  return [...host.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'もう一度試す') as HTMLButtonElement | undefined
 }
 
 describe('D019 機能設定の読み込み失敗', () => {
@@ -118,7 +120,7 @@ describe('D019 機能設定の読み込み失敗', () => {
     fixture.mode = 'down'
     await renderPage()
     await settle()
-    expect(document.body.textContent).toContain('機能設定を読み込めませんでした')
+    expect(document.body.textContent).toContain('設定を読み込めませんでした')
     expect(retryButton()).toBeTruthy()
     expect(switches()).toBe(0)
   })

@@ -21,6 +21,7 @@ import Button from '@/components/shared/button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
+import HelpTip from '@/components/shared/help-tip'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatNumber } from '@/lib/format'
 
@@ -444,6 +445,7 @@ export default function AdvancedSearchDialog({
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-scrim p-4"
+      data-design-node="CYJ0L"
       onClick={onClose}
     >
       <div
@@ -457,27 +459,34 @@ export default function AdvancedSearchDialog({
          * 組み換え（項目・比較方法・値の縦3段化）は、画面の幅ではなく
          * このパネルの幅で切り替える（#984 U011再）。
          */
-        className="@container flex max-h-[calc(100vh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-overlay"
+        className="@container flex max-h-[calc(100vh-32px)] w-full max-w-200 flex-col overflow-hidden rounded-panel border border-hairline bg-canvas shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-divider-soft px-6 py-5">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-divider-soft px-6 py-5">
           <div>
             <h2 id={dialogTitleId} className="text-ink text-lg font-bold">絞り込み条件を設定</h2>
             <p className="text-ink-secondary mt-0.5 text-xs">
-              条件を組み合わせて、対象の友だちだけを表示します。
+              条件を足すたびに人数を数え直します
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="閉じる"
-            className="flex h-8 w-8 items-center justify-center rounded-control text-xl leading-none text-ink-faint hover:bg-canvas-sunken"
-          >
-            ×
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {onLoadSaved && savedSearchEnabled ? (
+              <Button type="button" onClick={onLoadSaved}>
+                保存した検索から読み込む
+              </Button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="閉じる"
+              className="flex h-8 w-8 items-center justify-center rounded-control text-xl leading-none text-ink-faint hover:bg-canvas-sunken"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-3 overflow-y-auto px-6 py-4">
+        <div className="min-h-0 space-y-3 overflow-y-auto px-6 py-4">
           <section className="rounded-panel border border-accent-border bg-accent-soft px-4 py-3">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -487,7 +496,7 @@ export default function AdvancedSearchDialog({
                 </p>
               </div>
               {countFailed ? (
-                <span className="flex items-center gap-2 text-micro text-danger">
+                <span className="flex items-center gap-2 text-micro text-ink-secondary">
                   件数を確認できません
                   <button
                     type="button"
@@ -505,8 +514,8 @@ export default function AdvancedSearchDialog({
 
           <section className="rounded-card border border-hairline bg-canvas p-3">
           <div className="flex items-center gap-2 px-1 pb-2">
-            <span className="bg-accent-deep text-on-accent rounded-pill px-2 py-0.5 text-xs font-medium">
-              AND
+            <span className="bg-surface-pearl text-ink-secondary rounded-pill px-2 py-0.5 text-xs font-medium">
+              すべて
             </span>
             <span className="text-ink text-sm font-bold">すべて満たす条件</span>
           </div>
@@ -518,8 +527,7 @@ export default function AdvancedSearchDialog({
               className="mb-2 grid items-center gap-3 rounded-card bg-canvas-sunken p-3 last:mb-0 sm:grid-cols-12"
             >
               <div className="sm:col-span-3">
-                <h3 className="text-ink text-sm font-bold">{BLOCK_LABEL[b.kind]}</h3>
-                <p className="text-ink-faint mt-0.5 text-nano">{BLOCK_HELP[b.kind]}</p>
+                <h3 className="flex items-center text-sm font-semibold text-ink">{BLOCK_LABEL[b.kind]}<HelpTip label={`${BLOCK_LABEL[b.kind]}の説明`}>{BLOCK_HELP[b.kind]}</HelpTip></h3>
               </div>
 
               <div className="min-w-0 sm:col-span-8">
@@ -685,7 +693,7 @@ export default function AdvancedSearchDialog({
 
           <section className="rounded-panel border border-hairline bg-canvas p-3">
             <div className="flex items-center gap-2">
-              <span className="rounded-pill bg-action px-2 py-0.5 text-xs font-medium text-on-action">OR</span>
+              <span className="rounded-pill bg-surface-pearl px-2 py-0.5 text-xs font-medium text-ink-secondary">どれか</span>
               <span className="text-sm font-bold text-ink">いずれか1つ以上満たす条件</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-3">
@@ -786,11 +794,6 @@ export default function AdvancedSearchDialog({
         */}
         <div className="border-t border-divider-soft px-6 py-4">
           <div className="flex flex-wrap items-center gap-3">
-            {onLoadSaved && savedSearchEnabled ? (
-              <Button type="button" onClick={onLoadSaved}>
-                保存した検索から読み込む
-              </Button>
-            ) : null}
             <button
               type="button"
               onClick={resetConditions}

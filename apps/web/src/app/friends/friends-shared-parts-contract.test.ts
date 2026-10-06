@@ -33,13 +33,13 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
     expect(FRIENDS_BODY).toContain('<Chip key={summary} tone="neutral">')
   })
 
-  it('絞り込み4つを設計の幅（156/156/176/184）で置く', () => {
+  it('絞り込み4つを設計の幅（128/128/144/144）で置く', () => {
     /* 共通Selectの standard は176px固定。幅は外枠で持ち、size="full" を渡す。 */
     for (const [filter, width] of [
-      ['tag', 'w-39'],
-      ['response', 'w-39'],
-      ['operator', 'w-44'],
-      ['scenario', 'w-46'],
+      ['tag', 'w-32'],
+      ['response', 'w-32'],
+      ['operator', 'w-36'],
+      ['scenario', 'w-36'],
     ] as const) {
       expect(FRIENDS_BODY, `${filter} の幅が設計と違う`).toContain(
         `<div className="${width} shrink-0" data-filter="${filter}">`,
@@ -49,18 +49,16 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
     expect((FRIENDS_BODY.match(/size="full"/g) ?? []).length).toBeGreaterThanOrEqual(5)
   })
 
-  it('検索行の副操作を設計の高さ38pxと幅で置く', () => {
-    /* 共通Buttonは36px・角丸8pxで設計と一致済み。ここへ当てない。 */
-    expect(FRIENDS).toContain("const SEARCH_ROW_SECONDARY = 'inline-flex h-9.5")
-    expect(FRIENDS_BODY, '詳細条件が110pxでない').toContain('w-27.5')
-    expect(FRIENDS_BODY, '保存した検索が130pxでない').toContain('w-32.5')
-    expect(FRIENDS_BODY, '検索実行が70pxでない').toContain('w-17.5')
+  it('検索行の副操作を設計の高さ（V8は36px）と幅で置く', () => {
+    /* 共通Buttonは36px・角丸8pxで設計と一致済み。ここへ当てない。v8は36pxにそろえる。 */
+    expect(FRIENDS).toContain("const SEARCH_ROW_SECONDARY = 'inline-flex h-9")
+    expect(FRIENDS_BODY).not.toContain('type="submit"')
     expect(FRIENDS_BODY).not.toContain('h-10 whitespace-nowrap rounded-control')
   })
 
   // ★V7「友だちの顔」（KXDhj）：共通 Avatar の 40px の丸。画像が読めない時も頭文字（2026-09-24）。
-  it('行の顔は共通 Avatar（40px）', () => {
-    expect(ROW_BODY).toContain('<Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />')
+  it('行の顔は共通 Avatar（32px）', () => {
+    expect(ROW_BODY).toContain('<Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />')
     expect(ROW_BODY, '画像を直接描いている').not.toMatch(/<img src=\{friend\.pictureUrl\}/)
   })
 

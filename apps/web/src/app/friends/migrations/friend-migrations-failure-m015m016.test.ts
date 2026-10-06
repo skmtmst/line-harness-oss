@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const PAGE = [
+  'page.tsx',
+  'use-friend-migrations.ts',
+  'migrations-v8.tsx',
+].map((name) => readFileSync(new URL(`./${name}`, import.meta.url), 'utf8')).join('\n')
 
 /**
  * M015：反映の失敗で画面が固まる。

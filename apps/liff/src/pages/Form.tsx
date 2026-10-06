@@ -1,27 +1,42 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import liff from '@line/liff';
 import {
   PREFECTURES,
   collectInputs,
   isOtherFreeText,
   nextSectionIndex,
+  normalizeBookingValue,
   normalizeFormTheme,
+  normalizeRatingValue,
   validateAnswer,
   type FormBlock,
+  type FormBookingValue,
   type FormInputBlock,
   type FormLayout,
 } from '@line-crm/shared';
 import { submitButtonText } from '../lib/form-button-text.js';
-import { api, type PublicForm } from '../lib/api.js';
+import { api, type MenuItem, type PostalCodeCandidate, type PublicForm, type StaffItem } from '../lib/api.js';
+import {
+  addDays,
+  formatWeekday,
+  jstStartsAtIso,
+  jstToday,
+  utcToJstHm,
+  utcToJstMd,
+  utcToJstWeekday,
+} from '../lib/datetime.js';
 import {
   conflictMessage,
   decideFormSubmitStep,
   FORM_SUBMIT_INCOMPLETE_MESSAGE,
 } from '../lib/form-submit-flow.js';
 import { logFailure } from '../lib/user-message.js';
+import { useWideViewport } from '../lib/use-wide-viewport.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import Button from '../components/ui/Button.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
@@ -59,12 +74,12 @@ function initialAnswers(layout: FormLayout): Answers {
 }
 
 /**
- * 必須の印。★V7 (4-a) は欄名の横の小さな太字で、色は待ちの札と同じ琥珀。
- * 入力の失敗の赤 (お店のテーマの error) とは分け、必須は常に琥珀にする。
+ * 必須の印。★V8 (B8rCt・g9osGN) は欄名の横の小さな赤い札。
+ * 入力の失敗 (お店のテーマの error) とは分け、必須は常にこの札にする。
  */
 function RequiredMark() {
   return (
-    <span className="ml-1 text-xs font-bold whitespace-nowrap text-wait-ink">
+    <span className="ml-1.5 rounded bg-liff-required-bg px-1.5 py-px text-[10px] font-bold whitespace-nowrap text-liff-sun">
       必須
     </span>
   );
@@ -189,6 +204,8 @@ export default function Form() {
    */
   const testToken = search.get('test_token');
 
+  // 414 幅の板（`wPfqW`）は板 ID だけを替える。中身は同じ。
+  const wide = useWideViewport();
   const [form, setForm] = useState<PublicForm | null>(null);
   const [answers, setAnswers] = useState<Answers>({});
   const [sectionIndex, setSectionIndex] = useState(0);
@@ -364,6 +381,12 @@ export default function Form() {
   const [conflict, setConflict] = useState<
     null | { code: 'idempotency_content_mismatch' | 'idempotency_expired' }
   >(null);
+  /**
+   * 回答は保存できたが予約の確保に失敗したときの文言。空でなければ
+   * 終わり画面に直し方と送り直しを出す（回答自体は保存済みと伝える）。
+   */
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingRetrying, setBookingRetrying] = useState(false);
 
   const submitErrorText = (err: unknown): string => {
     const status = (err as { status?: number }).status;
@@ -373,6 +396,45 @@ export default function Form() {
     }
     // サーバが断った理由（期限切れ・1人1回・定員）はそのまま出す
     return body?.error ?? '送信できませんでした。時間をおいて試してください。';
+  };
+
+  /**
+   * 「予約を入れる」欄の枠を確保する。予約は「未承認」で入り、店が承認する。
+   * 枠の再確認と重なり防止は予約の受け口が担い、埋まっていれば断る。
+   * 試し回答では予約を入れない。失敗の文言を返し、空なら全件確保できた。
+   */
+  const ensureBookings = async (key: string): Promise<string | null> => {
+    if (testToken || !layout) return null;
+    const targets = collectInputs(layout)
+      .map((block) => ({ block, picked: normalizeBookingValue(answers[block.name]) }))
+      .filter((t) => t.block.type === 'booking' && t.picked !== null);
+    for (const { block, picked } of targets) {
+      const slot = picked as { menuId: string; staffId: string; startsAt: string };
+      try {
+        await api.createRequest(
+          { menu_id: slot.menuId, staff_id: slot.staffId, starts_at: slot.startsAt },
+          `${key}:booking:${block.id}`,
+        );
+      } catch (err) {
+        logFailure('form-booking-request', err);
+        const code = (err as { body?: { error?: string } }).body?.error;
+        if (code === 'slot_not_available') {
+          return '選んだ枠が埋まりました。日時を選び直してください。';
+        }
+        return '予約の確保に失敗しました。回答は保存されています。';
+      }
+    }
+    return null;
+  };
+
+  const retryBookings = async () => {
+    setBookingRetrying(true);
+    try {
+      const message = await ensureBookings(idemKey);
+      setBookingError(message);
+    } finally {
+      setBookingRetrying(false);
+    }
   };
 
   const sendFlow = async (key: string): Promise<void> => {
@@ -386,7 +448,10 @@ export default function Form() {
       }, current, testToken ?? undefined);
       const decision = decideFormSubmitStep(attempt);
       if (decision.action === 'done') {
-        const url = layout!.options?.thanksUrl;
+        // 回答の保存後に予約を確保する。予約だけ失敗しても回答は残す。
+        const bookingMessage = await ensureBookings(current);
+        setBookingError(bookingMessage);
+        const url = !bookingMessage ? layout!.options?.thanksUrl : undefined;
         if (url) {
           window.location.href = url;
           return;
@@ -432,6 +497,7 @@ export default function Form() {
     setSending(true);
     setError(null);
     setConflict(null);
+    setBookingError(null);
     try {
       await sendFlow(keyOverride ?? idemKey);
     } catch (err) {
@@ -471,26 +537,63 @@ export default function Form() {
   // P（試し回答）：試し合言葉があるときは、受付停止の下書きでも試せる。
   if (!form.isActive && !testToken) {
     return (
-      <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
-        <StatusView icon="calendar" title="このフォームは、いま回答を受け付けていません。" />
+      <div className="min-h-screen bg-ground">
+        <LiffHeader title={options.pageTitle || form.name} />
+        <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
+          <StatusView icon="calendar" title="このフォームは、いま回答を受け付けていません。" />
+        </div>
       </div>
     );
   }
 
   if (done) {
     return (
-      <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
-        <StatusView
-          icon="check"
-          tone="success"
-          title="送信しました"
-          body={layout.options?.thanksText || 'ご回答ありがとうございました。'}
-        />
-        {testToken ? (
-          <p className="px-6 pb-8 text-center text-xs text-ink-faint">
-            試しの回答のため、集計には入りません。
-          </p>
-        ) : null}
+      <div className="min-h-screen bg-ground" data-design-node="aNZKe">
+        <LiffHeader title={options.pageTitle || form.name} />
+        <div className="mx-auto max-w-md pb-28" style={{ backgroundColor: theme.sub }}>
+          <StatusView
+            icon="check"
+            tone="success"
+            title="送信しました"
+            body={layout.options?.thanksText || 'ご回答ありがとうございました。'}
+          />
+          {testToken ? (
+            <p className="px-6 pb-8 text-center text-xs text-ink-faint">
+              試しの回答のため、集計には入りません。
+            </p>
+          ) : null}
+          {bookingError && (
+            <div className="mx-6 mb-6 rounded-[10px] border border-liff-line-strong bg-canvas p-4">
+              <p className="text-sm font-bold text-ink">{bookingError}</p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void retryBookings()}
+                  disabled={bookingRetrying}
+                  className="min-h-11 flex-1 rounded-[10px] bg-liff-primary px-3 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  {bookingRetrying ? '確保中...' : '予約を取り直す'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBookingError(null);
+                    setDone(false);
+                    window.scrollTo({ top: 0 });
+                  }}
+                  className="min-h-11 flex-1 rounded-[10px] border border-liff-line-strong bg-canvas px-3 text-sm font-bold text-ink"
+                >
+                  日時を選び直す
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        <BottomBar>
+          <Button variant="primary" onClick={() => liff.closeWindow()}>
+            LINEに戻る
+          </Button>
+        </BottomBar>
       </div>
     );
   }
@@ -498,10 +601,13 @@ export default function Form() {
   const multi = layout.sections.length > 1;
   const radius = theme.cornerRadius === 'none' ? '0' : theme.cornerRadius === 'round' ? '1rem' : '0.5rem';
 
+  const pageTitle = options.pageTitle || form.name;
+
   return (
-    <div className="min-h-screen bg-ground">
+    <div className="min-h-screen bg-ground" data-design-node={wide ? 'wPfqW' : 'B8rCt'}>
+      <LiffHeader title={pageTitle} />
       <div
-        className="mx-auto min-h-screen w-full max-w-md px-4 pt-4 pb-28"
+        className="mx-auto min-h-screen w-full max-w-md px-4 pt-3 pb-28"
         style={{
           color: theme.text,
           backgroundColor: hasCustomTheme ? theme.sub : undefined,
@@ -511,39 +617,37 @@ export default function Form() {
           fontFamily: theme.fontFamily === 'serif' ? 'serif' : 'sans-serif',
         }}
       >
-        {options.pageTitle && (
-          <div className="-mx-4 -mt-4 border-b border-hairline bg-canvas px-4 py-3.5">
-            <h1 className="text-[17px] leading-[26px] font-bold text-ink">{options.pageTitle}</h1>
-          </div>
-        )}
-        {testToken ? (
-          <p className="mt-4 rounded-lg border border-hairline bg-canvas px-3 py-2 text-center text-xs text-ink-faint">
-            試し回答中です。この回答は集計に入りません。
-          </p>
-        ) : null}
-        <div className={options.pageTitle ? 'mt-4' : undefined}>
-          {form.description && (
-            <p className="mb-4 text-sm leading-relaxed whitespace-pre-wrap text-ink-secondary">
-              {form.description}
-            </p>
-          )}
-          {multi && options.sectionHeader !== 'none' && (
-            <div className="mb-4 flex items-center justify-center gap-2">
+        {multi && options.sectionHeader !== 'none' && (
+          <div className="mb-3">
+            <div className="flex gap-1" aria-hidden="true">
               {layout.sections.map((s, i) => (
                 <span
                   key={s.id}
-                  className={`text-xs tabular-nums ${
-                    i === sectionIndex ? 'font-bold' : 'text-ink-faint'
-                  }`}
-                  style={i === sectionIndex ? { color: theme.main } : undefined}
-                >
-                  {options.sectionHeader === 'name' ? s.name : i + 1}
-                </span>
+                  className={`h-1 flex-1 rounded-full ${i <= sectionIndex ? 'bg-liff-primary' : 'bg-liff-line'}`}
+                />
               ))}
             </div>
+            <p className="mt-1.5 text-[10px] text-liff-sub tabular-nums">
+              {options.sectionHeader === 'name'
+                ? layout.sections[sectionIndex]?.name
+                : `${sectionIndex + 1} / ${layout.sections.length}ページ`}
+            </p>
+          </div>
+        )}
+        {testToken ? (
+          <p className="mb-3 rounded-lg border border-hairline bg-canvas px-3 py-2 text-center text-xs text-ink-faint">
+            試し回答中です。この回答は集計に入りません。
+          </p>
+        ) : null}
+        <div>
+          <h1 className="text-xl font-bold text-ink">{pageTitle}</h1>
+          {form.description && (
+            <p className="mt-1 text-xs leading-relaxed whitespace-pre-wrap text-liff-sub">
+              {form.description}
+            </p>
           )}
 
-          <div className="space-y-5">
+          <div className="mt-4 space-y-5">
             {[...layout.header, ...(section?.blocks ?? [])].map((block) => (
               <BlockView
                 key={block.id}
@@ -576,26 +680,24 @@ export default function Form() {
       </div>
 
       <BottomBar>
-        <div className="flex gap-2">
-          {trail.length > 0 && (
-            <button
-              type="button"
-              onClick={goBack}
-              className="flex-1 rounded-lg border border-hairline bg-canvas py-3 text-sm font-medium text-ink disabled:opacity-50"
-            >
-              {options.prevLabel || '前へ'}
-            </button>
-          )}
+        <button
+          type="button"
+          onClick={() => (isLast ? submit() : goNext())}
+          disabled={sending}
+          className="w-full py-3 text-[15px] font-bold disabled:opacity-50"
+          style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
+        >
+          {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+        </button>
+        {trail.length > 0 && (
           <button
             type="button"
-            onClick={() => (isLast ? submit() : goNext())}
-            disabled={sending}
-            className="flex-1 py-3 text-sm font-bold disabled:opacity-50"
-            style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
+            onClick={goBack}
+            className="self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
           >
-            {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+            ← {options.prevLabel || '前のページへ'}
           </button>
-        </div>
+        )}
       </BottomBar>
 
       {confirming && (
@@ -623,6 +725,418 @@ export default function Form() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * F-11：5段階評価は★5つで答える。触る場所は44px以上にする。
+ * 値は 1〜5 の数で回答に入る（保存・平均の数え方と合わせる）。
+ */
+function RatingStars({
+  name,
+  current,
+  onChange,
+}: {
+  name: string;
+  current: number | null;
+  onChange: (name: string, value: unknown) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-label="5段階評価" className="mt-1 flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          role="radio"
+          aria-checked={current === n}
+          aria-label={`星${n}つ`}
+          onClick={() => onChange(name, current === n ? '' : n)}
+          className={`flex min-h-11 min-w-11 items-center justify-center text-3xl leading-none ${
+            current != null && n <= current ? 'text-liff-star' : 'text-liff-idle'
+          }`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** 回答の住所の形。空欄は空文字に寄せる（未入力判定と一致させるため）。 */
+type AddressDraft = {
+  postalCode: string;
+  prefecture: string;
+  city: string;
+  addressLine1: string;
+  addressLine2: string;
+};
+
+function toAddressDraft(value: unknown): AddressDraft {
+  const empty: AddressDraft = { postalCode: '', prefecture: '', city: '', addressLine1: '', addressLine2: '' };
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return empty;
+  const v = value as Record<string, unknown>;
+  const text = (key: string): string => (typeof v[key] === 'string' ? (v[key] as string) : '');
+  return {
+    postalCode: text('postalCode'),
+    prefecture: text('prefecture'),
+    city: text('city'),
+    addressLine1: text('addressLine1'),
+    addressLine2: text('addressLine2'),
+  };
+}
+
+/**
+ * F-11：住所は郵便番号→自動補完＋手入力。候補が複数の番号は選んでもらう。
+ * 選ばなければ手入力の住所はそのまま残す（上書きは選んだときだけ）。
+ */
+function AddressFields({
+  name,
+  draft,
+  onChange,
+  inputClass,
+}: {
+  name: string;
+  draft: AddressDraft;
+  onChange: (name: string, value: unknown) => void;
+  inputClass: string;
+}) {
+  const [candidates, setCandidates] = useState<PostalCodeCandidate[]>([]);
+  const [looking, setLooking] = useState(false);
+  const [lookupMessage, setLookupMessage] = useState<string | null>(null);
+
+  const patch = (next: AddressDraft) => onChange(name, next);
+
+  const applyCandidate = (c: PostalCodeCandidate) => {
+    patch({
+      ...draft,
+      postalCode: draft.postalCode,
+      prefecture: c.prefecture,
+      city: c.city,
+      // 町名は番地欄が空のときだけ入れる。書いた番地は消さない。
+      addressLine1: draft.addressLine1 || c.town,
+    });
+    setCandidates([]);
+    setLookupMessage(null);
+  };
+
+  const lookup = async () => {
+    setLooking(true);
+    setLookupMessage(null);
+    try {
+      const res = await api.postalCodeSearch(draft.postalCode);
+      if (!res.success) throw new Error('postal_code_search_failed');
+      const data = res.data;
+      if (data.status === 'matched' && data.candidates.length === 1) {
+        applyCandidate(data.candidates[0]);
+        return;
+      }
+      if (data.status === 'multiple') {
+        setCandidates(data.candidates);
+        return;
+      }
+      setCandidates([]);
+      setLookupMessage(
+        data.status === 'invalid'
+          ? '郵便番号は 123-4567 のように入力してください'
+          : 'その郵便番号の住所が見つかりません。下の欄へ直接入力してください',
+      );
+    } catch {
+      setCandidates([]);
+      setLookupMessage('住所を調べられませんでした。下の欄へ直接入力してください');
+    } finally {
+      setLooking(false);
+    }
+  };
+
+  return (
+    <div className="mt-1 space-y-2">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={draft.postalCode}
+          placeholder="123-4567"
+          aria-label="郵便番号"
+          onChange={(e) => patch({ ...draft, postalCode: e.target.value })}
+          className={inputClass}
+        />
+        <button
+          type="button"
+          onClick={() => void lookup()}
+          disabled={looking}
+          className="min-h-11 shrink-0 rounded-[10px] border border-liff-line-strong bg-canvas px-3 text-sm font-bold text-ink disabled:opacity-50"
+        >
+          {looking ? '調べています...' : '住所を自動入力'}
+        </button>
+      </div>
+      {candidates.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs text-ink-faint">候補が複数あります。選んでください</p>
+          {candidates.map((c) => (
+            <button
+              key={`${c.postalCode}-${c.town}`}
+              type="button"
+              onClick={() => applyCandidate(c)}
+              className="block w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3 py-2 text-left text-sm text-ink"
+            >
+              {c.prefecture}
+              {c.city}
+              {c.town}
+            </button>
+          ))}
+        </div>
+      )}
+      {lookupMessage && <p className="text-xs text-ink-faint">{lookupMessage}</p>}
+      <select
+        value={draft.prefecture}
+        aria-label="都道府県"
+        onChange={(e) => patch({ ...draft, prefecture: e.target.value })}
+        className={inputClass}
+      >
+        <option value="">都道府県を選択</option>
+        {PREFECTURES.map((p) => (
+          <option key={p} value={p}>
+            {p}
+          </option>
+        ))}
+      </select>
+      <input
+        type="text"
+        value={draft.city}
+        placeholder="市区町村（例：千代田区）"
+        aria-label="市区町村"
+        onChange={(e) => patch({ ...draft, city: e.target.value })}
+        className={inputClass}
+      />
+      <input
+        type="text"
+        value={draft.addressLine1}
+        placeholder="番地（例：1-1）"
+        aria-label="番地"
+        onChange={(e) => patch({ ...draft, addressLine1: e.target.value })}
+        className={inputClass}
+      />
+      <input
+        type="text"
+        value={draft.addressLine2}
+        placeholder="建物名・部屋番号（任意）"
+        aria-label="建物名"
+        onChange={(e) => patch({ ...draft, addressLine2: e.target.value })}
+        className={inputClass}
+      />
+    </div>
+  );
+}
+
+/**
+ * 「予約を入れる」ブロック。メニューは店の指定、担当は指定か選ぶ、
+ * 日にち→時刻の順に空き枠から選ぶ。選んだ枠は回答に入れ、送信後に
+ * 予約の受け口で確保する（枠の再確認と重なり防止はそちらが担う）。
+ */
+export function BookingSlotPicker({
+  block,
+  value,
+  onChange,
+}: {
+  block: FormInputBlock;
+  value: unknown;
+  onChange: (next: FormBookingValue | '') => void;
+}) {
+  const menuId = block.booking?.menuId ?? '';
+  const fixedStaffId = block.booking?.staffId ?? null;
+  const daysAhead = Math.min(60, Math.max(1, block.booking?.daysAhead ?? 14));
+  const picked = normalizeBookingValue(value);
+  const today = jstToday();
+  const lastDay = addDays(today, daysAhead - 1);
+
+  const [menu, setMenu] = useState<MenuItem | null>(null);
+  const [staffList, setStaffList] = useState<StaffItem[]>([]);
+  const [staffId, setStaffId] = useState<string>(fixedStaffId ?? '');
+  const [byDate, setByDate] = useState<Record<string, Array<{ start: string; open: boolean }>>>({});
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  // メニューと担当を読む。担当の指定が無いときは選べるように出す。
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setFailed(false);
+    Promise.all([
+      api.menus(),
+      fixedStaffId ? Promise.resolve(null) : api.staffOf(menuId).catch(() => null),
+    ])
+      .then(([menus, staff]) => {
+        if (cancelled || !menuId) return;
+        setMenu(menus.menus.find((m) => m.id === menuId) ?? null);
+        const list = staff?.staff ?? [];
+        setStaffList(list);
+        if (!fixedStaffId) setStaffId((prev) => prev || list[0]?.id || '');
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        logFailure('form-booking-menu', e);
+        setFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [menuId, fixedStaffId]);
+
+  // 選べる期間の空きを28日ずつに割って読む（口の上限に収める）。
+  useEffect(() => {
+    const activeStaff = fixedStaffId ?? staffId;
+    if (!menuId || !activeStaff) return;
+    let cancelled = false;
+    setLoading(true);
+    setFailed(false);
+    const chunks: Array<[string, string]> = [];
+    let head = today;
+    while (head <= lastDay) {
+      const tail = addDays(head, 27) <= lastDay ? addDays(head, 27) : lastDay;
+      chunks.push([head, tail]);
+      head = addDays(tail, 1);
+    }
+    Promise.all(chunks.map(([from, to]) => api.availability(menuId, activeStaff, from, to)))
+      .then((results) => {
+        if (cancelled) return;
+        const merged: Record<string, Array<{ start: string; open: boolean }>> = {};
+        for (const r of results) {
+          for (const bucket of r.by_staff ?? []) {
+            if (bucket.staff_id !== activeStaff) continue;
+            for (const s of bucket.slots ?? []) {
+              if (s.date < today || s.date > lastDay) continue;
+              const open = !((s.remaining ?? 1) <= 0 || s.state === 'full' || s.state === 'closed');
+              const list = (merged[s.date] ??= []);
+              if (!list.some((t) => t.start === s.start)) list.push({ start: s.start, open });
+              else if (open) list.find((t) => t.start === s.start)!.open = true;
+            }
+          }
+        }
+        for (const d of Object.keys(merged)) {
+          merged[d].sort((a, b) => (a.start < b.start ? -1 : 1));
+        }
+        setByDate(merged);
+        setSelectedDate((prev) => {
+          if (prev && merged[prev]?.some((t) => t.open)) return prev;
+          return Object.keys(merged).sort().find((d) => merged[d].some((t) => t.open)) ?? null;
+        });
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        logFailure('form-booking-availability', e);
+        setFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [menuId, fixedStaffId, staffId, today, lastDay]);
+
+  if (!menuId) {
+    return <p className="text-sm text-ink-secondary">予約のメニューが決まっていません。お店に確認してください。</p>;
+  }
+  if (loading && Object.keys(byDate).length === 0) {
+    return <p className="text-sm text-ink-faint">空き枠を読み込んでいます...</p>;
+  }
+  if (failed && Object.keys(byDate).length === 0) {
+    return <p className="text-sm text-ink-secondary">空き枠を読めませんでした。時間をおいて開き直してください。</p>;
+  }
+
+  const dates = Object.keys(byDate).sort().filter((d) => byDate[d].some((t) => t.open));
+  const daySlots = (selectedDate && byDate[selectedDate]) || [];
+
+  return (
+    <div className="space-y-2.5" data-design-node="g9osGN">
+      {menu && (
+        <p className="text-sm font-bold text-ink">
+          {menu.name}・{menu.duration_minutes}分
+        </p>
+      )}
+      {!fixedStaffId && staffList.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {staffList.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => {
+                // 担当を変えたら前の枠は捨てる（別の担当の枠で送らない）。
+                if (picked && picked.staffId !== s.id) onChange('');
+                setStaffId(s.id);
+              }}
+              aria-pressed={staffId === s.id}
+              className={`min-h-11 rounded-[10px] border px-3 text-sm ${
+                staffId === s.id
+                  ? 'border-liff-primary bg-liff-soft font-bold text-ink'
+                  : 'border-liff-line-strong bg-canvas text-ink'
+              }`}
+            >
+              {s.display_name}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {dates.map((d) => (
+          <button
+            key={d}
+            type="button"
+            onClick={() => setSelectedDate(d)}
+            aria-pressed={selectedDate === d}
+            className={`flex min-h-14 w-14 shrink-0 flex-col items-center justify-center rounded-[10px] border text-sm ${
+              selectedDate === d
+                ? 'border-liff-primary bg-liff-soft font-bold text-ink'
+                : 'border-liff-line-strong bg-canvas text-ink'
+            }`}
+          >
+            <span className="text-xs text-ink-faint">{formatWeekday(d)}</span>
+            <span>{Number(d.slice(8, 10))}</span>
+          </button>
+        ))}
+      </div>
+      {dates.length === 0 && (
+        <p className="text-sm text-ink-secondary">選べる期間に空きがありません。期間を変えてください。</p>
+      )}
+      {selectedDate && (
+        <div className="grid grid-cols-3 gap-2">
+          {daySlots.map((t) => {
+            const startsAt = jstStartsAtIso(selectedDate, t.start);
+            const active = picked?.startsAt === startsAt;
+            return (
+              <button
+                key={t.start}
+                type="button"
+                disabled={!t.open}
+                onClick={() =>
+                  onChange(active ? '' : { menuId, staffId: fixedStaffId ?? staffId, startsAt })
+                }
+                aria-pressed={active}
+                className={`min-h-11 rounded-[10px] border text-sm tabular-nums ${
+                  active
+                    ? 'border-liff-primary bg-liff-soft font-bold text-ink'
+                    : t.open
+                      ? 'border-liff-line-strong bg-canvas text-ink'
+                      : 'border-liff-line-strong bg-canvas text-ink-faint opacity-50'
+                }`}
+              >
+                {t.start}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {picked && (
+        <p className="text-sm font-bold text-ink">
+          {utcToJstMd(picked.startsAt)}（{utcToJstWeekday(picked.startsAt)}）
+          {utcToJstHm(picked.startsAt)}〜 を選んでいます
+        </p>
       )}
     </div>
   );
@@ -686,8 +1200,8 @@ function BlockView({
         rel="noreferrer"
         className={`block rounded-lg py-3 text-center text-sm font-bold ${
           block.style === 'outline'
-            ? 'border border-accent-deep text-accent-deep'
-            : 'bg-accent-deep text-white'
+            ? 'border border-liff-primary text-liff-primary'
+            : 'bg-liff-primary text-white'
         }`}
       >
         {block.label}
@@ -701,13 +1215,13 @@ function BlockView({
   const text = typeof value === 'string' ? value : '';
   const checked = Array.isArray(value) ? (value as string[]) : [];
   const inputClass =
-    'w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm text-ink focus:border-accent-deep focus:outline-none';
+    'w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3 py-2 text-sm text-ink placeholder:text-liff-idle focus:border-liff-primary focus:outline-none';
   /** 直しがある欄は枠を直しの色にする (お店のテーマの error)。 */
   const invalidStyle = error ? { borderColor: errorColor } : undefined;
 
   return (
     <div>
-      <label className="block text-sm font-medium text-ink">
+      <label className="block text-sm font-bold text-ink">
         {block.label}
         {block.required && <RequiredMark />}
       </label>
@@ -805,7 +1319,7 @@ function BlockView({
         )}
 
         {block.type === 'radio' && (
-          <div className={block.inline ? 'flex flex-wrap gap-3' : 'space-y-2'}>
+          <div className={block.inline ? 'flex flex-wrap gap-2' : 'space-y-2'}>
             {(block.choices ?? []).map((choice) => {
               // 「その他」は、ラベルそのものだけでなく自由記入の値でも選中扱い
               const isFree = choice.isOther ? isOtherFreeText(block, text) : false;
@@ -814,13 +1328,19 @@ function BlockView({
                 : text === choice.label;
               return (
                 <div key={choice.id}>
-                  <label className="flex min-h-11 items-center gap-2 text-sm text-ink-secondary">
+                  <label
+                    className={`flex min-h-12 items-center gap-2.5 rounded-[10px] border px-3.5 py-3 text-sm ${
+                      checkedRadio
+                        ? 'border-liff-primary bg-liff-soft font-semibold text-ink'
+                        : 'border-liff-line-strong bg-canvas text-ink'
+                    }`}
+                  >
                     <input
                       type="radio"
                       name={block.name}
                       checked={checkedRadio}
                       onChange={() => onChange(block.name, choice.label)}
-                      className="h-4 w-4 accent-accent-deep"
+                      className="h-[18px] w-[18px] shrink-0 accent-liff-primary"
                     />
                     {choice.label}
                   </label>
@@ -838,7 +1358,7 @@ function BlockView({
         )}
 
         {block.type === 'checkbox' && (
-          <div className={block.inline ? 'flex flex-wrap gap-3' : 'space-y-2'}>
+          <div className={block.inline ? 'flex flex-wrap gap-2' : 'space-y-2'}>
             {(block.choices ?? []).map((choice) => {
               const freeTexts = checked.filter((v) => isOtherFreeText(block, v));
               const isChecked = choice.isOther
@@ -846,11 +1366,17 @@ function BlockView({
                 : checked.includes(choice.label);
               return (
                 <div key={choice.id}>
-                  <label className="flex min-h-11 items-center gap-2 text-sm text-ink-secondary">
+                  <label
+                    className={`flex min-h-12 items-center gap-2.5 rounded-[10px] border px-3.5 py-3 text-sm ${
+                      isChecked
+                        ? 'border-liff-primary bg-liff-soft font-semibold text-ink'
+                        : 'border-liff-line-strong bg-canvas text-ink'
+                    }`}
+                  >
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      className="h-4 w-4 accent-accent-deep"
+                      className="h-[18px] w-[18px] shrink-0 accent-liff-primary"
                       onChange={() => {
                         if (!choice.isOther) {
                           onToggle(block.name, choice.label);
@@ -899,6 +1425,28 @@ function BlockView({
           </div>
         )}
 
+        {/*
+          F-11：5段階評価は★で答える。初期値は「3」などの文字でも来るため
+          数に直してから塗る（直せない文字は未選択として出す）。
+        */}
+        {block.type === 'rating' && (
+          <RatingStars
+            name={block.name}
+            current={normalizeRatingValue(value)}
+            onChange={onChange}
+          />
+        )}
+
+        {/* F-11：住所は郵便番号から自動補完。手入力も残す。 */}
+        {block.type === 'address' && (
+          <AddressFields
+            name={block.name}
+            draft={toAddressDraft(value)}
+            onChange={onChange}
+            inputClass={inputClass}
+          />
+        )}
+
         {block.type === 'file' && (
           <div>
             <input
@@ -909,7 +1457,7 @@ function BlockView({
                 const file = e.target.files?.[0];
                 if (file) onUpload(block.name, file);
               }}
-              className="w-full text-sm text-ink-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-accent-deep file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
+              className="w-full text-sm text-ink-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-liff-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
             />
             {uploading && <p className="mt-1 text-xs text-ink-faint">送っています...</p>}
             {text && (
@@ -926,6 +1474,14 @@ function BlockView({
             )}
             <p className="mt-1 text-xs text-ink-faint">jpg・png・gif・webp・heic、10MBまで</p>
           </div>
+        )}
+
+        {block.type === 'booking' && (
+          <BookingSlotPicker
+            block={block}
+            value={value}
+            onChange={(next) => onChange(block.name, next)}
+          />
         )}
 
         {/* 文字数。上限を決めているときだけ出す */}

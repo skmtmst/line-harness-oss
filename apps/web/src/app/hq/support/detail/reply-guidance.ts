@@ -23,8 +23,8 @@ export function supportSenderNote(hasSenderEmail: boolean): string {
 
 export function supportSendStatus(hasSenderEmail: boolean): string {
   return hasSenderEmail
-    ? '送信すると運営に届き、控えが登録メールアドレスにも届きます'
-    : '送信すると運営に届きます。返信はこの画面で確認できます'
+    ? '送ると運営の対応は「対応中」に戻ります。控えが登録メールアドレスにも届きます'
+    : '送ると運営の対応は「対応中」に戻ります。返信はこの画面で確認できます'
 }
 
 export function supportSentNotice(hasSenderEmail: boolean): string {

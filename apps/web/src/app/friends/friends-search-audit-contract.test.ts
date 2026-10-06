@@ -130,9 +130,8 @@ describe('FRIEND-18/19/20/29/30 保存した検索の窓', () => {
     expect(SAVED).toContain('の条件を表示')
   })
 
-  it('FRIEND-29: 長い名前は折り返し、共有範囲のバッジは縮めない', () => {
-    expect(SAVED).toContain('line-clamp-2')
-    expect(SAVED).toContain('wrap-anywhere')
+  it('FRIEND-29: 長い名前は省略とtitleで読める形にし、共有範囲のバッジは縮めない', () => {
+    expect(SAVED).toContain('truncate')
     expect(SAVED).toContain('title={search.name}')
     expect(SAVED).toContain('shrink-0 rounded-pill')
   })

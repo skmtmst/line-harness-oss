@@ -153,6 +153,14 @@ describe('写真審査の掲載管理（実DB / Issue #1040 IDEA-22）', () => {
   });
 
   afterEach(() => testDb.raw.close());
+  it('returns 30-day counts and ranks by that period, preserving lifetime separately',async()=>{
+    insertPhoto(testDb,{id:'daily-photo'});insertPublication(testDb,{id:'daily-pub',photoId:'daily-photo'});
+    const day=new Date().toISOString().slice(0,10);
+    testDb.raw.prepare(`INSERT INTO nen_photo_publication_daily_views(publication_id,line_account_id,view_date,placement_label,view_count,updated_at) VALUES ('daily-pub','account-a',?,'',42,?)`).run(day,day);
+    const response=await target.request('/api/nen-members/photos/publications?accountId=account-a');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({data:{items:[{view_count_30_days:42}],summary:{topPhoto30Days:{id:'daily-pub',view_count_30_days:42}}}});
+  });
 
   it('公開中・同意撤回で整理待ち・外し済みを分けて返し、撤回後に残る掲載先を追える', async () => {
     insertPhoto(testDb, { id: 'photo-live', awardedPoints: 5 });

@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsDashboard, type OpsDashboardPeriod, type OpsLineUnregistered } from '@/lib/api'
-import OpsPageHeader from '@/components/ops/ops-page-header'
+import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import '@/app/ops/readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { opsCall } from '@/components/ops/ops-ui'
 import { PlanDonut, RevenueBars, formatBytes, formatYen, shareColor } from '@/components/ops/ops-charts'
 import Button from '@/components/shared/button'
@@ -31,6 +33,7 @@ const PERIODS: Array<{ key: OpsDashboardPeriod; label: string }> = [
 ]
 
 export default function OpsDashboardPage() {
+  const theme = useAdminTheme()
   const [period, setPeriod] = useState<OpsDashboardPeriod>('month')
   const [data, setData] = useState<OpsDashboard | null>(null)
   const [error, setError] = useState('')
@@ -75,6 +78,19 @@ export default function OpsDashboardPage() {
     setSyncingBilling(false)
   }
 
+  // 板 `CyW0E`：V8 の下の札の1行のため、未登録の人を先に読む（窓を開いたときの再読込は openUnregistered が担う）。
+  useEffect(() => {
+    if (theme !== 'v8' || !data || unregistered || unregisteredError || showUnregistered) return
+    let active = true
+    void (async () => {
+      const res = await opsCall(api.ops.lineUnregistered())
+      if (!active) return
+      if (res.success) setUnregistered(res.data)
+      else setUnregisteredError(res.error || '読み込めませんでした')
+    })()
+    return () => { active = false }
+  }, [theme, data, unregistered, unregisteredError, showUnregistered])
+
   const openUnregistered = async () => {
     setShowUnregistered(true)
     if (unregistered) return
@@ -89,10 +105,23 @@ export default function OpsDashboardPage() {
   const loading = data === null && !error
 
   return (
-    <div data-design-node="Xvofy" className="flex flex-col gap-4">
+    <ReadonlyDesignNode node="CyW0E"><div data-design-node="Xvofy" className="v8-ro-ops-page v8-ro-ops-dashboard flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <OpsPageHeader title="ダッシュボード" />
+      <OpsPageHeader
+        title="ダッシュボード"
+        description={theme === 'v8' ? '契約先の売上・使用量・お問い合わせを見て、要対応から片づけます。' : undefined}
+        actions={theme === 'v8' ? (
+          <div className="flex items-center gap-1.5">
+            {PERIODS.map((p) => (
+              <FilterChip key={p.key} selected={period === p.key} onChange={(selected) => { if (selected) setPeriod(p.key) }}>
+                {p.label}
+              </FilterChip>
+            ))}
+          </div>
+        ) : undefined}
+      />
 
+      {theme === 'v8' ? null : (
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-body font-bold text-ink">{label}のようす</h2>
         <div className="flex items-center gap-1.5">
@@ -103,6 +132,7 @@ export default function OpsDashboardPage() {
           ))}
         </div>
       </div>
+      )}
 
       {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
@@ -113,17 +143,28 @@ export default function OpsDashboardPage() {
         </div>
       ) : (
       <>
-      <div data-design-node="s7wSj" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <div data-design-node="nPbgn"><KpiCard variant="v6" title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={k ? revenueDetail(k.revenueDelta, k.refundsThisMonth) : '—'} loading={loading} /></div>
-        <div data-design-node="BaoAQ"><KpiCard variant="v6" title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k ? contractDetail(k.active, k.byPlan, k.filledByListPriceCount) : '—'} loading={loading} /></div>
-        <KpiCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}` : '—'} loading={loading} />
-        <KpiCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />
-        <div data-design-node="G0vK7"><KpiCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `返信の下書き${data.ai.draftsThisMonth}回・記事化${data.ai.callsThisMonth - data.ai.draftsThisMonth}回` : '—'} loading={loading} /></div>
+      <div data-design-node="s7wSj" className={`v8-ro-ops-metrics grid gap-4 md:grid-cols-2 ${theme === 'v8' ? 'xl:grid-cols-4' : 'xl:grid-cols-5'}`}>
+        {theme === 'v8' ? (
+          <>
+            <div data-design-node="BaoAQ"><KpiCard variant="v6" title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k && data ? `契約中 ${k.active}・決済失敗 ${data.alerts.pastDue}（トライアルは入れない）` : '—'} loading={loading} /></div>
+            <div data-design-node="nPbgn"><KpiCard variant="v6" title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={k && data ? `決済失敗 ${data.alerts.pastDue} 社` : '—'} loading={loading} /></div>
+            <KpiCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="社" detail={data ? `期限 3日以内 ${data.alerts.trialEndingSoon}` : '—'} loading={loading} />
+            <div data-design-node="G0vK7"><KpiCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="枚" detail={data?.ai ? 'バナー生成・下書き' : '—'} loading={loading} /></div>
+          </>
+        ) : (
+          <>
+            <div data-design-node="nPbgn"><KpiCard variant="v6" title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={k ? revenueDetail(k.revenueDelta, k.refundsThisMonth) : '—'} loading={loading} /></div>
+            <div data-design-node="BaoAQ"><KpiCard variant="v6" title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k ? contractDetail(k.active, k.byPlan, k.filledByListPriceCount) : '—'} loading={loading} /></div>
+            <KpiCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}` : '—'} loading={loading} />
+            <KpiCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />
+            <div data-design-node="G0vK7"><KpiCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `返信の下書き${data.ai.draftsThisMonth}回・記事化${data.ai.callsThisMonth - data.ai.draftsThisMonth}回` : '—'} loading={loading} /></div>
+          </>
+        )}
       </div>
 
       {/* グラフ帯 */}
-      <div className="grid gap-4 xl:grid-cols-5">
-        <section data-design-node="fyib5" aria-label="月ごとの売上" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-3">
+      <div className="v8-ro-ops-dashboardGroup grid gap-4 xl:grid-cols-5">
+        <section data-design-node="fyib5" aria-label="月ごとの売上" className={`rounded-card border border-hairline bg-canvas px-5 py-4 ${theme === 'v8' ? 'xl:col-span-5' : 'xl:col-span-3'}`}>
           <div data-design-node="MVufa" className="mb-2 flex items-center gap-2">
             <h3 className="text-label font-semibold text-ink">月ごとの売上</h3>
             <span data-design-node="xaUOz" className="ml-auto text-nano text-ink-faint">{data ? revenueSourceLabel(data.pricing, data.lastSyncedAt) : '—'}</span>
@@ -135,8 +176,9 @@ export default function OpsDashboardPage() {
           </div>
           {billingSyncNotice ? <p role="status" className="mb-2 text-caption text-accent-deep">{billingSyncNotice}</p> : null}
           {billingSyncError ? <p role="alert" className="mb-2 text-caption text-danger">{billingSyncError}</p> : null}
-          {data ? <RevenueBars rows={data.revenueByMonth} /> : <ListState kind="loading" title="読み込んでいます" />}
+          {data ? theme === 'v8' ? <div className="v8-ro-ops-revenue"><p className="text-micro text-ink-faint">金額（円）・{data.revenueByMonth.map(row => row.label).join('、')}</p><RevenueBars rows={data.revenueByMonth} /></div> : <RevenueBars rows={data.revenueByMonth} /> : <ListState kind="loading" title="読み込んでいます" />}
         </section>
+        {theme === 'v8' ? null : (
         <section aria-label="プラン別の契約" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">
           <h3 className="mb-2 text-label font-semibold text-ink">プラン別の契約</h3>
           {data ? (
@@ -160,48 +202,96 @@ export default function OpsDashboardPage() {
             </div>
           ) : <ListState kind="loading" title="読み込んでいます" />}
         </section>
+        )}
       </div>
 
       {/* 要対応帯 */}
-      <div className="grid gap-4 xl:grid-cols-5">
+      <div className="v8-ro-ops-dashboardGroup grid gap-4 xl:grid-cols-5">
         <section aria-label="要対応" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-3">
           <h3 className="mb-2 text-label font-semibold text-ink">要対応</h3>
           {data ? (
-            <ul className="divide-y divide-hairline">
-              <AlertRow label="決済が失敗している契約先" count={data.alerts.pastDue} href="/ops/tenants?status=past_due" />
-              <AlertRow label="トライアル期限が3日以内" count={data.alerts.trialEndingSoon} href="/ops/tenants?status=trialing" />
-              <AlertRow label="LINEのトークン期限が近い店舗" count={data.alerts.lineTokenExpiring} href="/ops/tenants" />
-              <AlertRow label="未返信のお問い合わせ" count={data.alerts.unansweredTickets} href="/ops/support" />
-            </ul>
-          ) : <ListState kind="loading" title="読み込んでいます" />}
-        </section>
-        <section aria-label="お問い合わせ（チケット）" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-label font-semibold text-ink">お問い合わせ（チケット）</h3>
-            <Link href="/ops/support" className="text-caption text-action underline-offset-2 hover:underline">すべて見る →</Link>
-          </div>
-          {data ? (
             <>
-              <div className="grid grid-cols-2 gap-2">
-                <MiniStat label="未対応" value={String(data.tickets.newCount)} />
-                <MiniStat label="対応中" value={String(data.tickets.inProgressCount)} />
-                <MiniStat label="平均の初回返信" value={minutesLabel(data.tickets.avgFirstReplyMinutes)} />
-                <MiniStat label={`${label}クローズ`} value={String(data.tickets.closedInPeriod)} />
-              </div>
-              <Notice
-                tone="success"
-                className="mt-3"
-                message={`契約者専用LINEの登録　${data.lineRegistration.registered}人 / ${data.lineRegistration.total}人`}
-                action={(
-                  <Button size="field" onClick={() => void openUnregistered()} disabled={data.lineRegistration.unregisteredCount === 0}>
-                    未登録の{data.lineRegistration.unregisteredCount}人へ案内
-                  </Button>
-                )}
-              />
+              {theme === 'v8' ? (
+                <div className="flex items-center gap-3 border-b border-hairline pb-2 text-micro text-ink-faint">
+                  <span>何が</span>
+                  <span className="ml-auto">件数</span>
+                  <span className="w-10" />
+                </div>
+              ) : null}
+              <ul className="divide-y divide-hairline">
+                <AlertRow v8={theme === 'v8'} label="決済が失敗している契約先" count={data.alerts.pastDue} href="/ops/tenants?status=past_due" />
+                <AlertRow v8={theme === 'v8'} label="トライアル期限が3日以内" count={data.alerts.trialEndingSoon} href="/ops/tenants?status=trialing" />
+                <AlertRow v8={theme === 'v8'} label="LINEのトークン期限が近い店舗" count={data.alerts.lineTokenExpiring} href="/ops/tenants" />
+                <AlertRow v8={theme === 'v8'} label="未返信のお問い合わせ" count={data.alerts.unansweredTickets} href="/ops/support" />
+              </ul>
             </>
           ) : <ListState kind="loading" title="読み込んでいます" />}
         </section>
+        <section aria-label="お問い合わせ（チケット）" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">
+          {theme === 'v8' ? (
+            <>
+              <h3 className="mb-2 text-label font-semibold text-ink">お問い合わせ（チケット）</h3>
+              {data ? (
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    <MiniStat label="未対応" value={`${data.tickets.newCount} 件`} />
+                    <MiniStat label="対応中" value={`${data.tickets.inProgressCount} 件`} />
+                    <MiniStat label="平均の初回返信" value={v8HoursLabel(data.tickets.avgFirstReplyMinutes)} />
+                  </div>
+                  <Link href="/ops/support" className="mt-2 inline-block text-caption font-semibold text-action underline-offset-2 hover:underline">すべて見る →</Link>
+                </>
+              ) : <ListState kind="loading" title="読み込んでいます" />}
+            </>
+          ) : (
+            <>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-label font-semibold text-ink">お問い合わせ（チケット）</h3>
+                <Link href="/ops/support" className="text-caption text-action underline-offset-2 hover:underline">すべて見る →</Link>
+              </div>
+              {data ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <MiniStat label="未対応" value={String(data.tickets.newCount)} />
+                    <MiniStat label="対応中" value={String(data.tickets.inProgressCount)} />
+                    <MiniStat label="平均の初回返信" value={minutesLabel(data.tickets.avgFirstReplyMinutes)} />
+                    <MiniStat label={`${label}クローズ`} value={String(data.tickets.closedInPeriod)} />
+                  </div>
+                  <Notice
+                    tone="success"
+                    className="mt-3"
+                    message={`契約者専用LINEの登録　${data.lineRegistration.registered}人 / ${data.lineRegistration.total}人`}
+                    action={(
+                      <Button size="field" onClick={() => void openUnregistered()} disabled={data.lineRegistration.unregisteredCount === 0}>
+                        未登録の{data.lineRegistration.unregisteredCount}人へ案内
+                      </Button>
+                    )}
+                  />
+                </>
+              ) : <ListState kind="loading" title="読み込んでいます" />}
+            </>
+          )}
+        </section>
       </div>
+
+      {theme === 'v8' ? (
+      <div className="v8-ro-ops-dashboardGroup grid gap-4 xl:grid-cols-5">
+        <section aria-label="プラン別の契約" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-3">
+          <h3 className="mb-2 text-label font-semibold text-ink">プラン別の契約</h3>
+          {data ? <p className="text-caption text-ink">{planShareLine(data.planShare.rows)}</p> : <ListState kind="loading" title="読み込んでいます" />}
+        </section>
+        <section aria-label="契約者専用LINEに未登録の権限者" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">
+          <h3 className="mb-2 text-label font-semibold text-ink">契約者専用LINEに未登録の権限者</h3>
+          {data ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-caption text-ink">{lineUnregisteredLine(data.lineRegistration.unregisteredCount, unregistered)}</p>
+              <Button size="field" onClick={() => void openUnregistered()} disabled={data.lineRegistration.unregisteredCount === 0}>
+                未登録の{data.lineRegistration.unregisteredCount}人へ案内
+              </Button>
+            </div>
+          ) : <ListState kind="loading" title="読み込んでいます" />}
+        </section>
+      </div>
+      ) : null}
 
       {/* 使用量の表 */}
       <section aria-label="上限に近い契約先" className="rounded-card border border-hairline bg-canvas">
@@ -211,32 +301,59 @@ export default function OpsDashboardPage() {
           <ListState kind="empty" title="今月はまだ使用量がありません" description="配信・バナー生成・メディア登録があると、上限に近い契約先から順に並びます。" />
         ) : (
           <DataTable>
-            <thead>
-              <TableHeadRow>
-                {/*
-                  契約先の列で残りを吸収し、表を枠に収める。
-                  使用率は短い札なので右へ寄せ、右端の余白を左端とそろえる。
-                */}
-                <Th>上限に近い契約先</Th>
-                <Th className="w-32">プラン</Th>
-                <Th className="w-40">配信通数</Th>
-                <Th className="w-40">バナー生成</Th>
-                <Th className="w-40">メディア容量</Th>
-                <Th className="w-28" align="right">使用率</Th>
-              </TableHeadRow>
-            </thead>
-            <tbody>
-              {data.usage.map((row) => (
-                <Tr key={row.tenantId}>
-                  <Td><Link href={`/ops/tenants/detail?id=${encodeURIComponent(row.tenantId)}`} className="block truncate text-label font-medium text-ink hover:underline">{row.tenantName}</Link></Td>
-                  <Td><span className="text-caption text-ink-secondary">{row.planLabel}</span></Td>
-                  <Td><span className="text-caption text-ink">{formatNumber(row.messages)} / {row.limits.messages === null ? '—' : formatNumber(row.limits.messages)}</span></Td>
-                  <Td><span className="text-caption text-ink">{row.bannerUnits} / {row.limits.images ?? '—'}</span></Td>
-                  <Td><span className="text-caption text-ink">{formatBytes(row.mediaBytes)} / {row.limits.mediaBytes === null ? '—' : formatBytes(row.limits.mediaBytes)}</span></Td>
-                  <Td align="right">{row.usageRate >= 90 ? <Chip tone="danger">{row.usageRate}%</Chip> : row.usageRate >= 70 ? <Chip tone="warn">{row.usageRate}%</Chip> : <Chip tone="neutral">{row.usageRate}%</Chip>}</Td>
-                </Tr>
-              ))}
-            </tbody>
+            {theme === 'v8' ? (
+              <>
+                <thead>
+                  <TableHeadRow>
+                    <Th>契約先</Th>
+                    <Th className="w-32">プラン</Th>
+                    <Th className="w-40">配信通数</Th>
+                    <Th className="w-40">バナー生成</Th>
+                    <Th className="w-40">メディア容量</Th>
+                  </TableHeadRow>
+                </thead>
+                <tbody>
+                  {data.usage.map((row) => (
+                    <Tr key={row.tenantId}>
+                      <Td><Link href={`/ops/tenants/detail?id=${encodeURIComponent(row.tenantId)}`} className="block truncate text-label font-medium text-ink hover:underline">{row.tenantName}</Link></Td>
+                      <Td><span className="text-caption text-ink-secondary">{row.planLabel}</span></Td>
+                      <Td><span className="text-caption text-ink">{v8UsagePercent(row.messages, row.limits.messages)}</span></Td>
+                      <Td><span className="text-caption text-ink">{v8UsagePercent(row.bannerUnits, row.limits.images)}</span></Td>
+                      <Td><span className="text-caption text-ink">{v8UsagePercent(row.mediaBytes, row.limits.mediaBytes)}</span></Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </>
+            ) : (
+              <>
+                <thead>
+                  <TableHeadRow>
+                    {/*
+                      契約先の列で残りを吸収し、表を枠に収める。
+                      使用率は短い札なので右へ寄せ、右端の余白を左端とそろえる。
+                    */}
+                    <Th>上限に近い契約先</Th>
+                    <Th className="w-32">プラン</Th>
+                    <Th className="w-40">配信通数</Th>
+                    <Th className="w-40">バナー生成</Th>
+                    <Th className="w-40">メディア容量</Th>
+                    <Th className="w-28" align="right">使用率</Th>
+                  </TableHeadRow>
+                </thead>
+                <tbody>
+                  {data.usage.map((row) => (
+                    <Tr key={row.tenantId}>
+                      <Td><Link href={`/ops/tenants/detail?id=${encodeURIComponent(row.tenantId)}`} className="block truncate text-label font-medium text-ink hover:underline">{row.tenantName}</Link></Td>
+                      <Td><span className="text-caption text-ink-secondary">{row.planLabel}</span></Td>
+                      <Td><span className="text-caption text-ink">{formatNumber(row.messages)} / {row.limits.messages === null ? '—' : formatNumber(row.limits.messages)}</span></Td>
+                      <Td><span className="text-caption text-ink">{row.bannerUnits} / {row.limits.images ?? '—'}</span></Td>
+                      <Td><span className="text-caption text-ink">{formatBytes(row.mediaBytes)} / {row.limits.mediaBytes === null ? '—' : formatBytes(row.limits.mediaBytes)}</span></Td>
+                      <Td align="right">{row.usageRate >= 90 ? <Chip tone="danger">{row.usageRate}%</Chip> : row.usageRate >= 70 ? <Chip tone="warn">{row.usageRate}%</Chip> : <Chip tone="neutral">{row.usageRate}%</Chip>}</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </>
+            )}
           </DataTable>
         )}
       </section>
@@ -267,11 +384,57 @@ export default function OpsDashboardPage() {
           <ListState kind="error" title="未登録の人を表示できませんでした" description={unregisteredError} onRetry={() => void openUnregistered()} />
         ) : <ListState kind="loading" title="読み込んでいます" />}
       </Dialog>
-    </div>
+    </div></ReadonlyDesignNode>
   )
 }
 
-function AlertRow({ label, count, href }: { label: string; count: number; href: string }) {
+/** 板 `CyW0E` の平均の初回返信（2.4 時間のように小数1桁の時間で出す）。 */
+function v8HoursLabel(minutes: number | null): string {
+  if (minutes === null || !Number.isFinite(minutes)) return '—'
+  const hours = Math.round(Math.max(0, minutes) / 6) / 10
+  return `${hours} 時間`
+}
+
+/** 板 `CyW0E` の使用率（上限が無いときは —）。 */
+function v8UsagePercent(value: number, limit: number | null): string {
+  if (limit === null || limit <= 0) return '—'
+  return `${Math.round((value / limit) * 100)}%`
+}
+
+/** 板 `CyW0E` のプラン別の契約の1行（スタンダード 1・プロ 1・…の順）。停止は口に無いので出ない。 */
+function planShareLine(rows: Array<{ key: string; label: string; count: number }>): string {
+  const order = ['standard', 'pro', 'light', 'trial']
+  const byKey = new Map(rows.map((row) => [row.key, row]))
+  return order
+    .filter((key) => byKey.has(key))
+    .map((key) => {
+      const row = byKey.get(key)!
+      return `${row.label} ${row.count}`
+    })
+    .join('・')
+}
+
+/** 板 `CyW0E` の未登録の権限者の1行（メール未登録M人・LINE未登録N人（店1・店1））。 */
+function lineUnregisteredLine(unregisteredCount: number, unregistered: OpsLineUnregistered | null): string {
+  if (!unregistered) return `LINE未登録 ${unregisteredCount}人`
+  const noEmail = unregistered.people.filter((p) => !p.hasEmail).length
+  const byTenant = new Map<string, number>()
+  for (const p of unregistered.people) byTenant.set(p.tenantName, (byTenant.get(p.tenantName) ?? 0) + 1)
+  const top = [...byTenant].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([name, n]) => `${name} ${n}`)
+  const tail = top.length > 0 ? `（${top.join('・')}）` : ''
+  return `メール未登録${noEmail}人・LINE未登録${unregisteredCount}人${tail}`
+}
+
+function AlertRow({ label, count, href, v8 }: { label: string; count: number; href: string; v8?: boolean }) {
+  if (v8) {
+    return (
+      <li className="flex items-center gap-3 py-2.5">
+        <span className="text-caption text-ink">{label}</span>
+        <span className="ml-auto text-caption text-ink">{count}</span>
+        <Button size="field" href={href}>開く</Button>
+      </li>
+    )
+  }
   return (
     <li className="flex items-center gap-3 py-2.5">
       <span className="text-caption text-ink">{label}</span>

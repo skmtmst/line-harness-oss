@@ -101,6 +101,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@line-crm/db', () => ({
+  // 止まったとみなす目安は本物と同じ値にする（routes/forms.ts が参照）。
+  FORM_SUBMIT_CLAIM_STALE_MS: 60 * 1000,
   getFormAccountIds: vi.fn(async () => ['account-a']),
   listLineAccountsWithTenantStatus: vi.fn(async () => [
     { id: 'account-a', tenant_status: 'active' },

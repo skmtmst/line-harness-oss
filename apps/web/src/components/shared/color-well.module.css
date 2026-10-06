@@ -1,50 +1,80 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 @layer components {
 /*
- * 色を選ぶ（Pencil ★V8 `KVkPg`／`mpJVS`。macOS カラーウェル）。
+ * 色を選ぶ（Pencil ★V8 `KVkPg` / ★BG-2 `P8ZUj`・`d6PU4a`）。
  *
- *   閉じたとき  高さ36：色の見本（左・角丸）＋区切り線＋下向きの矢印
- *   開いたとき  下にポップ（8×3 の色の格子・スポイト・十六進の欄）
- *   動き        ポップは 8px 上から落ちながら開く（120ms）
+ * 丸み 8 は `--radius-segment`。`--radius-control` は V8 で 10 になり、
+ * h28 の小さな欄（HEX・スポイト）には丸すぎるので使わない。
+ * 動きは `--motion-*` だけを使う（ポップは fast=120ms のまま）。
  */
 
 .root {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
 }
 
+/* 2 列に並べるとき（Pencil `KkTNS`：役割ごとに 174px の枠へ伸びる） */
+.rootBlock {
+  display: flex;
+}
+
+/*
+ * 枠へ伸ばすのは flex で行う。width を書くと design/v8-part-values.json との
+ * 照合（verify:design）が `.well` の宣言として読み、`%` の数字を実寸と見て
+ * 落ちる。親が flex なので flex:1 で同じ見た目になる。
+ */
+.rootBlock .well {
+  flex: 1;
+}
+
+/* 呼び出し元のコントロール（見本＋区切り線＋矢印） */
 .well {
   display: inline-flex;
-  height: 36px;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  height: 36px;
+  /* 左 4・右 8（Pencil `KVkPg` の実寸。見本の左は詰める） */
   padding: 0 8px 0 4px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
-  color: var(--color-ink-secondary);
   cursor: pointer;
-}
-
-.well:hover:not(:disabled) {
-  background: var(--color-canvas-sunken);
-}
-
-.well:focus-visible {
-  outline: 2px solid var(--color-action);
-  outline-offset: 2px;
 }
 
 .well:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
 .swatch {
-  width: 28px;
-  height: 26px;
-  border-radius: var(--radius-mini);
+  width: 56px;
+  height: 28px;
+  border-radius: var(--radius-tile-sm);
   box-shadow: inset 0 0 0 1px var(--color-board-line);
+}
+
+/* 色なし（指定なし）のときは斜線で示す */
+.swatchEmpty {
+  background:
+    linear-gradient(
+      to top right,
+      transparent calc(50% - 1px),
+      var(--color-hairline) calc(50% - 1px),
+      var(--color-hairline) calc(50% + 1px),
+      transparent calc(50% + 1px)
+    ),
+    var(--color-canvas);
+}
+
+/* 今の色の値（Pencil `XaBKL`：12px・左寄せで余白を埋める） */
+.wellValue {
+  flex: 1;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 12px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .divider {
@@ -54,38 +84,264 @@
 }
 
 .caret {
-  flex: none;
+  color: var(--color-ink-secondary);
 }
 
+/* ピッカー本体（Pencil `d6PU4a`：288 幅・pad12・gap10・r16） */
 .pop {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 30;
+  z-index: 40;
   display: flex;
-  width: 236px;
+  width: 288px;
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  border: 1px solid var(--color-board-line);
-  border-radius: var(--radius-card);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-panel);
   background: var(--color-canvas);
   box-shadow: var(--shadow-float);
   animation: color-well-pop var(--motion-fast) var(--motion-ease-out);
 }
 
+/*
+ * 2列に並べた右側で、左そろえのままだと画面の右へはみ出す（横スクロールも
+ * 出ないので、はみ出した所は押せない）。入る幅が無いときだけ `color-well.tsx`
+ * がこれを足して、コントロールの右端にそろえる。大きさ・中身は `.pop` のまま。
+ */
+.popEnd {
+  right: 0;
+  left: auto;
+}
+
 @keyframes color-well-pop {
   from {
     opacity: 0;
-    transform: translateY(-8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
+    transform: translateY(-4px);
   }
 }
 
+/* 色の種類の見出し（Pencil `vy3Ku`：h36・pad3・gap2・r10） */
+.tabs {
+  display: flex;
+  gap: 2px;
+  height: 36px;
+  padding: 3px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+}
+
+.tab {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-segment);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tabOn {
+  border-color: var(--color-board-line);
+  background: var(--color-canvas);
+  /* V8 は切り替えのつまみと同じ影。V7 は近い値の既存トークンで代える。 */
+  box-shadow: var(--shadow-segment-thumb, var(--shadow-nav-active));
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* 彩度・明度の面（Pencil `K4fPq4`：h168・r8） */
+.plane {
+  position: relative;
+  height: 168px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-segment);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.planeHandle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--color-canvas);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 1px var(--color-board-line);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* 現在色とバー（gap10 → 現在色 38×38 ＋ バー2本 gap12） */
+.sliders {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.current {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-board-line);
+}
+
+.bars {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bar {
+  position: relative;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-board-line);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.barThumb {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--color-canvas);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 1px var(--color-board-line);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* HEX とスポイト（gap8） */
+.inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hexField,
+.alphaField {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-segment);
+  background: var(--color-canvas);
+}
+
+.hexField {
+  flex: 1;
+  gap: 4px;
+}
+
+.alphaField {
+  width: 64px;
+  gap: 2px;
+}
+
+.hexMark {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.unit {
+  color: var(--color-ink-faint);
+  font-size: 10px;
+}
+
+.hexInput,
+.alphaInput {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hexInput {
+  text-transform: uppercase;
+}
+
+/*
+ * キーボードで来たときだけ輪郭を出す（:focus だと指やマウスでも光り、
+ * 「選ばれている」と読み違える）。色は --color-action（＝普通の操作）。
+ */
+.well:focus-visible,
+.tab:focus-visible,
+.dropper:focus-visible,
+.hexInput:focus-visible,
+.alphaInput:focus-visible,
+.save:focus-visible,
+.cell:focus-visible,
+.saved:focus-visible,
+.clear:focus-visible,
+.apply:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.alphaInput {
+  text-align: right;
+}
+
+.dropper {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-segment);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.rule {
+  height: 1px;
+  background: var(--color-hairline);
+}
+
+/* 色の見出し行 */
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.headingText {
+  color: var(--color-ink-secondary);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.save {
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-deep);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* よく使う色（8 列・gap4・セル h28・r6） */
 .grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
@@ -93,90 +349,91 @@
 }
 
 .cell {
-  width: 100%;
-  aspect-ratio: 1 / 1;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-mini);
+  box-shadow: inset 0 0 0 1px var(--color-board-line);
+  cursor: pointer;
+  transition: transform var(--motion-fast) var(--motion-ease-out);
+}
+
+.cell:hover {
+  transform: scale(1.08);
+}
+
+.cellOn {
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: 1px;
+}
+
+/* 保存した色（28×28・r6） */
+.savedRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.saved {
+  width: 28px;
+  height: 28px;
   border: 0;
   border-radius: var(--radius-mini);
   box-shadow: inset 0 0 0 1px var(--color-board-line);
   cursor: pointer;
 }
 
-.cell:hover {
-  transform: scale(1.12);
-}
-
-.cell:focus-visible {
-  outline: 2px solid var(--color-action);
-  outline-offset: 1px;
-}
-
-.cell[aria-selected='true'] {
-  outline: 2px solid var(--color-accent-deep);
-  outline-offset: 1px;
-}
-
-.row {
+/* フッター（gap8・ボタン h36・r10） */
+.footer {
   display: flex;
-  align-items: center;
   gap: 8px;
 }
 
-.dropper {
-  display: inline-flex;
-  width: 32px;
-  height: 32px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-hairline);
+.clear,
+.apply {
+  flex: 1;
+  height: 36px;
   border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.dropper:hover {
-  background: var(--color-canvas-sunken);
-}
-
-.hexField {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  align-items: center;
-  gap: 4px;
-  height: 32px;
-  padding: 0 8px;
+.clear {
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
   background: var(--color-canvas);
+  color: var(--color-ink-secondary);
 }
 
-.hexField:focus-within {
-  outline: 2px solid var(--color-action);
-  outline-offset: -1px;
-}
-
-.hexMark {
-  color: var(--color-ink-faint);
-  font-size: var(--text-caption);
-}
-
-.hexInput {
-  width: 100%;
-  min-width: 0;
+.apply {
   border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-variant-numeric: tabular-nums;
-  outline: none;
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
 }
 
-/* ★V8「枠線の色」：色の見本の器と十六進の欄は control-border。 */
+/* V8 ではコントロールの枠を濃くする */
 [data-theme='v8'] .well,
-[data-theme='v8'] .hexField {
+[data-theme='v8'] .hexField,
+[data-theme='v8'] .alphaField,
+[data-theme='v8'] .dropper,
+[data-theme='v8'] .plane,
+[data-theme='v8'] .clear {
   border-color: var(--color-control-border);
 }
+
+/* V8 正本HTML の線・影・字の寸法。
+   枠まわりの見え方（枠を外して outline で内側に 1px）だけを V8 に合わせる。
+   大きさは承認済み ★BG-2 `P8ZUj` が正しい形なので上書きしない:
+   ピッカー本体 288px・見本は 8 列の可変幅・スポイト `TvFgh` は 28×28・
+   HEX 欄 `Ayckb` は残り幅いっぱい。ここで 226px や 16px に戻すと承認と食い違う。 */
+[data-theme='v8'] .well { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; box-shadow: var(--shadow-board); }
+[data-theme='v8'] .swatch { border-radius: 7px; box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -0.5px; }
+[data-theme='v8'] .pop { border: 0; outline: 1px solid var(--color-board-line); outline-offset: -0.5px; border-radius: 16px; box-shadow: var(--shadow-controls-pop); }
+[data-theme='v8'] .cell { box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -0.5px; }
+[data-theme='v8'] .cell[aria-selected='true'] { outline: 2px solid var(--color-accent-deep); outline-offset: -1px; box-shadow: var(--shadow-controls-selected); }
+[data-theme='v8'] .dropper svg { width: 16px; height: 16px; }
+[data-theme='v8'] .hexField { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; border-radius: 6px; }
+[data-theme='v8'] .hexMark, [data-theme='v8'] .hexInput { color: var(--color-ink-secondary); font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: auto; font-size: 12px; font-weight: 400; line-height: normal; }
+[data-theme='v8'] .well:focus-visible, [data-theme='v8'] .cell:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .swatch, [data-theme='v8'] .cell { gap: 0; }
+[data-theme='v8'] .cell, [data-theme='v8'] .dropper { min-height: 0; }
 }

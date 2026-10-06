@@ -1,0 +1,226 @@
+/* ★V8 シナリオを作る①：シナリオ情報と配信方式（Pencil `dnzqC`）。 */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.headDescription {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+/* 1つの「段」。 */
+.section {
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.sectionDesc {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink-faint);
+}
+
+.sectionBody {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: block;
+  min-width: 0;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.fieldHint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
+}
+
+.fieldError {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+/* 配信方式を選ぶカード。2枚横並び、狭くなったら縦。 */
+.modeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.modeCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  cursor: pointer;
+  text-align: left;
+}
+
+.modeCard:hover:not(:has(:disabled)) {
+  border-color: var(--color-accent);
+}
+
+.modeCardOn {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-canvas));
+}
+
+.modeCard:has(:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.modeHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modeIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--radius-control, 8px);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-canvas));
+  color: var(--color-accent-deep);
+}
+
+.modeTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.modeLead {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink-secondary);
+}
+
+.modeUses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.modeUse {
+  padding: 2px 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill, 9999px);
+  font-size: 11px;
+  color: var(--color-ink-secondary);
+}
+
+/* 見本の表：2人の届く時刻。 */
+.exampleTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.exampleTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.exampleTable th,
+.exampleTable td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-hairline);
+  text-align: left;
+  color: var(--color-ink-secondary);
+}
+
+.exampleTable th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+}
+
+.exampleTable td:first-child {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.modeResult {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink-secondary);
+}
+
+.modeNote {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-ink-faint);
+}
+
+/* 横幅が足りないとき、方式カードは縦に。 */
+@media (max-width: 1100px) {
+  .modeGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

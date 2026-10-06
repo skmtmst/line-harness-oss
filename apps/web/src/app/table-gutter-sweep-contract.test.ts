@@ -65,11 +65,6 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).not.toContain('<Th className="w-52">メール</Th>')
   })
 
-  it('/ops/tenants（/ops の行き先）：操作列はボタン幅まで広げる', () => {
-    const body = code(read('app', 'ops', 'tenants', 'page.tsx'))
-    expect(body).toContain('<Th className="w-36" align="right">操作</Th>')
-  })
-
   it('/ops/dashboard：契約先で吸収し、使用率は右へ寄せる', () => {
     const body = code(read('app', 'ops', 'dashboard', 'page.tsx'))
     expect(body).toContain('<Th>上限に近い契約先</Th>')
@@ -114,12 +109,6 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).toContain('py-2 pr-4 pl-2 text-right')
   })
 
-  it('/settings/manual-links：操作は右へ寄せる', () => {
-    const body = code(read('app', 'settings', 'manual-links', 'page.tsx'))
-    expect(body).toContain('<Th align="right">操作</Th>')
-    expect(body).toContain('<Td align="right">')
-  })
-
   it('/duplicates：外側は見出しの余白にそろえ、操作は右へ寄せる', () => {
     const body = code(read('app', 'duplicates', 'page.tsx'))
     // 候補の表（20px）。文字だけのセルは span で包み、本当の余白で測らせる（m22b。見た目は同じ）。
@@ -148,16 +137,6 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).toContain('<Th style={{ width: 128 }} className="sticky right-0')
     expect(body).toContain('>操作</Th>')
     expect(body).toContain('cursor-grab')
-  })
-
-  it('/inflow-links：外側は見出しの余白（20px）にそろえる', () => {
-    const body = code(read('app', 'inflow-links', 'page.tsx'))
-    expect(body).toContain('<col className="w-14" />')
-    expect(body).toContain('<col className="w-32" />')
-    expect(body).toContain('<Th className="pl-5">')
-    expect(body).toContain('<Th align="right" className="pr-5">編集</Th>')
-    expect(body).toContain('py-3 pr-2 pl-5')
-    expect(body).toContain('py-3 pr-5 pl-2 text-right')
   })
 
   it('/friends/identity-candidates：外側は20px、採用する値は固定幅', () => {

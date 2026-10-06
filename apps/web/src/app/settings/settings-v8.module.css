@@ -1,0 +1,802 @@
+/* 設定画面の V8 レイアウト（ywFJT / ztgRD / cIdA2 / PfA4o）。
+   data-theme="v8" のときだけマウントされる部品だけが使う。 */
+
+.shell {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.page { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.nav {
+  border-right: 1px solid var(--color-hairline);
+  padding-right: 12px;
+  min-width: 0;
+}
+
+.navTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+  padding: 4px 14px 6px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+}
+
+.navItem:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.navItemActive {
+  border-left-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  font-weight: 600;
+}
+
+.navSub {
+  padding-left: 32px;
+  font-size: 12px;
+}
+
+.navStatic {
+  color: var(--color-ink-faint);
+  cursor: default;
+}
+
+.navStatic:hover {
+  background: transparent;
+}
+
+.navSoon {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--color-ink-faint);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  padding: 0 6px;
+}
+
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.back {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-action);
+  text-decoration: none;
+  width: fit-content;
+}
+
+.headEyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+}
+
+.headTitle {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-ink);
+  margin-top: 2px;
+}
+
+.headDesc {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  margin-top: 2px;
+}
+
+.band {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-hairline);
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.bandInfo {
+  background: var(--color-info-bg);
+  border-color: var(--color-info);
+  color: var(--color-ink);
+}
+
+.bandWarn {
+  background: var(--color-warning-bg);
+  border-color: var(--color-status-warn-soft);
+  color: var(--color-ink);
+}
+
+.bandDanger {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbarSearch {
+  flex: 1;
+  min-width: 0;
+}
+
+.toolbarSearch input {
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 8px 12px;
+  font-size: 13px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+/* 競合の帯（`ziYCN`）：ほかの人の更新を知らせる。書き換えはしない。 */
+.conflictBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-warning-bg);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-warning-bg);
+}
+
+.conflictTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.conflictBody {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.conflictActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 1100px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .nav {
+    position: static;
+  }
+}
+
+.cardCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.card {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.cardHeadCollapsed {
+  border-bottom: none;
+}
+
+.chevron {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  width: 18px;
+  text-align: center;
+}
+
+.cardTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.cardMeta {
+  font-size: 11px;
+  color: var(--color-ink-faint);
+}
+
+.cardHeadAction {
+  margin-left: auto;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 14px;
+}
+
+.row + .row {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.rowMain {
+  min-width: 0; display: flex; align-items: center; gap: 6px;
+}
+
+.rowLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.rowNote {
+  font-size: 11px;
+  color: var(--color-ink-faint);
+  margin-top: 2px;
+}
+
+.rowSide {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.requiredBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  background: var(--color-canvas-sunken);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.usage {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+  background: var(--color-canvas-sunken);
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+
+.usageInfo {
+  color: var(--color-info);
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info);
+}
+
+.sameSwitch {
+  font-size: 10px;
+  color: var(--color-ink-faint);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.itemBadge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+
+/* 変更理由の帯（板の黄帯） */
+.reasonBand {
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-status-warn-soft);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+}
+
+.reasonBand label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.reasonBand input {
+  margin-top: 6px;
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 8px 12px;
+  font-size: 13px;
+  background: var(--color-canvas);
+}
+
+.reasonHint {
+  font-size: 11px;
+  color: var(--color-ink-secondary);
+  margin-top: 6px;
+}
+
+/* 画面の見た目（試作） */
+.themeCard {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  padding: 14px;
+}
+
+.themeTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.themeDesc {
+  font-size: 11.5px;
+  color: var(--color-ink-secondary);
+  margin-top: 4px;
+  line-height: 1.6;
+}
+
+.themeSegment {
+  display: inline-flex;
+  margin-top: 10px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.themeSegment button {
+  border: none;
+  background: var(--color-canvas);
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.themeSegment button + button {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.themeSegment button[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+/* 並び替えダイアログ（ztgRD） */
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  padding: 24px;
+}
+
+.dialog {
+  background: var(--color-canvas);
+  border-radius: var(--radius-card);
+  width: 520px;
+  max-width: 100%;
+  max-height: min(80vh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dialogHead {
+  padding: 14px 18px 10px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.dialogTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.dialogDesc {
+  font-size: 11.5px;
+  color: var(--color-ink-secondary);
+  margin-top: 4px;
+}
+
+.dialogBody {
+  overflow-y: auto;
+  padding: 8px 0;
+  flex: 1;
+}
+
+.orderGroupLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+  padding: 10px 18px 4px;
+}
+
+.orderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px;
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.orderRow + .orderRow {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.orderRowLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 並び替えの窓の中の「サイドメニューの見え方」（v7 の右の欄と同じ）。 */
+.previewWrap {
+  margin: 12px 18px 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-shell);
+}
+
+.previewTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.previewGroup {
+  margin-top: 8px;
+}
+
+.previewGroupLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+}
+
+.previewRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.previewOff {
+  color: var(--color-ink-faint);
+}
+
+.previewDot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.previewDotOn {
+  background: var(--color-accent);
+}
+
+.previewLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewOffTag {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--color-ink-faint);
+}
+
+.previewNote {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.moveBtn {
+  border: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  border-radius: var(--radius-mini);
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.moveBtn:disabled {
+  color: var(--color-ink-faint);
+  background: var(--color-canvas-sunken);
+  cursor: default;
+}
+
+.dialogFoot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.dialogFootLead {
+  margin-right: auto;
+}
+
+.dialogFootLead button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 4px;
+}
+
+.grip {
+  color: var(--color-ink-faint);
+  display: inline-flex;
+}
+
+/* 表（cIdA2 / PfA4o） */
+.tableCard {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.tableCard table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.tableCard th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  white-space: nowrap;
+}
+
+.tableCard td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  vertical-align: middle;
+}
+
+.tableCard tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.statusChip {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+.statusOk {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+  border: 1px solid var(--color-info);
+}
+
+.statusWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border: 1px solid var(--color-status-warn-soft);
+}
+
+.statusDanger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+
+.statusNeutral {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  border: 1px solid var(--color-hairline);
+}
+
+.footNote {
+  font-size: 11px;
+  color: var(--color-ink-faint);
+  line-height: 1.6;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.urlCell {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: bottom;
+  color: var(--color-ink-secondary);
+}
+
+.urlEmpty {
+  color: var(--color-ink-faint);
+}
+
+.editInput {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-mini);
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.stateBox {
+  padding: 32px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-ink-faint);
+}
+
+.inlineLink {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-action);
+  font-weight: 600;
+  text-decoration: underline;
+  font-size: inherit;
+  padding: 0;
+}
+
+.impactGroup {
+  margin-bottom: 10px;
+}
+
+.impactName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.impactText {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  margin-top: 2px;
+}
+
+.tdRight {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.chipInline {
+  margin-left: 8px;
+}
+
+.blockRow {
+  display: block;
+}
+
+.fieldGap {
+  margin-top: 10px;
+}
+
+.actionsGap {
+  margin-top: 8px;
+}
+
+.formNarrow {
+  margin-top: 12px;
+  max-width: 520px;
+}
+
+.formSubmit {
+  margin-top: 12px;
+}
+
+.urlCell { max-width: 100%; }
+.cardHeadAction:focus-visible, .chevron:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }

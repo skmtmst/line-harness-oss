@@ -31,7 +31,10 @@ export type FormInputType =
   | "select" // プルダウン
   | "file" // ファイル添付
   | "date" // 日付
-  | "prefecture"; // 都道府県
+  | "prefecture" // 都道府県
+  | "rating" // 5段階評価（F11）
+  | "address" // 住所（F11・郵便番号から補完）
+  | "booking"; // 予約を入れる（フォームの中で空き枠を選ぶ）
 
 /** 単一行の入力制限。空欄や「指定なし」は検証しない。 */
 export type FormInputFormat =
@@ -112,6 +115,31 @@ export type FormAction =
   | { kind: "scenario"; op: "start" | "stop"; scenarioId: string }
   | { kind: "reminder"; reminderId: string };
 
+/**
+ * 「予約を入れる」ブロックの設定。
+ *
+ * メニューは1つに決める（複数メニューの同時受付はしない）。
+ * 担当が空なら「だれでも」（予約側の自動割り当てに任せる）。
+ * 選べる期間は今日から daysAhead 日後まで。空なら14日。
+ * 予約は「未承認」で入り、店が承認する（すぐ確定は作らない）。
+ */
+export interface FormBookingConfig {
+  menuId: string;
+  staffId?: string | null;
+  daysAhead?: number;
+}
+
+/**
+ * 「予約を入れる」ブロックの回答の形。予約の確保は回答の送信後に
+ * 予約の受け口で行い、枠の再確認と重なりの防止はそちらが担う。
+ * ここでは「どの枠を選んだか」だけを持ち、形だけを検査する。
+ */
+export interface FormBookingValue {
+  menuId: string;
+  staffId: string;
+  startsAt: string;
+}
+
 /** 入力欄のブロック。 */
 export interface FormInputBlock {
   id: string;
@@ -146,6 +174,8 @@ export interface FormInputBlock {
   reminder?: { reminderId: string; time: string } | null;
   /** ファイルの種類。いまは画像だけ */
   fileKind?: "image";
+  /** type = 'booking' のときの「予約を入れる」の設定 */
+  booking?: FormBookingConfig | null;
 }
 
 /** 飾りのブロック（入力欄ではないもの）。 */
@@ -320,6 +350,13 @@ export function isFormAnswerEmpty(value: unknown): boolean {
       (item) => item === undefined || item === null || String(item).trim() === "",
     );
   }
+  if (typeof value === "object") {
+    const entries = Object.values(value as Record<string, unknown>);
+    if (entries.length === 0) return true;
+    return entries.every(
+      (item) => item === undefined || item === null || String(item).trim() === "",
+    );
+  }
   return false;
 }
 
@@ -430,6 +467,9 @@ function compatType(block: FormInputBlock): string {
   }
   if (block.type === "prefecture") return "select";
   if (block.type === "file") return "file";
+  if (block.type === "rating") return "rating";
+  if (block.type === "address") return "address";
+  if (block.type === "booking") return "booking";
   return block.type;
 }
 
@@ -504,6 +544,12 @@ function liftType(type: string): FormInputType {
       return "file";
     case "prefecture":
       return "prefecture";
+    case "rating":
+      return "rating";
+    case "address":
+      return "address";
+    case "booking":
+      return "booking";
     default:
       // text / email / tel / number は単一行＋入力制限へ寄せる
       return "text";
@@ -750,6 +796,150 @@ const FORMAT_RULES: Record<
 };
 
 /**
+ * F11 住所の回答の形。
+ *
+ * 郵便番号は文字列で持つ。先頭の 0 を落とさないため数にしない。
+ * 郵便番号を変えても手入力の住所は消さない（上書きは補完を選んだときだけ）。
+ */
+export interface FormAddressValue {
+  postalCode: string;
+  prefecture: string;
+  city: string;
+  addressLine1: string;
+  addressLine2?: string;
+}
+
+/**
+ * 郵便番号の数字だけ（ハイフンなし・7桁）。先頭0を保つ。
+ *
+ * 許すのは「7桁」「3桁-4桁」と前後の空白・全角数字だけ。
+ * `abc1000001` のような無関係文字の除去で有効化しない。
+ */
+export function normalizePostalCodeDigits(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.replace(/^[\s\u3000]+|[\s\u3000]+$/g, "");
+  const half = trimmed.replace(/[０-９]/g, (ch) => String("０１２３４５６７８９".indexOf(ch)));
+  if (!/^[0-9]{3}-?[0-9]{4}$/.test(half)) return null;
+  return half.replace("-", "");
+}
+
+/** 7桁を 123-4567 の表示形にする。7桁でなければそのまま返す。 */
+export function formatPostalCode(value: string): string {
+  const digits = value.replace(/[^0-9]/g, "");
+  return /^\d{7}$/.test(digits) ? `${digits.slice(0, 3)}-${digits.slice(3)}` : value;
+}
+
+/**
+ * 住所オブジェクトを人向けの1行にする。
+ *
+ * 汎用の `String(value)` でそのまま出すと `[object Object]` になる。
+ * 転記・通知・一覧の表示はこの関数を通す。
+ */
+export function formatAddressValue(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value !== "object" || Array.isArray(value)) return String(value);
+  const v = value as Partial<FormAddressValue>;
+  const postal = typeof v.postalCode === "string" && v.postalCode.trim() !== ""
+    ? `〒${formatPostalCode(v.postalCode.trim())} `
+    : "";
+  const body = [v.prefecture, v.city, v.addressLine1, v.addressLine2]
+    .filter((part) => typeof part === "string" && part.trim() !== "")
+    .map((part) => String(part).trim())
+    .join("");
+  return `${postal}${body}`.trim();
+}
+
+/** 回答値を人向けの文字にする（rating・address対応）。 */
+export function formatAnswerValue(block: FormInputBlock, value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (block.type === "rating") {
+    const n = normalizeRatingValue(value);
+    return n === null ? "" : String(n);
+  }
+  if (block.type === "address") return formatAddressValue(value);
+  if (block.type === "booking") {
+    const booking = normalizeBookingValue(value);
+    return booking === null ? "" : formatBookingStartsAt(booking.startsAt);
+  }
+  if (Array.isArray(value)) return value.map(String).join(", ");
+  return String(value);
+}
+
+/** 住所オブジェクトが空（未回答）か。全部空なら未回答。 */
+export function isAddressValueEmpty(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (typeof value !== "object" || Array.isArray(value)) return false;
+  const v = value as Partial<FormAddressValue>;
+  const parts = [v.postalCode, v.prefecture, v.city, v.addressLine1, v.addressLine2];
+  // 指定済みの非文字列（数・配列・物）は空にしない。後の型検査へ回す。
+  return parts.every((part) => part === undefined || part === null || part === "" ||
+    (typeof part === "string" && part.trim() === ""));
+}
+
+/**
+ * ASCII空白（0x20）だけを落とす。SQLiteのTRIMと範囲を合わせる。
+ *
+ * JSのtrimは全角空白・タブ・改行も落とすが、平均集計のSQLite TRIMは
+ * ASCII空白だけを落とす。受入と平均を一致させるため、ratingの前後空白は
+ * ASCII空白だけを許す（「　3　」・タブ付きは受け入れない）。
+ */
+export function trimAsciiSpaces(value: string): string {
+  return value.replace(/^ +| +$/g, "");
+}
+
+/** ASCII空白だけからなる文字列か（ratingの未入力判定用）。 */
+export function isAsciiBlank(value: string): boolean {
+  return /^ *$/.test(value);
+}
+
+/**
+ * 「予約を入れる」の回答の形か。menuId・staffId・startsAt（ISO日時）の
+ * 3つが文字列で揃っていれば通す。枠が今も空いているかの再確認は
+ * 予約の受け口（確保の直前）が担い、ここでは形だけを見る。
+ */
+export function normalizeBookingValue(value: unknown): FormBookingValue | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.menuId !== "string" || v.menuId.trim() === "") return null;
+  if (typeof v.staffId !== "string" || v.staffId.trim() === "") return null;
+  if (typeof v.startsAt !== "string" || Number.isNaN(Date.parse(v.startsAt))) return null;
+  return { menuId: v.menuId, staffId: v.staffId, startsAt: v.startsAt };
+}
+
+/** ISO日時を「M/D H:mm」（日本時間）にする。壊れた日時はそのまま返す。 */
+export function formatBookingStartsAt(startsAt: string): string {
+  const time = Date.parse(startsAt);
+  if (Number.isNaN(time)) return startsAt;
+  const jst = new Date(time + 9 * 60 * 60 * 1000);
+  const month = jst.getUTCMonth() + 1;
+  const day = jst.getUTCDate();
+  const hour = String(jst.getUTCHours()).padStart(2, "0");
+  const minute = String(jst.getUTCMinutes()).padStart(2, "0");
+  return `${month}/${day} ${hour}:${minute}`;
+}
+
+/**
+ * 5段階評価の値か。1〜5の整数と、ちょうどの "1"〜"5" だけ。
+ *
+ * "3.0" や "3e0" は数としては3だが、保存・平均の数え方（文字列1〜5・
+ * SQLite整数）と合わせるため認めない。真偽値は数に混ぜない。
+ * 前後の空白はASCII空白だけを許す。全角空白・タブ・改行付きは
+ * SQLiteのTRIMと範囲が合わず平均から外れるため受け入れない。
+ */
+export function normalizeRatingValue(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value >= 1 && value <= 5 ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = trimAsciiSpaces(value);
+    return /^(1|2|3|4|5)$/.test(trimmed) ? Number(trimmed) : null;
+  }
+  return null;
+}
+
+/**
  * 回答1件を検証する。返すのは利用者に見せる文言。問題なければ null。
  *
  * 管理画面のプレビュー・回答画面・保存側の3か所から呼ぶ。
@@ -758,8 +948,77 @@ export function validateAnswer(
   block: FormInputBlock,
   value: unknown,
 ): string | null {
-  const isEmpty = isFormAnswerEmpty(value);
+  if (block.type === "rating") {
+    const empty = value === undefined || value === null
+      || (typeof value === "string" && isAsciiBlank(value));
+    if (block.required && empty) return `${block.label} は必須項目です`;
+    if (empty) return null;
+    if (normalizeRatingValue(value) === null) {
+      return `${block.label} は1〜5で選んでください`;
+    }
+    return null;
+  }
 
+  if (block.type === "address") {
+    const empty = isAddressValueEmpty(value);
+    if (block.required && empty) return `${block.label} は必須項目です`;
+    if (empty) return null;
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return `${block.label} の住所を入力してください`;
+    }
+    // 指定済みの各欄は型と長さを検査する。数・配列・物を黙って空にしない。
+    // 未指定（null・なし・空文字）は任意欄として保持する。
+    const v = value as Record<string, unknown>;
+    const names: Record<keyof Omit<FormAddressValue, "postalCode" | "prefecture">, string> = {
+      city: "市区町村",
+      addressLine1: "番地",
+      addressLine2: "建物名",
+    };
+    const checkText = (key: string, label: string, max: number): string | null => {
+      const raw = v[key];
+      if (raw === undefined || raw === null || raw === "") return null;
+      if (typeof raw !== "string") return `${block.label} の${label}は文字で入力してください`;
+      if (raw.trim().length > max) return `${block.label} の${label}が長すぎます`;
+      return null;
+    };
+    const postalRaw = v.postalCode;
+    if (postalRaw !== undefined && postalRaw !== null && postalRaw !== "") {
+      if (typeof postalRaw !== "string") {
+        return `${block.label} の郵便番号は 123-4567 のように入力してください`;
+      }
+      const postal = postalRaw.trim();
+      if (postal.length > 8) return `${block.label} の郵便番号は 123-4567 のように入力してください`;
+      if (normalizePostalCodeDigits(postal) === null) {
+        return `${block.label} の郵便番号は 123-4567 のように入力してください`;
+      }
+    }
+    const prefectureRaw = v.prefecture;
+    if (prefectureRaw !== undefined && prefectureRaw !== null && prefectureRaw !== "") {
+      if (typeof prefectureRaw !== "string") {
+        return `${block.label} は都道府県から選んでください`;
+      }
+      if (!(PREFECTURES as readonly string[]).includes(prefectureRaw.trim())) {
+        return `${block.label} は都道府県から選んでください`;
+      }
+    }
+    for (const [key, label] of Object.entries(names)) {
+      const problem = checkText(key, label, 255);
+      if (problem !== null) return problem;
+    }
+    return null;
+  }
+
+  if (block.type === "booking") {
+    const empty = isFormAnswerEmpty(value);
+    if (block.required && empty) return `${block.label} は必須項目です`;
+    if (empty) return null;
+    if (normalizeBookingValue(value) === null) {
+      return `${block.label} は日時を選び直してください`;
+    }
+    return null;
+  }
+
+  const isEmpty = isFormAnswerEmpty(value);
   if (block.required && isEmpty) {
     return `${block.label} は必須項目です`;
   }
@@ -1214,6 +1473,26 @@ export function validateFormForPublish(layout: FormLayout): string | null {
     validateFormActionsReady(layout) ??
     validateFormBranchGraph(layout) ??
     validateFormDefaultValues(layout) ??
+    validateFormBookingReady(layout) ??
     formThemeContrastError(normalizeFormTheme(layout.options?.theme))
   );
+}
+
+/**
+ * 「予約を入れる」ブロックはメニューが決まっていないと公開できない。
+ * 下書きの保存までは止めない。担当の指定が無ければ「だれでも」、
+ * 期間が無ければ14日として扱うので、止めるのはメニューだけ。
+ */
+export function validateFormBookingReady(layout: FormLayout): string | null {
+  const groups = [layout.header, ...layout.sections.map((section) => section.blocks)];
+  for (const blocks of groups) {
+    for (const block of blocks) {
+      if (block.kind !== "input" || block.type !== "booking") continue;
+      const at = `「${block.label.trim() || block.name}」`;
+      if (!block.booking?.menuId) {
+        return `${at}の予約メニューが選ばれていません`;
+      }
+    }
+  }
+  return null;
 }

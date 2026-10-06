@@ -39,6 +39,7 @@ const fixture = vi.hoisted(() => ({
   saveSettings: null as null | ((...args: unknown[]) => Promise<unknown>),
   listResources: null as null | ((...args: unknown[]) => Promise<unknown>),
   saveMenuResources: null as null | ((...args: unknown[]) => Promise<unknown>),
+  patchMenu: null as null | ((...args: unknown[]) => Promise<unknown>),
 }))
 
 /**
@@ -114,7 +115,7 @@ vi.mock('@/lib/api', () => {
     bookingApi: {
       updateMenu: (...args: unknown[]) => fixture.updateMenu!(...args),
       listMenus: (...args: unknown[]) => fixture.listMenus!(...args),
-      patchMenu: async () => ({ ok: true }),
+      patchMenu: (...args: unknown[]) => fixture.patchMenu!(...args),
       getSettings: (...args: unknown[]) => fixture.getSettings!(...args),
       saveSettings: (...args: unknown[]) => fixture.saveSettings!(...args),
       listResources: (...args: unknown[]) => fixture.listResources!(...args),
@@ -168,6 +169,7 @@ beforeEach(() => {
   fixture.activeTab = 'menus'
   fixture.tagsList = async () => ({ success: true, data: TAGS })
   fixture.updateMenu = vi.fn(async () => ({ ok: true }))
+  fixture.patchMenu = vi.fn(async () => ({ ok: true }))
   fixture.listMenus = vi.fn(async () => ({ menus: [] }))
   fixture.getSettings = vi.fn(async () => ({ success: true, data: SETTINGS }))
   fixture.saveSettings = vi.fn(async (_accountId, body: Record<string, unknown>) => ({

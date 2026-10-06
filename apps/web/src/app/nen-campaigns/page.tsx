@@ -20,6 +20,8 @@ import {
 } from '@/lib/api'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { NenOverview, type ColumnDeliveryPlan, type FriendOption, type NenCoupon, type NenKpis, type NenTab } from './nen-overview'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import NenCampaignsV8 from './nen-campaigns-v8'
 import { defaultScheduleLocal, jstMonthRange } from './nen-period'
 
 type Notice = { tone: 'success' | 'error'; text: string }
@@ -271,10 +273,30 @@ export default function NenCampaignsPage() {
     if (!selectedAccountId || !introDraft.trim()) { setNotice({ tone: 'error', text: '紹介文を入力してください。' }); return }
     setSavingColumnId(column.id)
     try {
-      await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, introDraft)
-      setColumns((current) => current.map((item) => item.id === column.id ? { ...item, introText: introDraft } : item))
+      // M507: 開いたときの版を添える。ほかの人が先に保存していたら409で止まる。
+      const saved = await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, introDraft, column.updatedAt)
+      // 版を成功応答の新しい版へ進める。入力は残したままにする。
+      setColumns((current) => current.map((item) => item.id === column.id
+        ? { ...item, introText: introDraft, updatedAt: saved.data?.updatedAt ?? item.updatedAt }
+        : item))
       setNotice({ tone: 'success', text: `「${column.title}」の紹介文を保存しました。` })
-    } catch { setNotice({ tone: 'error', text: 'コラムの紹介文を保存できませんでした。' }) } finally { setSavingColumnId(null) }
+    } catch (caught) {
+      // M507: 競合時は最新の紹介文を読み直し、入力は残したまま比べながら
+      // 保存し直せるようにする。
+      if (caught instanceof ApiError && caught.status === 409 && caught.code === 'VERSION_CONFLICT') {
+        const latest = (caught.data as { latest?: { introText?: string; updatedAt?: string } } | null)?.latest
+        if (latest) {
+          setColumns((current) => current.map((item) => item.id === column.id
+            ? { ...item, introText: latest.introText ?? item.introText, updatedAt: latest.updatedAt ?? item.updatedAt }
+            : item))
+        } else {
+          await loadTab('columns')
+        }
+        setNotice({ tone: 'error', text: 'ほかの人が先に紹介文を保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。' })
+        return
+      }
+      setNotice({ tone: 'error', text: 'コラムの紹介文を保存できませんでした。' })
+    } finally { setSavingColumnId(null) }
   }
   /*
     ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届く。
@@ -395,6 +417,12 @@ export default function NenCampaignsPage() {
     if (!loadedTabs.current.has(next)) void loadTab(next)
   }
 
+  /*
+   * フックは早期 return より前で全部呼ぶ。読み込み中の早期 return の
+   * あとに置くと、読み込み完了でフックの数が変わり React が落ちる。
+   */
+  const theme = useAdminTheme()
+
   if (loading && loadedTabs.current.size === 0) return <div className="p-6"><ListState kind="loading" /></div>
 
   /*
@@ -411,6 +439,37 @@ export default function NenCampaignsPage() {
   )
     : tab === 'history' ? <Button type="button" disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
       : null
+
+  /*
+   * ★V8-B：data-theme="v8" のときだけ新しいNEN配信画面
+   * （MuhWR・Jxmqh・Tj7n4・oqSJP）へ切り替える。v7 の見た目はそのまま。
+   * 取得・保存の持ち方は変えない（page.tsx が持ったまま）。
+   */
+  if (theme === 'v8') {
+    return (
+      <NenCampaignsV8
+        topAction={headerAction}
+        tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
+        tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
+        kpisFailed={kpis === null && (tabErrors.auto !== '' || tabErrors.columns !== '' || tabErrors.paused !== '')}
+        flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
+        friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId}
+        loading={loading} notice={notice}
+        saving={saving} testing={testing}
+        previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}
+        onToggleSetting={(setting) => void toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
+        coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
+        selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
+        columnsTotal={columnsTotal}
+        plan={plan} onPlanChange={setPlan}
+        introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
+        onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
+        onDuplicateColumn={(column) => void duplicateColumn(column)} duplicatingColumnId={duplicatingColumnId} onTestColumn={(column) => void testColumn(column)}
+        onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
+        onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
+      />
+    )
+  }
 
   return (
     <>

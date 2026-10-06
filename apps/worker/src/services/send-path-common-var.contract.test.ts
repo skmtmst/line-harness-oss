@@ -37,6 +37,7 @@ const SEND_PATHS: Array<{ file: string; mustCall: string; label: string }> = [
   { file: 'services/carousel-tap.ts', mustCall: 'expandSendCommonVars', label: 'カルーセル制限時の返信' },
   { file: 'routes/liff.ts', mustCall: 'expandSendCommonVars', label: 'LIFFの案内テンプレート送信' },
   { file: 'routes/friends.ts', mustCall: 'expandSendCommonVars', label: '友だち詳細からの直接送信' },
+  { file: 'routes/friend-add-rules.ts', mustCall: 'expandSendCommonVars', label: '友だち追加時の配信のテスト送信' },
   { file: 'routes/webhook.ts', mustCall: 'expandSendCommonVars', label: '流入リンク案内・追加クーポン' },
   { file: 'services/ec-event-processing.ts', mustCall: 'expandSendCommonVars', label: 'ECイベント通知' },
   { file: 'routes/ec-commerce.ts', mustCall: 'expandSendCommonVars', label: 'EC通知のテスト送信' },
@@ -61,6 +62,9 @@ const NON_TEMPLATE_PATHS: Array<{ file: string; label: string }> = [
   { file: 'routes/line-notifications.ts', label: '通知の再試行（描画済みペイロードの再送）' },
   { file: 'services/segment-send.ts', label: '旧セグメント配信（呼出元なし・未使用）' },
   { file: 'services/platform-announcements.ts', label: '運営からのお知らせ（★V6 37-7。契約先の権限者宛て。友だち向けの共通情報は展開しない）' },
+  // 予約重複の自動通知は運用者本文を使わず、固定文へ staffName だけ差し込む。
+  // staffName が {{var.x}} を含んでも展開しない（別データ経由の共通情報漏れを防ぐ）。自動通知に manual は付けない。
+  { file: 'services/booking-channels.ts', label: '予約重複の自動通知（固定文。staffName のみ差し込み）' },
 ];
 
 // LINE API への実送信を示す呼出しパターン。

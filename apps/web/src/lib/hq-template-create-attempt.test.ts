@@ -20,6 +20,10 @@ describe('HQ creation receipt storage', () => {
     persistCreationAttempt(s, scope, 'tag', attempt); clearCreationAttempt(s, scope, 'tag', attempt.requestId)
     expect(loadCreationAttempt(s, scope, 'tag')).toBeNull()
   })
+  it('分類付きの未確定依頼を復元する', () => {
+    const s=storage(), item={...attempt,input:{...attempt.input,folderId:'folder-a'}}
+    persistCreationAttempt(s,scope,'tag',item); expect(loadCreationAttempt(s,scope,'tag')).toEqual(item)
+  })
   it('認証値等の未定義フィールドを保存しない', () => {
     const s = storage()
     expect(() => persistCreationAttempt(s, scope, 'tag', { ...attempt, token: 'fixture-not-a-secret' } as typeof attempt)).toThrow()

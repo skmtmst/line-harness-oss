@@ -80,7 +80,7 @@ describe('アクセス表とスタッフ表の名寄せ(#530)', () => {
 })
 
 describe('見せる範囲の保存先(#530)', () => {
-  it('管理者と見るだけはそのまま、運用と受付はスタッフへ寄る', () => {
+  it('管理者と閲覧のみはそのまま、運用と受付はスタッフへ寄る', () => {
     expect(scopeBundleToStaffRole('administrator')).toBe('admin')
     expect(scopeBundleToStaffRole('operations')).toBe('staff')
     expect(scopeBundleToStaffRole('reception')).toBe('staff')

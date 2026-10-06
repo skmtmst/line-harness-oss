@@ -1,6 +1,7 @@
 import type { FormLayout } from '@line-crm/shared';
 import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
 import { getIdToken, getLiffId } from './liff-auth.js';
+import type { LiffLookApiSettings } from './liff-look.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -13,6 +14,8 @@ export interface MenuItem {
   buffer_after_minutes: number;
   base_price: number;
   sort_order: number;
+  /** キャンセル期限 (開始の何時間前まで)。null は期限なし。 */
+  cancel_deadline_hours_before?: number | null;
 }
 
 export interface StaffItem {
@@ -44,10 +47,16 @@ export interface AvailabilityResponse {
   closed_dates?: string[];
 }
 
-/** LIFF 予約の設定（日時を選ぶ段の最初の形と受付期間）。 */
-export interface LiffBookingSettings {
+/**
+ * LIFF 予約の設定（日時を選ぶ段の最初の形と受付期間＋見た目）。
+ * 見た目の欄（型・店の色・カレンダーの出し方・空きの点）は M3 が足す。
+ * 来ない欄は呼び側が既定に倒す。
+ */
+export interface LiffBookingSettings extends LiffLookApiSettings {
   liff_date_view: 'list' | 'calendar';
   booking_window_days: number;
+  /** 予約のルール「お店が承認してから確定する」。無いときは承認あり扱い。 */
+  approval_mode?: 'automatic' | 'manual';
 }
 
 export interface BookingHistoryItem {
@@ -138,6 +147,7 @@ export interface EventDetail {
   id: string;
   name: string;
   venue_name: string | null;
+  venue_address?: string | null;
   venue_url: string | null;
   image_url: string | null;
   description: string | null;
@@ -180,6 +190,7 @@ export interface EventBookingMine {
   event_name: string;
   event_image_url: string | null;
   venue_name: string | null;
+  venue_address?: string | null;
   venue_url: string | null;
   cancel_deadline_hours_before: number | null;
   slot_starts_at: string;
@@ -229,6 +240,24 @@ export interface PublicForm {
   isTest?: boolean;
 }
 
+/** F-11：郵便番号検索の結果。status が matched/multiple のとき候補から選ぶ。 */
+export interface PostalCodeCandidate {
+  postalCode: string;
+  prefecture: string;
+  city: string;
+  town: string;
+}
+
+export interface PostalCodeSearchResponse {
+  success: boolean;
+  data: {
+    query: string;
+    normalized: string | null;
+    status: 'invalid' | 'none' | 'matched' | 'multiple';
+    candidates: PostalCodeCandidate[];
+  };
+}
+
 /** フォーム回答の送信結果。未完のとき data.complete が false で返る。 */
 export interface FormSubmitResponse {
   success: boolean;
@@ -240,6 +269,11 @@ export interface FormSubmitResponse {
 }
 
 export const api = {
+  /** 上の帯に出す店名など。liffId から店を決める公開口 (Worker は {success,data} で返す)。 */
+  liffConfig: () =>
+    get<{ success: boolean; data: { botBasicId: string; accountName: string; accountId: string } }>(
+      '/api/liff/config',
+    ),
   menus: () => get<{ menus: MenuItem[] }>('/api/liff/booking/menus'),
   staffOf: (menuId: string) =>
     get<{ staff: StaffItem[] }>(`/api/liff/booking/menus/${menuId}/staff`),
@@ -355,6 +389,26 @@ export const api = {
       `/api/forms/${id}/files${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`,
       file,
     ),
+  /**
+   * F-11：郵便番号から住所の候補を返す（外部通信なし・日本郵便の公開データ）。
+   * 候補が複数の番号は全部返す。選ばなければ手入力の住所はそのまま残す。
+   */
+  postalCodeSearch: (code: string) =>
+    get<PostalCodeSearchResponse>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
+
+  /**
+   * F11 郵便番号→住所の候補。選んだ候補だけ住所へ入れ、手入力は残す。
+   * 見つからない・通信失敗のときは投げず、その旨を状態で返す。
+   */
+  postalSearch: (code: string) =>
+    get<{
+      success: boolean;
+      data: {
+        status: 'matched' | 'multiple' | 'none' | 'invalid';
+        candidates: Array<{ postalCode: string; prefecture: string; city: string; town: string }>;
+        manualEntry: { note: string };
+      };
+    }>(`/api/postal-code/search?code=${encodeURIComponent(code)}`),
 
   // ===== Webinar =====
   webinarState: (slug: string) => get<WebinarState>(`/api/liff/webinars/${slug}`),

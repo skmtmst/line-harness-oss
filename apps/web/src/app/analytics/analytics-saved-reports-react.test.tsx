@@ -29,7 +29,7 @@ vi.mock('next/link', () => ({
     <a href={href}>{children}</a>
   ),
 }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/analytics',
   useSearchParams: () => new URLSearchParams(),
 }))
 
@@ -160,7 +160,7 @@ describe('V6 保存タブの定期レポート', () => {
     await render()
     expect(host.textContent).toContain('週次まとめ')
     expect(host.textContent).toContain('毎週月曜 09:00')
-    expect(host.textContent).toContain('送る予定あり')
+    expect(host.textContent).toContain('動いている')
     expect(host.textContent).not.toContain('定期レポートは現在「なし」です')
     // 選んでいる保存分析へ紐づく件数も実数で出る
     expect(host.textContent).toContain('定期レポート 1件')

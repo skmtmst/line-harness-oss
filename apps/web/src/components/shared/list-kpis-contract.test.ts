@@ -8,13 +8,18 @@ const read = (path: string) => readFileSync(join(SRC, path), 'utf8')
 describe('一覧KPIの取得失敗時', () => {
   it('利用中の全画面が4枚の見出しを渡す', () => {
     const callers = [
-      'app/scenarios/page.tsx',
-      'app/reminders/page.tsx',
       'components/friend-fields/tags-page-v4.tsx',
     ]
 
     for (const path of callers) {
       expect(read(path), `${path} に titles がありません`).toMatch(/<ListKpis[\s\S]*?titles=/u)
+    }
+  })
+
+  it('V8 のリマインダ・シナリオは取れない数を「—」で出す', () => {
+    // 板 `apLqS`・`axFrW`：ListKpis は使わず、取れない値は「—」。
+    for (const path of ['app/reminders/list-v8.tsx', 'app/scenarios/list-v8.tsx']) {
+      expect(read(path), `${path} に「—」の欠け表示がありません`).toContain("? '—'")
     }
   })
 

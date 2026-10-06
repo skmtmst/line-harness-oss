@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import StickyBar from '@/components/shared/sticky-bar'
 
 import { useEffect, useState } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useRouter } from 'next/navigation'
 import { api, ApiError, EventSlotsPartialError, eventsApi, type EventDetail, type EventSlot, type EventSlotInput } from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
@@ -12,6 +13,8 @@ import { useAccount } from '@/contexts/account-context'
 import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
 import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Dialog from '@/components/shared/dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
@@ -102,10 +105,16 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const { selectedAccount, accounts } = useAccount()
   const [tab, setTab] = useState<Tab>('overview')
   const [draft, setDraft] = useState<EventDetail>(DEFAULT_DRAFT)
+  /* 保存済みの写し。draft との差が「書きかけ」。枠タブの操作は
+     その場でサーバへ送る即時型なので番兵の対象外。 */
+  const [savedDraft, setSavedDraft] = useState<EventDetail>(DEFAULT_DRAFT)
   const [slots, setSlots] = useState<EventSlot[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(savedDraft)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
@@ -163,7 +172,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         if (cancelled) return
         // Worker は質問定義を questions_json の文字列で返す。フォームは
         // 配列で触るので、ここでほぐしてから draft に載せる。
+        // 読み直しは書きかけの起点にもなるので写しも揃える。
         setDraft(toEventDraft(ev))
+        setSavedDraft(toEventDraft(ev))
         setSlots(slotsRes.items)
       } catch (e) {
         // 生の `API error: 404` を主文にしない。消えたものと通信の失敗を言い分ける。
@@ -213,6 +224,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       const payload: Partial<EventDetail> = {
         name: draft.name,
         venue_name: draft.venue_name,
+        venue_address: draft.venue_address,
         venue_url: draft.venue_url,
         image_url: draft.image_url,
         description: draft.description,
@@ -247,7 +259,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         const updated = await eventsApi.updateEvent(accountId, eventId, payload, draft.version ?? 1)
         // 応答は questions_json の文字列で返る。ほぐさず載せると次の保存で
         // questions:null を送り、質問を消してしまう（R82）。
+        // 保存後は書きかけを解くので写しも揃える。
         setDraft(toEventDraft(updated))
+        setSavedDraft(toEventDraft(updated))
         notifyToast('保存しました')
         if (nextTab) setTab(nextTab)
       } else {
@@ -501,6 +515,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           />
         )}
       </div>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="イベントへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
@@ -520,7 +535,15 @@ function OverviewTab({
   accounts: Array<{ id: string; name: string; country: string | null; isActive: boolean }>
   currentAccountId: string
 }) {
+  const theme = useAdminTheme()
   const descLen = (draft.description ?? '').length
+  /* 保存前に欄を離れたとき出す直し方（文は保存時と同じ）。 */
+  const [nameError, setNameError] = useState<string | null>(null)
+  function checkName(value: string): string | null {
+    if (!value.trim()) return 'イベント名は必須です'
+    if (value.length > EVENT_NAME_MAX_LENGTH) return 'イベント名は255字以内で入力してください'
+    return null
+  }
   const targetType = draft.target_type ?? 'single'
   const accountIds: string[] = Array.isArray(draft.account_ids)
     ? draft.account_ids
@@ -537,11 +560,19 @@ function OverviewTab({
         <input
           type="text"
           value={draft.name}
-          onChange={(e) => update('name', e.target.value)}
+          onChange={(e) => {
+            update('name', e.target.value)
+            if (nameError !== null) setNameError(checkName(e.target.value))
+          }}
+          onBlur={() => setNameError(checkName(draft.name))}
           maxLength={EVENT_NAME_MAX_LENGTH}
           placeholder="例: 第1回 AAA 説明会"
           className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
+          aria-invalid={nameError !== null}
         />
+        {nameError !== null && (
+          <p className="text-status-danger mt-1 text-xs" role="alert">{nameError}</p>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -565,6 +596,7 @@ function OverviewTab({
           />
         </div>
       </div>
+      {theme === 'v8' && <Field label="会場の住所"><TextInput value={draft.venue_address ?? ''} maxLength={1000} onChange={(e) => update('venue_address', e.target.value || null)} /></Field>}
       <div>
         <ImageUploader
           mode="url"

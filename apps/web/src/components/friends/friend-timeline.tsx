@@ -214,7 +214,7 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
                         {bodyText(msg)}
                       </div>
                       <p
-                        className={`text-ink-faint mt-1 text-[11px] ${
+                        className={`text-ink-faint mt-1 text-micro ${
                           msg.direction === 'outgoing' ? 'text-right' : ''
                         }`}
                       >

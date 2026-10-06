@@ -19,7 +19,8 @@
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { countDirectValues, BASELINE } from '../../scripts/direct-values-baseline.mjs'
+import { join } from 'node:path'
+import { countDirectValues, BASELINE, SRC } from '../../scripts/direct-values-baseline.mjs'
 
 const baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<
   string,
@@ -33,9 +34,14 @@ describe('直接の値（色コード・px の丸み・影）', () => {
     const worse: Record<string, string> = {}
     for (const [file, entry] of Object.entries(now)) {
       const was = baseline[file] ?? { color: 0, radius: 0, shadow: 0 }
+      // 集計スクリプトはinline styleの引用符を直書きとして数える。
+      // CSS変数を参照するborderRadiusはトークンなので、増加に含めない。
+      const source = readFileSync(join(SRC, file), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(?<!:)\/\/[^\n]*/g, '')
+      const tokenRadii = source.match(/\bborderRadius\s*:\s*(['"])var\(--radius-[\w-]+\)\1/g)?.length ?? 0
+      const direct = { ...entry, radius: entry.radius - tokenRadii }
       for (const kind of ['color', 'radius', 'shadow'] as const) {
-        if (entry[kind] > was[kind]) {
-          worse[`${file} (${kind})`] = `${was[kind]} → ${entry[kind]}`
+        if (direct[kind] > was[kind]) {
+          worse[`${file} (${kind})`] = `${was[kind]} → ${direct[kind]}`
         }
       }
     }

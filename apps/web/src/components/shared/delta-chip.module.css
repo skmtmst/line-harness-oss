@@ -34,4 +34,20 @@
   background: var(--color-status-warn-soft);
   color: var(--color-status-warn-deep);
 }
+
+[data-theme='v8'] .root {
+  flex-shrink: 0;
+  justify-content: flex-start;
+  border-radius: 6px;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-variant-numeric: normal;
+  font-size: 12px;
+  line-height: 18px;
+}
+[data-theme='v8'] .attentionIcon { display: none; }
+[data-theme='v8'] .up { background: var(--color-success-bg); color: var(--color-success); }
+[data-theme='v8'] .down { background: var(--color-status-danger-soft); color: var(--color-danger); }
+[data-theme='v8'] .attention { background: var(--color-status-warn-soft); color: #94600a; }
+[data-theme='v8'] .root svg { flex-shrink: 0; }
+
 }

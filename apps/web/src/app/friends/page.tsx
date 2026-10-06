@@ -5,17 +5,19 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Bookmark, Megaphone, SlidersHorizontal } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 import { api, ApiError, fetchApi, type FriendListItem, type SupportMarkListItem } from '@/lib/api'
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
-import SingleFriendActions from '@/components/friends/single-friend-actions'
+import Dialog from '@/components/shared/dialog'
+import SingleFriendActions, { type FriendAction } from '@/components/friends/single-friend-actions'
 import NoticeDialog from '@/components/friends/notice-dialog'
 import SavedSearchDialog from '@/components/friends/saved-search-dialog'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { loadOperators } from '@/lib/operators-cache'
-import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { useMergedTab } from '@/components/layout/merged-tabs'
 import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
@@ -28,18 +30,18 @@ import Select from '@/components/shared/select'
 import { emptyMessageOf } from './friend-list-empty'
 import { csvExportLine } from './csv-export'
 import BulkRunDialog from '@/components/friends/bulk-run-dialog'
+import { canEditFeature } from '@/lib/staff-capability'
 import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { FRIENDS_MERGED_TABS } from './friends-tabs'
+import { FriendsListHeadV8 } from './friends-nav-v8'
 import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import FriendsHostV8 from '@/v8/friends/host'
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
-/*
-  検索行の副操作は設計 `PhxG6` で高さ38px。共通Buttonは36pxなので当てない
-  （共通Buttonは設計と一致済みで、こちらへ寄せると他画面が動く）。
-  幅は設計の実寸：詳細条件110 / 保存した検索130 / 検索70。
-*/
-const SEARCH_ROW_SECONDARY = 'inline-flex h-9.5 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas text-label font-semibold text-ink hover:bg-canvas-sunken'
+/* ★V8 ywJ5H：検索と絞り込みを同じ段に、表示設定を次の段に置く。 */
+const SEARCH_ROW_SECONDARY = 'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-label font-semibold text-ink hover:bg-canvas-sunken'
 
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
@@ -83,6 +85,9 @@ function FriendsPageInner({
    * 権限のある管理者が一括操作を始められなくなる。
    * 確認が終わるまで（staffRole === null）は押し口も理由も出さない。
    */
+  const [rowAction, setRowAction] = useState<{ friend: FriendListItem; action: FriendAction } | null>(null)
+  // アカウントを変えたら、前の相手への操作を引き継がない。
+  useEffect(() => { setRowAction(null) }, [selectedAccountId])
   const [staffRole, setStaffRole] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -502,7 +507,7 @@ function FriendsPageInner({
   }, [loadFriends, onNotice])
 
   return (
-    <div data-friends-design="v6" className="flex flex-col gap-4">
+    <div data-friends-design="v8" className="flex flex-col gap-4">
       <FriendKpis />
 
       {hasScoreRange ? (
@@ -517,7 +522,7 @@ function FriendsPageInner({
         </div>
       ) : null}
 
-      <section className={`rounded-card border border-hairline bg-canvas px-4 py-3.5 shadow-card`} data-design="V6SearchPanel" data-design-node="pRHvc">
+      <section data-design="V8SearchPanel" data-design-node="ywJ5H">
         <form
           onSubmit={(event) => {
             event.preventDefault()
@@ -536,10 +541,10 @@ function FriendsPageInner({
             「保存した検索」と同じ行に置く。横いっぱいに伸ばさない。
             狭い幅では240まで縮み、入りきらない分は折り返す。
           */}
-          <div className="w-80 max-w-full min-w-60 shrink-0">
+          <div className="min-w-60 max-w-full flex-1">
             <SearchField
               className="w-full"
-              aria-label="友だち名で検索"
+              aria-label="名前・LINE名・タグ・メモで探す"
               value={searchInput}
               onChange={(value) => {
                 setSearchInput(value)
@@ -549,48 +554,10 @@ function FriendsPageInner({
                 setSearchInput('')
                 if (searchSubmitted) resetPageWith(() => setSearchSubmitted(''))
               }}
-              placeholder="名前・LINE名・タグ・メモで検索"
+              placeholder="名前・LINE名・タグ・メモで探す"
             />
           </div>
-          <button
-            type="button"
-            aria-pressed={advanced !== null}
-            onClick={() => setAdvancedOpen(true)}
-            className={`${SEARCH_ROW_SECONDARY} w-27.5 ${advanced ? 'border-accent text-accent-deep' : ''}`}
-          >
-            <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
-            詳細条件
-          </button>
-          {savedSearchEnabled ? (
-            <button
-              type="button"
-              onClick={() => setSavedOpen(true)}
-              className={`${SEARCH_ROW_SECONDARY} w-32.5 text-action`}
-            >
-              <Bookmark aria-hidden="true" className="h-4 w-4" />
-              保存した検索
-            </button>
-          ) : null}
-          <Button variant="primary" className="h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap text-label font-medium border-0" type="submit">検索</Button>
-        </form>
-
-        {advanced?.summary.length ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-accent-soft px-3 py-2">
-            <span className="text-xs font-medium text-accent-deep">絞り込み中</span>
-            {/* 保存条件の札は共通 Chip（設計の印：高さ17 / 文字10・700 / 丸）。 */}
-            {advanced.summary.map((summary) => <Chip key={summary} tone="neutral">{summary}</Chip>)}
-            <button type="button" onClick={() => resetPageWith(() => setAdvanced(null))} className="ml-auto text-xs font-medium text-action hover:underline">条件を外す</button>
-          </div>
-        ) : null}
-
-        <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-2.5">
-          <span className="shrink-0 text-sm font-semibold text-ink-secondary">絞り込み</span>
-          {/*
-            絞り込み4つは共通 Select（設計 h42 / r8 / 文字13・600）。
-            幅は設計の実寸：タグ156 / 対応156 / 担当者176 / シナリオ184。
-            共通Selectの standard は176px固定なので、size="full" で外枠に幅を持たせる。
-          */}
-          <div className="w-39 shrink-0" data-filter="tag">
+          <div className="w-32 shrink-0" data-filter="tag">
             <Select
               aria-label="タグで絞り込む"
               size="full"
@@ -600,7 +567,7 @@ function FriendsPageInner({
               options={[{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ value: tag.id, label: tag.name }))]}
             />
           </div>
-          <div className="w-39 shrink-0" data-filter="response">
+          <div className="w-32 shrink-0" data-filter="response">
             <Select
               aria-label="対応状況で絞り込む"
               size="full"
@@ -613,17 +580,17 @@ function FriendsPageInner({
               ]}
             />
           </div>
-          <div className="w-44 shrink-0" data-filter="operator">
+          <div className="w-36 shrink-0" data-filter="operator">
             <Select
-              aria-label="担当者で絞り込む"
+              aria-label="担当で絞り込む"
               size="full"
-              label="担当者"
+              label="担当"
               value={operatorId}
               onChange={(value) => resetPageWith(() => setOperatorId(value))}
               options={[{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ value: operator.id, label: operator.name }))]}
             />
           </div>
-          <div className="w-46 shrink-0" data-filter="scenario">
+          <div className="w-36 shrink-0" data-filter="scenario">
             <Select
               aria-label="シナリオで絞り込む"
               size="full"
@@ -633,35 +600,37 @@ function FriendsPageInner({
               options={[{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
             />
           </div>
-          <FilterChip selected={responseFilter === 'unhandled'} onChange={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))}>
-            未対応
-          </FilterChip>
-          <FilterChip selected={attentionOnly} onChange={() => resetPageWith(() => setAttentionOnly(!attentionOnly))}>
-            注目のみ
-          </FilterChip>
-          {/*
-            絞り込みの行の件数は出さない。一覧の見出しの横とページ送りの
-            表示に同じ数があり、1画面に3回出ていた。件数はあの2か所で足りる。
-          */}
-          {/*
-            ★V7 `Xn1Mz`：2行目の右端に並び順。#670 02 の見える見出しは残す。
-            幅は現行210pxを保つ。
-          */}
-          <div className="ml-auto flex shrink-0 items-center gap-1.5">
-            <span className="shrink-0 text-sm font-semibold whitespace-nowrap text-ink-secondary">並び順</span>
-            <div className="w-52.5 shrink-0">
-              <Select
-                aria-label="並び順"
-                size="full"
-                value={sortMode}
-                onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
-                options={[
-                  { value: 'recent', label: '友だち追加の新しい順' },
-                  { value: 'oldest', label: '友だち追加の古い順' },
-                ]}
-              />
-            </div>
+          <button
+            type="button"
+            aria-pressed={advanced !== null}
+            onClick={() => setAdvancedOpen(true)}
+            className={`${SEARCH_ROW_SECONDARY} ${advanced ? 'border-accent text-accent-deep' : ''}`}
+          >
+            <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
+            詳細条件
+          </button>
+          {savedSearchEnabled ? (
+            <button
+              type="button"
+              onClick={() => setSavedOpen(true)}
+              className={`${SEARCH_ROW_SECONDARY} text-action`}
+            >
+              <Bookmark aria-hidden="true" className="h-4 w-4" />
+              保存した検索
+            </button>
+          ) : null}
+          {/* 板 `x6QsVz`：探す欄の決定は Enter。別の「検索」ボタンは置かない。 */}
+        </form>
+
+        {advanced?.summary.length ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-accent-soft px-3 py-2">
+            <span className="text-xs font-medium text-accent-deep">絞り込み中</span>
+            {/* 保存条件の札は共通 Chip（設計の印：高さ17 / 文字10・700 / 丸）。 */}
+            {advanced.summary.map((summary) => <Chip key={summary} tone="neutral">{summary}</Chip>)}
+            <button type="button" onClick={() => resetPageWith(() => setAdvanced(null))} className="ml-auto text-xs font-medium text-action hover:underline">条件を外す</button>
           </div>
+        ) : null}
+
           {broadcastHandoffHref ? (
             <Link
               href={broadcastHandoffHref}
@@ -673,7 +642,6 @@ function FriendsPageInner({
               この条件で配信を作成
             </Link>
           ) : null}
-        </div>
         {optionsFailed ? (
           <p className="mt-2 text-xs text-ink-secondary">
             絞り込みの選択肢を読み込めませんでした。タグが空なのは、取れなかっただけかもしれません。
@@ -688,11 +656,44 @@ function FriendsPageInner({
         selectedFriends={friends.filter((friend) => selectedIds.has(friend.id))}
         tags={allTags}
         accountId={selectedAccountId}
+        supportMarksEnabled={marksEnabled}
         onClose={() => setBulkOpen(false)}
         onDone={() => void loadFriends()}
       />
 
       <FriendListTable
+          canEdit={canRunBulk(staffRole) || canEditFeature('/friends')}
+          allowedActions={[
+            ...(canRunBulk(staffRole) || canEditFeature('/friends') ? ['tag', 'field'] as FriendAction[] : []),
+            ...(canRunBulk(staffRole) || canEditFeature('/chats') ? ['status', 'operator', 'template'] as FriendAction[] : []),
+            ...(canRunBulk(staffRole) ? ['scenario', 'reminder'] as FriendAction[] : []),
+          ]}
+          onAction={(friend, action) => setRowAction({ friend, action })}
+          toolbarFilters={(
+            <>
+          <FilterChip selected={responseFilter === 'unhandled'} onChange={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))}>
+            未対応
+          </FilterChip>
+          <FilterChip selected={attentionOnly} onChange={() => resetPageWith(() => setAttentionOnly(!attentionOnly))}>
+            注目のみ
+          </FilterChip>
+              <span className="whitespace-nowrap text-xs text-ink-faint">{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)}件` : '—'}</span>
+            </>
+          )}
+          sortControl={(
+            <div className="w-52 shrink-0">
+              <Select
+                aria-label="並び順"
+                size="full"
+                value={sortMode}
+                onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
+                options={[
+                  { value: 'recent', label: '友だち追加の新しい順' },
+                  { value: 'oldest', label: '友だち追加の古い順' },
+                ]}
+              />
+            </div>
+          )}
           friends={friends}
           status={loadStatus}
           refreshing={refreshing}
@@ -712,28 +713,20 @@ function FriendsPageInner({
           onToggleAttention={toggleAttention}
       />
 
+      {rowAction && <Dialog open title={`${rowAction.friend.displayName}への操作`} onCancel={() => setRowAction(null)} footer={<Button onClick={() => setRowAction(null)}>閉じる</Button>}>
+        <SingleFriendActions friendId={rowAction.friend.id} friendName={rowAction.friend.displayName} accountId={selectedAccountId} tags={allTags} initialAction={rowAction.action} hideActions friendTags={rowAction.friend.tags} onFriendTagsChange={(next) => applyFriendTags(rowAction.friend.id, next)} onDone={() => { setRowAction(null); void loadFriends() }} />
+      </Dialog>}
+
       {/*
         ★V7 仕上げ §2: 一括バーは表のすぐ下に置き、1件でも選ぶと
         下端から8px上がって出る。0件で下がって消える。
       */}
-      <span data-design="V4BulkBar" className="block">
+      <span data-design="V8BulkBar" className="block">
         <BulkBar
           count={selectedIds.size}
           unit="人"
           hint="対象を確認してから操作を選んでください"
-          below={selectedIds.size === 1 ? (
-            <div className="mt-2">
-              <SingleFriendActions
-                friendId={[...selectedIds][0]}
-                friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'}
-                tags={allTags}
-                accountId={selectedAccountId}
-                onDone={loadFriends}
-                friendTags={friends.find((friend) => friend.id === [...selectedIds][0])?.tags ?? []}
-                onFriendTagsChange={(next) => applyFriendTags([...selectedIds][0], next)}
-              />
-            </div>
-          ) : undefined}
+
         >
           {selectedIds.size > 1 && canRunBulk(staffRole) ? (
             <Button
@@ -846,7 +839,6 @@ function FriendsPageInner({
         />
       ) : null}
 
-      <div className="hidden" data-friends-v6-contract="10,20,30,40,50|compact-pagination|前へ|次へ|no-native-alert|1px-right-1px-down" />
     </div>
   )
 }
@@ -861,26 +853,11 @@ function FriendsPageHost() {
   )
 
   return (
-    <div data-friends-page="v6" data-design-node="PhxG6" className="flex flex-col gap-4">
-      {/*
-        画面名は共通トップバーだけに置く。本文側のタイトル・説明・マニュアルは
-        重複させない（Pencil `PhxG6` / トップバー `cBSCb`）。
-        操作は独立した見出し行にせず、タブ `JB0Ki` の右端へ置く。
-      */}
-      <div data-design="V6Tabs" data-design-node="JB0Ki">
-        <MergedTabs
-          basePath="/friends"
-          paramName="tab"
-          tabs={MERGED_TABS}
-          active={tab}
-          actions={(
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {tab === 'list' ? <Button variant="secondary" className="h-9.5 px-4 text-ink-secondary disabled:text-ink-disabled whitespace-normal" type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage}>表示中をCSVで書き出す</Button> : null}
-            </div>
-          )}
-        />
-      </div>
-      {tab === 'list' ? <FriendsPageInner onNotice={setNotice} onExportReady={registerExporter} /> : null}
+    <div data-friends-page="v8" data-design-node="ywJ5H" className="flex flex-col gap-4">
+      {tab === 'list' ? <>
+        <FriendsListHeadV8 onExportCurrentPage={exportCurrentPage} />
+        <FriendsPageInner onNotice={setNotice} onExportReady={registerExporter} />
+      </> : null}
       {tab === 'duplicates' ? <EmbeddedPageProvider><DuplicatesPage /></EmbeddedPageProvider> : null}
       {tab === 'merged' ? <EmbeddedPageProvider><MergedUsersPage /></EmbeddedPageProvider> : null}
       {notice ? <NoticeDialog notice={notice} onClose={() => setNotice(null)} /> : null}
@@ -889,9 +866,10 @@ function FriendsPageHost() {
 }
 
 export default function FriendsPage() {
+  const theme = useAdminTheme()
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
-      <FriendsPageHost />
+    <Suspense fallback={<div className="text-sm text-ink-faint">読み込み中…</div>}>
+      {theme === 'v8' ? <FriendsHostV8 /> : <FriendsPageHost />}
     </Suspense>
   )
 }

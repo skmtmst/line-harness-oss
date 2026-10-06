@@ -366,7 +366,7 @@ export function stopNote(rule: {
 }): string | null {
   if (rule.isActive || !rule.stoppedAt) return null
   const when = rule.stoppedAt.slice(0, 16).replace('T', ' ')
-  const who = rule.stoppedByStaffName ?? '担当者'
+  const who = rule.stoppedByStaffName ?? 'スタッフ'
   const reason = rule.stopReason ? ` — 理由: ${rule.stopReason}` : ''
   return `${when} に ${who} が停止${reason}`
 }

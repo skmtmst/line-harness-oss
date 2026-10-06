@@ -17,8 +17,9 @@ describe('V6 外部連携の運用者向け文言', () => {
   })
 
   it('作成画面と空状態から同じ操作名へ進める', () => {
-    expect(PAGE).toContain('受け取る設定を追加')
-    expect(PAGE).toContain("{showCreate ? 'キャンセル' : '＋ 受け取り口を作る'}")
+    // 板 `H031gC`：作る操作は小窓（Dialog）で出す。操作名は変えない。
+    expect(PAGE).toContain('title="受け取る設定を追加"')
+    expect(PAGE).toContain('＋ 受け取り口を作る')
     expect(PAGE).toContain('href="/webhooks/new">＋ 送り先を作る')
     expect(PAGE).not.toContain('送る設定を追加')
     expect(OVERVIEWS).toContain('「＋ 受け取り口を作る」から作成してください。')
@@ -31,7 +32,7 @@ describe('V6 外部連携の運用者向け文言', () => {
   it('使えない操作をヘッダーに出さない', () => {
     expect(PAGE).not.toContain('マニュアルは準備中です')
     expect(PAGE).not.toContain('通知先の追加は準備中です')
-    expect(PAGE).toContain('<Button variant="primary" onClick={() => setShowCreate(!showCreate)}>')
+    expect(PAGE).toContain('<Button variant="primary" onClick={() => setShowCreate(true)}>')
   })
 
   it('取得失敗を0件や空と表示しない', () => {

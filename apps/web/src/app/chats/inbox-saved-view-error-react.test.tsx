@@ -140,7 +140,7 @@ async function flush(milliseconds = 30) {
 
 function findButton(scope: ParentNode, label: string): HTMLButtonElement | undefined {
   return [...scope.querySelectorAll('button')].find(
-    (button) => button.textContent?.trim() === label,
+    (button) => button.getAttribute('aria-label') === label || button.textContent?.trim() === label,
   )
 }
 

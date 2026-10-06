@@ -2,6 +2,16 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+
+const V8 = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'manual-links-v8.tsx'), 'utf8')
+
+describe('板 cIdA2 開けないの札', () => {
+  it('すべてと開けない（件数つき）の札を出す', () => {
+    expect(V8).toContain('すべて')
+    expect(V8).toContain('開けない')
+    expect(V8).toContain("row.status === 'broken'")
+  })
+})
 import {
   LINK_STATUS_LABEL,
   MISSING_SCREENS_NOTE,
@@ -168,7 +178,12 @@ describe('触れる人', () => {
 })
 
 describe('失敗の表示', () => {
-  const page = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+  // 描画は page.tsx、動き（確かめる・保存・競合の扱い）は use-manual-links.ts にある。
+  const dir = dirname(fileURLToPath(import.meta.url))
+  const page = [
+    readFileSync(join(dir, 'manual-links-v8.tsx'), 'utf8'),
+    readFileSync(join(dir, 'use-manual-links.ts'), 'utf8'),
+  ].join('\n')
 
   it('「確かめる」と「保存」の失敗を無言にしない', () => {
     expect(page).toContain('actionError')

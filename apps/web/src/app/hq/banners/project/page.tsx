@@ -1,5 +1,8 @@
 'use client'
 
+import ReadonlyHeader from '@/app/hq/readonly-header-v8'
+import '@/app/hq/readonly-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { Archive, ArchiveRestore, Copy, LoaderCircle, Pencil, Sparkles, Star } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -21,9 +24,11 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import {
+  BANNER_MAX_REFERENCE_IMAGES,
   EMPTY_GENERATION_INPUT,
   activeGeneration,
   inputFromGeneration,
+  packedTextLines,
   progressBadgeText,
   readFileAsBase64,
   usageRefusal,
@@ -35,6 +40,8 @@ import {
   type BannerImage,
   type BannerPreset,
   type BannerProject,
+  type BannerReference,
+  type BannerReferenceMode,
   type BannerUsage,
 } from '@/lib/hq-banners'
 
@@ -57,6 +64,7 @@ export default function HqBannerProjectPage() {
 }
 
 function ProjectInner() {
+  const theme = useAdminTheme()
   const router = useRouter()
   const params = useSearchParams()
   const projectId = params.get('id') ?? ''
@@ -88,7 +96,8 @@ function ProjectInner() {
   const [archiveConfirm, setArchiveConfirm] = useState(false)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   // 参照画像（★V6 35-2 / 35-2-B）。実体は一覧かライブラリから引く。他プロジェクトの画像はここに置く。
-  const [referenceImage, setReferenceImage] = useState<BannerImage | null>(null)
+  // 参照に選んだ画像の実体。他プロジェクトの画像も選べるので、この一覧に関係なく手元に置く。
+  const [referencePool, setReferencePool] = useState<BannerImage[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [referenceBusy, setReferenceBusy] = useState(false)
   const [allProjects, setAllProjects] = useState<BannerProject[]>([])
@@ -221,7 +230,8 @@ function ProjectInner() {
     try {
       const res = await api.hqBanners.projects.createGeneration(project.id, {
         ...input,
-        textLines: input.textLines.map((l) => l.trim()).filter(Boolean),
+        // 空の行を落とすときは「強調」も同じ行と一緒に落とす（先に片方だけ詰めると番号がずれる）。
+        ...packedTextLines(input),
         customPrompt: input.customPrompt.trim(),
         freePrompt: input.freePrompt.trim(),
       })
@@ -264,7 +274,7 @@ function ProjectInner() {
 
   const duplicate = async () => {
     if (!project) return
-    setBusyAction('複製')
+    setBusyAction('複製する')
     setActionError('')
     try {
       const res = await api.hqBanners.projects.duplicate(project.id)
@@ -332,10 +342,25 @@ function ProjectInner() {
     return res.data
   }
 
-  /** 参照画像として使う。実体を手元に置き、パネルの入力に ID を入れる。 */
-  const applyReference = (image: BannerImage) => {
-    setReferenceImage(image)
-    setInput((cur) => ({ ...cur, referenceImageId: image.id }))
+  /** 参照画像に 1 枚足す。実体を手元に置き、入力の参照一覧へ（3 枚まで）足す。 */
+  const addReference = (image: BannerImage, usage: BannerReferenceMode = 'inspire') => {
+    if (input.references.some((reference) => reference.imageId === image.id)) {
+      setPickerOpen(false)
+      return
+    }
+    if (input.references.length >= BANNER_MAX_REFERENCE_IMAGES) {
+      setGenerationError(`参照画像は ${BANNER_MAX_REFERENCE_IMAGES} 枚までです。入れ替えるときは、どれかを外してください。`)
+      return
+    }
+    setReferencePool((prev) => [image, ...prev.filter((candidate) => candidate.id !== image.id)])
+    setInput((cur) => ({ ...cur, references: [...cur.references, { imageId: image.id, mode: usage }] }))
+    setPickerOpen(false)
+  }
+
+  /** ★BG-C `cOgWE` で選び終わったとき。選んだ実体を手元に置き、入力をそのまま置き換える。 */
+  const applyReferences = (references: BannerReference[], picked: BannerImage[]) => {
+    setReferencePool((prev) => [...picked, ...prev.filter((candidate) => !picked.some((image) => image.id === candidate.id))])
+    setInput((cur) => ({ ...cur, references }))
     setPickerOpen(false)
   }
 
@@ -354,7 +379,7 @@ function ProjectInner() {
     try {
       const data = await readFileAsBase64(file)
       const uploaded = await upload({ filename: file.name, mimeType: file.type, data })
-      if (uploaded) applyReference(uploaded)
+      if (uploaded) addReference(uploaded)
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした')
     } finally {
@@ -371,10 +396,15 @@ function ProjectInner() {
     }
   }
 
-  // 入力の参照 ID に合う実体。一覧に無ければ（他プロジェクト）手元の実体を使う。ID が消えたら実体も消す。
-  const reference = input.referenceImageId
-    ? images.find((i) => i.id === input.referenceImageId) ?? (referenceImage?.id === input.referenceImageId ? referenceImage : null)
-    : null
+  // 入力の参照 ID に合う実体（並び順は入力のまま）。一覧に無ければ手元の実体を使う。
+  const referenceImages = useMemo(() => {
+    const byId = new Map<string, BannerImage>()
+    for (const image of referencePool) byId.set(image.id, image)
+    for (const image of images) byId.set(image.id, image)
+    return input.references
+      .map((reference) => byId.get(reference.imageId))
+      .filter((image): image is BannerImage => image !== undefined)
+  }, [images, input.references, referencePool])
 
   const pendingCount = running ? Math.max(running.requestedCount - running.doneCount - running.failedCount, 0) : 0
   const visible = useMemo(
@@ -433,7 +463,8 @@ function ProjectInner() {
   const busy = busyAction !== null
 
   return (
-    <div data-design-node={running ? 'QGiQI' : 'g1WVyR'} className="flex flex-col gap-4">
+    <div data-design-node={theme === 'v8' && running ? 'p03ImY' : theme === 'v8' && usage && (usage.blocked || usage.paused || usage.month.remaining <= 0 || usage.today.remaining <= 0) ? 'zOpMG' : running ? 'QGiQI' : 'g1WVyR'} className="flex flex-col gap-4">
+      {theme === 'v8' && <ReadonlyHeader title={project.name} description={running ? `${running.requestedCount}枚中 ${running.doneCount}枚できました。生成の状況を確認できます。` : 'プロジェクトの画像と利用状況を確認します。'} />}
       <div data-design-node="G6NIIg" className="flex flex-wrap items-center gap-2">
         <Breadcrumb items={[{ label: 'プロジェクト一覧', href: '/hq/banners' }, { label: project.name }]} />
         <span className="flex-1" />
@@ -454,7 +485,7 @@ function ProjectInner() {
         </Button>
         <Button onClick={() => void duplicate()} disabled={busy}>
           <Copy aria-hidden="true" className="h-4 w-4" />
-          複製
+          複製する
         </Button>
         <Button onClick={() => setFormOpen(true)} disabled={busy}>
           <Pencil aria-hidden="true" className="h-4 w-4" />
@@ -476,11 +507,12 @@ function ProjectInner() {
       {actionError ? <p className="text-label text-danger" role="alert">{actionError}</p> : null}
       {project.description ? <p className="text-caption text-ink-faint">{project.description}</p> : null}
 
-      <div data-design-node="H2eb7f" className="flex flex-col gap-4 xl:flex-row xl:items-start">
-        <section data-design-node="ZwrHR" className="flex min-w-0 flex-1 flex-col rounded-card border border-hairline bg-canvas">
+      <div data-design-node={theme === 'v8' ? 'iMnph' : 'H2eb7f'} className="flex flex-col gap-4 xl:flex-row xl:items-start">
+        <section data-design-node="ZwrHR" className="v8-ro-hq-generationGallery flex min-w-0 flex-1 flex-col rounded-card border border-hairline bg-canvas">
           <div className="flex flex-wrap items-center gap-2 px-4 py-3">
             <h2 className="text-body font-bold text-ink">このプロジェクトの画像</h2>
             <span className="text-caption text-ink-faint">{images.length}枚</span>
+            {theme === 'v8' ? <span className="text-micro text-ink-faint">画像を押すと詳細・アカウントへ渡す</span> : null}
             {running ? (
               <span className="inline-flex h-5 items-center gap-1 rounded-pill bg-status-info-soft px-2 text-nano font-medium text-status-info" role="status">
                 <LoaderCircle aria-hidden="true" className="h-3 w-3 animate-spin" />
@@ -488,9 +520,9 @@ function ProjectInner() {
               </span>
             ) : null}
             <span className="flex-1" />
-            <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて</FilterChip>
-            <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り</FilterChip>
-            <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>アカウントへ渡し済み</FilterChip>
+            <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')}>すべて{theme === 'v8' ? ` ${images.length}` : null}</FilterChip>
+            <FilterChip selected={filter === 'favorite'} onChange={(on) => setFilter(on ? 'favorite' : 'all')}>お気に入り{theme === 'v8' ? ` ${images.filter((image) => image.isFavorite).length}` : null}</FilterChip>
+            <FilterChip selected={filter === 'delivered'} onChange={(on) => setFilter(on ? 'delivered' : 'all')}>アカウントへ渡し済み{theme === 'v8' ? ` ${images.filter((image) => image.deliveredAccountIds.length > 0).length}` : null}</FilterChip>
           </div>
           <div className="border-t border-hairline" />
           {generationError ? (
@@ -540,10 +572,12 @@ function ProjectInner() {
             value={input}
             onChange={setInput}
             disabled={Boolean(running) || Boolean(project.archivedAt) || !engineReady}
-            reference={reference}
+            referenceImages={referenceImages}
             onPickReference={openPicker}
             onUploadReference={(file) => void uploadReference(file)}
             referenceBusy={referenceBusy}
+            usage={usage}
+            onReloadUsage={loadUsage}
           />
         </div>
       </div>
@@ -562,7 +596,7 @@ function ProjectInner() {
           actions={
             running ? (
               <>
-                <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">残りをやめる
+                <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">生成をやめる
                 </Button>
                 <Button variant="primary" disabled>
                   <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
@@ -615,6 +649,7 @@ function ProjectInner() {
           confirmLabel="アーカイブする"
           destructive
           busy={busy}
+          designNode="I0w2e"
           onConfirm={() => {
             void patchProject('アーカイブ', { archived: true }).then((updated) => {
               setArchiveConfirm(false)
@@ -652,7 +687,7 @@ function ProjectInner() {
               : undefined
           }
           onUseAsReference={() => {
-            applyReference(openImage)
+            addReference(openImage)
             setOpenImage(null)
             panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
           }}
@@ -664,9 +699,9 @@ function ProjectInner() {
         projectId={project.id}
         presets={presets}
         projects={allProjects.length > 0 ? allProjects : [project]}
-        selectedId={input.referenceImageId}
+        selected={input.references}
         onClose={() => setPickerOpen(false)}
-        onPick={applyReference}
+        onPick={applyReferences}
         onUpload={(file) => {
           setPickerOpen(false)
           void uploadReference(file)

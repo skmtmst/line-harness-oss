@@ -31,7 +31,8 @@ describe('V8-Bの既存契約への追加', () => {
       INSERT INTO conversion_points (id, name, event_type, value) VALUES ('point', '成果', 'purchase', 50);
       INSERT INTO conversion_events (id, friend_id, conversion_point_id, value_snapshot) VALUES ('c1', 'f1', 'point', 100), ('c2', 'f1', 'point', 0), ('c3', 'f2', 'point', NULL), ('c4', 'f3', 'point', 999);`);
     const expected = { click_count: 0, friend_add_count: 2, form_submission_count: 0, cv_count: 3,
-      remainingCount: 1, blockedCount: 1, conversionValueSum: 150 };
+      remainingCount: 1, blockedCount: 1, conversionValueSum: 150, valuePerFriend: 75,
+      monthly: [{month:'2026-10',friendAddCount:2,remainingCount:1,blockedCount:1,conversionCount:3,conversionValueSum:150}] };
     expect(await getEntryRouteFunnel(db.db, 'route')).toEqual(expected);
     expect(await (await call('GET', '/api/entry-routes/route/funnel')).json()).toEqual({ success: true, data: expected });
     expect(await getEntryRouteFunnel(db.db, 'empty')).toMatchObject({ remainingCount: 0, blockedCount: 0, conversionValueSum: 0 });

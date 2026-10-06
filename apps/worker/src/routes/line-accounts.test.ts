@@ -10,9 +10,11 @@ const dbMocks = {
   getLineAccountScopeEntries: vi.fn(),
   getLineAccountsByIds: vi.fn(),
   getLineAccountListStats: vi.fn(),
+  getLineAccountTagsByAccountIds: vi.fn(async () => ({})),
   getLineAccountById: vi.fn(),
   getLineAccountCredentialHealth: vi.fn(),
   createLineAccount: vi.fn(),
+  listLineAccountTags: vi.fn(async () => [{id:'tag-own',tenant_id:'tenant-1'}]),
   updateLineAccount: vi.fn(),
   updateLineAccountFields: vi.fn(),
   updateLineAccountOrder: vi.fn(),
@@ -123,6 +125,7 @@ beforeEach(() => {
   lineClientMocks.getFollowersInsight.mockReset();
   lineClientMocks.getFollowerIds.mockReset();
   dbMocks.getAccountSetting.mockResolvedValue(null);
+  dbMocks.listLineAccountTags.mockResolvedValue([{id:'tag-own',tenant_id:'tenant-1'}]);
   dbMocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
   dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
   dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, parent_line_account_id: null }]);
@@ -626,6 +629,52 @@ describe('POST /api/line-accounts/connect', () => {
     expect(body.success).toBe(true);
     expect(body.data.steps[0]).toMatchObject({ order: 1, state: 'failed' });
     expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+
+  test('検査の成功時はV8の5行に載る内訳（verification）を返す', async () => {
+    installAutoConnectFetch();
+    lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
+    lineClientMocks.getFollowersInsight.mockResolvedValue({ status: 'ready', followers: 1284 });
+    const res = await setupApp('owner').request('/api/line-accounts/connect/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      success: boolean;
+      data: {
+        steps: Array<{ order: number; state: string }>;
+        verification: {
+          tokenOk: boolean; loginOk: boolean; sameProvider: boolean;
+          webhook: { registeredUrl: string | null; active: boolean | null; testPassed: boolean | null };
+          followerTotal: number | null;
+        };
+      };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.verification).toMatchObject({
+      tokenOk: true,
+      loginOk: true,
+      sameProvider: true,
+      webhook: { registeredUrl: 'http://localhost/webhook', active: true, testPassed: true },
+      followerTotal: 1284,
+    });
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+
+  test('友だち総数が取れなくても検査は通りfollowerTotalはnullになる', async () => {
+    installAutoConnectFetch();
+    lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
+    lineClientMocks.getFollowersInsight.mockRejectedValue(new Error('LINE API error: 503 Service Unavailable'));
+    const res = await setupApp('owner').request('/api/line-accounts/connect/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(autoConnectBody),
+    });
+    const body = await res.json() as { success: boolean; data: { followerImport: { capability: string }; verification: { followerTotal: number | null } } };
+    expect(body.success).toBe(true);
+    expect(body.data.verification.followerTotal).toBeNull();
   });
 
   test('5段成功時に1行だけ保存し、認証済みなら友だち取り込みを開始する', async () => {
@@ -1642,4 +1691,32 @@ describe('PUT /api/line-accounts/:id', () => {
       role: '本店',
     });
   });
+});
+
+test('登録前のタグをLINE通信前に検査する', async () => {
+ const remote=vi.fn(); vi.stubGlobal('fetch',remote);
+ for(const tagIds of [['not-own'],['tag-own','tag-own']]) {
+  const response=await setupApp('owner').request('/api/line-accounts/connect/check',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...autoConnectBody,tagIds})});
+  expect(response.status).toBe(tagIds[0] === 'not-own' ? 403 : 422);
+ }
+ expect(remote).not.toHaveBeenCalled();
+});
+test('登録に選んだタグを保存し、秘密と分けてLINE取得項目を返す', async () => {
+ installAutoConnectFetch();
+ let followerSetting: string | null = null;
+ dbMocks.getAccountSetting.mockImplementation(async () => followerSetting);
+ dbMocks.setAccountSetting.mockImplementation(async (_db,_id,_key,value) => {followerSetting=value;});
+ dbMocks.createLineAccount.mockResolvedValue({...fakeAccount,id:'created-account',channel_access_token:'issued-token',revision:1});
+ dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
+ lineClientMocks.getFollowerIds.mockResolvedValue({userIds:[]});
+ const insertTags = vi.fn();
+ const db = { prepare: vi.fn((sql: string) => ({ bind: (...args: unknown[]) => {
+  if (sql.startsWith('INSERT INTO line_account_tag_links')) insertTags(...args);
+  return { first: async () => sql.startsWith('SELECT id FROM staff_members') || sql.startsWith('SELECT id FROM line_account_tags') ? {id:'valid'} : null };
+ } })), batch: vi.fn(async () => []) } as unknown as D1Database;
+ const response=await setupApp('owner', db).request('/api/line-accounts/connect',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...autoConnectBody,tagIds:['tag-own']})});
+ expect(response.status).toBe(201);
+ expect(insertTags).toHaveBeenCalledExactlyOnceWith('created-account','tag-own', expect.any(String));
+ expect(db.batch).toHaveBeenCalledOnce();
+ expect(await response.json()).toMatchObject({data:{basicId:'@line',pictureUrl:'https://example.com/icon.png'}});
 });

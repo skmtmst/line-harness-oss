@@ -1470,11 +1470,15 @@ function evaluationFilters(input: {
   normalizedTextHash?: string;
   lineAccountIds: string[];
   includeUnassigned: boolean;
+  from?: string;
+  until?: string;
   includeCandidateSkips?: boolean;
 }): { where: string; bindings: Array<string | number> } {
   const visible = visibleAccountClause(input);
   const clauses = [visible.sql];
   const bindings: Array<string | number> = [...visible.bindings];
+  if (input.from) { clauses.push('julianday(are.evaluated_at) >= julianday(?)'); bindings.push(input.from); }
+  if (input.until) { clauses.push('julianday(are.evaluated_at) < julianday(?)'); bindings.push(input.until); }
   if (input.ruleId) {
     if (input.includeCandidateSkips) {
       clauses.push(`(
@@ -1516,6 +1520,8 @@ export async function listAutoReplyEvaluationRuns(
     normalizedTextHash?: string;
     lineAccountIds: string[];
     includeUnassigned: boolean;
+    from?: string;
+    until?: string;
     limit: number;
     offset: number;
   },
@@ -1585,6 +1591,8 @@ export async function getAutoReplyEvaluationSummary(
     ruleId?: string;
     lineAccountIds: string[];
     includeUnassigned: boolean;
+    from?: string;
+    until?: string;
     monthFrom: string;
     monthTo: string;
   },
@@ -1652,6 +1660,8 @@ export async function getAutoReplyTriggerBreakdown(
     ruleId?: string;
     lineAccountIds: string[];
     includeUnassigned: boolean;
+    from?: string;
+    until?: string;
     limit?: number;
   },
 ): Promise<Array<{ trigger: string; count: number }>> {

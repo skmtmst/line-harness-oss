@@ -8,6 +8,7 @@ import {
   createReminder,
   updateReminder,
   deleteReminder,
+  restoreReminder,
   getReminderSteps,
   createReminderStep,
   deleteReminderStep,
@@ -65,6 +66,22 @@ async function requireVisibleReminder(c: Context<Env>, next: () => Promise<void>
   // 今の所属だけで閉じると、所属変更後に旧登録が操作できなくなるため、
   // ここでは通して各 handler で行単位に判定する。
   if (isReminderRowScopedPath(c.req.path)) return next();
+  // B 元に戻す: 削除の取り消しは消えた行自体が対象。所属だけ確かめて通す。
+  if (c.req.path.endsWith('/restore')) {
+    const row = await c.env.DB
+      .prepare(`SELECT line_account_id FROM reminders WHERE id = ?`)
+      .bind(c.req.param('id')!)
+      .first<{ line_account_id: string | null }>();
+    if (!row || !await canAccessAllLineAccounts(
+      c.env.DB,
+      c.get('staff'),
+      [row.line_account_id ?? null],
+    )) {
+      return c.json({ success: false, error: 'Reminder not found' }, 404);
+    }
+    await next();
+    return;
+  }
   const reminder = await getReminderById(c.env.DB, c.req.param('id')!);
   if (!reminder || !await canAccessAllLineAccounts(
     c.env.DB,
@@ -118,6 +135,9 @@ function isNonNegativeInteger(value: unknown): value is number {
 type ReminderListRow = Awaited<ReturnType<typeof getReminders>>[number] & {
   step_count?: number | string | null;
   has_failure?: number | string | null;
+  planned_count?: number | string | null;
+  failed_count?: number | string | null;
+  next_scheduled_at?: string | null;
 };
 
 function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: boolean, timingSummary?: string | null) {
@@ -145,6 +165,15 @@ function publicReminder(row: ReminderListRow, stepCount?: number, hasFailure?: b
      */
     timingSummary: timingSummary ?? null,
     hasFailure: hasFailure ?? Number(row.has_failure ?? 0) > 0,
+    /*
+     * ★V8 一覧（`apLqS`）の「これから送る」「次に送る」「失敗 N」。
+     * ページ切替の経路でだけ数える（旧配列応答は null のまま）。
+     * 数え方は「失敗あり」の絞り込みと同じ retry_wait/permanent_failed、
+     * 予定は queued/retry_wait の先に送るもの。
+     */
+    plannedDeliveries: row.planned_count == null ? null : Number(row.planned_count),
+    failedCount: row.failed_count == null ? null : Number(row.failed_count),
+    nextScheduledAt: row.next_scheduled_at ?? null,
     displayOrder: row.display_order ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -865,7 +894,13 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
         .prepare(`SELECT r.*,
             (SELECT COUNT(*) FROM reminder_steps steps WHERE steps.reminder_id = r.id) AS step_count,
             EXISTS (SELECT 1 FROM reminder_delivery_runs failed
-              WHERE failed.reminder_id = r.id AND failed.status IN ('retry_wait', 'permanent_failed')) AS has_failure
+              WHERE failed.reminder_id = r.id AND failed.status IN ('retry_wait', 'permanent_failed')) AS has_failure,
+            (SELECT COUNT(*) FROM reminder_delivery_runs upcoming
+              WHERE upcoming.reminder_id = r.id AND upcoming.status IN ('queued', 'retry_wait')) AS planned_count,
+            (SELECT MIN(upcoming.scheduled_at) FROM reminder_delivery_runs upcoming
+              WHERE upcoming.reminder_id = r.id AND upcoming.status IN ('queued', 'retry_wait')) AS next_scheduled_at,
+            (SELECT COUNT(*) FROM reminder_delivery_runs failed
+              WHERE failed.reminder_id = r.id AND failed.status IN ('retry_wait', 'permanent_failed')) AS failed_count
           FROM reminders r WHERE ${where}
           ORDER BY ${sortSpec.orderBy}
           LIMIT ? OFFSET ?`)
@@ -1499,6 +1534,29 @@ reminders.delete('/api/reminders/:id', requireRole('owner', 'admin'), async (c) 
   } catch (err) {
     console.error('DELETE /api/reminders/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * POST /api/reminders/:id/restore — 削除の取り消し（B 元に戻す）。
+ *
+ * 定義の deleted_at だけを戻す。戻した直後は止めたまま。
+ * 削除時に取り消した登録・配信予定は戻さない（日時が過ぎた相手へ
+ * いきなり送らないため）。消していない行・無い行は 404。
+ */
+reminders.post('/api/reminders/:id/restore', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const restored = await restoreReminder(c.env.DB, c.req.param('id'));
+    if (!restored) {
+      return c.json({ success: false, error: 'Reminder not found' }, 404);
+    }
+    return c.json({
+      success: true,
+      data: { id: restored.id, name: restored.name, isActive: Boolean(restored.is_active) },
+    });
+  } catch (err) {
+    console.error('POST /api/reminders/:id/restore error:', err);
+    return c.json({ success: false, error: 'リマインダを元に戻せませんでした' }, 500);
   }
 });
 

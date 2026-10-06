@@ -1,18 +1,37 @@
 'use client'
 
-import React, { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import React, { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import Button from './button'
 import IconButton from './icon-button'
-import { useOverlayFocus } from './overlay-utils'
+import { useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
 
 export type DialogProps = {
   open: boolean
+  /** V8 の幅。v7 の寸法は維持する。 */
+  size?: 'medium' | 'large'
+  /**
+   * ★V8：絵の窓の幅（px）。絵ごとに 480〜720 とばらばらなので、画面が絵の値を渡す。
+   * 渡さなければ size の幅のまま。v7 では効かない。
+   */
+  designWidth?: number
+  /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。v7 では効かない。 */
+  designTop?: number
+  /** 手順の帯。本文のスクロールから独立させる。 */
+  steps?: ReactNode
+  /** 操作の左に出す現在の手順など。 */
+  footerLead?: ReactNode
   title: string
   description?: string
   tone?: 'default' | 'destructive'
+  /**
+   * 説明文を帯で囲む。'warning' は琥珀帯（CFAyf 送受信を止める）。
+   * 'danger' は桃箱（YZ57z 解除。題は箱の外・説明だけ箱の中）。
+   * tone（題・ボタンの色）とは独立。渡さなければ帯なし。
+   */
+  descriptionBand?: 'warning' | 'danger'
   busy?: boolean
   error?: string
   confirmLabel?: string
@@ -47,9 +66,15 @@ export type DialogProps = {
 /** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
 export default function Dialog({
   open,
+  size = 'medium',
+  designWidth,
+  designTop,
+  steps,
+  footerLead,
   title,
   description,
   tone = 'default',
+  descriptionBand,
   busy = false,
   error,
   confirmLabel = '保存する',
@@ -69,6 +94,8 @@ export default function Dialog({
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
+  /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
+  const leaving = useV8Leave(open)
   /*
    * open=true で初回マウントした場合、最初の描画は通常DOMで、effect後に
    * portal へ移る。フォーカス制御は portal の準備ができてから始める
@@ -91,21 +118,25 @@ export default function Dialog({
     : ''
 
   useEffect(() => setMounted(true), [])
-  if (!open) return null
+  if (!open && !leaving) return null
 
   const titleNode = (
     <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{title}</h2>
   )
+  /* YZ57z 解除の桃箱は「題は箱の外・説明だけ箱の中」のため、題と説明を分けておく。
+     かけらは描画に出ない（囲み要素なし）。渡さないときは h2 そのまま。 */
+  const titlePart = (<>{titleIcon ? (
+    <div className={styles.titleRow}>
+      <span className={styles.titleIcon} aria-hidden="true">{titleIcon}</span>
+      {titleNode}
+    </div>
+  ) : titleNode}</>)
+  const descriptionNode = description ? <p id={descriptionId} className={styles.description}>{description}</p> : null
   const heading = (
     <>
       {/* 絵が無いときは今までどおり h2 を直接置く。囲むと既存の余白が動く。 */}
-      {titleIcon ? (
-        <div className={styles.titleRow}>
-          <span className={styles.titleIcon} aria-hidden="true">{titleIcon}</span>
-          {titleNode}
-        </div>
-      ) : titleNode}
-      {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
+      {titlePart}
+      {descriptionNode}
     </>
   )
   const panel = (
@@ -118,20 +149,31 @@ export default function Dialog({
       aria-describedby={description ? descriptionId : undefined}
       aria-busy={busy || undefined}
       tabIndex={-1}
+      data-closing={leaving || undefined}
+      data-size={size}
+      data-design-width={designWidth ? '' : undefined}
+      style={designWidth ? ({ '--dialog-design-width': `${designWidth}px` } as CSSProperties) : undefined}
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >
       <div className={styles.headerRow}>
         <div className={styles.headerContent}>
-          {tone === 'destructive' && !confirmation ? <div className={styles.callout} data-qa-dialog-callout>{heading}</div> : heading}
+          {descriptionBand === 'danger' && description ? (
+            <>
+              {titlePart}
+              <div className={`${styles.callout} ${styles.calloutDanger}`} data-qa-dialog-callout>{descriptionNode}</div>
+            </>
+          ) : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
         </div>
         {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
         <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={onCancel} disabled={busy}>
           <X aria-hidden="true" size={18} />
         </IconButton>
       </div>
+      {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content}>{children}</div> : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      <div className={styles.footer}>
       {footer ?? (onConfirm ? (
         /*
          * 実行・取消は共通Buttonの役割（primary/danger/secondary）をそのまま
@@ -141,7 +183,9 @@ export default function Dialog({
          * に一本化する（UI-25）。
          */
         <div className={styles.actions}>
+          {footerLead ? <span className={styles.footerLead}>{footerLead}</span> : null}
           <Button
+            data-dialog-action={primaryAction === 'cancel' ? 'primary' : 'secondary'}
             variant={primaryAction === 'cancel' ? 'primary' : undefined}
             className={styles.designButton}
             ref={primaryAction === 'cancel' ? cancelRef : undefined}
@@ -151,6 +195,7 @@ export default function Dialog({
             {cancelLabel}
           </Button>
           <Button
+            data-dialog-action={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             variant={primaryAction === 'cancel' ? 'secondary' : tone === 'destructive' ? 'danger' : 'primary'}
             className={styles.designButton}
             onClick={onConfirm}
@@ -160,16 +205,32 @@ export default function Dialog({
           </Button>
         </div>
       ) : null)}
+      </div>
     </div>
   )
 
   if (!modal) return panel
   const overlay = (
-    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-design-node={designNode} onMouseDown={(event) => {
+    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) onCancel()
     }}>
       {panel}
     </div>
   )
   return mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay
+}
+
+/** q3DPdz の手順。済みは戻れるボタン、現在は aria-current で伝える。 */
+export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: boolean; current?: boolean; onSelect?: () => void }> }) {
+  return <nav aria-label="手順" className={styles.stepItems}>
+    {steps.map((step, index) => <React.Fragment key={step.label}>
+      {index > 0 ? <span className={styles.stepLine} aria-hidden="true" /> : null}
+      <button type="button" className={styles.stepItem} onClick={step.onSelect} disabled={!step.onSelect} aria-current={step.current ? 'step' : undefined}>
+        <span className={`${styles.stepCircle} ${step.done ? styles.stepDone : step.current ? styles.stepCurrent : ''}`}>
+          {step.done ? <Check size={12} aria-hidden="true" /> : index + 1}
+        </span>
+        <span>{step.label}</span>
+      </button>
+    </React.Fragment>)}
+  </nav>
 }

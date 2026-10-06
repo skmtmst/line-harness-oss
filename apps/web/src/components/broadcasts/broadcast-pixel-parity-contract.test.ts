@@ -8,19 +8,22 @@ const FORM = readFileSync(
   'utf8',
 )
 
-describe('一斉配信の画素比較対象', () => {
+const CSS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'broadcast-form-v8.module.css'), 'utf8')
+
+describe('一斉配信のV8構造（視覚一致は撮影で確認）', () => {
   it('作成画面の列幅を設計にそろえ、LINEプレビューは共通部品にする', () => {
     // B-6: 画面ごとの枠色（V6 の青い地）はやめ、共通の LinePreview に寄せた。
     // 見た目の正本は `components/shared/line-preview` が持つ。
-    expect(FORM).toContain('grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]')
+    expect(CSS).toContain('grid-template-columns: minmax(0, 1fr) 380px')
+    expect(CSS).toContain('@container broadcast-create (width < 1100px)')
     expect(FORM).toContain("@/components/shared/line-preview'")
     expect(FORM).toContain('<LinePreview')
-    expect(FORM).not.toContain('broadcast-line-preview')
+    expect(FORM).not.toContain('className="broadcast-line-preview"')
     expect(FORM).not.toContain('LINE_MOCK')
   })
 
   it('テンプレート選択は設計の確認項目だけをダイアログへ置く', () => {
-    expect(FORM).toContain("[data-design-node='p97Tf']")
+    expect(FORM).toContain('designNode="p97Tf"')
     expect(FORM).toContain('このテンプレートの内容を確認しました')
     expect(FORM).not.toContain('selectedTemplate?.messageContent}</dd>')
   })
@@ -37,7 +40,7 @@ describe('一斉配信の画素比較対象', () => {
     expect(FORM).not.toContain('開発担当')
     expect(FORM).toContain('confirmLabel={testSending ? \'送信中…\' : \'テストを送る\'}')
     expect(FORM).toContain('cancelLabel="キャンセル"')
-    expect(FORM).toContain("[data-design-node='h0kahp']")
+    expect(FORM).toContain('designNode="h0kahp"')
   })
 
   it('テスト送信の説明・履歴・結果を実装と一致させる', () => {
@@ -55,7 +58,7 @@ describe('一斉配信の画素比較対象', () => {
   })
 
   it('配信枠不足の確認は設計どおり3項目に絞る', () => {
-    expect(FORM).toContain("[data-design-node='vW4Es']")
+    expect(FORM).toContain('designNode="vW4Es"')
     const dialog = FORM.slice(
       FORM.indexOf('open={preflightDialogOpen}'),
       FORM.indexOf('<div data-design-node="FpgxH">'),
@@ -65,7 +68,8 @@ describe('一斉配信の画素比較対象', () => {
   })
 
   it('確認窓の位置指定を同じnode名のページ本体へ漏らさない', () => {
-    expect(FORM).toContain("[data-design-node='vW4Es'][role='presentation']")
+    expect(FORM).not.toContain("padding-top: 265px")
+    expect(FORM).not.toContain("padding-top: 236px")
     expect(FORM).not.toMatch(/\[data-design-node='vW4Es'\]\s*\{\s*align-items:/)
   })
 

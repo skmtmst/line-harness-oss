@@ -45,7 +45,13 @@ crons = ["*/5 * * * *", "1-56/5 * * * *", "0 */6 * * *"]
 
 [vars]
 DEPLOY_ENV = "production"
-RESTAURANT_TEST_ENABLED = "false"
+# Googleの機密スコープ審査（デモ動画の撮影と本番運用）のため本番でも有効。
+# 書き込みは確認画面＋owner/adminの権限が前提で、自動送信はしない。
+RESTAURANT_TEST_ENABLED = "true"
+# 返信・店舗情報・写真・投稿のGoogleへの送信を許可する。
+# クライアントIDとシークレットは [vars] に書かず、本番Workerのシークレットとして登録する
+# （GOOGLE_BUSINESS_OAUTH_CLIENT_ID / GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET）。
+GOOGLE_BUSINESS_WRITE_ENABLED = "true"
 WORKER_NAME = "nen-line"
 ADMIN_PAGES_PROJECT = "nen-line-admin-98712679"
 LIFF_PAGES_PROJECT = ""

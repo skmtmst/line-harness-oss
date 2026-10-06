@@ -199,7 +199,7 @@ describe('電話予約のLINE確認通知', () => {
     expect(testDb.raw.prepare('SELECT id FROM rt_reservations WHERE id = ?').get(result.data.id)).toBeDefined();
     return result.data;
   }
-  it('友だちへの送信に既存の確認文面を使い、自動通知として履歴を残す', async () => {
+  it('確認LINEに店舗・日時・人数・コースを載せ、自動通知として履歴を残す', async () => {
     seedFriend();
     const fetchMock = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
@@ -215,7 +215,22 @@ describe('電話予約のLINE確認通知', () => {
       messages: [{ type: 'text', text: expect.stringContaining('予約が確定しました。') }] });
     expect(JSON.parse(init.body as string).messages[0].text).toContain('テストコース');
     expect(JSON.parse(init.body as string).messages[0].text).toContain('2026-11-10 19:00');
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('2026-11-10 21:00');
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('人数: 2名');
+    expect(JSON.parse(init.body as string).messages[0].text).toContain('店舗: 銀座店');
     expect(testDb.raw.prepare("SELECT source FROM messages_log WHERE friend_id = 'friend-fixture'").get()).toEqual({ source: 'external' });
+  });
+  it('店舗の時間帯で夜をまたぐ終了日と席のみの予約を案内する', async () => {
+    seedFriend();
+    testDb.raw.prepare("UPDATE rt_stores SET timezone = 'Asia/Bangkok' WHERE id = 'store-ginza'").run();
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await notice({ ...body, guestCount: 3, startsAt: '2026-11-10T16:00:00.000Z', endsAt: '2026-11-10T18:00:00.000Z' })).lineNotice.sent).toBe(true);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const text = JSON.parse(init.body as string).messages[0].text;
+    expect(text).toContain('日時: 2026-11-10 23:00〜2026-11-11 01:00');
+    expect(text).toContain('人数: 3名');
+    expect(text).toContain('コース: 席のみ');
   });
   it.each([undefined, false])('notifyLine=%sでは送らず、従来の予約結果を返す', async notifyLine => {
     seedFriend();
@@ -898,7 +913,7 @@ describe('飲食店向けテストAPI', () => {
     const first = await request('/api/restaurant-test/reservations/manual?account_id=account-1', body);
     expect(first.status).toBe(201);
     const second = await request('/api/restaurant-test/reservations/manual?account_id=account-1', {
-      ...body, customerName: '重複 次郎',
+      ...body, customerName: '重複 次郎', tableId: 'table-2seat',
     });
     expect(second.status).toBe(409);
     const count = testDb.raw.prepare(
@@ -1104,7 +1119,7 @@ describe('飲食店向けテストAPI', () => {
     const path = '/api/restaurant-test/menu/menu-ginza?account_id=account-1';
     expect((await requestWithMethod(path, 'PATCH', { name: '新コース', kind: 'course', price: 9900, allergens: ['卵'], servicePeriods: ['lunch'] })).status).toBe(200);
     expect((await requestWithMethod(path, 'PATCH', { status: 'archived' })).status).toBe(200);
-    expect(testDb.raw.prepare('SELECT name, price, status, allergens_json FROM rt_menu_items WHERE id = ?').get('menu-ginza')).toEqual({ name: '新コース', price: 9900, status: 'archived', allergens_json: '["卵"]' });
+    expect(testDb.raw.prepare('SELECT name, price, status, allergens_json FROM rt_menu_items WHERE id = ?').get('menu-ginza')).toEqual({ name: '新コース', price: 8800, status: 'archived', allergens_json: '["卵"]' });
     expect(testDb.raw.prepare('SELECT course_id FROM rt_reservations WHERE id = ?').get('reservation-ginza')).toEqual({ course_id: 'menu-ginza' });
     const stoppedBooking = await request('/api/restaurant-test/reservations/manual?account_id=account-1', { storeId: 'store-ginza', customerName: '停止確認', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z', courseId: 'menu-ginza' });
     expect(stoppedBooking.status).toBe(400);
@@ -1168,6 +1183,127 @@ describe('飲食店向けテストAPI', () => {
 });
 
 
+describe('V8-B 卓から出す予約枠と週の営業時間', () => {
+  const slotPath = '/api/restaurant-test/inventory/inventory-test?account_id=account-1';
+  function seedCapacity() {
+    seedRestaurantFixture();
+    testDb.raw.prepare("UPDATE rt_tables SET is_active = 0 WHERE id = 'table-ginza'").run();
+    for (const [i, capacity] of [2, 2, 4, 4, 1, 1, 8, 4].entries()) {
+      testDb.raw.prepare('INSERT INTO rt_tables (id, store_id, code, label, seat_type, min_capacity, max_capacity) VALUES (?, ?, ?, ?, ?, 1, ?)')
+        .run(`v8-${i}`, 'store-ginza', `V8-${i}`, `卓${i}`, 'table', capacity);
+    }
+    testDb.raw.prepare("INSERT INTO rt_inventory_slots (id, store_id, starts_at, total_capacity) VALUES ('inventory-test', 'store-ginza', '2026-10-20T09:00:00Z', 999)").run();
+  }
+  const capacities = (expectedVersion = 1) => ({ otaCapacity: 10, lineCapacity: 10, walkInCapacity: 6, expectedVersion });
+  const hours = () => Array.from({ length: 7 }, (_, weekday) => ({ weekday, periods: weekday === 0 ? [] : [{ opensAt: '17:00', closesAt: '23:00' }] }));
+  it('停止中の卓を除いた合計26席を返し、任意の総数で増やせない', async () => {
+    seedCapacity();
+    const snapshot = await request('/api/restaurant-test/snapshot?account_id=account-1');
+    expect((await snapshot.json() as any).data.inventory.find((row: any) => row.id === 'inventory-test')).toMatchObject({ total_capacity: 26, version: 1 });
+    const saved = await requestWithMethod(slotPath, 'PUT', { ...capacities(), totalCapacity: 999 });
+    expect(saved.status).toBe(200);
+    expect((await saved.json() as any).data).toMatchObject({ totalCapacity: 26, version: 2 });
+    expect(testDb.raw.prepare("SELECT total_capacity, updated_by FROM rt_inventory_slots WHERE id = 'inventory-test'").get()).toMatchObject({ total_capacity: 26 });
+  });
+  it('26席を超える配分と版なしを400、同じ版の再保存を409にする', async () => {
+    seedCapacity();
+    expect((await requestWithMethod(slotPath, 'PUT', { ...capacities(), walkInCapacity: 7 })).status).toBe(400);
+    expect((await requestWithMethod(slotPath, 'PUT', { otaCapacity: 1, lineCapacity: 1, walkInCapacity: 1 })).status).toBe(400);
+    expect((await requestWithMethod(slotPath, 'PUT', capacities())).status).toBe(200);
+    expect((await requestWithMethod(slotPath, 'PUT', capacities())).status).toBe(409);
+  });
+  it('卓を止めると総席数と版が変わり、古い配分の保存を拒否する', async () => {
+    seedCapacity();
+    await requestWithMethod('/api/restaurant-test/tables/v8-6?account_id=account-1', 'PATCH', { isActive: false });
+    expect(testDb.raw.prepare("SELECT total_capacity, version FROM rt_inventory_slots WHERE id = 'inventory-test'").get()).toEqual({ total_capacity: 18, version: 2 });
+    expect((await requestWithMethod(slotPath, 'PUT', capacities())).status).toBe(409);
+    expect((await requestWithMethod(slotPath, 'PUT', capacities(2))).status).toBe(400);
+  });
+  it('7曜日まとめて保存し、同じ版の保存を409にする', async () => {
+    seedCapacity();
+    const path = '/api/restaurant-test/opening-hours?account_id=account-1&storeId=store-ginza';
+    expect((await (await request(path)).json() as any).data).toMatchObject({ hours: null, version: 0 });
+    const body = { storeId: 'store-ginza', hours: hours(), expectedVersion: 0 };
+    expect((await requestWithMethod(path, 'PUT', body)).status).toBe(200);
+    expect((await requestWithMethod(path, 'PUT', body)).status).toBe(409);
+    const get = await request(path);
+    expect((await get.json() as any).data).toMatchObject({ hours: hours(), version: 1 });
+    expect((await requestWithMethod(path, 'PUT', { ...body, expectedVersion: 1 })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PUT', { ...body, expectedVersion: 1 })).status).toBe(409);
+    expect((await requestWithMethod(path, 'PUT', { ...body, hours: hours().slice(0, 6), expectedVersion: 2 })).status).toBe(400);
+  });
+  it('選択中の店舗以外の予約枠と営業時間は変えられない', async () => {
+    seedCapacity();
+    expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-2', 'PUT', { storeId: 'store-yokohama', hours: hours(), expectedVersion: 0 })).status).toBe(400);
+    const token = await createAdminSession();
+    await requestAs('/api/restaurant-test/stores/store-yokohama/select?account_id=account-1', token, {});
+    expect((await requestWithMethod(slotPath, 'PUT', capacities(), token)).status).toBe(404);
+    expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-1', 'PUT', { storeId: 'store-ginza', hours: hours(), expectedVersion: 0 }, token)).status).toBe(400);
+  });
+});
+
+describe('V8-B メニューの価格承認', () => {
+  const menuPath = '/api/restaurant-test/menus/menu-ginza?account_id=account-1';
+  it('価格は申請中に保ち、承認時に一度だけ反映する', async () => {
+    seedRestaurantFixture();
+    const response = await requestWithMethod(menuPath, 'PATCH', { price: 9900 });
+    expect(response.status).toBe(200);
+    const { data } = await response.json() as any;
+    expect(data.pendingPrice).toBe(9900);
+    expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 8800 });
+    const list = await request('/api/restaurant-test/menus?account_id=account-1&storeId=store-ginza');
+    expect((await list.json() as any).data[0].pendingPrice).toBe(9900);
+    const snapshot = await request('/api/restaurant-test/snapshot?account_id=account-1');
+    expect((await snapshot.json() as any).data.menuItems[0].pendingPrice).toBe(9900);
+    expect((await requestWithMethod(menuPath, 'PATCH', { name: '二重申請', price: 10000 })).status).toBe(409);
+    expect(testDb.raw.prepare("SELECT name FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ name: 'テストコース' });
+    const approval = `/api/restaurant-test/approvals/${data.approvalId}?account_id=account-1`;
+    const approved = await requestWithMethod(approval, 'PATCH', { action: 'approve' });
+    expect((await approved.json() as any).data.menuChangeStatus).toBe('applied');
+    expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 9900 });
+    expect((await requestWithMethod(approval, 'PATCH', { action: 'approve' })).status).toBe(409);
+    expect((await requestWithMethod(approval, 'PATCH', { action: 'return', comment: '戻す' })).status).toBe(409);
+    expect(testDb.raw.prepare("SELECT before_price, after_price, requested_by, status FROM rt_menu_change_requests").get()).toMatchObject({ before_price: 8800, after_price: 9900, status: 'applied' });
+  });
+  it('差し戻しには理由が必要で、価格を変えず再申請できる', async () => {
+    seedRestaurantFixture();
+    const { data } = await (await requestWithMethod(menuPath, 'PATCH', { price: 9900 })).json() as any;
+    const path = `/api/restaurant-test/approvals/${data.approvalId}?account_id=account-1`;
+    expect((await requestWithMethod(path, 'PATCH', { action: 'return' })).status).toBe(400);
+    expect((await requestWithMethod(path, 'PATCH', { action: 'return', comment: '金額を再確認してください' })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT status, return_reason FROM rt_menu_change_requests').get()).toEqual({ status: 'returned', return_reason: '金額を再確認してください' });
+    expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 8800 });
+    expect((await requestWithMethod(menuPath, 'PATCH', { price: 9500 })).status).toBe(200);
+  });
+  it('申請後に価格が変わっていたら上書きせず失敗を記録する', async () => {
+    seedRestaurantFixture();
+    const { data } = await (await requestWithMethod(menuPath, 'PATCH', { price: 9900 })).json() as any;
+    testDb.raw.prepare("UPDATE rt_menu_items SET price = 9000 WHERE id = 'menu-ginza'").run();
+    const res = await requestWithMethod(`/api/restaurant-test/approvals/${data.approvalId}?account_id=account-1`, 'PATCH', { action: 'approve' });
+    expect((await res.json() as any).data).toMatchObject({ status: 'approved', menuChangeStatus: 'failed' });
+    expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 9000 });
+  });
+  it('未公開の下書きだけ削除でき、公開後に下書きへ戻しても削除できない', async () => {
+    seedRestaurantFixture();
+    const create = () => request('/api/restaurant-test/menu?account_id=account-1', { storeId: 'store-ginza', kind: 'course', name: '下書き', price: 1000, status: 'draft' });
+    const first = (await (await create()).json() as any).data.id;
+    expect((await requestWithMethod(`/api/restaurant-test/menus/${first}?account_id=account-1`, 'DELETE')).status).toBe(200);
+    const id = (await (await create()).json() as any).data.id;
+    const path = `/api/restaurant-test/menus/${id}?account_id=account-1`;
+    await requestWithMethod(path, 'PATCH', { status: 'active' });
+    await requestWithMethod(path, 'PATCH', { status: 'draft' });
+    expect((await requestWithMethod(path, 'DELETE')).status).toBe(409);
+    expect((await requestWithMethod(menuPath, 'DELETE')).status).toBe(409);
+  });
+  it('他店舗からの申請・削除を拒否する', async () => {
+    seedRestaurantFixture();
+    const token = await createAdminSession();
+    expect((await requestAs('/api/restaurant-test/stores/store-yokohama/select?account_id=account-1', token, {})).status).toBe(200);
+    expect((await requestWithMethod(menuPath, 'PATCH', { price: 9999 }, token)).status).toBe(404);
+    expect((await requestWithMethod(menuPath, 'DELETE', undefined, token)).status).toBe(404);
+  });
+});
+
 describe('V8-B 予約経路と隔離メール', () => {
   function seedEmails() {
     seedRestaurantFixture();
@@ -1226,4 +1362,201 @@ describe('V8-B 予約経路と隔離メール', () => {
     expect((await requestAs('/api/restaurant-test/inbound-emails?account_id=account-1&storeId=store-yokohama', token)).status).toBe(400);
     expect((await requestAs('/api/restaurant-test/inbound-emails/email-other/manual-import?account_id=account-1', token, {})).status).toBe(404);
   });
+});
+
+describe('V8 仮押さえ・日付・来店履歴', () => {
+  const hold = { storeId: 'store-ginza', startsAt: '2099-10-10T10:00:00Z', endsAt: '2099-10-10T12:00:00Z', guestCount: 2, holdMinutes: 15 };
+  it('仮押さえは期限を保存し、重なる要求を409で止め、解除後は再登録できる', async () => {
+    seedRestaurantFixture();
+    const res = await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold);
+    expect(res.status).toBe(201);
+    const saved = (await res.json() as any).data;
+    expect(Date.parse(saved.holdExpiresAt)).toBeGreaterThan(Date.now());
+    expect((await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold)).status).toBe(409);
+    expect((await requestWithMethod(`/api/restaurant-test/reservations/${saved.id}?account_id=account-1`, 'PATCH', { status: 'cancelled' })).status).toBe(200);
+    expect((await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold)).status).toBe(201);
+  });
+  it('期限が切れた押さえを再読込で解除し、確定させない', async () => {
+    seedRestaurantFixture();
+    const res = await request('/api/restaurant-test/reservations/holds?account_id=account-1', hold);
+    const { id } = (await res.json() as any).data;
+    testDb.raw.prepare("UPDATE rt_reservations SET hold_expires_at='2000-01-01T00:00:00Z' WHERE id=?").run(id);
+    expect((await requestWithMethod(`/api/restaurant-test/reservations/${id}?account_id=account-1`, 'PATCH', { status: 'confirmed' })).status).toBe(409);
+    expect(testDb.raw.prepare('SELECT status FROM rt_reservations WHERE id=?').get(id)).toEqual({ status: 'cancelled' });
+  });
+  it('店の暦日で500件を超えても全予約を返し、別店舗を混ぜない', async () => {
+    seedRestaurantFixture();
+    const insert = testDb.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at) VALUES(?, 'store-ginza','phone','試験',1,'2099-10-09T15:00:00Z','2099-10-09T16:00:00Z')`);
+    for (let i=0;i<501;i++) insert.run(`day-${i}`);
+    const res = await request('/api/restaurant-test/reservations/day?account_id=account-1&storeId=store-ginza&date=2099-10-10');
+    expect(res.status).toBe(200);
+    expect((await res.json() as any).data.reservations).toHaveLength(501);
+    expect((await request('/api/restaurant-test/reservations/day?account_id=account-1&storeId=store-ginza&date=2099-02-30')).status).toBe(400);
+  });
+  it('来店履歴はvisitedのみ、名前の一致で別人を混ぜない', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec("UPDATE rt_reservations SET customer_phone='090-0000-0000',status='visited' WHERE id='reservation-ginza'");
+    let res = await request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-ginza&phone=09000000000');
+    expect((await res.json() as any).data.visitCount).toBe(1);
+    res = await request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-yokohama&phone=09000000000');
+    expect((await res.json() as any).data.visitCount).toBe(0);
+  });
+  it('存在しない店舗・不正な期限では保存しない', async () => {
+    seedRestaurantFixture();
+    for (const body of [{ ...hold, holdMinutes: 0 }, { ...hold, storeId: 'other' }]) expect((await request('/api/restaurant-test/reservations/holds?account_id=account-1', body)).status).toBe(400);
+  });
+});
+
+describe('V8 枠の自動生成と全枠の競合', () => {
+  const hours = Array.from({length:7}, (_,weekday)=>({weekday,periods:[{opensAt:'17:00',closesAt:'19:00'}]}));
+  const alloc={otaCapacity:1,lineCapacity:1,walkInCapacity:1};
+  it('店舗時間の営業時間から30分枠を作り、再送で既存枠を上書きしない', async () => {
+    seedRestaurantFixture();
+    await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-1','PUT',{storeId:'store-ginza',hours,expectedVersion:0});
+    const body={storeId:'store-ginza',date:'2099-10-10',expectedHoursVersion:1,...alloc};
+    const res=await request('/api/restaurant-test/inventory/generate?account_id=account-1',body);
+    expect(res.status).toBe(200);
+    expect((await res.json() as any).data.generated).toBe(4);
+    const rows=testDb.raw.prepare('SELECT starts_at FROM rt_inventory_slots ORDER BY starts_at').all();
+    expect(rows[0]).toEqual({starts_at:'2099-10-10T08:00:00.000Z'});
+    expect((await (await request('/api/restaurant-test/inventory/generate?account_id=account-1',body)).json() as any).data.generated).toBe(0);
+    expect((await request('/api/restaurant-test/inventory/generate?account_id=account-1',{...body,expectedHoursVersion:0})).status).toBe(409);
+  });
+  it('全枠のどれか一つが古いと一件も変更せず、正しい版なら全部更新する', async () => {
+    seedRestaurantFixture();
+    for(const id of ['s1','s2']) testDb.raw.prepare(`INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity) VALUES(?,'store-ginza',?,4)`).run(id, id==='s1'?'2099-10-10T08:00:00Z':'2099-10-10T08:30:00Z');
+    const url='/api/restaurant-test/inventory/allocation?account_id=account-1';
+    expect((await requestWithMethod(url,'PUT',{storeId:'store-ginza',slots:[{id:'s1',expectedVersion:1},{id:'s2',expectedVersion:0}],...alloc})).status).toBe(400);
+    testDb.raw.exec("UPDATE rt_inventory_slots SET version=2 WHERE id='s2'");
+    expect((await requestWithMethod(url,'PUT',{storeId:'store-ginza',slots:[{id:'s1',expectedVersion:1},{id:'s2',expectedVersion:1}],...alloc})).status).toBe(409);
+    expect(testDb.raw.prepare("SELECT ota_capacity FROM rt_inventory_slots WHERE id='s1'").get()).toEqual({ota_capacity:0});
+    expect((await requestWithMethod(url,'PUT',{storeId:'store-ginza',slots:[{id:'s1',expectedVersion:1},{id:'s2',expectedVersion:2}],...alloc})).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT version FROM rt_inventory_slots ORDER BY id').all()).toEqual([{version:2},{version:3}]);
+  });
+  it('人数ではなく卓の占有席数で空きを返し、枠をまたぐ予約も集計する', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec(`INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity) VALUES('slot','store-ginza','2099-10-10T08:30:00Z',4);
+      INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,table_id) VALUES('occupy','store-ginza','phone','試験',2,'2099-10-10T08:00:00Z','2099-10-10T10:00:00Z','table-ginza');`);
+    const res=await request('/api/restaurant-test/inventory/day?account_id=account-1&storeId=store-ginza&date=2099-10-10');
+    expect(res.status).toBe(200);
+    const slot=(await res.json() as any).data[0];
+    expect(slot).toMatchObject({reserved_count:2,occupied_seats:4,occupiedTableIds:['table-ginza'],freeSeats:0});
+  });
+  it('夜をまたぐ営業時間も30分枠を作る', async () => {
+    seedRestaurantFixture();
+    const weekday=new Date('2099-10-10').getUTCDay();
+    await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-1','PUT',{storeId:'store-ginza',hours:Array.from({length:7},(_,w)=>({weekday:w,periods:w===weekday?[{opensAt:'23:00',closesAt:'01:00'}]:[]})),expectedVersion:0});
+    const res=await request('/api/restaurant-test/inventory/generate?account_id=account-1',{storeId:'store-ginza',date:'2099-10-10',expectedHoursVersion:1,...alloc});
+    expect((await res.json() as any).data.generated).toBe(4);
+  });
+});
+
+describe('V8 新価格の開始日時',()=>{
+ it('承認されても未来の開始日時までは現行価格を保つ',async()=>{
+  seedRestaurantFixture();
+  const res=await requestWithMethod('/api/restaurant-test/menu/menu-ginza?account_id=account-1','PATCH',{price:9900,effectiveAt:'2099-10-10T00:00:00Z'});
+  const change=(await res.json() as any).data;
+  expect((await requestWithMethod(`/api/restaurant-test/approvals/${change.approvalId}?account_id=account-1`,'PATCH',{action:'approve'})).status).toBe(200);
+  expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id='menu-ginza'").get()).toEqual({price:8800});
+  const snap=await request('/api/restaurant-test/snapshot?account_id=account-1');
+  expect((await snap.json() as any).data.menuItems[0]).toMatchObject({pendingPrice:9900,priceChangeStatus:'approved'});
+  testDb.raw.prepare("UPDATE rt_menu_change_requests SET effective_at='2000-01-01T00:00:00Z' WHERE id=?").run(change.requestId);
+  await request('/api/restaurant-test/snapshot?account_id=account-1');
+  expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id='menu-ginza'").get()).toEqual({price:9900});
+  await request('/api/restaurant-test/snapshot?account_id=account-1');
+  expect(testDb.raw.prepare('SELECT status FROM rt_menu_change_requests WHERE id=?').get(change.requestId)).toEqual({status:'applied'});
+ });
+ it('価格の開始日時の入力不正では申請を作らない',async()=>{
+  seedRestaurantFixture();
+  expect((await requestWithMethod('/api/restaurant-test/menu/menu-ginza?account_id=account-1','PATCH',{price:9900,effectiveAt:'bad'})).status).toBe(400);
+  expect(testDb.raw.prepare('SELECT COUNT(*) AS total FROM rt_menu_change_requests').get()).toEqual({total:0});
+ });
+});
+
+describe('V8 店の名簿とログイン権限',()=>{
+ function seedLogin(role='staff') {
+  seedRestaurantFixture();
+  testDb.raw.prepare(`INSERT INTO staff_members(id,name,role,api_key,account_scope,tenant_id) VALUES('login','試験',?,'login-key','accounts','00000000-0000-4000-8000-000000000001')`).run(role);
+  testDb.raw.exec("INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('login','account-2',datetime('now')); INSERT INTO rt_memberships(id,organization_id,store_id,staff_name,role) VALUES('member','org-fixture','store-ginza','試験','staff')");
+ }
+ it('同統括のログインメンバーとつなぎ、実際の役割と版を返す',async()=>{
+  seedLogin('admin');
+  expect((await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'})).status).toBe(200);
+  const res=await request('/api/restaurant-test/snapshot?account_id=account-1');
+  expect((await res.json() as any).data.memberships[0]).toMatchObject({staff_id:'login',role:'store_manager',loginRole:'admin',loginPolicyVersion:1});
+  const list=await request('/api/restaurant-test/login-members?account_id=account-1');
+  const text=await list.text(); expect(text).not.toContain('login-key'); expect(text).not.toContain('api_key');
+ });
+ it('連携後の役割変更は再認証なしで書き込まない',async()=>{
+  seedLogin();
+  await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'});
+  const res=await requestWithMethod('/api/restaurant-test/memberships/member?account_id=account-1','PATCH',{role:'store_manager',expectedPolicyVersion:1});
+  expect(res.status).toBe(428);
+  expect(testDb.raw.prepare("SELECT role FROM staff_members WHERE id='login'").get()).toEqual({role:'staff'});
+  expect(testDb.raw.prepare("SELECT role FROM rt_memberships WHERE id='member'").get()).toEqual({role:'staff'});
+ });
+ it('既存の本人確認を通ると役割を反映し、外側のログイン停止も名簿へ同期する',async()=>{
+  seedLogin();
+  await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'});
+  const token='verified-booking-session'; await createAdminSession(token);
+  testDb.raw.prepare('UPDATE admin_sessions SET step_up_at=? WHERE token_hash=?').run(new Date().toISOString(),await sha256Hex(token));
+  const res=await requestWithMethod('/api/restaurant-test/memberships/member?account_id=account-1','PATCH',{role:'store_manager',expectedPolicyVersion:1},`${ADMIN_SESSION_PREFIX}${token}`);
+  expect(res.status).toBe(200);
+  expect(testDb.raw.prepare("SELECT role FROM staff_members WHERE id='login'").get()).toEqual({role:'admin'});
+  testDb.raw.exec("UPDATE staff_members SET is_active=0 WHERE id='login'");
+  expect(testDb.raw.prepare("SELECT status FROM rt_memberships WHERE id='member'").get()).toEqual({status:'suspended'});
+ });
+ it('最後のログイン管理者を名簿から停止させない',async()=>{
+  seedLogin('admin');
+  await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'});
+  const res=await requestWithMethod('/api/restaurant-test/memberships/member?account_id=account-1','PATCH',{status:'suspended',expectedPolicyVersion:1});
+  expect(res.status).toBe(400);
+  expect(testDb.raw.prepare("SELECT is_active FROM staff_members WHERE id='login'").get()).toEqual({is_active:1});
+ });
+ it('別統括のログインメンバーを連携できず、スタッフは連携を変更できない',async()=>{
+  seedLogin();
+  testDb.raw.exec("INSERT INTO tenants(id,name) VALUES('other-tenant','別'); UPDATE staff_members SET tenant_id='other-tenant' WHERE id='login'");
+  expect((await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'})).status).toBe(404);
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'operator',name:'担当者',role:'staff',access_level:'full',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:0});
+  expect((await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'},'operator-key')).status).toBe(403);
+ });
+ it('担当者は予約入力と日付読取ができ、設定変更はできない',async()=>{
+  seedLogin();
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'login',name:'担当者',role:'staff',access_level:'full',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:0});
+  expect((await requestAs('/api/restaurant-test/reservations/holds?account_id=account-2','operator-key',{storeId:'store-ginza',startsAt:'2099-10-10T10:00:00Z',endsAt:'2099-10-10T12:00:00Z',guestCount:2,holdMinutes:15})).status).toBe(201);
+  expect((await requestAs('/api/restaurant-test/reservations/day?account_id=account-2&storeId=store-ginza&date=2099-10-10','operator-key')).status).toBe(200);
+  expect((await requestAs('/api/restaurant-test/reservations/day?account_id=account-2&storeId=store-yokohama&date=2099-10-10','operator-key')).status).toBe(400);
+  expect((await requestWithMethod('/api/restaurant-test/opening-hours?account_id=account-2','PUT',{},'operator-key')).status).toBe(403);
+ });
+});
+
+describe('V8 フロア配置と結合グループ',()=>{
+ it('追加と変更で座標・結合を保存し、再取得しても同じ配置を返す',async()=>{
+  seedRestaurantFixture();
+  const added=await request('/api/restaurant-test/tables?account_id=account-1',{storeId:'store-ginza',code:'T2',label:'試験卓',seatType:'table',minCapacity:1,maxCapacity:2,floorX:2,floorY:1,joinGroup:' A '});
+  expect(added.status).toBe(201);const id=(await added.json() as any).data.id;
+  const updated=await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{floorX:0,floorY:2,joinGroup:'B'});
+  expect(updated.status).toBe(200);
+  const snapshot=await request('/api/restaurant-test/snapshot?account_id=account-1');
+  expect((await snapshot.json() as any).data.tables.find((t:any)=>t.id===id)).toMatchObject({floor_x:0,floor_y:2,join_group:'B'});
+  await requestWithMethod(`/api/restaurant-test/tables/${id}?account_id=account-1`,'PATCH',{joinGroup:null});
+  expect(testDb.raw.prepare('SELECT join_group FROM rt_tables WHERE id=?').get(id)).toEqual({join_group:null});
+ });
+ it('一括の配置に別店舗の卓が混ざると一件も更新しない',async()=>{
+  seedRestaurantFixture();testDb.raw.exec("INSERT INTO rt_tables(id,store_id,code,label,seat_type,min_capacity,max_capacity) VALUES('other-table','store-yokohama','T2','試験','table',1,2)");
+  const url='/api/restaurant-test/tables/layout?account_id=account-1';
+  const table={id:'table-ginza',floorX:2,floorY:1,joinGroup:'A'};
+  expect((await requestWithMethod(url,'PUT',{storeId:'store-ginza',tables:[table,{...table,id:'other-table'}]})).status).toBe(404);
+  expect(testDb.raw.prepare("SELECT floor_x,join_group FROM rt_tables WHERE id='table-ginza'").get()).toEqual({floor_x:0,join_group:null});
+  expect((await requestWithMethod(url,'PUT',{storeId:'store-ginza',tables:[table]})).status).toBe(200);
+  expect(testDb.raw.prepare("SELECT floor_x,floor_y,join_group FROM rt_tables WHERE id='table-ginza'").get()).toEqual({floor_x:2,floor_y:1,join_group:'A'});
+ });
+ it('不正な座標・重複・スタッフによる配置変更を拒む',async()=>{
+  seedRestaurantFixture();
+  for(const floorX of [-1,10001,0.5,null]) expect((await requestWithMethod('/api/restaurant-test/tables/table-ginza?account_id=account-1','PATCH',{floorX})).status).toBe(400);
+  const table={id:'table-ginza',floorX:0,floorY:0,joinGroup:null};
+  expect((await requestWithMethod('/api/restaurant-test/tables/layout?account_id=account-1','PUT',{storeId:'store-ginza',tables:[table,table]})).status).toBe(400);
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'operator',name:'担当者',role:'staff',access_level:'full',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:0});
+  expect((await requestWithMethod('/api/restaurant-test/tables/layout?account_id=account-1','PUT',{storeId:'store-ginza',tables:[table]},'operator-key')).status).toBe(403);
+ });
 });

@@ -85,6 +85,22 @@ describe('色は2つまで（増えた=濃い緑・減った=灰色）', () => {
     expect(legend.textContent).toContain('増えた')
     expect(legend.textContent).toContain('減った')
   })
+
+  it('凡例の文言を変えられる（d8X09：登録／ブロック）', () => {
+    render(
+      <BarChart
+        items={SAMPLE}
+        legend={[
+          { label: '登録', tone: 'added' },
+          { label: 'ブロック', tone: 'removed' },
+        ]}
+      />,
+    )
+    const legend = screen.getByRole('list', { name: '凡例' })
+    expect(legend.textContent).toContain('登録')
+    expect(legend.textContent).toContain('ブロック')
+    expect(legend.textContent).not.toContain('増えた')
+  })
 })
 
 describe('数字は文字でも読める（色だけに頼らない）', () => {
@@ -145,5 +161,42 @@ describe('分析画面の配線（見た目と数字の一致）', () => {
     expect(analyticsPage).toContain('overview.campaigns')
     // 選択日の1行は BarChart の外で今までどおり出す。
     expect(analyticsPage).toContain('増加 {selectedDay.added}人・減少 {selectedDay.removed}人')
+  })
+})
+
+/*
+ * V8 QA 1003-1459 ①：読み上げ用の表が見えないまま画面いっぱいの箱になり、
+ * 画面全体の横はみ出し（1440で286px・1152で110px）の原因になっていた。
+ * 表は `height: 0` を最小と読むうえ、画面側の `table { width: 100% }`
+ * （層の外）が幅を奪い、絶対配置の包含塊＝画面いっぱいに広がる。
+ * 最小・最大の両方を 0 で押さえ、箱を作らない。読み上げは残す。
+ */
+describe('読み上げ用の表は箱を作らない', () => {
+  it('表は読み上げに残る（隠し属性なし・見出しつき）', () => {
+    render(<BarChart items={SAMPLE} />)
+    const table = document.querySelector('table') as HTMLTableElement
+    expect(table.getAttribute('aria-hidden')).toBeNull()
+    expect(table.querySelector('caption')?.textContent).toBe('日ごとの増減')
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(3)
+  })
+
+  it('.srOnly は最小・最大の両方を 0 で押さえる', () => {
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*min-width:\s*0/s)
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*max-width:\s*0/s)
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*max-height:\s*0/s)
+    expect(css).toMatch(/\.srOnly\s*\{[^}]*overflow:\s*hidden/s)
+  })
+})
+
+/*
+ * 黒をなくす（#2・オーナー「黒がいや」）：指を乗せた日の吹き出しは
+ * 白地＋細い線＋浮く影＋ink字。黒（ink地）に戻さないための歯止め。
+ */
+describe('グラフの吹き出しは白（黒をなくす #2）', () => {
+  it('.tooltip は白地＋ink字（ink地にしない）', () => {
+    const tooltip = css.match(/\.tooltip \{[^}]*\}/s)?.[0] ?? ''
+    expect(tooltip).toMatch(/background:\s*var\(--color-canvas\)/)
+    expect(tooltip).toMatch(/color:\s*var\(--color-ink\)/)
+    expect(tooltip).not.toMatch(/background:\s*var\(--color-ink\)/)
   })
 })

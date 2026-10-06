@@ -16,7 +16,9 @@ import VersionHistory, { type HistoryVersion } from '@/components/shared/version
 import FlexPreviewComponent from '@/components/flex-preview'
 import { validateFlexContent } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import TemplateDetailV8 from './detail-v8'
 import { templateDeleteDescription } from '../template-delete-message'
 import { messageTypeText } from '../template-message-type'
 import { isTemplateDetailData } from '../template-detail-data'
@@ -389,11 +391,11 @@ function TemplateDetailInner() {
             <section className="bg-canvas rounded-card border-hairline border p-5">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-ink text-sm font-semibold">本文</p>
-                <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-[11px]">
+                <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-micro">
                   {messageTypeText(template.messageType)}
                 </span>
                 {template.category && (
-                  <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-[11px]">
+                  <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-micro">
                     {template.category}
                   </span>
                 )}
@@ -549,7 +551,7 @@ function TemplateDetailInner() {
                 })()
               ) : (
                 <div className="bg-canvas-sunken rounded-card p-3">
-                  <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
+                  <p className="text-ink-faint mb-1 text-xs">LINE公式アカウント</p>
                   <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
                     {body}
                   </p>
@@ -724,11 +726,16 @@ function CompareBlock({
   )
 }
 
+function TemplateDetailGate() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <TemplateDetailV8 /> : <TemplateDetailInner />
+}
+
 export default function TemplateDetailPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <TemplateDetailInner />
+      <TemplateDetailGate />
     </Suspense>
   )
 }

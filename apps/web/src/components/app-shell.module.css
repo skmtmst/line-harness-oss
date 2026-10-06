@@ -137,6 +137,8 @@
  * ------------------------------------------------------------------- */
 @media (min-width: 1024px) {
   [data-theme="v8"] .main {
+    /* 左メニュー（240）が右に12の余白を持つので、板の左は0。右12・下12（zUg8S）。
+       左にも12を足すと間が二重（24）になり、板が狭くなって表がはみ出す。 */
     margin: 0 12px 12px 0;
     border: 1px solid var(--color-board-line);
     border-radius: var(--radius-panel);
@@ -172,6 +174,20 @@
  * ------------------------------------------------------------------- */
 [data-theme="v8"] .contentSettings {
   padding: 0;
+}
+
+/* ★V8：統括の「統括の情報」（絵 `K7HYu`）も板の左端から中のメニューが
+   始まる形。ただし左メニューの中身が統括用（`HqSettingsNav`）で共通の
+   `SettingsInnerNav` ではないため、上の `contentSettings`（道で決まる）は
+   使えない。画面側が付ける `data-board-bleed` を目印にして、板の余白だけ
+   取る。余白は画面側（頭と中身）が持つ。 */
+[data-theme="v8"] .content:has(> [data-board-bleed]) {
+  padding: 0;
+}
+
+/* 設定の住所で外のメニューを出さないときの包み。並びには影響させない（本文を作り直さないためだけの箱）。 */
+.settingsPass {
+  display: contents;
 }
 
 [data-theme="v8"] .settingsBody {

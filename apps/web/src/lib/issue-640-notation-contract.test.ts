@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-const SCENARIO_LIST = read('../components/scenarios/scenario-list.tsx')
+/* 完全切り替え：v7 の scenario-list.tsx は捨て、V8 の list-v8.tsx を見る。 */
+const SCENARIO_LIST = read('../app/scenarios/list-v8.tsx')
 const AUTO_REPLIES = read('../app/auto-replies/page.tsx')
 const FRIEND_ADD = read('../app/friend-add-settings/page.tsx')
 const VARS = read('../app/contents/vars/page.tsx')
@@ -18,15 +19,9 @@ const ANALYTICS_TIME = read('../app/analytics/analytics-time.ts')
  * - 日時は JST・画面ごとの統一フォーマットで出す。
  */
 describe('#640 省略表示の全文確認（title）', () => {
-  it('/scenarios: 各行の「配信を始める方法」導線は省略＋title', () => {
-    const link = SCENARIO_LIST.match(/配信を始める方法[\s\S]{0,400}?<Link[\s\S]{0,400}?配信を始める方法/)
-    expect(SCENARIO_LIST).toContain('title="配信を始める方法"')
-    // 狭い「購読 / 読了」列ではみ出さないよう、省略表示にする。
-    expect(SCENARIO_LIST).toMatch(/title="配信を始める方法"[\s\S]{0,200}?truncate/)
-  })
-
-  it('/scenarios: 購読・読了の数セルは title で全文を出す', () => {
-    expect(SCENARIO_LIST).toMatch(/title=\{`購読[\s\S]{0,200}?読了/)
+  it('/scenarios: 数のセルは title で全文を出す', () => {
+    // V8 の数セルに導線リンクは無い。数はそのまま出し、全文は title で読める。
+    expect(SCENARIO_LIST).toMatch(/title=\{`購読中[\s\S]{0,200}?読み終えた/)
   })
 
   it('/auto-replies: 操作列と今月の応答セルは title で全文を出す', () => {

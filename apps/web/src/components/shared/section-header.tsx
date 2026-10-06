@@ -36,7 +36,7 @@ export default function SectionHeader({
         {title}
       </h3>
       {note ? <span className={styles.note}>{note}</span> : null}
-      {help && helpLabel ? <HelpTip label={helpLabel}>{help}</HelpTip> : null}
+      {help && helpLabel ? <HelpTip label={helpLabel} className={styles.help}>{help}</HelpTip> : null}
       {href && linkLabel ? (
         <span className={styles.link}>
           <TextLink href={href}>{linkLabel}</TextLink>

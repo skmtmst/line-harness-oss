@@ -155,7 +155,7 @@ export async function processDueFileScans(
 
 fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
   const accountId = (c.req.query('accountId') ?? '').trim();
-  const status = (c.req.query('status') ?? '').trim() as FileScanStatus | '';
+  const status = (c.req.query('status') ?? '').trim() as FileScanStatus | 'released' | '';
   /*
    * 監査 R132: 一覧は以前先頭50件固定で、51件目以降へ辿り着けなかった。
    * ページ送り（limit/offset）に加えてファイル名の検索を受ける。検索は
@@ -169,10 +169,15 @@ fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   const allowed: FileScanStatus[] = ['pending', 'clean', 'rejected', 'quarantined'];
-  const conditions = status && (allowed as string[]).includes(status)
-    ? [`line_account_id = ?`, `status = ?`]
-    : [`line_account_id = ?`];
-  const binds: (string | number)[] = status && (allowed as string[]).includes(status) ? [accountId, status] : [accountId];
+  // 板 `PfA4o` の「戻した」札。戻したものだけを見る口。`clean` には一度も
+  // 止められていないものも混ざるため、`released_at` で絞る。
+  const releasedOnly = status === 'released';
+  const conditions = releasedOnly
+    ? [`line_account_id = ?`, `released_at IS NOT NULL`]
+    : status && (allowed as string[]).includes(status)
+      ? [`line_account_id = ?`, `status = ?`]
+      : [`line_account_id = ?`];
+  const binds: (string | number)[] = releasedOnly ? [accountId] : status && (allowed as string[]).includes(status) ? [accountId, status] : [accountId];
   if (query) {
     conditions.push(`filename LIKE ? ESCAPE '\\'`);
     binds.push(`%${query.replace(/[\\%_]/g, '\\$&')}%`);

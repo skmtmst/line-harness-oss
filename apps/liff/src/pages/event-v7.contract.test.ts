@@ -128,7 +128,8 @@ describe('自分のイベントは期限まで取り消せる', () => {
     // ブラウザの confirm() は使わず、LIFF 共通の確認窓で聞く。
     expect(bookings).toContain('ConfirmDialog');
     expect(bookings).toContain('setPendingCancel(b)');
-    expect(bookings).toContain('の予約をキャンセルしますか');
+    expect(bookings).toContain('をキャンセルしますか');
+    expect(bookings).toContain('designNode="nUYyb"');
     expect(bookings).toContain('api.cancelMyEventBooking(b.id)');
   });
 
@@ -192,9 +193,8 @@ describe('詳細の満席と上限のお知らせ (m11b 仕上げ)', () => {
     expect(event).toContain('text-ink-faint');
   });
 
-  it('選んだ時間は薄い緑の地＋濃い緑の枠', () => {
-    expect(event).toContain('bg-ok-bg');
-    expect(event).toContain('border-accent-deep');
+  it('選んだ時間は濃い緑の地＋白文字 (gVjiC・予約の日時選びと同じ形)', () => {
+    expect(event).toContain('bg-liff-primary');
     expect(event).toContain('setSelectedId(s.id)');
   });
 

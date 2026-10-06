@@ -19,9 +19,10 @@ import { formatDay } from '@/lib/format'
  * 変えるのは owner・admin だけ（口が 403 で止める）。
  */
 
-function policyLines(version: PhotoRewardPolicyVersion): string {
+function policyLines(version: PhotoRewardPolicyVersion, showPublicationReward = false): string {
   return [
     `報酬：採用1枚につき ${version.points}pt`,
+    ...(showPublicationReward ? [`掲載されたら（さらに）：${version.publicationPoints ?? 0}pt`] : []),
     `ひとこと：${version.summary || '—'}`,
     `使い始め：${version.effectiveFrom ? formatPhotoReceivedAt(version.effectiveFrom) : '公開と同時'}`,
   ].join('\n')
@@ -117,7 +118,8 @@ export function PhotoRewardPolicyCard({
   )
 }
 
-function PhotoRewardPolicyDrawer({
+export function PhotoRewardPolicyDrawer({
+  showPublicationReward = false,
   open,
   versions,
   loading,
@@ -133,6 +135,7 @@ function PhotoRewardPolicyDrawer({
   onReload: () => void
   onClose: () => void
   onChanged: () => void
+  showPublicationReward?: boolean
 }) {
   /*
    * N-144 と同じく、押すと 403 になる口は出さない。
@@ -147,6 +150,7 @@ function PhotoRewardPolicyDrawer({
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
   const [pointsInput, setPointsInput] = useState('')
+  const [publicationPointsInput, setPublicationPointsInput] = useState('0')
   const [summaryInput, setSummaryInput] = useState('')
   const [effectiveInput, setEffectiveInput] = useState('')
 
@@ -179,6 +183,11 @@ function PhotoRewardPolicyDrawer({
       setCreateError('1枚につき付ける点数を1〜100000で入力してください')
       return
     }
+    const publicationPoints = Number(publicationPointsInput)
+    if (showPublicationReward && (!Number.isInteger(publicationPoints) || publicationPoints < 0 || publicationPoints > 100000)) {
+      setCreateError('掲載時の追加点数を0〜100000で入力してください')
+      return
+    }
     if (effectiveInput && Number.isNaN(Date.parse(effectiveInput))) {
       setCreateError('使い始めの日時の形を確認してください')
       return
@@ -189,12 +198,14 @@ function PhotoRewardPolicyDrawer({
       const latest = versions?.[0]?.versionNumber
       const res = await api.nenMembers.createPhotoRewardPolicyVersion({
         points,
+        ...(showPublicationReward ? { publicationPoints } : {}),
         summary: summaryInput.trim(),
         effectiveFrom: effectiveInput || null,
         ...(latest !== undefined ? { expectedVersion: latest } : {}),
       })
       if (!res.success) throw new Error(res.error)
       setPointsInput('')
+      setPublicationPointsInput('0')
       setSummaryInput('')
       setEffectiveInput('')
       setSelectedVersion(res.data.version.versionNumber)
@@ -205,7 +216,7 @@ function PhotoRewardPolicyDrawer({
     } finally {
       setCreating(false)
     }
-  }, [creating, pointsInput, summaryInput, effectiveInput, versions, onChanged])
+  }, [creating, pointsInput, publicationPointsInput, showPublicationReward, summaryInput, effectiveInput, versions, onChanged])
 
   return (
     <>
@@ -240,7 +251,7 @@ function PhotoRewardPolicyDrawer({
                     : v.status === 'in_use'
                       ? 'いま使っている'
                       : null,
-                summary: v.summary || `${v.points}pt`,
+                summary: showPublicationReward ? `採用 ${v.points}・公式サイト掲載 さらに ${v.publicationPoints ?? 0}` : v.summary || `${v.points}pt`,
                 at: formatPhotoReceivedAt(v.createdAt),
               }))}
               selectedVersionNumber={selectedVersion}
@@ -272,7 +283,7 @@ function PhotoRewardPolicyDrawer({
                 <p className="mb-1 text-xs font-semibold text-ink">
                   いま使っている版と第{selected.versionNumber}版を比べる
                 </p>
-                <VersionCompare before={policyLines(inUse)} after={policyLines(selected)} />
+                <VersionCompare before={policyLines(inUse, showPublicationReward)} after={policyLines(selected, showPublicationReward)} />
               </div>
             )}
             {canMutate && (
@@ -293,6 +304,12 @@ function PhotoRewardPolicyDrawer({
                     className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink"
                   />
                 </label>
+                {showPublicationReward && <label className="mt-2 block text-xs font-semibold text-ink">
+                  掲載されたら（さらに）
+                  <input type="number" min={0} max={100000} step={1} value={publicationPointsInput}
+                    onChange={(event) => { setPublicationPointsInput(event.target.value); setCreateError('') }}
+                    className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+                </label>}
                 <label className="mt-2 block text-xs font-semibold text-ink">
                   ひとこと（版の中身）
                   <input

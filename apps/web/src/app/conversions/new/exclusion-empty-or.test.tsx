@@ -93,7 +93,7 @@ function addOrGroup() {
 }
 
 function save() {
-  fireEvent.click(screen.getByRole('button', { name: 'つくって数えはじめる' }))
+  fireEvent.click(screen.getByRole('button', { name: '保存して数えはじめる' }))
 }
 
 function pickKind(field: HTMLElement, query: string) {

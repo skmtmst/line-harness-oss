@@ -1,0 +1,881 @@
+/*
+ * ★V8-B 成果とアフィリエイト（Pencil `nJlxX` アフィリエイター・`h7dmB` 案件・
+ * `OylSV` 成果承認・`aINnz` 支払い・`Eo56k` レポート。1152 は `KdFRI`、
+ * 状態別は `rRk0C`、閲覧のみは `v9JWQ`）。
+ *
+ * 外側の白い板・灰色の地はシェル（app-shell）が持つ。ここは板の中身だけ。
+ * 板の中の左右の余白は各部が 24px で持ち、タブの下線・数の帯・表の枠は
+ * 板の端まで伸ばす（負の外余白でシェルの余白を相殺する）。
+ *
+ * 畳みの基準は板の幅。板が 1100px を切ったら道具の段を2段にし、
+ * 横に収まらない表は中で横送りにする（画面幅およそ 1352px 未満に相当）。
+ */
+
+.af-list-board {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: -20px -24px -28px;
+  container-type: inline-size;
+}
+
+/* ---- 板の頭（題・説明・右上の操作） ---- */
+.af-list-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 12px;
+}
+
+.af-list-headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.af-list-headDesc {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.af-list-headActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---- タブの段 ---- */
+.af-list-tabsRow {
+  padding: 0 24px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.af-list-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.af-list-tab {
+  padding: 0 0 10px;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.af-list-tab:hover {
+  color: var(--color-ink);
+}
+
+.af-list-tabActive {
+  border-bottom-color: var(--color-ink);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* ---- 閲覧のみの帯（タブの下、上に12のすき間） ---- */
+.af-list-roBand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 24px 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.af-list-roBand svg {
+  flex-shrink: 0;
+  color: var(--color-info);
+}
+
+/* ---- 数の帯（KPIの細切れ） ---- */
+.af-list-kpiStrip {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.af-list-kpiCell {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 115px;
+  padding: 16px 20px;
+  border-right: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+}
+
+.af-list-kpiCell:last-child {
+  border-right: 0;
+}
+
+.af-list-kpiHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.af-list-kpiLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.af-list-kpiLabel svg {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+}
+
+/* KPI の右上の「…」。押すと数え方の説明が出る（情報の入口）。 */
+.af-list-kpiInfo {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.af-list-kpiInfoButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.af-list-kpiInfoButton:hover {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+.af-list-kpiInfoPopover {
+  position: absolute;
+  top: 24px;
+  right: 0;
+  z-index: 30;
+  width: 240px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-soft, var(--color-hairline));
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  box-shadow: var(--v8-popover-shadow, var(--shadow-float));
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.af-list-kpiValue {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.af-list-kpiUnit {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.af-list-kpiSub {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ---- お知らせの帯 ---- */
+.af-list-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 24px 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.af-list-notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-info);
+}
+
+.af-list-noticeWarn {
+  background: var(--color-status-warn-soft);
+}
+
+.af-list-noticeWarn svg {
+  color: var(--color-warning);
+}
+
+/* ---- 道具の段 ---- */
+.af-list-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 24px;
+}
+
+.af-list-toolsSearch {
+  flex: 0 1 300px;
+  min-width: 180px;
+}
+
+.af-list-toolsSpacer {
+  flex: 1;
+}
+
+/* ---- 表 ---- */
+.af-list-tableWrap {
+  margin: 0 24px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+.af-list-tableScroll {
+  overflow-x: auto;
+}
+
+.af-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.af-list-table thead th {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.af-list-table tbody td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-ink);
+  vertical-align: middle;
+}
+
+.af-list-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.af-list-table tbody tr:hover td {
+  background: var(--color-canvas-sunken);
+}
+
+.af-list-cellCheck {
+  width: 36px;
+  padding-right: 0 !important;
+}
+
+.af-list-numRight {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.af-list-numCenter {
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 名前の欄：名前（濃い緑）・コード（青）・約束・状態の札。 */
+.af-list-personCell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.af-list-personName {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-deep);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+
+.af-list-personName:hover {
+  text-decoration: underline;
+}
+
+.af-list-personCode {
+  color: var(--color-action);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+
+.af-list-personPlan {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+
+.af-list-cellSub {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.af-list-cellMain {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 状態の札（ドットつきの小さな丸札） ---- */
+.af-list-statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  width: fit-content;
+}
+
+.af-list-statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: currentcolor;
+}
+
+.af-list-statusOk {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.af-list-statusNeutral {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+.af-list-statusWarn {
+  background: var(--color-status-warn-soft);
+  color: var(--color-warning);
+}
+
+.af-list-statusDanger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.af-list-statusInfo {
+  background: var(--color-status-info-soft);
+  color: var(--color-info);
+}
+
+/* ---- 行末の操作 ---- */
+.af-list-rowActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* ---- 状態カード（まだ無い・0件・読み込み中・失敗） ---- */
+.af-list-stateWrap {
+  margin: 0 24px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.af-list-stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 280px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.af-list-stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.af-list-stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.af-list-stateDesc {
+  margin: 0;
+  max-width: 440px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.af-list-stateActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* 読み込み中の骨組み（表の形のまま） */
+.af-list-skelRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.af-list-skelRow:last-child {
+  border-bottom: 0;
+}
+
+.af-list-skelDot {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: var(--color-track, var(--color-canvas-sunken));
+}
+
+.af-list-skelBar {
+  height: 10px;
+  border-radius: var(--radius-mini);
+  background: var(--color-track, var(--color-canvas-sunken));
+}
+
+/* 読み込めなかった：カードの頭に赤い帯＋もう一度 */
+.af-list-errorBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.af-list-errorBand svg {
+  flex-shrink: 0;
+}
+
+.af-list-errorRetry {
+  margin-left: auto;
+}
+
+.af-list-errorNote {
+  padding: 16px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ---- 表の下の件数とページ送り ---- */
+.pageFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 24px 0;
+}
+
+.pageCount {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* ---- 表の下の注記 ---- */
+.af-list-footNote {
+  margin: 0;
+  padding: 12px 24px 20px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ---- まとめ操作の浮き帯 ---- */
+.af-list-bulkBar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  align-self: center;
+  width: fit-content;
+  max-width: calc(100% - 48px);
+  margin: 16px 24px 20px;
+  padding: 10px 16px;
+  border: 1px solid var(--color-border-soft, var(--color-hairline));
+  border-radius: var(--radius-panel);
+  background: var(--color-canvas);
+  box-shadow: var(--v8-popover-shadow, var(--shadow-float));
+}
+
+.af-list-bulkCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.af-list-bulkHint {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.af-list-bulkActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* ---- フォルダの列（案件・板 `h7dmB`） ---- */
+.af-list-listBody {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 24px 0;
+}
+
+.af-list-folderCol {
+  flex-shrink: 0;
+  width: 188px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.af-list-folderColTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.af-list-folderItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+
+.af-list-folderItem:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.af-list-folderItemActive {
+  background: var(--color-canvas-sunken);
+  font-weight: 600;
+}
+
+.af-list-folderItemIcon {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+}
+
+.af-list-folderItemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.af-list-folderItemCount {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 狭いときに出るフォルダの選び器・作るボタン（1152 板 `KdFRI` の1段目）。 */
+.af-list-folderSelect {
+  display: none;
+}
+
+.af-list-toolsCreate {
+  display: none;
+}
+
+/* ---- 明細の引き出し（右から出る） ---- */
+.af-list-drawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--color-scrim);
+}
+
+.af-list-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  width: 480px;
+  max-width: calc(100vw - 40px);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-float);
+}
+
+.af-list-drawerHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.af-list-drawerTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+}
+
+.af-list-drawerSub {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.af-list-drawerBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.af-list-drawerKpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.af-list-drawerKpi {
+  padding: 10px 12px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.af-list-drawerKpi p:first-child {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+.af-list-drawerKpi p:last-child {
+  margin: 4px 0 0;
+  color: var(--color-ink);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.af-list-drawerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.af-list-drawerTable {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-control);
+}
+
+.af-list-drawerSectionTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.af-list-drawerFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.af-list-linkRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-control);
+}
+
+.af-list-linkUrl {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-action);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 1152px 相当：板が狭くなったら ---- */
+@container (max-width: 1099px) {
+  .af-list-kpiCell {
+    min-height: 104px;
+    padding: 14px 16px;
+  }
+
+  .af-list-personName,
+  .af-list-personCode,
+  .af-list-personPlan {
+    max-width: 180px;
+  }
+
+  /* 1152：フォルダの列を畳み、選び器を道具の1段目へ（板 `KdFRI`）。 */
+  .af-list-folderCol {
+    display: none;
+  }
+
+  .af-list-folderSelect {
+    display: block;
+    width: 160px;
+  }
+
+  .af-list-toolsCreate {
+    display: inline-flex;
+  }
+}
+
+/* KdFRI: PCでも主要な列と操作を板の幅に収める。 */
+.af-list-affiliateTable { table-layout: fixed; }
+.af-list-checkColumn { width: 44px; }
+.af-list-metricColumn { width: 88px; }
+.af-list-rewardColumn { width: 100px; }
+.af-list-actionsColumn { width: 156px; }
+.af-list-affiliateTable .af-list-personName, .af-list-affiliateTable .af-list-personCode, .af-list-affiliateTable .af-list-personPlan { max-width: 100%; }
+@container (max-width: 900px) {
+  .af-list-affiliateTable thead th, .af-list-affiliateTable tbody td { padding-left: 10px; padding-right: 10px; }
+  .af-list-metricColumn { width: 72px; }
+  .af-list-rewardColumn { width: 84px; }
+  .af-list-actionsColumn { width: 140px; }
+}
+@container (max-width: 600px) {
+  .af-list-affiliateTable { min-width: 760px; }
+}
