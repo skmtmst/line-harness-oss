@@ -584,6 +584,15 @@
   --tpl-folder-width: 200px; --tpl-folder-pad-block: 16px; --tpl-folder-pad-side: 12px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
+  /* 友だち属性 タグの一覧（絵 I1E7Bt・aPeD8・fkGUR）。 */
+  --tpl-tag-search-w: 240px; --tpl-tag-search-w-narrow: 200px;
+  --tpl-tag-col-star: 56px; --tpl-tag-col-folder: 86px; --tpl-tag-col-count: 76px; --tpl-tag-col-source: 106px;
+  --tpl-tag-col-link: 126px; --tpl-tag-col-usage: 136px; --tpl-tag-col-menu: 60px;
+  --tpl-tag-star: 18px; --tpl-tag-star-head: 14px; --tpl-tag-grip: 14px; --tpl-tag-name-gap: 6px; --tpl-tag-sub-gap: 2px;
+  --tpl-tag-cell-size: 12px; --tpl-tag-cell-lh: 17px; --tpl-tag-folder-icon: 14px; --tpl-tag-folder-gap: 5px; --tpl-tag-menu-btn: 28px;
+  --tpl-tag-ro-pad: 0 24px 8px; --tpl-tag-ro-band-pad: 10px 14px; --tpl-tag-ro-gap: 10px; --tpl-tag-ro-lh: 20px; --tpl-tag-ro-icon: 16px;
+  --tpl-tag-pager-pad: 10px 20px; --tpl-tag-pager-size: 13px; --tpl-tag-pager-lh: 20px;
+  --tpl-tag-other-pad: 16px 24px 24px; --tpl-tag-other-gap: 16px; --tpl-tag-note-size: 11px; --tpl-tag-note-lh: 17px; --tpl-tag-ring: 2px; --tpl-tag-tabs-h: 30px; --tpl-tag-tabs-pad-bottom: 9px;
   --tpl-thead-pad-block: 12px; --tpl-thead-pad-side: 24px; --tpl-thead-lh: 16px;
   --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
   --tpl-band-gap: 0;

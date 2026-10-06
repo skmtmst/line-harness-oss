@@ -235,6 +235,8 @@ describe('共通部品の影響範囲', () => {
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
+      // ★V8 友だち属性 タグの一覧（I1E7Bt）。一から書いた画面。表の下にページ送りを置く。
+      'v8/tags/tags-tab.tsx',
     ].sort())
   })
 
