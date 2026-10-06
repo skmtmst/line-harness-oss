@@ -64,6 +64,6 @@
 - 呼ぶ口：`friends.get`・`friends.mileage`・`staff.me`・`friendsV6`・`history`・`confirmMileageEntry`・`voidMileageEntry`・`retryMileageNotification`。
 - 手で増やす・減らす（`M8zhjL`）の窓は今と同じ約束（理由必須・追記だけ・二重反映しない・境界以上は別のオーナー承認・通知の再送）。
 
-## 窓の幅と位置（取り込み待ちの #1509 が入ったら渡す値）
+## 窓の幅と位置（共通の窓の designWidth・designTop で渡している）
 - 点数を手で直す `Nv7An`：designWidth 560・designTop 184。
 - 点数の変化の明細 `R8NNi`：designWidth 600・designTop 204。

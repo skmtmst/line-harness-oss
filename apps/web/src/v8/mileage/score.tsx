@@ -850,8 +850,7 @@ export default function ScoreTab() {
 /*
  * 点数を手で直す（板 `Nv7An`）。
  * 口と約束（理由必須・追記だけ・再送しても二重反映しない）は今と同じ。見せ方だけ V8。
- * 共通の窓が絵の幅・位置を受けられるようになったら（取り込み待ちの #1509）、
- * designWidth と designTop を渡す（値は BEHAVIOR.md）。
+ * 窓の幅・位置は絵どおり（designWidth 560・designTop 184）。
  */
 function ScoreAdjustDialog({
   accountId,
@@ -927,6 +926,8 @@ function ScoreAdjustDialog({
     <Dialog
       open
       designNode="Nv7An"
+      designWidth={560}
+      designTop={184}
       title="点数を手で直す"
       description="記録に残ります。お客様には見えない運用メモとして、あとから理由をたどれるようにしてください。"
       confirmLabel={confirmLabel}
@@ -1070,6 +1071,8 @@ function ScoreHistoryDialog({
     <Dialog
       open
       designNode="R8NNi"
+      designWidth={600}
+      designTop={204}
       title="点数の変化の明細"
       description="いつ・何で点数が変わったかを新しい順に並べています。スコアは配信や対応の順番を決める目安で、お客様には見えず、マイル残高は増えも減りもしません。"
       footer={<div className={styles.dlgFooterEnd}><Button variant="secondary" onClick={onCancel}>閉じる</Button></div>}
