@@ -235,8 +235,12 @@ describe('共通部品の影響範囲', () => {
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
+      // ★V8 一斉配信の一覧（l5V9a）。新しい置き場（src/v8）に一から書いた。
+      'v8/broadcasts/list.tsx',
       // ★V8 回答フォームの一覧（I3L41O）。新しい置き場（src/v8）に一から書いた。
       'v8/forms/list.tsx',
+      // ★V8 回答フォームの編集（m1cWEy ほか）。登録メディアから選ぶ窓の写しにページ送り。
+      'v8/form-edit/media-picker.tsx',
       // V8 のリッチメニュー一覧（src/v8 に一から書いた）。
       'v8/rich-menus/list.tsx',
       // ★V8 自動応答の一覧（uE9gf）。新しい置き場（src/v8）に一から書いた。
@@ -251,6 +255,8 @@ describe('共通部品の影響範囲', () => {
       'v8/webhooks/interactions.tsx',
       // ★V8 ログインユーザー（nku0f）。新しい置き場（src/v8/settings）に書いた。表の下にページ送りを置く。
       'v8/settings/staff/staff.tsx',
+      // ★V8 コンバージョンの一覧（r6dJFy）。新しい置き場（src/v8）に一から書いた。
+      'v8/conversions/list.tsx',
     ].sort())
   })
 
