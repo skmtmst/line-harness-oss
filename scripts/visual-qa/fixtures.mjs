@@ -6406,20 +6406,30 @@ const petPhoto = (id, owner, pet, caption, status, hours, reason = null, note = 
   review_notification_status: status === 'rejected' ? 'sent' : null,
 })
 
-/* Worker と同じ完成済みの呼び名を返し、男の子=くん／女の子=ちゃんを撮影でも固定する。 */
+/* Worker と同じ完成済みの呼び名を返し、男の子=くん／女の子=ちゃんを撮影でも固定する。
+   ★V8-B 投稿（TkA4D・cniyw）の絵と同じ並び・名前・日付（新しい順）。
+   採用・見送りの審査日は「今月」に入るよう、見本 API を立てた時刻から決める（数の帯の今月の数）。 */
+const reviewedThisMonth = () => new Date().toISOString()
+const photoOn = (base, createdAt, extra = {}) => ({ ...base, created_at: createdAt, ...extra })
 export const NEN_PHOTOS = [
-  petPhoto('ph-1', '高橋 直人', 'もも', '朝のおさんぽ', 'pending', 48),
-  petPhoto('ph-2', '前田 さくら', 'そら', 'はじめてのトリミング', 'pending', 44),
-  petPhoto('ph-3', '木村 亮', 'こむぎ', 'おやつを待つ顔', 'pending', 20),
-  petPhoto('ph-4', '中村 彩', 'ぷりん', 'ひなたぼっこ', 'adopted', 14),
-  petPhoto('ph-5', '石田 未来', 'レオ', '新しい首輪', 'adopted', 8),
+  photoOn(petPhoto('ph-3', '田中 明子', 'こむぎ', '散歩のあと、満足そうな顔です', 'pending', 0), '2026-09-30T01:00:00.000Z', { customer_id: '10234' }),
+  photoOn(petPhoto('ph-2', '佐藤 健', 'そら', '日なたで寝ているところ', 'pending', 0), '2026-09-29T01:00:00.000Z', { customer_id: '10198' }),
+  photoOn(petPhoto('ph-1', '鈴木 真理', 'もも', '鹿肉ジャーキーに夢中', 'pending', 0), '2026-09-28T01:00:00.000Z', { customer_id: '10311' }),
+  photoOn(petPhoto('ph-4', '佐藤 由美', 'きなこ', 'ひなたぼっこ', 'adopted', 0), '2026-09-27T01:00:00.000Z', {
+    customer_id: '10088', reviewed_at: reviewedThisMonth(), awarded_points: 100, point_sync_status: 'synced', review_notification_status: 'sent',
+  }),
+  photoOn(petPhoto('ph-5', '山本 大輔', 'レオ', '新しい首輪', 'adopted', 0), '2026-09-25T01:00:00.000Z', {
+    customer_id: '10102', reviewed_at: reviewedThisMonth(), awarded_points: 100, point_sync_status: 'synced',
+    publication_consent_at: null, review_notification_status: 'failed',
+  }),
   /* 戻したもの。**理由が無いと、なぜ戻したのかが画面から読めない。**
      理由はDB制約・API許可値にある正規値を使う（`other_person` は存在しない値）。 */
-  petPhoto('ph-6', '松本 圭', 'むぎ', '店内で撮影', 'rejected', 3, 'privacy', '人の顔が写っています'),
+  photoOn(petPhoto('ph-6', '松本 圭', 'むぎ', '店内で撮影', 'rejected', 0, 'quality', '暗くて見えにくいです'), '2026-09-26T01:00:00.000Z', { reviewed_at: reviewedThisMonth() }),
 ]
+const NEN_PHOTO_FIRST = NEN_PHOTOS.find((photo) => photo.id === 'ph-1')
 
 export const NEN_PHOTO_DETAIL = {
-  ...NEN_PHOTOS[0], pet_name: 'レオくん', owner_name: '大西 健一（LINE 本店）',
+  ...NEN_PHOTO_FIRST, pet_name: 'レオくん', owner_name: '大西 健一（LINE 本店）',
   caption: 'はじめて海に行きました', image_width: 2048, image_height: 1536,
   image_byte_size: 1887437, captured_device: 'iPhone 15', animal_type: 'dog',
   breed: 'ラブラドール', birthday: '2025-08-24', submission_count: 3, returned_count: 0,
@@ -6433,10 +6443,11 @@ export const NEN_PHOTO_DETAIL = {
 
 /** 機能22の実APIで返す一覧集計。設計 `cqWo8` の通常状態。 */
 export const NEN_PHOTO_REVIEW_METRICS = {
-  pendingCount: 18,
+  // ★V8-B 投稿の数の帯：審査待ち 3枚・いちばん古いもの 2日前（見本 API を立てた時刻から）。
+  pendingCount: 3,
   reviewedCount: 142,
   averageReviewMinutes: 22 / 60,
-  oldestPendingAt: '2026-08-23T00:00:00.000Z',
+  oldestPendingAt: new Date(Date.now() - 2 * 24 * 3600 * 1000 - 3600 * 1000).toISOString(),
   attentionCount: 2,
 }
 
@@ -6462,8 +6473,8 @@ export const NEN_PHOTO_DERIVATIVES = {
     { kind: 'thumbnail', sourceVersion: 1, objectKey: 'thumbnail/ph-1-v1.webp', contentType: 'image/webp', byteSize: 24576, width: 320, height: 240, createdAt: '2026-08-25T00:10:02.000Z' },
   ],
   knownUrls: [
-    { kind: 'review', url: NEN_PHOTOS[0].image_url, sourceVersion: 1 },
-    { kind: 'public', url: NEN_PHOTOS[0].image_url, sourceVersion: 1 },
+    { kind: 'review', url: NEN_PHOTO_FIRST.image_url, sourceVersion: 1 },
+    { kind: 'public', url: NEN_PHOTO_FIRST.image_url, sourceVersion: 1 },
   ],
 }
 
@@ -6485,27 +6496,33 @@ export const NEN_PHOTO_BULK_DECISION_RESULT = {
 
 /** #817: 報酬の決まりの版。新しい版から返す。status は in_use / reserved / past。 */
 export const NEN_PHOTO_REWARD_POLICY_VERSIONS = [
+  /* ★V8-B 版の履歴（N1br7）の絵と同じ4つの版。 */
   {
-    versionNumber: 4, policyKey: 'v4', points: 10, summary: '報酬を5pt→10ptに',
-    effectiveFrom: '2026-10-01T00:00:00+09:00', createdBy: 'visual-qa-owner',
+    versionNumber: 4, policyKey: 'v4', points: 120, publicationPoints: 200, summary: '10月のキャンペーンに合わせて',
+    effectiveFrom: '2026-10-15T00:00:00+09:00', createdBy: '高田 誠',
     createdAt: '2026-09-25T20:40:00+09:00', status: 'reserved',
   },
   {
-    versionNumber: 3, policyKey: 'v3', points: 10, summary: '審査の決まりに「顔が写る写真は不可」を追加',
-    effectiveFrom: null, createdBy: 'visual-qa-owner',
-    createdAt: '2026-09-10T11:02:00+09:00', status: 'in_use',
+    versionNumber: 3, policyKey: 'v3', points: 100, publicationPoints: 200, summary: '審査の決まりに「顔が写る写真は不可」を追加',
+    effectiveFrom: null, createdBy: '高田 誠',
+    createdAt: '2026-09-20T10:00:00+09:00', status: 'in_use',
   },
   {
-    versionNumber: 2, policyKey: 'v2', points: 5, summary: '最初の報酬の決まり',
-    effectiveFrom: null, createdBy: 'visual-qa-owner',
-    createdAt: '2026-08-01T10:00:00+09:00', status: 'past',
+    versionNumber: 2, policyKey: 'v2', points: 50, publicationPoints: 150, summary: '掲載の追加報酬を始める',
+    effectiveFrom: null, createdBy: '中川 由美',
+    createdAt: '2026-08-01T09:30:00+09:00', status: 'past',
+  },
+  {
+    versionNumber: 1, policyKey: 'v1', points: 50, publicationPoints: 0, summary: '最初の報酬の決まり',
+    effectiveFrom: null, createdBy: '高田 誠',
+    createdAt: '2026-06-12T14:00:00+09:00', status: 'past',
   },
 ]
 
 const publicationPhoto = (id, photoId, petName, ownerName, count, label, type = 'column') => ({
   id, photo_id: photoId, status: 'published', show_owner_name: ownerName ? 1 : 0,
   view_count: count, version: 1, published_at: '2026-08-20T00:00:00.000Z',
-  image_url: NEN_PHOTOS[0].image_url, publication_consent_at: '2026-08-20T00:00:00.000Z',
+  image_url: NEN_PHOTO_FIRST.image_url, publication_consent_at: '2026-08-20T00:00:00.000Z',
   pet_name: petName, owner_name: ownerName,
   placements: label ? [{ id: `${id}-place`, placement_type: type, placement_label: label, view_count: count }] : [],
 })
