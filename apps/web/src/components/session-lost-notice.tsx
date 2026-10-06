@@ -84,10 +84,10 @@ export default function SessionLostNotice() {
         </p>
 
         <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" className="text-ink-secondary h-10 px-5 whitespace-normal" type="button" onClick={() => window.location.reload()}>
+          <Button variant="secondary" className="text-ink-secondary v7:h-10 px-5 whitespace-normal" type="button" onClick={() => window.location.reload()}>
             再読み込み
           </Button>
-          <Button variant="primary" className="h-10 px-5 font-bold border-0 whitespace-normal" type="button" onClick={() => {
+          <Button variant="primary" className="v7:h-10 px-5 font-bold border-0 whitespace-normal" type="button" onClick={() => {
               window.localStorage.removeItem(ROLE_KEY)
               window.location.href = '/login'
             }}>

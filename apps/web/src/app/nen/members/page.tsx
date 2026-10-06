@@ -8,9 +8,11 @@ import ScrollableTabs from '@/components/layout/scrollable-tabs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import LifetimeTab from './lifetime-tab'
 import MembersTab from './members-tab'
+import MembersPageV8 from './members-v8'
 import RankSettingsTab from './rank-settings-tab'
 
 export type MemberTab = 'members' | 'ranks' | 'lifetime'
@@ -35,6 +37,7 @@ export default function NenMembersPage() {
 
 function MembersInner() {
   usePageTitle('会員')
+  const theme = useAdminTheme()
   const router = useRouter()
   const params = useSearchParams()
   const { selectedAccountId } = useAccount()
@@ -101,6 +104,24 @@ function MembersInner() {
 
   // 選択中アカウントの設定だけを下のタブへ渡す。別アカウントのものは渡さない。
   const settings = snapshot && snapshot.accountId === selectedAccountId ? snapshot.data : null
+
+  /*
+   * ★V8-B：data-theme="v8" のときだけ新しい会員画面（AOWoJ・fb9NJ・zQ5vY）
+   * へ切り替える。v7 の見た目はそのまま。
+   */
+  if (theme === 'v8') {
+    return (
+      <MembersPageV8
+        accountId={selectedAccountId}
+        tab={tab}
+        status={status}
+        settings={settings}
+        onRetry={() => void load()}
+        onSaved={handleSaved}
+        onChangeTab={changeTab}
+      />
+    )
+  }
 
   return (
     <div data-design-node="IqL2Z" className="flex flex-col gap-4">

@@ -1,0 +1,874 @@
+@layer properties, theme, base, components, utilities;
+/*
+ * ★V8 シナリオ配信の編集（Pencil `PMLkX` 稼働中 / `nMSiE` 始めた直後 /
+ * `ARuZ4` 停止中、小窓は `F1LK4e`・`OPGU2`・`Al4Ek`）。
+ *
+ * このファイルは detail-v8.tsx だけが読む。detail-v8.tsx は
+ * v8 のテーマのときしか出ないので、ここではテーマ条件の
+ * セレクタは書かない（v7 の見た目には一切効かない）。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+/* 見出し：戻る・題＋状態の札＋鉛筆・説明の行／右に操作。 */
+.back {
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.back:hover {
+  text-decoration: underline;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.renameButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.renameButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.renameButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.meta {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.meta button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.meta button:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.meta button:disabled {
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+}
+
+.headActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* 競合の帯（`kz2B6`）：ほかの人の更新を知らせる。書き換えはしない。 */
+.conflictBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--color-warning-bg);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-warning-bg);
+}
+
+.conflictTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.conflictBody {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.conflictActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 始めた直後の知らせ（`nMSiE`）。うまくいった帯。 */
+.startedBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.startedBand a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* 本体：左に流れの組、右の欄にスマホ（板は 380）。 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 24px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 「保存・開始のきっかけ・配信」の3つの箱。同じ高さ・ボタンは同じ位置。 */
+.stageCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.stageCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.stageHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stageNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.stageTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stageMain {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.stageMain .stateInline {
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+
+.stageNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 箱の下のボタン。3箱で同じ位置に出すため下揃え。 */
+.stageAction {
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* 数の帯：1枚の板の中に4つの数。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 16px;
+}
+
+.kpi:first-child {
+  padding-left: 0;
+}
+
+.kpi + .kpi {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpiLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.kpiDetail {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 「最後の1通の後」の行。 */
+.onComplete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+}
+
+.onCompleteLabel {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.onCompleteValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.onCompleteNote {
+  margin: 0;
+  margin-left: auto;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.linkButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* メッセージの行カード。 */
+.sectionTitle {
+  margin: 4px 0 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.stepList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  cursor: pointer;
+}
+
+.stepRow:hover {
+  background: var(--color-canvas-sunken);
+}
+
+/* 右の欄に出している通は緑の枠（板どおり）。 */
+.stepRowSelected {
+  composes: stepRow;
+  border: 2px solid var(--color-success);
+  background: var(--color-success-bg);
+}
+
+.stepNo {
+  flex-shrink: 0;
+  width: 40px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stepWhen {
+  flex-shrink: 0;
+  width: 170px;
+  min-width: 0;
+}
+
+.stepWhenMain {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 「届く日時の例」（/preview の試算）。板の青い補助行。 */
+.stepWhenSub {
+  margin: 2px 0 0;
+  color: var(--color-action);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.stepTitle {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 13px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.stepTitle:hover:not(:disabled) {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+.stepTitle:disabled {
+  cursor: default;
+}
+
+.kindChip {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stepOps {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.iconMove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.iconMove:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.iconMove:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.menuButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+/* 行と行のあいだの「ここに挿入」。常に見える（板どおり）。 */
+.insertRow {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.insertRow button {
+  padding: 2px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.insertRow button:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.insertRow button:disabled {
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+}
+
+/* 行の下に開く通の編集フォーム。 */
+.stepEdit {
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+}
+
+/* 通ごとの数（板の下の段。対象・届いた数・配信後を1行で見比べる）。 */
+.statPanel {
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.statPanelTitle {
+  margin: 0 0 10px;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.statList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.statRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.statNo {
+  width: 44px;
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.statAudience {
+  width: 150px;
+  flex-shrink: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statReach {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.statBar {
+  display: inline-block;
+  width: 110px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.statBarFill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-success);
+}
+
+.statReachText {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.statAfter {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.statAfterPause {
+  color: var(--color-warning);
+  font-weight: 700;
+}
+
+.draftChip {
+  padding: 2px 10px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 行の下の文字ボタン 3 つ（メッセージ・テンプレート・分岐）。 */
+.addRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 28px;
+}
+
+.addLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addLink:hover:not(:disabled) {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+.addLink:disabled {
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+}
+
+/* 右の欄：選んだ通の見え方。 */
+.previewCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.previewTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* スマホの中の吹き出し。 */
+.talkBubble {
+  max-width: 85%;
+  padding: 8px 10px;
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.talkChoice {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-action);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.talkImage {
+  display: block;
+  max-width: 85%;
+  border-radius: var(--radius-card, 12px);
+}
+
+/* 複製の窓（`Al4Ek`）の中の案内。 */
+.dupNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-info-soft, var(--color-canvas-sunken));
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 開始前の確認（`F1LK4e`）の横2桁の行。 */
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.checkMark {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.checkOk {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.checkWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.checkUnknown {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+/* 停止中・複製で残った作りかけの帯（v7 と同じ判断、V8 の帯）。 */
+.remainderBand {
+  padding: 12px 16px;
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-warning-bg);
+}
+
+.remainderBand p {
+  margin: 0;
+  color: var(--color-warning);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.remainderBand .remainderDetail {
+  margin-top: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.remainderActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 8px;
+}
+
+.remainderActions button,
+.remainderActions a {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.remainderActions button:hover,
+.remainderActions a:hover {
+  text-decoration: underline;
+}
+
+.remainderActions .dangerLink {
+  color: var(--color-danger);
+}
+
+/* ===== 板が 1100px を切ったら右の欄を下へ ===== */
+@container (max-width: 1099px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .previewCol {
+    order: 2;
+  }
+}
+
+@container (max-width: 720px) {
+  .stageCards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 0;
+  }
+
+  .kpi:nth-child(3) {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .stepWhen {
+    width: 120px;
+  }
+
+  .stepWhenSub {
+    white-space: normal;
+  }
+}

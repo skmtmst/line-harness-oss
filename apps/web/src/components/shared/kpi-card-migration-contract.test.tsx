@@ -23,7 +23,7 @@ describe('KpiCardへの一本化契約', () => {
     )
 
     expect(html).toContain('data-design-version="v6"')
-    expect(html).toContain('1,234件')
+    expect(html.replace(/<[^>]*>/g, '')).toContain('1,234件')
     expect(html).toContain('href="/conversions"')
   })
 
@@ -33,7 +33,7 @@ describe('KpiCardへの一本化契約', () => {
     )
 
     expect(html).toContain('data-design-version="broadcast"')
-    expect(html).toContain('3通')
+    expect(html.replace(/<[^>]*>/g, '')).toContain('3通')
   })
 
   it('3系統の実装元が共通KpiCardだけを描画する', () => {

@@ -23,6 +23,7 @@ const mode = vi.hoisted(() => ({
 vi.mock('next/link', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),

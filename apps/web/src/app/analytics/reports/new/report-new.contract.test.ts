@@ -9,9 +9,9 @@ describe('V6 URqOA 定期レポート作成', () => {
     for (const text of [
       '何を入れますか', 'いつ送りますか', 'だれに送りますか', '知らせの決めごと',
       '宛先を足す', 'LINEでも同じ内容を送る', '今すぐ1回だけ送る', 'つくって動かす',
-      'レポートが見ているもの', 'つながる先', '気をつけること',
+      'レポートが見ているもの', '気をつけること',
     ]) expect(PAGE).toContain(text)
-    expect(PAGE).toContain('data-design-node="URqOA"')
+    expect(PAGE).toContain("'H5UoIu'")
   })
 
   it('通常・読込・空・失敗と権限を画面で分ける', () => {

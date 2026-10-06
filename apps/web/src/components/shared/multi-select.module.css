@@ -355,4 +355,25 @@
     font-size: var(--text-lead);
   }
 }
+
+/*
+ * ★V8 仕上げ3回目（M10）⑤：候補は少し下から 200ms
+ * （…・選ぶ欄・選ぶ箱と同じ速さ・同じ出方）。v7 は 120ms のまま。
+ */
+[data-theme='v8'] .popup {
+  animation-name: multi-select-v8-in;
+  animation-duration: var(--motion-base);
+}
+
+@keyframes multi-select-v8-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 }

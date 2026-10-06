@@ -1,0 +1,5 @@
+.ec-fid-page { display: flex; flex-direction: column; gap: 16px; min-width: 0; container-type: inline-size; }
+.ec-fid-head { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.ec-fid-layout { display: grid; grid-template-columns: 176px minmax(0, 1fr); align-items: start; gap: 24px; }
+.ec-fid-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+@media (max-width: 900px) { .ec-fid-layout { grid-template-columns: minmax(0, 1fr); } }

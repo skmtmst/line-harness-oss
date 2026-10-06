@@ -1,0 +1,160 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8 友だち追加時の配信の有効化の完了（板 `e0FD1J`）。
+ * 真ん中に白い札を1枚。3つの行き先は札の中。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  container-type: inline-size;
+}
+
+.backLink {
+  align-self: flex-start;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+}
+
+.stepWrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.stepDone {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 4px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stepMark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.stepLine {
+  width: 24px;
+  height: 1px;
+  margin: 0 4px;
+  background: var(--color-hairline);
+}
+
+.stepNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+.center {
+  display: flex;
+  justify-content: center;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(560px, 100%);
+  padding: 32px 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.doneMark {
+  display: inline-grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+.doneTitle {
+  margin: 16px 0 0;
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+}
+
+.doneDesc {
+  margin: 8px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.rows {
+  display: grid;
+  width: 100%;
+  margin: 16px 0 0;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row dt {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.row dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 20px;
+}

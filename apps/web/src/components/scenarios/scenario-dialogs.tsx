@@ -144,10 +144,10 @@ export function ConditionDialog({
       wide
       footer={
         <>
-          <Button variant="secondary" className="text-ink-secondary h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
+          <Button variant="secondary" className="text-ink-secondary v7:h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" className="h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
+          <Button variant="primary" className="v7:h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
                * 欄の下で知らせて止める。保存済みの条件は維持する。
@@ -474,10 +474,10 @@ export function OnCompleteDialog({
       onClose={onClose}
       footer={
         <>
-          <Button variant="secondary" className="text-ink-secondary h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
+          <Button variant="secondary" className="text-ink-secondary v7:h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" className="h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
+          <Button variant="primary" className="v7:h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
               /*
                * R250 + R239: 移動先のない「次のシナリオへ移動」は保存しない。
                * 欠落したまま送ると400になるだけなので、欄の下と窓の上で理由を出す。
@@ -507,7 +507,7 @@ export function OnCompleteDialog({
                 setSaving(false)
               }
             }}>
-            {saving ? '保存中…' : '変更する'}
+            {saving ? '保存中…' : '編集'}
           </Button>
         </>
       }
@@ -551,7 +551,7 @@ export function OnCompleteDialog({
         <p className="text-ink-secondary mt-0.5 mb-2 text-xs">
           配り終えた人に対して、タグ・友だち情報・対応マークなどを動かします。
         </p>
-        <Button variant="secondary" className="text-ink-secondary h-10 px-4 whitespace-normal" type="button" onClick={onOpenActions}>
+        <Button variant="secondary" className="text-ink-secondary v7:h-10 px-4 whitespace-normal" type="button" onClick={onOpenActions}>
           アクション設定{actionCount > 0 ? `（${actionCount} 件）` : ''}
         </Button>
       </div>
@@ -858,7 +858,7 @@ export function TestSendDialog({
   ]
   const recipientLabel =
     recipientClass === 'staff'
-      ? `スタッフ連携のLINE（${staffName ?? '担当者'}）`
+      ? `スタッフ連携のLINE（${staffName ?? 'スタッフ'}）`
       : recipientClass === 'test'
         ? 'テスト受信者'
         : recipientClass === 'general'
@@ -991,10 +991,10 @@ export function TestSendDialog({
       // ここに確認中のフッターは要らない。
       footer={
         <>
-        <Button variant="secondary" className="text-ink-secondary h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
+        <Button variant="secondary" className="text-ink-secondary v7:h-10 px-5 whitespace-normal" type="button" onClick={onClose}>
           キャンセル
         </Button>
-        <Button variant="primary" className="h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={!selected || sending} onClick={openConfirm}>
+        <Button variant="primary" className="v7:h-10 px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={!selected || sending} onClick={openConfirm}>
           内容を確認
         </Button>
         </>

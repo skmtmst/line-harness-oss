@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moveTargetingGroup, orderTargetingGroups } from './targeting-order'
+import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from './targeting-order'
 
 const GROUPS = [
   { id: 'later-created', targetingPriority: 0, createdAt: '2026-08-02T00:00:00.000Z' },
@@ -28,5 +28,16 @@ describe('リッチメニューの出す順番', () => {
   it('先頭を上、末尾を下へ動かす操作は書き込み対象を返さない', () => {
     expect(moveTargetingGroup(GROUPS, 'first', -1)).toBeNull()
     expect(moveTargetingGroup(GROUPS, 'third', 1)).toBeNull()
+  })
+
+  it('先行反映はIDの順に並べ、番号を振り直して元の配列を壊さない', () => {
+    const next = withNormalizedPriority(GROUPS, ['third', 'first', 'later-created'])
+    expect(next.map((group) => group.id)).toEqual(['third', 'first', 'later-created'])
+    expect(next.map((group) => group.targetingPriority)).toEqual([0, 1, 2])
+    expect(GROUPS.map((group) => group.targetingPriority)).toEqual([0, 0, 9])
+  })
+
+  it('先行反映は知らないIDを飛ばす', () => {
+    expect(withNormalizedPriority(GROUPS, ['first', 'gone']).map((group) => group.id)).toEqual(['first'])
   })
 })

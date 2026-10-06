@@ -271,6 +271,22 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
     expect(res.status).toBe(404);
   });
 
+  it('returns 422 with an operator message when the reward basis is undeterminable (F-23 unbillable)', async () => {
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'unbillable', currentStatus: 'pending' });
+    const res = await req('PATCH', '/api/conversions/events/ev-unpriced/approval', {
+      status: 'approved',
+      expectedStatus: 'pending',
+    });
+    expect(res.status).toBe(422);
+    const body = (await res.json()) as { success: boolean; code: string; data: { currentStatus: string } };
+    expect(body.success).toBe(false);
+    expect(body.code).toBe('approval_unbillable');
+    expect(body.data.currentStatus).toBe('pending');
+    // 承認していないので台帳同期・通知・案件動作へ進まない。
+    expect(dbMocks.syncAffiliateConversionMileage).not.toHaveBeenCalled();
+    expect(notifyAffiliateApproval).not.toHaveBeenCalled();
+  });
+
   it('returns 200 without calling notifyAffiliate when status is already_set (double-click guard)', async () => {
     dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'already_set', currentStatus: 'approved' });
     // R354: 同じ承認世代の通知は送り済みなので送らない。

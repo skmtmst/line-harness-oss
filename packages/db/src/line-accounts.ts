@@ -982,6 +982,7 @@ export async function deleteUncommittedLineAccount(
 ): Promise<void> {
   await db.batch([
     db.prepare(`DELETE FROM account_settings WHERE line_account_id = ?`).bind(id),
+    db.prepare(`DELETE FROM line_account_tag_links WHERE line_account_id = ?`).bind(id),
     db.prepare(`DELETE FROM line_account_connection_checks WHERE line_account_id = ?`).bind(id),
     db.prepare(`DELETE FROM line_accounts WHERE id = ?`).bind(id),
   ]);
@@ -1323,6 +1324,7 @@ export async function listAutoSwitchedOutPoolAccounts(
 }
 
 export interface UpdateLineAccountFieldsInput {
+  timezone?: string;
   country?: string | null;
   role?: string | null;
   isActive?: boolean;
@@ -1362,6 +1364,11 @@ export async function updateLineAccountFields(
   const sets: string[] = [];
   const binds: unknown[] = [];
 
+  if (input.timezone !== undefined) {
+    new Intl.DateTimeFormat("ja-JP", { timeZone: input.timezone }).format();
+    sets.push("timezone = ?");
+    binds.push(input.timezone);
+  }
   if (input.country !== undefined) {
     sets.push('country = ?');
     binds.push(input.country); // empty string normalization happens at the route layer

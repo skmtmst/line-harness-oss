@@ -115,8 +115,8 @@
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    padding: 14px 24px;
+    gap: var(--tpl-toolbar-gap);
+    padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side);
   }
 
   [data-theme='v8'] .row1,
@@ -136,4 +136,36 @@
   [data-theme='v8'] .trailing {
     order: 4;
   }
+
+[data-theme='v8'] .toolbar { margin-bottom: 0; }
+[data-theme='v8'] .row1 > .search { width: 280px; max-width: 100%; flex: none; }
+
+
+[data-theme='v8'] .toolbar button:not(:focus-visible):not([class*='ghost']) { border: 0; }
+[data-theme='v8'] .trailing button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+  /*
+   * ★V8「道具の1段」（c4n9Kr）：探す欄は幅 280px・縮まない
+   * （flex-shrink: 0）。中の文だけが flex:1 で伸び縮みする。
+   * 白い板が狭い幅（1100〜1200）では帯全体の flex-wrap で
+   * 下へ折り返すので、右端がはみ出さない。
+   * 繰り返す1行の形（幅・枠・高さ）を守り、行数は問わない。
+   */
+
 }
+/* ★V8 型の道具の枠（[data-template-region=toolbar]）の中では、枠が余白を持つので部品は二重に持たない。並び・件数（trailing）は右端（c4n9Kr：右寄せ）。司令塔 2026-10-05 */
+[data-theme='v8'] :global([data-template-region='toolbar']) .toolbar { padding: 0; flex: 1; min-width: 0; }
+[data-theme='v8'] .trailing { margin-left: auto; display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+[data-theme='v8'] .toolbar [role='group'] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+[data-theme='v8'] .row1 > .search { width: var(--list-search-width, 280px); min-width: 0; }
+/*
+ * ★V8「道具の2段」（acRIl 予約管理）：1段目＝探す・担当・経路・CSV、
+ * 2段目＝札。段の間 10・段の中の間 6。v7 の2段組みは変えない。
+ * layout="stacked" のときだけ段を残し、それ以外は1本の帯。
+ */
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row1,
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .filters { display: contents; }
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .filters > *,
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row1 > *,
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .trailing { order: 0; }

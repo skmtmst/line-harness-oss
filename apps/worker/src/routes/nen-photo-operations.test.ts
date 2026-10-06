@@ -438,15 +438,22 @@ describe('photo review operations API', () => {
       };
     };
     expect(body.data.items.map((item) => item.notificationStatus)).toEqual(['sent', 'failed', 'failed']);
+    /*
+     * 失敗の理由は他の送信失敗と同じ安全な言い方にそろえる（2026-10-02）。
+     * 以前は生のエラー本文をそのまま返していて、画面に LINE 側の応答本文や
+     * 社内の呼び名が出ていた。
+     */
     expect(body.data.notificationFailures).toEqual([
-      { photoId: 'photo-2', error: 'LINE unavailable' },
+      { photoId: 'photo-2', error: '送信に失敗しました。設定とLINE連携を確認してください。' },
       { photoId: 'photo-9', error: '通知先が見つかりません' },
     ]);
     expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       decisionId: 'decision-1', status: 'sent',
     }));
     expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      decisionId: 'decision-2', status: 'failed', error: 'LINE unavailable',
+      decisionId: 'decision-2',
+      status: 'failed',
+      error: '送信に失敗しました。設定とLINE連携を確認してください。',
     }));
     // 宛先不明分も送達台帳へ失敗として残す。再送口の拾い上げ対象になる。
     expect(mocks.claim).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
@@ -455,6 +462,42 @@ describe('photo review operations API', () => {
     expect(mocks.complete).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       decisionId: 'decision-9', generation: 1, status: 'failed', error: '通知先が見つかりません',
     }));
+  });
+
+  /*
+   * 審査結果の通知が失敗したとき、LINE 側の応答本文と社内の呼び名が
+   * そのまま管理画面の失敗一覧に出ていた（2026-10-02）。
+   * 運用者に見せるのは次の行動が選べる言い方だけにする。
+   */
+  it('LINE側の応答本文や社内の呼び名を画面へ返さない', async () => {
+    mocks.bulk.mockResolvedValue({
+      kind: 'created',
+      result: {
+        updatedCount: 1,
+        items: [{ photoId: 'photo-1', decision: 'approve', reviewVersion: 2, decisionId: 'decision-1' }],
+      },
+    });
+    mocks.push.mockRejectedValue(
+      new Error('LINE Harness proxy error: 500 {"message":"internal error","details":[]}'),
+    );
+    const { app } = bulkHarness({ recipients: ['photo-1'] });
+    const response = await app.request('/api/nen-members/photos/decisions/bulk', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'bulk-notify-raw' },
+      body: JSON.stringify({
+        lineAccountId: 'account-a',
+        decisions: [{ photoId: 'photo-1', decision: 'approve', expectedVersion: 1 }],
+      }),
+    });
+    expect(response.status).toBe(201);
+    const raw = await response.text();
+    expect(raw).not.toContain('LINE Harness');
+    expect(raw).not.toContain('internal error');
+    const body = JSON.parse(raw) as {
+      data: { notificationFailures: Array<{ photoId: string; error: string }> };
+    };
+    expect(body.data.notificationFailures).toEqual([
+      { photoId: 'photo-1', error: 'LINEへの送信に一時的に失敗しました。自動で再試行します。' },
+    ]);
   });
 
   it('送信成功後の記録失敗は送達不明で残し、審査自体は確定する', async () => {

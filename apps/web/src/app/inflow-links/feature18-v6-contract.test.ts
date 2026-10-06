@@ -42,12 +42,12 @@ describe('V6 機能18の画面契約', () => {
   })
 
   it('各画面をPencilの実ノードと結び、未接続値を作らない', () => {
-    expect(SITE).toContain('data-design-node="IhSBB"')
-    expect(ADS).toContain('data-design-node="v0HaI"')
+    expect(SITE).toContain('data-design-node="XjOte"')
+    expect(ADS).toContain('data-design-node="qSTVR"')
     expect(ADS).toContain('data-design-node="BuVDB"')
     expect(ADS).toContain('data-design-node="Im2b1"')
-    expect(CREATE).toContain('designNode="TEVk8"')
-    expect(DETAIL).toContain('data-design-node="JupxW"')
+    expect(CREATE).toContain('data-design-node="KMaMk"')
+    expect(DETAIL).toContain('data-design-node="Q5le3"')
     expect(ADS).toContain('成果地点と、広告に返す名前の対応')
     // #514-14: 口はパスだけ返すため、死んでいる「知らないドメイン」判定と
     // 直書きの警告は出さない。届いたパスをそのまま出す。
@@ -63,9 +63,10 @@ describe('V6 機能18の画面契約', () => {
   })
 
   it('作成後は発行済みURLを使える詳細へ進む', () => {
-    expect(CREATE).toContain('saveLabel="発行してURLを受け取る"')
-    expect(CREATE).toContain('successHref={(id) => `/inflow-links/detail?id=${id}`}')
-    expect(CREATE).toContain('REF（URLに入る文字）')
+    // V8 KMaMk は CreatePage の包みを使わず、自前の板に直接書く。
+    expect(CREATE).toContain('発行してURLを受け取る')
+    expect(CREATE).toContain('`/inflow-links/detail?id=${res.data.id}`')
+    expect(CREATE).toContain('見分けるための文字')
     expect(CREATE).toContain('お客さまはこの順に進みます')
   })
 

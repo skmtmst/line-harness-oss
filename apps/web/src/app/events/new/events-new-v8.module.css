@@ -1,0 +1,42 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B イベント予約の「イベントを作る」（板 `d4adD4`）。
+ *
+ * 入力そのものは今の作り（`EventWizard` の3段階：概要・予約枠・公開設定）
+ * をそのまま使う。V8 の枠（戻る口・題・説明・板ID）だけを足す。
+ * 板の1枚絵（質問・通知・公開設定まで1画面）は今の段階式と形が違うため、
+ * 段階式を1枚絵に直すのは別作業として残す（司令塔へ報告済み）。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.backLink {
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 8px 0 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}

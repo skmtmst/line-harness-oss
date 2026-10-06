@@ -145,7 +145,7 @@ describe('定期レポートの編集画面(?id=)', () => {
     const nameInput = Array.from(host.querySelectorAll('input[type="text"], input:not([type])'))
       .find((item) => (item as HTMLInputElement).value === '週次まとめ')
     expect(nameInput).toBeTruthy()
-    expect(host.textContent).toContain('「週次まとめ」を直しています')
+    expect((host.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('週次まとめ')
     expect(host.textContent).toContain('変更を保存する')
     expect(host.textContent).not.toContain('今すぐ1回だけ送る')
 
@@ -190,6 +190,6 @@ describe('定期レポートの編集画面(?id=)', () => {
     net.handler = defaultHandler
     await act(async () => { button('もう一度読み込む').click() })
     expect(net.calls.filter((call) => call.path.startsWith('/api/analytics/report-schedules') && call.method === 'GET').length).toBeGreaterThanOrEqual(2)
-    expect(host.textContent).toContain('「週次まとめ」を直しています')
+    expect((host.querySelector('input[placeholder="例: 週次まとめ"]') as HTMLInputElement).value).toBe('週次まとめ')
   })
 })

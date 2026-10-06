@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { formatRelative } from '@/lib/format'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
@@ -35,19 +36,17 @@ function functionBody(source: string, name: string): string {
 }
 
 describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
-  const listDate = functionBody(PAGE, 'formatInboxListDate')
   const waiting = functionBody(PAGE, 'formatWaitingDuration')
   const lineRow = region(PAGE, 'const waitingLabel = needsAttention', '{/* Right Panel: Chat Detail */}')
 
-  it('日付は年を出さず MM/DD だけにする', () => {
-    expect(listDate).toContain("getMonth() + 1")
-    expect(listDate).toContain('getDate()')
-    expect(listDate).not.toContain('getFullYear()')
+  it('一覧の日時は共通の日付書式と相対時刻を使う', () => {
+    expect(PAGE).toContain("import { formatDateTime, formatNumber, formatRelative, formatTime }")
+    expect(lineRow).toContain('formatRelative(chat.lastMessageAt)')
   })
 
   it('取れない日時は空欄や Invalid Date ではなく — を出す', () => {
-    expect(listDate).toContain("if (!iso) return '—'")
-    expect(listDate).toContain("if (Number.isNaN(d.getTime())) return '—'")
+    expect(formatRelative(null)).toBe('—')
+    expect(formatRelative('invalid')).toBe('—')
     expect(waiting).toContain('if (!iso) return null')
     expect(waiting).toContain('if (!Number.isFinite(at)) return null')
   })
@@ -60,7 +59,7 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
 
   it('行は待ち時間があればそれを、無ければ日付を出す', () => {
     expect(lineRow).toContain('{waitingLabel ? (')
-    expect(lineRow).toContain('formatInboxListDate(chat.lastMessageAt)')
+    expect(lineRow).toContain('formatRelative(chat.lastMessageAt)')
     // 年入りの旧書式へ戻さない。
     expect(lineRow).not.toContain('formatDatetime(')
   })
@@ -71,16 +70,16 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
 })
 
 describe('f0zn6 一覧の未読表示', () => {
-  const row = region(PAGE, 'const waitingLabel = needsAttention', '<div className="flex items-start gap-3">')
+  const row = region(PAGE, 'const waitingLabel = needsAttention', 'return { at: chat.lastMessageAt')
 
   it('設計に無い右端の「自分の未読」操作を置かない', () => {
     expect(PAGE).not.toContain('data-inbox-v6="mine-unread-toggle"')
     expect(PAGE).not.toContain('mineUnreadOnly')
   })
 
-  it('自分あての未読の行は地の色を変える', () => {
+  it('未対応の選択行は中立色の地と通知の点で示す', () => {
     expect(row).toContain('chat.isUnread')
-    expect(row).toContain('bg-status-danger-soft')
+    expect(row).toContain('bg-shell')
   })
 })
 
@@ -111,7 +110,7 @@ describe('H3lAOB / xGLVe トーク見出しの操作', () => {
     // 折り返しは sm 未満だけ。sm 以上では従来どおり1行を保つ。
     expect(header).toContain('sm:flex-nowrap')
     // V8 移行 ①: 共通 Button の inline-flex は部品側が持つので高さだけを見る。
-    expect(header).toContain('className="h-10 shrink-0')
+    expect(header).toContain('className="h-9 w-9 shrink-0')
     expect(header).toContain('compact={showFriendInfo}')
     expect(INBOX_DROPDOWN).toContain('whitespace-nowrap border px-2.5 text-xs')
   })
@@ -126,16 +125,16 @@ describe('#455 受信箱の上端と入力欄', () => {
   })
 
   it('チャネルと並び順は折り返さず、左列を先に縮める', () => {
-    expect(PAGE).toContain('mt-2 flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden')
+    expect(PAGE).toContain('aria-label="受信経路で絞り込む"')
     // LAY-01(#982): 顧客情報を開いている間は一覧を288pxに留める。
     // 以前は 2xl で 420px へ急拡大し、3列が 1536px で収まらなくなっていた。
-    expect(PAGE).toContain("showFriendInfo ? 'lg:w-72'")
+    expect(PAGE).toContain('w-full lg:w-[340px]')
     expect(PAGE).not.toContain("showFriendInfo ? 'lg:w-72 2xl:w-[420px]'")
   })
 
   it('改行案内を入力欄の下へ置く', () => {
     const composer = region(PAGE, 'data-inbox-v4="composer"', '<TemplatePicker')
-    expect(composer.indexOf('aria-label="メッセージを入力"')).toBeLessThan(composer.indexOf("'Shift + Enter で改行'"))
+    expect(composer.indexOf('aria-label="メッセージを入力"')).toBeLessThan(composer.indexOf('Shift + Enter で改行'))
   })
 })
 
@@ -210,12 +209,12 @@ describe('LAY-01/LAY-02 顧客情報の列とドロワー', () => {
   const talkPane = region(PAGE, 'data-inbox-v4="talk-pane"', '{selectedThreadId ?')
   const panel = region(PAGE, 'data-inbox-v4="customer-panel"', '</aside>')
 
-  it('常設する境界は3列が収まる計算と同じ1536px（Tailwind 2xl）にする', () => {
-    expect(INBOX_LAYOUT).toContain('INBOX_INFO_PANEL_MIN_VIEWPORT = 1536')
+  it('白い板の実幅が1100px以上のときだけ3列を常設する', () => {
+    expect(INBOX_LAYOUT).toContain('INBOX_INFO_PANEL_MIN_WIDTH = INBOX_LIST_WIDTH + INBOX_INFO_PANEL_WIDTH + INBOX_TALK_MIN_WIDTH')
     // メディアクエリとCSSの `2xl:` は同じ境界を指す。片方だけ変わると
     // 「ドロワーのつもりが列になる」ずれが起きる。
-    expect(PAGE).toContain('(min-width: ${INBOX_INFO_PANEL_MIN_VIEWPORT}px)')
-    expect(panel).toContain('2xl:relative')
+    expect(PAGE).toContain('entry.contentRect.width >= INBOX_INFO_PANEL_MIN_WIDTH')
+    expect(panel).toContain('relative z-auto w-[260px]')
   })
 
   it('トーク列は最低幅で固定せず、残り幅いっぱいに伸縮する', () => {
@@ -230,9 +229,9 @@ describe('LAY-01/LAY-02 顧客情報の列とドロワー', () => {
     expect(panel).not.toContain('hidden xl:block')
     // 狭い幅では fixed のドロワー（背景の暗幕付き）として出す。
     expect(panel).toContain('fixed inset-y-0 right-0')
-    expect(PAGE).toContain('bg-scrim fixed inset-0 z-[60] 2xl:hidden')
+    expect(PAGE).toContain("wideInfoPanel ? 'hidden' : ''")
     // 広い幅では従来どおり列として並ぶ。
-    expect(panel).toContain('2xl:w-[300px]')
+    expect(panel).toContain('w-[260px]')
   })
 
   it('ドロワーは Escape・背景・閉じるボタンで閉じられる', () => {

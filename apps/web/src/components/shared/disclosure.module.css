@@ -44,6 +44,27 @@
   outline-offset: -2px;
 }
 
+/*
+ * ★V8 仕上げ（M10-2）：見出しのキーボードの印と押した沈み。
+ * 印は action の 2px の輪（ボタンと同じ色）。押したときは地を
+ * ほんの少し沈める。開く（∨180°・中身ふっと）・閉じる（一瞬）は
+ * 今までどおり。
+ */
+[data-theme='v8'] .summary {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    filter var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .summary:focus-visible {
+  outline: 2px solid var(--color-action);
+}
+
+[data-theme='v8'] .summary:active {
+  background: var(--color-canvas-sunken);
+  filter: brightness(0.97);
+}
+
 .title {
   min-width: 0;
   flex: 1;

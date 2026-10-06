@@ -1,0 +1,439 @@
+/*
+ * ★V8 テンプレートの作る画面（6種）の共通レイアウト。
+ * Pencil ★V8: u5YC6（メッセージ）・J60utH（カルーセル）・EFV8l（リッチメッセージ）・
+ * l87p1J（質問）・S6FEuB（クーポン）・EsYo4（リサーチ）。
+ *
+ * 型はすべて同じ：左に白いカードの縦積み、右に説明カード＋届き方（LinePreview）、
+ * 下に追従バー（キャンセル／下書きを保存／保存して公開）。
+ * 折り畳みの基準は板の幅（container）で、画面の幅ではない。
+ */
+.page {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* 下の追従バーに本文が隠れない分を開ける */
+  padding-bottom: 8px;
+}
+
+/* 戻る口＋見出し */
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--color-action);
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headLead {
+  margin: 2px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 左＝編集カード列 / 右＝説明＋届き方 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 16px;
+  min-width: 0;
+}
+
+/* 右の欄の「届き方」の見出し（`u5YC6` `J60utH`：スマホの見本の上）。 */
+.previewTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* 白いカード */
+.card {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 2カラムのフィールド行（名前とフォルダなど） */
+.fieldRow {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.fieldRowEven {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* 差し込みのチップ列・URL行などの細部 */
+.muted {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.countRow {
+  display: flex;
+  justify-content: flex-end;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 本文の中のURL：1行ぶん */
+.urlRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.urlText {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+}
+
+.urlBadge {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+}
+
+/* 警告の帯（カード内の注意） */
+.warn {
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+/* 右の説明カード内の小見出しつき箇条書き */
+.guideItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.guideTerm {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.guideDesc {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.guideList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+
+/* 数字の見える箇所（気をつけること／公開したあとに見られる数） */
+.statRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.statTerm {
+  color: var(--color-ink-secondary);
+}
+
+.statValue {
+  color: var(--color-ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* カルーセルのパネル帯 */
+.panelStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.panelChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  background: var(--color-canvas);
+}
+
+.panelChip[data-active='true'] {
+  border-color: var(--color-accent-deep);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.panelChipIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* パネル1枚ぶん・質問1つぶんの小カード */
+.subCard {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.subCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.subCardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.subCardTools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.toolButton {
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  border-radius: var(--radius-mini);
+  padding: 4px 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.toolButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.toolButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.toolButtonDanger {
+  color: var(--color-danger);
+}
+
+.toolButtonDanger:hover:not(:disabled) {
+  background: var(--color-danger-bg);
+}
+
+/* 面の分け方（リッチメッセージの6形） */
+.shapeGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.shapeButton {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  padding: 8px 4px;
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.shapeButton[data-active='true'] {
+  border-color: var(--color-accent-deep);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.shapeGlyph {
+  font-family: monospace;
+  white-space: pre-line;
+  text-align: center;
+  line-height: 1.3;
+  font-size: 12px;
+  color: inherit;
+}
+
+/* 画像の選択枠 */
+.imagePick {
+  border: 1px dashed var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.imageThumb {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-hairline);
+}
+
+/* 追加する口（ボタンを足す・質問を足すなど） */
+.addRow {
+  display: flex;
+  justify-content: center;
+}
+
+/* 行の並び（ボタン行：文字・種類・中身） */
+.choiceRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.6fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+/*
+ * 板が 1100px を切ったら（1152 幅の見本 `a1k3d`）右の欄を細くして横に残す。
+ * 720px を切ったら下へ畳む。
+ */
+@container (min-width: 720px) and (max-width: 1099px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr) 250px;
+  }
+}
+
+@container (max-width: 719px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aside {
+    position: static;
+  }
+}
+
+/* さらに狭い板では選択肢の行も1列に。 */
+@container (max-width: 720px) {
+  .choiceRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fieldRow,
+  .fieldRowEven {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shapeGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

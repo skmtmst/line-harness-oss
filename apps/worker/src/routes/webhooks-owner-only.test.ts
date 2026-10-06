@@ -35,6 +35,7 @@ const OWNER_ONLY_CALLS: Array<{ method: string; path: string; body?: unknown }> 
   { method: 'PUT', path: '/api/webhooks/outgoing/owh-1?lineAccountId=a', body: { name: 'x' } },
   { method: 'DELETE', path: '/api/webhooks/outgoing/owh-1?lineAccountId=a' },
   { method: 'POST', path: '/api/webhooks/api-tokens', body: { name: 'x' } },
+  { method: 'POST', path: '/api/webhooks/api-tokens/tok-1/reactivate?lineAccountId=a' },
 ];
 
 describe('webhooks の統括限定操作は管理者・スタッフを通さない（R32）', () => {

@@ -308,3 +308,14 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
     expect(Array.from(document.querySelectorAll('button')).some((item) => item.textContent?.trim() === '取り消す')).toBe(false)
   })
 })
+
+it('V8の成果1件あたりはAPIの確定件数と計算値を使う', async () => {
+ document.documentElement.dataset.theme='v8';
+ try {
+  handler=async(path)=> path.startsWith('/api/ad-platforms/logs') ? logs() : path.startsWith('/api/ad-costs') ? {success:true,data:{rows:[],platforms:[],conversionCost:{from:'2026-09-01',to:'2026-09-30',confirmedConversionCount:2,costPerConversionMinor:600,currency:'JPY'}}} : {success:true,data:[]};
+  await act(async()=>{root.render(<AdIntegration view="metrics"/>)});await settle();await settle();
+  expect(host.textContent).toContain('¥600');
+  expect(host.textContent).toContain('同じ期間の確定成果 2件');
+  expect(host.textContent).not.toContain('認めた成果の件数は未接続');
+ } finally {document.documentElement.dataset.theme='v7';}
+});

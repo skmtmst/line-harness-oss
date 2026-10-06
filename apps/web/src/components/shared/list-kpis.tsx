@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { api, type ListStats } from '@/lib/api'
 import KpiCard, { type KpiCardProps } from './kpi-card'
-import kpiStyles from './kpi-card.module.css'
+import KpiBand from './kpi-band'
 
 /**
  * 一覧画面の上部に出す数値カード4枚。
@@ -22,6 +22,11 @@ export interface KpiSpec {
   value: number | null
   unit: string
   detail: string
+  /**
+   * 題の右の「？」に入れる文（I1E7Bt の絵どおり）。
+   * KpiCard の `help` へそのまま渡す。渡さなければ「？」は出ない。
+   */
+  help?: ReactNode
 }
 
 export default function ListKpis({
@@ -87,12 +92,13 @@ export default function ListKpis({
       }))
 
   return (
-    <div className={`mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4 ${kpiStyles.strip}`} data-kpi-strip>
+    <KpiBand gridClassName="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
       {cards.map((card, i) => (
         // key は props に混ぜない。混ぜて spread すると React が
         // 「key を spread で渡すな」と毎回警告を出す。
-        <KpiCard key={card.title || i} {...card} loading={loading} variant={variant} />
+        // 数の帯は1本にまとめる（Pp3nS）。v8 の見た目だけ変わり v7 は不変。
+        <KpiCard key={card.title || i} {...card} loading={loading} variant={variant} presentation="band" />
       ))}
-    </div>
+    </KpiBand>
   )
 }

@@ -7,7 +7,7 @@ import HelpTip from '../components/HelpTip.js';
 import Button from '../components/ui/Button.js';
 import Card from '../components/ui/Card.js';
 import Badge from '../components/ui/Badge.js';
-import PageHeader from '../components/ui/PageHeader.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
 import Icon from '../components/ui/Icon.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -316,48 +316,48 @@ function mileageSourceLabel(source: string): string {
 }
 
 /**
- * 貯まったマイル (6-a の上の黒いカード)。
+ * 貯まったマイル (白地に緑の数のカード。オーナー「黒がいや」)。
  * 使えるマイル・確定待ち・内訳4つ・合算の注記を出す。
  */
 function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
   const { mileage, insights } = wallet;
   return (
-    <section aria-label="貯まったマイル" className="rounded-2xl bg-night p-5 text-white">
+    <section aria-label="貯まったマイル" className="rounded-2xl border border-hairline bg-canvas p-[18px] text-ink">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold text-white/70">使えるマイル</p>
+        <p className="text-xs text-ink-secondary">使えるマイル</p>
         {mileage.pending > 0 && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-bold whitespace-nowrap">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-liff-soft px-2.5 py-1 text-xs font-bold whitespace-nowrap text-liff-primary">
             確定待ち {mileage.pending.toLocaleString()}
             <HelpTip label="確定待ちの説明" align="right">条件の確定を待っているマイルです。</HelpTip>
           </span>
         )}
       </div>
-      <p className="mt-1 text-4xl font-bold tracking-tight tabular-nums">
+      <p className="mt-3 text-4xl font-bold tracking-tight tabular-nums text-liff-primary">
         {mileage.available.toLocaleString()}
-        <span className="ml-1 text-sm font-semibold text-white/70">マイル</span>
+        <span className="ml-1 text-[13px] text-ink-secondary">マイル</span>
       </p>
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-xs text-white/70">これまでに得た</p>
-          <p className="mt-0.5 text-lg font-bold tabular-nums">{mileage.lifetimeEarned.toLocaleString()}</p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-xl bg-liff-soft p-3">
+          <p className="text-[11px] text-ink-secondary">これまでに得た</p>
+          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{mileage.lifetimeEarned.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-xs text-white/70">紹介で得た</p>
-          <p className="mt-0.5 text-lg font-bold tabular-nums">{insights.referralMiles.toLocaleString()}</p>
+        <div className="rounded-xl bg-liff-soft p-3">
+          <p className="text-[11px] text-ink-secondary">紹介で得た</p>
+          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{insights.referralMiles.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-xs text-white/70">使った</p>
-          <p className="mt-0.5 text-lg font-bold tabular-nums">{mileage.spent.toLocaleString()}</p>
+        <div className="rounded-xl bg-liff-soft p-3">
+          <p className="text-[11px] text-ink-secondary">使った</p>
+          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{mileage.spent.toLocaleString()}</p>
         </div>
-        <div className="rounded-xl bg-white/10 p-3">
-          <p className="text-xs text-white/70">良質な紹介</p>
-          <p className="mt-0.5 text-lg font-bold tabular-nums">{insights.qualityReferralCount.toLocaleString()}人</p>
+        <div className="rounded-xl bg-liff-soft p-3">
+          <p className="text-[11px] text-ink-secondary">良質な紹介</p>
+          <p className="mt-1 text-lg font-bold tabular-nums text-liff-primary">{insights.qualityReferralCount.toLocaleString()}人</p>
         </div>
       </div>
 
       {insights.accountCount > 1 && (
-        <p className="mt-3 text-xs leading-relaxed text-white/70">
+        <p className="mt-3 text-xs leading-relaxed text-ink-secondary">
           {insights.accountCount}個のLINE公式アカウントで貯めたマイルを合算しています
         </p>
       )}
@@ -373,7 +373,7 @@ function OpportunityCta({ item, secondary = false }: { item: MileageOpportunity;
       className={
         secondary
           ? 'mt-3 block rounded-lg border border-hairline bg-canvas py-2.5 text-center text-sm font-bold text-ink'
-          : 'mt-3 block rounded-lg bg-accent-deep py-3 text-center text-sm font-bold text-white'
+          : 'mt-3 block rounded-lg bg-liff-primary py-3 text-center text-sm font-bold text-white'
       }
     >
       {item.ctaLabel}
@@ -425,7 +425,7 @@ function MileageOpportunities({ items }: { items: MileageOpportunity[] }) {
                       aria-valuemax={100}
                       aria-label={`${item.title}の視聴進捗`}
                     >
-                      <span className="block h-full rounded-full bg-accent-deep" style={{ width: `${item.progressPercent}%` }} />
+                      <span className="block h-full rounded-full bg-liff-primary" style={{ width: `${item.progressPercent}%` }} />
                     </div>
                   </div>
                 )}
@@ -827,31 +827,26 @@ export default function Affiliate() {
 
   if (state.phase === 'not_registered') {
     return (
-      <div className="min-h-screen bg-ground">
-        <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-2 pb-12">
-          <div>
-            <PageHeader title="マイル・紹介" />
-            <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
-              貯まったマイルを確かめ、紹介リンクからさらに増やせます
-            </p>
-          </div>
+      <div className="min-h-screen bg-ground" data-design-node="S3uBl">
+        <LiffHeader title="マイル・紹介" />
+        <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-3 pb-12">
           {wallet && <MileageSummaryCard wallet={wallet} />}
           {wallet && <MileageOpportunities items={wallet.opportunities} />}
-          <Card className="space-y-3 p-4 text-center">
-            <span
-              className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-ok-bg text-ok-ink"
-              aria-hidden="true"
-            >
-              <Icon name="share-2" className="h-7 w-7" />
-            </span>
+          <Card className="space-y-3 p-4" data-design-node="vqu9B">
+            <p className="text-xs text-ink-secondary">紹介者に登録していないとき</p>
             <div>
-              <h2 className="text-sm font-bold text-ink">紹介リンクを使う</h2>
+              <h2 className="text-base font-bold text-ink">お友だちを紹介してマイルをもらう</h2>
               <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
-                無料で登録すると、案件ごと・SNSごとの紹介リンクを作れます。紹介した友だちが予約や購入へ進むと、マイルが増えます。
+                紹介者になると、条件ごとのリンクが使えます。
               </p>
             </div>
-            <Button variant="primary" onClick={handleRegister} disabled={registerBusy}>
-              {registerBusy ? '登録中…' : 'はじめる（無料）'}
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={handleRegister}
+              disabled={registerBusy}
+            >
+              {registerBusy ? '登録中…' : '紹介者になる'}
             </Button>
           </Card>
           {wallet && <MileageHistory wallet={wallet} />}
@@ -901,16 +896,11 @@ export default function Affiliate() {
     });
   }
 
-  // 並びは 6-mile.png のとおり「貯まった → 増やす → 紹介の成果」。
+  // 並びは S3uBl のとおり「貯まった → 増やす → 紹介の成果」。
   return (
-    <div className="min-h-screen bg-ground">
-      <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-2 pb-12">
-        <div>
-          <PageHeader title="マイル・紹介" />
-          <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
-            貯まったマイルと、紹介の成果をまとめて見られます
-          </p>
-        </div>
+    <div className="min-h-screen bg-ground" data-design-node="S3uBl">
+      <LiffHeader title="マイル・紹介" />
+      <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-3 pb-12">
 
         {wallet && <MileageSummaryCard wallet={wallet} />}
 

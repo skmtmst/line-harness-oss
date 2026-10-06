@@ -31,6 +31,15 @@
   align-items: center;
   gap: 8px; /* gap: 8 */
   cursor: pointer;
+  /*
+   * 押せる範囲は札（label）自体を 3px ずつ広げて 24×24（WCAG 2.5.8、
+   * ★V7 修正方針 §4）。透明な input をはみ出させる方式だと、見えない
+   * はみ出しが表のセルの外側判定に載る（M3 報告・parity 1003-2106）。
+   * padding で広げ margin で戻すので、配置・見た目は変わらない。
+   * 札の押下で input が切り替わるのは label の既定の動き。
+   */
+  padding: 3px;
+  margin: -3px;
 }
 
 .root[data-disabled='true'] .line {
@@ -47,14 +56,15 @@
 
 /* 本物の input は四角の上に重ねて透明にする。押す・Space・読み上げはこれが受ける。 */
 /*
- * 押せる範囲は四角の外へ 3px ずつ広げて 24×24（WCAG 2.5.8、★V7 修正方針 §4）。
+ * input 自体は四角と同寸（18px）で箱からはみ出さない。
+ * 押せる 24px は札（.line）の padding が受ける（上記）。
  * 見た目の四角は 18px のまま。
  */
 .input {
   position: absolute;
-  inset: -3px;
-  width: 24px;
-  height: 24px;
+  inset: 0;
+  width: 18px;
+  height: 18px;
   margin: 0;
   opacity: 0;
   cursor: inherit;
@@ -155,4 +165,35 @@
 [data-theme='v8'] .box {
   border-color: var(--color-control-border);
 }
+
+/*
+ * ★V8 仕上げ（M10-2）：箱の乗せた・押した動き。
+ * 乗せたときは選んでいない箱だけ地を少し沈め、押したときは
+ * ほんの少し縮む。印の一筆描き・消え方は今までどおり。
+ */
+[data-theme='v8'] .box {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    scale var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .line:hover .input:not(:checked, :indeterminate) + .box {
+  background: var(--color-canvas-sunken);
+}
+
+[data-theme='v8'] .line:active .box {
+  scale: 0.92;
+}
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .label { line-height: 20px; font-weight: 400; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .box { border: 0; border-radius: 5px; outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
+[data-theme='v8'] .input:checked + .box, [data-theme='v8'] .input:indeterminate + .box { outline-color: var(--color-accent-deep); }
+[data-theme='v8'] .input[aria-invalid='true']:not(:checked) + .box { outline-color: var(--color-status-danger); }
+[data-theme='v8'] .input:focus-visible + .box { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .mark { width: 12px; height: 12px; stroke-width: 2; }
+
+[data-theme='v8'] .root { gap: 8px; }
+[data-theme='v8'] .box { gap: 0; }
 }

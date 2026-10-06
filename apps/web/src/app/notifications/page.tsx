@@ -1,5 +1,10 @@
 'use client'
 
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import NotificationsV8 from '@/v8/notifications/list'
+
 /*
  * 通知一覧（V6 1-1 ダッシュボードの通知パネルからの全件行き先）。
  *
@@ -35,6 +40,7 @@ import {
 const PAGE_SIZE = 50
 
 function NotificationsPageInner() {
+  const theme = useAdminTheme()
   usePageTitle('通知')
   const router = useRouter()
   const params = useSearchParams()
@@ -180,7 +186,8 @@ function NotificationsPageInner() {
 
   /* ★V7: 画面側で狭い中央寄せをしない。中身の幅は共通の枠が持つ。 */
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 v8-ro-notifications-page" data-design-node={theme === 'v8' ? 'y8QQV' : undefined}>
+      {theme === 'v8' && <ReadonlyHeaderV8 title="通知" description="配信のエラーやアップデートのお知らせです。未読のお知らせから確認できます。" />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
           items={filters.map((entry) => ({
@@ -192,7 +199,7 @@ function NotificationsPageInner() {
         />
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={() => { void markAllRead() }} disabled={!counts || counts.unread === 0}>
-            すべて既読にする
+            {theme === 'v8' && filter !== 'all' ? 'この分類をすべて既読にする' : 'すべて既読にする'}
           </Button>
           <Button variant="secondary" href="/line-notifications?tab=operator">
             通知設定
@@ -210,7 +217,7 @@ function NotificationsPageInner() {
         />
       ) : null}
 
-      <Card overflow="hidden">
+      <Card overflow="hidden" className="v8-ro-notifications-noticeList">
         {listFailed ? (
           <ListState
             kind="error"
@@ -226,7 +233,7 @@ function NotificationsPageInner() {
         ) : (
           <ul className="divide-hairline divide-y">
             {orderedItems.map((item) => (
-              <li key={item.id}>
+              <li key={item.id} data-unread={!item.isRead}>
                 <button
                   type="button"
                   onClick={() => openNotification(item)}
@@ -260,6 +267,7 @@ function NotificationsPageInner() {
         ) : null}
       </Card>
 
+      {theme === 'v8' && counts?.unread === 0 && !loading && !listFailed ? <p className="v8-ro-notifications-readNotice" role="status">未読のお知らせはありません。</p> : null}
       {hasMore ? (
         <div className="flex justify-center">
           <Button variant="secondary" onClick={() => { void load(items.length, true) }} disabled={loading}>
@@ -271,11 +279,17 @@ function NotificationsPageInner() {
   )
 }
 
+function NotificationsPageSwitch() {
+  // ★V8 は src/v8/notifications/list.tsx（絵 y8QQV）。v7 は今の画面のまま。
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <NotificationsV8 /> : <NotificationsPageInner />
+}
+
 export default function NotificationsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={null}>
-      <NotificationsPageInner />
+      <NotificationsPageSwitch />
     </Suspense>
   )
 }

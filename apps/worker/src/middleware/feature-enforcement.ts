@@ -86,6 +86,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/entry-route-genres', 'inflow_tracking'),
   feature('/api/links', 'inflow_tracking'),
   feature('/api/forms', 'forms'),
+  feature('/api/postal-code', 'forms'),
   feature('/api/liff/webinars', 'webinars'),
   feature('/api/nen-members/photos', 'photo_review'),
   feature('/api/nen/photo', 'photo_review'),
@@ -132,6 +133,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/ec-operations', 'ec_commerce'),
   feature('/api/line-notifications', 'line_notifications'),
   feature('/api/notifications/rules', 'line_notifications'),
+  feature('/api/notifications/teams', 'line_notifications'),
   feature('/api/nen-campaigns', 'nen_campaigns'),
   feature('/api/nen-members', 'photo_review'),
   // 然の会員（ランク・マイル）はECとの連携が前提。EC連携と同じ機能で止める。
@@ -149,6 +151,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/staff', 'core', 'ログインユーザーと権限管理'),
   exempt('/api/access', 'core', '権限と監査の共通基盤'),
   exempt('/api/capabilities', 'core', '権限判定の共通基盤'),
+  exempt('/api/line-account-tags', 'core', '統括内のLINEアカウント分類'),
   exempt('/api/line-accounts', 'core', 'LINEアカウント選択の共通基盤'),
   exempt('/api/friends', 'core', '友だち管理は必須機能'),
   exempt('/api/tags', 'core', 'タグは複数機能が参照する共通基盤'),
@@ -391,7 +394,7 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/automations\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM automation_definitions WHERE id = ?', fallbackSql: 'SELECT line_account_id AS account_id FROM automations WHERE id = ?' },
   { pattern: /^\/api\/tracked-links\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM tracked_links WHERE id = ?' },
   { pattern: /^\/api\/entry-routes\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM entry_routes WHERE id = ?' },
-  { pattern: /^\/api\/ad-platforms\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM ad_platforms WHERE id = ?' },
+  { pattern: /^\/api\/ad-platforms\/(?!mappings(?:\/|$))([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM ad_platforms WHERE id = ?' },
   { pattern: /^\/api\/friend-add-rules\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM friend_add_rules WHERE id = ?' },
   { pattern: /^\/api\/conversions\/(?:definitions|points)\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM conversion_points WHERE id = ?' },
   // R351: 成果の所属は地点表が持つ。イベント表に列は無いので結合して引く。

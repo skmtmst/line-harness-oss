@@ -45,7 +45,8 @@ test("internal links, assets and fragment targets resolve on every page", async 
     for (const [, link] of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
       if (link.startsWith("https://")) {
         assert.ok(
-          link.startsWith(config.stagingAppOrigin),
+          link.startsWith(config.stagingAppOrigin) ||
+            link === config.operator.supportLineUrl,
           `Unexpected network destination: ${link}`,
         );
         continue;
@@ -83,7 +84,11 @@ test("preview is unmistakably a review site, non-indexable and cannot be used as
     /Disallow: \//,
   );
   await assert.rejects(
-    build({ production: true, output: join(dir, "blocked") }),
+    build({
+      production: true,
+      settings: { ...config, legal: { ...config.legal, approved: false } },
+      output: join(dir, "blocked"),
+    }),
     /正式公開を停止/,
   );
   await assert.rejects(stat(join(dir, "blocked")), { code: "ENOENT" });
@@ -116,33 +121,41 @@ test("review hostname is separated and the alternate apex path is denied", async
   }
 });
 
-test("company identity is user-supplied, missing contacts and unapproved prices are not invented", async () => {
+test("company identity and contacts come from the config, prices are never invented", async () => {
   const commerce = await page("/legal/");
-  for (const field of ["name", "representative", "address"])
-    assert.ok(commerce.includes(config.operator[field]));
-  assert.match(commerce, /電話番号を取得中/);
-  assert.match(commerce, /公式LINE窓口は準備中/);
+  for (const field of [
+    "name",
+    "representative",
+    "address",
+    "phone",
+    "supportHours",
+  ])
+    assert.ok(commerce.includes(escapeHtml(config.operator[field])), field);
+  assert.ok(commerce.includes(escapeHtml(config.operator.supportLineUrl)));
+  assert.doesNotMatch(commerce, /電話番号を取得中|公式LINE窓口は準備中/);
   assert.doesNotMatch(commerce, /mailto:|href="tel:|9,800|29,800|59,800/);
   assert.match(await page("/terms/"), /正式な契約条件ではありません/);
   assert.match(await page("/privacy/"), /AI画像生成では/);
 });
 
 test("publication gate checks every commercial and legal requirement", () => {
-  const issues = publicationIssues(config);
-  for (const term of [
-    "本番登録",
-    "電話番号",
-    "公式LINE",
-    "受付時間",
-    "税込料金",
-    "支払時期",
-    "解約",
-    "返金",
-    "承認",
-    "施行日",
-    "保存",
-    "国外",
-  ]) {
+  assert.deepEqual(publicationIssues(config), []);
+  const cases = {
+    本番登録: { productionAppOrigin: "" },
+    電話番号: { operator: { ...config.operator, phone: "" } },
+    公式LINE: { operator: { ...config.operator, supportLineUrl: "" } },
+    受付時間: { operator: { ...config.operator, supportHours: "" } },
+    税込料金: { commercial: { ...config.commercial, prices: "" } },
+    支払時期: { commercial: { ...config.commercial, paymentTiming: "" } },
+    解約: { commercial: { ...config.commercial, cancellation: "" } },
+    返金: { commercial: { ...config.commercial, refunds: "" } },
+    承認: { legal: { ...config.legal, approved: false } },
+    施行日: { legal: { ...config.legal, effectiveDate: "2026-9-13" } },
+    保存: { legal: { ...config.legal, retention: "" } },
+    国外: { legal: { ...config.legal, overseasProcessing: "" } },
+  };
+  for (const [term, patch] of Object.entries(cases)) {
+    const issues = publicationIssues({ ...config, ...patch });
     assert.ok(
       issues.some((issue) => issue.includes(term)),
       `missing gate: ${term}`,
@@ -284,4 +297,22 @@ test("package contains only static public output, not source or configuration", 
     "sitemap.xml",
     "terms",
   ]);
+});
+
+test("the retention notice uses the same day count as the deletion implementation", async () => {
+  // 案内文の日数は packages/shared/src/data-retention.json が唯一の出どころ。
+  // Workerの削除処理も同じファイルを読むので、ここが一致していれば案内と運用がずれない。
+  const spec = JSON.parse(
+    await readFile(
+      new URL("../../../packages/shared/src/data-retention.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.equal(config.legal.retentionDays, spec.dataRetentionDays);
+  assert.match(config.legal.retention, new RegExp(`${spec.dataRetentionDays}日`));
+  // 保存期間を書いているのは利用規約とプライバシーポリシーの2ページ。
+  for (const route of ["terms", "privacy"]) {
+    const html = await page(route);
+    assert.match(html, new RegExp(`${spec.dataRetentionDays}日`));
+  }
 });

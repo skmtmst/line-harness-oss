@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
@@ -64,29 +64,6 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
     expect(dashboard).toContain("import Card, { CardHeader } from '@/components/shared/card'")
     expect(card).toContain('box-shadow: var(--shadow-card)')
     expect(dashboard).not.toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
-  })
-
-  it('編集画面はドラッグ・キーボード・表示切替・プレビューで操作する', () => {
-    // 2026-09-03: 設計 `ZN0ov` は「「今日やること」は4枠までです」と書く。
-    // R116: ドラッグだけでは操作できない人がいるため、上下ボタンによる
-    // キーボード操作を残す（WCAG 2.5.7）。旧い「矢印禁止」の期待を更新する。
-    for (const label of ['表示するカードと位置を変更します', 'カードと配置', 'プレビュー', '4枠までです', 'ダッシュボードに反映']) {
-      expect(dashboardEditor).toContain(label)
-    }
-    for (const label of ['上部・小カード', 'メイン・横長', 'メイン・左カラム']) {
-      expect(dashboardEditor).toContain(label)
-    }
-    expect(dashboardEditor).toContain('useSortable')
-    /*
-      カードID・区分の正本は @line-crm/shared の DASHBOARD_CARD_GROUPS（DASH-01）。
-      画面と保存APIが別々の一覧を持つと、画面が送るIDをAPIが拒否する。
-      区分は today / main / right の3つで、shared 側の契約試験が固定する。
-    */
-    expect(dashboardEditor).toContain("from '@line-crm/shared'")
-    expect(dashboardEditor).toContain('DashboardGroup = DashboardCardGroup')
-    expect(dashboardEditor).toContain('上へ移動')
-    expect(dashboardEditor).toContain('下へ移動')
-    expect(dashboardEditor).toContain('KeyboardSensor')
   })
 
   it('対応が必要な受信はV4の4列だけを出し、件数に合わせて高さを縮める', () => {

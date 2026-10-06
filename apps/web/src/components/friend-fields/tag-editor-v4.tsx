@@ -149,7 +149,7 @@ function StepTitle({ number, title, note }: { number: number; title: string; not
   )
 }
 
-function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClose, onAdd, referenceState = false }: { accountId: string | null; suppliedResources?: CommonActionResources | null; allowedActionTypes?: readonly TagEditorActionLabel[]; onClose: () => void; onAdd: (action: LinkedAction) => void; referenceState?: boolean }) {
+export function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClose, onAdd, referenceState = false }: { accountId: string | null; suppliedResources?: CommonActionResources | null; allowedActionTypes?: readonly TagEditorActionLabel[]; onClose: () => void; onAdd: (action: LinkedAction) => void; referenceState?: boolean }) {
   const [selected, setSelected] = useState<(typeof ACTION_TYPES)[number]>(referenceState ? ACTION_TYPES[1] : ACTION_TYPES[0])
   const [timing, setTiming] = useState<'immediate' | 'delay'>('immediate')
   const [delay, setDelay] = useState(referenceState ? '24' : '1')
@@ -280,7 +280,7 @@ function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClos
  * 確認ボタンはサーバーの計算が返ってくるまで押せない。実行時は
  * previewToken を保存APIへ渡し、サーバー側で対象の再計算と照合する。
  */
-function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, referenceState = false }: { values: TagEditorValues; count: number; tagId: string | null; accountId: string | null; onCancel: () => void; onSave: (previewToken: string) => void; referenceState?: boolean }) {
+export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, referenceState = false }: { values: TagEditorValues; count: number; tagId: string | null; accountId: string | null; onCancel: () => void; onSave: (previewToken: string) => void; referenceState?: boolean }) {
   const [accepted, setAccepted] = useState(referenceState)
   const [preview, setPreview] = useState<TagRetroactivePreview | null>(null)
   const [previewError, setPreviewError] = useState('')
@@ -578,10 +578,10 @@ export default function TagEditorV4({
               <div className="space-y-3">
                 <div className="grid gap-3 md:grid-cols-2">
                   {/* R137: 390pxで右へはみ出さないよう子の欄も縮める。 */}
-                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">本人へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-4 text-ink-faint">このタグが付いた本人へ、一度だけ積みます。</span></label>
-                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">紹介者へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-4 text-ink-faint">紹介経由の友だちなら、その紹介者にも積みます。</span></label>
-                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">今後のマイル倍率</span><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS.map((option) => ({ value: option.value, label: option.label }))} size="full" /><span className="mt-1 block text-[11px] leading-4 text-ink-faint">このタグが付いている間、次回以降の付与倍率に使います。</span></label>
-                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">倍率の優先度</span><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={[0, 1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: value === 0 ? '標準' : `優先度 ${value}` }))} size="full" /><span className="mt-1 block text-[11px] leading-4 text-ink-faint">倍率タグが複数ある場合、数字が大きい設定を優先します。</span></label>
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">本人へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-micro leading-4 text-ink-faint">このタグが付いた本人へ、一度だけ積みます。</span></label>
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">紹介者へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-micro leading-4 text-ink-faint">紹介経由の友だちなら、その紹介者にも積みます。</span></label>
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">今後のマイル倍率</span><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS.map((option) => ({ value: option.value, label: option.label }))} size="full" /><span className="mt-1 block text-micro leading-4 text-ink-faint">このタグが付いている間、次回以降の付与倍率に使います。</span></label>
+                  <label className="min-w-0"><span className="mb-1 block text-xs font-semibold text-ink-secondary">倍率の優先度</span><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={[0, 1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: value === 0 ? '標準' : `優先度 ${value}` }))} size="full" /><span className="mt-1 block text-micro leading-4 text-ink-faint">倍率タグが複数ある場合、数字が大きい設定を優先します。</span></label>
                 </div>
                 <RadioCardGroup legend="タグを外して付け直したときの扱い" legendVisible>
                   <RadioCard name="reapplyMode" value="once" checked={reapplyMode === 'once'} onChange={() => setReapplyMode('once')} title="最初の1回だけ積む" note="誤操作や付け直しで、同じマイルが重複しません。" />

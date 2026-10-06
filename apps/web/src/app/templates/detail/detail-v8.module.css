@@ -1,0 +1,389 @@
+/*
+ * ★V8 テンプレート詳細（Pencil `UTbi1`、公開の窓 `cuR8I`）。
+ * [data-theme='v8'] の下だけに効かせ、v7 には一切載らない。
+ */
+
+[data-theme='v8'] .board {
+  padding: 0 0 24px;
+  container-type: inline-size;
+}
+
+[data-theme='v8'] .crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  margin: 4px 0 8px;
+}
+[data-theme='v8'] .crumb:hover {
+  text-decoration: underline;
+}
+
+[data-theme='v8'] .head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-bottom: 16px;
+}
+[data-theme='v8'] .headTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-ink);
+  line-height: 1.3;
+  margin: 0;
+}
+[data-theme='v8'] .headMeta {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* 未公開の変更の帯（黄）。「比べる」と「公開する」を右に並べる。 */
+[data-theme='v8'] .draftBand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+[data-theme='v8'] .draftBandIcon {
+  color: var(--color-warning);
+  flex-shrink: 0;
+  display: flex;
+}
+[data-theme='v8'] .draftBandBody {
+  flex: 1 1 0;
+  min-width: 0;
+}
+[data-theme='v8'] .draftBandTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0 0 2px;
+}
+[data-theme='v8'] .draftBandText {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+[data-theme='v8'] .draftBandActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+[data-theme='v8'] .draftBandCompare {
+  margin-top: 10px;
+}
+
+/* 左に本文・使っている所・版の履歴、右に操作・情報・届き方。 */
+[data-theme='v8'] .split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+[data-theme='v8'] .mainCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+[data-theme='v8'] .sideCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 右の列いちばん上の操作（一斉配信で使う・複製する・…）。 */
+[data-theme='v8'] .actionRow {
+  display: flex;
+  gap: 8px;
+}
+[data-theme='v8'] .actionRow > * {
+  flex: 0 0 auto;
+}
+[data-theme='v8'] .moreWrap {
+  position: relative;
+}
+
+[data-theme='v8'] .card {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  padding: 16px 20px;
+}
+[data-theme='v8'] .cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+[data-theme='v8'] .cardTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0;
+}
+[data-theme='v8'] .cardNote {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  margin: -4px 0 10px;
+  line-height: 1.6;
+}
+
+/* 本文の吹き出し。差し込みの {} はそのまま見せる。 */
+[data-theme='v8'] .bodyBubble {
+  background: var(--color-canvas-sunken);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 使っている所の表。名前が長いときは1行で省略して title に全文。 */
+[data-theme='v8'] .usageTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+[data-theme='v8'] .usageTable th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+  padding: 0 12px 8px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+[data-theme='v8'] .usageTable td {
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
+  color: var(--color-ink-secondary);
+  vertical-align: middle;
+}
+[data-theme='v8'] .usageTable tr:last-child td {
+  border-bottom: none;
+}
+[data-theme='v8'] .usageKind {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  white-space: nowrap;
+  width: 1%;
+}
+[data-theme='v8'] .usageName {
+  color: var(--color-ink);
+  max-width: 0;
+}
+[data-theme='v8'] .usageNameLink {
+  color: var(--color-action);
+  text-decoration: none;
+}
+[data-theme='v8'] .usageNameLink:hover {
+  text-decoration: underline;
+}
+[data-theme='v8'] .usageCellText {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-theme='v8'] .usageVersion {
+  white-space: nowrap;
+  font-size: 12px;
+}
+[data-theme='v8'] .usageVersionFixed {
+  color: var(--color-warning);
+}
+[data-theme='v8'] .usageOpen {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+[data-theme='v8'] .usageMore {
+  margin-top: 10px;
+  text-align: center;
+}
+[data-theme='v8'] .usageEmpty {
+  padding: 16px 0 8px;
+  text-align: center;
+  color: var(--color-ink-faint);
+  font-size: 13px;
+}
+
+/* 版の履歴。下書き・いま使っている版・前の版を縦に並べる。 */
+[data-theme='v8'] .versionRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  margin-top: 8px;
+}
+[data-theme='v8'] .versionRowDraft {
+  background: var(--color-warning-bg);
+}
+[data-theme='v8'] .versionRowInUse {
+  background: var(--color-success-bg);
+}
+[data-theme='v8'] .versionNum {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+  flex-shrink: 0;
+}
+[data-theme='v8'] .versionBody {
+  flex: 1 1 0;
+  min-width: 0;
+}
+[data-theme='v8'] .versionLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+[data-theme='v8'] .versionMeta {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  margin-top: 1px;
+}
+[data-theme='v8'] .versionActions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+[data-theme='v8'] .versionCompare {
+  margin-top: 12px;
+}
+
+/* このテンプレートについて（種類・フォルダ・送った数・差し込み）。 */
+[data-theme='v8'] .aboutList {
+  margin: 0;
+}
+[data-theme='v8'] .aboutRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: 13px;
+}
+[data-theme='v8'] .aboutRow:last-child {
+  border-bottom: none;
+}
+[data-theme='v8'] .aboutLabel {
+  color: var(--color-ink-faint);
+  flex-shrink: 0;
+}
+[data-theme='v8'] .aboutValue {
+  color: var(--color-ink);
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 削除の小窓の中の使用先一覧（Z0g3si）。 */
+[data-theme='v8'] .blockedList {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+[data-theme='v8'] .blockedItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: 13px;
+}
+[data-theme='v8'] .blockedItem:last-child {
+  border-bottom: none;
+}
+[data-theme='v8'] .blockedItemIcon {
+  color: var(--color-ink-faint);
+  flex-shrink: 0;
+  display: flex;
+}
+[data-theme='v8'] .blockedItemLink {
+  color: var(--color-action);
+  text-decoration: none;
+}
+[data-theme='v8'] .blockedItemLink:hover {
+  text-decoration: underline;
+}
+
+/* 公開の窓（cuR8I）の使用先と差分。 */
+[data-theme='v8'] .publishList {
+  border-top: 1px solid var(--color-hairline);
+  margin-top: 12px;
+}
+[data-theme='v8'] .publishRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: 13px;
+}
+[data-theme='v8'] .publishRowKind {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  width: 88px;
+  flex-shrink: 0;
+}
+[data-theme='v8'] .publishRowName {
+  color: var(--color-ink);
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-theme='v8'] .publishRowState {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+[data-theme='v8'] .publishRowStateFixed {
+  color: var(--color-warning);
+}
+[data-theme='v8'] .publishMore {
+  padding: 8px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  text-align: center;
+}
+[data-theme='v8'] .publishDiffTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 16px 0 8px;
+}
+
+/* 1152 幅（ノートPC）では右の列を畳んで下へ落とす。 */
+@container (max-width: 1080px) {
+  [data-theme='v8'] .split {
+    grid-template-columns: 1fr;
+  }
+}
+@supports not (container-type: inline-size) {
+  @media (max-width: 1080px) {
+    [data-theme='v8'] .split {
+      grid-template-columns: 1fr;
+    }
+  }
+}

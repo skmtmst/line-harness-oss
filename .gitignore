@@ -50,6 +50,11 @@ playwright-report/
 # CI・配備では使わず、手動投入用の出力なので版に載せない。
 data/nen-knowledge-*.sql
 
+# 日本郵便の取り込み生成物（zip・生CSV・取込SQL）。由来・SHA・件数の
+# manifest.json だけ版に残し、大きく作り直せるものは載せない。
+data/postal/*
+!data/postal/manifest.json
+
 # 画面確認の絵。
 #
 # **作り直せるものを版に置かない。** `.git` 654MB のうち PNG が 528MB（8割）で、
@@ -71,3 +76,9 @@ docs/design-reference/**/*.png
 # 手元で `capture.spec.mjs` を回すときは、その場で作り直す。
 scripts/visual-qa/capture.spec.mjs-snapshots/
 apps/liff/scripts/qa-shots-out/
+# V8 の見本の写し。`sync-v8-design-refs.mjs` で作り直せるので版に入れない。
+scripts/visual-qa/v8-design-refs/
+# V8 見本比較の出力。`v8-parity.mjs` で作り直せるので版に入れない。
+scripts/visual-qa/v8-parity-out/
+# Playwright のブラウザ置き場（砂場では ~/Library に書けないための作業場所）。
+.playwright-browsers/

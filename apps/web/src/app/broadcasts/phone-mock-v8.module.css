@@ -1,0 +1,151 @@
+/*
+ * ★V8 右の欄の「本物のスマホ」（夕15・絵 `F3X1Mo` / `cgiGB` / `cdZBf`）。
+ *
+ * LINE のトーク画面に近い形で届く見本を出す。枠・時計の帯・部屋名・
+ * 下のメニューまでをここで持つ（中身の吹き出しは BroadcastMessagePreview）。
+ * 値は globals.css の `--v8-bphone-*`（`[data-theme="v8"]`）に置く。
+ */
+
+.phone {
+  overflow: hidden;
+  border: 10px solid var(--v8-bphone-ink);
+  border-radius: var(--v8-bphone-shell-radius);
+  background: var(--v8-bphone-ink);
+  box-shadow: var(--v8-bphone-shadow);
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--v8-bphone-screen-radius);
+  background: var(--v8-bphone-talk);
+  /* スマホの縦横比に寄せる。中身が少なくても形が保てるよう高さを持たせる。 */
+  min-height: 480px;
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 22px 4px;
+  background: var(--v8-bphone-chrome);
+  color: var(--v8-bphone-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Dynamic Island 相当の黒い楕円。 */
+.island {
+  width: 84px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--v8-bphone-ink);
+}
+
+.statusIcons {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chatHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--v8-bphone-hairline);
+  background: var(--v8-bphone-chrome);
+  color: var(--v8-bphone-ink);
+}
+
+.chatName {
+  flex: 1;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chatHeaderIcons {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--v8-bphone-sub);
+}
+
+.chatBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+/* 本文の上に乗る日時の札（「8/24（月）10:00 に届きます」）。 */
+.dateChip {
+  align-self: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--v8-bphone-chip);
+  color: var(--v8-bphone-chip-ink);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* 送信者の行：緑の顔の印＋部屋の名。 */
+.sender {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.senderAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--v8-bphone-send);
+  color: var(--v8-bphone-chrome);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.senderName {
+  overflow: hidden;
+  color: var(--v8-bphone-chrome);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 吹き出しのまとまり。プレビューの背景は白のまま出す。 */
+.bubbles {
+  font-size: 12px;
+}
+
+.bubbles :global(.shadow-card) {
+  box-shadow: none;
+}
+
+.chatFooter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 14px;
+  background: var(--v8-bphone-chrome);
+  color: var(--v8-bphone-sub);
+  font-size: 10px;
+}
+
+.homeIndicator {
+  width: 120px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--v8-bphone-ink);
+}

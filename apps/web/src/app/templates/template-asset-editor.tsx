@@ -21,9 +21,9 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import MediaPickerDialog from '@/app/contents/media-picker-dialog'
 
-type AssetKind = Extract<BroadcastAssetKind, 'rich_message' | 'coupon' | 'research'>
+export type AssetKind = Extract<BroadcastAssetKind, 'rich_message' | 'coupon' | 'research'>
 
-const META: Record<AssetKind, { title: string; folder: string }> = {
+export const META: Record<AssetKind, { title: string; folder: string }> = {
   rich_message: { title: 'リッチメッセージ', folder: '03_販促・クーポン' },
   coupon: { title: 'クーポン', folder: '03_販促・クーポン' },
   research: { title: 'リサーチ', folder: '02_健康フォロー' },
@@ -47,7 +47,7 @@ function Field({ label, children, note, required }: { label: string; children: R
  * tapAreas）がすべて同じ面数になる。面の定義を3か所に写すと、
  * 「6面を選んだのに2面しか保存されない」ような食い違いがまた起きる。
  */
-interface RichArea {
+export interface RichArea {
   label: string
   /** 画像の左上を 0,0 とした百分率。 */
   x: number
@@ -56,7 +56,7 @@ interface RichArea {
   height: number
 }
 
-interface RichShape {
+export interface RichShape {
   value: string
   label: string
   /** 形状ボタンの中に出す見取り図。 */
@@ -64,7 +64,7 @@ interface RichShape {
   areas: RichArea[]
 }
 
-function buildAreas(rows: string[][]): RichArea[] {
+export function buildAreas(rows: string[][]): RichArea[] {
   const height = 100 / rows.length
   return rows.flatMap((labels, rowIndex) => {
     const width = 100 / labels.length
@@ -78,7 +78,7 @@ function buildAreas(rows: string[][]): RichArea[] {
   })
 }
 
-const RICH_SHAPES: RichShape[] = [
+export const RICH_SHAPES: RichShape[] = [
   { value: '1', label: '1面', glyph: 'A', areas: buildAreas([['A']]) },
   { value: '2v', label: '上下2面', glyph: 'A\nB', areas: buildAreas([['A'], ['B']]) },
   { value: '2h', label: '左右2面', glyph: 'A B', areas: buildAreas([['A', 'B']]) },
@@ -87,44 +87,44 @@ const RICH_SHAPES: RichShape[] = [
   { value: '6', label: '6面', glyph: 'A B C\nD E F', areas: buildAreas([['A', 'B', 'C'], ['D', 'E', 'F']]) },
 ]
 
-type AreaActionKind = 'none' | 'uri' | 'actions'
+export type AreaActionKind = 'none' | 'uri' | 'actions'
 
 /** 面1つぶんの設定。`kind` が動きの種類。 */
-interface AreaDraft {
+export interface AreaDraft {
   kind: AreaActionKind
   uri: string
   actions: InlineAction[]
 }
 
-function emptyAreaDraft(): AreaDraft {
+export function emptyAreaDraft(): AreaDraft {
   return { kind: 'none', uri: '', actions: [] }
 }
 
 /** その面に設定が入っているか。面を減らす確認に使う。 */
-function areaDraftConfigured(draft: AreaDraft | undefined): boolean {
+export function areaDraftConfigured(draft: AreaDraft | undefined): boolean {
   return Boolean(draft && draft.kind !== 'none')
 }
 
-function areaSummary(draft: AreaDraft | undefined): string {
+export function areaSummary(draft: AreaDraft | undefined): string {
   if (!draft || draft.kind === 'none') return '未設定'
   if (draft.kind === 'uri') return 'URLを開く'
   return draft.actions.length > 0 ? `動きを ${draft.actions.length} 件` : '動きなし'
 }
 
 /* NEXT-19: リサーチの質問は配列で持ち、順序・形式・必須・選択肢まで保存する。 */
-const MAX_QUESTIONS = 10
+export const MAX_QUESTIONS = 10
 /** LINEのクイックリプライは13件まで。 */
-const MAX_CHOICES = 13
+export const MAX_CHOICES = 13
 
-type ResearchFormat = 'single' | 'multiple' | 'free'
+export type ResearchFormat = 'single' | 'multiple' | 'free'
 
-const FORMAT_LABEL: Record<ResearchFormat, string> = {
+export const FORMAT_LABEL: Record<ResearchFormat, string> = {
   single: '1つだけ選ぶ',
   multiple: 'いくつでも選ぶ',
   free: '自由に書く',
 }
 
-interface ResearchQuestion {
+export interface ResearchQuestion {
   /** 並び替え・選択のための画面内の印。保存しない。 */
   key: string
   text: string
@@ -133,11 +133,11 @@ interface ResearchQuestion {
   choices: string[]
 }
 
-function newQuestion(): ResearchQuestion {
+export function newQuestion(): ResearchQuestion {
   return { key: crypto.randomUUID(), text: '', format: 'single', required: true, choices: ['', ''] }
 }
 
-function visualQuestions(): ResearchQuestion[] {
+export function visualQuestions(): ResearchQuestion[] {
   return [
     { key: 'vq-1', text: '来月も定期便を続けたいと思いますか？', format: 'single', required: true, choices: ['続けたい', 'どちらともいえない', '止めたい'] },
     { key: 'vq-2', text: 'よく使っている商品を教えてください', format: 'multiple', required: false, choices: ['フード', 'おやつ', 'ケア用品'] },
@@ -146,7 +146,7 @@ function visualQuestions(): ResearchQuestion[] {
 }
 
 /** datetime-local の値を画面表示用に整える（`2026-09-30T23:59` → `2026/09/30 23:59`）。 */
-function displayDateTime(value: string): string {
+export function displayDateTime(value: string): string {
   return value ? value.replace('T', ' ').replaceAll('-', '/') : '未設定'
 }
 
@@ -155,7 +155,7 @@ function displayDateTime(value: string): string {
  * 押せる見た目のボタンを置くと「送れた」と誤解するので、押せない形にして
  * 理由と代替の手順を添える。
  */
-const TEST_SEND_UNAVAILABLE_NOTE =
+export const TEST_SEND_UNAVAILABLE_NOTE =
   'この形式は、いまの画面から自分へのテスト送信ができません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。'
 
 export default function TemplateAssetEditor({ kind, visual = false }: { kind: AssetKind; visual?: boolean }) {

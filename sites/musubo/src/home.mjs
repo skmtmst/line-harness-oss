@@ -9,6 +9,7 @@ const icons = {
   image:
     '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m3 16 5-5 5 5 3-3 5 5"/><circle cx="15" cy="8" r="1"/>',
   store: '<path d="M3 9h18l-2-6H5L3 9ZM5 12v9h14v-9M10 21v-7h4v7"/>',
+  star: '<path d="m12 3.5 2.6 5.5 6 .8-4.4 4.2 1.1 5.9-5.3-3-5.3 3 1.1-5.9L3.4 9.8l6-.8Z"/>',
 };
 export const icon = (key) =>
   `<svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[key]}</svg>`;
@@ -36,6 +37,13 @@ export function home(config, production) {
       "会話に、ちゃんと向き合う。",
       "個別チャットと自動応答を使い分け。繰り返しのご案内を整えて、人にしかできない対応に時間を使えます。",
       "1対1チャット / 自動応答",
+    ],
+    [
+      "star",
+      "応える",
+      "お店の評判にも、ていねいに。",
+      "ご自身が管理権限を持つGoogleビジネスプロフィールをGoogleの許可画面でつなぐと、店舗情報・口コミ・投稿・実績を管理画面で確認できます。口コミへの返信、営業時間などの店舗情報、写真、投稿は、内容を確かめて実行したときだけGoogleへ送信します。自動で送ることはありません。",
+      "Googleビジネス連携 / 口コミ返信",
     ],
     [
       "form",

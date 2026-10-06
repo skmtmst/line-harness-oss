@@ -41,3 +41,9 @@ export default function ActivityItem({
     </div>
   )
 }
+
+/** V8 x4FeKG. Also usable without a timeline row. */
+
+export function ActivityMarker({ icon: Icon }: { icon: LucideIcon }) {
+  return <span className={styles.marker} aria-hidden="true"><Icon size={12} /></span>
+}

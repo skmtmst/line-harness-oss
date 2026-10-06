@@ -31,13 +31,14 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...actual,
-    api: {
+    api: { notifications: { teams: { list: async () => ({ success: true, data: [] }) } },
       lineNotifications: {
         operatorRules: {
           previewRecipients: fixture.previewRecipients,
@@ -86,7 +87,7 @@ describe('M032 宛先の回復で保存ガード由来の古い文言を消す',
     render(<NewOperatorNotificationPage />)
 
     const retry = await screen.findByRole('button', { name: 'もう一度読み込む' })
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     // 保存ガードが出て、作成・公開・テスト送信は送らない。
     await waitFor(() => expect(screen.getByText(new RegExp(GUARD))).toBeTruthy())
     expect(fixture.create).not.toHaveBeenCalled()
@@ -113,7 +114,7 @@ describe('M032 宛先の回復で保存ガード由来の古い文言を消す',
     const nameInput = document.getElementById('operator-name')
     if (!nameInput) throw new Error('名前の入力が見つかりません')
     fireEvent.change(nameInput, { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await waitFor(() => expect(screen.getByText('お知らせの名前を入力してください。')).toBeTruthy())
 
     // 宛先が回復しても別原因の文言は残る。

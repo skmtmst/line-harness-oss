@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+/* 完全切り替え：v7 の page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+const LIST = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
 const LIST_STATE = readFileSync(
   join(HERE, '..', '..', 'components', 'shared', 'list-state.tsx'),
   'utf8',
@@ -23,17 +24,17 @@ const LIST_STATE = readFileSync(
  */
 describe('リマインダ一覧の空と失敗', () => {
   it('一覧のフォルダ欄を共通パネルの統一幅で表示する', () => {
-    expect(PAGE).toContain('lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
-    expect(PAGE).toContain('style={FOLDER_RAIL_STYLE}')
-    expect(PAGE).toContain('onAddFolder={() => setFolderDialogOpen(true)}')
-    expect(PAGE).not.toContain('lg:grid-cols-[13rem_minmax(0,1fr)]')
+    expect(LIST).toContain('<ListPageBody folders=')
+    expect(LIST).toContain('FolderPanel')
+    expect(LIST).toContain('setFolderDialogOpen(true)')
+    expect(LIST).not.toContain('lg:grid-cols-[13rem_minmax(0,1fr)]')
   })
 
-  it('失敗の言い方を画面で書き直さない', () => {
-    // 共通部品から引く。ここに文字列を直接書かない。
-    expect(PAGE).toContain('LIST_STATE_PRESETS.error.title')
-    expect(PAGE).not.toContain('リマインダの読み込みに失敗しました')
-    expect(PAGE).not.toContain('いまは読み込めていません')
+  it('失敗の言い方は見本どおりの1枚にまとめる', () => {
+    // 板 `apLqS`：失敗は「リマインダを読み込めませんでした」の1枚。
+    expect(LIST).toContain('リマインダを読み込めませんでした')
+    expect(LIST).not.toContain('リマインダの読み込みに失敗しました')
+    expect(LIST).not.toContain('いまは読み込めていません')
   })
 
   it('共通部品が、直らないときの行き先を持っている', () => {
@@ -45,14 +46,10 @@ describe('リマインダ一覧の空と失敗', () => {
 
   it('3つの状態を言い分ける', () => {
     // 読めない / そもそも0件 / 絞り込みで0件 は、運用者にとって意味が違う。
-    // ★V7: 手作りの行を TableStateRow へ寄せた。隠しの目印はやめ、見える文言で言い分ける。
-    // ★V7 `x63W5x`：失敗の言い方は共通部品から引く（`LIST_STATE_PRESETS.error.title`）。
-    // ページ上の帯は出さず、表の中の1行だけにまとめる。
-    expect(PAGE).toContain('この条件に合うリマインダはありません。')
-    expect(PAGE).toContain('まだリマインダがありません')
-    expect(PAGE).toContain('LIST_STATE_PRESETS.error.title')
-    expect(PAGE).toContain('onRetry={reminderList.retry}')
-    // 一覧の失敗の帯は無い（操作の失敗の知らせは別に残す）。
-    expect(PAGE).not.toContain('LIST_STATE_PRESETS.error.title}。{LIST_STATE_PRESETS.error.description}')
+    // 見える文言で言い分ける。ページ上の帯は出さず、1枚だけにまとめる。
+    expect(LIST).toContain('条件に合うリマインダはありません')
+    expect(LIST).toContain('まだリマインダはありません')
+    expect(LIST).toContain('リマインダを読み込めませんでした')
+    expect(LIST).toContain('onClick={reminderList.retry}')
   })
 })

@@ -21,12 +21,11 @@ import {
   recordAuditEvent,
   recordLoginAudit,
   revokeStaffAuthentication,
-  staffRequiresMfa,
   toJstString,
   updateStaffMember,
   type AuthEmailToken,
 } from '@line-crm/db';
-import { clientIp, issueSession, randomToken, startTwoFactorChallenge, twoFactorRequired } from '../services/admin-session.js';
+import { clientIp, issueSession, randomToken } from '../services/admin-session.js';
 import { hashPassword, validatePasswordPolicy, verifyPassword } from '../services/password-hash.js';
 import { turnstileErrorMessage, verifyTurnstile } from '../services/turnstile.js';
 import { candidateFromStaffRow, isPlatformAdminRow } from '../middleware/platform-admin.js';
@@ -303,18 +302,14 @@ authEmail.post('/api/auth/register/complete', async (c) => {
   });
   if (!staff) return c.json({ success: false, error: '登録を完了できませんでした' }, 500);
 
-  // オーナーは管理者束のためTOTP登録が必須（N-426）。ここで通常セッションは
-  // 発行せず、設定専用の合言葉を返す。画面は二段階認証の設定へ進む。
-  if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります。運営にお問い合わせください' }, 500);
-  const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'setup' });
+  // 2段階認証は削除済み。登録完了時点でそのままセッションを発行する。
+  await issueSession(c, staff.id, config.sameSite, false);
   c.header('Set-Cookie', markerCookie(deviceMarker, config.sameSite), { append: true });
   return c.json({
     success: true,
     data: {
       tenantId,
       deviceMarker,
-      twoFactorSetup: true,
-      challengeToken,
     },
   });
 });
@@ -377,19 +372,7 @@ authEmail.post('/api/auth/password/login', async (c) => {
       }, 403);
     }
   }
-  if (twoFactorRequired(staff)) {
-    if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります。運営にお問い合わせください' }, 500);
-    const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'verify', remember });
-    return c.json({ success: true, data: { twoFactor: true, challengeToken } });
-  }
-  // 管理者束はTOTP登録が必須。未登録のまま通常セッションは発行せず、
-  // 設定専用の合言葉へ回す（N-426）。
-  if (body.next === 'ops' || staffRequiresMfa(staff)) {
-    if (!c.env.TOTP_ENCRYPTION_KEY) return c.json({ success: false, error: '二段階認証の設定に不備があります。運営にお問い合わせください' }, 500);
-    const challengeToken = await startTwoFactorChallenge(c, staff.id, { purpose: 'setup', remember });
-    return c.json({ success: true, data: { twoFactorSetup: true, challengeToken } });
-  }
-
+  // 2段階認証は削除済み。パスワード確認後すぐセッション発行
   const session = await issueSession(c, staff.id, config.sameSite, remember);
   await recordSuccessfulLoginAudit(c, staff.id);
   return c.json({

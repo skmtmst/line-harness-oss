@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '../../../components/webinars/webinar-limits'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, 'comments-v8.tsx'), 'utf8')
 
 describe('V6 ウェビナーさくらコメントの件数上限の契約', () => {
   it('上限は200件でサーバーと画面が同じ値を見る', () => {

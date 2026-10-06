@@ -54,6 +54,12 @@ describe('RetentionSection (J-1)', () => {
     expect(svg?.getAttribute('aria-label')).toContain('始まりに見ていた112人')
   })
 
+  it('最後の観測区間の人数で完了人数を代用しない', () => {
+    mounted = renderSection({ retention, completed: 70, ctaAtSeconds: null, heartbeatRejects: 0 })
+    expect(mounted.host.textContent).toContain('最後まで見た人63%（70人）')
+    expect(mounted.host.textContent).not.toContain('最後まで見た人37%（41人）')
+  })
+
   it('区間が無ければ作らない（0にしない）', () => {
     mounted = renderSection({
       retention: { bucketSeconds: 60, started: 0, points: [] },

@@ -16,6 +16,7 @@ function replayStep<T>(execution: IncomingWebhookExecution | undefined, key: str
 
 import {
   getActiveOutgoingWebhooksByEvent,
+  hasMappedEcConversionSource,
   applyScoring,
   getActiveAutomationsByEvent,
   createAutomationLog,
@@ -148,7 +149,9 @@ export async function fireEvent(
     fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId, execution),
     replayStep(execution, 'event:scoring', () => processScoring(db, eventType, payload, outgoingWebhookLineAccountId, lineAccessToken, execution)),
   ];
-  const adConversion = payload.friendId ? adConversionForEvent(eventType, payload) : null;
+  const mappedEcSource = (eventType === 'ec.order.confirmed' || eventType === 'ec.order.payment_received')
+    && outgoingWebhookLineAccountId && await hasMappedEcConversionSource(db, outgoingWebhookLineAccountId);
+  const adConversion = payload.friendId && !mappedEcSource ? adConversionForEvent(eventType, payload) : null;
   if (payload.friendId && adConversion) {
     phase1.push(
       sendAdConversions(db, payload.friendId, adConversion.eventName, adConversion.value, {

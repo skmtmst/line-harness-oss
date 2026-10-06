@@ -46,6 +46,13 @@ import {
 import type { ReminderDeliveryRunRow, ReminderStepRow } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
 import { featureJobCanRun } from './feature-enforcement.js';
+import {
+  assertFinalMeetSendRight,
+  isMeetConsultationSendable,
+  isMeetSendCandidateCurrent,
+  readMeetSendCandidate,
+  type MeetSendCandidate,
+} from './meet-consultation-reminders.js';
 
 const LEASE_MINUTES = 5;
 
@@ -74,6 +81,87 @@ export interface ReminderDeliveryResult {
 }
 
 /** 本番配信と下書き試験が同じテンプレート・変数展開を通る共通口。 */
+/*
+ * F10: リマインダの差し込み「予約日時・Google Meet URL」。
+ * 個別相談の確定予定（meet_consultations）から、その人への値を引く。
+ * 直近の確定予定が先。確定が1つも無ければ空文字（残さない）。
+ * 取消・完了は確定ではないので空扱い。F6・Meet送信版・lease・
+ * 日時変更/取消ガードには触らない。読むだけ。
+ */
+export const RESERVATION_DATETIME_PATTERN = /\{\{\s*reservation_datetime\s*\}\}/;
+export const MEET_URL_PATTERN = /\{\{\s*meet_url\s*\}\}/;
+
+export function contentNeedsBookingPlaceholders(content: string): boolean {
+  return RESERVATION_DATETIME_PATTERN.test(content) || MEET_URL_PATTERN.test(content);
+}
+
+export interface BookingInterpolation {
+  reservationDatetime: string;
+  meetUrl: string;
+}
+
+/** 開始日時を「10月10日（木）10:00」の形にする（Meet通知と同じ形）。 */
+export function formatBookingDatetime(startsAt: string): string {
+  const start = new Date(startsAt);
+  const jst = new Date(start.getTime() + 9 * 60 * 60 * 1000);
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+  const iso = jst.toISOString();
+  const month = Number(iso.slice(5, 7));
+  const day = Number(iso.slice(8, 10));
+  const time = iso.slice(11, 16);
+  return `${month}月${day}日（${weekdays[jst.getUTCDay()]}）${time}`;
+}
+
+export interface BookingConsultationRow {
+  starts_at: string;
+  meet_url: string | null;
+}
+
+/*
+ * F10補修: 送る側と公開前検査で同じ行選びを使う。
+ * 直近の確定予定が先。無効な日時は飛ばす。確定が無ければ null。
+ */
+export function pickBookingConsultation(
+  rows: BookingConsultationRow[],
+  nowMs: number,
+): BookingConsultationRow | null {
+  const valid = rows.filter((row) => Number.isFinite(Date.parse(row.starts_at)));
+  const upcoming = valid
+    .filter((row) => Date.parse(row.starts_at) >= nowMs)
+    .sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  const past = valid
+    .filter((row) => Date.parse(row.starts_at) < nowMs)
+    .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
+  return upcoming[0] ?? past[0] ?? null;
+}
+
+export async function resolveBookingInterpolation(
+  db: D1Database,
+  friendId: string,
+  now: Date = new Date(),
+): Promise<BookingInterpolation> {
+  const empty = { reservationDatetime: '', meetUrl: '' };
+  const rows = await db.prepare(
+    `SELECT starts_at, meet_url FROM meet_consultations
+      WHERE friend_id = ? AND status = 'confirmed'`,
+  ).bind(friendId).all<BookingConsultationRow>();
+  const picked = pickBookingConsultation(rows.results ?? [], now.getTime());
+  if (!picked) return empty;
+  return {
+    reservationDatetime: formatBookingDatetime(picked.starts_at),
+    meetUrl: picked.meet_url ?? '',
+  };
+}
+
+export function substituteBookingPlaceholders(
+  content: string,
+  values: BookingInterpolation,
+): string {
+  return content
+    .replace(/\{\{\s*reservation_datetime\s*\}\}/g, values.reservationDatetime)
+    .replace(/\{\{\s*meet_url\s*\}\}/g, values.meetUrl);
+}
+
 export async function buildReminderStepMessage(
   db: D1Database,
   step: ReminderStepRow,
@@ -118,11 +206,19 @@ export async function buildReminderStepMessage(
     }
   }
   const resolvedMeta = await resolveMetadata(db, friend);
+  // F10: 予約日時・Meet URL は送る側で置き換える。共通展開より先に潰すので、
+  // 利用者が入れた値に同じ文字があっても二重に展開しない。
+  const bookingContent = contentNeedsBookingPlaceholders(messageContent)
+    ? substituteBookingPlaceholders(
+      messageContent,
+      await resolveBookingInterpolation(db, friend.id, deliveredAt),
+    )
+    : messageContent;
   const extra = await resolveSendInterpolationExtra(
-    db, friend.id, messageContent, { kind: sourceKind, id: step.id },
+    db, friend.id, bookingContent, { kind: sourceKind, id: step.id },
   );
   const expanded = expandVariables(
-    messageContent,
+    bookingContent,
     { ...friend, metadata: resolvedMeta },
     undefined,
     messageType,
@@ -407,6 +503,35 @@ export async function processReminderDeliveries(
         continue enrollmentLoop;
       }
 
+      // Meet個別相談のV6行は、結び付き予約の版・日時・本人・状態が
+      // 一致するときだけ送る。古い版の予定はここで止める (版なし旧行は通す)。
+      // 取消後に残った実行行は送らず止める。
+      // 本文解決の前に送信候補の写しを読み、最終送信権と突き合わせる。
+      let meetCandidate: MeetSendCandidate | null = null;
+      if (enrollment.source_kind === 'meet' && enrollment.source_id) {
+        if (!(await isMeetConsultationSendable(db, enrollment.source_id))) {
+          await db.prepare(
+            `UPDATE reminder_delivery_runs
+                SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
+                    next_retry_at = NULL, updated_at = ?
+              WHERE id = ? AND status = 'claimed' AND lease_expires_at = ?`,
+          ).bind(nowIso, nowIso, run.id, claimLease).run();
+          result.skipped++;
+          continue enrollmentLoop;
+        }
+        meetCandidate = await readMeetSendCandidate(db, enrollment.source_id);
+        if (!meetCandidate) {
+          await db.prepare(
+            `UPDATE reminder_delivery_runs
+                SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
+                    next_retry_at = NULL, updated_at = ?
+              WHERE id = ? AND status = 'claimed' AND lease_expires_at = ?`,
+          ).bind(nowIso, nowIso, run.id, claimLease).run();
+          result.skipped++;
+          continue enrollmentLoop;
+        }
+      }
+
       if (!friend) {
         await skipReminderDeliveryRun(db, {
           id: run.id,
@@ -442,7 +567,8 @@ export async function processReminderDeliveries(
           db, run, step, friend, sendAt, pinnedTemplateVersions, ownedLeases, nowIso,
         );
         // 取消と送信の競合対策: push の直前に送る権利を1文で確かめる。
-        // この後 push まで待たない (間に取消が入る余地を残さない)。
+        // この後も beforePush・再検証・関係確認・停止確認のawaitがあり、
+        // その間の更新は後の確認で拾う。push呼出しとの間にはawaitを挟まない。
         // 外部送信は巻き戻せないため、権利取得と取消確定の順序は DB の1文で
         // 直列化し、確定後の送信は成功にできない (後段で検出・記録する)。
         if (!await verifyClaimedRunBeforeSend(db, {
@@ -458,7 +584,7 @@ export async function processReminderDeliveries(
         }
         await options.beforePush?.({ id: run.id, friendReminderId: enrollment.id });
         // シーム (試験割り込み) の後に取り直す。シーム中の取消をここで拾う。
-        // 本番で beforePush は無く、この2文の間に待たない。
+        // 本番で beforePush は無い (2つの検証の間に他の処理は挟まない)。
         if (!await verifyClaimedRunBeforeSend(db, {
           id: run.id,
           friendReminderId: enrollment.id,
@@ -470,6 +596,24 @@ export async function processReminderDeliveries(
           result.skipped++;
           continue;
         }
+        // Meet個別相談のV6行は、認証・本文の解決awaitの後の早期選別でも
+        // 送信候補の写しと結び付き関係を確かめる。最終判断は停止確認の後の
+        // 最終送信権UPDATEで行う。古ければ実行行だけ取り消す
+        // (勝者の新版通知には触れない)。
+        if (
+          enrollment.source_kind === 'meet' &&
+          enrollment.source_id &&
+          !(await isMeetSendCandidateCurrent(db, enrollment.source_id, meetCandidate))
+        ) {
+          await db.prepare(
+            `UPDATE reminder_delivery_runs
+                SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
+                    next_retry_at = NULL, updated_at = ?
+              WHERE id = ? AND status = 'claimed' AND lease_expires_at = ?`,
+          ).bind(nowIso, nowIso, run.id, claimLease).run();
+          result.skipped++;
+          continue enrollmentLoop;
+        }
         // 外部送信の直前にも緊急停止を確かめる (#1050)。claim 後に停止へ
         // 切り替わった分は claim をキューへ戻し、失敗・skipped にはしない
         // (停止を理由に消さない。復旧後に届く)。
@@ -477,6 +621,36 @@ export async function processReminderDeliveries(
           await releaseClaimedReminderRun(db, { id: run.id, now: nowIso, expectedLeaseExpiresAt: ownedLeases });
           result.held += 1;
           continue enrollmentLoop;
+        }
+        // 最終送信権の確定：待機を全て終えた後、送信権の行と候補の
+        // 相談ID・予約ID・予約版・本人・対象日・run・leaseを同じUPDATE文で
+        // 結び直す。この後はpush呼出しまでawaitを置かない (呼出し自体の
+        // 間の取消は残差として記載)。既存の日時・lease保護はUPDATE内に維持。
+        if (enrollment.source_kind === 'meet' && enrollment.source_id) {
+          const finalRight = await assertFinalMeetSendRight(db, {
+            runId: run.id,
+            friendReminderId: enrollment.id,
+            expectedTargetDate: gate.targetDate,
+            ownedLeases,
+            candidate: meetCandidate,
+            leaseExpiresAt,
+            nowIso,
+          });
+          if (finalRight !== 'ok') {
+            // stale は旧候補のため実行行を取り消す。stolen
+            // (貸出が別処理へ移った) は行に触らず見送る。
+            if (finalRight === 'stale') {
+              const leaseList = ownedLeases.map(() => '?').join(',');
+              await db.prepare(
+                `UPDATE reminder_delivery_runs
+                    SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
+                        next_retry_at = NULL, updated_at = ?
+                  WHERE id = ? AND status = 'claimed' AND lease_expires_at IN (${leaseList})`,
+              ).bind(nowIso, nowIso, run.id, ...ownedLeases).run();
+            }
+            result.skipped++;
+            continue enrollmentLoop;
+          }
         }
         const response = await deliveryClient.pushMessageWithRequestId(
           friend.line_user_id,

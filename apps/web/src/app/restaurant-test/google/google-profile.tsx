@@ -244,7 +244,7 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
                     <span className="text-ink-secondary">{h.name}</span>
                     <span>{h.special ? `特別営業時間：${h.special.closed ? '休業' : formatPeriods(h.special.periods)}` : `通常どおり：${formatPeriods(profile.regularHours[h.weekday] ?? [], '定休日')}`}</span>
                     <span className="grow" />
-                    <Button size="field" onClick={() => go({ tab: 'profile', view: 'hours', mode: 'calendar', date: h.date })} disabled={!canChange}>{h.special ? '変更する' : '設定する'}</Button>
+                    <Button size="field" onClick={() => go({ tab: 'profile', view: 'hours', mode: 'calendar', date: h.date })} disabled={!canChange}>{h.special ? '編集' : '設定する'}</Button>
                   </li>
                 ))}
               </ul>
@@ -973,7 +973,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
   const exportCsv = async () => {
     setExporting(true)
     try {
-      const rows: string[][] = [['日時', '内容', '担当者', '種類', '結果', '備考']]
+      const rows: string[][] = [['日時', '内容', 'スタッフ', '種類', '結果', '備考']]
       for (let p = 1; p <= 25; p += 1) {
         const chunk = await restaurantGoogleApi.history(accountId, { kind, result, days: Number.parseInt(days, 10), q: applied || undefined, page: p, perPage: 100 })
         for (const e of chunk.changes) rows.push([e.createdAt, e.summary, e.staffName ?? '', KIND_LABEL[e.kind] ?? e.kind, STATUS_LABEL[e.status].label, e.error ?? ''])
@@ -1019,7 +1019,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
         <>
           <div className="border-hairline overflow-hidden rounded-card border" role="table" aria-label="変更履歴">
             <div className="bg-surface-pearl text-ink-faint gb-history-row grid items-center px-4 text-caption font-semibold" style={{ height: 42 }} role="row">
-              <span role="columnheader">日時</span><span role="columnheader">内容</span><span role="columnheader">担当者</span><span role="columnheader">種類</span><span role="columnheader">結果</span>
+              <span role="columnheader">日時</span><span role="columnheader">内容</span><span role="columnheader">スタッフ</span><span role="columnheader">種類</span><span role="columnheader">結果</span>
             </div>
             {data.changes.map((entry) => {
               const status = STATUS_LABEL[entry.status]

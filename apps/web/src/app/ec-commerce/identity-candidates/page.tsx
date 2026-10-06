@@ -1,5 +1,8 @@
 'use client'
 
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import NoteBar from '@/components/shared/note-bar'
@@ -21,6 +24,7 @@ import { useIdentityReview } from '@/components/identity/identity-review'
 import { impactText, maskedText, NOT_AVAILABLE } from '@/components/identity/identity-view'
 import styles from '@/components/identity/identity-review.module.css'
 import { useAccount } from '@/contexts/account-context'
+import { formatNumber } from '@/lib/format'
 import { ApiError, api, type EcIdentityCandidateOperationsList } from '@/lib/api'
 import { ORDER_IMPACT_KEYS, REVENUE_IMPACT_KEYS, type IdentityCandidateImpactMetric } from '@line-crm/shared'
 import EcTabs from '../ec-tabs-view'
@@ -65,7 +69,8 @@ export default function EcIdentityCandidatesPage() {
   const [operations, setOperations] = useState<EcIdentityCandidateOperationsList | null>(null)
   const [operationsState, setOperationsState] = useState<'loading' | 'ready' | 'empty' | 'error' | 'forbidden'>('loading')
   const [view, setView] = useState<'all' | 'candidate' | 'none' | 'conflict'>('all')
-  const [sort, setSort] = useState<'newest' | 'confidence'>('newest')
+  /* w1W8h：絵の並び順は「確からしさが高い順」。 */
+  const [sort, setSort] = useState<'newest' | 'confidence'>('confidence')
 
   /*
    * R600残件：アカウント切替で先行した集計要求の応答が後から届いても
@@ -118,7 +123,7 @@ export default function EcIdentityCandidatesPage() {
   const reviewReady = review.state === 'ready'
   const operationsReady = operationsState === 'ready' && operations !== null
   const candidateCount = operations?.summary.candidateExternalCustomers ?? 0
-  const noneCount = Math.max(0, (operations?.summary.unmatched ?? 0) - candidateCount)
+  const noneCount = operations?.summary.withoutCandidates ?? null
   const conflictCount = operations?.summary.duplicateSuspicions ?? 0
   /*
    * 集計のカード帯の3段目。読めていない数を 0 と書かない（未取得は「—」）。
@@ -159,7 +164,8 @@ export default function EcIdentityCandidatesPage() {
       : 'ready'
 
   return (
-    <div className={ecStyles.root}>
+    <div className={`${ecStyles.root} v8-ro-notifications-page`} data-design-node="w1W8h">
+      <ReadonlyHeaderV8 title="EC連携" description="LINEとまだ結びついていない出来事と、会員の候補を分けて確認します。" />
       <PageHeader
         breadcrumb={[
           { label: '専用機能' },
@@ -183,14 +189,18 @@ export default function EcIdentityCandidatesPage() {
 
       {pageState === 'ready' ? (
         <>
-          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          {/*
+            w1W8h：絵の順番・言葉に寄せる（自動で結びついた→候補が見つかった→
+            結びついていない→結びついていない注文の金額、単位は人／¥）。
+            つき合わせ総数は2枚目の補足へ移し、カードでは繰り返さない。
+          */}
+          <div data-ro-kpis="true" className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             <KpiCard
               variant="v6"
-              title="結びついていない"
-              value={operationsReady ? (operations?.summary.unmatched ?? null) : null}
-              unit="件"
-              detail={operationsDetail('確認待ちの注文・会員')}
-              badge="要対応"
+              title="自動で結びついた"
+              value={operationsReady ? (operations?.summary.linked ?? null) : null}
+              unit="人"
+              detail={operationsDetail('メールか電話番号が同じ')}
               loading={operationsState === 'loading'}
               onRetry={operationsRetry}
             />
@@ -198,31 +208,34 @@ export default function EcIdentityCandidatesPage() {
               variant="v6"
               title="候補が見つかった"
               value={operationsReady ? candidateCount : null}
-              unit="件"
-              detail={operationsDetail('')}
+              unit="人"
+              detail={operationsReady
+                ? `人が決める（つき合わせ ${formatNumber(operations?.summary.unmatched ?? 0)} のうち）`
+                : operationsDetail('人が決める')}
               help="名前や電話が近い人がいます"
               loading={operationsState === 'loading'}
             />
             <KpiCard
               variant="v6"
-              title="自動で結びついた"
-              value={operationsReady ? (operations?.summary.linked ?? null) : null}
-              unit="件"
-              detail={operationsDetail('')}
-              help="同じ人として結びついた会員です"
+              title="結びついていない"
+              value={operationsReady ? noneCount : null}
+              unit="人"
+              detail={operationsDetail('候補なし')}
+              help="候補が見つからなかった注文・会員です"
               loading={operationsState === 'loading'}
             />
-            {/*
-              m22d: 「24件」は「結びついていない」のカードと一覧の件数に集約し、
-              ここでは繰り返さない。売上の中身は「？」へ移す。
-            */}
             <KpiCard
               variant="v6"
-              title="結びつけると増える売上"
-              value={operationsReady ? (operations?.summary.potentialRevenue ?? null) : null}
-              unit="円"
-              detail={operationsDetail('分析にも入ります')}
-              help="結びついていない注文・会員の売上見込みです"
+              title="結びついていない注文の金額"
+              value={null}
+              unit=""
+              valueText={operationsReady && operations?.summary.potentialRevenue != null
+                ? `¥${formatNumber(operations.summary.potentialRevenue)}`
+                : undefined}
+              detail={operationsReady
+                ? `候補 ${formatNumber(candidateCount)} 人の注文`
+                : operationsDetail('分析にも入ります')}
+              help="候補全体の注文金額です。同じEC会員は1人分として数えます"
               loading={operationsState === 'loading'}
             />
           </div>
@@ -237,7 +250,7 @@ export default function EcIdentityCandidatesPage() {
             <Tabs items={([
                 ['all', 'すべて', operationsReady ? operations?.summary.unmatched ?? 0 : undefined],
                 ['candidate', '候補あり', operationsReady ? candidateCount : undefined],
-                ['none', '候補なし', operationsReady ? noneCount : undefined],
+                ['none', '候補なし', operationsReady ? noneCount ?? undefined : undefined],
                 ['conflict', '同じ人が2人いる疑い', operationsReady ? conflictCount : undefined],
               ] as const).map(([value, label, count]) => ({
                 label,

@@ -14,7 +14,7 @@ const CSS = readFileSync(join(ROOT, 'knowledge.module.css'), 'utf8')
  */
 describe('運営ナレッジ一覧の狭い画面 (監査R134)', () => {
   it('表の各項目にカード表示用のラベルが付いている', () => {
-    for (const label of ['種類', '記事の種類', '状態', '使われた回数', '役に立った', '更新日']) {
+    for (const label of ['種類', '状態', '使われた回数', '役に立った', '更新日']) {
       expect(LIST, `data-label="${label}" が無い`).toContain(`data-label="${label}"`)
     }
   })

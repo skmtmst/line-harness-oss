@@ -254,18 +254,17 @@ export default function Webinar() {
     else window.open(url, '_blank', 'noopener');
   };
 
-  // ---- 暗い地の共通の殻 ----
+  // ---- 白い地の共通の殻（⑤LINEらしい。夜の型はM2の型が入ってから） ----
   const shell = (content: ReactNode) => (
-    <div className="min-h-screen bg-night text-white">
+    <div className="min-h-screen bg-canvas text-ink" data-design-node="RpW2h">
       <div className="mx-auto w-full max-w-md px-4 pt-4 pb-12">{content}</div>
     </div>
   );
 
-  // 読み込めなかった時 (7 の注記: 5-b と同じ文面。暗い地なので白文字で出す)。
+  // 読み込めなかった時 (7 の注記: 5-b と同じ文面。白地なので濃い字で出す)。
   if (loadFailed) {
     return shell(
       <StatusView
-        dark
         icon="cloud-off"
         title="読み込めませんでした"
         body="電波の良いところで、もう一度お試しください。"
@@ -277,7 +276,6 @@ export default function Webinar() {
   if (error) {
     return shell(
       <StatusView
-        dark
         icon="user-plus"
         title="友だち追加すると見られます"
         body="この配信は、LINEで友だち追加した方だけが見られます。友だち追加のあと、もう一度開いてください。"
@@ -288,7 +286,6 @@ export default function Webinar() {
   if (unplayable) {
     return shell(
       <StatusView
-        dark
         icon="info"
         title="この端末では再生できません"
         body="別の端末かブラウザで開いてください。"
@@ -300,11 +297,11 @@ export default function Webinar() {
       <div role="status" aria-live="polite" aria-busy="true" aria-label="読み込み中">
         <div className="space-y-3" aria-hidden="true">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="flex animate-pulse gap-3 rounded-xl bg-night-soft p-4">
-              <div className="h-12 w-12 shrink-0 rounded-lg bg-night-line" />
+            <div key={i} className="flex animate-pulse gap-3 rounded-xl bg-liff-chip p-4">
+              <div className="h-12 w-12 shrink-0 rounded-lg bg-liff-line" />
               <div className="flex flex-1 flex-col justify-center gap-2">
-                <div className="h-3 w-2/5 rounded bg-night-line" />
-                <div className="h-3 w-4/5 rounded bg-night-line" />
+                <div className="h-3 w-2/5 rounded bg-liff-line" />
+                <div className="h-3 w-4/5 rounded bg-liff-line" />
               </div>
             </div>
           ))}
@@ -318,7 +315,6 @@ export default function Webinar() {
     if (state.nextSessionAt === null) {
       return shell(
         <StatusView
-          dark
           icon="clock"
           title={state.title}
           body="次回の開催は未定です。"
@@ -342,14 +338,14 @@ export default function Webinar() {
     return shell(
       <div className="flex flex-col items-center px-6 py-10 text-center">
         <span
-          className="flex h-16 w-16 items-center justify-center rounded-full bg-night-soft text-night-faint"
+          className="flex h-16 w-16 items-center justify-center rounded-full bg-liff-chip text-ink-faint"
           aria-hidden="true"
         >
           <Icon name="clock" className="h-7 w-7" />
         </span>
-        <p className="mt-4 text-sm text-night-faint">次のライブ配信</p>
-        <h1 className="mt-1 text-xl font-bold text-white">{state.title}</h1>
-        <p className="mt-3 text-sm font-bold text-white">{formatJp(state.nextSessionAt)} 開始</p>
+        <p className="mt-4 text-sm text-ink-faint">次のライブ配信</p>
+        <h1 className="mt-1 text-xl font-bold text-ink">{state.title}</h1>
+        <p className="mt-3 text-sm font-bold text-ink">{formatJp(state.nextSessionAt)} 開始</p>
         <div
           className="mt-4 flex gap-2"
           role="timer"
@@ -358,16 +354,16 @@ export default function Webinar() {
           {boxes.map((box) => (
             <div
               key={box.unit}
-              className="flex min-w-20 flex-col items-center rounded-xl bg-night-soft px-4 py-3"
+              className="flex min-w-20 flex-col items-center rounded-xl bg-liff-chip px-4 py-3"
             >
-              <span className="text-3xl font-bold text-white tabular-nums">
+              <span className="text-3xl font-bold text-ink tabular-nums">
                 {String(box.value).padStart(2, '0')}
               </span>
-              <span className="mt-1 text-xs text-night-faint">{box.unit}</span>
+              <span className="mt-1 text-xs text-ink-faint">{box.unit}</span>
             </div>
           ))}
         </div>
-        <p className="mt-6 text-xs leading-relaxed text-night-faint">
+        <p className="mt-6 text-xs leading-relaxed text-ink-faint">
           時間になると、この画面のまま自動で始まります。
           <br />
           閉じずにお待ちください。
@@ -380,7 +376,6 @@ export default function Webinar() {
   if (ended) {
     return shell(
       <StatusView
-        dark
         icon="circle-check"
         title="ご視聴ありがとうございました"
         body="配信は終了しました"
@@ -388,18 +383,18 @@ export default function Webinar() {
     );
   }
 
-  // ---- ライブ中 (7-b・7-c) ----
+  // ---- ライブ中 (7-b・7-c。RpW2h) ----
   return (
-    <div className="flex h-screen flex-col bg-night text-white">
+    <div className="flex h-screen flex-col bg-canvas text-ink" data-design-node="RpW2h">
       <div className="relative">
         <video ref={videoRef} className="w-full" playsInline />
-        <span className="absolute top-2 left-2 rounded bg-danger px-2 py-0.5 text-xs font-bold text-white">
+        <span className="absolute top-2 left-2 rounded bg-liff-sun px-2 py-0.5 text-[11px] font-bold text-white">
           ● ライブ
         </span>
         {needsTap && (
           <button
             type="button"
-            className="absolute right-2 bottom-2 inline-flex min-h-11 items-center gap-1 rounded-full bg-night-soft px-3 text-xs font-bold text-white"
+            className="absolute right-2 bottom-2 inline-flex min-h-11 items-center gap-1 rounded-full bg-ink px-3 text-xs font-semibold text-white"
             onClick={() => {
               const v = videoRef.current;
               if (v) {
@@ -415,13 +410,19 @@ export default function Webinar() {
         )}
       </div>
 
-      <div ref={chatBoxRef} className="flex-1 overflow-y-auto p-3 text-sm">
+      <div className="border-b border-hairline px-4 py-3">
+        <h1 className="truncate text-base font-bold text-ink" title={state.title}>
+          {state.title}
+        </h1>
+      </div>
+
+      <div ref={chatBoxRef} className="flex-1 overflow-y-auto p-3 text-[13px]">
         {chat.map((item) => (
           <div key={item.key} className="mb-2">
-            <span className={item.mine ? 'font-bold text-night-mine' : 'font-bold text-night-name'}>
+            <span className={item.mine ? 'font-bold text-liff-primary' : 'font-bold text-ink-secondary'}>
               {item.authorName}
             </span>{' '}
-            <span className="text-white">{item.body}</span>
+            <span className="text-ink">{item.body}</span>
           </div>
         ))}
       </div>
@@ -430,14 +431,14 @@ export default function Webinar() {
         <button
           type="button"
           onClick={clickCta}
-          className="mx-3 mb-2 flex items-center justify-center gap-2 rounded-lg bg-accent-deep py-3 text-center text-sm font-bold text-white"
+          className="mx-3 mb-2 flex items-center justify-center gap-2 rounded-lg bg-accent-deep py-3 text-center text-[15px] font-bold text-white"
         >
           <Icon name="send" className="h-4 w-4" />
           {state.cta.label}
         </button>
       )}
 
-      <div className="flex items-center gap-2 border-t border-night-line p-2">
+      <div className="flex items-center gap-2 border-t border-hairline p-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -447,7 +448,7 @@ export default function Webinar() {
           placeholder="コメントを書く"
           maxLength={500}
           aria-label="コメントを書く"
-          className="min-h-11 flex-1 rounded-full bg-night-soft px-4 text-sm text-white placeholder-night-faint"
+          className="min-h-11 flex-1 rounded-full bg-liff-chip px-4 text-[13px] text-ink placeholder-ink-faint"
         />
         <button
           type="button"

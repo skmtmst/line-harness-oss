@@ -17,6 +17,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/inflow-links',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
@@ -178,7 +179,7 @@ describe('R173 検索・絞り込みの0件は未登録と混ぜない', () => {
     // まず登録済みの行が見えること（絞り込みの土台がある）。
     expect(host.textContent).toContain('春キャンペーン')
 
-    const input = host.querySelector('input[placeholder="流入元の名前・REFで検索"]') as HTMLInputElement
+    const input = host.querySelector('input[placeholder="経路の名前・URLで探す"]') as HTMLInputElement
     expect(input).not.toBeNull()
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!

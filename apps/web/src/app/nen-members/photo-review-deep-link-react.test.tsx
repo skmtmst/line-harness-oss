@@ -81,6 +81,7 @@ function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
+    if (path === '/api/staff/me') return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
     const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
     net.calls.push(path)
@@ -322,9 +323,7 @@ describe('検索で探す(#931 N-308)', () => {
     const input = host.querySelector('input[placeholder*="探す"]') as HTMLInputElement
     expect(input).toBeTruthy()
     await act(async () => { setInputValue(input, 'モモ') })
-    const submit = buttonByText('探す', host)
-    expect(submit).toBeTruthy()
-    await act(async () => { submit!.click() })
+    await act(async () => { input.closest('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
     await act(async () => { await Promise.resolve() })
     expect(net.calls.some((path) => path.startsWith('/api/nen-members/photos?') && path.includes('q='))).toBe(true)
     expect(decodeURIComponent(window.location.search)).toContain('q=モモ')
@@ -359,11 +358,11 @@ describe('戻す約束の2チェック(#931 N-312)', () => {
     expect(watch.checked).toBe(false)
 
     await act(async () => { invite.click() })
-    await act(async () => { watch.click() })
+    await act(async () => { (document.querySelector('details.followup') ?? Array.from(document.querySelectorAll('details')).find((node) => node.textContent?.includes('次の投稿の確認方法')))?.setAttribute('open', ''); watch.click() })
     expect(invite.checked).toBe(false)
     expect(watch.checked).toBe(true)
 
-    const confirm = buttonByText('見送って、この文章を送る')
+    const confirm = buttonByText('見送る', document.querySelector('[role="alertdialog"]') as HTMLDivElement)
     expect(confirm).toBeTruthy()
     await act(async () => { confirm!.click() })
     await act(async () => { await Promise.resolve() })
@@ -375,7 +374,7 @@ describe('戻す約束の2チェック(#931 N-312)', () => {
     expect(reviewRequest!.body).toMatchObject({
       accountId: 'account-a',
       status: 'rejected',
-      reasonCode: 'privacy',
+      reasonCode: 'quality',
       resubmitInvite: false,
       watchSubmitter: true,
     })
@@ -417,7 +416,7 @@ describe('写真の向きの保存(#931 N-309)', () => {
   it('「回す」のあと「向きを保存」が版つきで送られ、詳細の表示へ残る', async () => {
     net.handler = detailCapableHandler(MIXED)
     await renderAt('/nen-members?tab=photos')
-    const openDetailButton = buttonByText('⛶ 1枚ずつ大きく見る', host)
+    const openDetailButton = buttonByText('1枚ずつ大きく見る', host)
     expect(openDetailButton).toBeTruthy()
     await act(async () => { openDetailButton!.click() })
     await act(async () => { await Promise.resolve() })
@@ -463,7 +462,7 @@ describe('戻る・再読込での復元(#931 N-314)', () => {
   it('詳細から戻ると一覧へ、進むと同じ詳細へ戻れる', async () => {
     net.handler = detailCapableHandler(MIXED)
     await renderAt('/nen-members?tab=photos')
-    await act(async () => { buttonByText('⛶ 1枚ずつ大きく見る', host)!.click() })
+    await act(async () => { buttonByText('1枚ずつ大きく見る', host)!.click() })
     await act(async () => { await Promise.resolve() })
     expect(buttonByText('向きを保存する')).toBeTruthy()
     // ブラウザの戻る: URLが一覧へ変わったあと popstate が来る。

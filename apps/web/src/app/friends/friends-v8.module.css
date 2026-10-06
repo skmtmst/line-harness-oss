@@ -1,0 +1,1189 @@
+/*
+ * ★V8 友だちのデータ管理（重複検出 `sdbsQ` 板1・候補確認 板2・統合ユーザー
+ * 板3・判定窓 板4・UID移行 板5・CSV 板6、状態 `SXCb3`）。
+ *
+ * 友だち一覧・統合ユーザー・UID移行・CSVの各 -v8 ファイルが共用する形だけ
+ * ここに置く。データや文言は各ファイルが持つ（色・余白・積み方だけ共有）。
+ *
+ * 折り畳みの基準は板の幅（container）で、画面幅ではない
+ * （tags/list-v8.module.css と同じ決まり）。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  container-type: inline-size;
+}
+
+/* 見出しブロック：画面名＋一行の説明。右端はその画面の主操作。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.headAction {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/*
+ * 「← 友だち一覧 › データ管理 › 今の画面」の段（sdbsQ）。
+ * 一覧以外のデータ管理画面が頭の下に置く。右端は同じ「データ管理 ▾」で、
+ * 隣の管理画面へ直接移れる。
+ */
+.manageNav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.manageCrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.manageCrumbs a {
+  color: var(--color-action);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.manageCrumbs a:hover {
+  text-decoration: underline;
+}
+
+.manageCrumbs .sep {
+  color: var(--color-ink-faint);
+}
+
+.manageCrumbs .group {
+  color: var(--color-ink);
+}
+
+.manageCrumbs .here {
+  color: var(--color-ink-faint);
+}
+
+/* 数の帯：4つのマス。見出しの右に「？」の補足。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px 16px;
+}
+
+.kpi + .kpi {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpiLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiLabel svg {
+  color: var(--color-ink-faint);
+}
+
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.kpiDetail {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 道具の段：検索・絞り込み・右に件数。 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+.toolbarCount {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.searchWrap {
+  width: 240px;
+  min-width: 160px;
+}
+
+.selectWrap {
+  width: 176px;
+  flex-shrink: 0;
+}
+
+/* 案内の帯（青。自動では結び付けません、など）。 */
+.infoBand {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-accent-border, var(--color-hairline));
+  border-radius: var(--radius-control);
+  background: var(--color-accent-soft);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.infoBand svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-action);
+}
+
+/* 操作の失敗の帯。 */
+.errorBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-control);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.errorBand button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 区画（白い箱）。見出しつき。 */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sectionDesc {
+  margin: -6px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 表。外側の丸い枠ごと。内側だけ横に動かす。 */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table th.num,
+.table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-hairline);
+  color: var(--color-ink-secondary);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 候補の2人（アバターの丸＋名前 ↔ 名前）。 */
+.pairCell {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink);
+  font-weight: 600;
+  min-width: 0;
+}
+
+.pairCell a {
+  color: var(--color-action);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pairCell a:hover {
+  text-decoration: underline;
+}
+
+.avatarDot {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* 確からしさ・一致の根拠の小さな札。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pillStrong {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.pillWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.pillWeak {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.evidenceChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.evidenceChip {
+  padding: 2px 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-mini);
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.evidenceChipWarn {
+  border-color: var(--color-warning);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+/* 行末の「根拠を確認 →」など文字の押し口。 */
+.linkAction {
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.linkAction:hover {
+  text-decoration: underline;
+}
+
+/* ページ送りの行。 */
+.pagerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* 空・失敗の1枚。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.stateIconError {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 読み込み中の骨格の行。 */
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 12px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.skeletonRow:last-child {
+  border-bottom: 0;
+}
+
+.skeletonDot {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.skeletonBar {
+  height: 12px;
+  flex: 1;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+}
+
+/* ===== UID移行の手順の帯（板5：緑の✓ → 数字の丸 → 線） ===== */
+.stepper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  overflow-x: auto;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.stepDot {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stepDone .stepDot {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  color: var(--color-canvas);
+}
+
+.stepCurrent .stepDot {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+
+.stepLabel {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.stepCurrent .stepLabel {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.stepLine {
+  flex: 1;
+  min-width: 24px;
+  height: 1px;
+  margin-top: 14px;
+  background: var(--color-hairline);
+}
+
+.stepLineDone {
+  background: var(--color-success);
+}
+
+/* ===== 候補確認（板2：A/Bを同じ高さで並べる） ===== */
+.comparePair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.subjectCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.subjectHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.subjectAvatar {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.subjectName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.subjectSub {
+  margin: 2px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.subjectRows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.subjectRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: 13px;
+}
+
+.subjectRow dt {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.subjectRow dd {
+  margin: 0;
+  color: var(--color-ink);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* 一致した根拠の緑の帯。 */
+.evidenceBand {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-control);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+/* 画面の下の段：左に説明、右に状態の札と判定の押し口。 */
+.decideBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.decideNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.decideActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ===== CSVの2箱（板6：同じ高さ、ボタンは真ん中） ===== */
+.duoCards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.duoCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.duoCardTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.duoCardDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.duoCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.duoCardFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* 取り込みの確認の内訳（追加・更新・変更なし・競合・エラー）。 */
+.importSummary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+}
+
+.importSummary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.importSummary dt {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+.importSummary dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 板が狭いとき（1100px 未満 ≒ 画面 1352px 未満） ===== */
+@container (max-width: 1099px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .comparePair,
+  .duoCards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container (max-width: 560px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpi + .kpi {
+    border-left: 0;
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .searchWrap {
+    width: 100%;
+  }
+}
+
+/* ============================================================
+   重複検出の表・根拠チップ・帯の中の操作
+   ============================================================ */
+
+.pairCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.pairCell a {
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.pairCell a:hover {
+  color: var(--color-accent-deep);
+  text-decoration: underline;
+}
+
+.avatarDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--color-success-bg);
+  color: var(--color-accent-deep);
+  font-size: 10px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.evidenceChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.evidenceChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  border: 1px solid var(--color-hairline);
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.evidenceChipWarn {
+  background: var(--color-status-warn-soft);
+  border-color: var(--color-status-warn);
+  color: var(--color-warning);
+}
+
+.infoBandRetry {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-left: 8px;
+  color: var(--color-accent-deep);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.stateIconError {
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+}
+
+/* ============================================================
+   統合ユーザーの詳細（Hn9eE）：左に切替・結び付き・履歴、右に使っている値
+   ============================================================ */
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.detailMain {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.detailRail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* 「配信に使う」のスイッチ（行ごとの即保存）。 */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  width: 36px;
+  height: 20px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-track);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.switchOn {
+  background: var(--color-accent);
+}
+
+.switchKnob {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  transition: transform 0.15s ease;
+}
+
+.switchOn .switchKnob {
+  transform: translateX(16px);
+}
+
+.cardFoot {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.historyList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historyRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-divider-soft);
+  font-size: 13px;
+}
+
+.historyRow:last-child {
+  border-bottom: 0;
+}
+
+.historyWhen {
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+}
+
+.historyWhat {
+  color: var(--color-ink);
+  font-weight: 600;
+  text-align: right;
+  min-width: 0;
+}
+
+.valueList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.valueRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-divider-soft);
+  font-size: 13px;
+}
+
+.valueRow:last-child {
+  border-bottom: 0;
+}
+
+.valueLabel {
+  color: var(--color-ink-secondary);
+}
+
+.valueText {
+  color: var(--color-ink);
+  font-weight: 600;
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 詳細の中の「← ○○へ」（Link ではなく onClose で一覧へ戻る面）。 */
+.crumbButton {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--color-accent-deep);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.crumbButton:hover {
+  text-decoration: underline;
+}
+
+@container (max-width: 1100px) {
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   統合ユーザー一覧：人のセル（丸い頭文字＋名前＋連絡先）
+   ============================================================ */
+
+.personCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.personCellText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.personName {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+button.personName:hover {
+  color: var(--color-accent-deep);
+  text-decoration: underline;
+}
+
+.personSub {
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   CSV 画面：カード内の入力の積み方・中央寄せの操作
+   ============================================================ */
+
+.fieldStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+fieldset.fieldLabel,
+legend.fieldLabel {
+  display: block;
+}
+
+.cardCenter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* 確認の内訳をまとめる薄いパネル（T9gblG の「確認の結果」）。 */
+.importPanel {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  background: var(--color-canvas-sunken);
+}
+
+/* 見出し行：題・説明・右端の札（状態バッジ等）を横に並べる。 */
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.sectionHead .sectionDesc {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.sectionHead > *:last-child {
+  margin-left: auto;
+}
+
+.sectionHead .sectionDesc:last-child {
+  margin-left: 0;
+}
+
+/* 行の中で小さな操作（選び欄＋文字の押し口）を横に並べる。 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 折り返さない短い文字（日時・uid）。 */
+.nowrap {
+  white-space: nowrap;
+}
+
+/* uid などの機械的な値。等幅で桁ずれをなくす。 */
+.mono {
+  color: var(--color-ink);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+}
+
+/* セル内の小さな補足行（候補名・件数など）。 */
+.pairCellSub {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* 解除の理由を書く欄 */
+.reasonArea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  min-height: 72px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  padding: 8px 10px;
+  font: inherit;
+  font-weight: 400;
+}

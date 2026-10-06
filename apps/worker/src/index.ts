@@ -63,6 +63,7 @@ import { broadcasts } from './routes/broadcasts.js';
 import { broadcastApprovals } from './routes/broadcast-approvals.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
+import { lineAccountTags } from './routes/line-account-tags.js';
 import { lineAccounts } from './routes/line-accounts.js';
 import { gettingStarted } from './routes/getting-started.js';
 import { recipes } from './routes/recipes.js';
@@ -104,6 +105,7 @@ import { richMenus } from './routes/rich-menus.js';
 import { trackedLinks } from './routes/tracked-links.js';
 import { entryRoutes } from './routes/entry-routes.js';
 import { forms } from './routes/forms.js';
+import { postalCode } from './routes/postal-code.js';
 import { adPlatforms } from './routes/ad-platforms.js';
 import { adCosts } from './routes/ad-costs.js';
 import { webMeasurement } from './routes/web-measurement.js';
@@ -152,6 +154,7 @@ import { analytics } from './routes/analytics.js';
 import { analyticsExports } from './routes/analytics-exports.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
+import { dbFor } from './services/db-router.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { restaurantGoogle } from './routes/restaurant-google.js';
 import { googleSheets } from './routes/google-sheets.js';
@@ -307,6 +310,8 @@ export type Env = {
     GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
     ECCUBE_WEBHOOK_SECRET?: string;
     NEN_EC_BASE_URL?: string;
+    /** ECの会員別ランクAPIを配備した後だけ true にする。未設定は送信停止。 */
+    NEN_EC_MEMBER_RANK_SYNC_ENABLED?: string;
     NEN_RICH_MENU_STORE_URL?: string;
     WORKER_URL: string;
     // Admin auth topology (see middleware/admin-auth-config.ts):
@@ -487,6 +492,7 @@ app.route('/', broadcastApprovals);
 app.route('/', broadcasts);
 app.route('/', broadcastMessageAssets);
 app.route('/', users);
+app.route('/', lineAccountTags);
 app.route('/', lineAccounts);
 app.route('/', brand);
 app.route('/', conversions);
@@ -523,6 +529,7 @@ app.route('/', richMenus);
 app.route('/', trackedLinks);
 app.route('/', entryRoutes);
 app.route('/', forms);
+app.route('/', postalCode);
 app.route('/', adPlatforms);
 app.route('/', adCosts);
 // Web計測の公開口と計測サイトの管理(#819)。
@@ -1354,6 +1361,13 @@ async function runFrequentHeavyJobs(
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
     {
+      name: 'follower import continuation',
+      run: async () => {
+        const { processPendingFollowerImports } = await import('./services/follower-import-background.js');
+        await processPendingFollowerImports(env.DB, { credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY });
+      },
+    },
+    {
       // EC の再試行（上限つき）の回収。落ちた受信を保存済み payload から
       // 同じ入口で回し直す。上限到達は dead letter へ倒す。安定キーと
       // claim で二重実行なし。停止中は回さない。
@@ -1646,8 +1660,17 @@ async function runFrequentHeavyJobs(
 
   if (restaurantTestEnabled(env)) {
     jobs.push({
-      // Googleビジネス第4段: 口コミ・投稿の再同期。5分レーンだが接続ごとの
-      // 55分ゲートで実質1時間ごと。書き込み経路は手動syncと同じ関数を使う。
+      name: 'restaurant hold expiry',
+      run: async () => {
+        const { expireRestaurantHolds, applyDueRestaurantMenuPrices } = await import('./services/restaurant-booking.js');
+        await expireRestaurantHolds(dbFor(env), new Date(event.scheduledTime).toISOString());
+        await applyDueRestaurantMenuPrices(dbFor(env));
+      },
+    });
+    jobs.push({
+      // Googleビジネス第4段: 口コミ・投稿の再同期。重い処理用レーン（`1-56/5`。
+      // 通知レーンと1分ずらした5分間隔）で動くが、接続ごとの55分ゲートで実質1時間ごと。
+      // 読み取りAPIだけを呼び、書き込みAPIは呼ばない（手動syncと同じ関数を使う）。
       name: 'google business resync',
       run: async () => {
         const { processGoogleBusinessHourlyResync } = await import('./services/google-business-resync.js');
@@ -1850,6 +1873,37 @@ async function runSixHourlyHeavyJobs(
         }
       },
     },
+    {
+      // ★V6 36-2: 退会・無料体験切れから保存期限が過ぎた統括の顧客データを消す。
+      // 1回の行数に上限があり、途中で止まっても次の回が続きから消す。
+      name: 'tenant data retention purge',
+      run: async () => {
+        const { processTenantDataPurge } = await import('./services/tenant-data-purge.js');
+        const result = await processTenantDataPurge(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.anchoredTrials + result.tenants + result.deletedRows > 0) {
+          console.log(JSON.stringify({ event: 'tenant_data_retention_purge', ...result }));
+        }
+      },
+    },
+    {
+      // Googleビジネス: Googleから受け取った内容の保存期限（暦日30日）を守る掃除。
+      // 機能スイッチでゲートしない。機能をoffにした店舗の古いコピーが残り続けるほうが
+      // ポリシー違反になるため、スイッチと関係なく毎回走らせる。
+      name: 'google business content retention',
+      run: async () => {
+        const { purgeExpiredGoogleContent, totalRetentionActions } = await import(
+          './services/google-business-retention.js'
+        );
+        const result = await purgeExpiredGoogleContent(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (totalRetentionActions(result) > 0) {
+          console.log(JSON.stringify({ event: 'google_business_content_retention', ...result }));
+        }
+      },
+    },
   ];
 
   if (restaurantTestEnabled(env)) {
@@ -1873,6 +1927,20 @@ async function runSixHourlyHeavyJobs(
         });
         if (result.synced + result.failed > 0) {
           console.log(JSON.stringify({ event: 'google_business_metrics_tick', ...result }));
+        }
+      },
+    });
+    jobs.push({
+      // Googleビジネス: 認可を切らさないための先回り更新。再同期が回らない接続
+      // （場所未選択・機能off）のトークンも6時間ごとに使って、放置による失効を防ぐ。
+      name: 'google business token keepalive',
+      run: async () => {
+        const { processGoogleBusinessTokenKeepalive } = await import('./services/google-business-resync.js');
+        const result = await processGoogleBusinessTokenKeepalive(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.refreshed + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'google_business_token_keepalive_tick', ...result }));
         }
       },
     });
@@ -2018,6 +2086,7 @@ async function scheduled(
       const now = new Date(event.scheduledTime).toISOString();
       const executors = createAutomationActionExecutors({
         credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        operatorMailEnv: env,
       });
       const scheduledResult = await processScheduledAutomationTriggers(env.DB, {
         now, executors, limit: 100,
@@ -2191,15 +2260,19 @@ async function scheduled(
        * 採用直後・手動の再試行で届かなかった分を、期限の来た順に届け直す。
        * EC接続が未設定の環境では何もしない（行は「要対応」として一覧に残る）。
        */
-      const { processDuePhotoRewards, ecPhotoPointClientFromEnv } = await import('./services/photo-reward-sync.js');
+      const { processDuePhotoRewards, processDuePhotoPublicationRewards, ecPhotoPointClientFromEnv } = await import('./services/photo-reward-sync.js');
       const photoRewards = await processDuePhotoRewards(
         env.DB,
         ecPhotoPointClientFromEnv(env),
         { now: new Date() },
       );
+      const publicationRewards = await processDuePhotoPublicationRewards(
+        env.DB, ecPhotoPointClientFromEnv(env), { now: new Date() },
+      );
       if (birthday.queued + birthday.failed + result.sent + result.failed + result.skipped
-        + result.deferred + photoRewards.synced + photoRewards.failed + photoRewards.skipped > 0) {
-        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, photoRewardSynced: photoRewards.synced, photoRewardFailed: photoRewards.failed, ...result }));
+        + result.deferred + photoRewards.synced + photoRewards.failed + photoRewards.skipped
+        + publicationRewards.synced + publicationRewards.failed > 0) {
+        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, photoPublicationRewardSynced: publicationRewards.synced, photoPublicationRewardFailed: publicationRewards.failed, photoRewardSynced: photoRewards.synced, photoRewardFailed: photoRewards.failed, ...result }));
       }
     });
   } catch (e) {
@@ -2364,7 +2437,7 @@ async function scheduled(
     const buildGroupInput = async (snapshot: unknown, fallbackGroupId: string) => {
       const record = snapshot as {
         id?: string; size?: 'large' | 'compact'; chatBarText?: string;
-        isDefaultForAll?: boolean; pages?: Array<{
+        isDefaultForAll?: boolean; defaultOpen?: boolean; pages?: Array<{
           id: string; orderIndex: number; name: string;
           imageR2Key: string | null; imageContentType: string | null;
           lineRichmenuId: string | null;
@@ -2400,6 +2473,7 @@ async function scheduled(
           size: record.size ?? 'large',
           chatBarText: record.chatBarText ?? '',
           isDefaultForAll: record.isDefaultForAll ?? false,
+          defaultOpen: record.defaultOpen === true,
           formBaseUrl,
           pages: (record.pages ?? []).map((page) => ({
             id: page.id,
@@ -2482,6 +2556,7 @@ async function scheduled(
           size: restoreGroup.size,
           chatBarText: restoreGroup.chat_bar_text,
           isDefaultForAll: restoreGroup.is_default_for_all === 1,
+          defaultOpen: restoreGroup.default_open === 1,
           formBaseUrl,
           pages: restoreGroup.pages.map((page) => ({
             id: page.id,

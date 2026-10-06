@@ -1,0 +1,8 @@
+[
+  { "postalCode": "1000001", "prefecture": "東京都", "city": "千代田区", "town": "千代田" },
+  { "postalCode": "1000001", "prefecture": "東京都", "city": "千代田区", "town": "皇居外苑" },
+  { "postalCode": "0600000", "prefecture": "北海道", "city": "札幌市中央区", "town": "" },
+  { "postalCode": "5300001", "prefecture": "大阪府", "city": "大阪市北区", "town": "梅田" },
+  { "postalCode": "9000000", "prefecture": "沖縄県", "city": "那覇市", "town": "" },
+  { "postalCode": "4600000", "prefecture": "愛知県", "city": "名古屋市中区", "town": "" }
+]

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
+import styles from './skeleton.module.css'
 
 /*
  * 骨組み（★V7 仕上げ `z97zZN` §3）。
@@ -116,6 +117,78 @@ export function DelayedSkeleton({
 }
 
 /**
+ * 形の決まった骨組みの組み合わせ（V8「サクサク感」⑤・Aで各画面が使う）。
+ * 出来上がりと同じ大きさで置くので、入れ替わっても高さは動かない
+ * （CLS 0）。使い方は `DelayedSkeleton` の `skeleton` に渡すだけ。
+ * 入れ物（表・一覧）の `aria-busy` は画面側が付ける。骨1本ずつは
+ * `Skeleton` が `aria-hidden` のため読み上げに出ない。
+ * V8 の光は `data-skeleton` に自動で付く。自前の動きは書かない。
+ */
+
+/**
+ * 表の骨組み。見出しは画面の表に残し、tbody の場所へ置く。
+ * 行の高さは出来上がりと同じ（V8 52・v7 は 58 を渡す）。
+ * 列の骨の幅は出来上がりの列幅と同じ値を渡す。
+ */
+export function TableSkeleton({
+  columns,
+  rows = 5,
+  rowHeight = 52,
+}: {
+  /** 列ごとの骨の幅（px 数か CSS の長さ。出来上がりの列幅と同じ）。 */
+  columns: Array<number | string>
+  /** 骨の行数。 */
+  rows?: number
+  /** 1 行の高さ（px）。 */
+  rowHeight?: number
+}) {
+  return (
+    <tbody aria-hidden="true">
+      {Array.from({ length: rows }, (_, row) => (
+        <tr key={row} style={{ height: rowHeight }}>
+          {columns.map((width, column) => (
+            <td key={column}>
+              <Skeleton height={14} width={width} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  )
+}
+
+/**
+ * カードの骨組み。カードの大きさで並べる。
+ */
+export function CardsSkeleton({ count = 4, height = 112 }: { count?: number; height?: number }) {
+  return (
+    <div aria-hidden="true" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {Array.from({ length: count }, (_, index) => (
+        <Skeleton key={index} height={height} className="w-full rounded-card" />
+      ))}
+    </div>
+  )
+}
+
+/**
+ * 数のタイルの骨組み。題の骨＋数字の幅の骨を帯に並べる。
+ */
+export function StatTilesSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div aria-hidden="true" className="flex flex-col gap-4 sm:flex-row">
+      {Array.from({ length: count }, (_, index) => (
+        <div key={index} className="flex-1 rounded-card border border-hairline bg-canvas px-4 py-3">
+          <Skeleton height={12} width={64} />
+          <div className="mt-2">
+            <Skeleton height={28} width={96} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
  * 「遅れてだけ見せる」判定（`sTJsh` §2 の「0.3秒より早く来たら薄めない」用）。
  * 骨組みと違って最低表示時間は無い。応答が来たらすぐ元に戻す。
  */
@@ -130,4 +203,17 @@ export function useDelayedShow(active: boolean, delayMs = SHOW_DELAY_MS): boolea
     return () => clearTimeout(timer)
   }, [active, delayMs])
   return visible
+}
+
+/** 正本 jr5Nl：一覧の顔と4列の骨。幅は置き場所に従う。 */
+export function SkeletonRow({ className }: { className?: string }) {
+  return (
+    <div className={[styles.row, className].filter(Boolean).join(' ')} aria-hidden="true">
+      <Skeleton circle width={32} height={32} className={styles.face} />
+      <Skeleton height={10} className={styles.flexBone} />
+      <Skeleton width={70} height={10} className={styles.bone} />
+      <Skeleton height={10} className={styles.flexBone} />
+      <Skeleton width={50} height={10} className={styles.bone} />
+    </div>
+  )
 }

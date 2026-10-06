@@ -55,7 +55,7 @@ describe('文字色は、置かれる面の上で 4.5:1 以上', () => {
   }
 })
 
-describe('LINE の緑は文字色に使わない', () => {
+describe('LINE の緑は管理画面の文字色に使わない（LINEの写しは正本どおり）', () => {
   it('画面のクラスに text-accent・text-accent-hover（-deep・-soft 以外）が無い', () => {
     const hits = files(SRC, (n) => /\.tsx?$/.test(n))
       .flatMap((path) => readFileSync(path, 'utf8').split('\n').map((line, i) => ({ path, line, i })))
@@ -66,7 +66,15 @@ describe('LINE の緑は文字色に使わない', () => {
 
   it('CSS の文字色に var(--color-accent) を使わない', () => {
     const hits = files(SRC, (n) => n.endsWith('.css'))
-      .filter((path) => /(?<![\w-])color:\s*var\(--color-accent\s*[,)]/.test(readFileSync(path, 'utf8')))
+      .filter((path) => {
+        let css = readFileSync(path, 'utf8')
+        // cfVyj は LINE アプリの写し。V8 の商品操作だけは正本のLINE緑を使う。
+        // 管理画面のボタン・リンクや、v7には例外を広げない。
+        if (path === join(SRC, 'components/shared/line-preview.module.css')) {
+          css = css.replace(/\[data-theme='v8'\] \.productAction \{[^}]*\}/g, '')
+        }
+        return /(?<![\w-])color:\s*var\(--color-accent\s*[,)]/.test(css)
+      })
       .map((path) => path.replace(SRC, ''))
     expect(hits, 'var(--color-accent-deep) にしてください').toEqual([])
   })

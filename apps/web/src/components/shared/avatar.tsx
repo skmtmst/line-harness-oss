@@ -21,7 +21,7 @@ export default function Avatar({
 }: {
   name?: string | null
   src?: string | null
-  size?: 24 | 32 | 40 | 56
+  size?: 24 | 28 | 32 | 34 | 40 | 52 | 56
   className?: string
 }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)

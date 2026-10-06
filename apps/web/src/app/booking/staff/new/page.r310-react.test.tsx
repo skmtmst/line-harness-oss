@@ -113,7 +113,7 @@ async function fillAndSave() {
   fireEvent.change(screen.getByPlaceholderText('例: 田中 美咲'), { target: { value: '田中' } })
   fireEvent.click(screen.getByRole('checkbox', { name: /カット/ }))
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: 'スタッフを登録する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'スタッフを追加する' }))
   })
 }
 

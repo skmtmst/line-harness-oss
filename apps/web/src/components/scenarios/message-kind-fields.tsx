@@ -205,7 +205,7 @@ function StickerThumb({ stickerId, label }: { stickerId: string; label: string }
 
   if (failed) {
     return (
-      <span className="text-ink-secondary flex h-12 w-12 items-center justify-center text-center text-[10px] leading-tight">
+      <span className="text-ink-secondary flex h-12 w-12 items-center justify-center text-center text-nano leading-tight">
         {label}
       </span>
     )
@@ -299,7 +299,7 @@ export default function MessageKindFields({ kind, value, onChange }: MessageKind
           <input
             value={v.title}
             onChange={(e) => set({ title: e.target.value })}
-            placeholder="例：然-NEN- 本店"
+            placeholder="例：本店"
             className={inputClass}
           />
         </label>

@@ -24,6 +24,7 @@ vi.mock('next/link', () => ({ default: () => null }))
 // N-264: 一覧は ?highlight= を読む。試験ではクエリ無しとして返す。
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
@@ -89,6 +90,7 @@ function installFetch() {
         success: true, data: { id: 'point-a', version: 4, revisionId: 'rev-1', movedUsages: 1, updatedAt: '' },
       }), { status: net.reviseStatus, headers: { 'Content-Type': 'application/json' } })
     }
+    if (path.startsWith('/api/staff/me')) return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (path.startsWith('/api/conversions/definitions')) {
       return new Response(JSON.stringify(listBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
@@ -274,7 +276,8 @@ describe('編集も起点に合う金額の決め方にする', () => {
           success: true, data: { id: 'point-x', version: 4, revisionId: 'rev-1', movedUsages: 1, updatedAt: '' },
         }), { status: net.reviseStatus, headers: { 'Content-Type': 'application/json' } })
       }
-      if (path.startsWith('/api/conversions/definitions')) {
+      if (path.startsWith('/api/staff/me')) return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (path.startsWith('/api/conversions/definitions')) {
         return new Response(JSON.stringify({ ...listBody(), data: { ...listBody().data, items } }),
           { status: 200, headers: { 'Content-Type': 'application/json' } })
       }
@@ -393,7 +396,8 @@ describe('停止済み成果地点の編集導線', () => {
       const raw = typeof input === 'string' ? input : String(input)
       const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
       net.calls.push({ path, method: init?.method ?? 'GET', body: null })
-      if (path.startsWith('/api/conversions/definitions')) {
+      if (path.startsWith('/api/staff/me')) return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    if (path.startsWith('/api/conversions/definitions')) {
         return new Response(JSON.stringify({ ...listBody(), data: { ...listBody().data, items: [stopped] } }),
           { status: 200, headers: { 'Content-Type': 'application/json' } })
       }

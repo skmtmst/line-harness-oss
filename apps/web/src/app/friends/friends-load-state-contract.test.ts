@@ -28,7 +28,7 @@ describe('V6 友だち一覧の読込状態', () => {
     expect(TABLE).toContain("status === 'ready' ? `${formatNumber(total)}件` : '—'")
     expect(PAGE).not.toContain("{loadStatus === 'ready' ? `${formatNumber(total)}件` : '—'}")
     expect(PAGE).toContain("onExportReady(loadStatus === 'ready' ? exportCurrentPage : null)")
-    expect(PAGE).toContain('disabled={!exportCurrentPage}')
+    expect(PAGE).toContain('<FriendsListHeadV8 onExportCurrentPage={exportCurrentPage} />')
   })
 
   it('条件変更前の遅い応答と古い一覧を採用しない', () => {

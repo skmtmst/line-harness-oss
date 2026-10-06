@@ -162,7 +162,7 @@ export default function V8PartsPage() {
       <section>
         <h2 className="text-sm font-bold text-ink">色を選ぶ（macOS のカラーウェル）</h2>
         <div className="mt-3 flex items-center gap-4">
-          <ColorWell value={color} onChange={setColor} label="アクセントカラー" />
+          <ColorWell value={color} onChange={(next) => setColor(next ?? '#06c755')} label="アクセントカラー" />
           <span className="text-xs tabular-nums text-ink-secondary">{color}</span>
         </div>
         {/* ポップは下へ開くので、下の節が重ならないよう高さを空ける。 */}

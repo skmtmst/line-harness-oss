@@ -1,0 +1,388 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8 オートメーション3板（LWQXd・J1VA8・c7dxp）の地の組立て。
+ * v8 の枝だけで読み込むので v7 の見た目には触らない。自前の動きは書かない。
+ */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.lead {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+  }
+}
+
+/* 数の帯の4マス：先頭マス以外に左の線だけ。 */
+@media (min-width: 768px) {
+  .kpis > :nth-child(n + 2) {
+    border-left: 1px solid var(--color-divider);
+  }
+}
+
+/* 札の箱を消して帯のマスにする（直置き・包みの中どちらの札も）。 */
+.kpis [data-design-version] {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-none);
+  background: transparent;
+  box-shadow: none;
+}
+
+.railGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .railGrid {
+    grid-template-columns: var(--folder-rail-width) minmax(0, 1fr);
+  }
+}
+
+.railSide {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.railMain {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.noticeBand {
+  margin: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbarSpice {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.searchWrap {
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .searchWrap {
+    width: 224px;
+  }
+}
+
+.selectWrap {
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .selectWrap {
+    width: 176px;
+  }
+}
+
+.pageSizeWrap {
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .pageSizeWrap {
+    width: 128px;
+  }
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.ruleName {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.subLine {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.cellStack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.footnote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+/* 見本の札：4列・高さをそろえる。 */
+.sampleGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .sampleGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .sampleGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.sampleCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.sampleRows {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 8px;
+  font-size: 13px;
+  margin: 0;
+}
+
+.sampleRows dt {
+  color: var(--color-ink-faint);
+}
+
+.sampleRows dd {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sampleButton {
+  margin-top: auto;
+}
+
+/* 下書き仕上げの2列：左の手順・右の rail。 */
+.finishGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+  .finishGrid {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+.finishMain {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.finishSide {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sourceBand {
+  margin: 0;
+}
+
+.stepNo {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.stepNote {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.triggerCards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .triggerCards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.actionRow + .actionRow {
+  margin-top: 8px;
+}
+
+.actionNo {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.actionBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.actionTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.actionDetail {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sideTitle {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.sideText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-ink-secondary);
+}
+
+.sideNumber {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sideNumber strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.careList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-ink-secondary);
+}
+
+.linkRows {
+  margin: 0;
+  font-size: 13px;
+}
+
+.linkRows div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.linkRows dt {
+  color: var(--color-ink-faint);
+}
+
+.linkRows dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-ink);
+  text-align: right;
+}

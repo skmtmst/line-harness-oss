@@ -1,3 +1,4 @@
+import type { FriendActiveMonthComparison as importFriendActiveMonthComparison } from '@line-crm/shared';
 /**
  * ダッシュボードが1回で読む数。
  *
@@ -6,6 +7,8 @@
  * 「有効友だちは今朝の値、未対応は今の値」のような画面は読み違えのもとなので、
  * 1回のリクエストでまとめて返す。
  */
+import { FORM_SUBMIT_CLAIM_STALE_MS } from './forms.js';
+import { toJstString } from './utils.js';
 
 /** 期間の指定。設計の「今日 / 過去7日 / 過去28日」に対応する。 */
 export type DashboardPeriod = 'today' | 'last7' | 'last28';
@@ -1151,7 +1154,7 @@ export async function getInboxStats(
 }
 
 /** 友だち画面の上部に出す数（設計 `V2 2-2 友だち` の KPIs）。 */
-export interface FriendStats {
+export interface FriendStats extends importFriendActiveMonthComparison {
   active: number;
   total: number;
   blockedByThem: number;
@@ -1161,6 +1164,20 @@ export interface FriendStats {
   /** 今月に追加された人数と、前月同期比。 */
   addedThisMonth: number;
   addedLastMonth: number;
+}
+
+/** 前月末の記録が可視対象すべてに揃う場合だけ合計する。 */
+export async function getFriendActiveMonthComparison(db: D1Database, scope: AccountStatsScope, active: number, nowMs = Date.now()): Promise<importFriendActiveMonthComparison> {
+  const now = new Date(nowMs + 9 * 3600_000);
+  const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0)).toISOString().slice(0, 10);
+  const filter = snapshotScopeSql(scope);
+  const row = await db.prepare(`SELECT COUNT(*) AS recorded, SUM(active) AS active FROM friend_daily_snapshots WHERE date = ? AND ${filter.sql}`)
+    .bind(day, ...filter.binds).first<{ recorded: number; active: number | null }>();
+  const expected = 'allTenants' in scope
+    ? (await db.prepare('SELECT COUNT(*) + 1 AS total FROM line_accounts').first<{ total: number }>())?.total ?? 0
+    : new Set([...scope.allowedAccountIds, ...(scope.includeUnassigned ? [UNASSIGNED_SNAPSHOT_ACCOUNT_ID] : [])]).size;
+  const previous = row?.recorded === expected && expected > 0 ? Number(row.active ?? 0) : null;
+  return { activeLastMonth: previous, activeMonthDelta: previous === null ? null : active - previous, activeComparisonDate: day };
 }
 
 /**
@@ -1191,6 +1208,7 @@ export async function getFriendStats(
   ]);
 
   return {
+    ...await getFriendActiveMonthComparison(db, scope, breakdown.active),
     active: breakdown.active,
     total: breakdown.total,
     // 設計は「相手から / 自分から」の2つ。相互は相手からに含める
@@ -1359,7 +1377,24 @@ export interface ListStats {
     /** 今週（過去7日）のシナリオ由来の送信。 */
     sentThisWeek: number;
   };
-  reminders: { total: number; active: number; waiting: number; sentThisMonth: number };
+  reminders: { total: number; active: number; waiting: number; sentThisMonth: number; failed: number };
+  /**
+   * ★V8 回答フォーム一覧（I3L41O）の数の帯。
+   * 「公開中」は受付中（is_active）の数、下書きは受付中でない数。
+   * 今月・先月は日本時間の暦月。答え終えた割合は「今月開いた人のうち
+   * 今月答え終えた人」の割合で、開いた人が 0 のとき null（「—」と出す）。
+   * 後処理の未完は、失敗したか途中で止まった予約を持つ回答の数
+   * （一覧の「後処理の未完」の札と同じ近似）。
+   */
+  forms: {
+    total: number;
+    published: number;
+    draft: number;
+    monthlySubmits: number;
+    prevMonthSubmits: number;
+    monthlyCompletionRate: number | null;
+    pendingPostActions: number;
+  };
 }
 
 export async function getListStats(db: D1Database, scope: AccountStatsScope): Promise<ListStats> {
@@ -1369,6 +1404,8 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
   const messageScope = accountScopeSql(scope, 'line_account_id');
   const scenarioScope = accountScopeSql(scope, 'line_account_id');
   const reminderScope = accountScopeSql(scope, 'line_account_id');
+  // reminder_delivery_runs にも line_account_id があるので、JOIN内では実施側の列で絞る。
+  const reminderRunScope = accountScopeSql(scope, 'rdr.line_account_id');
   const markScope = 'allTenants' in scope
     ? { sql: '1 = 1', binds: [] as string[] }
     : scope.allowedAccountIds.length > 0
@@ -1387,7 +1424,7 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
     }
   };
 
-  const [tags, marks, searches, templates, scenarios, reminders] = await Promise.all([
+  const [tags, marks, searches, templates, scenarios, reminders, forms] = await Promise.all([
     safe(async () => {
       const row = await db
         .prepare(
@@ -1538,10 +1575,13 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
           `SELECT
              (SELECT COUNT(*) FROM reminders WHERE deleted_at IS NULL AND ${reminderScope.sql}) AS total,
              (SELECT COUNT(*) FROM reminders WHERE deleted_at IS NULL AND is_active = 1 AND ${reminderScope.sql}) AS active,
-             (SELECT COUNT(*) FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.status = 'active' AND ${friendScope.sql}) AS waiting`,
+             (SELECT COUNT(*) FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.status = 'active' AND ${friendScope.sql}) AS waiting,
+             (SELECT COUNT(*) FROM reminder_delivery_runs rdr
+               JOIN reminders rm ON rm.id = rdr.reminder_id
+              WHERE rdr.status IN ('retry_wait', 'permanent_failed') AND rm.deleted_at IS NULL AND ${reminderRunScope.sql}) AS failed`,
         )
-        .bind(...reminderScope.binds, ...reminderScope.binds, ...friendScope.binds)
-        .first<{ total: number; active: number; waiting: number }>();
+        .bind(...reminderScope.binds, ...reminderScope.binds, ...friendScope.binds, ...reminderRunScope.binds)
+        .first<{ total: number; active: number; waiting: number; failed: number }>();
       // リマインダ由来の送信。source は 028 で入っている。
       const sentThisMonth = await count(
         db,
@@ -1554,10 +1594,105 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         active: row?.active ?? 0,
         waiting: row?.waiting ?? 0,
         sentThisMonth,
+        failed: row?.failed ?? 0,
       };
-    }, { total: 0, active: 0, waiting: 0, sentThisMonth: 0 }),
+    }, { total: 0, active: 0, waiting: 0, sentThisMonth: 0, failed: 0 }),
+
+    safe(async () => {
+      // フォームはアカウント直下ではなく form_accounts(M:N) で持つ。
+      // 一覧APIと同じ「そのアカウントに見えるフォーム」の範囲で数える。
+      const formScope: { sql: string; binds: string[] } = 'allTenants' in scope
+        ? { sql: '1 = 1', binds: [] }
+        : scope.allowedAccountIds.length > 0
+          ? {
+              sql: `(EXISTS (
+                      SELECT 1 FROM form_accounts fa
+                      WHERE fa.form_id = f.id
+                        AND fa.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')})
+                    )${scope.includeUnassigned
+                      ? ` OR NOT EXISTS (
+                          SELECT 1 FROM form_accounts unassigned_fa WHERE unassigned_fa.form_id = f.id
+                        )`
+                      : ''})`,
+              binds: [...scope.allowedAccountIds],
+            }
+          : scope.includeUnassigned
+            ? {
+                sql: `NOT EXISTS (
+                        SELECT 1 FROM form_accounts unassigned_fa WHERE unassigned_fa.form_id = f.id
+                      )`,
+                binds: [],
+              }
+            : { sql: '1 = 0', binds: [] };
+      // 先月（日本時間の暦月）。帯の「先月 640件」に使う。
+      const [year, month] = monthStart.split('-').map(Number);
+      const prevMonth = new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7);
+      // 「止まった」とみなす目安は一覧の未完札と同じ。
+      const staleBefore = toJstString(new Date(Date.now() - FORM_SUBMIT_CLAIM_STALE_MS));
+      const row = await db
+        .prepare(
+          `SELECT
+             (SELECT COUNT(*) FROM forms f
+               WHERE f.status = 'active' AND ${formScope.sql}) AS total,
+             (SELECT COUNT(*) FROM forms f
+               WHERE f.status = 'active' AND f.is_active = 1 AND ${formScope.sql}) AS published,
+             (SELECT COUNT(*) FROM form_submissions fs JOIN forms f ON f.id = fs.form_id
+               WHERE fs.is_test = 0 AND substr(fs.created_at, 1, 7) = ? AND ${formScope.sql}) AS monthly_submits,
+             (SELECT COUNT(*) FROM form_submissions fs JOIN forms f ON f.id = fs.form_id
+               WHERE fs.is_test = 0 AND substr(fs.created_at, 1, 7) = ? AND ${formScope.sql}) AS prev_month_submits,
+             -- 開いた人はフォームごとの一意数の合計（行の「開いた人数」と同じ数え方）。
+             (SELECT COUNT(*) FROM (
+               SELECT DISTINCT fo.friend_id, fo.form_id
+                 FROM form_opens fo JOIN forms f ON f.id = fo.form_id
+                 WHERE fo.is_test = 0 AND fo.friend_id IS NOT NULL
+                   AND substr(fo.opened_at, 1, 7) = ? AND ${formScope.sql}
+             )) AS monthly_opens,
+             (SELECT COUNT(*) FROM form_submit_claims c JOIN forms f ON f.id = c.form_id
+               WHERE c.submission_id IS NOT NULL
+                 AND (c.status = 'failed'
+                   OR (c.status = 'in_progress' AND c.updated_at < ?))
+                 AND ${formScope.sql}) AS pending_post_actions`,
+        )
+        .bind(
+          ...formScope.binds,
+          ...formScope.binds,
+          monthStart, ...formScope.binds,
+          prevMonth, ...formScope.binds,
+          monthStart, ...formScope.binds,
+          staleBefore, ...formScope.binds,
+        )
+        .first<{
+          total: number;
+          published: number;
+          monthly_submits: number;
+          prev_month_submits: number;
+          monthly_opens: number;
+          pending_post_actions: number;
+        }>();
+      const monthlyOpens = row?.monthly_opens ?? 0;
+      const monthlySubmits = row?.monthly_submits ?? 0;
+      return {
+        total: row?.total ?? 0,
+        published: row?.published ?? 0,
+        draft: (row?.total ?? 0) - (row?.published ?? 0),
+        monthlySubmits,
+        prevMonthSubmits: row?.prev_month_submits ?? 0,
+        monthlyCompletionRate: monthlyOpens === 0
+          ? null
+          : Math.round((monthlySubmits / monthlyOpens) * 1000) / 10,
+        pendingPostActions: row?.pending_post_actions ?? 0,
+      };
+    }, {
+      total: 0,
+      published: 0,
+      draft: 0,
+      monthlySubmits: 0,
+      prevMonthSubmits: 0,
+      monthlyCompletionRate: null,
+      pendingPostActions: 0,
+    }),
   ]);
 
   void ninetyDaysAgo;
-  return { tags, marks, searches, templates, scenarios, reminders };
+  return { tags, marks, searches, templates, scenarios, reminders, forms };
 }

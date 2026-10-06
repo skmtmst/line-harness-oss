@@ -78,8 +78,11 @@ export default function ListState({
   className,
   'data-design': dataDesign,
   error,
+  icon,
 }: {
   kind: ListStateKind
+  /** 空の表示で、その機能の印を渡す。 */
+  icon?: ReactNode
   /** 設計どおりの文言で足りないとき（「まだタグがありません」など）だけ渡す。 */
   title?: string
   description?: string
@@ -141,7 +144,7 @@ export default function ListState({
       aria-busy={kind === 'loading' || undefined}
       role={kind === 'forbidden' ? 'alert' : undefined}
     >
-      <Icon aria-hidden="true" size={24} className={iconClass} />
+      <span className={styles.iconWrap} aria-hidden="true">{icon ?? <Icon aria-hidden="true" size={24} className={iconClass} />}</span>
       <p className={styles.title}>{title ?? preset.title}</p>
       <p className={styles.description}>{description ?? preset.description}</p>
       {action ? <div className={styles.action}>{action}</div> : null}

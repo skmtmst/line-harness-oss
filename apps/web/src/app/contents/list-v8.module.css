@@ -1,0 +1,485 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8 登録メディア一覧（板 `O7hUt7`）。
+ * v6 の一覧（`page.tsx` 内）とは別の部品として持つ。
+ * データの口は同じ。違いは置き場と見せ方だけ——上に4マスの数の帯
+ * （登録メディア／どこでも使っていない／使っている容量／アーカイブ）、
+ * 左にフォルダの列、道具の段（検索・絞り込み・並べ方・並び順・表示件数）、
+ * 札の格子、表の下に表示範囲とページ送り、画面の下に浮く一括バー。
+ * 札の操作は「…」へ集める（プレビュー・使用箇所を見る・名前を変える・
+ * フォルダへ移す・ダウンロード・アーカイブ・削除）。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ *
+ * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
+ * 板が 1100px を切ったらフォルダの列を上へ畳み、数の帯は2列にする。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+/* 見出し：画面名＋一行の説明。右にメディアを登録する。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.headActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 閲覧のみの帯。数の帯の上。 */
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 数の帯：4つのマスを白い板いっぱいに区切り線で並べる。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-canvas);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 16px;
+  border-left: 1px solid var(--color-divider);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.kpi:first-child {
+  border-left: 0;
+}
+
+button.kpi {
+  cursor: pointer;
+}
+
+.kpiHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kpiTile {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+.kpiLabel {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiDetail {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 本体：左にフォルダの列、右に道具の段と札。 */
+.columns {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 札の格子。板の幅で列数が伸び縮みする。 */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.thumbButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 112px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas-sunken);
+  cursor: pointer;
+}
+
+.thumbNarrow {
+  width: 80px;
+  height: 56px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-hairline);
+  border-bottom: 0;
+}
+
+.thumbLabel {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.cardBody {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.nameRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kindBadge {
+  flex-shrink: 0;
+  padding: 2px 4px;
+  border-radius: var(--radius-mini);
+  background: var(--color-ink-secondary);
+  color: var(--color-on-accent);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.archivedBadge {
+  flex-shrink: 0;
+  padding: 2px 4px;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.fileName {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.usageUsed {
+  color: var(--color-success);
+}
+
+.usageIdle {
+  color: var(--color-ink-faint);
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.menuWrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+/* 名前を直している札。札のそばに失敗文を出す。 */
+.renameBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.renameInput {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-control, 8px);
+  font-size: 12px;
+}
+
+.renameError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.renameActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* 一覧で並べるときの行。載せる中身は格子の札と同じ。 */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.rowBody {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+}
+
+/* 並べ方の切り替え：枠 高さ40・各44幅、押している側に色。 */
+.viewToggle {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+}
+
+.viewButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 100%;
+  border: 0;
+  background: none;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.viewButtonActive {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+/* 表の下：表示範囲・ページ送り・全選択。 */
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.footLeft {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.selectAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+}
+
+/* 「…」の中身の案内。見本の札の下の一行。 */
+.helpNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* 200件超えの案内。 */
+.moreNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+/* フォルダへ移す窓の選び欄。 */
+.moveField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.moveLabel {
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
+@container (max-width: 1099px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 2列の帯：偶数マスに左の線、3・4番目に上の線。 */
+  .kpi:nth-child(n + 2) {
+    border-left: 0;
+  }
+
+  .kpi:nth-child(even) {
+    border-left: 1px solid var(--color-divider);
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--color-divider);
+  }
+
+  /* フォルダの列は本体の上へ畳む。 */
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ===== 板が 560px を切ったら数の帯は1列にする。 ===== */
+@container (max-width: 560px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpi:nth-child(n + 2) {
+    border-left: 0;
+    border-top: 1px solid var(--color-divider);
+  }
+}

@@ -251,8 +251,13 @@ export const restaurantGoogleApi = {
   connection: (accountId: string) => fetchApi<GoogleConnectionData>(withAccount(`${base}/connection`, accountId)),
   connectStart: (accountId: string) =>
     fetchApi<{ success: true; mode: 'connect' | 'reconnect'; authorizeUrl: string }>(withAccount(`${base}/connect/start`, accountId), { method: 'POST', body: '{}' }),
-  selectLocation: (accountId: string, locationName: string) =>
-    fetchApi<{ success: true; connection: GoogleConnection }>(withAccount(`${base}/connect/select-location`, accountId), { method: 'POST', body: JSON.stringify({ locationName }) }),
+  // confirmSwitch は「前につないでいた店舗とは別の店舗に切り替える」確認を取れたときだけ true。
+  // 付けずに別店舗を送ると、サーバーが code: 'switch_confirmation_required' で止める。
+  selectLocation: (accountId: string, locationName: string, confirmSwitch?: boolean) =>
+    fetchApi<{ success: true; connection: GoogleConnection }>(withAccount(`${base}/connect/select-location`, accountId), {
+      method: 'POST',
+      body: JSON.stringify(confirmSwitch ? { locationName, confirmSwitch: true } : { locationName }),
+    }),
   disconnect: (accountId: string) =>
     fetchApi<{ success: true; revoked: boolean; connection: GoogleConnection }>(withAccount(`${base}/disconnect`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
   syncReviews: (accountId: string) =>
@@ -266,10 +271,11 @@ export const restaurantGoogleApi = {
     ),
   review: (accountId: string, id: string) =>
     fetchApi<{ success: true; review: GoogleReview; store: { id: string; name: string }; connection: GoogleConnection }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}`, accountId)),
-  generateDraft: (accountId: string, id: string, mode: 'new' | 'shorter' | 'polite') =>
+  /** baseText は「短くする」「丁寧にする」で書き換える元の文章（保存前の画面上の内容）。 */
+  generateDraft: (accountId: string, id: string, mode: 'new' | 'shorter' | 'polite', baseText?: string) =>
     fetchApi<{ success: true; draft: string; aiGenerated: true; generatedAt: string; mode: string }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}/draft/generate`, accountId), {
       method: 'POST',
-      body: JSON.stringify({ mode }),
+      body: JSON.stringify(mode === 'new' ? { mode } : { mode, baseText: baseText ?? '' }),
     }),
   saveDraft: (accountId: string, id: string, replyDraft: string) =>
     fetchApi<{ success: true; review: GoogleReview }>(withAccount(`${base}/reviews/${encodeURIComponent(id)}/draft`, accountId), { method: 'PUT', body: JSON.stringify({ replyDraft }) }),

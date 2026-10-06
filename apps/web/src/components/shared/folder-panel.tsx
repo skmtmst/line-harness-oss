@@ -3,6 +3,8 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
+import { Ellipsis, FolderOpen, FolderPlus } from 'lucide-react'
+import styles from './folder-panel.module.css'
 
 /** テンプレート一覧を正とする、全画面共通のフォルダ欄幅。 */
 export const FOLDER_RAIL_WIDTH = '15.75rem'
@@ -38,6 +40,8 @@ export interface FolderPanelRow {
    * 未設定は null。色はフォルダに付き、属するタグに出る。
    */
   color?: string | null
+  /** V8 の分類の印。「すべて」などは呼び出し側が渡す。 */
+  icon?: ReactNode
   /**
    * 直せる行だけ渡す。「すべて」「未分類」は直せない。
    *
@@ -111,7 +115,10 @@ export default function FolderPanel({
   addFolderTitle,
   addFolderNote,
   children,
+  createAction,
 }: {
+  /** V8: 作る操作はフォルダ列の先頭に置く。 */
+  createAction?: ReactNode
   rows: FolderPanelRow[]
   activeId: string
   onSelect: (id: string) => void
@@ -141,40 +148,49 @@ export default function FolderPanel({
 
   return (
     // **読み上げ名を持つ。** 帯が何の分類かを、見出しの外からも辿れるように。
-    <aside aria-label="フォルダ" className="bg-canvas rounded-card border-hairline h-fit overflow-visible border">
-      <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
-        <p className="text-ink text-sm font-semibold">{heading}</p>
-        {total === undefined ? null : <span className="text-ink-faint text-xs tabular-nums">{total}</span>}
+    <aside aria-label="フォルダ" className={`${styles.panel} v7:bg-canvas v7:rounded-card v7:border-hairline v7:h-fit overflow-visible v7:border`}>
+      {createAction ? <div className={`${styles.create} v8-only`}>{createAction}</div> : null}
+      <div className={`${styles.heading} v7:border-hairline flex items-center justify-between v7:border-b v7:px-4 v7:py-3`}>
+        <p className="v7:text-ink v7:text-sm font-semibold">{heading}</p>
+        {total === undefined ? null : <span className="text-ink-faint v7:text-xs v7:tabular-nums">{total}</span>}
       </div>
-      <nav className="p-2">
+      <nav className={`${styles.rows} v7:p-2`}>
         {rows.map((row) => {
           const hasActions = Boolean(row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
+          const isActive = activeId === row.id
 
           return (
-            <div key={row.id} className="group relative flex items-center">
+            <div
+              key={row.id}
+              className={`${styles.row} group relative flex items-center`}
+              data-active={isActive || undefined}
+              data-menu-open={openMenuId === row.id || undefined}
+            >
               <button
                 type="button"
                 onClick={() => {
                   setOpenMenuId(null)
                   onSelect(row.id)
                 }}
-                className={`rounded-control flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                title={row.label}
+                aria-current={activeId === row.id ? 'true' : undefined}
+                className={`${styles.select} v7:rounded-control flex min-w-0 flex-1 items-center gap-2 v7:px-3 v7:py-2 text-left v7:text-sm transition-colors ${
                   activeId === row.id
-                    ? 'bg-accent-soft text-accent-deep font-medium'
-                    : 'text-ink-secondary hover:bg-canvas-sunken'
+                    ? 'v7:bg-accent-soft v7:text-accent-deep v7:font-medium'
+                    : 'v7:text-ink-secondary hover:bg-canvas-sunken'
                 }`}
               >
                 {/* 色が付いているフォルダは丸で出す。フォルダの形を塗ると、
                     色が面で乗って名前より目立ってしまう。 */}
                 {row.color ? (
                   <span
-                    className="rounded-pill h-3 w-3 shrink-0"
+                    className="v7-only rounded-pill h-3 w-3 shrink-0"
                     style={{ backgroundColor: row.color }}
                     aria-hidden="true"
                   />
                 ) : (
                   <svg
-                    className="h-4 w-4 shrink-0"
+                    className="v7-only h-4 w-4 shrink-0"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth={1.8}
@@ -187,13 +203,19 @@ export default function FolderPanel({
                     />
                   </svg>
                 )}
-                <span className="min-w-0 flex-1 truncate">{row.label}</span>
-                {row.count === null ? null : <span className="text-ink-faint shrink-0 text-xs tabular-nums">{row.count}</span>}
+                <span className={`${styles.folderIcon} v8-only`} aria-hidden="true">{row.icon ?? (row.color ? <svg width="15" height="15" viewBox="0 0 14 14"><path fill={row.color} d="M11.8125 3.9375H7.16406L5.6875 2.46094Q5.41406 2.1875 5.08594 2.1875H2.1875Q1.80469 2.1875 1.55859 2.43359T1.3125 3.0625V10.99219Q1.3125 11.32031 1.55859 11.56641T2.13281 11.8125H11.86719Q12.19531 11.8125 12.44141 11.56641T12.6875 10.99219V4.8125Q12.6875 4.42969 12.44141 4.18359T11.8125 3.9375ZM2.1875 3.0625H5.08594L5.96094 3.9375H2.1875Z" /></svg> : <FolderOpen size={15} />)}</span>
+                <span className={`${styles.label} min-w-0 flex-1 truncate`}>{row.label}</span>
+                {row.count === null ? null : <span className={`${styles.count} text-ink-faint shrink-0 v7:text-xs v7:tabular-nums`}>{row.count}</span>}
               </button>
               {/* 操作は設計どおり1つの「…」へまとめる。行に5個の小さな口を
                   並べると、選択との押し間違いが増え、短い名前も狭くなる。 */}
+              {/* I3L41O：選んだ行には絵どおり「…」の場所を取る。操作なしの
+                  選んだ行（すべて・未分類）は空きの場所取りを置く。 */}
+              {isActive && !hasActions ? (
+                <div className={styles.menuSlot} aria-hidden="true" />
+              ) : null}
               {hasActions && (
-                <div className="relative shrink-0">
+                <div className={`${styles.menu} relative shrink-0`}>
                   <button
                     type="button"
                     data-qa-open={row.qaOpen}
@@ -204,9 +226,9 @@ export default function FolderPanel({
                     title={`フォルダ「${row.label}」の操作`}
                     // R37: 狭い幅ではホバーが無いため「…」を常に出す。
                     // 出さないとスマホから名前変更・削除に届かない。
-                    className="text-ink-faint hover:bg-canvas-sunken hover:text-action rounded-control min-h-8 min-w-8 text-lg leading-none opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 max-lg:opacity-100"
+                    className={`${styles.menuButton} text-ink-faint v7:hover:bg-canvas-sunken hover:text-action v7:rounded-control min-h-8 min-w-8 text-lg leading-none v7:opacity-0 transition-opacity v7:group-hover:opacity-100 v7:focus:opacity-100 v7:max-lg:opacity-100`}
                   >
-                    …
+                    <span className="v7-only">…</span><Ellipsis className="v8-only" size={14} aria-hidden="true" />
                   </button>
                   {/*
                     ★V7（m13g）：フォルダの操作も共通 ActionMenu にそろえる。
@@ -226,15 +248,16 @@ export default function FolderPanel({
         })}
       </nav>
       {(onAddFolder || addFolderDisabled || addFolderNote || children) && (
-        <div className="border-hairline space-y-2 border-t p-3">
+        <div className={`${styles.footer} v7:border-hairline v7:space-y-2 v7:border-t v7:p-3`}>
           {(onAddFolder || addFolderDisabled) && (
             <Button
               type="button"
               onClick={onAddFolder}
               disabled={addFolderDisabled}
               title={addFolderTitle}
-              className="w-full"
+              className={`${styles.add} v7:w-full`}
             >
+              <FolderPlus className="v8-only" size={14} aria-hidden="true" />
               {addFolderLabel}
             </Button>
           )}

@@ -28,14 +28,10 @@ describe('LINE通知の見出しは、内部のイベントキーを出さない
     expect(CODE, 'eventType を title に入れている').not.toContain('title={setting.eventType}')
   })
 
-  it('区分の言葉に置き換えている', () => {
-    expect(CODE).toContain('{categoryLabel(setting.category)}')
-    expect(CODE).toContain("categories.find(([key]) => key === value)?.[1] ?? '区分なし'")
-  })
-
-  it('最終更新は日本時間で、取れないときは数を作らない', () => {
-    expect(CODE).toContain('formatDateTime(date)')
-    expect(CODE).toContain("return '最終更新 —'")
+  it('区分の言葉は運用者の言葉の一覧から取る', () => {
+    // 板 g3iDs：行の補足は出来事の言葉（いつ・だれに）だけ。区分の列は置かない。
+    expect(CODE).toContain('deliveryWords(setting).trigger')
+    expect(CODE).toContain('audienceLabel(setting)')
   })
 
   it('eventType 自体は鍵や絞り込みに使ってよい（描かないだけ）', () => {

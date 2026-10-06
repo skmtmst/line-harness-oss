@@ -419,7 +419,7 @@ export default function TemplatePicker({
                   まとめて選ぶ
                 </button>
               ) : null}
-              <span className="ml-auto text-[11px] text-ink-faint">
+              <span className="ml-auto text-micro text-ink-faint">
                 {visibleTemplatesStatus === 'ready' ? `${total}件` : '—'}
               </span>
             </div>
@@ -428,7 +428,7 @@ export default function TemplatePicker({
               1件も無いときは、推測ではなく実績が無いことを先に断る。
             */}
             {category === 'frequent' && visibleTemplatesStatus === 'ready' && shown.length > 0 && !frequentHasUsage ? (
-              <p className="mb-2 text-[11px] leading-relaxed text-ink-faint">
+              <p className="mb-2 text-micro leading-relaxed text-ink-faint">
                 まだ送信・使用の実績がないため、実績順ではなく登録順で表示しています。
               </p>
             ) : null}
@@ -523,7 +523,7 @@ export default function TemplatePicker({
                 </div>
                 <p className="mt-5 text-xs font-semibold text-ink-faint">送信内容のプレビュー</p>
                 <div className="mt-3 min-h-[250px] rounded-card bg-line-talk p-5 shadow-card">
-                  <div className="flex justify-center"><span className="rounded-pill bg-canvas/85 px-3 py-1 text-[11px] text-ink-faint">今日</span></div>
+                  <div className="flex justify-center"><span className="rounded-pill bg-canvas/85 px-3 py-1 text-micro text-ink-faint">今日</span></div>
                   <div className="mt-4 max-w-[78%] rounded-card rounded-tl-mini bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-ink-secondary shadow-card">{previewContent ?? selected.messageContent}</div>
                 </div>
                 {previewContent !== null && resolvedPreview?.unresolved.length ? (
@@ -564,10 +564,10 @@ export default function TemplatePicker({
               : '入力後に文章を編集してから送信できます。'}
           </p>
           <div className="mt-3 flex flex-wrap justify-end gap-2">
-            <Button variant="secondary" className="min-h-11 whitespace-nowrap px-4 py-2 text-ink-faint h-auto" onClick={onClose}>
+            <Button variant="secondary" className="v7:min-h-11 whitespace-nowrap px-4 py-2 text-ink-faint h-auto" onClick={onClose}>
               キャンセル
             </Button>
-            <Button variant="primary" className="min-h-11 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 border-0 h-auto" disabled={packMode && onPickPack ? packItems.length === 0 : !selected} onClick={() => {
+            <Button variant="primary" className="v7:min-h-11 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 border-0 h-auto" disabled={packMode && onPickPack ? packItems.length === 0 : !selected} onClick={() => {
                 if (packMode && onPickPack) {
                   if (packItems.length === 0) return
                   onPickPack(packItems.map((item) => item.content))

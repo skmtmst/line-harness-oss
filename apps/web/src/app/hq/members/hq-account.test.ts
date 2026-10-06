@@ -33,28 +33,45 @@ describe('統括の左下アカウントメニュー', () => {
     expect(topBar).not.toContain('auth/logout')
   })
 
-  it('Esc と外側の押下で閉じ、押した要素へフォーカスを戻す', () => {
+  it('Esc で閉じて押した要素へフォーカスを戻し、外側の押下は器（MenuPortal）が閉じる', () => {
     expect(menu).toContain("event.key === 'Escape'")
-    expect(menu).toContain("addEventListener('mousedown'")
     expect(menu).toContain('triggerRef.current?.focus()')
+    expect(menu).toContain('onClose={() => setOpen(false)}')
   })
 
-  it('開いたメニューは固定幅にせず、左サイドバーの幅に揃える', () => {
-    expect(menu).toContain('absolute bottom-full left-0')
-    expect(menu).toContain('w-full flex-col')
-    expect(menu).not.toContain('style={{ width: 300 }}')
+  /*
+   * 2026-10-06 の直し（Pencil 承認 `LINE-Harness-V8-B.pen` の `s6kZt/wmfIZ`）。
+   * 脇メニューの幅に揃えると中身が枠からはみ出したので、運営コンソールと
+   * 同じ「最上層の器＋幅240固定＋右の説明なし＋行の高さ40」に合わせた。
+   */
+  it('開いたメニューは最上層の器に出し、幅240で固定して行の右に説明を置かない', () => {
+    expect(menu).toContain('<MenuPortal')
+    expect(menu).toContain('w-60 rounded-mini border border-hairline bg-canvas py-2 shadow-float')
+    expect(menu).toContain('flex h-10 items-center gap-2.5 px-3.5 text-label')
+    expect(menu).toContain('h-px bg-divider-soft')
+    expect(menu).not.toContain('absolute bottom-full left-0')
+    expect(menu).not.toContain('権限者・担当アカウント')
+    expect(menu).not.toContain('プランと支払い')
+  })
+
+  /*
+   * 承認の絵は「管理者」の札のとなりに灰色の小さい字で
+   * 「無料トライアル 残り14日」を1行だけ出す。色の付いた札も、
+   * 下に足す行も無い（`s6kZt/wmfIZ` の右の案）。
+   */
+  it('頭の課金の一言は役目の札のとなりに灰色の字で1行だけ出す', () => {
+    expect(menu).toContain('const planNote = chip ?')
+    expect(menu).toContain('<span className="truncate text-nano text-ink-faint">{planNote}</span>')
+    expect(menu).not.toContain('{chip ? <PlanChip chip={chip} /> : null}')
+    expect(menu).not.toContain('billingNote')
   })
 })
 
 describe('メンバー管理（36-5）', () => {
-  it('旧「統括設定」はメンバー管理へ転送する', () => {
-    expect(settings).toContain("router.replace('/hq/members?tab=tenant')")
-  })
-
-  it('タブは ?tab= で切り替え、権限者と統括の情報を1画面に置く', () => {
-    expect(members).toContain("params.get('tab') === 'tenant'")
-    expect(members).toContain("router.replace(next === 'tenant' ? '/hq/members?tab=tenant' : '/hq/members')")
-    expect(members).toContain('api.tenants.updateName(trimmed)')
+  it('統括の情報は /hq/settings で見せる（板 yLKwV・BHEl9 にタブは無いため。旧「統括設定」の転送はやめた）', () => {
+    expect(settings).toContain('api.tenants.updateName(trimmed)')
+    expect(settings).toContain("usePageTitle('統括の情報')")
+    expect(members).not.toContain('?tab=')
   })
 
   it('招待は管理者と閲覧のみだけを選べる（担当者は統括の権限者にしない）', () => {
@@ -72,9 +89,9 @@ describe('メンバー管理（36-5）', () => {
     expect(members).toContain('（あなた）')
   })
 
-  it('保存は下部追従バーにしか置かない', () => {
-    expect(members).toContain('<StickyBar')
-    expect(members).toContain('統括名を保存する')
+  it('統括名の保存ボタンはカードの中（V8 正本 K7HYu どおり。下部追従バーは使わない） @claude 2026-10-06', () => {
+    expect(settings).not.toContain('<StickyBar')
+    expect(settings).toContain('統括名を保存する')
   })
 })
 
@@ -87,9 +104,10 @@ describe('お問い合わせ（36-3）', () => {
     expect(support).toContain('accept="image/png,image/jpeg"')
   })
 
-  it('送信は下部追従バーにしか置かず、控えが届くことを状態文で言う', () => {
-    expect(support).toContain('<StickyBar')
-    expect(support).toContain('送信すると、控えが登録メールアドレスにも届きます')
+  it('送信は問い合わせカードの中に置き、下部追従バーは出さない（板 b8xBtZ）', () => {
+    expect(support).not.toContain('<StickyBar')
+    expect(support).toContain('内容をクリア')
+    expect(support).toContain('控えが登録メールアドレスにも届きます')
     expect(support).toContain('api.hqSupport.create(')
   })
 
@@ -98,5 +116,10 @@ describe('お問い合わせ（36-3）', () => {
     expect(members).toContain("usePageTitle('メンバー管理')")
     expect(support).not.toContain('<h1')
     expect(members).not.toContain('<h1')
+  })
+
+  it('アカウントメニューは矢印キーで項目を移動できる', () => {
+    expect(menu).toContain('role="menu"')
+    expect(menu).toContain('onKeyDown={(event: ReactKeyboardEvent<HTMLElement>)')
   })
 })

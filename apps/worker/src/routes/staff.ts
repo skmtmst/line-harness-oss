@@ -653,9 +653,7 @@ staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), as
   }
 });
 
-staff.patch('/api/staff/:id', async (c) => {
-  const id = c.req.param('id');
-  const body = await c.req.json<{
+export type StaffPolicyInput = {
     name?: string; email?: string | null; role?: 'admin' | 'staff' | 'viewer'; isActive?: boolean;
     lineLinked?: boolean;
     permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>;
@@ -664,7 +662,10 @@ staff.patch('/api/staff/:id', async (c) => {
     roleBundle?: string; permissionScope?: Record<string, string>;
     permissionViewKeys?: string[]; emailMask?: string;
     idempotencyKey?: string; expectedPolicyVersion?: number;
-  }>();
+  };
+
+/** 飲食店の所属変更も、この既存の再認証・版・最終管理者保護を通す。 */
+export async function updateStaffPolicy(c: Context<Env>, id: string, body: StaffPolicyInput) {
   const idempotencyKey = parseIdempotencyKey(body.idempotencyKey);
   if (idempotencyKey === null) {
     return c.json({ success: false, error: '要求キーの形式が正しくありません' }, 400);
@@ -983,7 +984,9 @@ staff.patch('/api/staff/:id', async (c) => {
   const payload = { success: true as const, data: await serializeStaff(c.env.DB, updated, staffEmailVisibility(c, updated.id)) };
   await storeReceipt(payload);
   return c.json(payload);
-});
+}
+
+staff.patch('/api/staff/:id', async c => updateStaffPolicy(c, c.req.param('id'), await c.req.json<StaffPolicyInput>()));
 
 /*
  * N-433: メール変更の確定。メール内リンクは fragment にトークンを乗せて

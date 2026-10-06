@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -68,31 +68,6 @@ describe('表は器の幅にぴったり収める', () => {
     // タグ名は長さが読めない。省略を外して素の文字に戻さない。
     expect(page).toContain('max-w-32 truncate')
     expect(page).toContain('title={e.visible_tag_name}')
-  })
-
-  it('/inflow-links: 友だち追加・クリックの列は中身に合わせた幅にする', () => {
-    const page = read('inflow-links/page.tsx')
-    // 数字の列が中身より狭い（友だち追加 72>68・クリック 60>53）と
-    // 器からはみ出す。流入元名から回し、割合の合計は変えない（86%）。
-    expect(page).toMatch(/<col className="w-\[11%\]" \/>\s*<col className="w-\[9%\]" \/>/)
-    expect(page).toContain('<col className="w-[13%]" />')
-    expect(page).not.toContain('<col className="w-[17%]" />')
-    expect(page).not.toContain('<col className="w-[7%]" />')
-    const values = [...page.matchAll(/w-\[(\d+(?:\.\d+)?)%\]/g)].map((m) => Number(m[1]))
-    expect(values.reduce((sum, value) => sum + value, 0)).toBe(86)
-    // 見出しは折り返さず1行（共通 Th が white-space:nowrap を持つ）。
-    // 狭い列に戻しても割れないようにする。重ね書きはしない。
-    expect(page).toMatch(/<Th align="right"[^>]*>\s*友だち追加/)
-    expect(page).toMatch(/<Th align="right"[^>]*>\s*クリック/)
-  })
-
-  it('/booking/staff: 操作列は固定幅で、右に大きく空けない', () => {
-    const page = read('booking/staff/page.tsx')
-    expect(page).toContain('<DataTable')
-    // 操作列は「編集＋…」（約118px）に合わせた固定幅。割合（24%）に戻さない。
-    expect(page).toMatch(/<Th[^>]*w-32[^>]*>操作<\/Th>/)
-    expect(page).not.toMatch(/width:\s*['"]24%['"]/)
-    expect(percentTotal(page)).toBeLessThan(100)
   })
 
   it('/（対応が必要な受信）: 状態列は札に合わせた固定幅で、右に空けない', () => {

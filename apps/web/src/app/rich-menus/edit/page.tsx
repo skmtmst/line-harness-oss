@@ -34,6 +34,7 @@ import {
   type PublishPlanInput,
 } from './publish-plan-draft'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { PublishHistorySection } from './publish-history'
 import { PublishProgressSection } from './publish-progress-section'
 import { PrepublishCheckSection } from './prepublish-check-section'
@@ -353,6 +354,7 @@ function Editor({
   const [tapsByArea, setTapsByArea] = useState<Map<string, RichMenuAreaTapCount>>(new Map())
 
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [unpublishing, setUnpublishing] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -765,10 +767,12 @@ function Editor({
 
   async function handleSave() {
     setSaving(true)
+    setSaved(false)
     setError(null)
     try {
       await persistDraft()
       await reload()
+      setSaved(true)
     } catch (e) {
       // WRITE-01: 権限不足・所属違い・機能オフの理由が見えるようにする。
       // 内部文（API error: 5xx 等）は画面へ出さない。
@@ -1290,7 +1294,7 @@ function Editor({
                 onChange={(e) => setName(e.target.value)}
                 className="mt-1 block w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <p className="mt-1 text-[11px] text-ink-faint">管理画面でだけ使う名前 (友だちには見えない)</p>
+              <p className="mt-1 text-micro text-ink-faint">管理画面でだけ使う名前 (友だちには見えない)</p>
             </label>
             <label className="block">
               <span className="text-ink-secondary text-xs font-medium">フォルダ</span>
@@ -1309,7 +1313,7 @@ function Editor({
                 maxLength={14}
                 className="mt-1 block w-full border border-hairline rounded-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               />
-              <p className="mt-1 text-[11px] text-ink-faint">14 文字以内 (友だちのトーク画面でメニューを開く前に表示)</p>
+              <p className="mt-1 text-micro text-ink-faint">14 文字以内 (友だちのトーク画面でメニューを開く前に表示)</p>
             </label>
           </section>
 
@@ -1364,16 +1368,16 @@ function Editor({
                     登録メディアから選ぶ
                   </Button>
                 </div>
-                <p className="mt-1.5 text-[11px] text-ink-faint">
+                <p className="mt-1.5 text-micro text-ink-faint">
                   PNG / JPEG, {SIZE_LABEL[group.size]}, 1MB 以下
                 </p>
                 {activePage.id.startsWith('tmp-') && (
-                  <p className="mt-1 text-[11px] text-status-warn-deep">
+                  <p className="mt-1 text-micro text-status-warn-deep">
                     新規ページは「下書き保存」してから画像をアップロードしてください
                   </p>
                 )}
               </div>
-              <p className="text-[11px] text-ink-faint pt-3 border-t border-divider-soft">
+              <p className="text-micro text-ink-faint pt-3 border-t border-divider-soft">
                 中央のキャンバスでドラッグして tap 領域 (areas) を追加・編集できます。
               </p>
             </section>
@@ -1400,7 +1404,7 @@ function Editor({
             {targetingEnabled && (
               <>
                 {group.status !== 'published' && (
-                  <p className="rounded-control bg-warning-bg p-2 text-[11px] text-warning">
+                  <p className="rounded-control bg-warning-bg p-2 text-micro text-warning">
                     このメニューはまだ LINE に登録されていません。登録するまで、条件に
                     当てはまっても出せません。
                   </p>
@@ -1408,7 +1412,7 @@ function Editor({
 
                 <label className="block">
                   <span className="text-ink-secondary text-xs font-medium">出す順番</span>
-                  <span className="text-ink-faint block text-[11px]">
+                  <span className="text-ink-faint block text-micro">
                     一覧で上にあるメニューが優先されます。現在は
                     {targetingPriority + 1}番目です。
                   </span>
@@ -1430,7 +1434,7 @@ function Editor({
                 />
 
                 {!targetingCondition && (
-                  <p className="text-[11px] text-status-warn-deep">
+                  <p className="text-micro text-status-warn-deep">
                     条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。
                   </p>
                 )}
@@ -1728,8 +1732,8 @@ function Editor({
           >
             プレビュー
           </Checkbox>
-          <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" onClick={handleSave} disabled={saving || publishing || unpublishing || busy}>
-            {saving ? '保存中...' : '下書きを保存する'}
+          <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl disabled:opacity-50 h-auto whitespace-normal" onClick={handleSave} disabled={saving || publishing || unpublishing || busy} busy={saving} done={saved}>
+            下書きを保存する
           </Button>
           {/* #702: 共有Buttonのprimaryはaccent-deep＋白文字(5.44:1)。生のLINE緑だと2.78:1で落ちる。 */}
           <Button
@@ -1911,7 +1915,7 @@ function TargetingStep({
               <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
               <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} step={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
               {/* R205: 小数はサーバで弾かれる。欄の近くに制限を書く。 */}
-              <p className="text-ink-faint mt-1 text-[11px]">1以上の整数（小数は使えません）</p>
+              <p className="text-ink-faint mt-1 text-micro">1以上の整数（小数は使えません）</p>
             </div>
             <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-ink mt-1 text-2xl font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
           </div>
@@ -1932,7 +1936,7 @@ function TargetingStep({
             <p className="text-ink-secondary mt-4 text-xs font-medium">標準互換（15軸）</p>
             <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['名前','個別メモ','ステータスメッセージ','友だち登録日','タグ','友だち情報','シナリオ','イベント予約','カレンダー予約','共通情報','リマインダ','回答フォーム','最終反応日','その他','対応マーク'].map((label) => <span key={label} className="bg-canvas-sunken rounded-mini px-2 py-1">{label}</span>)}</div>
             <p className="text-ink-secondary mt-4 text-xs font-medium">この画面だけの軸（6軸）</p>
-            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['担当者','流入経路','配信状況','予約状況','購入履歴','ブロック状態'].map((label) => <span key={label} className="bg-canvas-sunken rounded-mini px-2 py-1">{label}</span>)}</div>
+            <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['担当','流入経路','配信状況','予約状況','購入履歴','ブロック状態'].map((label) => <span key={label} className="bg-canvas-sunken rounded-mini px-2 py-1">{label}</span>)}</div>
           </section>
           <Notice tone="info"><strong className="block text-xs">条件はここだけの話ではありません</strong><span className="text-xs">一度作った条件は保存した検索として、配信や自動応答でも呼び出せます。</span></Notice>
         </aside>
@@ -1995,6 +1999,8 @@ function PublishStep({
 }) {
   // N-162: ステップ移動は画面内の段階移動なので a[href] ではなく router.push で行う。
   const router = useRouter()
+  const adminTheme = useAdminTheme()
+  const v8 = adminTheme === 'v8'
   const { mode, startsAt, endsAt, restoreGroupId } = publish
   const [restoreMenus, setRestoreMenus] = useState<Array<{ id: string; name: string }>>([])
 
@@ -2097,8 +2103,7 @@ function PublishStep({
         ? '保存するとLINEに登録され、条件に当てはまる人の画面に出来事のタイミングで順次出ます'
         : 'LINEへの登録だけで、友だちの画面は変わりません。出す相手は一覧の「表示先」で決めてください'
 
-  return (
-    <div data-design-node="UMiJ9" className="pb-24">
+  const body = (<>
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
       <StepHeader active={3} groupId={group.id} />
       {/* R205: 下書き保存の結果はどの工程でも同じ位置に出す。 */}
@@ -2151,6 +2156,16 @@ function PublishStep({
 
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-semibold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}{previewUnsaved && !conditionEmpty ? <span className="text-ink-faint ml-1 font-normal">（未保存の条件）</span> : null}</dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
+          {v8 ? (
+            <section aria-label="いまの状態" className="border-hairline bg-canvas rounded-card border p-5">
+              <h2 className="text-ink text-sm font-semibold">いまの状態</h2>
+              <dl className="mt-4 space-y-3 text-xs">
+                <div className="flex items-baseline justify-between gap-3"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-semibold">{group.status === 'published' ? '公開中' : '下書き'}</dd></div>
+                <div className="flex items-baseline justify-between gap-3"><dt className="text-ink-faint">出す相手</dt><dd className="text-ink text-right font-semibold">{isDefaultForAll ? 'すべての友だち' : targetingEnabled ? '条件に合う人' : '—'}</dd></div>
+                <div className="flex items-baseline justify-between gap-3"><dt className="text-ink-faint">出る人</dt><dd className="text-ink font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</dd></div>
+              </dl>
+            </section>
+          ) : null}
           {/*
             R204: 「公開」は LINE への登録。全員の画面が変わるのは
             isDefaultForAll（全員の既定）のときだけ。条件で出し分ける設定は、
@@ -2217,7 +2232,11 @@ function PublishStep({
       {canOperate ? <PublishHistorySection groupId={group.id} onChanged={onChanged} /> : null}
       {/* N-156: staff は公開・保存を押せない（サーバ側も 403 で止める）。 */}
       <StickyBar actions={<div className="flex w-full items-center justify-between gap-3"><Button onClick={() => router.push(`/rich-menus/edit?id=${group.id}&step=targeting`)}>前へ：誰に出すか</Button><div className="flex gap-2">{canOperate ? <><Button onClick={onSave} disabled={saving || publishing}>下書きを保存する</Button><Button variant="primary" onClick={submit} disabled={saving || publishing || (mode !== 'now' && !startsAt) || (mode === 'period' && !endsAt)} busy={publishing} busyLabel="公開中…">{mode === 'now' ? 'この内容で公開する' : 'この内容で予約する'}</Button></> : <span className="text-ink-faint text-xs">閲覧のみ（公開・保存は管理者の操作です）</span>}</div></div>} />
-    </div>
+    </>)
+  return v8 ? (
+    <div data-design-node="hKr8f" className="pb-24">{body}</div>
+  ) : (
+    <div data-design-node="UMiJ9" className="pb-24">{body}</div>
   )
 }
 
