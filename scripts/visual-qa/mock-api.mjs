@@ -1066,21 +1066,20 @@ const ANALYTICS_FUNNEL_RUN = {
   }],
 }
 
+/* 保存した分析（絵 bglah の3件）。3件目は定義を変えたあとまだ集計していない（更新後未集計）。 */
 const ANALYTICS_SAVED = [
-  ['saved-1', '経路 × 体験申込', 'cross', '佐々木', 12, '2026-08-25T11:20:00+09:00'],
-  ['saved-2', '友だちになってからの5段', 'funnel', '佐々木', 9, '2026-08-25T09:40:00+09:00'],
-  ['saved-3', '広告ごとの費用対効果', 'cross', '田中', 6, '2026-08-24T18:05:00+09:00'],
-  ['saved-4', 'コラムの読まれ方', 'cross', '山口', 4, '2026-08-23T14:30:00+09:00'],
-  ['saved-5', 'タグ × 予約', 'cross', '田中', 21, '2026-08-12T10:15:00+09:00'],
-  ['saved-6', '旧・流入の内訳', 'cross', '佐々木', 3, '2026-07-28T16:40:00+09:00'],
-].map(([id, name, kind, createdByName, snapshotCount, updatedAt], index) => ({
-  id, name, kind, status: 'active', currentVersionNumber: index === 5 ? 1 : 2,
+  ['saved-1', '定期便 × 流入経路', 'cross', '高田 誠', 8, '2026-09-30T10:12:00+09:00', 2, false],
+  ['saved-2', '友だち追加から購入まで', 'funnel', '中川 由美', 4, '2026-09-28T18:40:00+09:00', 2, false],
+  ['saved-3', 'タグ × 年代', 'cross', '高田 誠', 2, '2026-09-12T09:05:00+09:00', 3, true],
+].map(([id, name, kind, createdByName, snapshotCount, updatedAt, version, stale], index) => ({
+  id, name, kind, status: 'active', currentVersionNumber: version,
   createdBy: `visual-owner-${index + 1}`, createdByName,
   createdAt: '2026-06-01T09:00:00+09:00', updatedAt, snapshotCount,
   latestSnapshot: {
-    id: `${id}-snapshot-latest`, state: index === 5 ? 'unavailable' : 'available',
-    periodFrom: '2026-08-05T00:00:00+09:00', periodTo: '2026-09-03T00:00:00+09:00',
-    dataCutoffAt: '2026-09-03T02:40:00.000Z', createdAt: updatedAt,
+    id: `${id}-snapshot-latest`, state: 'available',
+    periodFrom: '2026-09-01T00:00:00+09:00', periodTo: '2026-09-30T00:00:00+09:00',
+    dataCutoffAt: '2026-09-30T21:00:00.000Z', createdAt: updatedAt,
+    definitionStale: stale, sourceVersionNumber: stale ? version - 1 : version, sourceCurrentVersionNumber: version,
   },
 }))
 
@@ -1387,7 +1386,21 @@ const SHAPES = {
     これが無いと保存済み分析と受信者を選べず、設計 `URqOA` を撮れない。
   */
   '/api/analytics/report-schedules': {
-    items: [],
+    // 保存した分析（bglah）の定期レポート2件：動いている・止めている。
+    items: [
+      {
+        id: 'report-weekly-friends', lineAccountId: 'visual-qa-account', name: '毎週の友だちの増減', sections: ['friends'], savedAnalysisIds: ['saved-1'],
+        cadence: 'weekly', weekday: 1, monthDay: null, sendTime: '9:00', timeZone: 'Asia/Tokyo', periodDays: 7,
+        recipients: [{ kind: 'staff', staffId: 'staff-owner' }], channels: ['email'], alertRules: [],
+        status: 'active', isOneTime: false, nextRunAt: '2026-10-06T09:00:00+09:00', createdBy: 'staff-owner', createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-01T09:00:00+09:00',
+      },
+      {
+        id: 'report-monthly-outcomes', lineAccountId: 'visual-qa-account', name: '月末の成果まとめ', sections: ['routes'], savedAnalysisIds: [],
+        cadence: 'monthly', weekday: null, monthDay: 1, sendTime: '9:00', timeZone: 'Asia/Tokyo', periodDays: 30,
+        recipients: [{ kind: 'staff', staffId: 'staff-owner' }], channels: ['email', 'line'], alertRules: [],
+        status: 'paused', isOneTime: false, nextRunAt: '2026-11-01T09:00:00+09:00', createdBy: 'staff-owner', createdAt: '2026-08-01T09:00:00+09:00', updatedAt: '2026-09-15T09:00:00+09:00',
+      },
+    ],
     recentOneTime: [],
     options: {
       timeZone: 'Asia/Tokyo',
@@ -2344,9 +2357,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         id: `${saved.id}-snapshot-${offset + 1}`, savedAnalysisId: saved.id,
         analysisVersionId: `${saved.id}-version-${saved.currentVersionNumber}`,
         sourceKind: saved.kind, sourceResultId: `visual-result-${offset + 1}`,
-        periodFrom: `2026-0${Math.max(6, 8 - offset)}-05T00:00:00+09:00`,
-        periodTo: `2026-0${Math.max(7, 9 - offset)}-03T00:00:00+09:00`,
-        timeZone: 'Asia/Tokyo', dataCutoffAt: '2026-09-03T02:40:00.000Z',
+        // 絵（bglah）の履歴：9月・8月・7月の月ごと。締切は翌月1日 6:00。
+        periodFrom: `2026-0${9 - offset}-01T00:00:00+09:00`,
+        periodTo: `2026-0${9 - offset}-${offset === 1 ? 31 : 30}T00:00:00+09:00`.replace('-07-30', '-07-31'),
+        timeZone: 'Asia/Tokyo', dataCutoffAt: `2026-${String(10 - offset).padStart(2, '0')}-01T06:00:00+09:00`,
         state: offset === 2 ? 'partial' : 'available', result: {},
         createdBy: saved.createdBy, createdAt: saved.updatedAt,
       })) : [],
