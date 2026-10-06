@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MENU_SECTIONS } from '@/lib/menu'
+import { useV8Leave } from './overlay-utils'
 import styles from './command-palette.module.css'
 
 export type PaletteItem = {
@@ -51,12 +52,22 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
   const [active, setActive] = useState(0)
   const [menuItems, setMenuItems] = useState<PaletteItem[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  /* 閉じたら、開く前にいた場所へフォーカスを戻す（動きの点検 2 番）。 */
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+  const openRef = useRef(open)
+  openRef.current = open
+  /* 閉じるときも窓と同じく薄く消す（動きの点検 13 番）。 */
+  const leaving = useV8Leave(open)
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         if (!isV8()) return
         event.preventDefault()
+        if (!openRef.current) {
+          const active = document.activeElement
+          returnFocusRef.current = active instanceof HTMLElement && active !== document.body ? active : null
+        }
         setMenuItems(collectVisibleItems())
         setQuery('')
         setActive(0)
@@ -68,7 +79,15 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
   }, [])
 
   useEffect(() => {
-    if (open) inputRef.current?.focus()
+    if (!open) return
+    inputRef.current?.focus()
+    return () => {
+      const back = returnFocusRef.current
+      returnFocusRef.current = null
+      const active = document.activeElement
+      const lost = !active || active === document.body || !active.isConnected || active === inputRef.current
+      if (lost && back?.isConnected) back.focus({ preventScroll: true })
+    }
   }, [open ])
 
   const base = items ?? (menuItems.length > 0 ? menuItems : menuFallback())
@@ -90,7 +109,7 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
     [hits, trimmed],
   )
 
-  if (!open || typeof document === 'undefined') return null
+  if ((!open && !leaving) || typeof document === 'undefined') return null
 
   const go = (href: string) => {
     setOpen(false)
@@ -98,7 +117,7 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
   }
 
   return createPortal(
-    <div className={styles.backdrop} onClick={() => setOpen(false)}>
+    <div className={styles.backdrop} data-closing={leaving || undefined} aria-hidden={leaving || undefined} onClick={() => setOpen(false)}>
       <div
         role="dialog"
         aria-modal="true"
@@ -106,6 +125,7 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
         className={styles.panel}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
+          if (leaving) return
           if (event.key === 'Escape') setOpen(false)
           else if (event.key === 'ArrowDown') {
             event.preventDefault()
