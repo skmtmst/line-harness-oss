@@ -11,7 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const apiMocks = vi.hoisted(() => ({ previewRecipients: vi.fn() }))
 
+// 設定の中のメニュー（共通部品）はこの試験の対象外。localStorage と機能の出し分けを読むので外す。
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/line-notifications/operator/new',
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }))
@@ -22,7 +25,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
 vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, useSettingsNavInline: () => undefined }))
 vi.mock('@/lib/api', () => ({
   ApiError: class extends Error {
     status?: number

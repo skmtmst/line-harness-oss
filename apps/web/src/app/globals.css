@@ -1002,6 +1002,14 @@
   --tpl-fdt-info-pad: 16px 24px 24px; --tpl-fdt-info-gap: 16px; --tpl-fdt-info-col-gap: 24px; --tpl-fdt-info-row-gap: 14px; --tpl-fdt-field-gap: 6px; --tpl-fdt-chip-pad: 4px 12px;
   --tpl-fdt-form-pad: 16px 24px 24px; --tpl-fdt-form-gap: 14px; --tpl-fdt-card-pad: 16px; --tpl-fdt-card-head-gap: 10px; --tpl-fdt-form-icon: 28px; --tpl-fdt-form-label-w: 216px; --tpl-fdt-form-row-pad: 10px 0; --tpl-fdt-orphan-size: 11px; --tpl-fdt-changed-line: 2px;
   --tpl-fdt-empty-pad: 40px 24px; --tpl-fdt-empty-gap: 8px; --tpl-fdt-empty-icon: 40px;
+  /* 手作業扱いだった板（hb2）：設定の板の頭と中身・運用者へのお知らせ（gjUz3・hiBO8）。 */
+  --tpl-hb2-board-bleed: -20px -24px -28px; --tpl-hb2-head-pad: 20px 24px 12px 24px; --tpl-hb2-head-gap: 4px; --tpl-hb2-head-title: 22px; --tpl-hb2-content-pad: 16px 24px 24px 0;
+  --tpl-hb2-op-gap: 14px; --tpl-hb2-op-col-gap: 12px; --tpl-hb2-op-side-w: 340px; --tpl-hb2-op-card-pad: 18px; --tpl-hb2-op-card-radius: 12px; --tpl-hb2-op-head-gap: 2px; --tpl-hb2-op-field-gap: 6px; --tpl-hb2-op-lh: 20px; --tpl-hb2-op-note-lh: 18px;
+  --tpl-hb2-op-control-h: 36px; --tpl-hb2-op-control-radius: 10px; --tpl-hb2-op-input-pad: 0 12px; --tpl-hb2-op-box-pad: 16px; --tpl-hb2-op-row-h: 37.5px; --tpl-hb2-op-row-pad: 8px 0; --tpl-hb2-op-chip-gap: 8px; --tpl-hb2-op-band-pad: 10px 14px;
+  --tpl-hb2-op-preview-pad: 10px 12px; --tpl-hb2-op-preview-bg: #8fa9c4; --tpl-hb2-op-bubble-gap: 3px; --tpl-hb2-op-bubble-pad: 8px 11px; --tpl-hb2-op-bubble-radius: 14px; --tpl-hb2-op-link-gap: 12px;
+  --tpl-hb2-rm-section-pad: 20px; --tpl-hb2-rm-section-gap: 14px; --tpl-hb2-rm-title: 15px;
+  --tpl-hb2-np-min-h: calc(100dvh - 72px); --tpl-hb2-np-pad: 40px 24px; --tpl-hb2-np-card-w: 520px; --tpl-hb2-np-card-pad: 32px; --tpl-hb2-np-card-radius: 16px; --tpl-hb2-np-lock: 56px; --tpl-hb2-np-text-lh: 21px; --tpl-hb2-np-badge-pad: 2px 8px; --tpl-hb2-np-actions-pad: 8px;
+  --tpl-hb2-sd-chip-pad: 6px 12px; --tpl-hb2-sd-text-h: 96px;
   --tpl-settings-nav-width: 208px; --tpl-settings-nav-pad-block: 16px; --tpl-settings-nav-pad-side: 12px;
   /* 設定の中のメニュー（設定の板 ihjfd ほか 8 枚）。 */
   --tpl-setnav-w: 200px; --tpl-setnav-pad: 16px 12px; --tpl-setnav-gap: 2px; --tpl-setnav-item-pad: 8px 10px; --tpl-setnav-item-gap: 8px; --tpl-setnav-radius: 8px; --tpl-setnav-child-indent: 22px; --tpl-setnav-band-pad: 8px 16px;

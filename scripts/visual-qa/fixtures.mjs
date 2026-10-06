@@ -2184,6 +2184,24 @@ const richMenuArea = (id, label, targetPageId, boundsX) => ({
   trackedLinkId: null,
 })
 
+/* URL を開く面（2500×1686 の 3×2）。url が空なら未設定の面になる。 */
+const richMenuUrlArea = (id, label, boundsX, boundsY, uri) => ({
+  id,
+  boundsX,
+  boundsY,
+  boundsWidth: 834,
+  boundsHeight: 843,
+  actionType: 'uri',
+  actionData: uri ? { uri } : {},
+  intent: 'url',
+  label,
+  tagIds: [],
+  scoreChange: null,
+  templateId: null,
+  formId: null,
+  trackedLinkId: null,
+})
+
 const richMenuPage = (id, orderIndex, name, areas = [], imageR2Key = null) => ({
   id,
   orderIndex,
@@ -2309,6 +2327,30 @@ export const RICH_MENU_GROUP_DETAILS = {
       richMenuPage('rmg-1-booking', 2, '予約する', [
         richMenuArea('rmg-1-booking-product', '商品を見る', 'rmg-1-product', 833),
       ], null),
+    ],
+  },
+  /* 板 `Z0uO6`・`kmTab`（作る② ボタンの動き）：作りかけの下書き。一覧には出さない ID。
+   * 切替タブ3枚（トップ・タブA・タブB）、トップは6面。A〜C は URL を開く、D〜F は未設定。 */
+  'rmg-draft': {
+    ...RICH_MENU_BASE,
+    id: 'rmg-draft',
+    name: '通常メニュー（会員向け）',
+    status: 'draft',
+    isDefaultForAll: true,
+    targetingEnabled: false,
+    targetingCondition: null,
+    defaultPageId: 'rmg-draft-top',
+    pages: [
+      richMenuPage('rmg-draft-top', 0, 'トップ', [
+        richMenuUrlArea('rmg-draft-a', '予約する', 0, 0, 'https://nen.example/booking'),
+        richMenuUrlArea('rmg-draft-b', 'お知らせ', 833, 0, 'https://nen.example/news'),
+        richMenuUrlArea('rmg-draft-c', 'クーポン', 1666, 0, 'https://nen.example/coupon'),
+        richMenuUrlArea('rmg-draft-d', '会員証', 0, 843, ''),
+        richMenuUrlArea('rmg-draft-e', 'よくある質問', 833, 843, ''),
+        richMenuUrlArea('rmg-draft-f', 'お問い合わせ', 1666, 843, ''),
+      ], 'visual-qa/rich-menus/rmg-1-top.png'),
+      richMenuPage('rmg-draft-tab-a', 1, 'タブA：予約', []),
+      richMenuPage('rmg-draft-tab-b', 2, 'タブB：会員', []),
     ],
   },
   'rmg-2': {
@@ -6355,8 +6397,10 @@ export const OPERATOR_NOTIFICATION_RECIPIENTS = {
     { id: 'staff-owner', name: '高橋 直人', lineLinked: true, emailVerified: true, channels: { line: true, email: false, dashboard: true }, canReceive: true },
     { id: 'staff-support', name: '佐々木 花', lineLinked: true, emailVerified: false, channels: { line: true, email: false, dashboard: true }, canReceive: true },
     { id: 'staff-store', name: '中川 誠', lineLinked: false, emailVerified: true, channels: { line: false, email: false, dashboard: true }, canReceive: true },
+    // 絵 hiBO8 の4人目（選んでいない人）。なおす画面で「選ばない人も並ぶ」を見せる。
+    { id: 'staff-part', name: '佐藤 杏', lineLinked: true, emailVerified: false, channels: { line: true, email: false, dashboard: true }, canReceive: true },
   ],
-  summary: { staff: 3, canReceive: 3, line: 2, email: 0, dashboard: 3, unavailable: 0 },
+  summary: { staff: 4, canReceive: 4, line: 3, email: 0, dashboard: 4, unavailable: 0 },
 }
 
 const operatorRule = (id, name, eventType, recipientLabel, occurredToday, status = 'published', recipientIds = ['staff-owner', 'staff-support']) => ({

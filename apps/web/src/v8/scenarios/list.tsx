@@ -41,6 +41,9 @@ import { clampSearchQuery } from '@/lib/search-query'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { ROLE_LABELS } from '@/lib/hq-members'
+import { isForbidden } from '@/components/shared/api-error-message'
+import NoPermissionBoard from '@/v8/no-permission/no-permission'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { runUndoable } from '@/lib/undoable'
@@ -1158,6 +1161,17 @@ export default function ScenariosListV8() {
       {filteredCount ? <div className={styles.noteRow}>{filteredCount}</div> : null}
     </>
   )
+
+  /* 板 `O5tUeE`：一覧の口が 403（この役割では開けない）なら、画面ごと権限なしの板にする。 */
+  if (scenarioList.error && isForbidden(scenarioList.error)) {
+    return (
+      <NoPermissionBoard
+        featureName="シナリオ配信"
+        roleLabel={staffRole && staffRole in ROLE_LABELS ? ROLE_LABELS[staffRole as keyof typeof ROLE_LABELS] : null}
+        capabilitiesHref="/staff"
+      />
+    )
+  }
 
   return (
     <ListPage

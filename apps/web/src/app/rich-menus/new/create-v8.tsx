@@ -25,12 +25,14 @@ import {
   Circle,
   CircleCheck,
   CircleAlert,
+  CircleDot,
   Image as ImageIcon,
-  Plus,
   RectangleHorizontal,
   RectangleVertical,
   Repeat,
   Smartphone,
+  Star,
+  Trash2,
 } from 'lucide-react'
 import {
   RICH_MENU_DIMENSIONS,
@@ -709,6 +711,24 @@ export default function RichMenuCreateV8() {
     if (!res.success) throw new Error(res.error ?? '取得失敗')
     hydrate(res.data as Group)
   }
+
+  /*
+   * `?id=<下書き>` で作りかけの下書きを開き直す（手順②〜④へ直接来る・撮影の作る② Z0uO6・kmTab）。
+   * 開けたら手順はどれでも選べる（①で作った後と同じ）。開けなければ理由を出し、新しく作る道は残す。
+   */
+  const resumeIdRef = useRef<string | null>(
+    typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('id'),
+  )
+  useEffect(() => {
+    const id = resumeIdRef.current
+    if (!id) return
+    resumeIdRef.current = null
+    reloadGroup(id)
+      // 開いた手順より前は済み（①は下書きがある＝済み）。後ろは未着手のまま。
+      .then(() => setMaxStepIndex(Math.max(1, STEP_KEYS.indexOf(step))))
+      .catch(() => setError('作りかけの下書きを開けませんでした。一覧から開き直してください。'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /** 手順①の内容で下書きを作る。作れたら true。 */
   async function createDraft(): Promise<boolean> {
@@ -1828,15 +1848,14 @@ export default function RichMenuCreateV8() {
 
     return (
       <>
-        {/* 板 `Z0uO6`：札の箱と画像の区切りは1つの箱に入れない。 */}
-          <Card padding="roomy" layout="vertical" className={styles.stackSection}>
-          <div className={`flex flex-col ${styles.stackCompact}`}>
-            <SectionHeader title="切替タブ（ページ）" />
+        {/* 板 `Z0uO6`（2026-10-07 の絵）：外の箱に、札の箱・題・画像・面の一覧を入れる。 */}
+        <div className={styles.buttonsSection}>
+          <div className={styles.tabsCard}>
+            <h2 className={styles.tabsTitle}>切替タブ（ページ）</h2>
             <p className={styles.cardNote}>ページごとに画像・面・動きを決めます。最後の1ページは消せません。</p>
-          </div>
           <div className="flex flex-wrap items-center gap-2">
             {pages.map((p, i) => (
-              <FilterChip key={p.id} selected={p.id === activePage.id} onChange={() => {
+              <FilterChip key={p.id} selected={p.id === activePage.id} icon={i === 0 ? <CircleDot size={13} aria-hidden /> : <Star size={13} aria-hidden />} onChange={() => {
                 setActivePageId(p.id)
                 setSelectedAreaId(p.areas[0]?.id ?? null)
                 setPageActionsOpen(false)
@@ -1845,7 +1864,7 @@ export default function RichMenuCreateV8() {
               </FilterChip>
             ))}
             {pages.length < MAX_TAB_PAGES ? <Button type="button" onClick={addPage}>
-              <Plus size={13} aria-hidden /> ページを足す
+              ページを足す
             </Button> : null}
           </div>
           <div className="flex flex-wrap items-end gap-3">
@@ -1856,7 +1875,7 @@ export default function RichMenuCreateV8() {
               </Field>
             </div>
             <Button type="button" onClick={() => setRemovePageTarget(activePage)} disabled={pages.length <= 1}>
-              このページを消す
+              <Trash2 size={15} aria-hidden />このページを消す
             </Button>
             <div>
               <MoreAction label="ページと画像の操作" aria-expanded={pageActionsOpen} aria-haspopup="menu" onClick={() => setPageActionsOpen(!pageActionsOpen)} />
@@ -1868,10 +1887,9 @@ export default function RichMenuCreateV8() {
               ]} />
             </div>
           </div>
-          </Card>
-          <div className={`flex min-w-0 flex-col ${styles.stackSection}`}>
-          <div className={`flex flex-col ${styles.stackCompact}`}>
-            <SectionHeader title="画像の上で面を選ぶ" />
+          </div>
+          <div className={styles.buttonsHead}>
+            <h2 className={styles.buttonsTitle}>画像の上で面を選ぶ</h2>
             <p className={styles.cardNote}>面を押すと、下に動きを決める欄が出ます。線を動かして区切り直せます</p>
           </div>
           <CanvasEditor
@@ -2274,7 +2292,7 @@ export default function RichMenuCreateV8() {
             }
           >
             {selectedArea && activePage ? null : <p className={styles.cardNote}>面を選ぶと、ここに数が出ます。</p>}
-            <p className={styles.cardNote}>
+            <p className={styles.tapNote}>
               「メニューを切り替える」「日時を選ぶ」などLINEの中で終わる動きは、押されたことがこちらに届きません。
             </p>
           </CreateSummaryCard>

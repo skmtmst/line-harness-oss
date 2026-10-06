@@ -112,8 +112,11 @@ describe('U058: 差し込み操作は本文の欄より後に置く', () => {
 describe('U063: 長い選択肢のプルダウンは欄いっぱいに広げる', () => {
   it('運用者通知の選び欄は欄いっぱいに広げる（部品の full 指定）', () => {
     // 選び欄は Select 1 本化済み。幅は部品の size="full" で持たせる。
-    const operator = read('line-notifications/operator/new/operator-new-v8.tsx')
-    expect(operator.match(/size="full"/g)?.length).toBeGreaterThanOrEqual(7)
+    // 2026-10-07：画面は src/v8 に移った。選び欄は1つの Field 部品にまとめ、その中で size="full" を渡す。
+    const operator = readFileSync(join(__dirname, '../v8/line-notifications/operator-edit.tsx'), 'utf8')
+    expect(operator).toMatch(/<Select [^>]*size="full"/)
+    expect(operator.match(/<Select /g)?.length).toBe(1)
+    expect(operator.match(/<Field\s/g)?.length).toBeGreaterThanOrEqual(7)
     expect(operator).not.toContain('[data-selects-wide] select')
   })
   it('共通アクションの見本選択は内容に合わせて広がる', () => {
