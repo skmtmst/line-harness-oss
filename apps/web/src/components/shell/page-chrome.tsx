@@ -150,8 +150,10 @@ export function useSettingsNavInline(enabled = true) {
   const store = useContext(PageChromeContext)
   const setInline = store?.setSettingsNavInline
   useEffect(() => {
-    if (!setInline) return
-    setInline(enabled)
+    // 外に置くメニュー（enabled=false）は印に触らない。外のメニューが出る・消えるたびに
+    // 印を false に戻すと、板の中のメニューと外のメニューが2つ並ぶ（2026-10-07 設定の作業で見つかった）。
+    if (!setInline || !enabled) return
+    setInline(true)
     return () => setInline(false)
   }, [enabled, setInline])
 }
