@@ -1,0 +1,1231 @@
+/*
+ * ★V8 分析（ws9wt・eEhYU・L4Uov ほか）。枠・板の頭は型（ListPage）が持つ。
+ * ここは二段の切り替え・閲覧のみの帯・数の帯の線・本文（棒と右の列）だけ。
+ * 寸法は app/globals.css の --tpl-an-*。
+ */
+
+.waiting {
+  padding: var(--tpl-an-body-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-label);
+  text-align: center;
+}
+
+/* 二段の切り替え：上に組（灰の地に選んだ所だけ白）、下に見かたのタブ。 */
+.navigation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-an-nav-gap);
+}
+.groups {
+  display: flex;
+  gap: var(--tpl-an-group-gap);
+  padding: var(--tpl-an-group-pad);
+  border-radius: var(--tpl-an-seg-radius);
+  background: var(--color-surface-pearl);
+}
+.group {
+  padding: var(--tpl-an-group-item-pad);
+  border-radius: var(--tpl-an-seg-item-radius);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-an-seg-lh);
+  white-space: nowrap;
+}
+.group[aria-current] {
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-an-seg-thumb-shadow);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.tabs {
+  display: flex;
+  gap: var(--tpl-an-tabs-gap);
+  align-self: stretch;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.tab {
+  margin-bottom: -1px;
+  padding-bottom: var(--tpl-an-tab-pad-bottom);
+  border-bottom: var(--tpl-an-tab-line) solid transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-an-tab-lh);
+  white-space: nowrap;
+}
+.tab[aria-current] {
+  border-bottom-color: var(--color-ink);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* 閲覧のみの帯（タブの下・数の帯の上）。薄い青の地・目の印・枠なし。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: var(--tpl-an-ro-margin);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* 説明は絵どおり字の途中で折る（全体の言葉のまとまりの折り返しを外す）。 */
+.description {
+  word-break: normal;
+}
+
+/* 板の頭のボタンの間は絵では 12（型の間 8 に足す）。 */
+.csvButton {
+  margin-inline-end: var(--tpl-an-actions-extra);
+}
+
+/* 数の帯：上下に線（タブの線と重ねる）。 */
+.band {
+  border-block: 1px solid var(--color-hairline);
+}
+/* 絵の数字は詰めた字幅（11 が 18px）。表の桁そろえの等幅をここだけ外す。 */
+.band [data-kpi-number] {
+  font-variant-numeric: normal;
+}
+.kpiMenu {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-an-kpi-menu);
+}
+:global([data-theme='v8']) .kpiMenuButton {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+:global([data-theme='v8']) .kpiMenuButton:not(:focus-visible) {
+  outline: 0;
+}
+:global([data-theme='v8']) .kpiMenuButton {
+  min-height: 0;
+  width: var(--tpl-an-kpi-menu);
+  height: var(--tpl-an-kpi-menu);
+  flex: 0 0 var(--tpl-an-kpi-menu);
+}
+
+/* 本文：左に棒、右に 320 の列。1152 では1列にして右の2枚を横に並べる。 */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-split-gap);
+  padding: var(--tpl-an-body-pad);
+  min-width: 0;
+}
+.periodRow {
+  display: flex;
+  justify-content: flex-end;
+}
+.split {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-an-split-gap);
+  min-width: 0;
+}
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-side-gap);
+  width: var(--tpl-an-side-w);
+  flex-shrink: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-card-gap);
+  flex: 1 1 0;
+  min-width: 0;
+  padding: var(--tpl-an-card-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-an-ring);
+}
+.side > .card {
+  flex: none;
+  width: 100%;
+}
+.card[data-gap='routes'] {
+  gap: var(--tpl-an-routes-gap);
+}
+.card[data-gap='removed'] {
+  gap: var(--tpl-an-removed-gap);
+}
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-head-gap);
+  min-width: 0;
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-an-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-an-card-title-lh);
+  white-space: nowrap;
+}
+.cardSub {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-an-sub-lh);
+}
+.spacer {
+  flex: 1;
+}
+
+/* 期間の切り替え（器 3・項目 5/14・文 12）。 */
+:global([data-theme='v8']) .range {
+  padding: var(--tpl-an-range-pad);
+  border-radius: var(--tpl-an-seg-radius);
+  background: var(--color-surface-pearl);
+}
+:global([data-theme='v8']) .range button {
+  min-height: 0;
+  padding: var(--tpl-an-range-item-pad);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-seg-lh);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-an-legend-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+}
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-an-swatch-gap);
+}
+.legend > span::before {
+  content: '';
+  width: var(--tpl-an-swatch);
+  height: var(--tpl-an-swatch);
+  border-radius: var(--radius-chart-dot);
+  background: var(--color-accent);
+}
+.legend > [data-swatch='down']::before {
+  background: var(--color-control-border);
+}
+.legend > [data-swatch='broadcast']::before {
+  background: var(--color-action);
+}
+.legend > [data-swatch='scenario']::before {
+  background: var(--color-icon-tile-purple);
+}
+
+/* 日ごとの棒：上 110（増）・下 36（減）・真ん中に基準の線。 */
+.bars {
+  display: flex;
+  width: 100%;
+}
+.day {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--tpl-an-day-pad);
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: transparent;
+  cursor: pointer;
+}
+.day[data-selected] {
+  background: var(--color-surface-pearl);
+}
+.dayUp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-an-mark-gap);
+  height: var(--tpl-an-bar-up-h);
+}
+.dayDown {
+  display: flex;
+  flex-direction: column;
+  height: var(--tpl-an-bar-down-h);
+}
+.barUp {
+  flex-shrink: 0;
+  width: 100%;
+  max-height: calc(100% - var(--tpl-an-mark) - var(--tpl-an-mark-gap));
+  border-radius: var(--tpl-an-bar-top-radius);
+  background: var(--color-accent);
+}
+.barDown {
+  width: 100%;
+  border-radius: var(--tpl-an-bar-bottom-radius);
+  background: var(--color-control-border);
+}
+.dayUp > .barUp + .baseline {
+  margin-top: calc(0px - var(--tpl-an-mark-gap));
+}
+.baseline {
+  flex-shrink: 0;
+  width: 100%;
+  height: 1px;
+  background: var(--color-ink-faint);
+}
+.dayMark {
+  flex-shrink: 0;
+  width: var(--tpl-an-mark);
+  height: var(--tpl-an-mark);
+  border-radius: var(--tpl-an-mark-radius);
+  background: var(--color-action);
+}
+.dayMark[data-kind='scenario'] {
+  background: var(--color-icon-tile-purple);
+}
+.ticks {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-an-sub-lh);
+}
+.emptyChart {
+  padding: var(--tpl-an-notes-pad);
+  border-radius: var(--tpl-an-notes-radius);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+}
+
+/* 棒の下の注（配信・シナリオの日、選んだ日）。 */
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-notes-gap);
+  padding: var(--tpl-an-notes-pad);
+  border-radius: var(--tpl-an-notes-radius);
+  background: var(--color-surface-pearl);
+}
+.note {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-note-dot-gap);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+}
+.note > i {
+  flex-shrink: 0;
+  width: var(--tpl-an-mark);
+  height: var(--tpl-an-mark);
+  border-radius: var(--tpl-an-mark-radius);
+  background: var(--color-action);
+}
+.note > i[data-kind='scenario'] {
+  background: var(--color-icon-tile-purple);
+}
+.note > i[data-kind='selected'] {
+  background: var(--color-accent);
+}
+
+/* 右の列：どこから増えたか・減った友だち。 */
+.routeRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-routes-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.routeRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-route-bar-gap);
+}
+.sideRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tpl-an-head-gap);
+  min-width: 0;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+}
+.sideName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sideValue {
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.track {
+  height: var(--tpl-an-track-h);
+  border-radius: var(--tpl-an-bar-radius);
+  background: var(--color-surface-pearl);
+}
+.track > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--tpl-an-bar-radius);
+  background: var(--color-accent);
+}
+.more {
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-an-text-lh);
+}
+.sideNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-an-sub-lh);
+}
+
+/* 1152：棒を全幅にして、右の2枚をその下に横並び。 */
+@media (max-width: 1351px) {
+  .split {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .side {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--tpl-an-split-gap);
+    width: auto;
+  }
+  .side > .card {
+    flex: 1 1 0;
+    width: auto;
+  }
+}
+
+/* ── 見かたの本文（yvOtn ほか）：道具の段・説明・表・時間帯。 ── */
+.body[data-gap='tab'] {
+  gap: var(--tpl-an-tab-gap);
+  padding: var(--tpl-an-tab-pad);
+}
+.faint {
+  color: var(--color-ink-faint);
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-toolbar-gap);
+  min-width: 0;
+}
+.caption {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-an-sub-lh);
+}
+
+/* 表：見出し 9/16（11px）、行 10/16・中は2段（12px と 11px・間2）。列の幅は絵の値。 */
+.table {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-an-ring);
+}
+.thead,
+.trow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-col-gap);
+  min-width: 0;
+}
+.thead {
+  padding: var(--tpl-an-thead-pad);
+  border-radius: var(--tpl-an-head-radius);
+  background: var(--color-surface-pearl);
+  box-shadow: var(--tpl-an-ring);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-an-sub-lh);
+}
+.trow {
+  padding: var(--tpl-an-row-pad);
+  box-shadow: var(--tpl-an-line-top);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+}
+.thead + .trow {
+  box-shadow: none;
+}
+.colMain > *,
+.colType > *,
+.num > * {
+  display: block;
+  width: 100%;
+}
+.trow[data-h='two'] {
+  min-height: var(--tpl-an-row-two-h);
+}
+.trow[data-h='one'] {
+  min-height: var(--tpl-an-row-one-h);
+}
+.trow[data-selected] {
+  background: var(--color-accent-soft);
+}
+.emptyRow {
+  padding: var(--tpl-an-row-pad);
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  text-align: center;
+}
+.colMain {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-an-cell-gap);
+  min-width: 0;
+}
+.colType {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-cell-gap);
+  width: var(--tpl-an-col-type);
+  flex-shrink: 0;
+  min-width: 0;
+}
+.num {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--tpl-an-cell-gap);
+  flex-shrink: 0;
+  padding-right: var(--tpl-an-num-pad-end);
+  text-align: right;
+  white-space: nowrap;
+}
+.num[data-w='58'] { width: var(--tpl-an-col-58); }
+.num[data-w='70'] { width: var(--tpl-an-col-70); }
+.num[data-w='80'] { width: var(--tpl-an-col-80); }
+.num[data-w='88'] { width: var(--tpl-an-col-88); }
+.num[data-w='100'] { width: var(--tpl-an-col-100); }
+.num[data-w='116'] { width: var(--tpl-an-col-116); }
+.cellText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cellStrong {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cellSub {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-an-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 押された時間帯ごとの回数（16・間10・棒90）。多い3つは濃い緑。 */
+.hours {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-hours-gap);
+  padding: var(--tpl-an-hours-pad);
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-an-ring);
+}
+.hoursTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-an-hours-title-lh);
+}
+.hourBars,
+.hourTicks {
+  display: flex;
+  gap: var(--tpl-an-hour-gap);
+}
+.hourBars {
+  align-items: flex-end;
+  height: var(--tpl-an-hours-h);
+}
+.hourBar {
+  flex: 1 1 0;
+  border-radius: var(--radius-chart-dot);
+  background: var(--color-accent);
+}
+.hourBar[data-top] {
+  background: var(--color-accent-deep);
+}
+.hourTicks > span {
+  flex: 1 1 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-an-tick-size);
+  line-height: var(--tpl-an-tick-lh);
+  text-align: center;
+}
+
+/* 経路と成果（PFe9c）：左に全体の流れ（300）、右に表と注。 */
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-an-link-gap);
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-an-link-lh);
+  white-space: nowrap;
+}
+.routesSplit {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-an-routes-split-gap);
+  min-width: 0;
+}
+.flowCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-flow-gap);
+  width: var(--tpl-an-flow-w);
+  flex-shrink: 0;
+  padding: var(--tpl-an-flow-pad);
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-an-ring);
+}
+.flowLabel {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.track[data-size='flow'] {
+  height: var(--tpl-an-flow-track-h);
+}
+.track[data-size='flow'],
+.track[data-size='flow'] > span {
+  border-radius: var(--tpl-an-flow-track-radius);
+}
+.routesMain {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-an-routes-main-gap);
+  min-width: 0;
+}
+
+/* URLクリック（iK4cQ）：探す 300・状態 150、どこから 170・状態 80、注は薄い地の箱。 */
+.searchBox {
+  width: var(--tpl-an-search-w);
+  flex-shrink: 0;
+}
+.selectBox {
+  width: var(--tpl-an-select-w);
+  flex-shrink: 0;
+}
+.searchBox :global(*),
+.selectBox :global(*) {
+  max-width: 100%;
+}
+.searchBox > *,
+.selectBox > * {
+  width: 100%;
+}
+.colType[data-w='170'] {
+  width: var(--tpl-an-col-170);
+}
+.num[data-w='90'] { width: var(--tpl-an-col-90); }
+.colState {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-an-cell-gap);
+  width: var(--tpl-an-col-80);
+  flex-shrink: 0;
+  min-width: 0;
+}
+.colState > * {
+  max-width: 100%;
+}
+.pager {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-toolbar-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+.noteBox {
+  margin: 0;
+  padding: var(--tpl-an-note-box-pad);
+  border-radius: var(--tpl-an-seg-radius);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-an-link-lh);
+}
+
+/* 状態の札（2/8・点6・間5・12/18）。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-an-pill-gap);
+  padding: var(--tpl-an-pill-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-an-link-lh);
+  white-space: nowrap;
+}
+.pill::before {
+  content: '';
+  width: var(--tpl-an-pill-dot);
+  height: var(--tpl-an-pill-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.pill[data-tone='ok'] {
+  background: var(--color-accent-soft);
+  color: var(--color-success);
+}
+.pill[data-tone='info'] {
+  background: var(--color-status-info-soft);
+  color: var(--color-action);
+}
+.pill[data-tone='warn'] {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+
+/* 成果地点ごとのレポート（AzrZq）：日ごとの棒（140）と成果地点の表（見出し 13/20・行 9/20・間12）。 */
+.reportStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-split-gap);
+  min-width: 0;
+}
+.reportCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-report-gap);
+  padding: var(--tpl-an-card-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-an-ring);
+}
+.reportHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-toolbar-gap);
+  min-width: 0;
+}
+.reportSub {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-an-tab-lh);
+  white-space: nowrap;
+}
+.reportBars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-an-report-bar-gap);
+  height: var(--tpl-an-report-bars-h);
+  padding: var(--tpl-an-report-bars-pad);
+}
+.reportBar {
+  flex: 1 1 0;
+  border-radius: var(--tpl-an-bar-top-radius);
+  background: var(--color-accent);
+}
+.reportTable {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-an-ring);
+}
+.reportThead,
+.reportRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-report-col-gap);
+  min-width: 0;
+  box-shadow: var(--shadow-row-line);
+}
+.reportThead {
+  padding: var(--tpl-an-report-head-pad);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-an-text-lh);
+}
+.reportRow {
+  padding: var(--tpl-an-report-row-pad);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-an-tab-lh);
+}
+.reportRow:last-child {
+  box-shadow: none;
+}
+.reportRow[data-selected] {
+  background: var(--color-accent-soft);
+}
+.rcol {
+  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rcol[data-w='36'] { width: var(--tpl-an-icon-btn); overflow: visible; }
+.rcol[data-w='48'] { width: var(--tpl-an-col-48); }
+.rcol[data-w='62'] { width: var(--tpl-an-col-62); }
+.rcol[data-w='200'] { width: var(--tpl-an-col-200); }
+.rcol[data-change='up'] { color: var(--color-success); font-weight: 600; }
+.rcol[data-change='down'] { color: var(--color-danger); font-weight: 600; }
+.rowMenu {
+  display: inline-flex;
+}
+:global([data-theme='v8']) .rowMenuButton {
+  width: var(--tpl-an-icon-btn);
+  height: var(--tpl-an-icon-btn);
+  flex: 0 0 var(--tpl-an-icon-btn);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-an-ring);
+}
+.reportNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* 使われ方（N8ZrUl）：行の中の「中身を見る」＋「…」、右の気づいたこと。 */
+.colType[data-w='110'] { width: var(--tpl-an-col-110); }
+.colType[data-w='150'] { width: var(--tpl-an-col-150); }
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-swatch-gap);
+}
+.observation {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+}
+.plainList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+/* 保存した分析（bglah）：探す 280、右に履歴 460、定期レポートの見出しの段。 */
+.searchBox[data-w='saved'] { width: var(--tpl-an-saved-search-w); }
+.colType[data-w='60'] { width: var(--tpl-an-col-60); }
+.colType[data-w='80'] { width: var(--tpl-an-col-80); }
+.colType[data-w='90'] { width: var(--tpl-an-col-90); }
+.colType[data-w='100'] { width: var(--tpl-an-col-100); }
+.colType[data-w='130'] { width: var(--tpl-an-col-130); }
+.colOps {
+  display: flex;
+  width: var(--tpl-an-col-ops);
+  flex-shrink: 0;
+  min-width: 0;
+}
+.trow[data-h='pill'] { min-height: var(--tpl-an-pill-row-h); }
+.trow[data-h='button'] { min-height: var(--tpl-an-button-row-h); }
+.rowActions[data-gap='wide'] { gap: var(--tpl-an-wide-gap); }
+:global([data-theme='v8']) .rowButton {
+  min-height: 0;
+}
+.rowButton {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.linkButton {
+  margin-left: var(--tpl-an-wide-gap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.historyCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-flow-gap);
+  width: var(--tpl-an-history-w);
+  flex-shrink: 0;
+  padding: var(--tpl-an-flow-pad);
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-an-ring);
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-wide-gap);
+  min-width: 0;
+}
+.inlineError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-an-wide-gap);
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+.resultList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-cell-gap);
+  margin: 0;
+  font-size: var(--text-caption);
+}
+.resultList > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tpl-an-wide-gap);
+}
+.resultList dt {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.resultList dd {
+  margin: 0;
+  color: var(--color-ink);
+}
+
+/* ファネル（DkRDE）：選ぶ段（280・180・260）、全体の流れ（段 8/10・番号22・帯22）、右の選んだ段（320）。 */
+.controls {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-an-report-col-gap);
+  min-width: 0;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-route-bar-gap);
+  flex-shrink: 0;
+  min-width: 0;
+}
+.field[data-w='funnel'] { width: var(--tpl-an-field-funnel-w); }
+.field[data-w='window'] { width: var(--tpl-an-field-window-w); }
+.field[data-w='group'] { width: var(--tpl-an-field-group-w); }
+.field :global(*) { max-width: 100%; }
+.fieldLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-an-sub-lh);
+}
+.warnText {
+  margin: 0;
+  color: var(--color-status-warn-deep);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.funnelFlow {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-an-flow-gap);
+  min-width: 0;
+  padding: var(--tpl-an-flow-pad);
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-an-ring);
+}
+.funnelStep {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-report-col-gap);
+  width: 100%;
+  padding: var(--tpl-an-funnel-step-pad);
+  border: 0;
+  border-radius: var(--tpl-an-seg-radius);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+:global([data-theme='v8']) .funnelStep {
+  min-height: 0;
+}
+.funnelStep[data-selected] {
+  background: var(--color-accent-soft);
+}
+.funnelStep:disabled {
+  cursor: default;
+}
+.funnelNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-an-funnel-num);
+  height: var(--tpl-an-funnel-num);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-pearl);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+.funnelLabel {
+  width: var(--tpl-an-funnel-label-w);
+  flex-shrink: 0;
+  overflow: hidden;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-an-text-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.funnelTrack {
+  flex: 1 1 0;
+  height: var(--tpl-an-funnel-num);
+  min-width: 0;
+  border-radius: var(--tpl-an-flow-track-radius);
+  background: var(--color-surface-pearl);
+}
+.funnelTrack > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--tpl-an-flow-track-radius);
+  background: var(--color-accent);
+}
+.funnelStep[data-selected] .funnelTrack > span {
+  background: var(--color-accent-deep);
+}
+.funnelValue,
+.funnelDrop {
+  flex-shrink: 0;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+  text-align: right;
+  white-space: nowrap;
+}
+.funnelValue {
+  width: var(--tpl-an-col-70);
+  font-weight: 700;
+}
+.funnelDrop {
+  width: var(--tpl-an-funnel-drop-w);
+  color: var(--color-ink-faint);
+  font-weight: 600;
+}
+.funnelDrop[data-tone='warn'] {
+  color: var(--color-status-warn-deep);
+}
+.funnelSide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-an-flow-gap);
+  width: var(--tpl-an-side-w);
+  flex-shrink: 0;
+  padding: var(--tpl-an-flow-pad);
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-an-ring);
+}
+.funnelSide > p {
+  align-self: stretch;
+}
+.audienceCount {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-an-tab-lh);
+}
+.compareTitle {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: var(--tpl-an-text-lh);
+}
+.compareRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-wide-gap);
+  align-self: stretch;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+}
+.compareRow > strong {
+  font-weight: 600;
+}
+.compareRow > strong[data-tone='warn'] {
+  color: var(--color-status-warn-deep);
+}
+.flowLabel[data-size='row'] {
+  font-size: var(--text-caption);
+}
+.flowCard[data-w='full'] {
+  width: auto;
+}
+
+/* クロス分析（u5CuB8）：選ぶ欄 220・200・200・140、掛け合わせの表（行の名前 110・マス 40・間 6）。 */
+.field[data-w='measure'] { width: var(--tpl-an-field-measure-w); }
+.field[data-w='axis'] { width: var(--tpl-an-field-axis-w); }
+.field[data-w='period'] { width: var(--tpl-an-field-period-w); }
+.saveSlot :global(p.text-ink-faint) { display: none; }
+.waitBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-an-cell-gap);
+  padding: var(--tpl-an-wait-pad);
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-an-ring);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  text-align: center;
+}
+.waitBox > p { margin: 0; }
+.gridRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-swatch-gap);
+  min-width: 0;
+}
+.gridLabel {
+  width: var(--tpl-an-grid-label-w);
+  flex-shrink: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gridHead,
+.gridTotal {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gridHead {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-an-sub-lh);
+}
+.gridTotal {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+.gridCell {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--tpl-an-grid-cell-h);
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+:global([data-theme='v8']) .gridCell {
+  min-height: 0;
+}
+.gridCell[data-strong] { color: var(--color-canvas); }
+.gridCell[data-empty] { color: var(--color-ink-faint); cursor: default; }
+.gridCell[data-active] { box-shadow: var(--tpl-an-cell-active); }
+.legend[data-size='grid'] { align-items: center; color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.legend[data-size='grid'] > strong { color: var(--color-ink); font-weight: 600; }
+.legend[data-size='grid'] > [data-swatch='none']::before { background: var(--color-surface-pearl); }
+.legend[data-size='grid'] > [data-swatch='low']::before { background: var(--color-accent-soft); }
+.legend[data-size='grid'] > [data-swatch='mid']::before { background: var(--tpl-an-swatch-mid); }
+.legend[data-size='grid'] > [data-swatch='high']::before { background: var(--color-accent); }
+.funnelSide[data-w='cross'] { width: var(--tpl-an-flow-w); }
+.legend[data-size='grid'] { margin-top: var(--tpl-an-grid-legend-gap); }
+.legend[data-size='grid'] > span::before { width: var(--tpl-an-grid-swatch-w); }
+
+/* Search Console（h1G4d）：表は 9/14・間10、プロパティ 300、デバイス別 200。 */
+.thead[data-size='compact'],
+.trow[data-size='compact'] {
+  gap: var(--tpl-an-sc-col-gap);
+  padding: var(--tpl-an-sc-row-pad);
+}
+.num[data-w^='sc'] { padding-right: var(--tpl-an-sc-col-gap); }
+.num[data-w='sc60'] { width: var(--tpl-an-col-60); }
+.num[data-w='sc70'] { width: var(--tpl-an-col-70); }
+.num[data-w='sc64'] { width: var(--tpl-an-sc-col-64); }
+.controls[data-gap='narrow'] { gap: var(--tpl-an-wide-gap); }
+.field[data-w='property'] { width: var(--tpl-an-search-w); }
+.pillSlot { display: inline-flex; }
+.hourBar[data-empty] { background: var(--color-surface-pearl); }
+.scAxis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  line-height: var(--tpl-an-sc-tick-lh);
+}
+.funnelSide[data-w='devices'] { width: var(--tpl-an-sc-devices-w); }
+.compareRow > strong[data-weight='bold'] { font-weight: 700; }
+.table[data-kind='page'] .num[data-w='sc60'] { width: var(--tpl-an-sc-page-col-a); }
+.table[data-kind='page'] .num[data-w='sc70'] { width: var(--tpl-an-sc-page-col-b); }
+.table[data-kind='page'] .num[data-w='sc64'] { width: var(--tpl-an-sc-page-col-a); }
+.table[data-kind='page'] .thead[data-size='compact'],
+.table[data-kind='page'] .trow[data-size='compact'] { gap: var(--tpl-an-report-col-gap); }
+.table[data-kind='page'] .num[data-w^='sc'] { padding-right: var(--tpl-an-num-pad-end); }

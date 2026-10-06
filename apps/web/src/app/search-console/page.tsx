@@ -24,6 +24,8 @@ import type {
   SearchConsoleSetup,
 } from '@/lib/api'
 import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import SearchConsoleV8 from '@/v8/analytics/search-console'
 import { formatDateTime, formatNumber } from '@/lib/format'
 
 /**
@@ -114,7 +116,7 @@ function SetupCard({ setup, denied = false }: { setup: SearchConsoleSetup | null
   )
 }
 
-export default function SearchConsolePage() {
+function SearchConsoleCurrent() {
   usePageTitle('Search Console')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: '分析', href: '/analytics' }])
   const [days, setDays] = useState<RangeDays>(28)
@@ -258,4 +260,10 @@ export default function SearchConsolePage() {
       )}
     </div>
   )
+}
+
+/* V8 のときだけ新しい画面（src/v8/analytics/search-console.tsx）。それ以外は今の画面のまま。 */
+export default function SearchConsolePage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <SearchConsoleV8 /> : <SearchConsoleCurrent />
 }

@@ -509,6 +509,7 @@ shared-button-importer v8/rich-menus/list.tsx
 shared-button-importer v8/rich-menus/external-import.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
+shared-button-importer v8/scenarios/list.tsx
 shared-button-importer v8/webinars/list.tsx
 shared-button-importer v8/hq/account-dialogs.tsx
 shared-button-importer v8/hq/billing.tsx
@@ -517,3 +518,13 @@ shared-button-importer v8/hq/members.tsx
 shared-button-importer v8/hq/notice-line-dialog.tsx
 shared-button-importer v8/hq/support-detail.tsx
 shared-button-importer v8/hq/support.tsx
+shared-button-importer v8/analytics/analytics.tsx
+shared-button-importer v8/analytics/reactions.tsx
+shared-button-importer v8/analytics/routes.tsx
+shared-button-importer v8/analytics/url-clicks.tsx
+shared-button-importer v8/analytics/conversion-report.tsx
+shared-button-importer v8/analytics/usage.tsx
+shared-button-importer v8/analytics/saved.tsx
+shared-button-importer v8/analytics/funnel.tsx
+shared-button-importer v8/analytics/cross.tsx
+shared-button-importer v8/analytics/search-console.tsx
