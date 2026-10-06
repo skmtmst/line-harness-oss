@@ -54,6 +54,7 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
   const inputRef = useRef<HTMLInputElement>(null)
   /* 閉じたら、開く前にいた場所へフォーカスを戻す（動きの点検 2 番）。 */
   const returnFocusRef = useRef<HTMLElement | null>(null)
+  const backdropRef = useRef<HTMLDivElement>(null)
   const openRef = useRef(open)
   openRef.current = open
   /* 閉じるときも窓と同じく薄く消す（動きの点検 13 番）。 */
@@ -85,7 +86,8 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
       const back = returnFocusRef.current
       returnFocusRef.current = null
       const active = document.activeElement
-      const lost = !active || active === document.body || !active.isConnected || active === inputRef.current
+      // 窓の中（入力・候補）にいたら、閉じる動きの後に消えるので戻す。
+      const lost = !active || active === document.body || !active.isConnected || Boolean(backdropRef.current?.contains(active))
       if (lost && back?.isConnected) back.focus({ preventScroll: true })
     }
   }, [open ])
@@ -117,7 +119,7 @@ export default function CommandPalette({ items }: { items?: PaletteItem[] }) {
   }
 
   return createPortal(
-    <div className={styles.backdrop} data-closing={leaving || undefined} aria-hidden={leaving || undefined} onClick={() => setOpen(false)}>
+    <div ref={backdropRef} className={styles.backdrop} data-closing={leaving || undefined} aria-hidden={leaving || undefined} onClick={() => setOpen(false)}>
       <div
         role="dialog"
         aria-modal="true"

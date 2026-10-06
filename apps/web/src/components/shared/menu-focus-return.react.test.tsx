@@ -153,4 +153,16 @@ describe('⌘K を閉じたあとのフォーカス', () => {
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     await waitFor(() => expect(document.activeElement).toBe(before))
   })
+
+  it('候補へ Tab で移ってから Esc で閉じても、開く前のボタンへ戻る', async () => {
+    document.documentElement.dataset.theme = 'v8'
+    render(<div><button type="button">失敗を見る</button><CommandPalette items={[{ href: '/a', label: 'あ' }, { href: '/b', label: 'い' }]} /></div>)
+    const before = screen.getByRole('button', { name: '失敗を見る' })
+    before.focus()
+    act(() => { fireEvent.keyDown(document, { key: 'k', metaKey: true }) })
+    await waitFor(() => expect(document.activeElement?.tagName).toBe('INPUT'))
+    screen.getByRole('option', { name: 'い' }).focus()
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    await waitFor(() => expect(document.activeElement).toBe(before))
+  })
 })
