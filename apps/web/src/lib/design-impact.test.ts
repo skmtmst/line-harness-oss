@@ -253,6 +253,8 @@ describe('共通部品の影響範囲', () => {
       'v8/webhooks/interactions.tsx',
       // ★V8 コンバージョンの一覧（r6dJFy）。新しい置き場（src/v8）に一から書いた。
       'v8/conversions/list.tsx',
+      // ★V8 集まった回答の1件ずつ見る（MKQyJ）。表の下にページ送りを置く。
+      'v8/form-responses/responses.tsx',
     ].sort())
   })
 
