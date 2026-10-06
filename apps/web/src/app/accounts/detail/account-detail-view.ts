@@ -58,7 +58,7 @@ export function capacityLabel(account: LineAccount): string {
 /**
  * このアカウントでできること（設計の 4 つ）。
  *
- * **できないものは押し口を出さず、理由を書く**（`v6-common-rules.md` §7-10）。
+ * **できないものは押し口を出さず、理由を書く**（`docs/v8-design-rules.md` §5）。
  */
 export interface AccountAction {
   key: 'stop' | 'copy' | 'handover' | 'archive' | 'restore'

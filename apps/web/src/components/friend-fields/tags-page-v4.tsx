@@ -184,7 +184,7 @@ export function usageLabel(tag: Tag): string {
  * 「整理するものは無い」と読まれて放置される。
  *
  * `cleanupReasons` は `withCounts=1` のとき**理由が無くても `[]` で必ず返す**
- * 約束（`docs/v6-4-1-handoff.md` §0-1）。省略＝未取得。
+ * 約束。省略＝未取得（`docs/v8-design-rules.md` §5）。
  */
 export function cleanupKnown(items: Tag[], ready: boolean): boolean {
   // 読み込み中の空配列と、取得済みの0件を区別する。後者は `0件` と出せる。
@@ -712,7 +712,7 @@ export default function TagsPageV4({
 
   /*
     整理候補の数。**未取得は `null`（画面では `—`）、取得できて0件は `0`。**
-    `—` と `0件` を混ぜない（`docs/v6-4-1-handoff.md` §0-1）。
+    `—` と `0件` を混ぜない（`docs/v8-design-rules.md` §5）。
   */
   const cleanupItems = items
   const cleanupCount = cleanupKnown(cleanupItems, ready)
@@ -791,9 +791,9 @@ export default function TagsPageV4({
     <div>
       {/*
         タイトルと説明は共通トップバーが持つ。本文には置かない
-        （docs/v6-common-rules.md §1）。
+        （`docs/v8-design-rules.md` §5）。
         ヘッダー操作は独立した行にせず、タブ行の右端へ寄せる
-        （docs/v6-common-rules.md §1-4、Pencil `aToSv` は space_between）。
+        （`docs/v8-design-rules.md` §5、Pencil `aToSv` は space_between）。
       */}
       {/*
         設計の節の印。`design-structure.json` の `/tags` と突き合わせる。
@@ -891,7 +891,7 @@ export default function TagsPageV4({
         </div>
 
         {/*
-          設計 `HWP5R`。作る操作はここ。左に置く（`v6-common-rules.md` §1-5）。
+          設計 `HWP5R`。作る操作はここ。左に置く（`docs/v8-design-rules.md` §5）。
           **権限が無いときは出さない。** 押せるように見せてから断ると、
           何が足りないのかが分からないまま拒まれることになる。
         */}

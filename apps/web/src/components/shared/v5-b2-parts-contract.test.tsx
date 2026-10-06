@@ -91,7 +91,7 @@ describe('V5 B2 共通部品', () => {
 
     // 2026-09-03: 色と角丸を1系統にまとめ、同値の別名3つ
     // （--radius-tile / --color-status-warning / --color-status-warning-soft）
-    // を消したので 24 → 21。承認は docs/v6-directives.md §4。
+    // を消したので 24 → 21。承認は 2026-09-03 のオーナー決定。
     expect(contract.required.tokens).toBe(21)
     expect(contract.required.parts).toBe(20)
     expect(contract.required.partDeclarations).toBe(301)

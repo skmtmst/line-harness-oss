@@ -120,8 +120,7 @@ export default function UpdatesPage() {
                     r.rollback_expires_at &&
                     Date.now() < r.rollback_expires_at ? (
                       /*
-                        **押しても何も起きない口を置かない**（`docs/v6-common-rules.md`
-                        §7-10「出す＝使える」）。戻す仕組みは画面から使えないので、
+                        **押しても何も起きない口を置かない**（`docs/v8-design-rules.md` §5「出す＝使える」）。戻す仕組みは画面から使えないので、
                         押し口ではなく文で理由を出す。以前はブラウザの `alert()` で
                         「rollback not implemented in MVP — use CLI」と内部語を出していた。
                       */

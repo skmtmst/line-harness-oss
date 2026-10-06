@@ -10,8 +10,7 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
  * テンプレート一覧（設計 `W7LBc` 11-1）の、状態と押し口。
  *
  * リッチメッセージ作成（設計 `j9ixI` 11-1-D）に当たるルートは無い。
- * 作らずに、要る口を `docs/design-qa/v6-11-1-d-rich-message-handoff.md`
- * へ書いた。
+ * 作らずに、要る口を引き継ぎに書いた（2026-10-07 にリポジトリから外した）。
  */
 describe('テンプレート一覧の状態と押し口', () => {
   it('画面が名乗っているNodeを面に付ける', () => {

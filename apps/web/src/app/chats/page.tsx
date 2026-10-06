@@ -3837,7 +3837,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           友だち詳細。メールでも出したいが、メールのスレッドは友だちに
           紐づいていない（support_email_threads は customer_email しか
           持たない）。メールアドレスから友だちを引く口が要る。
-          docs/v025-open-questions.md に残している。
 
           いまはメールを開いているときは案内を出す。空の枠を出すより、
           なぜ出ないかが分かる方がよい。
