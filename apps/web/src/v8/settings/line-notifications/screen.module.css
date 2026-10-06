@@ -1,0 +1,253 @@
+/*
+ * ★V8 LINE通知（g3iDs）。外側（型・中のメニュー 200）は sb-frame の narrow-nav。
+ * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-sb-*）。
+ */
+
+.tabs {
+  display: flex;
+  gap: var(--tpl-sb-tab-gap);
+  box-shadow: var(--tpl-sb-line-bottom);
+}
+
+.tab {
+  padding-bottom: var(--tpl-sb-tab-pad-bottom);
+  border-bottom: var(--tpl-sb-tab-line) solid transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sb-band-text);
+  font-weight: 500;
+  line-height: var(--tpl-sb-row-name-lh);
+  white-space: nowrap;
+}
+
+.tab[aria-current='page'] {
+  border-bottom-color: var(--color-ink);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.tab:focus-visible {
+  outline: var(--tpl-sb-focus-ring);
+}
+
+.kpis {
+  gap: var(--tpl-sb-group-gap);
+}
+
+:global([data-theme='v8']) .kpis > [data-design-version] {
+  gap: var(--tpl-sb-kpi-gap);
+  padding: var(--tpl-sb-kpi-pad);
+}
+
+:global([data-theme='v8']) .kpis > [data-design-version] > :first-child,
+:global([data-theme='v8']) .kpis > [data-design-version] > :first-child > p,
+:global([data-theme='v8']) .kpis > [data-design-version] > :last-child {
+  min-height: 0;
+  font-size: var(--tpl-sb-row-sub);
+  line-height: var(--tpl-sb-row-sub-lh);
+}
+
+:global([data-theme='v8']) .kpis > [data-design-version] > :first-child > p {
+  font-weight: 600;
+}
+
+:global([data-theme='v8']) .kpis [data-kpi-number] {
+  font-size: var(--tpl-sb-kpi-num);
+  line-height: var(--tpl-sb-kpi-num-lh);
+}
+
+.minor {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-sb-row-sub);
+}
+
+.inlineLink {
+  margin-left: var(--tpl-sb-ctl-gap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.inlineRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+.infoBand,
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-band-gap);
+  margin: 0;
+  padding: var(--tpl-sb-band-pad);
+  border-radius: var(--tpl-sb-band-radius);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sb-band-text);
+  line-height: var(--tpl-sb-band-lh);
+}
+
+.infoBand { background: var(--color-status-info-soft); }
+.infoBand .bandIcon { color: var(--color-action); }
+.viewerBand { background: var(--color-shell); }
+
+.bandIcon {
+  flex-shrink: 0;
+  width: var(--tpl-sb-band-icon);
+  height: var(--tpl-sb-band-icon);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-sb-ctl-gap);
+}
+
+/* 表：枠 1・角丸 12。見出しは薄い地・余白 9/16、行は余白 10/16・上に線（間 14）。 */
+.table {
+  overflow: hidden;
+  border-radius: var(--tpl-sb-card-radius);
+  outline: 1px solid var(--color-hairline);
+}
+
+.row {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr) var(--tpl-sb-ln-col-when) var(--tpl-sb-ln-col-who) var(--tpl-sb-ln-col-count)
+    var(--tpl-sb-ln-col-status) var(--tpl-sb-ln-col-toggle) var(--tpl-sb-ln-col-edit);
+  align-items: center;
+  column-gap: var(--tpl-sb-ec-gap);
+  padding: var(--tpl-sb-ec-row-pad);
+  box-shadow: var(--tpl-sb-line-top);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-sb-tbl-head);
+  line-height: var(--tpl-sb-ec-lh);
+}
+
+.headRow {
+  padding: var(--tpl-sb-ec-head-pad);
+  background: var(--color-surface-pearl);
+  box-shadow: none;
+  font-size: var(--tpl-sb-row-sub);
+  font-weight: 600;
+  line-height: var(--tpl-sb-row-sub-lh);
+}
+
+.cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 種類は2行まで（絵は長い名前を折る）。 */
+.name {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-ink);
+  font-weight: 600;
+  word-break: normal;
+}
+
+.num {
+  padding-right: var(--tpl-sb-tbl-gap);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.numStrong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.numFaint {
+  color: var(--color-ink-faint);
+  font-weight: 600;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-sb-chip-gap);
+  padding: var(--tpl-sb-pill-pad-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--tpl-sb-chip-text);
+  font-weight: 600;
+  line-height: var(--tpl-sb-chip-lh);
+  white-space: nowrap;
+}
+
+.dot {
+  width: var(--tpl-sb-dot);
+  height: var(--tpl-sb-dot);
+  border-radius: var(--tpl-sb-dot-radius);
+  background: currentColor;
+}
+
+.status[data-tone='good'] { background: var(--color-accent-soft); color: var(--color-success); }
+.status[data-tone='muted'] { background: var(--color-shell); color: var(--color-ink-secondary); }
+.status[data-tone='warn'] { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sb-skeleton-gap);
+  padding: var(--tpl-sb-ec-row-pad);
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-skeleton-gap);
+}
+
+.skeletonGrow {
+  flex: 1;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* 内容を編集（左に入力・右に見え方 390）。 */
+.editorGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--tpl-sb-group-gap);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .editorGrid {
+    grid-template-columns: minmax(0, 1fr) var(--tpl-sb-ln-preview-w);
+  }
+}
+
+.previewImage {
+  width: 100%;
+  aspect-ratio: 20 / 9;
+  object-fit: cover;
+}
+
+.previewBrand {
+  letter-spacing: var(--tpl-sb-ln-brand-track);
+}
