@@ -13,7 +13,6 @@ import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
-import OperatorHistory from '@/components/hq/operator-history'
 import PlatformNotices from '@/components/hq/platform-notices'
 
 export default function HqPage() {
@@ -175,8 +174,8 @@ export default function HqPage() {
         <HqAccountList accounts={accounts} onSelect={login} onSettings={setEditingAccount} />
       ) : null}
 
-      {/* 運営が書き込みを伴う操作をしたときだけ出る（★V6 37-5）。 */}
-      <OperatorHistory />
+      {/* 「運営による操作」は契約先には出さない（2026-10-06 利用者指定）。
+          記録は残り続けるので、また見せるときは <OperatorHistory /> を戻すだけでよい。 */}
 
       {editingAccount ? (
         <AccountEditModal
