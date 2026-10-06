@@ -273,7 +273,10 @@ describe('V8 自動応答の通し：作る→止める→再開する', () => {
     await flush()
     const creates = screen.getAllByRole('button', { name: '＋ ルールを作る' })
     expect(creates.length).toBeGreaterThan(0)
+    // 絵 uE9gf の「＋ ルールを作る ▾」は、くわしく作る／かんたんに作るを選ぶ窓を開く。
     act(() => { creates[0].click() })
+    expect(pushMock).not.toHaveBeenCalled()
+    fireEvent.click(within(document.querySelector('[role="menu"]') as HTMLElement).getByText('くわしく作る'))
     expect(pushMock).toHaveBeenCalledWith('/auto-replies/edit')
   })
 
@@ -285,7 +288,8 @@ describe('V8 自動応答の通し：作る→止める→再開する', () => {
     openRowMenu()
     fireEvent.click(within(document.querySelector('[role="menu"]') as HTMLElement).getByText('止める'))
     const stopDialog = await screen.findByRole('dialog')
-    expect(stopDialog.textContent).toContain('を止めますか？')
+    // 絵 i8F12 の題は「「〇〇」を止める」。
+    expect(stopDialog.textContent).toMatch(/^「.+」を止める/)
     fireEvent.click(within(stopDialog).getByRole('button', { name: 'キャンセル' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(stopReply).not.toHaveBeenCalled()
@@ -294,7 +298,7 @@ describe('V8 自動応答の通し：作る→止める→再開する', () => {
     openRowMenu()
     fireEvent.click(within(document.querySelector('[role="menu"]') as HTMLElement).getByText('止める'))
     const stopDialog2 = await screen.findByRole('dialog')
-    expect(stopDialog2.textContent).toContain('を止めますか？')
+    expect(stopDialog2.textContent).toMatch(/^「.+」を止める/)
     fireEvent.click(within(stopDialog2).getByRole('button', { name: '止める' }))
     await waitFor(() => expect(stopReply).toHaveBeenCalledTimes(1))
     await screen.findByText('自動応答を停止しました')
