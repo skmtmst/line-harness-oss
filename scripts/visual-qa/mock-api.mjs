@@ -91,12 +91,12 @@ import {
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_SEND_COUNTS, LINE_NOTIFICATION_DELIVERIES,
-  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_WAITLIST, EVENT_BOOKINGS, EVENT_CHANGE_PREVIEW, EVENT_CHANGE_APPLY_RESULT, EVENT_LIFECYCLE_RESULT, EVENT_WAITLIST_REORDER_RESULT, EVENT_WAITLIST_SKIP_RESULT, EVENT_LIFF_CHANGE_RESULT, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_OCCURRENCE_APPLICANTS, EVENT_WAITLIST, EVENT_BOOKINGS, EVENT_CHANGE_PREVIEW, EVENT_CHANGE_APPLY_RESULT, EVENT_LIFECYCLE_RESULT, EVENT_WAITLIST_REORDER_RESULT, EVENT_WAITLIST_SKIP_RESULT, EVENT_LIFF_CHANGE_RESULT, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
   NEN_PHOTO_REWARD_POLICY_VERSIONS,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
-  FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS,
+  FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   ACCOUNT_HEALTH_LOGS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
@@ -1837,6 +1837,9 @@ const RAW_PATTERNS = [
   })],
   [/^\/api\/events\/admin\/events\/[^/]+$/, EVENT_DETAIL],
   [/^\/api\/events\/admin\/events\/[^/]+\/slots$/, { items: EVENT_SLOTS }],
+  /* 申込者（Mu8qW）の開催回の選び口と、回ごとの一覧。包まない口と包む口が混ざる（実APIと同じ）。 */
+  [/^\/api\/events\/admin\/events\/[^/]+\/occurrence-selector$/, { items: EVENT_SLOTS }],
+  [/^\/api\/events\/admin\/occurrences\/[^/]+\/applicants$/, { success: true, data: EVENT_OCCURRENCE_APPLICANTS }],
   [/^\/api\/events\/admin\/events\/[^/]+\/waitlist$/, { waitlist: EVENT_WAITLIST }],
   [/^\/api\/events\/admin\/events\/notifications\/pending$/, { count: 2 }],
   [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, (url) => ({
@@ -2770,6 +2773,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/forms') {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
   }
+  /* V8「集まった回答」の絵のフォーム（v0SbYR・MKQyJ）。form-1 とは別の ID。 */
+  if (pathname === `/api/forms/${FORM_VISIT_DETAIL.id}`) return { success: true, data: FORM_VISIT_DETAIL }
+  if (pathname === `/api/forms/${FORM_VISIT_DETAIL.id}/submissions`) return { success: true, data: FORM_VISIT_SUBMISSIONS }
   if (pathname === `/api/forms/${FORM_DETAIL.id}`) return { success: true, data: FORM_DETAIL }
   const formSubmissions = new RegExp(`^/api/forms/${FORM_DETAIL.id}/submissions$`).test(pathname)
   if (formSubmissions) {
@@ -5599,6 +5605,11 @@ const server = createServer((req, res) => {
       res.writeHead(action === 'schedule' ? 201 : 200).end(
         JSON.stringify({ success: true, data: payloads[action] }),
       )
+      return
+    }
+    /* 変更の確認（hmr2P・qUdNh）の口は実APIが器で包まずに返す。包むと人数が読めず「確定 0 人」になる。 */
+    if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/change-review(\/apply)?$/.test(url.pathname)) {
+      res.writeHead(200).end(JSON.stringify(url.pathname.endsWith('/apply') ? EVENT_CHANGE_APPLY_RESULT : EVENT_CHANGE_PREVIEW))
       return
     }
     const fixedResult = visualQaWriteBody(method, url.pathname)
