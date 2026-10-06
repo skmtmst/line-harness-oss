@@ -20,7 +20,7 @@ import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import type { EventChangeImpact } from '@/lib/api'
-import ChangeReviewV8 from './change-review-v8'
+import EventChangeReviewV8 from '@/v8/events/change-review'
 import {
   formatJp,
   noticeMessage,
@@ -354,30 +354,13 @@ function ChangeReviewPageInner() {
   return <ChangeReviewInner eventId={id} />
 }
 
-function ChangeReviewPageInnerV8() {
-  const params = useSearchParams()
-  const id = params.get('id')
-  if (!id) {
-    return (
-      <TargetMissing
-        kind="unspecified"
-        title="確認するイベントが指定されていません"
-        description="一覧から、変更を確認するイベントを選び直してください。"
-        backHref="/events"
-        backLabel="イベント一覧へ戻る"
-      />
-    )
-  }
-  return <ChangeReviewV8 eventId={id} />
-}
-
 /*
- * ★V8-B（板 `hmr2P`）：見た目テーマが v8 のときだけ新しい見せ方
- * （`change-review-v8.tsx`）に切り替える。処理は useChangeReview で同じ。
+ * ★V8（板 `hmr2P`）：見た目テーマが v8 のときだけ新しい画面
+ * （src/v8/events/change-review.tsx）に切り替える。処理は useChangeReview の写しで同じ。
  */
 function ChangeReviewSwitch() {
   const theme = useAdminTheme()
-  return theme === 'v8' ? <ChangeReviewPageInnerV8 /> : <ChangeReviewPageInner />
+  return theme === 'v8' ? <EventChangeReviewV8 /> : <ChangeReviewPageInner />
 }
 
 export default function EventChangeReviewPage() {
