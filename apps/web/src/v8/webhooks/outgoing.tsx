@@ -34,6 +34,7 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import Pagination from '@/components/shared/pagination'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -557,12 +558,15 @@ export default function WebhooksOutgoingV8() {
                 return (
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
-                      {canManage ? (
-                        <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
-                      ) : (
-                        <span className={styles.name} title={item.name}>{item.name}</span>
-                      )}
-                      <span className={styles.sub} title={item.url}>{maskedUrl(item.url)}</span>
+                      {/* 送り先はまだフォルダへ入れられない（全件が未分類）ので、丸は未分類の輪。 */}
+                      <FolderDotName folder={null}>
+                        {canManage ? (
+                          <Link href={`/webhooks/edit?id=${item.id}`} className={styles.name} title={item.name}>{item.name}</Link>
+                        ) : (
+                          <span className={styles.name} title={item.name}>{item.name}</span>
+                        )}
+                      </FolderDotName>
+                      <span className={`${styles.sub} ${styles.nameSub}`} title={item.url}>{maskedUrl(item.url)}</span>
                     </Td>
                     <Td className={styles.colWhen}><span className={styles.cellText} title={when}>{when}</span></Td>
                     <Td className={styles.colPayload}><span className={styles.cellText} title={payload}>{payload}</span></Td>
