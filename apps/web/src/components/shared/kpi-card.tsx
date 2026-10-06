@@ -199,7 +199,7 @@ export default function KpiCard({
             .filter(Boolean)
             .join(' ')}
         >
-          <span data-kpi-number className={styles.number}>{valueText !== undefined ? valueText : isCountableValue(value) ? `${signed && value > 0 ? '+' : ''}${formatNumber(value)}` : '—'}</span>
+          <span data-kpi-number className={styles.number}>{valueText === undefined && signed && isCountableValue(value) && value > 0 ? '+' : null}{valueText !== undefined ? valueText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
           {valueText !== undefined ? null : <span className={styles.unit}>{unit}</span>}
         </p>
       )}
