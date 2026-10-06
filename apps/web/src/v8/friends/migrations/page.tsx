@@ -6,10 +6,11 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import CsvMigrationsV8 from './csv'
+import UidMigrationV8 from './uid'
 
 function Inner() {
-  const tab = useSearchParams().get('tab')
-  if (tab === 'uid') return <CsvMigrationsV8 />
+  const params = useSearchParams()
+  if (params.get('tab') === 'uid') return <UidMigrationV8 initialRunId={params.get('run')} />
   return <CsvMigrationsV8 />
 }
 

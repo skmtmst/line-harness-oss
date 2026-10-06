@@ -1508,6 +1508,18 @@ const SHAPES = {
  * 画面確認だけで完結する、保存を伴わない固定の返事。
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
+
+/* ★V8 L48eY：本移行と照合が終わった UID 移行の履歴。 */
+const UID_MIGRATION_DONE = {
+  id: 'visual-uid-run-done', fromAccountId: 'visual-qa-account-old', toAccountId: 'visual-qa-account',
+  purpose: '友だち情報と配信停止の状態を新しいLINEアカウントへ引き継ぐ', sourceKind: 'csv',
+  sourceFilename: 'uid-map-2026-10-01.csv', status: 'completed', dryRunRevision: 2,
+  counts: { total: 1856, auto: 1820, review: 24, unmatched: 9, conflict: 2, applied: 1844, failed: 0 },
+  createdBy: 'visual-qa-admin', approvedBy: 'visual-qa-owner', createdAt: '2026-10-01T01:20:00.000Z',
+  reviewedAt: '2026-10-01T01:40:00.000Z', executedAt: '2026-10-01T02:00:00.000Z', completedAt: '2026-10-01T02:05:00.000Z',
+  rolledBackAt: null, failureReason: null, rollbackable: true,
+}
+
 function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && (pathname === '/api/notifications/operator-rules/recipients-preview' || pathname === '/api/line-notifications/operator-rules/recipients-preview')) {
     /*
@@ -2425,7 +2437,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: LINE_ACCOUNTS }
   }
   if (pathname === '/api/friends/migrations') {
-    return { success: true, data: [{
+    return { success: true, data: [UID_MIGRATION_DONE, {
       id: 'visual-uid-run', fromAccountId: ACCOUNT.id, toAccountId: 'visual-qa-account-new',
       purpose: '友だち情報・タグ・配信停止状態を新アカウントへ引き継ぐ', sourceKind: 'csv',
       sourceFilename: 'uid-map-2026-09-06.csv', status: 'review', dryRunRevision: 1,
@@ -2433,6 +2445,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       createdBy: STAFF.id, approvedBy: null, createdAt: '2026-09-06T05:20:00.000Z',
       reviewedAt: null, executedAt: null, completedAt: null, rolledBackAt: null, failureReason: null,
     }] }
+  }
+  // ★V8 L48eY：本移行と照合が終わった履歴（/friends/migrations?tab=uid&run=visual-uid-run-done）。
+  if (pathname === '/api/friends/migrations/visual-uid-run-done') {
+    return { success: true, data: { ...UID_MIGRATION_DONE, items: [], itemTotal: 0, decisionCounts: { pending: 0, link: 1844, create: 0, exclude: 3 } } }
   }
   if (pathname === '/api/friends/migrations/visual-uid-run') {
     return { success: true, data: {

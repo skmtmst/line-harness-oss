@@ -11,7 +11,7 @@ export const FRIENDS_TABS: ReadonlyArray<{ key: FriendsTabKey; label: string; hr
   { key: 'list', label: '友だち一覧', href: '/friends' },
   { key: 'duplicates', label: '重複検出', href: '/friends?tab=duplicates' },
   { key: 'merged', label: '統合ユーザー', href: '/friends?tab=merged' },
-  { key: 'uid-migration', label: 'UID移行', href: '/accounts?tab=migration' },
+  { key: 'uid-migration', label: 'UID移行', href: '/friends/migrations?tab=uid' },
   { key: 'csv', label: 'CSVで書き出す・取り込む', href: '/friends/migrations' },
 ]
 
