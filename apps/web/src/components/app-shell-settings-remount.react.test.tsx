@@ -43,3 +43,20 @@ describe('外枠：設定の画面で外のメニューを外しても本文を�
     expect(view.container.querySelector('[data-settings-split]')).toBeTruthy()
   })
 })
+
+describe('外枠：外のメニューが後から出入りしても、板の中のメニューの印を消さない', () => {
+  afterEach(cleanup)
+
+  it('外に置くメニュー（inline なし）は印に触らない', async () => {
+    const { usePageChrome } = await import('./shell/page-chrome')
+    const seen: boolean[] = []
+    function Probe() { seen.push(usePageChrome().settingsNavInline); return null }
+    function Outer() { useSettingsNavInline(false); return null }
+    function Inner() { useSettingsNavInline(true); return null }
+    const view = render(<PageChromeProvider><Inner /><Outer /><Probe /></PageChromeProvider>)
+    expect(seen.at(-1)).toBe(true)
+    // 外のメニューが消えても（片づけが走っても）、印は true のまま
+    view.rerender(<PageChromeProvider><Inner /><Probe /></PageChromeProvider>)
+    expect(seen.at(-1)).toBe(true)
+  })
+})
