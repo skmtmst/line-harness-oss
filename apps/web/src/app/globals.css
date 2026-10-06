@@ -720,6 +720,21 @@
   --tpl-tabs-h: 28px; --tpl-tabs-pad-bottom: 10px; --tpl-tabs-text-lh: 18px;
   --tpl-chip-h: 36px; --tpl-chip-pad: 0 10px; --tpl-chip-gap: 5px; --tpl-body-pad: 14px; --tpl-body-gap: 8px; --tpl-body-lh: 22px; --tpl-insert-pad: 0 14px; --tpl-body-spacer: 24px; --tpl-chip-row-gap: 4px; --tpl-rule-row-gap: 12px; --tpl-chip-label-lh: 20px; --tpl-kw-chip-pad: 4px 6px 4px 10px; --tpl-kw-input-w: 200px; --tpl-kw-input-pad: 0 12px; --tpl-seg-btn-h: 32px; --tpl-seg-btn-pad: 0 12px; --tpl-weekday-w: 48px; --tpl-field-gap-basic: 6px; --tpl-count-num-size: 24px; --tpl-count-num-lh: 29px; --tpl-summary-key-w: 140px; --tpl-summary-val-lh: 21px; --tpl-summary-gap: 13px; --tpl-conflict-desc-lh: 18px; --tpl-rule-note-lh: 16px;
   --tpl-action-row-pad: 10px 12px; --tpl-action-row-gap: 10px; --tpl-action-select-w: 140px;
+  /* LINEアカウントの詳細（ihjfd）・送受信を止める（CFAyf）・資格情報（Msb1j）・アーカイブ（WOfBN）・登録の編集（n9Z2P）・乗り換え（x2dSNv）。 */
+  --tpl-acd-pad: 16px 24px 24px 0; --tpl-acd-gap: 14px; --tpl-acd-stack-gap: 12px; --tpl-acd-side-w: 320px;
+  --tpl-acd-card-pad: 18px; --tpl-acd-card-gap: 12px; --tpl-acd-card-radius: 12px; --tpl-acd-inner-pad: 16px;
+  --tpl-acd-title-size: 14px; --tpl-acd-title-lh: 20px; --tpl-acd-head-gap: 2px; --tpl-acd-sub-lh: 16px;
+  --tpl-acd-row-pad: 7px 0; --tpl-acd-row-gap: 12px; --tpl-acd-label-w: 150px; --tpl-acd-label-size: 11px; --tpl-acd-label-lh: 16px; --tpl-acd-value-size: 12px; --tpl-acd-value-lh: 16.5px;
+  --tpl-acd-wide-pad: 8px 0; --tpl-acd-wide-size: 13px; --tpl-acd-wide-lh: 19px;
+  --tpl-acd-note-size: 11px; --tpl-acd-note-lh: 20px; --tpl-acd-link-size: 12px; --tpl-acd-link-lh: 20px;
+  --tpl-acd-actions-gap: 8px; --tpl-acd-inline-gap: 8px; --tpl-acd-head-actions-gap: 12px;
+  --tpl-acd-ring: inset 0 0 0 1px var(--color-hairline); --tpl-acd-line-top: inset 0 1px 0 var(--color-hairline); --tpl-acd-line-bottom: inset 0 -1px 0 var(--color-divider);
+  --tpl-acd-warn-bg: #fff4e0; --tpl-acd-warn-ink: #8a3c00;
+  --tpl-acd-dlg-pad: 24px; --tpl-acd-dlg-gap: 14px; --tpl-acd-dlg-title-size: 17px; --tpl-acd-dlg-title-lh: 25px;
+  --tpl-acd-dlg-band-pad: 10px 12px; --tpl-acd-dlg-band-radius: 8px; --tpl-acd-dlg-band-size: 11px; --tpl-acd-dlg-band-lh: 17px;
+  --tpl-acd-dlg-field-gap: 6px; --tpl-acd-dlg-label-size: 13px; --tpl-acd-dlg-label-lh: 20px; --tpl-acd-dlg-foot-pad: 14px 0 0 0; --tpl-acd-dlg-sub-size: 12px; --tpl-acd-dlg-pair-gap: 12px; --tpl-acd-otp-h: 48px; --tpl-acd-dlg-sub-lh: 17px;
+  --tpl-acd-ho-step-pad: 8px 12px; --tpl-acd-ho-step-radius: 10px; --tpl-acd-ho-step-size: 12px; --tpl-acd-ho-box-pad: 12px 14px; --tpl-acd-ho-box-gap: 6px; --tpl-acd-ho-result-w: 340px;
+  --tpl-acd-ho-head-pad: 9px 14px; --tpl-acd-ho-row-pad: 9px 14px; --tpl-acd-ho-evidence-w: 220px; --tpl-acd-ho-choice-w: 150px; --tpl-acd-ho-name-size: 12px; --tpl-acd-ho-sub-size: 10px; --tpl-acd-ho-band-pad: 12px 16px; --tpl-acd-ho-band-size: 13px; --tpl-acd-ho-list-gap: 4px; --tpl-acd-ho-title-size: 13px; --tpl-acd-ho-name-gap: 1px; --tpl-acd-ho-fixed-h: 36px; --tpl-acd-ho-fixed-pad: 0 12px; --tpl-acd-ring-current: inset 0 0 0 2px var(--color-accent-deep);
   --tpl-starter-gap: 12px; --tpl-starter-card-h: 168px; --tpl-card-title-size: 15px;
   --tpl-side-card-pad: 16px; --tpl-side-card-gap: 4px; --tpl-side-row-gap: 3px; --tpl-side-row-pad: 9px;
   --tpl-side-title-lh: 19px; --tpl-text-sm-lh: 17px; --tpl-side-note-pad: 12px 14px; --tpl-label-tag-gap: 6px;

@@ -555,3 +555,7 @@ shared-button-importer v8/conversions/list.tsx
 shared-button-importer v8/conversions/dialogs.tsx
 shared-button-importer v8/conversions/create.tsx
 shared-button-importer v8/inflow-links/new/create.tsx
+# ★V8 LINEアカウントの詳細（ihjfd）・窓（CFAyf・Msb1j・WOfBN・n9Z2P）・乗り換え（x2dSNv）。src/v8 に一から書いた。
+shared-button-importer v8/accounts-detail/detail.tsx
+shared-button-importer v8/accounts-detail/dialogs.tsx
+shared-button-importer v8/accounts-detail/handover.tsx
