@@ -282,19 +282,19 @@ const OPS_AUDIT = [
 ]
 const OPS_MEMBERS = [
   {
-    staffId: 'visual-qa-ops', name: '検証 太郎', email: 'ops@example.com', isActive: true,
+    staffId: 'visual-qa-ops', name: '検証 太郎', email: null, isActive: true,
     totpEnabled: true, lineLinked: false, inviteStatus: 'accepted', activationState: 'active',
     invitedAt: '2026-04-01T10:00:00+09:00', approvedBy: null,
     lastLoginAt: '2026-09-07T08:00:00+09:00', createdAt: '2026-04-01T10:00:00+09:00',
   },
   {
-    staffId: 'visual-ops-member', name: '見本 次郎', email: 'member@example.com', isActive: true,
+    staffId: 'visual-ops-member', name: '見本 次郎', email: null, isActive: true,
     totpEnabled: true, lineLinked: false, inviteStatus: 'accepted', activationState: 'active',
     invitedAt: '2026-05-01T10:00:00+09:00', approvedBy: '検証 太郎',
     lastLoginAt: '2026-10-01T22:40:00+09:00', createdAt: '2026-05-01T10:00:00+09:00',
   },
   {
-    staffId: 'visual-ops-invited', name: '見本 花子', email: 'invited@example.com', isActive: true,
+    staffId: 'visual-ops-invited', name: '見本 花子', email: null, isActive: true,
     totpEnabled: false, lineLinked: false, inviteStatus: 'sent', activationState: 'invited',
     invitedAt: '2026-09-06T10:00:00+09:00', approvedBy: '検証 太郎',
     lastLoginAt: null, createdAt: '2026-09-06T10:00:00+09:00',

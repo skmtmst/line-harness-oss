@@ -81,7 +81,7 @@ export default function OpsMembersV8() {
     void load()
   }
 
-  const confirm = async () => {
+  const applyPending = async () => {
     if (!pending) return
     setBusy(true)
     setError('')
@@ -214,7 +214,7 @@ export default function OpsMembersV8() {
         busy={busy}
         error={error}
         designNode={pending?.kind === 'stop' ? 'VUyYu' : undefined}
-        onConfirm={() => void confirm()}
+        onConfirm={() => void applyPending()}
         onCancel={() => { if (!busy) setPending(null) }}
       >
         <div className={parts.dialogBody}>

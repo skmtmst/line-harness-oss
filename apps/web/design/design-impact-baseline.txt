@@ -527,3 +527,15 @@ shared-button-importer v8/analytics/saved.tsx
 shared-button-importer v8/analytics/funnel.tsx
 shared-button-importer v8/analytics/cross.tsx
 shared-button-importer v8/analytics/search-console.tsx
+shared-button-importer v8/ops/login.tsx
+shared-button-importer v8/ops/two-factor.tsx
+shared-button-importer v8/ops/invite.tsx
+shared-button-importer v8/ops/dashboard.tsx
+shared-button-importer v8/ops/members.tsx
+shared-button-importer v8/ops/audit.tsx
+shared-button-importer v8/ops/announcements.tsx
+shared-button-importer v8/ops/knowledge.tsx
+shared-button-importer v8/ops/knowledge-article.tsx
+shared-button-importer v8/ops/tenants.tsx
+shared-button-importer v8/ops/tenant-detail.tsx
+shared-button-importer v8/ops/support.tsx
