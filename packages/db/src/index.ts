@@ -164,3 +164,5 @@ export * from './operator-notification-teams.js';
 
 export * from './ad-event-mappings.js';
 export * from './photo-publications';
+
+export * from './friend-summary.js';

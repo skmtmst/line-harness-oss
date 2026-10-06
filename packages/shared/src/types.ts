@@ -2716,3 +2716,19 @@ export interface FriendUpcomingItem {
   /** 一斉配信の対象条件を評価した日時。送信時には再判定される。 */
   audienceEvaluatedAt?: string;
 }
+
+/** 直近90日の友だち集計。率は0〜1、分母0はnull。金額は通貨の最小単位。 */
+export interface FriendSummary {
+  periodDays: 90;
+  from: string;
+  to: string;
+  deliveryOpenRate90Days: number | null;
+  deliveryOpenMeasuredCount90Days: number;
+  purchases90Days: {
+    count: number;
+    /** 複数通貨・金額不明はnull。購入なしは0。取消・全額返金を除き、部分返金を引く。 */
+    totalAmountMinor: number | null;
+    currency: string | null;
+    byCurrency: Array<{ currency: string; count: number; totalAmountMinor: number | null }>;
+  } | null;
+}

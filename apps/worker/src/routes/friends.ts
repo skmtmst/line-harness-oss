@@ -1,3 +1,4 @@
+import { getFriendSummary } from '@line-crm/db';
 import { getFriendUpcomingItems } from '../services/friend-upcoming-items.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
@@ -1183,6 +1184,19 @@ function serializeFriendFormSubmission(submission: FriendFormSubmission) {
     createdAt: submission.created_at,
   };
 }
+
+// 既存の友だち詳細を変えず、数の帯用の集計を別の口で返す。
+friends.get('/api/friends/:id/summary', requireVisibleFriend, async (c) => {
+  try {
+    const friend = await getFriendById(c.env.DB, c.req.param('id'));
+    if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+    const data = await getFriendSummary(c.env.DB, friend.id, friend.line_account_id ?? null);
+    return c.json({ success: true, data });
+  } catch {
+    console.error('友だちの90日集計を取得できませんでした');
+    return c.json({ success: false, error: '集計を取得できませんでした' }, 500);
+  }
+});
 
 friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
   try {

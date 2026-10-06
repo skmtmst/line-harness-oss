@@ -31,6 +31,7 @@ import type {
   AutoReplyValidationResult,
   Friend,
   FriendUpcomingItem,
+  FriendSummary,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
   FriendAddEventRoutingStatus,
@@ -6352,6 +6353,8 @@ export const api = {
      * 受信箱の顧客情報に出す「次の予定」（IDEA-02）。
      * 値が null = 予定なし、*_Error=true = 取得失敗（未取得）を区別する。
      */
+    summary: (id: string) =>
+      fetchApi<ApiResponse<FriendSummary>>(`/api/friends/${encodeURIComponent(id)}/summary`),
     upcoming: (id: string) =>
       fetchApi<ApiResponse<FriendUpcoming>>(`/api/friends/${id}/upcoming`),
     mileage: (id: string, params?: number | { limit?: number; accountId?: string }) => {
