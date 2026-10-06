@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 /**
@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest'
 const BOOKINGS = readFileSync(new URL('./bookings/page.tsx', import.meta.url), 'utf8')
 const MATRIX = readFileSync(new URL('./menus/staff/page.tsx', import.meta.url), 'utf8')
 const MENU_NEW = readFileSync(new URL('./menus/new/page.tsx', import.meta.url), 'utf8')
-const FORMS = readFileSync(new URL('../form-submissions/page.tsx', import.meta.url), 'utf8')
+const FORMS = readFileSync(new URL('../form-submissions/list-v8.tsx', import.meta.url), 'utf8')
 
 describe('予約カレンダーの空き枠取得（#1060）', () => {
   it('一括口（menu_ids）で全メニュー分を1要求にまとめる', () => {

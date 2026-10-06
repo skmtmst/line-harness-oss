@@ -1,0 +1,236 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B 外部連携の送り先を作る（板 `hsD8e`）。
+ * 左の設定カード・右の見本・下の帯。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.crumb {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.crumbLink {
+  color: var(--color-action);
+}
+
+.crumbLink:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 本体2列：左の設定・右の見本（幅 340〜380・左に細い線）。 */
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 24px;
+  align-items: start;
+  min-width: 0;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 板 `NGh7b`「段」：余白 20（四方）。 */
+.card {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 20px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cardNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.field {
+  margin-top: 12px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 10px);
+  padding: 0 12px;
+  height: 36px;
+  font-size: 13px;
+  color: var(--color-ink);
+  background: var(--color-canvas);
+}
+
+.input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.fieldError {
+  margin: 4px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.radioRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* 送る範囲の1つ選びは、向きと同じ選ぶカード（RadioCard）で出す。 */
+
+.eventGroup {
+  margin-top: 12px;
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas-sunken);
+  padding: 12px 16px;
+}
+
+.eventGroupTitle {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.eventChecks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.detailsBox {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.detailsSummary {
+  cursor: pointer;
+  color: var(--color-action);
+  font-weight: 600;
+}
+
+.selectRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.secretRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.secretRow .input {
+  font-family: monospace;
+}
+
+.side {
+  min-width: 0;
+  border-left: 1px solid var(--color-hairline);
+  padding-left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sideCard {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.sideTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sideNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.sampleBox {
+  margin: 12px 0 0;
+  border-radius: var(--radius-control, 10px);
+  background: var(--color-canvas-sunken);
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--color-ink-secondary);
+}
+
+.sideList {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--color-ink-secondary);
+}
+
+.testRow {
+  margin-top: 12px;
+}
+
+@container (max-width: 1100px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--color-hairline);
+    padding-top: 16px;
+  }
+}

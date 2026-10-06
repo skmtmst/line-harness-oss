@@ -44,16 +44,60 @@
 }
 
 /*
- * ★V8「板の頭」：題は 20px/600、説明は1行 13px ink-secondary。
- * v7 の 30px の題は板の中では大きすぎる。
+ * ★V8「板の頭」：既定は 379 板の多数派（JKjsE：題 22/700/32・間 4・
+ * 説明 13/19・余白 20/24/12・枠なし）。値は --tpl-* で読む。
+ * data-header-size="compact" は部品 EnlYo どおりの小さい形。
+ * v7 は変えない。
  */
+[data-theme='v8'] .header {
+  gap: 12px;
+  padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom);
+  background: var(--color-canvas);
+  border: 0;
+  outline-color: transparent;
+}
+
+[data-theme='v8'] .heading {
+  flex: 1;
+  gap: var(--tpl-head-gap);
+}
+
+[data-theme='v8'] .heading > nav { display: none; }
+
 [data-theme='v8'] .title {
-  font-size: var(--text-title);
+  display: block;
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
 }
 
 [data-theme='v8'] .description {
   color: var(--color-ink-secondary);
-  font-size: var(--text-label);
+  font-size: var(--tpl-desc-size);
   font-weight: 400;
+  line-height: var(--tpl-desc-lh);
 }
+
+[data-theme='v8'] .actions { gap: 12px; }
+
+[data-theme='v8'] .header[data-header-size='compact'] .title {
+  font-size: var(--tpl-compact-title-size);
+  font-weight: var(--tpl-compact-title-weight);
+  line-height: var(--tpl-compact-title-lh);
+}
+
+[data-theme='v8'] .header[data-header-size='compact'] .heading {
+  gap: var(--tpl-compact-gap);
+}
+
+[data-theme='v8'] .header[data-header-size='compact'] .description {
+  line-height: var(--tpl-compact-desc-lh);
+}
+
+
+[data-theme='v8'] .title, [data-theme='v8'] .description { width: fit-content; }
+[data-theme='v8'] .actions button { border: 0; }
+[data-theme='v8'] .actions button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+[data-theme='v8'] .actions button[class*="button_primary"]:not(:focus-visible) { outline-color: transparent; }
+
 }

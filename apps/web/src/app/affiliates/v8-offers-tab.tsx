@@ -24,7 +24,6 @@ import { MoreAction } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
 import {
   OFFER_PAGE_SIZES,
-  OFFER_SORTS,
   offersCsv,
   pageCountOf,
   pageOf,
@@ -36,7 +35,7 @@ import { OfferFormModal, listAllConversionApprovals } from './tabs'
 import OfferTermsDialog from './offer-terms'
 import { confirmedThisMonth, confirmedTotals, confirmedValue, confirmedUnit, confirmedDetail, type ConfirmedState } from './offer-kpi'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
-import styles from './list-v8.module.css'
+import './list-v8.css'
 
 function formatYen(n: number): string {
   return `¥${formatNumber(Math.round(n))}`
@@ -82,7 +81,7 @@ export default function OffersTabV8({
 
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<OfferFilter[]>([])
-  const [sort, setSort] = useState<OfferSort>('newest')
+  const [sort] = useState<OfferSort>('newest')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [folder, setFolder] = useState<FolderKey>('all')
@@ -231,7 +230,7 @@ export default function OffersTabV8({
           label="案件"
           value={listState === 'error' || (loading && offers.length === 0) ? null : offers.length}
           unit="件"
-          sub={listState === 'error' ? '読み込めませんでした' : `公開中 ${formatNumber(offers.filter((o) => o.isActive).length)}・停止・終了 ${formatNumber(offers.filter((o) => !o.isActive).length)}`}
+          sub={listState === 'error' ? '読み込めませんでした' : `公開中 ${formatNumber(offers.filter((o) => o.isActive).length)}・下書き ${formatNumber(offers.filter((o) => !o.isActive).length)}`}
           info="アフィリエイターに紹介してもらう内容です。公開中の案件だけが紹介リンクに出ます。"
         />
         <KpiCell
@@ -242,18 +241,17 @@ export default function OffersTabV8({
           info="今月（日本時間）に起きて、認めるまで済んだ成果の数です。承認待ちは含みません。"
         />
         <KpiCell
-          label="支払い予定"
-          value={confirmedValue(confirmedState, approvedTotals.yen)}
-          unit={confirmedUnit(confirmedState, '円')}
-          sub={confirmedDetail(confirmedState, '認めた成果の金額の合計')}
-          info="今月に認めた成果の金額を足したものです。承認待ちは金額が確定していないので入れていません。"
+          label="平均報酬"
+          value={confirmedState === 'ready' && approvedTotals.count > 0 ? formatYen(Math.round(approvedTotals.yen / approvedTotals.count)) : null}
+          sub={confirmedDetail(confirmedState, '1件あたり')}
+          info="今月に認めた成果の金額を件数で割ったものです。承認待ちは入れていません。"
         />
         <KpiCell
-          label="付与予定マイル"
-          value={confirmedValue(confirmedState, approvedTotals.miles)}
-          unit={confirmedUnit(confirmedState, 'マイル')}
-          sub={confirmedDetail(confirmedState, '認めた成果に結ぶ分')}
-          info="今月に認めた成果に結びついたマイルの合計です。案件に結びつかない成果にはマイルが付きません。"
+          label="マイルあり"
+          value={listState === 'error' || (loading && offers.length === 0) ? null : offers.filter((o) => o.rewardMiles > 0).length}
+          unit="件"
+          sub={listState === 'error' ? '読み込めませんでした' : '成果でマイルも付く'}
+          info="マイルが付く案件の数です。"
         />
       </KpiStrip>
 
@@ -264,8 +262,8 @@ export default function OffersTabV8({
       ) : null}
 
       {/* フォルダ列＋一覧。板 h7dmB：左にグループ、右に表。 */}
-      <div className={styles.listBody}>
-        <nav aria-label="案件のグループ" className={styles.folderCol}>
+      <div className="af-list-listBody">
+        <nav aria-label="案件のグループ" className="af-list-folderCol">
           {/* 板 `h7dmB`：作るボタンはフォルダ列のいちばん上 */}
           <Button
             type="button"
@@ -276,8 +274,8 @@ export default function OffersTabV8({
           >
             <FileText size={15} aria-hidden="true" /> 案件を作る
           </Button>
-          <p className={styles.folderColTitle} style={{ marginTop: 12 }}>
-            案件のグループ
+          <p className="af-list-folderColTitle" style={{ marginTop: 12 }}>
+            フォルダ
           </p>
           {FOLDERS.map((f) => {
             const count = offers.filter(f.match).length
@@ -286,27 +284,30 @@ export default function OffersTabV8({
               <button
                 key={f.key}
                 type="button"
-                className={`${styles.folderItem} ${active ? styles.folderItemActive : ''}`}
+                className={`af-list-folderItem ${active ? 'af-list-folderItemActive' : ''}`}
                 onClick={() => { setFolder(f.key); setPage(1) }}
                 aria-current={active ? 'true' : undefined}
               >
-                <FolderOpen size={14} aria-hidden="true" className={styles.folderItemIcon} />
-                <span className={styles.folderItemLabel}>{f.label}</span>
-                <span className={styles.folderItemCount}>{formatNumber(count)}</span>
+                <FolderOpen size={14} aria-hidden="true" className="af-list-folderItemIcon" />
+                <span className="af-list-folderItemLabel">{f.label}</span>
+                <span className="af-list-folderItemCount">{formatNumber(count)}</span>
               </button>
             )
           })}
           {/* 案件をフォルダへ入れる口は API に無いので、動きの有無で自動で分けて
               いることを書く（押せない「追加」は置かない）。 */}
-          <p className={styles.footNote} style={{ padding: '8px 0 0' }}>
+          <p className="af-list-footNote" style={{ padding: '8px 0 0' }}>
             成果が出たときの動き（タグ・シナリオ・マイル）で自動で分けています
           </p>
         </nav>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className={styles.tools} style={{ padding: '0 0 14px' }}>
+          <NoticeBar>
+            アフィリエイターは「紹介する人」、案件は「何を紹介すると、いくら払うか」の決まりです。1人のアフィリエイターが、いくつもの案件を紹介できます。
+          </NoticeBar>
+          <div className="af-list-tools" style={{ padding: '0 0 14px' }}>
             {/* 1152 ではフォルダ列を畳むので、作るボタンは道具の1段目の左へ（板 `KdFRI`） */}
-            <span className={styles.toolsCreate}>
+            <span className="af-list-toolsCreate">
               <Button
                 type="button"
                 variant="primary"
@@ -317,7 +318,7 @@ export default function OffersTabV8({
                 <FileText size={15} aria-hidden="true" /> 案件を作る
               </Button>
             </span>
-            <span className={styles.folderSelect}>
+            <span className="af-list-folderSelect">
               <Select
                 aria-label="案件のグループ"
                 value={folder}
@@ -331,7 +332,7 @@ export default function OffersTabV8({
               value={query}
               onChange={(value) => { setQuery(value); setPage(1) }}
               onClear={() => { setQuery(''); setPage(1) }}
-              className={styles.toolsSearch}
+              className="af-list-toolsSearch"
             />
             <FilterChip
               selected={filters.includes('open')}
@@ -344,21 +345,30 @@ export default function OffersTabV8({
               公開中
             </FilterChip>
             <FilterChip
-              selected={filters.includes('hasMiles')}
+              selected={filters.includes('draft')}
               onChange={(on) => {
-                setFilters((cur) => (on ? [...cur, 'hasMiles'] : cur.filter((v) => v !== 'hasMiles')))
+                setFilters((cur) => (on ? [...cur, 'draft'] : cur.filter((v) => v !== 'draft')))
                 setPage(1)
               }}
-              count={listState === 'error' ? undefined : formatNumber(offers.filter((o) => o.rewardMiles > 0).length)}
+              count={listState === 'error' ? undefined : formatNumber(offers.filter((o) => !o.isActive).length)}
             >
-              マイルあり
+              下書き
             </FilterChip>
-            <span className={styles.toolsSpacer} />
+            <span className="af-list-toolsSpacer" />
             <Select
-              aria-label="並び順"
-              value={sort}
-              options={OFFER_SORTS.map((o) => ({ value: o.value, label: o.label }))}
-              onChange={(value) => { setSort(value as OfferSort); setPage(1) }}
+              aria-label="よく使う絞り込み"
+              value=""
+              options={[
+                { value: '', label: 'よく使う絞り込み' },
+                { value: 'open', label: '公開中' },
+                { value: 'draft', label: '下書き' },
+                { value: 'hasMiles', label: 'マイルあり' },
+                { value: 'hasYen', label: '報酬あり' },
+              ]}
+              onChange={(value) => {
+                setFilters(value ? [value as OfferFilter] : [])
+                setPage(1)
+              }}
             />
             <Select
               aria-label="表示件数"
@@ -395,52 +405,61 @@ export default function OffersTabV8({
               <ZeroResultState onReset={resetConditions} />
             </div>
           ) : (
-            <div className={styles.tableWrap} style={{ margin: 0 }}>
-              <div className={styles.tableScroll}>
-                <table className={styles.table}>
+            <div className="af-list-tableWrap" style={{ margin: 0 }}>
+              <div className="af-list-tableScroll">
+                <table className="af-list-table">
                   <thead>
                     <tr>
                       <th>案件</th>
-                      <th className={styles.numRight}>報酬</th>
+                      <th className="af-list-numRight">報酬</th>
                       <th>成果が出たときの動き</th>
-                      <th className={styles.numRight}>紹介している人</th>
-                      <th className={styles.numRight}>成果</th>
-                      <th className={styles.numRight}>操作</th>
+                      <th className="af-list-numRight">紹介している人</th>
+                      <th className="af-list-numRight">成果</th>
+                      <th className="af-list-numRight">操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paged.map((offer) => (
                       <tr key={offer.id}>
                         <td>
-                          <span className={styles.cellMain} style={{ fontWeight: 600, color: 'var(--color-accent-deep)', maxWidth: 220 }} title={offer.name}>
+                          <span className="af-list-cellMain" style={{ fontWeight: 600, color: 'var(--color-accent-deep)', maxWidth: 220 }} title={offer.name}>
                             {offer.name}
                           </span>
-                          <span className={styles.cellSub} style={{ maxWidth: 220 }} title={offer.description ?? undefined}>
+                          <span className="af-list-cellSub" style={{ maxWidth: 220 }} title={offer.description ?? undefined}>
                             {offer.description ?? '説明はありません'}
                           </span>
-                          <span className={`${styles.statusBadge} ${offer.isActive ? styles.statusOk : styles.statusNeutral}`}>
-                            <span className={styles.statusDot} aria-hidden="true" />
-                            {offer.isActive ? '公開中' : '停止・終了'}
-                          </span>
                         </td>
-                        <td className={styles.numRight}>
+                        <td className="af-list-numRight">
                           <strong>{offer.rewardAmount != null ? formatYen(offer.rewardAmount) : '—'}</strong>
                           {offer.rewardMiles > 0 ? (
-                            <span className={styles.cellSub}>＋{formatNumber(offer.rewardMiles)}マイル</span>
+                            <span className="af-list-cellSub">＋{formatNumber(offer.rewardMiles)}マイル</span>
                           ) : null}
                         </td>
                         <td>
-                          <span className={styles.cellMain} style={{ color: offer.tagId || offer.scenarioId || offer.rewardMiles > 0 ? 'var(--color-ink-secondary)' : 'var(--color-warning)' }}>
+                          <span className="af-list-cellMain" style={{ color: offer.tagId || offer.scenarioId || offer.rewardMiles > 0 ? 'var(--color-ink-secondary)' : 'var(--color-warning)' }}>
                             {actionText(offer)}
                           </span>
                         </td>
-                        <td className={styles.numRight}>{formatNumber(offerStats.get(offer.id)?.introducers ?? 0)}人</td>
-                        <td className={styles.numRight}>
+                        <td className="af-list-numRight">{formatNumber(offerStats.get(offer.id)?.introducers ?? 0)}人</td>
+                        <td className="af-list-numRight">
                           <strong>{formatNumber(offerStats.get(offer.id)?.conversions ?? 0)}件</strong>
-                          <span className={styles.cellSub}>確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
+                          <span className="af-list-cellSub">確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
                         </td>
                         <td>
-                          <div className={styles.rowActions}>
+                          <div className="af-list-rowActions">
+                            <Button
+                              type="button"
+                              size="compact"
+                              onClick={() => { setEditTarget(offer); setFormOpen(true) }}
+                              disabled={!canEdit}
+                              title={!canEdit ? '閲覧のみのため変更できません' : undefined}
+                            >
+                              編集
+                            </Button>
+                            <span className={`af-list-statusBadge ${offer.isActive ? 'af-list-statusOk' : 'af-list-statusNeutral'}`}>
+                              <span className="af-list-statusDot" aria-hidden="true" />
+                              {offer.isActive ? '公開中' : '下書き'}
+                            </span>
                             <span style={{ position: 'relative', display: 'inline-flex' }}>
                               <MoreAction
                                 label={`${offer.name}のその他操作`}
@@ -479,7 +498,7 @@ export default function OffersTabV8({
 
           {listState === 'ready' ? (
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 12 }}>
-              <p className={styles.footNote} style={{ padding: 0 }}>
+              <p className="af-list-footNote" style={{ padding: 0 }}>
                 {shown.length === offers.length ? `全 ${formatNumber(offers.length)}件` : `${formatNumber(shown.length)}件 / 全 ${formatNumber(offers.length)}件`}
               </p>
               {pageCount > 1 ? <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} /> : null}
@@ -488,7 +507,7 @@ export default function OffersTabV8({
         </div>
       </div>
 
-      <p className={styles.footNote}>
+      <p className="af-list-footNote">
         行の「…」から 編集・決まり。案件は「何をしたら成果になり、いくら払うか」の組み合わせです。成果が出たときのタグ付け・シナリオ開始・マイル付与は、案件ごとに決めます。
       </p>
 

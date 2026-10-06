@@ -18,11 +18,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -42,7 +44,7 @@ import {
   type StaffMenuMatrix,
 } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
-import { bookingMenuError } from '../menu-validation'
+import { bookingMenuBufferError, bookingMenuDurationError, bookingMenuError, bookingMenuNameError } from '../menu-validation'
 import MenuVersionHistory from '../menu-version-history'
 import { LiffPhoneMenuStep } from '../liff-phone-v8'
 import shell from '../settings-v8.module.css'
@@ -61,6 +63,45 @@ function conflictTime(iso: string | null | undefined): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** 編集中身の読み込み待ちの骨組み（本物と同じ段の形。読み上げは呼び出し側の aria-busy で1回だけ）。 */
+function MenuFormSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <header className={shell.boardHead} data-design="Head">
+        <Skeleton width={64} height={16} />
+        <Skeleton width={200} height={22} />
+        <Skeleton width={260} height={14} />
+      </header>
+      <div className={shell.body} data-design="Body">
+        <div className={shell.main}>
+          {[0, 1, 2].map((section) => (
+            <section key={section} className={shell.section}>
+              <div className={shell.sectionHead}>
+                <Skeleton width={120} height={18} />
+              </div>
+              <div className={styles.fieldGrid}>
+                <Skeleton width="100%" height={32} />
+                <Skeleton width="100%" height={32} />
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** 札の並びの読み込み待ちの骨組み（担当・設備の本物と同じ高さの札3枚）。 */
+function ChipRowSkeleton() {
+  return (
+    <span className={`${styles.chipRow} mt-3`} aria-hidden="true">
+      <Skeleton width={120} height={32} />
+      <Skeleton width={96} height={32} />
+      <Skeleton width={136} height={32} />
+    </span>
+  )
 }
 
 function cutoffStoreLabel(settings: BookingSettings | null): string {
@@ -130,6 +171,8 @@ export default function MenuFormV8() {
   /* ---- 保存・競合 ---- */
   const [saving, setSaving] = useState<null | 'draft' | 'publish' | 'conflict'>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  /* 欄を離れたときに出す1欄ずつの直し方（文は保存時と同じ）。 */
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; duration?: string; buffer?: string }>({})
   const [conflict, setConflict] = useState<{ name: string; author: string | null; at: string | null; version: number } | null>(null)
   const [comparing, setComparing] = useState(false)
   /** 作成済みなのに後工程が残っている（DEEP-16）。再押しても作り直さない。 */
@@ -316,6 +359,12 @@ export default function MenuFormV8() {
   const tagCandidates = tags.filter(
     (tag) => tag.lineAccountId === selectedAccountId && tag.status !== 'archived',
   )
+  /* タグが多いときの絞り込み（v7 と同じ操作）。 */
+  const [tagQuery, setTagQuery] = useState('')
+  const trimmedTagQuery = tagQuery.trim()
+  const visibleTagCandidates = trimmedTagQuery === ''
+    ? tagCandidates
+    : tagCandidates.filter((tag) => tag.name.includes(trimmedTagQuery))
 
   const assignedIds = [...assigned].filter((id) => staff.some((person) => person.id === id))
   const activeResources = resources.filter((item) => item.isActive)
@@ -539,8 +588,17 @@ export default function MenuFormV8() {
     const validationError = validate()
     if (validationError) {
       setSaveError(validationError)
+      const nameError = bookingMenuNameError(name)
+      const durationError = bookingMenuDurationError(durationMinutes)
+      const bufferError = bookingMenuBufferError(bufferAfterMinutes)
+      setFieldErrors({
+        ...(nameError !== null ? { name: nameError } : {}),
+        ...(durationError !== null ? { duration: durationError } : {}),
+        ...(bufferError !== null ? { buffer: bufferError } : {}),
+      })
       return
     }
+    setFieldErrors({})
     setSaving(conflict ? 'conflict' : publish ? 'publish' : 'draft')
     try {
       let menuId: string | null = editTarget?.id ?? createdMenuNeedingFollowUp?.menuId ?? null
@@ -668,10 +726,9 @@ export default function MenuFormV8() {
 
   if (editId && editStatus === 'loading') {
     return (
-      <div className={shell.shell} data-design-node="QqER7">
-        <div className="p-10">
-          <ListState kind="loading" description="メニューを読み込んでいます。" />
-        </div>
+      <div className={shell.shell} data-design-node="QqER7" aria-busy="true">
+        <span className="sr-only" role="status">メニューを読み込んでいます</span>
+        <DelayedSkeleton loading skeleton={<MenuFormSkeleton />} />
       </div>
     )
   }
@@ -735,9 +792,21 @@ export default function MenuFormV8() {
                   className={styles.input}
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value)
+                    if (fieldErrors.name !== undefined) {
+                      setFieldErrors((previous) => ({ ...previous, name: bookingMenuNameError(e.target.value) ?? undefined }))
+                    }
+                  }}
+                  onBlur={() => {
+                    setFieldErrors((previous) => ({ ...previous, name: bookingMenuNameError(name) ?? undefined }))
+                  }}
                   placeholder="例: トリミング（小型犬）"
+                  aria-invalid={fieldErrors.name !== undefined}
                 />
+                {fieldErrors.name !== undefined ? (
+                  <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.name}</span>
+                ) : null}
               </label>
               <span className={styles.field}>
                 <span className={styles.label}>分類</span>
@@ -786,11 +855,23 @@ export default function MenuFormV8() {
                     type="number"
                     min={1}
                     value={durationMinutes}
-                    onChange={(e) => setDurationMinutes(e.target.value)}
+                    onChange={(e) => {
+                      setDurationMinutes(e.target.value)
+                      if (fieldErrors.duration !== undefined) {
+                        setFieldErrors((previous) => ({ ...previous, duration: bookingMenuDurationError(e.target.value) ?? undefined }))
+                      }
+                    }}
+                    onBlur={() => {
+                      setFieldErrors((previous) => ({ ...previous, duration: bookingMenuDurationError(durationMinutes) ?? undefined }))
+                    }}
                     aria-label="かかる時間（分）"
+                    aria-invalid={fieldErrors.duration !== undefined}
                   />
                   <span className={styles.unitSuffix}>分</span>
                 </span>
+                {fieldErrors.duration !== undefined ? (
+                  <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.duration}</span>
+                ) : null}
               </label>
               <label className={styles.field}>
                 <span className={styles.label}>金額（空なら「お問い合わせ」）</span>
@@ -833,7 +914,10 @@ export default function MenuFormV8() {
               <span className={shell.sectionDesc}>1人も選ばないと、お客さまの画面に枠が出ません</span>
             </div>
             {staffStatus === 'loading' ? (
-              <p className="text-ink-faint mt-3 text-sm">担当を読み込んでいます…</p>
+              <span className="mt-3 inline-block" aria-busy="true">
+                <span className="sr-only">担当を読み込んでいます</span>
+                <DelayedSkeleton loading skeleton={<ChipRowSkeleton />} />
+              </span>
             ) : staffStatus === 'error' ? (
               <div className="mt-3 space-y-2">
                 <p className="text-ink-faint text-sm">
@@ -968,11 +1052,23 @@ export default function MenuFormV8() {
                     type="number"
                     min={0}
                     value={bufferAfterMinutes}
-                    onChange={(e) => setBufferAfterMinutes(e.target.value)}
+                    onChange={(e) => {
+                      setBufferAfterMinutes(e.target.value)
+                      if (fieldErrors.buffer !== undefined) {
+                        setFieldErrors((previous) => ({ ...previous, buffer: bookingMenuBufferError(e.target.value) ?? undefined }))
+                      }
+                    }}
+                    onBlur={() => {
+                      setFieldErrors((previous) => ({ ...previous, buffer: bookingMenuBufferError(bufferAfterMinutes) ?? undefined }))
+                    }}
                     aria-label="後の空き時間（分）"
+                    aria-invalid={fieldErrors.buffer !== undefined}
                   />
                   <span className={styles.unitSuffix}>分</span>
                 </span>
+                {fieldErrors.buffer !== undefined ? (
+                  <span className="text-danger mt-1 text-xs" role="alert">{fieldErrors.buffer}</span>
+                ) : null}
               </label>
             </div>
           </section>
@@ -986,22 +1082,40 @@ export default function MenuFormV8() {
               <span className={styles.field}>
                 <span className={styles.label}>付けるタグ</span>
                 {tagStatus === 'loading' ? (
-                  <p className="text-ink-faint text-sm">タグを読み込んでいます…</p>
+                  <span className="inline-block w-full" aria-busy="true">
+                    <span className="sr-only">タグを読み込んでいます</span>
+                    <DelayedSkeleton loading skeleton={<Skeleton width="100%" height={40} />} />
+                  </span>
                 ) : tagStatus === 'error' ? (
                   <p className="text-ink-faint text-sm">タグを読み込めませんでした。タグなしで保存できます。</p>
                 ) : tagCandidates.length === 0 ? (
                   <p className="text-ink-faint text-sm">このアカウントに使えるタグがありません。タグなしで保存できます。</p>
                 ) : (
-                  <Select
-                    size="full"
-                    aria-label="予約後に付けるタグ"
-                    value={autoTagId ?? ''}
-                    onChange={(value) => setAutoTagId(value === '' ? null : value)}
-                    options={[
-                      { value: '', label: '— なし —' },
-                      ...tagCandidates.map((tag) => ({ value: tag.id, label: tag.name })),
-                    ]}
-                  />
+                  <div className="space-y-2">
+                    <SearchField
+                      value={tagQuery}
+                      onChange={setTagQuery}
+                      onClear={() => setTagQuery('')}
+                      placeholder="タグを検索"
+                      maxLength={100}
+                      aria-label="タグを検索"
+                    />
+                    <Select
+                      size="full"
+                      aria-label="予約後に付けるタグ"
+                      value={autoTagId ?? ''}
+                      onChange={(value) => setAutoTagId(value === '' ? null : value)}
+                      options={[
+                        { value: '', label: '— なし —' },
+                        ...visibleTagCandidates.map((tag) => ({ value: tag.id, label: tag.name })),
+                      ]}
+                    />
+                    {trimmedTagQuery !== '' && visibleTagCandidates.length === 0 && (
+                      <p className="text-ink-faint text-xs">
+                        「{trimmedTagQuery}」に合うタグがありません。
+                      </p>
+                    )}
+                  </div>
                 )}
               </span>
               <div className={shell.toggleRow}>
@@ -1034,7 +1148,10 @@ export default function MenuFormV8() {
               <h2 className={shell.sectionTitle}>使う設備</h2>
             </div>
             {resourcesStatus === 'loading' ? (
-              <p className="text-ink-faint mt-3 text-sm">設備を読み込んでいます…</p>
+              <span className="mt-3 inline-block" aria-busy="true">
+                <span className="sr-only">設備を読み込んでいます</span>
+                <DelayedSkeleton loading skeleton={<ChipRowSkeleton />} />
+              </span>
             ) : resourcesStatus === 'error' ? (
               <p className="text-ink-faint mt-3 text-sm">設備を読み込めませんでした。選ばずに保存できます。</p>
             ) : activeResources.length === 0 ? (
@@ -1141,17 +1258,19 @@ export default function MenuFormV8() {
           <Button
             variant="secondary"
             disabled={saving !== null}
+            busy={saving === 'draft'}
             onClick={() => void save(false)}
           >
-            {saving === 'draft' ? '保存しています…' : '下書きを保存'}
+            下書きを保存
           </Button>
         )}
         <Button
           variant="primary"
           disabled={saving !== null}
+          busy={saving !== null}
           onClick={() => void save(true, Boolean(conflict))}
         >
-          {saving ? '保存しています…' : primaryLabel}
+          {primaryLabel}
         </Button>
       </div>
 

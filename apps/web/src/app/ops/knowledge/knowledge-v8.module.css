@@ -1,0 +1,15 @@
+@layer properties, theme, base, components, utilities;
+.page { container-type: inline-size; gap: 14px; }
+.metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.metrics > div { min-width: 0; padding: 16px 20px; border-radius: var(--radius-none); box-shadow: none; }
+.page table { table-layout: fixed; width: 100%; }
+.page table col { width: auto; }
+.page table col:first-child { width: 38%; }
+.page table col:nth-child(2) { width: 10%; }
+.page table col:nth-child(3) { width: 11%; }
+.page table col:last-child { width: 16%; }
+.page table th, .page table td { padding: 9px 14px; font-size: 12px; }
+.page table td[data-label='使われた回数'], .page table td[data-label='役に立った'] { text-align: right; font-variant-numeric: tabular-nums; }
+.page table td:last-child > div { gap: 8px; flex-wrap: wrap; }
+.page table td:last-child button + button::before { content: none; }
+@container (max-width: 900px) { .metrics { grid-template-columns: repeat(2,minmax(0,1fr)); } }

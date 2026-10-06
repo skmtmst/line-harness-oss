@@ -594,6 +594,13 @@ function BookingDetailInner() {
       await bookingApi.decideRequest(selectedAccountId, id, action)
       // R322: 承認中に別の予約へ移っていたら、今の画面を触らない。
       if (!isCurrentTarget(actionTarget)) return
+      notifyToast(
+        action === 'approve' ? '予約を確定しました'
+          : action === 'reject' ? '予約をお断りしました'
+          : action === 'cancel' ? '予約をキャンセルしました'
+          : action === 'complete' ? '予約を完了にしました'
+          : '来店なしにしました',
+      )
       void load()
     } catch (e) {
       // R322: 前の予約の失敗で今の画面を汚さない。
@@ -882,7 +889,7 @@ function BookingDetailInner() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-design-node="If9Mh">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <nav className="text-ink-faint text-xs" aria-label="パンくず">
         <Link href="/booking/bookings" className="hover:underline">
@@ -983,14 +990,14 @@ function BookingDetailInner() {
 
             {/* ---- 予約内容の変更 (N-389) ---- */}
             {editing ? (
-              <section className="bg-canvas rounded-card border-hairline border p-5">
+              <section className="bg-canvas rounded-card border-hairline border p-5" data-design-node="YXrF6">
                 <h2 className="text-ink mb-3 text-sm font-semibold">予約内容を変更する</h2>
                 <div className="grid gap-3 md:grid-cols-2">
                   <EditField label="予約メニュー">
                     <Select size="full" aria-label="予約メニュー" value={editMenuId} onChange={(value) => { setEditMenuId(value); setEditTime('') }} options={editMenus.map((item) => ({ value: item.id, label: item.name }))} />
                   </EditField>
-                  <EditField label="担当者">
-                    <Select size="full" aria-label="担当者" value={editStaffId} onChange={(value) => { setEditStaffId(value); setEditTime('') }} options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))} />
+                  <EditField label="スタッフ">
+                    <Select size="full" aria-label="スタッフ" value={editStaffId} onChange={(value) => { setEditStaffId(value); setEditTime('') }} options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))} />
                   </EditField>
                   <EditField label="日付">
                     <DateField
@@ -1376,7 +1383,7 @@ function BookingDetailInner() {
                 <h2 className="text-ink mb-1 text-sm font-semibold">承認したときの通知</h2>
                 <p className="text-ink-faint mb-3 text-xs">お客様に届く内容</p>
                 <div className="bg-canvas-sunken rounded-card p-3">
-                  <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
+                  <p className="text-ink-faint mb-1 text-xs">LINE公式アカウント</p>
                   <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
                     {approvedText({ menu_name: detail.menuName, staff_name: detail.staffName, starts_at: detail.startsAt })}
                   </p>

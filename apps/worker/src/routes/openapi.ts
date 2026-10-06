@@ -352,6 +352,981 @@ const spec = {
     },
   },
   paths: {
+    // V8 API integration: authenticated endpoints, with account scope and revision checks.
+  "/api/hq/templates/folders": {
+    "get": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "統括ひな形の分類一覧を取得",
+      "parameters": [],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    },
+    "post": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "統括ひな形の分類を追加",
+      "parameters": [],
+      "responses": {
+        "201": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/hq/templates/folders/{id}": {
+    "patch": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "確認した版で分類名を変更",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "expectedRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "name",
+                "expectedRevision"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "delete": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "分類を外し、ひな形は未分類に残す",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "expectedRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "expectedRevision"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/hq/templates/message-references": {
+    "get": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "配布先の回答フォーム・シナリオの候補を取得",
+      "parameters": [],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    }
+  },
+  "/api/hq/templates/{id}/duplicate": {
+    "post": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "確認した版からひな形のコピーを作る",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "201": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "expectedRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "requestId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "expectedRevision",
+                "requestId"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/notifications/teams": {
+    "get": {
+      "tags": [
+        "Operator notifications"
+      ],
+      "summary": "運用者通知の送り先チーム一覧を取得",
+      "parameters": [
+        {
+          "name": "lineAccountId",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    },
+    "post": {
+      "tags": [
+        "Operator notifications"
+      ],
+      "summary": "担当範囲内のスタッフで送り先チームを作る",
+      "parameters": [],
+      "responses": {
+        "201": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "lineAccountId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "staffIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expectedVersion": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "lineAccountId",
+                "name",
+                "staffIds"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/notifications/teams/{id}": {
+    "put": {
+      "tags": [
+        "Operator notifications"
+      ],
+      "summary": "確認した版で送り先チームを変更",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "lineAccountId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "staffIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expectedVersion": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "lineAccountId",
+                "name",
+                "staffIds",
+                "expectedVersion"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "delete": {
+      "tags": [
+        "Operator notifications"
+      ],
+      "summary": "送り先チームを保管する",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "lineAccountId": {
+                  "type": "string"
+                },
+                "expectedVersion": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "lineAccountId",
+                "expectedVersion"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/ad-platforms/mappings": {
+    "get": {
+      "tags": [
+        "Conversions"
+      ],
+      "summary": "成果地点と広告媒体の名前の対応一覧",
+      "parameters": [
+        {
+          "name": "account_id",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    }
+  },
+  "/api/ad-platforms/mappings/{pointId}": {
+    "put": {
+      "tags": [
+        "Conversions"
+      ],
+      "summary": "広告へ返す成果名の自動対応・手動指定・停止を保存",
+      "parameters": [
+        {
+          "name": "pointId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "account_id": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string",
+                  "enum": [
+                    "meta",
+                    "google"
+                  ]
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "manual",
+                    "off"
+                  ]
+                },
+                "eventName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "googleActionId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "expectedVersion": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "account_id",
+                "provider",
+                "mode",
+                "expectedVersion"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/ad-platforms/{id}/connect": {
+    "post": {
+      "tags": [
+        "Conversions"
+      ],
+      "summary": "保存した広告連携設定の読み取り接続を検査",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    }
+  },
+  "/api/events/admin/application-preview": {
+    "post": {
+      "tags": [
+        "Events"
+      ],
+      "summary": "保存せずにイベント申込ページの見本を取得",
+      "parameters": [
+        {
+          "name": "account_id",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "venue_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "venue_address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "venue_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "requires_approval": {
+                  "type": "integer",
+                  "enum": [0, 1]
+                },
+                "slot": {
+                  "type": "object",
+                  "properties": {
+                    "starts_at": {
+                      "type": "string"
+                    },
+                    "ends_at": {
+                      "type": "string"
+                    },
+                    "capacity": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "starts_at",
+                    "ends_at",
+                    "capacity"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "slot"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/nen-members/photos/publications/order": {
+    "get": {
+      "tags": [
+        "NEN delivery"
+      ],
+      "summary": "掲載順の全件と現在の版を取得",
+      "parameters": [
+        {
+          "name": "accountId",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    },
+    "put": {
+      "tags": [
+        "NEN delivery"
+      ],
+      "summary": "掲載順の全件と確認した版を一度に保存",
+      "parameters": [],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "accountId": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "expectedVersion"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "accountId",
+                "items"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/nen-members/photos/{id}/publish": {
+    "post": {
+      "tags": [
+        "NEN delivery"
+      ],
+      "summary": "同意済み採用写真を掲載し、追加報酬を一度だけ手続きする",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "Idempotency-Key",
+          "in": "header",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "accountId": {
+                  "type": "string"
+                },
+                "expectedVersion": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "accountId",
+                "expectedVersion"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+
     // ── Email authentication ───────────────────────────────────────────────
     '/api/auth/register/request': {
       post: {
@@ -674,12 +1649,15 @@ const spec = {
         parameters: [
           { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
           { name: 'rank', in: 'query', schema: { type: 'string' } },
+          { name: 'ranks', in: 'query', schema: { type: 'string', description: '「○○以上」の札：区切りに合うランクキーをカンマ区切り。rank より優先' } },
+          { name: 'link', in: 'query', schema: { type: 'string', enum: ['linked', 'unlinked'] } },
           { name: 'pet', in: 'query', schema: { type: 'string', enum: ['any', 'with', 'without'] } },
           { name: 'q', in: 'query', schema: { type: 'string' } },
           { name: 'sort', in: 'query', schema: { type: 'string', enum: ['annual_desc', 'lifetime_desc', 'balance_desc', 'recent'] } },
           { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+          { name: 'pageSize', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
         ],
-        responses: { '200': { description: 'Paged members with KPIs and rank definitions' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
+        responses: { '200': { description: 'Paged members with KPIs (petMembers, monthPurchaseYen, monthBuyers) and rank definitions' }, '400': { description: 'accountId is required' }, '403': { description: 'Account not visible' } },
       },
     },
     '/api/nen/feeding-products': {
@@ -778,6 +1756,41 @@ const spec = {
       get: {
         tags: ['HQ Billing'], summary: '統括の契約状態と選択可能なプランを取得',
         responses: { '200': { description: 'Tenant billing summary and plan entitlements' }, '404': { description: 'Tenant not found' } },
+      },
+    },
+    '/api/hq/billing/preview': {
+      get: {
+        tags: ['HQ Billing'], summary: 'プラン変更の参考額を取得（契約・DBは変更しない）',
+        parameters: [
+          { name: 'planKey', in: 'query', required: true, schema: { type: 'string', enum: ['light', 'standard', 'pro'] } },
+          { name: 'interval', in: 'query', required: true, schema: { type: 'string', enum: ['month', 'year'] } },
+        ],
+        responses: {
+          '200': {
+            description: '即時変更を仮定した参考額（Cache-Control: no-store）',
+            content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean', const: true }, data: {
+              type: 'object',
+              required: ['planKey', 'interval', 'afterAmountYen', 'amountDueYen', 'prorationDifferenceYen', 'nextBillingAt', 'estimatedAt', 'isEstimate', 'notice'],
+              properties: {
+                planKey: { type: 'string', enum: ['light', 'standard', 'pro'] },
+                interval: { type: 'string', enum: ['month', 'year'] },
+                afterAmountYen: { type: 'integer', description: '変更後の1回あたりの金額（単価×数量）' },
+                amountDueYen: { type: 'integer', description: '見積り請求書の請求予定額' },
+                prorationDifferenceYen: { type: 'integer', description: '日割りの差額' },
+                nextBillingAt: { type: ['string', 'null'], format: 'date-time' },
+                estimatedAt: { type: 'string', format: 'date-time' },
+                isEstimate: { type: 'boolean', const: true },
+                notice: { type: 'string' },
+              },
+            } } } } },
+          },
+          '400': { description: 'Invalid plan or interval' },
+          '403': { description: 'Owner role required' },
+          '404': { description: 'Tenant not found' },
+          '409': { description: 'No changeable subscription' },
+          '502': { description: 'Stripe price or preview unavailable' },
+          '503': { description: 'Stripe or price configuration unavailable' },
+        },
       },
     },
     '/api/hq/billing/checkout': {
@@ -2352,6 +3365,13 @@ const spec = {
         },
       },
     },
+    '/api/reminders/{id}/restore': {
+      post: {
+        tags: ['Reminders'], summary: '削除したリマインダの定義を元に戻す（戻した直後は停止のまま。登録・配信予定は戻さない）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Reminder definition restored as stopped' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Reminder not found or not deleted' } },
+      },
+    },
     '/api/reminders/{id}/steps/{stepId}': {
       delete: {
         tags: ['Reminders'], summary: '指定したリマインダに属する通を削除',
@@ -2381,6 +3401,13 @@ const spec = {
         tags: ['Auto replies'], summary: 'LINEアカウント範囲内の自動応答一覧を取得',
         parameters: [{ name: 'accountId', in: 'query', schema: { type: 'string' } }],
         responses: { '200': { description: 'Visible auto replies' }, '403': { description: 'Staff role required' }, '404': { description: 'LINE account not found in account scope' } },
+      },
+    },
+    '/api/auto-replies/{id}/restore': {
+      post: {
+        tags: ['Auto replies'], summary: '削除した自動応答を元に戻す（戻した直後は停止のまま）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Auto reply restored as stopped' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Auto reply not found or not deleted' } },
       },
     },
     '/api/auto-replies/{id}/stop': {
@@ -2445,6 +3472,60 @@ const spec = {
           '403': { description: 'Owner or admin role required' },
           '404': { description: 'Account not in visible scope' },
           '409': { description: 'ORDER_CHANGED: list changed elsewhere; reload and retry' },
+        },
+      },
+    },
+    '/api/friend-add-rules/order': {
+      put: {
+        tags: ['Webhook'],
+        summary: '友だち追加時の配信の優先順位を版つきで一括更新（F8）',
+        description:
+          '対象IDの全部・所属・区分・expectedVersion の4点を厳密に見る。並びの版は一覧の orderVersion（受け皿以外の lock_version 合計）。どれか1つでも合わなければ書かず 409 で読み直しを促す。',
+        parameters: [{ name: 'account_id', in: 'query', required: false, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['friendKind', 'ids', 'expectedVersion'],
+                properties: {
+                  accountId: { type: 'string', description: '対象のLINEアカウント（query の account_id でも可）' },
+                  friendKind: { type: 'string', enum: ['first_time', 'returning'] },
+                  ids: { type: 'array', items: { type: 'string' }, maxItems: 500, description: '受け皿以外の全設定の新しい順' },
+                  expectedVersion: { type: 'integer', minimum: 0, description: '一覧の orderVersion' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Order updated with new orderVersion' },
+          '400': { description: 'account_id / friendKind / ids / expectedVersion missing or invalid' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Account not in visible scope' },
+          '409': { description: 'ORDER_CHANGED or ORDER_VERSION_CONFLICT: reload and retry with currentVersion' },
+        },
+      },
+    },
+    '/api/friend-add-rules/{id}/test-send': {
+      post: {
+        tags: ['Webhook'],
+        summary: '友だち追加時の配信を操作者本人だけへテスト送信（F12）',
+        description:
+          '保存済み版のテキスト本文で固定し、送り先は操作者のLINEだけ。本文・引数での送り先指定は受け付けない。手動扱いとして delivery_type=test・source=manual で記録する。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Test sent to self with fixed version' },
+          '400': { description: 'account_id or Idempotency-Key missing or invalid' },
+          '403': { description: 'Role or permission required' },
+          '404': { description: 'Rule or account not in visible scope' },
+          '409': { description: 'Operator LINE not found among friends' },
+          '422': { description: 'Saved version has no text body' },
+          '429': { description: 'Repeated too quickly; retry after 10 seconds' },
         },
       },
     },
@@ -3977,6 +5058,28 @@ const spec = {
         responses: { '200': { description: '詳細' }, '404': { description: 'Not found' } },
       },
     },
+    '/api/webhooks/incoming/{id}/restore': {
+      post: {
+        tags: ['Webhook'],
+        summary: '削除した受信Webhookを元に戻す（戻した直後は停止のまま）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Incoming webhook restored as stopped' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner role required' }, '404': { description: 'Webhook not found or not deleted' } },
+      },
+    },
+    '/api/webhooks/outgoing/{id}/restore': {
+      post: {
+        tags: ['Webhook'],
+        summary: '削除した送信Webhookを元に戻す（戻した直後は停止のまま）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Outgoing webhook restored as stopped' }, '400': { description: 'LINE account is required' }, '403': { description: 'Owner role required' }, '404': { description: 'Webhook not found or not deleted' } },
+      },
+    },
     '/api/webhooks/incoming/{id}/test': {
       post: {
         tags: ['Webhook'],
@@ -4103,6 +5206,41 @@ const spec = {
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
         ],
         responses: { '200': { description: '失効した' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/webhooks/interactions/{id}/payload': {
+      get: {
+        tags: ['Webhook'],
+        summary: 'やり取りの本文（伏せて返す）',
+        description: '送った・受け取った本文を伏せて返す(F-18)。'
+          + '名前・電話・メール・住所・トークンに当たる値は `***` に置き換える。'
+          + 'JSON でない・空の本文は body に null を返す。元やDBは変えない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '伏せた本文' },
+          '404': { description: 'Not found' },
+        },
+      },
+    },
+    '/api/webhooks/api-tokens/{id}/reactivate': {
+      post: {
+        tags: ['Webhook'],
+        summary: '止めた公開APIトークンを動かし直す',
+        description: '止めている行だけが対象。平文は保存していないが hash が残っているため、'
+          + '止める前の合言葉がそのまま使えるようになる（新しい発行はしない）。'
+          + '止めた人（revoked_by）は履歴として残し、動かし直しは監査記録へ残す(F-17)。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '動かし直した。止める前の合言葉が使える' },
+          '404': { description: 'Not found' },
+          '409': { description: '止められていない' },
+        },
       },
     },
     '/api/webhooks/api-tokens/{id}/rotate': {
@@ -5684,6 +6822,46 @@ const spec = {
         },
       },
     },
+    // ── LIFF Booking self change (F6 本人日時変更・取消) ─────────────────────
+    '/api/liff/booking/{id}/reschedule': {
+      post: {
+        tags: ['Booking'],
+        summary: '本人の予約日時を変更',
+        description: 'idToken→account→friend所有だけに許可。管理者キーは要求しない。期限・締切・空き・CASを検査し、Google同期とMeet連携の結果を返す。待ち列は含まない。',
+        security: [],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '変更成立（meet_sync 付き）・同日時再送は changed:false' },
+          '401': { description: 'idToken 検証失敗' },
+          '403': { description: '期限切れ' },
+          '404': { description: 'Unknown LIFF ID・友だち・予約なし' },
+          '409': { description: '版競合・枠なし' },
+          '422': { description: '不正な日時・締切切れ' },
+        },
+      },
+    },
+    '/api/liff/booking/{id}/cancel': {
+      post: {
+        tags: ['Booking'],
+        summary: '本人の予約を取消',
+        description: 'idToken→account→friend所有だけに許可。期限・CASを検査し、リマインダ停止・カレンダー削除・Meet取消の結果を返す。取消ずみ再送は副作用をそろえて 200。待ち列は含まない。',
+        security: [],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '取消成立（calendar_sync・meet_sync 付き）' },
+          '401': { description: 'idToken 検証失敗' },
+          '403': { description: '期限切れ' },
+          '404': { description: 'Unknown LIFF ID・友だち・予約なし' },
+          '409': { description: '版競合・送信中の再試行' },
+        },
+      },
+    },
     // ── Booking channels (V8-B) ──────────────────────────────────────────────
     '/api/booking/admin/channels': {
       get: {
@@ -6362,6 +7540,25 @@ const spec = {
           '201': { description: '複製した下書き（受付停止）' },
           '403': { description: 'フォームの編集権限が無い' },
           '404': { description: 'フォームが無い、または権限範囲外' },
+        },
+      },
+    },
+    '/api/forms/{id}/unarchive': {
+      post: {
+        tags: ['Forms'],
+        summary: '保管した回答フォームを元に戻す（戻した直後は受付停止のまま）',
+        description: '保管中の行だけ現行へ戻す。確認した版（expectedRevision）がずれたら409で読み直しを促す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['expectedRevision'], properties: { expectedRevision: { type: 'number' } } } } } },
+        responses: {
+          '200': { description: '現行へ戻した（status, revision, isActive）' },
+          '400': { description: '確認した版が必要' },
+          '403': { description: 'フォームの編集権限が無い' },
+          '404': { description: 'フォームが無い、または権限範囲外' },
+          '409': { description: '保管されていない、または版が変わった' },
         },
       },
     },

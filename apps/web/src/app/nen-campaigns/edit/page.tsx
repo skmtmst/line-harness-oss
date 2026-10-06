@@ -7,7 +7,7 @@ import { ApiError, api, type NenColumn } from '@/lib/api'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import CampaignEditor from './campaign-editor'
+import CampaignEditorV8 from './campaign-editor-v8'
 import { useAccount } from '@/contexts/account-context'
 import { formatDay } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -28,8 +28,6 @@ type Column = Pick<NenColumn, 'id' | 'slug' | 'title' | 'introText' | 'published
  * という食い違いになる。
  */
 function NenColumnEditInner() {
-  const params = useSearchParams()
-  const campaignKey = params.get('key') ?? ''
   const { selectedAccountId } = useAccount()
 
   const [columns, setColumns] = useState<Column[]>([])
@@ -134,7 +132,10 @@ function NenColumnEditInner() {
     }
   }
 
-  if (campaignKey) return <CampaignEditor campaignKey={campaignKey} />
+  /*
+   * ★V8-B：data-theme="v8" のときだけ新しい配信編集画面（w5pwG）へ切り替える。
+   * v7 の見た目はそのまま。取得・保存の決めごとは変えない。
+   */
 
   return (
     <div className="flex flex-col gap-4">
@@ -223,8 +224,8 @@ function NenColumnEditInner() {
                           ? '変更があります。保存するまで反映されません。'
                           : ''}
                 </p>
-                <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 py-1.5 font-medium h-auto whitespace-normal" onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')}>
-                  {savingId === column.id ? '保存中...' : '保存する'}
+                <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 py-1.5 font-medium h-auto whitespace-normal" onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')} busy={savingId === column.id} done={savedId === column.id}>
+                  保存する
                 </Button>
               </div>
             </div>
@@ -237,11 +238,17 @@ function NenColumnEditInner() {
   )
 }
 
+function NenEditRoute() {
+  const params = useSearchParams()
+  const campaignKey = params.get('key') ?? ''
+  return campaignKey ? <CampaignEditorV8 campaignKey={campaignKey} /> : <NenColumnEditInner />
+}
+
 export default function NenColumnEditPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <NenColumnEditInner />
+      <NenEditRoute />
     </Suspense>
   )
 }

@@ -2,7 +2,7 @@
 
 /*
  * ★V8 重複検出（Pencil `hn6Y8`、タブを消した採用版は `sdbsQ` 板1、
- * 状態は `SXCb3`）。
+ * 状態は `SXCb3`。再撮の板 `G9C4Uw`（1152）を数の帯に付ける）。
  *
  * データの口は v7 と同じ `use-duplicates-data`。違いは見せ方だけ——
  * タブの段を「← 友だち一覧 › データ管理 › 重複検出」と「データ管理 ▾」に
@@ -74,8 +74,8 @@ export default function DuplicatesV8() {
         </span>
       </p>
 
-      {/* 数の帯：4つのマス。取れない数は「—」と短い理由（SXCb3）。 */}
-      <div className={styles.kpis}>
+      {/* 数の帯：4つのマス。取れない数は「—」と短い理由（SXCb3）。1152 は `G9C4Uw`。 */}
+      <div className={styles.kpis} data-design-node="G9C4Uw">
         <div className={styles.kpi}>
           <span className={styles.kpiLabel}>重複候補</span>
           <p className={styles.kpiValue}>{d.duplicateTotalText}</p>
@@ -267,7 +267,12 @@ export default function DuplicatesV8() {
                         </Button>
                       </>
                     ) : (
-                      <p className={styles.stateDesc}>同じ人の疑いが見つかると、ここに並びます。</p>
+                      <>
+                        <p className={styles.stateDesc}>同じ人が別の友だちとして登録されていそうなときに、ここに出ます。</p>
+                        <Button type="button" variant="secondary" onClick={() => void d.loadCandidates()}>
+                          もう一度見直す
+                        </Button>
+                      </>
                     )}
                   </div>
                 </td>

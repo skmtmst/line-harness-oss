@@ -242,6 +242,17 @@
   cursor: pointer;
 }
 
+/* 消える行は薄くなってから外す（150ms。動きを減らす設定では一瞬）。 */
+@media (prefers-reduced-motion: no-preference) {
+  .rowClick {
+    transition: opacity var(--motion-exit) var(--motion-ease-out);
+  }
+
+  .rowClick[data-leaving='true'] {
+    opacity: 0;
+  }
+}
+
 .rowClick:hover td {
   background: var(--color-canvas-sunken);
 }
@@ -475,6 +486,23 @@
   flex: 1;
   border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
+}
+
+.skeletonFixedBar {
+  height: 12px;
+  flex: none;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+}
+
+.formSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
 }
 
 /* ページ送りの行。左に件数、右に表示件数とページ送り。 */

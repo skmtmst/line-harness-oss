@@ -45,6 +45,7 @@ describe('ログイン直後の着地点', () => {
 describe('統括から店舗画面を開く', () => {
   it('4つの許可済み遷移先を1か所で管理する', () => {
     expect(HQ_OPEN_TARGETS).toEqual({
+      scenarios: { label: 'シナリオ管理', destination: '/scenarios' },
       tags: { label: 'タグ', destination: '/tags' },
       templates: { label: 'テンプレート管理', destination: '/templates' },
       'rich-menus': { label: 'リッチメニュー管理', destination: '/rich-menus' },

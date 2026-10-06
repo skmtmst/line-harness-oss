@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api, type EventBookingMine, type EventSlot } from '../lib/api.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
@@ -9,7 +10,8 @@ import Badge from '../components/ui/Badge.js';
 import Button from '../components/ui/Button.js';
 import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import Icon from '../components/ui/Icon.js';
-import PageHeader from '../components/ui/PageHeader.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 
 /** 札の文字は設計どおり (参加・承認待ち…)。意味は今の状態名のまま変えない。 */
@@ -36,6 +38,9 @@ function canCancel(b: EventBookingMine): boolean {
  * 見た目だけ ★V7 (日付の四角＋名前＋札＋補足)。
  */
 export default function EventBookings() {
+  const navigate = useNavigate();
+  // ?liffId=... を引き継ぐ (再読み込みで失わない)。
+  const { search } = useLocation();
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const [items, setItems] = useState<EventBookingMine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,9 +190,10 @@ export default function EventBookings() {
   }
 
   return (
-    <div className="min-h-screen bg-ground">
-      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
-        <PageHeader title="自分のイベント" />
+    <LiffLookScope className="min-h-screen bg-ground" designNode="y1bs9A">
+      <LiffHeader title="自分のイベント" />
+      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-10">
+        <h1 className="text-xl font-bold text-ink">自分のイベント</h1>
         {loading ? (
           <LoadingView />
         ) : loadFailed ? (
@@ -195,7 +201,7 @@ export default function EventBookings() {
         ) : (
           <>
             <div
-              className="flex rounded-xl bg-hairline/40 p-1"
+              className="flex rounded-(--liff-radius) bg-liff-chip p-[3px]"
               role="tablist"
               aria-label="イベントの期間"
             >
@@ -211,10 +217,10 @@ export default function EventBookings() {
                   role="tab"
                   aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className={`min-h-11 flex-1 rounded-lg px-2 text-sm focus-visible:outline-2 focus-visible:outline-ink ${
+                  className={`flex h-8 flex-1 items-center justify-center rounded-lg px-1 text-xs focus-visible:outline-2 focus-visible:outline-ink ${
                     tab === t.key
-                      ? 'bg-canvas font-bold text-ink shadow-sm'
-                      : 'text-ink-secondary'
+                      ? 'bg-canvas font-bold text-ink'
+                      : 'font-semibold text-liff-sub'
                   }`}
                 >
                   {t.label}
@@ -238,46 +244,57 @@ export default function EventBookings() {
                   const meta = statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
                   return (
                     <li key={b.id}>
-                      <Card className="p-4">
+                      <Card className="p-3.5">
                         <div className="flex items-center gap-3">
                           <div
-                            className="flex w-13 shrink-0 flex-col items-center"
+                            className="flex w-14 shrink-0 flex-col items-center"
                             aria-label={`${utcToJstMd(b.slot_starts_at)} ${utcToJstHm(b.slot_starts_at)}`}
                           >
-                            <span className="text-base font-bold whitespace-nowrap text-ink">
+                            <span className="text-[15px] font-bold whitespace-nowrap text-ink">
                               {utcToJstMd(b.slot_starts_at)}
                             </span>
-                            <span className="text-xs text-ink-secondary">
+                            <span className="text-[11px] text-liff-sub">
                               {utcToJstHm(b.slot_starts_at)}
                             </span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate font-semibold text-ink" title={b.event_name}>
+                            <div className="truncate text-sm font-semibold text-ink" title={b.event_name}>
                               {b.event_name}
                             </div>
                             {b.venue_name && (
                               <div
-                                className="mt-0.5 truncate text-sm text-ink-secondary"
+                                className="mt-[3px] truncate text-[11.5px] text-liff-sub"
                                 title={b.venue_name}
                               >
                                 {b.venue_name}
                               </div>
                             )}
+                            <div className="mt-[3px]">
+                              <Badge tone={meta.tone}>{meta.text}</Badge>
+                            </div>
                           </div>
-                          <Badge tone={meta.tone}>{meta.text}</Badge>
+                          <button
+                            type="button"
+                            aria-label={`${b.event_name}のイベントを見る`}
+                            onClick={() =>
+                              navigate({ pathname: `/events/${b.event_id}`, search })
+                            }
+                            className="flex h-11 w-8 shrink-0 items-center justify-center text-ink-faint focus-visible:outline-2 focus-visible:outline-ink"
+                          >
+                            <Icon name="chevron-right" className="h-5 w-5" />
+                          </button>
                         </div>
                         {canCancel(b) && (
-                          <div className="mt-2 flex items-center gap-4 text-left">
+                          <div className="mt-3 flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => {
                                 void openChange(b);
                               }}
                               disabled={busy}
-                              className="inline-flex min-h-11 items-center gap-0.5 text-sm font-semibold text-info-link focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-hairline bg-canvas px-3 text-xs font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                             >
                               時間を変える
-                              <Icon name="chevron-right" className="h-4 w-4" />
                             </button>
                             <button
                               type="button"
@@ -286,10 +303,9 @@ export default function EventBookings() {
                                 setPendingCancel(b);
                               }}
                               disabled={busy}
-                              className="inline-flex min-h-11 items-center gap-0.5 text-sm font-semibold text-info-link focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-danger/30 bg-canvas px-3 text-xs font-semibold text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                             >
                               キャンセルする
-                              <Icon name="chevron-right" className="h-4 w-4" />
                             </button>
                           </div>
                         )}
@@ -304,12 +320,13 @@ export default function EventBookings() {
       </div>
       <ConfirmDialog
         open={pendingCancel !== null}
-        title={pendingCancel ? `「${pendingCancel.event_name}」の予約をキャンセルしますか？` : ''}
-        description={
+        designNode="nUYyb"
+        title={
           pendingCancel
-            ? `${utcToJstMd(pendingCancel.slot_starts_at)} ${utcToJstHm(pendingCancel.slot_starts_at)}${pendingCancel.venue_name ? `・${pendingCancel.venue_name}` : ''}の予約を取り消します。`
+            ? `${utcToJstMd(pendingCancel.slot_starts_at)} ${utcToJstHm(pendingCancel.slot_starts_at)} の${pendingCancel.event_name}をキャンセルしますか`
             : ''
         }
+        description="キャンセル待ちの方へ順番に案内されます。前日を過ぎるとここからは変えられません（お店へご連絡ください）。"
         confirmLabel="キャンセルする"
         cancelLabel="やめる"
         destructive
@@ -375,22 +392,22 @@ export default function EventBookings() {
                             prev ? { ...prev, selectedSlotId: s.id, changeError: null } : prev,
                           )
                         }
-                        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
+                        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-(--liff-radius) border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
                           disabled
                             ? 'border-hairline bg-shell-gray'
                             : selected
-                              ? 'border-accent-deep bg-ok-bg'
+                              ? 'border-liff-primary bg-liff-primary'
                               : 'border-hairline bg-canvas'
                         }`}
                       >
                         <span
-                          className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink'}`}
+                          className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}
                         >
                           {utcToJstMd(s.starts_at)} {utcToJstHm(s.starts_at)}〜
                           {utcToJstHm(s.ends_at)}
                         </span>
                         <span
-                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink-secondary'}`}
+                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink-secondary'}`}
                         >
                           {current ? '今の時間' : full ? '満席' : '空きあり'}
                         </span>
@@ -403,6 +420,6 @@ export default function EventBookings() {
           </div>
         )}
       </ConfirmDialog>
-    </div>
+    </LiffLookScope>
   );
 }

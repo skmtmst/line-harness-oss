@@ -144,6 +144,8 @@ export * from './ops-support';
 export * from './ops-dashboard';
 export * from './platform-announcements';
 export * from './tenant-billing';
+export * from './tenant-data-retention';
+export * from './data-retention-tables';
 export * from './billing-invoices';
 export * from './auth-email';
 export * from './friend-tag-side-effects';
@@ -155,3 +157,10 @@ export * from './integration-api-tokens';
 export * from './web-measurement';
 
 export * from './line-account-tags';
+
+export * from './photo-publication-views.js';
+
+export * from './operator-notification-teams.js';
+
+export * from './ad-event-mappings.js';
+export * from './photo-publications';

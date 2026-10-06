@@ -1,4 +1,9 @@
 {
+  "app/auto-replies/quick-create-v8.module.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
   "app/contents/contents-permission-behavior.spec.mjs": {
     "color": 1,
     "radius": 0,
@@ -14,25 +19,20 @@
     "radius": 0,
     "shadow": 0
   },
-  "app/form-submissions/page.tsx": {
-    "color": 1,
-    "radius": 0,
-    "shadow": 0
-  },
   "app/global-error.tsx": {
     "color": 3,
     "radius": 2,
     "shadow": 0
   },
-  "app/inflow-links/new/page.tsx": {
-    "color": 2,
-    "radius": 0,
+  "app/hq/account-settings-dialogs.tsx": {
+    "color": 0,
+    "radius": 2,
     "shadow": 0
   },
-  "app/nen-members/page.tsx": {
+  "app/inflow-links/new/inflow-create-v8.module.css": {
     "color": 0,
-    "radius": 0,
-    "shadow": 1
+    "radius": 2,
+    "shadow": 0
   },
   "app/ops/support/format.ts": {
     "color": 0,
@@ -45,8 +45,8 @@
     "shadow": 1
   },
   "app/rich-menus/new/create-v8.module.css": {
-    "color": 6,
-    "radius": 4,
+    "color": 5,
+    "radius": 3,
     "shadow": 1
   },
   "app/staff/page.tsx": {
@@ -70,7 +70,7 @@
     "shadow": 0
   },
   "app/visual-qa/v8-parts/page.tsx": {
-    "color": 1,
+    "color": 2,
     "radius": 0,
     "shadow": 0
   },
@@ -119,6 +119,16 @@
     "radius": 0,
     "shadow": 0
   },
+  "components/layout/shell-frame.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "components/layout/sidebar.module.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
   "components/ops/impersonation-bar.tsx": {
     "color": 2,
     "radius": 0,
@@ -129,18 +139,43 @@
     "radius": 0,
     "shadow": 0
   },
-  "components/shared/avatar.module.css": {
-    "color": 1,
+  "components/shared/activity-item.module.css": {
+    "color": 0,
     "radius": 1,
+    "shadow": 0
+  },
+  "components/shared/attention-star.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "components/shared/avatar.module.css": {
+    "color": 3,
+    "radius": 2,
     "shadow": 1
+  },
+  "components/shared/check-card.module.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
+  "components/shared/checkbox.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "components/shared/chip.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
   },
   "components/shared/color-well.module.css": {
     "color": 0,
-    "radius": 0,
-    "shadow": 2
+    "radius": 3,
+    "shadow": 7
   },
   "components/shared/color-well.tsx": {
-    "color": 24,
+    "color": 65,
     "radius": 0,
     "shadow": 0
   },
@@ -159,19 +194,64 @@
     "radius": 1,
     "shadow": 2
   },
+  "components/shared/delete-button.module.css": {
+    "color": 0,
+    "radius": 7,
+    "shadow": 0
+  },
+  "components/shared/delta-chip.module.css": {
+    "color": 1,
+    "radius": 1,
+    "shadow": 0
+  },
+  "components/shared/dialog.module.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
+  "components/shared/filter-chip.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
   "components/shared/folder-add-dialog.tsx": {
     "color": 8,
     "radius": 0,
     "shadow": 0
   },
+  "components/shared/folder-panel.module.css": {
+    "color": 0,
+    "radius": 5,
+    "shadow": 0
+  },
+  "components/shared/help-tip.module.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
+  "components/shared/icon-tile.module.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
+  "components/shared/kpi-band-v8.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
   "components/shared/kpi-card.module.css": {
     "color": 0,
-    "radius": 1,
+    "radius": 4,
+    "shadow": 0
+  },
+  "components/shared/line-preview.module.css": {
+    "color": 0,
+    "radius": 4,
     "shadow": 0
   },
   "components/shared/list-state.module.css": {
     "color": 0,
-    "radius": 1,
+    "radius": 3,
     "shadow": 0
   },
   "components/shared/menu-portal.tsx": {
@@ -184,19 +264,54 @@
     "radius": 0,
     "shadow": 1
   },
+  "components/shared/notice.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
   "components/shared/otp-input.module.css": {
     "color": 0,
     "radius": 0,
     "shadow": 3
   },
+  "components/shared/pagination.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "components/shared/progress.module.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
   "components/shared/radio-card.module.css": {
     "color": 0,
-    "radius": 0,
+    "radius": 2,
     "shadow": 1
+  },
+  "components/shared/radio.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 1
+  },
+  "components/shared/route-badge.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
   },
   "components/shared/save-conflict-bar.module.css": {
     "color": 1,
     "radius": 0,
+    "shadow": 0
+  },
+  "components/shared/scrollable-table.module.css": {
+    "color": 0,
+    "radius": 3,
+    "shadow": 0
+  },
+  "components/shared/section-header.module.css": {
+    "color": 0,
+    "radius": 1,
     "shadow": 0
   },
   "components/shared/select.module.css": {
@@ -204,8 +319,38 @@
     "radius": 1,
     "shadow": 0
   },
+  "components/shared/skeleton.module.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
+  "components/shared/status-badge.module.css": {
+    "color": 2,
+    "radius": 2,
+    "shadow": 0
+  },
+  "components/shared/tabs.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "components/shared/toast.module.css": {
+    "color": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "components/shared/toggle.module.css": {
+    "color": 0,
+    "radius": 2,
+    "shadow": 0
+  },
+  "components/shared/top-bar.module.css": {
+    "color": 0,
+    "radius": 7,
+    "shadow": 0
+  },
   "lib/hq-banners.ts": {
-    "color": 10,
+    "color": 4,
     "radius": 0,
     "shadow": 0
   },

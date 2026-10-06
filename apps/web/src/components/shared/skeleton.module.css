@@ -1,0 +1,8 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+.row { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--color-hairline); overflow: hidden; }
+.flexBone { flex: 1 1 0; }
+.bone, .face { flex-shrink: 0; }
+}
+[data-theme='v8'] .row [data-skeleton] { display: block; background-color: var(--color-shell-gray); border-radius: 4px; }
+[data-theme='v8'] .row .face { border-radius: 50%; }

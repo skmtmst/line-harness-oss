@@ -13,6 +13,7 @@ import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, type BookingStaff } from '@/lib/api'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
@@ -38,6 +39,9 @@ export function StaffEditModal({
 }) {
   const [form, setForm] = useState<Partial<BookingStaff>>(staff)
   const [saving, setSaving] = useState(false)
+  /* V8 のときだけボタンの内側の保存中表示へ。v7 は従来の文字のまま。 */
+  const adminTheme = useAdminTheme()
+  const busySave = adminTheme === 'v8' ? saving : undefined
   const [err, setErr] = useState<string | null>(null)
   // 保存の途中で窓だけ消えないよう、送信中はEscapeを止める。
   const panelRef = useOverlayFocus(true, onClose, saving)
@@ -176,8 +180,8 @@ export function StaffEditModal({
           >
             キャンセル
           </button>
-          <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={submit} disabled={saving}>
-            {saving ? '保存中…' : '保存する'}
+          <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={submit} disabled={saving} busy={busySave}>
+            {busySave === undefined && saving ? '保存中…' : '保存する'}
           </Button>
         </div>
       </div>

@@ -25,7 +25,7 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
 import { formatDateTime, formatNumber, formatYmd } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import BroadcastListV8 from './list-v8'
+import BroadcastListV8 from '@/v8/broadcasts/list'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -850,7 +850,7 @@ function BroadcastList() {
                           {broadcast.title}
                         </a>
                         {isDedup && (
-                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded-mini text-[10px] font-medium bg-info-bg text-info">
+                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded-mini text-nano font-medium bg-info-bg text-info">
                             複数アカウント
                           </span>
                         )}
@@ -891,7 +891,7 @@ function BroadcastList() {
                       配信条件。前は「全員」か「タグ指定」の2つしか見ていなかったので、
                       詳細条件で絞った配信も「タグ指定」と出ていた。送った相手を
                       後から確かめられないので、監査にならなかった。
-                      m20i: 「タグ：NEN会員（定期）」が3行に折れて行が高く
+                      m20i: 「タグ：定期便会員（毎月）」が3行に折れて行が高く
                       なるので、1行で省略し全文は title で見せる。
                     */}
                     <Td className="text-ink-secondary">

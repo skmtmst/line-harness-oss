@@ -95,7 +95,7 @@ export default function MenuList({
                 type="button"
                 onClick={() => onSelect(m)}
                 aria-pressed={selected}
-                className={`flex w-full items-center gap-3 rounded-[14px] p-3.5 text-left outline focus-visible:outline-2 focus-visible:outline-ink ${
+                className={`liff-press flex w-full items-center gap-3 rounded-(--liff-radius-lg) p-3.5 text-left outline focus-visible:outline-2 focus-visible:outline-ink ${
                   selected
                     ? 'bg-liff-soft outline-2 -outline-offset-1 outline-liff-primary'
                     : 'bg-canvas outline-1 -outline-offset-1 outline-liff-line'
@@ -110,13 +110,13 @@ export default function MenuList({
                     {m.name}
                   </span>
                   {m.description && (
-                    <span className="mt-0.5 block truncate text-[11.5px] text-liff-sub" title={m.description}>
+                    <span className="mt-[3px] block truncate text-[11.5px] text-liff-sub" title={m.description}>
                       {m.description}
                     </span>
                   )}
-                  <span className="mt-1 block text-xs">
+                  <span className="mt-[3px] block text-xs">
                     <span className="font-semibold text-ink">{m.duration_minutes}分</span>
-                    <span className="ml-1.5 font-bold text-liff-primary">
+                    <span className="ml-2 font-bold text-liff-primary">
                       {m.base_price === 0 ? '無料' : `¥${m.base_price.toLocaleString()}`}
                     </span>
                   </span>

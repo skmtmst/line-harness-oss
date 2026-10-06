@@ -55,6 +55,21 @@ describe('帯（Notice）の4種類', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('図柄を差し替えられる（rZEGN の帯は順序印）。省略時は既定印のまま', () => {
+    const custom = render(<Notice tone="info" message="順番の案内" icon={<i data-testid="custom-icon" />} />)
+    expect(custom.container.querySelector('[data-testid="custom-icon"]')).not.toBeNull()
+    // 既定印（lucide の svg）は出さない。
+    expect(custom.container.querySelector('svg[aria-hidden="true"]')).toBeNull()
+    custom.unmount()
+    const none = render(<Notice tone="info" message="順番の案内" icon={null} />)
+    expect(none.container.querySelector('[aria-hidden="true"]')).toBeNull()
+    expect(none.container.firstElementChild!.textContent).toContain('順番の案内')
+    none.unmount()
+    const def = render(<Notice tone="info" message="順番の案内" />)
+    expect(def.container.querySelector('svg[aria-hidden="true"]')).not.toBeNull()
+    def.unmount()
+  })
+
   it('補足の「？」は見出しの横に入り、本文は1〜2文のまま', () => {
     const { container } = render(
       <Notice tone="info" message="この画面の数は日本時間で数えます。" help="0時締めです" helpLabel="数の数え方" />,

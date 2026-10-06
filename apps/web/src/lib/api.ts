@@ -264,6 +264,7 @@ export interface IntegrationApiTokenInfo {
   lastUsedAt: string | null
   rotatedFromId: string | null
   createdAt: string
+  revokedAt: string | null
 }
 
 /** 発行・入れ替えの応答にだけ1回だけ平文が乗る。 */
@@ -1399,6 +1400,10 @@ export type ConversionDefinitionDetail = ConversionDefinitionListItem & {
 export type ConversionDefinitionPreview = {
   range: { from: string; to: string; timeZone: 'Asia/Tokyo' }
   matchedCount: number
+  /** 条件に合う友だちの重複を除いた人数。旧Workerの応答では未取得。 */
+  uniqueFriendCount?: number
+  /** 除外条件に当てはまった過去の成果件数。重複除外とは別。 */
+  excludedCount?: number
   estimatedCount: number
   estimatedValue: number
   duplicateExcludedCount: number
@@ -1451,7 +1456,7 @@ export type ConversionDefinitionEvent = {
 }
 
 /** #819: 計測サイト。公開ID・許可ドメイン・許可外ドメインの拒否集計。 */
-export type MeasurementSite = {
+export type MeasurementSite = Partial<import('@line-crm/shared').MeasurementSiteReceipt> & {
   id: string
   label: string
   domains: string[]
@@ -2888,6 +2893,44 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   return res.json() as Promise<T>
 }
 
+/**
+ * よく開く一覧の取り方（前のデータをすぐ出して裏で取り直す用）。
+ *
+ * - readCachedList：覚えている分だけすぐ返す（無いときは null）。画面はこちらを先に出す。
+ * - refreshCachedList：ETag を付けて取り直す。変わっていなければ 304 で覚えていた分を返す。
+ * 覚えるのは本文と ETag だけ。秘密値・個人情報を鍵や値に混ぜない（path をそのまま鍵にする）。
+ */
+const listCache = new Map<string, { etag: string | null; body: unknown }>()
+
+export function readCachedList<T>(path: string): T | null {
+  return (listCache.get(path)?.body ?? null) as T | null
+}
+
+export async function refreshCachedList<T>(path: string): Promise<T> {
+  const cached = listCache.get(path)
+  const headers: Record<string, string> = { ...adminSessionHeaders() }
+  if (cached?.etag) headers['If-None-Match'] = cached.etag
+  const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
+    credentials: 'include',
+    headers,
+  })
+  if (res.status === 304 && cached) return cached.body as T
+  if (!res.ok) {
+    const raw = await res.text()
+    throw new ApiError(
+      res.status,
+      extractApiErrorMessage(raw, res.status),
+      extractApiErrorCode(raw),
+      undefined,
+      extractApiErrorTrackingId(raw),
+      parseRetryAfterSeconds(res.headers.get('Retry-After')),
+    )
+  }
+  const body = (await res.json()) as T
+  listCache.set(path, { etag: res.headers.get('ETag'), body })
+  return body
+}
+
 async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
@@ -3069,8 +3112,25 @@ export type LineAccountConnectStep = {
   message: string
 }
 
+export type LineAccountConnectVerification = {
+  tokenOk: boolean
+  loginOk: boolean
+  /** 同じプロバイダー（両チャネル認証の通過を代理条件にする）。 */
+  sameProvider: boolean
+  webhook: {
+    expectedUrl: string
+    registeredUrl: string | null
+    active: boolean | null
+    testPassed: boolean | null
+  }
+  /** 登録前の友だち総数。取れなければ null。 */
+  followerTotal: number | null
+}
+
 export type LineAccountConnectData = {
   steps: LineAccountConnectStep[]
+  /** V8 登録④の5行に載る内訳。古い応答には無いことがある。 */
+  verification?: LineAccountConnectVerification
   id?: string
   displayName?: string
   pictureUrl: string | null
@@ -3079,6 +3139,7 @@ export type LineAccountConnectData = {
   followerImport: Pick<FollowerImportState, 'capability' | 'phase'>
   remainingActions: string[]
 }
+
 export type FriendFormSubmission = {
   id: string
   formId: string
@@ -4349,6 +4410,9 @@ export type BroadcastListKpis = Pick<
 
 /** 友だち画面の上部に出す数（設計 `V2 2-2 友だち`）。 */
 export type FriendStats = {
+  activeLastMonth?: number | null
+  activeMonthDelta?: number | null
+  activeComparisonDate?: string
   active: number
   total: number
   blockedByThem: number
@@ -4757,14 +4821,7 @@ export type EcOrderDetail = {
   }
 }
 
-export type EcIdentityCandidateSummary = {
-  unmatched: number
-  candidates: number
-  candidateExternalCustomers: number
-  duplicateSuspicions: number
-  linked: number
-  potentialRevenue: number | null
-}
+export type EcIdentityCandidateSummary = import('@line-crm/shared').EcIdentityCandidateSummary
 
 export type EcIdentityCandidateOperationsList = {
   items: Array<{
@@ -5252,6 +5309,7 @@ export type NenPhotoPublicationRecord = {
   photo_id?: string
   status: 'published' | 'withdrawn'
   view_count: number | null
+  view_count_30_days?: number | null
   version?: number
   published_at: string | null
   withdrawn_at: string | null
@@ -5289,6 +5347,7 @@ export type NenPhotoDetail = Record<string, unknown> & {
 
 /** #817: 報酬の決まりの版の1行。 */
 export type PhotoRewardPolicyVersion = {
+  publicationPoints?: number
   versionNumber: number
   policyKey: string
   points: number
@@ -5309,6 +5368,7 @@ export type NenPhotoPublicationList = {
     publishedCount: number
     placementCount: number
     topPhoto: Record<string, unknown> | null
+    topPhoto30Days?: (Record<string, unknown> & import('@line-crm/shared').PublicationThirtyDayCount) | null
     consentedCount: number
     attentionCount: number
     withdrawnCount: number
@@ -5382,6 +5442,8 @@ export type PhotoBulkReviewResult = {
 }
 
 export type AdPlatform = {
+  secretKeys?: string[]
+  verifiedAt?: string | null
   id: string
   /** meta / x / google / tiktok */
   name: string
@@ -5449,14 +5511,7 @@ function rangeQuery(params?: { from?: string; to?: string; accountId?: string })
 
 
 /** はじめの設定の段。設計 ★V6 34-1（`RAW35`）。 */
-export interface GettingStartedStep {
-  key: 'accounts' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
-  state: 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown'
-  href: string | null
-  reason: string | null
-  /** 段1だけ。Webhook をアカウントごとに確かめた結果。 */
-  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'; active?: boolean | null }>
-}
+export type GettingStartedStep = import('@line-crm/shared').GettingStartedStep
 
 /** レシピ。設計 ★V6 34-2（`y0P0Qx`）。 */
 export interface Recipe {
@@ -6199,6 +6254,9 @@ export type StepUpPurpose =
   | 'broadcast.approval'
   | 'webhook.api_token'
   | 'webhook.secret'
+
+/** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。 */
+export type LineAccountTag = { id: string; name: string; color: string | null; displayOrder: number }
 
 export const api = {
   system: {
@@ -7476,6 +7534,19 @@ export const api = {
         }`,
         { method: 'DELETE' },
       ),
+    /*
+     * B 元に戻す: 保管の取り消し。戻した直後は受付停止のまま。
+     * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+     */
+    unarchive: (id: string, accountId: string, expectedRevision: number) =>
+      fetchApi<ApiResponse<{
+        status: 'active'
+        revision: number
+        isActive: boolean
+      }>>(`/api/forms/${id}/unarchive?account_id=${encodeURIComponent(accountId)}`, {
+        method: 'POST',
+        body: JSON.stringify({ expectedRevision }),
+      }),
   },
   /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
   siteTracking: {
@@ -8330,6 +8401,8 @@ export const api = {
       }),
     list: (params?: {
       accountId?: string
+      from?: string
+      to?: string
       limit?: number
       cursor?: string | number
       status?: string
@@ -8343,6 +8416,8 @@ export const api = {
       sort?: 'newest' | 'oldest'
     }) => {
       const query = new URLSearchParams()
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.cursor !== undefined && params.cursor !== '') query.set('cursor', String(params.cursor))
@@ -9028,16 +9103,19 @@ export const api = {
         }),
     },
     images: {
-      list: (params?: { projectId?: string; favorite?: boolean; preset?: string; q?: string; before?: string; limit?: number }) => {
+      list: (params?: import("@line-crm/shared").HqBannerImageQuery) => {
         const q = new URLSearchParams()
         if (params?.projectId) q.set('projectId', params.projectId)
         if (params?.favorite) q.set('favorite', '1')
+        if (params?.delivered !== undefined) q.set('delivered', params.delivered ? '1' : '0')
+        if (params?.shape) q.set('shape', params.shape)
+        if (params?.withCounts) q.set('withCounts', '1')
         if (params?.preset) q.set('preset', params.preset)
         if (params?.q) q.set('q', params.q)
         if (params?.before) q.set('before', params.before)
         if (params?.limit) q.set('limit', String(params.limit))
         const query = q.toString()
-        return fetchApi<ApiResponse<BannerImage[]> & { nextBefore?: string | null }>(
+        return fetchApi<ApiResponse<BannerImage[]> & { nextBefore?: string | null; counts?: import("@line-crm/shared").HqBannerImageCounts }>(
           `/api/hq/banners/images${query ? `?${query}` : ''}`,
         )
       },
@@ -9060,7 +9138,7 @@ export const api = {
   },
   /** はじめの設定の順路。台帳 #134。**毎回いまの中身を数える（キャッシュしない）。** */
   gettingStarted: {
-    get: (accountId?: string) =>
+    get: (accountId?: string, version?: 'v8') =>
       fetchApi<ApiResponse<{
         steps: GettingStartedStep[]
         doneCount: number
@@ -9068,7 +9146,7 @@ export const api = {
         allDone: boolean
         /** 進捗帯を閉じたか（本人単位）。**完了判定には使わない。** */
         dismissed: boolean
-      }>>(`/api/getting-started${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`),
+      }>>(`/api/getting-started?${new URLSearchParams({ ...(accountId ? { account_id: accountId } : {}), ...(version ? { version } : {}) })}`),
     /** 進捗帯を閉じる。**閉じた日時は帯を出さないためだけの記憶。** */
     dismiss: () =>
       fetchApi<ApiResponse<{ dismissed: boolean }>>('/api/getting-started/dismiss', {
@@ -9287,6 +9365,29 @@ export const api = {
     ),
     jobs: () => fetchApi<ApiResponse<FriendMigrationJob[]>>('/api/friends/migration-jobs'),
   },
+  /** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。形は `apps/worker/src/routes/line-account-tags.ts`。 */
+  lineAccountTags: {
+    setForAccount: (id: string, tagIds: string[]) =>
+      fetchApi<ApiResponse<{ id: string; tags: LineAccountTag[] }>>(
+        `/api/line-accounts/${id}/tags`,
+        { method: 'PUT', body: JSON.stringify({ tagIds }) },
+      ),
+
+    list: () => fetchApi<ApiResponse<LineAccountTag[]>>('/api/line-account-tags'),
+    create: (input: string | import('@line-crm/shared').LineAccountTagInput) =>
+      fetchApi<ApiResponse<LineAccountTag>>('/api/line-account-tags', {
+        method: 'POST',
+        body: JSON.stringify(typeof input === 'string' ? { name: input } : input),
+      }),
+    remove: (id: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    replace: (accountId: string, tagIds: string[]) =>
+      fetchApi<ApiResponse<{ id: string; tags: LineAccountTag[] }>>(`/api/line-accounts/${encodeURIComponent(accountId)}/tags`, {
+        method: 'PUT',
+        body: JSON.stringify({ tagIds }),
+      }),
+    update: (id: string, input: Partial<import("@line-crm/shared").LineAccountTagInput>) => fetchApi<ApiResponse<import("@line-crm/shared").LineAccountTagSummary>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
+  },
   lineAccounts: {
     list: (live = false) =>
       fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '?live=1' : ''}`),
@@ -9317,22 +9418,10 @@ export const api = {
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
       }),
-    connectCheck: (data: {
-      name?: string
-      channelId: string
-      channelSecret: string
-      loginChannelId: string
-      loginChannelSecret: string
-    }) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect/check', {
+    connectCheck: (data: import('@line-crm/shared').LineAccountConnectInput) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect/check', {
       method: 'POST', body: JSON.stringify(data),
     }),
-    connect: (data: {
-      name?: string
-      channelId: string
-      channelSecret: string
-      loginChannelId: string
-      loginChannelSecret: string
-    }, stepUpToken?: string) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
+    connect: (data: import('@line-crm/shared').LineAccountConnectInput, stepUpToken?: string) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
       method: 'POST',
       headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
       body: JSON.stringify(data),
@@ -9365,6 +9454,7 @@ export const api = {
           | 'ogDefaultImageUrl'
           | 'friendCapacity'
           | 'capacityWarnAt'
+          | 'timezone'
           | 'iconUrl'
         >
       >,
@@ -9373,7 +9463,7 @@ export const api = {
       const touchesMessagingCredentials =
         data.channelAccessToken !== undefined || data.channelSecret !== undefined
       return fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}`, {
-        method: touchesMessagingCredentials ? 'PUT' : 'PATCH',
+        method: touchesMessagingCredentials || data.timezone !== undefined ? 'PUT' : 'PATCH',
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
       })
@@ -9465,6 +9555,15 @@ export const api = {
         `/api/line-accounts/${id}/follower-import/step`,
         { method: 'POST' },
       ),
+    followerInsight: (id: string, date: string) =>
+      fetchApi<ApiResponse<{
+        lineAccountId: string
+        date: string
+        status: string
+        followers: number | null
+        targetedReaches: number | null
+        blocks: number | null
+      }>>(`/api/line-accounts/${id}/follower-insight?date=${encodeURIComponent(date)}`),
   },
   conversions: {
     definitions: (params: {
@@ -10151,8 +10250,10 @@ export const api = {
      * **どのルールが、いつ、誰へ、どう返したか。** 設定だけ見ても、
      * 実際に返したのかは分からない。
      */
-    runs: (params?: { ruleId?: string; limit?: number; offset?: number }) => {
+    runs: (params?: { ruleId?: string; limit?: number; offset?: number; from?: string; to?: string }) => {
       const query = new URLSearchParams()
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       if (params?.ruleId) query.set('rule_id', params.ruleId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.offset !== undefined) query.set('offset', String(params.offset))
@@ -10241,6 +10342,21 @@ export const api = {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(body),
+      }),
+    /*
+     * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。再開は update で行う。
+     * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+     */
+    restore: (id: string) =>
+      fetchApi<ApiResponse<{
+        id: string;
+        isActive: boolean;
+        stoppedAt: string | null;
+        stoppedByStaffId: string | null;
+        stoppedByStaffName: string | null;
+        stopReason: string | null;
+      }>>(`/api/auto-replies/${id}/restore`, {
+        method: 'POST',
       }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?accountId=' + encodeURIComponent(params.accountId) : ''
@@ -11367,6 +11483,19 @@ export const api = {
     photoPublications: (accountId: string) => fetchApi<ApiResponse<NenPhotoPublicationList>>(
       `/api/nen-members/photos/publications?accountId=${encodeURIComponent(accountId)}`,
     ),
+    photoPublicationOrder: (accountId: string) =>
+      fetchApi<ApiResponse<{ items: Array<{id: string; version: number; pet_name: string}> }>>(
+        `/api/nen-members/photos/publications/order?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    savePhotoPublicationOrder: (data: import('@line-crm/shared').PhotoPublicationOrderInput) =>
+      fetchApi<ApiResponse<{ items: Array<{id: string; version: number; sortOrder: number}> }>>(
+        '/api/nen-members/photos/publications/order', { method: 'PUT', body: JSON.stringify(data) },
+      ),
+    publishPhoto: (id: string, data: { accountId: string; expectedVersion: number }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').PhotoPublicationPublishResult>>(
+        `/api/nen-members/photos/${encodeURIComponent(id)}/publish`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+      ),
     withdrawPhotoPublication: (id: string, data: { accountId: string; expectedVersion: number }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ status: 'withdrawn'; version: number }>>(
         `/api/nen-members/photos/publications/${encodeURIComponent(id)}/withdraw`,
@@ -11411,6 +11540,7 @@ export const api = {
       '/api/nen-members/photo-reward-policy/versions',
     ),
     createPhotoRewardPolicyVersion: (data: {
+      publicationPoints?: number
       points: number
       summary?: string
       effectiveFrom?: string | null
@@ -11784,6 +11914,14 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/reminders/${id}`, { method: 'DELETE' }),
+    /*
+     * B 元に戻す: 削除の取り消し（定義のみ。登録・配信予定は戻さない）。
+     * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+     */
+    restore: (id: string) =>
+      fetchApi<ApiResponse<Reminder>>(`/api/reminders/${id}/restore`, {
+        method: 'POST',
+      }),
     addStep: (
       id: string,
       data: {
@@ -12210,6 +12348,15 @@ export const api = {
           `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
         ),
+      /*
+       * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。
+       * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+       */
+      restore: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<IncomingWebhookDetail>>(
+          `/api/webhooks/incoming/${id}/restore?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST' },
+        ),
       /* 人が見つからなかった届物の箱(#939 N-367)。R401: 50件超えは limit/offset で辿る。 */
       unmatched: (
         id: string,
@@ -12264,6 +12411,15 @@ export const api = {
           `/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
         ),
+      /*
+       * B 元に戻す: 削除の取り消し。戻した直後は停止のまま。
+       * 画面の Toast から呼ぶ想定（各機能の担当が配線する）。
+       */
+      restore: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<OutgoingWebhook>>(
+          `/api/webhooks/outgoing/${id}/restore?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST' },
+        ),
       test: (id: string, lineAccountId: string) =>
         fetchApi<ApiResponse<{ delivered: boolean; responseStatus: number | null }>>(
           `/api/webhooks/outgoing/${encodeURIComponent(id)}/test?lineAccountId=${encodeURIComponent(lineAccountId)}`,
@@ -12295,6 +12451,11 @@ export const api = {
           `/api/webhooks/interactions/${id}/retry?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', body: JSON.stringify({ confirmed: options?.confirmed === true }) },
         ),
+      payload: (id: string, lineAccountId: string) =>
+        // F-18: 伏せた本文。available が false のとき body は null。
+        fetchApi<ApiResponse<{ id: string; body: unknown; available: boolean }>>(
+          `/api/webhooks/interactions/${id}/payload?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
       retryFailed: (lineAccountId: string) =>
         // remaining: 1回の外部通信上限で今回やり直せず残った失敗の件数(N-387)。
         // needsReview: 届いたか分からず、相手先で確かめてから1件ずつ
@@ -12306,9 +12467,9 @@ export const api = {
     },
     /* 外部システムが公開APIを呼ぶための鍵(#939 N-380)。 */
     apiTokens: {
-      list: (lineAccountId: string) =>
+      list: (lineAccountId: string, includeRevoked = false) =>
         fetchApi<ApiResponse<IntegrationApiTokenInfo[]>>(
-          `/api/webhooks/api-tokens?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          `/api/webhooks/api-tokens?lineAccountId=${encodeURIComponent(lineAccountId)}${includeRevoked ? '&includeRevoked=1' : ''}`,
         ),
       create: (lineAccountId: string, data: { name: string; scopes: string[] }, stepUpToken?: string) =>
         fetchApi<ApiResponse<IssuedIntegrationApiToken>>('/api/webhooks/api-tokens', {
@@ -12324,6 +12485,11 @@ export const api = {
       rotate: (id: string, lineAccountId: string, stepUpToken?: string) =>
         fetchApi<ApiResponse<IssuedIntegrationApiToken>>(
           `/api/webhooks/api-tokens/${encodeURIComponent(id)}/rotate?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined, body: '{}' },
+        ),
+      reactivate: (id: string, lineAccountId: string, stepUpToken?: string) =>
+        fetchApi<ApiResponse<IntegrationApiTokenInfo>>(
+          `/api/webhooks/api-tokens/${encodeURIComponent(id)}/reactivate?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined, body: '{}' },
         ),
     },
@@ -12370,6 +12536,12 @@ export const api = {
     },
   },
   notifications: {
+    teams: {
+      list: (lineAccountId: string) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam[]>>(`/api/notifications/teams?lineAccountId=${encodeURIComponent(lineAccountId)}`),
+      create: (data: { lineAccountId: string; name: string; staffIds: string[] }) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam>>('/api/notifications/teams', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: { lineAccountId: string; name: string; staffIds: string[]; expectedVersion: number }) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam>>(`/api/notifications/teams/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+      archive: (id: string, lineAccountId: string, expectedVersion: number) => fetchApi<ApiResponse<null>>(`/api/notifications/teams/${encodeURIComponent(id)}`, { method: 'DELETE', body: JSON.stringify({ lineAccountId, expectedVersion }) }),
+    },
     operatorRules: {
       list: (lineAccountId: string) =>
         fetchApi<ApiResponse<{
@@ -13153,7 +13325,7 @@ export const api = {
         options,
       ),
     get: (id: string) => fetchApi<ApiResponse<TrafficPool>>(`/api/traffic-pools/${id}`),
-    create: (data: { slug: string; name: string; activeAccountId: string }) =>
+    create: (data: import('@line-crm/shared').CreateTrafficPoolRequest) =>
       fetchApi<ApiResponse<TrafficPool>>('/api/traffic-pools', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -13530,6 +13702,11 @@ export const api = {
       ),
   },
   adPlatforms: {
+    mappings: (accountId: string) => fetchApi<ApiResponse<import('@line-crm/shared').AdEventMapping[]>>(`/api/ad-platforms/mappings?account_id=${encodeURIComponent(accountId)}`),
+    saveMapping: (pointId: string, data: import('@line-crm/shared').SaveAdEventMappingRequest) => fetchApi<ApiResponse<import('@line-crm/shared').AdEventMapping>>(`/api/ad-platforms/mappings/${encodeURIComponent(pointId)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    create: (data: {name: string;displayName?: string;lineAccountId: string;config: Record<string,unknown>}) => fetchApi<ApiResponse<AdPlatform>>('/api/ad-platforms',{method:'POST',body:JSON.stringify(data)}),
+    update: (id: string,data: {config?: Record<string,unknown>;displayName?: string;isActive?: boolean}) => fetchApi<ApiResponse<AdPlatform>>(`/api/ad-platforms/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(data)}),
+    connect: (id: string) => fetchApi<ApiResponse<import('@line-crm/shared').AdPlatformConnectResult>>(`/api/ad-platforms/${encodeURIComponent(id)}/connect`,{method:'POST'}),
     list: (lineAccountId?: string | null) =>
       fetchApi<ApiResponse<AdPlatform[]>>(`/api/ad-platforms${lineAccountId ? `?lineAccountId=${encodeURIComponent(lineAccountId)}` : ''}`),
     logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string; lineAccountId?: string | null }) => {
@@ -13573,6 +13750,7 @@ export const api = {
       if (params?.to) query.set('to', params.to)
       const suffix = query.size > 0 ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<{
+        conversionCost?: import('@line-crm/shared').AdConversionCostSummary
         rows: Array<{
           sourceLabel: string
           adPlatformId: string | null
@@ -14196,7 +14374,38 @@ function withAccount(path: string, accountId: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}account_id=${encodeURIComponent(accountId)}`;
 }
 
+/** 前払いのみの印を付け外しした記録（理由は店だけが見る）。 */
+export interface BookingNoshowFlagEvent {
+  action: 'manual_on' | 'manual_off';
+  reason: string | null;
+  staffId: string | null;
+  staffName: string | null;
+  at: string;
+}
+
+/** 友だちの無断キャンセルから決めた前払いのみの判定。 */
+export interface BookingPrepayDecision {
+  noshowCount: number;
+  threshold: number;
+  enabled: boolean;
+  windowMonths: number;
+  noPaymentMode: 'notice' | 'notice_call';
+  prepayOnly: boolean;
+  manual: boolean;
+  recentDates: string[];
+  lastEvent: BookingNoshowFlagEvent | null;
+}
+
 export const bookingApi = {
+  getFriendNoshow: (accountId: string, friendId: string) =>
+    fetchApi<{ success: true; data: BookingPrepayDecision }>(
+      withAccount(`/api/booking/admin/friends/${encodeURIComponent(friendId)}/noshow`, accountId),
+    ),
+  setFriendPrepay: (accountId: string, friendId: string, body: { mode: 'manual_on' | 'manual_off'; reason?: string }) =>
+    fetchApi<{ success: true; data: BookingPrepayDecision }>(
+      withAccount(`/api/booking/admin/friends/${encodeURIComponent(friendId)}/prepay`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   previewReminders: (accountId: string, startsAt: string) => {
     const params = new URLSearchParams({ account_id: accountId, starts_at: startsAt });
     return fetchApi<{ reminders: Array<{ kind: 'day_before' | 'hours_before'; scheduledAt: string }> }>(
@@ -14777,6 +14986,7 @@ export interface EventQuestion {
 }
 
 export interface EventDetail {
+  venue_address?: string | null;
   id: string;
   name: string;
   venue_name: string | null;
@@ -15097,6 +15307,8 @@ export interface EventLifecycleResult {
 }
 
 export const eventsApi = {
+  applicationPreview: (accountId: string, body: Partial<EventDetail> & { slot: { starts_at: string; ends_at: string; capacity: number } }) =>
+    fetchApi<import('@line-crm/shared').EventApplicationPreview>(withAccount('/api/events/admin/application-preview', accountId), { method: 'POST', body: JSON.stringify(body) }),
   listEvents: (
     accountId: string,
     options: { page?: number; limit?: number; q?: string; filter?: 'all' | 'open' | 'pending' | 'full'; sort?: 'soon' | 'name' } = {},
@@ -15620,6 +15832,8 @@ export type WebinarEditor = {
     viewSegmentFailures: number
     actionFailures: number
   }
+  /** 同時編集の見分けに使う、読んだときの更新日時。無い口では undefined。 */
+  updatedAt?: string | null
 }
 
 export type WebinarPublishValidation = {
@@ -15668,7 +15882,7 @@ export type WebinarListParams = {
   limit?: number
   q?: string
   folder?: string
-  status?: 'active' | 'draft'
+  status?: 'active' | 'draft' | 'archived'
   sort?: 'updated' | 'created' | 'name'
 }
 
@@ -15718,8 +15932,10 @@ export const webinarApi = {
   ),
   get: (id: string) => fetchApi<{ data: Webinar }>(`/api/webinars/${id}`),
   editor: (id: string) => fetchApi<{ data: WebinarEditor }>(`/api/webinars/${id}/editor`),
-  saveEditor: (id: string, input: Partial<Omit<WebinarEditor, 'version' | 'publicPage' | 'publication' | 'monitoring' | 'actionPolicy'>> & {
+  saveEditor: (id: string, input: Partial<Omit<WebinarEditor, 'version' | 'publicPage' | 'publication' | 'monitoring' | 'actionPolicy' | 'updatedAt'>> & {
     expectedVersion: number
+    /** 読んだときの更新日時。付けると違っていたら 409 で止まる。 */
+    expectedUpdatedAt?: string
     actionTemplateBody?: string
     missingResultPolicy?: WebinarEditor['actionPolicy']['missingResultPolicy']
     publicPageTest?: Record<string, unknown> | null

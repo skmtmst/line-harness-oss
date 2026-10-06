@@ -174,7 +174,7 @@ export async function syncConfirmedBookingToGoogle(
       start: row.starts_at,
       end: row.ends_at,
       description: [
-        `LINE Harness予約（担当: ${row.staff_name}）`,
+        `musubo予約（担当: ${row.staff_name}）`,
         `予約ID: ${row.id}`,
         row.customer_note ? `メモ: ${row.customer_note}` : '',
       ].filter(Boolean).join('\n'),
@@ -495,6 +495,15 @@ export async function runBookingGoogleSync(
     idempotencyKey,
     result: { direction: 'sync' },
   });
+  // 成功ずみの同版は外部へ再実行しない。同日時再送の delete/create・UUID再採番を止める。
+  // 失敗 (retry_wait 等) だけが回復対象。
+  if (!input.operationId) {
+    const existing = await findBookingOperation(db, {
+      lineAccountId: input.lineAccountId,
+      idempotencyKey,
+    });
+    if (existing && existing.status === 'succeeded') return 'succeeded';
+  }
   try {
     if (booking.status === 'cancelled' || booking.status === 'expired') {
       if (booking.external_event_id && booking.external_calendar_id) {

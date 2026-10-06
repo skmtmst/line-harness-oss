@@ -255,7 +255,7 @@ export default function ApiTokensPanel() {
       ) : null}
 
       {issued ? (
-        <section className="bg-canvas border-hairline rounded-card border p-5" aria-label="発行した鍵">
+        <section className="bg-canvas border-hairline rounded-card border p-5" aria-label="発行した鍵" data-design-node="UkZLi">
           <h2 className="text-ink mb-1 text-lg font-bold">鍵を発行しました</h2>
           <p className="text-ink-secondary mb-4 text-sm">
             この鍵は今だけ表示されます。写したらこの画面を閉じてください。一覧には二度と出ません。

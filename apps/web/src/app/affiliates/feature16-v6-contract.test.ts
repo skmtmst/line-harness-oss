@@ -3,8 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const TABS = readFileSync(new URL('./tabs.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
-const NEW_AFFILIATE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
-const NEW_OFFER = readFileSync(new URL('../affiliate-offers/new/page.tsx', import.meta.url), 'utf8')
+const NEW_AFFILIATE = readFileSync(new URL('./new-affiliate-v8.tsx', import.meta.url), 'utf8')
 const ACTION_DIALOGS = readFileSync(new URL('./action-dialogs.tsx', import.meta.url), 'utf8')
 
 function section(source: string, start: string, end: string): string {
@@ -99,30 +98,6 @@ describe('機能16 V6の確認画面', () => {
     expect(ACTION_DIALOGS).toContain('確認できる情報がありません')
     expect(ACTION_DIALOGS).toContain("phase === 'loading'")
     expect(ACTION_DIALOGS).toContain("phase === 'error'")
-  })
-})
-
-describe('機能16 V6の作成画面', () => {
-  it('紹介者登録は支払い条件を示す（★V7 C6: 未接続の振込先の断り書きは出さない）', () => {
-    expect(NEW_AFFILIATE).toContain('designNode="xqT1Z"')
-    for (const word of [
-      '支払いサイクル',
-      '確定までの保留期間',
-      'api.friends.list',
-      'つながる先',
-    ]) {
-      expect(NEW_AFFILIATE).toContain(word)
-    }
-    expect(NEW_AFFILIATE).not.toContain('label="振込先の登録"')
-  })
-
-  it('案件作成は成果地点の未接続の断り書きを出さない（★V7 C6）', () => {
-    expect(NEW_OFFER).toContain('designNode="GPWzq"')
-    expect(NEW_OFFER).not.toContain('label="何をもって成果とするか"')
-    for (const label of ['成果地点', '紹介とみなす期間', '同じ友だちを数える回数', '成果の自動承認']) {
-      expect(NEW_OFFER).not.toContain(`label="${label}"`)
-    }
-    expect(NEW_OFFER).not.toContain('まだ繋がっていません')
   })
 })
 

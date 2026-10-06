@@ -1,0 +1,404 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B 統括 LINEアカウントを登録（板 `xj3zz` `JYfda` `GwKE2` `v2KMj` `qw80E` `TvXII`）。
+ * 5手順の登録ウィザード。v7（`page.tsx`・手順1→2→3→4→5）とは
+ * 手順の並びと見せ方だけが違い、入力・検証・接続確認・保存の動きは同じ。
+ */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  padding-bottom: 96px;
+}
+
+.head h1 {
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.head p {
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* 手順の帯。済みは緑の ✓、今は番号の丸、今からは灰色。 */
+.steps {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 1024px) {
+  .steps {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 10px);
+  background: var(--color-canvas);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.stepCurrent {
+  border-color: var(--color-accent-deep);
+}
+
+.stepCurrent .stepLabel {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.stepDone {
+  background: var(--color-accent-soft);
+}
+
+.stepMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stepDone .stepMark {
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+}
+
+.stepCurrent .stepMark {
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+}
+
+.stepTodo .stepMark {
+  border: 1px solid var(--color-hairline);
+  color: var(--color-ink-faint);
+}
+
+.panel {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 20px 24px;
+}
+
+.panel h2 {
+  color: var(--color-ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.panelBody {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fieldLabel {
+  display: block;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.fieldInput {
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 10px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+.fieldInput[readonly] {
+  background: var(--color-surface-pearl);
+}
+
+.fieldError {
+  color: var(--color-danger);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.fieldHelp {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.twoCol {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .twoCol {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+/* ④の左右：左に検査の5行、右に登録内容の確認。 */
+.checkGrid {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .checkGrid {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+  }
+}
+
+.checkList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  overflow: hidden;
+}
+
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.checkRow:last-child {
+  border-bottom: none;
+}
+
+.checkIcon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.checkPass .checkIcon {
+  color: var(--color-success);
+}
+
+.checkFail .checkIcon {
+  color: var(--color-danger);
+}
+
+.checkTodo .checkIcon {
+  border: 1px dashed var(--color-hairline);
+  color: var(--color-ink-faint);
+}
+
+.checkText {
+  min-width: 0;
+  flex: 1;
+}
+
+.checkTitle {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.checkTitle .checkDetailInline {
+  color: var(--color-ink-secondary);
+  font-weight: 400;
+}
+
+.checkFail .checkTitle .checkDetailInline {
+  color: var(--color-danger);
+}
+
+.checkSub {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.reviewBox {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-surface-pearl);
+  padding: 16px;
+}
+
+.reviewBox h3 {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.reviewBox dl {
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reviewBox dt {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.reviewBox dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+/* 結果窓（`qw80E`）の表。 */
+.resultTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.resultTable td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: top;
+}
+
+.resultTable td.resultLabel {
+  color: var(--color-ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.resultTable td {
+  color: var(--color-ink-secondary);
+}
+
+.manualAck {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 12px 8px;
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+/* ⑤の取り込みの棒。 */
+.progressTrack {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-pearl);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-accent-deep);
+  border-radius: var(--radius-pill);
+  transition: width var(--motion-base, 200ms) var(--motion-ease-out, ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    transition: none;
+  }
+}
+
+.progressCaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.nextList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.noteBox {
+  border-radius: var(--radius-control, 10px);
+  background: var(--color-surface-pearl);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  border-top: 1px solid var(--color-hairline);
+  padding-top: 16px;
+}
+
+/* タグの札。選んだ札だけ濃い地。 */
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tagPill {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.tagPill[aria-pressed='true'] {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: var(--color-canvas);
+}
+
+.endpointRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.endpointValue {
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--radius-control, 10px);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink);
+  font-size: 12px;
+  padding: 8px 12px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}

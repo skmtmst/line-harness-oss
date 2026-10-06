@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { ChevronRight, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useEffect, type ChangeEvent } from 'react'
 import { SIDEBAR_TOGGLE_EVENT } from '@/lib/events'
 import styles from './top-bar.module.css'
@@ -47,6 +48,9 @@ export interface TopBarProps {
    * 押しても何も起きない偽の操作になる。
    */
   v8Chrome?: boolean
+  /** 画面の絵に合わせた外側の形。統括などの既存の形は default。 */
+  chromeVariant?: 'default' | 'shell'
+  menuCollapsed?: boolean
   /**
    * ★V8：パンくずの手前の段。「ホーム」「一斉配信」など。
    * 渡されなければ従来どおり選んでいるアカウント名を出す。
@@ -76,6 +80,8 @@ export default function TopBar({
   onLogout,
   notificationUnreadCount = 0,
   v8Chrome = false,
+  chromeVariant = 'default',
+  menuCollapsed = false,
   crumbs,
   className,
 }: TopBarProps) {
@@ -105,7 +111,7 @@ export default function TopBar({
   }, [])
 
   return (
-    <header className={classes} data-design-node="cBSCb">
+    <header className={classes} data-design-node="cBSCb" data-v8-chrome={chromeVariant} data-menu-collapsed={menuCollapsed || undefined}>
       {/*
         ★V8 外側（Pencil `y3gx8R`）：左に畳むボタンとパンくず
         （アカウント › 画面名）。v7 では .v8-only が消す。
@@ -121,32 +127,39 @@ export default function TopBar({
             title="メニューを畳む（⌘\）"
             onClick={() => window.dispatchEvent(new Event(SIDEBAR_TOGGLE_EVENT))}
           >
-            <PanelLeftIcon />
+            {chromeVariant === 'shell' ? (menuCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />) : <PanelLeftIcon />}
           </button>
           <nav className={styles.crumbs} aria-label="パンくず">
+            {/*
+              ★V8 殻合わせ（絵 `V8-B/JKjsE`）：手前はホーム。格子印＋
+              「ホーム」で最初の画面へ（統括もふだんの画面も同じ殻）。
+              v8-only の帯にだけ出すので v7 は変わらない。
+            */}
+            <Link href="/" className={styles.crumbHome}>
+              <HomeGridIcon /><span>ホーム</span>
+            </Link>
+            <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
             {/*
               手前の段。ページが crumbs を渡したらそれを出す
               （一覧からの詳細で「一斉配信 › 配信名」）。渡さない画面は
               従来どおり選んでいるアカウント名。未選択（統括の一覧など）
               では「店舗を選択」と出さず、画面名だけにする。
             */}
-            {crumbs && crumbs.length > 0 ? (
-              crumbs.map((crumb) => (
-                <span key={crumb.label} className={styles.crumbFromWrap}>
-                  {crumb.href ? (
-                    <Link href={crumb.href} className={styles.crumbFromLink}>{crumb.label}</Link>
-                  ) : (
-                    <span className={styles.crumbFrom}>{crumb.label}</span>
-                  )}
-                  <span className={styles.crumbSep} aria-hidden="true">›</span>
-                </span>
-              ))
-            ) : current ? (
-              <>
-                <span className={styles.crumbFrom}>{current.label}</span>
-                <span className={styles.crumbSep} aria-hidden="true">›</span>
-              </>
-            ) : null}
+            {/*
+              手前の段。帯は「ホーム ›」を自分で出すので、画面が渡した
+              先頭の「ホーム」は重ねない（`ホーム › ホーム › 画面名` になる）。
+              何も渡さない画面はアカウント名を出さず題だけにする（絵の指示）。
+            */}
+            {(crumbs ?? []).filter((crumb, index) => index > 0 || crumb.label !== 'ホーム').map((crumb) => (
+              <span key={crumb.label} className={styles.crumbFromWrap}>
+                {crumb.href ? (
+                  <Link href={crumb.href} className={styles.crumbFromLink}>{crumb.label}</Link>
+                ) : (
+                  <span className={styles.crumbFrom}>{crumb.label}</span>
+                )}
+                <span className={styles.crumbSep} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronRight size={14} /> : '›'}</span>
+              </span>
+            ))}
             <h1 className={styles.crumbCurrent} title={title}>{title}</h1>
           </nav>
         </div>
@@ -176,8 +189,23 @@ export default function TopBar({
           */}
           <span className={styles.accountPill}>
             <span className={styles.accountMark} aria-hidden="true">{current?.mark ?? current?.label.slice(0, 1) ?? ''}</span>
-            <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
-            <ChevronIcon />
+            {/*
+              ★V8 殻合わせ（絵 `V8-B/JKjsE`）：札に役割（統括など）を小さい
+              行で添える。v8-only なので v7 の1行札は変わらない。
+            */}
+            {roleLabel ? (
+              <span className={styles.pillText}>
+                {/*
+                  札の中の小さい字は「LINEアカウント」で固定（絵の指示）。
+                  v8-only の行なので v7 の札は変わらない。
+                */}
+                <span className={`${styles.pillRole} v8-only`}>LINEアカウント</span>
+                <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+              </span>
+            ) : (
+              <span className={styles.accountName}>{current?.label ?? '店舗を選択'}</span>
+            )}
+            {chromeVariant === 'shell' ? <ChevronsUpDown size={14} /> : <ChevronIcon />}
             <select
               className={styles.accountSelect}
               value={selectedAccountId}
@@ -215,18 +243,25 @@ export default function TopBar({
           <span className={styles.separator} aria-hidden="true" />
         </> : null}
 
+        {/*
+          ★V8 殻合わせ（絵 `V8-B/JKjsE`）：名前を太字・役割を下の小さい行に
+          積む。v7 は中箱を素通し（display: contents）にするので並びは不変。
+        */}
         <div className={styles.identity}>
           {/* ★V8: 自分（36px の顔）。名まえの頭1文字を丸いタイルで出す。 */}
           <span className={`${styles.avatar} v8-only`} aria-hidden="true">
             {userName.trim().slice(0, 1)}
           </span>
-          {onRoleClick
-            ? <button type="button" className={styles.roleButton} onClick={onRoleClick}>{roleLabel}</button>
-            : <span className={styles.role}>{roleLabel}</span>}
-          <span className={styles.user} title={userName}>{userName}</span>
+          <span className={styles.identityText}>
+            <span className={styles.user} title={userName}>{userName}</span>
+            {onRoleClick
+              ? <button type="button" className={styles.roleButton} onClick={onRoleClick}>{roleLabel}</button>
+              : <span className={styles.role}>{roleLabel}</span>}
+          </span>
         </div>
 
-        <span className={styles.separator} aria-hidden="true" />
+        {/* v7 の区切り線は残す（V8 では消す決まり）。 */}
+        <span className={`${styles.separator} v7-only`} aria-hidden="true" />
 
         <button type="button" className={styles.logout} onClick={onLogout} aria-label="ログアウト">
           <LogOutIcon /><span aria-hidden="true">ログアウト</span>
@@ -260,6 +295,18 @@ function ChevronIcon() {
   return (
     <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}
+
+/* ★V8 殻合わせ：ホームの格子印（lucide `layout-grid`） */
+function HomeGridIcon() {
+  return (
+    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect width="7" height="7" x="3" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="14" rx="1" />
+      <rect width="7" height="7" x="3" y="14" rx="1" />
     </svg>
   )
 }

@@ -37,4 +37,15 @@
   height: 32px;
   border-radius: var(--radius-tile);
 }
+
+[data-theme='v8'] .root {
+  gap: 0;
+  border: 0;
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+}
+[data-theme='v8'] .sm { border-radius: 7px; }
+[data-theme='v8'] .md, [data-theme='v8'] .lg { border-radius: 9px; }
+[data-theme='v8'] .root svg { flex-shrink: 0; }
+
 }

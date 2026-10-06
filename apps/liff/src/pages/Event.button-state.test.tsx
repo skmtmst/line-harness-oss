@@ -20,6 +20,9 @@ vi.mock('../lib/api.js', () => ({
     getEvent: vi.fn(),
     getEventSlots: vi.fn(),
     myEventBookings: vi.fn(),
+    liffConfig: vi.fn().mockResolvedValue({ success: true, data: {} }),
+    // 予約の画面の包み (LiffLookScope) が読む。見た目は既定のまま。
+    bookingSettings: vi.fn().mockResolvedValue({ liff_date_view: 'list', booking_window_days: 60 }),
   },
 }));
 
@@ -164,4 +167,12 @@ describe('選べる枠がある時', () => {
     const after = await screen.findByRole('button', { name: 'この時間で申し込む' });
     expect(after.hasAttribute('disabled')).toBe(false);
   });
+});
+
+it('会場の住所を表示する', async () => {
+  getEvent.mockResolvedValue(eventDetail({ venue_address: 'テスト会場の住所' }));
+  getEventSlots.mockResolvedValue({items:[slot()]});
+  myEventBookings.mockResolvedValue({items:[]});
+  render(<MemoryRouter initialEntries={['/events/e1']}><Routes><Route path="/events/:id" element={<Event />} /></Routes></MemoryRouter>);
+  expect(await screen.findByText('テスト会場の住所')).toBeTruthy();
 });

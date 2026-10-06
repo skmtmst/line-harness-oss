@@ -20,6 +20,19 @@ export function formatJstDateTime(value: string | null | undefined, fallback = '
   return formatDateTime(date)
 }
 
+/*
+ * 短いJST日時（絵は「9/30 10:12」）。端末の時差に振られないよう
+ * +9 時間ずらして読む。
+ */
+export function formatJstShortDateTime(value: string | null | undefined, fallback = '—'): string {
+  if (!value) return fallback
+  const time = new Date(value).getTime()
+  if (Number.isNaN(time)) return fallback
+  const jst = new Date(time + 9 * 60 * 60 * 1000)
+  const minutes = String(jst.getUTCMinutes()).padStart(2, '0')
+  return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.getUTCHours()}:${minutes}`
+}
+
 /** datetime-localへ入れられる端末時刻へ変換する。 */
 export function localDateTime(value: string | null | undefined): string {
   if (!value) return ''

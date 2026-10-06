@@ -2,7 +2,7 @@
 /*
  * Issue #620: ログインユーザー検索が不存在語で0件にならない。
  *
- * メンバー一覧の検索欄は「人の名前・メールで検索」。実物の StaffPage を
+ * メンバー一覧の検索欄は「名前・メールで探す」。実物の StaffPage を
  * マウントし、次を確かめる。
  *   - 不存在語では空状態（条件に合うログインユーザーはいません）が出る
  *   - 名前とメールを ' ' で繋いだ文字列への跨ぎ一致（別フィールド一致）をしない
@@ -105,7 +105,7 @@ async function mount() {
 }
 
 function searchBox(): HTMLElement {
-  return screen.getByRole('searchbox', { name: '人の名前・メールで検索' })
+  return screen.getByRole('searchbox', { name: '名前・メールで探す' })
 }
 
 function typeQuery(value: string) {

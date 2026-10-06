@@ -36,17 +36,24 @@ import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import DetailPanel from '@/components/shared/detail-panel'
+import InlineEdit from '@/components/shared/inline-edit'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListRange from '@/components/ui/list-range'
 import { notifyToast } from '@/components/shared/toast'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { runUndoable } from '@/lib/undoable'
+import { loadFailureCopy } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import styles from './list-v8.module.css'
 
 interface UsedByAccount {
@@ -182,6 +189,170 @@ function referenceLabel(reference: FormDeleteImpact['references'][number]): stri
   return `「${name}」`
 }
 
+/**
+ * A. 読み込み中の骨組み（V8だけ）。本物の表と同じ見出し・列幅で5行出し、
+ * 入れ替わってもガタつかない。0.3秒以内に来たら出さない・出したら最低
+ * 0.4秒は `DelayedSkeleton` が面倒を見る（自前の骨組みはやめた）。
+ */
+function FormListSkeleton({ label }: { label: string }) {
+  return (
+    <div className={styles.tableWrap} aria-busy="true">
+      <span className="sr-only">{label}</span>
+      <DelayedSkeleton
+        loading
+        skeleton={
+          <table className={styles.table} aria-hidden="true" inert>
+            <FormListHead reviewMode={false} />
+            <tbody>
+              {[0, 1, 2, 3, 4].map((index) => (
+                <tr key={index}>
+                  <td>
+                    <Skeleton className="block h-3.5 w-2/3" />
+                    <span className="mt-1 block"><Skeleton className="block h-3 w-1/2" /></span>
+                  </td>
+                  <td className={styles.destCell}><Skeleton className="block h-3.5 w-20" /></td>
+                  <td><Skeleton className="block h-5.5 w-16" /></td>
+                  <td className={styles.answerCell}>
+                    <Skeleton className="block h-3.5 w-16" />
+                    <span className="mt-0.5 block"><Skeleton className="block h-3 w-24" /></span>
+                  </td>
+                  <td><Skeleton className="block h-8 w-13" /></td>
+                  <td><Skeleton className="ml-auto block h-8 w-8" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        }
+      />
+    </div>
+  )
+}
+
+/**
+ * 表の見出し（本物と骨組みで同じものを出す。2か所に書くとずれる）。
+ */
+function FormListHead({ reviewMode }: { reviewMode: boolean }) {
+  return (
+    <thead>
+      <tr>
+        <th>フォーム（質問の数）</th>
+        <th className={styles.colDest}>保存先</th>
+        <th className={styles.colStatus}>状態</th>
+        <th className={styles.colAnswers}>回答</th>
+        <th className={styles.colUrl}>URL</th>
+        {!reviewMode ? <th className={styles.menuCell} aria-label="操作" /> : null}
+      </tr>
+    </thead>
+  )
+}
+
+/* 行の「…」を右クリック用に直す（D）。中身は同じものを渡す。 */
+function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
+  return menuItems.map((item) => ({
+    id: item.id,
+    label: item.label,
+    danger: item.tone === 'danger',
+    disabled: item.disabled,
+    onSelect: () => item.onSelect(),
+  }))
+}
+
+/*
+ * フォルダの追加・名前の変更の入力（右の詳細パネルに入れる中身）。
+ * 以前は真ん中の窓（共有の FolderAddDialog）だったが、
+ * V8「サクサク感」の決まりで右のパネルへ移した。名前と色は同じ。
+ */
+function FormFolderPanelForm({
+  accountId,
+  folder,
+  onCancel,
+  onAdded,
+}: {
+  accountId: string
+  folder: Folder | null
+  onCancel: () => void
+  onAdded: () => void
+}) {
+  const [name, setName] = useState(folder?.name ?? '')
+  const [color, setColor] = useState(folder?.color ?? FOLDER_COLORS[0])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const save = async () => {
+    const trimmed = name.trim()
+    if (!trimmed || saving) return
+    setSaving(true)
+    setError('')
+    try {
+      // 共有の FolderAddDialog と同じ送り（名前と色。更新口は部分受け）。
+      const folderUpdates = { name: trimmed, color }
+      const res = folder
+        ? await api.folders.update(folder.id, folderUpdates, accountId)
+        : await api.folders.create({ kind: 'form', name: trimmed, color, accountId })
+      if (!res.success) {
+        setError(res.error)
+        return
+      }
+      onAdded()
+      onCancel()
+    } catch {
+      setError(folder ? 'フォルダを直せませんでした' : 'フォルダを追加できませんでした')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+        フォームを分けてしまう箱です。消しても、入っていたフォームは未分類として残ります。
+      </p>
+      <label className="mt-4 block">
+        <span className="text-ink-secondary mb-1 block text-xs font-medium">
+          フォルダ名 <span className="text-danger">*</span>
+        </span>
+        <input
+          type="text"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && name.trim()) void save()
+          }}
+          placeholder="例: 01_来店・予約"
+          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+        />
+      </label>
+      <div className="mt-3">
+        <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
+        <div className="flex flex-wrap gap-2">
+          {FOLDER_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              aria-label={`色 ${c}`}
+              aria-pressed={color === c}
+              className={
+                color === c
+                  ? 'rounded-pill h-7 w-7 ring-accent ring-2 ring-offset-2'
+                  : 'rounded-pill h-7 w-7'
+              }
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
+      </div>
+      {error ? <p className="text-danger mt-2 text-sm">{error}</p> : null}
+      <div className="mt-5 flex justify-end gap-2">
+        <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
+        <Button variant="primary" onClick={() => void save()} disabled={!name.trim() || saving} busy={saving}>
+          {folder ? '直す' : '追加する'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function FormSubmissionsListV8() {
   usePageTitle('回答フォーム')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
@@ -195,6 +366,9 @@ export default function FormSubmissionsListV8() {
    */
   const [canManageFolders] = useState(() =>
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  // 1152の板（`GrnO4`）。折り畳みはCSSのコンテナ問い合わせが担い、
+  // ここでは板の印だけを切り替える。
+  const narrow = useNarrowViewport()
   const [forms, setForms] = useState<Form[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
@@ -240,6 +414,12 @@ export default function FormSubmissionsListV8() {
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  /* 行の名前を変更。保存は編集保存と同じ口を通すので版を添える（v7 と同じ）。 */
+  const [renameTarget, setRenameTarget] = useState<Form | null>(null)
+  const [renameName, setRenameName] = useState('')
+  const [renameRevision, setRenameRevision] = useState<number | null>(null)
+  const [renaming, setRenaming] = useState(false)
+  const [renameError, setRenameError] = useState('')
   /* 「受付を止める」の確認。止めるにも編集の版が要るので影響口で読む(#723)。 */
   const [stopTarget, setStopTarget] = useState<Form | null>(null)
   const [stopRevision, setStopRevision] = useState<number | null>(null)
@@ -253,6 +433,8 @@ export default function FormSubmissionsListV8() {
   const [statsFailed, setStatsFailed] = useState(false)
   /** 行の「…」。開いている行のID。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /* C①：右から出る詳細パネル。今開いている行の id だけ持つ（管理者確認モードは読み取り専用なので開かない）。 */
+  const [activeId, setActiveId] = useState<string | null>(null)
   const formRequest = useRef(0)
   const activeAccountRef = useRef<string | null>(selectedAccountId)
 
@@ -270,6 +452,7 @@ export default function FormSubmissionsListV8() {
     setStopTarget(null)
     setMoveTarget(null)
     setDuplicateTarget(null)
+    setRenameTarget(null)
     setOpenMenuId(null)
     setStats(null)
     setStatsFailed(false)
@@ -288,10 +471,13 @@ export default function FormSubmissionsListV8() {
         const res = await fetchApi<{ success: boolean; data: Form[] }>(`/api/forms/unassigned?${account}`)
         if (!res.success) throw new Error('load_failed')
         if (request !== formRequest.current) return
-        setForms(res.data)
+        // 未割り当て口は配列で返す契約。通常一覧と同じく、配列でない応答では
+        // 一覧を空にして描く（`[...forms]` が `e is not iterable` で落ちる）。
+        const unassigned = Array.isArray(res.data) ? res.data : []
+        setForms(unassigned)
         setFolders([])
-        setFormTotal(res.data.length)
-        setFolderTotal(res.data.length)
+        setFormTotal(unassigned.length)
+        setFolderTotal(unassigned.length)
       } catch (error) {
         if (request !== formRequest.current) return
         // 権限が無い人（staff・制限付き・別テナント）は専用口が403/404を返す。
@@ -478,6 +664,7 @@ export default function FormSubmissionsListV8() {
   }
 
   const openDuplicate = (form: Form) => {
+    closeDetail()
     setDuplicateTarget(form)
     setDuplicateName(`${displayFormName(form.name)}の複製`)
     setDuplicateError('')
@@ -509,6 +696,7 @@ export default function FormSubmissionsListV8() {
 
   /* アーカイブ・削除の窓を開く。影響（回答数・利用先・版）を先に読む。 */
   const openDelete = async (form: Form) => {
+    closeDetail()
     setDeleteTarget(form)
     setDeleteImpact(null)
     setDeleteImpactLoading(true)
@@ -579,7 +767,72 @@ export default function FormSubmissionsListV8() {
   }
 
   /* 「受付を止める」の窓を開く。止める保存には編集の版が要るので影響口で読む。 */
+  /*
+   * R27: 名前の変更は「…」の中の操作（v7 と同じ）。保存は編集保存と同じ口を
+   * 通るので、確認した編集の版を添える。一覧は版を持っていないため、窓を
+   * 開くときに1件取得で読む。版なしで送ると口が 400 にする（#723）。
+   */
+  const openRename = async (form: Form) => {
+    setRenameTarget(form)
+    setRenameName(displayFormName(form.name))
+    setRenameError('')
+    setRenameRevision(null)
+    if (!selectedAccountId) {
+      setRenameError('LINE公式アカウントを選んでください。')
+      return
+    }
+    try {
+      const res = await fetchApi<{ success: boolean; data: { contentRevision?: number } }>(
+        `/api/forms/${form.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+      )
+      if (!res.success) throw new Error('rename_revision_failed')
+      const revision = res.data.contentRevision
+      if (!Number.isInteger(revision)) throw new Error('rename_revision_failed')
+      setRenameRevision(revision as number)
+    } catch {
+      setRenameError('フォームの状態を確認できませんでした。開き直してください。')
+    }
+  }
+
+  const saveRename = async () => {
+    if (!renameTarget || !renameName.trim() || renaming || !selectedAccountId) return
+    const name = displayFormName(renameName)
+    setRenaming(true)
+    setRenameError('')
+    try {
+      let revision = renameRevision
+      if (revision === null) {
+        const res = await fetchApi<{ success: boolean; data: { contentRevision?: number } }>(
+          `/api/forms/${renameTarget.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+        )
+        if (!res.success || !Number.isInteger(res.data.contentRevision)) {
+          throw new Error('rename_revision_failed')
+        }
+        revision = res.data.contentRevision as number
+        setRenameRevision(revision)
+      }
+      const res = await api.forms.update(renameTarget.id, selectedAccountId, {
+        name,
+        expectedContentRevision: revision,
+      })
+      if (!res.success) throw new Error('rename_failed')
+      setForms((current) => current.map((form) => (
+        form.id === renameTarget.id ? { ...form, name } : form
+      )))
+      setRenameTarget(null)
+      // 名前は検索・名前順の対象。サーバー側の絞り込み・並びとずれないよう読み直す。
+      void loadForms()
+    } catch (error) {
+      setRenameError(error instanceof ApiError && error.status === 409
+        ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
+        : 'フォーム名を変更できませんでした。もう一度お試しください。')
+    } finally {
+      setRenaming(false)
+    }
+  }
+
   const openStop = async (form: Form) => {
+    closeDetail()
     setStopTarget(form)
     setStopRevision(null)
     setStopImpactLoading(true)
@@ -641,21 +894,32 @@ export default function FormSubmissionsListV8() {
   /*
    * R25: 箱の並び替え。2つの更新は口が1回で行う。途中で片方だけ変わらない。
    */
-  const moveFolder = async (index: number, direction: -1 | 1) => {
+  /*
+   * B. フォルダの並べ替えは押した瞬間に画面を変え、裏で保存する。
+   * 5秒は Toast の「元に戻す」で止められる（戻す口は同じ入れ替え）。
+   */
+  const moveFolder = (index: number, direction: -1 | 1) => {
     const target = folders[index]
     const neighbor = folders[index + direction]
     if (!target || !neighbor || folderBusy || !selectedAccountId) return
-    setFolderBusy(true)
+    const before = folders
+    const swapped = [...folders]
+    swapped[index] = neighbor
+    swapped[index + direction] = target
+    setFolders(swapped)
     setFolderError('')
-    try {
-      const result = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId)
-      if (!result.success) throw new Error(result.error)
-      await loadForms()
-    } catch {
-      setFolderError('並び順を変えられませんでした。')
-    } finally {
-      setFolderBusy(false)
-    }
+    runUndoable({
+      message: `フォルダ「${target.name}」の並び順を変えました`,
+      commit: async () => {
+        const result = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId)
+        if (!result.success) return { success: false, error: result.error }
+      },
+      undo: () => setFolders(before),
+      onCommitted: () => {
+        void loadForms()
+      },
+      failureMessage: '並び順を変えられませんでした。',
+    })
   }
 
   const openFolderDelete = async (folder: Folder) => {
@@ -695,6 +959,7 @@ export default function FormSubmissionsListV8() {
   }
 
   const openMove = (form: Form) => {
+    closeDetail()
     setMoveTarget(form)
     setMoveFolderId(form.folderId ?? UNFILED_VALUE)
     setMoveError('')
@@ -769,6 +1034,41 @@ export default function FormSubmissionsListV8() {
     ? clientFilteredForms.slice(pageStart, pageStart + pageSize)
     : forms
 
+  /* C①・E：行→詳細パネル。開閉と↑↓の移動はつながる移り変わりで。 */
+  const activeIndex = reviewMode ? -1 : visibleForms.findIndex((form) => form.id === activeId)
+  const active = activeIndex >= 0 ? visibleForms[activeIndex] : null
+  const openDetail = useCallback((id: string) => {
+    withViewTransition(() => setActiveId(id))
+  }, [])
+  const closeDetail = useCallback(() => {
+    withViewTransition(() => setActiveId(null))
+  }, [])
+  const goDetail = (direction: -1 | 1) => {
+    const next = visibleForms[activeIndex + direction]
+    if (!next) return
+    withViewTransition(() => setActiveId(next.id))
+  }
+
+  /*
+   * C②：行の名前のその場の書き換え。名前は中身の更新なので、
+   * 影響口で読んだ編集の版を付けて同じ更新口へ送る（#723）。
+   * 失敗したら投げて入力欄に理由を出す（勝手に進めない）。
+   */
+  const renameForm = async (target: Form, next: string) => {
+    if (!selectedAccountId) throw new Error('no_account')
+    const trimmed = next.trim()
+    if (!trimmed) throw new Error('empty_name')
+    if (trimmed === target.name) return
+    const impact = await api.forms.deleteImpact(target.id, selectedAccountId)
+    if (!impact.success) throw new Error('revision_failed')
+    const result = await api.forms.update(target.id, selectedAccountId, {
+      name: trimmed,
+      expectedContentRevision: impact.data.contentRevision,
+    })
+    if (!result.success) throw new Error(result.error)
+    setForms((current) => current.map((form) => (form.id === target.id ? { ...form, name: trimmed } : form)))
+  }
+
   useEffect(() => {
     if (!loading && !loadError && page > pageCount) updateListState({ page: pageCount })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -826,17 +1126,22 @@ export default function FormSubmissionsListV8() {
       detail: 'タグ・シナリオが失敗',
       link: {
         label: '未完を見る',
-        onSelect: () => updateListState({ filter: 'pending', page: 1 }),
+        onSelect: () => withViewTransition(() => updateListState({ filter: 'pending', page: 1 })),
       },
     },
   ]
 
-  /* ===== 行の「…」（I3L41O：編集・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除） ===== */
+  /* ===== 行の「…」（I3L41O：編集・名前を変更・集まった回答・複製・受付を止める・フォルダへ移す・アーカイブ・削除） ===== */
   const rowMenuItems = (form: Form): ActionMenuItem[] => [
     {
       id: 'edit',
       label: '編集',
       onSelect: () => router.push(`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`),
+    },
+    {
+      id: 'rename',
+      label: '名前を変更',
+      onSelect: () => void openRename(form),
     },
     {
       id: 'responses',
@@ -883,7 +1188,7 @@ export default function FormSubmissionsListV8() {
       // 箱ごとの件数はまだ数えていない（#631 の流儀で出さない）。
       count: folder.itemCount ?? null,
       color: folder.color,
-      onEdit: canManageFolders ? () => setEditingFolder(folder) : undefined,
+      onEdit: canManageFolders ? () => { closeDetail(); setEditingFolder(folder) } : undefined,
       onMoveUp: canManageFolders && index > 0 ? () => void moveFolder(index, -1) : undefined,
       onMoveDown: canManageFolders && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
       onDelete: canManageFolders ? () => void openFolderDelete(folder) : undefined,
@@ -915,13 +1220,7 @@ export default function FormSubmissionsListV8() {
   /* ===== 一覧の中身（読込中・失敗・空・0件・表を分ける） ===== */
   let listBody
   if (accountLoading) {
-    listBody = (
-      <div className={styles.skeletonRows} aria-label="読み込んでいます">
-        {[0, 1, 2, 3].map((index) => (
-          <div key={index} className={styles.skeletonRow}><span className={styles.skeletonBar} /></div>
-        ))}
-      </div>
-    )
+    listBody = <FormListSkeleton label="回答フォームの一覧を読み込んでいます" />
   } else if (!selectedAccountId) {
     listBody = (
       <div className={styles.stateCard}>
@@ -931,26 +1230,20 @@ export default function FormSubmissionsListV8() {
       </div>
     )
   } else if (loading) {
-    listBody = (
-      <div className={styles.skeletonRows} aria-label="読み込んでいます">
-        {[0, 1, 2, 3, 4].map((index) => (
-          <div key={index} className={styles.skeletonRow}><span className={styles.skeletonBar} /></div>
-        ))}
-      </div>
-    )
+    listBody = <FormListSkeleton label="回答フォームの一覧を読み込んでいます" />
   } else if (loadError) {
+    // 本線と同じ案内を使う。403は再試行せず、429は待ち秒数を添える。
+    const failure = loadFailureCopy(loadFailure, '回答フォーム')
     listBody = (
       <div className={styles.stateCard}>
         <span className={`${styles.stateIcon} ${styles.stateIconError}`}><TriangleAlert size={20} aria-hidden="true" /></span>
         <p className={styles.stateTitle}>
-          {isForbiddenOrRateLimited(loadFailure) ? 'この一覧を見る権限がありません' : '回答フォームを読み込めませんでした'}
+          {failure.title}
         </p>
         <p className={styles.stateDesc}>
-          {isForbiddenOrRateLimited(loadFailure)
-            ? 'アカウントの担当・役割の設定を確認してください。'
-            : '再読み込みしても直らないときは、エラー報告へお知らせください。'}
+          {failure.description}
         </p>
-        {!isForbiddenOrRateLimited(loadFailure) ? (
+        {failure.retryable ? (
           <Button type="button" variant="secondary" onClick={() => void loadForms()}>もう一度読み込む</Button>
         ) : null}
       </div>
@@ -993,24 +1286,17 @@ export default function FormSubmissionsListV8() {
     listBody = (
       <div className={styles.tableWrap}>
         <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>フォーム（質問の数）</th>
-              <th className={styles.colDest}>保存先</th>
-              <th className={styles.colStatus}>状態</th>
-              <th className={styles.colAnswers}>回答</th>
-              <th className={styles.colUrl}>URL</th>
-              {!reviewMode ? <th className={styles.menuCell} aria-label="操作" /> : null}
-            </tr>
-          </thead>
+          <FormListHead reviewMode={reviewMode} />
           <tbody>
             {visibleForms.map((form) => {
               const normalizedName = displayFormName(form.name)
               const answerCount = formAnswerCount(form)
+              /* 補足の行は1行のまま省略表示にするため、全文を title にも持つ。 */
+              const answerSubText = `今月 ${form.monthlySubmitCount == null ? '—' : formatNumber(form.monthlySubmitCount)}・完了 ${form.monthlyCompletionRate == null ? '—' : `${formatNumber(form.monthlyCompletionRate)}%`}`
               const pendingCount = form.pendingPostActionCount ?? 0
               const answerUrl = formAnswerUrl(selectedAccount?.liffId, form.id)
               return (
-                <tr key={form.id}>
+                <tr key={form.id} data-row-id={form.id}>
                   <td>
                     <div className={styles.nameLine}>
                       {reviewMode ? (
@@ -1023,13 +1309,18 @@ export default function FormSubmissionsListV8() {
                           ) : null}
                         </>
                       ) : (
-                        <Link
-                          href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`}
-                          className={styles.cellTitle}
-                          title={normalizedName}
-                        >
-                          {normalizedName}
-                        </Link>
+                        <ContextMenu label={`「${normalizedName}」の操作`} items={toContextMenuItems(rowMenuItems(form))}>
+                          <button
+                            type="button"
+                            onClick={() => openDetail(form.id)}
+                            title={`${normalizedName}の詳細を見る`}
+                            aria-label={`「${normalizedName}」の詳細を見る`}
+                            className={styles.cellTitle}
+                            style={{ background: 'none', border: 0, padding: 0, font: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+                          >
+                            {normalizedName}
+                          </button>
+                        </ContextMenu>
                       )}
                       {pendingCount > 0 ? (
                         <span className={styles.pendingBadge}>後処理の未完 {pendingCount}</span>
@@ -1061,9 +1352,8 @@ export default function FormSubmissionsListV8() {
                       今月開いた人。試しの回答は入れない。取れていない数は
                       「—」だけ出す（0 とは言わない）。
                     */}
-                    <p className={styles.answerSub}>
-                      今月 {form.monthlySubmitCount == null ? '—' : formatNumber(form.monthlySubmitCount)}
-                      ・完了 {form.monthlyCompletionRate == null ? '—' : `${formatNumber(form.monthlyCompletionRate)}%`}
+                    <p className={styles.answerSub} title={answerSubText}>
+                      {answerSubText}
                     </p>
                   </td>
                   <td>
@@ -1114,7 +1404,11 @@ export default function FormSubmissionsListV8() {
   const showPager = !loading && !loadError && visibleForms.length > 0
 
   return (
-    <div data-design-node="I3L41O" className={styles.board}>
+    <div
+      data-design-node={narrow ? 'GrnO4' : 'I3L41O'}
+      data-list-state={accountLoading || loading ? 'loading' : loadError ? 'error' : visibleForms.length === 0 ? 'empty' : 'ready'}
+      className={styles.board}
+    >
       {/* 見出し：画面名＋一行の説明。右に管理者確認の切り替え（i2ZAS）。 */}
       <div className={styles.head}>
         <div className={styles.headText}>
@@ -1132,6 +1426,13 @@ export default function FormSubmissionsListV8() {
           </FilterChip>
         </div>
       </div>
+
+      {/* 見るだけの人への帯（`JV2oR`）。箱の操作と同じく staff には出さない。 */}
+      {!canManageFolders && (
+        <p className="border-info bg-info-bg text-ink rounded-control border px-3 py-2 text-sm" data-design-node="JV2oR">
+          閲覧のみで見ています。変える操作は管理者に頼んでください。
+        </p>
+      )}
 
       {/* 数の帯。管理者確認モードは別のアカウント群の数なので出さない。 */}
       {!reviewMode ? (
@@ -1173,7 +1474,7 @@ export default function FormSubmissionsListV8() {
                 setActiveFolderId(folder)
                 updateListState({ page: 1 })
               }}
-              onAddFolder={canManageFolders ? () => setFolderDialogOpen(true) : undefined}
+              onAddFolder={canManageFolders ? () => { closeDetail(); setFolderDialogOpen(true) } : undefined}
               addFolderLabel="フォルダを追加"
               rows={folderRows}
             >
@@ -1294,28 +1595,32 @@ export default function FormSubmissionsListV8() {
         </div>
       </div>
 
-      {folderDialogOpen && (
-        <FolderAddDialog
-          kind="form"
-          accountId={selectedAccountId}
-          note="フォームを分けてしまう箱です。消しても、入っていたフォームは未分類として残ります。"
-          placeholder="例: 01_来店・予約"
-          onClose={() => setFolderDialogOpen(false)}
-          onAdded={() => void loadForms()}
-        />
-      )}
-
-      {editingFolder && (
-        <FolderAddDialog
-          kind="form"
-          folder={editingFolder}
-          accountId={selectedAccountId}
-          note="フォームを分けてしまう箱です。削除しても、中のフォームは未分類に残ります。"
-          placeholder="例: 01_来店・予約"
-          onClose={() => setEditingFolder(null)}
-          onAdded={() => { setEditingFolder(null); void loadForms() }}
-        />
-      )}
+      {(folderDialogOpen || editingFolder) && selectedAccountId ? (
+        <DetailPanel
+          open
+          title={editingFolder ? 'フォルダを直す' : 'フォルダを追加'}
+          description={editingFolder ? `「${editingFolder.name}」の名前と色を変えます。` : undefined}
+          onClose={() => {
+            if (folderBusy) return
+            withViewTransition(() => {
+              setFolderDialogOpen(false)
+              setEditingFolder(null)
+            })
+          }}
+        >
+          <FormFolderPanelForm
+            key={editingFolder?.id ?? 'new'}
+            accountId={selectedAccountId}
+            folder={editingFolder}
+            onCancel={() => {
+              if (folderBusy) return
+              setFolderDialogOpen(false)
+              setEditingFolder(null)
+            }}
+            onAdded={() => { setEditingFolder(null); void loadForms() }}
+          />
+        </DetailPanel>
+      ) : null}
 
       <ConfirmDialog
         open={deletingFolder !== null}
@@ -1337,60 +1642,213 @@ export default function FormSubmissionsListV8() {
         }}
       />
 
-      <ConfirmDialog
-        open={moveTarget !== null}
-        title={moveTarget ? `「${displayFormName(moveTarget.name)}」をどのフォルダへ移しますか？` : 'フォルダへ移しますか？'}
-        description="回答やURLは変わりません。入れる箱だけが変わります。"
-        confirmLabel="移動する"
-        busy={moveBusy}
-        error={moveError || undefined}
-        onConfirm={() => void moveForm()}
-        onCancel={() => {
-          if (moveBusy) return
-          setMoveTarget(null)
-          setMoveError('')
-        }}
-      >
-        <RadioCardGroup legend="移動先のフォルダ" className="space-y-1">
-          {[{ id: UNFILED_VALUE, name: '未分類' }, ...folders.map((folder) => ({ id: folder.id, name: folder.name }))].map((folder) => (
-            <RadioCard
-              key={folder.id}
-              name="move-folder"
-              value={folder.id}
-              checked={moveFolderId === folder.id}
-              onChange={() => setMoveFolderId(folder.id)}
-              title={folder.name}
-            />
-          ))}
-        </RadioCardGroup>
-      </ConfirmDialog>
+      {moveTarget !== null ? (
+        <DetailPanel
+          open
+          title={`「${displayFormName(moveTarget.name)}」をどのフォルダへ移しますか？`}
+          description="回答やURLは変わりません。入れる箱だけが変わります。"
+          onClose={() => {
+            if (moveBusy) return
+            withViewTransition(() => {
+              setMoveTarget(null)
+              setMoveError('')
+            })
+          }}
+          footer={(
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex-1" />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={moveBusy}
+                onClick={() => {
+                  if (moveBusy) return
+                  setMoveTarget(null)
+                  setMoveError('')
+                }}
+              >
+                キャンセル
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                busy={moveBusy}
+                busyLabel="処理中"
+                disabled={moveBusy}
+                onClick={() => void moveForm()}
+              >
+                移動する
+              </Button>
+            </div>
+          )}
+        >
+          {moveError ? <p className="text-danger text-xs" role="alert">{moveError}</p> : null}
+          <RadioCardGroup legend="移動先のフォルダ" className="space-y-1">
+            {[{ id: UNFILED_VALUE, name: '未分類' }, ...folders.map((folder) => ({ id: folder.id, name: folder.name }))].map((folder) => (
+              <RadioCard
+                key={folder.id}
+                name="move-folder"
+                value={folder.id}
+                checked={moveFolderId === folder.id}
+                onChange={() => setMoveFolderId(folder.id)}
+                title={folder.name}
+              />
+            ))}
+          </RadioCardGroup>
+        </DetailPanel>
+      ) : null}
 
-      <ConfirmDialog
-        open={duplicateTarget !== null}
-        title={duplicateTarget ? `「${displayFormName(duplicateTarget.name)}」を複製しますか？` : 'フォームを複製しますか？'}
-        description="質問・分岐・デザイン・回答後の設定を引き継いだ、受付停止中のフォームを作ります。集まった回答・公開状態・集計は引き継ぎません。"
-        confirmLabel="複製する"
-        busy={duplicating}
-        error={duplicateError || undefined}
-        onConfirm={() => void duplicateForm()}
-        onCancel={() => {
-          if (duplicating) return
-          setDuplicateTarget(null)
-          setDuplicateError('')
-        }}
+      {duplicateTarget !== null ? (
+        <DetailPanel
+          open
+          title={`「${displayFormName(duplicateTarget.name)}」を複製しますか？`}
+          description="質問・分岐・デザイン・回答後の設定を引き継いだ、受付停止中のフォームを作ります。集まった回答・公開状態・集計は引き継ぎません。"
+          onClose={() => {
+            if (duplicating) return
+            withViewTransition(() => {
+              setDuplicateTarget(null)
+              setDuplicateError('')
+            })
+          }}
+          footer={(
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex-1" />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={duplicating}
+                onClick={() => {
+                  if (duplicating) return
+                  setDuplicateTarget(null)
+                  setDuplicateError('')
+                }}
+              >
+                キャンセル
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                busy={duplicating}
+                busyLabel="処理中"
+                disabled={duplicating || !duplicateName.trim()}
+                onClick={() => void duplicateForm()}
+              >
+                複製する
+              </Button>
+            </div>
+          )}
+        >
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-ink-secondary">複製の名前</span>
+            <input
+              value={duplicateName}
+              onChange={(event) => setDuplicateName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void duplicateForm()
+              }}
+              className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+          </label>
+          {duplicateError ? <p className="text-danger text-xs" role="alert">{duplicateError}</p> : null}
+        </DetailPanel>
+      ) : null}
+
+      <DetailPanel
+        open={active !== null}
+        title={active ? displayFormName(active.name) : ''}
+        description={active ? subLineText(active) : undefined}
+        onClose={closeDetail}
+        hasPrev={activeIndex > 0}
+        hasNext={activeIndex >= 0 && activeIndex < visibleForms.length - 1}
+        onPrev={activeIndex > 0 ? () => goDetail(-1) : undefined}
+        onNext={activeIndex >= 0 && activeIndex < visibleForms.length - 1 ? () => goDetail(1) : undefined}
+        footer={active ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              href={`/form-submissions/responses?id=${encodeURIComponent(active.id)}`}
+            >
+              集まった回答
+            </Button>
+            <span className="flex-1" />
+            <Button
+              type="button"
+              variant="primary"
+              href={`/form-submissions/edit?id=${encodeURIComponent(active.id)}&tab=basic`}
+            >
+              編集する
+            </Button>
+          </div>
+        ) : undefined}
       >
-        <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-ink-secondary">複製の名前</span>
-          <input
-            value={duplicateName}
-            onChange={(event) => setDuplicateName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void duplicateForm()
-            }}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-        </label>
-      </ConfirmDialog>
+        {active ? (
+          <div>
+            <p className="text-ink-secondary mb-1 block text-xs font-medium">フォーム名</p>
+            <InlineEdit
+              value={active.name}
+              label="フォーム名"
+              placeholder="名称未設定のフォーム"
+              onSave={(next) => renameForm(active, next)}
+            />
+            <p className="text-ink-secondary mb-1 mt-4 block text-xs font-medium">状態</p>
+            <p>
+              <span className={`${styles.statusPill} ${active.isActive ? styles.statusPillLive : styles.statusPillDraft}`}>
+                {active.isActive ? '公開中' : '下書き'}
+              </span>
+              {(active.pendingPostActionCount ?? 0) > 0 ? (
+                <span className={styles.pendingBadge}>後処理の未完 {active.pendingPostActionCount}</span>
+              ) : null}
+            </p>
+            <p className="text-ink-secondary mb-1 mt-4 block text-xs font-medium">保存先</p>
+            <p className="text-ink text-sm">{destinationText(active)}</p>
+            <p className="text-ink-secondary mb-1 mt-4 block text-xs font-medium">回答</p>
+            <p className="text-ink text-sm tabular-nums">
+              {formatNumber(formAnswerCount(active))}件　今月 {active.monthlySubmitCount == null ? '—' : formatNumber(active.monthlySubmitCount)}
+              ・完了 {active.monthlyCompletionRate == null ? '—' : `${formatNumber(active.monthlyCompletionRate)}%`}
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => { closeDetail(); openDuplicate(active) }}
+              >
+                複製
+              </Button>
+              {active.isActive ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => { closeDetail(); void openStop(active) }}
+                >
+                  受付を止める
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => { closeDetail(); openMove(active) }}
+              >
+                フォルダへ移す
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => { closeDetail(); void openDelete(active) }}
+              >
+                アーカイブ・削除
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void copyAnswerUrl(active)}
+              >
+                URLをコピー
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </DetailPanel>
 
       {/* 「受付を止める」の確認（メニューから直行）。止めると URL を開いた人には「受付を終了しました」が出る。 */}
       <ConfirmDialog
@@ -1435,7 +1893,7 @@ export default function FormSubmissionsListV8() {
           setDeleteError('')
         }}
         footer={(
-          <div className={styles.dialogFooter}>
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="danger"
@@ -1445,7 +1903,7 @@ export default function FormSubmissionsListV8() {
             >
               削除する
             </Button>
-            <span className={styles.dialogFooterSpacer} />
+            <span className="flex-1" />
             <Button
               type="button"
               variant="secondary"
@@ -1505,7 +1963,62 @@ export default function FormSubmissionsListV8() {
             ) : null}
           </div>
         ) : null}
-        {deleteError ? <p className={styles.dialogError} role="alert">{deleteError}</p> : null}
+        {deleteError ? <p className="text-danger text-xs" role="alert">{deleteError}</p> : null}
+      </Dialog>
+
+      {/*
+       * 行の名前を変更（v7 と同じ操作）。回答データやURLは変わらない。
+       */}
+      <Dialog
+        open={renameTarget !== null}
+        title="フォーム名を変更"
+        description="回答データやURLは変わりませんが、回答者に表示されるフォーム名も変わります。"
+        busy={renaming}
+        onCancel={() => {
+          if (renaming) return
+          setRenameTarget(null)
+          setRenameError('')
+        }}
+        footer={(
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex-1" />
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={renaming}
+              onClick={() => {
+                if (renaming) return
+                setRenameTarget(null)
+                setRenameError('')
+              }}
+            >
+              キャンセル
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              busy={renaming}
+              busyLabel="保存中"
+              disabled={renaming || !renameName.trim()}
+              onClick={() => void saveRename()}
+            >
+              保存する
+            </Button>
+          </div>
+        )}
+      >
+        <label className="block">
+          <span className="text-ink-secondary mb-1 block text-xs font-medium">フォーム名</span>
+          <input
+            type="text"
+            value={renameName}
+            onChange={(e) => setRenameName(e.target.value)}
+            disabled={renaming}
+            maxLength={100}
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+          />
+        </label>
+        {renameError ? <p className="text-sm text-danger" role="alert">{renameError}</p> : null}
       </Dialog>
     </div>
   )

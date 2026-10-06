@@ -70,7 +70,7 @@ export async function processOperationNotificationOutbox(
         }
       } else {
         for (const recipient of recipients.results ?? []) {
-          if (recipient.email) await sendOperationEmail(env, { to: recipient.email, subject: '【然-NEN-】運用状態の重要なお知らせ', body: text });
+          if (recipient.email) await sendOperationEmail(env, { to: recipient.email, subject: '【musubo】運用状態の重要なお知らせ', body: text });
         }
       }
       await env.DB.prepare(

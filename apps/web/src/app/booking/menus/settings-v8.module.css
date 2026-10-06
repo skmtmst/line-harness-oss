@@ -95,6 +95,13 @@
   gap: 10px;
 }
 
+/* 板 VFxWU（1152）：畳んだスマホの代わりの「見え方」ボタン。
+   スマホが見えている広い板では出さない。 */
+.sidePhoneButton {
+  display: flex;
+  flex-direction: column;
+}
+
 .sideAction {
   display: flex;
 }
@@ -116,6 +123,13 @@
     padding: 16px;
   }
 
+  /* 板 P6EdLW（1152）：メニューの表は「担当」「30日」を畳み、
+     メニュー・時間・金額・状態だけにする。 */
+  .colStaff,
+  .colCount {
+    display: none;
+  }
+
   .sidePhone {
     display: none;
   }
@@ -127,6 +141,10 @@
 
 @container (min-width: 1081px) {
   .sideLineLink {
+    display: none;
+  }
+
+  .sidePhoneButton {
     display: none;
   }
 }
@@ -235,12 +253,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 11px 6px;
+  padding: 12px 8px;
 }
 
 .tableHead {
-  padding: 0 8px 8px;
-  border-bottom: 1px solid var(--color-divider);
+  padding: 0 8px;
   color: var(--color-ink-secondary);
   font-size: 12px;
   font-weight: 600;
@@ -271,7 +288,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  width: 28px;
+  width: 44px;
   flex-shrink: 0;
 }
 
@@ -364,7 +381,7 @@
 }
 
 .colStatus {
-  width: 84px;
+  width: 96px;
   flex-shrink: 0;
 }
 
@@ -401,7 +418,7 @@
 .statePill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   font-size: 12px;
@@ -512,14 +529,6 @@
 
 .skeletonRow:last-child {
   border-bottom: 0;
-}
-
-.skeletonDot {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-sunken);
 }
 
 .skeletonBar {
@@ -751,7 +760,7 @@
 .calMonth {
   margin: 0;
   color: var(--color-ink);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -784,17 +793,17 @@
 .calDay {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 2px;
-  min-height: 52px;
-  padding: 6px 8px;
+  padding: 8px 0;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-segment);
+  border-radius: var(--radius-control);
   background: var(--color-canvas);
   color: var(--color-ink);
   font-size: 12px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -818,8 +827,8 @@
 }
 
 .calMark {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 9px;
+  font-weight: 400;
   line-height: 1.3;
 }
 
@@ -845,9 +854,8 @@
 }
 
 .exceptionDates {
-  color: var(--color-ink);
-  font-size: 13px;
-  font-weight: 600;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -858,6 +866,7 @@
   overflow: hidden;
   color: var(--color-ink-secondary);
   font-size: 12px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -910,8 +919,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 0;
+  gap: 8px;
+  padding: 9px 0;
   border-bottom: 1px solid var(--color-divider);
 }
 
@@ -921,7 +930,7 @@
 
 .noticeWhen {
   color: var(--color-ink-secondary);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .noticeWhat {
@@ -1046,7 +1055,7 @@
 .linkState {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   background: var(--color-v8-pill-off);
@@ -1141,7 +1150,7 @@
 .checkOk {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   background: var(--color-success-bg);
@@ -1195,7 +1204,7 @@
 .phoneStatusIcons {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   margin-left: auto;
   color: var(--color-ink);
 }
@@ -1234,7 +1243,7 @@
 
 .phoneLiffTitleShop {
   color: var(--color-ink-faint);
-  font-size: 9px;
+  font-size: var(--text-nano);
   line-height: 1.3;
 }
 
@@ -1317,8 +1326,8 @@
 }
 
 .phoneCatNow {
-  background: var(--color-ink);
-  color: var(--color-canvas);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
 }
 
 /* 選ぶカード（メニュー・担当）。 */
@@ -1478,7 +1487,7 @@
 
 .phoneDayState {
   color: var(--v8-liff-primary);
-  font-size: 9px;
+  font-size: var(--text-nano);
   font-weight: 600;
 }
 

@@ -4,7 +4,8 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const LIST_PAGE = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
+/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+const LIST_PAGE = fs.readFileSync(path.join(__dirname, '..', 'list-v8.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V6 7-1-H リマインダ実行結果', () => {
@@ -26,13 +27,13 @@ describe('V6 7-1-H リマインダ実行結果', () => {
 
   it('一覧から予定と履歴を選べ、予定は公開APIのplannedで絞る', () => {
     expect(LIST_PAGE).toContain('status=planned')
-    expect(LIST_PAGE).toContain("label: '配信予定を確認'")
-    expect(LIST_PAGE).toContain("label: '実行履歴を見る'")
+    expect(LIST_PAGE).toContain("label: '配信予定を見る'")
+    expect(LIST_PAGE).toContain("label: '実行結果を見る'")
     expect(LIST_PAGE).toContain('<ActionMenu')
-    expect(LIST_PAGE).toContain('<MoreHorizontal />')
+    expect(LIST_PAGE).toContain('MoreHorizontal')
     // 削除は行に直に置かず、メニューの中の危ない操作にする。
     expect(LIST_PAGE).not.toContain('<Trash2 />')
-    expect(LIST_PAGE).toContain("label: '削除する'")
+    expect(LIST_PAGE).toContain("label: '削除'")
     expect(LIST_PAGE).toContain("tone: 'danger'")
     expect(PAGE).toContain("const isPlannedView = searchParams.get('status') === 'planned'")
     expect(PAGE).toContain("setStatus(isPlannedView ? 'planned' : '')")

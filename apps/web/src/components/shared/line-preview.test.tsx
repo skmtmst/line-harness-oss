@@ -90,7 +90,7 @@ describe('LINEプレビュー共通部品', () => {
         <p>こんにちは</p>
       </LinePreview>,
     )
-    expect(v8.container.querySelectorAll('section[aria-label="LINEプレビュー"]')).toHaveLength(1)
+    expect(v8.container.querySelectorAll('section[aria-label="LINEでの見え方"]')).toHaveLength(1)
     expect(screen.getByText('9:41')).toBeTruthy()
     expect(screen.getByText('メニュー')).toBeTruthy()
     expect(screen.getByText('こんにちは')).toBeTruthy()

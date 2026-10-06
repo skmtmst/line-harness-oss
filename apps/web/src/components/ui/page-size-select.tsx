@@ -17,6 +17,7 @@ export default function PageSizeSelect({
   onChange,
   options = [20, 50, 100],
   className,
+  label = '表示件数',
   ...rest
 }: {
   value: number
@@ -24,13 +25,15 @@ export default function PageSizeSelect({
   /** 選べる件数。既定は 20・50・100。 */
   options?: number[]
   className?: string
+  /** 板 `apLqS` は字ラベルなし（箱に「20件表示」）。他は今のまま。 */
+  label?: string | null
 } & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange' | 'className' | 'size'>) {
   // Select は素の select の属性を全部は受けない。呼び出し側は value/onChange
   // だけ使っているが、公開Propsの型は変えず、id/name/disabled だけ中へ渡す。
   const { disabled, id, name } = rest
   return (
     <label className={['flex min-w-0 items-center gap-2', className].filter(Boolean).join(' ')}>
-      <span className="text-ink-faint text-xs whitespace-nowrap">表示件数</span>
+      {label ? <span className="text-ink-faint text-xs whitespace-nowrap">{label}</span> : null}
       <Select
         size="page-size"
         value={String(value)}

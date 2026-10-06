@@ -1,0 +1,512 @@
+@layer properties, theme, base, components, utilities;
+
+/*
+ * ★V8-B 外部連携・こちらで受け取る（板 `gW0F2`・閲覧のみ `l5SRfT`）。
+ * 左の受け取り口の一覧と右の詳細の2段。板が 1100px を切ったら1段にする。
+ */
+.split {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.createButton {
+  align-self: stretch;
+}
+
+.railTitle {
+  margin: 8px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.railList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.railRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.railRowActive {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.railName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.railNote {
+  margin: 8px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.panel {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  padding: 16px;
+}
+
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.panelLead {
+  margin: 8px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.panelNote {
+  margin: 8px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.panelButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.panelError {
+  margin: 8px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 板 `gW0F2`「段 どこから受け取るか」の題。 */
+.urlTitle {
+  margin: 12px 0 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.urlBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+}
+
+.urlValue {
+  flex: 1;
+  min-width: 200px;
+  color: var(--color-ink);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.facts dt {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.facts dd {
+  margin: 4px 0 0;
+  color: var(--color-ink);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.factNote {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+.actionList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.actionItem {
+  padding: 8px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+}
+
+.actionName {
+  display: block;
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.actionDetail {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+}
+
+.unmatchedList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.unmatchedItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+}
+
+.unmatchedBody {
+  flex: 1;
+  min-width: 200px;
+}
+
+.unmatchedTitle {
+  display: block;
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.unmatchedDetail {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.candidateList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidateRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.candidateName {
+  color: var(--color-ink);
+  font-size: 12px;
+}
+
+.moreRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.moreRow .panelNote {
+  margin: 0;
+}
+
+.samplePre {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.tokenRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.token {
+  padding: 4px 8px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: 11px;
+}
+
+.emptySample {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+
+.otherTitle {
+  margin: 4px 0 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.otherGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.otherCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.otherButton {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.otherName {
+  display: block;
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.otherMeta {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialogFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fieldHint {
+  margin: 4px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.fieldError {
+  margin: 4px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.secretRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.secretRow input {
+  flex: 1;
+  min-width: 0;
+}
+
+.secretBox {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+}
+
+.secretLabel {
+  margin: 0 0 4px;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.secretValue {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.testArea {
+  width: 100%;
+  min-height: 144px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.testResult {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.testResultTitle {
+  display: block;
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.testActionList {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.testActionItem {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.testActionName {
+  color: var(--color-ink);
+}
+
+.testActionMeta {
+  margin-left: 8px;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+.testActionError {
+  margin-left: 8px;
+  color: var(--color-danger);
+  font-size: 11px;
+}
+
+/* ===== 板が 1100px を切ったら ===== */
+@container (max-width: 1099px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 受け口の切り替えは狭い板でも要るので、縦に積むだけにする。 */
+  .railList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .otherGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

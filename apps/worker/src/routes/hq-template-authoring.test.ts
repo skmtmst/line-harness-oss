@@ -5,7 +5,7 @@ import type { Env } from '../index.js';
 import { hqTemplates } from './hq-templates.js';
 // The real pure Web authoring functions feed the real HTTP + SQLite executor.
 const webAuthoringPath = '../../../web/src/lib/hq-template-authoring.ts';
-const { freshDefinition, withUploadedImage } = await import(/* @vite-ignore */ webAuthoringPath);
+const { freshDefinition, withUploadedImage, withMessageCard } = await import(/* @vite-ignore */ webAuthoringPath);
 type MessageTemplateDefinition = import('../services/hq-templates/template.js').MessageTemplateDefinition;
 type RichMenuDefinition = { richMenu: { name: string; pages: { imageR2Key: string }[] } };
 
@@ -52,6 +52,76 @@ beforeEach(()=>{
 });
 afterEach(()=>sql.raw.close());
 describe('HQ authoring Web payload to HTTP/SQLite/R2 distribution',()=>{
+  function referencedCard() {
+    for (const account of ['a','b','c']) {
+      sql.raw.prepare("UPDATE line_accounts SET liff_id=? WHERE id=?").run(`liff-${account}`,account);
+      sql.raw.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES (?,'案内','manual',?)").run(`scenario-${account}`,account);
+      sql.raw.prepare("INSERT INTO forms(id,name,fields) VALUES (?,'回答','[]')").run(`form-${account}`);
+      sql.raw.prepare('INSERT INTO form_accounts(form_id,line_account_id) VALUES (?,?)').run(`form-${account}`,account);
+    }
+    const value=freshDefinition('template') as MessageTemplateDefinition;
+    (value.template as any).name='案内';
+    return withMessageCard(value,{format:'flex',title:'タイトル',body:'scenario-a',buttons:[{id:'form',label:'回答する',action:'form',value:'form-a'},{id:'scenario',label:'始める',action:'scenario',value:'scenario-a'}]});
+  }
+  test('one save preserves title/body/buttons and maps references and postbacks per destination',async()=>{
+    const value=referencedCard(),id=await save('template',value);
+    const saved=await request(`/${id}`);expect(saved.body.data.definition.card).toEqual(value.card);
+    const body=await distribute(id);
+    const rows=sql.raw.prepare('SELECT id,line_account_id,message_content,carousel_actions_json FROM templates ORDER BY line_account_id').all() as any[];
+    for(const row of rows) {
+      const bubble=JSON.parse(row.message_content),account=row.line_account_id;
+      expect(bubble.body.contents.map((item:any)=>item.text)).toEqual(['タイトル','scenario-a']);
+      expect(bubble.footer.contents[0].action.uri).toBe(`https://liff.line.me/liff-${account}?form=form-${account}`);
+      expect(bubble.footer.contents[1].action.data).toBe(`ctpl=${row.id}&c=0&a=1`);
+      expect(JSON.parse(row.carousel_actions_json)[0][1][0].config).toEqual({op:'start',scenarioId:`scenario-${account}`});
+    }
+    await request(`/${id}/distribute`,'POST',body);expect(sql.raw.prepare('SELECT count(*) n FROM templates').get()).toEqual({n:3});
+    expect(sql.raw.pragma('foreign_key_check')).toEqual([]);
+  });
+  test.each(['missing','ambiguous','foreign','liff','shared-form'])('preflight stops %s references before destination writes',async mode=>{
+    const value=referencedCard();
+    if(mode==='missing')sql.raw.exec("DELETE FROM scenarios WHERE id='scenario-b'");
+    if(mode==='ambiguous')sql.raw.exec("INSERT INTO scenarios(id,name,trigger_type,line_account_id) VALUES ('duplicate','案内','manual','b')");
+    if(mode==='foreign'){sql.raw.exec("UPDATE line_accounts SET tenant_id='other' WHERE id='a'");}
+    if(mode==='liff')sql.raw.exec("UPDATE line_accounts SET liff_id=NULL WHERE id='b'");
+    if(mode==='shared-form')sql.raw.exec("INSERT INTO form_accounts(form_id,line_account_id) VALUES ('form-b','c')");
+    const id=await save('template',value),p=await request(`/${id}/preflight`,'POST',{accountIds:['b']});expect(p.status,JSON.stringify(p.body)).toBe(409);
+    expect(sql.raw.prepare('SELECT count(*) n FROM templates').get()).toEqual({n:0});
+  });
+  test.each(['source','target','liff','ownership'])('changed %s reference requires new preflight',async mode=>{
+    const id=await save('template',referencedCard()),p=await request(`/${id}/preflight`,'POST',{accountIds:['b']});expect(p.status).toBe(200);
+    if(mode==='source')sql.raw.exec("UPDATE scenarios SET description='changed' WHERE id='scenario-a'");
+    if(mode==='target')sql.raw.exec("UPDATE forms SET content_revision=content_revision+1 WHERE id='form-b'");
+    if(mode==='liff')sql.raw.exec("UPDATE line_accounts SET liff_id='changed' WHERE id='b'");
+    if(mode==='ownership')sql.raw.exec("INSERT INTO form_accounts(form_id,line_account_id) VALUES ('form-b','c')");
+    const result=await request(`/${id}/distribute`,'POST',{preflightId:p.body.data.preflightId,resolutions:p.body.data.stores[0].items.map((item:any)=>({accountId:'b',sourceId:item.sourceId,mode:'create'}))});
+    expect(result.body.data.stores[0].status).toBe('version_conflict');
+    expect(sql.raw.prepare('SELECT count(*) n FROM templates').get()).toEqual({n:0});
+  });
+  test('reference candidates respect authority and tenant boundaries',async()=>{
+    referencedCard();sql.raw.exec("UPDATE line_accounts SET tenant_id='other' WHERE id='c'");
+    const rows=await request('/message-references');expect(rows.status).toBe(200);
+    expect(rows.body.data.map((row:any)=>row.id).sort()).toEqual(['form-a','form-b','scenario-a','scenario-b']);
+    staff.readOnly=true;expect((await request('/message-references')).status).toBe(403);
+  });
+  test('card composition is authoritative over stale raw body and copies its uploaded hero image',async()=>{
+    const uploaded=await upload();expect(uploaded.status).toBe(201);
+    const draft=freshDefinition('template');draft.template.name='案内';
+    const value=withMessageCard(withUploadedImage(draft,uploaded.body.data),{format:'flex',title:'写真つき',body:'本文',imageMediaId:uploaded.body.data.id,buttons:[{id:'url',label:'開く',action:'url',value:'https://example.com'}]});
+    value.template.messageContent='stale';
+    const id=await save('template',value),saved=await request(`/${id}`);expect(saved.body.data.definition.template.messageContent).toContain('写真つき');
+    await distribute(id);
+    const rows=sql.raw.prepare('SELECT message_content,line_account_id FROM templates').all() as any[];
+    for(const row of rows)expect(JSON.parse(row.message_content).hero.url).toMatch(new RegExp(`^https://worker.test/images/media/${row.line_account_id}/`));
+    expect(rows.every(row=>!row.message_content.includes('hq-templates/'))).toBe(true);
+  });
+  test('text card accepts a confirmed per-account rewrite without recomposing original text',async()=>{
+    const draft=freshDefinition('template');draft.template.name='案内';
+    const value=withMessageCard(draft,{format:'text',title:'題',body:'原本',buttons:[]}),id=await save('template',value);
+    const p=await request(`/${id}/preflight`,'POST',{accountIds:['b'],textOverrides:[{accountId:'b',text:'配布先の文面'}]});expect(p.status).toBe(200);
+    const r=await request(`/${id}/distribute`,'POST',{preflightId:p.body.data.preflightId,resolutions:p.body.data.stores[0].items.map((item:any)=>({accountId:'b',sourceId:item.sourceId,mode:'create'}))});expect(r.body.data.stores[0].status).toBe('succeeded');
+    expect(sql.raw.prepare('SELECT message_content FROM templates').get()).toEqual({message_content:'配布先の文面'});
+  });
   test('new text needs no source account template and reaches all three stores',async()=>{
     const value=freshDefinition('template') as MessageTemplateDefinition;(value.template as any).name='ご案内';(value.template as any).messageContent='新しい本文';
     expect(sql.raw.prepare('SELECT count(*) n FROM templates').get()).toEqual({n:0});

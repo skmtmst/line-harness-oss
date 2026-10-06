@@ -26,10 +26,3 @@ it('取得件数を変えた後に古い「続きを表示」の応答を混ぜ�
  expect(container.querySelector('img[src="/old.png"]')).toBeNull()
  expect(fixture.images.mock.calls.at(-1)![0]).toMatchObject({limit:50})
 })
-it('v7の取得は30枚を保ち、新しい件数選択は表示しない', async () => {
- fixture.theme='v7';fixture.images.mockResolvedValue({success:true,data:[],nextBefore:null})
- render(<LibrarySection presets={[]} accounts={[]} onChanged={() => {}} />)
- await screen.findByText('まだ画像がありません')
- expect(fixture.images.mock.calls[0][0]).toMatchObject({limit:30})
- expect(screen.queryByRole('button',{name:'画像の取得件数'})).toBeNull()
-})

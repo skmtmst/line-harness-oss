@@ -2,7 +2,6 @@
 
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
@@ -32,7 +31,7 @@ import {
   type EcCommerceOverview,
   type EcOrder,
 } from '@/lib/api'
-import ConnectorPanel from './connector-panel'
+import EcConnectorV8 from './ec-connector-v8'
 import EcTabs from './ec-tabs-view'
 import SubscriptionsPanel from './subscriptions-panel'
 import OrderDetailDrawer from './order-detail-drawer'
@@ -384,7 +383,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
         </p>
       ) : null}
       <NoteBar help="注文にはLINEの友だちが書かれていないため、メールアドレスか電話番号で結びつけます" helpLabel="つき合わせの仕方">ECの注文には、LINEの友だちが誰なのかが書かれていません。メールアドレスか電話番号で結びつけています。どちらも一致しなかった注文は「会員のつき合わせ」に並びます。</NoteBar>
-      {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role="status">{notice.text}</div> : null}
+      {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role={notice.tone === 'success' ? 'status' : 'alert'}>{notice.text}</div> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <input
           type="search"
@@ -548,13 +547,12 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
 }
 
 function EcCommercePageInner() {
-  const theme = useAdminTheme()
   const tab = useMergedTab(EC_TABS, 'tab', 'events')
   const { selectedAccountId } = useAccount()
 
   return (
-    <div className={`${styles.root} ${tab === 'connector' ? '' : 'v8-ro-notifications-page'}`} data-design="Head" data-design-node={theme === 'v8' && tab !== 'connector' ? (tab === 'subscriptions' ? 'wqC8x' : 'GmVR5') : undefined}>
-      {theme === 'v8' && tab !== 'connector' && <ReadonlyHeaderV8 title="EC連携" description="取り込みの記録・会員のつき合わせ・定期便の状況を確認できます。" />}
+    <div className={`${styles.root} ${tab === 'connector' ? '' : 'v8-ro-notifications-page'}`} data-design="Head" data-design-node={tab !== 'connector' ? (tab === 'subscriptions' ? 'wqC8x' : 'GmVR5') : undefined}>
+      {tab !== 'connector' && <ReadonlyHeaderV8 title="EC連携" description="取り込みの記録・会員のつき合わせ・定期便の状況を確認できます。" />}
       {/* マニュアルは共通トップバーに置く。本文に「ECの注文・定期便を取り込み、LINEの配信や成果へつなげます。」という重複説明は置かない。 */}
       <PageHeaderH2
         /* 1段だけのパンくずは上の帯の画面名と重複するので出さない。 */
@@ -570,7 +568,8 @@ function EcCommercePageInner() {
       <EcTabs accountId={selectedAccountId} active={tab as typeof EC_TABS[number]['key']} />
       {tab === 'events' ? <EventsPanel accountId={selectedAccountId} /> : null}
       {tab === 'subscriptions' ? <SubscriptionsPanel accountId={selectedAccountId} /> : null}
-      {tab === 'connector' ? <ConnectorPanel accountId={selectedAccountId} /> : null}
+      {/* ★V8-B（板 `iLJmw`）：つなぎ先だけ v8 の枠に切り替える。 */}
+      {tab === 'connector' ? <EcConnectorV8 /> : null}
     </div>
   )
 }

@@ -13,8 +13,11 @@ import ToastHost from '@/components/shared/toast'
  * BrandTitle が差し替える。ここはそれが取れるまでの間と、取れなかった
  * ときの名前。以前は末尾に「TEST」を足して本番と見分けていたが、
  * 名前そのものを変えると利用者にもテスト用に見える。
+ *
+ * ここは製品の名前を出す場所なので musubo と書く。契約先の名前は公式
+ * アカウントから取れたものだけを出す。
  */
-const DEFAULT_TITLE = '然-NEN- LINE管理システム'
+const DEFAULT_TITLE = 'musubo LINE管理システム'
 
 /*
  * ★V8 移行②: テーマの切り替え。
@@ -56,6 +59,9 @@ const notoSansJp = Noto_Sans_JP({
 export const metadata: Metadata = {
   title: DEFAULT_TITLE,
   description: DEFAULT_TITLE,
+  icons: {
+    icon: '/icon.svg',
+  },
   openGraph: {
     title: DEFAULT_TITLE,
     description: DEFAULT_TITLE,

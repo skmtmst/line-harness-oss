@@ -34,6 +34,7 @@ import { describeCondition } from '@/components/scenarios/scenario-dialogs'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
+import { useRowLeaving } from '@/lib/use-row-leaving'
 import { formatDay, formatNumber } from '@/lib/format'
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
@@ -45,6 +46,8 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
+import { runOptimistic } from '@/lib/undoable'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import {
@@ -60,7 +63,7 @@ import {
   sameDeleteImpactRequest,
   type DeleteImpactRequest,
 } from './delete-impact'
-import { moveTargetingGroup, orderTargetingGroups } from './targeting-order'
+import { moveTargetingGroup, orderTargetingGroups, withNormalizedPriority } from './targeting-order'
 import { ExternalImportWorkspace, type LineMenu } from './external-import'
 import { richMenuError, richMenuErrorAll } from './rich-menu-errors'
 import styles from './list-v8.module.css'
@@ -190,9 +193,19 @@ export default function RichMenusListV8() {
   const [externalStatus, setExternalStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [externalError, setExternalError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const { leavingId, leave } = useRowLeaving()
   /* 消したときの影響（契約 #608）。窓を開けてから読む（v7 と同じ）。 */
   const [impact, setImpact] = useState<RichMenuDeleteImpact | null>(null)
   const [impactPhase, setImpactPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  /*
+   * 消せない理由があるとき（板 `yOyCg`）。見出しを「まだ消せません」にし、
+   * 実行ボタンを出さず、取消を「閉じる」にする。読み込み中・読み失敗の
+   * ときは従来の確認の形のままにする。
+   */
+  const blockedDelete = deleteTarget?.kind === 'managed'
+    && impactPhase === 'ready'
+    && impact !== null
+    && impact.blockers.length > 0
   const impactRequestRef = useRef<DeleteImpactRequest | null>(null)
   const impactRequestGenerationRef = useRef(0)
   const impactLoadGenerationRef = useRef(0)
@@ -406,21 +419,39 @@ export default function RichMenusListV8() {
     return orderTargetingGroups(res.data.items)
   }, [groups, groupTotal, selectedAccount?.id])
 
-  const applyOrderedIds = useCallback(async (orderedIds: string[]) => {
-    if (!selectedAccount?.id) return
+  /*
+   * 並べ替えは押した瞬間に画面を変えて、裏で保存する。
+   * 全件が見えているときだけ先に並べる（ページ送り中は保存後に読み直す）。
+   * 失敗したら元の順番に戻して、知らせの「もう一度」でやり直せる。
+   */
+  const applyOrderedIds = useCallback((orderedIds: string[], notice: string) => {
+    if (!selectedAccount?.id || reorderBusy) return
+    const accountId = selectedAccount.id
+    const fullView = groups.length === groupTotal && orderedIds.length === groups.length
+    const previous = groups
+    const optimistic = fullView ? withNormalizedPriority(groups, orderedIds) : null
+    if (optimistic) setGroups(optimistic)
+    setMoveNotice(notice)
     setReorderBusy(true)
-    try {
-      const res = await api.richMenuGroups.reorderPriorities(selectedAccount.id, orderedIds)
-      if (!res.success) throw new Error(res.error ?? '並び替え失敗')
-      // 並び替えで変わるのは一覧だけ。集計・外部状態は取り直さない（v7 と同じ）。
-      await loadList()
-      setActionError(null)
-    } catch (e) {
-      setActionError(richMenuError(e, 'reorder'))
-    } finally {
-      setReorderBusy(false)
-    }
-  }, [loadList, selectedAccount?.id])
+    runOptimistic({
+      request: async () => {
+        const res = await api.richMenuGroups.reorderPriorities(accountId, orderedIds)
+        if (!res.success) throw new Error(res.error ?? 'reorder_failed')
+      },
+      revert: () => {
+        if (optimistic) setGroups(previous)
+        setReorderBusy(false)
+      },
+      failureMessage: '順番を変えられませんでした。通信を確かめて、もう一度お試しください。',
+      retry: () => applyOrderedIds(orderedIds, notice),
+      onSuccess: () => {
+        setReorderBusy(false)
+        setActionError(null)
+        // 並び替えで変わるのは一覧だけ。集計・外部状態は取り直さない（v7 と同じ）。
+        void loadList()
+      },
+    })
+  }, [groups, groupTotal, loadList, reorderBusy, selectedAccount?.id])
 
   const keyboardMove = useCallback(async (id: string, direction: -1 | 1) => {
     if (reorderDisabledReason) return
@@ -431,8 +462,10 @@ export default function RichMenusListV8() {
     }
     const updates = moveTargetingGroup(ordered, id, direction)
     if (!updates) return
-    setMoveNotice(`「${ordered.find((g) => g.id === id)?.name ?? 'メニュー'}」を${direction === -1 ? '1つ上' : '1つ下'}へ動かしました`)
-    void applyOrderedIds(updates.map((u) => u.id))
+    applyOrderedIds(
+      updates.map((u) => u.id),
+      `「${ordered.find((g) => g.id === id)?.name ?? 'メニュー'}」を${direction === -1 ? '1つ上' : '1つ下'}へ動かしました`,
+    )
   }, [applyOrderedIds, fullOrderedGroups, reorderDisabledReason])
 
   const dropOn = useCallback(async (targetId: string) => {
@@ -450,8 +483,7 @@ export default function RichMenusListV8() {
     const working = [...ordered]
     const [moved] = working.splice(fromIndex, 1)
     working.splice(targetIndex, 0, moved)
-    setMoveNotice(`「${moved.name}」の順番を変えました`)
-    void applyOrderedIds(working.map((g) => g.id))
+    applyOrderedIds(working.map((g) => g.id), `「${moved.name}」の順番を変えました`)
   }, [applyOrderedIds, dragId, fullOrderedGroups, reorderDisabledReason])
 
   function beginImpactRequest(accountId: string, groupId: string): DeleteImpactRequest {
@@ -539,8 +571,13 @@ export default function RichMenusListV8() {
         if (!res.success) throw new Error('delete_failed')
       }
       if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
+      // 公開の取り下げは行が残るのでそのまま読み直す。消えた行だけ薄くして外す。
+      const goneId = deleteTarget.kind === 'managed' && deleteTarget.group.status !== 'published'
+        ? deleteTarget.group.id
+        : null
       setDeleteTarget(null)
-      await reload()
+      if (goneId) leave(goneId, () => reload())
+      else await reload()
     } catch (e) {
       if (!sameDeleteImpactRequest(impactRequestRef.current, request)) return
       /* 409は「読んだあとに状態が変わった」。新しい影響を描き直す。 */
@@ -597,6 +634,8 @@ export default function RichMenusListV8() {
   }
 
   /* ===== 数の帯 ===== */
+  // 月の集計が無い行は期間の集計で補う（v7 と同じ。集計自体が無ければ「—」）。
+  const tapsByGroup = new Map((tapStats?.byGroup ?? []).map((g) => [g.groupId, g.taps]))
   const topArea = tapStats?.byArea[0] ?? null
   const topAreaGroupName = topArea
     ? groups.find((g) => g.id === topArea.groupId)?.name ?? null
@@ -655,7 +694,7 @@ export default function RichMenusListV8() {
     const items: ActionMenuItem[] = [
       {
         id: 'edit',
-        label: '編集する',
+        label: '編集',
         onSelect: () => router.push(`/rich-menus/edit?id=${g.id}`),
       },
     ]
@@ -718,17 +757,64 @@ export default function RichMenusListV8() {
     : null
 
   /* ===== 一覧の中身（設計 `f3SoAm`：空・絞り込み0件・読み込み中・読み込めなかった） ===== */
-  const listBody = loading ? (
-    <div className={styles.skeletonRows} aria-label="読み込み中">
-      {[0, 1, 2, 3].map((i) => (
-        <div key={i} className={styles.skeletonRow}>
-          <span className={styles.skeletonDot} />
-          <span className={styles.skeletonBar} />
-          <span className={styles.skeletonBar} style={{ flex: 0.6 }} />
-          <span className={styles.skeletonBar} style={{ flex: 0.4 }} />
-        </div>
-      ))}
+  /*
+   * 読み込み中でも前のデータを出して裏で取り直す（取り直しでは groups を
+   * 消さない）。初回だけ骨組み（出来上がりの表と同じ形・5行）。
+   */
+  const listLoading = loading && groups.length === 0 && !error
+  /* 見出しは本物と骨組みで同じものを出す（二重に書かない）。 */
+  const menuTableColumns = (
+    <colgroup>
+      <col style={{ width: 72 }} />
+      <col />
+      <col style={{ width: '18%' }} />
+      <col style={{ width: 110 }} />
+      <col style={{ width: 110 }} />
+      <col style={{ width: 44 }} />
+    </colgroup>
+  )
+  const menuTableHead = (
+    <thead>
+      <tr>
+        <th>順</th>
+        <th>メニュー（大きさ・ボタン）</th>
+        <th>誰に出すか</th>
+        <th>状態</th>
+        <th>今月押された</th>
+        <th aria-label="操作" />
+      </tr>
+    </thead>
+  )
+  /* 出来上がりの表と同じ幅・高さの骨組み。入れ替わってもガタつかない。 */
+  const tableSkeleton = (
+    <div className={styles.tableWrap} aria-hidden="true">
+      <table className={styles.table}>
+        {menuTableColumns}
+        {menuTableHead}
+        <tbody>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <tr key={i}>
+              <td><Skeleton width={32} height={20} /></td>
+              <td>
+                <span className="flex items-center gap-2">
+                  <Skeleton width={52} height={36} />
+                  <span className="min-w-0 flex-1">
+                    <Skeleton width="100%" height={14} />
+                  </span>
+                </span>
+              </td>
+              <td><Skeleton width="100%" height={14} /></td>
+              <td><Skeleton width={64} height={22} /></td>
+              <td><Skeleton width={56} height={14} /></td>
+              <td><Skeleton width={20} height={20} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
+  )
+  const listBody = listLoading ? (
+    <DelayedSkeleton loading skeleton={tableSkeleton} />
   ) : error ? (
     <div className={styles.stateCard}>
       <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
@@ -767,11 +853,11 @@ export default function RichMenusListV8() {
           トーク画面の下にボタンのメニューを出せます。LINEにあるメニューを取り込むこともできます。
         </p>
         {canEdit ? (
-          <Button type="button" variant="primary" onClick={() => router.push('/rich-menus/new')}>
+          <Button type="button" variant="secondary" onClick={() => router.push('/rich-menus/new')}>
             ＋ メニューを作る
           </Button>
         ) : (
-          <Button type="button" variant="primary" disabled title={NO_MANAGE_NOTE}>
+          <Button type="button" variant="secondary" disabled title={NO_MANAGE_NOTE}>
             ＋ メニューを作る
           </Button>
         )}
@@ -784,29 +870,14 @@ export default function RichMenusListV8() {
       </span>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
-          <colgroup>
-            <col style={{ width: 72 }} />
-            <col />
-            <col style={{ width: '18%' }} />
-            <col style={{ width: 110 }} />
-            <col style={{ width: 110 }} />
-            <col style={{ width: 44 }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>順</th>
-              <th>メニュー（大きさ・ボタン）</th>
-              <th>誰に出すか</th>
-              <th>状態</th>
-              <th>今月押された</th>
-              <th aria-label="操作" />
-            </tr>
-          </thead>
+          {menuTableColumns}
+          {menuTableHead}
           <tbody>
             {groups.map((g) => (
               <tr
                 key={g.id}
                 className={styles.rowClick}
+                data-leaving={leavingId === g.id || undefined}
                 tabIndex={0}
                 onClick={() => router.push(`/rich-menus/edit?id=${g.id}`)}
                 onKeyDown={(event) => {
@@ -860,7 +931,7 @@ export default function RichMenusListV8() {
                         className={styles.cellSub}
                         title={`${menuShapeText(g)}・ボタン「${g.chatBarText}」`}
                       >
-                        {menuShapeText(g)}
+                        {menuShapeText(g)}・ボタン「{g.chatBarText}」
                       </span>
                     </span>
                   </div>
@@ -892,7 +963,11 @@ export default function RichMenusListV8() {
                 </td>
                 <td className={styles.countCell}>
                   <div className={styles.countMain}>
-                    {g.monthlyStats ? `${formatNumber(g.monthlyStats.taps)}回` : '—'}
+                    {g.monthlyStats
+                      ? `${formatNumber(g.monthlyStats.taps)}回`
+                      : tapStats
+                        ? `${formatNumber(tapsByGroup.get(g.id) ?? 0)}回`
+                        : '—'}
                   </div>
                   {g.monthlyStats?.uniqueAudience.value != null ? (
                     <div className={styles.countSub}>
@@ -900,6 +975,11 @@ export default function RichMenusListV8() {
                       {g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}
                     </div>
                   ) : null}
+                </td>
+                <td className={styles.countCell}>
+                  <span className={styles.countSub} title={formatDay(g.updatedAt)}>
+                    {formatDay(g.updatedAt)}
+                  </span>
                 </td>
                 <td className={styles.menuCellActions} onClick={(event) => event.stopPropagation()}>
                   <button
@@ -938,11 +1018,12 @@ export default function RichMenusListV8() {
   )
 
   return (
-    <div className={styles.board}>
+    <div className={styles.board} data-design-node={canEdit ? 'rZEGN' : 'ZoKow'}>
       {/*
         骨格の印（data-design）は v7 の page.tsx 側が担う。ここへ別の節名を
         足すと design-structure の検査が V7＋V8 の和集合で見えてしまう。
         KPIs は V7 と同じ節名なので残す。
+        板の印だけは付ける（ZoKow＝閲覧のみ、rZEGN＝操作できる一覧）。
       */}
       <div>
         <div className={styles.head}>
@@ -950,6 +1031,7 @@ export default function RichMenusListV8() {
             <h2 className={styles.headTitle}>リッチメニュー</h2>
             <p className={styles.headDescription}>
               トーク画面の下に出るボタンのメニューです。友だちの条件ごとに出し分けられます。
+              {canEdit ? null : '閲覧のみで見ています。変える操作は管理者に頼んでください。'}
             </p>
           </div>
           <Button
@@ -1140,7 +1222,9 @@ export default function RichMenusListV8() {
               />
             </div>
 
-            {listBody}
+            <div aria-busy={loading || undefined}>
+              {listBody}
+            </div>
           </div>
         </div>
       )}
@@ -1258,9 +1342,12 @@ export default function RichMenusListV8() {
         designNode="yOyCg"
         title={
           deleteTarget
-            ? `「${deleteTarget.kind === 'managed' ? deleteTarget.group.name : deleteTarget.menu.name}」を削除しますか？`
+            ? blockedDelete
+              ? `「${deleteTarget.group.name}」はまだ消せません`
+              : `「${deleteTarget.kind === 'managed' ? deleteTarget.group.name : deleteTarget.menu.name}」を削除しますか？`
             : 'リッチメニューを削除しますか？'
         }
+        cancelLabel={blockedDelete ? '閉じる' : 'キャンセル'}
         description={
           deleteTarget?.kind === 'managed'
             ? deleteTarget.group.status === 'published'
@@ -1339,9 +1426,13 @@ export default function RichMenusListV8() {
                         .map((ref) => `${referenceKindText(ref.kind)}「${ref.ownerName}」`)
                         .join('・')}
                 </p>
-                {blockerTexts(impact.blockers).map((text) => (
-                  <p key={text} className="font-semibold text-danger" role="alert">{text}</p>
-                ))}
+                {impact.blockers.length > 0 ? (
+                  <ol className="list-decimal space-y-1 pl-5 font-semibold text-danger" role="alert">
+                    {blockerTexts(impact.blockers).map((text) => (
+                      <li key={text}>{text}</li>
+                    ))}
+                  </ol>
+                ) : null}
                 {impact.blockers.length === 0 ? null : (
                   <p className="text-ink-faint">{recommendedActionText(impact.recommendedAction)}</p>
                 )}

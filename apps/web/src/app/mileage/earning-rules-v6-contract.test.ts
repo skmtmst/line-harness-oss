@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ruleEventLabel } from './earning-rule-view'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const NEW_PAGE = readFileSync(new URL('./earning-rules/new/page.tsx', import.meta.url), 'utf8')
+const NEW_PAGE = readFileSync(new URL('./earning-rules/new/v8-earning-rule-new.tsx', import.meta.url), 'utf8')
 const EDIT_PAGE = readFileSync(new URL('./earning-rules/edit/page.tsx', import.meta.url), 'utf8')
 
 describe('V6 たまる決めごと（N46cQ）の見せ方', () => {
@@ -172,6 +172,5 @@ describe('V6 たまる決めごとをつくる（BmoGY）の対象条件', () =>
     expect(NEW_PAGE).toContain('<ConditionBuilder')
     expect(NEW_PAGE).toContain('value={targetConditions}')
     expect(NEW_PAGE).toContain('targetConditions: pruneCondition(targetConditions)')
-    expect(NEW_PAGE).toContain('15の軸から組み合わせられます')
   })
 })

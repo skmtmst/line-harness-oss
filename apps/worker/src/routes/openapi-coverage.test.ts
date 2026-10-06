@@ -15,7 +15,7 @@ import { routeClassification } from '../middleware/feature-enforcement.js';
  * 対象: `/api/*` と `/webhook`、認証なし公開メタデータ 2 件
  * （GET /admin/version、GET /admin/manifest）。
  * 対象外とその理由:
- * - `/api/restaurant-test/*` … 飲食店向けテスト機能（本番では無効）
+ * - `/api/restaurant-test/*` … 飲食店向け機能（`RESTAURANT_TEST_ENABLED` で環境ごとに切替）
  * - `/api/internal/*` … 内部サービス間経路（内部専用口）
  * - `/admin/update/*` … 管理キー必須の内部保守口
  * - `ALL` メソッド … ミドルウェア掛け（同じ path の具体メソッドが別にある）
@@ -128,6 +128,25 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  // V8 integration endpoints.
+  'DELETE /api/hq/templates/folders/{id}',
+  'DELETE /api/notifications/teams/{id}',
+  'GET /api/ad-platforms/mappings',
+  'GET /api/hq/templates/folders',
+  'GET /api/hq/templates/message-references',
+  'GET /api/nen-members/photos/publications/order',
+  'GET /api/notifications/teams',
+  'PATCH /api/hq/templates/folders/{id}',
+  'POST /api/ad-platforms/{id}/connect',
+  'POST /api/events/admin/application-preview',
+  'POST /api/hq/templates/folders',
+  'POST /api/hq/templates/{id}/duplicate',
+  'POST /api/nen-members/photos/{id}/publish',
+  'POST /api/notifications/teams',
+  'PUT /api/ad-platforms/mappings/{pointId}',
+  'PUT /api/nen-members/photos/publications/order',
+  'PUT /api/notifications/teams/{id}',
+
   'DELETE /api/affiliates/{id}',
   'DELETE /api/auth/sessions/{tokenHash}',
   'DELETE /api/booking/admin/exceptions/{id}',
@@ -320,6 +339,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PATCH /api/booking/admin/resources/{id}',
   'PATCH /api/chats/{id}/scheduled/{scheduleId}',
   'PATCH /api/friend-add-rules/reorder',
+  'PUT /api/friend-add-rules/order',
+  'POST /api/friend-add-rules/{id}/test-send',
   'PATCH /api/friend-fields/reorder',
   'POST /api/folders/{id}/swap-order',
   'PATCH /api/saved-searches/reorder',
@@ -363,6 +384,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/auth/step-up',
   'POST /api/auth/two-factor/setup',
   'POST /api/auth/two-factor/setup/confirm',
+  'POST /api/auto-replies/{id}/restore',
   'POST /api/auto-replies/{id}/stop',
   'POST /api/auto-reply-runs/{id}/retry',
   'POST /api/automation-runs/{id}/cancel',
@@ -417,6 +439,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/forms/{id}/publish',
   'POST /api/forms/{id}/submissions/{submissionId}/retry-effects',
   'POST /api/forms/{id}/test-token',
+  'POST /api/forms/{id}/unarchive',
   'POST /api/hq/banners/generations/{id}/cancel',
   'POST /api/hq/banners/generations/{id}/run',
   'POST /api/hq/banners/images/{id}/deliver',
@@ -440,6 +463,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/integrations/google-sheets/disconnect',
   'POST /api/integrations/google-sheets/sync',
   'POST /api/integrations/tiktok-pnl/sync',
+  'POST /api/liff/booking/{id}/cancel',
+  'POST /api/liff/booking/{id}/reschedule',
   'POST /api/liff/events/waitlist/{token}/accept',
   'POST /api/nen-campaigns/pets',
   'POST /api/ops/announcements',
@@ -499,6 +524,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/reminders/{id}/audience',
   'POST /api/reminders/{id}/registrants/{enrollmentId}/cancel',
   'POST /api/reminders/{id}/registrants/{enrollmentId}/resume',
+  'POST /api/reminders/{id}/restore',
   'POST /api/scenario-subscriptions/{subscriptionId}/move',
   'POST /api/scenario-subscriptions/{subscriptionId}/pause',
   'POST /api/scenario-subscriptions/{subscriptionId}/resume',
@@ -546,12 +572,16 @@ const BASELINE_DOCUMENTED = new Set<string>([
   // #939: 外部連携の編集・未照合の箱・公開APIトークン・公開API。
   'GET /api/webhooks/outgoing/{id}',
   'POST /api/webhooks/incoming/{id}/test',
+  'POST /api/webhooks/incoming/{id}/restore',
+  'POST /api/webhooks/outgoing/{id}/restore',
   'GET /api/webhooks/incoming/{id}/unmatched',
   'POST /api/webhooks/unmatched/{id}/resolve',
   'GET /api/webhooks/api-tokens',
   'POST /api/webhooks/api-tokens',
   'POST /api/webhooks/api-tokens/{id}/revoke',
+  'POST /api/webhooks/api-tokens/{id}/reactivate',
   'POST /api/webhooks/api-tokens/{id}/rotate',
+  'GET /api/webhooks/interactions/{id}/payload',
   'GET /api/public/v1/tags',
   'PATCH /api/measurement-sites/{id}',
   'POST /api/measurement-sites',
@@ -575,6 +605,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/booking/admin/conflicts',
   'POST /api/analytics/exports',
   'GET /api/booking/admin/staff/me',
+  'GET /api/hq/billing/preview',
   'PUT /api/booking/admin/staff-menus',
   'PUT /api/booking/admin/staff/{id}/break-dates',
   'PUT /api/booking/admin/staff/{id}/breaks',

@@ -7,6 +7,7 @@ import {
   deleteMessageTemplate,
 } from '@line-crm/db';
 import type { MessageTemplate } from '@line-crm/db';
+import { listResponse } from '../lib/list-etag.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 
@@ -27,7 +28,8 @@ function serialize(t: MessageTemplate) {
 messageTemplates.get('/api/message-templates', async (c) => {
   try {
     const templates = await listMessageTemplates(c.env.DB);
-    return c.json({ success: true, data: templates.map(serialize) });
+    // 同じ中身なら304（list-etag）。
+    return listResponse(c, { success: true, data: templates.map(serialize) });
   } catch (err) {
     console.error('GET /api/message-templates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

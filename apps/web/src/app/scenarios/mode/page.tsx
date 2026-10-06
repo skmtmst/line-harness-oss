@@ -619,7 +619,7 @@ function ModeCard({
             <div key={r.who} className="flex items-center gap-2">
               <div className="w-36 shrink-0">
                 <p className="text-ink text-xs font-medium">{r.who}</p>
-                <p className="text-ink-faint text-[11px]">{r.start}</p>
+                <p className="text-ink-faint text-micro">{r.start}</p>
               </div>
               <Slot order="1通目" at={r.first} gap={r.gaps?.[0]} />
               <Slot order="2通目" at={r.second} gap={r.gaps?.[1]} />
@@ -629,7 +629,7 @@ function ModeCard({
         <p className={`border-hairline text-ink-secondary rounded-control border px-3 py-2 text-xs leading-relaxed ${mode === 'absolute_time' ? 'mt-0' : 'mt-2'}`}>
           {result}
         </p>
-        <p className={`text-ink-faint text-[11px] leading-relaxed ${mode === 'absolute_time' ? 'mt-0' : 'mt-1'}`}>※ {note}</p>
+        <p className={`text-ink-faint text-micro leading-relaxed ${mode === 'absolute_time' ? 'mt-0' : 'mt-1'}`}>※ {note}</p>
       </div>
 
     </label>
@@ -640,12 +640,12 @@ function Slot({ order, at, gap }: { order: string; at: string; gap?: string }) {
   return (
     <div className="min-w-0 flex-1">
       {gap && (
-        <p className="bg-info-bg text-info rounded-pill mb-1 px-2 py-0.5 text-center text-[10px]">
+        <p className="bg-info-bg text-info rounded-pill mb-1 px-2 py-0.5 text-center text-nano">
           {gap}
         </p>
       )}
       <div className="border-hairline rounded-control bg-canvas border px-2 py-1.5 text-center">
-        <p className="text-ink-faint text-[10px]">{order}</p>
+        <p className="text-ink-faint text-nano">{order}</p>
         <p className="text-ink text-xs font-medium">{at}</p>
       </div>
     </div>

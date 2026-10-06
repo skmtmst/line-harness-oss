@@ -168,7 +168,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
       {/* LINE連携済みのログインユーザーは、友だち検索に埋もれないよう常に候補へ出す。 */}
       {availableLoginUsers.length > 0 && (
         <div className="mb-2 rounded-control border border-accent-border bg-accent-soft/60 p-2">
-          <p className="mb-1.5 text-[11px] font-medium text-success">ログインユーザーから追加</p>
+          <p className="mb-1.5 text-micro font-medium text-success">ログインユーザーから追加</p>
           <div className="flex flex-wrap gap-1.5">
             {availableLoginUsers.map((candidate) => (
               <button

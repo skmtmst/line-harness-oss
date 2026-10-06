@@ -53,7 +53,6 @@ const KNOWN_FILES: string[] = [
   'app/events/bookings/page.tsx',
   'app/events/edit/page.tsx',
   'app/events/page.tsx',
-  'app/form-submissions/page.tsx',
   'app/form-submissions/responses/page.tsx',
   'app/form-submissions/responses/response-summary.ts',
   'app/friend-add-settings/runs/page.tsx',
@@ -74,11 +73,10 @@ const KNOWN_FILES: string[] = [
   'app/rich-menus/external-import.tsx',
   'app/rich-menus/page.tsx',
   'app/scenarios/detail/scenario-detail-client.tsx',
-  'app/scenarios/page.tsx',
+  // 2026-10-04 完全切り替え：v7 page を捨て、V8 の list-v8 にしたので外す。
   'app/scenarios/results/page.tsx',
   // ★V8 版も同じ持ち越し文言を使う（直すときは page.tsx と一緒に直す）
   'app/settings/feature-settings-v8.tsx',
-  'app/settings/page.tsx',
   'app/staff/page.tsx',
   'app/tags/fields/edit/page.tsx',
   'app/tags/searches/edit/page.tsx',

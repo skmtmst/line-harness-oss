@@ -5,10 +5,14 @@ import { useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { api, type FriendUpcoming, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
 import { tagTextColor } from '@/lib/presentation'
-import type { FriendField } from '@line-crm/shared'
+import type { FriendField, Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
+import InlineEdit from '@/components/shared/inline-edit'
+import { runOptimistic } from '@/lib/undoable'
+import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { GripVertical, X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 
@@ -50,6 +54,18 @@ interface Props {
   chatStatus?: ChatStatusInfo
   /** 担当者名 (ChatDetail で operatorId → name 変換済を渡す想定) */
   operatorName?: string | null
+  /** A-2 その場で直すための会話 ID。無いときは表示のみ（従来どおり）。 */
+  chatId?: string | null
+  /** 同時編集の見分け札（chats.revision）。無いときは送らない。 */
+  revision?: number
+  /** 担当の選択肢。無いときは担当の変更欄を出さない。 */
+  operators?: Array<{ id: string; name: string }>
+  /** 現在の担当 ID。無いときは未割り当て扱い。 */
+  operatorId?: string | null
+  /** 開いているLINEアカウントの ID。前払いのみの印に使う。無いときは印を出さない。 */
+  accountId?: string | null
+  /** 保存が通ったあとに親へ知らせる（一覧の読み直しなど）。 */
+  onChatChanged?: () => void
 }
 
 const DETAIL_SECTIONS = [
@@ -168,10 +184,29 @@ function upcomingDeliveryHref(delivery: NonNullable<FriendUpcoming['nextAutoDeli
     : `/reminders/detail?id=${delivery.id}`
 }
 
-export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }: Props) {
+export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, chatId, revision, operators, operatorId, accountId, onChatChanged }: Props) {
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /* 前払いのみの印を外せるのは店の管理者だけ（友だち詳細と同じ決まり）。 */
+  const [canClearPrepay] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin())
+  // A-2: その場で直したときの画面側の持ち直し（楽観更新）。親の chatDetail とは別に、
+  // このパネル内での見た目だけを先に変える。保存が失敗したら戻す。
+  const [localStatus, setLocalStatus] = useState<ChatStatusInfo['status'] | undefined>(undefined)
+  const [localOperatorId, setLocalOperatorId] = useState<string | null | undefined>(undefined)
+  const [localNotes, setLocalNotes] = useState<string | null | undefined>(undefined)
+  const [localTags, setLocalTags] = useState<Array<{ id: string; name: string; color: string }> | undefined>(undefined)
+  const effectiveStatus = localStatus !== undefined ? localStatus : chatStatus?.status
+  const effectiveOperatorId = localOperatorId !== undefined ? localOperatorId : operatorId
+  const effectiveNotes = localNotes !== undefined ? localNotes : chatStatus?.notes
+  const effectiveTags = localTags ?? friend?.tags
+  // 友だち・会話が切り替わったら持ち直しを捨てる。
+  useEffect(() => {
+    setLocalStatus(undefined)
+    setLocalOperatorId(undefined)
+    setLocalNotes(undefined)
+    setLocalTags(undefined)
+  }, [friendId, chatId])
   const [showSettings, setShowSettings] = useState(false)
   const [draggedGroupKey, setDraggedGroupKey] = useState<string | null>(null)
   const settingsButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -457,6 +492,196 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
   }, [friendId, upcomingRetry])
 
   /*
+   * A-2: 押した瞬間に画面を変えて裏で保存（lib/undoable の runOptimistic）。
+   * 成功は白い知らせに「元に戻す」、失敗は戻して「もう一度」。
+   * 知らせは notifyToast の白い板（黒にしない。オーナー決定 2026-10-04）。
+   */
+  const canEditChat = Boolean(chatId)
+  const statusButtonRef = useRef<HTMLDivElement | null>(null)
+  const tagSearchRef = useRef<HTMLInputElement | null>(null)
+  const memoAreaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  const saveChatStatus = useCallback((next: NonNullable<ChatStatusInfo['status']>) => {
+    if (!chatId) return
+    const previous = effectiveStatus
+    setLocalStatus(next)
+    runOptimistic({
+      request: () => api.chats.update(chatId, { status: next, ...(revision !== undefined ? { revision } : {}) }),
+      revert: () => setLocalStatus(previous),
+      failureMessage: '対応状況を変えられませんでした。',
+      retry: () => saveChatStatus(next),
+      onSuccess: () => onChatChanged?.(),
+    })
+  }, [chatId, effectiveStatus, revision, onChatChanged])
+
+  const saveAssignee = useCallback((nextOperatorId: string | null) => {
+    if (!chatId) return
+    const previous = effectiveOperatorId
+    setLocalOperatorId(nextOperatorId)
+    runOptimistic({
+      request: () => api.chats.update(chatId, { operatorId: nextOperatorId, ...(revision !== undefined ? { revision } : {}) }),
+      revert: () => setLocalOperatorId(previous),
+      failureMessage: '担当を変えられませんでした。',
+      retry: () => saveAssignee(nextOperatorId),
+      onSuccess: () => onChatChanged?.(),
+    })
+  }, [chatId, effectiveOperatorId, revision, onChatChanged])
+
+  // メモは書くのをやめて1秒で自動保存。最後に直した日時（revision）で比べ、
+  // ほかの人が先に直していたら上書きせず知らせる。
+  const memoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [memoSaving, setMemoSaving] = useState(false)
+  useEffect(() => {
+    if (memoTimerRef.current) clearTimeout(memoTimerRef.current)
+  }, [friendId, chatId, chatStatus?.notes])
+  const queueMemoSave = useCallback((text: string) => {
+    if (!chatId) return
+    if (memoTimerRef.current) clearTimeout(memoTimerRef.current)
+    memoTimerRef.current = setTimeout(() => {
+      const previous = effectiveNotes ?? null
+      const next = text.trim() || null
+      if (next === previous) return
+      setMemoSaving(true)
+      setLocalNotes(next)
+      runOptimistic({
+        request: () => api.chats.update(chatId, { notes: next, ...(revision !== undefined ? { revision } : {}) }),
+        revert: () => setLocalNotes(previous),
+        failureMessage: 'メモを保存できませんでした。状態を読み直してから、もう一度お試しください。',
+        retry: () => queueMemoSave(text),
+        onSuccess: () => {
+          setMemoSaving(false)
+          onChatChanged?.()
+        },
+      })
+      // runOptimistic は裏で送る。保存中の表示だけここで消す。
+      setTimeout(() => setMemoSaving(false), 1200)
+    }, 1000)
+  }, [chatId, effectiveNotes, revision, onChatChanged])
+  useEffect(() => () => {
+    if (memoTimerRef.current) clearTimeout(memoTimerRef.current)
+  }, [])
+
+  // タグの候補と新規作成。↑↓Enter で選び、×で外す。
+  const [tagQuery, setTagQuery] = useState('')
+  const [tagOptions, setTagOptions] = useState<Tag[]>([])
+  const [tagActive, setTagActive] = useState(0)
+  const [tagSaving, setTagSaving] = useState(false)
+  useEffect(() => {
+    if (!friendId) return
+    let cancelled = false
+    api.tags.list().then((res) => {
+      if (cancelled) return
+      if (res.success && Array.isArray(res.data)) setTagOptions(res.data as Tag[])
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [friendId])
+  const addTagById = useCallback((tagId: string) => {
+    if (!friendId || !tagId) return
+    const target = tagOptions.find((t) => t.id === tagId)
+    // 候補に無い ID は付けない（色は店が付けた値だけを使い、直書きしない）。
+    if (!target) return
+    const previous = [...(effectiveTags ?? [])]
+    if (previous.some((t) => t.id === tagId)) return
+    setTagSaving(true)
+    setLocalTags([...previous, { id: tagId, name: target.name, color: target.color }])
+    runOptimistic({
+      request: () => api.friends.addTag(friendId, tagId),
+      revert: () => setLocalTags(previous),
+      failureMessage: 'タグを付けられませんでした。',
+      retry: () => addTagById(tagId),
+      onSuccess: () => {
+        setTagSaving(false)
+        setTagQuery('')
+      },
+    })
+    setTimeout(() => setTagSaving(false), 1200)
+  }, [friendId, effectiveTags, tagOptions])
+  const removeTagById = useCallback((tagId: string) => {
+    if (!friendId) return
+    const previous = [...(effectiveTags ?? [])]
+    setLocalTags(previous.filter((t) => t.id !== tagId))
+    runOptimistic({
+      request: () => api.friends.removeTag(friendId, tagId),
+      revert: () => setLocalTags(previous),
+      failureMessage: 'タグを外せませんでした。',
+      retry: () => removeTagById(tagId),
+    })
+  }, [friendId, effectiveTags])
+
+  // 購入（EC の直近3件と合計）。今ある口だけを使い、結びつきが無い人は「—」で出す。
+  type PurchaseState =
+    | { kind: 'loading' }
+    | { kind: 'empty'; reason: string }
+    | { kind: 'data'; total: number; count: number; items: Array<{ id: string; title: string; amount: number; at: string }> }
+  const [purchase, setPurchase] = useState<PurchaseState>({ kind: 'loading' })
+  const [purchaseRetry, setPurchaseRetry] = useState(0)
+  useEffect(() => {
+    if (!friendId) {
+      setPurchase({ kind: 'empty', reason: 'no-friend' })
+      return
+    }
+    let cancelled = false
+    setPurchase({ kind: 'loading' })
+    // 友だち名で EC の注文を3件まで探す（friend_id の絞り口が無いため）。
+    // 名前が取れない・見つからないときは合計を出さず「—」にする（0にしない）。
+    const name = friend?.displayName ?? friend?.realName ?? ''
+    if (!name) {
+      setPurchase({ kind: 'empty', reason: 'no-name' })
+      return
+    }
+    const accountId = ''
+    void purchaseRetry
+    api.ecCommerce.orders({ lineAccountId: accountId, query: name, limit: 3 }).then((res: { success: boolean; data?: unknown }) => {
+      if (cancelled) return
+      if (!res.success || !res.data) {
+        setPurchase({ kind: 'empty', reason: 'unavailable' })
+        return
+      }
+      const list = (res.data as unknown as { orders?: Array<{ id: string; orderNumber?: string; total?: number; createdAt?: string }> }).orders ?? []
+      if (list.length === 0) {
+        setPurchase({ kind: 'empty', reason: 'none' })
+        return
+      }
+      const items = list.slice(0, 3).map((o) => ({
+        id: o.id,
+        title: o.orderNumber ?? o.id,
+        amount: typeof o.total === 'number' ? o.total : 0,
+        at: o.createdAt ?? '',
+      }))
+      const total = items.reduce((sum, item) => sum + item.amount, 0)
+      setPurchase({ kind: 'data', total, count: list.length, items })
+    }).catch(() => {
+      if (!cancelled) setPurchase({ kind: 'empty', reason: 'unavailable' })
+    })
+    return () => { cancelled = true }
+  }, [friendId, friend?.displayName, friend?.realName, purchaseRetry])
+
+  /*
+   * キーボード T・M・S（書く欄に字があるときは効かない）。
+   * T=タグを探す欄へ、M=メモ欄へ、S=対応状況のボタンへ。
+   */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const key = event.key.toLowerCase()
+      if (key === 't') {
+        event.preventDefault()
+        tagSearchRef.current?.focus()
+      } else if (key === 'm') {
+        event.preventDefault()
+        memoAreaRef.current?.focus()
+      } else if (key === 's') {
+        event.preventDefault()
+        statusButtonRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
+  /*
    * 友だち情報（metadata）のキーを、画面に出す項目名へ写す対応表。
    * friend_fields.fieldKey → name と、フォームの項目 name → label の
    * 両方を持つ。どちらにも無い内部キー（`_` 始まり）は業務表示から外す。
@@ -482,7 +707,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold text-ink">顧客情報</h3>
           </div>
-          <Button variant="secondary" className="mr-14 v7:h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-[11px] text-ink-faint" type="button" ref={settingsButtonRef} onClick={() => {
+          <Button variant="secondary" className="mr-14 v7:h-8 shrink-0 items-center justify-center whitespace-nowrap px-3 text-micro text-ink-faint" type="button" ref={settingsButtonRef} onClick={() => {
               if (!showSettings) updateSettingsPanelPos()
               setShowSettings(!showSettings)
             }} aria-expanded={showSettings}>
@@ -619,24 +844,24 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 empty="名前なし"
                 className="text-ink mt-2 max-w-full text-sm font-bold"
               />
-              <p className="text-ink-faint mt-0.5 text-[11px]">LINE表示名</p>
+              <p className="text-ink-faint mt-0.5 text-micro">LINE表示名</p>
               <div className="mt-3 flex max-w-full items-center justify-center gap-1.5">
                 {chatStatus?.status && statusLabels[chatStatus.status] ? (
-                  <span className={`inline-flex items-center rounded-pill px-2 py-1 text-[11px] font-semibold ${statusLabels[chatStatus.status].className}`}>
+                  <span className={`inline-flex items-center rounded-pill px-2 py-1 text-micro font-semibold ${statusLabels[chatStatus.status].className}`}>
                     {statusLabels[chatStatus.status].label}
                   </span>
                 ) : (
-                  <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-1 text-[11px] font-semibold">未設定</span>
+                  <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-1 text-micro font-semibold">未設定</span>
                 )}
                 <span
-                  className="bg-canvas-sunken text-ink-secondary max-w-[130px] truncate rounded-pill px-2 py-1 text-[11px] font-semibold"
+                  className="bg-canvas-sunken text-ink-secondary max-w-[130px] truncate rounded-pill px-2 py-1 text-micro font-semibold"
                   title={operatorName ?? undefined}
                 >
                   {operatorName || '未割り当て'}
                 </span>
               </div>
               {!friend.isFollowing && (
-                <span className="bg-canvas-sunken text-ink-faint mt-2 inline-block rounded-mini px-1.5 py-0.5 text-[10px] font-medium">
+                <span className="bg-canvas-sunken text-ink-faint mt-2 inline-block rounded-mini px-1.5 py-0.5 text-nano font-medium">
                   ブロック済
                 </span>
               )}
@@ -644,6 +869,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 友だち詳細
               </Button>
             </div>
+            {/* 前払いのみの印（友だち詳細と同じ置き場所・顔の下）。前払いの人だけ出る。 */}
+            {accountId && friendId ? (
+              <div className="border-hairline border-b px-5 py-3">
+                <PrepayBadgeV8 accountId={accountId} friendId={friendId} canEdit={canClearPrepay} />
+              </div>
+            ) : null}
 
             {/*
               名前（設計 `友だち詳細` の「名前」）。
@@ -653,15 +884,15 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             <div style={sectionStyle('names')} className={`${sectionVisibility('names')} space-y-2 px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">基本情報</h4>
               <div className="flex justify-between items-center gap-2">
-                <span className="text-[11px] text-ink-faint shrink-0">本名</span>
+                <span className="text-micro text-ink-faint shrink-0">本名</span>
                 <ExpandableText value={friend.realName} className="text-xs text-ink-secondary" />
               </div>
               <div className="flex justify-between items-center gap-2">
-                <span className="text-[11px] text-ink-faint shrink-0">システム表示名</span>
+                <span className="text-micro text-ink-faint shrink-0">システム表示名</span>
                 <ExpandableText value={friend.systemDisplayName} className="text-xs text-ink-secondary" />
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="shrink-0 text-[11px] text-ink-faint">登録日</span>
+                <span className="shrink-0 text-micro text-ink-faint">登録日</span>
                 <span className="truncate text-xs text-ink-secondary">{formatDate(friend.createdAt)}</span>
               </div>
             </div>
@@ -674,11 +905,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               ) : mileage.kind === 'error' ? (
                 /* INBOX-08: 失敗と未登録を分け、その場で再試行できる。 */
                 <div className="space-y-1.5">
-                  <p className="text-[11px] text-danger">マイルを読み込めませんでした</p>
+                  <p className="text-micro text-danger">マイルを読み込めませんでした</p>
                   <button
                     type="button"
                     onClick={() => setMileageRetry((key) => key + 1)}
-                    className="text-action text-[11px] font-semibold underline underline-offset-2"
+                    className="text-action text-micro font-semibold underline underline-offset-2"
                   >
                     再試行する
                   </button>
@@ -687,15 +918,15 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 <div className="border-hairline bg-canvas rounded-control border p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-ink-faint text-[10px] font-semibold">{mileage.summary.programName}</p>
+                      <p className="text-ink-faint text-nano font-semibold">{mileage.summary.programName}</p>
                       <p className="text-ink mt-0.5 text-xl font-bold tabular-nums">
                         {formatNumber(mileage.summary.available)}
-                        <span className="text-ink-faint ml-1 text-[11px] font-semibold">mile</span>
+                        <span className="text-ink-faint ml-1 text-micro font-semibold">mile</span>
                       </p>
-                      <p className="text-ink-faint text-[10px]">利用可能</p>
+                      <p className="text-ink-faint text-nano">利用可能</p>
                     </div>
                     {mileage.summary.pending > 0 && (
-                      <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-1 text-[10px] font-medium">
+                      <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-1 text-nano font-medium">
                         確定待ち {formatNumber(mileage.summary.pending)}
                       </span>
                     )}
@@ -704,7 +935,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   {mileage.history.length > 0 ? (
                     <div className="border-hairline mt-3 space-y-1.5 border-t pt-2.5">
                       {mileage.history.slice(0, 3).map((item) => (
-                        <div key={item.id} className="flex items-center justify-between gap-2 text-[10px]">
+                        <div key={item.id} className="flex items-center justify-between gap-2 text-nano">
                           <span className="text-ink-faint min-w-0 truncate">{item.reason}</span>
                           <span className={`shrink-0 font-semibold tabular-nums ${item.amount > 0 ? 'text-success' : 'text-ink-secondary'}`}>
                             {item.amount > 0 ? '+' : ''}{formatNumber(item.amount)}
@@ -713,7 +944,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                       ))}
                     </div>
                   ) : (
-                    <p className="text-ink-faint border-hairline mt-3 border-t pt-2.5 text-[10px]">
+                    <p className="text-ink-faint border-hairline mt-3 border-t pt-2.5 text-nano">
                       まだマイル履歴はありません
                     </p>
                   )}
@@ -728,27 +959,79 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               「この画面には対応の情報が無い」ように見えていた。
               設計は「未設定」「未割り当て」と書いて枠を残している。
             */}
-            <div style={sectionStyle('support')} className={`${sectionVisibility('support')} space-y-2 px-5 py-4`}>
+            <div style={sectionStyle('support')} className={`${sectionVisibility('support')} space-y-3 px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">次の対応</h4>
-              <div className="flex justify-between items-center">
-                <span className="text-[11px] text-ink-faint">対応状況</span>
-                {chatStatus?.status && statusLabels[chatStatus.status] ? (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-pill text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
-                    {statusLabels[chatStatus.status].label}
-                  </span>
+              {/* ①対応状況（3つのボタン・1タップ）。押した瞬間に変えて裏で保存。 */}
+              <div>
+                <span className="text-micro text-ink-faint">対応状況（Sキー）</span>
+                {canEditChat ? (
+                  <div ref={statusButtonRef} role="group" aria-label="対応状況を変える" className="mt-1.5 grid grid-cols-3 gap-1.5">
+                    {([
+                      { key: 'unread', label: '未対応' },
+                      { key: 'in_progress', label: '対応中' },
+                      { key: 'resolved', label: '対応済み' },
+                    ] as const).map((item) => {
+                      const active = effectiveStatus === item.key
+                      return (
+                        <Button variant="secondary"
+                          key={item.key}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => saveChatStatus(item.key)}
+                          style={{ minHeight: 0, height: 'auto', padding: 8, fontSize: 12, lineHeight: '16px', fontWeight: 600, borderColor: active ? 'var(--color-accent-deep)' : 'var(--color-hairline)', background: active ? 'var(--color-accent-soft)' : 'var(--color-canvas)', color: active ? 'var(--color-accent-deep)' : 'var(--color-ink-secondary)' }}
+                        >
+                          {item.label}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                ) : chatStatus?.status && statusLabels[chatStatus.status] ? (
+                  <div className="mt-1.5">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-pill text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
+                      {statusLabels[chatStatus.status].label}
+                    </span>
+                  </div>
                 ) : (
-                  <span className="text-xs text-ink-faint">未設定</span>
+                  <p className="text-xs text-ink-faint mt-1.5">未設定</p>
                 )}
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-[11px] text-ink-faint">担当者</span>
-                <span className="text-xs text-ink-secondary">{operatorName || <span className="text-ink-faint">未割り当て</span>}</span>
-              </div>
+              {/* ②担当（選ぶ）。 */}
               <div>
-                <span className="text-[11px] text-ink-faint">個別メモ</span>
-                <p className="text-xs text-ink-secondary whitespace-pre-wrap break-words mt-1">
-                  {chatStatus?.notes || <span className="text-ink-faint">まだありません</span>}
-                </p>
+                <label htmlFor="inbox-panel-assignee" className="text-micro text-ink-faint">担当者</label>
+                {canEditChat && operators ? (
+                  <select
+                    id="inbox-panel-assignee"
+                    value={effectiveOperatorId ?? ''}
+                    onChange={(event) => saveAssignee(event.target.value || null)}
+                    className="border-hairline rounded-control text-ink mt-1.5 w-full border bg-canvas px-2 py-2 text-xs outline-none"
+                  >
+                    <option value="">未割り当て</option>
+                    {operators.map((op) => (
+                      <option key={op.id} value={op.id}>{op.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-xs text-ink-secondary mt-1.5">{operatorName || <span className="text-ink-faint">未割り当て</span>}</p>
+                )}
+              </div>
+              {/* ④メモ（書くのをやめて1秒で自動保存）。 */}
+              <div>
+                <label htmlFor="inbox-panel-memo" className="text-micro text-ink-faint">メモ（Mキー）{memoSaving ? '・保存中…' : ''}</label>
+                {canEditChat ? (
+                  <textarea
+                    id="inbox-panel-memo"
+                    ref={memoAreaRef}
+                    defaultValue={effectiveNotes ?? ''}
+                    onChange={(event) => queueMemoSave(event.target.value)}
+                    rows={3}
+                    placeholder="この人へのメモを書く"
+                    className="border-hairline rounded-control text-ink mt-1.5 w-full resize-y border bg-canvas px-2 py-2 text-xs outline-none"
+                  />
+                ) : (
+                  <p className="text-xs text-ink-secondary whitespace-pre-wrap break-words mt-1.5">
+                    {effectiveNotes || <span className="text-ink-faint">まだありません</span>}
+                  </p>
+                )}
               </div>
               {/*
                 IDEA-02: 次回予約と次の確定した自動配信。
@@ -808,37 +1091,111 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               </div>
             </div>
 
-            {/* Tags */}
+            {/* ③タグ（×で外す・＋で探して付ける・↑↓Enter・新しいタグも作れる）。 */}
             <div style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4`}>
               <div className="mb-1.5 flex items-center justify-between">
-                <h4 className="text-ink text-xs font-bold">タグ</h4>
-                <a href={`/friends/detail?id=${friend.id}`} className="text-action text-[11px] hover:underline">
-                  ＋ 追加
+                <h4 className="text-ink text-xs font-bold">タグ（Tキー）</h4>
+                <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
+                  すべて見る
                 </a>
               </div>
-              {friend.tags.length === 0 ? (
-                <p className="text-[11px] text-ink-faint italic">タグなし</p>
-              ) : (
-                /*
-                  INBOX-35: タグ名はパネル幅以内に収める。長い名前は
-                  押して広げられる（ExpandableText）ので、
-                  切れたまま読めない状態にしない。
-                */
-                <div className="flex flex-wrap gap-1">
-                  {friend.tags.map((tag) => (
-                    <span
-                      key={tag.id}
-                      className="inline-flex max-w-full items-center rounded-mini px-2 py-0.5 text-[10px] font-medium"
-                      style={{
-                        backgroundColor: `${tag.color}20`,
-                        color: tagTextColor(tag.color),
-                      }}
-                    >
-                      <ExpandableText value={tag.name} className="max-w-full text-inherit" />
-                    </span>
-                  ))}
+              <div className="flex flex-wrap gap-1">
+                {(effectiveTags ?? []).map((tag) => (
+                  <span
+                    key={tag.id}
+                    className="inline-flex max-w-full items-center gap-1 rounded-mini px-2 py-0.5 text-nano font-medium"
+                    style={{
+                      backgroundColor: `${tag.color}20`,
+                      color: tagTextColor(tag.color),
+                    }}
+                  >
+                    <ExpandableText value={tag.name} className="max-w-full text-inherit" />
+                    {friendId ? (
+                      <button
+                        type="button"
+                        aria-label={`${tag.name}を外す`}
+                        onClick={() => removeTagById(tag.id)}
+                        className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-pill hover:bg-canvas-sunken"
+                      >
+                        <X aria-hidden="true" size={12} />
+                      </button>
+                    ) : null}
+                  </span>
+                ))}
+              </div>
+              {(effectiveTags ?? []).length === 0 ? (
+                <p className="text-micro text-ink-faint italic mt-1.5">タグなし</p>
+              ) : null}
+              {friendId ? (
+                <div className="mt-2">
+                  <input
+                    ref={tagSearchRef}
+                    type="text"
+                    value={tagQuery}
+                    onChange={(event) => {
+                      setTagQuery(event.target.value)
+                      setTagActive(0)
+                    }}
+                    onKeyDown={(event) => {
+                      const q = tagQuery.trim().toLowerCase()
+                      const attached = new Set((effectiveTags ?? []).map((t) => t.id))
+                      const shown = tagOptions.filter((t) => !attached.has(t.id) && (!q || t.name.toLowerCase().includes(q)))
+                      if (event.key === 'ArrowDown') {
+                        event.preventDefault()
+                        setTagActive((v) => Math.min(v + 1, Math.max(0, shown.length - 1)))
+                      } else if (event.key === 'ArrowUp') {
+                        event.preventDefault()
+                        setTagActive((v) => Math.max(v - 1, 0))
+                      } else if (event.key === 'Enter') {
+                        event.preventDefault()
+                        const picked = shown[tagActive]
+                        if (picked) {
+                          addTagById(picked.id)
+                        } else if (tagQuery.trim()) {
+                          // 新しいタグも作れる。
+                          const name = tagQuery.trim()
+                          setTagSaving(true)
+                          api.tags.create({ name }).then((res) => {
+                            if (res.success && res.data) {
+                              const created = res.data as Tag
+                              setTagOptions((prev) => [...prev, created])
+                              addTagById(created.id)
+                            }
+                          }).catch(() => {}).finally(() => setTagSaving(false))
+                        }
+                      }
+                    }}
+                    placeholder="＋ 探して付ける・作る"
+                    aria-label="タグを探して付ける"
+                    className="border-hairline rounded-control text-ink w-full border bg-canvas px-2 py-2 text-xs outline-none"
+                  />
+                  {tagQuery.trim() ? (
+                    <div role="listbox" aria-label="タグの候補" className="border-hairline rounded-control mt-1.5 max-h-40 overflow-y-auto border bg-canvas">
+                      {(() => {
+                        const q = tagQuery.trim().toLowerCase()
+                        const attached = new Set((effectiveTags ?? []).map((t) => t.id))
+                        const shown = tagOptions.filter((t) => !attached.has(t.id) && (!q || t.name.toLowerCase().includes(q))).slice(0, 8)
+                        if (shown.length === 0) {
+                          return <p className="text-ink-faint px-2 py-2 text-xs">Enterで「{tagQuery.trim()}」を作る</p>
+                        }
+                        return shown.map((t, i) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            role="option"
+                            aria-selected={i === tagActive}
+                            onClick={() => addTagById(t.id)}
+                            className={`flex w-full items-center px-2 py-1.5 text-left text-xs ${i === tagActive ? 'bg-accent-soft text-accent-deep' : 'text-ink'}`}
+                          >
+                            {t.name}
+                          </button>
+                        ))
+                      })()}
+                    </div>
+                  ) : null}
+                  {tagSaving ? <p className="text-ink-faint mt-1 text-micro">保存中…</p> : null}
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/*
@@ -850,8 +1207,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             */}
             <div style={sectionStyle('starred')} className={`${sectionVisibility('starred')} p-4`}>
               <div className="mb-2 flex items-center justify-between">
-                <h4 className="text-[11px] font-semibold text-ink-faint">★つき友だち情報</h4>
-                <a href={`/friends/detail?id=${friend.id}`} className="text-action text-[11px] hover:underline">
+                <h4 className="text-micro font-semibold text-ink-faint">★つき友だち情報</h4>
+                <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
                   すべて見る
                 </a>
               </div>
@@ -859,11 +1216,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 <DelayedSkeleton loading skeleton={<Skeleton className="block h-10 w-full rounded-control" />} />
               ) : friendFields.kind === 'error' ? (
                 <div className="space-y-1.5">
-                  <p className="text-[11px] text-danger">項目を読み込めませんでした</p>
+                  <p className="text-micro text-danger">項目を読み込めませんでした</p>
                   <button
                     type="button"
                     onClick={() => setFieldsRetry((key) => key + 1)}
-                    className="text-action text-[11px] font-semibold underline underline-offset-2"
+                    className="text-action text-micro font-semibold underline underline-offset-2"
                   >
                     再試行する
                   </button>
@@ -872,7 +1229,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 const starred = friendFields.items.filter((field) => field.isStarred)
                 if (starred.length === 0) {
                   return (
-                    <p className="text-[11px] text-ink-faint">
+                    <p className="text-micro text-ink-faint">
                       ★を付けた項目はまだありません。友だち詳細の「情報」で項目へ★を付けると、ここへ出ます。
                     </p>
                   )
@@ -881,7 +1238,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   <dl className="space-y-1.5 text-xs">
                     {starred.map((field) => (
                       <div key={field.id}>
-                        <dt className="text-[10px] text-ink-faint break-words">{field.name}</dt>
+                        <dt className="text-nano text-ink-faint break-words">{field.name}</dt>
                         <dd className="mt-0.5 text-ink-secondary">
                           <ExpandableText value={field.value ?? null} empty="未登録" className="text-xs text-ink-secondary" />
                         </dd>
@@ -894,29 +1251,29 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
 
             {/* Rich Menu */}
             <div style={sectionStyle('richMenu')} className={`${sectionVisibility('richMenu')} p-4`}>
-              <h4 className="text-[11px] font-semibold text-ink-faint mb-1.5">リッチメニュー</h4>
-              <p className="text-[11px] text-ink-faint mb-1">現在の設定</p>
+              <h4 className="text-micro font-semibold text-ink-faint mb-1.5">リッチメニュー</h4>
+              <p className="text-micro text-ink-faint mb-1">現在の設定</p>
               {richMenu.kind === 'loading' ? (
-                <p className="text-[11px] text-ink-faint italic">読み込み中...</p>
+                <p className="text-micro text-ink-faint italic">読み込み中...</p>
               ) : richMenu.kind === 'error' ? (
                 /* INBOX-08: 失敗と未設定を分け、その場で再試行できる。 */
                 <div className="space-y-1.5">
-                  <p className="text-[11px] text-danger">リッチメニューを読み込めませんでした</p>
+                  <p className="text-micro text-danger">リッチメニューを読み込めませんでした</p>
                   <button
                     type="button"
                     onClick={() => setRichMenuRetry((key) => key + 1)}
-                    className="text-action text-[11px] font-semibold underline underline-offset-2"
+                    className="text-action text-micro font-semibold underline underline-offset-2"
                   >
                     再試行する
                   </button>
                 </div>
               ) : richMenu.id === null ? (
-                <p className="text-[11px] text-ink-faint italic">未設定</p>
+                <p className="text-micro text-ink-faint italic">未設定</p>
               ) : (
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs text-ink-secondary">{richMenu.name ?? '(名前なし)'}</span>
                   {richMenu.isDefault && (
-                    <span className="px-1.5 py-0 rounded-mini text-[10px] font-medium bg-shell text-ink-faint">
+                    <span className="px-1.5 py-0 rounded-mini text-nano font-medium bg-shell text-ink-faint">
                       デフォルト
                     </span>
                   )}
@@ -926,15 +1283,15 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
 
             {/* Metadata custom fields */}
             <div style={sectionStyle('metadata')} className={`${sectionVisibility('metadata')} p-4`}>
-              <h4 className="text-[11px] font-semibold text-ink-faint mb-2">友だち情報</h4>
+              <h4 className="text-micro font-semibold text-ink-faint mb-2">友だち情報</h4>
               {/* 設計は追加日と流入元を必ず出す。どちらも既に持っている値。 */}
               <dl className="mb-2 space-y-1 text-xs">
                 <div className="flex justify-between gap-2">
-                  <dt className="text-[11px] text-ink-faint shrink-0">追加日</dt>
+                  <dt className="text-micro text-ink-faint shrink-0">追加日</dt>
                   <dd className="text-ink-secondary">{formatDate(friend.createdAt)}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <dt className="text-[11px] text-ink-faint shrink-0">流入元</dt>
+                  <dt className="text-micro text-ink-faint shrink-0">流入元</dt>
                   {/*
                     INBOX-06: 友だち詳細と同じ firstTrackedLinkName を出す。
                     計測できなかった人・経路が消えた人は null → 「不明」。
@@ -951,21 +1308,37 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               </dl>
               {(() => {
                 /*
+                  ⑤友だち情報の欄（押すとその場で書き換え）。
                   INBOX-07: `_` 始まりの制御用キーは業務表示から外し、
                   項目名は内部キーではなく定義済みの表示名へ写す。
+                  InlineEdit（ux-core）で Enter 保存・Esc やめる・失敗で戻す。
                 */
                 const entries = Object.entries(friend.metadata ?? {})
                   .map(([key, value]) => ({ key, label: metadataLabel(key), value }))
                   .filter((entry): entry is { key: string; label: string; value: unknown } => entry.label !== null)
                 if (entries.length === 0) {
-                  return <p className="text-[11px] text-ink-faint italic">まだ登録がありません</p>
+                  return <p className="text-micro text-ink-faint italic">まだ登録がありません</p>
                 }
                 return (
                   <dl className="space-y-2 text-xs">
                     {entries.map((entry) => (
                       <div key={entry.key}>
-                        <dt className="text-[10px] text-ink-faint break-words">{entry.label}</dt>
-                        <dd className="text-ink-secondary mt-0.5 whitespace-pre-wrap break-words">{renderValue(entry.value)}</dd>
+                        <dt className="text-nano text-ink-faint break-words">{entry.label}</dt>
+                        <dd className="text-ink-secondary mt-0.5 break-words">
+                          {friendId ? (
+                            <InlineEdit
+                              value={renderValue(entry.value)}
+                              label={entry.label}
+                              onSave={async (next) => {
+                                const res = await api.friends.updateMetadata(friendId, { [entry.key]: next || null })
+                                if (!res.success) throw new Error('failed')
+                                setFriend((prev) => prev ? { ...prev, metadata: { ...prev.metadata, [entry.key]: next } } : prev)
+                              }}
+                            />
+                          ) : (
+                            <span className="whitespace-pre-wrap">{renderValue(entry.value)}</span>
+                          )}
+                        </dd>
                       </div>
                     ))}
                   </dl>
@@ -973,22 +1346,64 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               })()}
             </div>
 
+            {/* ⑥購入（EC の直近3件と合計）。数は実データ。無いときは「—」。 */}
+            <div className="p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="text-micro font-semibold text-ink-faint">購入</h4>
+                <a href={`/friends/detail?id=${friend.id}`} className="text-action text-micro hover:underline">
+                  すべて見る
+                </a>
+              </div>
+              {purchase.kind === 'loading' ? (
+                <p className="text-micro text-ink-faint italic">読み込み中…</p>
+              ) : purchase.kind === 'data' ? (
+                <div className="space-y-1.5">
+                  <p className="text-ink text-sm font-bold tabular-nums">
+                    合計 {formatNumber(purchase.total)}<span className="text-ink-faint ml-1 text-micro font-semibold">円</span>
+                  </p>
+                  <ul className="space-y-1.5">
+                    {purchase.items.map((item) => (
+                      <li key={item.id} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="text-ink-secondary min-w-0 truncate">{item.title}</span>
+                        <span className="text-ink shrink-0 font-semibold tabular-nums">{formatNumber(item.amount)}円</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : purchase.reason === 'none' ? (
+                <p className="text-micro text-ink-faint italic">購入はまだありません</p>
+              ) : purchase.reason === 'unavailable' ? (
+                <div className="space-y-1.5">
+                  <p className="text-micro text-danger">購入を読み込めませんでした</p>
+                  <button
+                    type="button"
+                    onClick={() => setPurchaseRetry((key) => key + 1)}
+                    className="text-action text-micro font-semibold underline underline-offset-2"
+                  >
+                    再試行する
+                  </button>
+                </div>
+              ) : (
+                <p className="text-micro text-ink-faint italic">—</p>
+              )}
+            </div>
+
             {/* Form answers — save_to_metadata の設定に関係なく回答履歴を表示 */}
             <div style={sectionStyle('forms')} className={`${sectionVisibility('forms')} p-4`}>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h4 className="text-[11px] font-semibold text-ink-faint">フォーム回答</h4>
+                <h4 className="text-micro font-semibold text-ink-faint">フォーム回答</h4>
                 {/*
                   INBOX-17: 取得するのは最新10件まで。続きがあるか、全部で
                   何件あるかを黙らせない。10件を超える分は友だち詳細へ誘導する。
                 */}
                 {typeof friend.formSubmissionTotal === 'number' && friend.formSubmissionTotal > 0 && (
-                  <span className="text-[10px] text-ink-faint">
+                  <span className="text-nano text-ink-faint">
                     {formatNumber(friend.formSubmissionTotal)}件中 1〜{formatNumber(friend.formSubmissions.length)}件を表示
                   </span>
                 )}
               </div>
               {!friend.formSubmissions || friend.formSubmissions.length === 0 ? (
-                <p className="text-[11px] text-ink-faint italic">回答はまだありません</p>
+                <p className="text-micro text-ink-faint italic">回答はまだありません</p>
               ) : (
                 <div>
                 <div className="space-y-3">
@@ -999,14 +1414,14 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                       <div key={submission.id} className="rounded-control border border-divider-soft bg-surface-pearl p-3">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-xs font-medium text-ink-secondary break-words">{submission.formName}</p>
-                          <time className="shrink-0 text-[10px] text-ink-faint">
+                          <time className="shrink-0 text-nano text-ink-faint">
                             {formatDate(submission.createdAt)}
                           </time>
                         </div>
                         <dl className="mt-2 space-y-2">
                           {answers.map(([key, value]) => (
                             <div key={key}>
-                              <dt className="text-[10px] text-ink-faint">{labels.get(key) ?? key}</dt>
+                              <dt className="text-nano text-ink-faint">{labels.get(key) ?? key}</dt>
                               <dd className="mt-0.5 whitespace-pre-wrap break-words text-xs text-ink-secondary">
                                 {renderValue(value)}
                               </dd>
@@ -1025,7 +1440,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   && friend.formSubmissions.length < friend.formSubmissionTotal && (
                   <a
                     href={`/friends/detail?id=${friend.id}`}
-                    className="text-action mt-3 inline-flex text-[11px] font-semibold hover:underline"
+                    className="text-action mt-3 inline-flex text-micro font-semibold hover:underline"
                   >
                     残り{friend.formSubmissionTotal - friend.formSubmissions.length}件は友だち詳細で見る
                   </a>

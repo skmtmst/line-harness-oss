@@ -89,3 +89,23 @@ describe('R196 初期値はその欄の形で入れる', () => {
     expect(control?.type).toBe('text')
   })
 })
+
+describe('F-11 5段階評価・住所の初期値', () => {
+  it('評価は★1〜★5の選択欄になる', async () => {
+    mount(inputBlock('rating'))
+    const combo = defaultControl().querySelector('button[aria-label="初期値"]')
+    expect(combo).not.toBeNull()
+    await act(async () => { (combo as HTMLButtonElement).click() })
+    const labels = Array.from(document.querySelectorAll('[role="option"]')).map((o) => o.textContent)
+    expect(labels).toEqual(['— 入れない —', '★1', '★2', '★3', '★4', '★5'])
+  })
+
+  it('住所に初期値の入力欄は出ない', () => {
+    mount(inputBlock('address'))
+    const label = Array.from(host.querySelectorAll('label')).find((el) =>
+      el.textContent?.includes('初期値'),
+    )
+    expect(label).toBeUndefined()
+    expect(host.textContent).toContain('初期値は入れられません')
+  })
+})

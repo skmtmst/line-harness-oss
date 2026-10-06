@@ -54,35 +54,39 @@
   gap: 12px;
 }
 
+/* 数の帯のマス（板 `MRhef`「数 初回案内」：余白 16/20・間 8）。 */
 .kpi {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
-  padding: 14px 16px;
+  padding: 16px 20px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card, 12px);
   background: var(--color-canvas);
 }
 
+/* 数の帯の題（板 `MRhef`「題」：12・500・ink・行18）。 */
 .kpiLabel {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--color-ink-secondary);
+  color: var(--color-ink);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .kpiLabel svg {
   color: var(--color-ink-faint);
 }
 
+/* 数の帯の数（板 `MRhef`：22・600）。 */
 .kpiValue {
   margin: 0;
   color: var(--color-ink);
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
 }
@@ -155,6 +159,13 @@
   gap: 8px;
 }
 
+/* 板 `MRhef`：件数の選びは「20件表示」だけ出す（「表示件数」の字は置かない）。 */
+.toolbar > label > span:first-child {
+  display: none;
+}
+
+
+
 /* 広い板では「作る」とフォルダ選びはフォルダの列にいる。道具の段には出さない。 */
 .toolbarCreate,
 .folderSelectWrap {
@@ -165,9 +176,12 @@
   flex: 1;
 }
 
+/* 探す欄の幅（板 `MRhef`「検索」：幅 220・高さは共有部品）。 */
 .searchWrap {
-  width: 240px;
-  min-width: 160px;
+  flex: 0 0 auto;
+  width: 220px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* 操作の失敗の帯。 */
@@ -213,21 +227,23 @@
   font-size: 13px;
 }
 
+/* 表の見出し（板 `MRhef`「表の見出し」：余白 12/24・文字 12/600/secondary・地 table-head）。 */
 .table th {
-  padding: 10px 12px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--color-hairline);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-faint);
-  font-size: 11px;
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
   font-weight: 600;
   text-align: left;
   white-space: nowrap;
 }
 
+/* 表の行（板 `MRhef`「行 店頭QRの初回案内」ほか：余白 12/24・中央寄せ）。 */
 .table td {
-  padding: 12px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--color-hairline);
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .table tbody tr:last-child td {
@@ -310,7 +326,7 @@
 .statePill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   font-size: 11px;
@@ -479,6 +495,20 @@
   line-height: 1.6;
 }
 
+/* 板 `LEwkJ`：閲覧のみの帯（青の薄い地＋目の印）。 */
+.readonlyBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-info-bg);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 /* 止められない確かめの窓の中の注意の帯（黄）。 */
 .warnNote {
   display: flex;
@@ -515,10 +545,24 @@
   font-size: 13px;
 }
 
-/* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
+/* ===== 板 `P20kYU`：板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
 @container (max-width: 1099px) {
+  /* 数の帯は4つ並んだまま詰める（2列に割らない）。印は畳む。 */
   .kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .kpi {
+    padding: 10px 12px;
+  }
+
+  .kpiLabel svg {
+    display: none;
+  }
+
+  .kpiValue {
+    font-size: 18px;
   }
 
   .split {
@@ -536,6 +580,24 @@
 
   .folderSelectWrap {
     display: block;
+  }
+
+  /* 道具の段は2段に分かれてよい（作る・選ぶ・探す・件数／状態の札）。 */
+  .searchWrap {
+    flex: 1;
+  }
+
+  .toolbarSpacer {
+    display: none;
+  }
+
+  /* 「直近7日」の列は畳む（行の「…」から設定の詳細へ行ける）。 */
+  .recentCol {
+    display: none;
+  }
+
+  .table {
+    min-width: 560px;
   }
 }
 

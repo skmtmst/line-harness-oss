@@ -27,6 +27,8 @@ import { checkedAtText, placeholderText } from '../delete-impact'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { RequiredBadge } from '@/components/shared/form-controls'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import EditCommonVarV8 from '@/v8/common-vars-edit/edit'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -1500,13 +1502,22 @@ function EditCommonVarInner() {
   )
 }
 
+/*
+ * ★V8: data-theme="v8" のときだけ新しい編集画面（`AYc6O`）を出す。
+ * v7 の見た目は EditCommonVarInner のまま変えない。
+ */
+function EditCommonVarPageSwitch() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <EditCommonVarV8 /> : <EditCommonVarInner />
+}
+
 export default function EditCommonVarPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
       {/* 直URLでも共通情報オフのaccountには画面を出さない。 */}
       <FeatureGate feature="common_vars">
-        <EditCommonVarInner />
+        <EditCommonVarPageSwitch />
       </FeatureGate>
     </Suspense>
   )

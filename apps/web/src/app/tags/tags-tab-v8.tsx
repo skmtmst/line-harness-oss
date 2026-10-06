@@ -11,14 +11,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, CalendarPlus, ListChecks, MoreHorizontal, Tag as TagIcon, Users, X } from 'lucide-react'
+import { AlertCircle, CalendarPlus, ListChecks, MoreHorizontal, Tag as TagIcon, Users } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type ListStats } from '@/lib/api'
+import { useRowLeaving } from '@/lib/use-row-leaving'
 import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import MultiSelect from '@/components/shared/multi-select'
@@ -27,6 +30,8 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { TagRowsSkeleton } from './tag-rows-skeleton'
 import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
 import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
 import { isCurrentTagListRequest, type TagListRequestKey } from '@/components/friend-fields/tag-list-state'
@@ -64,11 +69,13 @@ function tagLinkChips(tag: Tag): Array<{ label: string; className: string }> {
 }
 
 /**
- * タグのフォルダ追加・編集の窓（Pencil `IjVpM`）。
+ * タグのフォルダ追加・編集（Pencil `IjVpM`）。
  *
  * 共通の FolderAddDialog は `folders` 表（api.folders）を書く。
- * タグの分類は `tag_groups` 表なので、この画面だけの窓を持つ
+ * タグの分類は `tag_groups` 表なので、この画面だけの形を持つ
  * （中身の形と色の並びは FolderAddDialog と同じ）。
+ * 入力用の窓は右のパネルへ移した（V8「サクサク感」C④）。
+ * 確認の窓（削除・保管）は残す。
  */
 function TagFolderDialog({
   group,
@@ -85,7 +92,6 @@ function TagFolderDialog({
   const [color, setColor] = useState(group?.color ?? FOLDER_COLORS[0])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const dialogRef = useOverlayFocus(true, onClose, saving)
 
   const save = async () => {
     const trimmed = name.trim()
@@ -110,60 +116,57 @@ function TagFolderDialog({
   }
 
   return (
-    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
-      <div role="dialog" aria-modal="true" aria-label={group ? 'フォルダを直す' : 'フォルダを追加'} className="bg-canvas rounded-panel w-full max-w-md p-5 shadow-float">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-ink text-base font-bold">{group ? 'フォルダを直す' : 'フォルダを追加'}</h2>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-        <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-          タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。
-        </p>
-        <label className="mt-4 block">
-          <span className="text-ink-secondary mb-1 block text-xs font-medium">
-            フォルダ名 <span className="text-danger">*</span>
-          </span>
-          <input
-            type="text"
-            autoFocus
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && name.trim()) void save()
-            }}
-            placeholder="例: VIP"
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
-          />
-        </label>
-        <div className="mt-3">
-          <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
-          <div className="flex flex-wrap gap-2">
-            {FOLDER_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                aria-label={`色 ${c}`}
-                aria-pressed={color === c}
-                style={{ backgroundColor: c }}
-                className={`rounded-pill h-7 w-7 ${color === c ? 'ring-accent ring-2 ring-offset-2' : ''}`}
-              />
-            ))}
-          </div>
-        </div>
-        {error ? <p className="text-danger mt-3 text-xs" role="alert">{error}</p> : null}
-        <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm">
+    <DetailPanel
+      open
+      title={group ? 'フォルダを直す' : 'フォルダを追加'}
+      description="タグを分けてしまう箱です。消しても、入っていたタグは未分類として残ります。"
+      onClose={onClose}
+      busy={saving}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm disabled:opacity-40">
             キャンセル
           </button>
           <Button variant="primary" type="button" onClick={() => void save()} disabled={saving || !name.trim()}>
             {saving ? (group ? '保存中…' : '追加中…') : (group ? '保存する' : 'フォルダを作る')}
           </Button>
+        </>
+      }
+    >
+      <label className="mt-1 block">
+        <span className="text-ink-secondary mb-1 block text-xs font-medium">
+          フォルダ名 <span className="text-danger">*</span>
+        </span>
+        <input
+          type="text"
+          autoFocus
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && name.trim()) void save()
+          }}
+          placeholder="例: VIP"
+          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
+        />
+      </label>
+      <div className="mt-3">
+        <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
+        <div className="flex flex-wrap gap-2">
+          {FOLDER_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              aria-label={`色 ${c}`}
+              aria-pressed={color === c}
+              style={{ backgroundColor: c }}
+              className={`rounded-pill h-7 w-7 ${color === c ? 'ring-accent ring-2 ring-offset-2' : ''}`}
+            />
+          ))}
         </div>
       </div>
-    </div>
+      {error ? <p className="text-danger mt-3 text-xs" role="alert">{error}</p> : null}
+    </DetailPanel>
   )
 }
 
@@ -197,6 +200,7 @@ export default function TagsTabV8({
   const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
+  const { leavingId, leave } = useRowLeaving()
   /* フォルダの窓と操作の状態。 */
   const [folderDialog, setFolderDialog] = useState<'new' | TagGroup | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<TagGroup | null>(null)
@@ -205,6 +209,12 @@ export default function TagsTabV8({
   /* 行の「…」メニュー。「フォルダへ移す」はメニューの2段目。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [menuMoveFor, setMenuMoveFor] = useState<string | null>(null)
+  /*
+   * 行の詳細パネル（C①）。URL に ?tag=<id> を残す。
+   * 行を押すとつながる移り変わり（D・E）で右から出て、↑↓で前・次へ。
+   */
+  const [activeTagId, setActiveTagId] = useDetailPanelUrl('tag')
+  const openTagDetail = (id: string) => withViewTransition(() => setActiveTagId(id))
   const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
   const load = useCallback(async () => {
@@ -284,6 +294,10 @@ export default function TagsTabV8({
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pages)
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  /* 詳細パネルに出す行（一覧全体から探すので、URL直打ちでも開く）。前・次は見えている行の中。 */
+  const activeTag = items.find((tag) => tag.id === activeTagId) ?? null
+  const activeTagIndex = visible.findIndex((tag) => tag.id === activeTagId)
+  const activeGroup = activeTag ? groups.find((item) => item.id === activeTag.groupId) : undefined
   useEffect(() => setPage(1), [query, folder, usageFilter, sourceFilter, quick, pageSize])
 
   /** アカウント切替直後の1フレームは「未取得」として扱う（v7 と同じ）。 */
@@ -307,7 +321,13 @@ export default function TagsTabV8({
     const result = await api.tags.reorder(order)
     if (!result.success) {
       setItems(previous)
-      setActionError(`並び順を保存できませんでした（${result.error}）`)
+      const message = `並び順を保存できませんでした（${result.error}）`
+      setActionError(message)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void applyTagOrder(order) },
+      })
     }
   }
 
@@ -335,7 +355,10 @@ export default function TagsTabV8({
     await applyTagOrder(order)
   }
 
-  /** 「一覧に出す」の星（v7 と同じ。押した瞬間に切り替え、失敗は戻す）。 */
+  /*
+   * 「一覧に出す」の星（V8「サクサク感」B：押した瞬間に切り替え、裏で保存。
+   * 失敗は戻して知らせで「もう一度」、成功は知らせの「元に戻す」で戻せる）。
+   */
   const toggleStar = async (tag: Tag) => {
     if (!canEdit) return
     const next = !tag.isStarred
@@ -351,32 +374,65 @@ export default function TagsTabV8({
       if (typeof version === 'number') {
         setItems((current) => current.map((item) => item.id === tag.id ? { ...item, version } : item))
       }
+      notifyToast(next ? `「${tag.name}」を一覧に出します` : `「${tag.name}」を一覧から外します`, {
+        actionLabel: '元に戻す',
+        onAction: () => { void toggleStar({ ...tag, isStarred: next }) },
+      })
     } catch (reason) {
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
-      setActionError(reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。')
+      const message = reason instanceof ApiError ? reason.message : '表示の切り替えに失敗しました。通信を確かめて、もう一度お試しください。'
+      setActionError(message)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void toggleStar(tag) },
+      })
       void load()
     }
   }
 
-  /* 「フォルダへ移す」（v7 は編集画面でやっていた操作を行の「…」から）。 */
+  /*
+   * 「フォルダへ移す」（V8「サクサク感」B：押した瞬間に移して裏で保存。
+   * 失敗は戻して知らせで「もう一度」、成功は知らせの「元に戻す」で戻せる）。
+   */
   const moveTagToGroup = async (tag: Tag, groupId: string | null) => {
     setOpenMenuId(null)
     setMenuMoveFor(null)
     setActionError('')
+    const previous = tag.groupId ?? null
+    if (previous === groupId) return
+    setItems((current) => current.map((item) => item.id === tag.id ? { ...item, groupId } : item))
     try {
       const res = await api.tags.setGroup(tag.id, groupId)
       if (!res.success) throw new Error(res.error)
-      void load()
+      const groupName = groupId === null ? '未分類' : groups.find((group) => group.id === groupId)?.name ?? 'フォルダ'
+      notifyToast(`「${tag.name}」を${groupName}へ移しました`, {
+        actionLabel: '元に戻す',
+        onAction: () => { void moveTagToGroup({ ...tag, groupId }, previous) },
+      })
     } catch (reason) {
-      setActionError(reason instanceof ApiError ? reason.message : 'フォルダへ移せませんでした。')
+      setItems((current) => current.map((item) => item.id === tag.id ? { ...item, groupId: previous } : item))
+      const message = reason instanceof ApiError ? reason.message : 'フォルダへ移せませんでした。'
+      setActionError(message)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void moveTagToGroup(tag, groupId) },
+      })
+      void load()
     }
   }
 
-  /* フォルダの並び順（v7 FolderList と同じ、隣との順位交換）。 */
+  /* フォルダの並び順（V8「サクサク感」B：押した瞬間に並び替え、裏で保存。失敗は戻して知らせで「もう一度」）。 */
   const moveGroupOrder = async (group: TagGroup, direction: -1 | 1) => {
     const index = groups.findIndex((item) => item.id === group.id)
     const other = groups[index + direction]
     if (!other || folderBusy) return
+    const previous = groups
+    const next = [...groups]
+    next[index] = other
+    next[index + direction] = group
+    setGroups(next)
     setFolderBusy(true)
     setFolderError('')
     try {
@@ -388,7 +444,14 @@ export default function TagsTabV8({
       if (!otherResult.success) throw new Error(otherResult.error)
       void load()
     } catch (reason) {
-      setFolderError(reason instanceof Error ? reason.message : '並び順を変更できませんでした')
+      setGroups(previous)
+      const message = reason instanceof Error ? reason.message : '並び順を変更できませんでした'
+      setFolderError(message)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void moveGroupOrder(group, direction) },
+      })
     } finally {
       setFolderBusy(false)
     }
@@ -445,6 +508,36 @@ export default function TagsTabV8({
       })
     }
     return items_
+  }
+
+  /*
+   * 右クリックのメニュー（C③）。行の「…」と同じ操作。
+   * 「フォルダへ移す」の2段目は、右クリックでは移し先をそのまま並べる
+   * （掘り進む形は「…」に残す）。
+   */
+  const tagContextItems = (tag: Tag): ContextMenuItem[] => {
+    const list: ContextMenuItem[] = []
+    const push = (item: ActionMenuItem) => {
+      list.push({
+        id: item.id,
+        label: item.label,
+        danger: item.tone === 'danger',
+        disabled: item.disabled,
+        onSelect: () => item.onSelect(),
+      })
+    }
+    for (const item of rowMenuItems(tag)) {
+      if (item.id === 'move-back') continue
+      if (item.id === 'move') {
+        list.push({ id: 'move-ungrouped', label: '未分類へ移す', disabled: !canEdit, onSelect: () => void moveTagToGroup(tag, null) })
+        for (const group of groups) {
+          list.push({ id: `move-${group.id}`, label: `「${group.name}」へ移す`, disabled: !canEdit, onSelect: () => void moveTagToGroup(tag, group.id) })
+        }
+        continue
+      }
+      push(item)
+    }
+    return list
   }
 
   /* フォルダの列。数は一覧と同じものを数える（v7 と同じ）。 */
@@ -582,19 +675,7 @@ export default function TagsTabV8({
             </p>
           ) : null}
 
-          {status === 'loading' || staleAccount ? (
-            <div className={styles.skeletonRows} role="status">
-              <span className="sr-only">読み込んでいます</span>
-              {[0, 1, 2, 3, 4].map((row) => (
-                <div key={row} className={styles.skeletonRow}>
-                  <span className={styles.skeletonDot} />
-                  <span className={styles.skeletonBar} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 160 }} />
-                </div>
-              ))}
-            </div>
-          ) : status === 'forbidden' ? (
+          {status === 'forbidden' ? (
             <div className={styles.stateCard}>
               <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
                 <AlertCircle size={20} aria-hidden="true" />
@@ -603,7 +684,7 @@ export default function TagsTabV8({
               <p className={styles.stateDesc}>タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。</p>
             </div>
           ) : status === 'error' ? (
-            <div className={styles.stateCard}>
+            <div className={styles.stateCard} data-design-node="U0aKD">
               <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
                 <AlertCircle size={20} aria-hidden="true" />
               </span>
@@ -612,7 +693,7 @@ export default function TagsTabV8({
               <Button type="button" onClick={() => void load()}>もう一度試す</Button>
             </div>
           ) : items.length === 0 ? (
-            <div className={styles.stateCard}>
+            <div className={styles.stateCard} data-design-node="U0aKD">
               <span className={styles.stateIcon}>
                 <TagIcon size={20} aria-hidden="true" />
               </span>
@@ -620,7 +701,7 @@ export default function TagsTabV8({
               <p className={styles.stateDesc}>「＋ タグを作る」から最初の1つを作ると、ここに並びます。</p>
             </div>
           ) : visible.length === 0 ? (
-            <div className={styles.stateCard}>
+            <div className={styles.stateCard} data-design-node="U0aKD">
               <p className={styles.stateTitle}>条件に合うタグはありません</p>
               <p className={styles.stateDesc}>検索語・フォルダ・絞り込みを変えてください。</p>
               {filterActive ? (
@@ -630,7 +711,7 @@ export default function TagsTabV8({
               ) : null}
             </div>
           ) : (
-            <>
+            <DelayedSkeleton loading={status === 'loading' || staleAccount} skeleton={<TagRowsSkeleton rows={5} narrow={[120, 160]} designNode="U0aKD" />}>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
@@ -655,13 +736,14 @@ export default function TagsTabV8({
                         <tr
                           key={tag.id}
                           className={styles.rowClick}
+                          data-leaving={leavingId === tag.id || undefined}
                           tabIndex={0}
-                          onClick={() => router.push(editHref)}
+                          onClick={() => openTagDetail(tag.id)}
                           onKeyDown={(event) => {
                             if (event.target !== event.currentTarget) return
                             if (event.key === 'Enter') {
                               event.preventDefault()
-                              router.push(editHref)
+                              openTagDetail(tag.id)
                             }
                           }}
                         >
@@ -677,13 +759,15 @@ export default function TagsTabV8({
                             <ReorderGrip label={tag.name} disabled={!canEdit} disabledReason="閲覧のみのため並び替えできません" onMove={(direction) => void keyboardMove(tag.id, direction)}><GripIcon /></ReorderGrip>
                           </td>
                           <td>
-                            <div className={styles.nameRow}>
-                              <span className={styles.folderDot} style={{ backgroundColor: group?.color ?? FOLDER_FALLBACK_COLOR }} />
-                              <Link href={editHref} className={styles.cellTitle} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
-                              {tag.status === 'archived' && <span className={styles.miniBadge}>保管済み</span>}
-                              {tag.cleanupReasons?.includes('duplicate_name') && <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
-                            </div>
-                            <p className={styles.cellSub}>{formatDate(tag.createdAt)} 登録</p>
+                            <ContextMenu label={`タグ「${tag.name}」の操作`} items={tagContextItems(tag)}>
+                              <div className={styles.nameRow}>
+                                <span className={styles.folderDot} style={{ backgroundColor: group?.color ?? FOLDER_FALLBACK_COLOR }} />
+                                <Link href={editHref} className={styles.cellTitle} title={tag.name} onClick={(event) => event.stopPropagation()}>{tag.name}</Link>
+                                {tag.status === 'archived' && <span className={styles.miniBadge}>保管済み</span>}
+                                {tag.cleanupReasons?.includes('duplicate_name') && <span className={`${styles.miniBadge} ${styles.miniBadgeWarn}`} title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
+                              </div>
+                              <p className={styles.cellSub}>{formatDate(tag.createdAt)} 登録</p>
+                            </ContextMenu>
                           </td>
                           <td className={styles.cellMuted}><span className={styles.cellTruncate} title={group?.name ?? '未分類'}>{group?.name ?? '未分類'}</span></td>
                           {/* 人数は、そのタグで絞った友だち一覧へのリンク（V8 の新しい導線）。 */}
@@ -757,6 +841,8 @@ export default function TagsTabV8({
                     onChange={(value) => setPageSize(Number(value) || 20)}
                     options={[
                       { value: '20', label: '20件表示' },
+                      { value: '30', label: '30件表示' },
+                      { value: '40', label: '40件表示' },
                       { value: '50', label: '50件表示' },
                       { value: '100', label: '100件表示' },
                     ]}
@@ -769,10 +855,65 @@ export default function TagsTabV8({
                   />
                 </div>
               </div>
-            </>
+            </DelayedSkeleton>
           )}
         </div>
       </div>
+
+      {/* 行の詳細パネル（C①）。フォルダの入力中はそちらを出す。 */}
+      {folderDialog ? null : (
+        <DetailPanel
+          open={activeTag !== null}
+          title={activeTag?.name ?? ''}
+          description={activeTag ? `${activeGroup?.name ?? '未分類'}・${activeTag.friendCount ?? 0}人` : undefined}
+          onClose={() => setActiveTagId(null)}
+          hasPrev={activeTagIndex > 0}
+          hasNext={activeTagIndex >= 0 && activeTagIndex < visible.length - 1}
+          onPrev={activeTagIndex > 0 ? () => setActiveTagId(visible[activeTagIndex - 1].id) : undefined}
+          onNext={activeTagIndex >= 0 && activeTagIndex < visible.length - 1 ? () => setActiveTagId(visible[activeTagIndex + 1].id) : undefined}
+          footer={activeTag ? (
+            <>
+              <Button href={`/tags/edit?id=${activeTag.id}`}>編集する</Button>
+              <Button href={`/tags/new?copy=${activeTag.id}`}>複製して作る</Button>
+            </>
+          ) : undefined}
+        >
+          {activeTag ? (
+            <dl>
+              <div>
+                <dt className={styles.cellMuted}>フォルダ</dt>
+                <dd className={styles.cellText}>{activeGroup?.name ?? '未分類'}</dd>
+              </div>
+              <div>
+                <dt className={styles.cellMuted}>人数</dt>
+                <dd>
+                  <Link href={`/friends?tag=${encodeURIComponent(activeTag.id)}`} className={styles.countLink}>
+                    {activeTag.friendCount ?? 0}人
+                  </Link>
+                </dd>
+              </div>
+              <div>
+                <dt className={styles.cellMuted}>付け方</dt>
+                <dd className={styles.cellText}>{sourceLabel(activeTag)}</dd>
+              </div>
+              <div>
+                <dt className={styles.cellMuted}>連動</dt>
+                <dd className={styles.cellText}>
+                  {tagLinkChips(activeTag).length === 0 ? '—' : tagLinkChips(activeTag).map((chip) => chip.label).join('・')}
+                </dd>
+              </div>
+              <div>
+                <dt className={styles.cellMuted}>使用先</dt>
+                <dd className={styles.cellText}>{usageLabel(activeTag)}</dd>
+              </div>
+              <div>
+                <dt className={styles.cellMuted}>登録日</dt>
+                <dd className={styles.cellText}>{formatDate(activeTag.createdAt)}</dd>
+              </div>
+            </dl>
+          ) : null}
+        </DetailPanel>
+      )}
 
       {csvOpen ? (
         <TagCsvImportDialog
@@ -808,7 +949,13 @@ export default function TagsTabV8({
           tag={deleteTarget}
           accountId={accountId}
           onCancel={() => setDeleteTarget(null)}
-          onArchived={(result) => { setDeleteTarget(null); if (result) notifyToast(result); void load() }}
+          onArchived={(result) => {
+            const id = deleteTarget?.id
+            setDeleteTarget(null)
+            if (result) notifyToast(result)
+            if (id) leave(id, () => load())
+            else void load()
+          }}
         />
       )}
     </>

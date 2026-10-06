@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
 const LIST_PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+/* 詳細・編集の窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
+const DIALOGS = readFileSync(new URL('./_components/conversion-dialogs.tsx', import.meta.url), 'utf8')
 
 /**
  * R41: 起点の説明は対応表(origin-labels)が正本。作成・一覧・詳細・編集の
@@ -24,10 +26,10 @@ describe('起点の説明の共通化(R41)', () => {
   })
 
   it('詳細と編集は対象・金額・起点の確認を出す', () => {
-    expect(LIST_PAGE).toContain('対象</dt>')
-    expect(LIST_PAGE).toContain('金額</dt>')
-    expect(LIST_PAGE).toContain('数えない条件</dt>')
-    expect(LIST_PAGE).toContain('起点：')
+    expect(DIALOGS).toContain('対象</dt>')
+    expect(DIALOGS).toContain('金額</dt>')
+    expect(DIALOGS).toContain('数えない条件</dt>')
+    expect(DIALOGS).toContain('起点：')
   })
 })
 
@@ -39,7 +41,7 @@ describe('数えない条件の共通化(R40)', () => {
   it('作成と編集は ConditionBuilder を使う', () => {
     expect(NEW_PAGE).toContain('ConditionBuilder')
     expect(NEW_PAGE).toContain('showCount={false}')
-    expect(LIST_PAGE).toContain('ConditionBuilder')
+    expect(DIALOGS).toContain('ConditionBuilder')
   })
 
   it('作成は試算の注意を出す', () => {
@@ -70,7 +72,7 @@ describe('起点に合う金額の出し方', () => {
   })
 
   it('編集も金額の決め方を対応表から作る', () => {
-    expect(LIST_PAGE).toContain('originInfoOf(editForm.sourceType).valueModes')
+    expect(DIALOGS).toContain('originInfoOf(editForm.sourceType).valueModes')
     expect(LIST_PAGE).toContain('EDIT_VALUE_MODE_LABELS')
     expect(LIST_PAGE).toContain('editValueModeNotice')
     // 3択の固定一覧は残さない(起点に金額が無いとき注文の金額が出てしまう)。

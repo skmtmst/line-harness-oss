@@ -10,7 +10,7 @@ import { nextMonthResetLabel, type BannerUsage } from '@/lib/hq-banners'
  * 数字は実際の値を出し、取れないときは「—」（推測で埋めない）。
  * 「課金プランを見る」は 36-2（/hq/billing）へ。上限と課金の停止のときだけ出す。
  */
-export default function LimitState({ usage, onReload }: { usage: BannerUsage | null; onReload?: () => void }) {
+export default function LimitState({ usage, onReload, compact }: { usage: BannerUsage | null; onReload?: () => void; compact?: boolean }) {
   const kind = !usage ? null : usage.blocked ? 'blocked' : usage.paused ? 'paused' : usage.month.remaining <= 0 ? 'month' : usage.today.remaining <= 0 ? 'today' : null
   if (!kind) return null
   const title =
@@ -25,6 +25,21 @@ export default function LimitState({ usage, onReload }: { usage: BannerUsage | n
       : kind === 'month'
         ? `今月の上限 ${usage?.month.limit ?? '—'}枚のうち ${usage?.month.used ?? '—'}枚を使いました。${nextMonthResetLabel()} に戻ります。`
         : `1日の上限 ${usage?.today.limit ?? '—'}枚のうち ${usage?.today.used ?? '—'}枚を使いました。明日以降にお試しください。`
+  if (compact) {
+    return (
+      <div data-design-node="oaFjL" role="status" className="flex flex-col items-start gap-2 rounded-card bg-status-warn-soft p-4">
+        <p className="flex items-center gap-2 text-label font-bold text-ink">
+          <CircleAlert aria-hidden="true" className="h-5 w-5 shrink-0 text-status-warn-deep" />
+          {title}
+        </p>
+        <p className="text-caption text-ink-secondary">{body}</p>
+        <div className="flex flex-wrap gap-2">
+          {kind === 'blocked' || kind === 'month' ? <Button href="/hq/billing">課金プランを見る</Button> : null}
+          {onReload ? <Button onClick={onReload}>利用量を読み直す</Button> : null}
+        </div>
+      </div>
+    )
+  }
   return (
     <div
       data-design-node="oaFjL"

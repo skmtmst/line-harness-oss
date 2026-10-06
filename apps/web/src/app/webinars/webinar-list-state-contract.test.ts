@@ -8,7 +8,7 @@ import { ApiError } from '@/lib/api'
 import { webinarLoadFailure } from './webinar-load-failure'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
+const PAGE = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
 const OVERVIEW = readFileSync(join(HERE, 'overview-view.ts'), 'utf8')
 
 /**
@@ -59,15 +59,15 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
     /*
      * 「1つも無い」と「読めなかった」は別のこと。0 と出すと消えたように見える。
      */
-    expect(PAGE).toContain('overviewCards(visibleOverview)')
+    expect(PAGE).toContain('webinarKpiCells(visibleOverview)')
     expect(OVERVIEW).toContain("metric.state !== 'available' || metric.value === null")
     expect(OVERVIEW).toContain('metric?.reason ??')
   })
 
   it('集計失敗を空表示にせず、その場で再読み込みできる', () => {
-    expect(PAGE).toContain('visibleOverviewFailure ? (')
+    expect(PAGE).toContain('overviewFailure && !loadFailure ?')
     expect(PAGE).toContain('集計を読み直す')
-    expect(PAGE).toContain('visibleOverviewFailure.retryable')
+    expect(PAGE).toContain('overviewFailure.retryable')
   })
 
   it('アカウント切替時に前の集計を表示しない', () => {
@@ -76,7 +76,7 @@ describe('一覧の状態（設計 10-1-L `zCQXe`）', () => {
   })
 
   it('読めていないときはページ送りを出さない', () => {
-    expect(PAGE).toContain('{hasListData && visibleTotal > 0 && (')
+    expect(PAGE).toContain('{hasListData && visibleTotal > 0 ? (')
   })
 
   it('読込・失敗・権限不足を共通部品で描く', () => {

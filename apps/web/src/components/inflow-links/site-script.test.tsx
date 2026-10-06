@@ -151,8 +151,8 @@ describe('サイトスクリプトの計測状況', () => {
     await act(async () => { root.render(<SiteScript />) })
     await settle()
 
-    expect(text()).toContain('動いています')
-    expect(text()).toContain('最後にデータが届いたのは 9月26日（土）18:02')
+    expect(text()).toContain('いま届いているか')
+    expect(text()).toContain('最後に届いたのは 9月26日（土）18:02')
     expect(text()).toContain('今日は 5件')
     expect(host.querySelector('[aria-label="サイトの計測は未接続"]')).toBeFalsy()
     expect(text()).toContain('/thanks')
@@ -172,14 +172,14 @@ describe('サイトスクリプトの計測状況', () => {
     mode = 'active'
     await act(async () => { retry!.click() })
     await settle()
-    expect(text()).toContain('動いています')
+    expect(text()).toContain('いま届いているか')
   })
 
   it('読めなくなっても、最後に受け取った時刻は残す', async () => {
     mode = 'active'
     await act(async () => { root.render(<SiteScript />) })
     await settle()
-    expect(text()).toContain('動いています')
+    expect(text()).toContain('いま届いているか')
 
     mode = 'failing'
     const check = Array.from(host.querySelectorAll('button')).find((el) => el.textContent?.includes('いま届いているか確かめる'))
@@ -213,11 +213,14 @@ describe('R275 計測サイトの停止と再開', () => {
     await settle()
     await settle()
 
-    const stop = button('計測を止める')
+    // 「…」を開いて止めるを選ぶ（絵どおりの操作）
+    await act(async () => { button('…')!.click() })
+    await settle()
+    const stop = button('止める')
     expect(stop).toBeTruthy()
     await act(async () => { stop!.click() })
+    await settle()
     // 理由なしでは送らない
-    await act(async () => { button('計測を止める')!.click(); await Promise.resolve() })
     const confirm = Array.from(document.querySelectorAll('button'))
       .filter((el) => el.textContent?.trim() === '計測を止める').pop()!
     await act(async () => { confirm.click(); await Promise.resolve() })
@@ -226,18 +229,21 @@ describe('R275 計測サイトの停止と再開', () => {
       && String((init?.body as string) ?? '').includes('reason'))).toBe(false)
   })
 
-  it('停止中のサイトは札と理由を出し、計測コードは出さない', async () => {
+  it('止めているサイトは札と理由を出し、計測コードは出さない', async () => {
     staffRole = 'owner'
     sites = [{ ...SITE, stoppedAt: '2026-09-27T00:00:00.000Z', stoppedReason: 'サイトを閉じたため' }]
     await act(async () => { root.render(<SiteScript />) })
     await settle()
     await settle()
 
-    expect(text()).toContain('停止中')
+    expect(text()).toContain('止めている')
     expect(text()).toContain('理由: サイトを閉じたため')
     expect(text()).not.toContain('data-site="site-1"')
-    expect(button('計測を再開する')).toBeTruthy()
-    expect(button('計測を止める')).toBeFalsy()
+    // 「…」の中に再開だけあり、止めるは無い
+    await act(async () => { button('…')!.click() })
+    await settle()
+    expect(button('再開する')).toBeTruthy()
+    expect(button('止める')).toBeFalsy()
   })
 
   it('staffには止める・再開する入口を出さない', async () => {
@@ -247,7 +253,19 @@ describe('R275 計測サイトの停止と再開', () => {
     await settle()
     await settle()
 
-    expect(button('計測を止める')).toBeFalsy()
-    expect(button('計測を再開する')).toBeFalsy()
+    // 「…」自体が出ない（見るだけ）
+    expect(button('…')).toBeFalsy()
+    expect(button('止める')).toBeFalsy()
+    expect(button('再開する')).toBeFalsy()
   })
 })
+
+it('V8でサイトごとの受信時刻と未受信を分ける', async () => {
+ document.documentElement.dataset.theme = 'v8';
+ try {
+  sites = [{ id:'one',label:'受信したサイト',domains:[],rejectedCount:0,lastReceivedAt:'2026-09-26T09:02:00.000Z' }, {id:'two',label:'未受信サイト',domains:[],rejectedCount:0,lastReceivedAt:null}];
+  await act(async () => { root.render(<SiteScript />) }); await settle(); await settle();
+  expect(text()).toContain('最後に受け取った時刻: 9月26日（土）18:02');
+  expect(text()).toContain('最後に受け取った時刻: まだ受け取っていません');
+ } finally { document.documentElement.dataset.theme = 'v7'; }
+});

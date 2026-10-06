@@ -21,6 +21,7 @@ import { api, bookingApi, type BookingMenu, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -203,15 +204,30 @@ export default function StaffNewV8() {
     return null
   }
 
+  /* 名前欄1欄の直し方。保存時と同じ判定のうち名前欄の分だけ出す。 */
+  function nameFieldError(value: string): string | null {
+    const parsed = parseBookingStaffInput(
+      { ...staffInput(), name: value, display_name: displayName.trim() || value },
+      'create',
+    )
+    if (!parsed.ok && parsed.field === 'name') return parsed.error
+    return null
+  }
+  /* 欄を離れたときに出す1欄ずつの直し方（文は保存時と同じ）。 */
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string }>({})
+
   async function save() {
     if (saving) return
     const validationError = validate()
     if (validationError) {
       setSaveError(validationError)
+      const nameError = nameFieldError(name)
+      setFieldErrors(nameError !== null ? { name: nameError } : {})
       return
     }
     setSaving(true)
     setSaveError(null)
+    setFieldErrors({})
     try {
       // R310: 割当だけ失敗して戻ってきた再試行では、スタッフを作り直さない。
       // 控えたIDを使い回して割当だけ送り直す。
@@ -311,11 +327,23 @@ export default function StaffNewV8() {
                   id="bs-name"
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value)
+                    if (fieldErrors.name !== undefined) {
+                      setFieldErrors({ name: nameFieldError(e.target.value) ?? undefined })
+                    }
+                  }}
+                  onBlur={() => {
+                    setFieldErrors({ name: nameFieldError(name) ?? undefined })
+                  }}
                   maxLength={BOOKING_STAFF_LIMITS.name}
                   placeholder="例: 田中 美咲"
                   className={styles.input}
+                  aria-invalid={fieldErrors.name !== undefined}
                 />
+                {fieldErrors.name !== undefined ? (
+                  <span className={styles.formError} role="alert">{fieldErrors.name}</span>
+                ) : null}
               </label>
               <label className={styles.field}>
                 <span className={styles.label}>お客さま向けの表示名（空欄なら上の名前）</span>
@@ -375,7 +403,19 @@ export default function StaffNewV8() {
               <p className={shell.sectionDesc}>チェックしたメニューだけ、このスタッフを指名できます。1つも選ばないと予約画面に出ません。</p>
             </div>
             {menusLoading ? (
-              <ListState kind="loading" title="メニューを読み込んでいます" />
+              <span className="inline-block w-full" aria-busy="true">
+                <span className="sr-only">メニューを読み込んでいます</span>
+                <DelayedSkeleton
+                  loading
+                  skeleton={
+                    <span className={styles.chipRow} aria-hidden="true">
+                      <Skeleton width={120} height={32} />
+                      <Skeleton width={96} height={32} />
+                      <Skeleton width={136} height={32} />
+                    </span>
+                  }
+                />
+              </span>
             ) : menusError !== null ? (
               <ListState
                 kind="error"
@@ -470,7 +510,13 @@ export default function StaffNewV8() {
               <p className={shell.sectionDesc}>ひも付けると、その人が左メニュー「自分の勤務」で、このスタッフのシフト・休憩・Google カレンダーを決められます。</p>
             </div>
             {membersLoading ? (
-              <ListState kind="loading" title="ログインユーザーを読み込んでいます" />
+              <span className="inline-block w-full" aria-busy="true">
+                <span className="sr-only">ログインユーザーを読み込んでいます</span>
+                <DelayedSkeleton
+                  loading
+                  skeleton={<Skeleton width="100%" height={32} />}
+                />
+              </span>
             ) : membersError !== null ? (
               <ListState
                 kind="error"
@@ -514,7 +560,7 @@ export default function StaffNewV8() {
               busy={saving}
               busyLabel="登録しています…"
             >
-              {createdStaffId ? '割当をやり直す' : 'スタッフを登録する'}
+              {createdStaffId ? '割当をやり直す' : 'スタッフを追加する'}
             </Button>
           </div>
         </div>

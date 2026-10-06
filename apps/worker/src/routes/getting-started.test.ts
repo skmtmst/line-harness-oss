@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
 const db = {
+  hasSavedFeatureConfiguration: vi.fn(async () => false),
   resolveLineCredential: vi.fn(async () => 'token'),
   hasFirstDeliveredMessage: vi.fn(async () => true),
 };
@@ -282,3 +283,15 @@ describe('POST /api/getting-started/dismiss', () => {
     expect(state.dismissedAt).not.toBeNull();
   });
 });
+
+ it('V8 inserts saved feature configuration as step 2 and keeps delivery as step 6', async () => {
+  db.hasSavedFeatureConfiguration.mockResolvedValue(false);
+  const request = () => makeApp().request('/api/getting-started?account_id=account-1&version=v8', {}, { DB: database() });
+  const first = await (await request()).json() as {data:{steps:Array<{key:string;state:string}>;total:number;allDone:boolean}};
+  expect(first.data.total).toBe(6); expect(first.data.steps[1]).toMatchObject({key:'featureSet',state:'todo'});
+  expect(first.data.allDone).toBe(false);
+  db.hasSavedFeatureConfiguration.mockResolvedValue(true);
+  db.hasFirstDeliveredMessage.mockResolvedValue(false);
+  const saved = await (await request()).json() as typeof first;
+  expect(saved.data.steps[1].state).toBe('done'); expect(saved.data.steps[5]).toMatchObject({key:'firstMessage',state:'todo'});
+ });

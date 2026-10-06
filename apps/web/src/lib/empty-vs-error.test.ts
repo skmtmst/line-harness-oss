@@ -19,7 +19,8 @@ const APP = join(dirname(fileURLToPath(import.meta.url)), '..', 'app');
 
 /** 一覧の画面と、そこに出る「1件も無い」の文（の一部）。 */
 const PAGES = [
-  { file: 'reminders/page.tsx', empty: 'リマインダがありません' },
+  /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。 */
+  { file: 'reminders/list-v8.tsx', empty: 'まだリマインダはありません' },
   { file: 'auto-replies/page.tsx', empty: '自動応答は0件です' },
   { file: 'broadcasts/page.tsx', empty: '配信がありません' },
 ];
@@ -48,6 +49,11 @@ describe('「1件も無い」と「読み込めなかった」', () => {
       const src = readFileSync(join(APP, page.file), 'utf8');
       const at = src.indexOf(page.empty);
       expect(at, `「${page.empty}」が見つからない。文面を変えたならこの試験も直す`).toBeGreaterThan(-1);
+      if (page.file.endsWith('list-v8.tsx')) {
+        // V8 は失敗の1枚を空より先に出す（入れ子の三項）。順番で見る。
+        expect(src.indexOf('reminderList.error')).toBeLessThan(at);
+        return;
+      }
 
       const expr = enclosingExpression(src, at);
       // 失敗したかどうかを見ずに「ありません」と出していないか。

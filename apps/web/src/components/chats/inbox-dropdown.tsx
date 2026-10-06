@@ -136,7 +136,7 @@ export function OperatorDropdown({
   value,
   operators,
   onChange,
-  label = '担当者',
+  label = '担当',
   ariaLabel = '担当者を選ぶ',
   allowAll = true,
   compact = false,
@@ -205,7 +205,7 @@ export function OperatorDropdown({
           matchWidth="min"
           getAnchor={() => wrapRef.current}
           onClose={() => setOpen(false)}
-          label={ariaLabel ?? '担当者'}
+          label={ariaLabel ?? '担当'}
           panelClassName={panelClass}
         >
           {/* 担当が増えるほど縦に伸びる。探す手段が無いと使えない。 */}
@@ -333,7 +333,7 @@ export function StatusDropdown({
                 className={`${rowClass} whitespace-nowrap ${selected ? 'bg-canvas-sunken' : 'hover:bg-canvas-sunken'}`}
               >
                 <span className={`h-2.5 w-2.5 shrink-0 rounded-pill ${style.dot}`} aria-hidden="true" />
-                <span className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${style.pill}`}>{style.label}</span>
+                <span className={`rounded-pill px-2 py-0.5 text-micro font-medium ${style.pill}`}>{style.label}</span>
                 <span className={`text-accent-deep ml-auto ${selected ? '' : 'invisible'}`}><Check /></span>
               </button>
             )

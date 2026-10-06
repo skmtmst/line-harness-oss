@@ -137,4 +137,26 @@
     transform: translateX(2px);
   }
 }
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .slot { height: 48px; border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; background: var(--color-shell); box-shadow: none; font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: auto; font-size: 20px; font-weight: 500; line-height: normal; caret-color: var(--color-ink); }
+[data-theme='v8'] .slot:focus { outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
+[data-theme='v8'] .group[data-state='success'] .slot { outline: 1.5px solid var(--color-success); outline-offset: -0.75px; background: var(--color-shell); box-shadow: none; }
+[data-theme='v8'] .slot[aria-invalid='true'] { outline-color: var(--color-status-danger); background: var(--color-status-danger-soft); }
+
+.field { display: contents; }
+[data-theme='v8'] .field:has(.label) { display: inline-flex; flex-direction: column; gap: 6px; }
+[data-theme='v8'] .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: auto; color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 20px; }
+[data-theme='v8'] .field:has(.label) { align-items: flex-start; }
+[data-theme='v8'] .slot { gap: 0; }
+
+/* 空の入力マスの目印は正本の2×24px。入力・選択は本物のinputが受ける。 */
+[data-theme='v8'] .slot[value='']:focus {
+  caret-color: transparent;
+  background-image: linear-gradient(var(--color-ink), var(--color-ink));
+  background-size: 2px 24px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+[data-theme='v8'] .slot { font-variant-numeric: normal; }
 }

@@ -1,0 +1,19 @@
+/* u3iab3：設定メニューの右に同じ高さのプールを2列で置く。 */
+.pool-fid-page { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.pool-fid-layout { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 24px; }
+.pool-fid-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; container-type: inline-size; }
+.pool-fid-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.pool-fid-card { min-width: 0; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.pool-fid-cardHead, .pool-fid-urlRow, .pool-fid-member { display: flex; align-items: center; gap: 8px; }
+.pool-fid-cardHead { justify-content: space-between; }
+.pool-fid-name { font-size: 16px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pool-fid-slug { color: var(--color-ink-secondary); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pool-fid-urlRow { background: var(--color-surface-pearl); border-radius: var(--radius-control); padding: 8px 12px; }
+.pool-fid-url { flex: 1; min-width: 0; color: var(--color-ink-secondary); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pool-fid-members { display: flex; flex-direction: column; gap: 10px; }
+.pool-fid-membersLabel { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--color-ink-secondary); }
+.pool-fid-memberList { display: flex; flex-direction: column; gap: 10px; }
+.pool-fid-member { border: 1px solid var(--color-hairline); border-radius: var(--radius-control); padding: 8px 12px; font-size: 12px; }
+.pool-fid-member > span:first-child { flex: 1; font-weight: 600; }
+@container (max-width: 760px) { .pool-fid-cards { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 900px) { .pool-fid-layout { grid-template-columns: minmax(0, 1fr); } }

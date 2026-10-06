@@ -33,13 +33,13 @@ export function defaultTitleForPath(pathname: string): string {
 }
 
 /**
- * 権限の呼び名。**`owner` は「統括」**。
+ * 権限の呼び名。言葉の表（GLOSSARY.md）どおり **`owner` は「オーナー」**。
  *
- * 「オーナー」ではない。V6 の設計（Pencil `cBSCb`）が「統括」で、
- * 画面にもともと浮いていた「統括」ボタンは、この印へ畳んだ。
+ * V6 の設計（Pencil `cBSCb`）が「統括」だったが、2026-10-01 のオーナー決定で
+ * 「オーナー」にそろえた。「統括」は組織と統括コンソールの名前だけに使う。
  */
 const ROLE_LABELS: Record<string, string> = {
-  owner: '統括',
+  owner: 'オーナー',
   admin: '管理者',
   viewer: '閲覧のみ',
   staff: 'スタッフ',
@@ -149,13 +149,18 @@ export default function AppTopBar() {
       v7 はこれまでどおり 1280px から。
     */}
     <div className="hidden xl:block v8-topbar-wrap">
+    {/*
+      ★V8 殻合わせ（絵 V8-B/JKjsE）：統括の画面にも切替の札を出す。
+      選ぶのは状態の切替だけで、画面の移動はしない（従来どおり）。
+      未選択の統括では「店舗を選択」と出る。
+    */}
     <TopBar
       title={shownTitle}
       manualHref={manualHref}
       accounts={options}
       selectedAccountId={selectedAccountId ?? ''}
       onAccountChange={setSelectedAccountId}
-      showAccountSwitcher={!isHq}
+      showAccountSwitcher={true}
       roleLabel={ROLE_LABELS[staffRole] ?? ''}
       onRoleClick={canReturnToHq ? returnToHq : undefined}
       userName={staffName}

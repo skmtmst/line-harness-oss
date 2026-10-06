@@ -13,6 +13,7 @@ import { Copy, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import {
   CLICK_SUMMARY_LABEL,
   LINK_CODE_HEADING,
@@ -29,7 +30,7 @@ import {
   type JourneySummary,
   type ReportV2,
 } from './tabs'
-import styles from './list-v8.module.css'
+import './list-v8.css'
 
 const JOURNEY_PAGE_SIZE = 30
 
@@ -102,7 +103,7 @@ export default function AffiliateDrawerV8({
       if (!isCurrent(id, gen)) return
       // 形を確かめてから入れる。読めない返事を入れると描くときに落ちる。
       setReport(reportRes.success ? asReportV2(reportRes.data) : null)
-      if (linksRes.success) setLinks(linksRes.data as unknown as AffiliateLink[])
+      if (linksRes.success && Array.isArray(linksRes.data)) setLinks(linksRes.data as unknown as AffiliateLink[])
       if (!reportRes.success || !linksRes.success) setError(true)
     } catch {
       if (!isCurrent(id, gen)) return
@@ -118,7 +119,8 @@ export default function AffiliateDrawerV8({
     try {
       const res = await api.affiliates.journeys(id, { limit: JOURNEY_PAGE_SIZE })
       if (!isCurrent(id, gen)) return
-      if (res.success) {
+      // 口が器（`{items,…}`）を返すことがある。配列でなければ失敗扱い。
+      if (res.success && Array.isArray(res.data)) {
         setJourneys(res.data)
         journeyCursorRef.current = res.nextCursor ?? null
         setJourneyMore(Boolean(res.nextCursor))
@@ -145,7 +147,7 @@ export default function AffiliateDrawerV8({
         beforeId: cursor.beforeId,
       })
       if (!isCurrent(id, gen)) return
-      if (res.success) {
+      if (res.success && Array.isArray(res.data)) {
         setJourneys((prev) => {
           const seen = new Set(prev.map((j) => j.friendId))
           return [...prev, ...res.data.filter((j) => !seen.has(j.friendId))]
@@ -185,6 +187,8 @@ export default function AffiliateDrawerV8({
     }
   }, [accountId])
 
+  // 焦点移動・Esc・背景スクロール停止・元のボタンへの復帰は共通へ任せる。
+  const panelRef = useOverlayFocus(true, onClose)
   useEffect(() => {
     genRef.current += 1
     idRef.current = affiliate.id
@@ -192,18 +196,7 @@ export default function AffiliateDrawerV8({
     void loadDetail(affiliate.id, gen)
     void loadJourneys(affiliate.id, gen)
     void loadSettlement(affiliate.id)
-    // Esc / 背面のスクロール
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prevOverflow
-    }
-  }, [affiliate.id, loadDetail, loadJourneys, loadSettlement, onClose])
+  }, [affiliate.id, loadDetail, loadJourneys, loadSettlement])
 
   const copyLinkUrl = useCallback(async (link: AffiliateLink) => {
     const url = distributionUrl(link.ref_code, linkBaseUrl)
@@ -219,24 +212,26 @@ export default function AffiliateDrawerV8({
 
   return (
     <>
-      <div className={styles.drawerBackdrop} onClick={onClose} aria-hidden="true" />
+      <div className="af-list-drawerBackdrop" onClick={onClose} aria-hidden="true" />
       <aside
-        className={styles.drawer}
+        className="af-list-drawer"
         role="dialog"
         aria-modal="true"
         aria-label={`${affiliate.name}の成果の詳細`}
         data-design-node="tnTn9"
+        ref={panelRef}
+        tabIndex={-1}
       >
-        <div className={styles.drawerHead}>
+        <div className="af-list-drawerHead">
           <div>
-            <h3 className={styles.drawerTitle}>{affiliate.name}</h3>
-            <p className={styles.drawerSub}>
+            <h3 className="af-list-drawerTitle">{affiliate.name}</h3>
+            <p className="af-list-drawerSub">
               {affiliate.code}　{affiliate.isActive ? '計測中' : '停止中'}
             </p>
           </div>
           <button
             type="button"
-            className={styles.kpiInfoButton}
+            className="af-list-kpiInfoButton"
             style={{ width: 32, height: 32 }}
             aria-label="詳細を閉じる"
             onClick={onClose}
@@ -245,25 +240,25 @@ export default function AffiliateDrawerV8({
           </button>
         </div>
 
-        <div className={styles.drawerBody}>
+        <div className="af-list-drawerBody">
           {loading ? (
             <p style={{ margin: 0, color: 'var(--color-ink-faint)', fontSize: 13 }}>読み込んでいます…</p>
           ) : (
             <>
               {/* 次の支払い */}
-              <section className={styles.drawerSection} aria-label="次の支払い">
-                <h4 className={styles.drawerSectionTitle}>次の支払い</h4>
+              <section className="af-list-drawerSection" aria-label="次の支払い">
+                <h4 className="af-list-drawerSectionTitle">次の支払い</h4>
                 {settlement ? (
-                  <div className={styles.drawerKpis}>
-                    <div className={styles.drawerKpi}>
+                  <div className="af-list-drawerKpis">
+                    <div className="af-list-drawerKpi">
                       <p>今回の金額</p>
                       <p>{formatYen(settlement.amount)}</p>
                     </div>
-                    <div className={styles.drawerKpi}>
+                    <div className="af-list-drawerKpi">
                       <p>成果</p>
                       <p>{formatNumber(settlement.conversionCount)}件</p>
                     </div>
-                    <div className={styles.drawerKpi}>
+                    <div className="af-list-drawerKpi">
                       <p>振込先</p>
                       <p style={{ color: settlement.bankProfileRegistered ? 'var(--color-success)' : 'var(--color-warning)' }}>
                         {settlement.bankProfileRegistered ? '登録済み' : '未登録'}
@@ -279,8 +274,8 @@ export default function AffiliateDrawerV8({
 
               {/* 読めなかったことを0件として描かない */}
               {!report && (
-                <section className={styles.drawerSection}>
-                  <h4 className={styles.drawerSectionTitle}>この期間の集計を読み込めませんでした</h4>
+                <section className="af-list-drawerSection">
+                  <h4 className="af-list-drawerSectionTitle">この期間の集計を読み込めませんでした</h4>
                   <p style={{ margin: 0, color: 'var(--color-ink-secondary)', fontSize: 12, lineHeight: 1.6 }}>
                     選んだ期間にこの人の成果が1件も無いか、集計が読めませんでした。
                     リンクと成果の記録は消えていません。
@@ -296,20 +291,20 @@ export default function AffiliateDrawerV8({
               )}
 
               {report ? (
-                <div className={styles.drawerKpis} style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
-                  <div className={styles.drawerKpi}>
+                <div className="af-list-drawerKpis" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+                  <div className="af-list-drawerKpi">
                     <p>{CLICK_SUMMARY_LABEL}</p>
                     <p>{formatNumber(report.clicks)}</p>
                   </div>
-                  <div className={styles.drawerKpi}>
+                  <div className="af-list-drawerKpi">
                     <p>友だち追加</p>
                     <p style={{ color: 'var(--color-info)' }}>{formatNumber(report.friendAdds)}</p>
                   </div>
-                  <div className={styles.drawerKpi}>
+                  <div className="af-list-drawerKpi">
                     <p>成果（却下を除く）</p>
                     <p>{formatNumber(report.conversions)}</p>
                   </div>
-                  <div className={styles.drawerKpi} style={{ background: 'var(--color-success-bg)' }}>
+                  <div className="af-list-drawerKpi" style={{ background: 'var(--color-success-bg)' }}>
                     <p>確定した報酬</p>
                     <p style={{ color: 'var(--color-success)' }}>{formatYen(report.confirmedReward)}</p>
                   </div>
@@ -317,25 +312,25 @@ export default function AffiliateDrawerV8({
               ) : null}
 
               {report && report.byOffer.length > 0 ? (
-                <section className={styles.drawerSection}>
-                  <h4 className={styles.drawerSectionTitle}>案件別の内訳</h4>
-                  <div className={styles.tableScroll}>
-                    <table className={`${styles.table} ${styles.drawerTable}`}>
+                <section className="af-list-drawerSection">
+                  <h4 className="af-list-drawerSectionTitle">案件別の内訳</h4>
+                  <div className="af-list-tableScroll">
+                    <table className={`af-list-table af-list-drawerTable`}>
                       <thead>
                         <tr>
                           <th>案件</th>
-                          <th className={styles.numRight}>報酬単価</th>
-                          <th className={styles.numRight}>承認済み</th>
-                          <th className={styles.numRight}>確定報酬</th>
+                          <th className="af-list-numRight">報酬単価</th>
+                          <th className="af-list-numRight">承認済み</th>
+                          <th className="af-list-numRight">確定報酬</th>
                         </tr>
                       </thead>
                       <tbody>
                         {report.byOffer.map((o) => (
                           <tr key={o.offerId}>
-                            <td><span className={styles.cellMain} title={o.offerName}>{o.offerName}</span></td>
-                            <td className={styles.numRight}>{formatYen(o.rewardAmount)}</td>
-                            <td className={styles.numRight}>{formatNumber(o.conversionsApproved)}</td>
-                            <td className={styles.numRight}>{formatYen(o.confirmedReward)}</td>
+                            <td><span className="af-list-cellMain" title={o.offerName}>{o.offerName}</span></td>
+                            <td className="af-list-numRight">{formatYen(o.rewardAmount)}</td>
+                            <td className="af-list-numRight">{formatNumber(o.conversionsApproved)}</td>
+                            <td className="af-list-numRight">{formatYen(o.confirmedReward)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -345,15 +340,15 @@ export default function AffiliateDrawerV8({
               ) : null}
 
               {report && report.duplicateFlags.length > 0 ? (
-                <section className={styles.drawerSection}>
-                  <h4 className={styles.drawerSectionTitle} style={{ color: 'var(--color-warning)' }}>
+                <section className="af-list-drawerSection">
+                  <h4 className="af-list-drawerSectionTitle" style={{ color: 'var(--color-warning)' }}>
                     {duplicateFlagHeading(report.duplicateFlags.length)}
                   </h4>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {report.duplicateFlags.map((f) => (
                       <span
                         key={f.friendId}
-                        className={`${styles.statusBadge} ${styles.statusWarn}`}
+                        className={`af-list-statusBadge af-list-statusWarn`}
                       >
                         {duplicateFriendNameText(f.friendId, journeys)}
                       </span>
@@ -364,17 +359,17 @@ export default function AffiliateDrawerV8({
 
               {/* 紹介リンク（コピーは計測を起こさない） */}
               {links.length > 0 ? (
-                <section className={styles.drawerSection}>
-                  <h4 className={styles.drawerSectionTitle}>紹介リンク（{formatNumber(links.length)}本）</h4>
+                <section className="af-list-drawerSection">
+                  <h4 className="af-list-drawerSectionTitle">紹介リンク（{formatNumber(links.length)}本）</h4>
                   {links.map((link) => {
                     const url = distributionUrl(link.ref_code, linkBaseUrl)
                     return (
-                      <div key={link.id} className={styles.linkRow}>
-                        <span className={styles.linkUrl} title={url}>{url || link.ref_code}</span>
+                      <div key={link.id} className="af-list-linkRow">
+                        <span className="af-list-linkUrl" title={url}>{url || link.ref_code}</span>
                         <Button type="button" onClick={() => { void copyLinkUrl(link) }}>
                           <Copy size={13} aria-hidden="true" /> {copiedLinkId === link.id ? 'コピーしました' : 'コピー'}
                         </Button>
-                        <span className={`${styles.statusBadge} ${link.is_active ? styles.statusOk : styles.statusNeutral}`}>
+                        <span className={`af-list-statusBadge ${link.is_active ? 'af-list-statusOk' : 'af-list-statusNeutral'}`}>
                           {link.is_active ? '有効' : '無効'}
                         </span>
                       </div>
@@ -384,8 +379,8 @@ export default function AffiliateDrawerV8({
               ) : null}
 
               {/* 帰属した友だちの動線 */}
-              <section className={styles.drawerSection}>
-                <h4 className={styles.drawerSectionTitle}>
+              <section className="af-list-drawerSection">
+                <h4 className="af-list-drawerSectionTitle">
                   紹介で増えた友だち（{formatNumber(journeys.length)}人{journeyMore ? 'ほか' : ''}）
                 </h4>
                 {journeyLoading ? (
@@ -407,13 +402,13 @@ export default function AffiliateDrawerV8({
                   </p>
                 ) : (
                   <>
-                    <div className={styles.tableScroll}>
-                      <table className={`${styles.table} ${styles.drawerTable}`}>
+                    <div className="af-list-tableScroll">
+                      <table className={`af-list-table af-list-drawerTable`}>
                         <thead>
                           <tr>
                             <th>友だち</th>
                             <th>{LINK_CODE_HEADING}</th>
-                            <th className={styles.numRight}>成果</th>
+                            <th className="af-list-numRight">成果</th>
                             <th>追加日</th>
                           </tr>
                         </thead>
@@ -424,7 +419,7 @@ export default function AffiliateDrawerV8({
                               <tr key={j.friendId} style={isDup ? { background: 'var(--color-status-warn-soft)' } : undefined}>
                                 <td>{isDup ? '⚠ ' : ''}{personNameText(j.displayName)}</td>
                                 <td style={{ color: 'var(--color-info)', fontFamily: 'monospace', fontSize: 12 }}>{j.refCode ?? '—'}</td>
-                                <td className={styles.numRight}>{formatNumber(j.conversionCount)}</td>
+                                <td className="af-list-numRight">{formatNumber(j.conversionCount)}</td>
                                 <td style={{ color: 'var(--color-ink-faint)', fontSize: 12 }}>{formatDate(j.addedAt)}</td>
                               </tr>
                             )
@@ -454,8 +449,8 @@ export default function AffiliateDrawerV8({
 
               {/* 報酬の約束（編集モード） */}
               {editing && canEdit ? (
-                <section className={styles.drawerSection}>
-                  <h4 className={styles.drawerSectionTitle}>報酬の約束</h4>
+                <section className="af-list-drawerSection">
+                  <h4 className="af-list-drawerSectionTitle">報酬の約束</h4>
                   <SettlementEditor
                     affiliate={affiliate}
                     onSaved={() => {
@@ -470,7 +465,7 @@ export default function AffiliateDrawerV8({
           )}
         </div>
 
-        <div className={styles.drawerFoot}>
+        <div className="af-list-drawerFoot">
           <Button
             type="button"
             variant="danger"

@@ -12,6 +12,7 @@ vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.Re
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/ops/announcements',
   useRouter: () => ({ push: navigation.push, replace: vi.fn(), back: vi.fn() }),
 }))
 
@@ -115,20 +116,20 @@ describe('表記の決まり', () => {
 })
 
 describe('画面', () => {
-  it('一覧に状態・LINE送達・画面で既読が出て、下書きだけ直す／消すが出る', async () => {
+  it('一覧に状態・LINE送達・画面で既読が出て、下書きだけ編集／消すが出る', async () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     const text = host.textContent ?? ''
-    expect(text).toContain('契約者専用LINEの登録 21人 / 24人')
+    expect(host.querySelector('button[aria-label="契約者専用LINEの登録状況"]')).not.toBeNull()
     expect(text).toContain('9月20日 深夜のメンテナンスのお知らせ')
     expect(text).toContain('送信済み')
     expect(text).toContain('21 / 24')
     expect(text).toContain('5 / 24')
     expect(text).toContain('下書き')
-    expect(text).toContain('12件の契約先・24人の権限者')
+    expect(host.querySelector('button[aria-label="宛先の見込み"]')).not.toBeNull()
     expect(Array.from(document.querySelectorAll('button')).filter((b) => b.textContent === '直す')).toHaveLength(1)
     expect(calls.some((c) => c.url.endsWith('/api/ops/announcements/preview') && c.method === 'POST')).toBe(true)
-    expect(document.querySelector('[data-design-node="q2CokV"]')).not.toBeNull()
+    expect(document.querySelector('[data-design-node="tQ2MJ"]')).not.toBeNull()
   })
 
   it('件名・本文を入れて「今すぐ送る」→確認の窓→送信。mode=send と送り方が API に渡る', async () => {
@@ -139,8 +140,15 @@ describe('画面', () => {
     await act(async () => { setValue(subject, 'メンテナンスのお知らせ'); setValue(body, '本文です') })
     await act(async () => { button('今すぐ送る')!.click() })
     await flush()
-    expect(document.body.textContent).toContain('今すぐ送りますか？')
-    await act(async () => { button('送る')!.click() })
+    // 板 `TJUUl`「送る前の確認」：宛先・届く方法・日時と件名・本文を見てから送る。
+    const confirm = document.body.querySelector('[data-design-node="TJUUl"]')
+    expect(confirm, '送る前の確認の窓が出ない').not.toBeNull()
+    for (const row of ['このお知らせを送りますか？', '宛先', '届く方法', '送る日時', '件名：メンテナンスのお知らせ', '取り下げられます', '戻って直す', '今すぐ送る']) {
+      expect(confirm?.textContent ?? '', `「${row}」がない`).toContain(row)
+    }
+    const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.trim() === '今すぐ送る')
+    expect(sendInDialog, '小窓の中に送るボタンがない').not.toBeUndefined()
+    await act(async () => { (sendInDialog as HTMLButtonElement).click() })
     await flush()
     const post = calls.find((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'POST')!
     expect(post.body).toMatchObject({ subject: 'メンテナンスのお知らせ', body: '本文です', audienceKind: 'all', channels: ['line', 'screen'], mode: 'send', publishAt: null })
@@ -198,7 +206,9 @@ describe('画面', () => {
     })
     await act(async () => { button('今すぐ送る')!.click() })
     await flush()
-    await act(async () => { button('送る')!.click() })
+    const confirm = document.body.querySelector('[data-design-node="TJUUl"]')
+    const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.trim() === '今すぐ送る') as HTMLButtonElement
+    await act(async () => { sendInDialog.click() })
     await flush()
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください')
     expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/api/ops/announcements'))).toBe(false)
@@ -266,16 +276,18 @@ describe('二重押しと同時保存（M512/M513）', () => {
     })
     await act(async () => { button('今すぐ送る')!.click() })
     await flush()
-    await act(async () => { button('送る')!.click() })
+    const confirm = document.body.querySelector('[data-design-node="TJUUl"]')
+    const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.trim() === '今すぐ送る') as HTMLButtonElement
+    await act(async () => { sendInDialog.click() })
     await flush()
     const post = calls.find((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'POST')!
     expect(post.headers['idempotency-key']).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
   })
 
-  it('M513: 直すときは開いたときの版を添え、競合時は入力を残したまま理由を出して読み直す', async () => {
+  it('M513: 編集するときは開いたときの版を添え、競合時は入力を残したまま理由を出して読み直す', async () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
-    // 下書きの「直す」を押して編集に入る。
+    // 下書きの「編集」を押して編集に入る。
     await act(async () => { button('直す')!.click() })
     await flush()
     expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!.value).toContain('料金改定のご案内')

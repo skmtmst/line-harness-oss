@@ -120,30 +120,114 @@
 
 /*
  * ★V8 `KjC1z`：印は 16px の正円（枠 1.2px）・「?」10px/600。
- * v7 は 18px・11px/500・枠 1px のまま。当たりも印に合わせて
- * 28px（-6px）・指では 44px（-14px）に変わる。
+ * v7 は 18px・11px/500・枠 1px のまま。
+ *
+ * ★V8 G3 はみ出し直し（parity 1004-0513：？印 181 件）。
+ * 28px の当たりを位置を持たない ::before で広げていたが、見えない
+ * はみ出しが表のセルの外側判定に載る（#1367 のチェックと同じ構図：
+ * 枠16＞中21）。V8 では正円を中の「?」の箱（.mark）が持ち、札自体を
+ * 透明な 28px の当たりにする（外側の配置は戻し余白で 16 に保つ）。
+ * 見た目の円・28px の当たり・読み上げは変わらない。v7 は今までどおり。
  */
 [data-theme='v8'] .button {
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
-  max-width: 16px;
-  max-height: 16px;
-  border-width: 1.2px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  margin: -6px; /* 外側の配置は 16 のまま */
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
+/* V8 の当たりは札自体。透明の ::before は出さない（指の 44px も同じ）。 */
 [data-theme='v8'] .button::before {
-  inset: -6px; /* 16 + 12 = 28px の当たり */
-}
-
-@media (pointer: coarse) {
-  [data-theme='v8'] .button::before {
-    inset: -14px; /* 16 + 28 = 44px の当たり */
-  }
+  content: none;
 }
 
 [data-theme='v8'] .mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.2px solid var(--color-ink-faint);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
   font-size: var(--text-nano);
   font-weight: 600;
+  line-height: 1;
+}
+
+/* 札は透明なので、キーボードの輪は中の円に寄せる。 */
+[data-theme='v8'] .button:focus-visible {
+  outline-offset: -5px;
+}
+
+/*
+ * ★V8 仕上げ（M10-2）：「?」の乗せた・押した・中身の開く動き。
+ * 印に乗せたときは地を少し沈め、押したときはほんの少し縮む。
+ * 中身は少し下からふっと出る（小さいふきだしなので 120ms）。
+ * （G3：沈みの地は円（.mark）側へ。札は透明の当たりのまま。）
+ */
+[data-theme='v8'] .button {
+  transition: scale var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .mark {
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
+[data-theme='v8'] .button:hover .mark {
+  background: var(--color-canvas-sunken);
+}
+
+[data-theme='v8'] .button:active {
+  scale: 0.88;
+}
+
+[data-theme='v8'] .tip {
+  animation: help-tip-v8-in var(--motion-fast) var(--motion-ease-out);
+  transform-origin: top left;
+}
+
+@keyframes help-tip-v8-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+}
+
+/* 正本 f6zwfs：影なし、枠なし、上下6、行間18。 */
+[data-theme='v8'] .tip {
+  display: flex; align-items: flex-start; gap: 0; padding: 6px 10px;
+  border: 0; border-radius: 8px; box-shadow: none;
+  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+  font-size: 12px; line-height: 18px; font-weight: 400;
+}
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .tip { -webkit-font-smoothing: auto; }
+
+@layer components {
+[data-theme='v8'] .mark {
+  gap: 0;
+  border: 0;
+  outline: 1.2px solid var(--color-ink-faint);
+  outline-offset: -0.6px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-ink-faint);
+  font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
+  font-size: 10px;
+  line-height: 10px;
 }
 }

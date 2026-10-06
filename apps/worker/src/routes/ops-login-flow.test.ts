@@ -51,28 +51,25 @@ beforeEach(async () => {
   ).run();
 });
 
-describe('運営コンソールのメール＋二段階認証', () => {
-  it('challengeをsessionへ交換し、そのBearerでsession確認とops認可まで通る', async () => {
+/*
+ * 二段階認証は一時解除中（利用者指示 2026-10-03）。運営ログインもパスワードが
+ * 合えばその場でセッションが出る。再有効化したら合言葉→/api/auth/two-factor/verify
+ * →セッションの順に戻す（`totpAtStep` と `SECRET` はそのために残している）。
+ */
+describe('運営コンソールのメールログイン', () => {
+  it('パスワードでsessionを受け取り、そのBearerでsession確認とops認可まで通る', async () => {
     const login = await app().request(`${WORKER}/api/auth/password/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Origin: PAGES },
       body: JSON.stringify({ email: 'ops-e2e@example.com', password: 'Abcdefg1', next: 'ops' }),
     }, environment());
     expect(login.status, await login.clone().text()).toBe(200);
-    const loginBody = await login.json() as { data: { twoFactor: boolean; challengeToken: string } };
-    expect(loginBody.data.twoFactor).toBe(true);
+    const loginBody = await login.json() as { data: { twoFactor: boolean; sessionToken: string }; csrfToken: string };
+    expect(loginBody.data.twoFactor).toBe(false);
+    expect(loginBody.data.sessionToken).toBeTruthy();
+    expect(loginBody.csrfToken).toBeTruthy();
 
-    const step = Math.floor(Date.now() / 30_000);
-    const verified = await app().request(`${WORKER}/api/auth/two-factor/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Origin: PAGES },
-      body: JSON.stringify({ challengeToken: loginBody.data.challengeToken, code: await totpAtStep(SECRET, step) }),
-    }, environment());
-    expect(verified.status, await verified.clone().text()).toBe(200);
-    const verifiedBody = await verified.json() as { data: { sessionToken: string }; csrfToken: string };
-    expect(verifiedBody.data.sessionToken).toBeTruthy();
-
-    const authorization = `Bearer lh_session:${verifiedBody.data.sessionToken}`;
+    const authorization = `Bearer lh_session:${loginBody.data.sessionToken}`;
     const session = await app().request(`${WORKER}/api/auth/session`, {
       headers: { Authorization: authorization, Origin: PAGES },
     }, environment());

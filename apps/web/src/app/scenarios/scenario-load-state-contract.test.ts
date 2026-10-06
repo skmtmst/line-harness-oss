@@ -1,11 +1,12 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+/* 完全切り替え：v7 の page.tsx は捨て、V8 の一覧（src/v8/scenarios/list.tsx・page.tsx が描く本体）を見る。 */
+const PAGE = readFileSync(new URL('../../v8/scenarios/list.tsx', import.meta.url), 'utf8')
 
 describe('V6 シナリオ一覧の読込状態', () => {
   it('読込・成功・失敗を別の状態として持つ', () => {
-    expect(PAGE).toContain('useOffsetServerList<ScenarioWithCount>')
+    expect(PAGE).toContain('useOffsetServerList<ScenarioRow>')
     expect(PAGE).toContain('scenarioList.loading')
     expect(PAGE).toContain('scenarioList.error')
     expect(PAGE).toContain('scenarioList.items')
@@ -13,8 +14,10 @@ describe('V6 シナリオ一覧の読込状態', () => {
 
   it('読込失敗を空のシナリオ一覧として表示しない', () => {
     expect(PAGE).toContain('scenarioList.error')
-    expect(PAGE).toContain('登録したシナリオは消えていません。')
-    expect(PAGE).toContain('onRetry={() => void loadScenarios()}')
+    /* 板 `BxGhV`「読み込めなかった」：細い帯＋もう一度試す。 */
+    expect(PAGE).toContain('シナリオを読み込めませんでした')
+    expect(PAGE).toContain('>もう一度試す<')
+    expect(PAGE).toContain('onClick={() => void loadScenarios()}')
     expect(PAGE).not.toContain("setError(res.error)")
   })
 
@@ -27,10 +30,15 @@ describe('V6 シナリオ一覧の読込状態', () => {
 
   it('操作失敗は内部エラーを出さず一覧読込失敗と分ける', () => {
     expect(PAGE).toContain("const [actionError, setActionError] = useState('')")
-    expect(PAGE).toContain('シナリオを停止できませんでした。')
-    expect(PAGE).toContain('シナリオを開始できませんでした。')
-    expect(PAGE).toContain('フォルダを変更できませんでした。')
-    expect(PAGE).toContain('シナリオを削除できませんでした。')
+    // V8のまとめて操作は先に表示を変え、失敗時は共通の知らせに出す。
+    expect(PAGE).toContain('runUndoable({')
+    expect(PAGE).toContain('配信を始められませんでした。')
+    expect(PAGE).toContain('停止できませんでした。')
+    expect(PAGE).toContain('results.filter((res) => !res || !res.success)')
+    expect(PAGE).toContain('if (failed > 0) throw new Error')
+    expect(PAGE).toContain('undo: () => setOptimisticRows(null)')
+    expect(PAGE).toContain('フォルダを移動できませんでした')
+    expect(PAGE).toContain('このシナリオを削除できませんでした')
     expect(PAGE).toContain('{actionError}')
   })
 })

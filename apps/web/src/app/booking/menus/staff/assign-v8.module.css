@@ -94,6 +94,13 @@
 .cellBox {
   position: relative;
   display: inline-flex;
+  /*
+   * 中のチェックの押せる範囲は見た目より外へ 3px 広い（24×24）。
+   * 枠をその分だけ内に余白を足して、外へのはみ出しに数えない。
+   * 外側の -3px で升の並びは動かさない。上書きの点（外へ4px）も中に収まる。
+   */
+  padding: 3px;
+  margin: -3px;
 }
 
 /* 上書きがある升の印（小さい黄の点）。 */
@@ -222,7 +229,7 @@
 .ovrBadge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   background: var(--color-status-warn-soft);

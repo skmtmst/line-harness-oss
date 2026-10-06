@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
+const CSS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'detail', 'friend-detail-v8.module.css'), 'utf8')
 const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'detail', 'page.tsx'), 'utf8')
 
 /*
@@ -13,11 +14,11 @@ const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'detail'
 describe('友だち詳細のタブ帯は右列を押し広げない', () => {
   it('グリッドの右列（data-design="Right"）は min-w-0 を持つ', () => {
     // タブ帯とパネルの縦間隔は親の gap-4 にそろえる（m13h。min-w-0 の意図は変えない）。
-    expect(PAGE).toContain('data-design="Right" className="flex min-w-0 flex-col gap-4"')
+    expect(CSS).toContain('.content { min-width: 0;')
   })
 
-  it('タブ帯は折り返さず横スクロールする', () => {
-    expect(PAGE).toContain('flex gap-1 overflow-x-auto border-b')
+  it('V8のタブ帯は板の全幅で安全に折り返す', () => {
+    expect(CSS).toContain('flex-wrap: wrap')
     expect(PAGE).not.toContain('flex flex-wrap gap-1 border-b')
   })
 

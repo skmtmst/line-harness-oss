@@ -416,8 +416,42 @@
   max-width: 128px;
 }
 
+/*
+ * ★V8 1152 の帯（parity 1003-2106：1152 の 29/31 板で札が 20px に
+ * 潰れて見えなくなっていた）。札は縮めない（長い名前は 128px の
+ * 「…」で受ける）。代わりにパンくずと自分の名前が縮む（どちらも
+ * 「…」持ち）。v7 は今までどおり。
+ */
+[data-theme='v8'] .accountPill {
+  flex-shrink: 0;
+}
+
+[data-theme='v8'] .crumbCurrent,
+[data-theme='v8'] .crumbFrom,
+[data-theme='v8'] .crumbFromLink,
+[data-theme='v8'] .user {
+  min-width: 0;
+}
+
 [data-theme="v8"] .user {
   max-width: 104px;
+}
+
+/*
+ * ★V8 1152 の帯（M3 報告・parity 1003-2106：1152 の 29/31 板で札が
+ * 20px に潰れて見えなくなっていた）。札は縮めない（長い名前は
+ * 128px の「…」で受ける）。代わりにパンくずと自分の名前が縮む
+ * （どちらも「…」持ち）。v7 は今までどおり。
+ */
+[data-theme='v8'] .accountPill {
+  flex-shrink: 0;
+}
+
+[data-theme='v8'] .crumbCurrent,
+[data-theme='v8'] .crumbFrom,
+[data-theme='v8'] .crumbFromLink,
+[data-theme='v8'] .user {
+  min-width: 0;
 }
 
 /* 1152 未満ではログアウトを印だけにする（板 NF3uI「1152 の帯」）。
@@ -433,4 +467,132 @@
     padding: 0;
   }
 }
+
+/* ---------------------------------------------------------------------
+ * ★V8 殻合わせ（絵 `V8-B/JKjsE`・統括もふだんの画面も同じ殻）。
+ * v7 の土台クラスは触らない。ここは V8 の上書きだけ。
+ * ------------------------------------------------------------------- */
+
+/* v7 の中箱（名前＋役割）は素通しにする。V8 でだけ積む。 */
+.identityText {
+  display: contents;
+}
+
+/* ホームの格子印＋文字。手前の段の頭。 */
+.crumbHome {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.crumbHome:hover {
+  color: var(--color-ink);
+}
+
+/* 札の中の役割（統括など）。V8 で名前の上に小さい行で添える。 */
+.pillText {
+  display: contents;
+}
+
+[data-theme='v8'] .pillText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+
+[data-theme='v8'] .pillRole {
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* 札は2行ぶんの高さにする（役割＋名前）。幅の決めは変えない。 */
+[data-theme='v8'] .accountPill {
+  height: auto;
+  min-height: 44px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/*
+ * 自分：名前を太字・役割を下の小さい行に積む（絵どおり）。
+ * 役割の印（押せる統括ボタンも）は札の形をやめ小さい文字にする。
+ */
+[data-theme='v8'] .identityText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+
+[data-theme='v8'] .identityText .user {
+  order: -1;
+  max-width: 140px;
+  color: var(--color-ink);
+}
+
+[data-theme='v8'] .identityText .role,
+[data-theme='v8'] .identityText .roleButton {
+  height: auto;
+  border-radius: var(--radius-none);
+  background: none;
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 0;
+}
+
+[data-theme='v8'] .identityText .roleButton:hover {
+  background: none;
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+[data-theme='v8'] .root { padding: 0 8px; gap: 10px; }
+[data-theme='v8'] .iconButton:not(:focus-visible) { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+
+/* zUg8S / Yw24X: 統括の別の絵は既存の default variant に残す。 */
+[data-theme='v8'] .root[data-v8-chrome='shell'] .actions { gap: 10px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .crumbs { gap: 6px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .crumbHome { gap: 6px; font-size: 13px; font-weight: 400; line-height: 20px; color: var(--color-ink-faint); }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .crumbHome > svg { display: block; width: 14px; height: 14px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .crumbCurrent { font-size: 13px; font-weight: 500; line-height: 20px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .v8Left > .iconButton { width: 32px; height: 32px; border-radius: 8px; background: transparent; }
+/* 切替の札は箱の中に小さい字＋名前の2行（絵の指示）。外の見出しは畳む。 */
+[data-theme='v8'] .accountField > span:first-child { display: none; }
+/* 1439 以下の v7 の決まり（見出しの span を画面外へ）が V8 では札そのものに当たり、幅 0 に潰れていた。札は戻す（1152 の絵にも札がある）。 */
+[data-theme='v8'] .accountField > .accountPill { position: relative; width: auto; height: 36px; overflow: visible; clip: auto; white-space: nowrap; }
+[data-theme='v8'] .accountPill { height: 36px; min-height: 36px; padding: 0 10px 0 6px; gap: 8px; border: 0; border-radius: 10px; outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
+[data-theme='v8'] .accountMark { width: 24px; height: 24px; border-radius: 7px; font-size: 11px; font-weight: 700; line-height: 17px; }
+[data-theme='v8'] .pillText { gap: 0; }
+[data-theme='v8'] .pillRole { font-size: 10px; font-weight: 400; line-height: 12px; }
+[data-theme='v8'] .accountName { font-size: 13px; font-weight: 600; line-height: 17px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .bellBadge { background: var(--color-status-danger); width: 18px; height: 18px; min-width: 18px; left: 22px; right: auto; top: -4px; padding: 0; outline: 2px solid var(--color-shell); outline-offset: -1px; font-size: 10px; font-weight: 700; line-height: 10px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .identity { height: 36px; padding: 0 10px 0 4px; gap: 8px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .avatar { width: 28px; height: 28px; border-radius: 999px; background: var(--color-status-info-soft); color: var(--color-action); font-size: 11px; font-weight: 600; line-height: 17px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .user { font-size: 13px; font-weight: 600; line-height: 17px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .role,
+[data-theme='v8'] .root[data-v8-chrome='shell'] .roleButton { font-size: 11px; font-weight: 400; line-height: 13px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .logout { gap: 6px; padding: 0 14px; border: 0; border-radius: 10px; outline: 1px solid var(--color-hairline); outline-offset: -.5px; box-shadow: var(--shadow-board); font-size: 13px; font-weight: 600; line-height: 20px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .logout svg { width: 15px; height: 15px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .v8Left > .iconButton:not(:focus-visible) { outline-color: transparent; }
+/* 展開時は絵の名前欄128/104px、畳んだ外側は内容に合わせた幅。 */
+[data-theme='v8'] .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .accountName { width: 128px; height: 20px; line-height: 17px; }
+[data-theme='v8'] .root[data-v8-chrome='shell']:not([data-menu-collapsed]) .user { width: 104px; height: 20px; line-height: 17px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .identity { border-radius: 10px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'] .bellBadge { border: 0; border-radius: 999px; }
+[data-theme='v8'] .root[data-v8-chrome='shell'][data-menu-collapsed] .crumbHome { gap: 0; }
+[data-theme='v8'] .root[data-v8-chrome='shell'][data-menu-collapsed] .crumbHome > svg { display: none; }
+
 }

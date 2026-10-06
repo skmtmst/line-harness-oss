@@ -275,7 +275,7 @@ textarea.input {
 }
 
 .conflictActions button {
-  padding: 7px 14px;
+  padding: 8px 14px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);

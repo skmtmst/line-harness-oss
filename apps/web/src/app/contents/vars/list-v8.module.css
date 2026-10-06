@@ -1,0 +1,674 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8 共通情報の一覧（Pencil「★V8 画面の地図」の共通情報の行：
+ * 一覧 `FM94M`、止める窓 `Hhl9M`、削除の窓 `xxKtW`、状態 `RqO7O`、
+ * 一覧（1152）`XIzkJ`、一覧（閲覧のみ）`OxSw8`）。
+ *
+ * v7 の一覧（`page.tsx` 内の VarsPageInner）とは別の部品として持つ。
+ * データの口は同じ。違いは置き場と見せ方だけ——上に4枚の数の帯、
+ * 空のまま使われているときの黄色の帯、「共通情報を作る」は左の
+ * フォルダの列の上、行の右端は「…」メニュー（編集・止める／再開する・
+ * 削除する）。止める・削除の窓は `Hhl9M`・`xxKtW` の1枚ずつにまとめる。
+ * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ *
+ * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
+ * 板が 1100px を切ったらフォルダの列を道具の段へ畳む
+ * （`docs/v8` RESPONSIVE の決まり。約 1352px 未満の画面幅に相当）。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+/* 見出し：画面名＋一行の説明。右に CSV で書き出す。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.headActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 閲覧のみの帯（板 `OxSw8`）。数の帯の上、12 のすき間。 */
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 数の帯：4つのマスを白い板いっぱいに区切り線で並べる。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+/* 数の帯のマス（板 `FM94M`「数 共通情報」：余白 16/20・間 8）。 */
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px 20px;
+}
+
+.kpi + .kpi {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpiHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kpiTile {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-tile-sm);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+}
+
+/* 数の帯の題（板 `FM94M`「題」：12・500・ink・行18）。 */
+.kpiLabel {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kpiMenu {
+  margin-left: auto;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--radius-mini);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+  line-height: 0;
+}
+
+/* 数の帯の数（板 `FM94M`：22・600）。 */
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.kpiDetail {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 数の帯の中の「直す →」。空のまま使われている帯だけの導線。 */
+.kpiLink {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kpiLink:hover {
+  text-decoration: underline;
+}
+
+/* 空のまま使われているときの黄色の帯（板 `FM94M`「警告」：余白 10/14・間 10）。 */
+.alertBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-warn-soft);
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.alertBand svg {
+  flex-shrink: 0;
+  color: var(--color-status-warn);
+}
+
+.alertText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.alertAction {
+  flex-shrink: 0;
+}
+
+/* 本体：左にフォルダの列、右に一覧。 */
+.split {
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.folderCol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.folderNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 道具の段：検索＋絞り込み＋表示件数。狭い板では2段に分ける。 */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 板が狭いときだけ出す「作る」とフォルダの選ぶ欄（板 `XIzkJ`）。 */
+.toolbarCreate {
+  display: none;
+}
+
+.folderSelectWrap {
+  display: none;
+  min-width: 160px;
+}
+
+/* 板が狭いときだけ出すフォルダの追加・名前変更・削除（v7 と同じ口）。 */
+.folderNarrowActions {
+  display: none;
+}
+
+.searchWrap {
+  flex: 0 0 auto;
+  width: 200px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.pageSizeWrap {
+  margin-left: auto;
+}
+
+/* 表。1列目（名前＋差し込み名）は伸び縮み、ほかは中身に合わせた幅。 */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.table {
+  width: 100%;
+  min-width: 680px;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+/* 表の見出し（板 `FM94M`「表の見出し」：余白 12/24・文字 12/600/secondary・地 table-head）。 */
+.table th {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+/* 表の行（板 `FM94M`「行 会社名」ほか：余白 12/24・間 16。行高 60.5 は中身の結果なので追わない）。 */
+.table td {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: middle;
+}
+
+/* 列幅（板 `FM94M`：中身 170・状態 80・使っている所 90。1列目は伸び縮み）。 */
+.cellValue {
+  width: 170px;
+}
+
+.cellStatus {
+  width: 80px;
+}
+
+.cellUsage {
+  width: 90px;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 消える行は薄くなってから外す（150ms。動きを減らす設定では一瞬）。 */
+@media (prefers-reduced-motion: no-preference) {
+  .table tbody tr {
+    transition: opacity var(--motion-exit) var(--motion-ease-out);
+  }
+
+  .table tbody tr[data-leaving='true'] {
+    opacity: 0;
+  }
+}
+
+.table tbody tr:hover {
+  background: var(--color-canvas-sunken);
+}
+
+/* 行を押すと右から詳細パネルが出る。 */
+.rowClick {
+  cursor: pointer;
+}
+
+/* パネルが開くときは右に 360px の列を足す（一覧は左に見えたまま）。 */
+.splitWithPanel {
+  grid-template-columns: 208px minmax(0, 1fr) 360px;
+}
+
+/* 詳細パネルの中の段。 */
+.panelActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.panelBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panelLabel {
+  margin: 12px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.panelLabel:first-child {
+  margin-top: 0;
+}
+
+.panelText {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.panelError {
+  margin: 8px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.cellCheck {
+  width: 40px;
+}
+
+.cellMenu {
+  width: 56px;
+  text-align: right;
+}
+
+/* 名＋差し込みキー。狭いときは1行のまま省略＋ title で全文。 */
+.nameLink {
+  display: block;
+  overflow: hidden;
+  color: var(--color-action);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameLink:hover {
+  text-decoration: underline;
+}
+
+.keyRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.keyCode {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.valueCell {
+  overflow: hidden;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.valueEmpty {
+  color: var(--color-status-warn);
+  font-size: 12px;
+}
+
+.usageLink {
+  color: var(--color-action);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.usageLink:hover {
+  text-decoration: underline;
+}
+
+.usageNone {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 更新・次回の列：v7 と同じ情報。狭いときは省略し、全文は title で読む。 */
+.updateCell {
+  overflow: hidden;
+  max-width: 220px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 10px 20px;
+}
+
+.footCount {
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+}
+
+/* 状態の板（`RqO7O`）：まだ無い・0件・読み込み中・失敗は同じ枠・同じ高さ。 */
+.stateCard {
+  min-height: 320px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+/* 止める・削除の窓の中身（板 `Hhl9M`・`xxKtW`）。 */
+.dialogLead {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.dialogWarn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-warn-soft);
+  color: var(--color-ink);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.dialogWarn svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-status-warn);
+}
+
+.dialogField {
+  display: block;
+  margin-top: 12px;
+}
+
+.dialogLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dialogInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.dialogError {
+  margin: 8px 0 0;
+  color: var(--color-danger);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dialogHint {
+  margin: 8px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.usageList {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.usageItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-hairline);
+  font-size: 12px;
+}
+
+.usageItemName {
+  min-width: 0;
+  color: var(--color-ink-secondary);
+}
+
+.usageItemLink {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.usageItemLink:hover {
+  text-decoration: underline;
+}
+
+.choiceBox {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+}
+
+.choiceBoxActive {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+}
+
+.choiceTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.choiceNote {
+  margin: 4px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満、板 `XIzkJ`） ===== */
+@container (max-width: 1099px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi:nth-child(3) {
+    border-left: 0;
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* フォルダの列は道具の段の選ぶ欄へ畳む。「作る」は道具の段の左端。 */
+  .folderCol {
+    display: none;
+  }
+
+  .toolbarCreate {
+    display: inline-flex;
+  }
+
+  .folderSelectWrap {
+    display: block;
+  }
+
+  .folderNarrowActions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pageSizeWrap {
+    margin-left: 0;
+  }
+}
+
+/* さらに狭い板では数の帯も1列に。 */
+@container (max-width: 560px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpi + .kpi {
+    border-left: 0;
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  .searchWrap {
+    flex-basis: 100%;
+  }
+}

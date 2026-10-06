@@ -12,6 +12,7 @@
  * 主ボタンは1画面1つの決まりで、カードのボタンは副（secondary）のまま。
  */
 import { useState } from 'react'
+import { ApiError } from '@/lib/api'
 import { Check, Eye, Undo2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -147,6 +148,7 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
     <Dialog
       open={item !== null}
       title="差し戻しますか？"
+      designNode="n4j0Rm"
       onCancel={onCancel}
       footer={(
         <div className={styles.dialogActions}>
@@ -181,7 +183,7 @@ function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
 }
 
 function ApprovalsBoard({ ctx }: { ctx: RestaurantV8Context }) {
-  const { data, selectedStoreId, busy, mutate } = ctx
+  const { data, selectedStoreId, busy, mutate, reload } = ctx
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   const readOnly = role !== null && !canManageRole(role)
@@ -191,7 +193,13 @@ function ApprovalsBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const decide = (id: string, action: 'approve' | 'return', comment?: string) => {
     if (!selectedAccountId) return
     void mutate(
-      () => restaurantTestApi.decideApproval(selectedAccountId, id, action, comment),
+      async () => {
+        const result = await restaurantTestApi.decideApproval(selectedAccountId, id, action, comment)
+        if (result.data.menuChangeStatus === 'failed') {
+          await reload()
+          throw new ApiError(409, result.data.failureReason || '新価格を反映できませんでした。最新価格を確認して再申請してください。')
+        }
+      },
       action === 'approve' ? '承認しました。外部公開は行っていません。' : '差し戻しました。',
     )
   }

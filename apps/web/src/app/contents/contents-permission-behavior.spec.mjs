@@ -251,7 +251,7 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
     /* staffの「…」には管理操作が混ざらないことも、開いた中身で見る。 */
     await expect(page.getByRole('menuitem', { name: '編集' })).toHaveCount(0)
     await expect(page.getByRole('menuitem', { name: '削除する' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'ファイルを入れる' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'メディアを登録する' }).first()).toBeVisible()
 
     /* 無効なボタンは通常clickが届かない。DOM側から直接叩いても呼ばないことまで見る。 */
     await button.evaluate((element) => element.click())

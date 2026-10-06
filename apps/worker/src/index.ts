@@ -154,6 +154,7 @@ import { analytics } from './routes/analytics.js';
 import { analyticsExports } from './routes/analytics-exports.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
+import { dbFor } from './services/db-router.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { restaurantGoogle } from './routes/restaurant-google.js';
 import { googleSheets } from './routes/google-sheets.js';
@@ -1360,6 +1361,13 @@ async function runFrequentHeavyJobs(
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
     {
+      name: 'follower import continuation',
+      run: async () => {
+        const { processPendingFollowerImports } = await import('./services/follower-import-background.js');
+        await processPendingFollowerImports(env.DB, { credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY });
+      },
+    },
+    {
       // EC の再試行（上限つき）の回収。落ちた受信を保存済み payload から
       // 同じ入口で回し直す。上限到達は dead letter へ倒す。安定キーと
       // claim で二重実行なし。停止中は回さない。
@@ -1652,8 +1660,17 @@ async function runFrequentHeavyJobs(
 
   if (restaurantTestEnabled(env)) {
     jobs.push({
-      // Googleビジネス第4段: 口コミ・投稿の再同期。5分レーンだが接続ごとの
-      // 55分ゲートで実質1時間ごと。書き込み経路は手動syncと同じ関数を使う。
+      name: 'restaurant hold expiry',
+      run: async () => {
+        const { expireRestaurantHolds, applyDueRestaurantMenuPrices } = await import('./services/restaurant-booking.js');
+        await expireRestaurantHolds(dbFor(env), new Date(event.scheduledTime).toISOString());
+        await applyDueRestaurantMenuPrices(dbFor(env));
+      },
+    });
+    jobs.push({
+      // Googleビジネス第4段: 口コミ・投稿の再同期。重い処理用レーン（`1-56/5`。
+      // 通知レーンと1分ずらした5分間隔）で動くが、接続ごとの55分ゲートで実質1時間ごと。
+      // 読み取りAPIだけを呼び、書き込みAPIは呼ばない（手動syncと同じ関数を使う）。
       name: 'google business resync',
       run: async () => {
         const { processGoogleBusinessHourlyResync } = await import('./services/google-business-resync.js');
@@ -1856,6 +1873,37 @@ async function runSixHourlyHeavyJobs(
         }
       },
     },
+    {
+      // ★V6 36-2: 退会・無料体験切れから保存期限が過ぎた統括の顧客データを消す。
+      // 1回の行数に上限があり、途中で止まっても次の回が続きから消す。
+      name: 'tenant data retention purge',
+      run: async () => {
+        const { processTenantDataPurge } = await import('./services/tenant-data-purge.js');
+        const result = await processTenantDataPurge(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.anchoredTrials + result.tenants + result.deletedRows > 0) {
+          console.log(JSON.stringify({ event: 'tenant_data_retention_purge', ...result }));
+        }
+      },
+    },
+    {
+      // Googleビジネス: Googleから受け取った内容の保存期限（暦日30日）を守る掃除。
+      // 機能スイッチでゲートしない。機能をoffにした店舗の古いコピーが残り続けるほうが
+      // ポリシー違反になるため、スイッチと関係なく毎回走らせる。
+      name: 'google business content retention',
+      run: async () => {
+        const { purgeExpiredGoogleContent, totalRetentionActions } = await import(
+          './services/google-business-retention.js'
+        );
+        const result = await purgeExpiredGoogleContent(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (totalRetentionActions(result) > 0) {
+          console.log(JSON.stringify({ event: 'google_business_content_retention', ...result }));
+        }
+      },
+    },
   ];
 
   if (restaurantTestEnabled(env)) {
@@ -2038,6 +2086,7 @@ async function scheduled(
       const now = new Date(event.scheduledTime).toISOString();
       const executors = createAutomationActionExecutors({
         credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        operatorMailEnv: env,
       });
       const scheduledResult = await processScheduledAutomationTriggers(env.DB, {
         now, executors, limit: 100,
@@ -2211,15 +2260,19 @@ async function scheduled(
        * 採用直後・手動の再試行で届かなかった分を、期限の来た順に届け直す。
        * EC接続が未設定の環境では何もしない（行は「要対応」として一覧に残る）。
        */
-      const { processDuePhotoRewards, ecPhotoPointClientFromEnv } = await import('./services/photo-reward-sync.js');
+      const { processDuePhotoRewards, processDuePhotoPublicationRewards, ecPhotoPointClientFromEnv } = await import('./services/photo-reward-sync.js');
       const photoRewards = await processDuePhotoRewards(
         env.DB,
         ecPhotoPointClientFromEnv(env),
         { now: new Date() },
       );
+      const publicationRewards = await processDuePhotoPublicationRewards(
+        env.DB, ecPhotoPointClientFromEnv(env), { now: new Date() },
+      );
       if (birthday.queued + birthday.failed + result.sent + result.failed + result.skipped
-        + result.deferred + photoRewards.synced + photoRewards.failed + photoRewards.skipped > 0) {
-        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, photoRewardSynced: photoRewards.synced, photoRewardFailed: photoRewards.failed, ...result }));
+        + result.deferred + photoRewards.synced + photoRewards.failed + photoRewards.skipped
+        + publicationRewards.synced + publicationRewards.failed > 0) {
+        console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, photoPublicationRewardSynced: publicationRewards.synced, photoPublicationRewardFailed: publicationRewards.failed, photoRewardSynced: photoRewards.synced, photoRewardFailed: photoRewards.failed, ...result }));
       }
     });
   } catch (e) {

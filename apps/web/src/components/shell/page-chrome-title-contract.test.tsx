@@ -27,13 +27,13 @@ describe('usePageTitle は空の題を出さない', () => {
   })
 
   it('題があるときは変えない', () => {
-    document.title = '然-NEN- LINE管理システム'
+    document.title = 'musubo LINE管理システム'
     const { unmount } = render(
       <PageChromeProvider>
         <Titled />
       </PageChromeProvider>,
     )
-    expect(document.title).toBe('然-NEN- LINE管理システム')
+    expect(document.title).toBe('musubo LINE管理システム')
     unmount()
     document.title = ''
   })

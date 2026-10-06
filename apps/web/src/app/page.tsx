@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { EntryRoute, NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { ApiError, api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
@@ -26,17 +27,20 @@ import {
   activeUpcomingBookings,
   inactiveBookingStatuses,
 } from '@/components/dashboard/side-cards'
-import DashboardEditor, {
+import DashboardEditor from '@/components/dashboard/dashboard-editor'
+import {
   defaultDashboardPreferences,
   normalizeDashboardPreferences,
   type DashboardCardId,
   type DashboardPreferences,
-} from '@/components/dashboard/dashboard-editor'
+} from '@/components/dashboard/dashboard-preference-defaults'
 import Card, { CardHeader } from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import { withViewTransition } from '@/components/shared/view-transition'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import HelpTip from '@/components/shared/help-tip'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
@@ -129,6 +133,10 @@ function TodayTaskCard({
   status,
   statusTone = 'success',
   loading = false,
+  expanded = false,
+  onToggle,
+  detailContent,
+  detailId,
 }: {
   title: string
   /*
@@ -149,34 +157,66 @@ function TodayTaskCard({
   statusTone?: 'success' | 'muted' | 'danger'
   /* true の間は件数の場所に骨組みを出す。失敗・未取得は「—」のまま（#673）。 */
   loading?: boolean
+  /* V8 のみ：広がっているとき真。onToggle が無いときは畳んだまま。 */
+  expanded?: boolean
+  /* V8 のみ：数の押しで広げる・畳む。無いときは従来どおり押せない。 */
+  onToggle?: (() => void) | null
+  /* V8 のみ：広げたときに出す内訳。実データだけを渡す。 */
+  detailContent?: ReactNode
+  /* V8 のみ：広げた領域の id（数のボタンの aria-controls 用）。 */
+  detailId?: string
 }) {
+  const numberContent = (
+    <>
+      {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
+      <DelayedSkeleton
+        loading={loading}
+        skeleton={
+          <>
+            <Skeleton className="h-7 w-16" />
+            <span className="sr-only">{STATE_TEXT.loading}</span>
+          </>
+        }
+      >
+        {value === null ? '—' : formatNumber(value)}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
+      </DelayedSkeleton>
+    </>
+  )
   return (
     /*
      * ★V7「ダッシュボードの見せ方」（V7 文書 fyR7V）。数字をいちばん大きく、状態は数字の横、
      * 操作は右下に1つ（→付き）。以前は右上の操作・数字・補足2つの3段で、目が上下に散っていた。
      */
-    <Card layout="vertical" padding="default" className="h-[116px] min-w-0">
+    <Card layout="vertical" padding="default" className={expanded && onToggle ? 'min-w-0' : 'h-[116px] min-w-0'}>
       <div className="flex min-w-0 items-baseline gap-2">
         <h3 className="text-ink-secondary min-w-0 truncate text-sm font-semibold" title={title}>{title}</h3>
         {period ? <span className="text-ink-faint whitespace-nowrap text-xs font-normal">{period}</span> : null}
       </div>
-      <div className="mt-2 flex min-w-0 items-baseline gap-2">
-        <p className="text-ink text-[28px] leading-none font-bold tabular-nums" aria-busy={loading || undefined}>
-          {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
-          <DelayedSkeleton
-            loading={loading}
-            skeleton={
-              <>
-                <Skeleton className="h-7 w-16" />
-                <span className="sr-only">{STATE_TEXT.loading}</span>
-              </>
-            }
-          >
-            {value === null ? '—' : formatNumber(value)}<span className="text-ink-secondary ml-0.5 text-sm font-semibold">件</span>
-          </DelayedSkeleton>
+      <div className="relative mt-2 flex min-w-0 items-baseline gap-2">
+        <p className="text-ink text-hero leading-none font-bold tabular-nums" aria-busy={loading || undefined}>
+          {numberContent}
         </p>
         <span className={`${statusTone === 'muted' ? 'text-ink-faint' : statusTone === 'danger' ? 'text-danger' : 'text-success'} shrink-0 whitespace-nowrap text-xs font-semibold`}>{status}</span>
+        {/*
+          V8 のみ：数の上に透明な押しを重ねる。数そのものの描き方は
+          v7 と同じにし、押すとタイルが広がって内訳へ開く。
+        */}
+        {onToggle ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            aria-controls={detailId}
+            aria-label={`${title}の内訳を${expanded ? '閉じる' : '開く'}`}
+            className="absolute inset-0 rounded-card focus-visible:outline-2 focus-visible:outline-ink"
+          />
+        ) : null}
       </div>
+      {onToggle && expanded && detailContent ? (
+        <div id={detailId} role="region" aria-label={`${title}の内訳`} className="border-hairline mt-2 min-w-0 border-t pt-2">
+          {detailContent}
+        </div>
+      ) : null}
       {/*
         配置は右下のまま（★V7「ダッシュボードの見せ方」fyR7V）。
         見た目だけ CardHeader の action（actionTone="info"）にそろえる。
@@ -293,7 +333,7 @@ function FriendAddLinkCard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex min-w-[220px] items-center gap-2">
-            <span className="text-ink-faint shrink-0 text-[10px] font-medium">発行中</span>
+            <span className="text-ink-faint shrink-0 text-nano font-medium">発行中</span>
             <Select
               value={routeId}
               onChange={(value) => setRouteId(value)}
@@ -331,7 +371,7 @@ function FriendAddLinkCard({
       <QrDialog
         open={showQr}
         onClose={() => writeQr(null)}
-        accountName={selectedAccount?.displayName ?? '然-NEN- 公式'}
+        accountName={selectedAccount?.displayName ?? 'LINE公式アカウント'}
         officialProfileUrl={visualQa?.officialProfileUrl ?? officialProfileUrl}
         accountBasicId={selectedAccount?.basicId ?? null}
         baseLink={baseLink}
@@ -442,7 +482,7 @@ function LiveDataCard({
         <div className="flex min-w-0 items-center gap-1">
           <h2 className="text-ink min-w-0 truncate text-sm font-semibold" title={title}>{title}</h2>
           {help ? <HelpTip label={`${title}の説明`}>{help}</HelpTip> : null}
-          {period ? <span className="text-ink-faint shrink-0 text-[11px] font-normal whitespace-nowrap">{period}</span> : null}
+          {period ? <span className="text-ink-faint shrink-0 text-micro font-normal whitespace-nowrap">{period}</span> : null}
         </div>
         {/*
           行き先リンクは CardHeader の action（actionTone="info"）と
@@ -621,7 +661,7 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
     <div className="flex items-baseline justify-between gap-3">
       <h2 className="text-ink min-w-0 truncate text-base font-bold" title="接続状態">接続状態</h2>
       {/* 現在時点の状態（IDEA-01）。 */}
-      <span className="text-ink-faint flex-1 whitespace-nowrap text-[11px] font-normal">現在</span>
+      <span className="text-ink-faint flex-1 whitespace-nowrap text-micro font-normal">現在</span>
       {dashboardLocalUpdatedAt(updatedAt) ? (
         <span className="text-ink-faint shrink-0 text-xs font-medium">{dashboardLocalUpdatedAt(updatedAt)}</span>
       ) : null}
@@ -633,6 +673,42 @@ function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, upda
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-ink font-semibold tabular-nums">{activeFriends === null ? '—' : `${formatNumber(activeFriends)}人`}</dd></div>
     </dl>
   </Card>
+}
+
+/*
+ * V8 だけ：編集パネル（dnd-kit を含む重い部品）は開くまで読まない。
+ * v7 は今までどおり静的に読む（動きを変えない）。
+ * v7 も遅延化を試したが、開いてすぐ出る既存の試験が赤になるため戻した。
+ */
+const DashboardEditorDynamic = dynamic(() => import('@/components/dashboard/dashboard-editor').then((module) => module.default), {
+  loading: () => <p className="text-ink-faint text-sm">編集パネルを読み込んでいます</p>,
+})
+
+/*
+ * V8 だけ：下の段が見えてから補足の口を叩く。
+ * 右の列は最初の画面に入らないため、起動時の口を減らす。
+ * v7・IO非対応では今までどおりすぐ叩く。
+ */
+function useSeenOnce(enabled: boolean): { ref: React.RefObject<HTMLElement | null>; ready: boolean } {
+  const ref = useRef<HTMLElement | null>(null)
+  const [seen, setSeen] = useState(false)
+  useEffect(() => {
+    if (!enabled || seen) return
+    const node = ref.current
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      setSeen(true)
+      return
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setSeen(true)
+        observer.disconnect()
+      }
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [enabled, seen])
+  return { ref, ready: !enabled || seen }
 }
 
 function DashboardPageInner() {
@@ -776,12 +852,48 @@ function DashboardPageInner() {
     .filter((item) => item.visible)
     .filter((item) => item.id !== 'support-mark-status' || supportMarksEnabled)
   const visibleToday = preferences.today.filter((item) => item.visible)
+  /*
+   * V8 のみ：数のタイルを押すと、そのタイルが広がって内訳へ（共通
+   * view-transition でつながる移り変わり）。v7 は押せないまま。
+   */
+  const theme = useAdminTheme()
+  const [expandedTodayId, setExpandedTodayId] = useState<DashboardCardId | null>(null)
+  const toggleTodayExpand = (id: DashboardCardId) => {
+    withViewTransition(() => {
+      setExpandedTodayId((prev) => (prev === id ? null : id))
+    })
+  }
+  const todayExpandProps = (id: DashboardCardId) =>
+    theme === 'v8'
+      ? {
+        expanded: expandedTodayId === id,
+        onToggle: () => toggleTodayExpand(id),
+        detailId: `today-detail-${id}`,
+      }
+      : { expanded: false as const, onToggle: undefined, detailId: undefined }
   const needsPhotos = visibleToday.some((item) => item.id === 'today-photo-review')
   const needsBookings = visibleToday.some((item) => item.id === 'today-bookings')
     || visibleRight.some((item) => item.id === 'upcoming')
   const needsHealth = visibleRight.some((item) => item.id === 'operational-alerts' || item.id === 'connection-status')
   const needsTwoFactor = visibleRight.some((item) => item.id === 'operational-alerts')
   const needsSupportMarks = visibleRight.some((item) => item.id === 'support-mark-status')
+  const adminTheme = useAdminTheme()
+  const isV8 = adminTheme === 'v8'
+  /*
+   * V8 だけ：下の段（右の列）が見えてから補足の口を叩く。
+   * 起動時は概要・配置だけを先に取り、予約・写真・稼働などの補足は
+   * 右の列が見えてから取る。v7 は今までどおりすぐ叩く。
+   */
+  const { ref: asideRef, ready: asideReady } = useSeenOnce(isV8)
+  /*
+   * テーマは最初の描画では 'v7' の初期値で、直後に本当の値へ揃う。
+   * その初回だけ門が開いたと誤認して補足をすぐ叩かないよう、
+   * 載ったあとに門を開ける。描き分け自体は門に依存しないため、
+   * 出来上がりの見た目は v7・V8 とも変わらない。
+   */
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  const supplementGate = mounted && (!isV8 || asideReady)
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -1051,6 +1163,8 @@ function DashboardPageInner() {
   }, [selectedAccountId])
 
   useEffect(() => {
+    // V8 だけ：右の列が見えるまで待つ（起動時の口を減らす）。
+    if (!supplementGate) return
     setPendingPhotos(null)
     setPendingPhotosState('loading')
     if (!selectedAccountId) return
@@ -1080,9 +1194,11 @@ function DashboardPageInner() {
       },
     )
     return () => { cancelled = true }
-  }, [markSupplementLoaded, needsPhotos, selectedAccountId])
+  }, [markSupplementLoaded, needsPhotos, selectedAccountId, supplementGate])
 
   useEffect(() => {
+    // V8 だけ：右の列が見えるまで待つ（起動時の口を減らす）。
+    if (!supplementGate) return
     setBookings(null)
     setTodayActiveBookings(null)
     setBookingsFailed(false)
@@ -1160,9 +1276,11 @@ function DashboardPageInner() {
       if (!cancelled) setSupplementLoading(false)
     })
     return () => { cancelled = true }
-  }, [markSupplementLoaded, needsBookings, selectedAccountId])
+  }, [markSupplementLoaded, needsBookings, selectedAccountId, supplementGate])
 
   useEffect(() => {
+    // V8 だけ：右の列が見えるまで待つ（起動時の口を減らす）。
+    if (!supplementGate) return
     setHealthRisk(null)
     setHealthIssueCount(null)
     setHealthFailed(false)
@@ -1191,9 +1309,11 @@ function DashboardPageInner() {
       },
     )
     return () => { cancelled = true }
-  }, [markSupplementLoaded, needsHealth, selectedAccountId])
+  }, [markSupplementLoaded, needsHealth, selectedAccountId, supplementGate])
 
   useEffect(() => {
+    // V8 だけ：右の列が見えるまで待つ（起動時の口を減らす）。
+    if (!supplementGate) return
     setTwoFactorSummary(null)
     if (!selectedAccountId || !needsTwoFactor) return
     let cancelled = false
@@ -1211,9 +1331,11 @@ function DashboardPageInner() {
       },
     )
     return () => { cancelled = true }
-  }, [markSupplementLoaded, needsTwoFactor, selectedAccountId])
+  }, [markSupplementLoaded, needsTwoFactor, selectedAccountId, supplementGate])
 
   useEffect(() => {
+    // V8 だけ：右の列が見えるまで待つ（起動時の口を減らす）。
+    if (!supplementGate) return
     setSupportMarkAutoOnInbound(null)
     if (!selectedAccountId || !needsSupportMarks) return
     let cancelled = false
@@ -1231,7 +1353,7 @@ function DashboardPageInner() {
       },
     )
     return () => { cancelled = true }
-  }, [markSupplementLoaded, needsSupportMarks, selectedAccountId])
+  }, [markSupplementLoaded, needsSupportMarks, selectedAccountId, supplementGate])
 
   const activeBookings = useMemo(
     () => bookings?.filter((booking) => !inactiveBookingStatuses.has(booking.status)) ?? [],
@@ -1319,6 +1441,19 @@ function DashboardPageInner() {
         : pendingOldest !== null ? `最長 ${formatWaitRough(pendingOldest)}` : '—'}
       /* 待っている人がいる時の「最長 ○日前」は注意の色。緑は「問題なし」に読める（★V7）。 */
       statusTone={pendingTotal === null ? 'muted' : pendingTotal > 0 ? 'danger' : 'success'}
+      {...todayExpandProps(id)}
+      detailContent={
+        <ul className="text-ink-secondary space-y-1 text-xs">
+          <li className="flex items-baseline justify-between gap-2">
+            <span>LINEの未対応</span>
+            <span className="tabular-nums">{lineUnread === null ? '未取得' : `${formatNumber(lineUnread)}件`}</span>
+          </li>
+          <li className="flex items-baseline justify-between gap-2">
+            <span>メールの未対応</span>
+            <span className="tabular-nums">{mailUnread === null ? '未取得' : `${formatNumber(mailUnread)}件`}</span>
+          </li>
+        </ul>
+      }
     />
     if (id === 'today-photo-review') {
       const override = reference?.pendingPhotos
@@ -1345,6 +1480,16 @@ function DashboardPageInner() {
         loading={state === 'loading'}
         status={forbidden ? '権限なし' : state === 'ready' ? 'ポイント付与あり' : '確認待ち'}
         statusTone={state === 'ready' ? 'success' : 'muted'}
+        {...todayExpandProps(id)}
+        detailContent={
+          <p className="text-ink-secondary text-xs leading-relaxed">
+            {forbidden
+              ? '写真を見る権限がありません。権限を確認してください。'
+              : state === 'ready' && value !== null && value > 0
+                ? `確認待ちが${formatNumber(value)}件あります。審査するとポイントが付きます。`
+                : detail}
+          </p>
+        }
       />
     }
     /*
@@ -1374,6 +1519,23 @@ function DashboardPageInner() {
           : bookings === null ? '確認中'
             : upcomingBookings.length > 0 ? nextBookingLabel(upcomingBookings[0].starts_at, today) : '次回予定なし'}
         statusTone={bookingsFailed ? 'muted' : 'success'}
+        {...todayExpandProps(id)}
+        detailContent={
+          upcomingBookings.length === 0 ? (
+            <p className="text-ink-secondary text-xs leading-relaxed">
+              {bookingsFailed ? STATE_TEXT.error : '直近の予約はありません。'}
+            </p>
+          ) : (
+            <ul className="text-ink-secondary space-y-1 text-xs">
+              {upcomingBookings.slice(0, 3).map((booking) => (
+                <li key={booking.id} className="flex min-w-0 items-baseline gap-2">
+                  <span className="shrink-0 tabular-nums">{formatTime(booking.starts_at)}</span>
+                  <span className="min-w-0 truncate" title={booking.menu_name}>{booking.menu_name}</span>
+                </li>
+              ))}
+            </ul>
+          )
+        }
       />
     }
     if (id === 'today-shipments') return <TodayTaskCard
@@ -1394,6 +1556,25 @@ function DashboardPageInner() {
        */
       status={reference?.shipmentStatus ?? (shipmentState === 'error' ? '未取得' : shipmentState === 'ready' ? `今日・明日 ${shipmentSummary?.soon ?? 0}件` : '確認中')}
       statusTone={shipmentState === 'error' ? 'muted' : 'success'}
+      {...todayExpandProps(id)}
+      detailContent={
+        shipmentState !== 'ready' || !shipmentSummary ? (
+          <p className="text-ink-secondary text-xs leading-relaxed">
+            {shipmentState === 'error' ? STATE_TEXT.error : STATE_TEXT.loading}
+          </p>
+        ) : (
+          <ul className="text-ink-secondary space-y-1 text-xs">
+            <li className="flex items-baseline justify-between gap-2">
+              <span>今日の出荷</span>
+              <span className="tabular-nums">{`${formatNumber(shipmentSummary.today)}件`}</span>
+            </li>
+            <li className="flex items-baseline justify-between gap-2">
+              <span>今日・明日の出荷</span>
+              <span className="tabular-nums">{`${formatNumber(shipmentSummary.soon)}件`}</span>
+            </li>
+          </ul>
+        )
+      }
     />
     return null
   }
@@ -1407,8 +1588,8 @@ function DashboardPageInner() {
     />
     if (id === 'operational-alerts') return <OperationalAlertsCard risk={displayedHealthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={pendingOldest} twoFactor={displayedTwoFactor} referenceCount={reference?.operationalAlerts} failed={healthFailed} updatedAt={supplementLoadedAt} />
     if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={displayedHealthRisk} activeFriends={activeFriends} healthFailed={healthFailed} updatedAt={supplementLoadedAt} />
-    if (id === 'upcoming') return <UpcomingCard accountId={selectedAccountId} bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} />
-    if (id === 'delivery-failures') return <DeliveryFailuresCard accountId={selectedAccountId} />
+    if (id === 'upcoming') return <UpcomingCard accountId={selectedAccountId} bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} startLoad={supplementGate} />
+    if (id === 'delivery-failures') return <DeliveryFailuresCard accountId={selectedAccountId} startLoad={supplementGate} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
       ? <UnavailableDataCard title="今月の配信" section={data.sections?.delivery} onRetry={() => void load()} />
       : data ? <MonthlyDeliveryCard delivery={data.delivery} freshness={<DashboardFreshness freshness={data.sections?.delivery?.freshness} asOf={data.sections?.delivery?.asOf} reason={data.sections?.delivery?.reason} />} />
@@ -1463,7 +1644,7 @@ function DashboardPageInner() {
      * ★V7 仕上げ `z97zZN` §1: 最初に開いたときだけ、段ごとに下から8px・
      * 200ms・40ms ずつずらして出す。`.v7-stagger` は globals.css の共通規定。
      */
-    <div className="v7-stagger flex flex-col gap-4">
+    <div className="v7-stagger flex flex-col gap-4" data-design-node="d8X09">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/* V6 `vUXKb/vwcM6`: 画面名は共通トップバーだけ。本文には操作だけを置く。 */}
       {/*
@@ -1608,22 +1789,38 @@ function DashboardPageInner() {
             return <div key={item.id}>{renderMainCard(item.id)}</div>
           })}
         </div>
-        <aside className="min-w-0 space-y-3.5">
+        <aside ref={asideRef} className="min-w-0 space-y-3.5">
           {visibleRight.map((item) => <div key={item.id}>{renderRightCard(item.id)}</div>)}
         </aside>
       </div>
 
-      <DashboardEditor
-        open={editorOpen}
-        preferences={preferences}
-        saving={preferenceSaving}
-        saveError={preferenceSaveError?.message ?? null}
-        saveConflict={preferenceSaveError?.conflict ?? false}
-        onReloadPreferences={reloadPreferences}
-        onCancel={closeEditor}
-        onApply={applyPreferences}
-        onReset={resetPreferences}
-      />
+      {/*
+        V8 だけ：編集パネル（dnd-kit を含む）は開くまで読まない。
+        v7 は今までどおり静的に読む（動きを変えない）。
+      */}
+      {isV8
+        ? (editorOpen ? <DashboardEditorDynamic
+          open={editorOpen}
+          preferences={preferences}
+          saving={preferenceSaving}
+          saveError={preferenceSaveError?.message ?? null}
+          saveConflict={preferenceSaveError?.conflict ?? false}
+          onReloadPreferences={reloadPreferences}
+          onCancel={closeEditor}
+          onApply={applyPreferences}
+          onReset={resetPreferences}
+        /> : null)
+        : <DashboardEditor
+          open={editorOpen}
+          preferences={preferences}
+          saving={preferenceSaving}
+          saveError={preferenceSaveError?.message ?? null}
+          saveConflict={preferenceSaveError?.conflict ?? false}
+          onReloadPreferences={reloadPreferences}
+          onCancel={closeEditor}
+          onApply={applyPreferences}
+          onReset={resetPreferences}
+        />}
     </div>
   )
 }

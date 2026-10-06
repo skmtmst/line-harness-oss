@@ -40,7 +40,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Tabs } from '@/components/shared/tabs'
 import { ApiError } from '@/lib/api'
 import { usePageCrumbs } from '@/components/shell/page-chrome'
-import { formatJstDateTime } from '@/lib/presentation'
+import { formatJstShortDateTime } from '@/lib/presentation'
 import { formatNumber } from '@/lib/format'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -109,7 +109,8 @@ export default function MembersPageV8({
             ネットショップの会員と LINE の友だちを結びつけて、ランクやペットの情報を見ます。
           </p>
         </div>
-        {tab === 'members' && accountId ? <CsvExportButton accountId={accountId} /> : null}
+        {/* fb9NJ・e5yBLx：ランク設定の板にも「CSV で書き出す」がある。 */}
+        {(tab === 'members' || tab === 'ranks') && accountId ? <CsvExportButton accountId={accountId} /> : null}
       </header>
 
       <Tabs
@@ -161,8 +162,9 @@ export default function MembersPageV8({
 /**
  * 数の帯。1枚の白い板を区切り線で4つに分ける（★V8 の決まり：
  * 数の帯はカードを離して並べず、白い板の左右いっぱいに置く）。
+ * 数と単位（人）は分け、金額は ¥込みの1つの数に見せる（見本 AOWoJ）。
  */
-function MembersKpiBand({
+export function MembersKpiBand({
   kpis,
   ranks,
   loading,
@@ -182,6 +184,7 @@ function MembersKpiBand({
     icon: React.ReactNode,
     label: string,
     value: string,
+    unit: string | null,
     sub: string,
   ) => (
     <div className={styles.kpiCell} key={label}>
@@ -189,7 +192,7 @@ function MembersKpiBand({
         <span className={styles.kpiIcon} aria-hidden="true">{icon}</span>
         <span className={styles.kpiLabel}>{label}</span>
       </div>
-      <p className={styles.kpiValue}>{value}</p>
+      <p className={styles.kpiValue}>{value}{unit ? <span className={styles.kpiUnit}>{unit}</span> : null}</p>
       <p className={styles.kpiSub}>{sub}</p>
     </div>
   )
@@ -197,10 +200,10 @@ function MembersKpiBand({
   const pending = loading || !kpis
   return (
     <section className={styles.kpiBand} aria-label="会員の数の帯">
-      {cell(<Users size={14} />, '会員', pending ? '—' : `${formatNumber(kpis!.members)}人`, pending ? ' ' : `LINE 連携済み ${formatNumber(kpis!.linkedMembers ?? 0)}`)}
-      {cell(<ShoppingBag size={14} />, topTwoLabel, pending || topTwo.length === 0 ? '—' : `${formatNumber(topTwoCount ?? 0)}人`, topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : ' ')}
-      {cell(<PawPrint size={14} />, 'ペット登録あり', pending ? '—' : `${formatNumber(kpis!.petMembers ?? 0)}人`, pending || petPercent === null ? ' ' : `会員の ${petPercent}%`)}
-      {cell(<Link2 size={14} />, '今月の購入', pending ? '—' : yen(kpis!.monthPurchaseYen ?? 0), pending ? ' ' : `会員 ${formatNumber(kpis!.monthBuyers ?? 0)} 人`)}
+      {cell(<Users size={14} />, '会員', pending ? '—' : formatNumber(kpis!.members), pending ? null : '人', pending ? ' ' : `LINE 連携済み ${formatNumber(kpis!.linkedMembers ?? 0)}`)}
+      {cell(<ShoppingBag size={14} />, topTwoLabel, pending || topTwo.length === 0 ? '—' : formatNumber(topTwoCount ?? 0), pending || topTwo.length === 0 ? null : '人', topTwo[1] ? `今年の購入 ${yen(topTwo[1].annualThresholdYen)} 以上` : ' ')}
+      {cell(<PawPrint size={14} />, 'ペット登録あり', pending ? '—' : formatNumber(kpis!.petMembers ?? 0), pending ? null : '人', pending || petPercent === null ? ' ' : `会員の ${petPercent}%`)}
+      {cell(<Link2 size={14} />, '今月の購入', pending ? '—' : yen(kpis!.monthPurchaseYen ?? 0), null, pending ? ' ' : `会員 ${formatNumber(kpis!.monthBuyers ?? 0)} 人`)}
     </section>
   )
 }
@@ -284,6 +287,7 @@ function MembersTabV8({
   const [chipPet, setChipPet] = useState(false)
   const [chipUnlinked, setChipUnlinked] = useState(false)
   const [rank, setRank] = useState('')
+  const [sort, setSort] = useState<NenMemberSort>('annual_desc')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const requestRef = useRef(0)
@@ -314,7 +318,7 @@ function MembersTabV8({
         ranks: chipTopRanks && topTwoKeyQuery ? topTwoKeyQuery.split(',') : undefined,
         link: chipUnlinked ? 'unlinked' : undefined,
         pet: chipPet ? 'with' : 'any',
-        sort: 'annual_desc' as NenMemberSort,
+        sort,
         page,
         pageSize,
       })
@@ -326,7 +330,7 @@ function MembersTabV8({
       if (request !== requestRef.current) return
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId, query, rank, chipTopRanks, chipPet, chipUnlinked, page, pageSize, topTwoKeyQuery])
+  }, [accountId, query, rank, chipTopRanks, chipPet, chipUnlinked, page, pageSize, sort, topTwoKeyQuery])
 
   useEffect(() => {
     void load()
@@ -393,6 +397,17 @@ function MembersTabV8({
             options={[
               { value: '', label: 'よく使う絞り込み' },
               ...(data?.ranks ?? settings?.ranks ?? []).map((r) => ({ value: r.key, label: `ランク：${r.name}` })),
+            ]}
+          />
+          <Select
+            aria-label="並び順"
+            value={sort}
+            onChange={(value) => { setSort(value as NenMemberSort); setPage(1) }}
+            options={[
+              { value: 'annual_desc', label: '通年が多い順' },
+              { value: 'lifetime_desc', label: 'ライフタイムが多い順' },
+              { value: 'balance_desc', label: 'マイル残高が多い順' },
+              { value: 'recent', label: '最終購入が新しい順' },
             ]}
           />
           <PageSizeSelect
@@ -539,7 +554,7 @@ function MemberRowV8({
 
 type RankDraft = { id: string | null; name: string; threshold: string; rate: string; tagName: string | null; memberCount: number }
 
-function RankSettingsTabV8({
+export function RankSettingsTabV8({
   accountId,
   status,
   settings,
@@ -744,7 +759,7 @@ function RankSettingsTabV8({
             </span>
           )}
         >
-          {conflict.latest.rules ? `${formatJstDateTime(conflict.latest.rules.updatedAt)} にランク設定が保存されました。` : 'ランク設定が別の場所で保存されました。'}
+          {conflict.latest.rules ? `${formatJstShortDateTime(conflict.latest.rules.updatedAt)} にランク設定が保存されました。` : 'ランク設定が別の場所で保存されました。'}
           このまま保存すると、その変更が消えます。
         </NoteBar>
       ) : null}
@@ -791,7 +806,7 @@ function RankSettingsTabV8({
                         <Td className="w-36">
                           <span className="flex items-center gap-2">
                             <TextField aria-label={`しきい値 ${index + 1}`} inputMode="numeric" value={row.threshold} disabled={readonly || isBase} onChange={(event) => update(index, { threshold: event.target.value })} />
-                            <span className="shrink-0 text-caption font-semibold text-ink-faint">円〜</span>
+                            <span className="shrink-0 text-caption font-semibold text-ink-faint">円〜{isBase ? '（固定）' : null}</span>
                           </span>
                         </Td>
                         <Td className="w-28">
@@ -835,7 +850,7 @@ function RankSettingsTabV8({
           <div className={styles.syncRow}>
             {rules?.syncStatus === 'synced' ? <Chip tone="ok">同期済み</Chip> : rules?.syncStatus === 'failed' ? <Chip tone="danger">失敗</Chip> : <Chip tone="warn">未同期</Chip>}
             <span className="text-caption text-ink-secondary">
-              {rules?.syncStatus === 'synced' && rules.syncedAt ? `最後に送った日時 ${formatJstDateTime(rules.syncedAt)}` : rules?.syncStatus === 'failed' ? rules.syncError ?? '理由は記録されていません' : 'まだECへ送っていません'}
+              {rules?.syncStatus === 'synced' && rules.syncedAt ? `最後に送った日時 ${formatJstShortDateTime(rules.syncedAt)}` : rules?.syncStatus === 'failed' ? rules.syncError ?? '理由は記録されていません' : 'まだECへ送っていません'}
             </span>
           </div>
           <div className="mt-3">
@@ -863,6 +878,7 @@ function RankSettingsTabV8({
 
       {/* 削除の確認：会員がいるランクには移す先が必須（API 側の決まりと同じ）。 */}
       <ConfirmDialog
+        designNode="dEv6G"
         open={removeTarget !== null && removeRow !== null && removeRow.id !== null}
         title={`「${removeRow?.name.trim() || `ランク ${(removeTarget ?? 0) + 1}`}」を削除しますか？`}
         description={
@@ -902,7 +918,7 @@ function RankSettingsTabV8({
         {conflict ? (
           <div className={styles.diffGrid}>
             <div>
-              <p className={styles.diffHead}>最新（{conflict.latest.rules ? formatJstDateTime(conflict.latest.rules.updatedAt) : '—'}）</p>
+              <p className={styles.diffHead}>最新（{conflict.latest.rules ? formatJstShortDateTime(conflict.latest.rules.updatedAt) : '—'}）</p>
               <ul className={styles.diffList}>
                 {conflict.latest.ranks.map((rank) => (
                   <li key={rank.id}>{rank.name} — {yen(rank.annualThresholdYen)}〜 / {rank.mileRatePercent}%</li>

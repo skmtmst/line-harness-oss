@@ -4,6 +4,8 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+/* 止める窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
+const DIALOGS = fs.readFileSync(path.join(__dirname, '_components', 'conversion-dialogs.tsx'), 'utf8')
 
 /** 注意書きの中の `confirm(` に当てないため、コメントを外す。 */
 function code(src: string): string {
@@ -35,12 +37,13 @@ function dialogWith(src: string, marker: string): string {
 describe('成果地点の削除確認', () => {
   it('ブラウザの confirm を使わない', () => {
     expect(code(PAGE), 'ブラウザのconfirmへ戻っている').not.toMatch(/[^.\w]confirm\(/)
-    expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
+    expect(code(DIALOGS), 'ブラウザのconfirmへ戻っている').not.toMatch(/[^.\w]confirm\(/)
+    expect(DIALOGS).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
   })
 
   it('停止の本体が二度押しを止め、3操作の返事を確かめ、finally で戻す', () => {
     const body = slice(PAGE, 'const runStop = async', '\n  const exportCsv')
-    expect(body, '処理中でも受け付けてしまう').toContain('if (!stopTarget || stopping) return')
+    expect(body, '処理中でも受け付けてしまう').toContain('if (!stopTarget || stopping || !canReverse) return')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body).toContain('api.conversions.stopDefinition')
     expect(body).toContain('api.conversions.replaceDefinition')
@@ -51,7 +54,7 @@ describe('成果地点の削除確認', () => {
   })
 
   it('安全な計測停止を既定にし、設計の重ね画面を名乗る', () => {
-    const dialog = dialogWith(PAGE, 'open={stopTarget !== null}')
+    const dialog = dialogWith(DIALOGS, 'open={stopTarget !== null}')
     expect(dialog, '物理削除の赤い確認に戻っている').not.toContain('destructive')
     expect(dialog, '設計の重ね画面のNodeが無い').toContain('designNode="d8d3Mz"')
     expect(dialog, '処理中を窓へ渡していない').toContain('busy={stopping || stopImpactLoading}')
@@ -62,7 +65,7 @@ describe('成果地点の削除確認', () => {
   })
 
   it('過去記録を残し、実データの利用先件数と3つの選択肢を本文で示す', () => {
-    const dialog = dialogWith(PAGE, 'open={stopTarget !== null}')
+    const dialog = dialogWith(DIALOGS, 'open={stopTarget !== null}')
     expect(dialog).toContain('の記録と金額は、そのまま残ります。')
     expect(dialog).toContain('stopImpact.usages.map')
     expect(dialog).toContain('利用先は実データです。')

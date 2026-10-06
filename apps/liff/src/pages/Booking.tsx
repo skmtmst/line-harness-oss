@@ -6,10 +6,11 @@ import DateTimePicker, { type SlotPick } from '../components/DateTimePicker.js';
 import Confirm from '../components/Confirm.js';
 import Done from '../components/Done.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
 import Stepper from '../components/ui/Stepper.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
-import type { MenuItem, StaffItem } from '../lib/api.js';
+import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 
 type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'done';
 
@@ -29,6 +30,23 @@ export default function Booking() {
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
   const [slot, setSlot] = useState<SlotPick | null>(null);
+  const [doneStatus, setDoneStatus] = useState('requested');
+  // 予約のルール「お店が承認してから確定する」。読めなければ承認あり扱い。
+  const [autoConfirm, setAutoConfirm] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api
+      .bookingSettings()
+      .then((r) => {
+        if (alive) setAutoConfirm(r.approval_mode === 'automatic');
+      })
+      .catch(() => {
+        if (alive) setAutoConfirm(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
   // 読み込み中・失敗の間は下の帯を出さない (押せないボタンの飾りを置かない)。
   const [stepReady, setStepReady] = useState(false);
   useEffect(() => {
@@ -61,10 +79,12 @@ export default function Booking() {
     step === 'menu' ? 0 : step === 'staff' ? 1 : step === 'datetime' ? 2 : STEPS.length - 1;
 
   return (
-    <div className="min-h-screen bg-canvas">
+    <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="ご予約" />
       {step !== 'done' && <Stepper steps={STEPS} current={stepIndex} />}
       <div className="mx-auto w-full max-w-md px-4 pt-3 pb-40">
+        {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
+        <div key={step} className="liff-step">
         {step === 'menu' && (
           <div data-design-node="IruGD">
             <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
@@ -99,13 +119,23 @@ export default function Booking() {
             menu={menu}
             staff={staff}
             slot={slot}
+            autoConfirm={autoConfirm}
             onBack={() => setStep('datetime')}
-            onSubmitted={() => setStep('done')}
+            onSubmitted={(status) => {
+              setDoneStatus(status);
+              setStep('done');
+            }}
           />
         )}
         {step === 'done' && menu && staff && slot && (
-          <Done menuName={menu.name} slot={slot} durationMinutes={staff.duration_minutes} />
+          <Done
+            menuName={menu.name}
+            slot={slot}
+            durationMinutes={staff.duration_minutes}
+            status={doneStatus}
+          />
         )}
+        </div>
       </div>
       {step === 'menu' && stepReady && (
         <BottomBar>
@@ -128,6 +158,6 @@ export default function Booking() {
           </button>
         </BottomBar>
       )}
-    </div>
+    </LiffLookScope>
   );
 }

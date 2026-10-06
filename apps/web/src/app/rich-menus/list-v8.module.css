@@ -43,22 +43,28 @@
   line-height: 1.6;
 }
 
-/* 数の帯：4つのマス。アイコンつき。 */
+/* 数の帯：区切り線で並べる1本の帯（`Y9ASp`）。狭い板でも2段にしない。 */
 .kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
 }
 
 .kpi {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
+  padding: 10px 16px;
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpi:first-child {
+  border-left: 0;
 }
 
 .kpiLabel {
@@ -67,7 +73,7 @@
   gap: 6px;
   color: var(--color-ink-secondary);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .kpiLabel svg {
@@ -79,7 +85,7 @@
   overflow: hidden;
   color: var(--color-ink);
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
@@ -106,6 +112,43 @@
   grid-template-columns: 200px minmax(0, 1fr);
   gap: 20px;
   align-items: start;
+}
+
+/* パネルが開くときは右に 360px の列を足す（一覧は左に見えたまま）。 */
+.splitWithPanel {
+  grid-template-columns: 200px minmax(0, 1fr) 360px;
+}
+
+/* 詳細パネルの中の段。 */
+.panelActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.panelBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panelLabel {
+  margin: 12px 0 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.panelLabel:first-child {
+  margin-top: 0;
+}
+
+.panelText {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .folderCol {
@@ -250,6 +293,17 @@
   cursor: pointer;
 }
 
+/* 消える行は薄くなってから外す（150ms。動きを減らす設定では一瞬）。 */
+@media (prefers-reduced-motion: no-preference) {
+  .rowClick {
+    transition: opacity var(--motion-exit) var(--motion-ease-out);
+  }
+
+  .rowClick[data-leaving='true'] {
+    opacity: 0;
+  }
+}
+
 .rowClick:hover td {
   background: var(--color-canvas-sunken);
 }
@@ -348,7 +402,7 @@
 .statePill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   font-size: 11px;
@@ -423,44 +477,6 @@
   opacity: 0.5;
 }
 
-/* 読み込み中の骨格の行。 */
-.skeletonRows {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
-}
-
-.skeletonRow {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 12px;
-  border-bottom: 1px solid var(--color-hairline);
-}
-
-.skeletonRow:last-child {
-  border-bottom: 0;
-}
-
-.skeletonDot {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas-sunken);
-}
-
-.skeletonBar {
-  height: 12px;
-  flex: 1;
-  border-radius: var(--radius-mini);
-  background: var(--color-canvas-sunken);
-}
-
 /* ページ送りの行。左に件数、右にページ送り。 */
 .pagerRow {
   display: flex;
@@ -521,10 +537,7 @@
 
 /* ===== 板が 1100px を切ったら（画面幅で約 1352px 未満） ===== */
 @container (max-width: 1099px) {
-  .kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
+  /* 数の帯は1本のまま（`Y9ASp`）。2段にしない。 */
   .split {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -543,12 +556,8 @@
   }
 }
 
-/* さらに狭い板では数の帯も1列に。 */
+/* さらに狭い板でも数の帯は1本のまま。 */
 @container (max-width: 560px) {
-  .kpis {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .searchWrap {
     width: 100%;
   }

@@ -159,7 +159,7 @@ export default function ShipmentPanel({
                 >
                   {label}
                   <span
-                    className={`rounded-pill px-1.5 text-[10px] tabular-nums ${
+                    className={`rounded-pill px-1.5 text-nano tabular-nums ${
                       bucket === key ? 'bg-canvas/25' : 'bg-canvas text-ink-faint'
                     }`}
                   >
@@ -234,7 +234,7 @@ export default function ShipmentPanel({
 
             {/* 走査上限に張り付いているときだけ、取りこぼしがありうる旨を出す。 */}
             {data.scanned >= data.scanLimit && (
-              <p className="text-ink-faint mt-3 text-[11px]">
+              <p className="text-ink-faint mt-3 text-micro">
                 直近{data.scanLimit}件のイベントから算出しています。それより前の予定は含まれません。
               </p>
             )}

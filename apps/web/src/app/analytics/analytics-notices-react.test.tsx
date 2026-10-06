@@ -32,7 +32,7 @@ const net = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: () => null }))
-vi.mock('next/navigation', () => ({
+vi.mock('next/navigation', () => ({ usePathname: () => '/analytics',
   useSearchParams: () => new URLSearchParams(),
 }))
 
@@ -181,7 +181,7 @@ describe('配信の反応タブの打切り注記', () => {
     expect(text()).not.toContain('CSVの書き出しにも入りません')
     // 一覧と同じ範囲を書き出すCSVボタンは常に出す。
     expect(
-      Array.from(host.querySelectorAll('button')).some((item) => item.textContent?.includes('CSVで書き出す')),
+      Array.from(host.querySelectorAll('button')).some((item) => item.textContent?.includes('CSV で書き出す')),
     ).toBe(true)
   })
 })

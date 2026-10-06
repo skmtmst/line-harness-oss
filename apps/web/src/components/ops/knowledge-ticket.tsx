@@ -46,7 +46,17 @@ export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetai
       {job?.status === 'failed' && <Button size="field" disabled={busy} onClick={() => void retry()}>もう一度試す</Button>}
     </div>
     {error && <p role="alert" className="text-caption text-danger">{error}</p>}
-    {article && <KnowledgeEditor key={article.id} article={article} onClose={() => setArticle(null)} onSaved={onRefresh} />}
+    {article && <KnowledgeEditor
+      key={article.id}
+      article={article}
+      ticket={{
+        label: detail.ticket.ticketLabel,
+        resolved: detail.ticket.stage === 'resolved' || detail.ticket.stage === 'closed',
+        stageLabel: detail.ticket.stageLabel,
+      }}
+      onClose={() => setArticle(null)}
+      onSaved={onRefresh}
+    />}
   </section>
 }
 

@@ -16,6 +16,7 @@ import {
   publishFormVersion,
   type UpdateFormInput,
   archiveFormAtRevision,
+  unarchiveFormAtRevision,
   deleteFormAtRevision,
   getFormSubmissions,
   getFormSubmissionsPage,
@@ -1478,6 +1479,74 @@ forms.post('/api/forms/:id/archive', async (c) => {
     }
     console.error('POST /api/forms/:id/archive error:', error);
     return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
+  }
+});
+
+// POST /api/forms/:id/unarchive — 保管の取り消し（B 元に戻す）。
+// 保管中の行だけ現行へ戻す。戻した直後は受付停止のまま。版がずれていたら
+// 読み直しを促す（保管口と同じ競合守り）。
+forms.post('/api/forms/:id/unarchive', async (c) => {
+  try {
+    const accountId = c.req.query('account_id')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'account_id is required' }, 400);
+    const unarchiveGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, c.req.param('id')));
+    if (unarchiveGate) return unarchiveGate;
+    const body = await readBoundedFormArchiveBody(c.req.raw);
+    const expectedRevision = typeof body.expectedRevision === 'number'
+      ? body.expectedRevision
+      : Number.NaN;
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+      return c.json({ success: false, error: '確認した版が必要です' }, 400);
+    }
+
+    const authorized = await authorizedDeleteImpact(c, c.req.param('id'), accountId);
+    if (authorized.kind === 'not_found') {
+      return c.json({ success: false, error: 'not found' }, 404);
+    }
+    if (authorized.kind === 'forbidden') {
+      return c.json({ success: false, error: 'すべての利用先を確認する権限がありません' }, 403);
+    }
+    if (authorized.impact.form.status !== 'archived') {
+      return c.json({
+        success: false,
+        error: 'form_not_archived',
+        message: 'この回答フォームは保管されていないため、元に戻せません。',
+        data: authorized.impact,
+      }, 409);
+    }
+    if (authorized.impact.revision !== expectedRevision) {
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: authorized.impact,
+      }, 409);
+    }
+
+    const unarchived = await unarchiveFormAtRevision(c.env.DB, c.req.param('id'), expectedRevision);
+    if (!unarchived) {
+      const latest = await getFormDeleteImpact(c.env.DB, c.req.param('id'), accountId);
+      return c.json({
+        success: false,
+        error: 'form_delete_changed',
+        message: '影響が変わりました。最新の状態を読み直してください。',
+        data: latest,
+      }, 409);
+    }
+    return c.json({
+      success: true,
+      data: {
+        status: 'active',
+        revision: unarchived.revision,
+        isActive: Boolean(unarchived.is_active),
+      },
+    });
+  } catch (error) {
+    if (error instanceof FormArchiveBodyError) {
+      return c.json({ success: false, error: error.message }, error.status);
+    }
+    console.error('POST /api/forms/:id/unarchive error:', error);
+    return c.json({ success: false, error: '回答フォームを元に戻せませんでした' }, 503);
   }
 });
 
@@ -3447,7 +3516,7 @@ async function runFormPostEffects(input: {
           contents: [
             ...answerRows,
             { type: 'separator', margin: 'lg' },
-            { type: 'text', text: '他社サービスでは、フォームの回答内容に合わせたリアルタイム返信はできません。LINE Harnessだからこそ可能な体験です。', size: 'xs', color: '#06C755', weight: 'bold', wrap: true, margin: 'lg' },
+            { type: 'text', text: '他社サービスでは、フォームの回答内容に合わせたリアルタイム返信はできません。musuboだからこそ可能な体験です。', size: 'xs', color: '#06C755', weight: 'bold', wrap: true, margin: 'lg' },
           ],
           paddingAll: '20px',
         },

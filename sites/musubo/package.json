@@ -6,6 +6,7 @@
   "scripts": {
     "build": "node build.mjs",
     "build:production": "node build.mjs --production",
+    "deploy:production": "node deploy-production.mjs",
     "test": "node --test test/*.test.mjs",
     "preview": "node preview.mjs"
   }

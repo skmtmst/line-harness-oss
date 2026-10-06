@@ -69,12 +69,18 @@
 }
 
 .kpiLabel {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
   color: var(--color-ink-secondary);
   font-size: 12px;
   font-weight: 600;
+}
+
+/* 板のタイル右上の「…」（飾りの印。押しても何も起きない）。 */
+.kpiDots {
+  margin-left: auto;
+  flex: none;
 }
 
 .kpiLabel svg {
@@ -89,7 +95,7 @@
   margin: 0;
   color: var(--color-ink);
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
 }
@@ -182,8 +188,16 @@
   color: var(--color-ink);
 }
 
-/* 道具の段：検索・札・並び順・件数。 */
+/* 道具の段1：作る・フォルダ選び・検索・件数。 */
 .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 道具の段2：絞り込みの札・並び順（板 I3L41O の2段目）。 */
+.chipRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -242,6 +256,17 @@
   border-bottom: 0;
 }
 
+/* 消える行は薄くなってから外す（150ms。動きを減らす設定では一瞬）。 */
+@media (prefers-reduced-motion: no-preference) {
+  .table tbody tr {
+    transition: opacity var(--motion-exit) var(--motion-ease-out);
+  }
+
+  .table tbody tr[data-leaving='true'] {
+    opacity: 0;
+  }
+}
+
 /* 列幅（table-layout: fixed）。「フォーム」は残り全部。 */
 .colDest {
   width: 128px;
@@ -251,8 +276,9 @@
   width: 88px;
 }
 
+/* 2行目（今月・完了率）が1152幅で器からはみ出すため広げる。 */
 .colAnswers {
-  width: 124px;
+  width: 140px;
 }
 
 .colUrl {
@@ -292,7 +318,7 @@
 .pendingBadge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   flex-shrink: 0;
   padding: 2px 10px;
   border-radius: var(--radius-pill);
@@ -346,7 +372,7 @@
 .statusPill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   font-size: 11px;
@@ -396,10 +422,13 @@
 
 .answerSub {
   margin: 2px 0 0;
+  max-width: 100%;
+  overflow: hidden;
   color: var(--color-ink-faint);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* 「URL」列：配っているURLを写す小さなボタン。 */
@@ -407,7 +436,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 10px;
+  padding: 4px 10px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
@@ -454,36 +483,6 @@
 .menuButton:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-}
-
-/* 読み込み中の骨格の行。 */
-.skeletonRows {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
-}
-
-.skeletonRow {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 12px;
-  border-bottom: 1px solid var(--color-hairline);
-}
-
-.skeletonRow:last-child {
-  border-bottom: 0;
-}
-
-.skeletonBar {
-  height: 12px;
-  flex: 1;
-  border-radius: var(--radius-mini);
-  background: var(--color-canvas-sunken);
 }
 
 /* ページ送りの行。左に件数、右にページ送り。 */
@@ -657,6 +656,12 @@
 
   /* フォルダの列は道具の段の選ぶ欄へ畳む。「作る」は道具の段の左端。 */
   .folderCol {
+    display: none;
+  }
+
+  /* 板 GrnO4（1152）：表の「保存先」を畳む。 */
+  .colDest,
+  .destCell {
     display: none;
   }
 

@@ -171,4 +171,50 @@
 [data-theme='v8'] .secondary {
   box-shadow: var(--shadow-board);
 }
+
+/*
+ * ★V8 仕上げ（M10）：押した沈みは 120ms（乗せた色変化と同じ速さ）。
+ * v7 は 80ms のまま。キーボードの印は action の 2px の輪
+ * （文字ボタン text-link と同じ色にそろえる）。
+ */
+[data-theme='v8'] .button {
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    filter var(--motion-fast) var(--motion-ease-out),
+    scale var(--motion-snap) var(--motion-spring);
+}
+
+/*
+ * ★A の押した感じ（M10）：押している間は 0.97 に縮め色を濃く
+ * （80ms ease-out）、離すとばねで戻る（160ms spring）。
+ * 動きを減らす設定では大きさを変えない（濃くするだけ残る）。
+ */
+[data-theme='v8'] .button:active:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme='v8'] .button:active:not(:disabled) {
+    scale: 0.97;
+    transition:
+      background-color var(--motion-instant) var(--motion-ease-out),
+      border-color var(--motion-instant) var(--motion-ease-out),
+      filter var(--motion-instant) var(--motion-ease-out),
+      scale var(--motion-instant) var(--motion-ease-out);
+  }
+}
+
+[data-theme='v8'] .button:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .button { border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .primary { box-shadow: var(--shadow-controls-primary); }
+[data-theme='v8'] .secondary { outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
+.text { border-color: transparent; background: transparent; color: var(--color-ink-secondary); }
+[data-theme='v8'] .text { background: transparent; color: var(--color-ink-secondary); box-shadow: none; }
+[data-theme='v8'] .button > svg { width: 15px; height: 15px; flex: none; }
 }

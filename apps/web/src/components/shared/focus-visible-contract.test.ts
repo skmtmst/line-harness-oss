@@ -64,7 +64,11 @@ describe('押せる部品のフォーカスが見える', () => {
     for (const name of files.filter((n) => n.endsWith('.css'))) {
       const css = withoutComments(read(name))
       if (/:focus-within\s*\{[^}]*outline:\s*2px solid var\(--color-action\)/.test(css)) continue
-      expect(css, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)\b/)
+      // 通常時だけ輪郭を消す指定は、キーボードの輪郭を消さない。
+      const focusCss = css.replace(/([^{}]+)\{([^{}]*)\}/g, (rule, selectors) =>
+        selectors.split(',').every((selector: string) => selector.includes(':not(:focus-visible)')) ? '' : rule,
+      )
+      expect(focusCss, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)\b/)
     }
   })
 

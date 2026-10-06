@@ -15,6 +15,8 @@ import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, Download, Pause, Pencil, RotateCcw, Search, TriangleAlert } from 'lucide-react'
 import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Avatar from '@/components/shared/avatar'
+import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -104,6 +106,8 @@ export default function AutoReplyRunsV8() {
   const requestedRuleId = searchParams.get('id') ?? ''
   const staffRole = useStaffRole()
   const canManage = staffRole === null || canManageRole(staffRole)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [data, setData] = useState<AutoReplyRunsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -137,6 +141,8 @@ export default function AutoReplyRunsV8() {
     setError('')
     try {
       const response = await api.autoReplies.runs({
+        from: dateFrom || undefined,
+        to: dateTo || undefined,
         ruleId: requestedRuleId || undefined,
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
@@ -155,7 +161,7 @@ export default function AutoReplyRunsV8() {
     } finally {
       if (loadSeqRef.current === seq) setLoading(false)
     }
-  }, [page, requestedRuleId])
+  }, [page, requestedRuleId, dateFrom, dateTo])
 
   useEffect(() => { void load() }, [load])
 
@@ -249,7 +255,7 @@ export default function AutoReplyRunsV8() {
       let capped = false
       for (;;) {
         if (exportCancelledRef.current) throw new Error('csv_cancelled')
-        const response = await api.autoReplies.runs({ ruleId: requestedRuleId || undefined, limit: 100, offset })
+        const response = await api.autoReplies.runs({ ruleId: requestedRuleId || undefined, from: dateFrom || undefined, to: dateTo || undefined, limit: 100, offset })
         if (!response.success) throw new Error(response.error)
         const room = MAX_CSV_ROWS - items.length
         items.push(...response.data.items.slice(0, room))
@@ -313,7 +319,7 @@ export default function AutoReplyRunsV8() {
       <div className={styles.head}>
         <div className={styles.headText}>
           <h1 className={styles.headTitle}>実行結果：{data?.rule.name ?? '自動応答'}</h1>
-          <p className={styles.headDescription}>いつ・誰に・何を返したかを確認できます</p>
+          <p className={styles.headDescription}>いつ・誰に・何を返したか、失敗した処理を見ます。</p>
         </div>
         <div className={styles.headActions}>
           {canManage && (
@@ -363,7 +369,7 @@ export default function AutoReplyRunsV8() {
         <div className={styles.kpi}>
           <p className={styles.kpiLabel}>失敗した処理</p>
           <p className={`${styles.kpiValue} ${failedCount > 0 ? styles.kpiValueDanger : ''}`}>{data ? formatNumber(failedCount) : '—'}<span className={styles.kpiUnit}> 件</span></p>
-          <p className={styles.kpiNote}>{failedCount > 0 ? '表の「失敗」で絞れます' : '記録を開始してからの合計です'}</p>
+          <p className={styles.kpiNote}>{failedCount > 0 ? '理由を見て、もう一度実行できます' : '記録を開始してからの合計です'}</p>
         </div>
         <div className={styles.kpi}>
           <p className={styles.kpiLabel}>平均で返すまで</p>
@@ -379,7 +385,7 @@ export default function AutoReplyRunsV8() {
         <div className={styles.failBanner} role="alert">
           <TriangleAlert size={18} className={styles.failBannerIcon} aria-hidden="true" />
           <div className={styles.failBannerText}>
-            <p className={styles.failBannerTitle}>失敗した処理があります</p>
+            <p className={styles.failBannerTitle}>失敗した処理が{formatNumber(failedCount)}件あります</p>
             <p className={styles.failBannerNote}>止まった行を選んで、もう一度実行できます。</p>
           </div>
           <div className={styles.failBannerActions}>
@@ -405,6 +411,8 @@ export default function AutoReplyRunsV8() {
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>実行の記録</h2>
           <div className={styles.cardTools}>
+            <DateField value={dateFrom} onChange={(value) => { setDateFrom(value); setPage(1) }} max={dateTo || undefined} aria-label="実行日（開始）" />
+            <DateField value={dateTo} onChange={(value) => { setDateTo(value); setPage(1) }} min={dateFrom || undefined} aria-label="実行日（終了）" />
             <div className={styles.filterChips} role="group" aria-label="結果で絞り込む">
               {FILTERS.map((f) => (
                 <button
@@ -462,18 +470,32 @@ export default function AutoReplyRunsV8() {
                   const label = failed && item.detail ? item.detail : actionLabel(item)
                   return (
                     <tr key={item.id} className={failed ? styles.rowFailed : ''}>
-                      <td className={styles.cellQuiet} style={{ whiteSpace: 'nowrap' }}>
+                      <td className="text-ink-faint" style={{ whiteSpace: 'nowrap' }}>
                         <time dateTime={item.occurredAt}>{formatDateTime(item.occurredAt)}</time>
                       </td>
-                      <td className={styles.cellMain}>{item.friendName ?? '削除済みの友だち'}</td>
+                      <td className={styles.cellMain}>
+                        <span className={styles.friendCell}>
+                          <Avatar name={item.friendName} size={32} />
+                          {item.friendId ? (
+                            <Link
+                              href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}
+                              title={item.friendName ?? undefined}
+                            >
+                              {item.friendName ?? '削除済みの友だち'}
+                            </Link>
+                          ) : (
+                            item.friendName ?? '削除済みの友だち'
+                          )}
+                        </span>
+                      </td>
                       <td>
                         <span title={item.inputPreview ?? undefined}>{item.inputPreview ?? '—'}</span>
                         <span className={styles.cellSub}>きっかけ：{item.triggerLabel}</span>
                       </td>
                       <td><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></td>
                       <td><span title={label}>{label}</span></td>
-                      <td className={styles.cellQuiet} style={{ whiteSpace: 'nowrap' }}>
-                        {item.durationMs === null ? '—' : `${item.durationMs}ms`}
+                      <td className="text-ink-faint" style={{ whiteSpace: 'nowrap' }}>
+                        {item.durationMs === null ? '—' : `${(item.durationMs / 1000).toFixed(1)}秒`}
                       </td>
                       {canManage && (
                         <td>
@@ -496,11 +518,19 @@ export default function AutoReplyRunsV8() {
                 })}
               </tbody>
             </table>
-            {pageCount > 1 && (
-              <div className={styles.pager}>
-                <Pagination page={page} pageCount={pageCount} onPageChange={setPage} disabled={loading} />
-              </div>
-            )}
+            <div className={styles.pager}>
+              <Pagination
+                page={page}
+                pageCount={pageCount}
+                onPageChange={setPage}
+                disabled={loading}
+                summary={
+                  data && data.pagination.total > 0
+                    ? `${formatNumber(data.pagination.total)}件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, data.pagination.total)}件`
+                    : undefined
+                }
+              />
+            </div>
           </>
         )}
       </section>
@@ -539,12 +569,14 @@ export default function AutoReplyRunsV8() {
               <dd className={styles.kvVal}>{data ? `${formatNumber(data.handovers.inProgress)}件` : '—'}</dd>
             </div>
             <div className={styles.kvRow}>
-              <dt className={styles.kvKey}>対応済み</dt>
+              <dt className={styles.kvKey}>完了</dt>
               <dd className={styles.kvVal}>{data ? `${formatNumber(data.handovers.completed)}件` : '—'}</dd>
             </div>
           </dl>
           <div className={styles.cardFoot}>
-            <Button variant="secondary" size="compact" href="/chats">受信箱で見る</Button>
+            <Link href="/chats" className={styles.footLink}>
+              → 受信箱で見る
+            </Link>
           </div>
         </section>
       </div>
