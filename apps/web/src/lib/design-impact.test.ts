@@ -311,6 +311,13 @@ describe('共通部品の影響範囲', () => {
       'v8/conversions/list.tsx',
       // ★V8 ダッシュボード（WQmep）。対応が必要な受信の表の下にページ送り（v7 と同じ）。
       'v8/dashboard/inbox.tsx',
+      // ★V8 集まった回答の1件ずつ見る（MKQyJ）。表の下にページ送りを置く。
+      'v8/form-responses/responses.tsx',
+      // ★V8 イベント予約の一覧（e2ekFu）。新しい置き場（src/v8）に一から書いた。
+      'v8/events/list.tsx',
+      // ★V8 登録メディア一覧（O7hUt7）と、写した差し替えの窓（候補のページ送り）。
+      'v8/contents/list.tsx',
+      'v8/contents/media-replacement-dialog.tsx',
     ].sort())
   })
 

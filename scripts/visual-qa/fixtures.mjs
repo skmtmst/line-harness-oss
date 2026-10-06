@@ -1087,15 +1087,18 @@ export const FORM_DETAIL = {
   },
 }
 
-/** 機能13 v9tYhl。回答一覧と集計を設計比較できる固定ページ。 */
+/**
+ * 機能13 v9tYhl。回答一覧と集計を設計比較できる固定ページ。
+ * 後処理（postActions）は V8 `MKQyJ`・`v0SbYR` の「未完」「済み」と帯が撮れるよう、2件目だけタグ付けで止める（絵は2行目が未完）。
+ */
 export const FORM_SUBMISSIONS = {
   items: [
-    { id: 'submission-1', formId: 'form-1', friendId: 'friend-1', friendName: '高橋 直人', data: { real_name: '高橋 直人', satisfaction: '大変満足', good_points: ['接客', '仕上がり'], opinion: '説明が分かりやすかったです', next_visit: '2026-09-12' }, destinationWrite: { status: 'succeeded', attempted: 3, succeeded: 3, failed: 0 }, createdAt: '2026-08-25T10:20:00+09:00' },
-    { id: 'submission-2', formId: 'form-1', friendId: 'friend-2', friendName: '前田 さくら', data: { real_name: '前田 さくら', satisfaction: '満足', good_points: ['店内'], opinion: 'また利用します', next_visit: '2026-09-18' }, destinationWrite: { status: 'partial', attempted: 3, succeeded: 2, failed: 1 }, createdAt: '2026-08-24T15:04:00+09:00' },
-    { id: 'submission-3', formId: 'form-1', friendId: 'friend-3', friendName: '木村 亮', data: { real_name: '木村 亮', satisfaction: 'ふつう', good_points: ['説明'], opinion: '', next_visit: '2026-09-18' }, destinationWrite: { status: 'failed', attempted: 3, succeeded: 0, failed: 3 }, createdAt: '2026-08-23T09:12:00+09:00' },
-    { id: 'submission-4', formId: 'form-1', friendId: 'friend-4', friendName: '中村 彩', data: { real_name: '中村 彩', satisfaction: '大変満足', good_points: ['接客'], opinion: '満足です', next_visit: '2026-09-20' }, destinationWrite: { status: 'succeeded', attempted: 3, succeeded: 3, failed: 0 }, createdAt: '2026-08-22T18:30:00+09:00' },
-    { id: 'submission-5', formId: 'form-1', friendId: null, friendName: null, data: { real_name: 'ゲスト回答', satisfaction: '満足', good_points: [], opinion: 'ありがとうございました', next_visit: null }, destinationWrite: { status: 'not_requested', attempted: 0, succeeded: 0, failed: 0 }, createdAt: '2026-08-21T07:40:00+09:00' },
-    { id: 'submission-6', formId: 'form-1', friendId: 'friend-5', friendName: '石田 未来', data: { real_name: '石田 未来', satisfaction: '不満', good_points: ['仕上がり'], opinion: '確認したいことがあります', next_visit: null }, destinationWrite: { status: 'pending', attempted: 3, succeeded: 0, failed: 0 }, createdAt: '2026-08-20T12:16:00+09:00' },
+    { id: 'submission-1', formId: 'form-1', friendId: 'friend-1', friendName: '高橋 直人', data: { real_name: '高橋 直人', satisfaction: '大変満足', good_points: ['接客', '仕上がり'], opinion: '説明が分かりやすかったです', next_visit: '2026-09-12' }, destinationWrite: { status: 'succeeded', attempted: 3, succeeded: 3, failed: 0 }, postActions: { state: 'completed', pending: [] }, createdAt: '2026-08-25T10:20:00+09:00' },
+    { id: 'submission-2', formId: 'form-1', friendId: 'friend-2', friendName: '前田 さくら', data: { real_name: '前田 さくら', satisfaction: '満足', good_points: ['店内'], opinion: 'また利用します', next_visit: '2026-09-18' }, destinationWrite: { status: 'partial', attempted: 3, succeeded: 2, failed: 1 }, postActions: { state: 'failed', pending: ['tag'] }, createdAt: '2026-08-24T15:04:00+09:00' },
+    { id: 'submission-3', formId: 'form-1', friendId: 'friend-3', friendName: '木村 亮', data: { real_name: '木村 亮', satisfaction: 'ふつう', good_points: ['説明'], opinion: '', next_visit: '2026-09-18' }, destinationWrite: { status: 'failed', attempted: 3, succeeded: 0, failed: 3 }, postActions: { state: 'completed', pending: [] }, createdAt: '2026-08-23T09:12:00+09:00' },
+    { id: 'submission-4', formId: 'form-1', friendId: 'friend-4', friendName: '中村 彩', data: { real_name: '中村 彩', satisfaction: '大変満足', good_points: ['接客'], opinion: '満足です', next_visit: '2026-09-20' }, destinationWrite: { status: 'succeeded', attempted: 3, succeeded: 3, failed: 0 }, postActions: { state: 'completed', pending: [] }, createdAt: '2026-08-22T18:30:00+09:00' },
+    { id: 'submission-5', formId: 'form-1', friendId: null, friendName: null, data: { real_name: 'ゲスト回答', satisfaction: '満足', good_points: [], opinion: 'ありがとうございました', next_visit: null }, destinationWrite: { status: 'not_requested', attempted: 0, succeeded: 0, failed: 0 }, postActions: { state: 'completed', pending: [] }, createdAt: '2026-08-21T07:40:00+09:00' },
+    { id: 'submission-6', formId: 'form-1', friendId: 'friend-5', friendName: '石田 未来', data: { real_name: '石田 未来', satisfaction: '不満', good_points: ['仕上がり'], opinion: '確認したいことがあります', next_visit: null }, destinationWrite: { status: 'pending', attempted: 3, succeeded: 0, failed: 0 }, postActions: { state: 'completed', pending: [] }, createdAt: '2026-08-20T12:16:00+09:00' },
   ],
   total: 6, page: 1, limit: 20,
   summary: {
@@ -1103,6 +1106,55 @@ export const FORM_SUBMISSIONS = {
     destinationWrites: { pending: 1, succeeded: 3, partial: 1, failed: 1, not_requested: 1, unknown: 0 },
     dateAnsweredUniqueFriends: 4,
     dateFields: [{ key: 'next_visit', label: '次回来店の希望日', answered: 4, uniqueFriends: 3, minDate: '2026-09-12', maxDate: '2026-09-20' }],
+  },
+}
+
+/*
+  V8「集まった回答」（`v0SbYR` まとめて見る・`MKQyJ` 1件ずつ見る）の絵のフォーム。
+  form-1（ほかの板が使う）とは質問が違うので、別の ID で持つ（撮影は ?id=form-visit）。
+  絵は「186件中 1〜20件」の下に3行だけ描いているので、3件だけ返す（件数は 1,284）。
+*/
+export const FORM_VISIT_DETAIL = {
+  ...FORMS[0],
+  id: 'form-visit',
+  name: '来店アンケート',
+  submitCount: 1284,
+  fields: [
+    { name: 'purpose', label: '今日のご来店の目的は？', type: 'radio', required: true, options: ['トリミング', 'シャンプーのみ', 'ご相談'] },
+    { name: 'staff', label: '担当の対応は？', type: 'rating' },
+    { name: 'comment', label: 'ご意見', type: 'textarea' },
+  ],
+  layout: {
+    version: 2,
+    header: [],
+    sections: [{
+      id: 'form-visit-section', name: '来店について', blocks: [
+        { id: 'fv-purpose', kind: 'input', type: 'radio', name: 'purpose', label: '今日のご来店の目的は？', required: true, choices: [
+          { id: 'fv-p1', label: 'トリミング' }, { id: 'fv-p2', label: 'シャンプーのみ' }, { id: 'fv-p3', label: 'ご相談' },
+        ] },
+        { id: 'fv-staff', kind: 'input', type: 'rating', name: 'staff', label: '担当の対応は？' },
+        { id: 'fv-comment', kind: 'input', type: 'textarea', name: 'comment', label: 'ご意見' },
+      ],
+    }],
+    options: {},
+  },
+}
+const visitSubmission = (id, name, createdAt, data, postActions) => ({
+  id, formId: 'form-visit', friendId: `friend-${id}`, friendName: name, data,
+  destinationWrite: { status: 'not_requested', attempted: 0, succeeded: 0, failed: 0 }, postActions, createdAt,
+})
+export const FORM_VISIT_SUBMISSIONS = {
+  items: [
+    visitSubmission('fv-1', '石田 未来', '2026-09-30T18:12:00+09:00', { purpose: 'トリミング', staff: 5, comment: '待ち時間が短くて助かりました' }, { state: 'completed', pending: [] }),
+    visitSubmission('fv-2', 'ココ', '2026-09-30T17:40:00+09:00', { purpose: 'シャンプーのみ', staff: 4, comment: '駐車場が分かりにくかったです' }, { state: 'failed', pending: ['tag'] }),
+    visitSubmission('fv-3', 'マロン', '2026-09-30T12:05:00+09:00', { purpose: 'ご相談', staff: 5, comment: '' }, { state: 'completed', pending: [] }),
+  ],
+  total: 1284, page: 1, limit: 20,
+  summary: {
+    startedUnique: 1712, submitted: 1284, completionRate: 75,
+    destinationWrites: { pending: 0, succeeded: 0, partial: 0, failed: 0, not_requested: 1284, unknown: 0 },
+    dateAnsweredUniqueFriends: 0, dateFields: [],
+    ratingFields: [{ key: 'staff', label: '担当の対応は？', answered: 186, average: 4.3 }],
   },
 }
 
@@ -6396,16 +6448,44 @@ export const EVENT_DETAIL = {
   line_account_id: 'visual-qa-account',
 }
 
-export const EVENT_SLOTS = [{
-  id: 'event-slot-1',
-  event_id: 'ev-1',
-  starts_at: '2026-09-25T05:00:00.000Z',
-  ends_at: '2026-09-25T06:30:00.000Z',
-  capacity: 12,
-  is_active: 1,
-  sort_order: 1,
-  active_count: 9,
-}]
+/*
+  開催回。設計 `hmr2P` の「10/12・10/19・9/28（終わった回）」の3回。
+  1つ目は申込者（`Mu8qW`）・待ち列（EVENT_WAITLIST）と同じ回。
+*/
+export const EVENT_SLOTS = [
+  { id: 'event-slot-1', event_id: 'ev-1', starts_at: '2026-10-12T01:00:00.000Z', ends_at: '2026-10-12T03:00:00.000Z', capacity: 12, is_active: 1, sort_order: 1, active_count: 10, version: 1 },
+  { id: 'event-slot-2', event_id: 'ev-1', starts_at: '2026-10-19T01:00:00.000Z', ends_at: '2026-10-19T03:00:00.000Z', capacity: 12, is_active: 1, sort_order: 2, active_count: 6, version: 1 },
+  { id: 'event-slot-3', event_id: 'ev-1', starts_at: '2026-09-28T01:00:00.000Z', ends_at: '2026-09-28T03:00:00.000Z', capacity: 12, is_active: 1, sort_order: 3, active_count: 12, version: 1 },
+]
+
+/*
+  申込者の画面（`Mu8qW`）の開催回ごとの一覧。実API（occurrences/:id/applicants）と同じ器。
+  設計の「申込 18/20・承認待ち 2・キャンセル待ち 3・キャンセル 1」「参加済 9・無断欠席 1・受付前 8」。
+*/
+const occApplicant = (row) => ({
+  pictureUrl: null, partySize: 1, answers: null, offeredAt: null, offerExpiresAt: null,
+  firstParticipation: { isFirst: row.isFirst ?? null, attendedCount: row.isFirst ? 0 : 2, checkedAt: '2026-09-30T00:00:00.000Z' },
+  ...row,
+})
+export const EVENT_OCCURRENCE_APPLICANTS = {
+  occurrence: { id: 'event-slot-1', eventId: 'ev-1', startsAt: '2026-10-12T05:00:00.000Z', endsAt: '2026-10-12T06:30:00.000Z', capacity: 20, activeSeats: 18, version: 3 },
+  summary: { bookingCount: 18, waitingCount: 3, activeSeats: 18, confirmedSeats: 16, requestedSeats: 2, waitingSeats: 2, offeredSeats: 1, remainingSeats: 2 },
+  applicants: [
+    occApplicant({ source: 'booking', id: 'eb-occ-1', friendId: 'friend-occ-1', displayName: '山田 太郎', status: 'requested', appliedAt: '2026-10-01T03:00:00.000Z', isFirst: true, offerExpiresAt: '2026-10-03T03:00:00.000Z' }),
+    occApplicant({ source: 'booking', id: 'eb-occ-2', friendId: 'friend-occ-2', displayName: '伊藤 さくら', status: 'requested', appliedAt: '2026-10-01T09:00:00.000Z', isFirst: false, offerExpiresAt: '2026-10-03T09:00:00.000Z' }),
+    occApplicant({ source: 'booking', id: 'eb-occ-3', friendId: 'friend-occ-3', displayName: '田中 明子', status: 'confirmed', appliedAt: '2026-09-28T03:00:00.000Z', isFirst: false }),
+    occApplicant({ source: 'booking', id: 'eb-occ-4', friendId: 'friend-occ-4', displayName: '佐藤 健', status: 'confirmed', appliedAt: '2026-09-28T05:00:00.000Z', isFirst: true }),
+    occApplicant({ source: 'waitlist', id: 'ew-occ-1', friendId: 'friend-occ-5', displayName: '鈴木 真理', status: 'offered', appliedAt: '2026-09-28T01:12:00.000Z', isFirst: false, offeredAt: '2026-10-01T12:00:00.000Z', offerExpiresAt: '2026-10-02T12:00:00.000Z' }),
+    occApplicant({ source: 'waitlist', id: 'ew-occ-2', friendId: 'friend-occ-6', displayName: '高橋 優', status: 'waiting', appliedAt: '2026-09-29T09:40:00.000Z', isFirst: true }),
+  ],
+  waitlistHistory: [
+    { id: 'ew-occ-3', friendId: 'friend-occ-7', displayName: '中村 彩', status: 'expired', partySize: 1, createdAt: '2026-09-27T00:02:00.000Z', offeredAt: '2026-09-30T03:00:00.000Z', offerExpiresAt: '2026-10-01T03:00:00.000Z', notifiedAt: '2026-09-30T03:00:00.000Z', updatedAt: '2026-10-01T03:00:00.000Z', convertedBookingId: null },
+    { id: 'eb-occ-9', friendId: 'friend-occ-8', displayName: '加藤 舞', status: 'cancelled', partySize: 1, createdAt: '2026-09-26T00:00:00.000Z', offeredAt: null, offerExpiresAt: null, notifiedAt: null, updatedAt: '2026-09-29T13:15:00.000Z', convertedBookingId: null },
+  ],
+  attendance: { attendedSeats: 9, noShowSeats: 1, entries: [] },
+  snapshotId: 'snap-visual-qa',
+  snapshotExpiresAt: '2026-10-12T00:00:00.000Z',
+}
 
 export const EVENT_WAITLIST = [
   { id: 'ew-1', slot_id: 'event-slot-1', friend_id: 'friend-4', status: 'waiting', notified_at: null, created_at: '2026-09-02T01:00:00.000Z', slot_starts_at: '2026-09-25T05:00:00.000Z', friend_name: '中村 彩' },
@@ -6418,21 +6498,21 @@ export const EVENT_CHANGE_PREVIEW = {
   impacts: [
     {
       slot_id: 'event-slot-1',
-      starts_at: '2026-09-25T05:00:00.000Z',
-      ends_at: '2026-09-25T06:30:00.000Z',
+      starts_at: '2026-10-12T01:30:00.000Z',
+      ends_at: '2026-10-12T03:30:00.000Z',
       capacity: 12,
-      confirmed_seats: 9,
+      confirmed_seats: 10,
       waiting_seats: 2,
-      pending_reminders: 9,
+      pending_reminders: 10,
       errors: [],
-      notices: ['datetime_moved_with_bookings'],
+      notices: [],
     },
   ],
   event_notices: [],
   blocked: false,
-  total_confirmed: 9,
+  total_confirmed: 10,
   total_waiting: 2,
-  total_pending_reminders: 9,
+  total_pending_reminders: 10,
 }
 
 export const EVENT_CHANGE_APPLY_RESULT = {
