@@ -2595,7 +2595,7 @@
     },
     "/friend-add-settings": {
       "node": "u1P0gG MRhef",
-      "name": "V2 4-6 友だち追加時の配信（一覧は★V8 MRhef）",
+      "name": "V2 4-6 友だち追加時の配信（一覧は★V8 MRhef・作る手順の輪は★V8 wDzkc）",
       "sections": [
         "Head",
         "Alert",
@@ -2604,7 +2604,8 @@
         "Rule",
         "Flow",
         "KPIs",
-        "KindTabs"
+        "KindTabs",
+        "Steps"
       ],
       "parts": [
         "友だち追加時の配信",
