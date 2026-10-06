@@ -106,7 +106,7 @@ export default function Sidebar({
 } = {}) {
   const pathname = usePathname()
   const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, loading: accountLoading } = useAccount()
   const brand = useBrand()
   /*
    * モバイルの固定ヘッダーに出す現在地（U037）。
@@ -407,6 +407,13 @@ export default function Sidebar({
     }))
     .filter((section) => section.items.length > 0)
     .filter((section) => !attrV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
+    /*
+     * 機能の見え方を読み込んでいる間は、最初の区分だけ出す（動きの点検 8・11 番）。
+     * 以前は機能に縛られない「設定」だけが先に出て、読み込み後にその上へ区分が
+     * 差し込まれ、「設定」が 250px 押し下げられていた（全画面で CLS の主な元）。
+     * 後ろに足すだけにすれば、出ている物は動かない。
+     */
+    .filter((_section, index) => isHq || currentVisibility !== null || visibilityStatus !== 'loading' || (!selectedAccountId && !accountLoading) || index === 0)
 
   /*
    * PERF-08: バッジ用の件数は「出す項目があるもの」だけを購読する。

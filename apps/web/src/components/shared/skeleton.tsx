@@ -109,10 +109,22 @@ export function DelayedSkeleton({
   if (visible) return <>{skeleton}</>
   if (!loading) return <>{children}</>
   // まだ骨組みを出さない間は本物を不可視で置き、場所だけ取る。
+  if (children !== undefined && children !== null) {
+    return (
+      <span aria-hidden="true" className="invisible inline-block">
+        {children}
+      </span>
+    )
+  }
+  /*
+   * 本物を渡さない画面では、骨組みを不可視で置いて高さを取っておく（動きの点検 8 番）。
+   * 以前は 0.3 秒の間は何も置かず高さ 0 で、その間に中身が届くと、下のページ送りや
+   * 帯がまとめて押し下げられていた（友だち一覧で CLS 0.28）。
+   */
   return (
-    <span aria-hidden="true" className="invisible inline-block">
-      {children}
-    </span>
+    <div aria-hidden="true" className="invisible" data-skeleton-reserve="">
+      {skeleton}
+    </div>
   )
 }
 

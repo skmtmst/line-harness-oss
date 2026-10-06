@@ -955,7 +955,8 @@ function WebinarList() {
         </Button>
       }
       stats={<>
-        {!canEdit ? (
+        {/* 役割が取れるまで（null）は閲覧のみの帯を出さない。出してから消すと一覧が 64px 跳ねていた（動きの点検 8 番）。 */}
+        {role !== null && !canEdit ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
             <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
