@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
+import { usePageChrome } from '@/components/shell/page-chrome'
 import styles from './settings-screen.module.css'
 
 /*
@@ -40,6 +41,12 @@ export function SbSettingsScreen({
   saveActions?: ReactNode
   saveStatus?: ReactNode
 }) {
+  /*
+   * 板の中のメニューの印（settingsNavInline）が後から false に戻されたら、メニューを付け直して印を立て直す。
+   * 見た目のテーマが後から v8 に決まる画面（EC連携・LINE通知・運用状態）では、外のメニューが先に出て、
+   * それが消えるときの片づけで印を false に戻し、外と中の2つのメニューが並んでしまうため。
+   */
+  const { settingsNavInline } = usePageChrome()
   return (
     <SettingsPage
       boardId={boardId}
@@ -47,7 +54,7 @@ export function SbSettingsScreen({
       description={description}
       identity={identity}
       actions={actions}
-      navigation={<SettingsInnerNav inline />}
+      navigation={<SettingsInnerNav inline key={settingsNavInline ? 'inline' : 'reassert'} />}
       saveActions={saveActions}
       saveStatus={saveStatus}
     >
