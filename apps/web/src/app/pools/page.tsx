@@ -21,7 +21,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
-import { useSettingsTheme } from '@/lib/use-settings-theme'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import PoolsV8 from '@/v8/settings/pools/pools'
 
 type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
@@ -465,6 +465,6 @@ function CreatePoolModal({
 
 /** ★V8：data-theme="v8" のときだけ新しい画面（src/v8/settings/pools）を出す。 */
 export default function PoolsPage() {
-  const theme = useSettingsTheme()
+  const theme = useAdminTheme()
   return theme === 'v8' ? <PoolsV8 /> : <PoolsPageV7 />
 }

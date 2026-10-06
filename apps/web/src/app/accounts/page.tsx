@@ -32,7 +32,7 @@ import {
   type AccountFilter,
 } from './account-list-view'
 import AccountMigration from './migration'
-import { useSettingsTheme } from '@/lib/use-settings-theme'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import AccountsV8 from '@/v8/settings/accounts/accounts'
 
 type AccountWithStats = LineAccount & {
@@ -435,7 +435,7 @@ const ARCHIVE_BLOCKER_MESSAGES: Record<string, string> = {
  * `?tab=migration`（UID の移行）は今までどおり今の画面が受ける。
  */
 export default function AccountsPage() {
-  const theme = useSettingsTheme()
+  const theme = useAdminTheme()
   const searchParams = useSearchParams()
   return theme === 'v8' && searchParams.get('tab') !== 'migration' ? <AccountsV8 /> : <AccountsPageV7 />
 }

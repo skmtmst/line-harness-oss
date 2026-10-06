@@ -22,7 +22,7 @@ import {
 } from './getting-started-view'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
 import styles from './getting-started.module.css'
-import { useSettingsTheme } from '@/lib/use-settings-theme'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import GettingStartedV8 from '@/v8/settings/getting-started/getting-started'
 
 /**
@@ -172,6 +172,6 @@ function StepRow({ step }: { step: StepResult }) {
 
 /** ★V8：data-theme="v8" のときだけ新しい画面（src/v8/settings/getting-started）を出す。 */
 export default function GettingStartedPage() {
-  const theme = useSettingsTheme()
+  const theme = useAdminTheme()
   return theme === 'v8' ? <GettingStartedV8 /> : <GettingStartedPageV7 />
 }
