@@ -13,12 +13,12 @@ import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import NewOutgoingV8 from './new-v8'
+import NewOutgoingV8 from '@/v8/webhooks/create'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
-import NewWebhookPageV8 from './new-v8'
+import NewWebhookPageV8 from '@/v8/webhooks/create'
 
 /**
  * #975 U067: 送るイベントの正本は `packages/db/src/webhooks.ts` の
