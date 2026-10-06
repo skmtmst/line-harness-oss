@@ -4643,21 +4643,20 @@ export const ACCESS_AUDIT_EVENTS = {
   `code` は運用者が決めてURLに出す符号なので、設計と同じ値を使う。
 */
 export const AFFILIATES = [
-  { id: 'af-1', name: '田中 明', code: 'tanaka01', commissionRate: 10, isActive: true, email: 'tanaka@example.com', holdDays: 30, payoutCycle: '月末締め翌月末払い', notifyOnConversion: true, createdAt: '2026-02-01T00:00:00.000Z' },
-  { id: 'af-2', name: '合同会社ノース', code: 'north', commissionRate: 0, isActive: true, email: 'north@example.com', holdDays: 30, payoutCycle: '月末締め翌月末払い', notifyOnConversion: false, createdAt: '2026-03-12T00:00:00.000Z' },
-  { id: 'af-3', name: '木村 亮', code: 'miyuki', commissionRate: 15, isActive: true, email: 'miyuki.s@example.jp', holdDays: 30, payoutCycle: '月末締め翌月末払い', notifyOnConversion: true, createdAt: '2026-04-02T00:00:00.000Z' },
-  { id: 'af-4', name: '中村 彩', code: 'aya-n', commissionRate: 10, isActive: true, email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false, createdAt: '2026-05-20T00:00:00.000Z' },
-  { id: 'af-5', name: '山口 商店', code: 'yamaguchi', commissionRate: 5, isActive: true, email: 'yamaguchi@example.com', holdDays: 60, payoutCycle: '四半期', notifyOnConversion: false, createdAt: '2026-01-15T00:00:00.000Z' },
-  { /* 設計の「停止中 2」のうち1人。 */ id: 'af-6', name: '旧パートナーA', code: 'old-a', commissionRate: 10, isActive: false, email: null, holdDays: 30, payoutCycle: null, notifyOnConversion: false, createdAt: '2025-11-01T00:00:00.000Z' },
+  { id: 'af-1', name: '田中 明', code: 'tanaka-a', commissionRate: 0, isActive: true, email: 'tanaka@example.com', holdDays: 14, payoutCycle: '毎月末', notifyOnConversion: true, friendId: 'friend-1', createdAt: '2026-02-01T00:00:00.000Z' },
+  { id: 'af-2', name: '合同会社ノース', code: 'north', commissionRate: 10, isActive: true, email: 'north@example.com', holdDays: 14, payoutCycle: '月末締め翌月末払い', notifyOnConversion: false, createdAt: '2026-03-12T00:00:00.000Z' },
+  { id: 'af-3', name: '木村 亮', code: 'kimura', commissionRate: 0, isActive: true, email: 'kimura@example.jp', holdDays: 14, payoutCycle: '月末締め翌月末払い', notifyOnConversion: true, createdAt: '2026-04-02T00:00:00.000Z' },
+  { id: 'af-4', name: '中村 彩', code: 'nakamura', commissionRate: 0, isActive: true, email: null, holdDays: null, payoutCycle: null, notifyOnConversion: false, createdAt: '2026-05-20T00:00:00.000Z' },
+  { id: 'af-5', name: '山口 商店', code: 'yamaguchi', commissionRate: 0, isActive: true, email: 'yamaguchi@example.com', holdDays: 14, payoutCycle: '四半期', notifyOnConversion: false, createdAt: '2026-01-15T00:00:00.000Z' },
+  { /* 設計の「停止中 1」。 */ id: 'af-6', name: '旧パートナーA', code: 'old-a', commissionRate: 10, isActive: false, email: null, holdDays: 14, payoutCycle: null, notifyOnConversion: false, createdAt: '2025-11-01T00:00:00.000Z' },
 ]
 
-/** 案件。設計 `GH8VL` の「案件 5」。金額は設計の ¥3,000／¥5,000／¥100／¥1,500／¥8,000。 */
+/** 案件。V8 の板（`h7dmB`）の「案件 4」（公開中 3・下書き 1）。名前・報酬・動きは板どおり。 */
 export const AFFILIATE_OFFERS = [
-  { id: 'ao-1', name: '体験の申し込み', description: 'はじめての方の体験予約', rewardAmount: 3000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-0', scenarioId: null, isActive: true, createdAt: '2026-02-01T00:00:00.000Z' },
-  { id: 'ao-2', name: '定期便のお申し込み', description: '定期便の初回', rewardAmount: 5000, rewardMiles: 500, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-1', scenarioId: null, isActive: true, createdAt: '2026-02-10T00:00:00.000Z' },
-  { id: 'ao-3', name: '友だち追加', description: null, rewardAmount: 100, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-2', scenarioId: null, isActive: true, createdAt: '2026-03-01T00:00:00.000Z' },
-  { id: 'ao-4', name: '資料請求', description: null, rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: 'scenario-0', isActive: true, createdAt: '2026-03-15T00:00:00.000Z' },
-  { /* 設計の「停止・終了 1」。 */ id: 'ao-5', name: '春の紹介キャンペーン', description: '2026春で終了', rewardAmount: 8000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-01-05T00:00:00.000Z' },
+  { id: 'ao-1', name: '定期便の初回', description: '初回の定期便が確定したとき', rewardAmount: 2000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: 'tag-1', scenarioId: null, isActive: true, createdAt: '2026-09-01T00:00:00.000Z' },
+  { id: 'ao-2', name: '夏の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 0, rewardMiles: 100, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-07-01T00:00:00.000Z' },
+  { id: 'ao-3', name: '資料請求', description: '資料をダウンロードしたとき', rewardAmount: 0, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: true, createdAt: '2026-06-01T00:00:00.000Z' },
+  { /* 下書き。 */ id: 'ao-4', name: '秋の紹介キャンペーン', description: '商品を買ったとき', rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-05-01T00:00:00.000Z' },
 ]
 
 /*
@@ -5181,11 +5180,13 @@ export const CONVERSION_EXPORT_CSV = `\uFEFF${[
  * 6人の並び・承認済み報酬の列は変えない（別の板が読む）。
  */
 export const AFFILIATE_REPORT = [
-  { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10, totalClicks: 820, totalConversions: 16, totalRevenue: 860000, confirmedReward: 86000, linkCount: 3, friendAdds: 58 },
-  { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', commissionRate: 0, totalClicks: 1240, totalConversions: 12, totalRevenue: 0, confirmedReward: 144000, linkCount: 2, friendAdds: 86 },
-  { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', commissionRate: 15, totalClicks: 420, totalConversions: 6, totalRevenue: 620000, confirmedReward: 93000, linkCount: 1, friendAdds: 31 },
-  { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', commissionRate: 10, totalClicks: 260, totalConversions: 3, totalRevenue: 400000, confirmedReward: 40000, linkCount: 1, friendAdds: 18 },
-  { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', commissionRate: 5, totalClicks: 90, totalConversions: 1, totalRevenue: 60000, confirmedReward: 3000, linkCount: 1, friendAdds: 4 },
+  /* V8 の板（nJlxX・Eo56k）の数：成果 14・9・8・5・2・0 件（今月 38 件）、報酬 ¥28,000・¥31,400・¥8,000・¥0・¥3,000・¥0。
+     1件ごとの人は割合 0% で、認めた定額（confirmedReward）が報酬。ノースは売上 ¥314,000 の 10%。 */
+  { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka-a', commissionRate: 0, totalClicks: 820, totalConversions: 14, totalRevenue: 412000, confirmedReward: 28000, linkCount: 2, friendAdds: 186 },
+  { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', commissionRate: 10, totalClicks: 1240, totalConversions: 9, totalRevenue: 314000, confirmedReward: 0, linkCount: 3, friendAdds: 240 },
+  { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', commissionRate: 0, totalClicks: 300, totalConversions: 8, totalRevenue: 256000, confirmedReward: 8000, linkCount: 1, friendAdds: 72 },
+  { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'nakamura', commissionRate: 0, totalClicks: 260, totalConversions: 5, totalRevenue: 0, confirmedReward: 0, linkCount: 1, friendAdds: 45 },
+  { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'kimura', commissionRate: 0, totalClicks: 90, totalConversions: 2, totalRevenue: 64000, confirmedReward: 3000, linkCount: 1, friendAdds: 30 },
   { /* 成果0の人。0と未取得を混ぜないため、0はきちんと0で返す。 */ affiliateId: 'af-6', affiliateName: '旧パートナーA', code: 'old-a', commissionRate: 10, totalClicks: 0, totalConversions: 0, totalRevenue: 0, confirmedReward: 0, linkCount: 1, friendAdds: 0 },
 ]
 
@@ -5197,7 +5198,7 @@ export const AFFILIATE_REPORT = [
   `duplicateFlags` に1件入れてあるのは、設計の「重複の疑い 1」を撮るため。
 */
 export const AFFILIATE_REPORT_DETAIL = {
-  affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10,
+  affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka-a', commissionRate: 0,
   clicks: 820, linkClicks: 760, friendAdds: 58,
   conversions: 24, conversionsApproved: 18, conversionsPending: 4, conversionsRejected: 2,
   conversionsByPoint: [
@@ -5224,12 +5225,14 @@ export const AFFILIATE_SETTLEMENT_PREVIEW = {
   periodFrom: '2026-08-01T00:00:00.000Z',
   periodTo: '2026-08-31T23:59:59.999Z',
   currency: 'JPY',
+  /* V8 の板（aINnz・usDpO・nJlxX）の今回払う額 ¥70,400・4人・33件。木村 亮は振込先が未登録。 */
   totalAmount: 70400,
-  conversionCount: 36,
+  conversionCount: 33,
   affiliates: [
-    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', amount: 30000, conversionCount: 18, bankProfileRegistered: true },
-    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', amount: 25000, conversionCount: 12, bankProfileRegistered: true },
-    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', amount: 15400, conversionCount: 6, bankProfileRegistered: false },
+    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', amount: 31400, grossAmount: 31400, deduction: 0, conversionCount: 9, bankProfileRegistered: true },
+    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka-a', amount: 28000, grossAmount: 30000, deduction: 2000, conversionCount: 14, bankProfileRegistered: true },
+    { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', amount: 8000, grossAmount: 8000, deduction: 0, conversionCount: 8, bankProfileRegistered: true },
+    { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'kimura', amount: 3000, grossAmount: 3000, deduction: 0, conversionCount: 2, bankProfileRegistered: false },
   ],
   previewVersion: '82e052367d36df0428262a3c69e38ec22e45b05de382deec83e924960f1aa13d',
 }
@@ -5257,9 +5260,9 @@ export const AFFILIATE_STATEMENT = {
 
 /** 紹介者が配っているリンク。設計 `jwrbf` の下半分。 */
 export const AFFILIATE_LINKS = [
-  { id: 'al-1', ref_code: 'tanaka01', label: '体験の申し込み用', click_count: 620, friend_adds: 42, conversions: 18, is_active: true, offer_id: 'ao-1', offer_name: '体験の申し込み' },
-  { id: 'al-2', ref_code: 'tanaka01-ig', label: 'Instagram用', click_count: 160, friend_adds: 12, conversions: 5, is_active: true, offer_id: 'ao-2', offer_name: '定期便のお申し込み' },
-  { /* 止めているリンク。全部有効だと、止めた行の見え方が撮れない。 */ id: 'al-3', ref_code: 'tanaka01-mail', label: 'メール署名用', click_count: 40, friend_adds: 4, conversions: 1, is_active: false, offer_id: null, offer_name: null },
+  /* V8 の板（tnTn9）の「発行ずみの紹介リンク」2本。 */
+  { id: 'al-1', affiliate_id: 'af-1', ref_code: 'ref-tanaka-teiki', label: '秋の定期便キャンペーン用', line_account_id: 'visual-qa-account', click_count: 620, friend_adds: 42, conversions: 9, is_active: 1, created_at: '2026-09-01T00:00:00.000Z', offer_id: 'ao-1', offer_name: '秋の定期便キャンペーン' },
+  { id: 'al-2', affiliate_id: 'af-1', ref_code: 'ref-tanaka-furikake', label: '鹿肉ふりかけ用', line_account_id: 'visual-qa-account', click_count: 160, friend_adds: 12, conversions: 5, is_active: 1, created_at: '2026-09-10T00:00:00.000Z', offer_id: 'ao-2', offer_name: '鹿肉ふりかけ 新登場' },
 ]
 
 /*

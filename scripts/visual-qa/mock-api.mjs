@@ -1113,28 +1113,40 @@ const PENDING_APPROVALS = [
   duplicateFlag,
 }))
 
-/* 今月認めた数は V8 の板（`OylSV`）の 33 件・合計 ¥70,400 にそろえる。
+/* 今月認めた数は V8 の板（`OylSV`・`Eo56k`）の 33 件。報酬の合計 ¥70,400・注文の合計 ¥1,046,000。
+ * アフィリエイターごとの件数は 田中 12・ノース 9・山口 7・中村 3・木村 2（多い順がレポートの並び）。
  * 起きた日は今月（10月）で持つ。今月より前だと帯の数に入らない。 */
-const APPROVED_APPROVALS = Array.from({ length: 33 }, (_, index) => {
-  const offerIndex = index < 18 ? 1 : index < 26 ? 2 : index < 31 ? 3 : 4
-  const rewards = [0, 2000, 3000, 1500, 1450]
-  const names = ['', '体験の申し込み', '定期便のお申し込み', '友だち追加', '資料請求']
-  return {
+const APPROVED_PLAN = [
+  // 紹介人ID, 案件ID, 案件名, 件数, 1件の報酬（最後の件だけ別の額）, 最後の件の報酬, 1件の注文額, 最後の件の注文額
+  ['af-1', 'ao-1', '定期便の初回', 12, 2000, 4500, 34000, 38000],
+  ['af-2', 'ao-2', '夏の紹介キャンペーン', 9, 3400, 4200, 35000, 34000],
+  ['af-5', 'ao-1', '定期便の初回', 7, 1000, 1000, 36000, 40000],
+  ['af-4', 'ao-3', '資料請求', 3, 0, 0, 0, 0],
+  ['af-3', 'ao-1', '定期便の初回', 2, 1500, 1500, 32000, 32000],
+]
+const APPROVED_APPROVALS = APPROVED_PLAN.flatMap(([affiliateId, offerId, offerName, count, reward, lastReward, value, lastValue]) =>
+  Array.from({ length: count }, (_, i) => {
+    /* 田中は最後の2件を 4,500（10×2,000＋2×4,500＝29,000）。ほかは最後の1件だけ別の額。 */
+    const special = affiliateId === 'af-1' ? i >= count - 2 : i === count - 1
+    return { affiliateId, offerId, offerName, rewardAmount: special ? lastReward : reward, value: i === count - 1 ? lastValue : value }
+  }))
+  .map((row, index) => ({
     eventId: `cv-a-${index + 1}`,
     createdAt: `2026-10-0${(index % 4) + 1}T10:00:00+09:00`,
     friendId: `approved-friend-${index + 1}`,
     friendName: `承認済みの友だち ${index + 1}`,
-    affiliateId: `af-${(index % 6) + 1}`,
-    affiliateName: AFFILIATES[index % AFFILIATES.length].name,
-    offerId: `ao-${offerIndex}`,
-    offerName: names[offerIndex],
+    affiliateId: row.affiliateId,
+    affiliateName: AFFILIATES.find((a) => a.id === row.affiliateId)?.name ?? null,
+    lineAccountName: '然 本店',
+    offerId: row.offerId,
+    offerName: row.offerName,
     offerRewardMiles: 0,
-    conversionPointName: names[offerIndex],
-    value: rewards[offerIndex],
+    conversionPointName: row.offerName,
+    value: row.value,
+    rewardAmount: row.rewardAmount,
     approvalStatus: 'approved',
     duplicateFlag: false,
-  }
-})
+  }))
 
 /* 今月認めなかった数は V8 の板（`OylSV`）の 2 件にそろえる。 */
 const REJECTED_APPROVALS = [
@@ -1185,13 +1197,15 @@ const SHAPES = {
     承認待ち・承認済み・重複ありの3行を置く。
   */
   '/api/conversions/approvals': CONVERSION_APPROVALS,
+  /* 支払いの集計。V8 の板（aINnz）の「認めてから 3日保留」。 */
   '/api/affiliate-payments': [
-    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka01', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 9, approvedReward: 84000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0, unsettledConversions: 9, unsettledReward: 84000, settledConversions: 0, settledReward: 0 },
-    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 8, approvedReward: 72000, heldConversions: 1, heldReward: 12000, holdStatusUnknown: 0, unsettledConversions: 8, unsettledReward: 72000, settledConversions: 0, settledReward: 0 },
-    { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'miyuki', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 7, approvedReward: 64000, heldConversions: 2, heldReward: 18000, holdStatusUnknown: 0, unsettledConversions: 7, unsettledReward: 64000, settledConversions: 0, settledReward: 0 },
-    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'aya-n', holdDays: 30, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 42000, heldConversions: 1, heldReward: 9000, holdStatusUnknown: 0, unsettledConversions: 5, unsettledReward: 42000, settledConversions: 0, settledReward: 0 },
-    { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', holdDays: 60, payoutCycle: '8/31締め・9/30払い', approvedConversions: 5, approvedReward: 50000, heldConversions: 2, heldReward: 15000, holdStatusUnknown: 0, unsettledConversions: 5, unsettledReward: 50000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-1', affiliateName: '田中 明', code: 'tanaka-a', holdDays: 3, payoutCycle: '毎月末', approvedConversions: 14, approvedReward: 30000, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 14, unsettledReward: 28000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-2', affiliateName: '合同会社ノース', code: 'north', holdDays: 3, payoutCycle: '月末締め翌月末払い', approvedConversions: 9, approvedReward: 31400, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 9, unsettledReward: 31400, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-3', affiliateName: '木村 亮', code: 'kimura', holdDays: 3, payoutCycle: '月末締め翌月末払い', approvedConversions: 2, approvedReward: 3000, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 2, unsettledReward: 3000, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-4', affiliateName: '中村 彩', code: 'nakamura', holdDays: null, payoutCycle: null, approvedConversions: 5, approvedReward: 0, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 0, unsettledReward: 0, settledConversions: 0, settledReward: 0 },
+    { affiliateId: 'af-5', affiliateName: '山口 商店', code: 'yamaguchi', holdDays: 3, payoutCycle: '四半期', approvedConversions: 8, approvedReward: 8000, heldConversions: 0, heldReward: 0, holdStatusUnknown: 0, unsettledConversions: 8, unsettledReward: 8000, settledConversions: 0, settledReward: 0 },
   ],
+
   '/api/action-scores/rules': ACTION_SCORE_RULES,
   '/api/action-scores/friends': {
     summary: {
@@ -2077,7 +2091,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/affiliate-settlements/preview') {
-    return { success: true, data: AFFILIATE_SETTLEMENT_PREVIEW }
+    /* 締めの期間は頼まれた期間を返す（本物と同じ）。無いときは見本の期間。 */
+    return { success: true, data: { ...AFFILIATE_SETTLEMENT_PREVIEW, periodFrom: query.get('periodFrom') ?? AFFILIATE_SETTLEMENT_PREVIEW.periodFrom, periodTo: query.get('periodTo') ?? AFFILIATE_SETTLEMENT_PREVIEW.periodTo } }
   }
   if (pathname === '/api/ec-commerce/orders') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
