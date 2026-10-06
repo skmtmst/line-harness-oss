@@ -2971,6 +2971,20 @@ export const IDENTITY_CANDIDATE_FRIEND = {
   canDecide: true, canUndo: false, undoNote: '判定を取り消すと、根拠を確認する候補へ戻ります。',
 }
 
+/** ★V8 比べて決める fcg2D：友だち同士の詳細（/api/friends/duplicates/:id）。判定の履歴を1件持つ。 */
+export const FRIEND_DUPLICATE_DETAIL = {
+  ...IDENTITY_CANDIDATE_FRIEND,
+  left: { ...IDENTITY_CANDIDATE_FRIEND.left, detail: '支店' },
+  right: { ...IDENTITY_CANDIDATE_FRIEND.right, detail: '本店' },
+  history: [
+    {
+      id: 'identity-history-1', fromStatus: 'pending', toStatus: 'deferred', actorName: 'Kenta',
+      reason: '本人に確認中', decidedAt: '2026-09-30T01:12:00.000Z', reprocessMode: null,
+    },
+  ],
+  detectedAt: '2026-09-28T09:40:00.000Z',
+}
+
 export const IDENTITY_CANDIDATE_EC = {
   ...IDENTITY_CANDIDATE_FRIEND,
   id: 'identity-ec-1', kind: 'ec_member',
@@ -2998,29 +3012,41 @@ function identityListItem(candidate) {
 }
 
 export const IDENTITY_CANDIDATE_LISTS = {
+  /*
+   * ★V8 重複検出 hn6Y8・G9C4Uw：候補3組（最高・高・低）、根拠とアカウントは絵の文。
+   * 数の帯は statusCounts（未確認11・保留2・結び付けた5 ＝18組）と lowConfidenceCount（2組）から出す。
+   */
   friend_duplicate: {
     items: [
-      identityListItem(IDENTITY_CANDIDATE_FRIEND),
-      identityListItem({
-        ...IDENTITY_CANDIDATE_FRIEND,
-        id: 'identity-friend-2', status: 'pending',
-        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: '山田 太郎', lineAccountName: '公式A（予約）' },
-        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'Yamada', lineAccountName: '然-NEN-TEST' },
-      }),
-      identityListItem({
-        ...IDENTITY_CANDIDATE_FRIEND,
-        id: 'identity-friend-3', status: 'deferred',
-        confidence: { ...IDENTITY_CANDIDATE_FRIEND.confidence, label: 'low', score: 42 },
-        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: 'テスト太郎', lineAccountName: 'ECサポート' },
-        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'test', lineAccountName: 'MAIL 配信' },
-      }),
-      identityListItem({
-        ...IDENTITY_CANDIDATE_FRIEND,
-        id: 'identity-friend-4', status: 'linked',
-        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: '坂本 真人', lineAccountName: 'MAIL 配信' },
-        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: '坂本真人', lineAccountName: '然-NEN-TEST' },
-      }),
+      {
+        ...identityListItem(IDENTITY_CANDIDATE_FRIEND),
+        left: { ...IDENTITY_CANDIDATE_FRIEND.left, lineAccountName: '支店' },
+        right: { ...IDENTITY_CANDIDATE_FRIEND.right, lineAccountName: '本店' },
+        evidenceSummary: ['確認済みのメールが同じ'],
+      },
+      {
+        ...identityListItem({
+          ...IDENTITY_CANDIDATE_FRIEND,
+          id: 'identity-friend-2', status: 'pending',
+          confidence: { ...IDENTITY_CANDIDATE_FRIEND.confidence, label: 'high', score: 78 },
+          left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: '山田 太郎', lineAccountName: '公式A' },
+          right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'Yamada', lineAccountName: '然-NEN-TEST' },
+        }),
+        evidenceSummary: ['電話番号が同じ'],
+      },
+      {
+        ...identityListItem({
+          ...IDENTITY_CANDIDATE_FRIEND,
+          id: 'identity-friend-3', status: 'deferred',
+          confidence: { ...IDENTITY_CANDIDATE_FRIEND.confidence, label: 'low', score: 42 },
+          left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: 'テスト太郎', lineAccountName: 'EC' },
+          right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'test', lineAccountName: 'MAIL配信' },
+        }),
+        evidenceSummary: ['表示名が似ている（参考）'],
+      },
     ], total: 18, limit: 20, offset: 0,
+    statusCounts: { pending: 11, deferred: 2, linked: 5, different: 0 },
+    lowConfidenceCount: 2,
   },
   ec_member: {
     items: [identityListItem(IDENTITY_CANDIDATE_EC)], total: 1, limit: 20, offset: 0,
