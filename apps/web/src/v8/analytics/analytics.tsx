@@ -106,9 +106,9 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
   const board = tab === 'friends' ? (readOnly ? 'L4Uov' : narrow ? 'eEhYU' : 'ws9wt') : BOARD[tab]
   const exportReady = exportAction !== null && exportAction.scope === scope && !exportAction.disabled
   const actions = <>
-    <Button variant="secondary" className={readOnly ? undefined : styles.csvButton} disabled={!exportReady} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
-    {/* 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。 */}
-    {readOnly ? null : <Button variant="primary" href="/analytics/reports/new"><Plus size={15} aria-hidden="true" />レポートを作る</Button>}
+    <Button variant="secondary" className={styles.csvButton} disabled={!exportReady} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={15} aria-hidden="true" />CSV で書き出す</Button>
+    {/* 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。場所だけ空けて CSV の位置を保つ。 */}
+    {readOnly ? <span className={styles.createSpace} aria-hidden="true" /> : <Button variant="primary" href="/analytics/reports/new"><Plus size={15} aria-hidden="true" />レポートを作る</Button>}
   </>
   const tabs = <>
     <Navigation active={tab} savedCount={savedCount} />
