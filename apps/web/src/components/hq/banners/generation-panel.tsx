@@ -5,6 +5,7 @@ import { useId, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import ColorWell from '@/components/shared/color-well'
 import LimitState from './limit-state'
+import styles from './generation-panel.module.css'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -363,6 +364,9 @@ function referenceTitle(image: BannerImage): string {
  * 入っているとき＝地 accent-soft・枠 accent-deep 1.5・文字 accent-deep。
  * 丸やタグの印は出さない（押した状態は地と枠と文字の色だけで示す）。
  * 読み上げには `aria-pressed` で入り切りを伝え、名前は「1行目を強調」にする。
+ *
+ * 見た目は `generation-panel.module.css` にまとめる。承認した見え方は同じで、
+ * 直書きの色と任意の大きさを画面側に残さないため（共通の約束 design-debt）。
  */
 function EmphasisToggle({
   index,
@@ -382,11 +386,7 @@ function EmphasisToggle({
       aria-label={`${index + 1}行目を強調`}
       disabled={disabled}
       onClick={onToggle}
-      className={`inline-flex h-[26px] shrink-0 items-center rounded-pill border-[1.5px] px-[9px] text-micro font-semibold transition-colors disabled:opacity-50 ${
-        on
-          ? 'border-accent-deep bg-accent-soft text-accent-deep'
-          : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
-      }`}
+      className={`${styles.emphasis} ${on ? styles.emphasisOn : styles.emphasisOff}`}
     >
       強調
     </button>

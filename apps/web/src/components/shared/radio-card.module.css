@@ -260,12 +260,16 @@
  * 小さい箱（★BG-B 出力サイズ o2XyUk/aCyxg）。
  * 角 8・枠 1・余白 8/10・間 3・題 11/600・補足 10。狭い脇のパネル（390px）に
  * 2列で並べる大きさ。箱（card）の寸法は変えない。
+ *
+ * 角は数字で書かず $radius-segment を使う。この約束の値は :root でも
+ * [data-theme='v8'] でも 8 のままなので、承認した角 8 がそのまま出る。
+ * （$radius-control は v8 で 10 になるため、ここでは使えない。）
  */
 [data-theme='v8'] .compact {
   gap: 3px;
   min-height: 0;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-segment);
 }
 [data-theme='v8'] .compact .body { gap: 3px; }
 [data-theme='v8'] .compact .title { font-size: 11px; line-height: 16px; font-weight: 600; }

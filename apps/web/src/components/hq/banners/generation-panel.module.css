@@ -1,0 +1,60 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * バナー生成パネルの小さな部品の見た目。
+ * 承認: musubo-design/バナー生成.pen フレーム `g64HOD`・2026-10-06・
+ * 利用者回答「この案で承認する」。
+ *
+ * 画面の見え方は承認したときと同じで、書き方だけを直書きから約束の値
+ * （トークン）へ移している。数字で書く必要があるのは承認済みの寸法
+ * （高さ 26・枠 1.5・左右の余白 9）だけに留める。
+ */
+@layer components {
+
+/*
+ * 「強調」の入り切り（`g64HOD` の行ごとのボタン）。
+ * 高さ 26・枠 1.5・左右の余白 9・文字 11/600・丸はぴったり丸い端。
+ * 入っていないときは白地＋薄い線、入っているときは薄い緑地＋濃い緑。
+ */
+.emphasis {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 26px;
+  padding: 0 9px;
+  border: 1.5px solid;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-micro);
+  /* 以前の `text-micro` クラスは行の高さも一緒に決めていたので、同じ値を添える。 */
+  line-height: var(--text-micro--line-height);
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease-out),
+    border-color var(--motion-fast) var(--motion-ease-out),
+    color var(--motion-fast) var(--motion-ease-out);
+}
+
+.emphasis:disabled {
+  opacity: 0.5;
+}
+
+/* 入っている行（強調カラーで目立たせる行）。 */
+.emphasisOn {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+/* 入っていない行。押せることが分かるように、重ねたときだけ面をわずかに沈める。 */
+.emphasisOff {
+  border-color: var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+}
+
+.emphasisOff:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+}
