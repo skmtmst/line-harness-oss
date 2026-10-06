@@ -595,6 +595,25 @@
   --tpl-an-nav-gap: 8px; --tpl-an-group-gap: 2px; --tpl-an-group-pad: 2px; --tpl-an-group-item-pad: 5px 12px; --tpl-an-seg-radius: 8px; --tpl-an-seg-item-radius: 6px; --tpl-an-seg-lh: 17px; --tpl-an-seg-thumb-shadow: 0 1px 2px #1d1d1f14;
   --tpl-an-tabs-gap: 24px; --tpl-an-tab-pad-bottom: 8px; --tpl-an-tab-line: 2px; --tpl-an-tab-lh: 19px; --tpl-an-ro-margin: 12px 0 13px; --tpl-an-kpi-menu: 24px; --tpl-an-actions-extra: 4px;
   --tpl-an-body-pad: 14px 24px 24px; --tpl-an-split-gap: 16px; --tpl-an-side-gap: 12px; --tpl-an-side-w: 320px; --tpl-an-card-pad: 20px; --tpl-an-card-gap: 14px; --tpl-an-routes-gap: 12px; --tpl-an-removed-gap: 10px; --tpl-an-head-gap: 6px;
+  /* ★V8 編集・詳細の画面（リッチメニューの編集・テンプレートの詳細・友だち属性の編集）。 */
+  --tpl-eds-back-gap: 4px; --tpl-eds-aside-w: 380px; --tpl-eds-aside-pad: 24px; --tpl-eds-aside-gap: 14px;
+  --tpl-eds-content-pad: 24px 28px; --tpl-eds-content-gap: 16px; --tpl-eds-card-pad: 20px; --tpl-eds-card-gap: 12px;
+  --tpl-eds-card-title-lh: 22px; --tpl-eds-note-lh: 17px; --tpl-eds-head-gap: 8px; --tpl-eds-title-gap: 2px;
+  --tpl-eds-band-pad: 12px 16px; --tpl-eds-band-gap: 12px; --tpl-eds-band-title-lh: 19px;
+  --tpl-eds-body-pad: 16px; --tpl-eds-body-lh: 22px; --tpl-eds-row-pad: 10px 0; --tpl-eds-row-gap: 12px;
+  --tpl-eds-kind-w: 96px; --tpl-eds-ver-w: 120px; --tpl-eds-state-w: 80px; --tpl-eds-ghost-h: 36px; --tpl-eds-ghost-pad: 0 14px; --tpl-eds-ghost-gap: 6px;
+  --tpl-eds-name-lh: 19px; --tpl-eds-ver-pad: 10px 12px; --tpl-eds-ver-meta-lh: 16px;
+  --tpl-eds-side-actions-gap: 8px; --tpl-eds-more: 36px; --tpl-eds-about-pad: 16px; --tpl-eds-about-gap: 4px; --tpl-eds-about-row-pad: 9px 0; --tpl-eds-about-row-gap: 8px;
+  --tpl-eds-dialog-gap: 14px; --tpl-eds-dialog-row-pad: 8px 0; --tpl-eds-dialog-more-pad: 6px 0 0; --tpl-eds-change-pad: 14px; --tpl-eds-change-gap: 6px;
+  --tpl-eds-dialog-desc-lh: 22px; --tpl-eds-dialog-footer-pull: -10px; --tpl-eds-dialog-footer-pad: 0 24px 24px;
+  --tpl-eds-tag-head-gap: 6px; --tpl-eds-tag-desc-size: 13px; --tpl-eds-tag-desc-lh: 19px; --tpl-eds-tag-card-gap: 14px;
+  --tpl-eds-field-gap: 6px; --tpl-eds-label-lh: 20px; --tpl-eds-label2-lh: 19px; --tpl-eds-input-h: 36px; --tpl-eds-input-pad: 0 12px; --tpl-eds-input-lh: 21px;
+  --tpl-eds-folder-w: 320px; --tpl-eds-hint-lh: 16px; --tpl-eds-summary-pad: 6px 0 0; --tpl-eds-open-gap: 8px;
+  --tpl-eds-action-pad: 10px 12px; --tpl-eds-action-gap: 10px; --tpl-eds-icon-btn: 28px; --tpl-eds-use-pad: 8px 0; --tpl-eds-use-label-w: 110px;
+  --tpl-eds-side-title-lh: 23px; --tpl-eds-info-pad: 10px 14px; --tpl-eds-info-gap: 10px; --tpl-eds-info-lh: 20px;
+  --tpl-eds-band-mt: 16px; --tpl-eds-band-mb: -8px; --tpl-eds-band-sub-lh: 19px; --tpl-eds-band-title2-lh: 20px; --tpl-eds-stat-pad: 10px 12px; --tpl-eds-unit-gap: 8px;
+  --tpl-eds-op-w: 25px; --tpl-eds-count-lh: 39px; --tpl-eds-cond-gap: 8px; --tpl-eds-seg-pad: 2px; --tpl-eds-seg-gap: 2px; --tpl-eds-seg-btn-pad: 6px 12px; --tpl-eds-seg-radius: 8px;
+  --tpl-eds-count-size: 32px; --tpl-eds-count-gap: 6px; --tpl-eds-list-gap: 12px; --tpl-eds-date-min: 160px; --tpl-eds-end-pad: 12px 14px; --tpl-eds-end-date-w: 189px; --tpl-eds-loading-pad: 24px;
   --tpl-an-card-title-size: 15px; --tpl-an-card-title-lh: 22px; --tpl-an-sub-lh: 16px; --tpl-an-text-lh: 17px; --tpl-an-range-pad: 3px; --tpl-an-range-item-pad: 5px 14px;
   --tpl-an-legend-gap: 16px; --tpl-an-swatch: 10px; --tpl-an-swatch-gap: 6px; --tpl-an-day-pad: 0 3px; --tpl-an-bar-up-h: 110px; --tpl-an-bar-down-h: 36px; --tpl-an-bar-radius: 3px; --tpl-an-mark: 8px; --tpl-an-mark-gap: 4px; --tpl-an-mark-radius: 4px;
   --tpl-an-notes-pad: 12px 14px; --tpl-an-notes-gap: 6px; --tpl-an-notes-radius: 10px; --tpl-an-note-dot-gap: 8px; --tpl-an-route-bar-gap: 4px; --tpl-an-track-h: 6px;
