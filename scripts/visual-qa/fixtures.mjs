@@ -6394,32 +6394,55 @@ export const LINE_ACCOUNT_VERIFY_CONNECTION = {
   errors: ['Webhook URLの一致・利用設定・接続テストを確認してください'],
 }
 
-/** アカウント詳細。資格情報の末尾だけを持ち、秘密値そのものは置かない。 */
+/**
+ * アカウント詳細（★V8 ihjfd ほか）。資格情報の末尾だけを持ち、秘密値そのものは置かない。
+ * 名前・ID・友だち数・上限・役割メモ・Webhook の URL は絵（ihjfd）の値。読むのは詳細と乗り換えだけ。
+ * 最後の確認（10/2 06:00）が通っていないので、題の下は「要確認」になる。
+ */
 export const LINE_ACCOUNT_DETAIL = {
   ...LINE_ACCOUNTS[0],
-  channelAccessTokenLast4: '4f0d', channelAccessTokenUpdatedAt: '2026-08-12T01:10:00.000Z',
-  channelSecretLast4: 'a91c', channelSecretUpdatedAt: '2026-08-12T01:12:00.000Z',
-  loginChannelSecretLast4: '77b2', loginChannelSecretUpdatedAt: '2026-08-12T01:14:00.000Z',
+  name: '然-NEN-TEST', channelId: '@nen-test', isDefault: false,
+  role: '本店の検証用。お客さまへの配信には使わない',
+  friendCapacity: 5000, capacityWarnAt: 4500,
+  stats: { friendCount: 1284, activeScenarios: 4, messagesThisMonth: 1842 },
+  channelAccessTokenLast4: 'x9Qa', channelAccessTokenUpdatedAt: '2026-09-28T01:10:00.000Z',
+  channelSecretLast4: null, channelSecretUpdatedAt: null,
+  loginChannelSecretLast4: null, loginChannelSecretUpdatedAt: null,
+  webhook: {
+    expectedUrl: 'https://api.musubo.jp/webhook/nen-test', actualUrl: 'https://api.musubo.jp/webhook/nen-test',
+    active: true, status: 'matched', checkedAt: '2026-10-01T21:00:00.000Z',
+  },
   connection: {
-    lastTestAt: '2026-08-13T00:12:00.000Z', lastTestStatus: 'succeeded',
-    lastReceivedAt: '2026-08-19T02:02:00.000Z',
+    lastTestAt: '2026-10-01T21:00:00.000Z', lastTestStatus: 'failed',
+    lastReceivedAt: null,
   },
 }
 
-/** 乗り換え事前確認。4区分の合計は元の友だち231人と一致させる。 */
+/** 止めたアカウントの詳細（★V8 WOfBN アーカイブの窓の後ろ）。止めた理由と日時を持つ。 */
+export const LINE_ACCOUNT_DETAIL_STOPPED = {
+  ...LINE_ACCOUNT_DETAIL,
+  id: 'visual-qa-account-old', isActive: false,
+  inactiveReason: 'manual', inactiveReasonDetail: '乗り換えの準備のため', inactivatedAt: '2026-10-01T22:00:00.000Z',
+}
+
+/**
+ * 乗り換え事前確認（★V8 x2dSNv）。4区分の合計は元の友だち14人と一致させる（自動10・要確認2・一致しない1・別人の可能性1）。
+ * 判断の行は絵の4人。要確認2人のうち1人が未判断（unresolvedReviews は mock-api で 1）。
+ */
 export const ACCOUNT_HANDOVER = {
   id: 'account-handover-1', fromAccountId: 'visual-qa-account', toAccountId: 'visual-qa-account-prod',
   code: 'NEN-4F2K-8H1Q', codeExpiresAt: '2026-09-08T03:00:00.000Z', status: 'previewed',
-  providerMatch: 'different', counts: { sourceTotal: 231, auto: 186, review: 23, unmatched: 18, lookalike: 4 },
+  providerMatch: 'different', counts: { sourceTotal: 14, auto: 10, review: 2, unmatched: 1, lookalike: 1 },
   movedCount: 0, failedCount: 0, failureReason: null,
   createdAt: '2026-09-07T01:00:00.000Z', linkedAt: '2026-09-07T01:10:00.000Z',
   previewedAt: '2026-09-07T01:15:00.000Z', resolvedAt: null, executedAt: null, completedAt: null,
 }
 
 export const ACCOUNT_HANDOVER_DECISIONS = [
-  { id: 'handover-decision-1', handover_id: 'account-handover-1', from_friend_id: 'friend-kyohei-yamamoto', to_friend_id: 'friend-kyohei-y', decision: 'link', bucket: 'review', note: 'メールアドレスが一致', decided_by: 'visual-qa-owner', decided_at: '2026-09-07T01:18:00.000Z', sourceName: 'Kyohei Yamamoto', candidateName: 'Kyohei Y.', evidenceLabel: 'メールアドレスが一致' },
-  { id: 'handover-decision-2', handover_id: 'account-handover-1', from_friend_id: 'friend-masato-sakamoto', to_friend_id: null, decision: 'skip', bucket: 'unmatched', note: '候補なし', decided_by: 'visual-qa-owner', decided_at: '2026-09-07T01:19:00.000Z', sourceName: '坂本 真人', candidateName: null, evidenceLabel: '候補なし' },
-  { id: 'handover-decision-3', handover_id: 'account-handover-1', from_friend_id: 'friend-ryo-kanno', to_friend_id: 'friend-kanno-candidate', decision: 'skip', bucket: 'lookalike', note: '別人', decided_by: 'visual-qa-owner', decided_at: '2026-09-07T01:20:00.000Z', sourceName: '菅野 亮', candidateName: '菅野', evidenceLabel: '名前と画像が似ています' },
+  { id: 'handover-decision-1', handover_id: 'account-handover-1', from_friend_id: 'friend-naoto-takahashi', to_friend_id: 'friend-naoto-t', decision: 'link', bucket: 'review', note: '電話番号が同じ', decided_by: 'visual-qa-owner', decided_at: '2026-09-07T01:18:00.000Z', sourceName: '高橋 直人', candidateName: '高橋 なおと', evidenceLabel: '電話番号が同じ' },
+  { id: 'handover-decision-2', handover_id: 'account-handover-1', from_friend_id: 'friend-yumi', to_friend_id: 'friend-yumi-sato', decision: 'skip', bucket: 'lookalike', note: '名前と画像だけが似ている', decided_by: 'visual-qa-owner', decided_at: '2026-09-07T01:19:00.000Z', sourceName: 'ゆみ🐶', candidateName: '佐藤 由美', evidenceLabel: '名前と画像だけが似ている' },
+  { id: 'handover-decision-3', handover_id: 'account-handover-1', from_friend_id: 'friend-kenta-kawano', to_friend_id: null, decision: 'new', bucket: 'unmatched', note: null, decided_by: 'visual-qa-owner', decided_at: '2026-09-07T01:20:00.000Z', sourceName: 'Kenta Kawano', candidateName: null, evidenceLabel: '—' },
+  { id: 'handover-decision-4', handover_id: 'account-handover-1', from_friend_id: 'friend-ryota-mori', to_friend_id: 'friend-ryota-m', decision: 'link', bucket: 'auto', note: 'メールアドレスが同じ', decided_by: 'visual-qa-owner', decided_at: '2026-09-07T01:21:00.000Z', sourceName: '森 涼太', candidateName: '森 りょうた', evidenceLabel: 'メールアドレスが同じ' },
 ]
 
 /*

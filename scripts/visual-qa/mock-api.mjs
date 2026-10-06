@@ -101,7 +101,7 @@ import {
   NEN_PHOTO_REWARD_POLICY_VERSIONS,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
   FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS,
-  LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
+  LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_DETAIL_STOPPED, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   ACCOUNT_HEALTH_LOGS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
@@ -1460,7 +1460,9 @@ const SHAPES = {
   },
   // 左メニューの出し分け。無いと汎用の空一覧が返り「機能設定を読み込めませんでした」になり、
   // メニューが基本の9項目だけになる（2026-09-24 の点検で発覚）。
-  '/api/settings/features/visibility': { features: FEATURES },
+  // 設定の画面（★V8 設定の中のメニュー・プール管理 u3iab3）は「プール管理」が見える統括で描かれている。
+  // 機能設定の既定（multi_store_hierarchy は既定オフ）はそのまま、表示の出し分けだけオンで返す。
+  '/api/settings/features/visibility': { features: { ...FEATURES, multi_store_hierarchy: true } },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
@@ -2024,7 +2026,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
      */
     return {
       success: true,
-      data: { ...STAFF, platformAdmin: true, platformAdminState: null, impersonation: null },
+      // 再確認の聞き方は認証アプリの6桁（★V8 WOfBN アーカイブの窓は6マスで描かれている）。
+      data: { ...STAFF, platformAdmin: true, platformAdminState: null, impersonation: null, stepUpMethod: 'totp' },
       csrfToken: 'visual-qa-csrf',
     }
   }
@@ -2420,8 +2423,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === `/api/account-handovers/${ACCOUNT_HANDOVER.id}`) {
     return {
       success: true,
-      data: { ...ACCOUNT_HANDOVER, decisions: ACCOUNT_HANDOVER_DECISIONS, unresolvedReviews: 20 },
+      data: { ...ACCOUNT_HANDOVER, decisions: ACCOUNT_HANDOVER_DECISIONS, unresolvedReviews: 1 },
     }
+  }
+  // 止めている間に送らなかった配信（★V8 WOfBN の窓の後ろ）。本物は配列を返す。
+  if (/^\/api\/line-accounts\/[^/]+\/skipped-deliveries$/.test(pathname)) {
+    return { success: true, data: [] }
   }
   if (pathname.startsWith('/api/line-accounts/') && pathname.split('/').length === 4) {
     /*
@@ -2435,6 +2442,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       data: {
         ...(LINE_ACCOUNTS.find((account) => account.id === pathname.split('/')[3]) ?? LINE_ACCOUNT_DETAIL),
         ...(pathname.split('/')[3] === LINE_ACCOUNT_DETAIL.id ? LINE_ACCOUNT_DETAIL : {}),
+        ...(pathname.split('/')[3] === LINE_ACCOUNT_DETAIL_STOPPED.id ? LINE_ACCOUNT_DETAIL_STOPPED : {}),
       },
     }
   }
