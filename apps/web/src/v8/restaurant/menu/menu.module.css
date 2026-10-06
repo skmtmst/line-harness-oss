@@ -1,0 +1,131 @@
+/*
+ * ★V8 メニュー管理（Pencil MJoJR）。表の列の幅・行の高さは板の書き出しから読む。
+ * 値は globals.css の --tpl-rs-*。
+ */
+
+/* 「…」の決まりの帯（枠の幅いっぱい・薄い青） */
+.legend {
+  margin: 0;
+  padding: var(--tpl-rs-legend-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-rs-lh-13);
+}
+
+.table {
+  border: 0;
+  border-radius: var(--tpl-rs-radius-none);
+}
+
+.headRow {
+  height: auto;
+  border: 0;
+  background: var(--color-surface-pearl);
+}
+
+/*
+ * 共通の表は [data-theme='v8'] の .cell・.bodyCell（端24・欄の間16の半分ずつ）を層の外で持つ。
+ * この表は絵の並び（端20・欄の右に16）なので、.table から書いて強くする。
+ */
+.table .th,
+.table .td {
+  padding: 0 var(--tpl-rs-cell-gap) 0 0;
+  white-space: nowrap;
+}
+
+.table tr.headRow th.th {
+  height: auto;
+  padding: var(--tpl-rs-th-pad-block) var(--tpl-rs-cell-gap) var(--tpl-rs-th-pad-block) 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-11);
+}
+
+.table tr.headRow th.th:first-child,
+.table .row .td:first-child {
+  padding-left: var(--tpl-rs-cell-side);
+}
+
+.table .row {
+  height: var(--tpl-rs-row-h);
+}
+
+.table .row .td {
+  border-top: 0;
+  box-shadow: var(--tpl-rs-line-top);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-rs-lh-12);
+}
+
+.colName { width: auto; }
+.colKind { width: var(--tpl-rs-menu-col-kind); }
+.colPeriod { width: var(--tpl-rs-menu-col-period); }
+.colDuration { width: var(--tpl-rs-menu-col-duration); }
+.colAllergy { width: var(--tpl-rs-menu-col-allergy); }
+.colStatus { width: var(--tpl-rs-menu-col-status); }
+.table tr.headRow th.th.colPrice,
+.table tr.row td.colPrice { width: var(--tpl-rs-menu-col-price); padding-right: var(--tpl-rs-col-pad-num); }
+.table tr.headRow th.th.colOps,
+.table tr.row td.colOps { width: var(--tpl-rs-menu-col-ops); padding-right: var(--tpl-rs-col-pad-ops); }
+
+.name {
+  display: block;
+  height: auto;
+  min-height: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+span.name {
+  cursor: default;
+}
+
+.clip {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-rs-row-actions-gap);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* 窓：価格と提供時間を横に並べる */
+.pair {
+  display: flex;
+  gap: var(--tpl-rs-pair-gap);
+}
+
+.stopName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-rs-lh-12);
+}
