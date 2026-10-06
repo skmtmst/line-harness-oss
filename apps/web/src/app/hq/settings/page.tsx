@@ -32,7 +32,7 @@ export default function HqSettingsPage() {
   }, [])
 
   return (
-    <div data-design-node="K7HYu" data-board-bleed className="flex flex-col">
+    <div data-design-node="K7HYu" data-board-bleed className="hq-settings-page flex flex-col gap-4">
       <ReadonlyHeader title="統括の情報" description="統括の名前です。各アカウントの画面の上と、メンバーへの招待メールに出ます。" />
       <div className="hq-settings-v8">
         <HqSettingsNav active="info" />
@@ -104,9 +104,11 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
 
   return (
     <form onSubmit={save} className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-5">
-      <div className="flex flex-col gap-1.5">
-        {/* 絵 `iY5pm` は高さ62＝名札20＋間6＋入力欄36。名札の箱を20に留める。 */}
-        <label htmlFor="tenant-name" className="text-label font-medium leading-5 text-ink">統括名</label>
+      {/* 組み方は旧テーマ（v7）のまま。絵 `K7HYu` の寸法（名札の箱20・説明の
+          上の間12・説明の高さ16）は `hq-settings-v8.css` の V8 限定の指定で
+          合わせる。ここで直に数字を足すと v7 の見た目も動いてしまう。 */}
+      <div className="hq-tenant-name__group flex flex-col gap-1.5">
+        <label htmlFor="tenant-name" className="hq-tenant-name__label text-label font-medium text-ink">統括名</label>
         <TextField
           id="tenant-name"
           value={name}
@@ -115,10 +117,8 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
           onChange={(event) => { setName(event.target.value); setSaved(false) }}
           className="w-full"
         />
+        <p className="hq-tenant-name__hint text-micro text-ink-faint">会社名やブランド名など、メンバーが見てわかる名前にします</p>
       </div>
-      {/* 絵 `K7HYu/P1fiZn` では説明 `TnzJK`（高さ16）は入力欄の組（`iY5pm`）の外。
-          カードの12の間で並ぶので、入力欄の組の中（間6）には入れない。 */}
-      <p className="text-micro leading-4 text-ink-faint">会社名やブランド名など、メンバーが見てわかる名前にします</p>
       {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
       {saved ? <p className="text-label text-accent-deep" role="status">保存しました。</p> : null}
       <div className="flex justify-end">

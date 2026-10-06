@@ -68,13 +68,52 @@ Codex の画像比較で、絵と実装のカードが3点ずれていた（受�
 | 左メニューが共通の `min-width:176px` のままだった | この画面の中だけ幅 200px に固定（仕切り線1pxを含む）。項目の間2・絵14角・字の高さ19も絵に合わせた | 同上（共通の `hq-settings-nav-v8.css` は触っていない） |
 | カードの枠を `border` で持つと中身が1px下がる（Pencil の線は中身を押さない） | 共通の頭（`page-header.module.css` の V8）と同じく `outline` ＋ `outline-offset:-1px` で描く | 同上 |
 
-- 上書きはすべて `[data-board-bleed]` か `.hq-settings-v8` の中だけ。共通の `readonly-v8.css`・`hq-settings-nav-v8.css`・`page-header.module.css` は変えていないので、`/hq/members`・`/hq/billing`・`/hq/support`・`/hq/banners`・`/hq/templates` と v7 の見た目は動かない
+- ~~上書きはすべて `[data-board-bleed]` か `.hq-settings-v8` の中だけ。…v7 の見た目は動かない~~ **← この見立ては誤りだった。下の「2026-10-06（3）」を見ること**
 - 既知の差: メニューの項目は絵の176pxに対して175px。メニュー全体の200pxに仕切り線1pxが含まれるため。カードの左端・幅を絵どおりにするには 200px が必要なので、こちらを優先した
 - 画像（絵と同じ 1440×1160）: `K7HYu-implementation-dim-1440.png`（実装）、`K7HYu-overlay-dim-1440.png`（重ね合わせ・差分表示）、`K7HYu-side-by-side-dim-1440.png`（左右並べ）。重ね合わせで板の頭・メニュー・カード・保存ボタンの輪郭はほぼ消えている（残る色は字の描画差と、模擬データで統括名が空なこと）
 - 直した後の確認: `tsc --noEmit` 合格、`vitest run src/app/hq src/components/hq` 53ファイル / 239件 合格、変更ファイルの `eslint` 指摘なし、`design:debt:check` 合格、`next build` 成功後の `verify:design` 456件すべて一致（不一致0）
 
 - 残置の確認: 部品 `apps/web/src/components/hq/operator-history.tsx`、`/api/hq/operator-history`、`platform_audit_logs` への記録づくり、既存試験 `apps/web/src/app/hq/operator-history-v8.react.test.tsx` はすべて残っている
 - 試験: `vitest run src/app/hq src/components/hq` 53ファイル / 239件 合格、`tsc --noEmit` 合格
+
+## 2026-10-06（3）旧テーマ（v7）への波及と、縦の仕切り線の長さを直した
+
+Codex の検証（受け渡し `bc600b7d…`）で2点の不一致が返ってきたので直した。**デザインは変えていない。承認済みの姿（`K7HYu`、2026-10-06 利用者承認）へ戻す不具合直しなので、新しい Pencil 承認は取っていない。**
+
+### 直した1：旧テーマ（v7）の `/hq/settings` が動いてしまっていた
+
+| 1440px・v7 | 本来（寸法合わせ前） | 不具合時 | 直した後 |
+|---|---:|---:|---:|
+| 設定メニューの幅 | 176px | 200px | **176px** |
+| カードの幅 | 880px | 856px | **880px** |
+| カードの上端 | 165px | 149px | **165px** |
+| 保存ボタン列の上端 | 286px | 275px | **286px** |
+
+原因は2つ。どちらも「V8 だけ」の条件が抜けていた。
+
+- **CSS**：目印の `data-board-bleed`・`hq-settings-v8` は道（`page.tsx`）が**テーマに関係なく**付ける。だから `.hq-settings-v8 .hq-settings-nav { width:200px … }` のようにテーマの条件がない指定は v7 にも効いてしまう。寸法の上書きを全部 `[data-theme='v8']` の中へ入れ直した
+- **道（`page.tsx`）**：一番外の `gap-4` を消していたのが v7 にもそのまま効き、カードの上端が16px上がっていた。`gap-4` を戻し、V8 の「間0」は CSS 側の `[data-theme='v8'] .hq-settings-page { gap: 0 }` で表すようにした。統括名カードの中（名札・入力欄・説明の組み方）も v7 のままへ戻し、絵の寸法（名札の箱20・説明の上の間12・説明の高さ16）は V8 限定の CSS で合わせた
+
+狭い画面の落とし穴も先に塞いだ。`[data-theme='v8'] .hq-settings-v8 .hq-settings-nav`（詳しさ 0,3,1）は `@media` の中の `.hq-settings-v8 .hq-settings-nav`（0,2,1）より強いので、幅200・頭寄せが狭い画面にも残ってしまう。`@media (max-width: 768px)` の中に V8 用の戻し（`align-self:auto; width:100%`）を足した。
+
+### 直した2：V8 の縦の仕切り線が22px長かった
+
+絵の `jbGiQ` は高さを持たず**中身ぴったり**＝ 上下余白16×2 ＋ 見出し16 ＋ 間2 ＋ 項目35×4 ＋ 項目の間2×3 ＝ **196px**。実装は `align-self: stretch` で右の中身の高さに引き伸ばされ 218px になっていた。V8 のときだけ `align-self: flex-start` にして **196px** に合わせた（v7 は今までどおり `stretch`）。
+
+### 直した後の確認（1440px の実測）
+
+| | 絵 `K7HYu` | 実装 | 差 |
+|---|---:|---:|---:|
+| 設定メニューの幅 | 200px | 200px | 0 |
+| **設定メニューの高さ（＝縦の仕切り線）** | **196px** | **196px** | **0** |
+| カードの幅 | 940px | 940px | 0 |
+| カードの上端 | 163px | 163px | 0 |
+| 保存ボタン列の上端 | 285px | 285px | 0 |
+
+- 6種類の幅（375/414/768/1024/1280/1440）で v8・v7 とも横はみ出し0・画面の JS エラーなし。768px 以下は両テーマとも設定メニューが縦並び・幅いっぱい・下線に戻る
+- `hq-settings-v8.css` の寸法合わせ前（`9ee2c7805`）からの追加行はすべて `[data-theme='v8']` の中（`git diff` で確認）。共通の `readonly-v8.css`・`hq-settings-nav-v8.css`・`page-header.module.css` は変えていない
+- `tsc --noEmit` 合格、変更ファイルの `eslint` 指摘なし、`vitest run src/app/hq src/components/hq` 53ファイル / 239件 合格、`next build` 成功後の `verify:design` 456件すべて一致（不一致0）、`design:debt:check` 合格
+- 画像（絵と同じ 1440×1160）: `K7HYu-implementation-dim-1440.png`・`K7HYu-overlay-dim-1440.png`・`K7HYu-side-by-side-dim-1440.png` を撮り直した
 
 **findings:** 対象2画面に残るP0/P1/P2なし。
 

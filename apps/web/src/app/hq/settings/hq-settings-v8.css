@@ -43,33 +43,51 @@
 }
 
 .hq-settings-v8 .hq-settings-nav {
-  /* 絵 `jbGiQ` は幅200（仕切り線の1を含む）。これでカードの左端が
-     240＋200＋24＝464、幅が 1188−200−24−24＝940 になる。 */
-  width: 200px;
-  flex: 0 0 auto;
-  gap: 2px;
   padding: 16px 12px;
   border-right: 1px solid var(--color-hairline);
   align-self: stretch;
 }
 
+/* ===== ここから下は V8 だけの寸法合わせ =====================================
+ * 絵 `K7HYu` は V8 の絵。旧テーマ（v7）の /hq/settings は今までの見た目を
+ * 保つので、下の上書きはすべて `[data-theme='v8']` の中に入れる。目印の
+ * `data-board-bleed`・`hq-settings-v8` は道（page.tsx）がテーマに関係なく
+ * 付けるため、テーマの条件を書かないと v7 にも効いてしまう。
+ * ========================================================================= */
+
+/* 頭と中身の間。絵では板の頭 `uSFzp` と中身がくっついている（間0）。 */
+[data-theme='v8'] .hq-settings-page {
+  gap: 0;
+}
+
+/* 絵 `jbGiQ` は幅200（仕切り線の1を含む）。これでカードの左端が
+   240＋200＋24＝464、幅が 1188−200−24−24＝940 になる。
+   高さは中身ぴったりの196（＝上下余白16×2 ＋ 見出し16 ＋ 間2 ＋
+   項目35×4 ＋ 項目の間2×3）。縦の仕切り線もこの196で止める。 */
+[data-theme='v8'] .hq-settings-v8 .hq-settings-nav {
+  width: 200px;
+  flex: 0 0 auto;
+  gap: 2px;
+  align-self: flex-start;
+}
+
 /* 見出し `hMMVC`：11px / 太字 / 箱の高さ16。間は上の gap:2 が持つ。 */
-.hq-settings-v8 .hq-settings-nav__label {
+[data-theme='v8'] .hq-settings-v8 .hq-settings-nav__label {
   padding: 0;
   line-height: 16px;
 }
 
 /* 項目 `BCMxg`：高さ35 = 上下8 + 字19、絵・字の間8、絵 `iXwYl` は14角 */
-.hq-settings-v8 .hq-settings-nav__item {
+[data-theme='v8'] .hq-settings-v8 .hq-settings-nav__item {
   gap: 8px;
   line-height: 19px;
 }
 
-.hq-settings-v8 .hq-settings-nav__item--active {
+[data-theme='v8'] .hq-settings-v8 .hq-settings-nav__item--active {
   font-weight: 700;
 }
 
-.hq-settings-v8 .hq-settings-nav__icon {
+[data-theme='v8'] .hq-settings-v8 .hq-settings-nav__icon {
   width: 14px;
   height: 14px;
 }
@@ -77,11 +95,23 @@
 /* カード `P1fiZn`：絵の余白20は枠線の外から数える（Pencil の線は中身を
    押さない）。枠を border で持つと中身が1下がるので、共通の頭
    （`page-header.module.css` の v8）と同じく線は outline で描く。 */
-[data-board-bleed] .hq-settings-v8__main > form,
-[data-board-bleed] .hq-settings-v8__main > section {
+[data-theme='v8'] [data-board-bleed] .hq-settings-v8__main > form,
+[data-theme='v8'] [data-board-bleed] .hq-settings-v8__main > section {
   border: 0;
   outline: 1px solid var(--color-hairline);
   outline-offset: -1px;
+}
+
+/* 名札 `qP2Ab` の箱は20（絵の入力欄の組 `iY5pm` は 20＋間6＋欄36＝62）。 */
+[data-theme='v8'] .hq-settings-v8__main .hq-tenant-name__label {
+  line-height: 20px;
+}
+
+/* 説明 `TnzJK` は高さ16で、絵では入力欄の組の外＝カードの間12で並ぶ。
+   組の中の間は6なので6足して12にする。 */
+[data-theme='v8'] .hq-settings-v8__main .hq-tenant-name__hint {
+  margin-top: 6px;
+  line-height: 16px;
 }
 
 .hq-settings-v8__main {
@@ -101,6 +131,13 @@
   .hq-settings-v8 .hq-settings-nav {
     border-right: none;
     border-bottom: 1px solid var(--color-hairline);
+    align-self: auto;
+    width: 100%;
+  }
+
+  /* 上の V8 限定の指定（幅200・頭寄せ）は詳しさが上なので、狭い画面でも
+     残ってしまう。V8 でも縦並びに戻す。 */
+  [data-theme='v8'] .hq-settings-v8 .hq-settings-nav {
     align-self: auto;
     width: 100%;
   }
