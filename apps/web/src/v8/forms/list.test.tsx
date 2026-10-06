@@ -123,6 +123,33 @@ describe('V8 回答フォーム一覧', () => {
     expect(unfiled.textContent).toContain('3')
   })
 
+  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）', async () => {
+    fetchApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/forms?')) {
+        return {
+          success: true,
+          data: {
+            items: [
+              { ...baseForm, id: 'f-1', name: '来店アンケート', folderId: 'fol-1' },
+              { ...baseForm, id: 'f-2', name: 'イベント申込', folderId: null },
+            ],
+            total: 2, all_total: 2, page: 1, limit: 20,
+          },
+        }
+      }
+      return { success: true, data: {} }
+    })
+    listFolders.mockResolvedValue({ success: true, data: [{ id: 'fol-1', kind: 'form', name: '来店・予約', itemCount: 6, displayOrder: 0, color: '#2f6fde' }], unfiledCount: 3 })
+    await mount()
+    const filed = host.querySelector('tr[data-row-id="f-1"]')?.querySelectorAll('[data-folder-dot]') ?? []
+    expect(filed).toHaveLength(1)
+    expect(filed[0].getAttribute('data-folder-dot')).toBe('filed')
+    expect(filed[0].getAttribute('aria-label')).toBe('フォルダ：来店・予約')
+    const unfiled = host.querySelector('tr[data-row-id="f-2"]')?.querySelectorAll('[data-folder-dot]') ?? []
+    expect(unfiled).toHaveLength(1)
+    expect(unfiled[0].getAttribute('data-folder-dot')).toBe('unfiled')
+  })
+
   it('行の「…」は「「〇〇」のその他の操作」で押せて、項目が開く', async () => {
     await mount()
     fireEvent.click(screen.getByRole('button', { name: '「来店アンケート」のその他の操作' }))
