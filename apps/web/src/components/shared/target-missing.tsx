@@ -104,8 +104,9 @@ export default function TargetMissing({
     )
   } else if (showRetry) {
     /* RqO7O：v8 の絵は「もう一度試す」。v7（x5cgUH）は読み込むのまま。 */
+    /* 読み上げ名は v7・v8 とも「もう一度読み込む」のまま（試験・操作の目印）。 */
     action = (
-      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">
+      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます" aria-label="もう一度読み込む">
         <RotateCw aria-hidden="true" size={16} />{v8 ? 'もう一度試す' : 'もう一度読み込む'}
       </Button>
     )
