@@ -6892,10 +6892,9 @@ export function mileageWriteResponse(method, pathname, body = {}, headers = {}) 
  * `count` は全18件を取得しなくても左の絞り込み件数を描ける一覧集計値。
  */
 export const WEBINAR_FOLDERS = [
-  ['webinar-folder-products', '商品説明', 6],
-  ['webinar-folder-cases', '導入事例', 4],
-  ['webinar-folder-seminars', 'セミナー', 5],
-  ['webinar-folder-archive', 'アーカイブ', 4],
+  ['webinar-folder-seminars', 'セミナー', 2],
+  ['webinar-folder-products', '商品説明', 1],
+  ['webinar-folder-cases', '導入事例', 1],
 ].map(([id, name, count], index) => ({
   id, kind: 'webinar', accountId: 'visual-qa-account', name, parentId: null, displayOrder: index, count,
   color: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
@@ -7081,35 +7080,48 @@ export const OPERATION_HISTORY = [
  * 申込・視聴の未取得は0で埋めず null にする。
  */
 export const WEBINARS = [
+  /* 並びは設計 `UyUMw` の上から（更新が新しい順）。未分類は 2件（旧機能説明会・秋の新商品説明会）。 */
   {
     id: 'webinar-1', title: 'NEN活用スタートセミナー', slug: 'nen-start', status: 'active',
     folderId: 'webinar-folder-seminars', folderName: 'セミナー',
-    durationSeconds: 2_538, registrationCount: 184, viewerCount: 142,
-    publicationState: 'period', publicationStartsAt: '2026-08-01T00:00:00+09:00', publicationEndsAt: '2026-08-31T23:59:59+09:00',
-  },
-  {
-    id: 'webinar-2', title: '予約機能の使い方', slug: 'booking-guide', status: 'active',
-    folderId: 'webinar-folder-products', folderName: '商品説明',
-    durationSeconds: 1_920, registrationCount: 96, viewerCount: 71,
+    durationSeconds: 2_538, registrationCount: 124, viewerCount: 98,
     publicationState: 'always', publicationStartsAt: null, publicationEndsAt: null,
+    updatedAt: '2026-08-25T06:00:00.000Z',
   },
   {
-    id: 'webinar-3', title: 'EC連携 実践講座', slug: 'ec-guide', status: 'draft',
+    id: 'webinar-2', title: 'EC連携 実践講座', slug: 'ec-practice', status: 'active',
+    folderId: 'webinar-folder-products', folderName: '商品説明',
+    durationSeconds: 2_160, registrationCount: 58, viewerCount: null,
+    publicationState: 'scheduled', publicationStartsAt: '2026-10-08T20:00:00+09:00', publicationEndsAt: null,
+    updatedAt: '2026-08-25T05:00:00.000Z',
+  },
+  {
+    id: 'webinar-3', title: '予約機能の使い方', slug: 'booking', status: 'active',
     folderId: 'webinar-folder-cases', folderName: '導入事例',
-    durationSeconds: 2_160, registrationCount: 63, viewerCount: null,
-    publicationState: 'scheduled', publicationStartsAt: '2026-08-28T20:00:00+09:00', publicationEndsAt: null,
+    durationSeconds: 1_920, registrationCount: 42, viewerCount: 39,
+    publicationState: 'period', publicationStartsAt: '2026-09-01T00:00:00+09:00', publicationEndsAt: '2026-10-31T23:59:59+09:00',
+    updatedAt: '2026-08-25T04:00:00.000Z',
   },
   {
-    id: 'webinar-4', title: '顧客対応の自動化', slug: 'support-automation', status: 'draft',
+    id: 'webinar-4', title: '顧客対応の自動化', slug: 'automation', status: 'active',
     folderId: 'webinar-folder-seminars', folderName: 'セミナー',
-    durationSeconds: 1_800, registrationCount: 0, viewerCount: null,
-    publicationState: 'unset', publicationStartsAt: null, publicationEndsAt: null,
+    durationSeconds: 1_800, registrationCount: 24, viewerCount: 20,
+    publicationState: 'always', publicationStartsAt: null, publicationEndsAt: null,
+    updatedAt: '2026-08-25T03:00:00.000Z',
   },
   {
-    id: 'webinar-5', title: '旧機能説明会', slug: 'legacy-guide', status: 'draft',
-    folderId: 'webinar-folder-archive', folderName: 'アーカイブ',
+    id: 'webinar-5', title: '旧機能説明会', slug: 'old', status: 'draft',
+    folderId: null, folderName: null,
     durationSeconds: 1_500, registrationCount: 85, viewerCount: 99,
-    publicationState: 'ended', publicationStartsAt: '2026-07-01T00:00:00+09:00', publicationEndsAt: '2026-07-31T23:59:59+09:00',
+    publicationState: 'ended', publicationStartsAt: '2026-08-01T00:00:00+09:00', publicationEndsAt: '2026-08-20T23:59:59+09:00',
+    updatedAt: '2026-08-25T02:00:00.000Z',
+  },
+  {
+    id: 'webinar-6', title: '秋の新商品説明会', slug: 'autumn', status: 'draft',
+    folderId: null, folderName: null,
+    durationSeconds: 0, registrationCount: 0, viewerCount: null,
+    publicationState: 'unset', publicationStartsAt: null, publicationEndsAt: null,
+    updatedAt: '2026-08-25T01:00:00.000Z',
   },
 ].map((webinar) => ({
   accountId: 'visual-qa-account', videoPrefix: `webinars/${webinar.slug}`,
@@ -7125,13 +7137,13 @@ export const WEBINAR_OVERVIEW = {
   metrics: {
     webinars: { value: 6, state: 'available', reason: null },
     activeWebinars: { value: 3, state: 'available', reason: null },
-    registrations: { value: 428, state: 'available', reason: null },
-    registrationBookings: { value: 428, state: 'available', reason: null },
-    viewers: { value: 312, state: 'available', reason: null },
-    viewRate: { value: 0.729, state: 'available', reason: null },
+    registrations: { value: 248, state: 'available', reason: null },
+    registrationBookings: { value: 260, state: 'available', reason: null },
+    viewers: { value: 118, state: 'available', reason: null },
+    viewRate: { value: 0.476, state: 'available', reason: null },
     averageWatchSeconds: { value: null, state: 'unavailable', reason: '一覧では未取得' },
-    ctaUniquePeople: { value: 86, state: 'available', reason: null },
-    ctaTotalClicks: { value: 86, state: 'available', reason: null },
+    ctaUniquePeople: { value: 18, state: 'available', reason: null },
+    ctaTotalClicks: { value: 41, state: 'available', reason: null },
   },
 }
 
