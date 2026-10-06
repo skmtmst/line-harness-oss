@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { RICH_MENU_DIMENSIONS, type RichMenuAreaIntent } from '@line-crm/shared'
 import Notice from '@/components/shared/notice'
 import { intentLabelOf } from '@/components/rich-menus/area-properties'
+import styles from './canvas-v8.module.css'
 
 export type Area = {
   id: string
@@ -64,6 +65,10 @@ type Props = {
   onDeleteArea: (id: string) => void
   preview?: boolean
   onPreviewAction?: (area: Area) => void
+  appearance?: 'default' | 'v8'
+  /** 作成画面が持つ面一覧と重複させない。 */
+  showAreaList?: boolean
+  showTools?: boolean
 }
 
 function snap(value: number, others: number[]): number {
@@ -101,13 +106,31 @@ export function CanvasEditor({
   onDeleteArea,
   preview = false,
   onPreviewAction,
+  appearance = 'default',
+  showAreaList = true,
+  showTools = true,
 }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
   const dims = RICH_MENU_DIMENSIONS[size]
-  const [scale, setScale] = useState(0.3)
+  const [scale, setScale] = useState(appearance === 'v8' ? 0.24 : 0.3)
   const [drag, setDrag] = useState<DragState>(null)
   /** 上限に当たったときの知らせ。**`alert()` の代わりに画面へ残す。** */
   const [limitNotice, setLimitNotice] = useState('')
+
+  useEffect(() => {
+    if (appearance !== 'v8' || showTools) return
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const fit = () => {
+      const width = viewport.getBoundingClientRect().width
+      if (width > 0) setScale(Math.min(width, 600) / dims.width)
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [appearance, showTools, dims.width])
 
   function toImageCoord(clientX: number, clientY: number) {
     // 描画前は ref がまだ無い。非null断言の代わりに原点へ倒す。
@@ -317,7 +340,7 @@ export function CanvasEditor({
           {limitNotice}
         </Notice>
       )}
-      <div className="flex items-center gap-2 text-sm">
+      {showTools ? <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-ink-faint text-xs">ズーム</span>
         {[0.25, 0.3, 0.5, 0.75, 1].map((s) => (
           <button
@@ -340,15 +363,16 @@ export function CanvasEditor({
             空白でドラッグ → 新規矩形 / 矩形クリックか下の一覧で選択 / 矢印キーで微調整 / Delete で削除
           </span>
         )}
-      </div>
+      </div> : null}
       <div
-        className="overflow-auto border border-hairline bg-shell"
-        style={{ maxHeight: '70vh' }}
+        ref={viewportRef}
+        className={appearance === 'v8' ? styles.viewport : 'overflow-auto border border-hairline bg-shell'}
+        style={appearance === 'v8' ? undefined : { maxHeight: '70vh' }}
       >
         <div
           ref={canvasRef}
           onMouseDown={handleCanvasMouseDown}
-          className="relative bg-canvas"
+          className={appearance === 'v8' ? styles.canvas : 'relative bg-canvas'}
           style={{
             width: dims.width * scale,
             height: dims.height * scale,
@@ -401,15 +425,19 @@ export function CanvasEditor({
                         }
                       }
                 }
-                className="absolute focus-visible:outline-2 focus-visible:outline-status-info"
+                className={appearance === 'v8' ? styles.area : 'absolute focus-visible:outline-2 focus-visible:outline-status-info'}
                 style={{
                   left: area.boundsX * scale,
                   top: area.boundsY * scale,
                   width: area.boundsWidth * scale,
                   height: area.boundsHeight * scale,
-                  border: `2px solid ${borderColor}`,
+                  border: appearance === 'v8'
+                    ? `${selected ? 3 : 1}px solid ${overlap ? 'var(--color-danger)' : selected ? 'var(--color-accent-deep)' : 'color-mix(in srgb, var(--color-canvas) 67%, transparent)'}`
+                    : `2px solid ${borderColor}`,
                   background: preview
                     ? 'transparent'
+                    : appearance === 'v8'
+                      ? selected ? 'color-mix(in srgb, var(--color-canvas) 33%, transparent)' : 'transparent'
                     : selected
                       ? 'color-mix(in srgb, var(--color-action) 18%, transparent)'
                       : 'color-mix(in srgb, var(--color-status-info) 10%, transparent)',
@@ -417,7 +445,7 @@ export function CanvasEditor({
                   boxSizing: 'border-box',
                 }}
               >
-                {!preview && selected &&
+                {!preview && selected && showTools &&
                   ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'].map((h) => (
                     <div
                       key={h}
@@ -454,7 +482,7 @@ export function CanvasEditor({
         ここから Tab → Enter で選べ、選んだあとは右の設定欄・矢印キーが効く。
         各ボタンの動きもここで読み上げられる。
       */}
-      {!preview && areas.length > 0 && (
+      {!preview && showAreaList && areas.length > 0 && (
         <div className="space-y-1">
           <h3 className="text-ink-faint text-xs font-semibold">エリア一覧</h3>
           <ul className="border-hairline divide-hairline divide-y rounded-mini border">

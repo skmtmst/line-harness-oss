@@ -7,7 +7,7 @@
 .board {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
   container-type: inline-size;
 }
 
@@ -26,54 +26,32 @@
   text-decoration: underline;
 }
 
-/* 画面名＋手順の段。 */
-.headRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-}
+/* 画面名＋手順の段は型に任せる。画面側に見出しの箱・文字の大きさを書かない。 */
 
-.headTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.subNote {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-/* 競合の帯（`r8dGXT`）：ほかの人の更新を知らせる。書き換えはしない。 */
+/* 板 `r8dGXT` の競合の帯：薄い黄色の地・濃い黄色の線・角丸 10。題は太字にしすぎない。 */
 .conflictBar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
-  border: 1px solid var(--color-warning-bg);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-warning-bg);
+  padding: var(--tpl-row-pad-block) var(--tpl-large-gap);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-control, 10px);
+  background: var(--color-status-warn-soft, #fdf3e1);
 }
 
 .conflictTitle {
   margin: 0;
   color: var(--color-ink);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .conflictBody {
-  margin: 4px 0 0;
+  margin: var(--tpl-head-gap) 0 0;
   color: var(--color-ink-secondary);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .conflictActions {
@@ -86,8 +64,8 @@
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 16px;
-  align-items: start;
+  gap: 0;
+  align-items: stretch;
 }
 
 @container (max-width: 1100px) {
@@ -101,16 +79,7 @@
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-}
-
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-canvas);
+  padding: 24px 28px;
 }
 
 .cardTitle {
@@ -120,17 +89,20 @@
   font-weight: 700;
 }
 
+/* 作る型どおり：説明の行は 12px/17（1.6 は行が1つずつずれるので使わない）。 */
 .cardNote {
   margin: 0;
   color: var(--color-ink-secondary);
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 17px;
 }
+
+/* 右の箱の題の下の行き先は部品（LinePreview の題の行）に任せる。画面側に置くと題が二重になる。 */
 
 /* 入力欄の並び（名前＋フォルダを横に）。 */
 .fieldGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) 200px;
   gap: 12px;
 }
 
@@ -149,7 +121,7 @@
 
 .input {
   width: 100%;
-  padding: 8px 12px;
+  padding: var(--tpl-toolbar-gap) var(--tpl-row-pad-block);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control, 8px);
   background: var(--color-canvas);
@@ -175,69 +147,6 @@
   line-height: 1.5;
 }
 
-/* 大きさの選択カード（大きい・小さい）。 */
-.choiceRow {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.choiceCard {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control, 8px);
-  background: var(--color-canvas);
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-  color: var(--color-ink);
-}
-
-.choiceCard:hover {
-  background: var(--color-canvas-sunken);
-}
-
-.choiceCardOn {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-}
-
-.choiceCardOn:hover {
-  background: var(--color-accent-soft);
-}
-
-.choiceName {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.choiceNote {
-  color: var(--color-ink-secondary);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.choiceDot {
-  margin-left: auto;
-  flex: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1.5px solid var(--color-hairline);
-  align-self: flex-start;
-}
-
-.choiceCardOn .choiceDot {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
-}
-
 /* 切替タブの数・トークを開いたとき（セグメント＋説明文を横に）。 */
 .segRow {
   display: flex;
@@ -252,6 +161,11 @@
   font-weight: 600;
 }
 
+/* 板 `OxEMM`「トークを開いたとき」：前の短い字は太字にしない。 */
+.segLabelPlain {
+  font-weight: 400;
+}
+
 .segHint {
   margin: 0;
   color: var(--color-ink-faint);
@@ -259,23 +173,20 @@
 }
 
 /* 面の分けかた（見本7つ）。 */
+/* 板 `JeINq`「面の分け方」：7つを横に広げ、見本は 64×44 の薄い地。 */
 .layoutGrid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  display: flex;
   gap: 8px;
-}
-
-@container (max-width: 760px) {
-  .layoutGrid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
+  flex-wrap: wrap;
 }
 
 .layoutItem {
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  min-width: 64px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -285,15 +196,19 @@
 
 .layoutThumb {
   display: block;
-  width: 100%;
+  width: 64px;
+  max-width: 100%;
+  height: 44px;
+  overflow: hidden;
   border-radius: var(--radius-mini, 6px);
   border: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
+  background: var(--color-surface-pearl);
 }
 
 .layoutItemOn .layoutThumb {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 1px var(--color-accent);
+  background: var(--color-accent-soft);
+  outline: 2px solid var(--color-accent-deep);
+  outline-offset: -2px;
 }
 
 .layoutThumb svg {
@@ -302,26 +217,26 @@
   height: auto;
 }
 
+/* 板 `JeINq`：見本の下に名を付ける（絵どおり「形 1面」等）。選んだ形の名は緑・太字。 */
 .layoutName {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-ink-secondary);
 }
-
 .layoutItemOn .layoutName {
   color: var(--color-accent-deep);
-  font-weight: 700;
+  font-weight: 600;
 }
 
-/* 画像カードの中身。 */
+/* 板 `JeINq`「画像」：文の列の間は 8。絵の置き場は上そろえ。 */
 .imageRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   flex-wrap: wrap;
 }
 
 .imageThumb {
-  width: 140px;
+  width: 180px;
   height: auto;
   border-radius: var(--radius-control, 8px);
   border: 1px solid var(--color-hairline);
@@ -332,10 +247,32 @@
 .imageMeta {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   font-size: 12px;
   color: var(--color-ink-secondary);
+}
+
+/* 板 `JeINq`：大きさが合っているときの文は濃い緑。 */
+.imageMetaOk {
+  color: var(--color-accent-deep);
+}
+
+/* 板 `JeINq`「画像の作り方」：箱にせず文字だけの押しボタン。 */
+.guideLink {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .imageGuideLink {
@@ -351,31 +288,7 @@
   text-decoration: underline;
 }
 
-/* 公開前に見ておくところ（右カードの行）。 */
-.summaryList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0;
-}
-
-.summaryRow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.summaryLabel {
-  color: var(--color-ink-secondary);
-}
-
-.summaryValue {
-  font-weight: 600;
-  color: var(--color-ink);
-}
-
+/* 右の箱の行の値の色（共通部品 CreateSummaryCard の行の中に掛ける）。 */
 .summaryValueWarn {
   color: var(--color-warning);
 }
@@ -437,7 +350,7 @@
 .areaList {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -448,7 +361,7 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 9px 10px;
   border: 0;
   border-radius: var(--radius-control, 8px);
   background: transparent;
@@ -469,25 +382,28 @@
   background: var(--color-accent-soft);
 }
 
+/* 板 `Z0uO6`「面の一覧」：記号は 22px・角丸 6・未選択は薄い地＋灰色の字。 */
 .areaLetter {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-mini);
+  background: var(--color-surface-pearl);
   font-size: 11px;
   font-weight: 700;
-  color: var(--color-ink);
+  color: var(--color-ink-secondary);
 }
 
 .areaRowOn .areaLetter {
-  background: var(--color-accent);
+  background: var(--color-accent-deep);
   color: #ffffff;
 }
 
 .areaName {
+  flex: 1 1 0;
   color: var(--color-ink);
   font-size: 13px;
   font-weight: 600;
@@ -497,18 +413,18 @@
   white-space: nowrap;
 }
 
+/* 板 `Z0uO6`：動きの要約と未設定は 11px。未設定は太字にしない。 */
 .areaAction {
   margin-left: auto;
   flex: none;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-ink-secondary);
 }
 
 .areaUnset {
   margin-left: auto;
   flex: none;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
   color: var(--color-warning);
 }
 
@@ -590,10 +506,11 @@
 }
 
 /* 出す順番（番号つきの並び）。 */
+/* 板 `OxEMM`「出す順番」：行の間 6、順番の数字は裸の 13px 太字。 */
 .orderList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -611,30 +528,24 @@
 }
 
 .orderRowSelf {
-  border-color: var(--color-accent);
+  border-color: var(--color-accent-deep);
   background: var(--color-accent-soft);
 }
 
 .orderNum {
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-  font-size: 12px;
+  color: var(--color-ink-faint);
+  font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .orderRowSelf .orderNum {
-  background: var(--color-accent);
-  color: #ffffff;
+  color: var(--color-accent-deep);
 }
 
 .orderName {
+  flex: 1 1 0;
   min-width: 0;
   color: var(--color-ink);
   font-weight: 600;
@@ -643,24 +554,27 @@
   white-space: nowrap;
 }
 
-.orderMeta {
-  margin-left: auto;
-  flex: none;
-  color: var(--color-ink-faint);
-  font-size: 11px;
-}
+/* 使っていない補助の余白・文字は置かない（予算のため。使うときに足す）。 */
 
 /* 青い案内帯（既定が入れ替わる注意など）。 */
+/* 板 `F4gELj` の注意の帯：絵の青い地・13px・印は青。段の中に置く。 */
 .infoBand {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: flex-start;
-  padding: 10px 12px;
+  padding: 10px 14px;
   border-radius: var(--radius-control, 8px);
-  background: var(--color-info-bg, #eef4ff);
+  background: var(--color-status-info-soft, #e9f1ff);
   color: var(--color-ink-secondary);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.infoBandIcon {
+  flex: none;
+  display: inline-flex;
+  margin-top: 2px;
+  color: var(--color-action);
 }
 
 .infoBand svg {
@@ -678,26 +592,27 @@
   list-style: none;
 }
 
+/* 板 `F4gELj`「公開の前の確認」：行は下の線で区切る。印は 18。 */
 .checkRow {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 0;
-  border-top: 1px solid var(--color-hairline);
-}
-
-.checkRow:first-child {
-  border-top: 0;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-divider);
 }
 
 .checkIcon {
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
 }
 
 .checkIconOk {
-  color: var(--color-success);
+  color: var(--color-accent-deep);
+}
+
+.checkIconWarn {
+  color: var(--color-warning);
 }
 
 .checkIconYet {
@@ -709,8 +624,30 @@
 }
 
 .checkBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
   flex: 1;
+}
+
+/* 板 `F4gELj`：1・2行目の「見直す」は箱にせず文字だけの押しボタン。 */
+.checkRetry {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.checkRetry:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .checkName {
@@ -729,32 +666,6 @@
 
 .checkAction {
   flex: none;
-}
-
-/* 「公開すると」の右カードの定義行。 */
-.factList {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0;
-}
-
-.factRow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.factLabel {
-  color: var(--color-ink-faint);
-}
-
-.factValue {
-  color: var(--color-ink);
-  font-weight: 700;
-  text-align: right;
 }
 
 /* 「終わりを決める」の入力行（トグルの下）。 */
@@ -785,3 +696,15 @@
   color: var(--color-ink-secondary);
   font-size: 13px;
 }
+
+.pageHead { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px 24px 16px; border-bottom: 1px solid var(--color-hairline); }
+.previewColumn { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 24px; border-left: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
+
+/* ページ名は正本の280px。狭い欄では欄の幅を超えない。 */
+.pageName { width: 280px; min-width: 0; max-width: 100%; }
+
+@container (max-width: 560px) { .fieldGrid { grid-template-columns: minmax(0, 1fr); } }
+
+/* 段の中の間（絵どおり14・題と説明の間2）。Tailwind の半端な段の代わりに型の変数。 */
+.stackSection { gap: var(--tpl-section-gap); }
+.stackCompact { gap: var(--tpl-compact-gap); }
