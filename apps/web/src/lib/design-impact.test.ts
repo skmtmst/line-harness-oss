@@ -249,6 +249,8 @@ describe('共通部品の影響範囲', () => {
       'v8/webhooks/outgoing.tsx',
       // ★V8 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りを置く。
       'v8/webhooks/interactions.tsx',
+      // ★V8 予約台帳の一覧（Z3FoM）。src/v8/restaurant に一から書いた。表の下にページ送りを置く。
+      'v8/restaurant/reservations/list.tsx',
     ].sort())
   })
 
