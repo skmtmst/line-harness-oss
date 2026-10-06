@@ -22,6 +22,12 @@ export type ContextMenuProps = {
   label: string
   /** 空の所の右クリックでは出さない、などの絞り。無ければどこでも出る。 */
   shouldOpen?: (event: React.MouseEvent) => boolean
+  /**
+   * 押した所から、その場で項目を作る（表全体を1つで包み、行ごとに中身が違うとき）。
+   * 親の state に「押した行」を入れてから items を作ると、開く時点では前の行の中身のままになる。
+   * これを渡すと右クリックの瞬間に押した行の項目で開く。Shift+F10 では items を使う。
+   */
+  itemsFor?: (event: React.MouseEvent) => ContextMenuItem[]
 }
 
 const MENU_MIN_WIDTH = 224
@@ -34,8 +40,11 @@ const MENU_ROW_PX = 36
  * ActionMenu の inline の扱いに任せる。画面の外には出さない。
  * キーボードだけの人用に Shift+F10 でも開く。
  */
-export default function ContextMenu({ items, children, label, shouldOpen }: ContextMenuProps) {
+export default function ContextMenu({ items, children, label, shouldOpen, itemsFor }: ContextMenuProps) {
   const [open, setOpen] = useState(false)
+  /* itemsFor で開いたときの項目（開いている間はこれを出す）。 */
+  const [openedItems, setOpenedItems] = useState<ContextMenuItem[] | null>(null)
+  const shownItems = open && openedItems ? openedItems : items
   const [point, setPoint] = useState({ x: 0, y: 0 })
   const areaRef = useRef<HTMLDivElement>(null)
   const layerRef = useRef<HTMLDivElement>(null)
@@ -53,20 +62,21 @@ export default function ContextMenu({ items, children, label, shouldOpen }: Cont
     layerRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus()
   }, [open ])
 
-  const place = (x: number, y: number) => {
+  const place = (x: number, y: number, count: number) => {
     // 画面の外に出さない（右端・下端で折り返す）。
     const width = typeof window === 'undefined' ? 1024 : window.innerWidth
     const height = typeof window === 'undefined' ? 768 : window.innerHeight
     return {
       x: Math.max(MENU_PAD, Math.min(x, width - MENU_MIN_WIDTH - MENU_PAD)),
-      y: Math.max(MENU_PAD, Math.min(y, height - MENU_PAD - items.length * MENU_ROW_PX - 16)),
+      y: Math.max(MENU_PAD, Math.min(y, height - MENU_PAD - count * MENU_ROW_PX - 16)),
     }
   }
 
-  const openAt = (x: number, y: number) => {
-    if (items.length === 0) return
+  const openAt = (x: number, y: number, list: ContextMenuItem[] = items, fromEvent = false) => {
+    if (list.length === 0) return
     returnFocusRef.current = document.activeElement
-    setPoint(place(x, y))
+    setOpenedItems(fromEvent ? list : null)
+    setPoint(place(x, y, list.length))
     setOpen(true)
   }
 
@@ -77,7 +87,8 @@ export default function ContextMenu({ items, children, label, shouldOpen }: Cont
       onContextMenu={(event) => {
         if (shouldOpen && !shouldOpen(event)) return
         event.preventDefault()
-        openAt(event.clientX, event.clientY)
+        if (itemsFor) openAt(event.clientX, event.clientY, itemsFor(event), true)
+        else openAt(event.clientX, event.clientY)
       }}
       onKeyDown={(event) => {
         // Shift+F10（Windows のメニューキー代わり）でも開く。
@@ -97,7 +108,7 @@ export default function ContextMenu({ items, children, label, shouldOpen }: Cont
                 inline
                 ariaLabel={label}
                 onClose={close}
-                items={items.map((item) => ({
+                items={shownItems.map((item) => ({
                   id: item.id,
                   label: item.label,
                   tone: item.danger ? ('danger' as const) : undefined,
