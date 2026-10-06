@@ -1,0 +1,724 @@
+/*
+ * ★V8 一斉配信の詳細（絵 `cgiGB`・`pNiUk`・`F3X1Mo`・`Q28Gb`）。
+ * 白い板いっぱいに 頭 → 競合の帯 → タブ → 左の本文／右の欄（380）。カードで囲まず線で分ける。
+ * 値は app/globals.css の `--tpl-bd-*`（[data-theme="v8"]）。線は内側の影で描き、高さを足さない。
+ */
+
+/* 板の頭：名前の列（題＋札・説明・進みの帯）と右の操作。 */
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bd-head-gap);
+  padding: var(--tpl-bd-head-pad);
+}
+
+.name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-bd-name-gap);
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bd-rail-gap);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-bd-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-bd-title-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-bd-badge-gap);
+  padding: var(--tpl-bd-badge-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bd-badge-size);
+  font-weight: 600;
+  line-height: var(--tpl-bd-badge-lh);
+  white-space: nowrap;
+}
+
+.dot {
+  width: var(--tpl-bd-dot);
+  height: var(--tpl-bd-dot);
+  border-radius: var(--radius-pill);
+  background: currentcolor;
+}
+
+.badge[data-tone='info'] {
+  background: var(--color-info-bg);
+  color: var(--color-action);
+}
+
+.badge[data-tone='warning'] {
+  background: var(--color-status-warn-soft);
+  color: var(--color-warning);
+}
+
+.badge[data-tone='success'] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge[data-tone='danger'] {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.meta {
+  margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bd-meta-size);
+  line-height: var(--tpl-bd-meta-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 進みの帯：丸18・丸と字の間5・線20・間8。 */
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-bd-rail-gap);
+  margin: 0;
+  padding: var(--tpl-bd-rail-pad-top) 0 0;
+  list-style: none;
+}
+
+.railItem {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bd-rail-gap);
+}
+
+.railLine {
+  width: var(--tpl-bd-rail-line);
+  height: 1px;
+  background: var(--color-hairline);
+}
+
+.railLine[data-done] {
+  background: var(--tpl-bd-green);
+}
+
+.railStep {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bd-rail-step-gap);
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bd-rail-size);
+  font-weight: 500;
+  line-height: var(--tpl-bd-rail-lh);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+a.railStep:hover .railLabel {
+  text-decoration: underline;
+}
+
+/* 送るまでの段の字は絵の幅（12px の字＋1）に合わせ、段の間を 108・96 にそろえる。 */
+.railItem[data-kind='delivery'] .railLabel {
+  padding-inline-end: 1px;
+}
+
+.railMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tpl-bd-rail-mark);
+  height: var(--tpl-bd-rail-mark);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-canvas);
+}
+
+.railItem[data-state='done'] .railMark {
+  background: var(--tpl-bd-green);
+}
+
+.railItem[data-state='done'] .railStep {
+  color: var(--color-action);
+}
+
+.railItem[data-kind='delivery'][data-state='done'] .railStep {
+  color: var(--color-ink-secondary);
+}
+
+.railItem[data-state='current'] .railMark {
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-bd-mark-ring);
+}
+
+.railItem[data-state='current'] .railStep {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-bd-head-gap);
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-bd-icon-btn);
+  height: var(--tpl-bd-icon-btn);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-bd-ring);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.iconButton:focus-visible {
+  outline: var(--tpl-bd-focus) solid var(--color-action);
+  outline-offset: var(--tpl-bd-focus);
+}
+
+/* ほかの人が更新した（Q28Gb）：頭とタブの間の琥珀の帯。 */
+.conflictWrap {
+  padding: var(--tpl-bd-conflict-wrap-pad);
+}
+
+.conflict {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bd-conflict-gap);
+  padding: var(--tpl-bd-conflict-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+  box-shadow: var(--tpl-bd-ring-warning);
+}
+
+.conflictIcon {
+  flex-shrink: 0;
+  width: var(--tpl-bd-conflict-icon);
+  height: var(--tpl-bd-conflict-icon);
+  color: var(--color-warning);
+}
+
+.conflictText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-bd-conflict-text-gap);
+  min-width: 0;
+}
+
+.conflictTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bd-conflict-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-bd-conflict-title-lh);
+}
+
+.conflictDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bd-conflict-desc-size);
+  line-height: var(--tpl-bd-conflict-desc-lh);
+}
+
+.tabs {
+  padding: var(--tpl-bd-tabs-pad);
+  box-shadow: var(--tpl-bd-line-b);
+}
+
+/* 左の本文と右の欄。右の欄は左の線で分ける。 */
+.split {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-bd-main-gap);
+  min-width: 0;
+  padding: var(--tpl-bd-main-pad);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--tpl-bd-side-gap);
+  box-sizing: border-box;
+  width: var(--tpl-bd-side-width);
+  padding: var(--tpl-bd-side-pad);
+  box-shadow: var(--tpl-bd-line-l);
+}
+
+.secTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bd-sec-size);
+  font-weight: 600;
+  line-height: var(--tpl-bd-sec-lh);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  min-width: 0;
+  padding: var(--tpl-bd-row-pad);
+  font-size: var(--tpl-bd-row-size);
+  line-height: var(--tpl-bd-row-lh);
+  box-shadow: var(--shadow-row-line);
+}
+
+.row:last-child {
+  box-shadow: none;
+}
+
+.row dt {
+  flex-shrink: 0;
+  width: var(--tpl-bd-row-label);
+  color: var(--color-ink-secondary);
+}
+
+.row dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 左の本文の段。 */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bd-sec-gap);
+  min-width: 0;
+}
+
+.secHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-bd-sec-gap);
+}
+
+.secLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bd-stat-gap);
+  color: var(--color-action);
+  font-size: var(--tpl-bd-link-size);
+  font-weight: 500;
+  line-height: var(--tpl-bd-link-lh);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.secLink:hover {
+  text-decoration: underline;
+}
+
+.secLink svg {
+  width: var(--tpl-bd-link-size);
+  height: var(--tpl-bd-link-size);
+}
+
+.softBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bd-box-gap);
+  padding: var(--tpl-bd-box-pad);
+  border-radius: var(--radius-card);
+  background: var(--tpl-bd-soft-bg);
+}
+
+.boxIcon {
+  flex-shrink: 0;
+  width: var(--tpl-bd-box-icon);
+  height: var(--tpl-bd-box-icon);
+  color: var(--color-ink-secondary);
+}
+
+.boxText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bd-box-text-gap);
+  min-width: 0;
+}
+
+.boxTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bd-box-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-bd-box-title-lh);
+}
+
+.desc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bd-desc-size);
+  line-height: var(--tpl-bd-desc-lh);
+}
+
+.faint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bd-desc-size);
+  line-height: var(--tpl-bd-desc-lh);
+}
+
+.plain {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bd-meta-size);
+  line-height: var(--tpl-bd-desc-lh);
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bd-note-size);
+  line-height: var(--tpl-bd-note-lh);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--tpl-bd-desc-size);
+  line-height: var(--tpl-bd-row-lh);
+}
+
+.inlineRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-bd-box-gap);
+}
+
+/* 数の帯：枠1つ・4つの升を縦の線で分ける（絵「数の帯」）。 */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-bd-ring);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bd-stat-gap);
+  min-width: 0;
+  padding: var(--tpl-bd-stat-pad);
+}
+
+.stat + .stat {
+  box-shadow: var(--tpl-bd-line-l);
+}
+
+.statLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bd-stat-label-size);
+  line-height: var(--tpl-bd-stat-label-lh);
+}
+
+.statValue {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-bd-stat-unit-gap);
+  margin: 0;
+}
+
+.statNum,
+.statDetail[data-numeric] {
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+}
+
+.statNum {
+  color: var(--color-ink);
+  font-size: var(--tpl-bd-stat-num-size);
+  font-weight: 700;
+  line-height: var(--tpl-bd-stat-num-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+.statUnit {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bd-stat-unit-size);
+  line-height: var(--tpl-bd-stat-unit-lh);
+}
+
+.statDetail {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bd-stat-detail-size);
+  line-height: var(--tpl-bd-stat-detail-lh);
+}
+
+/* 反応：リンクごとの行（枠1つ・行の間は線）。 */
+.linkList {
+  margin: 0;
+  padding: 0;
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-bd-ring);
+  list-style: none;
+}
+
+.linkRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bd-linkrow-gap);
+  padding: var(--tpl-bd-linkrow-pad);
+}
+
+.linkRow + .linkRow {
+  box-shadow: var(--tpl-bd-line-t);
+}
+
+.linkTop {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bd-rail-gap);
+  min-width: 0;
+}
+
+.linkText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-bd-box-text-gap);
+  min-width: 0;
+}
+
+.linkTitle,
+.linkUrl {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkTitle {
+  color: var(--color-ink);
+  font-size: var(--tpl-bd-linkrow-title-size);
+  font-weight: 600;
+  line-height: var(--tpl-bd-linkrow-title-lh);
+}
+
+.linkUrl {
+  color: var(--color-ink-faint);
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  font-size: var(--tpl-bd-linkrow-url-size);
+  line-height: var(--tpl-bd-linkrow-url-lh);
+}
+
+.linkCount {
+  flex-shrink: 0;
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bd-linkrow-count-size);
+  line-height: var(--tpl-bd-linkrow-count-lh);
+  white-space: nowrap;
+}
+
+.bar {
+  display: block;
+  width: 100%;
+  height: var(--tpl-bd-bar-h);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-track);
+  appearance: none;
+}
+
+.bar::-webkit-progress-bar {
+  border-radius: var(--radius-pill);
+  background: var(--color-track);
+}
+
+.bar::-webkit-progress-value {
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+}
+
+.bar::-moz-progress-bar {
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+}
+
+.chase {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-bd-soft-gap);
+  padding: var(--tpl-bd-box-pad);
+  border-radius: var(--radius-card);
+  background: var(--tpl-bd-soft-bg);
+}
+
+.chase .boxTitle {
+  font-weight: 600;
+}
+
+/* 承認待ち（pNiUk）：緑の箱。 */
+.approval {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bd-ap-gap);
+  padding: var(--tpl-bd-ap-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-accent-soft);
+  box-shadow: var(--tpl-bd-ring-accent);
+}
+
+.approvalTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bd-soft-gap);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bd-ap-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-bd-ap-title-lh);
+}
+
+.approvalIcon {
+  flex-shrink: 0;
+  width: var(--tpl-bd-box-icon);
+  height: var(--tpl-bd-box-icon);
+  color: var(--tpl-bd-green);
+}
+
+.approvalRequest {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bd-desc-size);
+  line-height: var(--tpl-bd-row-lh);
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-bd-ap-facts-gap);
+  margin: 0;
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bd-ap-fact-gap);
+}
+
+.fact dt {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bd-ap-fact-label-size);
+  line-height: var(--tpl-bd-ap-fact-label-lh);
+}
+
+.fact dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bd-ap-fact-value-size);
+  font-weight: 700;
+  line-height: var(--tpl-bd-ap-fact-value-lh);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bd-ap-field-gap);
+}
+
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--tpl-bd-ap-label-size);
+  font-weight: 500;
+  line-height: var(--tpl-bd-ap-label-lh);
+}
+
+.approvalButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tpl-bd-ap-btn-gap);
+}
+
+.deadline {
+  margin: 0;
+  padding: var(--tpl-bd-deadline-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-status-warn-soft);
+  color: var(--color-warning);
+  font-size: var(--tpl-bd-desc-size);
+  line-height: var(--tpl-bd-row-lh);
+}
+
+/* 予約を取り消す窓（BeNtj）：ボタンは左から 取り消す・やめる・残す。 */
+.dialogButtons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-bd-ap-btn-gap);
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--tpl-bd-dialog-pad);
+}
+
+/* 狭い板では右の欄を本文の下へ畳む。 */
+@container v8-page (max-width: 1023px) {
+  .head {
+    flex-wrap: wrap;
+  }
+
+  .split {
+    flex-direction: column;
+  }
+
+  .side {
+    width: 100%;
+    box-shadow: var(--tpl-bd-line-t);
+  }
+}
