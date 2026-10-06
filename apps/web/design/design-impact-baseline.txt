@@ -517,3 +517,4 @@ shared-button-importer v8/analytics/conversion-report.tsx
 shared-button-importer v8/analytics/usage.tsx
 shared-button-importer v8/analytics/saved.tsx
 shared-button-importer v8/analytics/funnel.tsx
+shared-button-importer v8/analytics/cross.tsx

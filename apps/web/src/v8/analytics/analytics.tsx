@@ -7,8 +7,8 @@
  * 保存した分析 `bglah`）。
  *
  * 型（ListPage）に、板の頭・二段の切り替え（組／見かた）・閲覧のみの帯・
- * 見かたごとの数の帯と本文を渡す。まだ一から作り直していない見かたは、
- * 入口（app/analytics/page.tsx）が今の中身を `renderLegacy` で渡す。
+ * 見かたごとの数の帯と本文を渡す。ファネルの作る・編集フォームと結果の保存欄だけは、
+ * 入口（app/analytics/page.tsx）が今の部品を `slots` で渡す。
  *
  * 受け付ける URL・呼ぶ口・権限は今の画面と同じ（BEHAVIOR.md）。
  */
@@ -31,6 +31,7 @@ import ConversionReportV8 from './conversion-report'
 import UsageV8 from './usage'
 import SavedV8 from './saved'
 import FunnelV8, { type FunnelFormSlot, type FunnelSaveSlot } from './funnel'
+import CrossV8 from './cross'
 import styles from './analytics.module.css'
 
 export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved'] as const
@@ -58,13 +59,6 @@ export type AnalyticsSlotsV8 = {
   funnelStepKindsLabel?: string
 }
 
-export type LegacyTabContext = {
-  tab: AnalyticsTabV8
-  accountId: string
-  canManage: boolean
-  registerExport: (action: ExportAction | null) => void
-  onSavedCountChange: (count: number | null) => void
-}
 
 function readTab(params: URLSearchParams): AnalyticsTabV8 {
   if (params.get('view') === 'conversion-report') return 'conversion-report'
@@ -89,7 +83,7 @@ function Navigation({ active, savedCount }: { active: AnalyticsTabV8; savedCount
   </div>
 }
 
-function AnalyticsInnerV8({ renderLegacy, slots }: { renderLegacy?: (context: LegacyTabContext) => ReactNode; slots?: AnalyticsSlotsV8 }) {
+function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
   const params = useSearchParams()
   const tab = readTab(params)
   usePageTitle('分析')
@@ -124,6 +118,8 @@ function AnalyticsInnerV8({ renderLegacy, slots }: { renderLegacy?: (context: Le
     : tab === 'reactions' ? <ReactionsV8 key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'routes' ? <RoutesV8 key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'conversion-report' ? <ConversionReportV8 key={selectedAccountId} accountId={selectedAccountId} />
+    : tab === 'cross' ? <CrossV8 key={selectedAccountId} accountId={selectedAccountId} canManage={canManage}
+      renderSave={slots?.renderSave ? (props) => slots.renderSave?.({ ...props, accountId: selectedAccountId, sourceKind: 'cross' }) : undefined} />
     : tab === 'funnel' ? <FunnelV8 key={selectedAccountId} accountId={selectedAccountId} canManage={canManage}
       presetConversion={params.get('conversionPointId') ? { id: params.get('conversionPointId') ?? '', name: params.get('conversionPointName') ?? '' } : null}
       renderForm={slots?.renderFunnelForm ? (props) => slots.renderFunnelForm?.({ ...props, accountId: selectedAccountId }) : undefined}
@@ -131,8 +127,7 @@ function AnalyticsInnerV8({ renderLegacy, slots }: { renderLegacy?: (context: Le
       stepKindsLabel={slots?.funnelStepKindsLabel} />
     : tab === 'saved' ? <SavedV8 key={selectedAccountId} accountId={selectedAccountId} onCountChange={setSavedCount} canManage={canManage} />
     : tab === 'usage' ? <UsageV8 key={selectedAccountId} accountId={selectedAccountId} />
-    : tab === 'url-clicks' ? <UrlClicksV8 key={selectedAccountId} accountId={selectedAccountId} />
-    : <div className={styles.legacy}>{renderLegacy?.({ tab, accountId: selectedAccountId, canManage, registerExport, onSavedCountChange: setSavedCount })}</div>
+    : <UrlClicksV8 key={selectedAccountId} accountId={selectedAccountId} />
 
   return <AnalyticsExportContextV8.Provider value={registerExport}>
     <ListPage
@@ -147,7 +142,7 @@ function AnalyticsInnerV8({ renderLegacy, slots }: { renderLegacy?: (context: Le
   </AnalyticsExportContextV8.Provider>
 }
 
-export default function AnalyticsV8({ renderLegacy, slots }: { renderLegacy?: (context: LegacyTabContext) => ReactNode; slots?: AnalyticsSlotsV8 }) {
+export default function AnalyticsV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
-  return <Suspense fallback={<div className={styles.waiting}>読み込み中...</div>}><AnalyticsInnerV8 renderLegacy={renderLegacy} slots={slots} /></Suspense>
+  return <Suspense fallback={<div className={styles.waiting}>読み込み中...</div>}><AnalyticsInnerV8 slots={slots} /></Suspense>
 }

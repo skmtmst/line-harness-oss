@@ -6,7 +6,7 @@ import AnalyticsNavigationV8 from './navigation-v8'
 import ConversionReportV8 from './conversion-report-v8'
 
 import ReadonlyHeaderV8 from './readonly-header-v8'
-import AnalyticsV8, { type AnalyticsSlotsV8, type LegacyTabContext } from '@/v8/analytics/analytics'
+import AnalyticsV8, { type AnalyticsSlotsV8 } from '@/v8/analytics/analytics'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import Select from '@/components/shared/select'
 import SegmentedControl from '@/components/shared/segmented'
@@ -3297,15 +3297,9 @@ function AnalyticsInner() {
 }
 
 /*
- * V8 のときだけ新しい分析（src/v8/analytics）。作り直していない見かたは、
- * 今の中身をそのまま渡して新しい枠の中に出す（機能を落とさない）。
+ * V8 のときだけ新しい分析（src/v8/analytics）。ファネルの作る・編集フォームと
+ * 結果の保存欄は今の部品を渡す（src/v8 から @/app を読めないため）。
  */
-function renderLegacyTabV8({ tab, accountId, canManage, registerExport }: LegacyTabContext) {
-  return <AnalyticsExportContext.Provider value={registerExport}><div className="v8-ro-analytics-content">
-    {tab === 'cross' && <CrossTab key={accountId} accountId={accountId} canManage={canManage} />}
-  </div></AnalyticsExportContext.Provider>
-}
-
 /* 新しい分析（V8）へ渡す今の部品：ファネルの作る・編集フォームと、結果の保存欄。 */
 const ANALYTICS_V8_SLOTS: AnalyticsSlotsV8 = {
   renderFunnelForm: ({ accountId, edit, presetConversion, onCancel, onCreated }) => <FunnelForm accountId={accountId} edit={edit} presetConversion={presetConversion} onCancel={onCancel} onCreated={onCreated} />,
@@ -3315,7 +3309,7 @@ const ANALYTICS_V8_SLOTS: AnalyticsSlotsV8 = {
 
 export default function AnalyticsPage() {
   const theme = useAdminTheme()
-  if (theme === 'v8') return <AnalyticsV8 renderLegacy={renderLegacyTabV8} slots={ANALYTICS_V8_SLOTS} />
+  if (theme === 'v8') return <AnalyticsV8 slots={ANALYTICS_V8_SLOTS} />
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
