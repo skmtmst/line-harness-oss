@@ -6,8 +6,7 @@
  * 自動応答・一斉配信・リマインダ・テンプレート・ウェビナー・イベント・
  * リッチメニュー・友だち追加・予約で割れていた枠（青い地・緑の枠・
  * 濃い緑・白）を、LINE のトーク画面に近い1つの見た目にそろえる。
- * 地はトーク背景色（`bg-line-talk`）。題「LINEプレビュー」は v7 だけに残し、
- * v8 のスマホには内の題を置かない（cfVyj・j7PP04 どおり）。
+ * 地はトーク背景色（`bg-line-talk`）、題は「LINEプレビュー」。
  *
  * 中身（吹き出し・カード・ボタン）は各画面の描き方をそのまま `children`
  * で渡す。枠だけが共通。届く日時の札など動く情報は `caption` で見える
@@ -49,11 +48,6 @@ export interface LinePreviewProps {
    * 文字ならその文を空の箱で出す。
    */
   empty?: boolean | string
-  /**
-   * 枠。既定 'phone' はスマホの枠。'flat' は電話枠なしの平らな
-   * カード（If9Mh お客様にはこう届きます：白・角丸・内側12・間4）。
-   */
-  frame?: 'phone' | 'flat'
 }
 
 /** 設定画面でその場でテーマを切り替えたときの合図を受ける。 */
@@ -76,17 +70,8 @@ export default function LinePreview({
   note,
   accountName,
   empty = false,
-  frame = 'phone',
 }: LinePreviewProps) {
   const v8 = useSyncExternalStore(subscribeTheme, readIsV8, readIsV8OnServer)
-
-  if (frame === 'flat') {
-    return (
-      <div className={styles.flat} data-preview-frame="flat">
-        {typeof empty === 'string' ? <p className={styles.flatEmpty}>{empty}</p> : children}
-      </div>
-    )
-  }
 
   /*
    * ★V8（夕15・cfVyj）：本物のスマホの枠 330×690。題は外の上、
@@ -94,13 +79,13 @@ export default function LinePreview({
    * 縦に送れる。見た目は line-preview.module.css の v8 節に集める。
    */
   if (v8) {
-    /*
-     * v8 のスマホには内の題を置かない（部品 cfVyj・板 j7PP04 どおり。
-     * 題は外の「LINEでの見え方」が担い、電話が 31px 下がらない）。
-     * v7 の題＋？は下の v7 の枝に残る。
-     */
     return (
-      <section aria-label="LINEプレビュー" className={styles.phoneRoot}>
+      <section aria-label="LINEでの見え方" className={styles.phoneRoot}>
+        {/* 絵（JeINq・A0pDt ほか24枚）はすべて「LINEでの見え方」。列の左に寄せ、スマホはその下の真ん中。 */}
+        <p className={styles.phoneTitle}>
+          <span>LINEでの見え方</span>
+          {note ? <HelpTip label="LINEでの見え方の説明">{note}</HelpTip> : null}
+        </p>
         <div className={styles.phone}>
           <div className={styles.screen}>
             <div className={styles.statusBar}>

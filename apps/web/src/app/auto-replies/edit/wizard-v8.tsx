@@ -1,6 +1,7 @@
 'use client'
 
 import { CreatePage } from '@/components/templates'
+import { CreatePreviewNote, CreateStarterCards, CreateSummaryCard } from '@/components/templates/create-parts'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -1153,28 +1154,14 @@ function AutoReplyWizardV8Inner() {
 
   const previewContent = (<>
           {step === 'basic' && (
-            <Card padding="roomy" layout="vertical" className={styles.sideCard}>
-              <h2 className={styles.sideTitle}>設定内容</h2>
-              <dl className={styles.kvList}>
-                <div className={styles.kvRow}>
-                  <dt className="text-ink-faint text-xs">状態</dt>
-                  <dd className={styles.kvVal}>停止中</dd>
-                </div>
-                <div className={styles.kvRow}>
-                  <dt className="text-ink-faint text-xs">動く順番</dt>
-                  <dd className={styles.kvVal}>{myIndex >= 0 ? myPositionLabel : `いちばん下（${orderedRules.length + 1}番目）`}</dd>
-                </div>
-                <div className={styles.kvRow}>
-                  <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
-                  <dd className={styles.kvVal}>手順4で確かめる</dd>
-                </div>
-              </dl>
-            </Card>
+            <CreateSummaryCard rows={[
+              { label: '状態', value: '停止中' },
+              { label: '動く順番', value: myIndex >= 0 ? myPositionLabel : `いちばん下（${orderedRules.length + 1}番目）` },
+              { label: '同時に当たるルール', value: '手順4で確かめる' },
+            ]} />
           )}
           {step === 'basic' && (
-            <p className={styles.sideNote}>
-              LINEでの見え方は、届けるメッセージを決める手順から右に出ます。
-            </p>
+            <CreatePreviewNote>LINEでの見え方は、届けるメッセージを決める手順から右に出ます。</CreatePreviewNote>
           )}
 
           {step === 'trigger' && (
@@ -1514,28 +1501,18 @@ function AutoReplyWizardV8Inner() {
                   <h2 className={styles.cardTitle}>ひな形から作る（任意）</h2>
                   <p className={styles.cardNote}>選ぶと、条件と返信がまとめて入ります。あとから全部変えられます。</p>
                 </div>
-                <div className={styles.tplGrid}>
-                  {STARTER_TEMPLATES.map((tpl) => (
-                    <Card key={tpl.key} padding="default" layout="vertical" className={styles.tplLayout}>
-                      <p className={styles.tplName}>{tpl.name}</p>
-                      {tpl.lines.map((line) => (
-                        <p key={line} className={styles.tplDesc}>{line}</p>
-                      ))}
-                      <div className={styles.tplActions}><Button
-                        type="button"
-                        onClick={() => {
-                          setForm((current) => tpl.apply(current))
-                          goToStep('trigger')
-                        }}
-                      >
-                        このひな形を使う
-                      </Button></div>
-                    </Card>
-                  ))}
-                </div>
-                <div className={styles.tplFoot}>
-                  <Button href="/templates">ひな形を管理</Button>
-                </div>
+                <CreateStarterCards
+                  items={STARTER_TEMPLATES.map((tpl) => ({
+                    key: tpl.key,
+                    name: tpl.name,
+                    lines: tpl.lines,
+                    onUse: () => {
+                      setForm((current) => tpl.apply(current))
+                      goToStep('trigger')
+                    },
+                  }))}
+                  manage={<Button href="/templates">ひな形を管理</Button>}
+                />
               </Card>
             </>
           )}

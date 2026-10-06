@@ -108,6 +108,11 @@ export interface BannerGeneration {
   apiSize: string
   quality: string
   textLines: string[]
+  /**
+   * 強調した行（Pencil ★修正案 `g64HOD`・2026-10-06 承認）。`textLines` と同じ順・
+   * 同じ長さで、true の行だけを強調カラーで目立たせる。強調を知らない古い生成は空。
+   */
+  emphasisLines: boolean[]
   /** 背景に敷く色（Pencil ★BG-B `KkTNS` ベースカラー）。 */
   baseColor: string | null
   mainColor: string | null
@@ -201,6 +206,11 @@ export interface BannerGenerationInput {
   /** 切り抜きの位置。run のときに送り、条件の登録ではサーバーが無視する。 */
   cropPosition: BannerCropPosition
   textLines: string[]
+  /**
+   * 行ごとの「強調」。`textLines` と同じ長さに保つ（行を足す・消すときも一緒に動かす）。
+   * Pencil ★修正案 `g64HOD`（2026-10-06 承認）の決まり 1・5。
+   */
+  emphasisLines: boolean[]
   baseColor: string | null
   mainColor: string | null
   subColor: string | null
@@ -219,6 +229,7 @@ export const EMPTY_GENERATION_INPUT: BannerGenerationInput = {
   presetKey: '',
   cropPosition: 'center',
   textLines: [''],
+  emphasisLines: [false],
   baseColor: null,
   mainColor: null,
   subColor: null,
@@ -257,6 +268,28 @@ export const FREE_PROMPT_MAX = 1200
 /** `#RRGGBB`。すけ具合つき（`#RRGGBBAA`）も受ける。 */
 export function isHexColor(value: string): boolean {
   return /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(value)
+}
+
+/**
+ * 強調の指定をテキストの行数へ揃える。足りない分はオフ、余った分は捨てる。
+ * 行を足す・消すで取り違えないよう、入口（戻し）と出口（送信）の両方でこれを通す。
+ */
+export function alignEmphasis(lines: string[], emphasis: boolean[] | null | undefined): boolean[] {
+  return lines.map((_, index) => emphasis?.[index] === true)
+}
+
+/**
+ * 送る形に整えたテキストと強調。空の行は落とすが、強調は同じ行に付いたまま
+ * 残す（先に片方だけ詰めると番号がずれる）。
+ */
+export function packedTextLines(input: Pick<BannerGenerationInput, 'textLines' | 'emphasisLines'>): {
+  textLines: string[]
+  emphasisLines: boolean[]
+} {
+  const kept = input.textLines
+    .map((line, index) => ({ line: line.trim(), emphasis: input.emphasisLines[index] === true }))
+    .filter((entry) => entry.line.length > 0)
+  return { textLines: kept.map((e) => e.line), emphasisLines: kept.map((e) => e.emphasis) }
 }
 
 /**
@@ -491,21 +524,31 @@ export function generationConditionRows(
   return rows
 }
 
-/** 画像の「生成時の条件」を、生成パネルへ戻す（同じ設定でもう一度生成）。 */
+/**
+ * 画像の「生成時の条件」を、生成パネルへ戻す（同じ設定でもう一度生成）。
+ *
+ * 2026-10-06（オーナー指示）：生成パネルから「バナー／自由入力」の切替を外したので、
+ * 戻すときは必ず `banner` にする。昔の自由入力で作った画像は、説明の文を
+ * 画面にある「追加の指示」へ移す（移さないと入力欄の無い状態で
+ * 「説明を入力してください」と止まり、やり直せなくなる）。
+ */
 export function inputFromGeneration(g: BannerGeneration): BannerGenerationInput {
+  const carried = g.mode === 'free' ? (g.freePrompt ?? '') : (g.customPrompt ?? '')
   return {
-    mode: g.mode,
+    mode: 'banner',
     presetKey: g.presetKey,
     // 切り抜き位置は保存していないので中央に戻す（R120・migration 不要のため）。
     cropPosition: 'center',
     textLines: g.textLines.length > 0 ? [...g.textLines] : [''],
+    // 強調は行と同じ長さに揃えて戻す（強調を知らない古い生成は全部オフになる）。
+    emphasisLines: alignEmphasis(g.textLines.length > 0 ? g.textLines : [''], g.emphasisLines),
     baseColor: g.baseColor,
     mainColor: g.mainColor,
     subColor: g.subColor,
     accentColor: g.accentColor,
     personOption: g.personOption,
-    customPrompt: g.customPrompt ?? '',
-    freePrompt: g.freePrompt ?? '',
+    customPrompt: carried.slice(0, CUSTOM_PROMPT_MAX),
+    freePrompt: '',
     count: 1,
     references: (g.references ?? []).map((reference) => ({ ...reference })),
   }

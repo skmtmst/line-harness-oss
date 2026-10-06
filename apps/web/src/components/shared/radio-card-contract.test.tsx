@@ -93,11 +93,11 @@ describe('ラジオカード（DEEP-02）', () => {
     expect(screen.getByText('説明')).toBeTruthy()
   })
 
-  it('既定はタグの図柄が出る（箱 fNPdg/r3xz1W の合格は不変）', () => {
+  it('印は渡したときだけ出る（本線の既定。合格した画面は印を渡している）', () => {
     const { container } = render(
       <RadioCard name="g" value="x" checked={false} onChange={() => {}} title="対象" />,
     )
-    expect(container.querySelector('span[aria-hidden="true"] svg')).not.toBeNull()
+    expect(container.querySelector('span[aria-hidden="true"] svg')).toBeNull()
   })
 })
 

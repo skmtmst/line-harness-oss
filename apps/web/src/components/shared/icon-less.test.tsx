@@ -14,11 +14,11 @@ afterEach(() => {
  * `icon={null}` で図柄を消す。省略時は今までどおり既定の図柄。
  */
 describe('図柄なしの形', () => {
-  it('RadioCard は省略時にタグ・null で図柄なし', () => {
+  it('RadioCard は省略時・null とも図柄なし（本線の既定：印は渡したときだけ）', () => {
     const { container, unmount } = render(
       <RadioCard name="a" value="1" checked={false} onChange={() => {}} title="はい" />,
     )
-    expect(container.querySelector('[class*="topIcon"]')).not.toBeNull()
+    expect(container.querySelector('[class*="topIcon"]')).toBeNull()
     unmount()
     const none = render(
       <RadioCard name="a" value="1" checked={false} onChange={() => {}} title="はい" icon={null} />,

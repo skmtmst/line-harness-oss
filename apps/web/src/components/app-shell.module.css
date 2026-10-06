@@ -176,6 +176,15 @@
   padding: 0;
 }
 
+/* ★V8：統括の「統括の情報」（絵 `K7HYu`）も板の左端から中のメニューが
+   始まる形。ただし左メニューの中身が統括用（`HqSettingsNav`）で共通の
+   `SettingsInnerNav` ではないため、上の `contentSettings`（道で決まる）は
+   使えない。画面側が付ける `data-board-bleed` を目印にして、板の余白だけ
+   取る。余白は画面側（頭と中身）が持つ。 */
+[data-theme="v8"] .content:has(> [data-board-bleed]) {
+  padding: 0;
+}
+
 [data-theme="v8"] .settingsBody {
   min-width: 0;
   padding: 24px 16px;

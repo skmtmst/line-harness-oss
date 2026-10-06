@@ -1269,7 +1269,7 @@ CREATE TABLE banner_generations (
   started_at       TEXT,
   finished_at      TEXT
 , reference_image_id TEXT REFERENCES banner_images(id), reference_mode TEXT
-  CHECK (reference_mode IS NULL OR reference_mode IN ('edit', 'inspire')), base_color TEXT, accent_color TEXT, reference_images TEXT);
+  CHECK (reference_mode IS NULL OR reference_mode IN ('edit', 'inspire')), base_color TEXT, accent_color TEXT, reference_images TEXT, emphasis_lines TEXT);
 
 CREATE TABLE banner_image_deliveries (
   id               TEXT PRIMARY KEY,
