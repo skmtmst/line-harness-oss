@@ -555,3 +555,6 @@ shared-button-importer v8/conversions/list.tsx
 shared-button-importer v8/conversions/dialogs.tsx
 shared-button-importer v8/conversions/create.tsx
 shared-button-importer v8/inflow-links/new/create.tsx
+# ★V8 予約スタッフの登録（CcA4k）・勤務とシフト（d5fmnM・E3YDK・wvGke）を src/v8/booking-staff に一から書いた。
+shared-button-importer v8/booking-staff/shifts.tsx
+shared-button-importer v8/booking-staff/staff-new.tsx
