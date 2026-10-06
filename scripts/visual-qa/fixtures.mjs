@@ -3358,9 +3358,10 @@ export const BROADCASTS = [
   folderId: folderId ?? null,
   measureOpens: true,
   internalMemo: index === 1 ? '購入前に離脱した方へ、商品の選び方を案内する' : null,
-  draftStep: index === 1 ? 'audience' : null,
+  // 板 `cgiGB`・`Q28Gb`：「3 メッセージ」の途中で止まった下書き。
+  draftStep: index === 1 ? 'message' : null,
   draftPayload: index === 1
-    ? { saveAsDraft: true, draftStep: 'audience', targetType: 'segment' }
+    ? { saveAsDraft: true, draftStep: 'message', targetType: 'segment' }
     : null,
   messageOptions: index === 1 ? { buttons: [] } : null,
   afterActionVersionId: index === 1 ? 'common-action-version-broadcast-tagged' : null,
