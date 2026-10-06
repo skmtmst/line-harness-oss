@@ -454,7 +454,8 @@ export const FRIEND_SCENARIOS = [
   // 絵の通数：4・3・3・4・2（上から順）。
   stepCount: [4, 3, 3, 4, 2][index] ?? 3,
   createdAt: `${day}T00:00:00.000Z`,
-  updatedAt: `${day}T00:00:00.000Z`,
+  /* 板 `PMLkX` ほか編集の①の箱「保存済み 10月1日 14:02」（日本時間）。一覧は更新日時を出さない。 */
+  updatedAt: index === 0 ? '2026-10-01T05:02:00.000Z' : `${day}T00:00:00.000Z`,
 }))
 
 /** シナリオ一覧 `axFrW` の3分類。件数は絵のとおり（初回案内2・購入後1・予約フォロー1）。未分類1件は mock-api が `unfiledCount` で返す。 */
@@ -3321,10 +3322,11 @@ export const SCENARIO_STEPS = [
   {
     id: 'step-3', scenarioId: 'scenario-0', stepOrder: 4, delayMinutes: 10080,
     offsetDays: 7, offsetMinutes: null, deliveryTime: '10:00', templateId: 'template-0',
-    onReachTagId: null, afterSend: 'pause', messageType: 'text',
-    /* 板 `PMLkX` の4通目の題（テンプレート名は実装が別口で付ける）。 */
+    /* 板 `PMLkX` の通ごとの数「到達タグ：初回案内済み」。 */
+    onReachTagId: 'tag-first-guide-complete', afterSend: 'pause', messageType: 'text',
+    /* 板 `PMLkX` の4通目の題（テンプレート名は実装が別口で付ける）。通ごとの数では「下書き」。 */
     messageContent: '初回限定のご案内',
-    targetCondition: null, question: null, isDraft: false,
+    targetCondition: null, question: null, isDraft: true,
     createdAt: '2026-08-16T00:00:00.000Z',
   },
 ]
