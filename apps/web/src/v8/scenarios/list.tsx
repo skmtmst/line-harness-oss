@@ -11,6 +11,7 @@
  * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -135,17 +136,18 @@ export default function ScenariosListV8() {
   const staffRole = useStaffRole()
   const canEdit = staffRole === null || canManageRole(staffRole)
 
-  const [nameQuery, setNameQuery] = useState('')
-  const [serverQuery, setServerQuery] = useState('')
+  /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
+  const [nameQuery, setNameQuery] = useListUrlParam('q')
+  const [serverQuery, setServerQuery] = useState(() => clampSearchQuery(readListUrlParam('q').trim()))
   /** よく使う絞り込み。いま数えられるのは「停止中のみ」「今月作った」「稼働中のみ」。 */
-  const [stoppedOnly, setStoppedOnly] = useState(false)
-  const [createdThisMonthOnly, setCreatedThisMonthOnly] = useState(false)
-  const [savedFilter, setSavedFilter] = useState('')
+  const [stoppedOnly, setStoppedOnly] = useListUrlFlag('stopped')
+  const [createdThisMonthOnly, setCreatedThisMonthOnly] = useListUrlFlag('thisMonth')
+  const [savedFilter, setSavedFilter] = useListUrlParam('view')
   const [actionError, setActionError] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
   /** 「未分類」の件数。`null` は数えていない。 */
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
-  const [folderFilter, setFolderFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   /** 絞り込みを掛けない「すべて」の件数。`null` は「まだ数えられていない」。 */
   const [overallTotal, setOverallTotal] = useState<number | null>(null)
@@ -187,11 +189,14 @@ export default function ScenariosListV8() {
    */
   const activeAccountRef = useRef<string | null>(selectedAccountId)
 
+  /* アカウントを切り替えたときだけフォルダの絞り込みを外す（最初の描画では URL の値を残す）。 */
+  const previousAccountRef = useRef(selectedAccountId)
   useEffect(() => {
     activeAccountRef.current = selectedAccountId
     setFolders([])
     setUnfiledCount(null)
-    setFolderFilter('')
+    if (previousAccountRef.current && previousAccountRef.current !== selectedAccountId) setFolderFilter('')
+    previousAccountRef.current = selectedAccountId
     setOverallTotal(null)
     setStats(null)
     setStatsFailed(false)
@@ -293,6 +298,7 @@ export default function ScenariosListV8() {
     }),
     load: loadScenarioPage,
     initialLimit: perPage,
+    pageUrlKey: 'page',
   })
   /*
    * 押した瞬間の見せ方（★V8 サクサク感 B）。軽い操作は先にこの重ねで
@@ -309,6 +315,8 @@ export default function ScenariosListV8() {
     page: scenarioList.page,
   })
   const scenarios = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : scenarioList.items
+  /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
+  useListScrollMemory(scenarioList.loaded)
   const loadScenarios = scenarioList.retry
 
   /*

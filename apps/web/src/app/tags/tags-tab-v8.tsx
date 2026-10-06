@@ -9,6 +9,7 @@
  * フォルダの追加は列の下、行の操作は右端の「…」、人数はリンク。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, CalendarPlus, ListChecks, MoreHorizontal, Tag as TagIcon, Users } from 'lucide-react'
@@ -191,13 +192,15 @@ export default function TagsTabV8({
   const [actionError, setActionError] = useState('')
   const [stats, setStats] = useState<ListStats | null>(null)
   const [statsFailed, setStatsFailed] = useState(false)
-  const [query, setQuery] = useState('')
-  const [folder, setFolder] = useState('')
-  const [usageFilter, setUsageFilter] = useState('all')
-  const [sourceFilter, setSourceFilter] = useState('all')
+  /* 絞り込み・検索語は URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
+  const [query, setQuery] = useListUrlParam('q')
+  const [folder, setFolder] = useListUrlParam('folder')
+  const [usageFilter, setUsageFilter] = useListUrlParam('usage', 'all')
+  const [sourceFilter, setSourceFilter] = useListUrlParam('source', 'all')
   const [quick, setQuick] = useState<string[]>([])
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
+  useListScrollMemory(status === 'ready')
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
   const { leavingId, leave } = useRowLeaving()
@@ -263,11 +266,14 @@ export default function TagsTabV8({
    * アカウントを切り替えたら、前のアカウントのフォルダ選択と件数を残さない
    * （v7 と同じ、#981 A04-02）。
    */
+  const previousAccountRef = useRef(accountId)
   useEffect(() => {
     if (fixture) return
     setItems([])
     setGroups([])
-    setFolder('')
+    // 最初の描画では URL のフォルダを残す。切り替えたときだけ外す。
+    if (previousAccountRef.current && previousAccountRef.current !== accountId) setFolder('')
+    previousAccountRef.current = accountId
     setPage(1)
     setOpenMenuId(null)
     setMenuMoveFor(null)

@@ -19,6 +19,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
 import { useCallback, useDeferredValue, useEffect, useState } from 'react'
+import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -178,13 +179,14 @@ export default function RemindersListV8() {
   const [folders, setFolders] = useState<Folder[]>([])
   /** 「未分類」の件数。`null` は数えていない。 */
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
-  const [nameQuery, setNameQuery] = useState('')
+  /* 絞り込み・検索語・並び順・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
+  const [nameQuery, setNameQuery] = useListUrlParam('q')
   const deferredNameQuery = useDeferredValue(nameQuery.trim())
-  const [folderFilter, setFolderFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlParam('folder')
+  const [statusFilter, setStatusFilter] = useListUrlParam('status')
   const [perPage, setPerPage] = useState(20)
   // apLqS・Iffil の一覧は、次に送る予定が近いものから確認する。
-  const [sort, setSort] = useState('next')
+  const [sort, setSort] = useListUrlParam('sort', 'next')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -281,7 +283,9 @@ export default function RemindersListV8() {
     requestKey: JSON.stringify([selectedAccountId, deferredNameQuery, folderFilter, statusFilter, perPage, sort]),
     load: loadReminderPage,
     initialLimit: perPage,
+    pageUrlKey: 'page',
   })
+  useListScrollMemory(reminderList.loaded)
   /*
    * 押した瞬間の見せ方（★V8 サクサク感 B）。軽い操作は先にこの重ねで
    * 描き換え、裏で保存する。確定・失敗・取り消しで重ねを外し、読み直す。

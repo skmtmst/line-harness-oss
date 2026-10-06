@@ -8,6 +8,7 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -177,12 +178,15 @@ export default function BroadcastListV8() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [forbidden, setForbidden] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<StatusChipKey>('all')
+  /* 絞り込み・検索語は URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
+  const [statusParam, setStatusParam] = useListUrlParam('status', 'all')
+  const statusFilter: StatusChipKey = STATUS_CHIPS.some((chip) => chip.key === statusParam) ? (statusParam as StatusChipKey) : 'all'
+  const setStatusFilter = setStatusParam as (next: StatusChipKey) => void
   const [showCreate, setShowCreate] = useState(false)
   const [openTemplatePicker, setOpenTemplatePicker] = useState(false)
   const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const createAnchorRef = useRef<HTMLElement | null>(null)
-  const [titleQuery, setTitleQuery] = useState('')
+  const [titleQuery, setTitleQuery] = useListUrlParam('q')
   const [savedViewId, setSavedViewId] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -190,7 +194,7 @@ export default function BroadcastListV8() {
   const datePopoverRef = useRef<HTMLDivElement>(null)
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
-  const [folderFilter, setFolderFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
@@ -291,7 +295,10 @@ export default function BroadcastListV8() {
   }
 
   /* ページ送りは口側の cursor（= オフセット）。条件を変えたら一覧の口だけ取り直す。 */
+  /* 遅れて返った前の条件の答えで、今の一覧を上書きしない（URL から条件が入る直後など）。 */
+  const loadSeqRef = useRef(0)
   const loadList = useCallback(async (cursor = 0) => {
+    const seq = ++loadSeqRef.current
     setLoading(true)
     setError('')
     setForbidden(false)
@@ -307,6 +314,7 @@ export default function BroadcastListV8() {
         from: dateFrom || undefined,
         to: dateTo || undefined,
       })
+      if (seq !== loadSeqRef.current) return
       if (res.success) {
         setBroadcasts(res.data)
         setListKpis(res.kpis)
@@ -316,12 +324,15 @@ export default function BroadcastListV8() {
         setError(res.error)
       }
     } catch (err) {
+      if (seq !== loadSeqRef.current) return
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
       else setError('データの読み込みに失敗しました。もう一度お試しください。')
     } finally {
-      setLoading(false)
+      if (seq === loadSeqRef.current) setLoading(false)
     }
   }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, dateFrom, dateTo])
+  /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
+  useListScrollMemory(!loading)
 
   /* タグ・シナリオは宛先の名前解決だけ。アカウントが変わったときだけ取り直す。 */
   const loadCandidates = useCallback(async () => {

@@ -15,6 +15,7 @@
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -326,17 +327,20 @@ export default function TemplatesListV8() {
   const [loading, setLoading] = useState(true)
   /** 一覧を読み込めなかった理由。取得失敗と権限不足を分ける。 */
   const [failure, setFailure] = useState<TemplatesFailure | null>(null)
-  const [templateQuery, setTemplateQuery] = useState('')
+  /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
+  const [templateQuery, setTemplateQuery] = useListUrlParam('q')
   const [chips, setChips] = useState<Record<ChipKey, boolean>>({
     single: false,
     multiple: false,
     variables: false,
     unused: false,
   })
-  const [savedFilter, setSavedFilter] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [savedFilter, setSavedFilter] = useListUrlParam('view')
+  const [selectedCategory, setSelectedCategory] = useListUrlParam('folder', 'all')
   const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  const [pageParam, setPageParam] = useListUrlParam('page', '1')
+  const page = Math.max(1, Number.parseInt(pageParam, 10) || 1)
+  const setPage = useCallback((next: number) => setPageParam(String(next)), [setPageParam])
 
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
@@ -382,12 +386,16 @@ export default function TemplatesListV8() {
   const activeAccountRef = useRef<string | null>(selectedAccountId)
   const loadGenerationRef = useRef(0)
 
+  const previousAccountRef = useRef(selectedAccountId)
   useEffect(() => {
     activeAccountRef.current = selectedAccountId
     // フォルダはアカウント単位。切り替えたら前のアカウントの帯も選択も残さない（N-147）。
+    // 最初の描画では URL のフォルダ・ページを残す（戻ると同じ一覧に戻る）。
+    const switched = Boolean(previousAccountRef.current) && previousAccountRef.current !== selectedAccountId
+    previousAccountRef.current = selectedAccountId
     setFolders([])
     setUnfiledCount(null)
-    setSelectedCategory('all')
+    if (switched) setSelectedCategory('all')
     setFolderDialogOpen(false)
     setEditingFolder(null)
     setDeletingFolder(null)
@@ -400,7 +408,7 @@ export default function TemplatesListV8() {
     setDuplicateTarget(null)
     setOpenMenuId(null)
     setSelectedIds(new Set())
-    setPage(1)
+    if (switched) setPage(1)
   }, [selectedAccountId])
 
   const load = useCallback(async () => {
@@ -577,9 +585,12 @@ export default function TemplatesListV8() {
   const shownItems = filteredTemplates.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   // 絞り込みや件数の変更でページが溢れたら先頭へ戻す。
+  // 読み込みが終わる前は件数が 0 なので戻さない（URL のページを先頭へ潰さない）。
   useEffect(() => {
+    if (loading) return
     if (page > pageCount) setPage(pageCount)
-  }, [page, pageCount])
+  }, [loading, page, pageCount, setPage])
+  useListScrollMemory(!loading)
 
   // 一覧に何を出すか。**読込中・取得失敗・権限不足・空・0件を混ぜない。**
   const view = listView({
