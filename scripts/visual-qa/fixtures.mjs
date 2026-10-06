@@ -2966,6 +2966,20 @@ export const IDENTITY_CANDIDATE_FRIEND = {
   canDecide: true, canUndo: false, undoNote: '判定を取り消すと、根拠を確認する候補へ戻ります。',
 }
 
+/** ★V8 比べて決める fcg2D：友だち同士の詳細（/api/friends/duplicates/:id）。判定の履歴を1件持つ。 */
+export const FRIEND_DUPLICATE_DETAIL = {
+  ...IDENTITY_CANDIDATE_FRIEND,
+  left: { ...IDENTITY_CANDIDATE_FRIEND.left, detail: '支店' },
+  right: { ...IDENTITY_CANDIDATE_FRIEND.right, detail: '本店' },
+  history: [
+    {
+      id: 'identity-history-1', fromStatus: 'pending', toStatus: 'deferred', actorName: 'Kenta',
+      reason: '本人に確認中', decidedAt: '2026-09-30T01:12:00.000Z', reprocessMode: null,
+    },
+  ],
+  detectedAt: '2026-09-28T09:40:00.000Z',
+}
+
 export const IDENTITY_CANDIDATE_EC = {
   ...IDENTITY_CANDIDATE_FRIEND,
   id: 'identity-ec-1', kind: 'ec_member',
@@ -2993,29 +3007,41 @@ function identityListItem(candidate) {
 }
 
 export const IDENTITY_CANDIDATE_LISTS = {
+  /*
+   * ★V8 重複検出 hn6Y8・G9C4Uw：候補3組（最高・高・低）、根拠とアカウントは絵の文。
+   * 数の帯は statusCounts（未確認11・保留2・結び付けた5 ＝18組）と lowConfidenceCount（2組）から出す。
+   */
   friend_duplicate: {
     items: [
-      identityListItem(IDENTITY_CANDIDATE_FRIEND),
-      identityListItem({
-        ...IDENTITY_CANDIDATE_FRIEND,
-        id: 'identity-friend-2', status: 'pending',
-        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: '山田 太郎', lineAccountName: '公式A（予約）' },
-        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'Yamada', lineAccountName: '然-NEN-TEST' },
-      }),
-      identityListItem({
-        ...IDENTITY_CANDIDATE_FRIEND,
-        id: 'identity-friend-3', status: 'deferred',
-        confidence: { ...IDENTITY_CANDIDATE_FRIEND.confidence, label: 'low', score: 42 },
-        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: 'テスト太郎', lineAccountName: 'ECサポート' },
-        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'test', lineAccountName: 'MAIL 配信' },
-      }),
-      identityListItem({
-        ...IDENTITY_CANDIDATE_FRIEND,
-        id: 'identity-friend-4', status: 'linked',
-        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: '坂本 真人', lineAccountName: 'MAIL 配信' },
-        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: '坂本真人', lineAccountName: '然-NEN-TEST' },
-      }),
+      {
+        ...identityListItem(IDENTITY_CANDIDATE_FRIEND),
+        left: { ...IDENTITY_CANDIDATE_FRIEND.left, lineAccountName: '支店' },
+        right: { ...IDENTITY_CANDIDATE_FRIEND.right, lineAccountName: '本店' },
+        evidenceSummary: ['確認済みのメールが同じ'],
+      },
+      {
+        ...identityListItem({
+          ...IDENTITY_CANDIDATE_FRIEND,
+          id: 'identity-friend-2', status: 'pending',
+          confidence: { ...IDENTITY_CANDIDATE_FRIEND.confidence, label: 'high', score: 78 },
+          left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: '山田 太郎', lineAccountName: '公式A' },
+          right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'Yamada', lineAccountName: '然-NEN-TEST' },
+        }),
+        evidenceSummary: ['電話番号が同じ'],
+      },
+      {
+        ...identityListItem({
+          ...IDENTITY_CANDIDATE_FRIEND,
+          id: 'identity-friend-3', status: 'deferred',
+          confidence: { ...IDENTITY_CANDIDATE_FRIEND.confidence, label: 'low', score: 42 },
+          left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: 'テスト太郎', lineAccountName: 'EC' },
+          right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'test', lineAccountName: 'MAIL配信' },
+        }),
+        evidenceSummary: ['表示名が似ている（参考）'],
+      },
     ], total: 18, limit: 20, offset: 0,
+    statusCounts: { pending: 11, deferred: 2, linked: 5, different: 0 },
+    lowConfidenceCount: 2,
   },
   ec_member: {
     items: [identityListItem(IDENTITY_CANDIDATE_EC)], total: 1, limit: 20, offset: 0,
@@ -4447,10 +4473,11 @@ export const INCOMING_WEBHOOK_UNMATCHED = [
 /* 板 `xbHxg`（流入と計測一覧）の6行。フォルダは広告1・SNS1・店頭1・
  * 未分類3（紹介と紙の分類は絵に無いので `genre: null`）。メール署名は
  * 未登録（`orphan` の行）のため経路自体を持たない。動きが未設定の2件は
- * Google広告とチラシ（タグもシナリオも無い行）。 */
+ * Google広告とチラシ（タグもシナリオも無い行）。
+ * 「友だちになったら」は絵どおり、Instagram と紹介リンクはシナリオ無し（1行目が「—」）・タグだけ。 */
 export const ENTRY_ROUTES = [
-  { id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿', tagId: 'tag-vip', scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-25T00:12:00.000Z' },
-  { id: 'er-2', refCode: 'ref-tanaka', genre: null, name: '紹介リンク 田中 明', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
+  { id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿', tagId: 'tag-vip', scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-25T00:12:00.000Z' },
+  { id: 'er-2', refCode: 'ref-tanaka', genre: null, name: '紹介リンク 田中 明', tagId: 'tag-purchase', scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
   { id: 'er-3', refCode: 'shop-pop', genre: '店頭', name: '店頭POPのQRコード', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-25T02:30:00.000Z' },
   { id: 'er-4', refCode: 'ad-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
   { id: 'er-6', refCode: 'flyer-26s', genre: null, name: 'チラシ計測リンク（2026春）', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, stoppedAt: '2026-06-30T00:00:00.000Z', stoppedReason: '春の配布が終わった', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
@@ -4464,7 +4491,9 @@ export const INFLOW_SUMMARY = {
     { refCode: 'ad-summer', name: 'Google広告 夏キャンペーン', friendCount: 42, clickCount: 1204, latestAt: '2026-09-30T14:12:00+09:00' },
     { refCode: 'summer-ig', name: '夏のInstagram投稿', friendCount: 31, clickCount: 880, latestAt: '2026-09-30T09:40:00+09:00' },
     { refCode: 'shop-pop', name: '店頭POPのQRコード', friendCount: 27, clickCount: null, latestAt: '2026-09-29T18:40:00+09:00' },
-    { refCode: 'mail-sign', name: 'メール署名', friendCount: 3, clickCount: 96, latestAt: '2026-09-26T11:02:00+09:00' },
+    /* 絵（xbHxg）の並びは メール署名 → 紹介リンク の順。一覧は友だち追加が多い順なので、
+     * メール署名を紹介リンク（12人）より1人多くして絵の並びにそろえる（絵の数「3人」はデータの違いとして残る）。 */
+    { refCode: 'mail-sign', name: 'メール署名', friendCount: 13, clickCount: 96, latestAt: '2026-09-26T11:02:00+09:00' },
     { refCode: 'ref-tanaka', name: '紹介リンク 田中 明', friendCount: 12, clickCount: 230, latestAt: '2026-09-29T10:21:00+09:00' },
     { refCode: 'flyer-26s', name: 'チラシ計測リンク（2026春）', friendCount: 0, clickCount: null, latestAt: '2026-05-31T18:00:00+09:00' },
   ],
