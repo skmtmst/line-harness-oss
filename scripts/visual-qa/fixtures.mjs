@@ -6472,28 +6472,45 @@ const lineAccount = (id, channelId, name, displayOrder, options = {}) => ({
   ...options,
 })
 
-/** LINEアカウント一覧。設計 `QT91v` の稼働3・停止1・保管2と親子関係。 */
+/** 統括のアカウントのタグ（絵 `JKjsE`：渋谷エリア・イベント・テスト）。`/api/line-account-tags` と各アカウントの `tags`。 */
+export const LINE_ACCOUNT_TAGS = [
+  { id: 'tag-shibuya', name: '渋谷エリア', color: '#2f6fdf', displayOrder: 0 },
+  { id: 'tag-event', name: 'イベント', color: '#087a3e', displayOrder: 1 },
+  { id: 'tag-test', name: 'テスト', color: '#d9822b', displayOrder: 2 },
+]
+const tagSummary = (...ids) => LINE_ACCOUNT_TAGS.filter((tag) => ids.includes(tag.id)).map(({ id, name, color }) => ({ id, name, color }))
+
+/**
+ * LINEアカウント一覧。設計 `QT91v` の稼働3・停止1・保管2と親子関係。
+ * 統括ホーム（絵 `JKjsE`）のために、タグ・接続状態（`connection`）・権限者の数（`stats.staffCount`）を足した（2026-10-06）。
+ */
 export const LINE_ACCOUNTS = [
   lineAccount('visual-qa-account', '2007123456', '然-NEN- TEST', 0, {
     isDefault: true, role: '検証用。本番の配信には使わない',
-    stats: { friendCount: 231, activeScenarios: 4, messagesThisMonth: 1842 },
+    stats: { friendCount: 231, activeScenarios: 4, messagesThisMonth: 1842, staffCount: 2 },
+    tags: tagSummary('tag-test'), connection: { status: 'warn', checkedAt: '2026-09-30T09:00:00.000Z' },
   }),
   lineAccount('visual-qa-account-prod', '2007111222', '然-NEN- 本店', 1, {
-    parentLineAccountId: 'visual-qa-account', stats: { friendCount: 186, activeScenarios: 3, messagesThisMonth: 1260 },
+    parentLineAccountId: 'visual-qa-account', stats: { friendCount: 186, activeScenarios: 3, messagesThisMonth: 1260, staffCount: 4 },
+    tags: tagSummary('tag-shibuya'), connection: { status: 'ok', checkedAt: '2026-09-30T09:00:00.000Z' },
   }),
   lineAccount('visual-qa-account-store', '2007333444', '然-NEN- 渋谷店', 2, {
-    parentLineAccountId: 'visual-qa-account', stats: { friendCount: 42, activeScenarios: 1, messagesThisMonth: 286 },
+    parentLineAccountId: 'visual-qa-account', stats: { friendCount: 42, activeScenarios: 1, messagesThisMonth: 286, staffCount: 3 },
     webhook: { expectedUrl: 'https://api.example/webhook', actualUrl: 'https://old.example/webhook', active: true, status: 'mismatched', checkedAt: '2026-08-22T00:00:00.000Z' },
+    tags: tagSummary('tag-shibuya'), connection: { status: 'ok', checkedAt: '2026-09-30T09:00:00.000Z' },
   }),
   lineAccount('visual-qa-account-old', '2007555666', '旧キャンペーン', 3, {
-    isActive: false, stats: { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0 },
+    isActive: false, stats: { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 0 },
     webhook: { expectedUrl: 'https://api.example/webhook', actualUrl: null, active: null, status: 'unknown', checkedAt: '2026-08-12T00:00:00.000Z' },
+    tags: tagSummary('tag-event'), connection: { status: 'unknown', checkedAt: null },
   }),
   lineAccount('visual-qa-account-event-2025', '2007777888', '2025年イベント', 4, {
-    isActive: false, archivedAt: '2026-04-01T00:00:00.000Z', stats: { friendCount: 18, activeScenarios: 0, messagesThisMonth: 0 },
+    isActive: false, archivedAt: '2026-04-01T00:00:00.000Z', stats: { friendCount: 18, activeScenarios: 0, messagesThisMonth: 0, staffCount: 2 },
+    tags: tagSummary('tag-event'), connection: { status: 'unknown', checkedAt: null },
   }),
   lineAccount('visual-qa-account-archive', '2007999000', '旧テストアカウント', 5, {
-    isActive: false, archivedAt: '2026-02-01T00:00:00.000Z', stats: { friendCount: 4, activeScenarios: 0, messagesThisMonth: 0 },
+    isActive: false, archivedAt: '2026-02-01T00:00:00.000Z', stats: { friendCount: 4, activeScenarios: 0, messagesThisMonth: 0, staffCount: 0 },
+    tags: [], connection: { status: 'unknown', checkedAt: null },
   }),
 ]
 

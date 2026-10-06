@@ -1,0 +1,85 @@
+/*
+ * ★V8 統括のアカウントの窓（設定 `HMpVx`・アーカイブ `D6ljr`・戻す `HFsO9`）の中身。
+ * 頭・下の帯は dialog-head.module.css。値は globals.css の `--tpl-hq-*`。
+ */
+.stack { display: flex; flex-direction: column; gap: var(--tpl-hq-body-gap); }
+.full { width: 100%; }
+.icon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: var(--tpl-hq-field-gap);
+  min-width: 0;
+}
+
+.label {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-hq-cell-lh);
+}
+
+.labelLarge {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-hq-nav-item-lh-20);
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-hq-field-gap);
+  margin: 0;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+}
+
+.tagField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-plan-head-gap);
+}
+
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-hq-field-gap);
+}
+
+.addRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-plan-head-gap);
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-hq-plan-head-gap);
+}
+
+.codeBoxes { display: flex; gap: var(--tpl-hq-plan-head-gap); }
+
+.codeBox {
+  width: var(--tpl-hq-code-box-w);
+  height: var(--tpl-hq-digit-h);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-heading);
+  font-weight: 700;
+  text-align: center;
+}
+
+.link { color: var(--color-action); font-size: var(--text-caption); }

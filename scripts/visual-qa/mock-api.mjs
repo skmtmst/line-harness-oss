@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url'
 /** このファイル自身の指紋。動いている中身が古くないかを言うために持つ。 */
 const FINGERPRINT = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 16)
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { BILLING_SUMMARY } from './billing-fixture.mjs'
+import { BILLING_INVOICES, BILLING_SUMMARY } from './billing-fixture.mjs'
 import {
   mileageWriteResponse,
   MILEAGE_REWARDS,
@@ -105,7 +105,7 @@ import {
   NEN_PHOTO_REWARD_POLICY_VERSIONS,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
   FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS,
-  LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
+  LINE_ACCOUNTS, LINE_ACCOUNT_TAGS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   ACCOUNT_HEALTH_LOGS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
@@ -395,17 +395,25 @@ const OPS_SUPPORT_DETAIL = {
  * 名前はすべて作り物で、日時は固定（撮るたびに同じ絵になる）。
  */
 const HQ_SUPPORT_REQUESTS = [
+  /* 絵 `b8xBtZ`・`OhguS`（2026-10-06 絵に合わせた）：対応中の #1042 と解決済みの #1031。 */
   {
-    id: 'visual-ticket-1', kind: 'usage', kindLabel: '使い方について',
-    subject: '画面確認用の問い合わせ', body: '画面確認用の問い合わせ本文。',
+    id: 'visual-ticket-1', kind: 'bug', kindLabel: '不具合の報告',
+    subject: 'LINE の Webhook が遅れる', body: '夕方の一斉配信のあと、友だちの返信が管理画面に出るまで 10 分ほどかかります。昨日から急に遅くなりました。',
     lineAccountId: 'visual-qa-account', attachments: [],
-    status: 'open', staffName: '検証 一郎', notified: true,
-    createdAt: '2026-09-06T10:00:00+09:00', ticketLabel: 'No.1',
+    status: 'open', staffName: '高田 誠', notified: true,
+    createdAt: '2026-09-29T18:20:00+09:00', ticketLabel: '#1042',
+  },
+  {
+    id: 'visual-ticket-2', kind: 'billing', kindLabel: '料金・契約について',
+    subject: '年払いへの切り替え', body: '年払いに切り替えるときの差額を教えてください。',
+    lineAccountId: null, attachments: [],
+    status: 'closed', staffName: '高田 誠', notified: true,
+    createdAt: '2026-09-21T15:20:00+09:00', ticketLabel: '#1031',
   },
 ]
 const HQ_SUPPORT_DETAIL = {
   ...HQ_SUPPORT_REQUESTS[0],
-  stageLabel: '受付済み',
+  stageLabel: '対応中',
   /*
    * 本物（`apps/worker/src/routes/hq-support.ts`）と同じく、最初の本文は
    * `body` にだけ置き、`messages` には追記だけを入れる。本文を両方に
@@ -414,8 +422,13 @@ const HQ_SUPPORT_DETAIL = {
   messages: [
     {
       id: 'visual-support-msg-1', authorKind: 'ops', authorName: 'musubo 運営 ／ 検証 太郎',
-      body: '画面確認用の返信文。', attachments: [],
-      createdAt: '2026-09-06T11:00:00+09:00',
+      body: 'ご連絡ありがとうございます。LINE 側の遅延の可能性があるため調べています。遅れた時間帯がわかれば教えてください。', attachments: [],
+      createdAt: '2026-09-30T10:05:00+09:00',
+    },
+    {
+      id: 'visual-support-msg-2', authorKind: 'tenant', authorName: '高田 誠',
+      body: '18:00〜18:30 の配信のあとです。画面の写しを添えます。', attachments: [],
+      createdAt: '2026-09-30T11:00:00+09:00',
     },
   ],
   canFollowUp: true,
@@ -1962,7 +1975,14 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: BILLING_SUMMARY }
   }
   if (method === 'GET' && pathname === '/api/hq/billing/invoices') {
-    return { success: true, data: [] }
+    return { success: true, data: BILLING_INVOICES }
+  }
+  if (method === 'GET' && pathname === '/api/hq/notices/line-registration') {
+    /* 絵 `D6fh3`：運営（契約者専用）の LINE は設定済み・まだ紐づいていない・確認コード 482913。 */
+    return { success: true, data: { available: true, accountName: 'musubo 運営（契約者専用）', basicId: '@musubo', addFriendUrl: 'https://line.me/R/ti/p/@musubo', linked: false, code: '482913', codeExpiresAt: '2026-10-07T18:00:00+09:00' } }
+  }
+  if (method === 'GET' && pathname === '/api/hq/support/requests') {
+    return { success: true, data: HQ_SUPPORT_REQUESTS }
   }
   if (method === 'GET' && pathname === '/api/hq/support/context') {
     /*
@@ -1980,11 +2000,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           { key: 'feature', label: '要望・提案' },
           { key: 'other', label: 'その他' },
         ],
-        accounts: [{ id: 'visual-qa-account', name: '画面確認アカウント' }],
+        accounts: [{ id: 'visual-qa-account', name: '然 -NEN- 本店' }],
+        /* 絵 `b8xBtZ`・`OhguS` の送信者（2026-10-06 絵に合わせた）。 */
         sender: {
-          tenantName: '画面確認統括',
-          name: '検証 一郎',
-          email: 'owner@example.com',
+          tenantName: '然 -NEN- 本部',
+          name: '高田 誠',
+          email: 'takada@example.jp',
           planLabel: 'スタンダード',
         },
       },
@@ -2446,6 +2467,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /* 統括ホーム（絵 `JKjsE`）の左のタグの列。 */
+  if (method === 'GET' && pathname === '/api/line-account-tags') return { success: true, data: LINE_ACCOUNT_TAGS }
+  /* 統括の名前（絵 `JKjsE` の説明・`K7HYu` の欄）。 */
+  if (method === 'GET' && pathname === '/api/tenants/me') return { success: true, data: { name: '然 -NEN- 本部' } }
   if (pathname === '/api/line-accounts') {
     /*
       `webhook` を付ける。無いと接続状態カードが「確認中」のままで、

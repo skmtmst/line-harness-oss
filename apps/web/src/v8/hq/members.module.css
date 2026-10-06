@@ -1,0 +1,200 @@
+/*
+ * ★V8 統括のメンバー（Pencil `r4ARpV`）。頭・左の列は型（ListPage）。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-body-gap);
+  padding: var(--tpl-hq-body-pad);
+  min-width: 0;
+}
+
+.buttonIcon {
+  width: var(--tpl-hq-button-icon);
+  height: var(--tpl-hq-button-icon);
+}
+
+.viewerBand {
+  margin: 0;
+  padding: var(--tpl-hq-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+
+.notice { margin: 0; color: var(--color-accent-deep); font-size: var(--text-label); }
+.error { margin: 0; color: var(--color-danger); font-size: var(--text-label); }
+
+/* 数のカード4枚（間12・余白12/16・角丸12・線は outline） */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tpl-hq-cards-gap);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-card-gap);
+  min-width: 0;
+  padding: var(--tpl-hq-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.cardLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-hq-small-lh);
+  white-space: nowrap;
+}
+
+.cardValueRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-hq-card-gap);
+}
+
+.cardValue {
+  color: var(--color-ink);
+  font-size: var(--text-metric);
+  font-weight: 700;
+  line-height: var(--tpl-hq-metric-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+.cardUnit,
+.cardSub {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+  white-space: nowrap;
+}
+
+.cardUnit {
+  padding-bottom: var(--tpl-hq-unit-drop);
+}
+
+/* 権限者の表（枠は outline・角丸12・見出しは薄い灰） */
+.table {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.head,
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tpl-hq-col-mail) var(--tpl-hq-col-role) var(--tpl-hq-col-scope) var(--tpl-hq-col-state) var(--tpl-hq-col-login) var(--tpl-hq-col-action);
+  align-items: center;
+  column-gap: var(--tpl-hq-col-gap);
+}
+
+.head {
+  padding: var(--tpl-hq-head-pad);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-hq-small-lh);
+  white-space: nowrap;
+}
+
+.row {
+  height: var(--tpl-hq-row-h);
+  padding: var(--tpl-hq-row-pad);
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-cell-lh);
+}
+
+.cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-hq-card-gap);
+  padding-right: var(--tpl-hq-action-pad);
+}
+
+.textButton {
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.textButton:disabled { opacity: 0.5; }
+
+/* 状態の札（点つき・角丸の札） */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-hq-pill-gap);
+  padding: var(--tpl-hq-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-hq-pill-lh);
+  white-space: nowrap;
+}
+
+.dot {
+  width: var(--tpl-hq-dot);
+  height: var(--tpl-hq-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.pillInfo { background: var(--color-status-info-soft); color: var(--color-status-info); }
+.pillDanger { background: var(--color-status-danger-soft); color: var(--color-danger); }
+.pillIdle { background: var(--color-step-idle); color: var(--color-ink-secondary); }
+
+.legend {
+  margin: 0;
+  padding: var(--tpl-hq-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.confirmList { display: grid; gap: var(--tpl-hq-confirm-gap); }
+.confirmRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-col-gap);
+  padding-bottom: var(--tpl-hq-confirm-gap);
+  border-bottom: 1px solid var(--color-hairline);
+}
+.confirmLabel { width: var(--tpl-hq-confirm-label); flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
+.confirmValue { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-caption); }
