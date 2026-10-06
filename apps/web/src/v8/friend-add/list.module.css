@@ -334,3 +334,7 @@
   display: block;
   line-height: var(--tpl-fa-kpi-detail-lh);
 }
+
+/* 閲覧のみ：隠した作るボタンとつまみの場所だけ空けて、並びを絵どおりに保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-fa-viewer-create-h); }
+.gripSpace { visibility: hidden; }

@@ -708,7 +708,7 @@ function FriendAddList() {
                         onMove={(direction) => keyboardMove(rule.id, direction)}
                       >
                         <span aria-hidden="true" className={styles.grip}>⠿</span>
-                      </ReorderGrip> : null}
+                      </ReorderGrip> : <span aria-hidden="true" className={`${styles.grip} ${styles.gripSpace}`}>⠿</span>}
                       <span className={styles.orderNum}>{index + 1}</span>
                     </span>
                   </Td>
@@ -816,7 +816,8 @@ function FriendAddList() {
         </KpiBand>
       }
       folders={<>
-        {createButton}
+        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ） */}
+        {createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         <FolderPanel
           activeId={folder ?? ''}
           onSelect={(id) => selectFolder(id || null)}

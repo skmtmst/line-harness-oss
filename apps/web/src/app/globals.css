@@ -621,6 +621,7 @@
   --tpl-large-title-size: 22px; --tpl-large-title-lh: 33px; --tpl-large-gap: 16px;
   /* 友だち追加時の配信（MRhef・LEwkJ・P20kYU・C0lfUP・cFo2p・kFz4b）。表は 見出し39・行62・欄の間16。 */
   --tpl-fa-create-gap: 6px; --tpl-fa-notice-after: 6px; --tpl-fa-search-w: 220px; --tpl-fa-folder-w: 150px;
+  --tpl-fa-viewer-create-h: 49px; /* 閲覧のみで隠した作るボタン（＋下の間）の高さ */
   --tpl-fa-col-gap: 16px; --tpl-fa-head-h: 39px; --tpl-fa-head-pad: 12px 24px; --tpl-fa-row-h: 62px; --tpl-fa-row-pad: 12px 24px;
   --tpl-fa-col-order: 28px; --tpl-fa-col-send: 170px; --tpl-fa-col-status: 80px; --tpl-fa-col-recent: 64px; --tpl-fa-col-menu: 28px;
   --tpl-fa-order-lh: 15px; --tpl-fa-sub-icon-gap: 6px; --tpl-fa-sub-gap: 3px; --tpl-fa-send-lh: 17px; --tpl-fa-send-gap: 2px;
