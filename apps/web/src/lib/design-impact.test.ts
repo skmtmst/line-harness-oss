@@ -87,8 +87,7 @@ describe('共通部品の影響範囲', () => {
       'app/affiliates/v8-payment-tab.tsx',
       // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
       'app/auto-replies/runs/page.tsx',
-      // ★V8 自動応答の実行結果（nWmLg）。表の下にページ送りを置く。
-      'app/auto-replies/runs/runs-v8.tsx',
+      // ★V8 自動応答の実行結果（app/auto-replies/runs/runs-v8.tsx）は描かれなくなった。入口は src/v8/auto-replies/runs.tsx（下）。
       // ★V8 オートメーション一覧（LWQXd）。表の下にページ送りを置く。
       'app/automations/list-v8.tsx',
       'app/automations/page.tsx',

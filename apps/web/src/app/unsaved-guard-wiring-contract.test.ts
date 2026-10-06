@@ -97,6 +97,9 @@ const GUARDED = [
   'v8/form-edit/edit.tsx',
   'v8/friend-add/editor.tsx',
   'v8/inflow-links/new/create.tsx',
+  // ★V8 共通変数の編集・作る（src/v8/common-vars-edit）。useUnsavedGuard で番兵を持つ。
+  'v8/common-vars-edit/edit.tsx',
+  'v8/common-vars-edit/new.tsx',
   'app/webinars/edit/page.tsx',
   'app/webinars/new/new-v8.tsx',
   'app/webinars/new/page.tsx',
