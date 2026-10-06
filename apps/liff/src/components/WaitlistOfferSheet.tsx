@@ -12,11 +12,11 @@ export default function WaitlistOfferSheet({ id, seat = false, decline = false, 
   const key = useRef(crypto.randomUUID());
   useEffect(() => { let alive = true; const request = seat ? api.seatWaitlists(id) : api.bookingWaitlists(id); request.then(r => { if (!alive) return; const own = r.waitlist.find(w => w.id === id); if (own) setEntry(own); else setError('この案内が見つかりません。'); }).catch(() => { if (alive) setError('案内を読み込めません。もう一度開いてください。'); }); const timer = setInterval(() => setNow(Date.now()), 1000); return () => { alive = false; clearInterval(timer); }; }, [id, seat]);
   const active = entry?.status === 'invited' && !!entry.hold_expires_at && Date.parse(entry.hold_expires_at) > now;
-  async function accept() {    
+  async function accept() {
 if (!entry || !active) return; setWorking(true); setError(null); try {
       if (seat) { await api.acceptSeatWaitlist(id, key.current); setMessage('予約が確定しました。'); }
       else { const person = entry as CustomerBookingWaitlist; const result = await api.acceptWaitlist({ menu_id: person.menu_id, staff_id: person.staff_id, starts_at: person.starts_at, waitlist_id: id }, key.current); if (result.payment && result.payment.status !== 'paid') setPaymentBooking(result.booking_id); else setMessage(result.status === 'confirmed' ? '予約が確定しました。' : '予約を受け付けました。お店の承認をお待ちください。'); }
-    } catch (e) { const code = (e as { body?: { error?: string ;} ;}).body?.error; setError(code === 'offer_expired' ? '仮押さえの期限が切れました。' : code === 'slot_conflict' || code === 'slot_not_available' ? 'この枠は予約できなくなりました。' : '予約できませんでした。期限内にもう一度お試しください。'); } finally { setWorking(false); }  
+    } catch (e) { const code = (e as { body?: { error?: string ;} ;}).body?.error; setError(code === 'offer_expired' ? '仮押さえの期限が切れました。' : code === 'slot_conflict' || code === 'slot_not_available' ? 'この枠は予約できなくなりました。' : '予約できませんでした。期限内にもう一度お試しください。'); } finally { setWorking(false); }
 }
   async function cancel() { setWorking(true); setError(null); try { if (seat) await api.cancelSeatWaitlist(id); else await api.cancelWaitlist(id); setMessage('取り消しました。次の方へ案内します。'); } catch { setError('取り消せませんでした。もう一度お試しください。'); } finally { setWorking(false); } }
   return <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="空いたら知らせる">
