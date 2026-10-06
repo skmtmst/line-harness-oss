@@ -33,16 +33,25 @@ describe('統括の左下アカウントメニュー', () => {
     expect(topBar).not.toContain('auth/logout')
   })
 
-  it('Esc と外側の押下で閉じ、押した要素へフォーカスを戻す', () => {
+  it('Esc で閉じて押した要素へフォーカスを戻し、外側の押下は器（MenuPortal）が閉じる', () => {
     expect(menu).toContain("event.key === 'Escape'")
-    expect(menu).toContain("addEventListener('mousedown'")
     expect(menu).toContain('triggerRef.current?.focus()')
+    expect(menu).toContain('onClose={() => setOpen(false)}')
   })
 
-  it('開いたメニューは固定幅にせず、左サイドバーの幅に揃える', () => {
-    expect(menu).toContain('absolute bottom-full left-0')
-    expect(menu).toContain('w-full flex-col')
-    expect(menu).not.toContain('style={{ width: 300 }}')
+  /*
+   * 2026-10-06 の直し（Pencil 承認 `LINE-Harness-V8-B.pen` の `s6kZt/wmfIZ`）。
+   * 脇メニューの幅に揃えると中身が枠からはみ出したので、運営コンソールと
+   * 同じ「最上層の器＋幅240固定＋右の説明なし＋行の高さ40」に合わせた。
+   */
+  it('開いたメニューは最上層の器に出し、幅240で固定して行の右に説明を置かない', () => {
+    expect(menu).toContain('<MenuPortal')
+    expect(menu).toContain('w-60 rounded-mini border border-hairline bg-canvas py-2 shadow-float')
+    expect(menu).toContain('flex h-10 items-center gap-2.5 px-3.5 text-label')
+    expect(menu).toContain('h-px bg-divider-soft')
+    expect(menu).not.toContain('absolute bottom-full left-0')
+    expect(menu).not.toContain('権限者・担当アカウント')
+    expect(menu).not.toContain('プランと支払い')
   })
 })
 

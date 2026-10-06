@@ -3,9 +3,10 @@
 import { ChevronsUpDown, CreditCard, LogOut, MessageCircleQuestion, Users } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import type { StaffMember } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import MenuPortal from '@/components/shared/menu-portal'
 import { billingChip, trialDaysLabel, type BillingSummary } from '@/lib/hq-billing'
 import { logoutAndGoToLogin } from '@/lib/logout'
 
@@ -15,9 +16,17 @@ import { logoutAndGoToLogin } from '@/lib/logout'
  *
  * `docs/v6-common-rules.md` §1-2 の統括だけの例外。アカウントの画面には置かない。
  *
- * プランの札（無料トライアル・残り日数）は課金の状態（`api.hqBilling.summary`）から出す。
+ * プランの札（無料トライアル）は課金の状態（`api.hqBilling.summary`）から出す。
  * 課金対象外（運営）の統括には札を出さず、役割の札だけにする。
  * 「プロフィールを編集」は本人の情報を変える画面ができるまで出さない（出す＝使える、§7-10）。
+ *
+ * 開いたメニューの整え方は運営コンソール（`components/ops/ops-shell.tsx` の
+ * `OpsAccountMenu`）に合わせる（Pencil 承認 2026-10-06・
+ * `LINE-Harness-V8-B.pen` の `s6kZt/wmfIZ`）。
+ * ・最上層の器（`MenuPortal`）に出す。脇メニューの幅や `overflow` に切られない。
+ * ・幅は 240（`w-60`）で固定。行の右に説明の字を置かない（はみ出しの元）。
+ * ・行の高さは 40（`h-10`）、区切りは `h-px bg-divider-soft`。
+ * ・残りの日数・次回の更新は札ではなく名前の下の字で出す。
  */
 const ROLE_LABELS: Record<string, string> = {
   owner: 'オーナー',
@@ -58,23 +67,19 @@ export default function HqAccountMenu() {
     }
   }, [])
 
-  // 画面が変わったら閉じる。外を押す・Esc でも閉じる。
+  // 画面が変わったら閉じる。外を押したときは器（`MenuPortal`）が閉じる。
   useEffect(() => setOpen(false), [pathname])
+  // Esc は押したボタンへフォーカスを戻すので、ここでも受ける。
   useEffect(() => {
     if (!open) return
-    const onPointer = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false)
-    }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setOpen(false)
         triggerRef.current?.focus()
       }
     }
-    document.addEventListener('mousedown', onPointer)
     document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('mousedown', onPointer)
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
@@ -84,15 +89,33 @@ export default function HqAccountMenu() {
   const initial = name.trim().slice(0, 1).toUpperCase() || '?'
   const chip = billing ? billingChip(billing) : null
   const daysLeft = billing ? trialDaysLabel(billing) : null
+  /*
+   * 名前の下に出す課金の一言。札にはしない（枠からはみ出す元）。
+   * 無料トライアルは「いつまで・残り何日」、契約中は「次回の更新」。
+   */
+  const billingNote =
+    billing?.state === 'trialing' && billing.trialEndsLabel
+      ? `${billing.trialEndsLabel} まで${daysLeft ? `・${daysLeft}` : ''}`
+      : billing?.state === 'active' && billing.currentPeriodEndsLabel
+        ? `次回の更新 ${billing.currentPeriodEndsLabel}`
+        : ''
   return (
     <div ref={rootRef} className="relative shrink-0 border-t border-hairline" data-design-node="X6G9j6">
       {open ? (
+        <MenuPortal
+          open={open}
+          align="start"
+          getAnchor={() => triggerRef.current}
+          onClose={() => setOpen(false)}
+        >
         <div
           id={menuId}
           role="menu"
           aria-label="アカウントメニュー"
           data-design-node="bfhe6"
-          className="absolute bottom-full left-0 z-30 mb-2 flex w-full flex-col rounded-panel border border-hairline bg-canvas shadow-card"
+          className="w-60 rounded-mini border border-hairline bg-canvas py-2 shadow-float"
+          // 最上層では位置は器が決める（absolute は使わない）。
+          style={{ position: 'static' }}
           onKeyDown={(event: ReactKeyboardEvent<HTMLElement>) => {
             if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
             const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])'))
@@ -103,67 +126,38 @@ export default function HqAccountMenu() {
             items[next].focus()
           }}
         >
-          <div className="flex flex-col gap-1 px-4 pb-3 pt-4">
-            <p className="text-body font-bold text-ink">{name}</p>
-            {me?.email ? <p className="truncate text-caption text-ink-faint">{me.email}</p> : null}
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              {role ? (
-                <span className="inline-flex h-5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-medium text-accent-deep">{role}</span>
-              ) : null}
-              {chip ? <PlanChip chip={chip} /> : null}
-              {billing?.state === 'trialing' && billing.trialEndsLabel ? (
-                <span className="text-caption text-ink-secondary">{billing.trialEndsLabel} まで・{daysLeft}</span>
-              ) : null}
-              {billing?.state === 'active' && billing.currentPeriodEndsLabel ? (
-                <span className="text-caption text-ink-secondary">次回の更新 {billing.currentPeriodEndsLabel}</span>
-              ) : null}
-            </div>
-          </div>
-          <div className="border-t border-hairline" />
-          <div className="flex flex-col p-2">
-            <Link
-              href="/hq/members"
-              role="menuitem"
-              className="flex h-10 items-center gap-3 rounded-control px-2 text-label font-semibold text-ink hover:bg-canvas-sunken focus-visible:bg-canvas-sunken"
-            >
-              <Users aria-hidden="true" className="h-4.5 w-4.5 text-ink-secondary" />
-              <span className="whitespace-nowrap">メンバー管理</span>
-              <span className="flex-1" />
-              <span className="whitespace-nowrap text-micro font-normal text-ink-faint">権限者・担当アカウント</span>
-            </Link>
-            {me?.role !== 'staff' ? (
-              // 担当者には出さない（権限表: 課金プランは担当者 不可）。
-              <Link
-                href="/hq/billing"
-                role="menuitem"
-                className="flex h-10 items-center gap-3 rounded-control px-2 text-label font-semibold text-ink hover:bg-canvas-sunken focus-visible:bg-canvas-sunken"
-              >
-                <CreditCard aria-hidden="true" className="h-4.5 w-4.5 text-ink-secondary" />
-                <span className="whitespace-nowrap">課金プラン</span>
-                <span className="flex-1" />
-                <span className="whitespace-nowrap text-micro font-normal text-ink-faint">プランと支払い</span>
-              </Link>
+          <div className="px-3.5 pb-2.5 pt-1.5">
+            <p className="truncate text-label font-medium text-ink">{name}</p>
+            {me?.email ? <p className="truncate text-nano text-ink-faint">{me.email}</p> : null}
+            {role || chip ? (
+              <p className="mt-1 flex flex-wrap items-center gap-1.5">
+                {role ? (
+                  <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-nano font-medium text-accent-deep">{role}</span>
+                ) : null}
+                {chip ? <PlanChip chip={chip} /> : null}
+              </p>
             ) : null}
-            <Link
-              href="/hq/support"
-              role="menuitem"
-              className="flex h-10 items-center gap-3 rounded-control px-2 text-label font-semibold text-ink hover:bg-canvas-sunken focus-visible:bg-canvas-sunken"
-            >
-              <MessageCircleQuestion aria-hidden="true" className="h-4.5 w-4.5 text-ink-secondary" />
-              お問い合わせ
-            </Link>
+            {billingNote ? <p className="mt-1 text-nano text-ink-faint">{billingNote}</p> : null}
           </div>
-          <div className="border-t border-hairline" />
+          <div className="h-px bg-divider-soft" />
+          <MenuLink href="/hq/members" icon={Users}>メンバー管理</MenuLink>
+          {me?.role !== 'staff' ? (
+            // 担当者には出さない（権限表: 課金プランは担当者 不可）。
+            <MenuLink href="/hq/billing" icon={CreditCard}>課金プラン</MenuLink>
+          ) : null}
+          <MenuLink href="/hq/support" icon={MessageCircleQuestion}>お問い合わせ</MenuLink>
+          <div className="h-px bg-divider-soft" />
           <button
             type="button"
             role="menuitem"
             onClick={() => void logoutAndGoToLogin()}
-            className="flex h-11 items-center gap-3 px-4 text-label font-medium text-danger hover:bg-status-danger-soft focus-visible:bg-status-danger-soft"
+            className="flex h-10 w-full items-center gap-2.5 px-3.5 text-label font-medium text-danger hover:bg-status-danger-soft focus-visible:bg-status-danger-soft"
           >
-            <LogOut aria-hidden="true" className="h-4.5 w-4.5" />
+            <LogOut aria-hidden="true" className="h-4 w-4" />
             ログアウト
           </button>
         </div>
+        </MenuPortal>
       ) : null}
 
       <button
@@ -192,6 +186,23 @@ export default function HqAccountMenu() {
         <ChevronsUpDown aria-hidden="true" className="h-4 w-4 shrink-0 text-ink-faint" />
       </button>
     </div>
+  )
+}
+
+/**
+ * メニューの1行。運営コンソールの `MenuLink` と同じ整え方
+ * （高さ40・左右の余白 3.5・アイコン 16px）。右に説明の字は置かない。
+ */
+function MenuLink({ href, icon: Icon, children }: { href: string; icon: typeof Users; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      role="menuitem"
+      className="flex h-10 items-center gap-2.5 px-3.5 text-label font-semibold text-ink hover:bg-canvas-sunken focus-visible:bg-canvas-sunken"
+    >
+      <Icon aria-hidden="true" className="h-4 w-4 text-ink-secondary" />
+      {children}
+    </Link>
   )
 }
 
