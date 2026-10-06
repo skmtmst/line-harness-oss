@@ -621,6 +621,18 @@
   --tpl-scn-row-h: 61px; --tpl-scn-saved-w: 151px; --tpl-scn-saved-icon-w: 48px; --tpl-scn-folder-w: 150px; --tpl-scn-skeleton-gap: 4px; --tpl-scn-sub-gap: 2px; --tpl-scn-count-gap: 1px; --tpl-scn-narrow-head-h: 34px;
   --tpl-scn-dup-gap: 14px; --tpl-scn-dup-field-gap: 6px; --tpl-scn-dup-box-pad: 12px; --tpl-scn-dup-box-gap: 4px; --tpl-scn-dup-note-pad: 10px 14px; --tpl-scn-dup-note-gap: 10px;
   --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
+  /* 会員（専用機能）V8：ランク設定 fb9NJ・ランクを消す dEv6G・競合 e5yBLx・ライフタイム zQ5vY。 */
+  --tpl-mb-gap: 12px; --tpl-mb-gap-s: 8px; --tpl-mb-gap-xs: 4px; --tpl-mb-head-gap: 2px; --tpl-mb-field-gap: 6px; --tpl-mb-dialog-gap: 14px;
+  --tpl-mb-body-pad: 16px 24px 24px; --tpl-mb-card-pad: 20px; --tpl-mb-card-radius: 12px; --tpl-mb-side-w: 320px; --tpl-mb-kpi-menu: 24px; --tpl-mb-ro-margin: 12px 0 0;
+  --tpl-mb-card-title: 15px; --tpl-mb-card-title-lh: 22px; --tpl-mb-text-13: 13px; --tpl-mb-text-12: 12px; --tpl-mb-text-11: 11px;
+  --tpl-mb-lh-19: 19px; --tpl-mb-lh-17: 17px; --tpl-mb-lh-16: 16px; --tpl-mb-diff-lh: 22px;
+  --tpl-mb-field-h: 36px; --tpl-mb-field-pad: 0 12px; --tpl-mb-field-radius: 8px; --tpl-mb-note-pad: 10px 12px;
+  --tpl-mb-col-threshold: 160px; --tpl-mb-col-rate: 120px; --tpl-mb-col-action: 36px; --tpl-mb-rank-row-pad: 6px 0; --tpl-mb-rank-head-pad-bottom: 4px;
+  --tpl-mb-conflict-slot-pad: 12px 0; --tpl-mb-conflict-pad: 12px 16px; --tpl-mb-conflict-radius: 10px; --tpl-mb-conflict-title-lh: 19px;
+  --tpl-mb-total-w: 200px; --tpl-mb-total-pad: 10px 12px; --tpl-mb-total-radius: 10px; --tpl-mb-total-value: 16px; --tpl-mb-total-value-lh: 23px;
+  --tpl-mb-life-gap: 16px; --tpl-mb-life-pad: 10px 24px; --tpl-mb-life-head-h: 35.5px; --tpl-mb-life-row-h: 55.5px; --tpl-mb-life-num-pad: 16px;
+  --tpl-mb-life-col-threshold: 130px; --tpl-mb-life-col-title: 120px; --tpl-mb-life-col-reached: 90px; --tpl-mb-life-col-notify: 140px;
+  --tpl-mb-tabs-h: 28.5px; --tpl-mb-text-action-pull: -7.5px; --tpl-mb-dialog-tail: -10px; --tpl-mb-dialog-pull: -14px; --tpl-mb-chip-h: 22px; --tpl-mb-chip-pad: 0 8px; --tpl-mb-search-w: 260px; --tpl-mb-avatar: 36px;
   /* リッチメニューの一覧（rZEGN・Y9ASp・ZoKow・yOyCg）。 */
   --tpl-rml-col-order: 60px; --tpl-rml-col-thumb: 80px; --tpl-rml-col-audience: 146px; --tpl-rml-col-state: 96px; --tpl-rml-col-count: 106px; --tpl-rml-col-menu: 60px; --tpl-rml-row-h: 67px; --tpl-rml-alone-shift: 11px;
   --tpl-rml-thumb-w: 64px; --tpl-rml-thumb-h: 43px; --tpl-rml-thumb-radius: 6px; --tpl-rml-order-gap: 4px; --tpl-rml-main-lh: 17px;
