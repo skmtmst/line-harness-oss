@@ -234,13 +234,7 @@
     flex-basis var(--motion-base) var(--motion-ease-out);
 }
 
-/* 1024〜1279px の谷間は展開でも 216px（V7 の狭い幅ルールを引き継ぐ） */
-@media (min-width: 1024px) and (max-width: 1439.98px) {
-  [data-theme="v8"] .desktop:not([data-collapsed]) {
-    width: 216px;
-    flex-basis: 216px;
-  }
-}
+/* 1152 の絵（35 枚）は開いたまま 240。狭い幅でも 216 に詰めない（2026-10-06 司令塔、絵が正本）。 */
 
 [data-theme="v8"] .identityRule {
   display: none;

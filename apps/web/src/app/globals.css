@@ -611,6 +611,8 @@
   --tpl-detail-head-gap: 12px; --tpl-detail-actions-gap: 6px; --tpl-detail-tabs-pad-bottom: 12px;
   --tpl-create-content-pad-block: 24px; --tpl-create-content-pad-side: 28px; --tpl-create-content-gap: 16px;
   --tpl-section-pad: 20px; --tpl-section-gap: 14px;
+  /* 行の「…」のメニューの項目（絵 IIesG・SkY9V・C0lfUP）。 */
+  --tpl-menu-item-h: 34px; --tpl-menu-item-gap: 8px;
   --tpl-preview-pad: 24px; --tpl-preview-narrow-width: 280px;
   --tpl-preview-content-width: 331px; --tpl-preview-narrow-content-width: 231px;
   --tpl-detail-content-gap: 20px;
