@@ -1,9 +1,7 @@
 'use client'
 
 import Select from '@/components/shared/select'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import { NewAutomationV8 } from '@/v8/automations/create/create'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Automation } from '@line-crm/shared'
@@ -12,15 +10,24 @@ import {
   api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail,
   type AutomationDraftDetail,
 } from '@/lib/api'
-import Breadcrumb from '@/components/shared/breadcrumb'
-import FilterChip from '@/components/shared/filter-chip'
-import StickyBar from '@/components/shared/sticky-bar'
+import Link from 'next/link'
+import {
+  ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, MessageCircle, MoreHorizontal, Pencil, Play,
+  RefreshCw, Tag as TagIcon, Trash2, TriangleAlert, UserPlus, UserRound, Zap,
+} from 'lucide-react'
+import { CreatePage } from '@/components/templates'
+import Card from '@/components/shared/card'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
+import HelpTip from '@/components/shared/help-tip'
+import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 /*
  * 「だれに」の条件は、一斉配信・シナリオと同じ共通部品で作る。
@@ -40,7 +47,7 @@ import ConditionBuilder, {
 // 共通アクションと同じフック1本に寄せる（サーバの認可が正本）。
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { isoToJstDatetimeLocal } from '@/components/automations/automation-datetime'
-import styles from './new-automation.module.css'
+import styles from './create.module.css'
 import Button from '@/components/shared/button'
 import {
   friendNamesOf,
@@ -256,6 +263,19 @@ const storedConditionToForm = (
  * (`action_unsupported`)ので出さない。
  */
 const ACTIONS: ReadonlyArray<{ value: string; label: string }> = [...AUTOMATION_DRAFT_ACTION_OPTIONS]
+/*
+ * この画面で中身を作れる「すること」。担当へ知らせる（notify_staff）は知らせのルールを
+ * 選ぶ口がこの画面に無く、選ぶと文面の送信として保存されてしまう（v7 の器でも同じ）。
+ * 作れるものだけを並べる。
+ */
+const EDITABLE_ACTIONS = ACTIONS.filter((action) => action.value !== 'notify_staff')
+
+/* 代表3件のカードの短い説明（絵 M4torY）。ほかは EVENT_NOTES をそのまま出す。 */
+const TRIGGER_SHORT_NOTES: Record<string, string> = {
+  friend_add: '友だち追加で動きます',
+  message_received: '届いたトークの言葉で絞れます',
+  tag_change: '選んだタグの付け外しで動きます',
+}
 
 type ActionType = string
 
@@ -711,72 +731,28 @@ const TEST_RUN_STATUS_LABEL: Record<string, string> = {
 
 const testRunStatusLabel = (status: string): string => TEST_RUN_STATUS_LABEL[status] ?? '確認中'
 
-/**
- * タグ・シナリオの選択行(#734: 借金を増やさないため1つにまとめた)。
- *
- * 2つの行は見出し・選択肢・文言だけが違い、骨組みは同じ。複写すると
- * 借金計数(`unresolved-classname`)が増えて試験が赤くなるため、部品化する。
- */
-function ResourcePickRow(props: {
-  title: string
-  id: string
-  selectLabel: string
-  value: string
-  onPick: (value: string) => void
-  options: Array<{ value: string; label: string }>
-  tagsLoading: boolean
-  tagsFailed: boolean
-  failedNote: string
-}) {
-  const { title, id, selectLabel, value, onPick, options, tagsLoading, tagsFailed, failedNote } = props
-  return (
-    <div className={styles.field}>
-      <label className={styles.label} htmlFor={id}>
-        {title}<RequiredBadge />
-      </label>
-      <div className={styles.field}>
-        <Select
-          id={id}
-          value={value}
-          disabled={tagsLoading || tagsFailed}
-          onChange={(value) => onPick(value)}
-          aria-label={selectLabel}
-          className={styles.select}
-          size="standard"
-          options={[
-            { value: '', label: '— 選んでください —' },
-            ...options.map((option) => ({ value: option.value, label: option.label })),
-          ]}
-        />
-        {tagsLoading ? <p className={styles.note}>読み込んでいます</p> : null}
-        {tagsFailed ? (
-          <p className={styles.note}>
-            {failedNote}
-          </p>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
 /*
- * ★V8-B の切り替え。v8 の器は別ファイル（new-v8.tsx）に置き、
- * v7 の器・動きはこの下の V7 のまま残す。
+ * ★V8-B ルールを作る（板 `M4torY`・競合 `tJqST`）。src/v8 に一から書いた画面。
+ *
+ * 型（CreatePage）に、戻る・題・説明・左の段（名前・どんなときに・だれに・何をするか）、
+ * 右の列（文章にすると・人数・1人で試す・気をつけること・つながる先）、
+ * 下の帯（キャンセル・下書きを保存・つくって動かす）を渡す。
+ * 動き（きっかけ・条件・することの並び・下書き保存・公開・1人テスト・人数・再開・競合）は
+ * app/automations/new/new-v8.tsx から写した（src/v8 は @/app を読めない）。
+ * することの中身は行の「…」→「中身を直す」の窓で選ぶ。だれにの条件は窓の ConditionBuilder。
+ * 競合（tJqST）は頭の下の帯と、比べる窓・「比べてから保存」。
+ *
+ * `chrome` は写し元と同じ口（'draft' は下書きの仕上げ J1VA8 用）。入口 /automations/new は 'create'。
  */
-export default function NewAutomationPage() {
-  const theme = useAdminTheme()
-  if (theme === 'v8') {
-    return (
-      <Suspense fallback={null}>
-        <NewAutomationV8 chrome="create" />
-      </Suspense>
-    )
-  }
-  return <NewAutomationPageV7 />
-}
-
-function NewAutomationPageV7() {
-  usePageTitle('ルールを作る')
+export function NewAutomationV8({
+  draftId,
+  chrome = 'create',
+}: {
+  draftId?: string
+  chrome?: 'create' | 'draft'
+}) {
+  usePageTitle(chrome === 'draft' ? '下書きを仕上げる' : 'ルールを作る')
+  usePageCrumbs([{ label: 'オートメーション', href: '/automations' }])
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const canManage = useCanManageCommonActions()
@@ -799,6 +775,11 @@ function NewAutomationPageV7() {
   /* AUTOMATION-03: 人数の確認は保存とは別の成否として持つ。 */
   const [previewFailed, setPreviewFailed] = useState(false)
   const [previewRefreshing, setPreviewRefreshing] = useState(false)
+  const [previewTotal, setPreviewTotal] = useState<{ accountId: string; draftId: string; total: number } | null>(null)
+  /* 右の列の「…」と、することの中身を直す窓・条件の窓。 */
+  const [actionMenuKey, setActionMenuKey] = useState<number | null>(null)
+  const [editingActionKey, setEditingActionKey] = useState<number | null>(null)
+  const [conditionOpen, setConditionOpen] = useState(false)
   const [testFriendId, setTestFriendId] = useState('')
   const [actions, setActions] = useState<ActionDraft[]>([newActionDraft()])
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
@@ -819,7 +800,7 @@ function NewAutomationPageV7() {
    * DETAIL-13: 「再開」は `?draft=<番号>` で明示した下書きだけ。
    * `undefined` はURLをまだ読んでいない（読み終わるまで画面を出さない）。
    */
-  const [resumeTarget, setResumeTarget] = useState<string | null | undefined>(undefined)
+  const [resumeTarget, setResumeTarget] = useState<string | null | undefined>(draftId ?? undefined)
   const [resumeStatus, setResumeStatus] = useState<'none' | 'loading' | 'ready' | 'failed'>('none')
   /*
    * R532: 再開の読み込みが失敗した理由。通信断・対象なし・権限なしで
@@ -834,6 +815,20 @@ function NewAutomationPageV7() {
   const [saveOutcome, setSaveOutcome] = useState<'idle' | 'saved' | 'failed' | 'published'>('idle')
   /* R491: 公開済みで戻ったとき、元のルールへ案内するための番号。 */
   const [publishedRuleId, setPublishedRuleId] = useState<string | null>(null)
+  /*
+   * 競合（板 `tJqST`）：保存しようとしたら、ほかの人が先に同じ下書きを
+   * 保存していた。自分の入力は残したまま、帯で知らせる。
+   * 誰が・いつ保存したかは口が返さないため、帯の文言は相手を名指ししない。
+   * 比べる窓は、自分のいまの入力と、取り直した保存済みの内容を並べる。
+   */
+  const [conflict, setConflict] = useState<null | {
+    draftId: string
+    serverVersionId: string
+    serverName: string
+    serverEventLabel: string
+    serverActionCount: number
+  }>(null)
+  const [compareOpen, setCompareOpen] = useState(false)
   /* R488: 受け付けた1人テストの実行。 */
   const [testRun, setTestRun] = useState<TestRunRecord | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
@@ -940,8 +935,12 @@ function NewAutomationPageV7() {
    * 再読込・「戻る」で同じ下書きへ戻るための唯一の入口（DETAIL-13）。
    * URLの書き換えだけを担当し、再開要求そのものは `setResumeRequest` が持つ。
    */
-  const syncResumeUrl = (draftId: string | null, mode: 'push' | 'replace' = 'replace') => {
-    const url = draftId ? `/automations/new?draft=${encodeURIComponent(draftId)}` : '/automations/new'
+  /* 下書きの仕上げでは番号を `?id=` で持つ。再開の読み直しは番号だけ見る。 */
+  const resumeBase = chrome === 'draft' ? '/automations/drafts' : '/automations/new'
+  const syncResumeUrl = (targetId: string | null, mode: 'push' | 'replace' = 'replace') => {
+    const url = chrome === 'draft'
+      ? (targetId ? `${resumeBase}?id=${encodeURIComponent(targetId)}` : resumeBase)
+      : (targetId ? `${resumeBase}?draft=${encodeURIComponent(targetId)}` : resumeBase)
     if (mode === 'push') history.pushState(null, '', url)
     else history.replaceState(null, '', url)
   }
@@ -1006,8 +1005,10 @@ function NewAutomationPageV7() {
    * ためだけに読み、番号を黙って画面へ結び付けることはしない。
    */
   useEffect(() => {
-    const readLocation = () =>
-      setResumeTarget(new URLSearchParams(window.location.search).get('draft'))
+    const readLocation = () => {
+      const params = new URLSearchParams(window.location.search)
+      setResumeTarget(params.get('draft') ?? params.get('id'))
+    }
     readLocation()
     setStoredDraftHint(
       selectedAccountRef.current ? readStoredDraft(selectedAccountRef.current) : null,
@@ -1552,6 +1553,8 @@ function NewAutomationPageV7() {
         setPreviewCount(preview.data.matched)
         setPreviewFailed(false)
       }
+      // 友だち全体の数は、数えた下書き・アカウントと一緒に持つ（別の下書きの数を出さない）。
+      setPreviewTotal({ accountId, draftId: draft.id, total: preview.data.total })
     } catch {
       const stashed = formStashRef.current[accountId]
       if (stashed) stashed.previewFailed = true
@@ -1577,10 +1580,75 @@ function NewAutomationPageV7() {
     }
   }
 
-  const save = async (activate: boolean) => {
+  /*
+   * 競合（tJqST）の記録。保存済みのいまの内容を取り直し、
+   * 自分の入力は残したまま帯で知らせる。比べる窓の材料にもする。
+   */
+  const recordConflict = async (targetDraftId: string, targetAccountId: string): Promise<boolean> => {
+    try {
+      const server = await api.automations.getDraft(targetDraftId, targetAccountId)
+      if (!server.success) return false
+      if (selectedAccountRef.current !== targetAccountId) return false
+      const eventLabel = AUTOMATION_DRAFT_TRIGGER_OPTIONS.find(
+        (option) => option.value === server.data.eventType,
+      )?.label ?? server.data.eventType
+      setConflict({
+        draftId: targetDraftId,
+        serverVersionId: server.data.draftVersionId,
+        serverName: server.data.name,
+        serverEventLabel: eventLabel,
+        serverActionCount: server.data.actions.length,
+      })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /*
+   * 競合のあと、保存されている内容で入力を置き換える。
+   * 自分の未保存の入力は消えるので、比べる窓から選ぶのが先。
+   */
+  const reloadServerDraft = async () => {
+    if (!conflict || !selectedAccountId) return
+    const accountId = selectedAccountId
+    try {
+      const res = await api.automations.getDraft(conflict.draftId, accountId)
+      if (!res.success) throw new Error(res.error)
+      if (selectedAccountRef.current !== accountId) return
+      const restored = draftDetailToForm(res.data)
+      if (restored.eventType !== eventType) suppressTriggerResetRef.current = true
+      setName(restored.name)
+      setEventType(restored.eventType)
+      setKeyword(restored.keyword)
+      setCondition(restored.condition)
+      setConditionUnreadable(restored.conditionUnreadable)
+      setTriggerConfig(restored.triggerConfig)
+      setActions(restored.actions)
+      setPreviewFailed(false)
+      const fingerprint = draftPayloadFingerprint(restored)
+      setSavedFingerprint(fingerprint)
+      bindAccountDraft(accountId, { id: res.data.id, draftVersionId: res.data.draftVersionId })
+      writeStoredDraft(accountId, { id: res.data.id, draftVersionId: res.data.draftVersionId })
+      setConflict(null)
+      setCompareOpen(false)
+      setSaveOutcome('saved')
+      setError('')
+      setNotice('最新の内容を読み込みました。表示は保存されている内容です。')
+    } catch {
+      if (selectedAccountRef.current === accountId) {
+        setError('最新の内容を読み込めませんでした。通信状態を確かめて、もう一度お試しください。')
+      }
+    }
+  }
+
+  const save = async (activate: boolean, force = false) => {
     // N-357: 連打で下書きが2つできないよう、描き直しより先に鍵をかける。
     if (saveRunningRef.current) return
     if (saving || blockedReason) return
+    /* 比べてから保存：競合の版を承知の上で上書きする。 */
+    const forcedVersion = force ? conflict?.serverVersionId : undefined
+    setConflict(null)
     const invalid = validate()
     if (invalid) {
       setError(invalid)
@@ -1652,7 +1720,7 @@ function NewAutomationPageV7() {
         writeStoredDraft(accountId, draft)
       }
       const res = await api.automations.updateDraft(draft.id, accountId, {
-        expectedDraftVersionId: draft.draftVersionId,
+        expectedDraftVersionId: forcedVersion ?? draft.draftVersionId,
         ...payload,
       })
       if (!res.success) throw new Error(res.error)
@@ -1668,7 +1736,12 @@ function NewAutomationPageV7() {
        */
       const saved = await api.automations.getDraft(draft.id, accountId)
       if (!saved.success) throw new Error(saved.error)
-      if (saved.data.draftVersionId !== res.data.draftVersionId) {
+      /*
+       * R489・tJqST: 承知の上書き（force）でなければ、ほかの人の保存と
+       * 重なったら帯で知らせる。自分の入力は残す。
+       */
+      if (!forcedVersion && saved.data.draftVersionId !== res.data.draftVersionId) {
+        if (await recordConflict(draft.id, accountId)) return
         throw new ApiError(
           409,
           'ほかの人が同じ下書きを保存しました。内容を確かめてから、もう一度お試しください',
@@ -1750,6 +1823,24 @@ function NewAutomationPageV7() {
         }
       }
     } catch (caught) {
+      /*
+       * tJqST: 版の重なり（409）は帯で知らせる。結び付き・控えは捨てず、
+       * 自分の入力のまま比べ直せるようにする。消えた下書き（404）だけ
+       * 従来どおり控えを捨てて作り直す。
+       */
+      if (
+        draft && accountId
+        && caught instanceof ApiError
+        && (caught.status === 409 || caught.code === 'version_conflict')
+      ) {
+        if (await recordConflict(draft.id, accountId)) {
+          if (selectedAccountRef.current === accountId) {
+            setSaveOutcome('failed')
+            setError('')
+          }
+          return
+        }
+      }
       // 下書き自体が無くなっていたら控えを捨て、次は作り直す（N-357）。
       if (
         caught instanceof ApiError &&
@@ -2043,549 +2134,630 @@ function NewAutomationPageV7() {
   const openStoredDraft = () => {
     if (!storedDraftHint || !selectedAccountId) return
     // 再開は「明示した下書き番号」。URLへ載せて読み込みに行く。
-    router.push(`/automations/new?draft=${encodeURIComponent(storedDraftHint.id)}`)
+    if (chrome === 'draft') {
+      router.push(`${resumeBase}?id=${encodeURIComponent(storedDraftHint.id)}`)
+    } else {
+      router.push(`${resumeBase}?draft=${encodeURIComponent(storedDraftHint.id)}`)
+    }
     setResumeTarget(storedDraftHint.id)
   }
+
+  /*
+   * 済んだことの知らせ（保存した・読み込んだ・テストを受け付けた）は、本文の上に帯を
+   * 積まずに右下の知らせで出す。帯で出すと、そのたびに段が下へずれる。
+   */
+  useEffect(() => {
+    if (!notice) return
+    notifyToast(notice)
+    setNotice('')
+  }, [notice])
 
   // `?draft=` を読み終わるまで描かない。一瞬だけ空の新規画面が出て、
   // そのまま保存で以前の下書きを上書きする事故を防ぐ。
   if (resumeTarget === undefined) return null
 
-  return (
-    <div data-design-node="Rv8Jv" className="flex flex-col gap-4">
-      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <div data-design="Crumb">
-        <Breadcrumb
-          items={[{ label: 'オートメーション', href: '/automations' }, { label: 'ルールを作る' }]}
-        />
-      </div>
+  /* つながる先：選んだ処理が指す名前を、読み込んだ選択肢から引く。 */
+  const usedTagNames = actions
+    .filter((row) => row.type === 'add_tag' && row.tagId)
+    .map((row) => tags.find((tag) => tag.id === row.tagId)?.name ?? '選んだタグ')
+  const usedScenarioNames = actions
+    .filter((row) => row.type === 'start_scenario' && row.scenarioId)
+    .map((row) => scenarios.find((item) => item.id === row.scenarioId)?.name ?? '選んだシナリオ')
+  const usedCommonActionNames = actions
+    .filter((row) => row.type === 'common_action' && row.commonActionId)
+    .map((row) => commonActions.find((item) => item.id === row.commonActionId)?.name ?? '選んだ共通アクション')
+  /* 見え方：閲覧のみ（権限なし）には、変える操作（足す・直す・保存・動かす・試す）を置かない。 */
+  const canEdit = canManage !== false
+  const totalForDraft = previewTotal && savedDraft && previewTotal.accountId === selectedAccountId && previewTotal.draftId === savedDraft.id
+    ? previewTotal.total
+    : null
+  const editingRow = actions.find((row) => row.key === editingActionKey) ?? null
+  const addAction = (type: ActionType) => {
+    const row = { ...newActionDraft(), type }
+    setActions((current) => [...current, row])
+    setEditingActionKey(row.key)
+  }
+  const moveAction = (key: number, delta: -1 | 1) => setActions((current) => {
+    const index = current.findIndex((row) => row.key === key)
+    const next = index + delta
+    if (index < 0 || next < 0 || next >= current.length) return current
+    const copy = [...current]
+    ;[copy[index], copy[next]] = [copy[next], copy[index]]
+    return copy
+  })
+  /* することの1行の下の小さな文（どれを・何を）。 */
+  const actionRowDetail = (row: ActionDraft): string => {
+    if (row.type === 'add_tag') {
+      const tagName = tags.find((tag) => tag.id === row.tagId)?.name
+      return tagName ? `タグ「${tagName}」` : 'タグを選んでください'
+    }
+    if (row.type === 'start_scenario') {
+      const scenarioName = scenarios.find((item) => item.id === row.scenarioId)?.name
+      return scenarioName ? `シナリオ「${scenarioName}」` : 'シナリオを選んでください'
+    }
+    if (row.type === 'common_action') {
+      const commonActionName = commonActions.find((item) => item.id === row.commonActionId)?.name
+      return commonActionName ? `共通アクション「${commonActionName}」` : '共通アクションを選んでください'
+    }
+    return row.message.trim() ? row.message.trim().replace(/\s+/g, ' ') : '送る文面を入れてください'
+  }
+  const representativeIcon: Record<string, ReactNode> = {
+    friend_add: <UserPlus size={16} />,
+    message_received: <MessageCircle size={16} />,
+    tag_change: <TagIcon size={16} />,
+  }
 
+  /*
+   * いまの決めごとを1つの文にする（「〜したら、〜に、〜して、〜します」）。
+   * 保存に送るのと同じ条件・することから作るので、文と実際の動きはずれない。
+   */
+  const triggerPhrase = (() => {
+    if (eventType === 'message_received') {
+      return keyword.trim() ? `友だちから「${keyword.trim()}」を含むメッセージが届いたら` : '友だちからメッセージが届いたら'
+    }
+    if (eventType === 'friend_add') return '友だちになったら'
+    if (eventType === 'tag_change') {
+      const tagName = tags.find((tag) => tag.id === String(triggerConfig.tagId ?? ''))?.name
+      const verb = triggerConfig.action === 'remove' ? '外れたら' : '付いたら'
+      return tagName ? `タグ「${tagName}」が${verb}` : `選んだタグが${verb}`
+    }
+    return `${selectedEvent.label.replace(/とき$/, '')}ら`
+  })()
+  const actionPhrases = actions.map((row, index) => {
+    const last = index === actions.length - 1
+    const tagName = tags.find((tag) => tag.id === row.tagId)?.name
+    const scenarioName = scenarios.find((item) => item.id === row.scenarioId)?.name
+    const commonName = commonActions.find((item) => item.id === row.commonActionId)?.name
+    if (row.type === 'add_tag') return `${tagName ? `タグ「${tagName}」` : 'タグ'}を付け${last ? 'ます' : 'て'}`
+    if (row.type === 'start_scenario') return `${scenarioName ? `シナリオ「${scenarioName}」` : 'シナリオ'}を始め${last ? 'ます' : 'て'}`
+    if (row.type === 'common_action') return `${commonName ? `共通アクション「${commonName}」` : '共通アクション'}を実行し${last ? 'ます' : 'て'}`
+    return `メッセージを送${last ? 'ります' : 'り'}`
+  })
+  const ruleSentence = conditionUnreadable
+    ? `${triggerPhrase}、${actionPhrases.join('、')}（以前保存した条件は読めませんでした）。`
+    : `${triggerPhrase}、${conditionSummaries.length > 0 ? `${conditionSummaries.join('・')}に、` : ''}${actionPhrases.join('、') || '処理を実行します'}。`
+
+  const conflictBand = conflict ? (
+    <div className={styles.conflictBand} role="alert">
+      <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
+      <div className={styles.conflictText}>
+        {/* 口が「だれが・いつ」を返さないので、相手を名指ししない。 */}
+        <p className={styles.conflictTitle}>ほかの人が先にこのルールを保存しました</p>
+        <p className={styles.conflictNote}>このまま保存すると、相手の変更が消えます</p>
+      </div>
+      <Button onClick={() => setCompareOpen(true)}><ArrowLeftRight size={15} aria-hidden="true" />違いを比べる</Button>
+      <Button onClick={() => void reloadServerDraft()}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
+    </div>
+  ) : null
+
+  const sideColumn = (
+    <div className={styles.side} aria-label="決めごとの確認">
+      <section className={styles.sideCard} aria-label="いまの決めごとを文章にすると">
+        <h2 className={styles.sideTitle}>いまの決めごとを文章にすると</h2>
+        {/* この文章のとおりに動く。おかしいと感じたら、左の3つを見直す。 */}
+        <p className={styles.sideBody}>{ruleSentence}</p>
+      </section>
+
+      <section className={styles.sideCard} aria-label="当てはまりそうな人数">
+        <div className={styles.sideHead}>
+          <h2 className={styles.sideTitle}>当てはまりそうな人数</h2>
+          <p className={styles.sideNote}>
+            {previewFailed
+              ? '人数を数えられませんでした（下書きは保存済み）'
+              : previewCount === null
+                ? '下書きを保存すると、いまの条件で数えます'
+                : '保存した条件で、いまの友だちを数えた見込み'}
+          </p>
+        </div>
+        <dl className={styles.kvList}>
+          <div className={styles.kvRow}>
+            <dt>友だち全体</dt>
+            <dd>{totalForDraft === null ? '—' : `${formatNumber(totalForDraft)} 人`}</dd>
+          </div>
+          <div className={styles.kvRow}>
+            <dt>人数</dt>
+            <dd>{previewCount === null ? '—' : `${formatNumber(previewCount)} 人`}</dd>
+          </div>
+        </dl>
+        {previewFailed && savedDraft && selectedAccountId ? (
+          <div>
+            <Button
+              disabled={previewRefreshing}
+              onClick={() => void refreshAudiencePreview(selectedAccountId, savedDraft)}
+              busy={previewRefreshing}
+              busyLabel="数え直しています"
+            >
+              人数をもう一度数える
+            </Button>
+          </div>
+        ) : null}
+      </section>
+
+      <section className={styles.sideCard} aria-label="1人で試す">
+        <div className={styles.sideHead}>
+          <div className={styles.sideTitleRow}>
+            <h2 className={styles.sideTitle}>1人で試す</h2>
+            <HelpTip label="1人で試すの説明">保存した時点の内容で試します。変えた後は保存し直してから試してください。</HelpTip>
+          </div>
+          <p className={styles.sideNote}>選んだ友だち1人だけに動かします</p>
+        </div>
+        <label className={styles.field} htmlFor="v8-test-friend">
+          <span className={styles.label}>友だち</span>
+          <TextField
+            id="v8-test-friend"
+            aria-label="1人テストの友だちID"
+            value={testFriendId}
+            onChange={(event) => setTestFriendId(event.target.value)}
+            placeholder="試す友だちのID"
+          />
+        </label>
+        {canEdit ? (
+          <div>
+            <Button
+              onClick={() => void askOnePersonTest()}
+              disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()}
+              title={!savedDraft ? '下書きを保存すると試せます' : !testFriendId.trim() ? '試す友だちを入れてください' : undefined}
+              busy={preparingTest}
+              busyLabel="確認中..."
+            >
+              <UserRound size={15} aria-hidden="true" />1人で試す
+            </Button>
+          </div>
+        ) : null}
+        {testConfirmation ? (
+          <div className={styles.subBox} role="dialog" aria-label="1人テストの確認">
+            <p className={styles.subTitle}>送る前に確認してください</p>
+            <p className={styles.sideNote}>送り先：{testConfirmation.friendId}</p>
+            <div className={styles.sideNote}>
+              <p>送る内容：</p>
+              <ul className={styles.noteList}>
+                {testConfirmation.contents.map((content, index) => <li key={`${index}-${content}`}>{content}</li>)}
+              </ul>
+            </div>
+            <p className={styles.sideNote}>起きること：{testConfirmation.effects.join('、')}。取り消せません。</p>
+            {canonicalJson(draftActions()) !== testConfirmation.actionsFingerprint ? (
+              <p className={styles.sideNote}>画面の入力は、ここに出ている内容と違います。送られるのは、保存済みのこの内容です。</p>
+            ) : null}
+            <div className={styles.buttonRow}>
+              <Button
+                onClick={() => {
+                  testTicketRef.current += 1
+                  setTestConfirmation(null)
+                }}
+              >
+                キャンセル
+              </Button>
+              <Button variant="primary" disabled={testing} onClick={() => void runOnePersonTest()} busy={testing} busyLabel="送信中...">
+                この内容で送る
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {testRun ? (
+          <div className={styles.subBox} aria-label="1人テストの実行">
+            <p className={styles.subTitle}>試した実行：{testRunStatusLabel(testRun.status)}</p>
+            <div className={styles.buttonRow}>
+              <Button onClick={() => router.push(`/automations/runs?run=${encodeURIComponent(testRun.runId)}`)}>実行の結果を見る</Button>
+              <Button disabled={testing} onClick={() => void refreshTestRun(testRun, testRun.accountId)}>結果を読み直す</Button>
+            </div>
+          </div>
+        ) : null}
+        {saveOutcome === 'published' && publishedRuleId ? (
+          <div className={styles.subBox} aria-label="公開済みの案内">
+            <p className={styles.subTitle}>この内容はすでに公開済みです</p>
+            <div className={styles.buttonRow}>
+              <Button onClick={() => router.push(`/automations?highlight=${publishedRuleId}`)}>公開したルールを見る</Button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      <section className={styles.sideCard} aria-label="気をつけること">
+        <h2 className={styles.sideTitle}>気をつけること</h2>
+        <ul className={styles.cautionList}>
+          {/* 同じきっかけのルールがほかにあるときは、1行目をその知らせに替える（一覧で確かめられる）。 */}
+          <li>{hasSameTrigger ? '・同じきっかけのルールが他にもあり、両方動きます' : '・同じきっかけのルールが2つあると、両方動きます'}</li>
+          <li>・止めると、そのあとのきっかけでは動きません</li>
+          <li>・友だちになったとき は、ブロック解除では動きません</li>
+        </ul>
+      </section>
+
+      <section className={styles.sideCard} aria-label="つながる先">
+        <h2 className={styles.sideTitle}>つながる先</h2>
+        <dl className={styles.kvList}>
+          <div className={styles.kvRow}>
+            <dt>シナリオ</dt>
+            <dd className={styles.kvLight}>{usedScenarioNames.length > 0 ? usedScenarioNames.join('、') : 'なし'}</dd>
+          </div>
+          <div className={styles.kvRow}>
+            <dt>タグ</dt>
+            <dd className={styles.kvLight}>{usedTagNames.length > 0 ? usedTagNames.join('、') : 'なし'}</dd>
+          </div>
+          <div className={styles.kvRow}>
+            <dt>共通アクション</dt>
+            <dd className={styles.kvLight}>{usedCommonActionNames.length > 0 ? usedCommonActionNames.join('、') : 'なし'}</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+  )
+
+  return (
+    <CreatePage
+      boardId={conflict ? 'tJqST' : 'M4torY'}
+      title="ルールを作る"
+      identity={<Link href="/automations" className={styles.backLink}>← オートメーションへ</Link>}
+      description="きっかけ・だれに・何をするかを決めます。1人で試してから動かすと、まちがいを防げます。"
+      /* 競合の帯（tJqST）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
+      previewToggle={conflictBand}
+      preview={sideColumn}
+      status={saveStatusText}
+      footerActions={(
+        <>
+          <Button href="/automations">キャンセル</Button>
+          {canEdit ? (
+            <>
+              <Button disabled={saving || Boolean(blockedReason)} onClick={() => void save(false)}>下書きを保存</Button>
+              {conflict ? (
+                <Button variant="primary" onClick={() => setCompareOpen(true)}>
+                  <ArrowLeftRight size={15} aria-hidden="true" />比べてから保存
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  disabled={saving || Boolean(blockedReason)}
+                  busy={saving}
+                  busyLabel="作成中..."
+                  onClick={() => {
+                    const invalid = validate()
+                    if (invalid) {
+                      setError(invalid)
+                      setNotice('')
+                      return
+                    }
+                    setActivateConfirmOpen(true)
+                  }}
+                >
+                  <Play size={15} aria-hidden="true" />つくって動かす
+                </Button>
+              )}
+            </>
+          ) : null}
+        </>
+      )}
+    >
+      {canManage === false ? (
+        <p className={styles.viewerBand} role="status">閲覧のみで見ています。ルールを作る操作は管理者に頼んでください。</p>
+      ) : null}
+      {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
+      {resumeTarget && resumeStatus === 'failed' ? (
+        <div className={styles.buttonRow}>
+          <Button onClick={retryResume}>下書きをもう一度読み込む</Button>
+          {resumeErrorKind !== 'network' ? <Button onClick={restartFresh}>白紙から作り直す</Button> : null}
+        </div>
+      ) : null}
       {storedDraftHint && !savedDraft && resumeTarget === null ? (
-        <div
-          className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info"
-          role="note"
-        >
-          <span>
-            前にこのアカウントで保存した下書きがあります。このまま入力すると、別の新しいルールになります。
-          </span>
-          <Button variant="secondary" onClick={openStoredDraft}>
-            保存した下書きを開く
-          </Button>
+        <div className={styles.infoBand} role="note">
+          <span>前にこのアカウントで保存した下書きがあります。このまま入力すると、別の新しいルールになります。</span>
+          <Button onClick={openStoredDraft}>保存した下書きを開く</Button>
         </div>
       ) : null}
 
-      <div className="grid grid-cols-3 gap-3 rounded-card border border-hairline bg-canvas px-5 py-4" aria-label="いまの決めごと">
-        <SummaryStep number={1} label="きっかけ" value={selectedEvent.label} />
-        <SummaryStep number={2} label="だれに" value={targetSummary} />
-        <SummaryStep number={3} label="すること" value={actionSummary || '処理を選んでください'} active />
-      </div>
+      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="名前">
+        <div className={styles.cardHead}>
+          <h2 className={styles.cardTitle}>名前</h2>
+          <p className={styles.cardDesc}>一覧で見分けるための名前。お客さまには見えません</p>
+        </div>
+        <label className={styles.field} htmlFor="v8-rule-name">
+          <span className={styles.label}>名前</span>
+          <TextField
+            id="v8-rule-name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="例：「予約」と送られたら担当へ知らせる"
+            maxLength={120}
+          />
+        </label>
+      </Card>
 
-      <div data-design="Body" className={styles.body}>
-        <div data-design="Left" className={styles.stack}>
-          <Step
-            step={1}
-            done={Boolean(name.trim())}
-            title="どんなときに動かしますか"
-            note="何が起きたら動かすか。ここで選んだ出来事が起きた人だけが対象になります。"
-          >
-            {/* #975 U061: 10件を最初から並べない。検索→代表3件→「すべてを見る」の順で絞る。 */}
-            <div className="mb-3">
-              <TextField
-                aria-label="きっかけを探す"
-                type="search"
-                value={eventQuery}
-                onChange={(e) => setEventQuery(e.target.value)}
-                placeholder="きっかけを言葉で探す（例: 予約・タグ・時刻）"
-              />
-            </div>
-            {triggerEventGroups.map((group) =>
-              group.events.length === 0 ? null : (
-                <div key={group.id} className="mb-3">
-                  <p className="mb-2 text-xs font-medium text-ink-faint">{group.label}</p>
-                  <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
-                    {group.events.map((event) => (
-                      <button
-                        key={event.value}
-                        type="button"
-                        className={`${styles.eventCard} ${eventType === event.value ? styles.eventCardSelected : ''}`}
-                        onClick={() => setEventType(event.value)}
-                      >
-                        <span className="text-sm font-bold text-ink">{event.label}</span>
-                        <span className="line-clamp-2 text-xs leading-5 text-ink-faint">{event.note}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ),
-            )}
-            {matchedEvents && matchedEvents.length === 0 ? (
-              <p className="mb-3 text-xs text-ink-faint">合うきっかけがありません。言葉を変えるか、すべてのきっかけから選んでください。</p>
-            ) : null}
-            {!normalizedEventQuery && !expandedEvents ? (
-              <Button variant="secondary" onClick={() => setShowAllEvents(true)}>
-                ほかのきっかけもすべて見る（あと{EVENTS.length - REPRESENTATIVE_TRIGGER_EVENTS.length}件）
-              </Button>
-            ) : null}
-
-            <div className="mt-4 grid items-center gap-3 lg:grid-cols-3">
-              <label className={styles.label} htmlFor="au-name">
-                名前（あとで見分けるため）<RequiredBadge />
-                <span className="mt-1 block text-xs font-normal text-ink-faint">どのルールか。一覧に表示される名前です。</span>
-              </label>
-              <div className="lg:col-span-2">
-                <TextField
-                  id="au-name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="例: 「予約」と送られたらタグを付ける"
-                  maxLength={120}
+      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="どんなときに動かしますか">
+        <div className={styles.cardHead}>
+          <h2 className={styles.cardTitle}>どんなときに動かしますか</h2>
+        </div>
+        {expandedEvents || normalizedEventQuery ? (
+          <TextField
+            aria-label="きっかけを探す"
+            type="search"
+            value={eventQuery}
+            onChange={(e) => setEventQuery(e.target.value)}
+            placeholder="きっかけを言葉で探す（例：予約・タグ・時刻）"
+          />
+        ) : null}
+        {triggerEventGroups.map((group) => group.events.length === 0 ? null : (
+          <div key={group.id} className={styles.triggerGroup}>
+            {expandedEvents || matchedEvents ? <p className={styles.groupLabel}>{group.label}</p> : null}
+            <RadioCardGroup legend={group.label} className={styles.triggerGrid}>
+              {group.events.map((event) => (
+                <RadioCard
+                  key={event.value}
+                  name="v8-trigger"
+                  value={event.value}
+                  checked={eventType === event.value}
+                  onChange={() => setEventType(event.value)}
+                  icon={representativeIcon[event.value] ?? <Zap size={16} />}
+                  title={event.label}
+                  note={TRIGGER_SHORT_NOTES[event.value] ?? event.note}
+                  className={styles.triggerCard}
                 />
-              </div>
-            </div>
-
-            {['tag_change', 'form_submitted', 'link_clicked', 'calendar_booked', 'datetime', 'daily', 'weekly'].includes(eventType) ? (
-              <div className="mt-4 rounded-control border border-hairline bg-canvas-sunken p-3">
-                <p className="text-xs font-semibold text-ink-secondary">きっかけの詳しい設定</p>
-                <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                  {eventType === 'tag_change' ? <Select aria-label="きっかけのタグ" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={[{ value: '', label: 'どのタグか選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className={styles.select} size="standard" /> : null}
-                  {eventType === 'tag_change' ? <Select aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(value) => setTriggerConfig({ ...triggerConfig, action: value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} className={styles.select} size="standard" /> : null}
-                  {eventType === 'form_submitted' ? <TextField aria-label="回答フォーム" placeholder="フォームID（空欄ならすべて）" value={String(triggerConfig.formId ?? '')} onChange={(e) => setTriggerConfig({ formId: e.target.value })} /> : null}
-                  {eventType === 'link_clicked' ? <TextField aria-label="計測リンク" placeholder="計測リンクID（空欄ならすべて）" value={String(triggerConfig.trackedLinkId ?? '')} onChange={(e) => setTriggerConfig({ trackedLinkId: e.target.value })} /> : null}
-                  {eventType === 'calendar_booked' ? <Select aria-label="予約の種類" value={String(triggerConfig.bookingType ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, bookingType: value })} options={[{ value: '', label: 'すべての予約' }, { value: 'salon', label: 'サロン予約' }, { value: 'event', label: 'イベント予約' }]} className={styles.select} size="standard" /> : null}
-                  {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <TextField aria-label="予約メニュー" placeholder="メニューID（空欄ならすべて）" value={String(triggerConfig.menuId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, menuId: e.target.value })} /> : null}
-                  {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <TextField aria-label="対象イベント" placeholder="イベントID（空欄ならすべて）" value={String(triggerConfig.eventId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, eventId: e.target.value })} /> : null}
-                  {eventType === 'datetime' ? <DateTimeField aria-label="実行日時" value={String(triggerConfig.at ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, at: v })} /> : null}
-                  {/* R21: 曜日は数字を打たせず7つの札から選ぶ。空の要素を数字にしない。 */}
-                  {eventType === 'weekly' ? (
-                    <div className="sm:col-span-2">
-                      <WeekdaySelect
-                        value={triggerConfig.weekdays as ReadonlyArray<number>}
-                        time={String(triggerConfig.time ?? '')}
-                        onChange={(days) => setTriggerConfig({ ...triggerConfig, weekdays: days })}
-                      />
-                    </div>
-                  ) : null}
-                  {eventType === 'daily' || eventType === 'weekly' ? <TimeField aria-label="実行時刻" step={300} value={String(triggerConfig.time ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, time: v })} /> : null}
-                  {/* R22: 対象は名前で探して選ぶ。IDの手入力はさせない。 */}
-                  {eventType === 'datetime' || eventType === 'daily' || eventType === 'weekly' ? (
-                    <div className="sm:col-span-2">
-                      <FriendMultiSelect
-                        accountId={selectedAccountId ?? null}
-                        selectedIds={normalizeFriendIds(triggerConfig.friendIds)}
-                        names={friendNamesOf(triggerConfig)}
-                        onChange={(ids, nextNames) => setTriggerConfig({ ...triggerConfig, friendIds: ids, friendNames: nextNames })}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-                <p className="mt-2 text-xs text-ink-faint">{triggerConfigSummary}。保存後も設定を確認できます。</p>
-              </div>
-            ) : null}
-          </Step>
-
-          <Step
-            step={2}
-            done
-            title="だれに動かしますか"
-            note="条件を付けないと、きっかけに当てはまった人全員に動きます。"
-          >
-            {usesKeyword ? (
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="au-keyword">
-                  条件（含まれる言葉）
-                </label>
-                <div className={styles.field}>
-                  <TextField
-                    id="au-keyword"
-                    value={keyword}
-                    onChange={(event) => setKeyword(event.target.value)}
-                    placeholder="例: 予約"
-                    maxLength={100}
-                  />
-                  <p className={styles.note}>空欄なら、どんな内容でも動きます。</p>
-                </div>
-              </div>
-            ) : null}
-            {/* AUTOMATION-02: 要約と同じ条件から作った札。条件が本当に無いときだけ「条件なし」。 */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              {usesKeyword && keyword.trim() ? (
-                <span className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary">「{keyword.trim()}」を含む</span>
-              ) : null}
-              {conditionSummaries.map((text, index) => (
-                <span
-                  key={`${index}-${text}`}
-                  className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary"
-                >
-                  {text}
-                </span>
               ))}
-              {!((usesKeyword && keyword.trim()) || conditionSummaries.length > 0) ? (
-                <span className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary">条件なし</span>
+            </RadioCardGroup>
+          </div>
+        ))}
+        {matchedEvents && matchedEvents.length === 0 ? (
+          <p className={styles.cardDesc}>合うきっかけがありません。言葉を変えるか、すべてのきっかけから選んでください。</p>
+        ) : null}
+        {!normalizedEventQuery && !expandedEvents ? (
+          <button type="button" className={styles.linkButton} onClick={() => setShowAllEvents(true)}>
+            ほかのきっかけもすべて見る（あと{EVENTS.length - REPRESENTATIVE_TRIGGER_EVENTS.length}件）
+          </button>
+        ) : null}
+        {usesKeyword ? (
+          <label className={styles.field} htmlFor="v8-rule-keyword">
+            <span className={styles.label}>含まれる言葉</span>
+            <TextField
+              id="v8-rule-keyword"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="例：予約（空欄なら、どんな内容でも動きます）"
+              maxLength={100}
+            />
+          </label>
+        ) : null}
+        {['tag_change', 'form_submitted', 'link_clicked', 'calendar_booked', 'datetime', 'daily', 'weekly'].includes(eventType) ? (
+          <div className={styles.subBox}>
+            <p className={styles.subTitle}>きっかけの詳しい設定</p>
+            <div className={styles.formGrid}>
+              {eventType === 'tag_change' ? <Select aria-label="きっかけのタグ" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={[{ value: '', label: 'どのタグか選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} size="full" /> : null}
+              {eventType === 'tag_change' ? <Select aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(value) => setTriggerConfig({ ...triggerConfig, action: value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} size="full" /> : null}
+              {eventType === 'form_submitted' ? <TextField aria-label="回答フォーム" placeholder="フォームID（空欄ならすべて）" value={String(triggerConfig.formId ?? '')} onChange={(e) => setTriggerConfig({ formId: e.target.value })} /> : null}
+              {eventType === 'link_clicked' ? <TextField aria-label="計測リンク" placeholder="計測リンクID（空欄ならすべて）" value={String(triggerConfig.trackedLinkId ?? '')} onChange={(e) => setTriggerConfig({ trackedLinkId: e.target.value })} /> : null}
+              {eventType === 'calendar_booked' ? <Select aria-label="予約の種類" value={String(triggerConfig.bookingType ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, bookingType: value })} options={[{ value: '', label: 'すべての予約' }, { value: 'salon', label: 'サロン予約' }, { value: 'event', label: 'イベント予約' }]} size="full" /> : null}
+              {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <TextField aria-label="予約メニュー" placeholder="メニューID（空欄ならすべて）" value={String(triggerConfig.menuId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, menuId: e.target.value })} /> : null}
+              {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <TextField aria-label="対象イベント" placeholder="イベントID（空欄ならすべて）" value={String(triggerConfig.eventId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, eventId: e.target.value })} /> : null}
+              {eventType === 'datetime' ? <DateTimeField aria-label="実行日時" value={String(triggerConfig.at ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, at: v })} /> : null}
+              {eventType === 'weekly' ? (
+                <WeekdaySelect
+                  value={triggerConfig.weekdays as ReadonlyArray<number>}
+                  time={String(triggerConfig.time ?? '')}
+                  onChange={(days) => setTriggerConfig({ ...triggerConfig, weekdays: days })}
+                />
+              ) : null}
+              {eventType === 'daily' || eventType === 'weekly' ? <TimeField aria-label="実行時刻" step={300} value={String(triggerConfig.time ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, time: v })} /> : null}
+              {eventType === 'datetime' || eventType === 'daily' || eventType === 'weekly' ? (
+                <FriendMultiSelect
+                  accountId={selectedAccountId ?? null}
+                  selectedIds={normalizeFriendIds(triggerConfig.friendIds)}
+                  names={friendNamesOf(triggerConfig)}
+                  onChange={(ids, nextNames) => setTriggerConfig({ ...triggerConfig, friendIds: ids, friendNames: nextNames })}
+                />
               ) : null}
             </div>
-            {conditionUnreadable ? (
-              /*
-               * 古い保存口が残した読めない条件（AUTOMATION-04）。
-               * 消すことも付け直すことも本人が決める。いきなり新しい条件へ
-               * 置き換える操作だけ用意し、中身を黙って書き換えない。
-               */
-              <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken px-4 py-3" role="alert">
-                <p className="text-sm font-bold text-ink">保存されていた条件は読めませんでした</p>
-                <p className="mt-1 text-xs leading-5 text-ink-secondary">
-                  以前の画面が別の形で保存した条件です。このままでは人数を数えられないため、保存できません。
-                  以前の条件を外してもよければ、下のボタンから付け直せます。
-                </p>
-                <div className="mt-2">
-                  <Button variant="secondary" onClick={() => setConditionUnreadable(false)}>
-                    以前の条件を外して付け直す
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-3">
-                <ConditionBuilder
-                  value={condition}
-                  onChange={setCondition}
-                  label="このルールで動かす相手"
-                  showCount={false}
-                />
-                <p className="mt-2 text-xs text-ink-faint">標準互換（15軸）。一斉配信やシナリオと同じ条件です。</p>
-              </div>
-            )}
-            <p className="mt-3 text-xs font-medium text-info">いまの条件に当てはまる友だち　保存後に見込み人数を確認できます。</p>
-          </Step>
+            <p className={styles.cardDesc}>{triggerConfigSummary}。保存後も設定を確認できます。</p>
+          </div>
+        ) : null}
+      </Card>
 
-          <Step step={3} done={actions.length > 0} title="何をするか" note="上から順に実行します。">
-            <div className={styles.rows}>
-              {actions.map((row, index) => (
-                <div key={row.key} className={styles.group}>
-                  <div className={styles.rowHead}>
-                    <span className={styles.rowName}>{index + 1}つめ</span>
-                    <button
-                      type="button"
-                      className={styles.rowAction}
-                      disabled={actions.length === 1}
-                      onClick={() =>
-                        setActions((current) => current.filter((item) => item.key !== row.key))
-                      }
-                    >
-                      この動きを削除する
-                    </button>
-                  </div>
-
-                  {/*
-                    「すること」と対象の設定は狭い幅では縦に並べる（#973 U023）。
-                    2列のままだと390pxで処理名・タグ名が読めないほど潰れる。
-                  */}
-                  <div className="grid gap-3 lg:grid-cols-2">
-                  <div className={styles.field}>
-                    <label className={styles.label} htmlFor={`au-action-${row.key}`}>
-                      すること<RequiredBadge />
-                    </label>
-                    <div className={styles.field}>
-                      <Select
-                        id={`au-action-${row.key}`}
-                        aria-label="すること"
-                        value={row.type}
-                        onChange={(value) =>
-                          updateAction(row.key, { type: value as ActionType })
-                        }
-                        options={ACTIONS.map((action) => ({ value: action.value, label: action.label }))}
-                        className={styles.select}
-                        size="standard"
-                      />
-                    </div>
-                  </div>
-
-                  {row.type === 'add_tag' ? (
-                    <ResourcePickRow
-                      title="付けるタグ"
-                      id={`au-tag-${row.key}`}
-                      selectLabel="自動化で付けるタグ"
-                      value={row.tagId}
-                      onPick={(value) => updateAction(row.key, { tagId: value })}
-                      options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
-                      tagsLoading={tagsLoading}
-                      tagsFailed={tagsFailed}
-                      failedNote="タグを読み込めませんでした。画面を再読み込みしてください。"
-                    />
-                  ) : row.type === 'start_scenario' ? (
-                    <ResourcePickRow
-                      title="始めるシナリオ"
-                      id={`au-scenario-${row.key}`}
-                      selectLabel="自動化で始めるシナリオ"
-                      value={row.scenarioId}
-                      onPick={(value) => updateAction(row.key, { scenarioId: value })}
-                      options={scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))}
-                      tagsLoading={tagsLoading}
-                      tagsFailed={tagsFailed}
-                      failedNote="シナリオを読み込めませんでした。画面を再読み込みしてください。"
-                    />
-                  ) : row.type === 'common_action' ? (
-                    <ResourcePickRow
-                      title="使う共通アクション"
-                      id={`au-common-action-${row.key}`}
-                      selectLabel="自動化で使う共通アクション"
-                      value={row.commonActionId}
-                      onPick={(value) => updateAction(row.key, { commonActionId: value })}
-                      options={commonActions.map((item) => ({ value: item.id, label: item.name }))}
-                      tagsLoading={tagsLoading}
-                      tagsFailed={tagsFailed}
-                      failedNote="共通アクションを読み込めませんでした。画面を再読み込みしてください。"
-                    />
-                  ) : (
-                    <div className={styles.field}>
-                      <label className={styles.label} htmlFor={`au-message-${row.key}`}>
-                        送る文面<RequiredBadge />
-                      </label>
-                      <div className={styles.field}>
-                        <TextArea
-                          id={`au-message-${row.key}`}
-                          value={row.message}
-                          onChange={(event) =>
-                            updateAction(row.key, { message: event.target.value })
-                          }
-                          className={styles.textareaTall}
-                        />
-                        <p className={styles.note}>差し込みが使えます（例: {'{{name}}'}さん）。</p>
-                      </div>
-                    </div>
-                  )}
-                  </div>
-                  <p>
-                    失敗したとき: 現在はここで止まります。「次の処理へ進む」は実行基盤の接続後に選べます。
-                  </p>
-                </div>
-              ))}
+      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="だれに動かしますか">
+        <div className={styles.cardHead}>
+          <h2 className={styles.cardTitle}>だれに動かしますか</h2>
+        </div>
+        {conditionUnreadable ? (
+          <div className={styles.subBox} role="alert">
+            <p className={styles.subTitle}>保存されていた条件は読めませんでした</p>
+            <p className={styles.cardDesc}>
+              以前の画面が別の形で保存した条件です。このままでは人数を数えられないため、保存できません。
+              以前の条件を外してもよければ、下のボタンから付け直せます。
+            </p>
+            <div>
+              <Button onClick={() => setConditionUnreadable(false)}>以前の条件を外して付け直す</Button>
             </div>
-
+          </div>
+        ) : (
+          <>
             <div className={styles.field}>
+              <span className={styles.subLabel} id="v8-target-label">動かす相手</span>
+              {/* 条件は一斉配信・シナリオと同じ部品（ConditionBuilder）で作る。押すと窓で開く。 */}
               <button
                 type="button"
-                className={`${styles.action} ${styles.actionSecondary} ${styles.addAction}`}
-                onClick={() => setActions((current) => [...current, newActionDraft()])}
+                className={styles.selectBox}
+                aria-labelledby="v8-target-label"
+                aria-haspopup="dialog"
+                onClick={() => setConditionOpen(true)}
+                title={conditionSummaries.join('・') || undefined}
               >
-                動きを追加する
+                <span className={styles.selectText}>
+                  {conditionSummaries.length > 0 ? conditionSummaries.join('・') : 'すべての友だち'}
+                </span>
+                <ChevronDown size={14} aria-hidden="true" />
               </button>
             </div>
-          </Step>
-
-          {error ? (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
-          ) : null}
-          {/*
-            R532: 再開の読み込み失敗中は保存が止まる。通信断では同じ下書きの
-            再試行だけを出し、対象なし・権限なしでは白紙への作り直しを選ばせる。
-            失敗中に別の新規下書きは作らない。
-          */}
-          {resumeTarget && resumeStatus === 'failed' ? (
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={retryResume}>
-                下書きをもう一度読み込む
-              </Button>
-              {resumeErrorKind !== 'network' ? (
-                <Button variant="secondary" onClick={restartFresh}>
-                  白紙から作り直す
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
-          {notice ? <p className={styles.note}>{notice}</p> : null}
-          {canManage === false ? (
-            <p className={styles.error} role="alert">
-              操作する権限がありません。オーナーか管理者に依頼してください。
-            </p>
-          ) : null}
-        </div>
-
-        <div data-design="Right" className={styles.stack}>
-          <section className={styles.sideCard}>
-            <h2 className={styles.sideTitle}>いまの決めごとを文章にすると</h2>
-            <p>
-              {selectedEvent.label}、{targetSummary}{actionSummary || '処理を実行します'}。
-            </p>
-            <p className={styles.sideMissingNote}>
-              「こうなったら、こうする」を決めておくと、あとは自動で動きます。<br />
-              この文章のとおりに動きます。おかしいと感じたら、上の3つを見直してください。
-            </p>
-          </section>
-
-          <section className={styles.sideCard}>
-            <h2 className={styles.sideTitle}>当てはまりそうな人数</h2>
-            <p className={styles.sideMissingValue}>{previewCount === null ? '—' : `${formatNumber(previewCount)}人`}</p>
-            <p className={styles.sideMissingNote}>
-              {/* AUTOMATION-03: 人数の失敗は保存の失敗ではない。下書きは残っている。 */}
-              {previewFailed
-                ? '人数を数えられませんでした。下書きは保存されています。'
-                : previewCount === null
-                  ? '下書きを保存すると、いまの条件で数えます。'
-                  : '保存した条件を、選択中のLINEアカウントで数えた結果です。'}
-            </p>
-            {previewFailed && savedDraft && selectedAccountId ? (
-              <div className="mt-2">
-                <Button
-                  variant="secondary"
-                  disabled={previewRefreshing}
-                  onClick={() => void refreshAudiencePreview(selectedAccountId, savedDraft)} busy={previewRefreshing} busyLabel="数え直しています">人数をもう一度数える
-                </Button>
-              </div>
-            ) : null}
-            <div className="mt-3 space-y-2">
-              <TextField aria-label="1人テストの友だちID" value={testFriendId} onChange={(event) => setTestFriendId(event.target.value)} placeholder="試す友だちID" />
-              <Button
-                onClick={() => void askOnePersonTest()}
-                disabled={saving || testing || preparingTest || !savedDraft || !testFriendId.trim()} busy={preparingTest} busyLabel="確認中...">1人で試す
-              </Button>
-              <p className="mt-1 text-xs font-medium leading-relaxed text-ink-faint">保存した時点の内容で試します。変えた後は保存し直してから試してください。</p>
-            </div>
-            {testConfirmation ? (
-              <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" role="dialog" aria-label="1人テストの確認">
-                <p className="text-xs font-medium text-ink">送る前に確認してください</p>
-                <p className="text-xs leading-5 text-ink-secondary">送り先：{testConfirmation.friendId}</p>
-                <div className="text-xs leading-5 text-ink-secondary">
-                  <p>送る内容：</p>
-                  <ul className="list-disc pl-5">
-                    {testConfirmation.contents.map((content, index) => <li key={`${index}-${content}`}>{content}</li>)}
-                  </ul>
-                </div>
-                <p className="text-xs leading-5 text-ink-secondary">起きること：{testConfirmation.effects.join('、')}。取り消せません。</p>
-                {canonicalJson(draftActions()) !== testConfirmation.actionsFingerprint ? (
-                  <p className="text-xs font-medium leading-5 text-ink">画面の入力は、ここに出ている内容と違います。送られるのは、保存済みのこの内容です。</p>
-                ) : null}
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      // R485: 読み取り待ちの送信を止める番号を進める。
-                      testTicketRef.current += 1
-                      setTestConfirmation(null)
-                    }}
-                  >
-                    キャンセル
-                  </Button>
-                  <Button
-                    variant="primary"
-                    disabled={testing}
-                    onClick={() => void runOnePersonTest()} busy={testing} busyLabel="送信中...">この内容で送る
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-            {/*
-             * R488: 受け付けた1人テストの実行。待機・完了・失敗を日本語で区別し、
-             * 同じ実行の結果へ飛べる。新規実行と結果確認を混同させない。
-             */}
-            {testRun ? (
-              <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" aria-label="1人テストの実行">
-                <p className="text-xs font-medium text-ink">試した実行：{testRunStatusLabel(testRun.status)}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => router.push(`/automations/runs?run=${encodeURIComponent(testRun.runId)}`)}
-                  >
-                    実行の結果を見る
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    disabled={testing}
-                    onClick={() => void refreshTestRun(testRun, testRun.accountId)}
-                  >
-                    結果を読み直す
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-            {/*
-             * R491: 公開済みで戻ったときは、元のルールへ案内する。
-             * 同じ内容の作り直しは案内に従い、別ルールは入力を変えて作る。
-             */}
-            {saveOutcome === 'published' && publishedRuleId ? (
-              <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" aria-label="公開済みの案内">
-                <p className="text-xs font-medium text-ink">この内容はすでに公開済みです</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => router.push(`/automations?highlight=${publishedRuleId}`)}
-                  >
-                    公開したルールを見る
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </section>
-
-          <FeatureLinkCard
-            items={[
-              { label: '友だち属性', note: '付けるタグはここで作ります', href: '/tags' },
-              { label: 'テンプレート', note: '送る文面の型を用意できます', href: '/templates' },
-              { label: '共通アクション', note: '同じ処理を使い回せます', href: '/common-actions' },
-            ]}
-          />
-
-          <CareCard
-            items={[
-              {
-                head: '下書きで確認してから動かせます',
-                note: '下書きを保存すると、見込み人数と1人テストを確認できます。',
-              },
-              {
-                head: '同じきっかけのルールは両方動きます',
-                note: hasSameTrigger
-                  ? '同じきっかけのルールが他にもあります。一覧で確かめてください。'
-                  : '一覧で、同じきっかけのルールが他にないか確かめてください。',
-              },
-              {
-                head: '作る前に起きたことにはさかのぼりません',
-                note: '過去のメッセージや友だち追加では動きません。',
-              },
-            ]}
-          />
-        </div>
-      </div>
-
-      <StickyBar
-        className={styles.stickyBar}
-        status={saveStatusText}
-        actions={
-          <>
-            <button
-              type="button"
-              className={`${styles.action} ${styles.actionSecondary}`}
-              onClick={() => router.push('/automations')}
-            >
-              キャンセル
-            </button>
-            <button
-              type="button"
-              className={`${styles.action} ${styles.actionSecondary}`}
-              disabled={saving || Boolean(blockedReason)}
-              onClick={() => void save(false)}
-            >
-              下書きを保存する
-            </button>
-            <button
-              type="button"
-              className={`${styles.action} ${styles.actionPrimary}`}
-              disabled={saving || Boolean(blockedReason)}
-              onClick={() => {
-                const invalid = validate()
-                if (invalid) {
-                  setError(invalid)
-                  setNotice('')
-                  return
-                }
-                setActivateConfirmOpen(true)
-              }}
-            >
-              {saving ? '作成中...' : 'つくって動かす'}
+            <button type="button" className={styles.linkButton} onClick={() => setConditionOpen(true)}>
+              ＋「いずれか1つ以上を満たす」条件（or 条件）を足す
             </button>
           </>
-        }
-      />
+        )}
+      </Card>
 
-      {/* #975 U073: 動かし始める前に、対象・きっかけ・最初の実行・止め方を読み合わせる。 */}
+      <Card padding="roomy" layout="vertical" className={styles.card} aria-label="何をするか">
+        <div className={styles.cardHead}>
+          <h2 className={styles.cardTitle}>何をするか</h2>
+          <p className={styles.cardDesc}>上から順に動きます</p>
+        </div>
+        <ol className={styles.actionList}>
+          {actions.map((row, index) => {
+            const menuLabel = `${index + 1}つめのすること「${actionRowTitle(row.type)}」の操作`
+            return (
+              <li key={row.key} className={styles.actionRow}>
+                <span className={styles.actionNum}>{index + 1}</span>
+                <span className={styles.actionText}>
+                  <strong>{actionRowTitle(row.type)}</strong>
+                  <small title={actionRowDetail(row)}>{actionRowDetail(row)}</small>
+                </span>
+                {canEdit ? (
+                  <span className={styles.menuBox}>
+                    <button
+                      type="button"
+                      className={styles.menuButton}
+                      aria-label={menuLabel}
+                      aria-haspopup="menu"
+                      aria-expanded={actionMenuKey === row.key}
+                      title={menuLabel}
+                      onClick={() => setActionMenuKey((current) => (current === row.key ? null : row.key))}
+                    >
+                      <MoreHorizontal size={16} aria-hidden="true" />
+                    </button>
+                    <ActionMenu
+                      open={actionMenuKey === row.key}
+                      onClose={() => setActionMenuKey(null)}
+                      ariaLabel={menuLabel}
+                      items={[
+                        { id: 'edit', label: '中身を直す', icon: <Pencil size={14} />, onSelect: () => { setActionMenuKey(null); setEditingActionKey(row.key) } },
+                        { id: 'up', label: '上へ', icon: <ArrowUp size={14} />, disabled: index === 0, onSelect: () => { setActionMenuKey(null); moveAction(row.key, -1) } },
+                        { id: 'down', label: '下へ', icon: <ArrowDown size={14} />, disabled: index === actions.length - 1, onSelect: () => { setActionMenuKey(null); moveAction(row.key, 1) } },
+                        {
+                          id: 'delete',
+                          label: '削除',
+                          icon: <Trash2 size={14} />,
+                          tone: 'danger',
+                          dividerBefore: true,
+                          disabled: actions.length === 1,
+                          disabledReason: '最後の1つは消せません',
+                          onSelect: () => { setActionMenuKey(null); setActions((current) => current.filter((item) => item.key !== row.key)) },
+                        },
+                      ]}
+                    />
+                  </span>
+                ) : null}
+              </li>
+            )
+          })}
+        </ol>
+        {canEdit ? (
+          <div className={styles.linkRow}>
+            <button type="button" className={styles.linkButton} onClick={() => addAction('add_tag')}>＋ すること を足す</button>
+            <button type="button" className={styles.linkButton} onClick={() => addAction('common_action')}>共通アクションから選ぶ</button>
+          </div>
+        ) : null}
+      </Card>
+
+      {/* することの中身を直す窓。種類と「どれを」をここで選ぶ。失敗したら、いまはその場で止まる。 */}
+      <Dialog
+        open={editingRow !== null}
+        title={editingRow ? `${actions.findIndex((row) => row.key === editingRow.key) + 1}つめのすること` : 'すること'}
+        description="上から順に動きます。失敗したときは、いまはここで止まります。"
+        designWidth={560}
+        confirmLabel="閉じる"
+        cancelLabel="閉じる"
+        onConfirm={() => setEditingActionKey(null)}
+        onCancel={() => setEditingActionKey(null)}
+      >
+        {editingRow ? (
+          <div className={styles.dialogBody}>
+            <label className={styles.field} htmlFor={`v8-action-${editingRow.key}`}>
+              <span className={styles.label}>すること</span>
+              <Select
+                id={`v8-action-${editingRow.key}`}
+                aria-label="すること"
+                value={editingRow.type}
+                onChange={(value) => updateAction(editingRow.key, { type: value as ActionType })}
+                options={EDITABLE_ACTIONS.map((action) => ({ value: action.value, label: action.label }))}
+                size="full"
+              />
+            </label>
+            {editingRow.type === 'add_tag' ? (
+              <ResourcePick
+                title="付けるタグ"
+                id={`v8-tag-${editingRow.key}`}
+                selectLabel="自動化で付けるタグ"
+                value={editingRow.tagId}
+                onPick={(value) => updateAction(editingRow.key, { tagId: value })}
+                options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+                loading={tagsLoading}
+                failed={tagsFailed}
+                failedNote="タグを読み込めませんでした。画面を再読み込みしてください。"
+              />
+            ) : editingRow.type === 'start_scenario' ? (
+              <ResourcePick
+                title="始めるシナリオ"
+                id={`v8-scenario-${editingRow.key}`}
+                selectLabel="自動化で始めるシナリオ"
+                value={editingRow.scenarioId}
+                onPick={(value) => updateAction(editingRow.key, { scenarioId: value })}
+                options={scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))}
+                loading={tagsLoading}
+                failed={tagsFailed}
+                failedNote="シナリオを読み込めませんでした。画面を再読み込みしてください。"
+              />
+            ) : editingRow.type === 'common_action' ? (
+              <ResourcePick
+                title="使う共通アクション"
+                id={`v8-common-action-${editingRow.key}`}
+                selectLabel="自動化で使う共通アクション"
+                value={editingRow.commonActionId}
+                onPick={(value) => updateAction(editingRow.key, { commonActionId: value })}
+                options={commonActions.map((item) => ({ value: item.id, label: item.name }))}
+                loading={tagsLoading}
+                failed={tagsFailed}
+                failedNote="共通アクションを読み込めませんでした。画面を再読み込みしてください。"
+              />
+            ) : (
+              <label className={styles.field} htmlFor={`v8-message-${editingRow.key}`}>
+                <span className={styles.label}>送る文面</span>
+                <TextArea
+                  id={`v8-message-${editingRow.key}`}
+                  value={editingRow.message}
+                  onChange={(event) => updateAction(editingRow.key, { message: event.target.value })}
+                />
+              </label>
+            )}
+          </div>
+        ) : null}
+      </Dialog>
+
+      {/* だれに：条件の窓。一斉配信・シナリオと同じ条件（標準互換・15軸）。 */}
+      <Dialog
+        open={conditionOpen}
+        title="動かす相手"
+        description="条件を付けないと、きっかけに当てはまった人全員に動きます。一斉配信やシナリオと同じ条件です。"
+        designWidth={720}
+        confirmLabel="この条件にする"
+        cancelLabel="閉じる"
+        onConfirm={() => setConditionOpen(false)}
+        onCancel={() => setConditionOpen(false)}
+      >
+        <ConditionBuilder value={condition} onChange={setCondition} label="このルールで動かす相手" showCount={false} />
+      </Dialog>
+
       <ConfirmDialog
         open={activateConfirmOpen}
         title="この内容で動かし始めますか"
@@ -2599,81 +2771,103 @@ function NewAutomationPageV7() {
         }}
         onCancel={() => setActivateConfirmOpen(false)}
       >
-        <dl className="space-y-2 text-sm">
-          <div>
-            <dt className="text-xs font-medium text-ink-faint">名前</dt>
-            <dd className="font-semibold text-ink">{name.trim()}</dd>
+        <dl className={styles.kvList}>
+          <div className={styles.kvRow}><dt>名前</dt><dd>{name.trim()}</dd></div>
+          <div className={styles.kvRow}><dt>きっかけ</dt><dd>{selectedEvent.label}（{triggerConfigSummary}）</dd></div>
+          <div className={styles.kvRow}>
+            <dt>だれに</dt>
+            <dd>{targetSummary}{previewCount !== null ? ` 見込み ${formatNumber(previewCount)}人` : ''}</dd>
           </div>
-          <div>
-            <dt className="text-xs font-medium text-ink-faint">きっかけ</dt>
-            <dd className="text-ink">{selectedEvent.label}（{triggerConfigSummary}）</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-ink-faint">だれに</dt>
-            <dd className="text-ink">
-              {targetSummary}
-              {previewCount !== null ? ` 見込み ${formatNumber(previewCount)}人` : ''}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-ink-faint">すること</dt>
-            <dd className="text-ink">{actionSummary || '未設定'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-ink-faint">最初に動くのは</dt>
-            <dd className="text-ink">
-              {['datetime', 'daily', 'weekly'].includes(eventType)
-                ? `次の決めた時刻（${triggerConfigSummary}）`
-                : '次にきっかけが起きたとき'}
-            </dd>
+          <div className={styles.kvRow}><dt>すること</dt><dd>{actionSummary || '未設定'}</dd></div>
+          <div className={styles.kvRow}>
+            <dt>最初に動くのは</dt>
+            <dd>{['datetime', 'daily', 'weekly'].includes(eventType) ? `次の決めた時刻（${triggerConfigSummary}）` : '次にきっかけが起きたとき'}</dd>
           </div>
         </dl>
-        <p className="mt-3 rounded-control bg-canvas-sunken px-3 py-2 text-xs text-ink-secondary">
-          止め方：動かし始めたあとも「オートメーション」の一覧からいつでも止められます。先に確かめたい場合は「下書きに保存」して、1人で試すこともできます。
+        <p className={styles.sideNote}>
+          止め方：動かし始めたあとも「オートメーション」の一覧からいつでも止められます。先に確かめたい場合は「下書きを保存」して、1人で試すこともできます。
         </p>
       </ConfirmDialog>
-    </div>
+
+      {/* tJqST の比べる窓。左に自分のいまの入力、右に保存されている内容。 */}
+      <Dialog
+        open={compareOpen && Boolean(conflict)}
+        title="内容を比べる"
+        description="左があなたのいまの入力、右が保存されている内容です。"
+        confirmLabel="この内容で保存する"
+        cancelLabel="閉じる"
+        busy={saving}
+        onCancel={() => setCompareOpen(false)}
+        onConfirm={() => {
+          setCompareOpen(false)
+          void save(false, true)
+        }}
+      >
+        {conflict ? (
+          <div className={styles.dialogBody}>
+            <div className={styles.compareGrid}>
+              <section className={styles.subBox}>
+                <p className={styles.sideNote}>あなたの入力</p>
+                <p className={styles.subTitle}>{name.trim() || '（名前なし）'}</p>
+                <p className={styles.sideNote}>{selectedEvent.label}</p>
+                <p className={styles.sideNote}>{actionSummary || '処理未設定'}</p>
+              </section>
+              <section className={styles.subBox}>
+                <p className={styles.sideNote}>保存されている内容</p>
+                <p className={styles.subTitle}>{conflict.serverName || '（名前なし）'}</p>
+                <p className={styles.sideNote}>{conflict.serverEventLabel}</p>
+                <p className={styles.sideNote}>処理 {conflict.serverActionCount}件</p>
+              </section>
+            </div>
+            <p className={styles.sideNote}>
+              「この内容で保存する」と、相手の変更はあなたの内容で上書きされます。
+              相手の内容で続けるときは、窓を閉じて「最新を読み込んで続ける」を押してください。
+            </p>
+          </div>
+        ) : null}
+      </Dialog>
+    </CreatePage>
   )
 }
 
-/**
- * 決めごとの帯。番号バッジ 26×26・丸・12px・700（設計 `Rv8Jv`）。
- *
- * 本文に「1.」と書くのと違い、番号が段の頭に立つ。上から順に埋めれば終わる、
- * と分かるための番号なので、見出しを並べるのとは意味が違う。
- */
-function Step({
-  step,
-  done,
-  title,
-  note,
-  children,
-}: {
-  step: number
-  done: boolean
+/* することの行の見出し（行の種類が変わっても番号は動かない）。 */
+function actionRowTitle(type: string): string {
+  if (type === 'add_tag') return 'タグを付ける'
+  if (type === 'start_scenario') return 'シナリオを始める'
+  if (type === 'common_action') return '共通アクションを実行'
+  return 'メッセージを送る'
+}
+
+/* することで使う選択肢の行（タグ・シナリオ・共通アクション）。 */
+function ResourcePick(props: {
   title: string
-  note: string
-  children: ReactNode
+  id: string
+  selectLabel: string
+  value: string
+  onPick: (value: string) => void
+  options: Array<{ value: string; label: string }>
+  loading: boolean
+  failed: boolean
+  failedNote: string
 }) {
+  const { title, id, selectLabel, value, onPick, options, loading, failed, failedNote } = props
   return (
-    <section className={styles.card}>
-      <div className={styles.step}>
-        <span className={`${styles.stepBadge} ${done ? '' : styles.stepBadgeIdle}`}>{step}</span>
-        <div>
-          <h2 className={styles.stepTitle}>{title}</h2>
-          <p className={styles.stepNote}>{note}</p>
-        </div>
-      </div>
-      <div className={styles.field}>{children}</div>
-    </section>
-  )
-}
-
-function SummaryStep({ number, label, value, active = false }: { number: number; label: string; value: string; active?: boolean }) {
-  return (
-    <div className="flex min-w-0 items-center gap-3">
-      <span className={`${styles.stepBadge} ${active ? '' : styles.stepBadgeIdle}`}>{number}</span>
-      <span className="flex min-w-0 flex-col"><small className="text-xs font-medium text-ink-faint">{label}</small><strong className="truncate text-sm text-ink" title={value}>{value}</strong></span>
+    <div className={styles.field}>
+      <label className={styles.label} htmlFor={id}>{title}<RequiredBadge /></label>
+      <Select
+        id={id}
+        value={value}
+        disabled={loading || failed}
+        onChange={(picked) => onPick(picked)}
+        aria-label={selectLabel}
+        size="full"
+        options={[
+          { value: '', label: '— 選んでください —' },
+          ...options.map((option) => ({ value: option.value, label: option.label })),
+        ]}
+      />
+      {loading ? <p className={styles.cardDesc}>読み込んでいます</p> : null}
+      {failed ? <p className={styles.cardDesc}>{failedNote}</p> : null}
     </div>
   )
 }
