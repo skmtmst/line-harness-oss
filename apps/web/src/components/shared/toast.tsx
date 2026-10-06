@@ -2,6 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from 'react'
 import { CircleAlert, CircleCheck, X } from 'lucide-react'
+import { humanizeErrorText } from './human-error-text'
 import styles from './toast.module.css'
 
 /** 知らせの種類。白地に印の色で分ける（緑=うまくいった、赤=できなかった）。 */
@@ -160,7 +161,8 @@ export function notifyToast(message: string, options?: NotifyToastOptions): () =
     ...items,
     {
       id,
-      message,
+      // 失敗の知らせは機械の文（API error: 500 など）を人の文へ置き換えてから出す。
+      message: (options?.tone ?? 'success') === 'error' ? humanizeErrorText(message) : message,
       tone: options?.tone ?? 'success',
       actionLabel: options?.actionLabel,
       onAction: options?.onAction,

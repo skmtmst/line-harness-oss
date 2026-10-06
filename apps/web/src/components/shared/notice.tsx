@@ -4,6 +4,7 @@ import type { HTMLAttributes, ReactNode } from 'react'
 import { CircleAlert, CircleCheck, CircleHelp, Info, TriangleAlert, X } from 'lucide-react'
 import HelpTip from './help-tip'
 import styles from './notice.module.css'
+import { humanizeErrorText } from './human-error-text'
 
 /**
  * 帯（Notice）の種類。★V7 共通部品その2 §1 の4つ。
@@ -108,7 +109,7 @@ export default function Notice({
         <span className={styles.icon} aria-hidden="true">{icon}</span>
       )}
       <span className={styles.message}>
-        {children ?? message}
+        {typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}
         {hasHelp ? (
           <HelpTip label={`${helpLabel ?? 'この案内'}の説明`}>
             {help}

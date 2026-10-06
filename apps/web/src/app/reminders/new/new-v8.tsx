@@ -27,6 +27,7 @@ import {
 } from '../basics-form-v8'
 import { SummaryCardV8, WizardFooterV8, ReminderV8Stepper } from '../wizard-v8-ui'
 import styles from '../wizard-v8.module.css'
+import { humanizeErrorText } from '@/components/shared/human-error-text'
 
 /**
  * ★V8 リマインダを作る・手順1「基本設定」（板 VE1u5）。
@@ -173,7 +174,8 @@ export default function NewReminderV8() {
       return res.data.reminderId
     } catch (caught) {
       setSaving('failed')
-      setError(caught instanceof Error ? caught.message : '下書きを保存できませんでした')
+      // 機械の文（API error: 500）は出さず、何が起きた・どうすればよいかを出す（動きの点検 7 番）。
+      setError(caught instanceof Error ? humanizeErrorText(caught.message) : '下書きを保存できませんでした')
       return null
     }
   }
