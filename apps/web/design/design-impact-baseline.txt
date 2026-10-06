@@ -545,6 +545,17 @@ shared-button-importer v8/mileage/score.tsx
 shared-button-importer v8/mileage/reward-edit.tsx
 shared-button-importer v8/mileage/friend-detail.tsx
 shared-button-importer v8/mileage/adjust-dialog.tsx
+# ★V8 予約設定（owaS3 ほか）を src/v8/booking-menus に書き直した。
+shared-button-importer v8/booking-menus/assign.tsx
+shared-button-importer v8/booking-menus/channels-tab.tsx
+shared-button-importer v8/booking-menus/menu-form.tsx
+shared-button-importer v8/booking-menus/settings.tsx
+shared-button-importer v8/booking-menus/staff-edit-dialog.tsx
+shared-button-importer v8/booking-menus/tabs/holidays-tab.tsx
+shared-button-importer v8/booking-menus/tabs/hours-tab.tsx
+shared-button-importer v8/booking-menus/tabs/menus-tab.tsx
+shared-button-importer v8/booking-menus/tabs/rules-tab.tsx
+shared-button-importer v8/booking-menus/tabs/staff-tab.tsx
 shared-button-importer v8/friend-add/list.tsx
 shared-button-importer v8/friend-add/editor.tsx
 shared-button-importer v8/notifications/list.tsx
