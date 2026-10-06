@@ -563,52 +563,29 @@
   margin: 0;
 }
 
-/* 完了（V4LjH）：中央の板。 */
+/* 完了（V4LjH）：作る型の頭の下に、中央の完了カード（幅560・余白32・間12）。 */
+.doneBody { display: flex; justify-content: center; padding: var(--tpl-ar-done-body-pad); }
 .done {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  max-width: 640px;
-  margin: 32px auto 0;
-  padding: 32px 28px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card, 12px);
+  display: flex; flex-direction: column; align-items: center; gap: var(--tpl-rule-row-gap);
+  width: min(var(--tpl-ar-done-w), 100%); padding: var(--tpl-ar-done-pad);
+  border-radius: var(--radius-card); outline: 1px solid var(--color-hairline); outline-offset: -1px;
   background: var(--color-canvas);
-  text-align: center;
 }
 .doneIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-pill);
-  background: var(--color-success-bg);
-  color: var(--color-success);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--tpl-ar-done-icon); height: var(--tpl-ar-done-icon);
+  border-radius: var(--radius-pill); background: var(--color-success-bg); color: var(--color-success);
 }
-.doneTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 18px;
-  font-weight: 700;
+.doneTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-ar-done-title-size); font-weight: 700; line-height: var(--tpl-ar-done-title-lh); }
+.doneNote { margin: 0; align-self: stretch; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-ar-done-note-lh); }
+.doneRows { display: flex; flex-direction: column; align-self: stretch; margin: 0; }
+.doneRow {
+  display: flex; align-items: center; gap: var(--tpl-body-gap); min-height: var(--tpl-ar-done-row-h);
+  padding: var(--tpl-side-row-pad) 0; box-shadow: var(--shadow-row-line);
 }
-.doneNote {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 1.7;
-}
-.doneRows {
-  width: 100%;
-  border-top: 1px solid var(--color-hairline);
-}
-.doneActions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-}
+.doneRow > dt { flex: 1 1 auto; color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
+.doneRow > dd { min-width: 0; margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.doneActions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--tpl-body-gap); padding-top: var(--tpl-body-gap); }
 
 /* トグルの行（細かい決まり）。 */
 /* 絵 rfhIf「細かい決まり」：行は線なし・間12・右に操作。 */
@@ -797,3 +774,42 @@
 .conflictResult { min-height: calc(var(--tpl-conflict-desc-lh) * 2); } /* 試すと2行になる。先に場所を取って、出たときに下が動かないように */
 .testRow { display: flex; align-items: center; gap: var(--tpl-body-gap); }
 .testGrow { flex: 1 1 0; min-width: 0; }
+
+/*
+ * 1152 の板（Z2LIUx）。右の列は幅280・余白16で、スマホは置かず上のボタンから窓で開く。
+ * 左の段は「言葉の合い方」「言葉が2つ以上のとき」を縦に積み、まとめて・月〜金の行を分ける。
+ */
+:global([data-page-template='create']):has(.narrowPhoneOpen) {
+  --tpl-preview-pad: var(--tpl-ar-ed-narrow-pad);
+  --tpl-preview-narrow-content-width: var(--tpl-ar-ed-narrow-side-w);
+}
+.narrowPhoneOpen { display: flex; flex-direction: column; align-self: stretch; }
+.narrowPhoneOpen > :global(*) { width: 100%; }
+.narrowPhoneOpen ~ * { align-self: stretch; }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .sideCard .kvRow > dt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .kwSpacer { flex-basis: 100%; height: 0; }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .kwRow { row-gap: var(--tpl-ar-ed-kw-row-gap); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .kwInput { margin-left: auto; }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .kwField { gap: var(--tpl-compact-gap); }
+/* 札の × は押せる大きさ（32）のまま、行の高さには数えない（絵の札は高さ26）。 */
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .chipRemove { margin-block: var(--tpl-ar-ed-chip-x-pull); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .labelRow { height: var(--tpl-chip-label-lh); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .pairRow { grid-template-columns: minmax(0, 1fr); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .labelRow .moreKinds { flex: 1 1 auto; height: auto; padding: var(--tpl-ar-ed-none); text-align: left; }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .kindsNote { flex: 1 1 0; min-width: 0; margin-left: var(--tpl-body-gap); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .weekdayPresets { flex-wrap: wrap; row-gap: var(--tpl-body-gap); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .weekdaySummary { flex-basis: 100%; margin-left: var(--tpl-ar-ed-none); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .inlineSelect > :last-child { width: var(--tpl-ar-ed-holiday-w); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .inlineSelect :global(*) { max-width: 100%; }
+
+/* 編集の競合（UGrd2）：頭の「ルール名」の行の下に横いっぱいの帯（琥珀の地・枠）。 */
+.conflictBand {
+  display: flex; align-items: center; gap: var(--tpl-rule-row-gap);
+  margin: var(--tpl-ar-ed-band-mt) 0 var(--tpl-ar-ed-band-mb);
+  padding: var(--tpl-ar-ed-band-pad); border-radius: var(--radius-control);
+  outline: 1px solid var(--color-warning); outline-offset: -1px; background: var(--color-warning-bg);
+}
+.conflictBandIcon { flex-shrink: 0; color: var(--color-warning); }
+.conflictBandText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
+.conflictBandTitle { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; line-height: var(--tpl-chip-label-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conflictBandNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-ar-ed-band-note-lh); }
