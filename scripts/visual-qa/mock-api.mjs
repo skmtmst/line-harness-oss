@@ -1001,38 +1001,46 @@ const METRIC = (value, state = 'available', reason = null) => ({ value, state, r
   設計画像と比較できない。固定時刻と架空の集計結果だけを返し、保存や
   再集計そのものは行わない。
 */
+/* クロス分析の結果（絵 u5CuB8：タグ（会員の段階）× 流入経路の4×4）。 */
 const ANALYTICS_CROSS_RESULT = {
   lineAccountId: 'visual-qa-account',
   timeZone: 'Asia/Tokyo',
   rowValues: [
-    { key: 'instagram', label: 'Instagram' },
-    { key: 'store-qr', label: '店頭のQR' },
-    { key: 'referral', label: '紹介リンク' },
-    { key: 'meta', label: '広告（Meta）' },
-    { key: 'unknown', label: '分からない' },
+    { key: 'regular', label: '定期便' },
+    { key: 'first', label: '初回購入' },
+    { key: 'repeat', label: 'リピーター' },
+    { key: 'dormant', label: '休眠' },
   ],
   columnValues: [
-    { key: 'tagged', label: '付いている' },
-    { key: 'untagged', label: '付いていない' },
+    { key: 'instagram', label: 'Instagram' },
+    { key: 'google-ads', label: 'Google広告' },
+    { key: 'store-qr', label: '店頭QR' },
+    { key: 'referral', label: '紹介' },
   ],
   cells: [
-    ['instagram', 'Instagram', 'tagged', '付いている', 86, 79],
-    ['instagram', 'Instagram', 'untagged', '付いていない', 318, 306],
-    ['store-qr', '店頭のQR', 'tagged', '付いている', 142, 104],
-    ['store-qr', '店頭のQR', 'untagged', '付いていない', 96, 91],
-    ['referral', '紹介リンク', 'tagged', '付いている', 54, 49],
-    ['referral', '紹介リンク', 'untagged', '付いていない', 171, 168],
-    ['meta', '広告（Meta）', 'tagged', '付いている', 31, 26],
-    ['meta', '広告（Meta）', 'untagged', '付いていない', 208, 201],
-    ['unknown', '分からない', 'tagged', '付いている', 12, 9],
-    ['unknown', '分からない', 'untagged', '付いていない', 286, 277],
+    ['regular', '定期便', 'instagram', 'Instagram', 86, 83],
+    ['regular', '定期便', 'google-ads', 'Google広告', 41, 38],
+    ['regular', '定期便', 'store-qr', '店頭QR', 52, 49],
+    ['regular', '定期便', 'referral', '紹介', 18, 15],
+    ['first', '初回購入', 'instagram', 'Instagram', 64, 61],
+    ['first', '初回購入', 'google-ads', 'Google広告', 38, 35],
+    ['first', '初回購入', 'store-qr', '店頭QR', 47, 44],
+    ['first', '初回購入', 'referral', '紹介', 9, 6],
+    ['repeat', 'リピーター', 'instagram', 'Instagram', 42, 39],
+    ['repeat', 'リピーター', 'google-ads', 'Google広告', 22, 19],
+    ['repeat', 'リピーター', 'store-qr', '店頭QR', 61, 58],
+    ['repeat', 'リピーター', 'referral', '紹介', 14, 11],
+    ['dormant', '休眠', 'instagram', 'Instagram', 12, 9],
+    ['dormant', '休眠', 'google-ads', 'Google広告', 6, 3],
+    ['dormant', '休眠', 'store-qr', '店頭QR', 0, 0],
+    ['dormant', '休眠', 'referral', '紹介', 0, 0],
   ].map(([rowKey, rowLabel, columnKey, columnLabel, value, previousValue]) => ({
     rowKey, rowLabel, columnKey, columnLabel, value, uniqueFriends: value,
-    totalRatio: value / 1404, previousValue, difference: value - previousValue,
+    totalRatio: value / 512, previousValue, difference: value - previousValue,
   })),
-  totalValue: 1404,
-  totalFriends: 1404,
-  previousTotalValue: 1310,
+  totalValue: 512,
+  totalFriends: 553,
+  previousTotalValue: 470,
   periodFrom: '2026-06-06T00:00:00.000Z',
   periodTo: '2026-09-03T00:00:00.000Z',
   previousPeriodFrom: '2026-03-08T00:00:00.000Z',
@@ -1054,33 +1062,42 @@ const ANALYTICS_FUNNEL_RUN = {
   dataCutoffAt: '2026-09-03T02:40:00.000Z',
   state: 'available',
   stateReason: null,
+  // 比較する条件は流入経路（Instagram・店頭QR）の2群。
   groups: [{
-    key: 'all', label: 'すべての経路', entrants: 1404, completed: 96,
+    key: 'instagram', label: 'Instagram', entrants: 1284, completed: 23,
     steps: [
-      { stepOrder: 1, label: '友だちになった', reached: 1404, conversionFromPrevious: null, droppedAfter: 0, inProgressAfter: 0, averageSecondsFromPrevious: null, medianSecondsFromPrevious: null },
-      { stepOrder: 2, label: '1回でも反応した', reached: 886, conversionFromPrevious: 0.631, droppedAfter: 518, inProgressAfter: 0, averageSecondsFromPrevious: 86400, medianSecondsFromPrevious: 72000 },
-      { stepOrder: 3, label: 'フォームに答えた', reached: 412, conversionFromPrevious: 0.465, droppedAfter: 474, inProgressAfter: 0, averageSecondsFromPrevious: 172800, medianSecondsFromPrevious: 151200 },
-      { stepOrder: 4, label: '予約か購入をした', reached: 238, conversionFromPrevious: 0.578, droppedAfter: 174, inProgressAfter: 0, averageSecondsFromPrevious: 259200, medianSecondsFromPrevious: 216000 },
-      { stepOrder: 5, label: 'くり返し買った', reached: 96, conversionFromPrevious: 0.403, droppedAfter: 142, inProgressAfter: 0, averageSecondsFromPrevious: 604800, medianSecondsFromPrevious: 518400 },
+      { stepOrder: 1, label: '友だち追加', reached: 1284, conversionFromPrevious: null, droppedAfter: 644, inProgressAfter: 0, averageSecondsFromPrevious: null, medianSecondsFromPrevious: null },
+      { stepOrder: 2, label: 'リンクを踏んだ', reached: 640, conversionFromPrevious: 0.498, droppedAfter: 428, inProgressAfter: 0, averageSecondsFromPrevious: 172800, medianSecondsFromPrevious: 144000 },
+      { stepOrder: 3, label: 'フォームに答えた', reached: 212, conversionFromPrevious: 0.331, droppedAfter: 151, inProgressAfter: 0, averageSecondsFromPrevious: 259200, medianSecondsFromPrevious: 216000 },
+      { stepOrder: 4, label: '予約が確定した', reached: 61, conversionFromPrevious: 0.288, droppedAfter: 38, inProgressAfter: 0, averageSecondsFromPrevious: 345600, medianSecondsFromPrevious: 288000 },
+      { stepOrder: 5, label: '購入が確定した', reached: 23, conversionFromPrevious: 0.377, droppedAfter: 0, inProgressAfter: 0, averageSecondsFromPrevious: 432000, medianSecondsFromPrevious: 360000 },
+    ],
+  }, {
+    key: 'store-qr', label: '店頭QR', entrants: 300, completed: 66,
+    steps: [
+      { stepOrder: 1, label: '友だち追加', reached: 300, conversionFromPrevious: null, droppedAfter: 120, inProgressAfter: 0, averageSecondsFromPrevious: null, medianSecondsFromPrevious: null },
+      { stepOrder: 2, label: 'リンクを踏んだ', reached: 180, conversionFromPrevious: 0.6, droppedAfter: 80, inProgressAfter: 0, averageSecondsFromPrevious: 172800, medianSecondsFromPrevious: 144000 },
+      { stepOrder: 3, label: 'フォームに答えた', reached: 100, conversionFromPrevious: 0.556, droppedAfter: 20, inProgressAfter: 0, averageSecondsFromPrevious: 259200, medianSecondsFromPrevious: 216000 },
+      { stepOrder: 4, label: '予約が確定した', reached: 80, conversionFromPrevious: 0.8, droppedAfter: 14, inProgressAfter: 0, averageSecondsFromPrevious: 345600, medianSecondsFromPrevious: 288000 },
+      { stepOrder: 5, label: '購入が確定した', reached: 66, conversionFromPrevious: 0.825, droppedAfter: 0, inProgressAfter: 0, averageSecondsFromPrevious: 432000, medianSecondsFromPrevious: 360000 },
     ],
   }],
 }
 
+/* 保存した分析（絵 bglah の3件）。3件目は定義を変えたあとまだ集計していない（更新後未集計）。 */
 const ANALYTICS_SAVED = [
-  ['saved-1', '経路 × 体験申込', 'cross', '佐々木', 12, '2026-08-25T11:20:00+09:00'],
-  ['saved-2', '友だちになってからの5段', 'funnel', '佐々木', 9, '2026-08-25T09:40:00+09:00'],
-  ['saved-3', '広告ごとの費用対効果', 'cross', '田中', 6, '2026-08-24T18:05:00+09:00'],
-  ['saved-4', 'コラムの読まれ方', 'cross', '山口', 4, '2026-08-23T14:30:00+09:00'],
-  ['saved-5', 'タグ × 予約', 'cross', '田中', 21, '2026-08-12T10:15:00+09:00'],
-  ['saved-6', '旧・流入の内訳', 'cross', '佐々木', 3, '2026-07-28T16:40:00+09:00'],
-].map(([id, name, kind, createdByName, snapshotCount, updatedAt], index) => ({
-  id, name, kind, status: 'active', currentVersionNumber: index === 5 ? 1 : 2,
+  ['saved-1', '定期便 × 流入経路', 'cross', '高田 誠', 8, '2026-09-30T10:12:00+09:00', 2, false],
+  ['saved-2', '友だち追加から購入まで', 'funnel', '中川 由美', 4, '2026-09-28T18:40:00+09:00', 2, false],
+  ['saved-3', 'タグ × 年代', 'cross', '高田 誠', 2, '2026-09-12T09:05:00+09:00', 3, true],
+].map(([id, name, kind, createdByName, snapshotCount, updatedAt, version, stale], index) => ({
+  id, name, kind, status: 'active', currentVersionNumber: version,
   createdBy: `visual-owner-${index + 1}`, createdByName,
   createdAt: '2026-06-01T09:00:00+09:00', updatedAt, snapshotCount,
   latestSnapshot: {
-    id: `${id}-snapshot-latest`, state: index === 5 ? 'unavailable' : 'available',
-    periodFrom: '2026-08-05T00:00:00+09:00', periodTo: '2026-09-03T00:00:00+09:00',
-    dataCutoffAt: '2026-09-03T02:40:00.000Z', createdAt: updatedAt,
+    id: `${id}-snapshot-latest`, state: 'available',
+    periodFrom: '2026-09-01T00:00:00+09:00', periodTo: '2026-09-30T00:00:00+09:00',
+    dataCutoffAt: '2026-09-30T21:00:00.000Z', createdAt: updatedAt,
+    definitionStale: stale, sourceVersionNumber: stale ? version - 1 : version, sourceCurrentVersionNumber: version,
   },
 }))
 
@@ -1270,38 +1287,45 @@ const SHAPES = {
       historyAvailableFrom: '2026-09-01',
     },
   },
-  /* 分析・配信の反応。`AnalyticsReactionsOverview`。 */
+  /* 分析・配信の反応。`AnalyticsReactionsOverview`。絵（yvOtn）の5配信・時間帯。 */
   '/api/analytics/reactions': {
     lineAccountId: 'visual-qa-account', timeZone: 'Asia/Tokyo',
-    period: { from: '2026-08-04', to: '2026-09-02' }, dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    period: { from: '2026-09-02', to: '2026-10-01' }, dataCutoffAt: '2026-10-01T06:00:00+09:00',
     data: {
       metrics: {
-        sent: METRIC(1842), delivered: METRIC(1836), opened: METRIC(1274),
-        lineClicked: METRIC(318), trackedClicks: METRIC(204),
-        unavailableCampaigns: METRIC(1, 'partial', '20人未満の配信は開封を取得できません'),
+        sent: METRIC(3986), delivered: METRIC(3912), opened: METRIC(2070),
+        lineClicked: METRIC(305), trackedClicks: METRIC(305),
+        unavailableCampaigns: METRIC(1),
       },
       campaigns: [
         {
-          id: 'bc-1', name: '8月キャンペーンのお知らせ', kind: 'broadcast', sentAt: '2026-08-24T10:00:00+09:00',
-          targetPeople: METRIC(624), delivered: METRIC(624), opened: METRIC(438),
-          lineClicked: METRIC(112), outcomes: METRIC(9), fetchedAt: '2026-08-25T03:00:00+09:00',
+          id: 'bc-1', name: '秋の新商品のご案内', kind: 'broadcast', sentAt: '2026-09-30T19:00:00+09:00',
+          targetPeople: METRIC(1284), delivered: METRIC(1262), sentMessages: METRIC(null, 'unavailable', '一斉配信は送信通数を数えません'), opened: METRIC(702),
+          lineClicked: METRIC(118), outcomes: METRIC(9), fetchedAt: '2026-10-01T06:00:00+09:00',
         },
         {
-          id: 'bc-2', name: '予約空き枠のご案内', kind: 'broadcast', sentAt: '2026-08-18T18:30:00+09:00',
-          targetPeople: METRIC(203), delivered: METRIC(203), opened: METRIC(141),
-          lineClicked: METRIC(37), outcomes: METRIC(2), fetchedAt: '2026-08-19T03:00:00+09:00',
+          id: 'bc-2', name: '定期便 10%オフ', kind: 'broadcast', sentAt: '2026-09-24T12:00:00+09:00',
+          targetPeople: METRIC(1280), delivered: METRIC(1251), sentMessages: METRIC(null, 'unavailable', '一斉配信は送信通数を数えません'), opened: METRIC(655),
+          lineClicked: METRIC(96), outcomes: METRIC(6), fetchedAt: '2026-10-01T06:00:00+09:00',
         },
         {
-          id: 'sc-1', name: '新しいシナリオ 8/18', kind: 'scenario', sentAt: '2026-08-18T09:00:00+09:00',
-          targetPeople: METRIC(18), delivered: METRIC(18),
-          opened: METRIC(null, 'insufficient', '20人未満のため取得できません'),
-          lineClicked: METRIC(3), outcomes: METRIC(0), fetchedAt: null,
+          id: 'sc-1', name: '初回購入のお礼 3通目', kind: 'scenario', sentAt: '2026-09-02T09:00:00+09:00',
+          targetPeople: METRIC(612), delivered: METRIC(null, 'unavailable', 'シナリオは届いた人数を取得できません'), sentMessages: METRIC(598), opened: METRIC(412),
+          lineClicked: METRIC(61), outcomes: METRIC(4), fetchedAt: '2026-10-01T06:00:00+09:00',
+        },
+        {
+          id: 'sc-2', name: '誕生日クーポン', kind: 'scenario', sentAt: '2026-09-02T09:00:00+09:00',
+          targetPeople: METRIC(14), delivered: METRIC(null, 'unavailable', 'シナリオは届いた人数を取得できません'), sentMessages: METRIC(14), opened: METRIC(null, 'insufficient', '20人未満のため取得できません'),
+          lineClicked: METRIC(null, 'insufficient', '20人未満のため取得できません'), outcomes: METRIC(null, 'insufficient', '20人未満のため取得できません'), fetchedAt: '2026-10-01T06:00:00+09:00',
+        },
+        {
+          id: 'bc-3', name: 'お盆休みのお知らせ', kind: 'broadcast', sentAt: '2026-09-10T10:00:00+09:00',
+          targetPeople: METRIC(796), delivered: METRIC(787), sentMessages: METRIC(null, 'unavailable', '一斉配信は送信通数を数えません'), opened: METRIC(301),
+          lineClicked: METRIC(30), outcomes: METRIC(0), fetchedAt: '2026-10-01T06:00:00+09:00',
         },
       ],
-      trackedClickHours: [
-        { hour: 9, clicks: 22 }, { hour: 10, clicks: 48 }, { hour: 12, clicks: 31 },
-        { hour: 18, clicks: 57 }, { hour: 20, clicks: 46 },
-      ],
+      campaignsTruncation: { limit: 50, broadcast: false, scenario: false },
+      trackedClickHours: [{ hour: 0, clicks: 2 }, { hour: 1, clicks: 2 }, { hour: 2, clicks: 2 }, { hour: 3, clicks: 2 }, { hour: 4, clicks: 2 }, { hour: 5, clicks: 3 }, { hour: 6, clicks: 7 }, { hour: 7, clicks: 13 }, { hour: 8, clicks: 30 }, { hour: 9, clicks: 46 }, { hour: 10, clicks: 38 }, { hour: 11, clicks: 30 }, { hour: 12, clicks: 42 }, { hour: 13, clicks: 35 }, { hour: 14, clicks: 24 }, { hour: 15, clicks: 22 }, { hour: 16, clicks: 26 }, { hour: 17, clicks: 33 }, { hour: 18, clicks: 49 }, { hour: 19, clicks: 63 }, { hour: 20, clicks: 70 }, { hour: 21, clicks: 55 }, { hour: 22, clicks: 30 }, { hour: 23, clicks: 10 }],
       clickDefinition: 'クリック率は「そのURLを含む配信が届いた人数」に対する割合です。同じ人が複数回押しても、実人数は1として数えます。',
     },
   },
@@ -1312,21 +1336,43 @@ const SHAPES = {
     data: {
       attributionModel: 'first_touch',
       attributionLabel: '最初に触れた経路',
+      /* 経路と成果の絵（PFe9c）の6経路。友だちの増減（ws9wt）の右の列はこの上位5件。 */
       routes: [
         {
-          id: 'rt-1', refCode: 'sns-aug', name: 'SNSの8月投稿',
-          clicks: METRIC(412), friendAdds: METRIC(38), currentFriends: METRIC(35), reactionPeople: METRIC(21),
-          conversions: { approved: METRIC(4), pending: METRIC(1), rejected: METRIC(0), revenue: METRIC(48000) },
-          adCost: METRIC(12000), costPerFriend: METRIC(315), costPerConversion: METRIC(3000), profitAfterAdCost: METRIC(36000),
+          id: 'rt-1', refCode: 'g-summer', name: 'Google広告 夏キャンペーン',
+          clicks: METRIC(820), friendAdds: METRIC(42), currentFriends: METRIC(40), reactionPeople: METRIC(25),
+          conversions: { approved: METRIC(9), pending: METRIC(2), rejected: METRIC(1), revenue: METRIC(96300) },
+          adCost: METRIC(52000), costPerFriend: METRIC(1238), costPerConversion: METRIC(5778), profitAfterAdCost: METRIC(44300),
         },
         {
-          id: 'rt-2', refCode: null, name: '代理店A',
-          clicks: METRIC(97), friendAdds: METRIC(6), currentFriends: METRIC(6), reactionPeople: METRIC(2),
+          id: 'rt-2', refCode: 'ig-summer', name: '夏のInstagram投稿',
+          clicks: METRIC(610), friendAdds: METRIC(31), currentFriends: METRIC(30), reactionPeople: METRIC(19),
+          conversions: { approved: METRIC(6), pending: METRIC(1), rejected: METRIC(0), revenue: METRIC(58800) },
+          adCost: METRIC(34000), costPerFriend: METRIC(1097), costPerConversion: METRIC(5667), profitAfterAdCost: METRIC(24800),
+        },
+        {
+          id: 'rt-3', refCode: 'pop-qr', name: '店頭POPのQRコード',
+          clicks: METRIC(380), friendAdds: METRIC(27), currentFriends: METRIC(27), reactionPeople: METRIC(18),
+          conversions: { approved: METRIC(5), pending: METRIC(1), rejected: METRIC(0), revenue: METRIC(49500) },
+          adCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerFriend: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerConversion: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), profitAfterAdCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'),
+        },
+        {
+          id: 'rt-4', refCode: 'ref-tanaka', name: '紹介リンク 田中 明',
+          clicks: METRIC(200), friendAdds: METRIC(12), currentFriends: METRIC(12), reactionPeople: METRIC(8),
+          conversions: { approved: METRIC(3), pending: METRIC(0), rejected: METRIC(0), revenue: METRIC(33800) },
+          adCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerFriend: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerConversion: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), profitAfterAdCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'),
+        },
+        {
+          id: 'rt-5', refCode: 'flyer-2026', name: 'チラシ計測リンク（2026春）',
+          clicks: METRIC(40), friendAdds: METRIC(0), currentFriends: METRIC(0), reactionPeople: METRIC(0),
           conversions: { approved: METRIC(0), pending: METRIC(0), rejected: METRIC(0), revenue: METRIC(0) },
-          adCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'),
-          costPerFriend: METRIC(null, 'unavailable', '広告費が無いので出せません'),
-          costPerConversion: METRIC(null, 'unavailable', '広告費が無いので出せません'),
-          profitAfterAdCost: METRIC(null, 'unavailable', '広告費が無いので出せません'),
+          adCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerFriend: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerConversion: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), profitAfterAdCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'),
+        },
+        {
+          id: 'rt-6', refCode: null, name: '参照コードなし',
+          clicks: METRIC(90), friendAdds: METRIC(16), currentFriends: METRIC(15), reactionPeople: METRIC(4),
+          conversions: { approved: METRIC(0), pending: METRIC(0), rejected: METRIC(0), revenue: METRIC(null, 'unavailable', '売上は未取得') },
+          adCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerFriend: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), costPerConversion: METRIC(null, 'unavailable', '広告費を受け取る口がありません'), profitAfterAdCost: METRIC(null, 'unavailable', '広告費を受け取る口がありません'),
         },
       ],
       searchConsoleHref: 'https://search.google.com/search-console',
@@ -1335,22 +1381,21 @@ const SHAPES = {
   /* 分析・使われ方。`AnalyticsUsageOverview`。 */
   '/api/analytics/usage': {
     lineAccountId: 'visual-qa-account', timeZone: 'Asia/Tokyo',
-    period: { from: '2026-08-04', to: '2026-09-02' }, dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    period: { from: '2026-09-02', to: '2026-10-01' }, dataCutoffAt: '2026-10-01T06:00:00+09:00',
     data: {
       state: 'available', stateReason: null,
-      checkedAt: '2026-09-02T00:00:00+09:00', automaticDeletion: false,
+      checkedAt: '2026-10-01T06:00:00+09:00', automaticDeletion: false,
+      // 絵（N8ZrUl）の6機能。一斉配信は利用中・未使用が未取得（「—」と理由）の形を残す。
       summary: {
-        unusedItems: METRIC(79), automaticRuns: METRIC(214), manualSends: METRIC(12), estimatedHoursSaved: METRIC(1),
+        unusedItems: METRIC(7), brokenReferences: METRIC(1), automaticRuns: METRIC(4812), manualSends: METRIC(312), estimatedHoursSaved: METRIC(40),
       },
       categories: [
-        { key: 'templates', label: 'テンプレート', href: '/templates', created: METRIC(0), inUse: METRIC(0), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC(null, 'unavailable', 'まだ使われていません') },
-        { key: 'scenarios', label: 'シナリオ', href: '/scenarios', created: METRIC(11), inUse: METRIC(11), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-26') },
-        { key: 'forms', label: '回答フォーム', href: '/form-submissions', created: METRIC(8, 'partial', '回答実績から確認できるフォームのみです'), inUse: METRIC(5, 'partial', '回答実績から確認できるフォームのみです'), unused: METRIC(3, 'partial', '回答実績から確認できるフォームのみです'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-29', 'partial', '回答実績から確認できるフォームのみです') },
-        { key: 'rich_menus', label: 'リッチメニュー', href: '/rich-menus', created: METRIC(4), inUse: METRIC(2), unused: METRIC(2), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-30') },
-        { key: 'friend_attributes', label: 'タグ・友だち情報', href: '/tags', created: METRIC(101, 'partial', '旧共通項目を含みます'), inUse: METRIC(22, 'partial', '旧共通項目を含みます'), unused: METRIC(79, 'partial', '旧共通項目を含みます'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-24', 'partial', '旧共通項目を含みます') },
-        { key: 'inflow_conversion', label: '流入リンク・成果地点', href: '/inflow-links', created: METRIC(16), inUse: METRIC(9), unused: METRIC(7), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-31') },
-        { key: 'automations', label: 'オートメーション・共通アクション', href: '/automations', created: METRIC(7), inUse: METRIC(3), unused: METRIC(4), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-09-01') },
-        { key: 'media_vars', label: '登録メディア・共通情報', href: '/contents', created: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), inUse: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), unused: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません') },
+        { key: 'scenarios', label: 'シナリオ配信', href: '/scenarios', created: METRIC(8), inUse: METRIC(6), unused: METRIC(2), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-09-30T21:00:00Z') },
+        { key: 'broadcasts', label: '一斉配信', href: '/broadcasts', created: METRIC(24), inUse: METRIC(null, 'unavailable', '一斉配信は送ったら終わりのため数えません'), unused: METRIC(null, 'unavailable', '一斉配信は送ったら終わりのため数えません'), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-09-30T10:00:00Z') },
+        { key: 'auto_replies', label: '自動応答', href: '/auto-replies', created: METRIC(12), inUse: METRIC(10), unused: METRIC(2), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-09-30T20:41:00Z') },
+        { key: 'templates', label: 'テンプレート', href: '/templates', created: METRIC(31), inUse: METRIC(28), unused: METRIC(3), brokenReferences: METRIC(1), lastUsedAt: METRIC('2026-09-30T09:52:00Z') },
+        { key: 'forms', label: '回答フォーム', href: '/form-submissions', created: METRIC(4, 'partial', '回答実績から確認できるフォームのみです'), inUse: METRIC(4, 'partial', '回答実績から確認できるフォームのみです'), unused: METRIC(0, 'partial', '回答実績から確認できるフォームのみです'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-09-29T12:10:00Z', 'partial', '回答実績から確認できるフォームのみです') },
+        { key: 'automations', label: 'オートメーション', href: '/automations', created: METRIC(6), inUse: METRIC(6), unused: METRIC(0), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-09-30T20:58:00Z') },
       ],
     },
   },
@@ -1359,7 +1404,21 @@ const SHAPES = {
     これが無いと保存済み分析と受信者を選べず、設計 `URqOA` を撮れない。
   */
   '/api/analytics/report-schedules': {
-    items: [],
+    // 保存した分析（bglah）の定期レポート2件：動いている・止めている。
+    items: [
+      {
+        id: 'report-weekly-friends', lineAccountId: 'visual-qa-account', name: '毎週の友だちの増減', sections: ['friends'], savedAnalysisIds: ['saved-1'],
+        cadence: 'weekly', weekday: 1, monthDay: null, sendTime: '9:00', timeZone: 'Asia/Tokyo', periodDays: 7,
+        recipients: [{ kind: 'staff', staffId: 'staff-owner' }], channels: ['email'], alertRules: [],
+        status: 'active', isOneTime: false, nextRunAt: '2026-10-06T09:00:00+09:00', createdBy: 'staff-owner', createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-01T09:00:00+09:00',
+      },
+      {
+        id: 'report-monthly-outcomes', lineAccountId: 'visual-qa-account', name: '月末の成果まとめ', sections: ['routes'], savedAnalysisIds: [],
+        cadence: 'monthly', weekday: null, monthDay: 1, sendTime: '9:00', timeZone: 'Asia/Tokyo', periodDays: 30,
+        recipients: [{ kind: 'staff', staffId: 'staff-owner' }], channels: ['email', 'line'], alertRules: [],
+        status: 'paused', isOneTime: false, nextRunAt: '2026-11-01T09:00:00+09:00', createdBy: 'staff-owner', createdAt: '2026-08-01T09:00:00+09:00', updatedAt: '2026-09-15T09:00:00+09:00',
+      },
+    ],
     recentOneTime: [],
     options: {
       timeZone: 'Asia/Tokyo',
@@ -2266,7 +2325,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return {
       success: true,
       data: [{
-        id: 'visual-funnel-1', name: '友だちになってからの5段', windowDays: 30,
+        // 絵（DkRDE）のファネル。status が無いと「使えるファネルがありません」になって撮れなかった。
+        id: 'visual-funnel-1', name: '友だち追加から購入まで', windowDays: 30, status: 'active',
         createdAt: '2026-06-01T09:00:00+09:00',
         currentVersion: { id: 'visual-funnel-version-1', versionNumber: 3, createdAt: '2026-08-20T09:00:00+09:00' },
         migrationState: 'ready',
@@ -2316,9 +2376,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         id: `${saved.id}-snapshot-${offset + 1}`, savedAnalysisId: saved.id,
         analysisVersionId: `${saved.id}-version-${saved.currentVersionNumber}`,
         sourceKind: saved.kind, sourceResultId: `visual-result-${offset + 1}`,
-        periodFrom: `2026-0${Math.max(6, 8 - offset)}-05T00:00:00+09:00`,
-        periodTo: `2026-0${Math.max(7, 9 - offset)}-03T00:00:00+09:00`,
-        timeZone: 'Asia/Tokyo', dataCutoffAt: '2026-09-03T02:40:00.000Z',
+        // 絵（bglah）の履歴：9月・8月・7月の月ごと。締切は翌月1日 6:00。
+        periodFrom: `2026-0${9 - offset}-01T00:00:00+09:00`,
+        periodTo: `2026-0${9 - offset}-${offset === 1 ? 31 : 30}T00:00:00+09:00`.replace('-07-30', '-07-31'),
+        timeZone: 'Asia/Tokyo', dataCutoffAt: `2026-${String(10 - offset).padStart(2, '0')}-01T06:00:00+09:00`,
         state: offset === 2 ? 'partial' : 'available', result: {},
         createdBy: saved.createdBy, createdAt: saved.updatedAt,
       })) : [],
@@ -4063,6 +4124,69 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /* Search Console（絵 h1G4d）。つないだ状態の検索の数字。 */
+  if (pathname === '/api/search-console/performance') {
+    return {
+      success: true,
+      data: {
+        status: 'connected', siteUrl: 'sc-domain:nen.example', startDate: '2026-09-02', endDate: '2026-10-01', rangeDays: Number(query.get('days') ?? 28),
+        summary: { clicks: 1846, impressions: 48210, ctr: 0.038, position: 12.4 },
+        previousSummary: { clicks: 1634, impressions: 44310, ctr: 0.037, position: 12.9 },
+        daily: [
+        { key: '2026-09-02', clicks: 55, impressions: 1430, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-03', clicks: 50, impressions: 1300, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-04', clicks: 64, impressions: 1664, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-05', clicks: 58, impressions: 1508, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-06', clicks: 73, impressions: 1898, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-07', clicks: 69, impressions: 1794, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-08', clicks: 42, impressions: 1092, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-09', clicks: 40, impressions: 1040, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-10', clicks: 61, impressions: 1586, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-11', clicks: 66, impressions: 1716, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-12', clicks: 74, impressions: 1924, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-13', clicks: 72, impressions: 1872, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-14', clicks: 78, impressions: 2028, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-15', clicks: 47, impressions: 1222, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-16', clicks: 43, impressions: 1118, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-17', clicks: 63, impressions: 1638, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-18', clicks: 69, impressions: 1794, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-19', clicks: 76, impressions: 1976, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-20', clicks: 71, impressions: 1846, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-21', clicks: 83, impressions: 2158, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-22', clicks: 53, impressions: 1378, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-23', clicks: 49, impressions: 1274, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-24', clicks: 67, impressions: 1742, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-25', clicks: 73, impressions: 1898, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-26', clicks: 79, impressions: 2054, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-27', clicks: 77, impressions: 2002, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-28', clicks: 86, impressions: 2236, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-29', clicks: 59, impressions: 1534, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-30', clicks: 51, impressions: 1326, ctr: 0.038, position: 12.4 },
+        { key: '2026-10-01', clicks: 0, impressions: 0, ctr: 0, position: 12.4 },
+        ],
+        queries: [
+        { key: '鹿肉 ドッグフード', clicks: 412, impressions: 6120, ctr: 0.0673, position: 3.2 },
+        { key: '犬 手作りごはん', clicks: 238, impressions: 9800, ctr: 0.0243, position: 8.9 },
+        { key: '然 nen', clicks: 201, impressions: 640, ctr: 0.3141, position: 1.0 },
+        { key: 'ペット 定期便', clicks: 96, impressions: 4210, ctr: 0.0228, position: 11.6 },
+        { key: '鹿肉ふりかけ', clicks: 88, impressions: 1020, ctr: 0.0863, position: 4.1 },
+        ],
+        pages: [
+        { key: 'https://nen.example/', clicks: 522, impressions: 12400, ctr: 0.0421, position: 6.1 },
+        { key: 'https://nen.example/products/venison', clicks: 388, impressions: 8950, ctr: 0.0434, position: 4.8 },
+        { key: 'https://nen.example/guide/homemade', clicks: 241, impressions: 10300, ctr: 0.0234, position: 9.2 },
+        { key: 'https://nen.example/teiki', clicks: 119, impressions: 5020, ctr: 0.0237, position: 10.4 },
+        { key: 'https://nen.example/column/autumn', clicks: 74, impressions: 3880, ctr: 0.0191, position: 14.0 },
+        ],
+        devices: [
+          { key: 'MOBILE', clicks: 1420, impressions: 36000, ctr: 0.039, position: 12.1 },
+          { key: 'DESKTOP', clicks: 371, impressions: 10500, ctr: 0.035, position: 13.0 },
+          { key: 'TABLET', clicks: 55, impressions: 1710, ctr: 0.032, position: 13.4 },
+        ],
+        fetchedAt: '2026-10-01T06:00:00+09:00',
+      },
+    }
+  }
   if (pathname === '/api/analytics/url-clicks') {
     /*
       分析のURLクリック。**入れ子の器で返す。**
@@ -4075,29 +4199,49 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       data: {
         lineAccountId: 'visual-qa-account',
         timeZone: 'Asia/Tokyo',
-        period: { from: '2026-08-05', to: '2026-09-03' },
-        dataCutoffAt: '2026-09-03T00:00:00+09:00',
+        period: { from: '2026-09-02', to: '2026-10-01' },
+        dataCutoffAt: '2026-10-01T06:00:00+09:00',
         data: {
           state: 'available',
           stateReason: null,
           clickRateDefinition: 'クリック率は「実人数 ÷ 届いた人数」で出しています。',
           // 点検#508軽5: 初回・最終日時とタグ由来がないと、その表示を壊しても撮影で気づけない。
-          hasMore: true,
+          // 絵（iK4cQ）の5件。初回・最終日時とタグ由来は1件目・3件目に入れて、行の補足を撮影で見られるようにする。
+          hasMore: false,
           links: [
             {
-              trackedLinkId: 'tl-1', name: '定期便の案内', originalUrl: 'https://example.com/subscription',
-              isActive: true, clicks: METRIC(482), knownClickPeople: METRIC(311),
-              deliveredPeople: METRIC(1_842), clickRate: METRIC(16.9),
-              firstClickedAt: METRIC('2026-08-06T10:00:00+09:00'),
-              lastClickedAt: METRIC('2026-09-02T18:30:00+09:00'),
-              actions: { tagName: '来店タグ', scenarioName: '9月の定期便' },
-              usageLocations: ['一斉配信「9月の定期便」', 'リッチメニュー「メインA」'],
+              trackedLinkId: 'tl-1', name: '秋の新商品ページ', originalUrl: 'https://nen.example/autumn',
+              isActive: true, clicks: METRIC(412), knownClickPeople: METRIC(118),
+              deliveredPeople: METRIC(1262), clickRate: METRIC(9.4),
+              firstClickedAt: METRIC('2026-09-30T19:05:00+09:00'),
+              lastClickedAt: METRIC('2026-10-01T05:40:00+09:00'),
+              actions: { tagName: '秋の新商品に興味', scenarioName: null },
+              usageLocations: ['一斉配信「秋の新商品のご案内」'],
             },
             {
-              trackedLinkId: 'tl-2', name: '来店クーポン', originalUrl: 'https://example.com/coupon',
-              isActive: false, clicks: METRIC(96), knownClickPeople: METRIC(74),
-              deliveredPeople: METRIC(640), clickRate: METRIC(11.6),
-              usageLocations: [],
+              trackedLinkId: 'tl-2', name: '定期便の申し込み', originalUrl: 'https://nen.example/teiki',
+              isActive: true, clicks: METRIC(301), knownClickPeople: METRIC(96),
+              deliveredPeople: METRIC(1251), clickRate: METRIC(7.7),
+              usageLocations: ['一斉配信「定期便 10%オフ」'],
+            },
+            {
+              trackedLinkId: 'tl-3', name: 'はじめてガイド', originalUrl: 'https://nen.example/guide',
+              isActive: true, clicks: METRIC(188), knownClickPeople: METRIC(61),
+              deliveredPeople: METRIC(598), clickRate: METRIC(10.2),
+              actions: { tagName: null, scenarioName: '初回購入フォロー' },
+              usageLocations: ['シナリオ「初回購入のお礼 3通目」'],
+            },
+            {
+              trackedLinkId: 'tl-4', name: 'お盆の営業日', originalUrl: 'https://nen.example/obon',
+              isActive: false, clicks: METRIC(97), knownClickPeople: METRIC(30),
+              deliveredPeople: METRIC(787), clickRate: METRIC(3.8),
+              usageLocations: ['一斉配信「お盆休みのお知らせ」'],
+            },
+            {
+              trackedLinkId: 'tl-5', name: '誕生日クーポン', originalUrl: 'https://nen.example/birthday',
+              isActive: true, clicks: METRIC(0), knownClickPeople: METRIC(0),
+              deliveredPeople: METRIC(14), clickRate: METRIC(null, 'insufficient', 'まだ押されていません'),
+              usageLocations: ['シナリオ「誕生日クーポン」'],
             },
           ],
         },
