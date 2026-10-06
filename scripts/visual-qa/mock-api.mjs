@@ -110,7 +110,7 @@ import {
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
   CONVERSION_DEFINITION_PREVIEW, CONVERSION_DEFINITION_DELETE_IMPACT,
-  OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
+  OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY, OPERATION_ALERTS,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_COMMENTS, WEBINAR_ANALYTICS,
   WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS, WEBINAR_VIDEO_ASSET,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
@@ -2751,7 +2751,27 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: { deleted: true } }
   }
   if (pathname === '/api/operations/health') {
-    return { success: true, data: OPERATION_HEALTH }
+    /* 確認の時刻は「いま」に寄せる（固定の日時だと全部が「古い確認」になり、★V8 Y4LkX1 の判定が撮れない）。 */
+    const now = Date.now()
+    const at = new Date(now - 60 * 1000).toISOString()
+    return {
+      success: true,
+      data: {
+        ...OPERATION_HEALTH,
+        latestRun: OPERATION_HEALTH.latestRun && {
+          ...OPERATION_HEALTH.latestRun,
+          overallStatus: 'warning', startedAt: at, completedAt: at,
+          results: OPERATION_HEALTH.latestRun.results.map((result) => ({ ...result, observedAt: at })),
+        },
+        overallStatus: 'warning',
+        lastCheckedAt: at,
+        nextCheckAt: new Date(now + 4 * 60 * 1000).toISOString(),
+        serverNow: new Date(now).toISOString(),
+      },
+    }
+  }
+  if (pathname === '/api/operations/alerts') {
+    return { success: true, data: OPERATION_ALERTS }
   }
   if (pathname === '/api/operations/history') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)

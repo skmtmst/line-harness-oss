@@ -304,6 +304,9 @@ describe('共通部品の影響範囲', () => {
       'v8/restaurant/reservations/list.tsx',
       // ★V8 ログインユーザー（nku0f）。新しい置き場（src/v8/settings）に書いた。表の下にページ送りを置く。
       'v8/settings/staff/staff.tsx',
+      // ★V8 設定のEC連携（GmVR5）・ファイルの検査（PfA4o）。src/v8/settings に一から書いた。表の下にページ送りを置く。
+      'v8/settings/ec-commerce/screen.tsx',
+      'v8/settings/file-scan/screen.tsx',
       // ★V8 友だち（x6QsVz 一覧・ADjK8 統合ユーザー・hn6Y8 重複検出・Z0jHp UID移行）を src/v8/friends に一から書いた。
       'v8/friends/list/list.tsx',
       'v8/friends/merged/merged.tsx',

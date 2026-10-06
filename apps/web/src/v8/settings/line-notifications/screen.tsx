@@ -1,21 +1,29 @@
 'use client'
 
-import '@/app/notifications/readonly-v8.css'
-import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
-
+/*
+ * ★V8 LINE通知（Pencil `g3iDs`。運用者へのお知らせ `u8xibp`・送れなかったもの `DrwMm`・記録 `PZBVb`）。
+ *
+ * app/line-notifications/page.tsx を写して、見た目（外側の型・中のメニュー・タブ・数のカード・帯・札・表）だけを
+ * 絵に合わせた（src/v8 は @/app を読めない）。動き（読み込み・下書き・保存・公開・止める・テスト送信・
+ * アカウント切替の見張り）は同じ。運用者へのお知らせの一覧は今の部品を入口（page.tsx）から差し込む。
+ * 動きの一覧は同じ場所の BEHAVIOR.md。
+ */
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationRunList from '@/components/line-notifications/notification-run-list'
-import OperatorNotificationRules from './operator-notification-rules'
-import LineNotificationsScreen from '@/v8/settings/line-notifications/screen'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import KpiBand from '@/components/shared/kpi-band'
+import Toggle from '@/components/shared/toggle'
+import { CircleDot, Info, Star } from 'lucide-react'
+import { formatNumber } from '@/lib/format'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { SbSettingsScreen } from '../sb-frame/settings-screen'
+import styles from './screen.module.css'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { withViewTransition } from '@/components/shared/view-transition'
-import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import {
   ApiError,
@@ -35,7 +43,6 @@ import {
 } from './customer-kpis'
 import KpiCard from '@/components/shared/kpi-card'
 import FilterChip from '@/components/shared/filter-chip'
-import { DataTable, NameCell, Td, Th, Tr } from '@/components/shared/table'
 import {
   isForbidden,
   isForbiddenOrRateLimited,
@@ -485,20 +492,18 @@ const TABS = [
   { key: 'history', label: '記録' },
 ] as const
 
-function Toggle({ setting, busy, onToggle }: { setting: EcNotificationSetting; busy: boolean; onToggle: () => void }) {
-  return <button type="button" role="switch" aria-checked={setting.isEnabled} aria-label={`${setting.label}のお知らせを出す・止める`} disabled={busy} onClick={onToggle}
-    className={`inline-flex h-7 w-12 shrink-0 items-center rounded-pill p-1 transition-colors disabled:opacity-50 ${setting.isEnabled ? 'bg-accent' : 'bg-hairline'}`}>
-    <span className={`h-5 w-5 rounded-pill bg-canvas shadow-card transition-transform ${setting.isEnabled ? 'translate-x-5' : ''}`} />
-  </button>
+/* 出す・止める（共通のつまみ）。押すとすぐは変えず、確認の窓を開く（#734）。送っている間は押せない。 */
+function NotificationToggle({ setting, busy, onToggle }: { setting: EcNotificationSetting; busy: boolean; onToggle: () => void }) {
+  return <Toggle checked={setting.isEnabled} label={`${setting.label}のお知らせを出す・止める`} onChange={busy ? undefined : () => onToggle()} />
 }
 
 function CardPreview({ setting }: { setting: EcNotificationSetting }) {
   return <div className="border-nen-border bg-nen-ivory overflow-hidden rounded-card border shadow-float">
-    {setting.imageUrl && <img src={setting.imageUrl} alt="" className="aspect-[20/9] w-full object-cover" />}
+    {setting.imageUrl && <img src={setting.imageUrl} alt="" className={styles.previewImage} />}
     <div className="p-5">
       <div className="border-nen-gold-soft flex items-center gap-2 border-b pb-3">
         <span className="text-nen-gold font-serif text-xl font-bold">然</span>
-        <span className="text-nen-green text-nano font-bold tracking-[.22em]">NEN</span>
+        <span className={`text-nen-green text-nano font-bold ${styles.previewBrand}`}>NEN</span>
         <span className="text-nen-label ml-auto text-nano font-semibold">LINE NOTIFICATION</span>
       </div>
       <h3 className="text-nen-green mt-4 text-xl font-bold leading-7">{setting.title}</h3>
@@ -551,7 +556,7 @@ function CustomerNotificationEditor({
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
     {/* N-337: 狭い幅では見本を下に回す。390pxを無条件に横置きしない。 */}
-    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
+    <div className={styles.editorGrid}>
       <div className="min-w-0 space-y-4">
         <section className="rounded-card border border-hairline bg-canvas p-4">
           <h2 className="font-bold text-ink">いつ送りますか</h2>
@@ -629,8 +634,11 @@ function CustomerNotificationEditor({
   </div>
 }
 
-function LineNotificationsPage() {
+function LineNotificationsPage({ renderOperatorRules }: { renderOperatorRules?: (lineAccountId: string | null) => ReactNode } = {}) {
   const { selectedAccountId, selectedAccount } = useAccount()
+  /* 変える操作（出す・止める・文面を直す）はオーナー・管理者だけ。閲覧のみには押せないボタンを置かない。役割が分かるまでは今までどおり出す。 */
+  const staffRole = useStaffRole()
+  const canManage = staffRole ? canManageRole(staffRole) : true
   /*
    * N-340: `loadGeneration` は load() の useEffect の中でしか進まない。
    * アカウント切替の描画コミットと、その useEffect が実際に発火する瞬間の
@@ -767,7 +775,7 @@ function LineNotificationsPage() {
                     used: null,
                     remaining: null,
                     asOf: null,
-                    reason: 'LINEから送信枠を取得できませんでした',
+                    reason: 'LINEから送信枠を読み込めませんでした',
                   },
                 },
               }
@@ -905,12 +913,12 @@ function LineNotificationsPage() {
     loadFailed: customerLoadFailed,
   })
   /*
-   * send-countsだけ取れなかったときは、そのカードだけ「取得できませんでした」にする。
+   * send-countsだけ取れなかったときは、そのカードだけ「読み込めませんでした」にする。
    * 一覧全体は ListState error にしない（設定・定義は表示を続ける）。
    * 見た目は共通の失敗の1枚と同じ中立（赤を使わない。★V7 `x63W5x`）。
    */
   const kpisWithSendCountsState = sendCountsFailed
-    ? kpis.map((kpi) => kpi.label === '今日 送った' ? { ...kpi, note: '送信件数を取得できませんでした' } : kpi)
+    ? kpis.map((kpi) => kpi.label === '今日 送った' ? { ...kpi, note: '送信件数を読み込めませんでした' } : kpi)
     : kpis
   const tabsWithCounts = TABS.map((item) => {
     if (item.key === 'customer') return { ...item, label: `${item.label} ${loadState === 'ready' ? settings.length : '—'}` }
@@ -925,13 +933,17 @@ function LineNotificationsPage() {
   const renderKpiCard = (kpi: CustomerNotificationKpi) => (
     <KpiCard
       key={kpi.label}
+      presentation="card"
+      icon={null}
       title={kpi.label}
       value={typeof kpi.value === 'number' || kpi.value === null ? kpi.value : null}
       valueText={kpi.valueText ?? (typeof kpi.value === 'string' ? kpi.value : undefined)}
-      unit={kpi.unit ?? ''}
-      detail={kpi.note}
+      unit=""
+      detail={kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
+      help={kpi.note || undefined}
+      valueTone={kpi.label === '送れなかった' && typeof kpi.value === 'number' && kpi.value > 0 ? 'warning' : 'default'}
       loading={loadState === 'loading'}
-      action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '送れなかったものを見る', href: kpi.href } : undefined}
+      action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '見る', href: kpi.href } : undefined}
     />
   )
   // N-340: 入力のたびに端末へ下書きを置き、未保存の印を付ける。
@@ -1096,33 +1108,42 @@ function LineNotificationsPage() {
     setBusy(null)
   }
 
-  return <div className={`flex flex-col gap-4 ${expandedSetting === null ? 'v8-ro-notifications-page' : ''}`} data-design-node={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}>
-    {expandedSetting === null && <ReadonlyHeaderV8 title="LINE通知" description="注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。" />}
-    {expandedSetting === null ? <MergedTabs basePath="/line-notifications" tabs={tabsWithCounts} active={tab} defaultKey="customer" /> : null}
+  const tabHref: Record<string, string> = {
+    customer: '/line-notifications',
+    operator: '/line-notifications?tab=operator',
+    failures: '/line-notifications?tab=failures',
+    history: '/line-notifications?tab=history',
+  }
+  const statusOf = (setting: EcNotificationSetting): { label: string; tone: 'good' | 'muted' | 'warn' } => setting.isEnabled
+    ? { label: '出している', tone: 'good' }
+    : isIncomplete(setting) ? { label: '文面が未設定', tone: 'warn' } : { label: '止めている', tone: 'muted' }
+
+  return <SbSettingsScreen
+    boardId={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}
+    layout="narrow-nav"
+    title="LINE通知"
+    description="注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。"
+  >
+    {expandedSetting === null ? <nav className={styles.tabs} aria-label="LINE通知の中の切り替え">
+      {tabsWithCounts.map((item) => <Link key={item.key} href={tabHref[item.key]} className={styles.tab} aria-current={tab === item.key ? 'page' : undefined}>{item.label}</Link>)}
+    </nav> : null}
     {/*
-      * #634: 運用者タブの件数だけが取れなかったとき、タブの「取得失敗」の
-      * 隣に直す道を出す。出さないと、ページ全体を開き直す以外に
-      * 読み直す手段がない。押すと load() が件数の取得からやり直す。
+      * #634・M031：運用者タブの件数だけが取れなかったとき、その場所に小さく1行だけ。403 は押しても直らないので再試行の口は出さない。
       */}
-    {/*
-      ★V7 `x63W5x`：補助のデータ（運用者タブの件数）だけ取れないときは、
-      その場所に小さく1行だけ。黄色の帯にしない。
-    */}
     {expandedSetting === null && (operatorState === 'error' || operatorState === 'forbidden') ? (
-      <p role="alert" className="text-ink-secondary text-xs">
+      <p role="alert" className={styles.minor}>
         {isForbiddenOrRateLimited(operatorCountError)
-          // M031: 403・429は共通の言い方（権限の案内・待ち案内）へ切り替える。
           ? loadFailureNotice(operatorCountError, '運用者へのお知らせ')
           : '運用者へのお知らせの件数を読み込めませんでした。'}
-        {/* M031: 403は押しても直らないので再試行の口は出さない。 */}
         {isForbidden(operatorCountError) ? null : (
-          <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void load()}>もう一度</button>
+          <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度</button>
         )}
       </p>
     ) : null}
+    {!canManage && expandedSetting === null ? <p className={styles.viewerBand} role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</p> : null}
     {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
-    {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
+    {tab === 'operator' ? renderOperatorRules?.(selectedAccountId) : null}
     {tab === 'customer' && expandedSetting ? <>
       <CustomerNotificationEditor
         setting={expandedSetting}
@@ -1195,61 +1216,41 @@ function LineNotificationsPage() {
       onConfirm={pendingToggle ? () => { const s = pendingToggle; setPendingToggle(null); void save(s, !s.isEnabled) } : undefined}
       onCancel={() => setPendingToggle(null)}
     />
-    {tab === 'customer' && !expandedSetting ? <div
-      data-design-node="festr"
-      data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}
-      className="flex flex-col gap-4"
-    >
-    {/* 板 g3iDs：数カードは4枚をそのまま並べる。 */}
-    <div data-design="KPIs" data-ro-kpis="true" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {tab === 'customer' && !expandedSetting ? <>
+    {/* 板 g3iDs：数のカード4枚（共通の KpiBand・KpiCard）。 */}
+    <KpiBand data-kpi-presentation="cards" gridClassName={styles.kpis} data-design="KPIs">
       {kpisWithSendCountsState.map(renderKpiCard)}
-    </div>
-    {/*
-      R611: 一覧の取得に失敗したときは、上部の件数も取れていないことを添え、
-      下の一覧の再読み込みへ案内する。読み直しの口は一覧の ListState が持つ
-      ので、ここにはボタンも帯も置かない。赤も使わない（★V7 `x63W5x`）。
-    */}
-    {loadState === 'error' ? <p className="text-xs text-ink-secondary">お知らせの件数は取得失敗です。下の一覧の「もう一度読み込む」から読み直してください。</p> : null}
-    <div><NoteBar help="お知らせは売り込みではなく取引に必要な連絡です" helpLabel="お知らせの意味">これは「お知らせ」であって「売り込みの配信」ではありません。お客さまが配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
-    {/*
-      send-countsだけ読み込めなかったときの部分表示。一覧全体は残す。
-      共通ボタン（副・小）で読み直せる。赤は使わない（★V7 `x63W5x`）。
-    */}
-    {sendCountsFailed && loadState === 'ready' ? <div className="flex flex-wrap items-center gap-2">
-      <p className="text-xs text-ink-faint">送信件数を読み込めませんでした。時間をおいて、もう一度お試しください。</p>
+    </KpiBand>
+    {/* R611: 一覧の取得に失敗したときは、上部の件数も取れていないことを添える（赤は使わない）。 */}
+    {loadState === 'error' ? <p className={styles.minor}>お知らせの件数は取得失敗です。下の一覧の「もう一度読み込む」から読み直してください。</p> : null}
+    <p className={styles.infoBand}>
+      <Info className={styles.bandIcon} aria-hidden="true" />
+      <span>これは「お知らせ」であって「売り込みの配信」ではありません。お客さまが配信を止めていても、取引に必要な連絡は届きます。</span>
+    </p>
+    {sendCountsFailed && loadState === 'ready' ? <div className={styles.inlineRow}>
+      <p className={styles.minor}>送信件数を読み込めませんでした。時間をおいて、もう一度お試しください。</p>
       <Button variant="secondary" size="compact" onClick={() => void load()}>もう一度読み込む</Button>
     </div> : null}
 
     {/* 板 g3iDs：絞り込みは共通の札。並びは送った数が多い順のまま。 */}
-    <div className="flex flex-wrap items-center gap-2" aria-label="お知らせの絞り込み">
-      {customerFilters.map(([value, label]) => <FilterChip key={value} selected={filter === value} onChange={() => setFilter(value)}>{label} {loadState === 'ready' ? filterCount(value) : '—'}</FilterChip>)}
+    <div className={styles.toolbar} aria-label="お知らせの絞り込み">
+      {customerFilters.map(([value, label]) => <FilterChip key={value} selected={filter === value} icon={value === 'all' ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />} onChange={() => setFilter(value)}>{`${label} ${loadState === 'ready' ? filterCount(value) : '—'}`}</FilterChip>)}
     </div>
 
     {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
-    <section className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas">
+    <section className={styles.table} data-design-node="festr" data-list-state={loadState === 'ready' && settings.length === 0 ? 'empty' : loadState}>
       {loadState === 'loading' ? (
         <div aria-busy="true" aria-label="顧客へのお知らせを読み込んでいます">
           <DelayedSkeleton
             loading
             skeleton={(
-              <div aria-hidden="true">
-                <div style={{ display: 'flex', gap: 24, padding: '12px 16px' }}>
-                  <Skeleton height={12} width={80} />
-                  <Skeleton height={12} width={90} />
-                  <Skeleton height={12} width={50} />
-                  <Skeleton height={12} width={60} />
-                  <Skeleton height={12} width={90} />
-                  <Skeleton height={12} width={40} />
-                </div>
+              <div aria-hidden="true" className={styles.skeleton}>
                 {[0, 1, 2, 3, 4].map((row) => (
-                  <div key={row} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderTop: '1px solid var(--color-hairline)' }}>
-                    <span style={{ flex: 1 }}><Skeleton height={14} width="50%" /></span>
+                  <div key={row} className={styles.skeletonRow}>
+                    <span className={styles.skeletonGrow}><Skeleton height={14} width="50%" /></span>
                     <Skeleton height={13} width={110} />
-                    <Skeleton height={13} width={60} />
-                    <Skeleton height={13} width={60} />
                     <Skeleton height={20} width={76} />
-                    <Skeleton height={30} width={96} />
                   </div>
                 ))}
               </div>
@@ -1260,21 +1261,39 @@ function LineNotificationsPage() {
         : loadState === 'forbidden' ? <ListState kind="forbidden" />
         : loadState === 'error' ? <ListState kind="error" title="顧客へのお知らせを表示できませんでした" error={customerLoadError ?? undefined} onRetry={() => void load()} />
         : settings.length === 0 ? <ListState kind="empty" title="顧客へのお知らせはまだありません" description="EC連携の取引イベントを接続すると、ここで種類ごとに管理できます。" />
-        : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="絞り込みを変えてください。" />
-        : <DataTable><thead><tr><Th>お知らせの種類（きっかけ）</Th><Th>いつ送るか</Th><Th>だれに</Th><Th>この30日</Th><Th>状態</Th><Th>出す</Th><Th>内容を編集</Th></tr></thead><tbody>
-        {visible.map((setting) => <Tr key={setting.eventType}>
-          <NameCell name={setting.title?.trim() || setting.label} sub={deliveryWords(setting).trigger} />
-          <Td>{timingLabel(setting)}</Td>
-          <Td>{audienceLabel(setting)}</Td>
-          <Td>{sendCountsFailed ? '取得失敗' : `${sent30dOf(setting.eventType) ?? '—'}通`}</Td>
-          <Td><span className={`whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-semibold ${setting.isEnabled ? 'bg-success-bg text-success' : !setting.isEnabled && isIncomplete(setting) ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>{setting.isEnabled ? '出している' : isIncomplete(setting) ? '文面が未設定' : '止めている'}</span></Td>
-          <Td><Toggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /></Td>
-          <Td><div className="flex justify-end"><Button variant="secondary" size="compact" onClick={() => setExpanded(setting.eventType)}>内容を編集</Button></div></Td>
-        </Tr>)}
-        </tbody></DataTable>}
+        : visible.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合うものはありません" description="札や検索を外すと、すべて出ます" action={<Button variant="secondary" onClick={() => setFilter('all')}>条件を外す</Button>} />
+        : <div role="table" aria-label="顧客へのお知らせ">
+          <div role="rowgroup">
+            <div role="row" className={`${styles.row} ${styles.headRow}`}>
+              <span role="columnheader">お知らせの種類（きっかけ）</span>
+              <span role="columnheader">いつ送るか</span>
+              <span role="columnheader">だれに</span>
+              <span role="columnheader">この30日</span>
+              <span role="columnheader">状態</span>
+              <span role="columnheader">出す</span>
+              <span role="columnheader"><span className={styles.srOnly}>内容を編集</span></span>
+            </div>
+          </div>
+          <div role="rowgroup">
+            {visible.map((setting) => {
+              const status = statusOf(setting)
+              const sent = sendCountsFailed ? null : sent30dOf(setting.eventType)
+              const name = setting.title?.trim() || setting.label
+              return <div role="row" key={setting.eventType} className={styles.row}>
+                <span role="cell" className={styles.name} title={`${name}（${deliveryWords(setting).trigger}）`}>{deliveryWords(setting).trigger || name}</span>
+                <span role="cell" className={styles.cell} title={timingLabel(setting)}>{timingLabel(setting)}</span>
+                <span role="cell" className={styles.cell} title={audienceLabel(setting)}>{audienceLabel(setting)}</span>
+                <span role="cell" className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : '—'}</span>
+                <span role="cell"><span className={styles.status} data-tone={status.tone}><span className={styles.dot} aria-hidden="true" />{status.label}</span></span>
+                <span role="cell">{canManage ? <NotificationToggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /> : <span className={styles.minor}>{setting.isEnabled ? 'オン' : 'オフ'}</span>}</span>
+                <span role="cell" className={styles.actions}>{canManage ? <Button variant="secondary" onClick={() => setExpanded(setting.eventType)} aria-label={`${name}の内容を編集`}>内容を編集</Button> : null}</span>
+              </div>
+            })}
+          </div>
+        </div>}
     </section>
-    </div> : null}
-  </div>
+    </> : null}
+  </SbSettingsScreen>
 }
 
 /*
@@ -1282,15 +1301,7 @@ function LineNotificationsPage() {
  * 画面の hook を作り替えず、実APIと同じ非同期境界のまま
  * 逆順応答・保存失敗・狭幅の並びを確かめられるようにする。
  */
-/* ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/line-notifications）。運用者へのお知らせの一覧は今の部品を差し込む。 */
-function LineNotificationsEntry() {
-  const theme = useAdminTheme()
-  return theme === 'v8'
-    ? <LineNotificationsScreen renderOperatorRules={(lineAccountId) => <OperatorNotificationRules lineAccountId={lineAccountId} />} />
-    : <LineNotificationsPage />
-}
-
-const LineNotificationsPageWithTestSupport = Object.assign(LineNotificationsEntry, {
+const LineNotificationsPageWithTestSupport = Object.assign(LineNotificationsPage, {
   __testing: {
     CustomerNotificationEditor,
     clearCustomerDraft,

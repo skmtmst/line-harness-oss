@@ -84,7 +84,9 @@ const GUARDED = [
   'app/rich-menus/edit/page.tsx',
   'app/rich-menus/new/create-v8.tsx',
   'app/rich-menus/new/page.tsx',
-  'app/settings/file-scan/page.tsx',
+  // ★V8：入口（app/settings/file-scan/page.tsx）は src/v8 の画面を出すだけ。番兵は画面と同じ場所のフックが持つ。
+  'v8/settings/file-scan/screen.tsx',
+  'v8/settings/features/screen.tsx',
   'app/staff/new/page.tsx',
   'app/tags/field-editor-v8.tsx',
   'app/tags/fields/edit/page.tsx',

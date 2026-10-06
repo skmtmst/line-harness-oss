@@ -6163,14 +6163,13 @@ export const RECIPES = [
 ]
 
 export const MANUAL_LINKS = {
+  /* ★V8 cIdA2 の3行（開けます1・開けません1・まだ決めていない1）。 */
   items: [
-    { key: '2-1', keyKind: 'screen', name: '受信箱', url: 'https://help.line-harness.example/inbox', status: 'ok', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 200, lastError: null, version: 2 },
-    { key: '3-1', keyKind: 'screen', name: '友だち', url: 'https://help.line-harness.example/friends', status: 'ok', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 200, lastError: null, version: 2 },
-    { key: '4-1', keyKind: 'screen', name: '友だち属性・タグ', url: 'https://help.line-harness.example/tags', status: 'broken', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 404, lastError: 'HTTP_404', version: 3 },
-    { key: '5-1', keyKind: 'screen', name: 'シナリオ配信', url: 'https://help.line-harness.example/scenarios', status: 'ok', lastCheckedAt: '2026-08-27T19:00:00.000Z', lastHttpStatus: 200, lastError: null, version: 2 },
+    { key: '2-1', keyKind: 'screen', name: '受信箱', url: 'https://help.musubo.example/inbox', status: 'ok', lastCheckedAt: '2026-09-30T19:00:00.000Z', lastHttpStatus: 200, lastError: null, version: 2 },
+    { key: '4-1', keyKind: 'screen', name: '友だち属性・タグ', url: 'https://help.musubo.example/tags', status: 'broken', lastCheckedAt: '2026-09-30T19:00:00.000Z', lastHttpStatus: 404, lastError: 'HTTP_404', version: 3 },
     { key: '33-1', keyKind: 'screen', name: 'LINEアカウント', url: null, status: 'broken', lastCheckedAt: null, lastHttpStatus: null, lastError: 'URL_UNSET', version: 1 },
   ],
-  total: 5,
+  total: 3,
   brokenCount: 2,
 }
 
@@ -6227,10 +6226,10 @@ export const EC_NOTIFICATION_SETTINGS = [
   ecNotification('ec.order.shipped', '発送した', 'shipping', 3),
   ecNotification('ec.order.bank_transfer_reminder', 'お届けした', 'shipping', 4),
   ecNotification('ec.subscription.upcoming', '定期便が続いた', 'subscription', 5),
-  ecNotification('ec.subscription.payment_failed', '定期便を止めた', 'subscription', 6),
+  /* 設計の「止めている 2」（★V8 g3iDs では定期便の決済失敗が止めている）。 */
+  ecNotification('ec.subscription.payment_failed', '定期便を止めた', 'subscription', 6, false),
   ecNotification('ec.order.cancelled', 'キャンセルした', 'support', 7),
-  /* 設計の「止めている 2」。 */
-  ecNotification('ec.order.refunded', '返金した', 'support', 8, false),
+  ecNotification('ec.order.refunded', '返金した', 'support', 8),
   /* 設計の「文面が未設定 1」。**空文字は「まだ決めていない」で、0件ではない。** */
   { ...ecNotification('ec.subscription.card_updated', '入荷待ちになった', 'order', 9, false), title: null, introText: '', outroText: '' },
 ]
@@ -6267,12 +6266,13 @@ export const LINE_NOTIFICATION_METRICS = {
 
 /** 機能24。送信履歴から数えたJSTの今日・この30日（`send-counts` の見本）。 */
 export const LINE_NOTIFICATION_SEND_COUNTS = {
-  sentToday: 34,
-  sentLast30d: 412,
+  sentToday: 38,
+  sentLast30d: 1041,
+  /* ★V8 g3iDs の並び（画面は今日の数の多い順）：注文確定・発送・入金・振込期限・キャンセル・返金・定期便・止めている・未設定。この30日は絵の数。 */
   byEventType: EC_NOTIFICATION_SETTINGS.map((setting, index) => ({
     eventType: setting.eventType,
-    today: [12, 8, 6, 3, 2, 1, 1, 1, 0][index],
-    last30d: [148, 96, 74, 41, 23, 12, 9, 6, 3][index],
+    today: [12, 6, 8, 3, 0, 0, 2, 1, 0][index],
+    last30d: [412, 86, 398, 12, 3, 0, 9, 4, 0][index],
   })),
   period: { today: '2026-08-25', from30d: '2026-07-27', to: '2026-08-25' },
 }
@@ -6958,11 +6958,11 @@ export const EC_ORDERS = {
 
 export const EC_ACTION_EXECUTIONS = {
   items: [
+    /* ★V8 GmVR5 の5行の並び（処理完了・処理完了・処理中・送信なし・失敗）。数の帯は summary のまま。 */
     { id: 'ec-action-1', eventId: 'ece-1', eventType: 'ec.order.confirmed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T08:49:00.000Z', nextRetryAt: null, version: 2, receivedAt: '2026-08-25T08:48:00.000Z', orderNumber: 'NEN-12492', customerName: '高橋 直人', retryAvailable: false },
-    { id: 'ec-action-2', eventId: 'ece-2', eventType: 'ec.order.payment_received', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'processing', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T08:21:00.000Z', nextRetryAt: null, version: 1, receivedAt: '2026-08-25T08:20:00.000Z', orderNumber: 'NEN-12488', customerName: '前田 さくら', retryAvailable: false },
     { id: 'ec-action-3', eventId: 'ece-3', eventType: 'ec.order.shipped', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'succeeded', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T07:31:00.000Z', nextRetryAt: null, version: 1, receivedAt: '2026-08-25T07:30:00.000Z', orderNumber: 'NEN-12471', customerName: '木村 亮', retryAvailable: false },
+    { id: 'ec-action-2', eventId: 'ece-2', eventType: 'ec.order.payment_received', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'processing', attemptCount: 1, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: '2026-08-25T08:21:00.000Z', nextRetryAt: null, version: 1, receivedAt: '2026-08-25T08:20:00.000Z', orderNumber: 'NEN-12488', customerName: '前田 さくら', retryAvailable: false },
     { id: 'ec-action-4', eventId: 'ece-4', eventType: 'ec.order.confirmed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'skipped', attemptCount: 0, maxAttempts: 3, errorCode: 'IDENTITY_PENDING', errorMessage: 'LINEの友だちとのつき合わせが必要です', lastAttemptedAt: null, nextRetryAt: null, version: 1, receivedAt: '2026-08-25T08:40:00.000Z', orderNumber: 'NEN-12486', customerName: null, retryAvailable: false },
-    { id: 'ec-action-5', eventId: 'ece-5', eventType: 'ec.subscription.payment_failed', actionType: 'line_notification', ruleVersion: 'ec-rule-v4', status: 'pending', attemptCount: 0, maxAttempts: 3, errorCode: null, errorMessage: null, lastAttemptedAt: null, nextRetryAt: '2026-08-25T09:05:00.000Z', version: 1, receivedAt: '2026-08-25T08:55:00.000Z', orderNumber: 'NEN-12480', customerName: '中村 彩', retryAvailable: false },
     { id: 'ec-action-6', eventId: 'ece-6', eventType: 'ec.order.refunded', actionType: 'conversion_mileage_adjustment', ruleVersion: 'ec-rule-v4', status: 'retryable_failed', attemptCount: 1, maxAttempts: 3, errorCode: 'LINE_REJECTED', errorMessage: 'LINEが送信を受け付けませんでした', lastAttemptedAt: '2026-08-25T06:01:00.000Z', nextRetryAt: '2026-08-25T09:10:00.000Z', version: 2, receivedAt: '2026-08-25T06:00:00.000Z', orderNumber: 'NEN-12402', customerName: '石田 未来', retryAvailable: true },
   ],
   total: 2486,
@@ -7286,15 +7286,19 @@ export const OPERATION_HEALTH = {
     results: [
       ['line_connection', '3アカウントすべて 応答あり'],
       ['message_quota', '86,420 / 200,000通'],
-      ['external_integrations', '管理API 応答あり ／ EC 148件/日'],
+      ['external_integrations', '取り込みが3件失敗'],
       ['webhook', '送る 6本・受ける 3本 ／ 失敗 0'],
       ['dispatch_jobs', '待っている 148通 ／ 遅れ 0分'],
       ['friend_change', '今日 ＋16 ／ －6（純増 ＋10）'],
+      ['monitoring_heartbeat', '5分ごとの確認 応答あり'],
+      ['infra_canary', 'DB・保管庫・順番待ち 応答あり'],
+      ['credential_expiry', 'いちばん近い期限 82日後'],
     ].map(([checkKey, summary], index) => ({
       id: `operation-health-result-${index + 1}`,
       runId: 'operation-health-20260825-1145',
       checkKey,
-      status: 'normal',
+      /* ★V8 Y4LkX1：API・外部連携だけ「注意」（取り込みが3件失敗）。 */
+      status: checkKey === 'external_integrations' ? 'warning' : 'normal',
       summary,
       value: {},
       threshold: {},
@@ -7307,6 +7311,24 @@ export const OPERATION_HEALTH = {
   nextCheckAt: '2026-08-25T11:50:00+09:00',
   serverNow: '2026-08-25T11:46:00+09:00',
 }
+
+/** ★V8 Y4LkX1 の「開いている異常 1件」。API・外部連携の注意（受領前・通知1件送信済み）。 */
+export const OPERATION_ALERTS = [
+  {
+    id: 'operation-alert-1', lineAccountId: 'visual-qa-account', checkKey: 'external_integrations',
+    status: 'open', severity: 'warning', summary: '取り込みが3件失敗',
+    sourceRunId: 'operation-health-20260825-1145',
+    firstDetectedAt: '2026-10-02T10:15:00+09:00', lastDetectedAt: '2026-10-02T10:15:00+09:00',
+    acknowledgedAt: null, acknowledgedById: null, acknowledgementNote: null, resolvedAt: null,
+    version: 1, reopenedCount: 0,
+    createdAt: '2026-10-02T10:15:00+09:00', updatedAt: '2026-10-02T10:15:00+09:00',
+    notification: { queued: 0, sending: 0, sent: 1, failed: 0, unconfigured: 0, total: 1 },
+    events: [{
+      id: 'operation-alert-1-opened', action: 'opened', severity: 'warning', summary: '取り込みが3件失敗',
+      actorId: null, note: null, alertVersion: 1, createdAt: '2026-10-02T10:15:00+09:00',
+    }],
+  },
+]
 
 export const OPERATION_CONTROL_PREVIEW = {
   control: {
