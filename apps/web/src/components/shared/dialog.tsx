@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import React, { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
 import Button from './button'
@@ -12,6 +12,13 @@ export type DialogProps = {
   open: boolean
   /** V8 の幅。v7 の寸法は維持する。 */
   size?: 'medium' | 'large'
+  /**
+   * ★V8：絵の窓の幅（px）。絵ごとに 480〜720 とばらばらなので、画面が絵の値を渡す。
+   * 渡さなければ size の幅のまま。v7 では効かない。
+   */
+  designWidth?: number
+  /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。v7 では効かない。 */
+  designTop?: number
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
   /** 操作の左に出す現在の手順など。 */
@@ -60,6 +67,8 @@ export type DialogProps = {
 export default function Dialog({
   open,
   size = 'medium',
+  designWidth,
+  designTop,
   steps,
   footerLead,
   title,
@@ -142,6 +151,8 @@ export default function Dialog({
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-size={size}
+      data-design-width={designWidth ? '' : undefined}
+      style={designWidth ? ({ '--dialog-design-width': `${designWidth}px` } as CSSProperties) : undefined}
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >
@@ -200,7 +211,7 @@ export default function Dialog({
 
   if (!modal) return panel
   const overlay = (
-    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} onMouseDown={(event) => {
+    <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) onCancel()
     }}>
       {panel}

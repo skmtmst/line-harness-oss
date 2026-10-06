@@ -25,6 +25,8 @@ import {
   GoogleBusinessError,
   buildAuthorizeUrl,
   buildReplyDraftPrompt,
+  replyDraftRewriteChangeScore,
+  replyDraftRewriteFellShort,
   codeChallengeFor,
   createCodeVerifier,
   exchangeAuthorizationCode,
@@ -1011,7 +1013,10 @@ restaurantGoogle.get('/api/restaurant-test/google/reviews', async (c) => {
     where.push('(comment LIKE ? OR reviewer_display_name LIKE ?)');
     binds.push(`%${q}%`, `%${q}%`);
   }
-  const orderSql = order === 'oldest' ? 'create_time ASC' : order === 'rating_low' ? 'star_rating ASC, create_time DESC' : order === 'rating_high' ? 'star_rating DESC, create_time DESC' : 'create_time DESC';
+  // 口コミが編集されるとGoogleは update_time だけを新しくする。画面の「受信」も新しい方を出すので、
+  // 並び替えも COALESCE(update_time, create_time) を基準にして表示順と一致させる。
+  const receivedAt = 'COALESCE(update_time, create_time)';
+  const orderSql = order === 'oldest' ? `${receivedAt} ASC` : order === 'rating_low' ? `star_rating ASC, ${receivedAt} DESC` : order === 'rating_high' ? `star_rating DESC, ${receivedAt} DESC` : `${receivedAt} DESC`;
   const db = dbFor(c.env, store.id);
   const total = await db.prepare(`SELECT COUNT(*) AS n FROM rt_google_reviews WHERE ${where.join(' AND ')}`).bind(...binds).first<{ n: number }>();
   const rows = await db
@@ -1077,19 +1082,43 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
     return fail(c, 409, 'この口コミにはすでに返信があります', { code: 'already_replied' });
   }
   if (!c.env.AI) return fail(c, 503, 'AI下書きはこの環境では使えません', { code: 'ai_unavailable' });
-  const body = await c.req.json<{ mode?: string }>().catch(() => ({}) as { mode?: string });
+  const body = await c.req.json<{ mode?: string; baseText?: string }>().catch(() => ({}) as { mode?: string; baseText?: string });
   const mode = body.mode === 'shorter' || body.mode === 'polite' ? body.mode : 'new';
+  // 「短くする」「丁寧にする」は、保存前に画面で直した文章を元にする。
+  // 画面から送られてこなかったときだけ、保存済みの下書きを使う。
+  const base = (typeof body.baseText === 'string' ? body.baseText.slice(0, 4096) : (row.reply_draft ?? '')).trim();
+  if (mode !== 'new' && !base) return fail(c, 400, '先に下書きを作るか、返信文を入力してください', { code: 'draft_required' });
   const connection = await connectionFor(c, store.id);
-  const prompt = buildReplyDraftPrompt({
-    storeTitle: connection?.location_title ?? store.name,
-    starRating: row.star_rating,
-    comment: row.comment,
-    mode,
-    previousDraft: row.reply_draft,
-  });
+  const storeTitle = connection?.location_title ?? store.name;
+  const generateOnce = async (strict: boolean) => {
+    const prompt = buildReplyDraftPrompt({
+      storeTitle,
+      starRating: row.star_rating,
+      comment: row.comment,
+      mode,
+      previousDraft: base,
+      strict,
+    });
+    return runGoogleAi(c, prompt, { temperature: mode === 'new' ? 0.4 : 0.3, maxTokens: 600 });
+  };
   let text = '';
   try {
-    text = await runGoogleAi(c, prompt, { temperature: 0.4, maxTokens: 600 });
+    text = await generateOnce(false);
+    // 1回目で目に見えて変わらなかったときだけ、条件を厳しくして作り直す。
+    // 2回のうち変化が大きい方を採用する。
+    if (replyDraftRewriteFellShort(mode, base, text)) {
+      const retried = await generateOnce(true).catch(() => '');
+      if (retried && replyDraftRewriteChangeScore(mode, base, retried) > replyDraftRewriteChangeScore(mode, base, text)) {
+        text = retried;
+      }
+      // 作り直しても元から十分に変わらなかった（無変化・逆方向・目安から遠い）結果は
+      // 書き換えの失敗として扱い、下書きには保存しない。画面は既存のエラー表示で
+      // やり直しを促す。不十分な文章を成功として保存しないため。
+      if (replyDraftRewriteFellShort(mode, base, text)) {
+        console.error('[restaurant-google] AI rewrite fell short', { mode, baseLength: base.length, resultLength: text.trim().length });
+        return fail(c, 502, '元の文章から十分に書き換えられませんでした。もう一度お試しください', { code: 'rewrite_failed' });
+      }
+    }
   } catch (error) {
     console.error('[restaurant-google] AI draft failed', { code: error instanceof GoogleAiTimeout ? 'timeout' : 'provider_failure' });
     return fail(c, error instanceof GoogleAiTimeout ? 504 : 502, 'AIの下書き作成に失敗しました。もう一度お試しください', { code: error instanceof GoogleAiTimeout ? 'ai_timeout' : 'ai_failed' });

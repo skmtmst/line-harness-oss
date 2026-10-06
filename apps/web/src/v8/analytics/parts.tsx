@@ -1,0 +1,146 @@
+'use client'
+
+/*
+ * ★V8 分析の画面で共通に使う処理（app/analytics/page.tsx から写した）。
+ * src/v8 からは @/app を読めないので、読み込み・数の出し方・期間・CSV を
+ * ここへ写す。中身（判定・文言）は今の画面と同じ。
+ */
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import type { AnalyticsMetric, AnalyticsMetricState } from '@/lib/api'
+import { csvCell } from '@/lib/presentation'
+import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
+
+export function downloadCsv(filename: string, rows: Array<Array<string | number | null | undefined>>) {
+  const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n')
+  const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+/** 板の頭の「CSV で書き出す」へ、いま開いている見かたの書き出しを登録する。 */
+export type ExportAction = { onClick: () => void; disabled: boolean }
+export const AnalyticsExportContextV8 = createContext<((action: ExportAction | null) => void) | null>(null)
+
+export function useRegisterExport(onClick: () => void, disabled: boolean) {
+  const register = useContext(AnalyticsExportContextV8)
+  const action = useRef(onClick)
+  action.current = onClick
+  useEffect(() => {
+    register?.({ onClick: () => action.current(), disabled })
+    return () => register?.(null)
+  }, [register, disabled])
+}
+
+export const RANGES = [7, 30, 90]
+
+/** 今の画面と同じ日本時間の暦日の範囲。 */
+export function rangeFor(days: number, now = new Date()): { from: string; to: string } {
+  const jstNow = new Date(now.getTime() + 9 * 3600_000)
+  return {
+    from: new Date(jstNow.getTime() - days * 24 * 3600_000).toISOString().slice(0, 10),
+    to: jstNow.toISOString().slice(0, 10),
+  }
+}
+
+export type OverviewResult<T> =
+  | { success: true; data: T }
+  | { success: false; error: string }
+
+/** 概要の読み込み。key が変わった時と retry の時だけ読み直す。 */
+export function useOverview<T>(load: () => Promise<OverviewResult<T>>, key: string) {
+  const [data, setData] = useState<T | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [reloadSeq, setReloadSeq] = useState(0)
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError('')
+    setData(null)
+    void load()
+      .then((result) => {
+        if (!active) return
+        if (result.success) setData(result.data)
+        else setError(result.error || '分析を表示できませんでした')
+      })
+      .catch(() => {
+        if (active) setError('分析を表示できませんでした')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, reloadSeq])
+  return { data, loading, error, retry: () => setReloadSeq((n) => n + 1) }
+}
+
+export function metricText(
+  value: AnalyticsMetric<number | string>,
+  options?: { percent?: boolean; currency?: boolean },
+) {
+  if (value.value === null) return '—'
+  if (typeof value.value === 'string') return value.value
+  if (options?.percent) return `${Math.round(value.value * 1000) / 10}%`
+  if (options?.currency) return `${formatNumber(value.value)}円`
+  return formatNumber(value.value)
+}
+
+/** 実測（available）か途中まで（partial）のときだけ数を出す。集計待ちの 0 を実測に見せない。 */
+export function shownValue(metric: AnalyticsMetric<number>): number | null {
+  if (metric.value === null) return null
+  return metric.state === 'available' || metric.state === 'partial' ? metric.value : null
+}
+
+export const METRIC_STATE_TEXT: Record<AnalyticsMetricState, string> = {
+  available: '',
+  partial: '一部だけ集計できています',
+  pending: '集計を待っています',
+  insufficient: '数が少なく出せません',
+  unavailable: '未取得',
+  failed: '集計を読めませんでした。もう一度お試しください',
+}
+
+export type KpiCardState = { detail: string; description?: string; help?: string; onRetry?: () => void }
+
+/** 理由があるときは短い状態を下の行へ、理由の全文は「？」へ。failed だけ読み直しを付ける。 */
+export function metricCardState(
+  metric: Pick<AnalyticsMetric<unknown>, 'state' | 'reason'>,
+  fallback: KpiCardState,
+  retry?: () => void,
+): KpiCardState {
+  const retryable = metric.state === 'failed' && retry ? { onRetry: retry } : {}
+  if (!metric.reason) return { ...fallback, ...retryable }
+  return { detail: METRIC_STATE_TEXT[metric.state] || '未取得', description: metric.reason, ...retryable }
+}
+
+export function formatAnalyticsDateTime(value: string | null): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return formatDateTime(date)
+}
+
+export function formatAnalyticsDate(value: string | null): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return formatDay(date)
+}
+
+const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土'] as const
+export function analyticsWeekday(date: string): string {
+  return WEEKDAY_JP[new Date(`${date}T00:00:00Z`).getUTCDay()] ?? ''
+}
+
+/** YYYY-MM-DD を「9/15」に。 */
+export function shortDate(date: string): string {
+  return `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`
+}
+
+export function periodCaption(from: string, to: string, cutoffAt: string): string {
+  return `集計期間 ${formatAnalyticsDate(from)}〜${formatAnalyticsDate(to)} ／ データ締切 ${formatAnalyticsDateTime(cutoffAt)}`
+}

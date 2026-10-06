@@ -58,7 +58,8 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
   })
 
   it('フォームはフォーム総件数を出す', () => {
-    const src = read('form-submissions/page.tsx')
+    // 2026-10-06：入口（page.tsx）は新しい一覧（src/v8/forms/list）を読む。相対 import ではないので直に読む。
+    const src = read('../v8/forms/list.tsx')
     // R12: 総数は「すべて」の行に出し、見出しには重ねて出さない。
     // R602補足: 未取得・読込中・取得失敗の総数は不明なので出さない
     // （null は数を出さない約束。偽ゼロにしない）。
@@ -83,13 +84,20 @@ describe('Issue #709: 一覧表は1440pxの初期表示に操作列まで収め�
   })
 
   it('フォーム一覧は最小幅を実効幅内に収める', () => {
-    const src = read('form-submissions/page.tsx')
-    const css = read('form-submissions/list-v8.module.css')
-    expect(src).toContain('className={styles.table}')
-    const table = css.match(/\.table\s*\{[^}]*\}/)?.[0]
-    const minWidth = table?.match(/min-width:\s*(\d+)px/)
-    expect(minWidth, '表の最小幅が付いている').toBeTruthy()
-    expect(Number(minWidth![1])).toBeLessThanOrEqual(800)
+    // 2026-10-06：新しい一覧（src/v8/forms/list）は共通の表（DataTable）に列の幅を渡す。
+    // 表に最小幅を付けないので、1440 で操作列（「…」）まで横にはみ出さない。列の幅の合計で見張る。
+    const src = read('../v8/forms/list.tsx')
+    const css = read('../v8/forms/list.module.css')
+    const globals = read('globals.css')
+    expect(src).toContain('<DataTable>')
+    expect(css).not.toMatch(/min-width:\s*\d+px/)
+    const cols = ['dest', 'status', 'answers', 'url', 'menu'].map((name) => {
+      const value = globals.match(new RegExp(`--tpl-fm-col-${name}:\\s*(\\d+)px`))
+      expect(value, `--tpl-fm-col-${name}`).toBeTruthy()
+      return Number(value![1])
+    })
+    // 1440 の表の幅は 988（板 1188 − フォルダの列 200）。名前の列に半分は残す。
+    expect(cols.reduce((sum, width) => sum + width, 0)).toBeLessThanOrEqual(988 / 2 + 100)
   })
 })
 
@@ -110,7 +118,8 @@ describe('Issue #709: リッチメニューの状態表示は共有StatusBadge�
  */
 describe('Issue #709: フォームのフォルダ追加は止まっている理由を常時表示する', () => {
   it('止めずにつなぐ。押せない飾りの口は置かない', () => {
-    const src = read('form-submissions/page.tsx')
+    // 2026-10-06：入口（page.tsx）は新しい一覧（src/v8/forms/list）を読む。
+    const src = read('../v8/forms/list.tsx')
     expect(src).toContain('onAddFolder=')
     expect(src).not.toContain('addFolderDisabled')
     expect(src).not.toContain('フォルダ保存先はまだ接続されていません')
