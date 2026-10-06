@@ -59,6 +59,7 @@ import PageSizeSelect from '@/components/ui/page-size-select'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -852,8 +853,9 @@ export default function ScenariosListV8() {
             </thead>
             <tbody>
               {scenarios.map((s) => {
+                const rowFolder = s.folderId ? folders.find((f) => f.id === s.folderId) : undefined
                 const folderName = s.folderId
-                  ? folders.find((f) => f.id === s.folderId)?.name ?? 'フォルダ'
+                  ? rowFolder?.name ?? 'フォルダ'
                   : '未分類'
                 const showFolder = folders.length > 0 || s.folderId
                 const meta = [
@@ -907,19 +909,21 @@ export default function ScenariosListV8() {
                     <NameCell
                       name={
                         <div className={styles.nameRow}>
-                          <Link
-                            href={`/scenarios/detail?id=${s.id}`}
-                            title={s.name}
-                            className={styles.cellTitle}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                              event.preventDefault()
-                              goDetail(s.id)
-                            }}
-                          >
-                            {s.name}
-                          </Link>
+                          <FolderDotName folder={rowFolder ? { name: rowFolder.name, color: rowFolder.color } : null}>
+                            <Link
+                              href={`/scenarios/detail?id=${s.id}`}
+                              title={s.name}
+                              className={styles.cellTitle}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                                event.preventDefault()
+                                goDetail(s.id)
+                              }}
+                            >
+                              {s.name}
+                            </Link>
+                          </FolderDotName>
                           {s.lineAccountId === null && (
                             <span className={styles.miniBadge} title="全アカウントに適用されるシナリオです">
                               全アカウント共通
