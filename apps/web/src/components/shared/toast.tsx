@@ -2,6 +2,8 @@
 
 import { useEffect, useSyncExternalStore } from 'react'
 import { CircleAlert, CircleCheck, X } from 'lucide-react'
+import { humanizeErrorText } from './human-error-text'
+import { useV8LeaveList } from './overlay-utils'
 import styles from './toast.module.css'
 
 /** 知らせの種類。白地に印の色で分ける（緑=うまくいった、赤=できなかった）。 */
@@ -160,7 +162,8 @@ export function notifyToast(message: string, options?: NotifyToastOptions): () =
     ...items,
     {
       id,
-      message,
+      // 失敗の知らせは機械の文（API error: 500 など）を人の文へ置き換えてから出す。
+      message: (options?.tone ?? 'success') === 'error' ? humanizeErrorText(message) : message,
       tone: options?.tone ?? 'success',
       actionLabel: options?.actionLabel,
       onAction: options?.onAction,
@@ -215,17 +218,28 @@ export function undoLatestToast(): boolean {
 export function Toast({
   item,
   onDismiss,
+  leaving = false,
 }: {
   item: Omit<ToastItem, 'id'> & { id?: number }
   onDismiss?: () => void
+  /** 消えかけ（閉じる動きの間）。読み上げ・押す対象から外す。 */
+  leaving?: boolean
 }) {
   const Icon = item.tone === 'success' ? CircleCheck : CircleAlert
   const dismiss = onDismiss ?? (item.id !== undefined ? () => dismissToast(item.id as number) : undefined)
+  /*
+   * 1件ずつには role・aria-live を持たせない（動きの点検 14 番）。
+   * 読み上げは置き場所（ToastHost）の入れ物が最初から受け持つ。
+   * 1件ずつに付けると、入れ物と二重に読まれたり、入れ物ごと後から
+   * 差し込まれて最初の1件が読まれなかったりする。
+   */
   return (
     <div
       className={styles.toast}
-      role="status"
-      aria-live="polite"
+      data-toast=""
+      data-closing={leaving || undefined}
+      aria-hidden={leaving || undefined}
+      inert={leaving || undefined}
       onPointerEnter={item.id !== undefined ? () => pauseToast(item.id as number, 'pointer') : undefined}
       onPointerLeave={item.id !== undefined ? () => resumeToast(item.id as number, 'pointer') : undefined}
       onFocus={
@@ -298,11 +312,18 @@ export default function ToastHost() {
       resumeAllLifecycles()
     }
   }, [])
-  if (live.length === 0) return null
+  /* 消えるときは窓と同じ「消えかけ」で薄く消す（動きの点検 13 番）。 */
+  const shown = useV8LeaveList(live)
+  /*
+   * 読み上げの入れ物は空でも最初から置いておく（動きの点検 14 番）。
+   * 入れ物ごと後から差し込むと、読み上げ側が見張り始める前に中身が入り、
+   * 最初の知らせが読まれないことがある。role=status は全体を読み直す
+   * （aria-atomic=true が既定）ので、足された1件だけを読むよう false にする。
+   */
   return (
-    <div className={styles.host} aria-live="polite">
-      {live.map((item) => (
-        <Toast key={item.id} item={item} />
+    <div className={styles.host} role="status" aria-live="polite" aria-atomic="false" aria-label="知らせ">
+      {shown.map(({ item, leaving }) => (
+        <Toast key={item.id} item={item} leaving={leaving} />
       ))}
     </div>
   )

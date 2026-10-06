@@ -1,6 +1,9 @@
 'use client'
 
 
+import { RovingTbody } from '@/components/shared/row-roving'
+import { useDeferredDelete } from '@/lib/use-deferred-delete'
+import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { ListPageBody } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
@@ -19,6 +22,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
 import { useCallback, useDeferredValue, useEffect, useState } from 'react'
+import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -189,13 +193,14 @@ export default function RemindersListV8() {
   const [folders, setFolders] = useState<Folder[]>([])
   /** 「未分類」の件数。`null` は数えていない。 */
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
-  const [nameQuery, setNameQuery] = useState('')
+  /* 絞り込み・検索語・並び順・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
+  const [nameQuery, setNameQuery] = useListUrlParam('q')
   const deferredNameQuery = useDeferredValue(nameQuery.trim())
-  const [folderFilter, setFolderFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [folderFilter, setFolderFilter] = useListUrlParam('folder')
+  const [statusFilter, setStatusFilter] = useListUrlParam('status')
   const [perPage, setPerPage] = useState(20)
   // apLqS・Iffil の一覧は、次に送る予定が近いものから確認する。
-  const [sort, setSort] = useState('next')
+  const [sort, setSort] = useListUrlParam('sort', 'next')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -211,6 +216,7 @@ export default function RemindersListV8() {
   /* 窓・まとめての帯の状態。 */
   const [pauseTarget, setPauseTarget] = useState<ReminderRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ReminderRow | null>(null)
+  const deferredDelete = useDeferredDelete()
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
@@ -292,7 +298,9 @@ export default function RemindersListV8() {
     requestKey: JSON.stringify([selectedAccountId, deferredNameQuery, folderFilter, statusFilter, perPage, sort]),
     load: loadReminderPage,
     initialLimit: perPage,
+    pageUrlKey: 'page',
   })
+  useListScrollMemory(reminderList.loaded)
   /*
    * 押した瞬間の見せ方（★V8 サクサク感 B）。軽い操作は先にこの重ねで
    * 描き換え、裏で保存する。確定・失敗・取り消しで重ねを外し、読み直す。
@@ -308,7 +316,11 @@ export default function RemindersListV8() {
     sort,
     page: reminderList.page,
   })
-  const reminders = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : reminderList.items
+  const listedReminders = optimisticRows && optimisticRows.key === listContextKey ? optimisticRows.rows : reminderList.items
+  // 消して「元に戻す」を待っている行は出さない（動きの点検 17 番）。
+  const reminders = deferredDelete.hiddenCount > 0
+    ? listedReminders.filter((row) => !deferredDelete.isHidden(row.id))
+    : listedReminders
   const detailHref = (id: string) => `/reminders/detail?id=${encodeURIComponent(id)}`
   const filterActive = Boolean(nameQuery.trim() || folderFilter || statusFilter)
 
@@ -358,6 +370,35 @@ export default function RemindersListV8() {
   const runResume = (row: ReminderRow) => runToggle(row, true)
 
   /* ===== 削除 ===== */
+
+  /*
+   * 下書きのまま一度も予定を作っていないリマインダは、消しても誰にも影響しない。
+   * 確かめの窓を出さずに一覧から外し、5秒は「元に戻す」で取り消せる（動きの点検 17 番）。
+   * 公開済み・止めたもの（登録者や予定が消える）は、今までどおり確かめの窓（VsSyu）。
+   */
+  const requestDelete = (row: ReminderRow) => {
+    setDeleteError('')
+    if (statusKeyOf(row) !== 'draft' || (row.plannedDeliveries ?? 0) > 0) {
+      setDeleteTarget(row)
+      return
+    }
+    setSelectedIds((current) => {
+      if (!current.has(row.id)) return current
+      const next = new Set(current)
+      next.delete(row.id)
+      return next
+    })
+    deferredDelete.schedule({
+      ids: [row.id],
+      message: `リマインダ「${row.name}」を削除しました`,
+      commit: () => api.reminders.delete(row.id),
+      onCommitted: () => {
+        reminderList.retry()
+        void loadStats()
+      },
+      failureMessage: 'リマインダを削除できませんでした。もう一度お試しください。',
+    })
+  }
 
   const deleteStillListed =
     deleteTarget !== null && reminders.some((row) => row.id === deleteTarget.id)
@@ -457,6 +498,9 @@ export default function RemindersListV8() {
 
   const allOnPageSelected = reminders.length > 0 && reminders.every((row) => selectedIds.has(row.id))
   const selectedCount = selectedIds.size
+  // 選んでいる間は Esc で選択を外す（動きの点検 12・20 番）。
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+  useEscapeToClearSelection(selectedCount > 0, clearSelection)
   const selectedRows = reminders.filter((row) => selectedIds.has(row.id))
   const stoppableIds = selectedRows.filter((row) => statusKeyOf(row) === 'active').map((row) => row.id)
   const resumableIds = selectedRows.filter((row) => statusKeyOf(row) === 'stopped').map((row) => row.id)
@@ -721,10 +765,7 @@ export default function RemindersListV8() {
         dividerBefore: true,
         disabled: !canEdit,
         disabledReason: canEdit ? undefined : readonlyReason,
-        onSelect: () => {
-          setDeleteError('')
-          setDeleteTarget(row)
-        },
+        onSelect: () => requestDelete(row),
       },
     ]
     // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見る項目だけ残す。
@@ -852,7 +893,7 @@ export default function RemindersListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <tbody>
+            <RovingTbody>
               {reminders.map((row) => {
                 const view = rowView(row)
                 const planned =
@@ -987,7 +1028,7 @@ export default function RemindersListV8() {
                   </Tr>
                 )
               })}
-            </tbody>
+            </RovingTbody>
           </DataTable>
         </div>
 
@@ -1043,9 +1084,8 @@ export default function RemindersListV8() {
                       variant="secondary"
                       disabled={!canEdit}
                       onClick={() => {
-                        setDeleteError('')
-                        setDeleteTarget(panelRow)
                         setPanelId(null)
+                        requestDelete(panelRow)
                       }}
                     >
                       削除する

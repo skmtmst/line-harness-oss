@@ -11,6 +11,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/friend-add-settings/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -642,9 +643,26 @@ function FriendAddList() {
 
   let listBody: ReactNode
   if (accountLoading || (loading && items.length === 0 && !error)) {
+    /*
+     * 初回の読み込みにも骨組みを出す（動きの点検 15 番）。0.3 秒以内に届けば出さない。
+     * 読み上げには「読み込んでいます」を残す。
+     */
     listBody = (
-      <div className={styles.stateCard} role="status">
-        <p className={styles.stateTitle}>友だち追加時の配信を読み込んでいます</p>
+      <div role="status" aria-busy="true" className={styles.loadingRows}>
+        <span className="sr-only">友だち追加時の配信を読み込んでいます</span>
+        <DelayedSkeleton
+          loading
+          skeleton={
+            <div aria-hidden="true">
+              {[0, 1, 2, 3, 4].map((row) => (
+                <div key={row} className={styles.loadingRow}>
+                  <Skeleton height={12} width="36%" />
+                  <Skeleton height={10} width="22%" />
+                </div>
+              ))}
+            </div>
+          }
+        />
       </div>
     )
   } else if (!selectedAccountId) {
@@ -788,7 +806,8 @@ function FriendAddList() {
         </Button>
       }
       tabs={<>
-        {!canEdit ? (
+        {/* 役割が取れるまで（null）は閲覧のみの帯を出さない。出してから消すと一覧が 48px 跳ねていた（動きの点検 8 番）。 */}
+        {role !== null && !canEdit ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
             <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>

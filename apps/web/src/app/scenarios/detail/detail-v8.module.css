@@ -112,39 +112,6 @@
   margin-left: auto;
 }
 
-/* 競合の帯（`kz2B6`）：ほかの人の更新を知らせる。書き換えはしない。 */
-.conflictBar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0;
-  padding: 12px 16px;
-  border: 1px solid var(--color-warning-bg);
-  border-radius: var(--radius-card, 12px);
-  background: var(--color-warning-bg);
-}
-
-.conflictTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.conflictBody {
-  margin: 4px 0 0;
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-}
-
-.conflictActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 /* 始めた直後の知らせ（`nMSiE`）。うまくいった帯。 */
 .startedBand {
   display: flex;

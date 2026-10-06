@@ -63,7 +63,7 @@
  * 回らなくても文言で伝わる。
  */
 .spin {
-  animation: list-state-spin 1.1s linear infinite;
+  animation: list-state-spin var(--motion-spin) linear infinite;
 }
 
 @keyframes list-state-spin {

@@ -498,10 +498,27 @@
    * （0 8px 24px 黒8%）。枠線は持たないので影だけ。
    */
   --shadow-bar-float: 0 8px 24px rgb(0 0 0 / 0.08);
+  /* 一括バーが長い一覧で画面の下に付いてくるときの、下端からの間（動きの点検 12 番）。 */
+  --bulk-bar-float-gap: 12px;
   /* 板の幅いっぱいの保存の帯（上向き・0 -4px 12px 黒8%）。 */
   --shadow-bar-line: 0 -4px 12px rgb(29 29 31 / 0.08);
   /* 骨組みの明滅 1 周期（★V7 仕上げ §3）。transition ではなく animation の周期専用。 */
   --motion-pulse: 1.2s;
+  /*
+   * 押したときの手応え（動きの点検 6 番・2026-10-07）。押すと乗せたときより
+   * 少し暗く（塗りのボタンは 0.88、白地のボタンは 0.96）、ごく少し縮む（0.98）。
+   * 以前は乗せる 0.92・押す 0.95 で、押した瞬間に明るく戻る逆の手応えだった。
+   */
+  /*
+   * 動きの直書きを変数へ（動きの点検 18 番）。順に出す行のずらし幅（40ms）と、
+   * 骨組みの光の 1 周（--motion-pulse と同じ 1.2s）。
+   */
+  --motion-stagger: 40ms;
+  /* 読み込み中の輪・帯が 1 周する長さ（動きの点検 18 番。900ms・1.1s・1s とばらばらだった）。 */
+  --motion-spin: 1s;
+  --press-scale: 0.98;
+  --press-dim: brightness(0.88);
+  --press-dim-soft: brightness(0.96);
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
@@ -677,6 +694,10 @@
   --tpl-fe-add-pad: 14px; --tpl-fe-add-card-h: 58px; --tpl-fe-add-card-gap: 4px; --tpl-fe-add-card-pad: 8px 10px;
   --tpl-fe-limit-w: 120px; --tpl-fe-booking-cols: 31fr 31fr 20fr; --tpl-fe-wells-gap: 6px; --tpl-fe-words-gap: 8px; --tpl-fe-url-pad: 0 10px; --tpl-fe-change-gap: 6px; --tpl-fe-changes-pad: 12px 14px; --tpl-fe-notes-gap: 12px;
   --tpl-fe-band-slot-pad: 0 24px 8px; --tpl-fe-band-gap: 12px; --tpl-fe-band-pad: 12px 16px; --tpl-fe-band-title-size: 14px; --tpl-fe-band-title-lh: 20px;
+  /* 保存がぶつかったときの帯・比べる窓（共通 save-conflict。J1pdB・k32cn）。回答フォームの編集の値と同じ。 */
+  --save-conflict-gap: var(--tpl-fe-band-gap); --save-conflict-pad: var(--tpl-fe-band-pad); --save-conflict-ring: var(--tpl-fe-ring-warning); --save-conflict-head-gap: var(--tpl-fe-head-gap);
+  --save-conflict-title-size: var(--tpl-fe-band-title-size); --save-conflict-title-lh: var(--tpl-fe-band-title-lh); --save-conflict-desc-size: var(--tpl-fe-body-size); --save-conflict-desc-lh: var(--tpl-fe-body-lh);
+  --save-conflict-icon: 18px; --save-conflict-button-icon: 15px; --save-conflict-change-gap: var(--tpl-fe-change-gap); --save-conflict-changes-pad: var(--tpl-fe-changes-pad); --save-conflict-change-size: var(--tpl-fe-note-size); --save-conflict-change-lh: var(--tpl-fe-note-lh);
   --tpl-fe-rail-narrow-w: 280px; --tpl-fe-rail-narrow-pad: 16px; --tpl-fe-rail-narrow-content-w: 247px;
   --tpl-fe-phone-title-lh: 23px; --tpl-fe-phone-w: 330px; --tpl-fe-phone-h: 690px; --tpl-fe-phone-pad: 10px; --tpl-fe-phone-radius: 52px; --tpl-fe-phone-screen-radius: 42px; --tpl-fe-phone-ring: 2px; --tpl-fe-phone-body: #111214; --tpl-fe-phone-ring-color: #3a3b3f; --tpl-fe-phone-black: #000000;
   --tpl-fe-phone-bar-h: 44px; --tpl-fe-phone-status-pad: 14px 26px 0 30px; --tpl-fe-phone-head-pad: 0 12px; --tpl-fe-phone-clock-lh: 18px; --tpl-fe-phone-island-w: 96px; --tpl-fe-phone-island-h: 28px; --tpl-fe-phone-icon-gap: 5px; --tpl-fe-phone-name-lh: 21px;
@@ -1316,7 +1337,7 @@ html:not([data-theme="v8"]) .v8-only {
       transparent 60%
     );
     background-size: 200% 100%;
-    animation: v8-skeleton-shimmer 1200ms linear infinite;
+    animation: v8-skeleton-shimmer var(--motion-pulse) linear infinite;
   }
 }
 
@@ -1431,8 +1452,13 @@ aside[aria-label="フォルダ"] .shadow-lg {
   transform-origin: top right;
 }
 
-/* モーダルは中央から。最前面の影（★V7 段3）で浮かせる。 */
-[data-design-part="dialog"] {
+/*
+ * モーダルは中央から。最前面の影（★V7 段3）で浮かせる。
+ * V8 は窓の部品（dialog.module.css）が開く・閉じる動きを持つので、ここは当てない。
+ * 部品の CSS は層の中・ここは層の外なので、当てるとこちらが必ず勝ち、
+ * 閉じる逆再生の代わりに開く動きがもう一度走ってちらついていた（動きの点検 1 番）。
+ */
+:root:not([data-theme="v8"]) [data-design-part="dialog"] {
   animation: lh-surface-in var(--motion-base) var(--motion-ease-out);
 }
 
@@ -1476,15 +1502,15 @@ aside[aria-label="フォルダ"] .shadow-lg {
   }
 
   [data-theme="v8"] tbody > tr:nth-child(2) {
-    animation-delay: 40ms;
+    animation-delay: var(--motion-stagger);
   }
 
   [data-theme="v8"] tbody > tr:nth-child(3) {
-    animation-delay: 80ms;
+    animation-delay: calc(var(--motion-stagger) * 2);
   }
 
   [data-theme="v8"] tbody > tr:nth-child(n + 4) {
-    animation-delay: 120ms;
+    animation-delay: calc(var(--motion-stagger) * 3);
   }
 }
 
@@ -1533,13 +1559,13 @@ aside[aria-label="フォルダ"] .shadow-lg {
     animation: v7-rise var(--motion-base) var(--motion-ease-out) both;
   }
   .v7-stagger > :nth-child(2) {
-    animation-delay: 40ms;
+    animation-delay: var(--motion-stagger);
   }
   .v7-stagger > :nth-child(3) {
-    animation-delay: 80ms;
+    animation-delay: calc(var(--motion-stagger) * 2);
   }
   .v7-stagger > :nth-child(n + 4) {
-    animation-delay: 120ms;
+    animation-delay: calc(var(--motion-stagger) * 3);
   }
 }
 
@@ -1587,7 +1613,7 @@ aside[aria-label="フォルダ"] .shadow-lg {
 
 @media (prefers-reduced-motion: no-preference) {
   .v7-refresh-line::before {
-    animation: v7-refresh-sweep 1s var(--motion-ease-in-out) infinite;
+    animation: v7-refresh-sweep var(--motion-spin) var(--motion-ease-in-out) infinite;
   }
 }
 
@@ -1650,9 +1676,18 @@ select[aria-invalid='true'] {
     transition: scale var(--motion-instant) var(--motion-ease-out);
   }
 
+  /*
+   * 押せるものは全部「指」の形（動きの点検 7 番）。Tailwind v4 の土台は button を
+   * default にするので、部品が書き忘れた所（フォルダの行など）が矢印のままだった。
+   * 層の中に置くので、選ばれているタブなど部品が決めた形はそのまま勝つ。
+   */
+  :is(button, [role='button'], [role='tab'], [role='menuitem'], [role='option'], summary):not(:disabled, [aria-disabled='true']) {
+    cursor: pointer;
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     :is(button, [role='button']):not(:disabled, [aria-disabled='true'], .w-full, [role='tab'], [role='option'], [role='menuitem'], [role='switch'], [role='gridcell'] *):active {
-      scale: 0.98;
+      scale: var(--press-scale);
     }
   }
 }

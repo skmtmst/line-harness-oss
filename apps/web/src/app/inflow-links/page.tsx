@@ -850,6 +850,9 @@ function InflowLinksPageInner({
           */}
           {visibility.enabled('site_tracking') ? (
             <Button variant="secondary" href="/inflow-links?tab=script">サイトスクリプト</Button>
+          ) : visibility.status === 'loading' ? (
+            /* 機能の見え方を読む間も場所を取る。後から出すと説明が折り返し直し、下が 19px 跳ねていた（動きの点検 8 番）。 */
+            <span aria-hidden="true" className="invisible"><Button variant="secondary" tabIndex={-1}>サイトスクリプト</Button></span>
           ) : null}
         </>}
       />
@@ -928,12 +931,6 @@ function InflowLinksPageInner({
         </div>
       </div>
 
-      {routeCountAvailable && unconfiguredCount > 0 ? (
-        <Notice tone="info">
-          友だちになっても何も起きない経路が {formatNumber(unconfiguredCount)}件あります。「動きが未設定」で絞って、タグやメッセージを決めてください。
-        </Notice>
-      ) : null}
-
       {!readonly ? (
         <div className={styles.createRow}>
           <Button href="/inflow-links/new" variant="primary">＋ 流入リンクを作る</Button>
@@ -967,6 +964,15 @@ function InflowLinksPageInner({
         </div>
 
         <section className="flex min-w-0 flex-col gap-4" aria-label={`${selectedGenreLabel}の流入経路（${genreRows.length}件）`}>
+          {/*
+            未設定の知らせは絵（xbHxg）どおり一覧の列の頭に置く。以前は数の帯と作るボタンの
+            間に後から差し込まれ、フォルダの列ごと 56px 押し下げていた（動きの点検 8 番）。
+          */}
+          {routeCountAvailable && unconfiguredCount > 0 ? (
+            <Notice tone="info">
+              友だちになっても何も起きない経路が {formatNumber(unconfiguredCount)}件あります。「動きが未設定」で絞って、タグやメッセージを決めてください。
+            </Notice>
+          ) : null}
           {/*
             板 xbHxg の道具。絵どおり、よく使う2枚だけ外に出し、残りの絞り込みと
             並び順は「よく使う絞り込み」の中に置く。

@@ -37,9 +37,10 @@ describe('自動応答の残りの板ID', () => {
   })
 
   it('編集の競合に UGrd2 の帯と比較み・読み込みが出る', () => {
-    expect(WIZARD).toContain('data-design-node="UGrd2"')
-    expect(WIZARD).toContain('違いを比べる')
-    expect(WIZARD).toContain('最新を読み込んで続ける')
+    // 帯・比べる窓は共通の save-conflict に寄せた（2026-10-07）。文言・ボタンは共通部品が持つ。
+    expect(WIZARD).toMatch(/<SaveConflictBand[\s\S]{0,200}designNode="UGrd2"/)
+    expect(WIZARD).toContain('onCompare={() => void openCompare()}')
+    expect(WIZARD).toContain('<SaveConflictCompareDialog')
     expect(WIZARD).toContain('describeAutoReplyDiff')
   })
 

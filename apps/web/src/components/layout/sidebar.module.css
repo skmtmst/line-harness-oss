@@ -31,7 +31,7 @@
   color: var(--color-ink);
   font-size: 14px;
   font-weight: 600;
-  transition: color 150ms, background-color 150ms;
+  transition: color var(--motion-fast) var(--motion-ease-out), background-color var(--motion-fast) var(--motion-ease-out);
 }
 
 .item:hover {

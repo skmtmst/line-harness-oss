@@ -9,6 +9,7 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { useListScrollMemory } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -227,6 +228,8 @@ export default function FormsListV8() {
   const [folderTotal, setFolderTotal] = useState(0)
   const [activeFolderId, setActiveFolderId] = useState('all')
   const [loading, setLoading] = useState(true)
+  /* 戻ってきたら前のスクロール位置へ（絞り込みは前から URL に置いている）。 */
+  useListScrollMemory(!loading)
   const [loadError, setLoadError] = useState('')
   /** 掴んだ失敗そのもの。403（権限不足）と 503（通信失敗）の案内を言い分ける。 */
   const [loadFailure, setLoadFailure] = useState<unknown>(null)

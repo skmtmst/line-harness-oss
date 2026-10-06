@@ -52,6 +52,8 @@ export default function ReorderGrip({
     <button
       type="button"
       onKeyDown={handleKeyDown}
+      // 一覧の行の矢印移動（row-roving）に ↑↓ を取られないようにする。←→ は行の中の移動に使う。
+      data-roving-own="vertical"
       aria-label={`${label}を並び替え。上下キーで移動`}
       title="ドラッグまたは上下キーで並び替え"
       className="inline-flex cursor-grab items-center justify-center rounded-control p-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"

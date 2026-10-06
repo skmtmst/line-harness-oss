@@ -42,7 +42,7 @@
 [data-theme='v8'] .panel { max-width: 100%; min-width: 0; }
 [data-theme='v8'] .row { padding: 7px 10px; gap: 8px; border-radius: 8px; }
 [data-theme='v8'] .row .select { padding: 0; }
-[data-theme='v8'] .menu { width: 14px; height: 14px; flex-shrink: 0; }
+[data-theme='v8'] .menu { position: relative; width: 14px; height: 14px; flex-shrink: 0; }
 /*
  * I3L41O（部品正本 faSbC も同じ）：「…」は選んだ行だけが場所を取る。
  * 選んでいない行に箱を置くと件数が絵より左へ22ずれる（14の箱＋8の隙間）。
@@ -61,18 +61,28 @@
 @media (hover: none) {
   [data-theme='v8'] .row:not([data-active]) .menu { opacity: 1; pointer-events: auto; }
 }
+/*
+ * 動きの点検（2026-10-07）4 番：選んでいない行で「…」を出すと、件数の上に
+ * 斜めにずれて重なり、件数を押したつもりでメニューが開いていた。
+ * 「…」は件数と同じ場所（右端・上下の真ん中）に重ねて出し、その間だけ件数を隠す。
+ * 場所は取らないので、件数も名前も動かない。
+ */
+[data-theme='v8'] .row[data-has-actions]:not([data-active]):is(:hover, :focus-within, [data-menu-open]) .count { visibility: hidden; }
 /* 選んだ行の場所取り（操作なしの行用。絵では選んだ行に「…」がある）。v7 では出さない。 */
 .menuSlot { display: none; }
 [data-theme='v8'] .menuSlot { display: block; width: 14px; height: 14px; flex-shrink: 0; }
 [data-theme='v8'] .menuButton { position: absolute; left: -9px; top: -9px; width: 32px; height: 32px; opacity: 1; font-size: 16px; display: flex; align-items: center; justify-content: center; }
 /* 絵（uE9gf・apLqS・I1E7Bt）：「…」の場所を取るのは選んでいる行だけ。ほかの行は件数が右端に来る。
    乗せたとき・キーボードで中へ入ったときだけ場所を取って出す（押せなくはしない）。 */
-[data-theme='v8'] .row:not([data-active]) .menu { width: 0; margin-inline-start: -8px; }
 [data-theme='v8'] .row:not([data-active]) .menuButton { opacity: 0; }
-[data-theme='v8'] .row:not([data-active]):hover .menu,
-[data-theme='v8'] .row:not([data-active]):focus-within .menu { width: 14px; margin-inline-start: 0; }
 [data-theme='v8'] .row:not([data-active]):hover .menuButton,
-[data-theme='v8'] .row:not([data-active]):focus-within .menuButton { opacity: 1; }
+[data-theme='v8'] .row:not([data-active]):focus-within .menuButton,
+[data-theme='v8'] .row:not([data-active])[data-menu-open] .menuButton { opacity: 1; }
+/* 触れない端末では「…」を常に出すので、重ねずに場所を取って並べる。 */
+@media (hover: none) {
+  [data-theme='v8'] .row:not([data-active]) .menu { position: relative; right: auto; top: auto; translate: none; }
+  [data-theme='v8'] .row:not([data-active]) .menuButton { opacity: 1; }
+}
 [data-theme='v8'] .row .select { min-height: 0; height: auto; }
 }
 

@@ -13,15 +13,7 @@
 /* 競合の帯（J1pdB）は左右の列の上に横いっぱい。型の「狭い板の切り替え」の置き場を借りて、そこだけ出す。 */
 :global([data-theme='v8'] [data-page-template='create']) > div:has(> .bandSlot) { display: block; padding: 0; }
 .bandSlot { padding: var(--tpl-fe-band-slot-pad); }
-.conflictBand {
-  display: flex; align-items: center; gap: var(--tpl-fe-band-gap);
-  padding: var(--tpl-fe-band-pad); border-radius: var(--radius-control);
-  background: var(--color-status-warn-soft); box-shadow: var(--tpl-fe-ring-warning);
-}
-.conflictIcon { flex: none; color: var(--color-warning); }
-.conflictText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-fe-head-gap); }
-.conflictTitle { font-size: var(--tpl-fe-band-title-size); font-weight: 600; line-height: var(--tpl-fe-band-title-lh); color: var(--color-ink); }
-.conflictDesc { font-size: var(--tpl-fe-body-size); line-height: var(--tpl-fe-body-lh); color: var(--color-ink-secondary); }
+/* 帯そのものは共通の save-conflict（動きの点検 16 番）。 */
 
 .root { display: flex; flex-direction: column; gap: var(--tpl-fe-card-gap-outer); min-width: 0; }
 .loading { color: var(--color-ink-faint); font-size: var(--tpl-fe-body-size); }
