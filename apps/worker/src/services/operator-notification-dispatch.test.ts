@@ -97,6 +97,19 @@ describe('運用者通知の自動発火と登録簿', () => {
     expect(items.every((item) => item.producer.file.length > 0 && item.producer.route.length > 0)).toBe(true);
   });
 
+  it('チームの変更後の発火は現在のメンバーだけへ送り、退避後は全員へ広げない', async () => {
+    const { saveOperatorNotificationTeam, archiveOperatorNotificationTeam } = await import('@line-crm/db');
+    const team = (await saveOperatorNotificationTeam(testDb.db, { lineAccountId: 'account-1', name: 'Team', staffIds: ['owner-1'] }))!;
+    await publishRule(testDb, { conditions: { teamId: team.id }, channels: ['line'] });
+    await saveOperatorNotificationTeam(testDb.db, { id: team.id, lineAccountId: 'account-1', name: 'Team', staffIds: ['staff-2'], expectedVersion: 1 });
+    await dispatchOperatorEvent(testDb.db, env, { lineAccountId: 'account-1', eventType: 'booking_created', sourceEventId: 'team-booking-1', executionMode: 'automatic' });
+    expect(pushMessageWithRequestId).toHaveBeenCalledTimes(1);
+    expect(testDb.raw.prepare('SELECT recipient_id FROM notification_deliveries').all()).toEqual([{ recipient_id: 'staff-2' }]);
+    await archiveOperatorNotificationTeam(testDb.db, team.id, 'account-1', 2);
+    await dispatchOperatorEvent(testDb.db, env, { lineAccountId: 'account-1', eventType: 'booking_created', sourceEventId: 'team-booking-2', executionMode: 'automatic' });
+    expect(pushMessageWithRequestId).toHaveBeenCalledTimes(1);
+  });
+
   it('未登録のきっかけは発火しない', async () => {
     await expect(dispatchOperatorEvent(testDb.db, env, {
       lineAccountId: 'account-1', eventType: 'not_registered',

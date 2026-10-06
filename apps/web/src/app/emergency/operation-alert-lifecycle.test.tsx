@@ -221,19 +221,20 @@ describe('運用異常の受領・通知再開UI', () => {
     })
     alertRequest.retry = () => new Promise((resolve) => { resolveRetry = resolve })
     const { rerender } = render(<HealthPanel accountId="account-A" manualRunRequest={0} onSeverity={vi.fn()} />)
-    await screen.findByText('account-Aの異常')
+    // 板の1行は「項目名：内容（いつから〜）」の形。内容の部分一致で見る。
+    await screen.findByText(/account-Aの異常/)
     fireEvent.click(screen.getByRole('button', { name: '失敗した通知を再送する' }))
 
     rerender(<HealthPanel accountId="account-B" manualRunRequest={0} onSeverity={vi.fn()} />)
-    await screen.findByText('account-Bの異常')
+    await screen.findByText(/account-Bの異常/)
     await act(async () => {
       resolveRetry?.({ success: true, data: { retried: 1 } })
       await Promise.resolve()
     })
 
     await waitFor(() => {
-      expect(screen.getByText('account-Bの異常')).toBeTruthy()
-      expect(screen.queryByText('account-Aの異常')).toBeNull()
+      expect(screen.getByText(/account-Bの異常/)).toBeTruthy()
+      expect(screen.queryByText(/account-Aの異常/)).toBeNull()
       expect(screen.queryByText(/通知または通知先を再確認しました/)).toBeNull()
     })
   })

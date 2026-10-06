@@ -3,7 +3,7 @@
 /*
  * 削除ボタン（Pencil ★V8 `prbOC`／`zopvP`）。
  *
- *   閉じたとき  48×36 のタイル（白地・細い枠・角丸 control）
+ *   閉じたとき  48×48 のタイル（白地・細い枠・角丸 16）。★V8実寸に合わせた
  *   開いたとき  右へ確認の帯が開く（✓ 赤 / ×）。開閉は 200ms
  *   Esc・× はどちらも「やめる」
  */
@@ -12,16 +12,16 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  height: 36px;
+  height: 48px;
 }
 
 .tile,
 .confirm {
   display: inline-flex;
   align-items: center;
-  height: 36px;
+  height: 48px;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-panel);
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
 }
@@ -47,13 +47,24 @@
   opacity: 0.45;
 }
 
+/* ★V8（夕17・prbOC）：地は灰色 #f5f5f7（shell）・枠なし。 */
+[data-theme='v8'] .tile {
+  border: 0;
+  background: var(--color-shell);
+}
+
+[data-theme='v8'] .tile:hover:not(:disabled) {
+  background: var(--color-shell-gray);
+  color: var(--color-status-danger);
+}
+
 /* 確認の帯。閉じている間は畳んで隠す。 */
 .confirm {
   position: absolute;
   left: 0;
-  gap: 2px;
+  gap: 8px;
   overflow: hidden;
-  padding: 0 4px;
+  padding: 0 10px;
   opacity: 0;
   transform: scaleX(0.6);
   transform-origin: left center;
@@ -63,12 +74,12 @@
 
 .confirm button {
   display: inline-flex;
-  width: 32px;
+  width: 28px;
   height: 28px;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-pill);
   background: transparent;
   cursor: pointer;
 }
@@ -116,4 +127,19 @@
     opacity var(--motion-base) var(--motion-ease-out),
     transform var(--motion-base) var(--motion-ease-out);
 }
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .root { gap: 0; border-radius: 16px; background: var(--color-shell); }
+[data-theme='v8'] .tile { flex: none; border-radius: 16px; box-shadow: var(--shadow-board); }
+[data-theme='v8'] .tile > svg { width: 20px; height: 20px; }
+[data-theme='v8'] .root[data-open] .tile { opacity: 1; transform: none; box-shadow: none; border-radius: 16px 0 0 16px; }
+[data-theme='v8'] .root[data-open] .confirm { position: relative; width: 84px; padding: 0; justify-content: center; border: 0; border-radius: 0 16px 16px 0; background: var(--color-shell-gray); }
+[data-theme='v8'] .confirm button { flex: none; background: var(--color-canvas); box-shadow: var(--shadow-board); }
+[data-theme='v8'] .confirm button svg { width: 14px; height: 14px; }
+[data-theme='v8'] .yes { color: var(--color-danger); }
+[data-theme='v8'] .tile { gap: 0; }
+[data-theme='v8'] .root[data-open] { overflow: hidden; }
+[data-theme='v8'] .root[data-open] .tile { background: transparent; border-radius: 0; }
+[data-theme='v8'] .root[data-open] .confirm { border-radius: 0; }
+[data-theme='v8'] .confirm button { min-height: 0; gap: 0; border-radius: 999px; }
 }

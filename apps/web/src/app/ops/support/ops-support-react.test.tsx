@@ -233,6 +233,15 @@ describe('画面', () => {
     const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '返信する')
     await act(async () => { send!.click() })
     await flush()
+    // 板 `GgP2d`「この返事を送りますか？」を見てから送る。
+    const confirm = document.body.querySelector('[data-design-node="GgP2d"]')
+    expect(confirm, '返事の確認の窓が出ない').not.toBeNull()
+    for (const row of ['この返事を送りますか？', '宛先', '状態', '優先度', '下書きを削除', '戻って直す', '送って解決にする']) {
+      expect(confirm?.textContent ?? '', `「${row}」がない`).toContain(row)
+    }
+    const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.includes('送って解決にする')) as HTMLButtonElement
+    await act(async () => { sendInDialog.click() })
+    await flush()
     const reply = calls.find((c) => c.url.endsWith('/reply'))
     expect(reply?.body).toMatchObject({ aiAssisted: true })
     expect(String(reply?.body?.body)).toContain('山田さま')

@@ -97,7 +97,7 @@ export async function getBroadcasts(
   accountId?: string,
   scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean },
   // 一覧の並び順。一覧画面の「並び順」選択と連動する。既定は新しい順。
-  opts?: { order?: 'asc' | 'desc' },
+  opts?: { order?: 'asc' | 'desc'; from?: string; until?: string },
 ): Promise<Broadcast[]> {
   // 一覧に集計の最新行を同梱する。送信済みごとに insight 口を叩く N+1 を
   // 一覧1クエリで吸収するため。LINEへの再取得は手動ボタン(fetch-insight)に寄せる。
@@ -148,6 +148,12 @@ LEFT JOIN broadcast_insights bi ON b.id = bi.broadcast_id
       conditions.push('(b.line_account_id IS NULL AND b.account_ids IS NULL)');
     }
     sql += ` WHERE ${conditions.length > 0 ? conditions.join(' OR ') : '0 = 1'}`;
+  }
+  if (opts?.from || opts?.until) {
+    // 範囲のOR条件を括り、期間が別アカウントへ漏れないようにする。
+    sql = `SELECT * FROM (${sql}) b WHERE 1 = 1`;
+    if (opts.from) { sql += ' AND julianday(COALESCE(b.sent_at, b.scheduled_at, b.created_at)) >= julianday(?)'; params.push(opts.from); }
+    if (opts.until) { sql += ' AND julianday(COALESCE(b.sent_at, b.scheduled_at, b.created_at)) < julianday(?)'; params.push(opts.until); }
   }
   sql += ` ORDER BY COALESCE(b.sent_at, b.scheduled_at, b.created_at) ${opts?.order === 'asc' ? 'ASC' : 'DESC'}`;
   const result = params.length > 0

@@ -59,7 +59,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
 
 const { EmergencyPageInner, HealthPanel } = EmergencyPage.__test
 
-function snapshot(summary: string): { success: true, data: OperationHealthSnapshot } {
+function snapshot(summary: string, status: 'normal' | 'warning' = 'normal'): { success: true, data: OperationHealthSnapshot } {
+  const now = new Date().toISOString()
   return {
     success: true,
     data: {
@@ -68,25 +69,25 @@ function snapshot(summary: string): { success: true, data: OperationHealthSnapsh
         lineAccountId: account.id,
         source: 'manual',
         status: 'completed',
-        overallStatus: 'normal',
-        startedAt: '2026-09-16T00:00:00.000Z',
-        completedAt: '2026-09-16T00:00:00.000Z',
+        overallStatus: status,
+        startedAt: now,
+        completedAt: now,
         results: [{
           id: 'result-1',
           runId: 'run-1',
           checkKey: 'webhook',
-          status: 'normal',
+          status,
           summary,
           value: null,
           threshold: null,
           source: 'manual',
-          observedAt: '2026-09-16T00:00:00.000Z',
+          observedAt: now,
         }],
       },
-      overallStatus: 'normal',
-      lastCheckedAt: '2026-09-16T00:00:00.000Z',
+      overallStatus: status,
+      lastCheckedAt: now,
       nextCheckAt: null,
-      serverNow: '2026-09-16T00:00:00.000Z',
+      serverNow: now,
     },
   }
 }
@@ -184,8 +185,9 @@ describe('手動ヘルス確認の二重実行防止(N-458)', () => {
     await flush()
     expect(screen.queryByText('旧アカウントの結果')).toBeNull()
 
-    await act(async () => { deferredList.read.at(-1)?.resolve(snapshot('新アカウントの結果')) })
-    expect(await screen.findByText('新アカウントの結果')).toBeTruthy()
+    // 新アカウントの応答（注意）だけが帯に出る。板に実測の文は出さない。
+    await act(async () => { deferredList.read.at(-1)?.resolve(snapshot('新アカウントの結果', 'warning')) })
+    expect(await screen.findByText('全体の状態：注意1件')).toBeTruthy()
 
     // 手動実行が落ち着いたのでボタンは使える
     expect(((await screen.findByRole('button', { name: '↻ いますぐ確かめる' })) as HTMLButtonElement).disabled).toBe(false)

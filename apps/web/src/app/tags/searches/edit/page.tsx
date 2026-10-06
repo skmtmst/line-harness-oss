@@ -38,6 +38,8 @@ import { savedSearchSummary, type SavedSearchConditionLabels } from '@/component
 import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 import { formatDateTime } from '@/lib/format'
+import SearchEditorV8 from '@/app/tags/search-editor-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -52,7 +54,7 @@ const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> 
   { value: 'status_message', label: 'ステータスメッセージ' },
   { value: 'mark', label: '対応マーク' },
   { value: 'scenario', label: 'シナリオ' },
-  { value: 'assignee', label: '担当者' },
+  { value: 'assignee', label: '担当' },
   { value: 'event_booking', label: 'イベント予約' },
   { value: 'calendar_booking', label: 'カレンダー予約' },
   { value: 'form', label: '回答フォーム' },
@@ -146,7 +148,7 @@ function normalizeForEdit(search: SavedSearch): SavedSearchConditions {
     all: [...(search.conditions.all ?? [])],
     any: [...(search.conditions.any ?? [])],
     list: {
-      columns: search.conditions.list?.columns ?? ['名前', 'タグ', '担当者'],
+      columns: search.conditions.list?.columns ?? ['名前', 'タグ', '担当'],
       sort: search.conditions.list?.sort ?? 'recent',
       limit: search.conditions.list?.limit ?? 20,
     },
@@ -355,7 +357,7 @@ function ConditionEditor({
             className="w-32"
           />
           <Select
-            aria-label="担当者"
+            aria-label="担当"
             value={rawValue}
             disabled={referenceErrors.operators}
             onChange={(value) => onChange({ ...condition, value })}
@@ -984,5 +986,6 @@ function SavedSearchEditInner() {
 }
 
 export default function SavedSearchEditPage() {
-  return <FeatureGate feature="saved_searches"><Suspense fallback={<p className="text-sm text-ink-faint">読み込んでいます</p>}><SavedSearchEditInner /></Suspense></FeatureGate>
+  const theme = useAdminTheme()
+  return <FeatureGate feature="saved_searches"><Suspense fallback={<p className="text-sm text-ink-faint">読み込んでいます</p>}>{theme === 'v8' ? <SearchEditorV8 /> : <SavedSearchEditInner />}</Suspense></FeatureGate>
 }

@@ -1405,7 +1405,7 @@ export default function ScenarioDetailClient({
             }
             options={[
               { value: 'continue', label: '送信後：次のステップへ進む' },
-              { value: 'pause', label: '送信後：ここで一時停止する' },
+              { value: 'pause', label: '送信後：ここで止める' },
             ]}
             size="full"
           />
@@ -2074,7 +2074,7 @@ export default function ScenarioDetailClient({
                       ? `${latestStartedLabel} 開始`
                       : '開始日時を取得できませんでした'
                     : scenario.isActive
-                      ? '配信を一時停止する'
+                      ? '配信を止める'
                       : '配信を再開する'}
                 </p>
                 {/*
@@ -2467,7 +2467,7 @@ export default function ScenarioDetailClient({
                                 { id: 'test', label: 'テスト', onSelect: () => setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` }) },
                                 /* この通を送ったあとに動かすアクション。件数を出すのは、設定済みを忘れて二重に足すのを防ぐため。 */
                                 { id: 'action', label: `アクション${actionCounts[step.id] ? ` ${actionCounts[step.id]}` : ''}`, onSelect: () => setActionTarget({ hook: 'step_sent', stepId: step.id, choiceIndex: null, title: `${step.stepOrder}通目を送ったあと` }) },
-                                { id: 'duplicate', label: duplicatingStepId === step.id ? '複製中…' : '複製', disabled: duplicatingStepId === step.id, disabledReason: 'この通を複製しています', onSelect: () => { void handleDuplicateStep(step) } },
+                                { id: 'duplicate', label: duplicatingStepId === step.id ? '複製中…' : '複製する', disabled: duplicatingStepId === step.id, disabledReason: 'この通を複製しています', onSelect: () => { void handleDuplicateStep(step) } },
                                 { id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, onSelect: () => { setDeleteStepError(''); setDeleteStepTarget(step) } },
                               ]}
                             />

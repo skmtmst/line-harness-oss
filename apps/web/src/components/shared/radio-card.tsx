@@ -9,9 +9,10 @@ import styles from './radio-card.module.css'
  * 使う。同じ `name` のラジオ群は Tab で群に入り、矢印キーと Space で
  * 選べて、読み上げにも選択状態が伝わる。
  *
- * 押せる範囲はカード全体（label が丸ごと囲む）。装飾の丸は input 自体を
- * `appearance: none` で描き直すので、読み上げには何も増えない。
- * 外円 20px・内点 8px・間に白い隙間。選択中のカードは淡い緑＋強めの枠。
+ * 押せる範囲はカード全体（label が丸ごと囲む）。V8 の箱（card・compact）は
+ * 選んだことが**枠と面の色**で分かるので装飾の丸を出さない。読み上げと矢印
+ * キーのために本物の input は残し、見えない大きさで置く（キーボードの位置は
+ * 箱の枠に出す）。行（row）は素のラジオ行なので丸 18px をそのまま出す。
  *
  * 使い方:
  *   <RadioCardGroup legend="配信方法" className="grid gap-3 md:grid-cols-3">
@@ -71,6 +72,16 @@ export interface RadioCardProps {
    */
   onClick?: () => void
   className?: string
+  /** V8 の上段に出す印。省略すると印は出さない（既定）。v7 では非表示。 */
+  icon?: ReactNode
+  /**
+   * 選ぶカードの形。既定は箱（fNPdg/r3xz1W）。
+   * `'row'` は箱なしの行（BHEl9 の素のラジオ行：丸 18・文字 13）。
+   * `'compact'` は小さい箱（★BG-B の出力サイズ o2XyUk/aCyxg：
+   * 角 8・余白 8/10・題 11/600・補足 10）。狭い脇のパネルに並べる選択肢に使う。
+   * 画面の絵で行で並んでいる選択肢には `'row'` を使う。箱の合格は変えない。
+   */
+  variant?: 'card' | 'row' | 'compact'
 }
 
 export default function RadioCard({
@@ -85,18 +96,23 @@ export default function RadioCard({
   invalid = false,
   onClick,
   className,
+  icon,
+  variant = 'card',
 }: RadioCardProps) {
   return (
     <label
       className={[
-        styles.card,
+        variant === 'row' ? styles.row : styles.card,
+        variant === 'compact' ? styles.compact : null,
         checked ? styles.checked : null,
         disabled ? styles.disabled : null,
         invalid ? styles.invalid : null,
         className,
       ].filter(Boolean).join(' ')}
+      data-variant={variant}
       onClick={disabled ? undefined : onClick}
     >
+      {icon ? <span className={styles.topIcon} aria-hidden="true">{icon}</span> : null}
       <input
         type="radio"
         className={styles.radio}
@@ -109,7 +125,7 @@ export default function RadioCard({
       />
       <span className={styles.body}>
         <strong className={styles.title}>{title}</strong>
-        {note ? <small className={styles.note}>{note}</small> : null}
+        {note ? <small className={styles.note} title={typeof note === 'string' ? note : undefined}>{note}</small> : null}
         {disabled && disabledReason ? <small className={styles.reason}>{disabledReason}</small> : null}
       </span>
     </label>

@@ -1,8 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ApiResponse, LineAccount } from '@line-crm/shared'
-import { api, ApiError, fetchApi, type UidMigrationItem, type UidMigrationRun } from '@/lib/api'
+import type { LineAccount } from '@line-crm/shared'
+import type { UidMigrationItem } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Breadcrumb from '@/components/shared/breadcrumb'
@@ -20,87 +19,26 @@ import ListRange from '@/components/ui/list-range'
 import { TextField } from '@/components/shared/text-field'
 import MergedTabs from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { FRIENDS_MERGED_TABS } from '@/app/friends/friends-tabs'
-import { splitCsvRecords } from '@/app/friends/migrations/friend-csv'
 import { formatDateTime, formatNumber } from '@/lib/format'
+import UidMigrationV8 from './uid-migration-v8'
+import {
+  classLabel,
+  decisionLabel,
+  formatMappingBytes,
+  ITEM_CLASSIFICATIONS,
+  ITEM_PAGE_SIZE,
+  MIGRATION_STEPS as STEPS,
+  parseUidCsv,
+  splitUidCsvLine,
+  useUidMigration,
+  type ItemClassification,
+  type UidMigrationDetail,
+} from './use-uid-migration'
 
-const STEPS: readonly string[] = ['移行の登録', '対応表の取込', '事前確認', '要確認の判断', '本移行と照合']
-
-/**
- * CSVの1行を切り分ける。**引用符の中のカンマは区切りにしない。**
- * 単純な `split(',')` だと、名前やUIDにカンマが入った行で列がずれ、
- * 別人の結び付けになる。閉じていない引用符の行は `null` で返す。
- */
-export function splitUidCsvLine(line: string): string[] | null {
-  const cells: string[] = []
-  let current = ''
-  let quoted = false
-  for (let index = 0; index < line.length; index++) {
-    const char = line[index]
-    if (quoted) {
-      if (char === '"') {
-        if (line[index + 1] === '"') { current += '"'; index++ }
-        else quoted = false
-      } else current += char
-    } else if (char === '"' && current === '') {
-      quoted = true
-    } else if (char === ',') {
-      cells.push(current); current = ''
-    } else current += char
-  }
-  if (quoted) return null
-  cells.push(current)
-  return cells
-}
-
-export function parseUidCsv(text: string) {
-  const records = splitCsvRecords(text).filter((cells) => cells.some((cell) => cell.trim()))
-  if (records.length < 2) return []
-  const headers = records[0].map((value) => value.trim().toLowerCase())
-  const oldIndex = headers.findIndex((value) => ['old_uid', '旧uid', '移行元uid'].includes(value))
-  const newIndex = headers.findIndex((value) => ['new_uid', '新uid', '移行先uid'].includes(value))
-  if (oldIndex < 0 || newIndex < 0) return []
-  const rows: Array<{ oldUid: string; newUid: string | null; evidenceType: 'operator_csv' }> = []
-  for (const cells of records.slice(1)) {
-    // **列の数が合わない行は読み飛ばす。** ずれたまま結び付けると別人になる。
-    if (cells.length !== headers.length) continue
-    const oldUid = cells[oldIndex].trim()
-    if (!oldUid) continue
-    rows.push({ oldUid, newUid: cells[newIndex].trim() || null, evidenceType: 'operator_csv' as const })
-  }
-  return rows
-}
-
-/** 対応表の1ページの行数。口側の既定とそろえる。 */
-const ITEM_PAGE_SIZE = 20
-
-/** 選んだ対応表の大きさを行に出すだけの短い表記。 */
-function formatMappingBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${Math.round(bytes / (1024 * 1024) * 10) / 10}MB`
-  return `${Math.max(1, Math.round(bytes / 1024))}KB`
-}
-
-const ITEM_CLASSIFICATIONS = ['auto', 'review', 'unmatched', 'conflict'] as const
-type ItemClassification = (typeof ITEM_CLASSIFICATIONS)[number]
-
-/** ページ送り・絞り込み付きの対応表。口が `itemTotal` 等を返さない古い応答にも耐える。 */
-type UidMigrationDetail = UidMigrationRun & {
-  itemTotal?: number
-  itemLimit?: number
-  itemOffset?: number
-  unresolved?: number | null
-  /** FRIEND-33: 実行前の確認画面に出す、判断別の全件数。 */
-  decisionCounts?: { pending: number; link: number; create: number; exclude: number }
-}
-
-const classLabel = { auto: '自動一致', review: '要確認', unmatched: '未一致', conflict: '競合' } as const
-const decisionLabel = { pending: '未判断', link: '結び付ける', create: '新規作成', exclude: '除外' } as const
-
-/** 失敗応答の日本語だけを画面へ出す。内部文言・HTML は ApiError が捨てている。 */
-function apiErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.message) return error.message
-  return fallback
-}
+// 契約テスト（migration-contract.test.ts）がこのファイルから読むため再公開する。
+export { parseUidCsv, splitUidCsvLine }
 
 interface RunStatusView {
   heading: string
@@ -113,7 +51,7 @@ interface RunStatusView {
  * FRIEND-15: 見出し・説明・バッジ・操作は run.status だけで決める。
  * 完了した履歴へ「実データはまだ変更していません」と出さない。
  */
-function runStatusView(run: UidMigrationDetail, unresolved: number | null): RunStatusView {
+export function runStatusView(run: UidMigrationDetail, unresolved: number | null): RunStatusView {
   switch (run.status) {
     case 'completed':
       return {
@@ -162,288 +100,66 @@ function runStatusView(run: UidMigrationDetail, unresolved: number | null): RunS
 
 export default function AccountMigration() {
   usePageTitle('UID移行')
-  const [accounts, setAccounts] = useState<LineAccount[]>([])
-  const [runs, setRuns] = useState<UidMigrationRun[]>([])
-  const [active, setActive] = useState<UidMigrationDetail | null>(null)
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [fromAccountId, setFromAccountId] = useState('')
-  const [toAccountId, setToAccountId] = useState('')
-  const [purpose, setPurpose] = useState('友だち情報と配信停止状態を新しいアカウントへ引き継ぐ')
-  const [file, setFile] = useState<File | null>(null)
-  const [mappings, setMappings] = useState<ReturnType<typeof parseUidCsv>>([])
-  const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const [page, setPage] = useState(0)
-  const [classification, setClassification] = useState<'' | ItemClassification>('')
-  const [pendingOnly, setPendingOnly] = useState(false)
-  /*
-    FRIEND-16: 対応表の切替・ページ・絞り込みで応答が逆順に届いても
-    最後に選んだ対象だけを表示するための世代番号。
-  */
-  const detailTicket = useRef(0)
-  const [detailBusy, setDetailBusy] = useState(false)
-  /* FRIEND-33/36: 実行・切り戻しの権限と作成者判定に使う自分自身の情報。 */
-  const [me, setMe] = useState<{ id: string; role: string } | null>(null)
-  /* FRIEND-14: 「詳細を見る」は読み取り専用。判断はダイアログ内の明示操作だけ。 */
-  const [detailItem, setDetailItem] = useState<UidMigrationItem | null>(null)
-  const [detailError, setDetailError] = useState<string | null>(null)
-  const [confirmExecute, setConfirmExecute] = useState(false)
-  const [executeError, setExecuteError] = useState<string | null>(null)
-  const [confirmRollback, setConfirmRollback] = useState(false)
-  const [rollbackError, setRollbackError] = useState<string | null>(null)
-  const [rollbackConflicts, setRollbackConflicts] = useState<Array<{ itemId: string; oldUid: string; reason: string }>>([])
+  const m = useUidMigration()
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <UidMigrationV8 m={m} />
+  return <AccountMigrationV7 m={m} />
+}
 
-  /**
-   * 対応表を1ページずつ読む。**全件は読まない。**
-   * 数千行の対応表でも応答が重くならない。
-   *
-   * FRIEND-16: 応答が遅れて届いても、最新の要求（ticket）の結果だけを
-   * 反映する。履歴A→Bと選び直したあとにAの応答で対応表が戻らない。
-   */
-  const loadDetail = useCallback(async (
-    runId: string,
-    targetPage: number,
-    targetClassification: '' | ItemClassification,
-    targetPendingOnly: boolean,
-  ): Promise<UidMigrationDetail | null> => {
-    const ticket = ++detailTicket.current
-    setDetailBusy(true)
-    try {
-      const params = new URLSearchParams({ limit: String(ITEM_PAGE_SIZE), offset: String(targetPage * ITEM_PAGE_SIZE) })
-      if (targetClassification) params.set('classification', targetClassification)
-      if (targetPendingOnly) params.set('pendingOnly', '1')
-      const response = await fetchApi<ApiResponse<UidMigrationDetail>>(`/api/friends/migrations/${runId}?${params.toString()}`)
-      if (ticket !== detailTicket.current) return null
-      if (!response.success) {
-        setMessage(response.error)
-        return null
-      }
-      setActive(response.data)
-      return response.data
-    } catch {
-      if (ticket === detailTicket.current) setMessage('対応表を読み直せませんでした。')
-      return null
-    } finally {
-      if (ticket === detailTicket.current) setDetailBusy(false)
-    }
-  }, [])
-
-  const load = useCallback(async () => {
-    setStatus('loading')
-    try {
-      const [accountResponse, runResponse] = await Promise.all([api.lineAccounts.list(), api.friendMigrations.list()])
-      if (!accountResponse.success || !runResponse.success) throw new Error('load failed')
-      setAccounts(accountResponse.data)
-      setRuns(runResponse.data)
-      setFromAccountId((value) => value || accountResponse.data[0]?.id || '')
-      setToAccountId((value) => value || accountResponse.data[1]?.id || '')
-      setPage(0)
-      setClassification('')
-      setPendingOnly(false)
-      if (runResponse.data[0]) {
-        await loadDetail(runResponse.data[0].id, 0, '', false)
-      }
-      setStatus('ready')
-    } catch {
-      setStatus('error')
-    }
-    /*
-      実行権限の案内用に自分のid/roleだけ取る。失敗しても画面は出す
-      （実行可否はサーバーが最終判断する）。
-    */
-    try {
-      const meResponse = await api.staff.me()
-      if (meResponse.success && meResponse.data) {
-        setMe({ id: meResponse.data.id, role: meResponse.data.role })
-      }
-    } catch {
-      /* 権限が読めなくても操作自体はサーバーが止める */
-    }
-  }, [loadDetail])
-
-  useEffect(() => { void load() }, [load])
-
-  /*
-    対応表CSVの受け口。選ぶ・落とすのどちらもここへ来る。
-    受け付ける種類（accept）・読み方・読み飛ばしの文は変えない。
-  */
-  const onUidFile = async (files: File[]) => {
-    const selected = files[0] ?? null
-    setFile(selected)
-    if (!selected) { setMappings([]); return }
-    const text = await selected.text()
-    const parsed = parseUidCsv(text)
-    setMappings(parsed)
-    const dataLines = Math.max(text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim()).length - 1, 0)
-    setMessage(dataLines > parsed.length
-      ? `対応表のうち ${dataLines - parsed.length} 行は読み取れなかったため除いています。列の数と引用符を確認してください。`
-      : null)
-  }
-
-  const createDryRun = async () => {
-    if (!file || mappings.length === 0 || !fromAccountId || !toAccountId || !purpose.trim()) {
-      setMessage('移行元・移行先・利用目的と、old_uid / new_uid 列を持つCSVを選んでください。')
-      return
-    }
-    setBusy(true)
-    setMessage(null)
-    try {
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(await file.text()))
-      const sourceChecksum = Array.from(new Uint8Array(digest)).map((value) => value.toString(16).padStart(2, '0')).join('')
-      const response = await api.friendMigrations.dryRun({
-        fromAccountId, toAccountId, purpose: purpose.trim(), sourceFilename: file.name, sourceChecksum, mappings,
-      })
-      if (!response.success) throw new Error(response.error)
-      setPage(0)
-      setClassification('')
-      setPendingOnly(false)
-      const detail = await loadDetail(response.data.id, 0, '', false)
-      if (!detail) throw new Error('結果を読み直せませんでした。')
-      setRuns((current) => [{ ...detail, items: undefined }, ...current.filter((run) => run.id !== detail.id)])
-      setMessage('テスト移行が完了しました。実データはまだ変更していません。')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'テスト移行を実行できませんでした。')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const decide = async (item: UidMigrationItem, decision: 'link' | 'exclude') => {
-    if (!active || busy || detailBusy) return
-    setBusy(true)
-    setMessage(null)
-    setDetailError(null)
-    try {
-      const response = await api.friendMigrations.decide(active.id, item.id, decision)
-      if (!response.success) throw new ApiError(400, response.error)
-      const detail = await loadDetail(active.id, page, classification, pendingOnly)
-      // 絞り込みで今のページが空になったら1ページ戻る。
-      if (detail && (detail.items?.length ?? 0) === 0 && page > 0) {
-        setPage(page - 1)
-        await loadDetail(active.id, page - 1, classification, pendingOnly)
-      }
-      // 詳細ダイアログを開いたままの判断は、中の表示も追従させる。
-      setDetailItem((current) => (current && current.id === item.id ? { ...current, decision } : current))
-    } catch (error) {
-      /*
-        TECH-07: 通信断・タイムアウト（ApiError ではない例外）は
-        「サーバーが拒否した」のか「応答だけ失われた」のか分からない。
-        確定失敗と結果不明を分け、結果不明では対応表を読み直して
-        実際の判断結果を表示する。無条件の再送はしない。
-      */
-      const text = error instanceof ApiError
-        ? apiErrorMessage(error, '判断を保存できませんでした。')
-        : '応答を確認できませんでした。判断が保存されている可能性があります。対応表を読み直してから確認してください。'
-      setMessage(text)
-      setDetailError(text)
-      if (!(error instanceof ApiError)) void loadDetail(active.id, page, classification, pendingOnly)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // 口が返す未判断数があればそれを使い、なければ表示中の行で数える。
-  const unresolved = active?.unresolved ?? active?.items?.filter((item) => item.decision === 'pending').length ?? null
-
-  /*
-    FRIEND-33: 「本移行を実行」は確認画面を開くだけ。実際の実行は
-    ダイアログの確定ボタンだけが行う（入口クリック時の書込みは0回）。
-    作成者本人・owner以外はここで理由を示し、確定ボタンを出さない
-    （サーバー側でも 409/403 で拒否する）。
-  */
-  const canRunExecute = me ? me.role === 'owner' && me.id !== active?.createdBy : true
-  const canRunRollback = me ? me.role === 'owner' : true
-
-  const execute = async () => {
-    if (!active || busy) return
-    setBusy(true)
-    setExecuteError(null)
-    try {
-      const response = await api.friendMigrations.execute(active.id)
-      if (!response.success) throw new ApiError(400, response.error)
-      const detail = await loadDetail(active.id, page, classification, pendingOnly)
-      const failed = response.data.counts.failed
-      const applied = response.data.counts.applied
-      setMessage(
-        failed > 0
-          ? `本移行で ${formatNumber(applied)} 件を反映しましたが、${formatNumber(failed)} 件が失敗しました。失敗した行を確認して再実行するか、反映済みの分だけ切り戻せます。`
-          : '本移行と照合が完了しました。必要な場合はこの履歴から切り戻せます。',
-      )
-      if (detail) setRuns((current) => current.map((run) => (run.id === detail.id ? { ...detail, items: undefined } : run)))
-      setConfirmExecute(false)
-    } catch (error) {
-      /*
-        TECH-07/FRIEND-33: 通信断・タイムアウトは「応答だけ失われた」
-        可能性がある（サーバーでは実行が完了していることがある）。
-        確定失敗（サーバーの拒否応答）と分け、結果不明では履歴を
-        読み直して実際の状態を見せる。再実行はサーバー側が
-        executing/completed で止めるので二重反映にはならない。
-      */
-      if (error instanceof ApiError) {
-        /*
-         * R398: 500でも「実データはまだ変更していません」と残さない。
-         * 一部反映のまま失敗することがあるので、必ず履歴を読み直して
-         * 実際の反映件数を見せる。再取得できなければ結果未確認にする。
-         * POSTの再送はしない（loadDetailはGETだけ）。
-         */
-        const detail = await loadDetail(active.id, page, classification, pendingOnly)
-        if (detail) {
-          setRuns((current) => current.map((run) => (run.id === detail.id ? { ...detail, items: undefined } : run)))
-          const applied = detail.counts.applied
-          setExecuteError(applied > 0 || detail.status === 'failed' || detail.status === 'completed'
-            ? `本移行で ${formatNumber(applied)} 件が反映されています。失敗した行を確認して再実行するか、反映済みの分だけ切り戻せます。`
-            : apiErrorMessage(error, '本移行を実行できませんでした。'))
-        } else {
-          setExecuteError('実行結果を確認できませんでした。履歴を読み直して状態を確認してください。')
-        }
-      } else {
-        setExecuteError('応答を確認できませんでした。サーバーでは実行が完了している可能性があります。履歴を読み直して状態を確認してから、必要な場合だけ再実行してください。')
-        void loadDetail(active.id, page, classification, pendingOnly)
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  /*
-    FRIEND-36: 完了・一部失敗の履歴から切り戻しへ進む。確認ダイアログで
-    対象件数・制約・権限を示し、競合があればサーバーの409をそのまま表示する。
-  */
-  const rollback = async () => {
-    if (!active || busy) return
-    setBusy(true)
-    setRollbackError(null)
-    setRollbackConflicts([])
-    try {
-      const response = await api.friendMigrations.rollback(active.id)
-      if (!response.success) throw new ApiError(400, response.error)
-      setPage(0)
-      setClassification('')
-      setPendingOnly(false)
-      const detail = await loadDetail(active.id, 0, '', false)
-      const rolledBack = (response.data as UidMigrationRun & { rolledBack?: number }).rolledBack
-      setMessage(typeof rolledBack === 'number'
-        ? `切り戻しが完了しました（${formatNumber(rolledBack)} 件を移行前の状態に戻しました）。`
-        : '切り戻しが完了しました。')
-      if (detail) setRuns((current) => current.map((run) => (run.id === detail.id ? { ...detail, items: undefined } : run)))
-      setConfirmRollback(false)
-    } catch (error) {
-      // TECH-07: 応答喪失と確定失敗を分ける（execute と同じ考え方）。
-      if (error instanceof ApiError) {
-        setRollbackError(apiErrorMessage(error, '切り戻しを実行できませんでした。'))
-        const data = error.data
-        const conflicts = data && typeof data === 'object' && 'conflicts' in data
-          ? (data as { conflicts?: Array<{ itemId: string; oldUid: string; reason: string }> }).conflicts
-          : undefined
-        setRollbackConflicts(Array.isArray(conflicts) ? conflicts : [])
-      } else {
-        setRollbackError('応答を確認できませんでした。切り戻しが完了している可能性があります。履歴を読み直して状態を確認してください。')
-        void loadDetail(active.id, 0, '', false)
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
+function AccountMigrationV7({ m }: { m: ReturnType<typeof useUidMigration> }) {
+  const {
+    accounts,
+    runs,
+    active,
+    status,
+    fromAccountId,
+    setFromAccountId,
+    toAccountId,
+    setToAccountId,
+    purpose,
+    setPurpose,
+    file,
+    setFile,
+    mappings,
+    setMappings,
+    busy,
+    message,
+    setMessage,
+    page,
+    setPage,
+    classification,
+    setClassification,
+    pendingOnly,
+    setPendingOnly,
+    detailBusy,
+    me,
+    detailItem,
+    setDetailItem,
+    detailError,
+    setDetailError,
+    confirmExecute,
+    setConfirmExecute,
+    executeError,
+    setExecuteError,
+    confirmRollback,
+    setConfirmRollback,
+    rollbackError,
+    setRollbackError,
+    rollbackConflicts,
+    setRollbackConflicts,
+    load,
+    onUidFile,
+    createDryRun,
+    decide,
+    unresolved,
+    canRunExecute,
+    canRunRollback,
+    execute,
+    rollback,
+    selectRun,
+    onFilterChange,
+    onPageChange,
+  } = m
 
   if (status === 'loading') return <ListState kind="loading" title="UID移行を読み込んでいます" description="移行履歴とアカウントを確認しています。" />
   if (status === 'error') return <ListState kind="error" title="UID移行を表示できませんでした" description="登録した移行履歴は消えていません。" action={<Button onClick={() => void load()}>再読み込み</Button>} />
@@ -603,16 +319,8 @@ export default function AccountMigration() {
         onShowDetail={(item) => { setDetailError(null); setDetailItem(item) }}
         onRequestExecute={() => { setExecuteError(null); setConfirmExecute(true) }}
         onRequestRollback={() => { setRollbackError(null); setRollbackConflicts([]); setConfirmRollback(true) }}
-        onFilterChange={(nextClassification, nextPendingOnly) => {
-          setClassification(nextClassification)
-          setPendingOnly(nextPendingOnly)
-          setPage(0)
-          void loadDetail(active.id, 0, nextClassification, nextPendingOnly)
-        }}
-        onPageChange={(nextPage) => {
-          setPage(nextPage)
-          void loadDetail(active.id, nextPage, classification, pendingOnly)
-        }}
+        onFilterChange={(nextClassification, nextPendingOnly) => onFilterChange(active.id, nextClassification, nextPendingOnly)}
+        onPageChange={(nextPage) => onPageChange(active.id, nextPage)}
       /> : (
         <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
           {/*
@@ -629,117 +337,227 @@ export default function AccountMigration() {
         FRIEND-14: 「詳細を見る」は読み取り専用。開くだけでは更新APIを
         呼ばない。保存はダイアログ内の「この組合せを承認」「除外する」だけ。
       */}
-      <Dialog
-        open={detailItem !== null}
-        title="移行内容の確認"
-        description="内容の確認だけでは保存されません。承認・除外は下のボタンで確定します。"
+      <MigrationItemDialog
+        detailItem={detailItem}
+        active={active}
+        me={me}
         busy={busy}
-        error={detailError ?? undefined}
-        onCancel={() => { if (!busy) { setDetailItem(null); setDetailError(null) } }}
-        footer={detailItem ? (
-          <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
-            {active && !['review', 'ready', 'failed'].includes(active.status) ? (
-              <span className="text-ink-faint text-xs">この移行の状態では判断を変更できません。</span>
-            ) : me && !['owner', 'admin'].includes(me.role) ? (
-              <span className="text-ink-faint text-xs">判断の保存はowner/adminが行います。</span>
-            ) : (<>
-              {detailItem.decision !== 'exclude' && (
-                <Button type="button" disabled={busy} onClick={() => void decide(detailItem, 'exclude')}>除外する</Button>
-              )}
-              {detailItem.newUid && detailItem.decision !== 'link' && (
-                <Button type="button" variant="primary" disabled={busy} onClick={() => void decide(detailItem, 'link')}>この組合せを承認</Button>
-              )}
-            </>)}
-          </div>
-        ) : undefined}
-      >
-        {detailItem && (
-          <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
-            <div><dt className="text-ink-faint text-xs">旧UID</dt><dd className="text-ink break-all">{detailItem.oldUid}</dd></div>
-            <div><dt className="text-ink-faint text-xs">新UID</dt><dd className="text-ink break-all">{detailItem.newUid ?? '—'}</dd></div>
-            <div><dt className="text-ink-faint text-xs">候補ユーザー</dt><dd className="text-ink">{detailItem.candidateName ?? '候補なし'}</dd></div>
-            <div><dt className="text-ink-faint text-xs">一致根拠</dt><dd className="text-ink">{({ same_provider: '同一提供者', line_login: 'LINEログイン', signed_customer_id: '署名済み顧客ID', verified_contact: '確認済み連絡先', operator_csv: '運用者のCSV', manual: '手作業' } as const)[detailItem.evidenceType]}</dd></div>
-            <div><dt className="text-ink-faint text-xs">分類</dt><dd className="text-ink">{classLabel[detailItem.classification]}</dd></div>
-            <div><dt className="text-ink-faint text-xs">競合内容</dt><dd className="text-ink">{detailItem.conflictReason ?? '—'}</dd></div>
-            <div><dt className="text-ink-faint text-xs">現在の判断</dt><dd className="text-ink font-semibold">{decisionLabel[detailItem.decision]}</dd></div>
-            <div><dt className="text-ink-faint text-xs">実行結果</dt><dd className="text-ink">{({ pending: '未実行', applied: '反映済み', skipped: '除外', failed: '失敗', rolled_back: '切り戻し済み' } as const)[detailItem.result]}{detailItem.errorMessage ? `（${detailItem.errorMessage}）` : ''}</dd></div>
-          </dl>
-        )}
-      </Dialog>
+        detailError={detailError}
+        onClose={() => { setDetailItem(null); setDetailError(null) }}
+        decide={(item, decision) => void decide(item, decision)}
+      />
 
       {/*
         FRIEND-33: 実行ボタンはこの確認画面を開くだけで書込みはしない。
         対象・件数・権限・復旧条件を示し、確定ボタンだけが execute を呼ぶ。
         権限が無いことが分かっている場合は確定ボタン自体を出さない。
       */}
-      {active && (
-        <ConfirmDialog
-          open={confirmExecute}
-          title="本移行を実行します"
-          description="実行すると友だちと統合ユーザーの紐付けが実際に変わります。内容を確認してから確定してください。"
-          confirmLabel="本移行を実行"
-          busy={busy}
-          error={executeError ?? undefined}
-          onConfirm={canRunExecute ? () => void execute() : undefined}
-          onCancel={() => { if (!busy) setConfirmExecute(false) }}
-        >
-          <ul className="text-ink list-disc space-y-1 pl-5 text-sm">
-            <li>対象：{accounts.find((account) => account.id === active.fromAccountId)?.name ?? active.fromAccountId} → {accounts.find((account) => account.id === active.toAccountId)?.name ?? active.toAccountId}</li>
-            <li>結び付け {active.decisionCounts?.link ?? '—'} 件・除外 {active.decisionCounts?.exclude ?? '—'} 件・新規作成の判断 {active.decisionCounts?.create ?? '—'} 件（自動反映できない行は失敗として記録されます）</li>
-            <li>実行権限：ownerのみ。テスト移行を作成した本人は実行できません。</li>
-            <li>復旧：実行後、この履歴から反映済みの分だけ切り戻せます。移行後に別の変更があった行は切り戻しを止めて表示します。</li>
-          </ul>
-          {me && me.role !== 'owner' && <p className="text-danger mt-2 text-sm font-semibold">本移行の実行はownerの権限が必要です。</p>}
-          {me && me.role === 'owner' && me.id === active.createdBy && <p className="text-danger mt-2 text-sm font-semibold">この移行はあなたが作成したため、別のownerが実行してください。</p>}
-        </ConfirmDialog>
-      )}
+      <ExecuteConfirmDialog
+        active={active}
+        accounts={accounts}
+        me={me}
+        busy={busy}
+        open={confirmExecute}
+        error={executeError}
+        canRun={canRunExecute}
+        onConfirm={() => void execute()}
+        onCancel={() => { if (!busy) setConfirmExecute(false) }}
+      />
 
       {/*
         FRIEND-36: 完了・一部失敗の履歴から、確認付きで切り戻しへ進める。
         対象件数・制約（移行後の変更がある行は止まる）・権限を明示する。
       */}
-      {active && (
-        <ConfirmDialog
-          open={confirmRollback}
-          title="この移行を切り戻します"
-          description={`反映した ${formatNumber(active.counts.applied)} 件を移行前の紐付けに戻します。移行後に別の変更があった行は切り戻さず、競合として表示します。`}
-          confirmLabel="切り戻す"
-          destructive
-          busy={busy}
-          error={rollbackError ?? undefined}
-          onConfirm={canRunRollback ? () => void rollback() : undefined}
-          onCancel={() => { if (!busy) { setConfirmRollback(false); setRollbackConflicts([]) } }}
-        >
-          <ul className="text-ink list-disc space-y-1 pl-5 text-sm">
-            <li>対象：この履歴で反映済みの {formatNumber(active.counts.applied)} 行だけです。失敗・除外の行は変更しません。</li>
-            <li>制約：移行後に統合ユーザーへ別の変更があった行は切り戻せません。</li>
-            <li>実行権限：ownerのみ。</li>
-          </ul>
-          {rollbackConflicts.length > 0 && (
-            <ul className="text-danger mt-2 list-disc space-y-1 pl-5 text-sm">
-              {rollbackConflicts.map((conflict) => <li key={conflict.itemId}>{conflict.oldUid}：{conflict.reason}</li>)}
-            </ul>
-          )}
-          {me && me.role !== 'owner' && <p className="text-danger mt-2 text-sm font-semibold">切り戻しはownerの権限が必要です。</p>}
-        </ConfirmDialog>
-      )}
+      <RollbackConfirmDialog
+        active={active}
+        me={me}
+        busy={busy}
+        open={confirmRollback}
+        error={rollbackError}
+        conflicts={rollbackConflicts}
+        canRun={canRunRollback}
+        onConfirm={() => void rollback()}
+        onCancel={() => { if (!busy) { setConfirmRollback(false); setRollbackConflicts([]) } }}
+      />
 
-      <section id="migration-history" className="bg-canvas rounded-card border-hairline border"><div className="border-hairline border-b px-4 py-3"><h2 className="text-ink text-sm font-bold">移行履歴</h2></div>{runs.length === 0 ? <ListState kind="empty" title="移行履歴はまだありません" /> : <div className="divide-hairline divide-y">{runs.map((run) => {
-        /*
-          FRIEND-15: 履歴の状態表示も run.status だけで決める。
-          一部失敗と完了を同じ「反映ずみ」で出さない。
-        */
-        const badge: { tone: StatusBadgeTone; label: string } =
-          run.status === 'completed' ? { tone: 'success', label: '本移行済み' }
-            : run.status === 'rolled_back' ? { tone: 'neutral', label: '切り戻し済み' }
-              : run.status === 'failed' ? { tone: 'danger', label: run.counts.applied > 0 ? '一部失敗' : '失敗' }
-                : run.status === 'executing' ? { tone: 'info', label: '実行中' }
-                  : run.status === 'ready' ? { tone: 'success', label: '確認完了' }
-                    : { tone: 'neutral', label: '確認中' }
-        return <button key={run.id} className="hover:bg-canvas-sunken flex w-full items-center justify-between px-4 py-3 text-left" onClick={() => { setPage(0); setClassification(''); setPendingOnly(false); void loadDetail(run.id, 0, '', false) }}><span><span className="text-ink block text-sm font-semibold">{run.purpose}</span><span className="text-ink-faint text-xs">{formatDateTime(run.createdAt)} ・ {formatNumber(run.counts.total)}件</span></span><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></button>
-      })}</div>}</section>
+      <MigrationHistorySection runs={runs} onSelect={selectRun} />
       {/* #984 LAY-13: 移行元・移行先の選び欄は欄いっぱいに広げる（部品の size="full" を使う）。 */}
     </div>
+  )
+}
+
+/** 行の「詳細を見る」で開く読み取り専用ダイアログ。v7/v8 で共用する。 */
+export function MigrationItemDialog({
+  detailItem,
+  active,
+  me,
+  busy,
+  detailError,
+  onClose,
+  decide,
+}: {
+  detailItem: UidMigrationItem | null
+  active: UidMigrationDetail | null
+  me: { id: string; role: string } | null
+  busy: boolean
+  detailError: string | null
+  onClose: () => void
+  decide: (item: UidMigrationItem, decision: 'link' | 'create' | 'exclude') => void
+}) {
+  return (
+    <Dialog
+      open={detailItem !== null}
+      title="移行内容の確認"
+      description="内容の確認だけでは保存されません。承認・除外は下のボタンで確定します。"
+      busy={busy}
+      error={detailError ?? undefined}
+      onCancel={() => { if (!busy) onClose() }}
+      footer={detailItem ? (
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+          {active && !['review', 'ready', 'failed'].includes(active.status) ? (
+            <span className="text-ink-faint text-xs">この移行の状態では判断を変更できません。</span>
+          ) : me && !['owner', 'admin'].includes(me.role) ? (
+            <span className="text-ink-faint text-xs">判断の保存はowner/adminが行います。</span>
+          ) : (<>
+            {detailItem.decision !== 'exclude' && (
+              <Button type="button" disabled={busy} onClick={() => decide(detailItem, 'exclude')}>除外する</Button>
+            )}
+            {detailItem.newUid && detailItem.decision !== 'link' && (
+              <Button type="button" variant="primary" disabled={busy} onClick={() => decide(detailItem, 'link')}>この組合せを承認</Button>
+            )}
+          </>)}
+        </div>
+      ) : undefined}
+    >
+      {detailItem && (
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
+          <div><dt className="text-ink-faint text-xs">旧UID</dt><dd className="text-ink break-all">{detailItem.oldUid}</dd></div>
+          <div><dt className="text-ink-faint text-xs">新UID</dt><dd className="text-ink break-all">{detailItem.newUid ?? '—'}</dd></div>
+          <div><dt className="text-ink-faint text-xs">候補ユーザー</dt><dd className="text-ink">{detailItem.candidateName ?? '候補なし'}</dd></div>
+          <div><dt className="text-ink-faint text-xs">一致根拠</dt><dd className="text-ink">{({ same_provider: '同一提供者', line_login: 'LINEログイン', signed_customer_id: '署名済み顧客ID', verified_contact: '確認済み連絡先', operator_csv: '運用者のCSV', manual: '手作業' } as const)[detailItem.evidenceType]}</dd></div>
+          <div><dt className="text-ink-faint text-xs">分類</dt><dd className="text-ink">{classLabel[detailItem.classification]}</dd></div>
+          <div><dt className="text-ink-faint text-xs">競合内容</dt><dd className="text-ink">{detailItem.conflictReason ?? '—'}</dd></div>
+          <div><dt className="text-ink-faint text-xs">現在の判断</dt><dd className="text-ink font-semibold">{decisionLabel[detailItem.decision]}</dd></div>
+          <div><dt className="text-ink-faint text-xs">実行結果</dt><dd className="text-ink">{({ pending: '未実行', applied: '反映済み', skipped: '除外', failed: '失敗', rolled_back: '切り戻し済み' } as const)[detailItem.result]}{detailItem.errorMessage ? `（${detailItem.errorMessage}）` : ''}</dd></div>
+        </dl>
+      )}
+    </Dialog>
+  )
+}
+
+/** 本移行の実行確認（v7/v8 共用）。確定ボタンだけが execute を呼ぶ。 */
+export function ExecuteConfirmDialog({
+  active,
+  accounts,
+  me,
+  busy,
+  open,
+  error,
+  canRun,
+  onConfirm,
+  onCancel,
+}: {
+  active: UidMigrationDetail | null
+  accounts: LineAccount[]
+  me: { id: string; role: string } | null
+  busy: boolean
+  open: boolean
+  error: string | null
+  canRun: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  if (!active) return null
+  return (
+    <ConfirmDialog
+      open={open}
+      title="本移行を実行します"
+      description="実行すると友だちと統合ユーザーの紐付けが実際に変わります。内容を確認してから確定してください。"
+      confirmLabel="本移行を実行"
+      busy={busy}
+      error={error ?? undefined}
+      onConfirm={canRun ? onConfirm : undefined}
+      onCancel={onCancel}
+    >
+      <ul className="text-ink list-disc space-y-1 pl-5 text-sm">
+        <li>対象：{accounts.find((account) => account.id === active.fromAccountId)?.name ?? active.fromAccountId} → {accounts.find((account) => account.id === active.toAccountId)?.name ?? active.toAccountId}</li>
+        <li>結び付け {active.decisionCounts?.link ?? '—'} 件・除外 {active.decisionCounts?.exclude ?? '—'} 件・新規作成の判断 {active.decisionCounts?.create ?? '—'} 件（自動反映できない行は失敗として記録されます）</li>
+        <li>実行権限：ownerのみ。テスト移行を作成した本人は実行できません。</li>
+        <li>復旧：実行後、この履歴から反映済みの分だけ切り戻せます。移行後に別の変更があった行は切り戻しを止めて表示します。</li>
+      </ul>
+      {me && me.role !== 'owner' && <p className="text-danger mt-2 text-sm font-semibold">本移行の実行はownerの権限が必要です。</p>}
+      {me && me.role === 'owner' && me.id === active.createdBy && <p className="text-danger mt-2 text-sm font-semibold">この移行はあなたが作成したため、別のownerが実行してください。</p>}
+    </ConfirmDialog>
+  )
+}
+
+/** 切り戻しの確認（v7/v8 共用）。 */
+export function RollbackConfirmDialog({
+  active,
+  me,
+  busy,
+  open,
+  error,
+  conflicts,
+  canRun,
+  onConfirm,
+  onCancel,
+}: {
+  active: UidMigrationDetail | null
+  me: { id: string; role: string } | null
+  busy: boolean
+  open: boolean
+  error: string | null
+  conflicts: Array<{ itemId: string; oldUid: string; reason: string }>
+  canRun: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  if (!active) return null
+  return (
+    <ConfirmDialog
+      open={open}
+      title="この移行を切り戻します"
+      description={`反映した ${formatNumber(active.counts.applied)} 件を移行前の紐付けに戻します。移行後に別の変更があった行は切り戻さず、競合として表示します。`}
+      confirmLabel="切り戻す"
+      destructive
+      busy={busy}
+      error={error ?? undefined}
+      onConfirm={canRun ? onConfirm : undefined}
+      onCancel={onCancel}
+    >
+      <ul className="text-ink list-disc space-y-1 pl-5 text-sm">
+        <li>対象：この履歴で反映済みの {formatNumber(active.counts.applied)} 行だけです。失敗・除外の行は変更しません。</li>
+        <li>制約：移行後に統合ユーザーへ別の変更があった行は切り戻せません。</li>
+        <li>実行権限：ownerのみ。</li>
+      </ul>
+      {conflicts.length > 0 && (
+        <ul className="text-danger mt-2 list-disc space-y-1 pl-5 text-sm">
+          {conflicts.map((conflict) => <li key={conflict.itemId}>{conflict.oldUid}：{conflict.reason}</li>)}
+        </ul>
+      )}
+      {me && me.role !== 'owner' && <p className="text-danger mt-2 text-sm font-semibold">切り戻しはownerの権限が必要です。</p>}
+    </ConfirmDialog>
+  )
+}
+
+/** 履歴一覧（v7 ではカード内の行ボタン）。v8 では表で使い回す。 */
+export function MigrationHistorySection({ runs, onSelect }: { runs: UidMigrationDetail[] | import('@/lib/api').UidMigrationRun[]; onSelect: (runId: string) => void }) {
+  return (
+    <section id="migration-history" className="bg-canvas rounded-card border-hairline border"><div className="border-hairline border-b px-4 py-3"><h2 className="text-ink text-sm font-bold">移行履歴</h2></div>{runs.length === 0 ? <ListState kind="empty" title="移行履歴はまだありません" /> : <div className="divide-hairline divide-y">{runs.map((run) => {
+      /*
+        FRIEND-15: 履歴の状態表示も run.status だけで決める。
+        一部失敗と完了を同じ「反映ずみ」で出さない。
+      */
+      const badge: { tone: StatusBadgeTone; label: string } =
+        run.status === 'completed' ? { tone: 'success', label: '本移行済み' }
+          : run.status === 'rolled_back' ? { tone: 'neutral', label: '切り戻し済み' }
+            : run.status === 'failed' ? { tone: 'danger', label: run.counts.applied > 0 ? '一部失敗' : '失敗' }
+              : run.status === 'executing' ? { tone: 'info', label: '実行中' }
+                : run.status === 'ready' ? { tone: 'success', label: '確認完了' }
+                  : { tone: 'neutral', label: '確認中' }
+      return <button key={run.id} className="hover:bg-canvas-sunken flex w-full items-center justify-between px-4 py-3 text-left" onClick={() => onSelect(run.id)}><span><span className="text-ink block text-sm font-semibold">{run.purpose}</span><span className="text-ink-faint text-xs">{formatDateTime(run.createdAt)} ・ {formatNumber(run.counts.total)}件</span></span><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></button>
+    })}</div>}</section>
   )
 }
 
@@ -813,7 +631,7 @@ function ActiveMigration({
           */}
           <ActionCell><div className="flex flex-wrap items-center gap-2">
             {/* #641: 行操作は共通の枠つきボタン */}
-            <Button type="button" variant="secondary" disabled={busy || detailBusy} onClick={() => onShowDetail(item)}>詳細を見る</Button>
+            <Button type="button" variant="secondary" disabled={busy || detailBusy} onClick={() => onShowDetail(item)}>開く</Button>
             {!item.newUid && <span className="text-ink-faint text-xs">一致先なし（新規作成は「CSVで書き出す・取り込む」で行ってください）</span>}
           </div></ActionCell>
         </Tr>)}</tbody>

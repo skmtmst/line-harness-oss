@@ -15,11 +15,18 @@ const apiFolders = vi.hoisted(() => ({
   delete: vi.fn(),
   swapOrder: vi.fn(),
 }))
+// V8 の名前変更は型付き口 `api.forms.update` を使う（V7 の生 PUT と違う）。
+const formsUpdate = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   // `api.folders.*` は内部で生の fetchApi を掴むため、部品ごと差し替える。
-  return { ...actual, fetchApi, api: { ...(actual as unknown as { api: object }).api, folders: apiFolders } }
+  const api = (actual as unknown as { api: Record<string, object> }).api
+  return {
+    ...actual,
+    fetchApi,
+    api: { ...api, folders: apiFolders, forms: { ...api.forms, update: formsUpdate } },
+  }
 })
 
 vi.mock('next/link', () => ({
@@ -36,7 +43,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
-import FormSubmissionsPage from './page'
+import FormSubmissionsPage from './list-v8'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -129,6 +136,10 @@ beforeEach(() => {
     writes.push({ url: `/api/folders/${id}/swap-order`, method: 'SWAP', body: { withId } })
     return { success: true, data: { swapped: [id, withId] } }
   })
+  formsUpdate.mockImplementation(async (id: string, _accountId: string, data: Record<string, unknown>) => {
+    writes.push({ url: `/api/forms/${id}`, method: 'PUT', body: data })
+    return { success: true, data: { id } }
+  })
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -169,7 +180,7 @@ describe('フォルダ選択はサーバーへ渡す（N-175・実マウント�
 
 async function openRowMenu(formName: string) {
   const menuButton = [...host.querySelectorAll('button')].find(
-    (b) => b.getAttribute('aria-label') === `${formName}のその他操作`,
+    (b) => (b.getAttribute('aria-label') ?? '').startsWith(`「${formName}」のその他の操作`),
   )
   expect(menuButton).toBeTruthy()
   await act(async () => {
@@ -194,7 +205,7 @@ describe('箱の作成・名前変更・移動が選んだアカウントでつ�
     await act(async () => {
       root.render(<FormSubmissionsPage />)
     })
-    await clickFolder('フォルダを追加する')
+    await clickFolder('フォルダを追加')
     const nameInput = host.querySelector('input[placeholder^="例:"]') as HTMLInputElement | null
     expect(nameInput).toBeTruthy()
     await act(async () => {
@@ -221,9 +232,10 @@ describe('箱の作成・名前変更・移動が選んだアカウントでつ�
     })
     await openRowMenu('箱フォーム')
     await clickMenuItem('名前を変更')
-    expect(host.textContent).toContain('フォーム名を変更')
+    // 名前変更の窓は最上層の portal に出るため、文書全体で見る。
+    expect(document.body.textContent).toContain('フォーム名を変更')
     await act(async () => {})
-    const saveButton = [...host.querySelectorAll('button')].find((b) => b.textContent === '保存する')
+    const saveButton = [...document.querySelectorAll('button')].find((b) => b.textContent === '保存する')
     expect(saveButton).toBeTruthy()
     await act(async () => {
       saveButton!.click()
@@ -265,15 +277,16 @@ describe('行の編集は質問の編集へ行く（R27・実マウント）', (
     await act(async () => {
       root.render(<FormSubmissionsPage />)
     })
-    // 名前の行き先と同じ URL なので、文言が「編集」の行き先で見分ける。
-    const editLink = [...host.querySelectorAll('a[href="/form-submissions/edit?id=f-a1&tab=basic"]')].find(
-      (a) => a.textContent === '編集',
+    // 名前自体が編集画面への行き先になっている。
+    const nameLink = [...host.querySelectorAll('button[aria-label="「箱フォーム」の詳細を見る"]')].find(
+      (a) => a.textContent === '箱フォーム',
     )
-    expect(editLink).toBeTruthy()
+    expect(nameLink).toBeTruthy()
     await openRowMenu('箱フォーム')
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent)
+    expect(items).toContain('編集')
     expect(items).toContain('名前を変更')
     expect(items).toContain('フォルダへ移す')
-    expect(items).toContain('削除する')
+    expect(items).toContain('削除')
   })
 })

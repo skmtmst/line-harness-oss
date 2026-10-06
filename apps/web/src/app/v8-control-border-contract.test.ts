@@ -1,5 +1,5 @@
 /*
- * ★V8「枠線の色」`--color-control-border`（#868e98）の固定。
+ * ★V8「枠線の色」`--color-control-border`（#c9ced6・絵の変数）の固定。
  *
  *   - V8（`[data-theme="v8"]`）のときだけ効くトークンであること
  *   - 操作する部品（入力・選ぶ欄・探す欄・チェック・ラジオ・
@@ -21,7 +21,7 @@ const V8 = String.raw`\[data-theme=['"]?v8['"]?\]`
 describe('★V8 枠線の色（--color-control-border）', () => {
   it('トークンが v8 の下にだけ定義されている', () => {
     const v8Block = globals.match(/\[data-theme="v8"\]\s*\{([^}]*)\}/)
-    expect(v8Block?.[1]).toContain('--color-control-border: #868e98')
+    expect(v8Block?.[1]).toContain('--color-control-border: #c9ced6')
     const rootBlock = globals.slice(0, globals.indexOf('[data-theme'))
     expect(rootBlock).not.toContain('--color-control-border')
   })

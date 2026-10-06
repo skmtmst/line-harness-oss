@@ -46,4 +46,32 @@ describe('U094 運営コンソールの外枠', () => {
     expect(HEADER).toContain('min-h-14')
     expect(HEADER).not.toContain('flex h-14')
   })
+
+  /*
+   * 縦に長い画面（監査ログなど）で、左下のアカウント情報が本文と一緒に
+   * 下へ送られ、一番下までスクロールしないと見えなかった。外枠の高さを
+   * 画面に合わせ、縦に流れるのは本文の中だけにする。
+   */
+  it('外枠は画面の高さに収め、縦に流れるのは本文の中だけにする', () => {
+    expect(SHELL).toContain('flex h-svh flex-col overflow-hidden')
+    expect(SHELL).not.toContain('flex min-h-svh flex-col bg-canvas-sunken')
+    expect(SHELL).toContain('<div className="flex min-h-0 flex-1">')
+    expect(SHELL).toContain("navOpen ? 'overflow-hidden' : 'overflow-y-auto'")
+    expect(SHELL).toContain('id="ops-main"')
+  })
+
+  it('左下のアカウント情報は常に見え、流れるのはメニューの部分だけ', () => {
+    // サイドバー自体はスクロールさせない（中の nav だけが流れる）。
+    expect(SHELL).toContain('w-64 shrink-0 flex-col overflow-hidden')
+    expect(SHELL).toContain('<nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-3">')
+    // 上の見出しと下のアカウントは縮まない。
+    expect(SHELL).toContain('flex shrink-0 items-center gap-3 px-4 py-4')
+    expect(SHELL).toContain('relative shrink-0 px-3 py-3')
+  })
+
+  it('利用者メニューは矢印キーで項目を移動できる', () => {
+    expect(SHELL).toContain("role=\"menu\"")
+    expect(SHELL).toContain("querySelectorAll<HTMLElement>('[role=\"menuitem\"]:not([disabled])')")
+    expect(SHELL).toContain("onKeyDown={(event: ReactKeyboardEvent<HTMLElement>)")
+  })
 })

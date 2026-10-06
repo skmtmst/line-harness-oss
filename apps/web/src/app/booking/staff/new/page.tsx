@@ -20,6 +20,8 @@ import Select from '@/components/shared/select'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { canEditFeature } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import StaffNewV8 from './staff-new-v8'
 
 /**
  * 予約スタッフを登録する（設計 V2 8-2-2 / node bEL9g）。
@@ -30,6 +32,12 @@ import { usePageTitle } from '@/components/shell/page-chrome'
  * 設計どおり、担当メニューをここで選べるようにした。
  */
 export default function NewBookingStaffPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <StaffNewV8 />
+  return <NewBookingStaffV7 />
+}
+
+function NewBookingStaffV7() {
   const { selectedAccountId } = useAccount()
   // /booking/staff/new はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
   usePageTitle('予約スタッフを登録')
@@ -180,11 +188,11 @@ export default function NewBookingStaffPage() {
   return (
     <>
     <CreatePage
-      title="予約スタッフを登録する"
-      description="お客様が予約するときに指名できる担当者を登録します。"
+      title="予約スタッフを追加する"
+      description="お客様が予約するときに指名できるスタッフを追加します。"
       showHeader={false}
       parent={['予約設定', '/booking/menus?tab=staff']}
-      saveLabel={createdStaffId ? '割当をやり直す' : 'スタッフを登録する'}
+      saveLabel={createdStaffId ? '割当をやり直す' : 'スタッフを追加する'}
       variant="v6"
       statusLabel={
         createdStaffId
@@ -256,7 +264,7 @@ export default function NewBookingStaffPage() {
                     .map((m) => (
                       <span
                         key={m.id}
-                        className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[10px]"
+                        className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-nano"
                       >
                         {m.name}
                       </span>

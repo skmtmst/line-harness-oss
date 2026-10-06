@@ -10,6 +10,8 @@ import {
   claimAdConversionSend,
   claimAdConversionOutboxDue,
   enqueueAdConversionOutbox,
+  mappedAdSnapshot,
+  recoverMappedAdConversions,
   finishAdConversionSend,
   finishAdConversionOutbox,
   getAdConversionOutboxById,
@@ -234,6 +236,12 @@ async function attemptPlatformSend(
     retryable,
   });
 
+  if (args.platform.name === 'google' && outbox.row.idempotency_key.startsWith('conversion:')) {
+    const snapshot = await mappedAdSnapshot(db, outbox.row.idempotency_key.slice('conversion:'.length), args.platform.id);
+    if (!snapshot?.googleActionId) { await finishOutbox('failed', 'google_conversion_action_missing', false); return 'failed'; }
+    args.config = { ...args.config, conversion_action_id: snapshot.googleActionId };
+  }
+
   if (outbox.row.selection_reason !== 'eligible') {
     await finishOutbox('failed', outbox.row.selection_reason, false);
     return 'failed';
@@ -318,6 +326,7 @@ export async function drainAdConversionOutbox(
   db: D1Database,
   opts?: { limit?: number; credentialKey?: string },
 ): Promise<{ claimed: number; sent: number; failed: number }> {
+  await recoverMappedAdConversions(db, opts?.limit ?? 100);
   const rows = await claimAdConversionOutboxDue(db, { limit: opts?.limit });
   let sent = 0;
   let failed = 0;

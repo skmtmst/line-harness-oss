@@ -7,46 +7,36 @@ import type { LineAccount } from '@line-crm/shared'
  * アカウント / 接続状態 / Webhook / 友だち / 既定 / 親アカウント / 操作。
  */
 
-/** 接続状態。**色だけに頼らず、必ず文字で言う。** */
-export function connectionLabel(account: LineAccount): { label: string; tone: 'success' | 'neutral' } {
+/** 接続状態。板 V7vn3：正常／確認停止中／アーカイブ。**色だけに頼らず、必ず文字で言う。** */
+export function connectionLabel(account: LineAccount): { label: string; tone: 'success' | 'warning' | 'neutral' } {
   if (account.archivedAt) return { label: 'アーカイブ', tone: 'neutral' }
   return account.isActive
-    ? { label: '稼働中', tone: 'success' }
-    : { label: '停止中', tone: 'neutral' }
+    ? { label: '正常', tone: 'success' }
+    : { label: '確認停止中', tone: 'warning' }
 }
 
 /**
- * Webhook の照合結果。
- *
- * **「確認していません」と「合っていません」を言い分ける。**
- * どちらも「届かないかもしれない」だが、運用者のやることが違う——
- * 前者は確かめる、後者は直す。
+ * Webhook の照合結果。板 V7vn3：正常／未確認。
+ * 合っていない・登録が無い・まだ確かめていないは、どれも「未確認」にまとめる。
+ * 直し方は詳しい画面で言い分ける。
  */
 export function webhookLabel(
   account: LineAccount,
-): { label: string; tone: 'success' | 'warning' | 'neutral' } {
-  switch (account.webhook?.status) {
-    case 'matched':
-      return { label: '一致・利用中', tone: 'success' }
-    case 'mismatched':
-      return { label: 'URLが違います', tone: 'warning' }
-    case 'unconfigured':
-      return { label: '登録されていません', tone: 'warning' }
-    default:
-      // `unknown` と、そもそも `webhook` が付かないとき。
-      return { label: '確認していません', tone: 'neutral' }
-  }
+): { label: string; tone: 'success' | 'neutral' } {
+  return account.webhook?.status === 'matched'
+    ? { label: '正常', tone: 'success' }
+    : { label: '未確認', tone: 'neutral' }
 }
 
-/** 絞り込みの区分。設計のタブと同じ並び。 */
+/** 絞り込みの区分。板 V7vn3 と同じ並び。 */
 export type AccountFilter = 'all' | 'active' | 'inactive' | 'archived' | 'problem'
 
 export const ACCOUNT_FILTERS: ReadonlyArray<{ value: AccountFilter; label: string }> = [
   { value: 'all', label: 'すべて' },
   { value: 'active', label: '稼働中' },
   { value: 'inactive', label: '停止中' },
-  { value: 'archived', label: 'アーカイブ' },
   { value: 'problem', label: '接続に問題' },
+  { value: 'archived', label: 'アーカイブ' },
 ]
 
 /** 接続に問題がある＝Webhook が合っていない、または登録されていない。 */

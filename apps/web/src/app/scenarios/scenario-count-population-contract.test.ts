@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+/* 完全切り替え：v7 の page.tsx は捨て、V8 の一覧（src/v8/scenarios/list.tsx・page.tsx が描く本体）を見る。 */
+const PAGE = readFileSync(new URL('../../v8/scenarios/list.tsx', import.meta.url), 'utf8')
 
 /**
  * #981 A05-02: シナリオ総数とフォルダ内訳の母集団の照合。
@@ -24,7 +25,7 @@ describe('シナリオ一覧の件数定義（#981 A05-02）', () => {
 
   it('フォルダAPI・KPIは一覧と同じアカウント範囲で数える', () => {
     expect(PAGE).toContain("api.folders.list('scenario', accountId ?? undefined)")
-    expect(PAGE).toContain('accountId={selectedAccountId ?? undefined}')
+    expect(PAGE).toContain('api.listStats.get(accountId ?? undefined)')
   })
 
   it('「未分類」の件数はAPIの unfiledCount で、現在ページの行数では数えない', () => {

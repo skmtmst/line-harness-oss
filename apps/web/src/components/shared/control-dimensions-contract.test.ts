@@ -71,12 +71,13 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
      * ★V8 移行が済んで不要になったら、次の1行で全部消せる（この試験も消す）:
      *   grep -rl 'layer-order: V8 移行後に消す' apps/web/src | xargs sed -i '' '/layer-order: V8 移行後に消す/d'
      */
-    const line = '@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */'
+    // 層の順番を守る。注釈の有無は描画に関係しない。
+    const order = /^@layer properties,\s*theme,\s*base,\s*components,\s*utilities;\s*(?:\/\*[\s\S]*?\*\/\s*)?@layer components\s*\{/
     const dir = new URL('.', import.meta.url)
     const modules = readdirSync(dir).filter((name) => name.endsWith('.module.css'))
     const offenders = modules.filter((name) => {
       const css = read(`./${name}`)
-      return css.includes('@layer components') && !css.startsWith(`${line}\n@layer components {`)
+      return css.includes('@layer components') && !order.test(css)
     })
     expect(offenders).toEqual([])
   })

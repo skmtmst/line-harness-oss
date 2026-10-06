@@ -78,6 +78,14 @@ describe('絞り込み札 FilterChip（m13i）', () => {
     expect((container.querySelector('button') as HTMLButtonElement).disabled).toBe(true)
   })
 
+  it('v8 の札は板どおり（高36・内側0/10・間5・角丸999・枠hairline。I3L41O）', () => {
+    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
+    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*padding:\s*0 10px/s)
+    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*gap:\s*5px/s)
+    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{\s*[^}]*border-radius:\s*999px/s)
+    expect(CODE).toMatch(/\[data-theme='v8'\]\s*\.v6-filter-chip\s*\{[^}]*outline:\s*1px solid var\(--color-hairline\)/s)
+  })
+
   it('見た目の決まりは CSS が持つ（高さ32・濃い緑の選択・タッチ44px）', () => {
     // 高さ32（#639 の契約と同じ錨）。
     expect(CODE).toMatch(/\.v6-filter-chip\s*\{[^}]*height:\s*32px/s)

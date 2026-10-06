@@ -30,7 +30,8 @@ const PERMISSION_GROUPS = [
   { label: 'コンテンツ', items: [['/templates', 'テンプレート'], ['/rich-menus', 'リッチメニュー'], ['/form-submissions', '回答フォーム'], ['/contents/vars', '共通情報'], ['/contents', '登録メディア一覧']] },
   { label: '成果と分析', items: [['/conversions', '成果とアフィリエイト'], [CONVERSION_APPROVAL_EDIT_KEY, '成果を承認・却下する'], ['/mileage', 'マイル'], ['/inflow-links', '流入と計測'], ['/analytics', '分析']] },
   { label: '自動化・予約', items: [['/automations', 'オートメーション'], ['/webhooks', '外部連携'], ['/booking/bookings', '予約管理'], ['/booking/menus', '予約設定'], ['/events', 'イベント予約']] },
-  { label: 'NEN運用', items: [['/ec-commerce', 'ECデータ連携'], ['/line-notifications', 'LINE通知'], ['/nen-campaigns', 'フォロー配信'], ['/nen-members', '投稿写真審査']] },
+  // 共通メニュー（sidebar.tsx）と同じ見出しにする。特定の契約先の名前は出さない。
+  { label: '専用機能', items: [['/ec-commerce', 'ECデータ連携'], ['/line-notifications', 'LINE通知'], ['/nen-campaigns', 'フォロー配信'], ['/nen-members', '投稿写真審査']] },
 ] as const
 
 const NOTIFICATIONS = [
@@ -121,7 +122,7 @@ export default function NewStaffPage() {
     </FormSection>
 
     <FormSection step={2} label="役割" note="役割を選ぶと、できることの範囲が決まります。">
-      <div className="grid gap-3 lg:grid-cols-3">{ROLES.map((item) => <button key={item.value} type="button" onClick={() => setRole(item.value)} className={`min-h-24 cursor-pointer rounded-card border p-4 text-left transition-colors ${role === item.value ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'}`}><span className="flex items-center gap-2 text-sm font-semibold text-ink"><span className={`h-4 w-4 rounded-pill border-2 ${role === item.value ? 'border-accent bg-accent shadow-[inset_0_0_0_3px_var(--color-canvas)]' : 'border-hairline'}`} />{item.label}</span><span className="mt-2 block text-xs leading-relaxed text-ink-secondary">{item.note}</span></button>)}</div>
+      <div className="grid gap-3 lg:grid-cols-3">{ROLES.map((item) => <button key={item.value} type="button" onClick={() => setRole(item.value)} className={`min-h-24 cursor-pointer rounded-card border p-4 text-left transition-colors ${role === item.value ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'}`}><span className="flex items-center gap-2 text-sm font-semibold text-ink"><span className={`h-4 w-4 rounded-pill border-2 ${role === item.value ? 'border-accent bg-accent shadow-ring-inset' : 'border-hairline'}`} />{item.label}</span><span className="mt-2 block text-xs leading-relaxed text-ink-secondary">{item.note}</span></button>)}</div>
     </FormSection>
 
     <FormSection step={3} label="最初に表示するLINEアカウント" note="ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。">

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * #641: LINEアカウント一覧の行操作を「枠つき詳細ボタン」へ統一。
- * 文字リンク＋押せない「•••」の飾りをやめたことを実マウントで確かめる。
+ * 板 V7vn3：LINEアカウント一覧の行操作は「⋯」にまとめる。
+ * 開くと詳細・確かめ直し・引き継ぎ・アーカイブが出ることを実マウントで確かめる。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -12,6 +12,7 @@ vi.hoisted(() => {
 })
 
 const listAccounts = vi.hoisted(() => vi.fn())
+const push = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -30,8 +31,9 @@ vi.mock('next/link', () => ({
 }))
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  useRouter: () => ({ push, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
+  usePathname: () => '/accounts',
 }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -40,6 +42,7 @@ vi.mock('@/contexts/account-context', () => ({
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
+  usePageChrome: () => ({}),
 }))
 
 import AccountsPage from './page'
@@ -50,6 +53,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  push.mockClear()
   listAccounts.mockImplementation(async () => ({
     success: true,
     data: [{
@@ -83,14 +87,40 @@ async function flush() {
   await act(async () => { await Promise.resolve() })
 }
 
-describe('#641 LINEアカウント一覧の行操作', () => {
-  it('操作欄は枠つき「詳細」ボタンで、押せない「•••」の飾りは無い', async () => {
+describe('V7vn3 LINEアカウント一覧の行操作', () => {
+  it('行の操作は「⋯」1つで、枠つき「詳細」ボタンは無い', async () => {
     await act(async () => { root.render(<AccountsPage />) })
     await flush()
 
-    const detail = [...host.querySelectorAll('a')]
-      .find((el) => el.getAttribute('href') === '/accounts/detail?id=account-a' && el.textContent?.includes('詳細'))
-    expect(detail, '枠つき「詳細」ボタンが見つかりません').toBeTruthy()
+    const menuButton = [...host.querySelectorAll('button')]
+      .find((el) => el.getAttribute('aria-label') === '本店アカウントの操作')
+    expect(menuButton, '行の「⋯」ボタンが見つかりません').toBeTruthy()
+    // #641 の枠つき詳細ボタンはやめ、メニューの中に移した。
     expect(host.textContent).not.toContain('•••')
+    const detailLinks = [...host.querySelectorAll('a')]
+      .filter((el) => el.getAttribute('href') === '/accounts/detail?id=account-a')
+    expect(detailLinks, '行に直接の詳細リンクが残っています').toHaveLength(0)
+  })
+
+  it('「⋯」を開くと4項目が出て、詳細で詳しい画面へ行く', async () => {
+    await act(async () => { root.render(<AccountsPage />) })
+    await flush()
+
+    const menuButton = [...host.querySelectorAll('button')]
+      .find((el) => el.getAttribute('aria-label') === '本店アカウントの操作')
+    expect(menuButton).toBeTruthy()
+    await act(async () => { menuButton?.click() })
+    await flush()
+
+    // メニューはポータルに出るので、画面全体で探す。
+    const body = document.body.textContent ?? ''
+    for (const label of ['詳細', '接続をもう一度確かめる', '引き継ぎ', 'アーカイブ']) {
+      expect(body, `メニューに「${label}」がありません`).toContain(label)
+    }
+
+    const detail = [...document.body.querySelectorAll('button')].find((el) => el.textContent === '詳細')
+    expect(detail).toBeTruthy()
+    await act(async () => { detail?.click() })
+    expect(push).toHaveBeenCalledWith('/accounts/detail?id=account-a')
   })
 })

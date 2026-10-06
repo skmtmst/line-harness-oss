@@ -20,118 +20,44 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
-  DASHBOARD_CARD_GROUPS,
   DASHBOARD_TODAY_VISIBLE_LIMIT,
-  type DashboardCardGroup,
   type DashboardCardId,
 } from '@line-crm/shared'
+/*
+ * 配置の初期値・正規化は起動直後に要る軽い口へ移した
+ *（V8 速さ対応。編集パネル自体は開くまで読まない）。
+ * 外からの import はここからも通る（互換の再送り）。
+ */
+export {
+  DASHBOARD_CARD_DEFINITIONS,
+  defaultDashboardPreferences,
+  normalizeDashboardPreferences,
+} from './dashboard-preference-defaults'
+export type {
+  DashboardGroup,
+  DashboardPreferenceItem,
+  DashboardPreferences,
+} from './dashboard-preference-defaults'
+import {
+  DASHBOARD_CARD_DEFINITIONS,
+  defaultDashboardPreferences,
+  type CardDefinition,
+  type DashboardGroup,
+  type DashboardPreferenceItem,
+  type DashboardPreferences,
+} from './dashboard-preference-defaults'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 
-/*
- * カードIDと区分の正本は @line-crm/shared の DASHBOARD_CARD_GROUPS。
- * 保存APIも同じ一覧で検証するため、ここだけ変えると画面が送るIDを
- * APIが拒否する（DASH-01の再来になる）。名前・説明・既定ON/OFFだけを
- * ここで持ち、IDと区分は共有定義から組み立てる。
- */
 export type { DashboardCardId }
-export type DashboardGroup = DashboardCardGroup
-
-export type DashboardPreferenceItem = {
-  id: DashboardCardId
-  visible: boolean
-}
-
-export type DashboardPreferences = Record<DashboardGroup, DashboardPreferenceItem[]>
-
-type CardDefinition = {
-  id: DashboardCardId
-  label: string
-  description: string
-  group: DashboardGroup
-  defaultVisible: boolean
-}
 
 export const TODAY_TASK_LIMIT = DASHBOARD_TODAY_VISIBLE_LIMIT
 
-/** カードの名前・説明・既定ON/OFF。キーは共有定義のIDと完全一致する（型で強制）。 */
-const CARD_META: Record<DashboardCardId, { label: string; description: string; defaultVisible: boolean }> = {
-  'today-inbox': { label: '対応が必要な受信', description: '上部・小カード', defaultVisible: true },
-  'today-photo-review': { label: '写真審査', description: '上部・小カード', defaultVisible: true },
-  'today-bookings': { label: '今日の予約', description: '上部・小カード', defaultVisible: true },
-  'today-shipments': { label: '出荷予定件数', description: '上部・小カード', defaultVisible: true },
-  'shipment': { label: '出荷予定', description: 'メイン・横長', defaultVisible: true },
-  'pending-inbox': { label: '対応が必要な受信一覧', description: 'メイン・横長', defaultVisible: true },
-  'friend-trend': { label: '友だち数の推移', description: 'メイン・横長', defaultVisible: true },
-  'friend-add': { label: '友だち追加リンク', description: 'メイン・左カラム', defaultVisible: true },
-  'scenario-status': { label: 'シナリオ配信状況', description: 'メイン｜配信中・停止中', defaultVisible: false },
-  'uid-migration': { label: 'UID移行状況', description: 'メイン｜移行の進捗', defaultVisible: false },
-  'send-quota': { label: '今月の送信枠', description: '右サイド', defaultVisible: true },
-  'operational-alerts': { label: '運用アラート', description: '右サイド', defaultVisible: true },
-  'connection-status': { label: '接続状態', description: '右サイド', defaultVisible: true },
-  'support-mark-status': { label: '現在の対応状況', description: '右サイド', defaultVisible: true },
-  'friend-status': { label: '友だちの状態', description: '右サイド｜有効数・ブロック率', defaultVisible: false },
-  /* M: 予約だけでなく予約配信・リマインダも載せるので、表題と名前を「今後の予定」にした。 */
-  'upcoming': { label: '今後の予定', description: '右サイド', defaultVisible: true },
-  /* L (#824): 通知の送達台帳から数えた今日の失敗。出どころはカードの「？」に出す。 */
-  'delivery-failures': { label: '配信の失敗', description: '右サイド｜今日・出どころ付き', defaultVisible: true },
-  'monthly-delivery': { label: '今月の配信', description: '右サイド', defaultVisible: true },
-  'recent-results': { label: '最近の成果', description: '右サイド', defaultVisible: true },
-  'booking-status': { label: '予約状況', description: '右サイド｜本日・変更・キャンセル', defaultVisible: false },
-  'inflow-top': { label: '流入経路TOP3', description: '右サイド｜直近7日の上位経路', defaultVisible: false },
-  'funnel-alert': { label: 'ファネル要注意', description: '右サイド｜離脱率が基準超過時', defaultVisible: false },
-  'automation-failures': { label: 'オートメーション失敗', description: '右サイド｜失敗した処理', defaultVisible: false },
-}
-
-export const DASHBOARD_CARD_DEFINITIONS: CardDefinition[] = (
-  Object.keys(DASHBOARD_CARD_GROUPS) as DashboardGroup[]
-).flatMap((group) =>
-  DASHBOARD_CARD_GROUPS[group].map((id) => ({ id, group, ...CARD_META[id] })),
-)
-
 const CARD_DEFINITION_MAP = new Map(DASHBOARD_CARD_DEFINITIONS.map((card) => [card.id, card]))
 const DASHBOARD_GROUPS: DashboardGroup[] = ['today', 'main', 'right']
-
-export function defaultDashboardPreferences(): DashboardPreferences {
-  return {
-    today: DASHBOARD_CARD_DEFINITIONS.filter((card) => card.group === 'today').map((card) => ({ id: card.id, visible: card.defaultVisible })),
-    main: DASHBOARD_CARD_DEFINITIONS.filter((card) => card.group === 'main').map((card) => ({ id: card.id, visible: card.defaultVisible })),
-    right: DASHBOARD_CARD_DEFINITIONS.filter((card) => card.group === 'right').map((card) => ({ id: card.id, visible: card.defaultVisible })),
-  }
-}
-
-/** 保存済み設定へ追加カードを補い、知らないIDと重複を取り除く。 */
-export function normalizeDashboardPreferences(value: unknown): DashboardPreferences {
-  const defaults = defaultDashboardPreferences()
-  if (!value || typeof value !== 'object') return defaults
-  const input = value as Partial<Record<DashboardGroup, unknown>>
-
-  const normalizeGroup = (group: DashboardGroup): DashboardPreferenceItem[] => {
-    const allowed = new Map(defaults[group].map((item) => [item.id, item] as const))
-    const normalized: DashboardPreferenceItem[] = []
-    if (Array.isArray(input[group])) {
-      for (const candidate of input[group]) {
-        if (!candidate || typeof candidate !== 'object') continue
-        const item = candidate as Partial<DashboardPreferenceItem>
-        if (!item.id || !allowed.has(item.id) || normalized.some((entry) => entry.id === item.id)) continue
-        normalized.push({ id: item.id, visible: item.visible !== false })
-      }
-    }
-    for (const item of defaults[group]) {
-      if (!normalized.some((entry) => entry.id === item.id)) normalized.push(item)
-    }
-    return normalized
-  }
-
-  return {
-    today: normalizeGroup('today'),
-    main: normalizeGroup('main'),
-    right: normalizeGroup('right'),
-  }
-}
 
 export function reorderDashboardItems(
   items: DashboardPreferenceItem[],
@@ -214,7 +140,7 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
       </button>
       <div className="min-w-0 flex-1">
         <p className="text-ink truncate text-sm font-medium" title={definition.label}>{definition.label}</p>
-        <p className="text-ink-faint truncate text-[11px]" title={definition.description}>{definition.description}</p>
+        <p className="text-ink-faint truncate text-micro" title={definition.description}>{definition.description}</p>
       </div>
       {/*
         R116: ドラッグが難しいときの上下ボタン。タッチやマウスだけでも
@@ -251,7 +177,7 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
 }
 
 function PreviewCard({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
-  return <div className={`rounded-control border px-2 py-2 text-[10px] font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-card'}`}>{children}</div>
+  return <div className={`rounded-control border px-2 py-2 text-nano font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-card'}`}>{children}</div>
 }
 
 /*
@@ -271,10 +197,10 @@ function DashboardPreview({ draft }: { draft: DashboardPreferences }) {
   return (
     <div className="border-hairline bg-canvas-sunken rounded-card border p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-ink-faint text-[11px]">実際のダッシュボードと同じ順番で表示します。</p>
+        <p className="text-ink-faint text-micro">実際のダッシュボードと同じ順番で表示します。</p>
         <div className="flex gap-1" role="tablist" aria-label="プレビューの画面幅">
           {([['pc', 'PC'], ['mobile', 'スマホ']] as const).map(([key, text]) => (
-            <Button variant="primary" className={(`rounded-pill border px-2.5 py-1 text-[10px] font-medium ${device === key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={key} type="button" role="tab" aria-selected={device === key} onClick={() => setDevice(key)}>{text}</Button>
+            <Button variant="primary" className={(`rounded-pill border px-2.5 py-1 text-nano font-medium ${device === key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={key} type="button" role="tab" aria-selected={device === key} onClick={() => setDevice(key)}>{text}</Button>
           ))}
         </div>
       </div>
@@ -416,7 +342,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
   }
 
   return (
-    <div data-design="Editor" className="bg-ink/30 fixed inset-0 z-50 flex justify-end" role="presentation" onMouseDown={() => { if (!saving) onCancel() }}>
+    <div data-design="Editor" data-design-node="mcOqK" className="bg-ink/30 fixed inset-0 z-50 flex justify-end" role="presentation" onMouseDown={() => { if (!saving) onCancel() }}>
       <aside ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dashboard-editor-title" className="bg-canvas flex h-full w-full max-w-[540px] flex-col shadow-float" onMouseDown={(event) => event.stopPropagation()}>
         <header className="border-hairline border-b px-[22px] pb-4 pt-5">
           <div className="flex items-start justify-between gap-4">
@@ -506,7 +432,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
                       設計 `ZN0ov` は「「今日やること」は4枠までです」を独立した1行で出す。
                       繋げると、上限の文と操作の案内が1つの札に見える。
                     */}
-                    <span className="text-ink-faint text-[11px]">上下ボタン・ドラッグで順番変更</span>
+                    <span className="text-ink-faint text-micro">上下ボタン・ドラッグで順番変更</span>
                   </div>
                   <DndContext
                     sensors={sensors}

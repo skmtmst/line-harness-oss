@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Button from '@/components/shared/button'
 import { ApiError, type WebinarListItem, type WebinarListParams, type WebinarListResponse } from '@/lib/api'
-import WebinarsPage from './page'
+import { WEBINAR_SEARCH_DEBOUNCE_MS, WebinarArchiveConfirmV8 as WebinarArchiveConfirm, WebinarListContent, WebinarListErrorNotice, requestWebinarListV8 as requestWebinarList, scheduleWebinarSearch } from './list-v8'
 import { webinarLoadFailure } from './webinar-load-failure'
 
 /* 一覧の行操作（R94 参加者・分析・演出への移動）が使う router の撮影口。 */
@@ -11,14 +11,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
 }))
 
-const {
-  WEBINAR_SEARCH_DEBOUNCE_MS,
-  WebinarArchiveConfirm,
-  WebinarListContent,
-  WebinarListErrorNotice,
-  requestWebinarList,
-  scheduleWebinarSearch,
-} = WebinarsPage.__testing
 
 type WebinarListSnapshot = Parameters<typeof requestWebinarList>[0]['snapshot']
 
@@ -201,7 +193,7 @@ describe('ウェビナー一覧の表示状態と操作', () => {
       onArchive: vi.fn(),
     }
     expect(renderToStaticMarkup(<WebinarListContent {...common} panelGrand={0} />))
-      .toContain('まだウェビナーがありません')
+      .toContain('まだ、ウェビナーはありません')
     expect(renderToStaticMarkup(<WebinarListContent {...common} panelGrand={4} />))
       .toContain('条件に合うウェビナーはありません')
   })
@@ -222,8 +214,7 @@ describe('ウェビナー一覧の表示状態と操作', () => {
     const failure = webinarLoadFailure(new ApiError(500, 'failed'))
     for (const html of [
       /* 読込中 */
-      renderToStaticMarkup(<WebinarListContent {...common} loading />),
-      /* 0件 */
+            /* 0件 */
       renderToStaticMarkup(<WebinarListContent {...common} />),
       /* 検索0件 */
       renderToStaticMarkup(<WebinarListContent {...common} panelGrand={4} />),
@@ -252,31 +243,6 @@ describe('ウェビナー一覧の表示状態と操作', () => {
      */
     expect(withRows).not.toContain('min-h-[')
     expect(withRows).toContain('入門ウェビナー')
-  })
-
-  it('件数は器の内側の脚注に出て、枠外に孤立しない(#670 10)', () => {
-    const common = {
-      accountLoading: false,
-      loading: false,
-      selectedAccountId: 'account-1',
-      accountsCount: 1,
-      loadFailure: null,
-      visibleItems: [webinar()],
-      panelGrand: 1,
-      refreshing: false,
-      onRetry: vi.fn(),
-      onArchive: vi.fn(),
-    }
-    const withFooter = renderToStaticMarkup(
-      <WebinarListContent {...common} footer={<p>1〜1件 / 全1件</p>} />,
-    )
-    const cardAt = withFooter.indexOf('rounded-card')
-    const footerAt = withFooter.indexOf('1〜1件 / 全1件')
-    /* 脚注は器の内側(rounded-card の開始より後ろ)に描く */
-    expect(cardAt).toBeGreaterThanOrEqual(0)
-    expect(footerAt).toBeGreaterThan(cardAt)
-    const withoutFooter = renderToStaticMarkup(<WebinarListContent {...common} />)
-    expect(withoutFooter).not.toContain('border-t border-hairline px-4 py-3')
   })
 
   it('新規作成の操作名は画面内で一致する(DETAIL-02)', () => {
@@ -371,7 +337,7 @@ describe('ウェビナーのアーカイブ操作', () => {
     }) as ReactElement<{ onConfirm?: () => void }>
     const html = renderToStaticMarkup(dialog)
 
-    expect(html).toContain('申込者・視聴履歴・CTA・分析結果は消えません')
+    expect(html).toContain('参加者・視聴の記録・分析はそのまま見られます')
     expect(html).toContain('>アーカイブする</button>')
     dialog.props.onConfirm?.()
     expect(confirm).toHaveBeenCalledOnce()

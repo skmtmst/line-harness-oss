@@ -18,7 +18,10 @@ import { Tabs } from '@/components/shared/tabs'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData } from '@/lib/api'
 import { api } from '@/lib/api'
-import FriendAddRuleEditor from './friend-add-rule-editor'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import FriendAddListV8 from '@/v8/friend-add/list'
+import FriendAddRuleEditorV7 from './friend-add-rule-editor'
+import FriendAddEditorV8 from '@/v8/friend-add/editor'
 import { describeFriendAddFailure } from './friend-add-failure'
 import { useCursorStack } from './use-cursor-stack'
 import { formatNumber } from '@/lib/format'
@@ -70,11 +73,18 @@ export default function FriendAddSettingsPage() {
 }
 
 function FriendAddSettingsInner() {
+  /*
+   * ★V8 分岐：一覧（板 `MRhef`）と作る・直す手順（板 `wDzkc`・`h8uNW`・
+   * `al47K`・`i1nThZ`・`U8Xm3X`）を `data-theme="v8"` の下で積み替える。
+   * v7 の配線の文面（下の2行）は変えない。指す先だけ v8 で差し替える。
+   */
+  const theme = useAdminTheme()
   const searchParams = useSearchParams()
   const view = searchParams.get('view')
+  const FriendAddRuleEditor = theme === 'v8' ? FriendAddEditorV8 : FriendAddRuleEditorV7
   if (view === 'new') return <FriendAddRuleEditor />
   if (view === 'edit') return <FriendAddRuleEditor ruleId={searchParams.get('id') ?? undefined} />
-  return <FriendAddSettingsList />
+  return theme === 'v8' ? <FriendAddListV8 /> : <FriendAddSettingsList />
 }
 
 function FriendAddSettingsList() {

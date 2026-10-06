@@ -123,9 +123,9 @@ describe('V6分析イベントと日別投影', () => {
     })).rejects.toThrow('analytics_event_time_requires_timezone');
   });
 
-  it('EC受信の全11種を分析へ記録し、状態だけを残す', async () => {
+  it('EC受信の全12種を分析へ記録し、状態だけを残す', async () => {
     const { EC_EVENT_TYPES } = await import('@line-crm/shared');
-    expect(EC_EVENT_TYPES).toHaveLength(11);
+    expect(EC_EVENT_TYPES).toHaveLength(12);
     for (const [index, eventType] of EC_EVENT_TYPES.entries()) {
       const event = await recordAnalyticsEvent(db, {
         lineAccountId: 'account-a',
@@ -140,7 +140,7 @@ describe('V6分析イベントと日別投影', () => {
     }
     expect(sqlite.prepare(
       `SELECT COUNT(*) AS count FROM analytics_events WHERE source_kind = 'eccube'`,
-    ).get()).toEqual({ count: 11 });
+    ).get()).toEqual({ count: 12 });
   });
 
   it('UTCの日付ではなくアカウントの暦日で集計し、別アカウントを混ぜない', async () => {

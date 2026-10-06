@@ -13,7 +13,7 @@ const folders = [
 const rows = [
   { tag: 'EC顧客連携済み', folder: '購入', folderTone: 'blue', count: '5人', source: 'EC連携', links: [['本人+10', 'green'], ['1.2倍', 'orange'], ['他1', 'gray']], usage: '配信3・フォーム1', date: '2026/01/11', star: '★ 一覧' },
   { tag: 'LINEログイン連携済み', folder: '会員', folderTone: 'emerald', count: '5人', source: 'LINE Login', links: [], usage: 'シナリオ2', date: '2026/01/13', star: '★ 一覧' },
-  { tag: 'NEN会員', folder: '会員', folderTone: 'emerald', count: '5人', source: '回答フォーム', links: [['本人+10', 'green'], ['紹介+5', 'green'], ['1.5倍', 'orange'], ['他3', 'gray']], usage: '配信4', date: '2026/01/13', star: '—' },
+  { tag: '定期便会員', folder: '会員', folderTone: 'emerald', count: '5人', source: '回答フォーム', links: [['本人+10', 'green'], ['紹介+5', 'green'], ['1.5倍', 'orange'], ['他3', 'gray']], usage: '配信4', date: '2026/01/13', star: '—' },
   { tag: '商品到着確認対象', folder: '購入', folderTone: 'blue', count: '3人', source: 'EC購入', links: [['本人+3', 'green'], ['他1', 'gray']], usage: '自動応答1', date: '2026/01/13', star: '—' },
   { tag: '未契約', folder: '未分類', folderTone: 'gray', count: '3人', source: '手動', links: [], usage: '保存検索2', date: '2026/01/13', star: '★ 一覧' },
   { tag: '誕生日クーポン対象', folder: 'VIP', folderTone: 'orange', count: '0人', source: '誕生日ルール', links: [['本人+20', 'green'], ['他2', 'gray']], usage: '配信1', date: '2026/01/13', star: '—' },

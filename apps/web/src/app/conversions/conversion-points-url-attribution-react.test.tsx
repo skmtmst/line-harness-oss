@@ -20,6 +20,7 @@ const net = vi.hoisted(() => ({
 vi.mock('next/link', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: () => {}, push: () => {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
@@ -94,6 +95,7 @@ function installFetch() {
         success: true, data: { id: 'point-page', version: 4, revisionId: 'rev-1', movedUsages: 0, updatedAt: '' },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
+    if (path.startsWith('/api/staff/me')) return new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     if (path.startsWith('/api/conversions/definitions')) {
       return new Response(JSON.stringify(listBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }

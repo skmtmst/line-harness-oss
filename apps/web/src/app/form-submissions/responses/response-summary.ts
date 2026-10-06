@@ -26,6 +26,19 @@ export type FormSubmissionSummary = {
     minDate: string | null
     maxDate: string | null
   }>
+  /** F-11：5段階評価の平均（全回答から集計。無いフォームでは空）。 */
+  ratingFields?: Array<{
+    key: string
+    label: string
+    answered: number
+    average: number | null
+  }>
+}
+
+/** F-11：評価の平均を「4.3」の形にする。小数第2位を四捨五入。 */
+export function ratingAverageText(average: number | null): string {
+  if (average == null) return '—'
+  return (Math.round(average * 10) / 10).toFixed(1)
 }
 
 export function completedDestinationWrites(summary: FormSubmissionSummary | null): number | null {

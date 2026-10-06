@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { X } from 'lucide-react'
@@ -17,7 +17,12 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import { withViewTransition } from '@/components/shared/view-transition'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import BookingDetailV8 from './booking-detail-v8'
 import { canOperateBookings } from '../lib/booking-permissions'
 import { fetchAllPages } from './fetch-all-pages'
 import BookingCalendar, {
@@ -241,6 +246,12 @@ export default function BookingsPage() {
       setPage(Math.floor(pageNumber))
       pageResetRef.current.restoreTransition = true
     }
+    // V8 C①：詳細パネルの行（?booking=<id>）もURLから戻す。パネル用の
+    // 合図が自分で読むので、ここでは渡すだけで開く行の正しさは変えない。
+    const bookingParam = urlParams.get('booking')
+    if (bookingParam) {
+      setActiveBookingId(bookingParam)
+    }
   }, [urlParams])
   const [menuFilter, setMenuFilter] = useState<string>('all')
   // N-398: 担当者・予約経路の絞り込み。一覧の取得とCSV書出しの両方に渡す。
@@ -325,6 +336,16 @@ export default function BookingsPage() {
   // 詳細パネルは行の実体ではなく id を保持する。承認などで再読み込みしたあとも
   // 最新の行を引き直せるので、パネルに古い状態が残らない。
   const [detailId, setDetailId] = useState<string | null>(null)
+  const adminTheme = useAdminTheme()
+  const isV8 = adminTheme === 'v8'
+  /*
+   * V8「サクサク感」C①：一覧（表）の行の詳細パネル。URL に ?booking=<id> を残す。
+   * 行を押すとつながる移り変わり（E）で右から出て、↑↓で前・次へ。
+   * v7 は今のまま（引き出し・小窓）で、1画素も変えない。
+   */
+  const [activeBookingId, setActiveBookingId] = useDetailPanelUrl('booking')
+  const openBookingDetail = (id: string) => withViewTransition(() => setActiveBookingId(id))
+  const closeBookingDetail = () => setActiveBookingId(null)
 
   const liffId = selectedAccount?.liffId ?? null
   // Worker `/o` は ref 解決・追跡なしで liffId を直接受けるラップ URL。
@@ -746,6 +767,8 @@ export default function BookingsPage() {
     ...(staffFilter === 'all' ? [] : [`staff=${encodeURIComponent(staffFilter)}`]),
     ...(sourceFilter === 'all' ? [] : [`source=${sourceFilter}`]),
     ...(page <= 1 ? [] : [`page=${page}`]),
+    // V8 C①：開いている詳細パネルの行を残す。無いとURLの写しが ?booking= を消す。
+    ...(activeBookingId ? [`booking=${encodeURIComponent(activeBookingId)}`] : []),
   ].join('&')
   useEffect(() => {
     if (!urlInitRef.current) return
@@ -776,6 +799,48 @@ export default function BookingsPage() {
       setDetailId(null)
     }
   }, [calendarItems, items, detailId])
+
+  /*
+   * V8「サクサク感」C①：表の行に出す予約（一覧全体から探すので、URL直打ちでも開く）。
+   * 前・次は今のページの行の中。名前のその場書き換え（C②）は付けない。
+   * 予約の1項目だけを直す口は無く、状態の変更は確認の窓・備考や時間の変更は
+   * 詳細ページで行うため、無い口は作らず詳細ページへ送る。
+   */
+  const activeBooking = activeBookingId ? (items.find((b) => b.id === activeBookingId) ?? null) : null
+  const activeBookingIndex = activeBookingId ? shown.findIndex((b) => b.id === activeBookingId) : -1
+
+  /*
+   * V8「サクサク感」C③：右クリックのメニュー。操作列のボタンと同じ操作
+   * （詳細を開く・会話を開く・状態の変更）。状態の変更は確認の窓を通す。
+   * 閲覧のみの人には状態を変える操作を出さない（操作列と同じ）。
+   */
+  const bookingContextItems = (b: BookingRequest): ContextMenuItem[] => {
+    const list: ContextMenuItem[] = [
+      { id: 'open', label: '詳細を開く', onSelect: () => openBookingDetail(b.id) },
+    ]
+    if (b.friend_id) {
+      list.push({
+        id: 'chat',
+        label: '会話を開く',
+        onSelect: () => router.push(`/chats?friend=${b.friend_id}`),
+      })
+    }
+    if (canOperate) {
+      if (b.status === 'requested') {
+        list.push(
+          { id: 'approve', label: '承認する', onSelect: () => handleDecide(b.id, 'approve') },
+          { id: 'reject', label: '拒否する', danger: true, onSelect: () => handleDecide(b.id, 'reject') },
+        )
+      } else if (b.status === 'confirmed') {
+        list.push(
+          { id: 'complete', label: '来ていただきました にする', onSelect: () => handleDecide(b.id, 'complete') },
+          { id: 'no_show', label: '無断キャンセルにする', danger: true, onSelect: () => handleDecide(b.id, 'no_show') },
+          { id: 'cancel', label: '予約を取り消す', danger: true, onSelect: () => handleDecide(b.id, 'cancel') },
+        )
+      }
+    }
+    return list
+  }
 
   // タブの数はその期間の有効な予約だけ（取消・拒否・期限切れを除く）。
   // 旧Worker（タブ用未返却）では従来の集計に倒す。
@@ -831,7 +896,20 @@ export default function BookingsPage() {
 
   const dialogs = (
     <>
-      {detail && (
+      {detail && (adminTheme === 'v8' ? (
+        /*
+         * ★V8-B 予約の詳細（`AjZhH`）。v7 の引き出しは残し、
+         * `data-theme="v8"` のときだけ小窓にする。
+         */
+        <BookingDetailV8
+          booking={detail}
+          accountId={selectedAccountId}
+          canOperate={canOperate}
+          onClose={() => setDetailId(null)}
+          onCancel={() => handleDecide(detail.id, 'cancel')}
+          detailHref={`/booking/bookings/detail?id=${encodeURIComponent(detail.id)}`}
+        />
+      ) : (
         <BookingDetailPanel
           booking={detail}
           accountId={selectedAccountId}
@@ -839,9 +917,10 @@ export default function BookingsPage() {
           onClose={() => setDetailId(null)}
           onAction={(a) => handleDecide(detail.id, a)}
         />
-      )}
+      ))}
       <ConfirmDialog
         open={decideTarget !== null}
+        designNode={decideTarget?.action === 'cancel' ? 'iJdAi' : undefined}
         title={`この予約を「${decideTarget ? actionLabel[decideTarget.action] : ''}」にしますか？`}
         description={
           // N-390: LINE未連携の予約へ「届きます」と出すと事実と違う。
@@ -862,7 +941,7 @@ export default function BookingsPage() {
   {/* 帯同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
   if (view === 'day' || view === 'week') {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4" data-design-node="acRIl">
         {pageHead}
         {createRow}
         {/*
@@ -904,7 +983,7 @@ export default function BookingsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-design-node="acRIl">
       {pageHead}
 
       {/*
@@ -1107,15 +1186,40 @@ export default function BookingsPage() {
                   </thead>
                   <tbody>
                     {shown.map((b) => (
-                      <Tr key={b.id} interactive className="group">
+                      <Tr
+                        key={b.id}
+                        interactive
+                        className="group"
+                        {...(isV8
+                          ? {
+                              tabIndex: 0,
+                              onClick: () => openBookingDetail(b.id),
+                              onKeyDown: (event: ReactKeyboardEvent<HTMLTableRowElement>) => {
+                                if (event.target !== event.currentTarget) return
+                                if (event.key === 'Enter') {
+                                  event.preventDefault()
+                                  openBookingDetail(b.id)
+                                }
+                              },
+                            }
+                          : {})}
+                      >
                         <Td className="whitespace-nowrap">
                           {formatShort(b.starts_at)}
                         </Td>
                         <Td>
                           {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
-                          <span className="text-ink" title={b.friend_name ?? undefined}>
-                            {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
-                          </span>
+                          {isV8 ? (
+                            <ContextMenu label={`予約「${b.friend_name ?? 'お客様'}」の操作`} items={bookingContextItems(b)}>
+                              <span className="text-ink" title={b.friend_name ?? undefined}>
+                                {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
+                              </span>
+                            </ContextMenu>
+                          ) : (
+                            <span className="text-ink" title={b.friend_name ?? undefined}>
+                              {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
+                            </span>
+                          )}
                         </Td>
                         <Td>{b.menu_name}</Td>
                         <Td className="cq-hide-below-830">{b.staff_name}</Td>
@@ -1138,9 +1242,10 @@ export default function BookingsPage() {
                           </span>
                         </Td>
                         <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
-                          <div className="inline-flex items-center gap-1">
+                          {/* V8では行全体が詳細パネルを開くので、操作列の押下は行へ伝えない。v7は今のまま。 */}
+                          <div className="inline-flex items-center gap-1" onClick={isV8 ? (event) => event.stopPropagation() : undefined}>
                             <button
-                              onClick={() => setDetailId(b.id)}
+                              onClick={() => (isV8 ? openBookingDetail(b.id) : setDetailId(b.id))}
                               className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
                             >
                               詳細
@@ -1237,6 +1342,68 @@ export default function BookingsPage() {
           </div>
         </div>
       </div>
+
+      {/* V8「サクサク感」C①・E：表の行の詳細パネル。確認の窓は残す。v7は引き出しのまま。 */}
+      {isV8 ? (
+        <DetailPanel
+          open={activeBooking !== null}
+          title={activeBooking ? `${activeBooking.friend_name ?? 'お客様'} ／ ${activeBooking.menu_name}` : ''}
+          description={
+            activeBooking
+              ? `${formatJpDateTime(activeBooking.starts_at)}〜${formatJpTime(activeBooking.ends_at)}・${statusLabel[activeBooking.status] ?? activeBooking.status}`
+              : undefined
+          }
+          onClose={closeBookingDetail}
+          hasPrev={activeBookingIndex > 0}
+          hasNext={activeBookingIndex >= 0 && activeBookingIndex < shown.length - 1}
+          onPrev={activeBookingIndex > 0 ? () => setActiveBookingId(shown[activeBookingIndex - 1].id) : undefined}
+          onNext={
+            activeBookingIndex >= 0 && activeBookingIndex < shown.length - 1
+              ? () => setActiveBookingId(shown[activeBookingIndex + 1].id)
+              : undefined
+          }
+          footer={activeBooking ? (
+            <>
+              <Button href={`/booking/bookings/detail?id=${encodeURIComponent(activeBooking.id)}`} variant="secondary">
+                時間や担当を変える
+              </Button>
+              {activeBooking.friend_id ? (
+                <Button href={`/chats?friend=${activeBooking.friend_id}`} variant="primary">
+                  この人と話す
+                </Button>
+              ) : null}
+            </>
+          ) : undefined}
+        >
+          {activeBooking ? (
+            <div>
+              <DetailRow label="日時">
+                {formatJpDateTime(activeBooking.starts_at)} 〜 {formatJpTime(activeBooking.ends_at)}
+              </DetailRow>
+              <DetailRow label="担当">{activeBooking.staff_name}</DetailRow>
+              <DetailRow label="料金">
+                <span className="tabular-nums">¥{formatNumber(activeBooking.price_at_booking)}</span>
+              </DetailRow>
+              <DetailRow label="予約経路">{isLineBooking(activeBooking) ? 'LINE' : '電話・店頭'}</DetailRow>
+              <DetailRow label="状態">{statusLabel[activeBooking.status] ?? activeBooking.status}</DetailRow>
+              <DetailRow label="予約番号">
+                <span className="text-ink-secondary font-mono text-xs">{activeBooking.id}</span>
+              </DetailRow>
+              <DetailRow label="お客様からのご希望">
+                {activeBooking.customer_note ?? <span className="text-ink-faint">記入なし</span>}
+              </DetailRow>
+              <p className="mt-3 text-xs">
+                <Link
+                  href={`/booking/bookings/detail?id=${encodeURIComponent(activeBooking.id)}`}
+                  className="text-action font-semibold hover:underline focus-visible:underline"
+                >
+                  予約の詳細ページを開く →
+                </Link>
+              </p>
+            </div>
+          ) : null}
+        </DetailPanel>
+      ) : null}
 
       {dialogs}
     </div>

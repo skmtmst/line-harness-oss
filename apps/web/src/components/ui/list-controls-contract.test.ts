@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
+import { readFileSync as readNative } from 'node:fs'
 
 /*
  * 監査6 #668: 一覧のフィルターバーを「検索 → 絞り込み → 並び順 → 表示件数」
@@ -13,11 +14,16 @@ import { describe, expect, it } from 'vitest'
  * ツールバーの並び順をソース上の位置で縛る。
  */
 
-const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+// 自動応答にはv7とV8が両方ある。v7の契約にV8のSelectを混ぜない。
+const read = (path: string) => (path === '../../app/auto-replies/page.tsx' ? readNative : readFileSync)(new URL(path, import.meta.url), 'utf8')
+
+/* 完全切り替え：リマインダ・シナリオの v7 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+const REMINDERS_V8 = '../../app/reminders/list-v8.tsx'
+const SCENARIOS_V8 = '../../app/scenarios/list-v8.tsx'
 
 /** 並び替えを持つ一覧（SortSelect を呼ぶ画面）。 */
 const SORT_SELECT_USERS: Array<[string, string]> = [
-  ['リマインダ', '../../app/reminders/page.tsx'],
+  ['リマインダ', REMINDERS_V8],
   ['自動応答', '../../app/auto-replies/page.tsx'],
   ['ウェビナー', '../../app/webinars/page.tsx'],
   ['共通情報', '../../app/contents/vars/page.tsx'],
@@ -25,7 +31,8 @@ const SORT_SELECT_USERS: Array<[string, string]> = [
 
 /** 表示件数を持つ一覧（PageSizeSelect を呼ぶ画面）。 */
 const PAGE_SIZE_SELECT_USERS: Array<[string, string]> = [
-  ['リマインダ', '../../app/reminders/page.tsx'],
+  ['リマインダ', REMINDERS_V8],
+  ['シナリオ', SCENARIOS_V8],
   ['自動応答', '../../app/auto-replies/page.tsx'],
   ['ウェビナー', '../../app/webinars/page.tsx'],
   ['共通情報', '../../app/contents/vars/page.tsx'],
@@ -41,23 +48,34 @@ const PAGE_SIZE_SELECT_USERS: Array<[string, string]> = [
  * 幅の実数（320・下限240）は ListToolbar の契約テストで守る。
  */
 const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
-  ['リマインダ', '../../app/reminders/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
+  // 板 `apLqS`：検索 → 札 → 並び → 件数。部品は変数にまとめ（1152 の Iffil と共用）、広い板の道具の段で並べる。
+  ['リマインダ', REMINDERS_V8, ['<ListToolbar', '{statusChips}', '{sortSelect}', '{perPageSelect}']],
   ['自動応答', '../../app/auto-replies/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
-  ['ウェビナー', '../../app/webinars/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
+  ['ウェビナー', '../../app/webinars/page.tsx', ['<SearchField', '<FilterChip', '<SortSelect', '<PageSizeSelect']],
   ['共通情報', '../../app/contents/vars/page.tsx', ['data-search-row', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
 ]
 
 /** 固定の絞り込みチップの前置きは「よく使う絞り込み」の1形（DETAIL-20 の語）。 */
 const FILTER_LABEL_USERS: Array<[string, string]> = [
-  ['シナリオ', '../../app/scenarios/page.tsx'],
+  // 板 `apLqS`：札に前置きは無い（絵どおり）。
+  ['シナリオ', SCENARIOS_V8],
   ['自動応答', '../../app/auto-replies/page.tsx'],
   ['ウェビナー', '../../app/webinars/page.tsx'],
   ['リッチメニュー', '../../app/rich-menus/page.tsx'],
   ['共通情報', '../../app/contents/vars/page.tsx'],
-  ['リマインダ', '../../app/reminders/page.tsx'],
 ]
 
 describe('フィルターバー統一（監査6 #668）', () => {
+  it('自動応答V8は選択した並び順・表示件数を一覧表示へ反映する', () => {
+    const source = read('../../app/auto-replies/list-v8.tsx')
+    expect(source).toMatch(/<Select\s+aria-label="並び順"\s+value=\{sortKey\}/)
+    expect(source).toMatch(/<Select\s+aria-label="1ページに出す件数"[\s\S]*?value=\{String\(pageSize\)\}/)
+    expect(source).toContain('options={SORT_OPTIONS}')
+    expect(source).toContain('options={PAGE_SIZE_OPTIONS}')
+    expect(source).toContain('sort: sortKey')
+    expect(source).toContain('switch (sortKey)')
+    expect(source).toContain('sortedItems.slice((safePage - 1) * pageSize, safePage * pageSize)')
+  })
   it.each(SORT_SELECT_USERS.map(([name, path]) => ({ name, path })))(
     '$name の並び順は SortSelect',
     ({ path }) => {
@@ -99,7 +117,7 @@ describe('フィルターバー統一（監査6 #668）', () => {
     '$name の絞り込みチップの前置きは「よく使う絞り込み」',
     ({ path }) => {
       const source = read(path)
-      expect(source, `${path} に「よく使う絞り込み」の前置きがない`).toContain('>よく使う絞り込み<')
+      expect(source, `${path} に「よく使う絞り込み」の前置きがない`).toContain('よく使う絞り込み')
       // 旧い前置き（よく使う単体 / 保存した条件 / 保存した検索）は残さない
       expect(source).not.toContain('>よく使う<')
       expect(source).not.toContain('>保存した条件<')

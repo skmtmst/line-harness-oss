@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+// 文言の正本は rich-menu-errors.ts（★V7・★V8 の一覧で共有）。
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+  + readFileSync(new URL('./rich-menu-errors.ts', import.meta.url), 'utf8')
 
 describe('V6 リッチメニューのエラー表示', () => {
   it('APIの内部エラーを画面や警告へそのまま出さない', () => {

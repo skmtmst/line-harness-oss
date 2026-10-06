@@ -1,6 +1,8 @@
 import { Hono, type Context } from 'hono';
 import {
   getNotificationRules,
+  getOperatorNotificationTeam,
+  operatorRuleRecipientIds,
   getNotificationRuleById,
   createNotificationRule,
   updateNotificationRule,
@@ -26,7 +28,9 @@ import {
   listOperatorEventTypes,
 } from '../services/operator-notification-registry.js';
 
+import { notificationTeams } from './notification-teams.js';
 const notifications = new Hono<Env>();
+notifications.route('/', notificationTeams);
 
 const OPERATOR_NOTIFICATION_CHANNELS = new Set(['dashboard', 'email', 'line']);
 
@@ -103,7 +107,7 @@ const listOperatorRules = async (c: Context<Env>) => {
     const resolvedRecipientIds = new Set<string>();
     const items = await Promise.all(rules.map(async (rule) => {
       const conditions = ruleConditions(rule);
-      const recipients = await operatorRecipients(c.env.DB, lineAccountId, conditions.recipientIds);
+      const recipients = await operatorRecipients(c.env.DB, lineAccountId, await operatorRuleRecipientIds(c.env.DB, lineAccountId, conditions));
       const preview = recipients.map((recipient) => recipientPreview(recipient, ruleChannels(rule)));
       for (const recipient of preview) {
         if (recipient.canReceive) resolvedRecipientIds.add(recipient.id);
@@ -206,7 +210,7 @@ const previewOperatorRuleRecipients = async (c: Context<Env>) => {
     if (!channels) {
       return c.json({ success: false, error: '利用できない通知方法が含まれています' }, 400);
     }
-    const recipientIds = body.recipientIds ?? ruleConditions(rule).recipientIds;
+    const recipientIds = body.recipientIds ?? await operatorRuleRecipientIds(c.env.DB, lineAccountId, ruleConditions(rule));
     const recipients = await operatorRecipients(c.env.DB, lineAccountId, recipientIds);
     const items = recipients.map((recipient) => recipientPreview(recipient, channels));
     return c.json({
@@ -257,10 +261,11 @@ const publishOperatorRule = async (c: Context<Env>) => {
       }, 409);
     }
     const conditions = ruleConditions(rule);
-    if (!conditions.recipientIds?.length) {
+    const recipientIds = await operatorRuleRecipientIds(c.env.DB, lineAccountId, conditions);
+    if (!recipientIds?.length) {
       return c.json({ success: false, code: 'recipient_required', error: '受け取るスタッフを1人以上選んでください' }, 409);
     }
-    const recipients = await operatorRecipients(c.env.DB, lineAccountId, conditions.recipientIds);
+    const recipients = await operatorRecipients(c.env.DB, lineAccountId, await operatorRuleRecipientIds(c.env.DB, lineAccountId, conditions));
     const deliverable = recipients.map((recipient) => recipientPreview(recipient, ruleChannels(rule)))
       .filter((recipient) => recipient.canReceive);
     if (deliverable.length === 0) {
@@ -527,6 +532,9 @@ const createOperatorRule = async (c: Context<Env>) => {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
+    if (body.conditions?.teamId !== undefined && (typeof body.conditions.teamId !== 'string' || !body.conditions.teamId || !await getOperatorNotificationTeam(c.env.DB, body.conditions.teamId, lineAccountId))) {
+      return c.json({ success: false, error: '選んだチームが見つかりません。読み直してください' }, 422);
+    }
     const item = await createNotificationRule(c.env.DB, {
       lineAccountId,
       name,
@@ -573,6 +581,9 @@ const updateOperatorRule = async (c: Context<Env>) => {
     }
     const current = await getNotificationRuleById(c.env.DB, id, lineAccountId);
     if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+    if (body.conditions?.teamId !== undefined && (typeof body.conditions.teamId !== 'string' || !body.conditions.teamId || !await getOperatorNotificationTeam(c.env.DB, body.conditions.teamId, lineAccountId))) {
+      return c.json({ success: false, error: '選んだチームが見つかりません。読み直してください' }, 422);
+    }
     await updateNotificationRule(c.env.DB, id, lineAccountId, {
       name: body.name,
       eventType: body.eventType,
@@ -636,6 +647,9 @@ const updateOperatorRuleDraft = async (c: Context<Env>) => {
     }
     const current = await getNotificationRuleById(c.env.DB, id, lineAccountId);
     if (!current) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
+    if (body.conditions?.teamId !== undefined && (typeof body.conditions.teamId !== 'string' || !body.conditions.teamId || !await getOperatorNotificationTeam(c.env.DB, body.conditions.teamId, lineAccountId))) {
+      return c.json({ success: false, error: '選んだチームが見つかりません。読み直してください' }, 422);
+    }
     const saved = await updateNotificationRule(c.env.DB, id, lineAccountId, {
       name: body.name,
       eventType: body.eventType,

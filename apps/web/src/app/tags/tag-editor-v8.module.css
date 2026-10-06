@@ -1,0 +1,481 @@
+/* ★V8 タグを作る・編集（`d9xoI` / `Qat9s`）。段・右の欄・追従バーの配置。 */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.headDescription {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+/* 左の段と右の欄。右の欄は固定幅。 */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 1つの「段」。 */
+.section {
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.sectionDesc {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink-faint);
+}
+
+.sectionBody {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.fieldGrid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.field {
+  display: block;
+  min-width: 0;
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.fieldHint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
+}
+
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  font-size: 14px;
+  color: var(--color-ink);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.numberRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.unit {
+  font-size: 14px;
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+}
+
+/* 「付け方」の説明の箱。 */
+.wayGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.wayBox {
+  padding: 14px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+}
+
+.wayTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.wayDesc {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-ink-secondary);
+}
+
+/* 連動アクションの行。 */
+.actionRow {
+  display: grid;
+  grid-template-columns: 28px 28px minmax(88px, auto) minmax(0, 1fr) minmax(70px, auto) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  font-size: 14px;
+}
+
+.actionRowDragging {
+  opacity: 0.5;
+}
+
+.actionGrip {
+  cursor: grab;
+  color: var(--color-ink-faint);
+}
+
+.actionIndex {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--color-canvas-sunken);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.actionType {
+  padding: 3px 8px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.actionLabel {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actionTiming {
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+}
+
+.actionIcons {
+  display: flex;
+  gap: 4px;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.iconButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.iconButton:disabled {
+  color: var(--color-ink-disabled);
+  cursor: not-allowed;
+}
+
+.emptyBox {
+  padding: 20px;
+  border: 1px dashed var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-ink-faint);
+}
+
+.noteText {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-ink-faint);
+}
+
+.noteBand {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-warning-bg);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-warning);
+}
+
+.errorBand {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-danger-bg);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-danger);
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.statBox {
+  padding: 10px 12px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+}
+
+.statLabel {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-ink-faint);
+}
+
+.statValue {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.statUnit {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* 右の欄の「使っている所」。 */
+.useList {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.useRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.useName {
+  color: var(--color-ink-secondary);
+}
+
+.useCount {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.warnCard {
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 40%, transparent);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-warning-bg);
+}
+
+.warnTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-warning);
+}
+
+.warnDesc {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-warning);
+}
+
+/* できあがりの見本。 */
+.previewTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill, 9999px);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.previewDot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill, 9999px);
+}
+
+.previewName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.previewGroup {
+  padding: 4px 8px;
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--color-canvas-sunken);
+  font-size: 12px;
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+}
+
+/* トグル。 */
+.toggle {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--color-hairline);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.toggleOn {
+  background: var(--color-accent);
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-card);
+  transition: left 0.15s ease;
+}
+
+.toggleOn .toggleKnob {
+  left: 24px;
+}
+
+.toggleState {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.toggleStateOn {
+  color: var(--color-accent-deep);
+}
+
+.toggleStateOff {
+  color: var(--color-ink-faint);
+}
+
+/* 削除の押し口（追従バーの左）。 */
+.dangerButton {
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 25%, transparent);
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-danger);
+  cursor: pointer;
+}
+
+.dangerButton:hover {
+  background: var(--color-danger-bg);
+}
+
+/* 横幅が足りないとき、右の欄を下へ。 */
+@media (max-width: 1180px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fieldGrid,
+  .fieldGrid2,
+  .wayGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

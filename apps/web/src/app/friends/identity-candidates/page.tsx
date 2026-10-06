@@ -16,6 +16,8 @@ import {
 } from '@/components/identity/identity-parts'
 import { IdentityStateBlock } from '@/components/identity/identity-state'
 import { useIdentityReview } from '@/components/identity/identity-review'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import FriendIdentityCandidatesV8 from '@/v8/friends/compare/compare'
 import styles from '@/components/identity/identity-review.module.css'
 import './issue481-height.css'
 
@@ -29,6 +31,12 @@ import './issue481-height.css'
  * 判断に使う部品は `components/identity` に1組だけ置いてある。
  */
 export default function FriendIdentityCandidatesPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <FriendIdentityCandidatesV8 />
+  return <FriendIdentityCandidatesPageV7 />
+}
+
+function FriendIdentityCandidatesPageV7() {
   usePageTitle('重複候補の確認')
   const review = useIdentityReview('friend_duplicate')
   const first = review.items[0] ?? null

@@ -3,6 +3,9 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import ListState from '@/components/shared/list-state'
+import { useStaffRole } from '@/lib/staff-role'
+import { canEditFeature } from '@/lib/staff-capability'
 import type { Tag } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -101,6 +104,8 @@ function audienceLabel(audience: AudienceHandoff): string {
 
 function NewBroadcastPageContent() {
   const router = useRouter()
+  const staffRole = useStaffRole()
+  const canManage = staffRole === null || canEditFeature('broadcast.definition.edit')
   const searchParams = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [tags, setTags] = useState<Tag[]>([])
@@ -205,10 +210,10 @@ function NewBroadcastPageContent() {
   return (
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      {loading || audiencePending || (effectiveAudienceId && accountLoading) ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          読み込み中...
-        </div>
+      {!canManage ? (
+        <ListState kind="forbidden" title="一斉配信を作る権限がありません" description="一斉配信を作成する権限が必要です。管理者に依頼してください" action={<Link href="/broadcasts" className="text-action text-sm">一斉配信一覧へ戻る</Link>} />
+      ) : loading || audiencePending || (effectiveAudienceId && accountLoading) ? (
+        <ListState kind="loading" title="読み込み中..." />
       ) : audienceNoAccount ? (
         <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
           <p className="text-ink text-sm font-semibold">
@@ -258,11 +263,7 @@ function NewBroadcastPageContent() {
           onSuccess={(broadcast) => router.push(
             broadcast.status === 'scheduled'
               ? `/broadcasts/reserved?id=${encodeURIComponent(broadcast.id)}`
-              /*
-               * 「今すぐ配信」はここで送らない。下書きとして保存したあと、
-               * 送信ボタンのある詳細画面へ進める（IDEA-06: 保存と送信を
-               * ひとつの操作に見せない）。
-               */
+              // 送信後・承認依頼後は実物の配信詳細へ進む。
               : `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`,
           )}
           onCancel={() => router.push('/broadcasts')}
@@ -285,7 +286,7 @@ function NewBroadcastPageContent() {
 
 export default function NewBroadcastPage() {
   return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+    <Suspense fallback={<ListState kind="loading" title="読み込み中..." />}>
       <NewBroadcastPageContent />
     </Suspense>
   )

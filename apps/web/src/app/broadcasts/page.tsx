@@ -24,6 +24,8 @@ import Button from '@/components/shared/button'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
 import { formatDateTime, formatNumber, formatYmd } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import BroadcastListV8 from '@/v8/broadcasts/list'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -848,7 +850,7 @@ function BroadcastList() {
                           {broadcast.title}
                         </a>
                         {isDedup && (
-                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded-mini text-[10px] font-medium bg-info-bg text-info">
+                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded-mini text-nano font-medium bg-info-bg text-info">
                             複数アカウント
                           </span>
                         )}
@@ -889,7 +891,7 @@ function BroadcastList() {
                       配信条件。前は「全員」か「タグ指定」の2つしか見ていなかったので、
                       詳細条件で絞った配信も「タグ指定」と出ていた。送った相手を
                       後から確かめられないので、監査にならなかった。
-                      m20i: 「タグ：NEN会員（定期）」が3行に折れて行が高く
+                      m20i: 「タグ：定期便会員（毎月）」が3行に折れて行が高く
                       なるので、1行で省略し全文は title で見せる。
                     */}
                     <Td className="text-ink-secondary">
@@ -1078,9 +1080,14 @@ function BroadcastList() {
 
 // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
 export default function BroadcastsPage() {
+  /*
+   * ★V8：テーマが v8 のときは別の一覧（list-v8.tsx）を出す。
+   * v7 の BroadcastList には指一本触れない（1画素も変えない決まり）。
+   */
+  const theme = useAdminTheme()
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <BroadcastsPageContent />
+      {theme === 'v8' ? <BroadcastListV8 /> : <BroadcastsPageContent />}
     </Suspense>
   )
 }

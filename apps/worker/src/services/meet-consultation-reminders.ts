@@ -4,6 +4,7 @@ import {
   activeTenantLineAccountSql,
   isOperationCapabilityStopped,
   resolveLineCredential,
+  type V6WriteGuard,
 } from '@line-crm/db';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { featureJobCanRun } from './feature-enforcement.js';
@@ -18,6 +19,16 @@ export interface RegisterMeetConsultationInput {
   startsAt: string;
   endsAt: string;
   meetUrl: string;
+  /** 結び付く予約。版と組で後発の勝者を古い操作から守る。無いときは従来どおり無条件。 */
+  bookingId?: string | null;
+  bookingVersion?: number | null;
+}
+
+export interface CancelMeetConsultationOptions {
+  failOnSendInFlight?: boolean;
+  /** 行が見た版と違うときは何も変えず false (古い補償が勝者を消さない)。無いときは従来どおり無条件。 */
+  expectedBookingId?: string | null;
+  expectedBookingVersion?: number | null;
 }
 
 export interface MeetReminderSchedule {
@@ -40,6 +51,8 @@ interface MeetConsultationRow {
   ends_at: string;
   meet_url: string;
   status: 'confirmed' | 'cancelled' | 'completed';
+  booking_id: string | null;
+  booking_version: number | null;
 }
 
 interface DueMeetReminderRow {
@@ -54,6 +67,10 @@ interface DueMeetReminderRow {
   line_account_id: string;
   channel_access_token: string;
   channel_access_token_encrypted: string | null;
+  /** pushする候補の写し。認証・送信awaitの後の再確認はこの写しと一致させる。 */
+  snapshot_booking_id: string | null;
+  snapshot_booking_version: number | null;
+  snapshot_friend_id: string;
 }
 
 const MINUTE_MS = 60_000;
@@ -61,6 +78,63 @@ const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const MAX_RETRY = 3;
 const MEET_URL_RE = /^https:\/\/meet\.google\.com\/[a-z0-9-]+(?:[/?#].*)?$/i;
+
+// 結び付き予約の生存条件 (due選択と送信直前再確認で同一にする)。
+// 版なし旧相談は従来どおり通す。日時は正規化比較する。
+const LINKED_BOOKING_ALIVE_SQL = `(
+  c.booking_id IS NULL
+  OR EXISTS (
+    SELECT 1 FROM bookings live_booking
+    WHERE live_booking.id = c.booking_id
+      AND live_booking.line_account_id = (
+        SELECT f.line_account_id FROM friends f WHERE f.id = c.friend_id
+      )
+      AND live_booking.friend_id = c.friend_id
+      AND live_booking.status IN ('requested','confirmed')
+      AND live_booking.lock_version = c.booking_version
+      AND datetime(live_booking.starts_at) = datetime(c.starts_at)
+  )
+)`;
+
+// due読取時の候補写しと一致させる条件。相談と予約が両方新版へ進むと
+// 現在同士の一致だけでは旧行の日時・URL・宛先で送れるため、写しとの
+// 一致も求める。認証await・送信awaitの後の再確認に付ける。
+// push呼出しとの間に await は挟まない (呼出し自体の間の取消は残差)。
+function candidateSnapshotSql(): string {
+  return `AND (c.booking_id = ? OR (c.booking_id IS NULL AND ? IS NULL))
+      AND (c.booking_version = ? OR (c.booking_version IS NULL AND ? IS NULL))
+      AND datetime(c.starts_at) = datetime(?)
+      AND c.friend_id = ?`;
+}
+
+function candidateSnapshotBinds(row: DueMeetReminderRow): unknown[] {
+  return [
+    row.snapshot_booking_id,
+    row.snapshot_booking_id,
+    row.snapshot_booking_version,
+    row.snapshot_booking_version,
+    row.starts_at,
+    row.snapshot_friend_id,
+  ];
+}
+
+// 子の状態更新を候補写しと同一文で結び付ける。再登録で子の行IDが新版へ
+// 再利用されるため、行ID＋状態だけでは新版の子を壊し得る。新版が勝てば
+// 0 件になり、勝者の子を残す。古い処理の再試行・retry_countも同様に守る。
+function snapshotGuardExists(): string {
+  return `AND EXISTS (
+    SELECT 1 FROM meet_consultations snap
+     WHERE snap.id = ?
+       AND (snap.booking_id = ? OR (snap.booking_id IS NULL AND ? IS NULL))
+       AND (snap.booking_version = ? OR (snap.booking_version IS NULL AND ? IS NULL))
+       AND datetime(snap.starts_at) = datetime(?)
+       AND snap.friend_id = ?
+  )`;
+}
+
+function snapshotGuardBinds(row: DueMeetReminderRow): unknown[] {
+  return [row.consultation_id, ...candidateSnapshotBinds(row)];
+}
 
 function normalizeDate(value: string, field: string): Date {
   const date = new Date(value);
@@ -115,7 +189,7 @@ export async function registerMeetConsultation(
   db: D1Database,
   input: RegisterMeetConsultationInput,
   now = new Date(),
-): Promise<{ id: string; reminders: MeetReminderSchedule[] }> {
+): Promise<{ id: string; reminders: MeetReminderSchedule[]; updated: boolean }> {
   if (!input.externalEventId.trim()) throw new Error('externalEventId is required');
   if (!input.friendId.trim()) throw new Error('friendId is required');
   if (!input.title.trim()) throw new Error('title is required');
@@ -149,12 +223,28 @@ export async function registerMeetConsultation(
       existing.meet_url !== input.meetUrl),
   );
   const nowIso = now.toISOString();
+  const schedules = calculateMeetReminderSchedule(normalizedStart, now);
 
-  await db
+  // 版フェンス: 同じ予定IDに後発の勝者がいるとき、古い登録は何も書かない
+  // (勝者の相談・未来通知・V6を残す)。版なし同士・同版の再送・版なし行への
+  // 上書きは従来どおり通す。SELECT と書込みの間の交差は下の WHERE でも防ぐ。
+  const incomingVersion = input.bookingVersion ?? null;
+  const storedVersion = existing?.booking_version ?? null;
+  if (
+    existing != null &&
+    incomingVersion !== null &&
+    storedVersion !== null &&
+    incomingVersion < storedVersion
+  ) {
+    return { id: consultationId, reminders: schedules, updated: false };
+  }
+
+  const upsert = await db
     .prepare(
       `INSERT INTO meet_consultations
-        (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)
+        (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url,
+         status, booking_id, booking_version, cancel_claim_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, NULL, ?, ?)
        ON CONFLICT(external_event_id) DO UPDATE SET
          friend_id=excluded.friend_id,
          title=excluded.title,
@@ -162,7 +252,13 @@ export async function registerMeetConsultation(
          ends_at=excluded.ends_at,
          meet_url=excluded.meet_url,
          status='confirmed',
-         updated_at=excluded.updated_at`,
+         booking_id=excluded.booking_id,
+         booking_version=excluded.booking_version,
+         cancel_claim_id=NULL,
+         updated_at=excluded.updated_at
+       WHERE excluded.booking_version IS NULL
+          OR meet_consultations.booking_version IS NULL
+          OR excluded.booking_version >= meet_consultations.booking_version`,
     )
     .bind(
       consultationId,
@@ -172,12 +268,35 @@ export async function registerMeetConsultation(
       normalizedStart,
       normalizedEnd,
       input.meetUrl,
+      input.bookingId ?? null,
+      incomingVersion,
       nowIso,
       nowIso,
     )
     .run();
+  // SELECT 後に勝者が書いていたら WHERE が止めて 0 件になる。敗者は何も触らない。
+  // existing が null でも 0 件は敗者 (両者 null 読取の競合)。無条件で止める。
+  if ((upsert.meta?.changes ?? 0) === 0) {
+    return { id: consultationId, reminders: schedules, updated: false };
+  }
 
-  const schedules = calculateMeetReminderSchedule(normalizedStart, now);
+  // 子の書込みは1文ごとに親の版と結び付ける。親が動いていたらその文だけ
+  // 0 件になり、勝者の子を壊さない。書いた値は登録時の版で固定する。
+  const writtenBookingId = input.bookingId ?? null;
+  const versionGuard = `EXISTS (
+    SELECT 1 FROM meet_consultations guard
+     WHERE guard.id = ?
+       AND (guard.booking_id = ? OR (guard.booking_id IS NULL AND ? IS NULL))
+       AND (guard.booking_version = ? OR (guard.booking_version IS NULL AND ? IS NULL))
+  )`;
+  const guardBinds = [
+    consultationId,
+    writtenBookingId,
+    writtenBookingId,
+    incomingVersion,
+    incomingVersion,
+  ] as unknown[];
+
   const expectedKinds = new Set(schedules.map((item) => item.kind));
   for (const item of schedules) {
     const reminder = await db
@@ -191,9 +310,12 @@ export async function registerMeetConsultation(
         .prepare(
           `INSERT INTO meet_consultation_reminders
             (id, consultation_id, kind, scheduled_at, status, retry_count, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 'pending', 0, ?, ?)`,
+           SELECT ?, ?, ?, ?, 'pending', 0, ?, ? WHERE ${versionGuard}`,
         )
-        .bind(crypto.randomUUID(), consultationId, item.kind, item.scheduledAt, nowIso, nowIso)
+        .bind(
+          crypto.randomUUID(), consultationId, item.kind, item.scheduledAt, nowIso, nowIso,
+          ...guardBinds,
+        )
         .run();
     } else if (scheduleChanged || reminder.status === 'cancelled') {
       // 送信ずみは履歴として残し、未来分だけ再設定する。sent を pending に
@@ -203,9 +325,10 @@ export async function registerMeetConsultation(
           `UPDATE meet_consultation_reminders
               SET scheduled_at=?, status='pending', retry_count=0,
                   last_error=NULL, updated_at=?
-            WHERE id=? AND status IN ('pending','failed','cancelled')`,
+            WHERE id=? AND status IN ('pending','failed','cancelled')
+              AND ${versionGuard}`,
         )
-        .bind(item.scheduledAt, nowIso, reminder.id)
+        .bind(item.scheduledAt, nowIso, reminder.id, ...guardBinds)
         .run();
     }
   }
@@ -217,11 +340,29 @@ export async function registerMeetConsultation(
       .prepare(
         `UPDATE meet_consultation_reminders
             SET status='cancelled', updated_at=?
-          WHERE consultation_id=? AND kind=? AND status IN ('pending','failed')`,
+          WHERE consultation_id=? AND kind=? AND status IN ('pending','failed')
+            AND ${versionGuard}`,
       )
-      .bind(nowIso, consultationId, kind)
+      .bind(nowIso, consultationId, kind, ...guardBinds)
       .run();
   }
+
+  // 共有 V6 操作の直前の版の再確認。子の書込み後・各共有呼出しの前に
+  // 勝者が上書きしていたら、その共有呼出しを出さず stale で終える。
+  // 行と子は勝者の full pass がそろえるため、敗者は何も直さない。
+  // 共有層に版条件を持てないため、確認→呼出しの窓は残差として記録する。
+  const stillMine = async (): Promise<boolean> => {
+    const current = await db
+      .prepare('SELECT booking_id, booking_version FROM meet_consultations WHERE id = ?')
+      .bind(consultationId)
+      .first<{ booking_id: string | null; booking_version: number | null }>();
+    return (
+      !!current &&
+      current.booking_id === writtenBookingId &&
+      current.booking_version === incomingVersion
+    );
+  };
+  const staleResult = { id: consultationId, reminders: schedules, updated: false };
 
   // N-065: 個別相談の日程変更・再送を V6 へ連動する。
   // 予約ルール (booking) を個別相談にも使い、sourceKind='meet' で追跡する。
@@ -249,9 +390,16 @@ export async function registerMeetConsultation(
   ).bind(input.friendId, consultationId, input.externalEventId).first<{ c: number }>();
   // 新規成功後に旧取消: 新 friend 側の行が無いときは登録を先に行い、
   // 失敗は投げる (旧行に触る前に終えるため旧通知が残り、再送で回復できる)。
+  // 共有 V6 書込みにも版ガードを付ける。確認→呼出しの間に勝者が動いても
+  // 共有側の各文が 0 件になり、新版の通知予定を変えない。ガードで止まった
+  // 書込みは後の stillMine で stale にまとめる。
+  const v6Guard = meetWriteGuard(
+    consultationId, writtenBookingId, incomingVersion, null, true,
+  );
   const mustEnrollFirst = friendChanged || (oldFriendId !== null && (newActive?.c ?? 0) === 0);
   if (mustEnrollFirst) {
     // 新側の日付ずれだけ先に直す (旧側には触れない)。無いときは何もしない。
+    if (!(await stillMine())) return staleResult;
     await reconcileV6ToStartsAt(db, {
       triggerType: v6Base.triggerType,
       sourceKind: v6Base.sourceKind,
@@ -260,12 +408,22 @@ export async function registerMeetConsultation(
       friendId: v6Base.friendId,
       startsAtIso: normalizedStart,
       leaveOtherFriends: true,
+      writeGuard: v6Guard,
     });
-    await enrollByTrigger(db, {
-      ...v6Base,
-      startsAtIso: normalizedStart,
-    });
+    if (!(await stillMine())) return staleResult;
+    try {
+      await enrollByTrigger(db, {
+        ...v6Base,
+        startsAtIso: normalizedStart,
+        writeGuard: v6Guard,
+      });
+    } catch (error) {
+      // ガードで止まった敗者は stale で終える (他は投げる)。
+      if (!(error instanceof Error) || error.message !== 'V6_WRITE_GUARDED') throw error;
+      return staleResult;
+    }
   }
+  if (!(await stillMine())) return staleResult;
   await reconcileV6ToStartsAt(db, {
     triggerType: v6Base.triggerType,
     sourceKind: v6Base.sourceKind,
@@ -273,63 +431,379 @@ export async function registerMeetConsultation(
     sourceEventId: v6Base.sourceEventId,
     friendId: v6Base.friendId,
     startsAtIso: normalizedStart,
+    writeGuard: v6Guard,
   });
   if (!mustEnrollFirst) {
+    if (!(await stillMine())) return staleResult;
     // 登録失敗で相談登録自体を壊さない。二重登録は enroll 側で吸収する。
+    // ガードで止まったときは V6_WRITE_GUARDED が飛ぶが、後の stillMine 相当として
+    // ここでは吸収し、最後の再確認にまとめる (敗者は stale で終える)。
     await enrollByTrigger(db, {
       ...v6Base,
       startsAtIso: normalizedStart,
-    }).catch((error) => console.error('meet reminder enroll (v6) failed:', error));
+      writeGuard: v6Guard,
+    }).catch((error) => {
+      if (error instanceof Error && error.message === 'V6_WRITE_GUARDED') return;
+      console.error('meet reminder enroll (v6) failed:', error);
+    });
   }
+  // V6 phase の後の最終確認。共有呼出しの間に勝者が動いていたら stale。
+  if (!(await stillMine())) return staleResult;
 
-  return { id: consultationId, reminders: schedules };
+  return { id: consultationId, reminders: schedules, updated: true };
+}
+
+/**
+ * 共有 V6 書込みへ渡す版ガードを組み立てる。親の版 (と登録なら confirmed、
+ * 取消なら操作 uuid) が動いていたら共有側の各文は 0 件になる。
+ */
+function meetWriteGuard(
+  consultationId: string,
+  bookingId: string | null,
+  bookingVersion: number | null,
+  claimId: string | null,
+  requireConfirmed: boolean,
+): V6WriteGuard {
+  const conds = ['GuardMC.id = ?'];
+  const binds: unknown[] = [consultationId];
+  conds.push('(GuardMC.booking_id = ? OR (GuardMC.booking_id IS NULL AND ? IS NULL))');
+  binds.push(bookingId, bookingId);
+  conds.push('(GuardMC.booking_version = ? OR (GuardMC.booking_version IS NULL AND ? IS NULL))');
+  binds.push(bookingVersion, bookingVersion);
+  if (requireConfirmed) conds.push(`GuardMC.status = 'confirmed'`);
+  if (claimId !== null) {
+    conds.push('GuardMC.cancel_claim_id = ?');
+    binds.push(claimId);
+  }
+  return {
+    sql: `EXISTS (SELECT 1 FROM meet_consultations GuardMC WHERE ${conds.join(' AND ')})`,
+    binds,
+  };
+}
+
+/**
+ * Meet相談の送信可否。V6共有送信路（reminder-delivery）から使う。
+ * 版なし旧相談は従来どおり通す。結び付き予約の本人・状態・版・日時が
+ * 一致しない古い版は送らない。相談行自体が confirmed でないときも送らない。
+ */
+export async function isMeetConsultationSendable(
+  db: D1Database,
+  consultationId: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 AS ok FROM meet_consultations c
+        WHERE c.id = ? AND c.status = 'confirmed' AND ${LINKED_BOOKING_ALIVE_SQL}`,
+    )
+    .bind(consultationId)
+    .first<{ ok: number }>();
+  return !!row;
+}
+
+/** V6送信の最終権利と結び付ける送信候補の写し。本文解決の前に読む。 */
+export interface MeetSendCandidate {
+  bookingId: string | null;
+  bookingVersion: number | null;
+  startsAt: string;
+  friendId: string;
+}
+
+export async function readMeetSendCandidate(
+  db: D1Database,
+  consultationId: string,
+): Promise<MeetSendCandidate | null> {
+  const row = await db
+    .prepare(
+      `SELECT booking_id, booking_version, starts_at, friend_id
+         FROM meet_consultations WHERE id = ?`,
+    )
+    .bind(consultationId)
+    .first<{
+      booking_id: string | null;
+      booking_version: number | null;
+      starts_at: string;
+      friend_id: string;
+    }>();
+  if (!row) return null;
+  return {
+    bookingId: row.booking_id ?? null,
+    bookingVersion: row.booking_version ?? null,
+    startsAt: row.starts_at,
+    friendId: row.friend_id,
+  };
+}
+
+/**
+ * 送信候補の写しが最終送信権の時点で今も有効か。結び付き予約の生存と
+ * 写し一致を同一文で確かめる。新版が勝てば false になり、勝者の通知を残す。
+ */
+/**
+ * V6最終送信権の確定。認証・本文解決・beforePush・停止確認の待機を全て
+ * 終えた後、送信権の行と候補の版を同じUPDATE文で結び直す。この後は
+ * push呼出しまでawaitを置かない (呼出し自体の間の取消は残差)。
+ * 戻り値: 'ok' 送ってよい / 'stale' 旧候補 (呼出し側が実行行を取り消す) /
+ * 'stolen' 貸出が別処理へ移った (行に触らず見送る)。
+ */
+export async function assertFinalMeetSendRight(
+  db: D1Database,
+  input: {
+    runId: string;
+    friendReminderId: string;
+    expectedTargetDate: string;
+    ownedLeases: string[];
+    candidate: MeetSendCandidate | null;
+    leaseExpiresAt: string;
+    nowIso: string;
+  },
+): Promise<'ok' | 'stale' | 'stolen'> {
+  if (!input.candidate || input.ownedLeases.length === 0) return 'stale';
+  const leaseList = input.ownedLeases.map(() => '?').join(',');
+  const refreshed = await db
+    .prepare(
+      `UPDATE reminder_delivery_runs
+          SET lease_expires_at = ?, updated_at = ?
+        WHERE id = ?
+          AND status = 'claimed'
+          AND lease_expires_at IN (${leaseList})
+          AND EXISTS (
+            SELECT 1 FROM friend_reminders fr
+             WHERE fr.id = ?
+               AND fr.status = 'active'
+               AND fr.target_date = ?
+          )
+          AND EXISTS (
+            SELECT 1 FROM meet_consultations c
+             WHERE c.id = (
+                 SELECT fr2.source_id FROM friend_reminders fr2 WHERE fr2.id = ?
+               )
+               AND c.status = 'confirmed'
+               AND ${LINKED_BOOKING_ALIVE_SQL}
+               ${candidateSnapshotSql()}
+          )`,
+    )
+    .bind(
+      input.leaseExpiresAt,
+      input.nowIso,
+      input.runId,
+      ...input.ownedLeases,
+      input.friendReminderId,
+      input.expectedTargetDate,
+      input.friendReminderId,
+      input.candidate.bookingId,
+      input.candidate.bookingId,
+      input.candidate.bookingVersion,
+      input.candidate.bookingVersion,
+      input.candidate.startsAt,
+      input.candidate.friendId,
+    )
+    .run();
+  if ((refreshed.meta?.changes ?? 0) === 1) return 'ok';
+  // 0件のとき、貸出が自分のままなら旧候補。別処理へ移っていたら触らない。
+  const mine = await db
+    .prepare(
+      `SELECT status, lease_expires_at FROM reminder_delivery_runs WHERE id = ?`,
+    )
+    .bind(input.runId)
+    .first<{ status: string; lease_expires_at: string | null }>();
+  if (
+    mine?.status === 'claimed' &&
+    mine.lease_expires_at !== null &&
+    input.ownedLeases.includes(mine.lease_expires_at)
+  ) {
+    return 'stale';
+  }
+  return 'stolen';
+}
+
+export async function isMeetSendCandidateCurrent(
+  db: D1Database,
+  consultationId: string,
+  candidate: MeetSendCandidate | null,
+): Promise<boolean> {
+  if (!candidate) return false;
+  const row = await db
+    .prepare(
+      `SELECT 1 AS ok FROM meet_consultations c
+        WHERE c.id = ? AND c.status = 'confirmed'
+          AND ${LINKED_BOOKING_ALIVE_SQL}
+          AND (c.booking_id = ? OR (c.booking_id IS NULL AND ? IS NULL))
+          AND (c.booking_version = ? OR (c.booking_version IS NULL AND ? IS NULL))
+          AND datetime(c.starts_at) = datetime(?)
+          AND c.friend_id = ?`,
+    )
+    .bind(
+      consultationId,
+      candidate.bookingId,
+      candidate.bookingId,
+      candidate.bookingVersion,
+      candidate.bookingVersion,
+      candidate.startsAt,
+      candidate.friendId,
+    )
+    .first<{ ok: number }>();
+  return !!row;
 }
 
 export async function cancelMeetConsultation(
   db: D1Database,
   externalEventId: string,
   now = new Date(),
-  options?: { failOnSendInFlight?: boolean },
+  options?: CancelMeetConsultationOptions,
 ): Promise<boolean> {
   const consultation = await db
     .prepare(
-      `SELECT c.id, c.friend_id, c.starts_at, f.line_account_id
+      `SELECT c.id, c.friend_id, c.starts_at, c.status, c.booking_id, c.booking_version,
+              f.line_account_id
          FROM meet_consultations c
          LEFT JOIN friends f ON f.id = c.friend_id
         WHERE c.external_event_id = ?`,
     )
     .bind(externalEventId)
-    .first<{ id: string; friend_id: string; starts_at: string; line_account_id: string | null }>();
+    .first<{
+      id: string;
+      friend_id: string;
+      starts_at: string;
+      status: 'confirmed' | 'cancelled' | 'completed';
+      booking_id: string | null;
+      booking_version: number | null;
+      line_account_id: string | null;
+    }>();
   if (!consultation) return false;
+  // 版フェンス: 期待と違う版の行は古い補償の対象外。何も変えず false。
+  // (同じ予定IDの後発の勝者を敗者が取り消せない)。期待なしは従来どおり無条件。
+  if (
+    options?.expectedBookingVersion !== undefined &&
+    options.expectedBookingVersion !== consultation.booking_version
+  ) {
+    return false;
+  }
+  if (
+    options?.expectedBookingId !== undefined &&
+    options.expectedBookingId !== consultation.booking_id
+  ) {
+    return false;
+  }
   const nowIso = now.toISOString();
-  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-  // 送信権の貸出中は投げて何も変えず 409 にする (状態更新より先に調べる。
-  // 配送側は通知行だけを見るため、状態だけ先に変えると貸出中の送信が
-  // 取消ずみの相談へ届いてしまう)。再送は active が無いため 0 件で返す。
-  // 移行前の行は探さない。
-  await cancelByTrigger(db, {
-    triggerType: 'booking',
-    sourceKind: 'meet',
-    sourceId: consultation.id,
-    sourceEventId: externalEventId,
-    friendId: consultation.friend_id,
-    startsAtIso: consultation.starts_at,
-    lineAccountId: consultation.line_account_id,
-    cancelReason: `meet_cancel:${externalEventId}:by:admin`,
-    allowLegacyFallback: false,
-    failOnSendInFlight: options?.failOnSendInFlight,
-  });
-  await db
-    .prepare("UPDATE meet_consultations SET status='cancelled', updated_at=? WHERE id=?")
-    .bind(nowIso, consultation.id)
+  // 行の確定と操作所有権の主張を同じ文で勝ち取る。SELECT 後に勝者が
+  // 上書きしていたら 0 件になり、V6・通知には触らず false (敗者は何も壊さない)。
+  // 同版の別操作も uuid が違うため、後で戻すときに区別できる。
+  const claimId = crypto.randomUUID();
+  const claimed = await db
+    .prepare(
+      `UPDATE meet_consultations SET status='cancelled', cancel_claim_id=?, updated_at=?
+        WHERE id=?
+          AND (booking_version = ? OR (booking_version IS NULL AND ? IS NULL))
+          AND (booking_id = ? OR (booking_id IS NULL AND ? IS NULL))`,
+    )
+    .bind(
+      claimId,
+      nowIso,
+      consultation.id,
+      consultation.booking_version,
+      consultation.booking_version,
+      consultation.booking_id,
+      consultation.booking_id,
+    )
     .run();
+  if ((claimed.meta?.changes ?? 0) === 0) return false;
+  // V6 の前の版＋操作の再確認。claim から V6 の間に勝者が上書きしていたら、
+  // V6・子には触らず false (敗者は何も壊さない)。行は勝者のものが残る。
+  // 同版の別操作の claim 上書きも uuid で検出する。
+  const beforeV6 = await db
+    .prepare(
+      'SELECT booking_id, booking_version, cancel_claim_id FROM meet_consultations WHERE id = ?',
+    )
+    .bind(consultation.id)
+    .first<{ booking_id: string | null; booking_version: number | null; cancel_claim_id: string | null }>();
+  if (
+    !beforeV6 ||
+    beforeV6.booking_id !== consultation.booking_id ||
+    beforeV6.booking_version !== consultation.booking_version ||
+    beforeV6.cancel_claim_id !== claimId
+  ) {
+    return false;
+  }
+  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+  // 再送は active が無いため 0 件で返す。移行前の行は探さない。
+  // 共有取消にも版＋操作ガードを付け、前確認→呼出しの間に勝者が動いても
+  // 共有側の各文が 0 件になり、新版の通知予定を変えない。
+  const cancelGuard = meetWriteGuard(
+    consultation.id,
+    consultation.booking_id,
+    consultation.booking_version,
+    claimId,
+    false,
+  );
+  try {
+    await cancelByTrigger(db, {
+      triggerType: 'booking',
+      sourceKind: 'meet',
+      sourceId: consultation.id,
+      sourceEventId: externalEventId,
+      friendId: consultation.friend_id,
+      startsAtIso: consultation.starts_at,
+      lineAccountId: consultation.line_account_id,
+      cancelReason: `meet_cancel:${externalEventId}:by:admin`,
+      allowLegacyFallback: false,
+      failOnSendInFlight: options?.failOnSendInFlight,
+      writeGuard: cancelGuard,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'REMINDER_SEND_IN_FLIGHT') {
+      // 409 では行の確定も戻す (自分の操作 uuid のときだけ。主張も消す)。
+      // 同版の別操作が上書きずみなら 0 件になり、後発の cancelled を残す。
+      // 再送で回復できる。
+      await db
+        .prepare(
+          `UPDATE meet_consultations SET status=?, cancel_claim_id=NULL, updated_at=?
+            WHERE id=? AND status='cancelled' AND cancel_claim_id=?`,
+        )
+        .bind(consultation.status, nowIso, consultation.id, claimId)
+        .run();
+    }
+    throw error;
+  }
+  // V6 の後の最終確認。共有呼出しの間に勝者が動いていたら false。
+  // 書けた分は正当な接頭辞 (版が自分の間に通った文だけ) として残す。
+  const afterV6 = await db
+    .prepare(
+      'SELECT booking_id, booking_version, cancel_claim_id FROM meet_consultations WHERE id = ?',
+    )
+    .bind(consultation.id)
+    .first<{ booking_id: string | null; booking_version: number | null; cancel_claim_id: string | null }>();
+  if (
+    !afterV6 ||
+    afterV6.booking_id !== consultation.booking_id ||
+    afterV6.booking_version !== consultation.booking_version ||
+    afterV6.cancel_claim_id !== claimId
+  ) {
+    return false;
+  }
+  // 子の取消も親の版＋操作と結び付ける。V6 の間に勝者が来ていたら 0 件になり、
+  // 勝者の未来通知を残す。同版の別操作の claim 上書きもここで止まる。
   await db
     .prepare(
       `UPDATE meet_consultation_reminders
           SET status='cancelled', updated_at=?
-        WHERE consultation_id=? AND status IN ('pending','failed')`,
+        WHERE consultation_id=? AND status IN ('pending','failed')
+          AND EXISTS (
+            SELECT 1 FROM meet_consultations guard
+             WHERE guard.id = ?
+               AND (guard.booking_id = ? OR (guard.booking_id IS NULL AND ? IS NULL))
+               AND (guard.booking_version = ? OR (guard.booking_version IS NULL AND ? IS NULL))
+               AND guard.cancel_claim_id = ?
+          )`,
     )
-    .bind(nowIso, consultation.id)
+    .bind(
+      nowIso,
+      consultation.id,
+      consultation.id,
+      consultation.booking_id,
+      consultation.booking_id,
+      consultation.booking_version,
+      consultation.booking_version,
+      claimId,
+    )
     .run();
   return true;
 }
@@ -356,6 +830,9 @@ export async function processDueMeetConsultationReminders(
     .prepare(
       `SELECT r.id, r.consultation_id, r.kind, r.retry_count,
               c.title, c.starts_at, c.meet_url,
+              c.booking_id AS snapshot_booking_id,
+              c.booking_version AS snapshot_booking_version,
+              c.friend_id AS snapshot_friend_id,
               f.line_user_id, f.line_account_id, la.channel_access_token,
               la.channel_access_token_encrypted
          FROM meet_consultation_reminders r
@@ -370,6 +847,13 @@ export async function processDueMeetConsultationReminders(
           AND f.is_following = 1
           AND la.is_active = 1
           AND ${activeTenantLineAccountSql('f.line_account_id')}
+          AND NOT EXISTS (
+            SELECT 1 FROM bookings dead_booking
+            WHERE dead_booking.external_event_id = c.external_event_id
+              AND dead_booking.line_account_id = f.line_account_id
+              AND dead_booking.status IN ('cancelled','expired')
+          )
+          AND ${LINKED_BOOKING_ALIVE_SQL}
         ORDER BY r.scheduled_at ASC
         LIMIT 100`,
     )
@@ -389,18 +873,32 @@ export async function processDueMeetConsultationReminders(
       continue;
     }
     // 取消と配信の競合対策: 送る直前に相談の状態を確かめ、取消済みなら送らない。
+    // 結び付く予約の版・日時・本人・状態も due 選択と同一条件で確かめる。
+    // さらに due 時の候補写しとも一致させる (両方新版へ進んだ旧行は送らない)。
     const live = await db
-      .prepare(`SELECT status FROM meet_consultations WHERE id = ?`)
-      .bind(row.consultation_id)
+      .prepare(
+        `SELECT c.status AS status FROM meet_consultations c
+          WHERE c.id = ?
+            AND NOT EXISTS (
+              SELECT 1 FROM bookings dead_booking
+              WHERE dead_booking.external_event_id = c.external_event_id
+                AND dead_booking.status IN ('cancelled','expired')
+            )
+            AND ${LINKED_BOOKING_ALIVE_SQL}
+            ${candidateSnapshotSql()}`,
+      )
+      .bind(row.consultation_id, ...candidateSnapshotBinds(row))
       .first<{ status: string }>();
     if (!live || live.status !== 'confirmed') {
+      // 候補写しと違う旧行は整理する。新版へ再利用ずみなら 0 件で残す。
       await db
         .prepare(
           `UPDATE meet_consultation_reminders
               SET status='cancelled', updated_at=?
-            WHERE id=? AND status IN ('pending','failed')`,
+            WHERE id=? AND status IN ('pending','failed')
+              ${snapshotGuardExists()}`,
         )
-        .bind(nowIso, row.id)
+        .bind(nowIso, row.id, ...snapshotGuardBinds(row))
         .run();
       continue;
     }
@@ -413,18 +911,32 @@ export async function processDueMeetConsultationReminders(
       );
       // 取消と送信の競合対策: push の直前にもう一度だけ確かめる。
       // この後 push まで待たない (間に取消が入る余地を残さない)。
+      // 版・日時・本人・状態は due 選択と同一条件で結び付ける。
+      // 認証await中の更新も含め、候補写しと違う旧行はここで止める。
       const liveBeforePush = await db
-        .prepare(`SELECT status FROM meet_consultations WHERE id = ?`)
-        .bind(row.consultation_id)
+        .prepare(
+          `SELECT c.status AS status FROM meet_consultations c
+            WHERE c.id = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM bookings dead_booking
+                WHERE dead_booking.external_event_id = c.external_event_id
+                  AND dead_booking.status IN ('cancelled','expired')
+              )
+              AND ${LINKED_BOOKING_ALIVE_SQL}
+              ${candidateSnapshotSql()}`,
+        )
+        .bind(row.consultation_id, ...candidateSnapshotBinds(row))
         .first<{ status: string }>();
       if (!liveBeforePush || liveBeforePush.status !== 'confirmed') {
+        // 候補写しと違う旧行は整理する。新版へ再利用ずみなら 0 件で残す。
         await db
           .prepare(
             `UPDATE meet_consultation_reminders
                 SET status='cancelled', updated_at=?
-              WHERE id=? AND status IN ('pending','failed')`,
+              WHERE id=? AND status IN ('pending','failed')
+                ${snapshotGuardExists()}`,
           )
-          .bind(nowIso, row.id)
+          .bind(nowIso, row.id, ...snapshotGuardBinds(row))
           .run();
         continue;
       }
@@ -438,13 +950,15 @@ export async function processDueMeetConsultationReminders(
         'reminder_dispatch',
       );
       // 同時取消で止められた行を sent で上書きしない (状態だけ守る。送信数は数える)。
+      // push の間に新版へ再利用された行も sent にしない (候補写しと同一文で結ぶ)。
       const marked = await db
         .prepare(
           `UPDATE meet_consultation_reminders
               SET status='sent', sent_at=?, last_error=NULL, updated_at=?
-            WHERE id=? AND status IN ('pending','failed')`,
+            WHERE id=? AND status IN ('pending','failed')
+              ${snapshotGuardExists()}`,
         )
-        .bind(nowIso, nowIso, row.id)
+        .bind(nowIso, nowIso, row.id, ...snapshotGuardBinds(row))
         .run();
       sent++;
       // push と確定の間に取消が確定したときは送り直さず、追跡用に記録する。
@@ -457,17 +971,21 @@ export async function processDueMeetConsultationReminders(
       }
     } catch (error) {
       const retryCount = row.retry_count + 1;
+      // 失敗の確定も新版へ再利用された行に触れない (候補写しと同一文で結ぶ)。
+      // 新版が勝てば 0 件になり、勝者の pending を残す。試行数は数える。
       await db
         .prepare(
           `UPDATE meet_consultation_reminders
               SET status='failed', retry_count=?, last_error=?, updated_at=?
-            WHERE id=?`,
+            WHERE id=?
+              ${snapshotGuardExists()}`,
         )
         .bind(
           retryCount,
           error instanceof Error ? error.message.slice(0, 1000) : String(error).slice(0, 1000),
           nowIso,
           row.id,
+          ...snapshotGuardBinds(row),
         )
         .run();
       failed++;

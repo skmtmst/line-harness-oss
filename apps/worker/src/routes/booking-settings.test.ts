@@ -995,6 +995,8 @@ describe('LIFF 日時表示の最初の形 (liff_date_view)', () => {
     await expect(own.json()).resolves.toEqual({
       liff_date_view: 'calendar',
       booking_window_days: 45,
+      // 承認なし確定の店だけ automatic。ここは通常の店なので manual。
+      approval_mode: 'manual',
     });
     // 別店舗の liffId では別店舗の値にならない（設定行が無い新店舗は既定値）。
     const other = await app.request('/api/liff/booking/settings?liffId=liff-empty', {}, env);
@@ -1002,6 +1004,7 @@ describe('LIFF 日時表示の最初の形 (liff_date_view)', () => {
     await expect(other.json()).resolves.toEqual({
       liff_date_view: 'list',
       booking_window_days: 60,
+      approval_mode: 'manual',
     });
   });
 

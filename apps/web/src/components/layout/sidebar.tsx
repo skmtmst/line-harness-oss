@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { SIDEBAR_TOGGLE_EVENT, UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
+import { adminSessionHeaders } from '@/lib/admin-session'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { HQ_MENU_SECTIONS, menuOwnerForScreen, orderedMenuSections, type MenuItem, type MenuSection } from '@/lib/menu'
 import { HQ_TEMPLATE_DISTRIBUTION_ENABLED } from '@/lib/hq-template-availability'
@@ -13,6 +14,7 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
+import { brandInitial } from './brand-initial'
 import SidebarVersion from './sidebar-version'
 import Notice from '@/components/shared/notice'
 import HqAccountMenu from '@/components/hq/account-menu'
@@ -32,6 +34,8 @@ const V8_GROUPS_OPEN_BY_DEFAULT = new Set(['basic', 'delivery', 'contents', 'boo
 
 /** 組の開閉を覚えるキー（ブラウザごと）。 */
 const SIDEBAR_GROUPS_KEY = 'lh-sidebar-groups'
+/** 保存が無いとき、この幅より狭ければ左メニューを畳んで開く。1152 の絵は開いたまま。 */
+export const SIDEBAR_AUTO_COLLAPSE_BELOW = 1152
 
 /** 左メニューのいちばん下の「設定」（夕41・部品 njl8e）。歯車は予約設定と同じ形。 */
 const SETTINGS_GEAR_ICON = 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31-.826 2.37-2.37 1.04-.6 2.296-.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
@@ -162,7 +166,7 @@ export default function Sidebar({
    * ★V8 外側：左メニューの畳み（幅 64・アイコンだけ）。
    * 上の帯のボタンと ⌘\ が SIDEBAR_TOGGLE_EVENT を投げ、ここで受ける。
    * 状態はブラウザに覚える（lh-sidebar-collapsed）。保存がなければ
-   * 1280px 未満では畳んだ形で開く。v7 では見た目を変えないので、
+   * 1152px 未満では畳んだ形で開く（1152 の絵 35 枚はどれも開いたまま）。v7 では見た目を変えないので、
    * data-collapsed が立っていても v7 の見た目は動かない。
    */
   const [collapsed, setCollapsed] = useState(false)
@@ -175,7 +179,7 @@ export default function Sidebar({
       if (saved !== null) {
         setCollapsed(saved === '1')
       } else {
-        setCollapsed(window.innerWidth < 1280)
+        setCollapsed(window.innerWidth < SIDEBAR_AUTO_COLLAPSE_BELOW)
       }
     } catch {
       // localStorage が使えないときは展開のまま
@@ -208,6 +212,22 @@ export default function Sidebar({
 
   const [staffName, setStaffName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<string | null>(null)
+  /*
+   * ★V8 殻合わせ：脇の頭の会社名。契約先の名前は /api/tenants/me が返す。
+   * 統括の殻のときだけ取る（ふだんの殻は選んだ店の看板で変わらない）。
+   * 取れなければ null のまま「統括」で出す。
+   */
+  const [tenantName, setTenantName] = useState<string | null>(null)
+  useEffect(() => {
+    if (!isHq) return
+    let cancelled = false
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    fetch(`${apiUrl}/api/tenants/me`, { credentials: 'include', headers: adminSessionHeaders() })
+      .then((res) => res.json() as Promise<{ data?: { name?: string } } | null>)
+      .then((tenant) => { if (!cancelled) setTenantName(tenant?.data?.name ?? null) })
+      .catch(() => { if (!cancelled) setTenantName(null) })
+    return () => { cancelled = true }
+  }, [isHq])
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
   const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
 
@@ -630,10 +650,10 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-card object-cover" />
           ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-ink">{brand.name ?? '然-NEN- LINE管理システム'}</p>
+            <p className="truncate text-sm font-bold text-ink">{brand.name ?? 'musubo LINE管理システム'}</p>
             <p className="mt-0.5 text-micro font-medium text-ink-faint">管理メニュー</p>
           </div>
         </div>
@@ -642,19 +662,39 @@ export default function Sidebar({
       )}
 
       {isHq ? (
-        <div className={`px-3 pb-3 pt-4 ${styles.collapseHide}`}>
-          <div className="rounded-card border border-hairline bg-canvas px-4 py-3">
-            <p className="text-xs font-semibold text-accent-deep">musubo</p>
-            <p className="mt-1 text-sm font-bold text-ink">統括コンソール</p>
+        <>
+          {/* v7 の札は残す。V8 では下のロゴの段に替わる。 */}
+          <div className={`px-3 pb-3 pt-4 ${styles.collapseHide} v7-only`}>
+            <div className="rounded-card border border-hairline bg-canvas px-4 py-3">
+              <p className="text-xs font-semibold text-accent-deep">musubo</p>
+              <p className="mt-1 text-sm font-bold text-ink">統括コンソール</p>
+            </div>
           </div>
-        </div>
+          {/*
+            ★V8 殻合わせ（絵 `V8-B/JKjsE`）：脇の頭は会社のロゴ（緑の四角に
+            頭1字）＋会社名＋小さく musubo。会社名は契約先（/api/tenants/me）。
+            取れなければ「統括」で出す。v7 は上の札のまま。
+          */}
+          <div className={`v8-only px-3 pb-3 pt-4 ${styles.collapseHide}`}>
+            <div className="flex items-center gap-3 px-1">
+              <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-accent-deep text-lg font-bold text-canvas">
+                {(tenantName ?? '統').slice(0, 1)}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-lead font-bold text-ink" title={tenantName ?? undefined}>{tenantName ?? '統括'}</span>
+                <span className="mt-0.5 block text-micro font-medium text-ink-faint">musubo</span>
+              </span>
+            </div>
+          </div>
+        </>
       ) : preview ? (
         <div className={`px-[13px] pb-[9px] pt-[18px] ${styles.collapseHide}`}>
-          <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
+          <p className="mb-[11px] text-caption font-normal text-ink-faint">現在のLINEアカウント</p>
           <div className="flex h-[66px] items-center rounded-card border border-hairline bg-canvas px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-[14px] font-semibold text-accent-deep">然</div>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-body font-semibold text-accent-deep">サ</div>
             <div className="ml-3 min-w-0 flex-1">
-              <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
+              {/* デザイン確認用の見本。特定の利用者の名前は書かない。 */}
+              <p className="truncate text-body font-semibold text-ink">サンプルアカウント</p>
               <p className="mt-0.5 truncate text-micro text-ink-faint">コミュニケーション</p>
             </div>
           </div>
@@ -735,6 +775,8 @@ export default function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
+                  // V8は多数の別画面を先読みせず、選んだ画面だけ読み込む。
+                  prefetch={isV8 ? false : undefined}
                   onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={visibleLabel}
                   /*
@@ -743,7 +785,7 @@ export default function Sidebar({
                     なって一覧の中でそこだけ浮き、目が先にそこへ行く。
                     印は「いまここ」を示せれば足りる。
                   */
-                  className={`${styles.item} ${attrV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} border border-transparent text-[13px]` : ''} ${
+                  className={`${styles.item} ${attrV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} border border-transparent text-label` : ''} ${
                     active
                       ? isDanger
                         ? `${styles.active} ${styles.danger}`
@@ -786,6 +828,7 @@ export default function Sidebar({
         <div className={styles.settingsEntry}>
           <Link
             href="/settings"
+            prefetch={false}
             title="設定"
             className={`${styles.item} ${settingsActive ? styles.active : ''}`}
           >
@@ -794,14 +837,20 @@ export default function Sidebar({
           </Link>
         </div>
       )}
+      {/*
+        統括（/hq）の脇の下には歯車の入口を置かない
+        （Pencil 承認 2026-10-06・`LINE-Harness-V8-B.pen` の `s6kZt/wCdWg`）。
+        統括の情報の画面へは左下のアカウントの行から行く。店舗側（上の枠）はそのまま。
+      */}
 
       {/*
         メニューの下の版の表示（★V7 監査の直し E）。いま動いている版・
         commit・配備日時と環境。取れないときは「版の情報なし」。
         移行中の見た目承認（preview）は版の取得をしない。
+        統括（/hq）には出さない（同じ承認・`s6kZt/wCdWg`）。
         V8 でメニューを畳んだときは枠ごと隠す（`styles.collapseHide`）。
       */}
-      {preview ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
+      {preview || isHq ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
@@ -843,7 +892,7 @@ export default function Sidebar({
             1280px 未満では PC のトップバー（画面の唯一の <h1>）を畳むので、
             現在地を h1 で持つのはここ（#734: 390px で全画面 h1 が消えていた）。 */}
         <h1 className={styles.mobileTitle} title={mobileTitle || brand.name || undefined}>
-          {mobileTitle || brand.name || '然-NEN- LINE管理システム'}
+          {mobileTitle || brand.name || 'musubo LINE管理システム'}
         </h1>
         {/* 公式アカウントの印。名前は画面名が持つので、ここはアイコンだけ。 */}
         <div className={styles.mobileBrand}>
@@ -851,7 +900,7 @@ export default function Sidebar({
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
             <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-control object-cover" />
           ) : (
-            <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
           )}
         </div>
       </div>

@@ -41,10 +41,10 @@ describe('ANALYTICS-04: 未取得・失敗のファネルで数字を出さな�
 
   it('「まだ途中の人」を「止まった人」に混ぜない', () => {
     // 前段到達−今段到達ではなく、口が数えた droppedAfter を使う
-    expect(PAGE).toContain('prev.droppedAfter')
-    expect(PAGE).toContain('prev?.inProgressAfter')
+    expect(PAGE).toContain('previous.droppedAfter')
+    expect(PAGE).toContain('previous.inProgressAfter')
     expect(PAGE).not.toContain('prev - result[i].reached')
-    expect(PAGE).toContain('人はまだ途中です')
+    expect(PAGE).toContain('result[picked].inProgressAfter')
   })
 
   it('判定不能では対象者を選べない', () => {

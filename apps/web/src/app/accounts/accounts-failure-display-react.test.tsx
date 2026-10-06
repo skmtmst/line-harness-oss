@@ -3,7 +3,7 @@
  * R520: アカウント一覧の取得失敗中も上部の集計を 0 件と表示する。
  *
  * 本物の React で本物の `AccountsPage` を mount し、差し替えるのは通信だけ。
- * - 取得失敗中は 4 つの集計と一覧合計を 0 と出さず「—」にする。
+ * - 取得失敗中は 3 つの集計と一覧合計を 0 と出さず「—」にする。
  * - 成功した空一覧だけ 0 を出す（ここでは 2 件の成功で件数が戻ることを見る）。
  * - 再読み込み後は実際の件数を表示する。
  */
@@ -20,7 +20,14 @@ vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
 vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/accounts',
+}))
+
+vi.mock('@/components/shell/page-chrome', () => ({
+  usePageTitle: () => {},
+  usePageChrome: () => ({}),
 }))
 
 const ACCOUNTS = [
@@ -100,7 +107,7 @@ describe('R520 アカウント一覧の取得失敗中の集計（本物のReact
     // 一覧部分は error と再読み込みを示す。
     expect(container.textContent ?? '').toContain('再読み込み')
 
-    // 4 つの集計は未取得と真の 0 件を見分けられる形にする。
+    // 3 つの集計は未取得と真の 0 件を見分けられる形にする。
     const text = kpis()?.textContent ?? ''
     expect(text).toContain('—')
     expect(text).toContain('読み込めませんでした')
@@ -122,9 +129,11 @@ describe('R520 アカウント一覧の取得失敗中の集計（本物のReact
     await flush()
 
     const text = kpis()?.textContent ?? ''
-    // 稼働中 1・停止中 1・アーカイブ 0・接続に問題 0。
+    // 稼働中 1・停止中 1・アーカイブ 0（板 V7vn3 の3枚だけ）。
     expect(text).toContain('稼働中')
-    expect(text).toContain('友だち 10人')
+    expect(text).toContain('停止中')
+    expect(text).toContain('アーカイブ')
+    expect(text).not.toContain('接続に問題')
     expect(container.textContent ?? '').toContain('2件中 1〜2件を表示')
   })
 })

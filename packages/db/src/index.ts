@@ -3,7 +3,7 @@
  * （読むと `@line-crm/db` を差し替えている試験が全部この名前を要求される）。
  * 口が名乗る数と天井が離れていないことを試験から確かめるために公開する（#722）。
  */
-export { jstNow, toJstString, isTimeBefore, jstDateString, nextDateString, MAX_LIST_LIMIT } from './utils';
+export { jstNow, toJstString, isTimeBefore, jstDateString, nextDateString, nextVersionToken, MAX_LIST_LIMIT } from './utils';
 export { DEFAULT_TENANT_ID } from '@line-crm/shared';
 export * from './credential-crypto';
 export * from './friends';
@@ -60,6 +60,7 @@ export * from './entry-route-genres';
 export * from './entry-route-stop-suppressions';
 export * from './tracked-links';
 export * from './forms';
+export * from './postal-codes';
 export * from './ad-platforms';
 export * from './ad-costs';
 export * from './staff';
@@ -143,6 +144,8 @@ export * from './ops-support';
 export * from './ops-dashboard';
 export * from './platform-announcements';
 export * from './tenant-billing';
+export * from './tenant-data-retention';
+export * from './data-retention-tables';
 export * from './billing-invoices';
 export * from './auth-email';
 export * from './friend-tag-side-effects';
@@ -152,3 +155,12 @@ export * from './nen-member-ranks';
 export * from './platform-knowledge.js';
 export * from './integration-api-tokens';
 export * from './web-measurement';
+
+export * from './line-account-tags';
+
+export * from './photo-publication-views.js';
+
+export * from './operator-notification-teams.js';
+
+export * from './ad-event-mappings.js';
+export * from './photo-publications';

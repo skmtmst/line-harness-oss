@@ -62,3 +62,10 @@
 
 .breadcrumb { font-size: 12px; color: var(--color-ink-secondary); margin-bottom: 20px; }
 .breadcrumb button { cursor: pointer; text-decoration: underline; }
+/* 配布の進み具合（meBRB）。V8 のときだけ出す。数はまだ分からないので
+ * 帯だけ動かし、数や割合は出さない。 */
+.progress h2 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.progressTrack { height: 8px; border-radius: var(--radius-pill); background: var(--color-canvas-sunken); overflow: hidden; margin-bottom: 12px; }
+.progressFill { display: block; height: 100%; width: 30%; border-radius: var(--radius-pill); background: var(--color-accent-deep); animation: progress-slide 1.6s ease-in-out infinite alternate; }
+@keyframes progress-slide { from { margin-left: 0; } to { margin-left: 70%; } }
+@media (prefers-reduced-motion: reduce) { .progressFill { animation: none; width: 100%; } }

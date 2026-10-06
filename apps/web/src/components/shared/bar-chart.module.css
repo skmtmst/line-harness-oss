@@ -124,7 +124,7 @@
   background: var(--color-ink-faint);
 }
 
-/* 指を乗せた日・選んだ日の黒い吹き出し。 */
+/* 指を乗せた日・選んだ日の白い吹き出し（オーナー「黒がいや」・白地＋細い線＋浮く影）。 */
 .tooltip {
   position: absolute;
   bottom: calc(100% + 4px);
@@ -136,9 +136,11 @@
   width: max-content;
   max-width: 220px;
   padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
-  background: var(--color-ink);
-  color: var(--color-canvas);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-float);
+  color: var(--color-ink);
   font-size: var(--text-label);
   text-align: left;
   white-space: nowrap;
@@ -164,11 +166,34 @@
   white-space: nowrap;
 }
 
-/* 読み上げ用の表は目に見せない。点検の表の余白測りから外すため大きさは0にする（読み上げは残る）。 */
+/*
+ * ★V8 G3 はみ出し直し（parity 1004-0513：目盛り 58＞24 など 104 件）。
+ * 狭い列で中央寄せの字が隣の列へはみ出すと、後に描かれる隣の列の棒の
+ * 下に隠れる（.column が relative のため）。字を前に出す＋地を敷いて、
+ * 曜日まで読めるようにする。位置・大きさは変えない。v7 は今までどおり。
+ */
+[data-theme='v8'] .axisLabel {
+  position: relative;
+  z-index: 1;
+  background: var(--color-canvas);
+}
+
+/*
+ * 読み上げ用の表は目に見せない（読み上げは残る）。
+ *
+ * `width: 0` だけでは足りない。表は `height: 0` を最小の高さと読むうえ、
+ * 画面側の `table { width: 100% }`（層の外＝無条件に勝つ）が幅を奪う。
+ * 絶対配置の包含塊は画面なので、表が見えないまま画面いっぱいの箱になり、
+ * 画面全体の横はみ出し・点検の表外れの原因になる（V8 QA 1003-1459）。
+ * 最小・最大の両方を 0 で押さえ、箱を作らない（中身は隠したまま残る）。
+ */
 .srOnly {
   position: absolute;
   width: 0;
+  min-width: 0;
+  max-width: 0;
   height: 0;
+  max-height: 0;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
@@ -201,5 +226,26 @@
 .emptyDetail {
   color: var(--color-ink-faint);
   font-size: var(--text-label);
+}
+
+/*
+ * ★V8 仕上げ（M10-2）：棒のふきだしの開く動き。
+ * 選んだ日の白いふきだしは少し下からふっと出る
+ * （小さいふきだしなので 120ms）。横の位置合わせは変えない。
+ */
+[data-theme='v8'] [aria-pressed='true'] .tooltip {
+  animation: bar-chart-v8-tooltip-in var(--motion-fast) var(--motion-ease-out);
+}
+
+@keyframes bar-chart-v8-tooltip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 }

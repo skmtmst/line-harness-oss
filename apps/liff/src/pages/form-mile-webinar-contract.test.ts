@@ -105,13 +105,14 @@ describe('マイル・紹介は中身を全部残し、6-mile の順に並べる
     expect(src).toContain('合算しています');
   });
 
-  it('増やす (取り組み・登録マイル・履歴) と未登録のはじめるがある', () => {
+  it('増やす (取り組み・登録マイル・履歴) と未登録の紹介者になるがある', () => {
     const src = affiliate();
     expect(src).toContain('今、マイルを増やせます');
     expect(src).toContain('LINEアカウント登録マイル');
     expect(src).toContain('マイル履歴');
-    expect(src).toContain('はじめる（無料）');
-    expect(src).toContain('紹介リンクを使う');
+    expect(src).toContain('紹介者になる');
+    expect(src).toContain('お友だちを紹介してマイルをもらう');
+    expect(src).toContain('vqu9B');
   });
 
   it('紹介の成果 (数・参加中とリンク・参加できる・その他) がある', () => {
@@ -153,10 +154,11 @@ describe('マイル・紹介は中身を全部残し、6-mile の順に並べる
 });
 
 describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・送信する)', () => {
-  it('必須は琥珀の小さな太字。赤は入力の失敗だけに残す', () => {
+  it('必須は欄名の横の小さな赤い札。入力の失敗の赤とは分ける', () => {
     const src = formSrc();
-    // 必須の印は待ちの札と同じ琥珀 (設計 #94600a) の小さな太字
-    expect(src).toMatch(/function RequiredMark[\s\S]*?text-wait-ink/);
+    // 必須の印は ★V8 (B8rCt・g9osGN) の赤い札 (地 #fdecec・文字 liff-sun)
+    expect(src).toMatch(/function RequiredMark[\s\S]*?bg-liff-required-bg/);
+    expect(src).toMatch(/function RequiredMark[\s\S]*?text-liff-sun/);
     expect(src).toContain('<RequiredMark />');
     // 必須に失敗の赤を渡さない
     expect(src).not.toMatch(/<RequiredMark[^/]*color/);
@@ -164,14 +166,13 @@ describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・�
     expect(src).toContain('errorColor={theme.error}');
   });
 
-  it('題名は白い上の帯に、その下に説明を出す', () => {
+  it('題名は本文の題 (20) に、その下に説明を出す', () => {
     const src = formSrc();
     expect(src).toContain('options.pageTitle');
-    // 上の帯: 白地・下の hairline・画面いっぱい (設計 4-a)
-    expect(src).toContain('bg-canvas');
-    expect(src).toContain('border-b border-hairline');
-    expect(src).toContain('-mx-4 -mt-4');
-    // 帯の下の説明 (例「3分ほどで終わります」)
+    // ★V8 (B8rCt): 白い帯は作らず、LIFF の上の帯の下に題と説明を直接出す
+    expect(src).toContain('<LiffHeader');
+    expect(src).toContain('text-xl font-bold');
+    // 題の下の説明 (例「3分ほどで終わります」)
     expect(src).toContain('form.description');
   });
 
@@ -192,7 +193,7 @@ describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・�
   });
 });
 
-describe('ウェビナーは暗い地のまま (7-webinar)、時刻の同期はそのまま', () => {
+describe('ウェビナーは白地 (⑤LINEらしい。夜の型はM2の型が入ってから)、時刻の同期はそのまま', () => {
   it('同期・補正・ハートビート・計測が残る', () => {
     const src = webinar();
     expect(src).toContain('expectedPosition');
@@ -203,9 +204,10 @@ describe('ウェビナーは暗い地のまま (7-webinar)、時刻の同期は�
     expect(src).toContain('webinarComment');
   });
 
-  it('地は暗く、ボタンと送信は濃い緑', () => {
+  it('地は白く、ボタンと送信は濃い緑', () => {
     const src = webinar();
-    expect(src).toContain('bg-night');
+    expect(src).toContain('bg-canvas');
+    expect(src).not.toContain('bg-night');
     expect(src).toContain('bg-accent-deep');
   });
 
@@ -228,7 +230,7 @@ describe('ウェビナーは暗い地のまま (7-webinar)、時刻の同期は�
 
   it('会話はほか・自分を文字色で分ける', () => {
     const src = webinar();
-    expect(src).toContain('text-night-name');
-    expect(src).toContain('text-night-mine');
+    expect(src).toContain('text-ink-secondary');
+    expect(src).toContain('text-liff-primary');
   });
 });

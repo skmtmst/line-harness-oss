@@ -1,0 +1,14 @@
+@layer properties, theme, base, components, utilities;
+.page { display: flex; flex-direction: column; gap: 14px; min-width: 0; container-type: inline-size; }
+.columns { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr); align-items: start; gap: 14px; min-width: 0; }
+.fields { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 18px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); }
+.fields label { font-size: 12px; }
+.fields label input, .fields label button { height: 36px; }
+.fields label:nth-child(1) { order: 0; }
+.kind { order: 1; width: 100%; }
+.fields label:nth-child(2) { order: 2; }
+.fields label:nth-child(3) { order: 3; }
+.fields label:nth-child(4) { order: 4; }
+.evidence { border: 1px solid var(--color-hairline); border-radius: var(--radius-card); padding: 16px; background: var(--color-canvas); }
+.source { font-size: 12px; }
+@container (max-width: 1100px) { .columns { grid-template-columns: minmax(0,1fr); } }

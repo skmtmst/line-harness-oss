@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { createAccountRequestGuard } from './account-request-guard'
 
-const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+const source = [
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'feature-settings-v8.tsx'), 'utf8'),
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'use-feature-settings.ts'), 'utf8'),
+].join('\n')
 const apiSource = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('機能設定のオフ前影響確認(#643)', () => {

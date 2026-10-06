@@ -1,0 +1,148 @@
+/* 板 `xLpnS`：LINE来店フォローのプレビュー。タイトル・本文・配信ボタンの見本。 */
+.preview {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+.previewHead {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-surface-pearl);
+}
+
+.previewBrand {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--color-ink-faint);
+}
+
+.previewBody {
+  padding: 16px;
+}
+
+.previewTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.previewText {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-ink-secondary);
+  white-space: pre-wrap;
+}
+
+.previewAction {
+  margin: 12px 0 0;
+  padding: 10px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-surface-pearl);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+/* 流れのカード2列。 */
+.flowGrid {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .flowGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.flowInner {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+@media (min-width: 768px) {
+  .flowInner {
+    grid-template-columns: minmax(0, 1fr) 240px;
+  }
+}
+
+.field {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.field + .field {
+  margin-top: 12px;
+}
+
+.input {
+  margin-top: 4px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.timingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.miniGrid {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .miniGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.miniCard {
+  padding: 20px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-surface-pearl);
+}
+
+.miniKicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--color-ink-faint);
+}
+
+.miniTitle {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.miniText {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-ink-secondary);
+}

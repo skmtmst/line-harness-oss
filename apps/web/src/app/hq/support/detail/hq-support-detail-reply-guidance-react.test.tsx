@@ -83,7 +83,7 @@ describe('返信先の案内（R609）', () => {
     const text = host.textContent ?? ''
     expect(text).toContain('運営からの返信はここと登録メールアドレスに届きます')
     expect(text).toContain('返信はこのメールアドレスに届きます')
-    expect(text).toContain('送信すると運営に届き、控えが登録メールアドレスにも届きます')
+    expect(text).toContain('送ると運営の対応は「対応中」に戻ります。控えが登録メールアドレスにも届きます')
     await typeBody('直りました。ありがとうございます。')
     const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('送る'))!
     await act(async () => { send.click() })
@@ -103,7 +103,7 @@ describe('返信先の案内（R609）', () => {
     expect(text).not.toContain('このメールアドレスに届きます')
     expect(text).toContain('運営からの返信はここに届きます')
     expect(text).toContain('返信はこの画面のやり取りに届きます')
-    expect(text).toContain('送信すると運営に届きます。返信はこの画面で確認できます')
+    expect(text).toContain('送ると運営の対応は「対応中」に戻ります。返信はこの画面で確認できます')
     await typeBody('追加の情報です。')
     const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('送る'))!
     await act(async () => { send.click() })

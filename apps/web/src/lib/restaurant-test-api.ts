@@ -1,3 +1,4 @@
+import type { RestaurantHoldInput, RestaurantHoldResult, RestaurantCustomer, RestaurantCustomerHistory, RestaurantOpeningHours, RestaurantAllocation, RestaurantLoginMember, RestaurantMenuChangeResult, RestaurantTableLayoutInput, RestaurantTablePosition, RestaurantApprovalDecision } from '@line-crm/shared'
 import { fetchApi } from './api'
 
 export type RestaurantStore = {
@@ -8,7 +9,10 @@ export type RestaurantStore = {
 }
 export type RestaurantMembership = {
   id: string; store_id: string | null; staff_name: string; email: string | null; role: 'super_admin' | 'store_manager' | 'staff';
-  line_uid: string | null; google_email: string | null; status: string
+  line_uid: string | null; google_email: string | null; status: string;
+  staff_id?: string | null; loginName?: string | null; loginRole?: 'owner' | 'admin' | 'staff' | null;
+  loginAccessLevel?: 'full' | 'read_only' | null; loginActive?: number | null; loginPolicyVersion?: number | null;
+  loginAccountScope?: 'all' | 'accounts' | null; loginAccountIdsJson?: string | null
 }
 export type RestaurantApproval = {
   id: string; store_id: string | null; kind: 'gbp_post' | 'line_message' | 'menu_change'; title: string;
@@ -23,6 +27,7 @@ export type RestaurantReservation = {
   customer_name: string; customer_phone: string | null; line_uid: string | null; guest_count: number;
   starts_at: string; ends_at: string; table_id: string | null; table_label: string | null;
   course_id: string | null; course_name: string | null; status: string; allergy_note: string | null; note: string | null;
+  hold_expires_at?: string | null;
   sync_direction: 'inbound_only'
 }
 export type RestaurantTable = {
@@ -31,11 +36,12 @@ export type RestaurantTable = {
 }
 export type RestaurantInventory = {
   id: string; store_id: string; starts_at: string; slot_minutes: 15 | 30; total_capacity: number;
-  ota_capacity: number; line_capacity: number; walk_in_capacity: number; reserved_count: number
+  ota_capacity: number; line_capacity: number; walk_in_capacity: number; reserved_count: number; version?: number; updated_by?: string | null; updated_by_name?: string | null; updated_at?: string;
+  guest_count?: number; occupied_seats?: number; occupiedTableIds?: string[]; freeSeats?: number
 }
 export type RestaurantMenuItem = {
   id: string; store_id: string; kind: 'course' | 'a_la_carte'; name: string; price: number;
-  tax_mode: string; allergens_json: string; service_periods_json: string; duration_minutes: number | null; status: string
+  tax_mode: string; allergens_json: string; service_periods_json: string; duration_minutes: number | null; status: string; pendingPrice?: number | null; pendingEffectiveAt?: string | null; priceChangeStatus?: string | null
 }
 export type RestaurantConnector = {
   id: string; store_id: string; provider: string; mode: 'disabled' | 'inbound_only'; status: string;
@@ -79,6 +85,17 @@ const withOptionalAccount = (path: string, accountId: string | null) =>
   accountId ? withAccount(path, accountId) : path
 
 export const restaurantTestApi = {
+  loginMembers: (accountId: string) => fetchApi<{ success: true; data: RestaurantLoginMember[] }>(withAccount('/api/restaurant-test/login-members', accountId)),
+  linkMembershipLogin: (accountId: string, id: string, staffId: string | null) => fetchApi<{ success: true; data: { id: string; staffId: string | null } }>(withAccount(`/api/restaurant-test/memberships/${encodeURIComponent(id)}/login`, accountId), { method: 'PUT', body: JSON.stringify({ staffId }) }),
+  openingHours: (accountId: string, storeId: string) => fetchApi<{ success: true; data: RestaurantOpeningHours }>(withAccount(`/api/restaurant-test/opening-hours?storeId=${encodeURIComponent(storeId)}`, accountId)),
+  saveOpeningHours: (accountId: string, body: { storeId: string; hours: NonNullable<RestaurantOpeningHours['hours']>; expectedVersion: number }) => fetchApi<{ success: true; data: { version: number } }>(withAccount('/api/restaurant-test/opening-hours', accountId), { method: 'PUT', body: JSON.stringify(body) }),
+  inventoryDay: (accountId: string, storeId: string, date: string) => fetchApi<{ success: true; data: RestaurantInventory[] }>(withAccount(`/api/restaurant-test/inventory/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`, accountId)),
+  generateInventory: (accountId: string, body: RestaurantAllocation & { storeId: string; date: string; expectedHoursVersion: number }) => fetchApi<{ success: true; data: { generated: number } }>(withAccount('/api/restaurant-test/inventory/generate', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  saveInventoryAllocation: (accountId: string, body: RestaurantAllocation & { storeId: string; slots: Array<{ id: string; expectedVersion: number }> }) => fetchApi<{ success: true; data: { updated: number } }>(withAccount('/api/restaurant-test/inventory/allocation', accountId), { method: 'PUT', body: JSON.stringify(body) }),
+  holdReservation: (accountId: string, body: RestaurantHoldInput) => fetchApi<{ success: true; data: RestaurantHoldResult }>(withAccount('/api/restaurant-test/reservations/holds', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  reservationsDay: (accountId: string, storeId: string, date: string) => fetchApi<{ success: true; data: { date: string; reservations: RestaurantReservation[] } }>(withAccount(`/api/restaurant-test/reservations/day?storeId=${encodeURIComponent(storeId)}&date=${encodeURIComponent(date)}`, accountId)),
+  customerSearch: (accountId: string, storeId: string, q: string) => fetchApi<{ success: true; data: RestaurantCustomer[] }>(withAccount(`/api/restaurant-test/customers/search?storeId=${encodeURIComponent(storeId)}&q=${encodeURIComponent(q)}`, accountId)),
+  customerHistory: (accountId: string, storeId: string, contact: { phone?: string; lineUid?: string }) => fetchApi<{ success: true; data: RestaurantCustomerHistory }>(withAccount(`/api/restaurant-test/customers/history?${new URLSearchParams({ storeId, ...(contact.lineUid ? { lineUid: contact.lineUid } : { phone: contact.phone || '' }) })}`, accountId)),
   listStores: (accountId: string) => fetchApi<{ success: true; data: { organization: RestaurantSnapshot['organization']; stores: RestaurantStore[] } }>(withAccount('/api/restaurant-test/stores', accountId)),
   storeContext: (accountId: string) => fetchApi<{ success: true; data: { selectedStore: { id: string; name: string } | null } }>(withAccount('/api/restaurant-test/store-context', accountId)),
   selectStore: (accountId: string, storeId: string) => fetchApi<{ success: true; data: { selectedStore: { id: string; name: string } } }>(withAccount(`/api/restaurant-test/stores/${storeId}/select`, accountId), { method: 'POST', body: '{}' }),
@@ -100,17 +117,18 @@ export const restaurantTestApi = {
   updateStore: (accountId: string, id: string, body: { name: string; code: string; area: string; capacity: number; status: RestaurantStore['status']; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount(`/api/restaurant-test/stores/${id}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
   listIntakeAddresses: (accountId: string, storeId: string) => fetchApi<{ success: true; data: RestaurantIntakeAddress[] }>(withAccount(`/api/restaurant-test/intake-addresses?storeId=${encodeURIComponent(storeId)}`, accountId)),
   issueIntakeAddress: (accountId: string, storeId: string) => fetchApi<{ success: true; data: { id: string; storeId: string; localPart: string; address: string; graceDays: number } }>(withAccount('/api/restaurant-test/intake-addresses', accountId), { method: 'POST', body: JSON.stringify({ storeId }) }),
-  decideApproval: (accountId: string, id: string, action: 'approve' | 'return', comment?: string) => fetchApi(withAccount(`/api/restaurant-test/approvals/${id}`, accountId), { method: 'PATCH', body: JSON.stringify({ action, comment }) }),
-  createReservation: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/reservations/manual', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  decideApproval: (accountId: string, id: string, action: 'approve' | 'return', comment?: string) => fetchApi<{ success: true; data: RestaurantApprovalDecision }>(withAccount(`/api/restaurant-test/approvals/${id}`, accountId), { method: 'PATCH', body: JSON.stringify({ action, comment }) }),
+  createReservation: (accountId: string, body: Record<string, unknown>) => fetchApi<{ success: true; data: { id: string; tableId: string | null; lineNotice: { sent: boolean; reason: string | null } } }>(withAccount('/api/restaurant-test/reservations/manual', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateReservation: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi(withAccount(`/api/restaurant-test/reservations/${id}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
   importReservation: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/inbound/reservations', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  saveTableLayout: (accountId: string, body: RestaurantTableLayoutInput) => fetchApi<{ success: true; data: { tables: RestaurantTablePosition[] } }>(withAccount('/api/restaurant-test/tables/layout', accountId), { method: 'PUT', body: JSON.stringify(body) }),
   createTable: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/tables', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateTable: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi(withAccount(`/api/restaurant-test/tables/${encodeURIComponent(id)}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
   createMembership: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/memberships', accountId), { method: 'POST', body: JSON.stringify(body) }),
-  updateMembership: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi(withAccount(`/api/restaurant-test/memberships/${encodeURIComponent(id)}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
+  updateMembership: (accountId: string, id: string, body: Record<string, unknown>, stepUpToken?: string) => fetchApi(withAccount(`/api/restaurant-test/memberships/${encodeURIComponent(id)}`, accountId), { method: 'PATCH', headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined, body: JSON.stringify(body) }),
   updateInventory: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi(withAccount(`/api/restaurant-test/inventory/${id}`, accountId), { method: 'PUT', body: JSON.stringify(body) }),
   createMenu: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/menu', accountId), { method: 'POST', body: JSON.stringify(body) }),
-  updateMenu: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi(withAccount(`/api/restaurant-test/menu/${encodeURIComponent(id)}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
+  updateMenu: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi<{success:true;data:RestaurantMenuChangeResult}>(withAccount(`/api/restaurant-test/menu/${encodeURIComponent(id)}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
   createGbpPost: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/gbp/posts', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateReviewDraft: (accountId: string, id: string, replyDraft: string) => fetchApi(withAccount(`/api/restaurant-test/gbp/reviews/${id}/draft`, accountId), { method: 'PUT', body: JSON.stringify({ replyDraft }) }),
   updateLineFlow: (accountId: string, id: string, body: Record<string, unknown>) => fetchApi(withAccount(`/api/restaurant-test/line-flows/${id}`, accountId), { method: 'PUT', body: JSON.stringify(body) }),

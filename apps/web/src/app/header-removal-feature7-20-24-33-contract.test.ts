@@ -25,10 +25,12 @@ describe('機能7・20・24・33の本文上部', () => {
     expect(source('notifications/page.tsx')).toContain("usePageTitle('通知')")
   })
 
-  it('Search Consoleの操作は分析タブの後に残す', () => {
+  it('Search ConsoleはV8の見出しに書き出し・連携の操作を残す', () => {
     const page = source('search-console/page.tsx')
-    expect(page.indexOf('<MergedTabs')).toBeLessThan(page.indexOf('data-design="Head"'))
-    expect(page).toContain('CSVで書き出す')
+    expect(page).toContain("usePageTitle('Search Console')")
+    expect(page).toContain('<ReadonlyHeaderV8')
+    expect(page).toContain('onClick={exportCsv}')
+    expect(page).toContain('CSV で書き出す')
     expect(page).toContain('連携を設定')
   })
 })

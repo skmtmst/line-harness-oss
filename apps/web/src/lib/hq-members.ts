@@ -9,9 +9,9 @@ import { formatRelative } from '@/lib/format'
 export type MemberStatus = 'active' | 'invited' | 'expired' | 'inactive'
 
 export const ROLE_LABELS: Record<StaffMember['role'], string> = {
-  owner: '統括',
+  owner: 'オーナー',
   admin: '管理者',
-  staff: '担当者',
+  staff: 'スタッフ',
   viewer: '閲覧のみ',
 }
 

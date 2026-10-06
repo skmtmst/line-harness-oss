@@ -14,7 +14,9 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import StickyBar from '@/components/shared/sticky-bar'
 import KpiCard from '@/components/shared/kpi-card'
 import { api, ApiError } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import AutoReplyRunsV8 from '@/v8/auto-replies/runs'
 import styles from './auto-reply-runs.module.css'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
@@ -411,7 +413,14 @@ export default function AutoReplyRunsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <AutoReplyRunsInner />
+      <AutoReplyRunsThemed />
     </Suspense>
   )
+}
+
+/* ★V8 では実行結果（`nWmLg`）へ、V7 は今の画面のまま。 */
+function AutoReplyRunsThemed() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <AutoReplyRunsV8 />
+  return <AutoReplyRunsInner />
 }

@@ -1,0 +1,23 @@
+/* ★V8 自動応答の作る③「返したあとに行うこと」の行（絵 rfhIf「処理」）。値は型の変数だけ。 */
+.list { display: flex; flex-direction: column; gap: var(--tpl-section-gap); }
+.empty { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
+.item {
+  display: flex; flex-direction: column; gap: var(--tpl-side-row-pad);
+  padding: var(--tpl-action-row-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.row { display: flex; align-items: center; gap: var(--tpl-action-row-gap); min-width: 0; }
+.grip { flex-shrink: 0; color: var(--color-ink-faint); }
+.num { flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-caption); font-weight: 700; }
+.title { min-width: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.incomplete { flex-shrink: 0; padding: 0 var(--tpl-label-tag-gap); border-radius: var(--radius-pill); background: var(--color-warning-bg); color: var(--color-warning); font-size: var(--text-caption); }
+.spacer { flex: 1 1 0; }
+.failLabel { flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-micro); }
+.failSelect { flex-shrink: 0; width: var(--tpl-action-select-w); }
+.reason { margin: 0; color: var(--color-warning); font-size: var(--text-caption); }
+.editor { display: flex; flex-direction: column; gap: var(--tpl-side-row-pad); padding-top: var(--tpl-side-row-pad); border-top: 1px solid var(--color-hairline); }
+.notify { display: flex; flex-direction: column; gap: var(--tpl-side-row-pad); }
+.notifyText { width: 100%; min-height: var(--tpl-starter-card-h); padding: var(--tpl-side-row-pad); border: 1px solid var(--color-control-border); border-radius: var(--radius-control); font-size: var(--text-label); }
+.add { display: flex; }

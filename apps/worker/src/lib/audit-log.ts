@@ -16,6 +16,10 @@ import type { Env } from '../index.js';
  */
 
 export type AuditAction =
+  | 'line_account_tag.create'
+  | 'line_account_tag.update'
+  | 'line_account_tag.delete'
+  | 'line_account_tag.replace'
   | 'line_account.deactivate'
   | 'line_account.activate'
   | 'line_account.pool_switch'
@@ -121,6 +125,7 @@ export type AuditAction =
   | 'webhook.incoming.deactivate'
   | 'webhook.incoming.secret.rotate'
   | 'webhook.incoming.delete'
+  | 'webhook.incoming.restore'
   | 'webhook.incoming.unmatched.resolve'
   | 'webhook.incoming.test'
   | 'webhook.outgoing.create'
@@ -129,12 +134,14 @@ export type AuditAction =
   | 'webhook.outgoing.deactivate'
   | 'webhook.outgoing.secret.rotate'
   | 'webhook.outgoing.delete'
+  | 'webhook.outgoing.restore'
   | 'webhook.outgoing.test'
   | 'webhook.interaction.retry'
   | 'webhook.interaction.retry_failed'
   | 'webhook.api_token.create'
   | 'webhook.api_token.revoke'
   | 'webhook.api_token.rotate'
+  | 'webhook.api_token.reactivate'
   // #838 第2段: Google Sheets 連携の接続・切断・出力先変更・手動同期。
   | 'google.sheets.connect.start'
   | 'google.sheets.connect'

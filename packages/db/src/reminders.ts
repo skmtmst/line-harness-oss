@@ -401,6 +401,32 @@ export async function deleteReminder(db: D1Database, id: string): Promise<void> 
   ]);
 }
 
+/*
+ * 削除の取り消し（B 元に戻す）。定義の deleted_at を空に戻すだけ。
+ * 戻した直後は止めたまま（is_active = 0、lifecycle は stopped のまま）。
+ * 削除時に取り消した登録・配信予定は戻さない。消えている間に日時が
+ * 過ぎた相手へいきなり送らないため。送り直しは画面で登録し直す。
+ */
+export async function restoreReminder(
+  db: D1Database,
+  id: string,
+): Promise<ReminderRow | null> {
+  const now = jstNow();
+  const result = await db
+    .prepare(
+      `UPDATE reminders
+          SET deleted_at = NULL, is_active = 0, updated_at = ?
+        WHERE id = ? AND deleted_at IS NOT NULL`,
+    )
+    .bind(now, id)
+    .run();
+  if ((result.meta.changes ?? 0) !== 1) return null;
+  return db
+    .prepare(`SELECT * FROM reminders WHERE id = ?`)
+    .bind(id)
+    .first<ReminderRow>();
+}
+
 // =============================================================================
 // V6 公開版・下書き（274）
 // =============================================================================
@@ -915,6 +941,8 @@ export async function enrollFriendInReminder(
     sourceId?: string | null;
     sourceEventId?: string | null;
     timezone?: string;
+    /** 指定時は親の版が動いていたら書かず V6_WRITE_GUARDED を投げる。 */
+    writeGuard?: V6WriteGuard;
   },
 ): Promise<FriendReminderRow> {
   // 起点日は日付として読める値だけ。空欄や存在しない日の登録予定は、
@@ -962,11 +990,17 @@ export async function enrollFriendInReminder(
     db,
     versionSteps.map((step) => step.template_id),
   );
-  await db.prepare(
-    `INSERT INTO friend_reminders
-       (id, friend_id, reminder_id, reminder_version_id, template_version_snapshot, target_date,
-        source_kind, source_id, source_event_id, timezone, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  const guard = input.writeGuard;
+  const inserted = await db.prepare(
+    guard
+      ? `INSERT INTO friend_reminders
+           (id, friend_id, reminder_id, reminder_version_id, template_version_snapshot, target_date,
+            source_kind, source_id, source_event_id, timezone, created_at, updated_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${guard.sql}`
+      : `INSERT INTO friend_reminders
+           (id, friend_id, reminder_id, reminder_version_id, template_version_snapshot, target_date,
+            source_kind, source_id, source_event_id, timezone, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id,
     input.friendId,
@@ -980,7 +1014,12 @@ export async function enrollFriendInReminder(
     input.timezone ?? 'Asia/Tokyo',
     now,
     now,
+    ...(guard ? guard.binds : []),
   ).run();
+  // ガードで止められたら書いていない。呼び出し側は stale として扱う。
+  if (guard && Number(inserted.meta?.changes ?? 0) === 0) {
+    throw new Error('V6_WRITE_GUARDED');
+  }
   return (await db.prepare(`SELECT * FROM friend_reminders WHERE id = ?`).bind(id).first<FriendReminderRow>())!;
 }
 
@@ -1428,6 +1467,16 @@ export interface CancelV6RemindersResult {
 }
 
 /**
+ * 共有 V6 書込みの版ガード。呼び出し側が所有権の EXISTS 述語を渡し、
+ * 各書込み文に AND で結び付ける。親が動いていたらその文は 0 件になる。
+ * 省略時は従来どおり無条件。
+ */
+export interface V6WriteGuard {
+  sql: string;
+  binds: unknown[];
+}
+
+/**
  * 取消: 未送信の V6 登録だけを原子的に止める。
  *
  * source 連動の行を先に探し、1件も無ければ移行前の行 (friend + target_date)
@@ -1445,6 +1494,11 @@ export async function cancelV6RemindersForSource(
      * 未指定時は従来どおり最善努力で止める (貸出中は残し、cron 等の次回で収束)。
      */
     failOnSendInFlight?: boolean;
+    /**
+     * 指定時は各取消文に AND で結び付ける。親が動いていたらその文は
+     * 0 件になり、古い操作が新版の通知予定を変えない。省略時は従来どおり。
+     */
+    writeGuard?: V6WriteGuard;
   },
 ): Promise<CancelV6RemindersResult> {
   const now = input.now ?? jstNow();
@@ -1490,6 +1544,7 @@ export async function cancelV6RemindersForSource(
     // 取消UPDATEが先ならclaim側のactive確認が失敗し、claimが先なら
     // NOT EXISTSが全件の書き換えを拒否する。json_eachで分割UPDATEを避け、
     // 複数登録もall-or-noneにする。
+    const guard = input.writeGuard;
     const cancelled = await db.prepare(
       `UPDATE friend_reminders
           SET status = 'cancelled', cancel_reason = ?, updated_at = ?
@@ -1500,8 +1555,9 @@ export async function cancelV6RemindersForSource(
              WHERE r.friend_reminder_id IN (SELECT value FROM json_each(?))
                AND r.status = 'claimed'
                AND r.lease_expires_at IS NOT NULL
-               AND strftime('%s', r.lease_expires_at) > strftime('%s', ?))`,
-    ).bind(input.cancelReason, now, idsJson, idsJson, now).run();
+               AND strftime('%s', r.lease_expires_at) > strftime('%s', ?))
+          ${guard ? `AND (${guard.sql})` : ''}`,
+    ).bind(input.cancelReason, now, idsJson, idsJson, now, ...(guard ? guard.binds : [])).run();
 
     const remaining = await db.prepare(
       `SELECT COUNT(*) AS c FROM friend_reminders
@@ -1519,8 +1575,9 @@ export async function cancelV6RemindersForSource(
           AND friend_reminder_id IN (SELECT value FROM json_each(?))
           AND NOT EXISTS (
             SELECT 1 FROM friend_reminders fr
-             WHERE fr.id = reminder_delivery_runs.friend_reminder_id AND fr.status = 'active')`,
-    ).bind(now, now, idsJson).run();
+             WHERE fr.id = reminder_delivery_runs.friend_reminder_id AND fr.status = 'active')
+          ${guard ? `AND (${guard.sql})` : ''}`,
+    ).bind(now, now, idsJson, ...(guard ? guard.binds : [])).run();
     return {
       cancelledEnrollments: Number(cancelled.meta?.changes ?? 0),
       cancelledRuns: Number(cancelledRuns.meta?.changes ?? 0),
@@ -2399,6 +2456,10 @@ export async function getReminderDeliveryRunSummary(
   errors: number;
   targetCount: number;
   nextScheduledAt: string | null;
+  /** 画面の「今月送った」。月の区切りは利用者の日本時間で数える。 */
+  sentThisMonth: number;
+  /** 画面の「これから送る（今後7日）」。期限切れの未送分行も残っているので含める。 */
+  scheduledNext7Days: number;
 }> {
   const bindings: unknown[] = [reminderId];
   const scopePredicate = reminderRowScopePredicate('line_account_id', scope, bindings);
@@ -2408,6 +2469,14 @@ export async function getReminderDeliveryRunSummary(
        SUM(CASE WHEN status IN ('queued', 'claimed', 'retry_wait') THEN 1 ELSE 0 END) AS scheduled,
        SUM(CASE WHEN status IN ('skipped', 'cancelled') THEN 1 ELSE 0 END) AS stopped,
        SUM(CASE WHEN status = 'permanent_failed' THEN 1 ELSE 0 END) AS errors,
+       SUM(CASE
+         WHEN status = 'succeeded'
+           AND strftime('%Y-%m', completed_at, '+9 hours') = strftime('%Y-%m', 'now', '+9 hours')
+         THEN 1 ELSE 0 END) AS sent_this_month,
+       SUM(CASE
+         WHEN status IN ('queued', 'claimed') AND scheduled_at <= datetime('now', '+7 days') THEN 1
+         WHEN status = 'retry_wait' AND next_retry_at <= datetime('now', '+7 days') THEN 1
+         ELSE 0 END) AS scheduled_next7_days,
        COUNT(DISTINCT friend_reminder_id) AS target_count,
        MIN(CASE
          WHEN status = 'retry_wait' THEN next_retry_at
@@ -2419,6 +2488,8 @@ export async function getReminderDeliveryRunSummary(
     scheduled: number | null;
     stopped: number | null;
     errors: number | null;
+    sent_this_month: number | null;
+    scheduled_next7_days: number | null;
     target_count: number | null;
     next_scheduled_at: string | null;
   }>();
@@ -2427,6 +2498,8 @@ export async function getReminderDeliveryRunSummary(
     scheduled: Number(row?.scheduled ?? 0),
     stopped: Number(row?.stopped ?? 0),
     errors: Number(row?.errors ?? 0),
+    sentThisMonth: Number(row?.sent_this_month ?? 0),
+    scheduledNext7Days: Number(row?.scheduled_next7_days ?? 0),
     targetCount: Number(row?.target_count ?? 0),
     nextScheduledAt: row?.next_scheduled_at ?? null,
   };

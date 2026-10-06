@@ -188,6 +188,59 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
   }
 });
 
+// 即時変更を仮定した参考額だけを取得する。契約・顧客・DBは変更しない。
+hqBilling.get('/api/hq/billing/preview', requireRole('owner'), async (c) => {
+  c.header('Cache-Control', 'no-store');
+  const plan = findPlan(c.req.query('planKey'));
+  const interval = c.req.query('interval');
+  if (!plan || (interval !== 'month' && interval !== 'year')) {
+    return c.json({ success: false, error: 'プランと月払いまたは年払いを選んでください' }, 400);
+  }
+  if (!stripeReady(c)) return c.json({ success: false, error: '決済の接続設定がまだありません。運営にお問い合わせください' }, 503);
+  const priceId = priceIdForPlan(c.env, plan.key, interval);
+  if (!priceId) return c.json({ success: false, error: 'このプランの価格がまだ設定されていません。運営にお問い合わせください' }, 503);
+  try {
+    const billing = await getTenantBilling(c.env.DB, tenantOf(c));
+    if (!billing) return c.json({ success: false, error: '統括が見つかりません' }, 404);
+    if (billing.plan_status === 'exempt' || !billing.stripe_subscription_id) {
+      return c.json({ success: false, error: '変更できる契約がありません' }, 409);
+    }
+    const subscription = await stripeApi.retrieveSubscription(c.env, billing.stripe_subscription_id);
+    const item = subscription.items.data[0];
+    if (!['active', 'trialing', 'past_due'].includes(subscription.status)
+      || subscription.customer !== billing.stripe_customer_id || subscription.items.data.length !== 1 || !item?.id) {
+      return c.json({ success: false, error: 'この契約の見積りは支払い管理画面で確認してください' }, 409);
+    }
+    const quantity = item.quantity ?? 1;
+    const price = await stripeApi.retrievePrice(c.env, priceId);
+    if (price.currency !== 'jpy' || price.unit_amount === null || price.recurring?.interval !== interval) {
+      return c.json({ success: false, error: '価格を確認できませんでした' }, 502);
+    }
+    const prorationDate = Math.floor(Date.now() / 1000);
+    const preview = await stripeApi.createInvoicePreview(c.env, {
+      subscriptionId: subscription.id, itemId: item.id, priceId, quantity, prorationDate,
+    });
+    if (preview.currency !== 'jpy' || preview.lines.has_more) {
+      return c.json({ success: false, error: '見積りの明細を確認できませんでした' }, 502);
+    }
+    const prorationDifferenceYen = preview.lines.data
+      .filter((line) => line.proration && line.period.start === prorationDate)
+      .reduce((sum, line) => sum + line.amount, 0);
+    const renewal = preview.lines.data.find((line) => !line.proration && line.type === 'subscription' && line.subscription_item === item.id);
+    return c.json({ success: true, data: {
+      planKey: plan.key, interval, afterAmountYen: price.unit_amount * quantity,
+      amountDueYen: preview.amount_due, prorationDifferenceYen,
+      nextBillingAt: renewal ? new Date(renewal.period.start * 1000).toISOString() : null,
+      estimatedAt: new Date(prorationDate * 1000).toISOString(), isEstimate: true,
+      notice: '参考。確定の金額と適用日は Stripe の支払いの画面で確かめます',
+    } });
+  } catch (error) {
+    // Stripe の応答本文や顧客情報を返さない。
+    if (error instanceof StripeApiError) console.warn('billing preview stripe error:', error.status, error.code);
+    return c.json({ success: false, error: '決済サービスの見積りを取得できませんでした。時間をおいてもう一度お試しください' }, 502);
+  }
+});
+
 // ================================================================ checkout
 
 hqBilling.post('/api/hq/billing/checkout', requireRole('owner'), async (c) => {

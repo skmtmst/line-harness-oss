@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 /*
@@ -24,7 +24,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['../../app/friends/page.tsx を使う友だち一覧', '../friends/friend-list-table.tsx'],
   ['友だち追加時の配信 実行結果', '../../app/friend-add-settings/runs/page.tsx'],
   ['リッチメニュー', '../../app/rich-menus/page.tsx'],
-  ['回答フォーム 一覧', '../../app/form-submissions/page.tsx'],
+  ['回答フォーム 一覧', '../../app/form-submissions/list-v8.tsx'],
   ['回答フォーム 回答一覧', '../../app/form-submissions/responses/page.tsx'],
   ['コンテンツ管理', '../../app/contents/page.tsx'],
   ['運営へのお知らせ', '../../app/line-notifications/operator-notification-rules.tsx'],
@@ -64,7 +64,8 @@ describe('ListRange 統一（監査6 #667）', () => {
   it.each(LIST_RANGE_USERS.map(([name, path]) => ({ name, path })))(
     '$name に旧い書き方の残骸がない',
     ({ path }) => {
-      const source = read(path)
+      // 説明コメントの「7つのうち」は件数表示ではない。
+      const source = read(path).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(?<!:)\/\/[^\n]*/g, '')
       for (const pattern of RAW_PATTERNS) {
         expect(source, `${path} が ${pattern} を含む`).not.toMatch(pattern)
       }

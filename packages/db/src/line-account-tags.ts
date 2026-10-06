@@ -1,0 +1,83 @@
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { jstNow } from './utils.js';
+
+export interface LineAccountTag {
+  id: string;
+  tenant_id: string;
+  name: string;
+  color: string | null;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+export function serializeLineAccountTag(tag: LineAccountTag) {
+  return { id: tag.id, name: tag.name, color: tag.color, displayOrder: tag.display_order,
+    createdAt: tag.created_at, updatedAt: tag.updated_at };
+}
+export async function listLineAccountTags(db: D1Database, tenantId: string): Promise<LineAccountTag[]> {
+  const { results } = await db.prepare('SELECT * FROM line_account_tags WHERE tenant_id = ? ORDER BY display_order, name, id')
+    .bind(tenantId).all<LineAccountTag>();
+  return results;
+}
+export async function getLineAccountTag(db: D1Database, tenantId: string, id: string): Promise<LineAccountTag | null> {
+  return db.prepare('SELECT * FROM line_account_tags WHERE tenant_id = ? AND id = ?').bind(tenantId, id).first<LineAccountTag>();
+}
+export async function createLineAccountTag(db: D1Database, tenantId: string,
+  input: { name: string; color?: string | null; displayOrder?: number }): Promise<LineAccountTag> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  await db.prepare('INSERT INTO line_account_tags (id, tenant_id, name, color, display_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, tenantId, input.name, input.color ?? null, input.displayOrder ?? 0, now, now).run();
+  return (await getLineAccountTag(db, tenantId, id))!;
+}
+export async function updateLineAccountTag(db: D1Database, tenantId: string, id: string,
+  input: { name?: string; color?: string | null; displayOrder?: number }): Promise<LineAccountTag | null> {
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  for (const [key, column] of [['name', 'name'], ['color', 'color'], ['displayOrder', 'display_order']] as const) {
+    if (key in input) { sets.push(`${column} = ?`); values.push(input[key]); }
+  }
+  if (sets.length) await db.prepare(`UPDATE line_account_tags SET ${sets.join(', ')}, updated_at = ? WHERE tenant_id = ? AND id = ?`)
+    .bind(...values, jstNow(), tenantId, id).run();
+  return getLineAccountTag(db, tenantId, id);
+}
+export async function deleteLineAccountTag(db: D1Database, tenantId: string, id: string): Promise<void> {
+  await db.batch([
+    db.prepare('DELETE FROM line_account_tag_links WHERE tenant_id = ? AND tag_id = ?').bind(tenantId, id),
+    db.prepare('DELETE FROM line_account_tags WHERE tenant_id = ? AND id = ?').bind(tenantId, id),
+  ]);
+}
+export async function getLineAccountTagsByAccountIds(db: D1Database, tenantId: string, accountIds: string[]) {
+  const out: Record<string, ReturnType<typeof serializeLineAccountTag>[]> = {};
+  if (!accountIds.length) return out;
+  const { results } = await db.prepare(`SELECT t.*, l.line_account_id FROM line_account_tags t
+    JOIN line_account_tag_links l ON l.tag_id = t.id AND l.tenant_id = t.tenant_id
+    JOIN line_accounts a ON a.id = l.line_account_id
+    WHERE t.tenant_id = ? AND COALESCE(a.tenant_id, ?) = ?
+      AND l.line_account_id IN (${accountIds.map(() => '?').join(',')})
+    ORDER BY t.display_order, t.name, t.id`).bind(tenantId, DEFAULT_TENANT_ID, tenantId, ...accountIds)
+    .all<LineAccountTag & { line_account_id: string }>();
+  for (const tag of results) (out[tag.line_account_id] ??= []).push(serializeLineAccountTag(tag));
+  return out;
+}
+/** D1の一括処理で付け外しをまとめ、途中でアーカイブされた場合も変更しない。 */
+export async function replaceLineAccountTags(db: D1Database, tenantId: string, accountId: string, tagIds: string[]): Promise<boolean> {
+  const active = `EXISTS (SELECT 1 FROM line_accounts a WHERE a.id = ? AND COALESCE(a.tenant_id, ?) = ? AND a.archived_at IS NULL)`;
+  const scope = [accountId, DEFAULT_TENANT_ID, tenantId];
+  const results = await db.batch([
+    db.prepare('UPDATE line_accounts SET revision = revision + 1, updated_at = ? WHERE id = ? AND COALESCE(tenant_id, ?) = ? AND archived_at IS NULL')
+      .bind(jstNow(), ...scope),
+    db.prepare(`DELETE FROM line_account_tag_links WHERE line_account_id = ? AND tenant_id = ? AND ${active}`)
+      .bind(accountId, tenantId, ...scope),
+    ...tagIds.map(id => db.prepare(`INSERT INTO line_account_tag_links (line_account_id, tag_id, tenant_id)
+      SELECT ?, id, tenant_id FROM line_account_tags WHERE id = ? AND tenant_id = ? AND ${active}`)
+      .bind(accountId, id, tenantId, ...scope)),
+  ]);
+  return Number(results[0]?.meta?.changes ?? 0) > 0;
+}
+
+/** 新規登録用。版を進めず、途中の失敗はまとめて巻き戻す。 */
+export async function attachLineAccountRegistrationTags(db: D1Database, tenantId: string, accountId: string, tagIds: string[]): Promise<void> {
+  if (!tagIds.length) return;
+  await db.batch(tagIds.map(id => db.prepare('INSERT INTO line_account_tag_links (line_account_id, tag_id, tenant_id) VALUES (?, ?, ?)').bind(accountId, id, tenantId)));
+}

@@ -43,4 +43,8 @@
 .arrow {
   transition: transform var(--motion-fast) var(--motion-ease-out);
 }
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .root { font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .label { line-height: 18px; }
 }

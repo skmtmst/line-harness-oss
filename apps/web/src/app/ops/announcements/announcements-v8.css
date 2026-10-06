@@ -1,0 +1,19 @@
+@layer properties, theme, base, components, utilities;
+.ops-ann-page { display: flex; flex-direction: column; gap: 14px; min-width: 0; container-type: inline-size; }
+.ops-ann-columns { display: grid; grid-template-columns: minmax(0, 40fr) minmax(0, 58fr); align-items: start; gap: 14px; }
+.ops-ann-form { display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 1px solid var(--color-hairline); border-radius: var(--radius-card); min-width: 0; }
+.ops-ann-field { display: grid; gap: 6px; font-size: 13px; font-weight: 500; color: var(--color-ink); }
+.ops-ann-body { height: 110px; }
+.ops-ann-choices { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.ops-ann-radio { padding: 0; border: 0; border-radius: var(--radius-none); background: transparent; gap: 8px; }
+.ops-ann-radio strong { font-weight: 400; white-space: nowrap; }
+.ops-ann-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.ops-ann-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ops-ann-table { table-layout: fixed; width: 100%; }
+.ops-ann-table th, .ops-ann-table td { padding: 9px 12px; font-size: 12px; }
+.ops-ann-table th { white-space: nowrap; }
+.ops-ann-audience { width: 14%; }
+.ops-ann-status { width: 14%; }
+.ops-ann-number { width: 13%; }
+.ops-ann-operation { width: 16%; }
+@container (max-width: 1000px) { .ops-ann-columns { grid-template-columns: minmax(0, 1fr); } }

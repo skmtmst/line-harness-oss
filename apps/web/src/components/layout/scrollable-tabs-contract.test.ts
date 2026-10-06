@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -10,6 +10,8 @@ const SRC = join(HERE, '..', '..')
 const NEN_MEMBERS = readFileSync(join(SRC, 'app', 'nen', 'members', 'page.tsx'), 'utf8')
 const NEN_HEALTH = readFileSync(join(SRC, 'app', 'nen', 'health', 'page.tsx'), 'utf8')
 const HQ_MEMBERS = readFileSync(join(SRC, 'app', 'hq', 'members', 'page.tsx'), 'utf8')
+const HQ_NAV = readFileSync(join(SRC, 'app', 'hq', 'hq-settings-nav-v8.tsx'), 'utf8')
+const HQ_NAV_CSS = readFileSync(join(SRC, 'app', 'hq', 'hq-settings-nav-v8.css'), 'utf8')
 
 /*
  * #975 U091: タブが右にはみ出す画面（/analytics、/search-console、
@@ -38,6 +40,14 @@ describe('右に隠れたタブへ届く（#975 U091）', () => {
     expect(WRAPPER).toContain('onFocus')
   })
 
+  it('あとから本文フォントが届いた時点でも端の判定をやり直す', () => {
+    // ResizeObserver は容器の箱が変わったときだけ動くので、中のタブ名だけが
+    // 広がる本文フォントの読み込み完了では動かない。影と送りボタンが
+    // 出ないまま残るため、読み込み後にもう一度測る。
+    expect(WRAPPER).toContain('document.fonts?.ready')
+    expect(WRAPPER).toContain('updateEdges()')
+  })
+
   it('右端の操作はスクロール領域に入れず、初期位置から押せる', () => {
     // actions は scroller の外に描く（U029/U031 で直した重なりを戻さない）。
     expect(WRAPPER).toContain('shrink-0 items-center gap-2 border-b border-hairline')
@@ -48,6 +58,15 @@ describe('右に隠れたタブへ届く（#975 U091）', () => {
     expect(MERGED).toContain('ScrollableTabs')
     expect(NEN_MEMBERS).toContain('ScrollableTabs')
     expect(NEN_HEALTH).toContain('ScrollableTabs')
-    expect(HQ_MEMBERS).toContain('ScrollableTabs')
+  })
+
+  it('V8のメンバー管理は縦の設定メニューから各画面へ進む', () => {
+    expect(HQ_MEMBERS).toContain('<HqSettingsNav active="members"')
+    expect(HQ_NAV).toContain('aria-label="統括の設定"')
+    expect(HQ_NAV).toContain("aria-current={key === active ? 'page' : undefined}")
+    expect(HQ_NAV_CSS).toMatch(/\.hq-settings-nav__list\s*\{[^}]*flex-direction:\s*column/s)
+    for (const href of ['/hq/members', '/hq/settings', '/hq/billing', '/hq/support']) {
+      expect(HQ_NAV).toContain(href)
+    }
   })
 })

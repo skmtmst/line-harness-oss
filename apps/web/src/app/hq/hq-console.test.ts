@@ -15,7 +15,7 @@ describe('統括コンソール', () => {
   it('既存のLINEアカウント一覧APIだけでアカウント一覧を作る', () => {
     expect(page).toContain('api.lineAccounts.list()')
     expect(page).not.toContain('restaurantTestApi')
-    expect(page).toContain('<HqAccountList')
+    expect(page).toContain('<AccountBrowser')
     expect(accountList).toContain('pictureUrl')
     expect(accountList).toContain('stats?.friendCount')
     expect(accountList).toContain('connection?.status')
@@ -23,7 +23,7 @@ describe('統括コンソール', () => {
     for (const label of ['アカウント', '友だち数', '今月の配信数', '接続状態', '担当者数', '状態', '操作']) {
       expect(accountList).toContain(label)
     }
-    for (const node of ['MjMCg', 'x5Tkb6', 'w7yY6']) expect(page).toContain(node)
+    for (const node of ['JKjsE', 'x5Tkb6', 'w7yY6']) expect(page).toContain(node)
     expect(accountList).toContain('vLMQ5')
   })
 
@@ -44,8 +44,11 @@ describe('統括コンソール', () => {
   })
 
   it('各アカウントの設定から既存編集モーダルを開き、保存後に一覧を再読込する', () => {
+    // 板 `HMpVx`：カードの「設定」は設定の窓を開き、「詳しい数値を見る」から
+    // 既存編集モーダルへ進む。保存後の再読込は変えない。
+    expect(page).toContain('AccountSettingsDialog')
+    expect(page).toContain('onSettings={setSettingsAccount}')
     expect(page).toContain('AccountEditModal')
-    expect(page).toContain('onSettings={setEditingAccount}')
     expect(page).toContain('initialChannelId={editingAccount.channelId}')
     expect(page).toContain('Promise.all([load(), refreshAccounts()])')
     expect(accountList).toContain('onSettings(account)')

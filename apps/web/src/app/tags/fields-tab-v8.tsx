@@ -11,14 +11,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ClipboardList, FileText, MoreHorizontal, RefreshCw, Users } from 'lucide-react'
+import { AlertCircle, ClipboardList, FileText, LockKeyhole, MoreHorizontal, RefreshCw, Users } from 'lucide-react'
 import type { Folder, FriendField, FriendFieldListSummary, FriendFieldType } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
+import InlineEdit from '@/components/shared/inline-edit'
+import { withViewTransition } from '@/components/shared/view-transition'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useRowLeaving } from '@/lib/use-row-leaving'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
@@ -33,6 +38,9 @@ import {
   knownUsageCount,
 } from '@/components/friend-fields/field-list'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
+import { notifyToast } from '@/components/shared/toast'
+import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { TagRowsSkeleton } from './tag-rows-skeleton'
 import styles from './list-v8.module.css'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -58,12 +66,21 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
   const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<FriendField | null>(null)
+  const { leavingId, leave } = useRowLeaving()
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderDialog, setFolderDialog] = useState<'new' | Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /*
+   * 行の詳細パネル（C①）。URL に ?field=<id> を残す。
+   * 行を押すとつながる移り変わり（D・E）で右から出て、↑↓で前・次へ。
+   * フォルダの入力は共通の FolderAddDialog のまま（M10 の部品のため。
+   * パネル化は M10 へ依頼する）。
+   */
+  const [activeFieldId, setActiveFieldId] = useDetailPanelUrl('field')
+  const openFieldDetail = (id: string) => withViewTransition(() => setActiveFieldId(id))
 
   /* アカウント切替のあとに届いた古い応答で一覧を上書きしない（ATTR-01）。 */
   const gateRef = useRef(createResponseGate())
@@ -144,6 +161,9 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
   const pages = Math.max(1, Math.ceil(visible.length / pageSize))
   const currentPage = Math.min(page, pages)
   const pageItems = visible.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  /* 詳細パネルに出す行（一覧全体から探すので、URL直打ちでも開く）。前・次は見えている行の中。 */
+  const activeField = items.find((item) => item.id === activeFieldId) ?? null
+  const activeFieldIndex = pageItems.findIndex((item) => item.id === activeFieldId)
   useEffect(() => setPage(1), [query, type, folderFilter, pageSize])
 
   /*
@@ -162,8 +182,14 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
       await load()
     } catch (reason) {
       setItems(previous)
-      setActionError(reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした')
+      const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
+      setActionError(message)
       setRetryOrder(next)
+      notifyToast(message, {
+        tone: 'error',
+        actionLabel: 'もう一度',
+        onAction: () => { void applyOrder(next) },
+      })
     }
   }
 
@@ -197,7 +223,10 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
       return
     }
     setActionError('')
-    try { await api.friendFields.delete(field.id, accountId); await load() }
+    try {
+      await api.friendFields.delete(field.id, accountId)
+      leave(field.id, () => load())
+    }
     catch (reason) { setActionError(reason instanceof ApiError ? reason.message : '削除できませんでした') }
   }
 
@@ -237,6 +266,19 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
       setFolderBusy(false)
     }
   }
+
+  /*
+   * 右クリックのメニュー（C③）。行の「…」と同じ操作
+   * （編集・移行・削除する）。押せない理由もそのまま渡す。
+   */
+  const fieldContextItems = (field: FriendField): ContextMenuItem[] =>
+    rowMenuItems(field).map((item) => ({
+      id: item.id,
+      label: item.label,
+      danger: item.tone === 'danger',
+      disabled: item.disabled,
+      onSelect: () => item.onSelect(),
+    }))
 
   /** 行の「…」。編集・移行・削除。 */
   const rowMenuItems = (field: FriendField): ActionMenuItem[] => {
@@ -401,18 +443,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
             </p>
           ) : null}
 
-          {status === 'loading' ? (
-            <div className={styles.skeletonRows} role="status">
-              <span className="sr-only">読み込んでいます</span>
-              {[0, 1, 2, 3].map((row) => (
-                <div key={row} className={styles.skeletonRow}>
-                  <span className={styles.skeletonDot} />
-                  <span className={styles.skeletonBar} />
-                  <span className={styles.skeletonBar} style={{ maxWidth: 120 }} />
-                </div>
-              ))}
-            </div>
-          ) : status === 'forbidden' ? (
+          {status === 'forbidden' ? (
             <div className={styles.stateCard}>
               <span className={`${styles.stateIcon} ${styles.stateIconError}`}>
                 <AlertCircle size={20} aria-hidden="true" />
@@ -446,7 +477,7 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
               ) : null}
             </div>
           ) : (
-            <>
+            <DelayedSkeleton loading={status === 'loading'} skeleton={<TagRowsSkeleton rows={4} narrow={[120]} />}>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
@@ -467,13 +498,14 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                         <tr
                           key={field.id}
                           className={styles.rowClick}
+                          data-leaving={leavingId === field.id || undefined}
                           tabIndex={0}
-                          onClick={() => router.push(editHref)}
+                          onClick={() => openFieldDetail(field.id)}
                           onKeyDown={(event) => {
                             if (event.target !== event.currentTarget) return
                             if (event.key === 'Enter') {
                               event.preventDefault()
-                              router.push(editHref)
+                              openFieldDetail(field.id)
                             }
                           }}
                         >
@@ -494,8 +526,10 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                             />
                           </td>
                           <td>
-                            <Link href={editHref} className={styles.cellTitle} title={`${field.name}を編集`} onClick={(event) => event.stopPropagation()}>{field.name}</Link>
-                            <p className={`${styles.cellSub} ${styles.mono}`} title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p>
+                            <ContextMenu label={`項目「${field.name}」の操作`} items={fieldContextItems(field)}>
+                              <Link href={editHref} className={styles.cellTitle} title={`${field.name}を編集`} onClick={(event) => event.stopPropagation()}>{field.name}</Link>
+                              <p className={`${styles.cellSub} ${styles.mono}`} title={`{{field.${field.fieldKey}}}`}>{`{{field.${field.fieldKey}}}`}</p>
+                            </ContextMenu>
                           </td>
                           <td className={styles.cellText}>{FIELD_TYPE_LABELS[field.type] ?? field.type}</td>
                           <td className={styles.cellText} style={{ fontVariantNumeric: 'tabular-nums' }}>{knownUsageCount(field) ?? '—'}{knownUsageCount(field) === null ? '' : '人'}</td>
@@ -504,6 +538,11 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                           </td>
                           <td className={styles.cellMuted}><span className={styles.cellTruncate} title={destinationLabel(field)}>{destinationLabel(field)}</span></td>
                           <td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
+                            {field.isInherited ? (
+                              <span title="共通項目は直接削除できません" className="mr-1 inline-flex align-middle text-ink-faint">
+                                <LockKeyhole size={16} aria-label="共通項目のため削除できません" />
+                              </span>
+                            ) : null}
                             <button
                               type="button"
                               className={styles.menuButton}
@@ -541,6 +580,8 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                     onChange={(value) => setPageSize(Number(value) || 20)}
                     options={[
                       { value: '20', label: '20件表示' },
+                      { value: '30', label: '30件表示' },
+                      { value: '40', label: '40件表示' },
                       { value: '50', label: '50件表示' },
                       { value: '100', label: '100件表示' },
                     ]}
@@ -559,10 +600,72 @@ export default function FieldsTabV8({ accountId, canEdit }: { accountId: string 
                 <h2 className={styles.safetyNoteTitle}>既定値・種類・削除の安全確認</h2>
                 <p className={styles.safetyNoteBody}>既定値は空欄送信事故を防ぎます。種類は新規登録後に変更不可とし、値が入っている項目は削除せず新しい項目へ移行します。</p>
               </section>
-            </>
+            </DelayedSkeleton>
           )}
         </div>
       </div>
+
+      {/* 行の詳細パネル（C①）。名前はその場で直せる（C②）。確認の窓（削除）は残す。 */}
+      <DetailPanel
+        open={activeField !== null}
+        title={activeField?.name ?? ''}
+        description={activeField ? `{{field.${activeField.fieldKey}}}・${FIELD_TYPE_LABELS[activeField.type] ?? activeField.type}` : undefined}
+        onClose={() => setActiveFieldId(null)}
+        hasPrev={activeFieldIndex > 0}
+        hasNext={activeFieldIndex >= 0 && activeFieldIndex < pageItems.length - 1}
+        onPrev={activeFieldIndex > 0 ? () => setActiveFieldId(pageItems[activeFieldIndex - 1].id) : undefined}
+        onNext={activeFieldIndex >= 0 && activeFieldIndex < pageItems.length - 1 ? () => setActiveFieldId(pageItems[activeFieldIndex + 1].id) : undefined}
+        footer={activeField ? (
+          <>
+            <Button href={`/tags/fields/edit?id=${encodeURIComponent(activeField.id)}`}>編集する</Button>
+            {(knownUsageCount(activeField) ?? 0) > 0 ? (
+              <Button href={`/tags/fields/migrate?id=${encodeURIComponent(activeField.id)}`}>移行する</Button>
+            ) : null}
+          </>
+        ) : undefined}
+      >
+        {activeField ? (
+          <dl>
+            <div>
+              <dt className={styles.cellMuted}>項目名</dt>
+              <dd>
+                <InlineEdit
+                  label="項目名"
+                  value={activeField.name}
+                  maxLength={40}
+                  disabled={!canEdit || !accountId || activeField.isInherited}
+                  onSave={async (next) => {
+                    if (!accountId) throw new Error('no account')
+                    const res = await api.friendFields.update(activeField.id, accountId, { name: next })
+                    if (!res.success) throw new Error(res.error)
+                    void load()
+                  }}
+                />
+              </dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>差し込み名</dt>
+              <dd className={`${styles.cellText} ${styles.mono}`}>{`{{field.${activeField.fieldKey}}}`}</dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>種類</dt>
+              <dd className={styles.cellText}>{FIELD_TYPE_LABELS[activeField.type] ?? activeField.type}</dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>使っている友だち</dt>
+              <dd className={styles.cellText}>{knownUsageCount(activeField) === null ? '—' : `${knownUsageCount(activeField)}人`}</dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>回答フォームの使用数</dt>
+              <dd className={styles.cellText}>{activeField.formUsageCount === undefined ? '—' : `${activeField.formUsageCount}個`}</dd>
+            </div>
+            <div>
+              <dt className={styles.cellMuted}>移行先</dt>
+              <dd className={styles.cellText}>{destinationLabel(activeField)}</dd>
+            </div>
+          </dl>
+        ) : null}
+      </DetailPanel>
 
       {folderDialog ? (
         <FolderAddDialog

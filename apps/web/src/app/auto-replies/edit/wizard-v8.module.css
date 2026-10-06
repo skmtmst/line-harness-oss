@@ -1,0 +1,815 @@
+/*
+ * ★V8 自動応答の作成・編集・有効化（Pencil `K7HWG` `A0pDt` `rfhIf`
+ * `Guoye` `XJUqs`、完了 `V4LjH`）。
+ *
+ * 組版は「作る・確かめる板（左）」と「いまの状態・LINEの見え方（右）」の
+ * 2列。板が狭い画面では右の列を下へ畳む。
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  text-decoration: none;
+  width: fit-content;
+}
+.backLink:hover {
+  color: var(--color-ink);
+  text-decoration: underline;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* 板の頭の題は `A0pDt` どおり 22px。 */
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 手順の下の一行。「いま何をしているか」を置く。 */
+
+.cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 0;
+  align-items: stretch;
+}
+@media (max-width: 1100px) {
+  .cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 24px 28px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 24px;
+  border-left: 1px solid var(--color-hairline);
+  background: var(--color-surface-pearl);
+}
+
+.cardContent {
+  gap: 14px;
+  min-width: 0;
+}
+.cardHeading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-field-gap-basic);
+}
+
+/* ルール名＋フォルダの2列（`K7HWG`）。狭い板では縦に積む。 */
+.fieldPair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .fieldPair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+/* 手順②（絵 A0pDt）だけ：欄の題と中身の間 8・題の行 20。①（K7HWG）は 6 のまま。 */
+.stepTrigger .label { line-height: var(--tpl-chip-label-lh); }
+/* 言葉の欄：題のすぐ下に札と足す欄（絵の行は高さ36で中央そろえ）。 */
+.stepTrigger .kwField { gap: var(--tpl-compact-gap); }
+.labelOptional {
+  margin-left: var(--tpl-label-tag-gap);
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: var(--tpl-text-sm-lh);
+}
+.hint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 「言葉で反応する／すべてのメッセージ」のような2枚の選択カード。 */
+.radioPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .radioPair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 反応する言葉の札（追加は入力欄＋Enter、消すは各札の ×）。 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* 絵 A0pDt「言葉」：緑の地の小さい札。 */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-label-tag-gap);
+  padding: var(--tpl-kw-chip-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.chipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+.chipRemove:hover {
+  color: var(--color-danger);
+}
+
+/* 反応するメッセージの種類の押せる札。選んだものは濃く。 */
+.pickChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-chip-gap);
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-chip-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-tabs-text-lh);
+  cursor: pointer;
+}
+/* 絵 rfhIf・A0pDt：選んでいる札は墨の地に白い字。 */
+.pickChip[aria-pressed='true'] {
+  outline-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  font-weight: 600;
+}
+
+/* 「部分一致／完全一致」などのつながった選択。 */
+/* 絵 A0pDt「切り替え」：灰の地に、選んだ所だけ白。 */
+.seg {
+  display: inline-flex;
+  gap: var(--tpl-compact-gap);
+  padding: var(--tpl-compact-gap);
+  border-radius: var(--radius-control);
+  background: var(--color-shell);
+}
+.segBtn {
+  height: var(--tpl-seg-btn-h);
+  padding: var(--tpl-seg-btn-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 600;
+  cursor: pointer;
+}
+.segBtn[aria-pressed='true'] {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-controls-toggle);
+}
+
+/* 曜日：つなげた7つ。 */
+.weekdays {
+  display: inline-flex;
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.weekday {
+  min-width: var(--tpl-weekday-w);
+  height: var(--tpl-chip-h);
+  padding: 0;
+  border: 0;
+  border-right: 1px solid var(--color-control-border);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  cursor: pointer;
+}
+.weekday:last-child {
+  border-right: 0;
+}
+.weekday[aria-pressed='true'] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  font-weight: 600;
+}
+.weekdayPresets {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--tpl-compact-gap);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+.weekdayPreset {
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-insert-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  cursor: pointer;
+}
+.weekdayPreset:hover {
+  text-decoration: underline;
+}
+.weekdayNow {
+  color: var(--color-ink-secondary);
+}
+
+
+/* 手順4「動く順番」の行。 */
+.orderList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rule-row-gap);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+/* 絵 Guoye「順番」：角10・上下10・左右12・間10。 */
+.orderRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-action-row-gap);
+  padding: var(--tpl-action-row-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.orderRowSelf {
+  outline-color: var(--color-accent-deep);
+  background: var(--color-success-bg);
+}
+.orderRowConflict {
+  outline-color: var(--color-warning-border, var(--color-warning));
+  background: var(--color-warning-bg);
+}
+.orderGrip {
+  color: var(--color-ink-faint);
+}
+.orderNum {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+.orderBody {
+  flex: 1;
+  min-width: 0;
+}
+.orderName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.orderSub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-label-tag-gap);
+  margin: var(--tpl-compact-gap) 0 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+.orderOverlap {
+  color: var(--color-warning);
+}
+.orderMove {
+  display: flex;
+  gap: 8px;
+}
+
+/* 手順4「試しに送ってみる」の結果帯。 */
+.testResult {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-canvas-sunken);
+  font-size: 13px;
+}
+.testResultWin {
+  border: 1px solid var(--color-success);
+  background: var(--color-success-bg);
+}
+.testResultLose {
+  border: 1px solid var(--color-warning);
+  background: var(--color-warning-bg);
+}
+.testResultTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 700;
+}
+.testResultNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  line-height: 1.6;
+}
+
+/* 重なりの確かめ行。 */
+.conflictRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.conflictRow:last-child {
+  border-bottom: 0;
+}
+.conflictBody {
+  flex: 1;
+  min-width: 0;
+}
+.conflictName {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.conflictNote {
+  margin: 2px 0 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.conflictCertainty {
+  color: var(--color-warning);
+}
+
+/* 右の「設定内容」などの名前と値の行。 */
+.kvList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.kvRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.kvRow:last-child {
+  border-bottom: 0;
+}
+.kvKey {
+  color: var(--color-ink-faint);
+  font-size: 12px;
+}
+.kvVal {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* 手順5「有効にする前の確認」の行。 */
+/* 絵 XJUqs「確認」：中央そろえ・上下10・右に「見直す」。 */
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-action-row-gap);
+  padding: var(--tpl-page-pad-block) 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.checkRow:last-child {
+  border-bottom: 0;
+}
+.checkIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  flex-shrink: 0;
+}
+.checkIconOk {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.checkIconWarn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+.checkBody {
+  flex: 1;
+  min-width: 0;
+}
+.checkTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-side-title-lh);
+}
+.checkNote {
+  margin: var(--tpl-compact-gap) 0 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rule-note-lh);
+}
+
+/* 確認の「設定の確認」表。各行の右に「変える」。 */
+/* 絵 XJUqs「設定の確認」：行は 上下10・題140・字13/21・右に「変える」。行と行の間14。 */
+.summaryList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-summary-gap);
+}
+.summaryRow {
+  display: grid;
+  grid-template-columns: var(--tpl-summary-key-w) minmax(0, 1fr) auto;
+  gap: var(--tpl-rule-row-gap);
+  align-items: center;
+  padding: var(--tpl-page-pad-block) 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.summaryRow:last-child {
+  border-bottom: 0;
+}
+.summaryKey {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+.summaryVal {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-summary-val-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* LINE の中の吹き出し（返す側＝右の緑、届いた側＝左の白）。 */
+.bubbleReply {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 10px 12px;
+  border-radius: var(--v8-line-bubble-out-radius);
+  background: var(--color-action);
+  color: var(--color-canvas);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bubbleIn {
+  align-self: flex-start;
+  max-width: 85%;
+  padding: 10px 12px;
+  border-radius: var(--v8-line-bubble-in-radius);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bubbleMeta {
+  align-self: flex-end;
+  color: var(--color-ink-faint);
+  font-size: 10px;
+}
+.talkStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.talkStack .bubbleReply,
+.talkStack .bubbleIn,
+.talkStack .bubbleMeta {
+  margin: 0;
+}
+
+/* 完了（V4LjH）：作る型の頭の下に、中央の完了カード（幅560・余白32・間12）。 */
+.doneBody { display: flex; justify-content: center; padding: var(--tpl-ar-done-body-pad); }
+.done {
+  display: flex; flex-direction: column; align-items: center; gap: var(--tpl-rule-row-gap);
+  width: min(var(--tpl-ar-done-w), 100%); padding: var(--tpl-ar-done-pad);
+  border-radius: var(--radius-card); outline: 1px solid var(--color-hairline); outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.doneIcon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--tpl-ar-done-icon); height: var(--tpl-ar-done-icon);
+  border-radius: var(--radius-pill); background: var(--color-success-bg); color: var(--color-success);
+}
+.doneTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-ar-done-title-size); font-weight: 700; line-height: var(--tpl-ar-done-title-lh); }
+.doneNote { margin: 0; align-self: stretch; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-ar-done-note-lh); }
+.doneRows { display: flex; flex-direction: column; align-self: stretch; margin: 0; }
+.doneRow {
+  display: flex; align-items: center; gap: var(--tpl-body-gap); min-height: var(--tpl-ar-done-row-h);
+  padding: var(--tpl-side-row-pad) 0; box-shadow: var(--shadow-row-line);
+}
+.doneRow > dt { flex: 1 1 auto; color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
+.doneRow > dd { min-width: 0; margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.doneActions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--tpl-body-gap); padding-top: var(--tpl-body-gap); }
+
+/* トグルの行（細かい決まり）。 */
+/* 絵 rfhIf「細かい決まり」：行は線なし・間12・右に操作。 */
+.ruleRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rule-row-gap);
+}
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-rule-row-gap);
+}
+.toggleText {
+  flex: 1;
+  min-width: 0;
+}
+.toggleTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-side-title-lh);
+}
+.toggleNote {
+  margin: var(--tpl-compact-gap) 0 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rule-note-lh);
+}
+.toggleExtra {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* 「60 分あける」：文字のように見える数の欄（押すと直せる）。 */
+.toggleNum {
+  width: 4ch;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dashed var(--color-control-border);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  text-align: right;
+}
+.toggleUnit {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  white-space: nowrap;
+}
+
+/* 絵 rfhIf「本文」：箱の中に 文 → 間24 → 差し込む・札・字数。 */
+.bodyBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-body-gap);
+  padding: var(--tpl-body-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.bodyText {
+  min-height: calc(var(--tpl-body-lh) * 2);
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: var(--text-label);
+  line-height: var(--tpl-body-lh);
+  resize: vertical;
+}
+.insertChips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-chip-row-gap);
+  margin-top: calc(var(--tpl-body-spacer) + var(--tpl-body-gap));
+}
+.insertLabel {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+.insertChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-label-tag-gap);
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-insert-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  cursor: pointer;
+}
+.insertChip:hover {
+  background: var(--color-canvas-sunken);
+}
+.counter {
+  margin-left: auto;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+/* 編集の競合の帯（`UGrd2`）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
+
+
+/* 右の列の箱（絵 K7HWG「右の箱 設定内容」）：余白16・題13太字・行の間4・行は上下9＋下線。 */
+.sideCard {
+  gap: var(--tpl-side-card-gap);
+  align-self: stretch;
+  min-width: 0;
+  padding: var(--tpl-side-card-pad);
+  /* 絵の枠は内側の線（場所を取らない）。border だと中身が1つ下がる。 */
+  border: 0;
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+.sideTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: var(--tpl-side-title-lh);
+}
+.sideCard .kvList {
+  gap: var(--tpl-side-row-gap);
+}
+.sideCard .kvRow {
+  align-items: center;
+  padding: var(--tpl-side-row-pad) 0;
+}
+.sideCard .kvRow > dt {
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  line-height: var(--tpl-text-sm-lh);
+}
+.sideCard .kvVal {
+  font-size: 12px;
+  line-height: var(--tpl-text-sm-lh);
+}
+
+/* 絵 A0pDt：題の下の説明・言葉の並びと足す欄・2つの欄を横に・種類の札と注意を1行に・曜日とまとめてを1行に。 */
+.cardDesc { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
+.kwRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-body-gap); }
+.kwSpacer { flex: 1 1 0; }
+.kwInput {
+  display: inline-flex; align-items: center; gap: var(--tpl-body-gap);
+  width: var(--tpl-kw-input-w); height: var(--tpl-chip-h); padding: var(--tpl-kw-input-pad);
+  border-radius: var(--radius-control); outline: 1px solid var(--color-control-border); outline-offset: -1px;
+  background: var(--color-canvas); color: var(--color-ink-faint);
+}
+.kwInput input { min-width: 0; flex: 1 1 0; border: 0; outline: 0; background: transparent; font-size: var(--text-label); }
+.pairRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-rule-row-gap); }
+.kindsRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-body-gap); }
+.kindsNote { margin-left: auto; color: var(--color-ink-faint); font-size: var(--text-micro); }
+.weekdayRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-rule-row-gap); }
+.inlineSelect { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); color: var(--color-ink-faint); font-size: var(--text-caption); }
+.labelRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-rule-row-gap); }
+.sourceInline { display: inline-flex; align-items: center; gap: var(--tpl-rule-row-gap); color: var(--color-ink-faint); font-size: var(--text-caption); }
+.moreKinds { height: var(--tpl-chip-h); padding: var(--tpl-chip-pad); border: 0; background: transparent; color: var(--color-action); font-size: var(--text-caption); cursor: pointer; }
+.countRow { display: flex; align-items: baseline; gap: var(--tpl-chip-row-gap); margin: 0; padding: var(--tpl-chip-row-gap) 0; }
+.countNum { color: var(--color-ink-faint); font-size: var(--tpl-count-num-size); font-weight: 700; line-height: var(--tpl-count-num-lh); }
+.countUnit { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+.sideHint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); }
+.sideCard .kvRow > dt { color: var(--color-ink-secondary); }
+.sampleHit { margin: 0; color: var(--color-success); font-size: var(--text-caption); font-weight: 600; }
+.sampleMiss { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); font-weight: 600; }
+.stepTrigger .field { gap: var(--tpl-compact-gap); }
+.stepTrigger .pairRow .field { gap: var(--tpl-field-gap-basic); }
+.weekdaySummary { margin-left: auto; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.stepTrigger { padding-bottom: var(--tpl-section-pad); }
+
+/* 絵 Guoye「重なりを1件ずつ確かめる」：クリームの地・角12・余白16。 */
+.conflictCard { display: flex; flex-direction: column; align-self: stretch; gap: var(--tpl-body-gap); padding: var(--tpl-side-card-pad); border-radius: var(--radius-card); background: var(--color-warning-bg); }
+.conflictDesc { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-conflict-desc-lh); }
+.conflictItem { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-body-gap); padding: var(--tpl-section-gap) 0; border-top: 1px solid var(--color-hairline); }
+.conflictItem:first-of-type { border-top: 0; }
+.conflictChipCertain, .conflictChipPossible { font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-conflict-desc-lh); }
+.conflictChipCertain { color: var(--color-status-danger); }
+.conflictChipPossible { color: var(--color-warning); }
+.conflictResult { min-height: calc(var(--tpl-conflict-desc-lh) * 2); } /* 試すと2行になる。先に場所を取って、出たときに下が動かないように */
+.testRow { display: flex; align-items: center; gap: var(--tpl-body-gap); }
+.testGrow { flex: 1 1 0; min-width: 0; }
+
+/*
+ * 1152 の板（Z2LIUx）。右の列は幅280・余白16で、スマホは置かず上のボタンから窓で開く。
+ * 左の段は「言葉の合い方」「言葉が2つ以上のとき」を縦に積み、まとめて・月〜金の行を分ける。
+ */
+:global([data-page-template='create']):has(.narrowPhoneOpen) {
+  --tpl-preview-pad: var(--tpl-ar-ed-narrow-pad);
+  --tpl-preview-narrow-content-width: var(--tpl-ar-ed-narrow-side-w);
+}
+.narrowPhoneOpen { display: flex; flex-direction: column; align-self: stretch; }
+.narrowPhoneOpen > :global(*) { width: 100%; }
+.narrowPhoneOpen ~ * { align-self: stretch; }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .sideCard .kvRow > dt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .kwSpacer { flex-basis: 100%; height: 0; }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .kwRow { row-gap: var(--tpl-ar-ed-kw-row-gap); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .kwInput { margin-left: auto; }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .kwField { gap: var(--tpl-compact-gap); }
+/* 札の × は押せる大きさ（32）のまま、行の高さには数えない（絵の札は高さ26）。 */
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .chipRemove { margin-block: var(--tpl-ar-ed-chip-x-pull); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .labelRow { height: var(--tpl-chip-label-lh); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .pairRow { grid-template-columns: minmax(0, 1fr); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .labelRow .moreKinds { flex: 1 1 auto; height: auto; padding: var(--tpl-ar-ed-none); text-align: left; }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .kindsNote { flex: 1 1 0; min-width: 0; margin-left: var(--tpl-body-gap); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .weekdayPresets { flex-wrap: wrap; row-gap: var(--tpl-body-gap); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .weekdaySummary { flex-basis: 100%; margin-left: var(--tpl-ar-ed-none); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .inlineSelect > :last-child { width: var(--tpl-ar-ed-holiday-w); }
+:global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .inlineSelect :global(*) { max-width: 100%; }
+
+/* 編集の競合（UGrd2）：頭の「ルール名」の行の下に横いっぱいの帯（琥珀の地・枠）。 */
+.conflictBand {
+  display: flex; align-items: center; gap: var(--tpl-rule-row-gap);
+  margin: var(--tpl-ar-ed-band-mt) 0 var(--tpl-ar-ed-band-mb);
+  padding: var(--tpl-ar-ed-band-pad); border-radius: var(--radius-control);
+  outline: 1px solid var(--color-warning); outline-offset: -1px; background: var(--color-warning-bg);
+}
+.conflictBandIcon { flex-shrink: 0; color: var(--color-warning); }
+.conflictBandText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
+.conflictBandTitle { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; line-height: var(--tpl-chip-label-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conflictBandNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-ar-ed-band-note-lh); }

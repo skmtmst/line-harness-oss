@@ -4,7 +4,8 @@
  * - 1店舗（rt_stores）＝1 LINE公式アカウント（rt_stores.line_account_id）＝1 Googleロケーション。
  * - 店舗は必ず account_id → rt_stores.line_account_id と担当者の統括（tenant）で引く。組織IDだけで信用しない。
  * - Googleとの通信は services/google-business.ts に閉じ込め、この層はDBと権限だけを扱う。
- * - Googleへの書き込みは GOOGLE_BUSINESS_WRITE_ENABLED=true の環境でしか行わない（検証・本番の環境分離）。
+ * - Googleへの書き込みは GOOGLE_BUSINESS_WRITE_ENABLED=true の環境でしか行わない（環境ごとのスイッチ。
+ *   2026-10-04からGoogleの機密スコープ審査のため実運用でも有効。自動送信はせず、確認画面で本人が押したときだけ送る）。
  * - トークンは暗号化して保存し、応答・ログに平文を出さない。
  */
 import { Hono } from 'hono';
@@ -17,11 +18,15 @@ import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
+import { deleteGoogleContentForStore } from '../services/google-business-retention.js';
 import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import {
+  GOOGLE_BUSINESS_REQUIRED_SCOPES,
   GoogleBusinessError,
   buildAuthorizeUrl,
   buildReplyDraftPrompt,
+  replyDraftRewriteChangeScore,
+  replyDraftRewriteFellShort,
   codeChallengeFor,
   createCodeVerifier,
   exchangeAuthorizationCode,
@@ -155,9 +160,14 @@ function oauthClientForEnv(env: Env['Bindings'], origin?: string): GoogleOAuthCl
   const clientId = env.GOOGLE_BUSINESS_OAUTH_CLIENT_ID?.trim();
   const clientSecret = env.GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) return null;
+  // redirectUri は環境ごとに1つへ固定する。Workerは独自ドメインと workers.dev の
+  // どちらでも開けるため、リクエストのoriginから組み立てるとGoogleに登録した1行と
+  // ずれて redirect_uri_mismatch になる。WORKER_PUBLIC_URL を正本にすれば、
+  // 管理画面がどちらのホストを呼んでも同じURIを送る。
   // refresh には redirectUri を使わない。cron などリクエスト外から呼ぶときは
   // ダミーの origin でよい（google-sheets の sheetsOauthClient と同じ扱い）。
-  return { clientId, clientSecret, redirectUri: `${origin ?? 'https://localhost'}${CALLBACK_PATH}` };
+  const base = env.WORKER_PUBLIC_URL?.trim().replace(/\/+$/, '') || origin || 'https://localhost';
+  return { clientId, clientSecret, redirectUri: `${base}${CALLBACK_PATH}` };
 }
 
 function oauthClient(c: Context<Env>): GoogleOAuthClient | null {
@@ -393,7 +403,13 @@ export async function accessTokenForConnection(env: Env['Bindings'], connection:
   const client = oauthClientForEnv(env);
   if (!client) throw new GoogleBusinessError('unavailable', null, 'google_oauth_not_configured');
   try {
-    const tokens = await refreshAccessToken({ client, refreshToken: await decryptCredential(connection.refresh_token_enc, key), fetch });
+    const tokens = await refreshAccessToken({
+      client,
+      refreshToken: await decryptCredential(connection.refresh_token_enc, key),
+      fetch,
+      // 連携後にGoogle側で「ビジネス情報の管理」だけ取り消された場合も、ここで接続を止める。
+      requiredScopes: GOOGLE_BUSINESS_REQUIRED_SCOPES,
+    });
     await dbFor(env, connection.store_id)
       .prepare(
         `UPDATE rt_google_connections
@@ -412,6 +428,9 @@ export async function accessTokenForConnection(env: Env['Bindings'], connection:
   } catch (error) {
     if (error instanceof GoogleBusinessError && error.kind === 'auth_expired') {
       await setConnectionStatusForEnv(env, connection.store_id, 'expired', 'auth_expired');
+    }
+    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') {
+      await setConnectionStatusForEnv(env, connection.store_id, 'no_permission', 'no_permission');
     }
     throw error;
   }
@@ -466,6 +485,19 @@ async function reviewFor(c: Context<Env>, storeId: string, id: string): Promise<
 
 export const googleAccessGuard: MiddlewareHandler<Env> = async (c, next) => {
   if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
+  // 長期間使えるAPIキーでは通さない。管理画面に人がログインした状態だけを受ける。
+  //
+  // Google Business Profile APIのポリシー
+  // （https://developers.google.com/my-business/content/policies 、2026-08-28更新）は
+  // 「End users of your Business Profile APIs need to manually sign in to use it.」
+  // 「They're not allowed automatic access to make manual or programmatic changes to
+  // their accounts.」「You cannot provide indirect access to your Business Profile
+  // project.」と定めている。APIキー1本をお客様のスクリプトやバッチに渡せば、
+  // musuboの承認済みプロジェクトを間接的に使わせたことになるため、
+  // Googleを触るルートだけはこの入口を閉じる。ほかのAPIのキー運用は変えない。
+  if (c.get('staff')?.credential === 'api-key') {
+    return fail(c, 403, 'Googleビジネスの操作は管理画面にログインしてから行ってください');
+  }
   // restaurant-test.ts と同じ統括ゲート。パック無しは環境無効と同じ404。
   if (!(await tenantHasFeaturePack(dbFor(c.env), staffTenantId(c), 'restaurant'))) {
     return fail(c, 404, 'Not found');
@@ -574,6 +606,9 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnec
       state,
       codeChallenge: await codeChallengeFor(verifier),
       loginHint: existing?.google_account_email ?? null,
+      // どのGoogleアカウントでも接続できるよう、毎回アカウント選択画面を出す。
+      // loginHint は「前回つないだアカウント」の目印で、別のアカウントを選んでもよい。
+      selectAccount: true,
     }),
   });
 });
@@ -622,7 +657,14 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
   const key = c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;
   const db = dbFor(c.env, store.id);
   try {
-    const tokens = await exchangeAuthorizationCode({ client, code, codeVerifier: await decryptCredential(stateRow.code_verifier_enc, key), fetch });
+    const tokens = await exchangeAuthorizationCode({
+      client,
+      code,
+      codeVerifier: await decryptCredential(stateRow.code_verifier_enc, key),
+      fetch,
+      // 同意画面で「ビジネス情報の管理」のチェックを外されたままの接続を、ここで止める。
+      requiredScopes: GOOGLE_BUSINESS_REQUIRED_SCOPES,
+    });
     const options: RequestOptions = { fetch, accessToken: tokens.accessToken };
     const email = await fetchAccountEmail(options);
     const locations = await listManageableLocations(options);
@@ -634,8 +676,33 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     if (stateRow.mode === 'reconnect' && existing?.location_name) {
       const same = locations.find((location) => location.name === existing.location_name);
       if (!same) {
-        await writeLog(c, store.id, { kind: 'reconnect', targetName: existing.location_name, result: 'failed', error: 'location_mismatch' });
-        return c.redirect(adminReturnUrl(c, lineAccountId, 'error:location_mismatch'));
+        // 別のGoogleアカウント（または管理店舗が変わったアカウント）で戻ってきた場合。
+        // ここで止めず、そのアカウントが管理している店舗を一覧で選べるようにする。
+        // 旧店舗名は残したまま「選択待ち」にして、切り替えの確認は選択時に取る。
+        if (locations.length === 0) {
+          await writeLog(c, store.id, { kind: 'reconnect', targetName: existing.location_name, result: 'failed', error: 'no_locations' });
+          return c.redirect(adminReturnUrl(c, lineAccountId, 'error:no_locations'));
+        }
+        await db
+          .prepare(
+            `UPDATE rt_google_connections
+             SET google_account_email = ?, refresh_token_enc = ?, access_token_enc = ?, access_token_expires_at = ?,
+                 status = 'pending_location', connected_by_staff_id = ?, disconnected_at = NULL,
+                 last_sync_error = NULL, updated_at = ?
+             WHERE store_id = ?`,
+          )
+          .bind(email, refreshEnc, accessEnc, accessExpires, c.get('staff')!.id, nowIso(), store.id)
+          .run();
+        await db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
+        await db.batch(
+          locations.map((location) =>
+            db
+              .prepare('INSERT OR IGNORE INTO rt_google_location_candidates (id, store_id, location_name, location_title, address_text) VALUES (?, ?, ?, ?, ?)')
+              .bind(crypto.randomUUID(), store.id, location.name, location.title, location.addressText),
+          ),
+        );
+        await writeLog(c, store.id, { kind: 'reconnect', targetName: existing.location_name, result: 'unknown', error: 'location_switch_pending' });
+        return c.redirect(adminReturnUrl(c, lineAccountId, 'select_location'));
       }
       await db
         .prepare(
@@ -656,7 +723,10 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     if (locations.length === 0) {
       return c.redirect(adminReturnUrl(c, lineAccountId, 'error:no_locations'));
     }
-    const single: GoogleLocation | null = locations.length === 1 ? locations[0] : null;
+    // 前の店舗が残っている状態（切り替え待ちや解除後）で別の店舗しか無いときは、1件でも自動確定しない。
+    // 旧店舗の取り込み済みデータを消す確認を店舗選択画面で取る必要があるため。
+    const autoSelectable = locations.length === 1 && (!existing?.location_name || existing.location_name === locations[0].name);
+    const single: GoogleLocation | null = autoSelectable ? locations[0] : null;
     const status: ConnectionStatus = single ? 'connected' : 'pending_location';
     await db
       .prepare(
@@ -685,9 +755,10 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
         store.id,
         store.line_account_id,
         email,
-        single?.name ?? null,
-        single?.title ?? null,
-        single?.mapsUri ?? null,
+        // 店舗未確定のときは前の店舗名を残す（切り替え確認とデータ削除の判定に使う）。
+        single?.name ?? existing?.location_name ?? null,
+        single?.title ?? existing?.location_title ?? null,
+        single?.mapsUri ?? existing?.location_maps_url ?? null,
         refreshEnc,
         accessEnc,
         accessExpires,
@@ -723,9 +794,19 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const connection = await connectionFor(c, store.id);
   if (!connection || connection.status !== 'pending_location') return fail(c, 409, '店舗の選択待ちではありません');
-  const body = await c.req.json<{ locationName?: string }>().catch(() => ({}) as { locationName?: string });
+  const body = await c.req
+    .json<{ locationName?: string; confirmSwitch?: boolean }>()
+    .catch(() => ({}) as { locationName?: string; confirmSwitch?: boolean });
   const locationName = body.locationName?.trim();
   if (!locationName) return fail(c, 400, 'locationName が必要です');
+  // 以前つないでいた店舗が残っている状態で別の店舗を選ぶのは「店舗の切り替え」。
+  // 取得済みの口コミ・プロフィール・投稿・数値は前の店舗のものなので、
+  // 本人の確認なしには切り替えない（確認したら下で消す）。
+  const previousName = connection.location_name;
+  const switching = Boolean(previousName) && previousName !== locationName;
+  if (switching && body.confirmSwitch !== true) {
+    return fail(c, 400, '店舗を切り替えるには確認が必要です', { code: 'switch_confirmation_required' });
+  }
   const db = dbFor(c.env, store.id);
   const candidate = await db
     .prepare('SELECT location_name, location_title FROM rt_google_location_candidates WHERE store_id = ? AND location_name = ? LIMIT 1')
@@ -742,14 +823,36 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
     return googleErrorResponse(c, error);
   }
   if (!selectedLocation) return fail(c, 409, '選択した店舗をGoogleで確認できません', { code: 'location_mismatch' });
+  if (switching) {
+    // 取り込み済みのものは全部「前の店舗」の中身。新しい店舗の画面に混ざらないよう先に消す。
+    // 操作の記録（rt_google_write_log）は誰がいつ切り替えたかを追えるように残す。
+    await db.batch([
+      db.prepare('DELETE FROM rt_google_reviews WHERE store_id = ?').bind(store.id),
+      db.prepare('DELETE FROM rt_google_changes WHERE store_id = ?').bind(store.id),
+      db.prepare('DELETE FROM rt_google_profiles WHERE store_id = ?').bind(store.id),
+      db.prepare('DELETE FROM rt_google_posts WHERE store_id = ?').bind(store.id),
+      db.prepare('DELETE FROM rt_google_metrics_daily WHERE store_id = ?').bind(store.id),
+    ]);
+  }
   await db
     .prepare(
-      `UPDATE rt_google_connections SET location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE store_id = ?`,
+      switching
+        ? // 件数・評価・最終同期も前の店舗のものなので空に戻し、新しい店舗で取り直させる。
+          `UPDATE rt_google_connections
+             SET location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ?,
+                 average_rating = NULL, total_review_count = NULL, last_synced_at = NULL, last_metrics_synced_at = NULL, last_sync_error = NULL
+             WHERE store_id = ?`
+        : `UPDATE rt_google_connections SET location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE store_id = ?`,
     )
     .bind(candidate.location_name, selectedLocation.title, selectedLocation.mapsUri, nowIso(), nowIso(), store.id)
     .run();
   await db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
-  await writeLog(c, store.id, { kind: 'connect', targetName: candidate.location_name, result: 'accepted' });
+  await writeLog(c, store.id, {
+    kind: switching ? 'reconnect' : 'connect',
+    targetName: candidate.location_name,
+    beforeText: switching ? previousName : null,
+    result: 'accepted',
+  });
   auditLog(c, 'restaurant.google.connect', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
   return c.json({ success: true, connection: publicConnection(await connectionFor(c, store.id)) });
 });
@@ -769,17 +872,26 @@ restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectio
   } catch {
     revoked = false;
   }
-  // 履歴（口コミ・下書き・記録）は残す。止めるのは同期と書き込みだけ。
-  await dbFor(c.env, store.id)
+  // 解除したらGoogleから受け取ったものは残さない。公開中の個人情報の取扱い第6項が
+  // 「接続を解除した場合は保存している連携情報を削除します」と約束しているため、
+  // トークンだけでなく口コミ本文・プロフィール・指標・取り込み投稿・接続した
+  // Googleアカウントのメール・店舗名まで消す。
+  // 残すのは rt_google_write_log の操作記録（誰がいつ何を送ったか。送信前の
+  // スナップショットは消す）と、解除済みという接続行そのもの。
+  const db = dbFor(c.env, store.id);
+  await db
     .prepare(
       `UPDATE rt_google_connections
        SET refresh_token_enc = NULL, access_token_enc = NULL, access_token_expires_at = NULL,
+           google_account_email = NULL, location_name = NULL, location_title = NULL, location_maps_url = NULL,
+           average_rating = NULL, total_review_count = NULL,
+           last_synced_at = NULL, last_metrics_synced_at = NULL, last_sync_error = NULL,
            status = 'disconnected', disconnected_at = ?, updated_at = ?
        WHERE store_id = ?`,
     )
     .bind(nowIso(), nowIso(), store.id)
     .run();
-  await dbFor(c.env, store.id).prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
+  await deleteGoogleContentForStore(db, store.id);
   await writeLog(c, store.id, { kind: 'disconnect', targetName: connection.location_name, result: revoked ? 'accepted' : 'unknown', error: revoked ? null : 'revoke_failed' });
   auditLog(c, 'restaurant.google.disconnect', { id: store.id, kind: 'rt_store' }, { lineAccountId: store.lineAccountId });
   return c.json({ success: true, revoked, connection: publicConnection(await connectionFor(c, store.id)) });
@@ -901,7 +1013,10 @@ restaurantGoogle.get('/api/restaurant-test/google/reviews', async (c) => {
     where.push('(comment LIKE ? OR reviewer_display_name LIKE ?)');
     binds.push(`%${q}%`, `%${q}%`);
   }
-  const orderSql = order === 'oldest' ? 'create_time ASC' : order === 'rating_low' ? 'star_rating ASC, create_time DESC' : order === 'rating_high' ? 'star_rating DESC, create_time DESC' : 'create_time DESC';
+  // 口コミが編集されるとGoogleは update_time だけを新しくする。画面の「受信」も新しい方を出すので、
+  // 並び替えも COALESCE(update_time, create_time) を基準にして表示順と一致させる。
+  const receivedAt = 'COALESCE(update_time, create_time)';
+  const orderSql = order === 'oldest' ? `${receivedAt} ASC` : order === 'rating_low' ? `star_rating ASC, ${receivedAt} DESC` : order === 'rating_high' ? `star_rating DESC, ${receivedAt} DESC` : `${receivedAt} DESC`;
   const db = dbFor(c.env, store.id);
   const total = await db.prepare(`SELECT COUNT(*) AS n FROM rt_google_reviews WHERE ${where.join(' AND ')}`).bind(...binds).first<{ n: number }>();
   const rows = await db
@@ -967,19 +1082,43 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
     return fail(c, 409, 'この口コミにはすでに返信があります', { code: 'already_replied' });
   }
   if (!c.env.AI) return fail(c, 503, 'AI下書きはこの環境では使えません', { code: 'ai_unavailable' });
-  const body = await c.req.json<{ mode?: string }>().catch(() => ({}) as { mode?: string });
+  const body = await c.req.json<{ mode?: string; baseText?: string }>().catch(() => ({}) as { mode?: string; baseText?: string });
   const mode = body.mode === 'shorter' || body.mode === 'polite' ? body.mode : 'new';
+  // 「短くする」「丁寧にする」は、保存前に画面で直した文章を元にする。
+  // 画面から送られてこなかったときだけ、保存済みの下書きを使う。
+  const base = (typeof body.baseText === 'string' ? body.baseText.slice(0, 4096) : (row.reply_draft ?? '')).trim();
+  if (mode !== 'new' && !base) return fail(c, 400, '先に下書きを作るか、返信文を入力してください', { code: 'draft_required' });
   const connection = await connectionFor(c, store.id);
-  const prompt = buildReplyDraftPrompt({
-    storeTitle: connection?.location_title ?? store.name,
-    starRating: row.star_rating,
-    comment: row.comment,
-    mode,
-    previousDraft: row.reply_draft,
-  });
+  const storeTitle = connection?.location_title ?? store.name;
+  const generateOnce = async (strict: boolean) => {
+    const prompt = buildReplyDraftPrompt({
+      storeTitle,
+      starRating: row.star_rating,
+      comment: row.comment,
+      mode,
+      previousDraft: base,
+      strict,
+    });
+    return runGoogleAi(c, prompt, { temperature: mode === 'new' ? 0.4 : 0.3, maxTokens: 600 });
+  };
   let text = '';
   try {
-    text = await runGoogleAi(c, prompt, { temperature: 0.4, maxTokens: 600 });
+    text = await generateOnce(false);
+    // 1回目で目に見えて変わらなかったときだけ、条件を厳しくして作り直す。
+    // 2回のうち変化が大きい方を採用する。
+    if (replyDraftRewriteFellShort(mode, base, text)) {
+      const retried = await generateOnce(true).catch(() => '');
+      if (retried && replyDraftRewriteChangeScore(mode, base, retried) > replyDraftRewriteChangeScore(mode, base, text)) {
+        text = retried;
+      }
+      // 作り直しても元から十分に変わらなかった（無変化・逆方向・目安から遠い）結果は
+      // 書き換えの失敗として扱い、下書きには保存しない。画面は既存のエラー表示で
+      // やり直しを促す。不十分な文章を成功として保存しないため。
+      if (replyDraftRewriteFellShort(mode, base, text)) {
+        console.error('[restaurant-google] AI rewrite fell short', { mode, baseLength: base.length, resultLength: text.trim().length });
+        return fail(c, 502, '元の文章から十分に書き換えられませんでした。もう一度お試しください', { code: 'rewrite_failed' });
+      }
+    }
   } catch (error) {
     console.error('[restaurant-google] AI draft failed', { code: error instanceof GoogleAiTimeout ? 'timeout' : 'provider_failure' });
     return fail(c, error instanceof GoogleAiTimeout ? 504 : 502, 'AIの下書き作成に失敗しました。もう一度お試しください', { code: error instanceof GoogleAiTimeout ? 'ai_timeout' : 'ai_failed' });

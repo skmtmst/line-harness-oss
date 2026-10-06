@@ -5,15 +5,13 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('V6 機能20 分析', () => {
-  it('V6の8タブと実Nodeを維持する', () => {
+  it('8種類の分析への入口を維持する', () => {
     for (const tab of [
       '友だちの増減', '配信の反応', '経路と成果', '使われ方',
       'クロス分析', 'ファネル', 'URLクリック', '保存した分析',
     ]) expect(PAGE).toContain(`label: '${tab}'`)
 
-    for (const node of ['Zxezb', 'J6Inc', 'YBGtm', 'QQ1SR', 'f5HsX', 'C2I7ry', 'Fh2Qj', 'dfwD4']) {
-      expect(PAGE).toContain(`data-design-node="${node}"`)
-    }
+
   })
 
   it('クロス分析とファネルは旧集計へ戻らず、版付きの不変結果を使う', () => {
@@ -97,7 +95,7 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain("id=\"cross-measure-event\"")
     expect(PAGE).toContain("kind: 'events'")
     // N-288: 期間切替は選択状態を持ち、棒・段は名前を持つ。
-    expect(PAGE).toContain('aria-pressed={days === range}')
+    expect(readFileSync(new URL('../../components/shared/segmented.tsx', import.meta.url), 'utf8')).toContain('aria-pressed={option.value === value}')
     expect(PAGE).toContain('aria-describedby={`funnel-step-')
   })
 

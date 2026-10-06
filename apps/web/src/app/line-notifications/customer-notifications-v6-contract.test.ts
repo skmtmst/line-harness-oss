@@ -13,7 +13,6 @@ const HERE = import.meta.dirname
 /** リポジトリの根。`apps/web/src/app/line-notifications` から5つ上。 */
 const REPO = join(HERE, '..', '..', '..', '..', '..')
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
-const CSS = readFileSync(join(HERE, 'customer-notifications.module.css'), 'utf8')
 
 /**
  * 注釈を落とした page.tsx。「なぜ消したか」を書いた文が、消したはずの
@@ -25,46 +24,21 @@ const CODE = PAGE
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*\/\/.*$/gm, '')
 
-describe('V6 顧客へのお知らせの寸法', () => {
-  it('種類の絞り込みは 高さ40 / 角丸8 / 13px / 700', () => {
-    expect(CSS).toMatch(/\.category\s*\{[^}]*height: 40px;/)
-    expect(CSS).toMatch(/\.category\s*\{[^}]*border-radius: var\(--radius-control\);/)
-    expect(CSS).toMatch(/\.category\s*\{[^}]*font-size: var\(--text-label\);/)
-    expect(CSS).toMatch(/\.category\s*\{[^}]*font-weight: 500;/)
-    expect(PAGE).toContain('className={`${styles.category}')
-    // Tailwind直書きの帯へ戻さない。
-    expect(PAGE).not.toContain('rounded-control px-3 py-2.5 text-left text-sm')
+describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
+  // 板 g3iDs：一覧は全部出し、ページ送りは置かない。種類の数だけ並ぶ。
+  it('一覧はページ送りなしで全部出す', () => {
+    expect(PAGE).not.toContain('CUSTOMER_PAGE_SIZE')
+    expect(PAGE).not.toContain('<Pagination')
+    expect(PAGE).toContain('{visible.map((setting) => <Tr key={setting.eventType}>')
   })
 
-  it('主要ボタンは 高さ40 / 角丸8 / 余白[0,14] / 13px / 700', () => {
-    expect(CSS).toMatch(/\.action\s*\{[^}]*height: 40px;/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*border-radius: var\(--radius-control\);/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*padding: 0 14px;/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*font-size: var\(--text-label\);/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 600;/)
-    expect(PAGE).toContain('<Button variant="primary" onClick={onPublish}')
-    expect(PAGE).toContain('<Button onClick={onTestSend}')
-    // 直書きの主要ボタンへ戻さない。
-    expect(PAGE).not.toContain('bg-accent text-on-accent rounded-control px-5 py-2.5')
-  })
-
-  it('行の中の小さな操作は 高さ32 / 角丸6', () => {
-    expect(CSS).toMatch(/line-notification-v6-row-action\)\s*\{[^}]*height: 32px;/)
-    expect(CSS).toMatch(/line-notification-v6-row-action\)\s*\{[^}]*border-radius: var\(--radius-mini\);/)
-    expect(PAGE).toContain('className="line-notification-v6-row-action"')
-  })
-
-  it('カードは r10', () => {
-    // `--radius-card` は 10px 1本になった（以前は tile 10 と card 12 の2つ）。
-    // 値そのものは design-token-contract.test.ts が固定している。
-    expect(PAGE).toContain('rounded-card')
-  })
-
-  it('一覧は設計どおり1ページ6件に区切り、件数とページ送りを同じ場所に出す', () => {
-    expect(PAGE).toContain('const CUSTOMER_PAGE_SIZE = 6')
-    expect(PAGE).toContain('const visiblePage = visible.slice(')
-    expect(PAGE).toContain('<Pagination page={customerPage}')
-    expect(PAGE).toContain('お知らせの種類 {settings.length}つのうち {visiblePage.length}つを表示')
+  // 板 g3iDs：絞り込み・表・数カードは共通部品。手描きのv6行・分類ボタンは置かない。
+  it('絞り込み・表・数カードは共通部品を使う', () => {
+    expect(PAGE).toContain('<FilterChip')
+    expect(PAGE).toContain('<DataTable>')
+    expect(PAGE).toContain('<KpiCard')
+    expect(PAGE).not.toContain('line-notification-v6-row')
+    expect(PAGE).not.toContain('styles.category')
   })
 
   it('タブ帯は共通部品（高さ44）を使う', () => {

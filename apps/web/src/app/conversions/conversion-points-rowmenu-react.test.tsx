@@ -16,18 +16,31 @@ import ConversionsPage from './page'
  * ではなく body に出た `[role="menu"]` の数と、開いた先の詳細の有無。
  */
 
-const fixture = vi.hoisted(() => ({ accountId: 'account-a' as string | null }))
+const fixture = vi.hoisted(() => ({ accountId: 'account-a' as string | null, role: 'owner', roleMode: 'ok', tab: 'points', rows: 1, replace: vi.fn() }))
+let releaseRole: (value: Response) => void
+let writes: Array<{ path: string; body: Record<string, unknown> }> = []
 
-vi.mock('next/link', () => ({ default: () => null }))
+class MemoryStorage implements Storage {
+  private readonly values = new Map<string, string>()
+  get length() { return this.values.size }
+  clear() { this.values.clear() }
+  getItem(key: string) { return this.values.get(key) ?? null }
+  key(index: number) { return [...this.values.keys()][index] ?? null }
+  removeItem(key: string) { this.values.delete(key) }
+  setItem(key: string, value: string) { this.values.set(key, String(value)) }
+}
+
+vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(`tab=${fixture.tab}&affiliate=affiliate-a&from=notice`),
+  useRouter: () => ({ replace: fixture.replace, push: () => {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: () => null,
-  useMergedTab: () => 'points',
+  useMergedTab: () => fixture.tab,
 }))
 
 const DEFINITION = {
@@ -65,18 +78,27 @@ function listBody() {
   return {
     success: true,
     data: {
-      items: [DEFINITION],
-      stateCounts: { active: 1, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0, unused: 0 },
+      items: Array.from({ length: fixture.rows }, (_, index) => ({ ...DEFINITION, id: `point-${index}`, name: index === 0 ? '購入' : `購入 ${index + 1}` })),
+      stateCounts: { active: fixture.rows, draft: 0, stopped: 0, invalid: 0, sourceStopped: 0, unused: 0 },
       range: { from: '2026-09-01 00:00:00', to: '2026-09-30 23:59:59', timeZone: 'Asia/Tokyo' },
-      pagination: { total: 1, limit: 50, cursor: '0', nextCursor: null },
+      pagination: { total: fixture.rows, limit: 50, cursor: '0', nextCursor: null },
     },
   }
 }
 
 function installFetch() {
-  vi.stubGlobal('fetch', async (input: unknown) => {
+  vi.stubGlobal('fetch', async (input: unknown, options?: RequestInit) => {
     const raw = typeof input === 'string' ? input : String(input)
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
+    const reply = (data: unknown, status = 200) => new Response(JSON.stringify({ success: status === 200, data }), { status, headers: { 'Content-Type': 'application/json' } })
+    if (path.startsWith('/api/conversions/') && options?.method && options.method !== 'GET') writes.push({ path, body: JSON.parse(String(options.body ?? '{}')) })
+    if (path.includes('/ingest-events')) return reply({ items: [] })
+    if (path.startsWith('/api/staff/me')) {
+      if (fixture.roleMode === 'pending') return new Promise<Response>((resolve) => { releaseRole = resolve })
+      return reply({ role: fixture.role }, fixture.roleMode === 'failed' ? 503 : 200)
+    }
+    if (path.includes('/delete-impact')) return reply({ definition: DEFINITION, usages: [], eventCount: 5, canDelete: false, stopImpact: { affectedUsageCount: 1, preservesPastEvents: true, preservesUsages: true }, replacementCandidates: [] })
+    if (path.endsWith('/stop')) return reply({ id: DEFINITION.id, status: 'stopped', version: 4, stoppedAt: '2026-10-04' })
     if (path.startsWith('/api/conversions/definitions')) {
       return new Response(JSON.stringify(listBody()), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
@@ -121,6 +143,14 @@ async function click(node: HTMLElement | undefined) {
 
 beforeEach(() => {
   fixture.accountId = 'account-a'
+  fixture.role = 'owner'
+  fixture.roleMode = 'ok'
+  fixture.tab = 'points'
+  fixture.rows = 1
+  fixture.replace.mockClear()
+  writes = []
+  vi.stubGlobal('localStorage', new MemoryStorage())
+  localStorage.setItem('lh_csrf', 'test-csrf')
   installFetch()
 })
 
@@ -169,5 +199,68 @@ describe('R280 成果地点の操作メニューは1つだけ', () => {
     })
     await act(async () => { await Promise.resolve() })
     expect(document.body.textContent).toContain('この成果地点の数え方と利用状況です。')
+  })
+})
+
+
+describe('V8 閲覧だけの担当者と権限確認中', () => {
+  for (const roleMode of ['staff', 'failed', 'pending']) {
+    it(`${roleMode} は管理操作を出さず、詳細の閲覧は残す`, async () => {
+      fixture.role = 'staff'
+      fixture.roleMode = roleMode === 'staff' ? 'ok' : roleMode
+      await mount()
+      expect(container.querySelector('a[href="/conversions/new"]')).toBeNull()
+      await click(moreButtons()[0])
+      expect(byText('編集する')).toBeUndefined()
+      expect(byText('止める・差し替える・削除する')).toBeUndefined()
+      expect(byText('使う場所を足す')).toBeUndefined()
+      await click(byText('中身を見る'))
+      expect(byText('編集')).toBeUndefined()
+      expect(byText('停止・削除する')).toBeUndefined()
+      expect(byText('鍵を発行する')).toBeUndefined()
+      expect(document.body.textContent).toContain('この成果地点の数え方と利用状況です。')
+      expect(writes).toEqual([])
+      if (roleMode === 'pending') {
+        await act(async () => { releaseRole(new Response(JSON.stringify({ success: true, data: { role: 'owner' } }), { headers: { 'Content-Type': 'application/json' } })) })
+        expect(container.querySelector('a[href="/conversions/new"]')).not.toBeNull()
+        expect(byText('編集')).toBeTruthy()
+      }
+    })
+  }
+
+  it('停止の理由が空なら送らず、入力した理由と開いた版を送る', async () => {
+    await mount()
+    await click(moreButtons()[0])
+    await click(byText('止める・差し替える・削除する'))
+    await click(byText('数えるのをやめる'))
+    expect(writes).toHaveLength(0)
+    expect(document.body.textContent).toContain('理由を入力してください')
+    const reason = document.body.querySelector<HTMLInputElement>('#cv-stop-reason')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(reason, '計測の仕方を変えるため')
+      reason.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click(byText('数えるのをやめる'))
+    expect(writes).toHaveLength(1)
+    expect(writes[0].body).toMatchObject({ expectedVersion: 3, reason: '計測の仕方を変えるため' })
+  })
+
+  it('表示件数を増やすとページを戻し、全21行を表示する', async () => {
+    fixture.rows = 21
+    await mount()
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(20)
+    await click(container.querySelector<HTMLButtonElement>('button[aria-label="次のページ"]') ?? undefined)
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+    await click(container.querySelector<HTMLButtonElement>('button[aria-label="表示件数"]') ?? undefined)
+    await click(byText('50件表示'))
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(21)
+    expect(container.querySelector('button[aria-label="次のページ"]')).toBeNull()
+  })
+
+  it('旧URLの紹介者や送り元を失わず成果とアフィリエイトへ送る', async () => {
+    fixture.tab = 'approvals'
+    await mount()
+    expect(fixture.replace).toHaveBeenCalledWith('/affiliates?tab=approvals&affiliate=affiliate-a&from=notice')
+    expect(container.querySelector('table')).toBeNull()
   })
 })

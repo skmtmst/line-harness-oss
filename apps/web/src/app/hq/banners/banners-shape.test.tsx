@@ -18,8 +18,9 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => '/hq/banners',
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
 vi.mock('@/components/hq/banners/projects-section', () => ({ default: () => null }))
 vi.mock('@/components/hq/banners/library-section', () => ({ default: () => null }))
 vi.mock('@/lib/api', () => ({

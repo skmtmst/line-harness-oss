@@ -21,10 +21,10 @@ const PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
 describe('CHK-04 友だち詳細「最近の履歴」の狭幅表示', () => {
   it('表組みはカード幅(@lg)でのみ。狭いカードでは見出しを畳み各行カードにする', () => {
     // カード自身がコンテナになり、その幅で表組み/折り返しを切り替える。
-    expect(PAGE).toContain('@container bg-canvas rounded-card border-hairline overflow-hidden border shadow-card')
+    expect(PAGE).toContain('@container min-w-0 bg-canvas')
     expect(PAGE).toContain('@container bg-canvas rounded-card border-hairline overflow-hidden border')
     // 見出し行はコンテナが狭いとき消す（hidden ... @lg:grid）。
-    expect(PAGE).toContain('hidden border-y px-4 py-3 text-xs font-semibold text-ink-faint @lg:grid')
+    expect(PAGE).toContain('flex min-w-0 items-start gap-3 py-3 text-xs')
     expect(PAGE).toContain('hidden border-b px-4 py-3 text-xs font-semibold text-ink-faint @lg:grid')
     // 各行は flex-wrap のカード。本文は行いっぱいに折り返す。
     expect(PAGE).toContain('flex flex-wrap items-baseline gap-x-3 gap-y-1')
@@ -39,9 +39,12 @@ describe('CHK-04 友だち詳細「最近の履歴」の狭幅表示', () => {
 
   it('タブ帯ははみ出し中だけ右端フェードで続きを示す', () => {
     // V7 の「折らずに横へ流す」を維持しつつ、切断が壊れに見えないようにする。
-    expect(PAGE).toContain('overflow-x-auto')
+    expect(PAGE).toContain('className={styles.tabs}')
     expect(PAGE).toContain('tabsOverflowing')
     expect(PAGE).toContain('bg-gradient-to-l')
+    // あとから本文フォントが届いて中のタブ名だけが広がる場合、ResizeObserver
+    // は動かずフェードが出ないまま残る。読み込み完了時にもう一度測る。
+    expect(PAGE).toContain('document.fonts?.ready')
   })
 
   it('「すべてを見る」は実際の履歴タブへつながる', () => {

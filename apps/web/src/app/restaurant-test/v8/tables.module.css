@@ -1,0 +1,179 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8-B 座席・卓管理（板 `BERxg`）。
+ * 器（shell）の数・枠に加え、フロアマップ（選ぶと結合札）・卓の詳細だけの段を持つ。
+ */
+.addRow {
+  display: flex;
+  justify-content: flex-end;
+  margin: 16px 0 0;
+}
+
+.mapGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 20px;
+  list-style: none;
+}
+
+@container (max-width: 900px) {
+  .mapGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.mapCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 96px;
+  padding: 14px 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  cursor: grab;
+  width: 100%;
+}
+
+.mapCard[aria-pressed="true"] {
+  border: 1.5px solid var(--color-accent-deep);
+  background: var(--color-accent-soft);
+}
+
+.mapCardStopped {
+  opacity: 0.55;
+}
+
+.mapCode {
+  font-size: 11px;
+  color: var(--color-ink-faint);
+}
+
+.mapLabel {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mapCapacity {
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.mapJoin {
+  margin-top: 4px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-canvas);
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-accent-deep);
+}
+
+.detailList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detailRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.detailRow:first-child {
+  border-top: none;
+}
+
+.detailMain {
+  min-width: 0;
+  margin-right: auto;
+}
+
+.detailName {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.detailSub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-ink-faint);
+}
+
+.detailActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 20px;
+}
+
+@container (max-width: 900px) {
+  .formGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+}
+
+.select,
+.numberInput {
+  height: 36px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control, 10px);
+  background: var(--color-canvas);
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.formActions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ruleTitle {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent-deep);
+}
+
+.ruleText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--color-ink-secondary);
+}
+
+.mapCard:active { cursor: grabbing; }
+.mapCard:disabled { cursor: wait; }

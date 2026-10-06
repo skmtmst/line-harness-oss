@@ -1,0 +1,286 @@
+@layer properties, theme, base, components, utilities;
+/*
+ * ★V8 シナリオ配信の配信結果（Pencil `X4STXS`）。
+ *
+ * このファイルは results-v8.tsx だけが読む。results-v8.tsx は
+ * v8 のテーマのときしか出ないので、ここではテーマ条件の
+ * セレクタは書かない（v7 の見た目には一切効かない）。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 上の行：戻るリンクと、右にまとめる操作。 */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.crumb {
+  color: var(--color-action);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.crumb:hover {
+  text-decoration: underline;
+}
+
+.actionEnd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* 題の行：名前＋状態の札＋「配信結果」。 */
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.titleSuffix {
+  color: var(--color-ink-faint);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 送れずに止まった人がいるときの帯（板の警告帯）。 */
+.bandWarn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-warning-bg);
+}
+
+.bandWarn p {
+  margin: 0;
+  color: var(--color-warning);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bandWarn button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-warning);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* いま送っているときの帯（板の送信中状態）。 */
+.bandInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-info, var(--color-action));
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-info-bg, var(--color-status-info-soft, var(--color-canvas-sunken)));
+}
+
+.bandInfo p {
+  margin: 0;
+  color: var(--color-info, var(--color-action));
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 数の帯：1枚の板の中に4つの数（届いた・送れなかった・途中・終わった）。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 16px;
+}
+
+.kpi:first-child {
+  padding-left: 0;
+}
+
+.kpi + .kpi {
+  border-left: 1px solid var(--color-hairline);
+}
+
+.kpiLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kpiValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiUnit {
+  margin-left: 2px;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.kpiDetail {
+  margin: 0;
+  min-height: 1.5em;
+  color: var(--color-ink-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* 段の箱（通ごとの結果・友だちごとの記録）。 */
+.panel {
+  padding: 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card, 12px);
+  background: var(--color-canvas);
+}
+
+.panelTitle {
+  margin: 0 0 10px;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.panelHeadRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+
+.panelHeadRow .panelTitle {
+  margin: 0;
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 10px 0 12px;
+}
+
+/* 通ごとの結果の行。 */
+.stepList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.stepNo {
+  width: 44px;
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stepWhen {
+  width: 150px;
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.stepReach {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.stepBar {
+  display: inline-block;
+  width: 110px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.stepBarFill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-success);
+}
+
+.stepReachText {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stepMeta {
+  margin-left: auto;
+  color: var(--color-ink-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

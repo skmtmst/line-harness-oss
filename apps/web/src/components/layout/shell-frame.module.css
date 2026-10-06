@@ -1,0 +1,12 @@
+[data-theme='v8'] .shell { display: flex; height: 100%; width: 100%; gap: 0; overflow: hidden; background: var(--color-shell); }
+[data-theme='v8'] .navigation { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 240px; height: 100%; flex-shrink: 0; padding: 16px 12px; }
+[data-theme='v8'] .navigation[data-collapsed] { width: 64px; padding: 16px 12px; }
+[data-theme='v8'] .side { display: flex; flex-direction: column; align-items: flex-start; flex: 1; height: 100%; padding: 0 12px 12px 0; gap: 0; min-width: 0; }
+[data-theme='v8'] .topBar { display: flex; align-items: center; width: 100%; height: 60px; padding: 0 8px; gap: 10px; flex-shrink: 0; }
+[data-theme='v8'] .board { display: flex; flex-direction: column; align-items: flex-start; width: 100%; flex: 1; min-height: 0; gap: 0; background: var(--color-canvas); border-radius: 16px; outline: 1px solid var(--color-board-line); outline-offset: -0.5px; box-shadow: var(--shadow-board); overflow: hidden; }
+
+[data-theme='v8'] .navigation[data-collapsed] { gap: 6px; }
+
+[data-theme='v8'] .topBar > * { width: 100%; padding-inline: 0; }
+
+[data-theme='v8'] .navigation[data-collapsed] { align-items: center; }

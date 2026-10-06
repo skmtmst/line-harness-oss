@@ -43,12 +43,16 @@ export interface BroadcastStepInput {
   scheduleDone: boolean
 }
 
+/*
+ * 段の名前は ★V8 板 `FU2aU` どおり（2026-10-04 の絵合わせで変更。
+ * 旧名「対象者・メッセージ・確認」を指す契約テストも同日に書き換え）。
+ */
 const DEFINITIONS: ReadonlyArray<{ key: BroadcastStepKey; label: string; anchor: string }> = [
   { key: 'basic', label: '基本設定', anchor: 'broadcast-step-basic' },
-  { key: 'audience', label: '対象者', anchor: 'broadcast-step-audience' },
-  { key: 'message', label: 'メッセージ', anchor: 'broadcast-step-message' },
+  { key: 'audience', label: '配信対象', anchor: 'broadcast-step-audience' },
+  { key: 'message', label: 'メッセージを作成', anchor: 'broadcast-step-message' },
   { key: 'schedule', label: '送信設定', anchor: 'broadcast-step-schedule' },
-  { key: 'confirm', label: '確認', anchor: 'broadcast-step-confirm' },
+  { key: 'confirm', label: '最終確認', anchor: 'broadcast-step-confirm' },
 ]
 
 /**

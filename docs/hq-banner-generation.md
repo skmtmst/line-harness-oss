@@ -51,7 +51,7 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 
 ## 用途と画像の大きさ
 
-画像生成APIが受け付ける大きさは 3 種類なので、用途ごとにいちばん近いものを選ぶ。生成後は用途の規格へ Cloudflare Images binding（`CF_IMAGES`）で `fit: cover` 整形し、切り抜きの位置（中央・上・下）は生成パネルで選ぶ（R120・2026-09-28）。binding が無い環境（手元・試験）では元のまま保存し、画面に「大きさの調整は検証環境で確認」と出す。縦横比が違う用途では、プロンプトで「重要な文字は中央に収める」と指示する。
+画像生成APIが受け付ける大きさは 3 種類なので、用途ごとにいちばん近いものを選ぶ。生成後は用途の規格へ Cloudflare Images binding（`CF_IMAGES`）で `fit: cover` 整形し、切り抜きの位置は**常に中央**（R120・2026-09-28／2026-10-06 にオーナー指示で生成パネルの選択UIと点線の枠を機能外として外した。受け口 `cropPosition` と Worker の `gravity` は残す）。binding が無い環境（手元・試験）では元のまま保存し、画面に「大きさの調整は検証環境で確認」と出す。縦横比が違う用途では、プロンプトで「重要な文字は中央に収める」と指示する。
 
 | 用途 | 規格 | 縦横比 | APIの大きさ |
 |---|---|---|---|
@@ -93,7 +93,7 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 | 表 | 役割 |
 |---|---|
 | `banner_projects` | プロジェクト。統括ごと。アーカイブは `archived_at` |
-| `banner_generations` | 1回の「生成する」。条件・プロンプト・進み具合・失敗理由。参照画像は `reference_image_id`（`banner_images`）と `reference_mode`（edit／inspire、migration 389） |
+| `banner_generations` | 1回の「生成する」。条件・プロンプト・進み具合・失敗理由。参照画像は `reference_image_id`（`banner_images`）と `reference_mode`（edit／inspire、migration 389）。行ごとの強調は `emphasis_lines`（`text_lines` と同じ順の JSON、migration 581） |
 | `banner_images` | 画像1枚。実体は `media`（`line_account_id` が NULL＝統括所有） |
 | `banner_image_deliveries` | 店舗へ渡した記録。店舗側の `media` 行との対応 |
 | `banner_usage_ledger` | 利用量の台帳（`units` は 1枚＝1） |
@@ -143,6 +143,17 @@ OpenAI の公式価格はトークン単位（gpt-image-2: 出力 $15/1M トー�
 - どちらも OpenAI の `images/edits`（multipart）に画像を添える。違いはプロンプトの先頭で伝える（`services/banner-prompt.ts`）
 - 枚数の上限・1 日の上限・1 回 4 枚までは同じ。参照画像が消されていたら、その生成は分かる言葉で止まる（OpenAI は呼ばない）
 - 画像の詳細モーダルの「参照画像にする」でも選べる
+
+## 画像に入れるテキストと行ごとの「強調」（2026-10-06 追加）
+
+承認: `musubo-design/バナー生成.pen` のフレーム `qIp42`（★ BG-B プロジェクト詳細）内「項目 画像に入れるテキスト」`g64HOD`・2026-10-06・利用者回答「この案で承認する」。
+
+- 生成パネルの「画像に入れるテキスト」は **1行に1つ・40文字まで**（`TEXT_LINE_LENGTH_MAX` と Worker の `BANNER_MAX_TEXT_LINE_LENGTH` が 40。以前の設計メモの「20文字まで」は誤りで、40文字に合わせた）。行は6行まで
+- 各行の右に「強調」ボタンがある。行ごとに入り切りでき、押した状態は `aria-pressed` で読み上げに伝える。印（アイコン）や丸は付けず、枠と中の色が変わるだけ
+- 行を足す・消すをしても、強調の指定は同じ行に付いてくる（行と強調を組にしてから空行を落とす。`packedTextLines`）
+- 強調した行はプロンプトで「特に目立たせる」と伝え、**強調カラー**を指定しているときは「その行は強調カラーで他の行よりはっきり目立たせる」と足す（`services/banner-prompt.ts`）
+- 指定は `banner_generations.emphasis_lines` に残るので、「同じ条件で作る」で戻したときも強調が復元する。この列より前の生成は NULL＝強調なしとして読む
+- 同じ 2026-10-06 の指示で、生成パネルから「バナー／自由入力」の切替・「切り抜きの位置」・その下の点線の枠を機能外として外し、出力サイズと人物の選択は細いカードにした。カードの印（アイコン）とラジオの丸は全画面で出さない
 
 ## まだやっていないこと
 

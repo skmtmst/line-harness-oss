@@ -13,6 +13,8 @@ import AccountDetailPage from './page'
  * 統括・管理者だけに開く。
  */
 
+vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
+
 const fixture = vi.hoisted(() => ({
   tab: 'overview' as string | null,
   role: 'owner' as 'owner' | 'staff',
@@ -112,10 +114,11 @@ function clickButton(label: string) {
 }
 
 describe('R73 編集・差替えの入口', () => {
-  it('「編集する」で登録内容の入力窓が開く', async () => {
+  it('「編集」で登録内容の入力窓が開く', async () => {
     await renderPage()
-    clickButton('編集する')
+    clickButton('編集')
     expect(host.textContent).toContain('登録の内容を編集する')
+    expect(host.querySelector('input[aria-label="タイムゾーン"]')).toBeTruthy()
     const nameInput = host.querySelector('input[value="然-NEN- TEST"]')
     expect(nameInput).toBeTruthy()
   })
@@ -142,3 +145,20 @@ describe('R73 編集・差替えの入口', () => {
     expect(host.textContent).toContain('資格情報を差し替える')
   })
 })
+
+ it('V8 saves timezone through PUT and reloads the account', async () => {
+    await renderPage(); clickButton('編集');
+    const input = host.querySelector('input[aria-label="タイムゾーン"]') as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'Europe/Paris');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const original = globalThis.fetch;
+    vi.stubGlobal('fetch', async (url: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: String(url), init });
+      return original(url, init);
+    });
+    await act(async () => { host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    expect(requests.some((r) => r.init?.method === 'PUT' && JSON.parse(String(r.init.body)).timezone === 'Europe/Paris')).toBe(true);
+ });

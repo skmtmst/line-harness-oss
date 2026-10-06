@@ -167,6 +167,7 @@ describe('ウェビナー参加者の分類表示と絞り込み (IDEA-10)', () 
     await act(async () => { root.render(<EditWebinarPage />) })
     await flush()
 
+    await act(async () => { (host.querySelector('button[aria-label="分類の根拠"]') as HTMLButtonElement).click() })
     // 分類の根拠（完了閾値 540秒=9:00 はサーバー応答の rule から）。
     expect(host.textContent).toContain('分類の根拠')
     expect(host.textContent).toContain('9:00')

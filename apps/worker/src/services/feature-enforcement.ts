@@ -55,6 +55,16 @@ export type FeatureJobMetadata = {
  */
 export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
   {
+    name: 'follower import continuation',
+    classification: { kind: 'core', reason: 'LINEアカウント登録後の既存友だちの取り込み継続' },
+    enforcement: { mode: 'exempt', reason: '登録処理の後半で、個別機能の有効・無効には属さない' },
+  },
+  {
+    name: 'restaurant hold expiry',
+    classification: { kind: 'core', reason: '保存済み予約の仮押さえ期限と予約済み価格変更の後始末' },
+    enforcement: { mode: 'exempt', reason: '飲食店の検証環境だけで、保存済みの期限と予約した変更を確定する' },
+  },
+  {
     name: 'friend bulk runs',
     classification: { kind: 'core', reason: '複数機能の友だち一括操作' },
     enforcement: { mode: 'exempt', reason: '共通の一括操作で、単一機能に属さない' },
@@ -337,6 +347,14 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'tenant data retention purge',
+    classification: { kind: 'core', reason: '退会後の顧客データ保存期限（★V6 36-2）' },
+    enforcement: {
+      mode: 'exempt',
+      reason: '契約が終わった統括のデータ削除で、機能スイッチのon/offに関係なく実行する',
+    },
+  },
+  {
     name: 'restaurant raw mail retention',
     classification: { kind: 'feature', featureId: 'restaurant_test' },
     enforcement: {
@@ -361,6 +379,23 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       mode: 'gated',
       sources: ['apps/worker/src/services/google-business-resync.ts'],
       markers: ["'restaurant_test', 'google business metrics'"],
+    },
+  },
+  {
+    name: 'google business token keepalive',
+    classification: { kind: 'core', reason: 'Google認可（リフレッシュトークン）の失効防止' },
+    enforcement: {
+      mode: 'exempt',
+      reason: '機能offの間もトークンを生かし続けるのが目的で、offで止めると放置失効して再接続が必要になる',
+    },
+  },
+  {
+    name: 'google business content retention',
+    classification: { kind: 'core', reason: 'Googleから受け取った内容の保存期限（暦日30日）' },
+    enforcement: {
+      mode: 'exempt',
+      reason:
+        'Googleの利用者データポリシーで決まった保存期限の掃除で、機能をoffにした店舗の古いコピーが残り続けるほうが違反になる',
     },
   },
   {

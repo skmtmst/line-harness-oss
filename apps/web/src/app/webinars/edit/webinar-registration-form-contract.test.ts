@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, 'cta-v8.tsx'), 'utf8') + fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const ERROR_TEXT = fs.readFileSync(
   path.join(__dirname, '..', '..', '..', 'components', 'webinars', 'webinar-error-text.ts'),
@@ -19,7 +19,7 @@ describe('N-113 ウェビナーの申込フォーム選択の契約', () => {
     /* 口は account_id で絞る。別アカウントは器の段階で混ざらない。 */
     expect(PAGE).toContain('/api/forms?account_id=')
     /* 停止中は候補から外す（公開中だけ）。 */
-    expect(PAGE).toContain('publishedRegistrationForms')
+    expect(PAGE).toContain('publishedForms')
     expect(PAGE).toContain('.filter((form) => form.isActive)')
     /* 判定材料の isActive を口の型に含める。 */
     expect(API).toContain('isActive: boolean')
@@ -46,7 +46,7 @@ describe('N-113 ウェビナーの申込フォーム選択の契約', () => {
     /* 開き直し時は保存済みの registrationFormId を初期値にする。 */
     expect(PAGE).toContain('useState<string>(editor.registrationFormId ??')
     /* 二重保存を防ぐ。 */
-    expect(PAGE).toContain('disabled={savingRegistrationForm')
+    expect(PAGE).toContain('disabled={conflict || readingLatest || savingRegistrationForm')
     expect(PAGE).toContain('busy={savingRegistrationForm')
   })
 
@@ -54,7 +54,7 @@ describe('N-113 ウェビナーの申込フォーム選択の契約', () => {
     /* サーバーの拒否コードを受けて候補を取り直す。 */
     expect(PAGE).toContain('form_inactive_or_missing')
     expect(PAGE).toContain('form_account_mismatch')
-    expect(PAGE).toContain('loadRegistrationForms()')
+    expect(PAGE).toContain('loadForms()')
     /* 理由文は共通の日本語化を通す。 */
     expect(PAGE).toContain('webinarErrorText(cause,')
     expect(ERROR_TEXT).toContain('form_inactive_or_missing')
@@ -67,9 +67,9 @@ describe('N-113 ウェビナーの申込フォーム選択の契約', () => {
 
   it('選択→保存→再読込→公開前確認の一連の流れがつながる', () => {
     /* 保存済みの表示は editor の公開フォーム詳細から描く。 */
-    expect(PAGE).toContain('editor.publicPage.form')
+    expect(PAGE).toContain('editor.publicPage?.form')
     /* 公開前確認は公開フォームの有効状態を見る。 */
-    expect(PAGE).toContain('webinarApi.publishValidation(webinar.id)')
+    expect(fs.readFileSync(path.join(__dirname, 'review-v8.tsx'), 'utf8')).toContain('webinarApi.publishValidation(webinar.id)')
     expect(WORKER).toContain("key: 'form_active'")
     /* 保存後の案内で公開前確認へ誘導する。 */
     expect(PAGE).toContain('公開前確認で申込フォーム')
@@ -77,7 +77,7 @@ describe('N-113 ウェビナーの申込フォーム選択の契約', () => {
 
   it('CTA内のフォームと申込フォームを混同しない', () => {
     /* CTA側は CTA カードの formId のまま。 */
-    expect(PAGE).toContain('primary?.formId')
+    expect(PAGE).toContain('current.formId')
     /* 申込側は registrationFormId のまま。別名で扱う。 */
     expect(PAGE).toContain('selectedRegistrationFormId')
     expect(PAGE).toContain('editor.registrationFormId')

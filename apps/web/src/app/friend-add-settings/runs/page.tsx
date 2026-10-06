@@ -9,7 +9,9 @@ import type {
   FriendAddEventRoutingStatus,
 } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, type FriendAddRunList } from '@/lib/api'
+import FriendAddRunsV8 from './runs-v8'
 import { describeFriendAddFailure } from '../friend-add-failure'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { csvCell } from './csv'
@@ -234,7 +236,7 @@ function FriendAddRunsInner() {
       const detail = await api.friendAddRules.get(selectedAccountId, activeRuleId)
       if (!detail.success) throw new Error('rule detail missing')
       const response = await api.friendAddRules.stop(selectedAccountId, activeRuleId, detail.data.rule.version)
-      setStopMessage(response.success ? '配信を一時停止しました。' : '配信を停止できませんでした。')
+      setStopMessage(response.success ? '配信を止めました。' : '配信を止められませんでした。')
       if (response.success) {
         setStopDialogOpen(false)
         // 停止後の状態を読み直す。読み直さないと停止中も稼働中に見える。
@@ -597,9 +599,9 @@ function FriendAddRunsInner() {
       })()}</>} />
       <ConfirmDialog
         open={stopDialogOpen}
-        title="友だち追加時の配信を一時停止しますか？"
+        title="友だち追加時の配信を止めますか？"
         description="停止後は、新しく友だち追加された人へこの案内が送られません。設定は残るため、あとで再開できます。"
-        confirmLabel="一時停止する"
+        confirmLabel="止める"
         busy={stopBusy}
         error={stopMessage.includes('できませんでした') ? stopMessage : undefined}
         onCancel={() => {
@@ -615,7 +617,15 @@ export default function FriendAddRunsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <FriendAddRunsInner />
+      <FriendAddRunsSwitch />
     </Suspense>
   )
+}
+
+function FriendAddRunsSwitch() {
+  /*
+   * ★V8 分岐：実行結果（板 `REIxB`）を `data-theme="v8"` の下で積み替える。
+   */
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <FriendAddRunsV8 /> : <FriendAddRunsInner />
 }

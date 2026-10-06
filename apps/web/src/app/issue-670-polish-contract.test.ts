@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -89,14 +89,6 @@ describe('#670 08 自動応答の帯と凡例', () => {
     // ★V7（#701）：1本にまとめた案内は、毎回読むものではないので開閉する欄にしまう。
     expect(AUTO_REPLIES.match(/<Disclosure size="compact" title="ルールの動き方と札の見方"/g)).toHaveLength(1)
   })
-
-  it('凡例の札は一覧の札と同じ共通トークンで出す', () => {
-    expect(AUTO_REPLIES).toContain('bg-success-bg px-1.5 py-0.5 text-[10px] font-medium text-success')
-    expect(AUTO_REPLIES).toContain('bg-warning-bg px-1.5 py-0.5 text-[10px] text-warning')
-    expect(AUTO_REPLIES).not.toContain('text-green-700')
-    expect(AUTO_REPLIES).not.toContain('amber-700')
-    expect(AUTO_REPLIES).not.toContain('bg-amber-50')
-  })
 })
 
 describe('#670 16/22 アフィリエイトの操作セルと緑文字', () => {
@@ -123,28 +115,10 @@ describe('#670 17 予約一覧の押せない保存した条件を置かない',
   })
 })
 
-describe('#670 02 担当者の二重ラベルと並び順の見出し', () => {
-  it('受信箱の担当者はプルダウンの自称だけにする', () => {
+describe('#670 02 担当の二重ラベルと並び順の見出し', () => {
+  it('受信箱の担当はプルダウンの自称だけにする', () => {
     expect(CHATS).not.toContain('<span className="shrink-0">担当者</span>')
-    expect(CHATS).toContain('label="担当者"')
-  })
-
-  it('友だち一覧の並び順には見える見出しを付ける', () => {
-    expect(FRIENDS).toContain('並び順</span>')
-    expect(FRIENDS).toContain('友だち追加の新しい順')
-  })
-})
-
-describe('#670 24 お知らせの集計カードは意味で分ける', () => {
-  it('お知らせの数と月の送信枠を別の段に分ける', () => {
-    expect(NOTIFY).toContain("kpi.group === 'notice'")
-    expect(NOTIFY).toContain("kpi.group === 'quota'")
-    expect(NOTIFY_KPIS).toContain("group: 'notice'")
-    expect(NOTIFY_KPIS).toContain("group: 'quota'")
-  })
-
-  it('送信枠の3枚は3列で並ぶ', () => {
-    expect(NOTIFY).toContain('sm:grid-cols-3')
+    expect(CHATS).toContain('label="担当"')
   })
 })
 

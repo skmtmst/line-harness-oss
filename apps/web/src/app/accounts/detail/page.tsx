@@ -1,5 +1,8 @@
 'use client'
 
+import '@/app/notifications/readonly-v8.css'
+import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
+
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState } from 'react'
@@ -13,6 +16,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextArea } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
@@ -68,6 +72,7 @@ function AccountDetail() {
   const [editSection, setEditSection] = useState<null | 'basic' | 'credentials'>(null)
   /** 保存口は統括・管理者だけ。運用担当には入力の入口を見せない。 */
   const [canManage, setCanManage] = useState(false)
+  const [canEditTimezone, setCanEditTimezone] = useState(false)
   /** ダイアログ内のエラー（必須漏れ・接続失敗など）。窓を閉じずに見せる。 */
   const [dialogError, setDialogError] = useState('')
   /** 止めている間に送らなかった配信の一覧（X-1）。 */
@@ -120,7 +125,10 @@ function AccountDetail() {
   useEffect(() => {
     let active = true
     void api.staff.me().then((response) => {
-      if (active && response.success) setCanManage(response.data.role === 'owner' || response.data.role === 'admin')
+      if (active && response.success) {
+        setCanManage(response.data.role === 'owner' || response.data.role === 'admin')
+        setCanEditTimezone(response.data.role === 'owner')
+      }
     })
     return () => { active = false }
   }, [])
@@ -261,7 +269,8 @@ function AccountDetail() {
   const webhook = webhookLabel(account)
 
   return (
-    <div data-design-node="T9rA9" className="flex flex-col gap-4">
+    <div data-design-node="ihjfd" className="flex flex-col gap-4 v8-ro-notifications-page">
+      <ReadonlyHeaderV8 title={account.name} description="登録の内容・接続状態・送受信の記録を確認します。秘密値は表示しません。" />
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Head">
         <Breadcrumb items={[{ label: 'LINEアカウント', href: '/accounts' }, { label: account.name }]} />
@@ -283,7 +292,7 @@ function AccountDetail() {
               <div className="flex items-start justify-between gap-3">
                 <p className="text-ink text-base font-bold">登録の内容</p>
                 {canManage && (
-                  <Button type="button" onClick={() => setEditSection('basic')}>編集する</Button>
+                  <Button type="button" onClick={() => setEditSection('basic')}>編集</Button>
                 )}
               </div>
               <dl className="mt-3">
@@ -469,6 +478,7 @@ function AccountDetail() {
 
             <Card padding="roomy">
               <p className="text-ink text-sm font-bold">つながる先</p>
+              <Button href="/?qr=base" variant="secondary" className="mt-3">友だち追加URLとQRを見る</Button>
               <ul className="text-ink-secondary mt-3 space-y-3 text-xs">
                 <li><Link className="text-action hover:underline" href="/">ダッシュボード</Link><p className="mt-1">友だち追加URLとQRはここに出ます。</p></li>
                 <li><Link className="text-action hover:underline" href="/staff">ログインユーザー</Link><p className="mt-1">人ごとの既定のアカウントはここで決めます。</p></li>
@@ -558,25 +568,26 @@ function AccountDetail() {
         destructive={stopTarget?.isActive}
         busy={busy}
         error={dialogError || undefined}
+        designNode={stopTarget?.isActive ? 'CFAyf' : undefined}
         onCancel={() => { if (!busy) { setStopTarget(null); setStopReason(''); setDialogError('') } }}
         onConfirm={() => void toggleActive()}
       >
-        {/* 理由は必須（X-1）。あとから「なぜ止めたか」を追うため。 */}
+        {/* 理由は必須（X-1）。あとから「なぜ止めたか」を追うため。板 `CFAyf` は1行入力。 */}
         <label className="mt-3 block">
           <span className="text-ink-secondary text-xs">
             {stopTarget?.isActive ? '止める理由' : '再開する理由'}（必須）
           </span>
-          <TextArea
-            className="mt-1"
-            rows={2}
-            maxLength={500}
-            placeholder={stopTarget?.isActive
-              ? '例: LINE側の表示がおかしいので、確認するまで止める'
-              : '例: 接続を直したので再開する'}
-            value={stopReason}
-            onChange={(e) => setStopReason(e.target.value)}
-            disabled={busy}
-          />
+          <span className="mt-1 block">
+            <TextField
+              maxLength={500}
+              placeholder={stopTarget?.isActive
+                ? '例: LINE側の表示がおかしいので、確認するまで止める'
+                : '例: 接続を直したので再開する'}
+              value={stopReason}
+              onChange={(e) => setStopReason(e.target.value)}
+              aria-label={stopTarget?.isActive ? '止める理由（必須）' : '再開する理由（必須）'}
+            />
+          </span>
         </label>
       </ConfirmDialog>
 
@@ -588,6 +599,7 @@ function AccountDetail() {
         destructive
         busy={busy}
         error={dialogError || undefined}
+        designNode="WOfBN"
         onCancel={() => { if (!busy) { setArchiveTarget(null); setArchiveReason(''); setDialogError('') } }}
         onConfirm={() => void runArchive()}
       >
@@ -617,6 +629,7 @@ function AccountDetail() {
       />
       {editSection !== null && (
         <AccountEditModal
+          initialTimezone={canEditTimezone ? account.timezone ?? 'Asia/Tokyo' : undefined}
           accountId={account.id}
           initialName={account.name}
           initialChannelId={account.channelId}

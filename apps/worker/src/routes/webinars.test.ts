@@ -354,6 +354,13 @@ describe('admin webinar tenant scope', () => {
     expect(await res.json()).toMatchObject({ data: { limit: 200 } });
   });
 
+  test('アーカイブの絞り込みを一覧と件数の両方へ渡す', async () => {
+    const res = await adminReq('/api/webinars?account_id=account-a&status=archived');
+    expect(res.status).toBe(200);
+    expect(dbMocks.getWebinarList).toHaveBeenCalledWith({}, expect.objectContaining({ accountId: 'account-a' }), expect.anything(), expect.objectContaining({ status: 'archived' }));
+    expect(dbMocks.countWebinarList).toHaveBeenCalledWith({}, expect.objectContaining({ accountId: 'account-a' }), expect.objectContaining({ status: 'archived' }));
+  });
+
   test('一覧は固定契約の集計値と公開5状態を返す', async () => {
     dbMocks.getWebinarList.mockResolvedValue([
       makeWebinar({
@@ -1596,6 +1603,7 @@ describe('admin CRUD', () => {
     expect(body.data).toMatchObject({
       version: 4, deliveryKind: 'on_demand', publicDescription: '説明',
       ctaCount: 2,
+      updatedAt: expect.any(String) as unknown as string,
       viewingCondition: { kind: 'registered', label: '申込済みの友だち' },
       publicPage: {
         liffId: '999-test', form: {
