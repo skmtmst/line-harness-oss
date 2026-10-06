@@ -7,7 +7,10 @@
  * 呼ぶ口・世代の守り・失敗の言い分け・CSV は今の画面（SavedAnalyticsTab）と同じ。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from 'lucide-react'
+import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, MoreHorizontal, Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
@@ -67,6 +70,16 @@ function latestPill(item: SavedAnalyticsSummary) {
   if (latest.definitionStale) return <StatePill tone="info">更新後未集計</StatePill>
   if (latest.state === 'available') return <StatePill tone="ok">最新の期間</StatePill>
   return <StatePill tone={latest.state === 'partial' ? 'warn' : 'neutral'}>{SAVED_STATE_LABELS[latest.state]}</StatePill>
+}
+
+/** 定期レポートの行の「…」：内容を変える（作る画面を開く）。 */
+function ScheduleMenu({ schedule }: { schedule: AnalyticsReportSchedule }) {
+  const [open, setOpen] = useState(false)
+  const router = useRouter()
+  return <span className={styles.rowMenu}>
+    <IconButton className={styles.rowMenuButton} aria-label={`定期レポート「${schedule.name}」の操作`} aria-expanded={open} onClick={() => setOpen((value) => !value)}><MoreHorizontal size={16} aria-hidden="true" /></IconButton>
+    <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel={`定期レポート「${schedule.name}」の操作`} items={[{ id: 'edit', label: '内容を変える', onSelect: () => router.push(`/analytics/reports/new?id=${schedule.id}`) }]} />
+  </span>
 }
 
 export default function SavedV8({ accountId, onCountChange, canManage }: { accountId: string; onCountChange?: (count: number | null) => void; canManage: boolean }) {
@@ -304,7 +317,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
               {schedule.status === 'active' && !schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'paused')}>止める</Button> : null}
               {schedule.status === 'paused' ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => void changeScheduleStatus(schedule, 'active')}>また送る</Button> : null}
               {!schedule.isOneTime ? <Button variant="secondary" disabled={scheduleBusyId === schedule.id} onClick={() => setArchiveTarget(schedule)}>しまう</Button> : null}
-              {!schedule.isOneTime ? <Button variant="secondary" href={`/analytics/reports/new?id=${schedule.id}`}>内容を変える</Button> : null}
+              {!schedule.isOneTime ? <ScheduleMenu schedule={schedule} /> : null}
             </span> : null}</span>
           </div>)}
         </div>}
