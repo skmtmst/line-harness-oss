@@ -307,3 +307,6 @@
   color: var(--color-ink);
   font-size: var(--text-label);
 }
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }

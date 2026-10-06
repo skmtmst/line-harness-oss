@@ -87,7 +87,6 @@ interface MessageTemplate {
 
 /** フォルダの「未分類」。空文字は「すべて」なので別の値にする。 */
 const UNCATEGORIZED = '__uncategorized__'
-const READONLY_REASON = 'この操作にはオーナーか管理者の権限が要ります'
 
 const SORT_OPTIONS: Array<{ value: RouteSort; label: string }> = [
   { value: 'friends-desc', label: '友だち追加が多い順' },
@@ -437,14 +436,13 @@ export default function InflowListV8({
       items.push({ id: 'qr', label: 'QRコードを見る', onSelect: () => { setOpenMenuRefCode(null); setQrRoute(qrFor(row)) } })
       items.push({ id: 'copy', label: 'URLをコピー', onSelect: () => { setOpenMenuRefCode(null); void onCopy(row.refCode) } })
     }
-    if (row.entryRouteId) {
+    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見る項目（QR・コピー）だけ残す。
+    if (row.entryRouteId && !readonly) {
       const target = routes.find((entry) => entry.id === row.entryRouteId) ?? null
       if (target) {
         items.push({
           id: 'edit',
           label: 'リンクを編集',
-          disabled: readonly,
-          disabledReason: readonly ? READONLY_REASON : undefined,
           onSelect: () => { setOpenMenuRefCode(null); setEditing(target) },
         })
       }
@@ -452,16 +450,12 @@ export default function InflowListV8({
         ? {
           id: 'resume',
           label: '受付を再開する',
-          disabled: readonly,
-          disabledReason: readonly ? READONLY_REASON : undefined,
           onSelect: () => void toggleRouteActive(row.entryRouteId!, true, row.name),
         }
         : {
           id: 'stop',
           label: '受付を止める',
           tone: 'danger' as const,
-          disabled: readonly,
-          disabledReason: readonly ? READONLY_REASON : undefined,
           onSelect: () => void toggleRouteActive(row.entryRouteId!, false, row.name),
         })
     }
@@ -497,8 +491,9 @@ export default function InflowListV8({
       ]}
     />
   )
+  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
   const createButton = readonly
-    ? <Button variant="primary" disabled title={READONLY_REASON}><Plus size={15} aria-hidden="true" />流入リンクを作る</Button>
+    ? null
     : <Button variant="primary" href="/inflow-links/new"><Plus size={15} aria-hidden="true" />流入リンクを作る</Button>
 
   /* ===== 道具の段 ===== */
@@ -651,14 +646,14 @@ export default function InflowListV8({
             <thead>
               <TableHeadRow className={styles.headRow} data-table-layout="columns">
                 <Th className={styles.colCheck}>
-                  <Checkbox
+                  {readonly ? null : <Checkbox
                     aria-label="表示中の登録済み経路をすべて選ぶ"
                     checked={allShownSelected}
                     indeterminate={!allShownSelected && selectableIds.some((id) => selectedRouteIds.has(id))}
-                    disabled={readonly || selectableIds.length === 0}
-                    title={readonly ? READONLY_REASON : selectableIds.length === 0 ? 'まとめて操作できる登録済みの経路がありません' : undefined}
+                    disabled={selectableIds.length === 0}
+                    title={selectableIds.length === 0 ? 'まとめて操作できる登録済みの経路がありません' : undefined}
                     onCheckedChange={(checked) => setSelectedRouteIds(checked ? new Set(selectableIds) : new Set())}
-                  />
+                  />}
                 </Th>
                 <Th className={styles.colName}>流入元名</Th>
                 <Th className={styles.colPool}>追加先</Th>
@@ -683,12 +678,10 @@ export default function InflowListV8({
                 return (
                   <Tr key={r.refCode} interactive className={styles.row} data-table-layout="columns" data-row-id={r.refCode}>
                     <Td className={styles.colCheck}>
-                      {r.entryRouteId ? (
+                      {r.entryRouteId && !readonly ? (
                         <Checkbox
                           aria-label={`${r.name}をまとめて操作の対象にする`}
                           checked={selectedRouteIds.has(r.entryRouteId)}
-                          disabled={readonly}
-                          title={readonly ? READONLY_REASON : undefined}
                           onCheckedChange={(checked) => {
                             const id = r.entryRouteId!
                             setSelectedRouteIds((current) => {
@@ -783,7 +776,6 @@ export default function InflowListV8({
                               open={openMenuRefCode === r.refCode}
                               onClose={() => setOpenMenuRefCode(null)}
                               ariaLabel={menuLabel}
-                              note={readonly ? READONLY_REASON : undefined}
                               items={menuItems}
                             />
                           </>
@@ -792,10 +784,9 @@ export default function InflowListV8({
                     </Td>
                     <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
-                        {editTarget ? (
+                        {/* 閲覧のみ：編集・登録するは置かない（列の幅は残す） */}
+                        {readonly ? null : editTarget ? (
                           <Button
-                            disabled={readonly}
-                            title={readonly ? READONLY_REASON : undefined}
                             onClick={() => setEditing(editTarget)}
                             aria-label={`${r.name}のリンクを編集`}
                           >
@@ -806,9 +797,8 @@ export default function InflowListV8({
                           <span className={styles.cellMain} title="この経路は別の仕組み（クリック計測）で管理しています">—</span>
                         ) : (
                           <Button
-                            disabled={readonly}
                             onClick={() => setEditing({ register: r.refCode })}
-                            title={readonly ? READONLY_REASON : '未登録 ref を登録します。流入実績はそのまま引き継がれます。'}
+                            title="未登録 ref を登録します。流入実績はそのまま引き継がれます。"
                           >
                             登録する
                           </Button>
@@ -929,14 +919,13 @@ export default function InflowListV8({
         </KpiBand>
       </>}
       folders={<>
-        {createButton}
+        {/* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ。2026-10-06 オーナー決定） */}
+        {createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
         <FolderPanel
           activeId={selectedGenre}
           onSelect={selectGenre}
           onAddFolder={readonly ? undefined : () => setEditingGenre('new')}
           addFolderLabel="フォルダを追加"
-          addFolderDisabled={readonly}
-          addFolderTitle={readonly ? READONLY_REASON : undefined}
           rows={folderRows}
         >
           <p className={styles.folderNote}>フォルダを消しても、中の経路は未分類に残ります</p>
