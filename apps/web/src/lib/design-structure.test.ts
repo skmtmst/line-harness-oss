@@ -178,7 +178,8 @@ describe('画面の骨格が設計と一致する', () => {
 
   it.each([
     ['/broadcasts/new', 'data-design-node="FU2aU"'],
-    ['/form-submissions', "data-design-node={narrow ? 'GrnO4' : 'I3L41O'}"],
+    // 2026-10-06：一覧は src/v8/forms/list に一から書いた。板の印は型（ListPage）の boardId で付ける。
+    ['/form-submissions', "boardId={narrow ? 'GrnO4' : 'I3L41O'}"],
   ])('%s はV8の画面を読み込む', (route, marker) => {
     expect(readWithParts(route)).toContain(marker);
   });
