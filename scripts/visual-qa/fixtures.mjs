@@ -4042,6 +4042,11 @@ export const AUTO_REPLY_NEW_DRAFT = {
     priority: 6,
   },
 }
+/* 作る④（Guoye）の絵：下書き「予約の日程変更」と重なるのは 2番目「予約変更のお問い合わせ」（必ず）と 1番目「営業時間外の自動返信」（ことがある）。 */
+export const AUTO_REPLY_NEW_CONFLICTS = [
+  { autoReplyId: 'ar-2', name: '予約変更のお問い合わせ', certainty: 'certain', winnerAutoReplyId: 'ar-2', reason: '「予約変更」を含むメッセージに反応します。' },
+  { autoReplyId: 'ar-1', name: '営業時間外の自動返信', certainty: 'possible', winnerAutoReplyId: 'ar-1', reason: '営業時間外は、すべてのメッセージに反応します。' },
+]
 export const AUTO_REPLY_NEW_LIVE = {
   ...AR_BASE, id: 'ar-new', name: '予約の日程変更', keyword: '予約変更', matchType: 'contains',
   responseType: 'text', responseContent: '', isActive: false, lifecycleStatus: 'draft', priority: 6,

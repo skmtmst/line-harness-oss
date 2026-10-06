@@ -52,7 +52,7 @@ import {
   FILE_SCAN_ITEMS,
   FILE_SCAN_CONFIG,
   FRIEND_ADD_RUNS,
-  AUTO_REPLIES, AUTO_REPLY_NEW_DRAFT, AUTO_REPLY_NEW_LIVE, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
+  AUTO_REPLIES, AUTO_REPLY_NEW_DRAFT, AUTO_REPLY_NEW_LIVE, AUTO_REPLY_NEW_CONFLICTS, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
   AUTO_REPLY_PUBLISH_RESULT, AUTO_REPLY_PUBLISH_TEST, AUTO_REPLY_PUBLISH_VALIDATION,
   BROADCASTS, BROADCAST_FOLDERS, BROADCAST_INSIGHTS, BROADCAST_LIST_META,
@@ -1565,17 +1565,18 @@ function visualQaWriteBody(method, pathname) {
     return { id: 'visual-cross-result-1', state: 'pending' }
   }
   /*
-   * 本番の口は `{success,data}` で包む。素値のままだと `api.ts` の
-   * 応答期待と形が違い、目視環境でテスト成功の絵を再現できない（#494 軽14）。
+   * 本番の口は `{success,data}` で包む。包むのは外側（このファイルの返し口）なので、
+   * ここは素の値を返す（ここでも包むと二重になり、作る⑤が落ちていた・2026-10-06）。
    */
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/test$/.test(pathname)) {
-    return { success: true, data: AUTO_REPLY_PUBLISH_TEST }
+    return AUTO_REPLY_PUBLISH_TEST
   }
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/validate$/.test(pathname)) {
-    return { success: true, data: AUTO_REPLY_PUBLISH_VALIDATION }
+    if (pathname === '/api/auto-replies/ar-new/validate') return { ...AUTO_REPLY_PUBLISH_VALIDATION, conflicts: AUTO_REPLY_NEW_CONFLICTS }
+    return AUTO_REPLY_PUBLISH_VALIDATION
   }
   if (method === 'POST' && /^\/api\/auto-replies\/[^/]+\/publish$/.test(pathname)) {
-    return { success: true, data: AUTO_REPLY_PUBLISH_RESULT }
+    return AUTO_REPLY_PUBLISH_RESULT
   }
   if (method === 'POST' && /^\/api\/rich-menu-groups\/[^/]+\/preview-targets$/.test(pathname)) {
     return {
@@ -2784,6 +2785,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/auto-replies/ar-new/draft') return { success: true, data: AUTO_REPLY_NEW_DRAFT }
+  if (pathname === '/api/auto-replies/ar-new/conflicts') return { success: true, data: { conflicts: AUTO_REPLY_NEW_CONFLICTS, source: 'draft' } }
   if (pathname === '/api/auto-replies/ar-new') return { success: true, data: AUTO_REPLY_NEW_LIVE }
   if (/^\/api\/auto-replies\/[^/]+\/draft$/.test(pathname)) {
     return { success: true, data: AUTO_REPLY_PUBLISH_DRAFT }

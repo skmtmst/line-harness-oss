@@ -1,7 +1,7 @@
 'use client'
 
 import { CreatePage } from '@/components/templates'
-import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
+import InlineActionRowsV8, { actionRowTitle } from '@/components/auto-replies/inline-action-rows-v8'
 import { CreatePreviewNote, CreateStarterCards, CreateSummaryCard } from '@/components/templates/create-parts'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -25,6 +25,8 @@ import {
   IdCard,
   Braces,
   CalendarDays,
+  ArrowUp,
+  ArrowUpToLine,
   TextQuote,
   MessagesSquare,
   Users,
@@ -349,6 +351,13 @@ function weekdaySummary(days: number[]): string {
     return `${WEEKDAY_LABELS[sorted[0]]}〜${WEEKDAY_LABELS[sorted[sorted.length - 1]]}に反応`
   }
   return `${sorted.map((day) => WEEKDAY_LABELS[day]).join('・')}に反応`
+}
+
+/** 手順④の行の2行目：そのルールの動き方（すべて／言葉・曜日・時間）。 */
+function ruleTriggerSummary(rule: { keyword?: string | null; activeFrom?: string | null; activeUntil?: string | null }): string {
+  const what = rule.keyword ? `「${rule.keyword}」を含む` : 'すべてのメッセージ'
+  const when = rule.activeFrom ? `毎日 ${rule.activeFrom}〜${rule.activeUntil ?? ''}` : 'いつでも'
+  return `${what}・${when}`
 }
 
 /** 差し込みに使える札。本文の末尾へトークンを足す。 */
@@ -1091,6 +1100,27 @@ function AutoReplyWizardV8Inner() {
     return [first, '日程を変えられますか'].map((text) => ({ text, hit: hits(text) }))
   })()
 
+  /**
+   * 手順⑤「有効にする前の確認」（絵 XJUqs）：絵の3つ（重なり・試し・知らせる先）を絵の言葉で出す。
+   * きっかけ・返す内容の関門は、足りないときだけ前に出す（有効にする条件は gates のまま変えない）。
+   */
+  const v8Checks = (() => {
+    const [triggerGate, replyGate, testGate, conflictGate] = gates
+    const rows: Array<{ label: string; state: string; detail: string; back: WizardStep }> = []
+    if (triggerGate && triggerGate.state !== 'ok') rows.push({ ...triggerGate, back: 'trigger' })
+    if (replyGate && replyGate.state !== 'ok') rows.push({ ...replyGate, back: 'response' })
+    if (conflictGate) rows.push({ label: '重なりを確かめた', state: conflictGate.state, detail: conflictGate.detail, back: 'priority' })
+    if (testGate) rows.push({ label: '試しに送った', state: testGate.state, detail: testGate.detail, back: 'priority' })
+    const notify = form.actions.filter((a) => a.actionType === 'notify_staff')
+    if (notify.length > 0) {
+      const ids = notify.map((a) => String((a.config as Record<string, unknown> | null)?.notificationRuleId ?? ''))
+      const ok = ids.every(Boolean)
+      const names = ids.map((id) => actionOptions.notificationRules?.find((r) => r.id === id)?.name).filter(Boolean).join('・')
+      rows.push({ label: '担当者へ知らせる先がある', state: ok ? 'ok' : 'blocked', detail: ok ? `${names || '知らせる先'}（通知オン）` : '知らせる先が決まっていない処理があります', back: 'response' })
+    }
+    return rows
+  })()
+
   const thisRuleName = form.ruleName.trim() || effectiveKeywords[0]?.keyword.trim() || '名前なしのルール'
   const myPositionLabel = myIndex >= 0 ? `${myIndex + 1}番目` : 'いちばん下'
 
@@ -1293,18 +1323,23 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'priority' && (
             <>
-              <Card padding="roomy" layout="vertical" className={styles.sideCard}>
-                <div className={styles.cardHeading}>
-                  <h2 className={styles.sideTitle}>重なりを1件ずつ確かめる</h2>
-                  <p className={styles.cardNote}>すべてにチェックを付けるまで、⑤で有効にできません。</p>
-                </div>
+              {/* 絵 Guoye：重なりを1件ずつ確かめる（クリーム地）→ 重なりの確認（行3つ）。 */}
+              <section className={styles.conflictCard} aria-label="重なりを1件ずつ確かめる">
+                <h2 className={styles.sideTitle}>重なりを1件ずつ確かめる</h2>
+                <p className={styles.conflictDesc}>すべてにチェックを付けるまで、⑤で有効にできません。</p>
                 {conflicts.length === 0 ? (
-                  <p className={styles.hint}>同時に当たるルールはありません。</p>
+                  <p className={styles.conflictDesc}>同時に当たるルールはありません。</p>
                 ) : (
                   conflicts.map((conflict) => {
-                    const tone = autoReplyId ? conflictTone(conflict, autoReplyId) : { label: '', losing: false }
+                    const pos = orderedRules.findIndex((r) => r.id === conflict.autoReplyId)
                     return (
-                      <div key={conflict.autoReplyId} className={styles.conflictRow}>
+                      <div key={conflict.autoReplyId} className={styles.conflictItem}>
+                        <span className={conflict.certainty === 'certain' ? styles.conflictChipCertain : styles.conflictChipPossible}>
+                          ● {conflict.certainty === 'certain' ? '必ず重なります' : '重なることがあります'}
+                        </span>
+                        <p className={styles.conflictName} title={conflict.reason}>
+                          {conflict.name}{pos >= 0 ? `（${pos + 1}番目）` : ''}
+                        </p>
                         <Checkbox
                           checked={acknowledged.has(conflict.autoReplyId)}
                           onCheckedChange={(on) =>
@@ -1316,37 +1351,25 @@ function AutoReplyWizardV8Inner() {
                             })
                           }
                           aria-label={`「${conflict.name}」を確かめた`}
-                        />
-                        <div className={styles.conflictBody}>
-                          <p className={styles.conflictName}>{conflict.name}</p>
-                          <p className={styles.conflictNote}>
-                            <span className={styles.conflictCertainty}>{tone.label}</span>
-                            {conflict.reason ? ` — ${conflict.reason}` : ''}
-                          </p>
-                        </div>
+                        >
+                          確かめた
+                        </Checkbox>
                       </div>
                     )
                   })
                 )}
-                <dl className={styles.kvList}>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">同時に当たるルール</dt>
-                    <dd className={styles.kvVal}>{conflicts.length > 0 ? `${conflicts.length}つ` : 'なし'}</dd>
-                  </div>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">当たる受信（過去28日）</dt>
-                    <dd className={styles.kvVal}>
-                      {matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件`}
-                    </dd>
-                  </div>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">試した結果</dt>
-                    <dd className={styles.kvVal}>
-                      {dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません'}
-                    </dd>
-                  </div>
-                </dl>
-              </Card>
+                <p className={`${styles.conflictDesc} ${styles.conflictResult}`}>
+                  試した結果：{dryRun ? (dryRun.draftWon ? 'このルールが返す' : `「${dryRun.winner?.name ?? '別のルール'}」が先に動く → このルールは見送り`) : 'まだ試していません'}
+                </p>
+              </section>
+              <CreateSummaryCard
+                title="重なりの確認"
+                rows={[
+                  { label: '同時に当たるルール', value: conflicts.length > 0 ? `${conflicts.length}つ` : 'なし' },
+                  { label: '当たる受信（過去28日）', value: matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件` },
+                  { label: '試した結果', value: dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません' },
+                ]}
+              />
               <LinePreview accountName="公式アカウント">
                 <div className={styles.talkStack}>
                   {testMessage.trim() ? <p className={styles.bubbleIn}>{testMessage.trim()}</p> : null}
@@ -1371,7 +1394,7 @@ function AutoReplyWizardV8Inner() {
                   <div className={styles.kvRow}>
                     <dt className="text-ink-faint text-xs">状態</dt>
                     <dd className={styles.kvVal}>
-                      {isActive ? '有効のまま更新' : '停止中 → 有効にします'}
+                      {isActive ? '有効のまま更新' : '停止中 → 有効にする'}
                     </dd>
                   </div>
                   <div className={styles.kvRow}>
@@ -2162,6 +2185,7 @@ function AutoReplyWizardV8Inner() {
                     {orderedRules.map((rule, index) => {
                       const isSelf = rule.id === autoReplyId
                       const isConflict = conflicts.some((c) => c.autoReplyId === rule.id)
+                      const certain = conflicts.some((c) => c.autoReplyId === rule.id && c.certainty === 'certain')
                       const aboveSelf = myIndex >= 0 && index < myIndex
                       return (
                         <li
@@ -2169,51 +2193,40 @@ function AutoReplyWizardV8Inner() {
                           className={[
                             styles.orderRow,
                             isSelf ? styles.orderRowSelf : '',
-                            isConflict && aboveSelf ? styles.orderRowConflict : '',
+                            certain && aboveSelf ? styles.orderRowConflict : '',
                           ].join(' ')}
                         >
-                          <GripVertical size={16} aria-hidden="true" className={styles.orderGrip} />
+                          <GripVertical size={14} aria-hidden="true" className={styles.orderGrip} />
                           <span className={styles.orderNum}>{index + 1}</span>
                           <div className={styles.orderBody}>
                             <p className={styles.orderName}>
                               {isSelf ? `${displayName(rule)}（このルール）` : displayName(rule)}
                             </p>
+                            {/* 絵 Guoye：どの行も2行目に一言（このルール＝いまの順番・先に動く重なり＝黄・止まっている・動き方・重なりなし）。 */}
                             <p className={styles.orderSub}>
-                              {rule.lifecycleStatus === 'draft' || !rule.isActive ? (
+                              {isSelf ? (
+                                <span>{`いまの順番：${myIndex === orderedRules.length - 1 ? 'いちばん下' : myPositionLabel}`}</span>
+                              ) : rule.lifecycleStatus === 'draft' || !rule.isActive ? (
                                 <span>停止中</span>
-                              ) : null}
-                              {isConflict && aboveSelf ? (
-                                <span className={styles.orderOverlap}>
-                                  同じ受信に当たります → このルールより先に動きます
-                                </span>
+                              ) : certain && aboveSelf ? (
+                                <span className={styles.orderOverlap}>同じ受信に当たる → このルールより先に動きます</span>
                               ) : isConflict ? (
-                                <span className={styles.orderOverlap}>同じ受信に当たることがあります</span>
-                              ) : null}
-                              {!isConflict && rule.activeFrom ? (
-                                <span>
-                                  {rule.activeFrom}〜{rule.activeUntil ?? ''}だけ動く
-                                </span>
-                              ) : null}
+                                <span>{ruleTriggerSummary(rule)}</span>
+                              ) : (
+                                <span>重なりなし</span>
+                              )}
                             </p>
                           </div>
                           {isSelf && (
                             <span className={styles.orderMove}>
-                              <Button
-                                type="button"
-                                size="compact"
-                                disabled={myIndex <= 0}
-                                onClick={moveUp}
-                              >
+                              <Button type="button" disabled={myIndex <= 0} onClick={moveUp}>
+                                <ArrowUp size={14} aria-hidden="true" />
                                 上へ
                               </Button>
                               {firstConflictAbove && (
-                                <Button
-                                  type="button"
-                                  size="compact"
-                                  variant="primary"
-                                  onClick={moveBeforeFirstConflict}
-                                >
-                                  「{displayName(firstConflictAbove)}」より前へ
+                                <Button type="button" onClick={moveBeforeFirstConflict}>
+                                  <ArrowUpToLine size={14} aria-hidden="true" />
+                                  {`「${displayName(firstConflictAbove)}」より前へ`}
                                 </Button>
                               )}
                             </span>
@@ -2230,24 +2243,15 @@ function AutoReplyWizardV8Inner() {
               </Card>
 
               <Card padding="roomy" layout="vertical" className={styles.cardContent}>
+                <div className={styles.cardHeading}>
                 <h2 className={styles.cardTitle}>試しに送ってみる</h2>
-                <div className={styles.field}>
-                  <label htmlFor="wiz-test-friend" className={styles.label}>
-                    送信者
-                  </label>
-                  <div className={styles.chips}>
-                    <SearchField
-                      placeholder="名前で探す"
-                      value={friendQuery}
-                      onChange={(value) => {
-                        setFriendQuery(value)
-                        void searchFriends(value)
-                      }}
-                      aria-label="友だちを名前で探す"
-                    />
-                  </div>
+                  <p className={styles.cardDesc}>本番には影響しません。友だちには届きません。</p>
+                </div>
+                {/* 絵 Guoye：送信者の行 → 届いたメッセージと「試す」の行。友だちを名前で探す欄は機能なので送信者の行の右に残す。 */}
+                <div className={styles.testRow}>
                   <Select
                     id="wiz-test-friend"
+                    className={styles.testGrow}
                     aria-label="送信者"
                     value={selectedFriendId}
                     onChange={setSelectedFriendId}
@@ -2256,27 +2260,33 @@ function AutoReplyWizardV8Inner() {
                         ? [{ value: '', label: '友だちを読み込めませんでした' }]
                         : friends.length === 0
                           ? [{ value: '', label: '友だちがいません' }]
-                          : friends.map((f) => ({ value: f.id, label: f.displayName || '名前なし' }))
+                          : friends.map((f) => ({
+                              value: f.id,
+                              label: f.id === selectedFriendId
+                                ? `送信者：${f.displayName || '名前なし'}（名前で探す・候補 ${formatNumber(friendTotal)}人中 ${friends.length}人）`
+                                : f.displayName || '名前なし',
+                            }))
                     }
                   />
-                  <p className={styles.hint}>
-                    {friendLoadState === 'ready'
-                      ? `候補${formatNumber(friendTotal)}人中 ${friends.length}人を表示`
-                      : '友だちを読み込んでいます…'}
-                  </p>
-                </div>
-                <div className={styles.field}>
-                  <label htmlFor="wiz-test-message" className={styles.label}>
-                    届いたメッセージ
-                  </label>
-                  <TextField
-                    id="wiz-test-message"
-                    value={testMessage}
-                    onChange={(e) => setTestMessage(e.target.value)}
-                    placeholder={effectiveKeywords[0]?.keyword.trim() || '例：予約変更したいです'}
+                  <SearchField
+                    placeholder="名前で探す"
+                    value={friendQuery}
+                    onChange={(value) => {
+                      setFriendQuery(value)
+                      void searchFriends(value)
+                    }}
+                    aria-label="友だちを名前で探す"
                   />
                 </div>
-                <div>
+                <div className={styles.testRow}>
+                  <TextField
+                    id="wiz-test-message"
+                    className={styles.testGrow}
+                    aria-label="届いたメッセージ"
+                    value={testMessage}
+                    onChange={(e) => setTestMessage(e.target.value)}
+                    placeholder={effectiveKeywords[0]?.keyword.trim() ? `${effectiveKeywords[0].keyword.trim()}したいです` : '例：予約変更したいです'}
+                  />
                   <Button
                     type="button"
                     variant="primary"
@@ -2327,12 +2337,12 @@ function AutoReplyWizardV8Inner() {
             <>
               <Card padding="roomy" layout="vertical" className={styles.cardContent}>
                 <h2 className={styles.cardTitle}>設定の確認</h2>
-                <div>
+                <div className={styles.summaryList}>
                   <SummaryRow label="名前・フォルダ" onEdit={() => goToStep('basic')}>
                     {thisRuleName}
                     {form.folderId
-                      ? ` / ${folders.find((f) => f.id === form.folderId)?.name ?? '分けない'}`
-                      : ' / 分けない'}
+                      ? `・${folders.find((f) => f.id === form.folderId)?.name ?? '分けない'}`
+                      : '・分けない'}
                   </SummaryRow>
                   <SummaryRow label="反応する言葉" onEdit={() => goToStep('trigger')}>
                     {form.respondToAll
@@ -2343,13 +2353,8 @@ function AutoReplyWizardV8Inner() {
                   </SummaryRow>
                   <SummaryRow label="いつ" onEdit={() => goToStep('trigger')}>
                     {[
-                      form.weekdays.length === 0 || form.weekdays.length === 7
-                        ? '毎日'
-                        : `${form.weekdays
-                            .slice()
-                            .sort((a, b) => a - b)
-                            .map((d) => WEEKDAY_LABELS[d])
-                            .join('・')}曜`,
+                      // 絵 XJUqs「月〜金・いつでも」：手順②の「まとめて」と同じ言い方
+                      weekdaySummary(form.weekdays).replace(/に反応$/, ''),
                       form.timeMode === 'custom' && (form.activeFrom || form.activeUntil)
                         ? `${form.activeFrom || '00:00'}〜${form.activeUntil || '24:00'}`
                         : 'いつでも',
@@ -2372,13 +2377,15 @@ function AutoReplyWizardV8Inner() {
                             : `テキスト ${formatNumber(form.responseContent.length)}字`}
                   </SummaryRow>
                   <SummaryRow label="返したあと" onEdit={() => goToStep('response')}>
-                    {form.actions.length > 0 ? `${form.actions.length}つの処理` : 'なし'}
+                    {form.actions.length > 0
+                      ? form.actions.map((a, i) => `${i + 1} ${actionRowTitle(a, actionOptions)}`).join(' → ')
+                      : 'なし'}
                   </SummaryRow>
                   <SummaryRow label="細かい決まり" onEdit={() => goToStep('response')}>
                     {[
                       Number(form.replyDelaySeconds) > 0 ? `${form.replyDelaySeconds}秒待つ` : 'すぐ返す',
-                      form.cooldownOn ? `${form.cooldownMinutes}分あける` : null,
-                      form.skipWhenOperatorActive ? '対応中は返さない' : null,
+                      form.cooldownOn ? `同じ人へは${form.cooldownMinutes}分あける` : null,
+                      form.skipWhenOperatorActive ? '対応中のトークには返さない' : null,
                       form.oncePerFriend ? '1人1回' : null,
                       form.unmatchedMode === 'notify_operator' ? '外れたら担当者へ' : null,
                     ]
@@ -2407,10 +2414,8 @@ function AutoReplyWizardV8Inner() {
                   </p>
                 )}
                 {confirmState === 'ready' &&
-                  gates.map((gate, index) => {
-                    // 見直す先：きっかけ→手順2、返す内容→手順3、テスト・競合→手順4。
-                    const backTo: WizardStep =
-                      index === 0 ? 'trigger' : index === 1 ? 'response' : 'priority'
+                  v8Checks.map((gate) => {
+                    const backTo = gate.back
                     return (
                       <div key={gate.label} className={styles.checkRow}>
                         <span
@@ -2423,7 +2428,7 @@ function AutoReplyWizardV8Inner() {
                           <p className={styles.checkTitle}>{gate.label}</p>
                           <p className={styles.checkNote}>{gate.detail}</p>
                         </div>
-                        <Button type="button" size="compact" onClick={() => goToStep(backTo)}>
+                        <Button type="button" variant="text" onClick={() => goToStep(backTo)}>
                           見直す
                         </Button>
                       </div>
@@ -2499,8 +2504,8 @@ function SummaryRow({
   return (
     <div className={styles.summaryRow}>
       <span className={styles.summaryKey}>{label}</span>
-      <span className={styles.summaryVal}>{children}</span>
-      <Button type="button" size="compact" onClick={onEdit}>
+      <span className={styles.summaryVal} title={typeof children === 'string' ? children : undefined}>{children}</span>
+      <Button type="button" variant="text" onClick={onEdit}>
         変える
       </Button>
     </div>
