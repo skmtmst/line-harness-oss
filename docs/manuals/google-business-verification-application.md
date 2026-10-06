@@ -130,6 +130,8 @@ YouTube Studioへアップロードし、公開設定は**「限定公開（Unli
 
 撮影前・撮影後のチェックリスト、申請フォームに貼る公開URLの一覧、審査員向けのデモアカウント手順、追加質問が来たときの回答集は `docs/manuals/google-business-review-package.md` にまとめてある。撮影当日はそのチェックリストを上から順に潰す。
 
+**撮影当日に手元で見るのは `docs/manuals/google-business-demo-video-shoot-sheet.md`。** 下の台本を秒数つきの時間割にしてあり、英語字幕は `docs/manuals/google-business-demo-video-subtitles.srt` をYouTubeへそのまま上げられる（33行が下の手順と1対1で対応している）。
+
 - **管理画面の文言は日本語しかない。** 英語化の仕組みは入っていないので、画面は日本語のまま撮り、**英語の字幕（またはYouTubeの字幕ファイル）を必ず付ける**。レビュー担当は英語で読む
 - **ブラウザの表示言語を英語にする**（Googleの**許可画面だけ**は英語で出る。Chromeの設定→言語→Englishを一番上へ）。管理画面は日本語のまま
 - **アドレスバーを画面に入れる**。許可画面のURLに `client_id=` が写っている必要がある（**OAuthクライアントIDは動画に写ってよい。シークレットは絶対に写さない**）
