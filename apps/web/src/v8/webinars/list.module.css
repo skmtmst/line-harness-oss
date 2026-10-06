@@ -1,0 +1,348 @@
+/*
+ * ★V8 ウェビナーの一覧（Pencil `UyUMw`・1152 `uBMuB`・閲覧のみ `jiNg0`）。
+ * 枠・見出し・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
+ */
+
+/* 案内の帯（表の上の主列）。帯の下は道具の段の上の余白と同じだけ空ける。 */
+.noticeRow {
+  flex-basis: 100%;
+  margin-bottom: var(--tpl-wb-notice-after);
+}
+
+/* 表：絵の列の並び（見出し 13/20・行 9/20・欄の間16・行 56）。
+ * 共通の表の「列の並び」（data-table-layout=columns）を使い、この板の寸法だけ上から当てる。 */
+.tableWrap {
+  min-width: 0;
+}
+.table {
+  border: 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+  gap: var(--tpl-wb-col-gap);
+  height: var(--tpl-wb-head-h);
+  padding: var(--tpl-wb-head-pad);
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  gap: var(--tpl-wb-col-gap);
+  height: var(--tpl-wb-row-h);
+  padding: var(--tpl-wb-row-pad);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
+  cursor: pointer;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: normal;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colCount,
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colView,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colCount,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colView {
+  padding-right: var(--tpl-wb-num-pad-end);
+  text-align: right;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.colStatus { width: var(--tpl-wb-col-status); }
+.colCount { width: var(--tpl-wb-col-count); }
+.colView { width: var(--tpl-wb-col-view); }
+.colPeriod { width: var(--tpl-wb-col-period); min-width: 0; }
+.colOps { width: var(--tpl-wb-col-ops); }
+
+/* 名前（緑の 13/600）と公開ページの道（11）。 */
+.nameButton {
+  display: block;
+  max-width: 100%;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-deep);
+  font: inherit;
+  font-size: var(--tpl-row-name-size);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.nameButton:hover {
+  text-decoration: underline;
+}
+.slug {
+  display: block;
+  margin-top: var(--tpl-row-sub-gap);
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 申込・視聴の数（右寄せ）。2行目は小さく。 */
+.numMain {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-row-name-lh);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.numSub {
+  display: block;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-row-sub-lh);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.period {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-row-name-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 状態の札（点つき）。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-wb-pill-gap);
+  padding: var(--tpl-wb-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-wb-pill-lh);
+  white-space: nowrap;
+}
+.pillDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.pill[data-tone='active'] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.pill[data-tone='scheduled'] {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+.pill[data-tone='neutral'] {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+/* 行の右端：編集と「…」。メニューの位置の目印が行を1段増やさないよう横に並べる。 */
+.opsBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sub-gap);
+}
+
+/* 表の下の案内。 */
+.footNote {
+  margin: 0;
+  padding: var(--tpl-wb-foot-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.errorBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  margin: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-pad-block);
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+/* 道具の段の右：並び・よく使う絞り込み（左に印）。 */
+.sortBox { width: var(--tpl-wb-sort-w); }
+.sortBox :global(*) { max-width: 100%; }
+.savedBox { position: relative; width: var(--tpl-wb-saved-w); }
+.savedBox :global(*) { max-width: 100%; }
+.savedBox :global(button) { width: 100%; padding-left: calc(var(--tpl-chip-row-gap) * 9); }
+.savedBox :global(button) > svg:last-child { display: none; }
+.savedIcon {
+  position: absolute;
+  top: 50%;
+  left: var(--tpl-rule-row-gap);
+  z-index: 1;
+  color: var(--color-ink-secondary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* 1152 の板（uBMuB）：案内の帯 → 1段目 → 2段目。 */
+.narrowTools {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowTools > .noticeRow {
+  margin-bottom: var(--tpl-wb-notice-after);
+}
+.narrowRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowRow > div[role='group'] {
+  display: flex;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowFolder { width: var(--tpl-narrow-folder-w); }
+.narrowFolder :global(*) { max-width: 100%; }
+.narrowFolder :global(button) { width: 100%; }
+.narrowSearch { width: var(--tpl-wb-search-w); }
+.spacer { flex: 1 1 0; }
+
+/* フォルダの列の下の注。 */
+.folderNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: 1.6;
+}
+
+/* 閲覧のみの帯（数の帯の上）。薄い青の地・目の印・枠なし。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: var(--tpl-wb-ro-gap) var(--tpl-head-pad-side);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+.statsNotice {
+  padding: 0 var(--tpl-head-pad-side) var(--tpl-wb-ro-gap);
+}
+
+/* アーカイブの確かめ（VXZ6T）：対象の箱と、アーカイブしたあとの3点。 */
+.targetBox {
+  padding: var(--tpl-wb-target-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+}
+.targetLabel {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.targetName {
+  margin: var(--tpl-compact-gap) 0 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+}
+.afterTitle {
+  margin: var(--tpl-wb-after-gap) 0 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+}
+.afterList {
+  margin: var(--tpl-compact-gap) 0 0;
+  padding: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-chip-label-lh);
+  list-style: none;
+}
+
+/* 窓・詳細の中身。 */
+.dialogLabel {
+  display: block;
+  margin: var(--tpl-rule-row-gap) 0 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.dialogValue {
+  margin: var(--tpl-sub-gap) 0 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: 1.6;
+}
+.dialogAction {
+  display: block;
+  margin-top: var(--tpl-cell-gap-half);
+}
+.detail {
+  display: flex;
+  flex-direction: column;
+}
+.detailActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-cell-gap-half);
+  margin-top: var(--tpl-rule-row-gap);
+}
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-cell-gap-half);
+  margin-top: var(--tpl-rule-row-gap);
+}
+.folderForm {
+  display: flex;
+  flex-direction: column;
+}
+.folderInput {
+  width: 100%;
+  margin-top: var(--tpl-sub-gap);
+  padding: var(--tpl-kw-input-pad);
+  min-height: var(--tpl-chip-h);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+.errorText {
+  margin: var(--tpl-sub-gap) 0 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+/* 骨組みの棒。 */
+.skeletonName { display: block; width: 75%; height: var(--tpl-rule-row-gap); }
+.skeletonPill { display: block; width: 60%; height: var(--tpl-wb-pill-lh); }
+.skeletonNum { display: block; width: 60%; height: var(--tpl-rule-row-gap); margin-left: auto; }
