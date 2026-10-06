@@ -7,7 +7,7 @@
 import React from 'react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   push: null as null | ((...args: unknown[]) => void),
@@ -125,8 +125,12 @@ describe('メニュー作成（V8）の読み込みと保存ボタン', () => {
     expect(screen.queryByLabelText('予約後に付けるタグ')).toBeNull()
 
     await act(async () => { gate.resolve({ success: true, data: TAGS }) })
-    const select = await screen.findByLabelText('予約後に付けるタグ') as HTMLSelectElement
-    expect([...select.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['— なし —', '予約済み', '常連さん'])
+    // ★V8 書き直し（src/v8/booking-menus/menu-form.tsx）：打って絞れる1つ選び。候補を開いて中身を見る。
+    await screen.findByRole('combobox', { name: '予約後に付けるタグ' })
+    fireEvent.click(screen.getByRole('button', { name: '候補を開く' }))
+    const listbox = await screen.findByRole('listbox', { name: '予約後に付けるタグの候補' })
+    const options = within(listbox).getAllByRole('option')
+    expect(options.map((o) => o.textContent)).toEqual(['付けるタグ：予約済み', '付けるタグ：常連さん'])
   })
 
   test('保存を押すとボタンの内側だけ「保存中…」になり成功したら一覧へ戻る', async () => {

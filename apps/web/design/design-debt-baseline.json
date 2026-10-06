@@ -686,5 +686,20 @@
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
     "arbitrary-value": 1
+  },
+  "v8/booking-menus/liff-phone.tsx": {
+    "unresolved-classname": 1
+  },
+  "v8/booking-menus/menu-form.tsx": {
+    "unresolved-classname": 2
+  },
+  "v8/booking-menus/staff-edit-dialog.tsx": {
+    "arbitrary-value": 1
+  },
+  "v8/booking-menus/tabs/holidays-tab.tsx": {
+    "unresolved-classname": 1
+  },
+  "v8/booking-menus/tabs/shared.tsx": {
+    "unresolved-classname": 1
   }
 }

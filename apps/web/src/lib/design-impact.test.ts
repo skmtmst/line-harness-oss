@@ -241,6 +241,9 @@ describe('共通部品の影響範囲', () => {
       'v8/auto-replies/list.tsx',
       // ★V8 ウェビナーの一覧（UyUMw）。新しい置き場（src/v8）に一から書いた。
       'v8/webinars/list.tsx',
+      // ★V8 予約設定のメニュー・担当スタッフのタブ（owaS3）。src/v8/booking-menus に書き直した。
+      'v8/booking-menus/tabs/menus-tab.tsx',
+      'v8/booking-menus/tabs/staff-tab.tsx',
     ].sort())
   })
 

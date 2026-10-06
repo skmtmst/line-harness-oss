@@ -509,3 +509,14 @@ shared-button-importer v8/rich-menus/external-import.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
 shared-button-importer v8/webinars/list.tsx
+# ★V8 予約設定（owaS3 ほか）を src/v8/booking-menus に書き直した。
+shared-button-importer v8/booking-menus/assign.tsx
+shared-button-importer v8/booking-menus/channels-tab.tsx
+shared-button-importer v8/booking-menus/menu-form.tsx
+shared-button-importer v8/booking-menus/settings.tsx
+shared-button-importer v8/booking-menus/staff-edit-dialog.tsx
+shared-button-importer v8/booking-menus/tabs/holidays-tab.tsx
+shared-button-importer v8/booking-menus/tabs/hours-tab.tsx
+shared-button-importer v8/booking-menus/tabs/menus-tab.tsx
+shared-button-importer v8/booking-menus/tabs/rules-tab.tsx
+shared-button-importer v8/booking-menus/tabs/staff-tab.tsx
