@@ -296,52 +296,56 @@
 .orderList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--tpl-rule-row-gap);
   list-style: none;
   margin: 0;
   padding: 0;
 }
+/* 絵 Guoye「順番」：角10・上下10・左右12・間10。 */
 .orderRow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control, 8px);
+  gap: var(--tpl-action-row-gap);
+  padding: var(--tpl-action-row-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
   background: var(--color-canvas);
 }
 .orderRowSelf {
-  border-color: var(--color-action);
+  outline-color: var(--color-accent-deep);
   background: var(--color-success-bg);
 }
 .orderRowConflict {
-  border-color: var(--color-warning);
+  outline-color: var(--color-warning-border, var(--color-warning));
+  background: var(--color-warning-bg);
 }
 .orderGrip {
   color: var(--color-ink-faint);
 }
 .orderNum {
-  min-width: 24px;
   color: var(--color-ink-faint);
-  font-size: 12px;
-  text-align: right;
+  font-size: var(--text-caption);
+  font-weight: 700;
 }
 .orderBody {
   flex: 1;
   min-width: 0;
 }
 .orderName {
+  margin: 0;
   color: var(--color-ink);
-  font-size: 13px;
+  font-size: var(--text-label);
   font-weight: 600;
 }
 .orderSub {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 2px;
+  gap: var(--tpl-label-tag-gap);
+  margin: var(--tpl-compact-gap) 0 0;
   color: var(--color-ink-faint);
-  font-size: 12px;
+  font-size: var(--text-micro);
 }
 .orderOverlap {
   color: var(--color-warning);
@@ -438,11 +442,12 @@
 }
 
 /* 手順5「有効にする前の確認」の行。 */
+/* 絵 XJUqs「確認」：中央そろえ・上下10・右に「見直す」。 */
 .checkRow {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 0;
+  align-items: center;
+  gap: var(--tpl-action-row-gap);
+  padding: var(--tpl-page-pad-block) 0;
   border-bottom: 1px solid var(--color-hairline);
 }
 .checkRow:last-child {
@@ -474,36 +479,47 @@
 .checkTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 13px;
+  font-size: var(--text-label);
   font-weight: 600;
+  line-height: var(--tpl-side-title-lh);
 }
 .checkNote {
-  margin: 2px 0 0;
+  margin: var(--tpl-compact-gap) 0 0;
   color: var(--color-ink-secondary);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rule-note-lh);
 }
 
 /* 確認の「設定の確認」表。各行の右に「変える」。 */
+/* 絵 XJUqs「設定の確認」：行は 上下10・題140・字13/21・右に「変える」。行と行の間14。 */
+.summaryList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-summary-gap);
+}
 .summaryRow {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: var(--tpl-summary-key-w) minmax(0, 1fr) auto;
+  gap: var(--tpl-rule-row-gap);
   align-items: center;
-  padding: 10px 0;
+  padding: var(--tpl-page-pad-block) 0;
   border-bottom: 1px solid var(--color-hairline);
 }
 .summaryRow:last-child {
   border-bottom: 0;
 }
 .summaryKey {
-  color: var(--color-ink-faint);
-  font-size: 13px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
 }
 .summaryVal {
+  min-width: 0;
+  overflow: hidden;
   color: var(--color-ink);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--text-label);
+  line-height: var(--tpl-summary-val-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* LINE の中の吹き出し（返す側＝右の緑、届いた側＝左の白）。 */
@@ -769,3 +785,15 @@
 .stepTrigger .pairRow .field { gap: var(--tpl-field-gap-basic); }
 .weekdaySummary { margin-left: auto; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .stepTrigger { padding-bottom: var(--tpl-section-pad); }
+
+/* 絵 Guoye「重なりを1件ずつ確かめる」：クリームの地・角12・余白16。 */
+.conflictCard { display: flex; flex-direction: column; align-self: stretch; gap: var(--tpl-body-gap); padding: var(--tpl-side-card-pad); border-radius: var(--radius-card); background: var(--color-warning-bg); }
+.conflictDesc { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-conflict-desc-lh); }
+.conflictItem { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-body-gap); padding: var(--tpl-section-gap) 0; border-top: 1px solid var(--color-hairline); }
+.conflictItem:first-of-type { border-top: 0; }
+.conflictChipCertain, .conflictChipPossible { font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-conflict-desc-lh); }
+.conflictChipCertain { color: var(--color-status-danger); }
+.conflictChipPossible { color: var(--color-warning); }
+.conflictResult { min-height: calc(var(--tpl-conflict-desc-lh) * 2); } /* 試すと2行になる。先に場所を取って、出たときに下が動かないように */
+.testRow { display: flex; align-items: center; gap: var(--tpl-body-gap); }
+.testGrow { flex: 1 1 0; min-width: 0; }
