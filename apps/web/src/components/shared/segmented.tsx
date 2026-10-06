@@ -17,12 +17,19 @@ export default function SegmentedControl<T extends string>({
   onChange,
   'aria-label': ariaLabel,
   className,
+  size = 'medium',
 }: {
   options: { value: T; label: string }[]
   value: T
   onChange: (value: T) => void
   'aria-label': string
   className?: string
+  /**
+   * 大きさ。既定 'medium' は箱型（dtJVi：項目 6/12・文 13）。
+   * 'small' は小型（d8X09 グラフ／表：器 r8・項目 3/10・文 12・
+   * つまみ r6・全体の高さ 28）。v8 だけで効く。
+   */
+  size?: 'medium' | 'small'
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -58,6 +65,7 @@ export default function SegmentedControl<T extends string>({
       role="group"
       aria-label={ariaLabel}
       className={[styles.root, className].filter(Boolean).join(' ')}
+      data-size={size}
       onKeyDown={onKeyDown}
     >
       <span

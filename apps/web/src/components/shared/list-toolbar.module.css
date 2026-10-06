@@ -157,3 +157,15 @@
 [data-theme='v8'] .trailing { margin-left: auto; display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 [data-theme='v8'] .toolbar [role='group'] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 [data-theme='v8'] .row1 > .search { width: var(--list-search-width, 280px); min-width: 0; }
+/*
+ * ★V8「道具の2段」（acRIl 予約管理）：1段目＝探す・担当・経路・CSV、
+ * 2段目＝札。段の間 10・段の中の間 6。v7 の2段組みは変えない。
+ * layout="stacked" のときだけ段を残し、それ以外は1本の帯。
+ */
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row1,
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .filters { display: contents; }
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .filters > *,
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .row1 > *,
+[data-theme='v8'] .toolbar[data-toolbar-layout='stacked'] .trailing { order: 0; }

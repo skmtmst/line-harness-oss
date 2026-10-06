@@ -4029,8 +4029,9 @@ export const AUTO_REPLY_NEW_DRAFT = {
     responseContent: '{{name}}さん、ご連絡ありがとうございます。\n予約の変更は、下のボタンから日時を選び直せます。担当からも折り返しご連絡します。',
     lineAccountId: 'visual-qa-account',
     actions: [
-      { actionType: 'support_mark', config: { label: '予約変更' }, onFailure: 'continue' },
-      { actionType: 'notify_staff', config: { notificationRuleId: '', notificationRuleVersion: 0, message: '予約の日程変更のお問い合わせがありました。' }, onFailure: 'stop' },
+      // 実際の形（markId・notificationRuleId）で持つ。名前は既存の見本（絵の「予約変更」「Kenta Kawano」はデータの文字の違いとして扱う）。
+      { actionType: 'support_mark', config: { markId: 'mark-in-progress' }, onFailure: 'continue' },
+      { actionType: 'notify_staff', config: { notificationRuleId: 'operator-rule-1', notificationRuleVersion: 1, message: '予約の日程変更のお問い合わせがありました。' }, onFailure: 'stop' },
     ],
     replyDelaySeconds: 0,
     cooldownMinutes: 60,

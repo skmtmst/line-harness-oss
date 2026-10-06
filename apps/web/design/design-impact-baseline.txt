@@ -397,6 +397,7 @@ shared-button-importer components/accounts/account-setup-urls.tsx
 shared-button-importer components/accounts/account-switcher.tsx
 shared-button-importer components/auto-replies/edit-dialog.tsx
 shared-button-importer components/auto-replies/inline-action-list.tsx
+shared-button-importer components/auto-replies/inline-action-rows-v8.tsx
 shared-button-importer components/automations/automation-template-gallery.tsx
 shared-button-importer components/automations/common-action-editor.tsx
 shared-button-importer components/broadcasts/broadcast-approval.tsx

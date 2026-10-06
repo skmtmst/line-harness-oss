@@ -35,6 +35,17 @@
   line-height: 1.4;
 }
 
+/* 「任意」の札（Td4TN：11px・行17・薄い灰・左に6。丸い地なし）。 */
+.optional {
+  display: inline-flex;
+  margin-left: 6px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 400;
+  line-height: var(--text-micro--line-height);
+  white-space: nowrap;
+}
+
 .control {
   box-sizing: border-box;
   width: 100%;

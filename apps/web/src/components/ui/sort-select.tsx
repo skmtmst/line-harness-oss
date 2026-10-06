@@ -20,6 +20,7 @@ export default function SortSelect({
   onChange,
   className,
   label = '並び順',
+  treatment = 'box',
 }: {
   options: SelectOption[]
   value: string
@@ -27,6 +28,8 @@ export default function SortSelect({
   className?: string
   /** 板 `apLqS` は「並び：」。他は今のまま。 */
   label?: string
+  /** 'text' で枠なし文字＋上下矢印（x6QsVz の並び替え）。v8 だけ。 */
+  treatment?: 'box' | 'text'
 }) {
   const theme = useAdminTheme()
   // ★V8（c4n9Kr）：「並び：〇〇」を1つの箱の中に出す（箱の外に見出しを置かない）。v7 は今のまま。
@@ -39,6 +42,7 @@ export default function SortSelect({
         aria-label={name}
         label={name}
         options={options}
+        treatment={treatment}
         className="w-auto max-w-full"
       />
     )

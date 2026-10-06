@@ -19,6 +19,12 @@ export type DialogProps = {
   title: string
   description?: string
   tone?: 'default' | 'destructive'
+  /**
+   * 説明文を帯で囲む。'warning' は琥珀帯（CFAyf 送受信を止める）。
+   * 'danger' は桃箱（YZ57z 解除。題は箱の外・説明だけ箱の中）。
+   * tone（題・ボタンの色）とは独立。渡さなければ帯なし。
+   */
+  descriptionBand?: 'warning' | 'danger'
   busy?: boolean
   error?: string
   confirmLabel?: string
@@ -59,6 +65,7 @@ export default function Dialog({
   title,
   description,
   tone = 'default',
+  descriptionBand,
   busy = false,
   error,
   confirmLabel = '保存する',
@@ -107,16 +114,20 @@ export default function Dialog({
   const titleNode = (
     <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{title}</h2>
   )
+  /* YZ57z 解除の桃箱は「題は箱の外・説明だけ箱の中」のため、題と説明を分けておく。
+     かけらは描画に出ない（囲み要素なし）。渡さないときは h2 そのまま。 */
+  const titlePart = (<>{titleIcon ? (
+    <div className={styles.titleRow}>
+      <span className={styles.titleIcon} aria-hidden="true">{titleIcon}</span>
+      {titleNode}
+    </div>
+  ) : titleNode}</>)
+  const descriptionNode = description ? <p id={descriptionId} className={styles.description}>{description}</p> : null
   const heading = (
     <>
       {/* 絵が無いときは今までどおり h2 を直接置く。囲むと既存の余白が動く。 */}
-      {titleIcon ? (
-        <div className={styles.titleRow}>
-          <span className={styles.titleIcon} aria-hidden="true">{titleIcon}</span>
-          {titleNode}
-        </div>
-      ) : titleNode}
-      {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
+      {titlePart}
+      {descriptionNode}
     </>
   )
   const panel = (
@@ -136,7 +147,12 @@ export default function Dialog({
     >
       <div className={styles.headerRow}>
         <div className={styles.headerContent}>
-          {tone === 'destructive' && !confirmation ? <div className={styles.callout} data-qa-dialog-callout>{heading}</div> : heading}
+          {descriptionBand === 'danger' && description ? (
+            <>
+              {titlePart}
+              <div className={`${styles.callout} ${styles.calloutDanger}`} data-qa-dialog-callout>{descriptionNode}</div>
+            </>
+          ) : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <div className={`${styles.callout} ${descriptionBand === 'warning' ? styles.calloutWarning : ''}`} data-qa-dialog-callout>{heading}</div> : heading}
         </div>
         {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
         <IconButton aria-label="閉じる" title="閉じる" className={styles.close} onClick={onCancel} disabled={busy}>
