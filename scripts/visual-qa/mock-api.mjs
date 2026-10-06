@@ -901,37 +901,45 @@ const RESTAURANT_STORES = [
   { id: 'store-omt', organization_id: 'org-nen', name: '然 表参道店', code: 'OMT-02', area: '表参道', capacity: 64, timezone: 'Asia/Tokyo', status: 'active', line_status: 'connected', google_status: 'warning', line_account_id: 'visual-qa-account-2', line_account_name: '然 表参道店', friend_count: 842 },
   { id: 'store-nkm', organization_id: 'org-nen', name: '然 中目黒店', code: 'NKM-03', area: '中目黒', capacity: 48, timezone: 'Asia/Tokyo', status: 'active', line_status: 'error', google_status: 'connected', line_account_id: null, line_account_name: null, friend_count: null },
 ]
+/* 板 BERxg（座席・卓管理）の9卓。稼働8卓で26席（予約枠・在庫 Y8SjT2 の総数）、停止中の個室Bを含めて32席。T2・T3 が結合A。 */
 const RESTAURANT_TABLES = [
-  { id: 'tbl-1', store_id: 'store-sby', code: 'T-1', label: '窓際2名卓', seat_type: 'table', min_capacity: 1, max_capacity: 2, floor_x: 0, floor_y: 0, join_group: 'A', is_active: 1 },
-  { id: 'tbl-2', store_id: 'store-sby', code: 'T-2', label: '窓際2名卓', seat_type: 'table', min_capacity: 1, max_capacity: 2, floor_x: 1, floor_y: 0, join_group: 'A', is_active: 1 },
-  { id: 'tbl-3', store_id: 'store-sby', code: 'T-3', label: '中央4名卓', seat_type: 'table', min_capacity: 2, max_capacity: 4, floor_x: 0, floor_y: 1, join_group: null, is_active: 1 },
-  { id: 'tbl-4', store_id: 'store-sby', code: 'T-4', label: '中央4名卓', seat_type: 'table', min_capacity: 2, max_capacity: 4, floor_x: 1, floor_y: 1, join_group: 'B', is_active: 1 },
-  { id: 'tbl-5', store_id: 'store-sby', code: 'T-5', label: '中央4名卓', seat_type: 'table', min_capacity: 2, max_capacity: 4, floor_x: 2, floor_y: 1, join_group: 'B', is_active: 1 },
-  { id: 'tbl-6', store_id: 'store-sby', code: 'C-1', label: 'カウンター', seat_type: 'counter', min_capacity: 1, max_capacity: 1, floor_x: 0, floor_y: 2, join_group: null, is_active: 1 },
-  { id: 'tbl-7', store_id: 'store-sby', code: 'C-2', label: 'カウンター', seat_type: 'counter', min_capacity: 1, max_capacity: 1, floor_x: 1, floor_y: 2, join_group: null, is_active: 1 },
-  { id: 'tbl-8', store_id: 'store-sby', code: 'P-1', label: '個室 松', seat_type: 'private_room', min_capacity: 4, max_capacity: 8, floor_x: 2, floor_y: 2, join_group: null, is_active: 1 },
-  { id: 'tbl-9', store_id: 'store-sby', code: 'T-6', label: 'テラス4名卓', seat_type: 'terrace', min_capacity: 2, max_capacity: 4, floor_x: 2, floor_y: 0, join_group: null, is_active: 0 },
+  { id: 'tbl-1', store_id: 'store-sby', code: 'T1', label: '2人卓', seat_type: 'table', min_capacity: 1, max_capacity: 2, floor_x: 0, floor_y: 0, join_group: null, is_active: 1 },
+  { id: 'tbl-2', store_id: 'store-sby', code: 'T2', label: '2人卓', seat_type: 'table', min_capacity: 1, max_capacity: 2, floor_x: 1, floor_y: 0, join_group: 'A', is_active: 1 },
+  { id: 'tbl-3', store_id: 'store-sby', code: 'T3', label: '窓側4人卓', seat_type: 'table', min_capacity: 2, max_capacity: 4, floor_x: 2, floor_y: 0, join_group: 'A', is_active: 1 },
+  { id: 'tbl-4', store_id: 'store-sby', code: 'T4', label: '4人卓', seat_type: 'table', min_capacity: 2, max_capacity: 4, floor_x: 0, floor_y: 1, join_group: null, is_active: 1 },
+  { id: 'tbl-6', store_id: 'store-sby', code: 'C1', label: 'カウンター', seat_type: 'counter', min_capacity: 1, max_capacity: 1, floor_x: 1, floor_y: 1, join_group: null, is_active: 1 },
+  { id: 'tbl-7', store_id: 'store-sby', code: 'C2', label: 'カウンター', seat_type: 'counter', min_capacity: 1, max_capacity: 1, floor_x: 2, floor_y: 1, join_group: null, is_active: 1 },
+  { id: 'tbl-8', store_id: 'store-sby', code: '個室A', label: '個室', seat_type: 'private_room', min_capacity: 4, max_capacity: 8, floor_x: 0, floor_y: 2, join_group: null, is_active: 1 },
+  { id: 'tbl-5', store_id: 'store-sby', code: '個室B', label: '個室', seat_type: 'private_room', min_capacity: 4, max_capacity: 6, floor_x: 1, floor_y: 2, join_group: null, is_active: 0 },
+  { id: 'tbl-9', store_id: 'store-sby', code: 'TR1', label: 'テラス', seat_type: 'terrace', min_capacity: 2, max_capacity: 4, floor_x: 2, floor_y: 2, join_group: null, is_active: 1 },
 ]
+/* 板 MJoJR（メニュー管理）の6品：有効4・申請中1（ランチコースの価格改定）・保管済1。 */
 const RESTAURANT_MENU = [
-  { id: 'menu-1', store_id: 'store-sby', kind: 'course', name: 'おまかせコース', price: 6800, tax_mode: 'included', allergens_json: '["卵","小麦","乳"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'active' },
-  { id: 'menu-2', store_id: 'store-sby', kind: 'course', name: '季節の会席', price: 9800, tax_mode: 'included', allergens_json: '["小麦","大豆","海老"]', service_periods_json: '["dinner"]', duration_minutes: 150, status: 'active' },
+  { id: 'menu-6', store_id: 'store-sby', kind: 'course', name: '秋の鹿肉コース', price: 8800, tax_mode: 'included', allergens_json: '["小麦","乳"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'active' },
+  { id: 'menu-1', store_id: 'store-sby', kind: 'course', name: 'おまかせコース', price: 12000, tax_mode: 'included', allergens_json: '["えび","かに"]', service_periods_json: '["dinner"]', duration_minutes: 150, status: 'active' },
+  { id: 'menu-5', store_id: 'store-sby', kind: 'course', name: 'ランチコース', price: 4200, tax_mode: 'included', allergens_json: '["小麦"]', service_periods_json: '["lunch"]', duration_minutes: 90, status: 'active', pendingPrice: 4500, pendingEffectiveAt: null, priceChangeStatus: 'pending' },
   { id: 'menu-3', store_id: 'store-sby', kind: 'a_la_carte', name: '鹿肉のロースト', price: 2400, tax_mode: 'included', allergens_json: '[]', service_periods_json: '["lunch","dinner"]', duration_minutes: null, status: 'active' },
-  { id: 'menu-4', store_id: 'store-sby', kind: 'a_la_carte', name: '本日のデザート', price: 800, tax_mode: 'included', allergens_json: '["卵","乳"]', service_periods_json: '["lunch","dinner"]', duration_minutes: null, status: 'active' },
-  { id: 'menu-5', store_id: 'store-sby', kind: 'course', name: 'ランチコース', price: 3800, tax_mode: 'included', allergens_json: '["小麦"]', service_periods_json: '["lunch"]', duration_minutes: 90, status: 'paused' },
+  { id: 'menu-4', store_id: 'store-sby', kind: 'a_la_carte', name: '季節の前菜盛り合わせ', price: 1600, tax_mode: 'included', allergens_json: '["卵","乳"]', service_periods_json: '["dinner"]', duration_minutes: null, status: 'active' },
+  { id: 'menu-2', store_id: 'store-sby', kind: 'course', name: '夏の冷製コース', price: 6600, tax_mode: 'included', allergens_json: '["小麦"]', service_periods_json: '["dinner"]', duration_minutes: 120, status: 'archived' },
 ]
+/*
+ * 板 l9NlC0（予約台帳 今日・時間×卓）の1日：7件・22名＋押さえ1枠（TR1）。承認待ちは山田さん（食べログ）。
+ * 卓「T3」には先の予約が3件（板 eY9F3 卓を止める確認）。ほかの店舗の予約は数を見るために少し残す。
+ */
 const RESTAURANT_RESERVATIONS = [
-  { id: 'rsv-1', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '佐藤 花子', customer_phone: '090-1111-2222', line_uid: 'U-demo-1', guest_count: 2, starts_at: restaurantAt(12, 0), ends_at: restaurantAt(13, 30), table_id: 'tbl-1', table_label: '窓際2名卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-2', store_id: 'store-sby', store_name: '然 渋谷店', source: 'hotpepper', external_id: 'HP-88213', customer_name: '鈴木 一郎', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(18, 0), ends_at: restaurantAt(20, 0), table_id: 'tbl-3', table_label: '中央4名卓', course_id: 'menu-2', course_name: '季節の会席', status: 'confirmed', allergy_note: '海老アレルギー', note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-3', store_id: 'store-sby', store_name: '然 渋谷店', source: 'tabelog', external_id: 'TB-11230', customer_name: '田中 美咲', customer_phone: '080-3333-4444', line_uid: null, guest_count: 2, starts_at: restaurantAt(18, 30), ends_at: restaurantAt(20, 0), table_id: 'tbl-2', table_label: '窓際2名卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'pending', allergy_note: null, note: '記念日', sync_direction: 'inbound_only' },
-  { id: 'rsv-4', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '高橋 健', customer_phone: '03-5555-6666', line_uid: null, guest_count: 6, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 0), table_id: 'tbl-8', table_label: '個室 松', course_id: 'menu-2', course_name: '季節の会席', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-5', store_id: 'store-sby', store_name: '然 渋谷店', source: 'restaurant_board', external_id: 'RB-55210', customer_name: '伊藤 直樹', customer_phone: null, line_uid: null, guest_count: 2, starts_at: restaurantAt(19, 30), ends_at: restaurantAt(21, 0), table_id: null, table_label: null, course_id: null, course_name: null, status: 'pending', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-6', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '渡辺 あかり', customer_phone: null, line_uid: 'U-demo-2', guest_count: 3, starts_at: restaurantAt(20, 0), ends_at: restaurantAt(21, 30), table_id: 'tbl-4', table_label: '中央4名卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: '小麦抜き', note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-7', store_id: 'store-sby', store_name: '然 渋谷店', source: 'gurunavi', external_id: 'GN-33019', customer_name: '山本 翔', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(12, 30, 1), ends_at: restaurantAt(14, 0, 1), table_id: 'tbl-5', table_label: '中央4名卓', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-8', store_id: 'store-omt', store_name: '然 表参道店', source: 'line', external_id: null, customer_name: '中村 陽子', customer_phone: '090-7777-8888', line_uid: 'U-demo-3', guest_count: 2, starts_at: restaurantAt(18, 0), ends_at: restaurantAt(19, 30), table_id: null, table_label: null, course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-9', store_id: 'store-omt', store_name: '然 表参道店', source: 'hotpepper', external_id: 'HP-88400', customer_name: '小林 誠', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 0), table_id: null, table_label: null, course_id: 'menu-2', course_name: '季節の会席', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-10', store_id: 'store-omt', store_name: '然 表参道店', source: 'retty', external_id: 'RT-7781', customer_name: '加藤 裕子', customer_phone: null, line_uid: null, guest_count: 2, starts_at: restaurantAt(12, 0, 1), ends_at: restaurantAt(13, 30, 1), table_id: null, table_label: null, course_id: null, course_name: null, status: 'pending', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-11', store_id: 'store-nkm', store_name: '然 中目黒店', source: 'manual', external_id: null, customer_name: '松本 大輔', customer_phone: '070-9999-0000', line_uid: null, guest_count: 5, starts_at: restaurantAt(18, 30, 1), ends_at: restaurantAt(20, 30, 1), table_id: null, table_label: null, course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
-  { id: 'rsv-12', store_id: 'store-sby', store_name: '然 渋谷店', source: 'ikyu', external_id: 'IK-20111', customer_name: '斎藤 真紀', customer_phone: null, line_uid: null, guest_count: 2, starts_at: restaurantAt(19, 0, 2), ends_at: restaurantAt(21, 0, 2), table_id: null, table_label: null, course_id: 'menu-2', course_name: '季節の会席', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-1', store_id: 'store-sby', store_name: '然 渋谷店', source: 'tabelog', external_id: 'TB-11230', customer_name: '山田 太郎', customer_phone: '080-1234-5678', line_uid: null, guest_count: 2, starts_at: restaurantAt(18, 30), ends_at: restaurantAt(20, 30), table_id: 'tbl-1', table_label: '2人卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'pending', allergy_note: '乳', note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-2', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '佐藤 健', customer_phone: null, line_uid: 'U-demo-1', guest_count: 2, starts_at: restaurantAt(18, 0), ends_at: restaurantAt(20, 0), table_id: 'tbl-2', table_label: '2人卓', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-3', store_id: 'store-sby', store_name: '然 渋谷店', source: 'restaurant_board', external_id: 'RB-55210', customer_name: '田中 明子', customer_phone: '090-5555-1234', line_uid: null, guest_count: 4, starts_at: restaurantAt(18, 0), ends_at: restaurantAt(20, 0), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: 'えび', note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-4', store_id: 'store-sby', store_name: '然 渋谷店', source: 'hotpepper', external_id: 'HP-88213', customer_name: '鈴木 真理', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 0), table_id: 'tbl-4', table_label: '4人卓', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-5', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '小林 健太', customer_phone: '03-5555-6666', line_uid: null, guest_count: 1, starts_at: restaurantAt(18, 30), ends_at: restaurantAt(20, 0), table_id: 'tbl-6', table_label: 'カウンター', course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-6', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '加藤 舞', customer_phone: null, line_uid: 'U-demo-2', guest_count: 1, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(20, 30), table_id: 'tbl-7', table_label: 'カウンター', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-7', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '坂本 真人', customer_phone: '03-1111-0000', line_uid: null, guest_count: 8, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 30), table_id: 'tbl-8', table_label: '個室', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: 'そば・小麦', note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-8', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '押さえ', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(20, 0), ends_at: restaurantAt(21, 30), table_id: 'tbl-9', table_label: 'テラス', course_id: null, course_name: null, status: 'pending', allergy_note: '電話のお客さま用', note: '電話のお客さま用', hold_expires_at: restaurantAt(23, 30), sync_direction: 'inbound_only' },
+  { id: 'rsv-9', store_id: 'store-sby', store_name: '然 渋谷店', source: 'line', external_id: null, customer_name: '山田 花子', customer_phone: '090-1111-2222', line_uid: 'U-demo-3', guest_count: 4, starts_at: restaurantAt(19, 0, 1), ends_at: restaurantAt(21, 0, 1), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: 'menu-6', course_name: '秋の鹿肉コース', status: 'confirmed', allergy_note: 'えび', note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-10', store_id: 'store-sby', store_name: '然 渋谷店', source: 'phone', external_id: null, customer_name: '佐藤 健', customer_phone: '090-3333-4444', line_uid: null, guest_count: 3, starts_at: restaurantAt(12, 0, 2), ends_at: restaurantAt(14, 0, 2), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: null, course_name: null, status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-11', store_id: 'store-sby', store_name: '然 渋谷店', source: 'restaurant_board', external_id: 'RB-55290', customer_name: '田中 明子', customer_phone: '090-5555-1234', line_uid: null, guest_count: 2, starts_at: restaurantAt(18, 30, 7), ends_at: restaurantAt(20, 30, 7), table_id: 'tbl-3', table_label: '窓側4人卓', course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-12', store_id: 'store-omt', store_name: '然 表参道店', source: 'hotpepper', external_id: 'HP-88400', customer_name: '小林 誠', customer_phone: null, line_uid: null, guest_count: 4, starts_at: restaurantAt(19, 0), ends_at: restaurantAt(21, 0), table_id: null, table_label: null, course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
+  { id: 'rsv-13', store_id: 'store-nkm', store_name: '然 中目黒店', source: 'manual', external_id: null, customer_name: '松本 大輔', customer_phone: '070-9999-0000', line_uid: null, guest_count: 5, starts_at: restaurantAt(18, 30, 1), ends_at: restaurantAt(20, 30, 1), table_id: null, table_label: null, course_id: 'menu-1', course_name: 'おまかせコース', status: 'confirmed', allergy_note: null, note: null, sync_direction: 'inbound_only' },
 ]
 const RESTAURANT_SNAPSHOT = {
   environment: 'staging_test',
@@ -983,6 +991,48 @@ const RESTAURANT_SNAPSHOT = {
     { id: 'flow-4', store_id: null, flow_type: 'rebooking', title: 'またのご来店を', body: '次回のご予約をお待ちしています。', timing_minutes: 10080, is_enabled: 0, delivery_mode: 'preview_only' },
   ],
 }
+/*
+ * 板 Y8SjT2（予約枠・在庫）の1日：17:00〜20:00 の7枠・総数26席（稼働8卓）。
+ * 埋まっている卓と席数は予約台帳から出す形（occupiedTableIds・occupied_seats・freeSeats）。
+ * 19:00 だけ配分を直してある（OTA 6・LINE 4・当日 4）。最後に保存したのは中川さん 14:02（競合 qf3ky の文言）。
+ */
+const RESTAURANT_INVENTORY_DAY = [
+  [17, 0, ['tbl-8'], 8], [17, 30, ['tbl-8', 'tbl-3'], 12], [18, 0, ['tbl-8', 'tbl-3', 'tbl-4', 'tbl-6'], 17],
+  [18, 30, ['tbl-8', 'tbl-1', 'tbl-3', 'tbl-4', 'tbl-6'], 19], [19, 0, ['tbl-8', 'tbl-1', 'tbl-2', 'tbl-3', 'tbl-4', 'tbl-6', 'tbl-7'], 22],
+  [19, 30, ['tbl-8', 'tbl-3'], 12], [20, 0, ['tbl-8'], 8],
+].map(([h, m, tables, seats]) => ({
+  id: `inv-${h}${m}`, store_id: 'store-sby', starts_at: restaurantAt(h, m), slot_minutes: 30, total_capacity: 26,
+  ota_capacity: h === 19 && m === 0 ? 6 : 8, line_capacity: h === 19 && m === 0 ? 4 : 6, walk_in_capacity: h === 19 && m === 0 ? 4 : 6,
+  reserved_count: seats, occupied_seats: seats, occupiedTableIds: tables, freeSeats: 26 - seats,
+  version: 3, updated_by: 'mem-2', updated_by_name: '中川 由美', updated_at: restaurantAt(14, 2),
+}))
+/* 開ける時間：月休み・火〜木 17:00〜22:00・金 〜23:00・土 昼夜・日 昼と 〜21:00（weekday は 0=日）。 */
+const RESTAURANT_OPENING_HOURS = {
+  storeId: 'store-sby', version: 4, updatedBy: 'mem-2', updatedAt: restaurantAt(14, 2),
+  hours: [
+    { weekday: 0, periods: [{ opensAt: '11:30', closesAt: '14:00' }, { opensAt: '17:00', closesAt: '21:00' }] },
+    { weekday: 1, periods: [] },
+    { weekday: 2, periods: [{ opensAt: '17:00', closesAt: '22:00' }] },
+    { weekday: 3, periods: [{ opensAt: '17:00', closesAt: '22:00' }] },
+    { weekday: 4, periods: [{ opensAt: '17:00', closesAt: '22:00' }] },
+    { weekday: 5, periods: [{ opensAt: '17:00', closesAt: '23:00' }] },
+    { weekday: 6, periods: [{ opensAt: '11:30', closesAt: '14:00' }, { opensAt: '17:00', closesAt: '23:00' }] },
+  ],
+}
+/* 板 hQQlt（予約経路の連携）：媒体ごとの受け取り。サーバ（/api/restaurant-test/channels）と同じ形。 */
+const RESTAURANT_CHANNELS = [
+  { id: 'media-hp', code: 'hotpepper', name: 'Hot Pepper グルメ', todayCount: 9, lastReceivedAt: restaurantAt(18, 42), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
+  { id: 'media-tb', code: 'tabelog', name: '食べログ', todayCount: 6, lastReceivedAt: restaurantAt(18, 20), unreadableCount: 1, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
+  { id: 'media-gn', code: 'gurunavi', name: 'ぐるなび', todayCount: 3, lastReceivedAt: restaurantAt(16, 5), unreadableCount: 0, receiveMethod: 'email_forward', status: 'receiving', daysWithoutReceipt: 0 },
+  { id: 'media-rt', code: 'retty', name: 'Retty', todayCount: 0, lastReceivedAt: restaurantAt(12, 10, -7), unreadableCount: 0, receiveMethod: 'email_forward', status: 'not_receiving', daysWithoutReceipt: 7 },
+  { id: 'restaurant_board', code: 'restaurant_board', name: 'レストランボード', todayCount: 5, lastReceivedAt: restaurantAt(18, 51), unreadableCount: 0, receiveMethod: 'direct', status: 'receiving', daysWithoutReceipt: 0 },
+  { id: 'media-gg', code: 'google', name: 'Google で予約', todayCount: 0, lastReceivedAt: null, unreadableCount: 0, receiveMethod: 'email_forward', status: 'preparing', daysWithoutReceipt: null },
+  { id: 'media-ik', code: 'ikyu', name: '一休.com レストラン', todayCount: 0, lastReceivedAt: null, unreadableCount: 0, receiveMethod: 'email_forward', status: 'preparing', daysWithoutReceipt: null },
+  { id: 'manual', code: 'manual', name: '電話・LINE・店頭', todayCount: 4, lastReceivedAt: restaurantAt(17, 30), unreadableCount: 0, receiveMethod: 'manual', status: 'receiving', daysWithoutReceipt: 0 },
+]
+const RESTAURANT_INBOUND_EMAILS = [
+  { id: 'mail-1', storeId: 'store-sby', receivedAt: restaurantAt(18, 20), status: 'quarantined', reason: '人数の欄が読めませんでした', mediaCode: 'tabelog', mediaName: '食べログ' },
+]
 const RESTAURANT_INTAKE_ADDRESSES = [
   { id: 'ia-1', storeId: 'store-sby', localPart: 'r-sby01', address: 'r-sby01@intake.example.jp', status: 'active', createdAt: restaurantAt(9, 0, -30), revokedAt: null },
 ]
@@ -1985,6 +2035,30 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/store-context') {
     return { success: true, data: { selectedStore: { id: 'store-sby', name: '然 渋谷店' } } }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/reservations/day') {
+    const storeId = query.get('storeId') || 'store-sby'
+    const date = query.get('date') || ''
+    const sameDay = (iso) => { const d = new Date(iso); const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0'); return `${y}-${m}-${dd}` === date }
+    return { success: true, data: { date, reservations: RESTAURANT_RESERVATIONS.filter((r) => r.store_id === storeId && sameDay(r.starts_at)) } }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/customers/search') {
+    return { success: true, data: [{ name: '山田 花子', phone: '090-1111-2222', lineUid: 'U-demo-3' }] }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/customers/history') {
+    return { success: true, data: { visitCount: 3, visits: [{ id: 'v-1', starts_at: '2026-08-14T10:00:00.000Z', guest_count: 4, table_label: '個室A', course_name: '秋の鹿肉コース', allergy_note: 'えび' }] } }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/inventory/day') {
+    return { success: true, data: RESTAURANT_INVENTORY_DAY }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/opening-hours') {
+    return { success: true, data: RESTAURANT_OPENING_HOURS }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/channels') {
+    return { success: true, data: RESTAURANT_CHANNELS }
+  }
+  if (method === 'GET' && pathname === '/api/restaurant-test/inbound-emails') {
+    return { success: true, data: RESTAURANT_INBOUND_EMAILS, total: RESTAURANT_INBOUND_EMAILS.length }
   }
   if (method === 'GET' && pathname === '/api/restaurant-test/intake-addresses') {
     return { success: true, data: RESTAURANT_INTAKE_ADDRESSES }
