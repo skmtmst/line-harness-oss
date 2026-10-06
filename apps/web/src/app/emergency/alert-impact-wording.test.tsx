@@ -172,15 +172,20 @@ describe('A32-01: 根拠のない影響を断定しない', () => {
 })
 
 describe('A32-01: 期限切れ(stale)の健全性を現在の判定と混ぜない', () => {
-  it('古い実行の項目は「未確認」へ倒し、本文に古い結果と明示する', async () => {
+  it('古い実行の項目は「古い確認」の札にし、帯では確かめ直しへ誘導する', async () => {
     healthResponse.handler = () => Promise.resolve(staleSnapshot())
     render(<HealthPanel accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
 
+    // 古い「正常」を現在の判定として出さない。板どおり「古い確認」の札。
+    // 札の文字は点と文字が別の要素なので、textContent で探す。
+    const stalePills = () => [...document.querySelectorAll('span')]
+      .filter((el) => el.textContent === '●古い確認')
     await waitFor(() => {
-      expect(screen.getByText('古い結果です（再確認待ち）: LINE接続は正常です')).toBeTruthy()
+      expect(stalePills().length).toBeGreaterThan(0)
     })
-    // 全体の状態は「期限切れ」と分けて出し、過去の次回予定は案内しない
-    expect(screen.getByText('期限切れ（再確認待ち）')).toBeTruthy()
+    expect(screen.queryByText(/全体の状態：正常/)).toBeNull()
+    // 帯では期限切れと分け、自動確認の停止を疑って確かめ直しへ誘導する
+    expect(screen.getByText(/前回の確認結果が期限切れです/)).toBeTruthy()
     expect(screen.getByText(/自動確認が止まっている可能性があります/)).toBeTruthy()
     expect(screen.queryByText(/次は.*に自動で確かめます/)).toBeNull()
   })
@@ -188,12 +193,18 @@ describe('A32-01: 期限切れ(stale)の健全性を現在の判定と混ぜな�
   it('期限内の実行はこれまでどおり実測の判定を出す', async () => {
     const fresh = staleSnapshot()
     fresh.data.overallStatus = 'normal'
+    // 項目ごとの古さ（10分より古いと「古い確認」）に当たらないよう、観測を現在にする
+    const now = new Date().toISOString()
+    fresh.data.latestRun.results[0].observedAt = now
+    fresh.data.lastCheckedAt = now
     healthResponse.handler = () => Promise.resolve(fresh)
     render(<HealthPanel accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.getByText('LINE接続は正常です')).toBeTruthy()
+      expect(screen.getAllByText('LINE のアカウントとつながっているか').length).toBeGreaterThan(0)
     })
+    expect(screen.getAllByText(/正常/).length).toBeGreaterThan(0)
     expect(screen.queryByText(/古い結果です/)).toBeNull()
+    expect([...document.querySelectorAll('span')].filter((el) => el.textContent === '●古い確認').length).toBe(0)
   })
 })

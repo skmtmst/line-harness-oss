@@ -21,12 +21,12 @@ import ApiTokensPanel from './api-tokens-panel'
 import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import OutgoingV8Page from './outgoing-v8'
-import InteractionsV8Page from './interactions-v8'
-import IncomingV8Page from './incoming-v8'
+import OutgoingV8Page from '@/v8/webhooks/outgoing'
+import InteractionsV8Page from '@/v8/webhooks/interactions'
+import IncomingV8Page from '@/v8/webhooks/incoming'
 import ApiTokensV8Page from './apitokens-v8'
-import SheetsV8Page from './sheets-v8'
-import SamplesV8Page from './samples-v8'
+import SheetsV8Page from '@/v8/webhooks/sheets'
+import SamplesV8Page from '@/v8/webhooks/samples'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 
@@ -1124,6 +1124,10 @@ function WebhooksPageHost() {
   )
 }
 
+/*
+ * ★V8-B の切り替え。v8 の器は別器（_components/webhooks-v8-*.tsx）に置き、
+ * v7 の器・動きはこの下の V7 のまま残す。
+ */
 export default function WebhooksPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (

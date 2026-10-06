@@ -1,0 +1,57 @@
+/* 請求（板 JB8V1）。左に統括の設定のメニュー、右に中身。 */
+.hq-billing-v8 {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.hq-billing-v8 .hq-settings-nav {
+  padding: 16px 12px;
+  border-right: 1px solid var(--color-hairline);
+  align-self: stretch;
+}
+
+.hq-billing-v8__main {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 24px 24px;
+}
+
+/* 契約の帯（板の灰色の箱）。 */
+.hq-billing-v8__contract {
+  background: var(--color-surface-pearl);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  font-size: var(--text-caption);
+  line-height: 1.5;
+  color: var(--color-ink-secondary);
+}
+
+/* 周期の切り替えと支払い方法を管理の段。 */
+.hq-billing-v8__interval-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .hq-billing-v8 {
+    flex-direction: column;
+  }
+
+  .hq-billing-v8 .hq-settings-nav {
+    border-right: none;
+    border-bottom: 1px solid var(--color-hairline);
+    align-self: auto;
+    width: 100%;
+  }
+
+  .hq-billing-v8__main {
+    padding: 16px;
+  }
+}

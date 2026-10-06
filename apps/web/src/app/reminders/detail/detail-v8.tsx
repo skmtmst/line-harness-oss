@@ -453,7 +453,7 @@ function ReminderDetailV8() {
               disabled={!canManage}
             >
               <Pencil size={14} aria-hidden="true" />
-              {isUnpublishedDraft ? '編集を続ける' : '編集する'}
+              {isUnpublishedDraft ? '編集を続ける' : '編集'}
             </Button>
             <button
               ref={menuButtonRef}

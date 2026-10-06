@@ -16,8 +16,8 @@ import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 export const ADMIN_THEME_STORAGE_KEY = 'lh-admin-theme'
 
 /*
- * G6 移し替え：上バーの「前の見た目に戻す」も同じ効き方にするため、
  * 切り替えの本体を外へ出す。localStorage に残すので次回以降も覚える。
+ * 上バーの「前の見た目に戻す」は廃止したので、使うのは設定画面の切り替えだけ。
  */
 export function applyAdminTheme(next: 'v7' | 'v8') {
   document.documentElement.dataset.theme = next

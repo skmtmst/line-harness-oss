@@ -68,8 +68,9 @@ describe('バナー生成のタブ行（U032）', () => {
     expect(SHELL).toContain("[data-design-node='bpdek'] > nav")
   })
 
-  it('広い幅では設計どおり操作をタブ行の右端に置く（actions を渡す）', () => {
-    // `docs/v6-common-rules.md` §1-4: ヘッダー操作を独立した行にしない。
-    expect(SHELL).toContain('actions={actions}')
+  it('V8（板 B9ZAr・W5Wxr）では操作（作る・取り込む）と見るを左列に置き、タブ行はタブだけにする', () => {
+    // タブ行の右端に操作を置かない。狭い幅では左列が中身の上に回る。
+    expect(PROJECTS).toContain('onChrome')
+    expect(LIBRARY).toContain('onChrome')
   })
 })

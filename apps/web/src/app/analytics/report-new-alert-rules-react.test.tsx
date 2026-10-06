@@ -362,7 +362,7 @@ describe('定期レポートの宛先(R228)', () => {
   it('形の合わないメール宛先は行のそばで理由を出し、送信しない', async () => {
     await render()
     await selectStaffRecipient()
-    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await act(async () => { button('メールだけの宛先を足す').click(); await Promise.resolve() })
     await typeInto('宛先のメールアドレス 1行目', 'not-an-address')
 
     // どの行がなぜ止まったかが、その行に出る。
@@ -376,7 +376,7 @@ describe('定期レポートの宛先(R228)', () => {
   it('直すか消すと送れる。直した宛先は本文へ残る', async () => {
     await render()
     await selectStaffRecipient()
-    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await act(async () => { button('メールだけの宛先を足す').click(); await Promise.resolve() })
     await typeInto('宛先のメールアドレス 1行目', 'broken')
     await typeInto('宛先のメールアドレス 1行目', 'ops@example.com')
 
@@ -392,7 +392,7 @@ describe('定期レポートの宛先(R228)', () => {
   it('行の「消す」で不備のある宛先だけ外せる', async () => {
     await render()
     await selectStaffRecipient()
-    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await act(async () => { button('メールだけの宛先を足す').click(); await Promise.resolve() })
     await typeInto('宛先のメールアドレス 1行目', 'broken')
     expect(button('つくって動かす').disabled).toBe(true)
 

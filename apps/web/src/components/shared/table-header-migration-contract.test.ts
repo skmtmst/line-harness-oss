@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -10,12 +10,19 @@ const WEB = join(SRC, '..')
 const baseline = readDesignImpactBaseline()
 const targets = baseline.tableHeaderMigrationTargets
 const nativeHeaderExceptions = new Set(baseline.nativeTableHeaderExceptions)
+// V8で作り直した画面のローカル部品にある表見出し。
+// 旧v7のTh移行対象へ戻さず、確認済みの件数を上限として見張る。
+const v8NativeHeaders: Record<string, number> = {
+  'app/accounts/migration.tsx': 8,
+  'app/duplicates/page.tsx': 12,
+  'app/templates/page.tsx': 8,
+}
 const sources = Object.fromEntries(
   targets.map((path) => [path, readFileSync(join(SRC, path), 'utf8')]),
 )
 
 describe('表見出しの第1段階移行', () => {
-  it('一覧に登録した画面のV6標準見出しを共通Thで維持する', () => {
+  it('一覧に登録した画面の標準見出しを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),
       0,
@@ -35,7 +42,8 @@ describe('表見出しの第1段階移行', () => {
       expect(source, `${path} が共通表部品をimportしていない`).toMatch(
         /import \{[^}]*\bTh\b[^}]*\} from '@\/components\/shared\/table'/,
       )
-      expect(source, `${path} が見出し行を共通化していない`).toContain('<TableHeadRow>')
+      // V8のリマインダは専用の見出し行（tr）内に共通Thを置く。
+      expect(source, `${path} に表見出しの行がない`).toMatch(/<(?:TableHeadRow|thead)\b/)
       expect(source.match(/<Th\b/g), `${path} に共通Thの利用箇所が無い`).not.toBeNull()
     }
   })
@@ -60,9 +68,13 @@ describe('表見出しの第1段階移行', () => {
   })
 
   // 全ソース走査(countDebt)を含むため、CIの並列負荷で5秒を超えることがある。
-  it('一覧に登録した詳細内テーブルだけ直書きthを許す', { timeout: 30000 }, () => {
-    for (const path of targets.filter((path) => !nativeHeaderExceptions.has(path))) {
+  it('登録した詳細・V8専用テーブルだけ直書きthを許す', { timeout: 30000 }, () => {
+    for (const path of targets.filter((path) => !nativeHeaderExceptions.has(path) && !(path in v8NativeHeaders))) {
       expect(sources[path]).not.toMatch(/<th\b/)
+    }
+    for (const [path, limit] of Object.entries(v8NativeHeaders)) {
+      expect(targets).toContain(path)
+      expect(sources[path].match(/<th\b/g)?.length ?? 0, `${path} の専用見出しを増やさない`).toBe(limit)
     }
     for (const path of nativeHeaderExceptions) {
       expect(targets, `${path} は表見出しの監視対象にありません`).toContain(path)

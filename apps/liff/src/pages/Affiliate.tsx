@@ -832,21 +832,21 @@ export default function Affiliate() {
         <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-3 pb-12">
           {wallet && <MileageSummaryCard wallet={wallet} />}
           {wallet && <MileageOpportunities items={wallet.opportunities} />}
-          <Card className="space-y-3 p-4 text-center">
-            <span
-              className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-ok-bg text-ok-ink"
-              aria-hidden="true"
-            >
-              <Icon name="share-2" className="h-7 w-7" />
-            </span>
+          <Card className="space-y-3 p-4" data-design-node="vqu9B">
+            <p className="text-xs text-ink-secondary">紹介者に登録していないとき</p>
             <div>
-              <h2 className="text-sm font-bold text-ink">紹介リンクを使う</h2>
+              <h2 className="text-base font-bold text-ink">お友だちを紹介してマイルをもらう</h2>
               <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
-                無料で登録すると、案件ごと・SNSごとの紹介リンクを作れます。紹介した友だちが予約や購入へ進むと、マイルが増えます。
+                紹介者になると、条件ごとのリンクが使えます。
               </p>
             </div>
-            <Button variant="primary" onClick={handleRegister} disabled={registerBusy}>
-              {registerBusy ? '登録中…' : 'はじめる（無料）'}
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={handleRegister}
+              disabled={registerBusy}
+            >
+              {registerBusy ? '登録中…' : '紹介者になる'}
             </Button>
           </Card>
           {wallet && <MileageHistory wallet={wallet} />}

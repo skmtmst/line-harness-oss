@@ -38,10 +38,12 @@ vi.mock('@/lib/api', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(''),
+  usePathname: () => '/hq/members',
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: vi.fn(),
+  usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }),
 }))
 
 import HqMembersPage from './page'

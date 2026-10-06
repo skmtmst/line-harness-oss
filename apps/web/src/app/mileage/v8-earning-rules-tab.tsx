@@ -53,7 +53,8 @@ import {
 } from '@/lib/api'
 import { isMileageFriendsV6Overview } from './friends-overview-guard'
 import { ruleEventLabel } from './earning-rule-view'
-import { formatMileageDate, formatMileageNumber } from './mileage-display'
+import { formatMileageDate, formatMileageMonthDay, formatMileageNumber } from './mileage-display'
+import type { MileageV8TabKey } from './mileage-v8'
 import { describeMileageCsvExportFailure } from './mileage-response-state'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -142,27 +143,29 @@ function validityText(rule: MileageEarningRuleV6): string {
     ? `${days / 365}年`
     : `${formatMileageNumber(days)}日`
   const until = rule.draft.validUntil
-    ? formatMileageDate(rule.draft.validUntil).replace(/^\d+\//, '')
+    ? formatMileageMonthDay(rule.draft.validUntil)
     : '期限なし'
   return `${span}・${until}`
 }
 
 type SortKey = 'order' | 'granted' | 'name' | 'amount'
 
-const PRESETS: Array<{ value: string; label: string; active: boolean; pending: boolean; sort: SortKey }> = [
-  { value: 'default', label: '既定の見方', active: false, pending: false, sort: 'order' },
-  { value: 'active-granted', label: '動いている・付いたマイルが多い順', active: true, pending: false, sort: 'granted' },
-  { value: 'active-name', label: '動いている・名前順', active: true, pending: false, sort: 'name' },
-  { value: 'stopped', label: '止めているのみ', active: false, pending: false, sort: 'order' },
-  { value: 'pending', label: '確定待ちありのみ', active: false, pending: true, sort: 'order' },
+const PRESETS: Array<{ value: string; label: string; active: boolean; pending: boolean; stopped: boolean; sort: SortKey }> = [
+  { value: 'default', label: 'よく使う絞り込み', active: false, pending: false, stopped: false, sort: 'order' },
+  { value: 'active-granted', label: '動いている・付いたマイルが多い順', active: true, pending: false, stopped: false, sort: 'granted' },
+  { value: 'active-name', label: '動いている・名前順', active: true, pending: false, stopped: false, sort: 'name' },
+  { value: 'stopped', label: '止めているのみ', active: false, pending: false, stopped: true, sort: 'order' },
+  { value: 'pending', label: '確定待ちありのみ', active: false, pending: true, stopped: false, sort: 'order' },
 ]
 
 export default function V8EarningRulesTab({
   readonly,
   registerHeaderActions,
+  registerTabCount,
 }: {
   readonly: boolean
   registerHeaderActions: (node: ReactNode) => void
+  registerTabCount?: (key: MileageV8TabKey, text: string | null) => void
 }) {
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -185,12 +188,14 @@ export default function V8EarningRulesTab({
   const [folder, setFolder] = useState<FolderKey>('all')
   const [activeOnly, setActiveOnly] = useState(false)
   const [pendingOnly, setPendingOnly] = useState(false)
+  const [stoppedOnly, setStoppedOnly] = useState(false)
   const [sort, setSort] = useState<SortKey>('order')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [menuId, setMenuId] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
+  const [menuNotice, setMenuNotice] = useState('')
   const [publishTarget, setPublishTarget] = useState<MileageEarningRuleV6 | null>(null)
   const [publishError, setPublishError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<MileageEarningRuleV6 | null>(null)
@@ -317,11 +322,16 @@ export default function V8EarningRulesTab({
   useEffect(() => {
     registerHeaderActions(
       <Button onClick={() => void exportCsv()} disabled={exporting || rules.length === 0}>
-        <Download size={14} aria-hidden="true" /> CSVで書き出す
+        <Download size={14} aria-hidden="true" /> CSV で書き出す
       </Button>,
     )
     return () => registerHeaderActions(null)
   }, [exportCsv, exporting, registerHeaderActions, rules.length])
+
+  /* タブの名の横の件数。読み直し中・失敗時は消す。 */
+  useEffect(() => {
+    registerTabCount?.('earning-rules', loading || loadError ? null : formatMileageNumber(rules.length))
+  }, [loading, loadError, registerTabCount, rules.length])
 
   const activeRules = useMemo(() => rules.filter((rule) => rule.published.status === 'published'), [rules])
   const pendingRules = useMemo(() => rules.filter((rule) => rule.draft.initialStatus === 'pending'), [rules])
@@ -340,6 +350,7 @@ export default function V8EarningRulesTab({
     const filtered = rules.filter((rule) => {
       if (folder !== 'all' && folderOf(rule) !== folder) return false
       if (activeOnly && rule.published.status !== 'published') return false
+      if (stoppedOnly && rule.published.status === 'published') return false
       if (pendingOnly && rule.draft.initialStatus !== 'pending') return false
       if (keyword && !rule.draft.name.includes(keyword)) return false
       return true
@@ -351,15 +362,15 @@ export default function V8EarningRulesTab({
       if (sort === 'amount') return b.draft.amount - a.draft.amount
       return (order.get(a.id) ?? a.draft.sortOrder) - (order.get(b.id) ?? b.draft.sortOrder)
     })
-  }, [activeOnly, folder, pendingOnly, ruleOrder, rules, search, sort])
+  }, [activeOnly, folder, pendingOnly, stoppedOnly, ruleOrder, rules, search, sort])
 
   const pageCount = Math.max(1, Math.ceil(shown.length / pageSize))
   const visible = shown.slice((page - 1) * pageSize, page * pageSize)
   const presetValue = PRESETS.find((p) =>
-    p.active === activeOnly && p.pending === pendingOnly && p.sort === sort)?.value ?? 'custom'
+    p.active === activeOnly && p.pending === pendingOnly && p.stopped === stoppedOnly && p.sort === sort)?.value ?? 'custom'
 
   const moveRule = (id: string, direction: -1 | 1) => {
-    if (readonly || folder !== 'all' || activeOnly || pendingOnly || search.trim() || sort !== 'order') return
+    if (readonly || folder !== 'all' || activeOnly || pendingOnly || stoppedOnly || search.trim() || sort !== 'order') return
     setRuleOrder((current) => {
       const index = current.indexOf(id)
       const target = index + direction
@@ -441,6 +452,45 @@ export default function V8EarningRulesTab({
     }
   }
 
+  /*
+   * 行の「…」の「複製」。今の決めごとの写しを止めた状態で1つ作る
+   * （作りかけの口と写しの口を続けて叩く。公開はしない）。
+   */
+  const duplicateRule = async (rule: MileageEarningRuleV6) => {
+    if (readonly || !selectedAccountId || savingId !== null) return
+    setSavingId(rule.id)
+    setActionError('')
+    setMenuNotice('')
+    try {
+      const name = `${rule.draft.name} のコピー`
+      const created = await api.mileage.createRule({
+        name,
+        eventType: rule.draft.eventType,
+        source: rule.draft.source,
+        amount: rule.draft.amount,
+        initialStatus: rule.draft.initialStatus,
+        lineAccountId: selectedAccountId,
+        conditions: {},
+        validFrom: rule.draft.validFrom,
+        validUntil: rule.draft.validUntil,
+        isActive: false,
+      })
+      if (!created.success) throw new Error(created.error)
+      const drafted = await api.mileage.saveEarningRuleDraft(created.data.id, {
+        accountId: selectedAccountId,
+        expectedVersion: 0,
+        draft: { ...rule.draft, name },
+      })
+      if (!drafted.success) throw new Error(drafted.error)
+      setMenuNotice(`「${name}」を止めた状態で作りました。`)
+      await load()
+    } catch {
+      setActionError('複製できませんでした。もう一度お試しください。')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
   const runTest = async (rule: MileageEarningRuleV6) => {
     if (readonly || !selectedAccountId || testBusy) return
     setTestTarget(rule)
@@ -464,6 +514,7 @@ export default function V8EarningRulesTab({
     setFolder('all')
     setActiveOnly(false)
     setPendingOnly(false)
+    setStoppedOnly(false)
     setSort('order')
     setPage(1)
   }
@@ -487,7 +538,7 @@ export default function V8EarningRulesTab({
         <div className={styles.kpi}>
           <div className={styles.kpiTop}>
             <span className={styles.kpiIcon}><Coins size={14} aria-hidden="true" /></span>
-            <span className={styles.kpiLabel}>今月付けたマイル</span>
+            <span className={styles.kpiLabel}>今月 付けたマイル</span>
           </div>
           <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(grantedMiles ?? 0)}</p>
           <p className={styles.kpiSub}>
@@ -497,7 +548,7 @@ export default function V8EarningRulesTab({
         <div className={styles.kpi}>
           <div className={styles.kpiTop}>
             <span className={styles.kpiIcon}><Gift size={14} aria-hidden="true" /></span>
-            <span className={styles.kpiLabel}>今月使われたマイル</span>
+            <span className={styles.kpiLabel}>今月 使われたマイル</span>
           </div>
           <p className={styles.kpiValue}>{loading || loadError ? '—' : formatMileageNumber(spentMiles ?? 0)}</p>
           <p className={styles.kpiSub}>
@@ -517,6 +568,7 @@ export default function V8EarningRulesTab({
       </div>
 
       {actionError ? <Notice tone="danger" message={actionError} /> : null}
+      {menuNotice ? <Notice tone="success" message={menuNotice} /> : null}
       {orderDirty && !readonly ? (
         <Notice tone="warn" message={`並び順を変えています。保存するまでこの画面の並びは仮のままです。${savingOrder ? '保存しています…' : ''}`} />
       ) : null}
@@ -535,6 +587,7 @@ export default function V8EarningRulesTab({
             }))}
             activeId={folder}
             onSelect={(id) => resetPage(() => setFolder(id as FolderKey))}
+            addFolderNote="フォルダを消しても、中の経路は未分類に残ります"
           />
         </div>
 
@@ -575,7 +628,10 @@ export default function V8EarningRulesTab({
             />
             <FilterChip
               selected={activeOnly}
-              onChange={(selected) => resetPage(() => setActiveOnly(selected))}
+              onChange={(selected) => resetPage(() => {
+                setActiveOnly(selected)
+                if (selected) setStoppedOnly(false)
+              })}
             >
               動いている {formatMileageNumber(activeRules.length)}
             </FilterChip>
@@ -604,6 +660,7 @@ export default function V8EarningRulesTab({
                   setPage(1)
                   setActiveOnly(preset.active)
                   setPendingOnly(preset.pending)
+                  setStoppedOnly(preset.stopped)
                   setSort(preset.sort)
                 }}
               />
@@ -747,7 +804,7 @@ export default function V8EarningRulesTab({
                               items={[
                                 {
                                   id: 'edit',
-                                  label: '下書きを編集',
+                                  label: '編集',
                                   external: true,
                                   onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
                                 },
@@ -760,7 +817,7 @@ export default function V8EarningRulesTab({
                                 },
                                 {
                                   id: 'toggle',
-                                  label: active ? '決めごとを停止' : '決めごとを再開',
+                                  label: active ? '止める' : '再開する',
                                   disabled: savingId === rule.id,
                                   disabledReason: '反映しています',
                                   onSelect: () => void toggleRule(rule),
@@ -771,6 +828,13 @@ export default function V8EarningRulesTab({
                                   disabled: savingId !== null,
                                   disabledReason: '別の決めごとを反映しています',
                                   onSelect: () => { setPublishError(''); setPublishTarget(rule) },
+                                },
+                                {
+                                  id: 'duplicate',
+                                  label: '複製',
+                                  disabled: savingId !== null,
+                                  disabledReason: 'ほかの操作を反映しています',
+                                  onSelect: () => void duplicateRule(rule),
                                 },
                                 ...(rule.publishedVersion == null ? [{
                                   id: 'delete',
@@ -803,7 +867,7 @@ export default function V8EarningRulesTab({
           ) : null}
 
           {!loading && !loadError && rules.length > 0 ? (
-            <p className={styles.footnote}>行の「…」から 下書きを編集・テスト・停止／再開・公開・削除ができます。</p>
+            <p className={styles.footnote}>行の「…」から 編集・テスト・止める・公開・複製・削除ができます。</p>
           ) : null}
         </div>
       </div>

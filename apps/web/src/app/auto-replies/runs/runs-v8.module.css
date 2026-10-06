@@ -89,6 +89,7 @@
   font-size: 22px;
   font-weight: 700;
   line-height: 1.2;
+  font-variant-numeric: tabular-nums;
 }
 .kpiValueDanger {
   color: var(--color-danger);
@@ -223,6 +224,19 @@
 .cellMain {
   font-weight: 600;
 }
+/* 友だちの列：顔＋名前のリンク（`nWmLg`）。 */
+.friendCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.friendCell a {
+  overflow: hidden;
+  color: var(--color-action);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .cellSub {
   display: block;
   margin-top: 2px;
@@ -307,6 +321,16 @@
 .cardFoot {
   display: flex;
   justify-content: flex-end;
+}
+.footLink {
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.footLink:hover {
+  color: var(--color-action);
+  text-decoration: underline;
 }
 
 .hint {

@@ -171,7 +171,7 @@
   padding: 10px 14px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control, 8px);
-  background: var(--color-canvas);
+  background: var(--color-status-info-soft);
   color: var(--color-ink-secondary);
   font-size: 12px;
   line-height: 1.6;
@@ -179,11 +179,24 @@
 
 .noteBand ol {
   margin: 6px 0 0;
-  padding-left: 18px;
+  padding-left: 20px;
 }
 
 .noteBand li + li {
   margin-top: 2px;
+}
+
+/* 板 `X0QrW0`：閲覧のみの帯。頭のすぐ下。 */
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 /* 操作の失敗の帯。 */
@@ -256,6 +269,12 @@
 
 .rowClick:hover td {
   background: var(--color-canvas-sunken);
+}
+
+/* 消える行は 150ms で薄くなる（V8 の動き §8）。 */
+.rowClick[data-leaving='true'] {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease-out);
 }
 
 .selectCell {
@@ -345,7 +364,7 @@
 .statePill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   font-size: 11px;

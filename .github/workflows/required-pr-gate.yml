@@ -71,8 +71,7 @@ jobs:
           fi
 
           changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
-          if printf '%s\n' "$changed" \
-            | grep -qE '^packages/db/(src/|test/|migrations/)'; then
+          if grep -qE '^packages/db/(src/|test/|migrations/)' <<< "$changed"; then
             echo "db_tests=true" >> "$GITHUB_OUTPUT"
             echo "DBの実装・テスト・マイグレーション変更があるため、DBテストを行います。"
           else
@@ -80,8 +79,7 @@ jobs:
           fi
 
           full_suite=false
-          if [ -n "$changed" ] && printf '%s\n' "$changed" \
-            | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
+          if [ -n "$changed" ] && grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)' <<< "$changed"; then
             full_suite=true
             echo "コードまたは設定の変更があるため、全検査を行います。"
           else
@@ -94,8 +92,7 @@ jobs:
           # 秘密の扱い（値を出さない・main へ配らない）を見張っている(#704)。
           # ワークフローだけを変えたPRは full_suite=false になり、いちばん効く場面で
           # 外れてしまうので、そこだけ別に見る。
-          if [ "$full_suite" = "true" ] || printf '%s\n' "$changed" \
-            | grep -qE '^\.github/workflows/'; then
+          if [ "$full_suite" = "true" ] || grep -qE '^\.github/workflows/' <<< "$changed"; then
             echo "docs_tests=true" >> "$GITHUB_OUTPUT"
             echo "docs の試験を行います。"
           else
@@ -652,6 +649,8 @@ jobs:
       # 目標（表示1秒・反応100ms・長い作業50ms）の未達は結果に出すだけ。
       # 道具の対照は speed-budget.mjs の頭に書いた。
       - name: Speed budget on V8 (10 screens on a real browser)
+        # オーナー決定（2026-10-04）：速さは測り方のぶれで落ちることがあるので、当面は知らせるだけにして止めない。
+        continue-on-error: true
         if: steps.scope.outputs.run == 'true'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -665,6 +664,8 @@ jobs:
           fi
           ALLOW_JS_BASELINE_UPDATE="$allow_js" node apps/web/scripts/v8-guard/speed-budget.mjs http://127.0.0.1:4310 /tmp/v8-guard/speed.json
       - name: v7 screens are pixel-identical to the base
+        # オーナー決定（V8 へ完全切替）：共通部品が V8 になったので v7 の画素は変わる。比べた結果は残すが止めない。
+        continue-on-error: true
         if: steps.scope.outputs.diff == 'true'
         run: |
           node apps/web/scripts/v8-guard/shots.mjs http://127.0.0.1:4311 /tmp/v8-guard/base v7

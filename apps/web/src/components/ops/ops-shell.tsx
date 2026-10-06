@@ -152,12 +152,19 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   // 画面名は各画面の OpsPageHeader が出す。認証とアカウントメニューの
   // 振る舞いは変えない。
   return (
-    <div className="flex min-h-svh flex-col bg-canvas-sunken" data-design-node="jIZP0">
+    <div className="flex h-svh flex-col overflow-hidden bg-canvas-sunken" data-design-node="jIZP0">
       <OpsEnvBar />
       {me?.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
-      <div className="flex flex-1">
+      {/*
+       * ★V7: 縦に長い画面でも左のメニューは画面に残す。外枠の高さを画面に
+       * 合わせ、縦スクロールは本文（main）の中だけで起きるようにする。
+       * こうすると左下のアカウント情報が一番下まで送られず、常に見える。
+       * 統括・店舗の外枠（app-shell.module.css の `.main { overflow: auto }`）
+       * と同じ作りにそろえる。
+       */}
+      <div className="flex min-h-0 flex-1">
         <OpsSidebar me={me} meError={meError} onRetryMe={() => { setChecked(false); setMeError(''); void load() }} pathname={pathname} open={navOpen} onClose={() => setNavOpen(false)} />
-        <main className="min-w-0 flex-1">
+        <main id="ops-main" className={`min-w-0 flex-1 ${navOpen ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           {/*
            * 1280px未満ではナビを常設しない。256pxの帯が残ると本文が潰れて
            * 検索や操作が画面外へ出る（U094）。開く操作だけ本文の上に置く。
@@ -196,11 +203,15 @@ function OpsSidebar({ me, meError, onRetryMe, pathname, open, onClose }: { me: O
           className="fixed inset-0 z-40 cursor-default bg-ink/40 xl:hidden"
         />
       ) : null}
+      {/*
+       * メニューが長いときにスクロールするのは中の `nav` だけにする。
+       * 外側で受けると、左下のアカウント情報まで一緒に流れて見えなくなる。
+       */}
       <aside
         aria-label="運営メニュー"
-        className={`${open ? 'flex' : 'hidden'} fixed inset-y-0 left-0 z-50 w-64 shrink-0 flex-col overflow-y-auto border-r border-hairline bg-canvas shadow-float xl:static xl:z-auto xl:flex xl:shadow-none`}
+        className={`${open ? 'flex' : 'hidden'} fixed inset-y-0 left-0 z-50 w-64 shrink-0 flex-col overflow-hidden border-r border-hairline bg-canvas shadow-float xl:static xl:z-auto xl:flex xl:shadow-none`}
       >
-      <div className="flex items-center gap-3 px-4 py-4">
+      <div className="flex shrink-0 items-center gap-3 px-4 py-4">
         <span className="flex h-9 w-9 items-center justify-center rounded-mini bg-accent-deep text-lg font-bold text-on-accent">m</span>
         <div className="min-w-0">
           <p className="truncate text-label font-medium text-ink">musubo</p>
@@ -215,8 +226,8 @@ function OpsSidebar({ me, meError, onRetryMe, pathname, open, onClose }: { me: O
           <X aria-hidden="true" className="h-5 w-5" />
         </button>
       </div>
-      <div className="h-px bg-hairline" />
-      <nav className="flex-1 px-3 pt-3">
+      <div className="h-px shrink-0 bg-hairline" />
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-3">
         <p className="px-3 pb-1 pt-2 text-nano font-semibold text-ink-faint">運営</p>
         <ul className="flex flex-col gap-0.5">
           {MENU.map((item) => {
@@ -237,12 +248,12 @@ function OpsSidebar({ me, meError, onRetryMe, pathname, open, onClose }: { me: O
           })}
         </ul>
       </nav>
-      <div className="h-px bg-hairline" />
+      <div className="h-px shrink-0 bg-hairline" />
       {me ? (
         <OpsAccountMenu me={me} />
       ) : (
         // ★V7：担当者だけ読めていない間は、左下に小さく1行出す。外枠は残す。
-        <div className="px-4 py-3">
+        <div className="shrink-0 px-4 py-3">
           <p className="text-nano text-ink-secondary" role="status">
             {meError || '担当者を読み込んでいます'}
             {meError ? (
@@ -269,7 +280,7 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
   const initial = me.name.trim().charAt(0) || 'M'
 
   return (
-    <div className="relative px-3 py-3">
+    <div className="relative shrink-0 px-3 py-3">
       {open ? (
         <MenuPortal
           open={open}

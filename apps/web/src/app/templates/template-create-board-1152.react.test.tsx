@@ -96,4 +96,15 @@ describe('テンプレート作る画面の1152幅の印', () => {
       if (!page) throw new Error('u5YC6 not attached')
     })
   })
+
+  it('右の欄に届き方の見出しが出る', async () => {
+    narrowMatches = false
+    const { container } = render(<TemplateEditV8 />)
+    await eventually(() => {
+      const heading = Array.from(container.querySelectorAll('h2')).find(
+        (element) => element.textContent === '届き方',
+      )
+      if (!heading) throw new Error('届き方 heading missing')
+    })
+  })
 })

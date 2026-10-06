@@ -1,15 +1,8 @@
 'use client'
 
 /*
- * ★V8-B 運用者へのお知らせを作る（板 `gjUz3`、公開前の確認 `sDXNy`）。
- *
- * v7 の作成画面（`page.tsx` 内の NewOperatorNotificationInner）とは別の部品
- * として持つ。データの口・下書き保存・公開・テスト送信・版の守りは同じ。
- * 違いは置き場と見せ方だけ——左に3枚のカード（どんなときに知らせるか・
- * だれが受け取るか・いつ送るか・重ならないか）、右に届き方の見本・
- * 気をつけること・つながる先、下の帯にキャンセル・下書きを保存・公開。
- * 公開の前には `sDXNy` の確認の窓で宛先と LINE の届く人数を確かめる。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8-B 完成までの二重管理）。
+ * 運用者へのお知らせを作る（板 `gjUz3`、公開前の確認 `sDXNy`）。
+ * V8だけで作る（v7の作成画面は捨てた）。
  */
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -18,7 +11,6 @@ import { ArrowRight, Eye, Send } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
-import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -38,6 +30,7 @@ import {
   DEFAULT_OPERATOR_EVENT_TYPE,
   OPERATOR_EVENT_OPTIONS,
 } from '../../operator-event-options'
+import type { OperatorNotificationTeam } from '@line-crm/shared'
 import styles from './operator-new-v8.module.css'
 
 const THRESHOLD_OPTIONS = [
@@ -76,6 +69,7 @@ const RECIPIENTS_SAVE_GUARD_MESSAGE =
 function readConditions(rule: { conditions: Record<string, unknown> }) {
   const conditions = rule.conditions
   return {
+    teamId: typeof conditions.teamId === 'string' ? conditions.teamId : '',
     threshold: typeof conditions.threshold === 'string' ? conditions.threshold : 'one',
     importance: typeof conditions.importance === 'string' ? conditions.importance : 'normal',
     recipientIds: Array.isArray(conditions.recipientIds)
@@ -119,6 +113,48 @@ function NewOperatorNotificationV8Inner() {
   const [name, setName] = useState('新しい予約が入りました')
   const [recipients, setRecipients] = useState<OperatorRecipientPreview | null>(null)
   const [recipientIds, setRecipientIds] = useState<string[]>([])
+  const [teams, setTeams] = useState<OperatorNotificationTeam[]>([])
+  const [teamId, setTeamId] = useState('')
+  const [teamName, setTeamName] = useState('')
+  const [teamError, setTeamError] = useState('')
+  const [teamBusy, setTeamBusy] = useState(false)
+  const teamGeneration = useRef(0)
+  const loadTeams = () => {
+    const accountId = selectedAccountId
+    const generation = ++teamGeneration.current
+    setTeams([])
+    if (!accountId) return
+    setTeamError('')
+    void api.notifications.teams.list(accountId).then(result => {
+      if (generation !== teamGeneration.current) return
+      if (!result.success) throw new Error(result.error)
+      setTeams(result.data)
+    }).catch(() => { if (generation === teamGeneration.current) setTeamError('チームを読み込めませんでした。もう一度読み込んでください。') })
+  }
+  useEffect(() => {
+    setTeamId(''); setTeamName(''); loadTeams()
+    return () => { teamGeneration.current++ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId])
+  const saveTeam = async () => {
+    if (!selectedAccountId || teamBusy) return
+    const accountId = selectedAccountId
+    const generation = teamGeneration.current
+    if (!teamName.trim() || recipientIds.length === 0) { setTeamError('チーム名と1人以上のスタッフを選んでください。'); return }
+    setTeamBusy(true); setTeamError('')
+    try {
+      const existing = teams.find(team => team.id === teamId)
+      const result = existing
+        ? await api.notifications.teams.update(existing.id, { lineAccountId: accountId, name: teamName.trim(), staffIds: recipientIds, expectedVersion: existing.version })
+        : await api.notifications.teams.create({ lineAccountId: accountId, name: teamName.trim(), staffIds: recipientIds })
+      if (generation !== teamGeneration.current) return
+      if (!result.success) throw new Error(result.error)
+      setTeams(current => [...current.filter(team => team.id !== result.data.id), result.data])
+      setTeamId(result.data.id); setRecipientIds(result.data.staffIds)
+    } catch (caught) { if (generation === teamGeneration.current) setTeamError(caught instanceof Error ? caught.message : '保存できませんでした。') }
+    finally { setTeamBusy(false) }
+  }
+
   const [schedule, setSchedule] = useState('anytime')
   const [dedupeMinutes, setDedupeMinutes] = useState('10')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
@@ -163,6 +199,7 @@ function NewOperatorNotificationV8Inner() {
         setThreshold(saved.threshold)
         setImportance(saved.importance)
         setRecipientIds(saved.recipientIds)
+        setTeamId(saved.teamId)
         setSchedule(saved.schedule)
         setDedupeMinutes(saved.dedupeMinutes)
         setOnlyAvailable(saved.onlyAvailable)
@@ -203,7 +240,7 @@ function NewOperatorNotificationV8Inner() {
       setError((current) => (current === RECIPIENTS_SAVE_GUARD_MESSAGE ? '' : current))
       // NOTIFY-04: 再開したお知らせの宛先は保存ずみのもの。全選択で
       // 上書きすると、本人だけにしていた設定が全員へ広がる。
-      if (!editId) {
+      if (!editId && !teamId) {
         const autoIds = result.data.items.map((item) => item.id)
         setRecipientIds(autoIds)
         autoIdsRef.current = autoIds
@@ -220,7 +257,12 @@ function NewOperatorNotificationV8Inner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId, editId])
 
-  const signature = JSON.stringify([name, eventType, threshold, importance, recipientIds, schedule, dedupeMinutes, onlyAvailable, emailFallback])
+  useEffect(() => {
+    const selectedTeam = teams.find(team => team.id === teamId)
+    if (selectedTeam) { setRecipientIds(selectedTeam.staffIds); setTeamName(selectedTeam.name) }
+  }, [teamId, teams])
+
+  const signature = JSON.stringify([name, eventType, threshold, importance, recipientIds, teamId, schedule, dedupeMinutes, onlyAvailable, emailFallback])
 
   useEffect(() => {
     if (baseline !== null) return
@@ -234,7 +276,7 @@ function NewOperatorNotificationV8Inner() {
     if (!editId && recipients === null && !error && recipientsError === null) return
     if (!editId && autoIdsRef.current !== null) {
       // 読み込み前に触った分も未保存に数えるよう、初期値＋自動選択で基準を作る。
-      setBaseline(JSON.stringify(['新しい予約が入りました', DEFAULT_OPERATOR_EVENT_TYPE, 'one', 'normal', autoIdsRef.current, 'anytime', '10', false, true]))
+      setBaseline(JSON.stringify(['新しい予約が入りました', DEFAULT_OPERATOR_EVENT_TYPE, 'one', 'normal', autoIdsRef.current, '', 'anytime', '10', false, true]))
       return
     }
     setBaseline(signature)
@@ -282,7 +324,8 @@ function NewOperatorNotificationV8Inner() {
         conditions: {
           threshold,
           importance,
-          recipientType: 'team',
+          recipientType: teamId ? 'team' : 'staff',
+          ...(teamId ? { teamId } : {}),
           recipientIds,
           recipientLabel: `${recipientIds.length}人`,
           message: null,
@@ -484,12 +527,24 @@ function NewOperatorNotificationV8Inner() {
                   aria-label="チーム"
                   id="operator-recipient-team"
                   size="full"
-                  value="all"
-                  onChange={() => undefined}
-                  options={[{ value: 'all', label: `スタッフ（${recipientIds.length}人）` }]}
+                  value={teamId}
+                  onChange={(value) => {
+                    setTeamId(value)
+                    const team = teams.find(item => item.id === value)
+                    if (team) { setRecipientIds(team.staffIds); setTeamName(team.name) }
+                    else setTeamName('')
+                  }}
+                  options={[{ value: '', label: 'スタッフを選んでチームを作る' }, ...teams.map(team => ({ value: team.id, label: `${team.name}（${team.staffIds.length}人）` }))]}
                 />
               </div>
             </div>
+            <div className={styles.fieldGrid}>
+              <label className={styles.fieldLabel}>チーム名
+                <input aria-label="チーム名" value={teamName} maxLength={100} disabled={!canWrite || teamBusy} onChange={event => setTeamName(event.target.value)} className="w-full rounded-control border border-hairline px-3 py-2" />
+              </label>
+              <Button variant="secondary" disabled={!canWrite || teamBusy} onClick={() => void saveTeam()}>{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
+            </div>
+            {teamError && <div><p role="alert">{teamError}</p><Button variant="secondary" onClick={loadTeams}>チームをもう一度読み込む</Button></div>}
             <div className={styles.recipientList}>
               {recipients
                 // 候補0人では選ぶ操作自体ができない。準備と次の画面を案内する。
@@ -505,9 +560,9 @@ function NewOperatorNotificationV8Inner() {
                     <Checkbox
                       key={recipient.id}
                       checked={selected}
-                      onCheckedChange={(checked) => setRecipientIds((current) => checked
+                      onCheckedChange={(checked) => { setTeamId(''); setRecipientIds((current) => checked
                         ? [...current, recipient.id]
-                        : current.filter((id) => id !== recipient.id))}
+                        : current.filter((id) => id !== recipient.id)) }}
                     >
                       {recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}
                     </Checkbox>
@@ -632,7 +687,7 @@ function NewOperatorNotificationV8Inner() {
           <>
             <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
             <Button onClick={() => void saveDraft()} disabled={saveDisabled} busy={saving} title={canWrite ? undefined : '閲覧のみのため保存できません'}>
-              {savedRuleId ? '保存し直す' : '下書きを保存'}
+              下書きを保存
             </Button>
             <Button
               onClick={() => void openPublishConfirm()}

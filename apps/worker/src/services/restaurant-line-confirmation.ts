@@ -3,7 +3,7 @@ import { isOperationCapabilityStopped, resolveLineCredential } from '@line-crm/d
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { dbFor } from './db-router.js';
-import { formatStartsAtForStore, notificationTiming, renderNotificationText } from './booking-notifier.js';
+import { formatStartsAtForStore } from './booking-notifier.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import { dispatchLineProxyLocally } from './local-line-proxy.js';
 
@@ -19,6 +19,8 @@ export async function sendRestaurantLineConfirmation(c: Context<Env>, input: {
   tenantId: string;
   lineUid: string | null;
   startsAt: string;
+  endsAt: string;
+  guestCount: number;
   courseId: string | null;
   status: string;
 }): Promise<RestaurantLineNotice> {
@@ -46,12 +48,9 @@ export async function sendRestaurantLineConfirmation(c: Context<Env>, input: {
     }
     const course = input.courseId ? await db.prepare('SELECT name FROM rt_menu_items WHERE id = ? AND store_id = ?')
       .bind(input.courseId, input.storeId).first<{ name: string }>() : null;
-    const text = renderNotificationText('approved', {
-      menuName: course?.name ?? store.name,
-      staffName: store.name,
-      startsAt: formatStartsAtForStore(input.startsAt, store.timezone),
-      ...notificationTiming(input.startsAt, store.timezone, new Date()),
-    });
+    const startsAt = formatStartsAtForStore(input.startsAt, store.timezone);
+    const endsAt = formatStartsAtForStore(input.endsAt, store.timezone);
+    const text = `予約が確定しました。\n店舗: ${store.name}\n日時: ${startsAt}〜${endsAt}\n人数: ${input.guestCount}名\nコース: ${course?.name ?? '席のみ'}\n\n変更・キャンセルはお店に直接ご連絡ください。`;
     const token = await resolveLineCredential(store.channel_access_token_encrypted, store.channel_access_token,
       { lineAccountId: store.line_account_id, field: 'channel_access_token' }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
     if (!token) return { sent: false, reason: 'account_unavailable' };

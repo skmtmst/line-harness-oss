@@ -85,6 +85,22 @@ describe('色は2つまで（増えた=濃い緑・減った=灰色）', () => {
     expect(legend.textContent).toContain('増えた')
     expect(legend.textContent).toContain('減った')
   })
+
+  it('凡例の文言を変えられる（d8X09：登録／ブロック）', () => {
+    render(
+      <BarChart
+        items={SAMPLE}
+        legend={[
+          { label: '登録', tone: 'added' },
+          { label: 'ブロック', tone: 'removed' },
+        ]}
+      />,
+    )
+    const legend = screen.getByRole('list', { name: '凡例' })
+    expect(legend.textContent).toContain('登録')
+    expect(legend.textContent).toContain('ブロック')
+    expect(legend.textContent).not.toContain('増えた')
+  })
 })
 
 describe('数字は文字でも読める（色だけに頼らない）', () => {
@@ -169,5 +185,18 @@ describe('読み上げ用の表は箱を作らない', () => {
     expect(css).toMatch(/\.srOnly\s*\{[^}]*max-width:\s*0/s)
     expect(css).toMatch(/\.srOnly\s*\{[^}]*max-height:\s*0/s)
     expect(css).toMatch(/\.srOnly\s*\{[^}]*overflow:\s*hidden/s)
+  })
+})
+
+/*
+ * 黒をなくす（#2・オーナー「黒がいや」）：指を乗せた日の吹き出しは
+ * 白地＋細い線＋浮く影＋ink字。黒（ink地）に戻さないための歯止め。
+ */
+describe('グラフの吹き出しは白（黒をなくす #2）', () => {
+  it('.tooltip は白地＋ink字（ink地にしない）', () => {
+    const tooltip = css.match(/\.tooltip \{[^}]*\}/s)?.[0] ?? ''
+    expect(tooltip).toMatch(/background:\s*var\(--color-canvas\)/)
+    expect(tooltip).toMatch(/color:\s*var\(--color-ink\)/)
+    expect(tooltip).not.toMatch(/background:\s*var\(--color-ink\)/)
   })
 })

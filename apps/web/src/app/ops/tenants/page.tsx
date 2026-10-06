@@ -5,7 +5,12 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
-import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import PageHeader from '@/components/shared/page-header'
+import ActionMenu from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
+import HelpTip from '@/components/shared/help-tip'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import './tenants-v8.css'
 import '@/app/ops/readonly-v8.css'
 import { formatDate, formatDateTime, planLabel, planStatusChip, tenantDetailHref, tenantUseStatusChip, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
@@ -62,6 +67,8 @@ export default function OpsTenantsPage() {
   const [createBusy, setCreateBusy] = useState(false)
   const [createError, setCreateError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const [impersonateTarget, setImpersonateTarget] = useState<OpsTenantRow | null>(null)
 
   const load = useCallback(async () => {
     setError('')
@@ -104,11 +111,13 @@ export default function OpsTenantsPage() {
   })
 
   const impersonate = async (tenant: OpsTenantRow) => {
+    if (busyId) return
     setBusyId(tenant.id)
     const res = await opsCall(api.ops.impersonation.start(tenant.id))
     setBusyId(null)
     if (!res.success) { setError(res.error || '代理ログインを始められませんでした'); return }
     // 契約先の統括コンソールへ。帯は AppShell が出す。
+    setImpersonateTarget(null)
     window.location.assign('/hq')
   }
 
@@ -135,19 +144,15 @@ export default function OpsTenantsPage() {
   }
 
   return (
-    <ReadonlyDesignNode node="XWtYC"><div data-design-node="X9f5jy" className="v8-ro-ops-page v8-ro-ops-tenants flex flex-col gap-4">
+    <div data-design-node="XWtYC" className={`ops-tenants-page flex flex-col gap-4`}>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <OpsPageHeader title="契約先アカウント" />
+      <PageHeader breadcrumb={[]} title="契約先アカウント" description="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。" actions={<Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}><Plus size={16} aria-hidden="true" />契約先を作る</Button>} />
 
-      <div className="v8-ro-ops-metrics grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="ops-tenants-metrics">
         <KpiCard variant="v6" title="契約中" value={summary ? summary.active : null} unit="社" detail="" help="請求が生きている契約先（決済失敗を含む）" loading={loading && !summary} />
         <KpiCard variant="v6" title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail="期限切れ前に案内" loading={loading && !summary} />
-        <KpiCard variant="v6" title="停止中" value={summary ? summary.suspended : null} unit="社" detail="" help="運営が止めた契約先です" badge={summary?.suspended ? '確認' : undefined} badgeTone="warning" loading={loading && !summary} />
         <KpiCard variant="v6" title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail="Stripe で支払いが止まっている" badge={summary?.pastDue ? '要対応' : undefined} badgeTone="danger" loading={loading && !summary} />
-      </div>
-
-      <div>
-        <NoteBar tone="info">契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。</NoteBar>
+        <KpiCard variant="v6" title="停止中" value={summary ? summary.suspended : null} unit="社" detail="" help="運営が止めた契約先です" badge={summary?.suspended ? '確認' : undefined} badgeTone="warning" loading={loading && !summary} />
       </div>
 
       {/*
@@ -155,19 +160,17 @@ export default function OpsTenantsPage() {
         探す・絞り込むも一覧の操作なので同じ並びへ。
       */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}>
-          ＋ 契約先を作る
-        </Button>
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-sm">
           <SearchField
             value={q}
             onChange={setQ}
             onClear={() => setQ('')}
-            placeholder="統括名・メール・店舗名・LINEアカウント名で探す"
+            placeholder="統括名・メール・店舗名で探す"
             aria-label="契約先を探す"
           />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+<FilterChip selected={filter === ''} count={loading || listFailed ? undefined : rows.length} onChange={() => setFilter('')}>すべて</FilterChip>
           {STATUS_FILTERS.map((f) => (
             <FilterChip key={f.key} selected={filter === f.key} onChange={(selected) => setFilter(selected ? f.key : '')}>
               {f.label}
@@ -237,15 +240,11 @@ export default function OpsTenantsPage() {
               {/* 列幅は画面が決める（部品は幅を持たない）。1,440px 幅で操作列まで収まるよう、日付系は狭く。 */}
               <Th>統括名</Th>
               <Th className="w-28">プラン</Th>
-              <Th className="w-40 tenants-use-col">利用 / 請求</Th>
+              <Th className="w-32">状態</Th>
               <Th className="w-28">契約日</Th>
               <Th className="w-28">期限</Th>
-              <Th className="w-16" align="right">店舗</Th>
-              <Th className="w-16" align="right">権限者</Th>
-              <Th className="w-36">最終ログイン</Th>
-              {/* 「代理ログイン」（5文字）が w-28 では右端で切れる。操作列は入る幅で固定する。 */}
-              {/* 代理ログインボタンが列からはみ出さない幅にする。 */}
-                <Th className="w-36 tenants-op-col" align="right">操作</Th>
+              <Th className="w-28">最終ログイン</Th>
+              <Th className="w-16" align="right">操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
@@ -253,24 +252,23 @@ export default function OpsTenantsPage() {
               <Tr key={row.id}>
                 <Td>
                   <Link href={tenantDetailHref(row.id)} className="block truncate text-label font-medium text-ink hover:underline" title={row.name}>{row.name}</Link>
-                  <span className="mt-1 block truncate text-caption text-ink-faint">{row.featurePacks.length ? row.featurePacks.join('・') : ' '}</span>
+                  <div className="flex items-center gap-2 text-micro text-ink-faint"><span>{row.account_count}店舗・{row.staff_count}権限者</span><HelpTip label={`${row.name}の機能と請求`}>{row.featurePacks.length ? row.featurePacks.join('・') : '追加機能なし'}・{planStatusChip(row.plan_status)}</HelpTip></div>
                 </Td>
                 <Td><span className="text-label text-ink-secondary">{planLabel(row.plan_key)}</span></Td>
-                <Td><span className="inline-flex flex-wrap items-center gap-1">{tenantUseStatusChip(row.status)}{planStatusChip(row.plan_status)}</span></Td>
+                <Td><span className="inline-flex flex-wrap items-center gap-1">{row.status !== 'active' ? tenantUseStatusChip(row.status) : planStatusChip(row.plan_status)}</span></Td>
                 <Td><span className="text-caption text-ink-secondary">{formatDate(row.created_at)}</span></Td>
                 <Td>
                   {row.trial_ends_at
                     ? <span className="text-caption font-medium text-status-warn-deep">{formatDate(row.trial_ends_at)}</span>
-                    : <span className="text-caption text-ink-faint">—</span>}
+                    : <span className="text-caption text-ink-faint">{formatDate(row.current_period_ends_at)}</span>}
                 </Td>
-                <Td align="right"><span className="text-label text-ink">{row.account_count}</span></Td>
-                <Td align="right"><span className="text-label text-ink">{row.staff_count}</span></Td>
                 <Td><span className="text-caption text-ink-secondary">{formatDateTime(row.last_login_at)}</span></Td>
                 <Td align="right">
-                  {/* 「詳細」は統括名のリンクと重複するので置かない。操作は代理ログインだけ。 */}
-                  <Button size="field" onClick={() => void impersonate(row)} disabled={busyId === row.id || row.status === 'archived'}>
-                    代理ログイン
-                  </Button>
+                  <MoreAction label={`${row.name}の操作`} onClick={() => setMenuId(menuId === row.id ? null : row.id)} />
+                  <ActionMenu open={menuId === row.id} onClose={() => setMenuId(null)} items={[
+                    { id: 'impersonate', label: '代理ログイン（閲覧のみ）', disabled: busyId !== null || row.status === 'archived', disabledReason: row.status === 'archived' ? '解約済みの契約先には入れません' : undefined, onSelect: () => { setMenuId(null); setImpersonateTarget(row) } },
+                    { id: 'detail', label: '詳細', onSelect: () => router.push(tenantDetailHref(row.id)) },
+                  ]} />
                 </Td>
               </Tr>
             ))}
@@ -278,6 +276,7 @@ export default function OpsTenantsPage() {
         </DataTable>
       )}
       {!loading && visible.length > 0 ? <p className="mt-2"><Chip tone="neutral">{visible.length} 件</Chip></p> : null}
-    </div></ReadonlyDesignNode>
+      <ConfirmDialog open={impersonateTarget !== null} title="代理ログインを始めますか？" description={impersonateTarget ? `「${impersonateTarget.name}」へ閲覧のみで入ります。操作はすべて記録されます。` : ''} confirmLabel="代理ログインを始める" busy={busyId !== null} error={error || undefined} onConfirm={() => { if (impersonateTarget) void impersonate(impersonateTarget) }} onCancel={() => { if (!busyId) setImpersonateTarget(null) }} />
+    </div>
   )
 }

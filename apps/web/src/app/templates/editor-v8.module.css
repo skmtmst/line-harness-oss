@@ -76,6 +76,14 @@
   min-width: 0;
 }
 
+/* 右の欄の「届き方」の見出し（`u5YC6` `J60utH`：スマホの見本の上）。 */
+.previewTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 /* 白いカード */
 .card {
   background: var(--color-canvas);

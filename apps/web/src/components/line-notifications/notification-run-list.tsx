@@ -1,7 +1,5 @@
 'use client'
 
-import { useAdminTheme } from '@/lib/use-admin-theme'
-
 import Link from 'next/link'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, api, fetchApi, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
@@ -11,6 +9,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
+import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Notice from '@/components/shared/notice'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -311,7 +310,6 @@ export default function NotificationRunList({
   lineAccountId: string | null
   mode: 'history' | 'failures'
 }) {
-  const theme = useAdminTheme()
   const [page, setPage] = useState(1)
   const currentScopeKey = `${lineAccountId ?? 'none'}:${mode}`
 
@@ -408,7 +406,7 @@ export default function NotificationRunList({
   })
 
   const title = mode === 'failures' ? '送れなかったもの' : 'お知らせの記録'
-  const nodeId = theme === 'v8' ? (mode === 'failures' ? 'DrwMm' : 'PZBVb') : (mode === 'failures' ? 'X8JCA5' : 'Se65i')
+  const nodeId = mode === 'failures' ? 'DrwMm' : 'PZBVb'
   // 前世代の書き込みは、いつ届いても表示に反映しない（レンダー時点の比較だけで決める）。
   const visibleState: LoadState = loaded.generation === generation ? loaded.state : lineAccountId ? 'loading' : 'ready'
   const scopedResult = loaded.generation === generation ? loaded.result : null
@@ -417,6 +415,20 @@ export default function NotificationRunList({
   const visibleRetryingId = retrying.generation === generation ? retrying.id : null
   const items = useMemo(() => (scopedResult?.items ?? []) as NotificationRunItem[], [scopedResult])
   const summary = scopedResult?.summary ?? null
+  /*
+   * 板 DrwMm の4枚。口の集計には内訳が無いので、読み込んだ記録から数える。
+   * 送れなかった件数だけは口の合計（送れなかったもの画面の総数）を使う。
+   */
+  const failureBreakdown = useMemo(() => {
+    const blocked = items.filter((item) => item.reason?.includes('ブロック')).length
+    const emailed = items.filter((item) => item.channel === 'email' || item.reason?.includes('メール')).length
+    const retryPlanned = items.filter((item) => item.nextRetryAt !== null)
+    const nextRetry = retryPlanned
+      .map((item) => new Date(item.nextRetryAt as string).getTime())
+      .filter(Number.isFinite)
+      .sort((a, b) => a - b)[0]
+    return { blocked, emailed, retry: retryPlanned.length, nextRetryAt: nextRetry === undefined ? null : new Date(nextRetry).toISOString() }
+  }, [items])
   const pageCount = Math.max(1, Math.ceil(scopedTotal / PAGE_SIZE))
   const summaryDetail = (ready: string): string => {
     if (!lineAccountId) return 'LINEアカウントを選択すると表示します'
@@ -424,9 +436,6 @@ export default function NotificationRunList({
     if (visibleState === 'forbidden') return '見る権限がありません'
     return ready
   }
-  const filters: Array<{ value: RunFilter; label: string }> = mode === 'failures'
-    ? [{ value: 'all', label: 'すべて' }, { value: 'failed', label: '送信できなかった' }, { value: 'excluded', label: '送信対象外' }]
-    : [{ value: 'all', label: 'すべて' }, { value: 'clicked', label: 'クリック記録あり' }, { value: 'failed', label: '送れなかった' }]
   const visibleItems = useMemo(() => filterNotificationRuns(items, {
     query,
     status: filter,
@@ -441,26 +450,23 @@ export default function NotificationRunList({
         ? 'filtered-empty'
         : visibleState
 
+  const kpiValue = (count: number | null): number | null => visibleState === 'ready' ? count : null
   return (
     <section className="space-y-4" data-design-node={nodeId} data-list-state={listState} aria-label={title}>
-      <div data-ro-kpis="true" className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${mode === 'history' ? 'xl:grid-cols-4' : ''}`}>
-        {mode === 'failures' ? <>
-          <KpiCard title="届かなかった" value={summary?.failed ?? null} unit="通" detail={summaryDetail('確認と連絡が必要')} variant="v6" loading={visibleState === 'loading'} badgeTone="danger" />
-          <KpiCard title="送信対象外" value={summary?.excluded ?? null} unit="通" detail={summaryDetail('つながりや設定を確認')} variant="v6" loading={visibleState === 'loading'} />
-        </> : <>
-          <KpiCard title="お知らせの記録" value={lineAccountId && visibleState === 'ready' ? scopedTotal : null} unit="件" detail={summaryDetail('選択中のLINEアカウント')} variant="v6" loading={visibleState === 'loading'} />
-          <KpiCard title="LINE API受付済み" value={summary?.accepted ?? null} unit="通" detail={summaryDetail('LINEへの受付まで確認')} variant="v6" loading={visibleState === 'loading'} />
-          <KpiCard title="送信処理中" value={summary?.pending ?? null} unit="通" detail={summaryDetail('送信台帳に記録済み')} variant="v6" loading={visibleState === 'loading'} />
-          <KpiCard title="送れなかった" value={summary?.failed ?? null} unit="通" detail={summaryDetail('対応が必要なもの')} variant="v6" loading={visibleState === 'loading'} badgeTone="danger" />
-        </>}
-      </div>
-
-      <Notice tone="warn">
-        {mode === 'failures'
-          ? '発送や返金のお知らせが届いていない場合は、その日のうちに受信箱など別の手だてで連絡してください。確認を終えた記録は、この一覧で対応済みにできます。'
-          : '選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します。個人の既読は取得せず、押されたかどうかは自社の短縮URLだけで数えます。'}
-        <span className="mt-1 block text-xs">個人の既読は取得できません。試行回数と次の再試行予定は送信台帳の記録を表示します。</span>
-      </Notice>
+      {mode === 'failures' ? (
+        <KpiBand data-ro-kpis="true" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard title="送れなかった" value={kpiValue(summary?.failed ?? null)} unit="件" detail={summaryDetail('この7日')} loading={visibleState === 'loading'} />
+          <KpiCard title="ブロック" value={kpiValue(failureBreakdown.blocked)} unit="件" detail={summaryDetail('対応不要')} loading={visibleState === 'loading'} />
+          <KpiCard title="メールで送った" value={kpiValue(failureBreakdown.emailed)} unit="件" detail={summaryDetail('LINE未ログイン')} loading={visibleState === 'loading'} />
+          <KpiCard
+            title="再試行の予定"
+            value={kpiValue(failureBreakdown.retry)}
+            unit="件"
+            detail={summaryDetail(failureBreakdown.nextRetryAt ? formatJst(failureBreakdown.nextRetryAt) : '予定あり')}
+            loading={visibleState === 'loading'}
+          />
+        </KpiBand>
+      ) : null}
 
       {visibleNotice ? <Notice tone={visibleNotice.tone === 'success' ? 'success' : 'danger'}>{visibleNotice.text}</Notice> : null}
 
@@ -469,7 +475,6 @@ export default function NotificationRunList({
           <span className="sr-only">お客様の名前・注文番号で検索</span>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お客様の名前・注文番号で検索（表示中の20件のみ）" className="min-h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-label outline-none focus:border-accent" />
         </label>
-        {filters.map((item) => <FilterChip key={item.value} selected={filter === item.value} onChange={() => setFilter(item.value)}>{item.label}</FilterChip>)}
         <Select
           aria-label="対象を絞り込み"
           label="対象"
@@ -493,7 +498,9 @@ export default function NotificationRunList({
             { value: '30d', label: '30日以内' },
           ]}
         />
-        <span className="text-xs text-ink-faint" title="検索と絞り込みは表示中のページの中だけに効きます">表示中の20件を絞り込み</span>
+        {mode === 'history' ? <FilterChip selected={filter === 'clicked'} onChange={() => setFilter(filter === 'clicked' ? 'all' : 'clicked')}>クリック記録あり</FilterChip> : null}
+        <span className="flex-1" />
+        <Button onClick={() => void load()}>記録を再読み込み</Button>
       </div>
 
       {!lineAccountId ? (
@@ -520,39 +527,24 @@ export default function NotificationRunList({
       ) : (
         <>
           <DataTable>
-            <colgroup>
-              <col style={{ width: '18%' }} />
-              <col style={{ width: '16%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '16%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '20%' }} />
-            </colgroup>
             <thead>
               <TableHeadRow>
                 <Th>お知らせ</Th>
                 <Th>対象者</Th>
                 <Th>状態</Th>
-                <Th>受け付けた日時</Th>
-                <Th>試行・クリック</Th>
                 <Th>理由・対応</Th>
+                <Th>試行・クリック</Th>
               </TableHeadRow>
             </thead>
             <tbody>
               {visibleItems.map((item) => (
                 <Tr key={item.id}>
-                  <NameCell name={item.notificationName} sub={item.orderNumber ? `注文 ${item.orderNumber}` : item.source} />
-                  <NameCell name={item.friendName || '名前は未取得'} sub={item.recipientType === 'customer' ? '顧客へのお知らせ' : '運用者へのお知らせ'} />
+                  <NameCell
+                    name={<><span className="block whitespace-nowrap text-caption font-semibold">{formatJst(item.receivedAt)}</span><span className="mt-0.5 block">{item.notificationName}</span></>}
+                    sub={item.orderNumber ? `注文 ${item.orderNumber}` : item.source}
+                  />
+                  <NameCell name={item.friendName || '名前は未取得'} sub={item.recipientType === 'customer' ? `顧客${item.orderNumber ? `・${item.orderNumber}` : ''}` : '運用者'} />
                   <Td><StatusBadge status={item.status} /></Td>
-                  <Td>
-                    <span className="block whitespace-nowrap text-caption font-semibold">{formatJst(item.receivedAt)}</span>
-                    <span className="mt-1 block whitespace-nowrap text-xs text-ink-faint">LINE受付 {formatJst(item.acceptedAt)}</span>
-                  </Td>
-                  <Td>
-                    <span className="block text-caption">試行 {item.attemptCount == null ? '—' : `${item.attemptCount}回`}</span>
-                    <span className="mt-1 block text-xs text-ink-faint">クリック {formatJst(item.clickedAt)}</span>
-                    {item.nextRetryAt ? <span className="mt-1 block text-xs text-warning">次回 {formatJst(item.nextRetryAt)}</span> : null}
-                  </Td>
                   <Td>
                     <span className="block text-caption leading-5 text-ink-secondary">{item.reason || '—'}</span>
                     {item.resolved ? (
@@ -591,15 +583,21 @@ export default function NotificationRunList({
                       </Button>
                     ) : null}
                   </Td>
+                  <Td>
+                    <span className="block text-caption">試行 {item.attemptCount == null ? '—' : `${item.attemptCount}回`}・{item.clickedAt ? 'クリックあり' : '—'}</span>
+                    {item.nextRetryAt ? <span className="mt-1 block text-xs text-warning">次回 {formatJst(item.nextRetryAt)}</span> : null}
+                  </Td>
                 </Tr>
               ))}
             </tbody>
           </DataTable>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-ink-faint">
-              {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, scopedTotal)}件 / 全{formatNumber(scopedTotal)}件
+              {mode === 'failures'
+                ? '個人の既読は取得できません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。'
+                : `表示中の20件を絞り込み・${formatNumber(scopedTotal)}件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, scopedTotal)}件`}
             </p>
-            <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
+            {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
           </div>
         </>
       )}

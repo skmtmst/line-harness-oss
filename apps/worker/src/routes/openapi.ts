@@ -352,6 +352,981 @@ const spec = {
     },
   },
   paths: {
+    // V8 API integration: authenticated endpoints, with account scope and revision checks.
+  "/api/hq/templates/folders": {
+    "get": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "統括ひな形の分類一覧を取得",
+      "parameters": [],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    },
+    "post": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "統括ひな形の分類を追加",
+      "parameters": [],
+      "responses": {
+        "201": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/hq/templates/folders/{id}": {
+    "patch": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "確認した版で分類名を変更",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "expectedRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "name",
+                "expectedRevision"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "delete": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "分類を外し、ひな形は未分類に残す",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "expectedRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "expectedRevision"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/hq/templates/message-references": {
+    "get": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "配布先の回答フォーム・シナリオの候補を取得",
+      "parameters": [],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    }
+  },
+  "/api/hq/templates/{id}/duplicate": {
+    "post": {
+      "tags": [
+        "HQ Templates"
+      ],
+      "summary": "確認した版からひな形のコピーを作る",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "201": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "expectedRevision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "requestId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "expectedRevision",
+                "requestId"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/notifications/teams": {
+    "get": {
+      "tags": [
+        "Operator notifications"
+      ],
+      "summary": "運用者通知の送り先チーム一覧を取得",
+      "parameters": [
+        {
+          "name": "lineAccountId",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    },
+    "post": {
+      "tags": [
+        "Operator notifications"
+      ],
+      "summary": "担当範囲内のスタッフで送り先チームを作る",
+      "parameters": [],
+      "responses": {
+        "201": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "lineAccountId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "staffIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expectedVersion": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "lineAccountId",
+                "name",
+                "staffIds"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/notifications/teams/{id}": {
+    "put": {
+      "tags": [
+        "Operator notifications"
+      ],
+      "summary": "確認した版で送り先チームを変更",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "lineAccountId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "staffIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expectedVersion": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "lineAccountId",
+                "name",
+                "staffIds",
+                "expectedVersion"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "delete": {
+      "tags": [
+        "Operator notifications"
+      ],
+      "summary": "送り先チームを保管する",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "lineAccountId": {
+                  "type": "string"
+                },
+                "expectedVersion": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "lineAccountId",
+                "expectedVersion"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/ad-platforms/mappings": {
+    "get": {
+      "tags": [
+        "Conversions"
+      ],
+      "summary": "成果地点と広告媒体の名前の対応一覧",
+      "parameters": [
+        {
+          "name": "account_id",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    }
+  },
+  "/api/ad-platforms/mappings/{pointId}": {
+    "put": {
+      "tags": [
+        "Conversions"
+      ],
+      "summary": "広告へ返す成果名の自動対応・手動指定・停止を保存",
+      "parameters": [
+        {
+          "name": "pointId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "account_id": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string",
+                  "enum": [
+                    "meta",
+                    "google"
+                  ]
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "manual",
+                    "off"
+                  ]
+                },
+                "eventName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "googleActionId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "expectedVersion": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "account_id",
+                "provider",
+                "mode",
+                "expectedVersion"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/ad-platforms/{id}/connect": {
+    "post": {
+      "tags": [
+        "Conversions"
+      ],
+      "summary": "保存した広告連携設定の読み取り接続を検査",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    }
+  },
+  "/api/events/admin/application-preview": {
+    "post": {
+      "tags": [
+        "Events"
+      ],
+      "summary": "保存せずにイベント申込ページの見本を取得",
+      "parameters": [
+        {
+          "name": "account_id",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "venue_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "venue_address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "venue_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "requires_approval": {
+                  "type": "integer",
+                  "enum": [0, 1]
+                },
+                "slot": {
+                  "type": "object",
+                  "properties": {
+                    "starts_at": {
+                      "type": "string"
+                    },
+                    "ends_at": {
+                      "type": "string"
+                    },
+                    "capacity": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": [
+                    "starts_at",
+                    "ends_at",
+                    "capacity"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "slot"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/nen-members/photos/publications/order": {
+    "get": {
+      "tags": [
+        "NEN delivery"
+      ],
+      "summary": "掲載順の全件と現在の版を取得",
+      "parameters": [
+        {
+          "name": "accountId",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      }
+    },
+    "put": {
+      "tags": [
+        "NEN delivery"
+      ],
+      "summary": "掲載順の全件と確認した版を一度に保存",
+      "parameters": [],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "accountId": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "expectedVersion": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "expectedVersion"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "accountId",
+                "items"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "/api/nen-members/photos/{id}/publish": {
+    "post": {
+      "tags": [
+        "NEN delivery"
+      ],
+      "summary": "同意済み採用写真を掲載し、追加報酬を一度だけ手続きする",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "Idempotency-Key",
+          "in": "header",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "成功",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "権限がありません"
+        },
+        "409": {
+          "description": "確認した版や対象が変わりました"
+        },
+        "422": {
+          "description": "入力を確認してください"
+        }
+      },
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "accountId": {
+                  "type": "string"
+                },
+                "expectedVersion": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "accountId",
+                "expectedVersion"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+
     // ── Email authentication ───────────────────────────────────────────────
     '/api/auth/register/request': {
       post: {

@@ -11,6 +11,17 @@
 .frame {
   display: block;
 }
+
+/*
+ * 電話枠なしの平らなカード（If9Mh お客様にはこう届きます）。
+ * 白・内側12・間4。角丸は絵14にいちばん近い既存トークンを使う。
+ */
+.flat {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px; border-radius: var(--radius-card); background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+}
+.flatEmpty { margin: 0; color: var(--color-ink-faint); font-size: 12px; line-height: 1.5; }
 }
 
 /*
@@ -37,7 +48,7 @@
   margin-inline: auto;
 }
 
-/* 題「LINEプレビュー」はスマホの外の上。? は題の横。 */
+/* 題「LINEでの見え方」はスマホの外の上。? は題の横。（PR 1482 で一緒に消えていたのを戻す・2026-10-06） */
 .phoneTitle {
   display: flex;
   align-items: center;
@@ -49,6 +60,9 @@
   line-height: var(--text-lh, 1.4);
   color: var(--color-ink);
 }
+
+
+/* v8 のスマホに内の題は置かない（cfVyj・j7PP04 どおり）。題は外が担う。 */
 
 /* 器 330×690・黒・縁 2px・内側 10・角丸 52・下への影。 */
 .phone {
@@ -210,3 +224,46 @@
   border-radius: var(--v8-line-homebar-radius);
   background: var(--v8-line-homebar);
 }
+
+/* cfVyj の実測。既存の v7 パネルには適用しない。 */
+[data-theme='v8'] .phoneRoot { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; }
+[data-theme='v8'] .statusBar { align-items: flex-start; }
+[data-theme='v8'] .statusIcons { flex-shrink: 0; }
+[data-theme='v8'] .talkHead svg { flex-shrink: 0; }
+[data-theme='v8'] .dateChip > span { display: flex; align-items: flex-start; }
+[data-theme='v8'] .messageRow { display: flex; align-items: flex-start; gap: 6px; flex-shrink: 0; width: 100%; }
+[data-theme='v8'] .senderAvatar { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 34px; height: 34px; border-radius: 999px; background: var(--color-accent-deep); color: var(--color-canvas); font-size: 13px; font-weight: 700; line-height: 20px; }
+[data-theme='v8'] .senderBody { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex-shrink: 0; }
+[data-theme='v8'] .senderName { color: var(--v8-line-sender); font-size: 10px; font-weight: 400; line-height: 15px; }
+[data-theme='v8'] .bubbleRow { display: flex; align-items: flex-end; gap: 4px; }
+[data-theme='v8'] .bubble { position: relative; width: 176px; min-height: 94px; flex-shrink: 0; }
+[data-theme='v8'] .tail { position: absolute; left: -5px; top: 2px; width: 10px; height: 8px; color: var(--color-canvas); overflow: visible; }
+[data-theme='v8'] .bubbleBody { position: relative; z-index: 1; display: flex; align-items: flex-start; min-height: 94px; width: 176px; padding: 8px 11px; border-radius: 16px; background: var(--color-canvas); color: var(--color-ink); font-size: 11.5px; font-weight: 400; line-height: 18px; }
+[data-theme='v8'] .messageTime { font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 9px; font-weight: 400; line-height: 14px; color: var(--v8-line-time); white-space: nowrap; }
+[data-theme='v8'] .cardRow { display: flex; flex-shrink: 0; align-items: flex-end; gap: 4px; width: 100%; padding-left: 40px; }
+[data-theme='v8'] .productCard { display: flex; flex-direction: column; flex-shrink: 0; width: 186px; border-radius: 16px; background: var(--color-canvas); overflow: hidden; }
+[data-theme='v8'] .productImage { width: 100%; height: 104px; flex-shrink: 0; background-position: center; background-size: cover; }
+[data-theme='v8'] .productCopy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 9px 11px 8px; }
+[data-theme='v8'] .productTitle { color: var(--color-ink); font-size: 12.5px; font-weight: 700; line-height: 19px; white-space: nowrap; }
+[data-theme='v8'] .productDescription { color: var(--v8-line-muted); font-size: 10.5px; font-weight: 400; line-height: 16px; white-space: nowrap; }
+[data-theme='v8'] .priceRow { display: flex; align-items: flex-end; gap: 4px; padding-top: 3px; }
+[data-theme='v8'] .price { font-family: var(--font-inter), Inter, system-ui, sans-serif; color: var(--color-ink); font-size: 14px; font-weight: 700; line-height: 21px; }
+[data-theme='v8'] .tax { color: var(--v8-line-muted); font-size: 9.5px; font-weight: 400; line-height: 14px; }
+[data-theme='v8'] .productAction { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 100%; height: 34px; padding: 0; border: 0; border-top: 1px solid var(--v8-line-hairline); background: transparent; color: var(--color-accent); font-family: inherit; font-size: 12px; font-weight: 700; line-height: 18px; cursor: pointer; }
+[data-theme='v8'] .secondaryAction { color: var(--color-action); }
+[data-theme='v8'] .productAction:focus-visible { outline: 2px solid var(--color-action); outline-offset: -3px; }
+
+[data-theme='v8'] .island, [data-theme='v8'] .dateChip > span { border-radius: 999px; }
+[data-theme='v8'] .bubbleText { flex: 1; word-break: normal; }
+[data-theme='v8'] .clock { font-variant-numeric: normal; }
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .phoneRoot { -webkit-font-smoothing: auto; }
+
+/* LINEの時刻は正本のInterと同じ比例幅。管理画面の等幅数字を継承しない。 */
+[data-theme='v8'] .messageTime { font-variant-numeric: normal; }
+
+/* ★V8 絵（JeINq「段の題 LINEでの見え方」）：題は右の列の幅いっぱいで左寄せ・15px/600/23・? との間6。スマホは下の真ん中。 */
+[data-theme='v8'] .phoneRoot { width: 100%; }
+[data-theme='v8'] .phoneTitle { justify-content: flex-start; font-size: var(--tpl-preview-title-size); font-weight: 600; line-height: var(--tpl-preview-title-lh); }
+[data-theme='v8'] .phone { margin-inline: auto; }

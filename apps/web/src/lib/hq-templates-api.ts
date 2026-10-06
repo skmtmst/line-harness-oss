@@ -1,12 +1,12 @@
 import { ApiError, fetchApi } from './api'
 import type { FormLayout } from '@line-crm/shared'
 
-export const TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form'] as const
+export const TEMPLATE_TYPES = ['tag', 'template', 'rich_menu', 'form', 'scenario'] as const
 export type TemplateType = typeof TEMPLATE_TYPES[number]
 export type DistributionMode = 'create' | 'overwrite' | 'alias'
 export interface HqTemplate {
   id: string; name: string; description: string | null; template_type: TemplateType
-  revision: number; updated_at: string; reference_summary?: string; distributed_account_count?: number
+  folder_id?: string | null; revision: number; updated_at: string; reference_summary?: string; distributed_account_count?: number
 }
 export interface TagDefinition {
   schemaVersion: 1
@@ -20,6 +20,7 @@ export interface TagDefinition {
   folders: { id: string; name: string; parentId?: string | null; color?: string | null }[]
 }
 export interface MessageTemplateDefinition {
+  card?: import('@line-crm/shared').HqMessageCard
   schemaVersion: 1
   template: {
     id: string; name: string; category: string
@@ -63,10 +64,11 @@ export interface TemplateDefinitionByType {
   template: MessageTemplateDefinition
   rich_menu: RichMenuDefinition
   form: FormDefinition
+  scenario: import('@line-crm/shared').HqScenarioDefinition
 }
 export type TemplateDefinition = TemplateDefinitionByType[TemplateType]
 export type TemplateInput = {
-  [K in TemplateType]: { type: K; name: string; description?: string; definition: TemplateDefinitionByType[K] }
+  [K in TemplateType]: { type: K; name: string; description?: string; folderId?: string | null; definition: TemplateDefinitionByType[K] }
 }[TemplateType]
 export type TemplateDetail = {
   [K in TemplateType]: { template: HqTemplate & { template_type: K }; definition: TemplateDefinitionByType[K] }
@@ -78,7 +80,7 @@ export interface PreflightItem {
 }
 export interface Preflight {
   preflightId: string; expiresAt: string
-  stores: { accountId: string; accountName: string; items: PreflightItem[] }[]
+  stores: { accountId: string; accountName: string; items: PreflightItem[]; textOverride?: string }[]
 }
 export interface Resolution { accountId: string; sourceId: string; mode: DistributionMode }
 export interface DistributionResult {
@@ -164,7 +166,15 @@ export const hqTemplatesApi = {
    * 参照先に選ぶため、一覧表示とは別に全部入りの目録が要る。
    */
   list: (type?: TemplateType) => request<HqTemplate[]>(type ? `?type=${type}` : ''),
+  folders: {
+    list: () => request<import('@line-crm/shared').HqTemplateFolder[]>('/folders'),
+    create: (name: string) => request<import('@line-crm/shared').HqTemplateFolder>('/folders', 'POST', { name }),
+    update: (id: string, name: string, expectedRevision: number) => request<import('@line-crm/shared').HqTemplateFolder>(`/folders/${encodeURIComponent(id)}`, 'PATCH', { name, expectedRevision }),
+    remove: (id: string, expectedRevision: number) => request<{ id: string }>(`/folders/${encodeURIComponent(id)}`, 'DELETE', { expectedRevision }),
+  },
+  duplicate: (id: string, name: string, expectedRevision: number, requestId: string) => request<TemplateDetail>(`${idPath(id)}/duplicate`, 'POST', { name, expectedRevision, requestId }),
   accounts: () => request<HqAccount[]>('/accounts'),
+  messageReferences: () => request<import('@line-crm/shared').HqMessageReference[]>('/message-references'),
   get: (id: string) => request<TemplateDetail>(idPath(id)),
   create: (input: TemplateInput, requestId: string) => request<TemplateDetail>(
     '',
@@ -174,7 +184,7 @@ export const hqTemplatesApi = {
   ),
   update: (id: string, input: TemplateInput & { expectedRevision: number }) => request<TemplateDetail>(idPath(id), 'PATCH', input),
   remove: (id: string, expectedRevision: number) => request<unknown>(idPath(id), 'DELETE', { expectedRevision }),
-  preflight: (id: string, accountIds: string[]) => request<Preflight>(`${idPath(id)}/preflight`, 'POST', { accountIds }),
+  preflight: (id: string, accountIds: string[], textOverrides?: import('@line-crm/shared').HqTemplateTextOverride[]) => request<Preflight>(`${idPath(id)}/preflight`, 'POST', { accountIds, ...(textOverrides ? {textOverrides} : {}) }),
   distribute: (id: string, preflightId: string, resolutions: Resolution[]) => request<DistributionResult>(`${idPath(id)}/distribute`, 'POST', { preflightId, resolutions }),
   result: (id: string, runId: string) => request<DistributionResult>(`${idPath(id)}/distributions/${encodeURIComponent(runId)}`),
 }

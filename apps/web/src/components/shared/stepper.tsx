@@ -38,6 +38,7 @@ export default function Stepper({
   steps,
   label,
   currentKey,
+  tone = 'default',
 }: {
   /** 何の進みか（例：「配信作成の進み」）。nav の読み上げ名。 */
   label: string
@@ -48,7 +49,13 @@ export default function Stepper({
    * 渡さないときは state の `current` を居場所にする（昔の呼び方）。
    */
   currentKey?: string
+  /**
+   * 見た目。既定は緑の ✓（28px）。'mono' は黒丸・番号・約22px
+   * （If9Mh 予約の入力：いまいる所も済みも黒丸＋番号、まだは枠線）。
+   */
+  tone?: 'default' | 'mono'
 }) {
+  const mono = tone === 'mono'
   return (
     <nav aria-label={label} data-part="stepper" className="border-hairline bg-canvas rounded-card mb-4 border p-4">
       <ol data-design="Steps" aria-label={label} className="flex flex-wrap items-center gap-y-3">
@@ -62,20 +69,24 @@ export default function Stepper({
           const clickable = (filled || needsFix) && !isCurrent && (step.anchor || step.onSelect)
           const circle = (
             <span
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-pill text-xs font-medium ${
+              className={`flex shrink-0 items-center justify-center rounded-pill text-xs font-medium ${mono ? 'h-5.5 w-5.5' : 'h-7 w-7'} ${
                 filled
-                  ? isCurrent
-                    ? 'bg-accent-deep text-on-accent outline-accent-deep outline-2 outline-offset-2'
-                    : 'bg-accent-deep text-on-accent'
+                  ? mono
+                    ? 'bg-ink text-canvas'
+                    : isCurrent
+                      ? 'bg-accent-deep text-on-accent outline-accent-deep outline-2 outline-offset-2'
+                      : 'bg-accent-deep text-on-accent'
                   : needsFix
                     ? 'bg-warning-bg text-warning'
                     : isCurrent
-                      ? 'bg-canvas text-accent-deep outline-accent-deep outline-2'
+                      ? mono
+                        ? 'bg-ink text-canvas'
+                        : 'bg-canvas text-accent-deep outline-accent-deep outline-2'
                       : 'border-hairline text-ink-faint border'
               }`}
               title={needsFix ? '直すところがあります' : undefined}
             >
-              {filled ? '✓' : needsFix ? <span aria-hidden="true">△</span> : step.order}
+              {filled && !mono ? '✓' : needsFix ? <span aria-hidden="true">△</span> : step.order}
               {needsFix ? <span className="sr-only">（直すところあり）</span> : null}
             </span>
           )

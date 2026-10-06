@@ -31,7 +31,8 @@ export async function tenantHasFeaturePack(
 /**
  * 飲食店機能（restaurant-test）が、この統括に対して実際に有効か。
  *
- * 環境のキルスイッチ（`RESTAURANT_TEST_ENABLED`、本番は常にfalse）が
+ * 環境のキルスイッチ（`RESTAURANT_TEST_ENABLED`。Googleの機密スコープ審査のため
+ * 現在は検証・実運用の両方で true。環境ごとに切り替えられる）が
  * 最上位で、そのうえで統括に `restaurant` パックが付いている場合だけ有効。
  * どちらか片方だけでは有効にならない。
  */

@@ -26,7 +26,7 @@ const summary: WebinarAnalytics['summary'] = {
  * 「今月」の合計はいつ走っても同じになるよう、日付は今月・先月で作る。
  * 先月10 + 今月20 + 今月11 ＝ 今月 +31。
  */
-const jstNow = new Date(Date.now() + 9 * 3_600_000)
+const jstNow = new Date()
 const thisMonth = `${jstNow.getUTCFullYear()}-${String(jstNow.getUTCMonth() + 1).padStart(2, '0')}`
 const prevMonth = jstNow.getUTCMonth() === 0
   ? `${jstNow.getUTCFullYear() - 1}-12`
@@ -95,4 +95,14 @@ test('申込が無いときは割合を「—」にする（0にしない）', (
     )
   })
   expect(container.textContent).toContain('申込の—')
+})
+
+
+test('直接参加で人数が増えた段も棒をはみ出さず増加で示す', () => {
+  act(() => { root.render(<AnalyticsFunnelV8 summary={{ ...summary, reservations: 20, viewers: 100 }} daily={[]} />) })
+  expect(container.textContent).toContain('+80')
+  expect(container.textContent).not.toContain('--80')
+  for (const bar of container.querySelectorAll<HTMLElement>('[style]')) {
+    expect(parseFloat(bar.style.width)).toBeLessThanOrEqual(100)
+  }
 })

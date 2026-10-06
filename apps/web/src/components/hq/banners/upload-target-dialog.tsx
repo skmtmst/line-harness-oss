@@ -7,8 +7,7 @@ import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import { api } from '@/lib/api'
 import { readFileAsBase64, type BannerProject } from '@/lib/hq-banners'
-import { useAdminTheme } from '@/lib/use-admin-theme'
-import UploadButton, { BANNER_UPLOAD_ACCEPT, BANNER_UPLOAD_MAX_BYTES } from './upload-button'
+import { BANNER_UPLOAD_ACCEPT, BANNER_UPLOAD_MAX_BYTES } from './upload-button'
 
 /**
  * 画像ライブラリの「画像を取り込む」。Pencil 35-3 `Lveyd`。
@@ -27,8 +26,6 @@ export default function UploadTargetDialog({
   onPick: (projectId: string) => void
 }) {
   const uid = useId()
-  const theme = useAdminTheme()
-  const v8 = theme === 'v8'
   const [projects, setProjects] = useState<BannerProject[]>([])
   const [projectId, setProjectId] = useState('')
   const [error, setError] = useState('')
@@ -121,38 +118,24 @@ export default function UploadTargetDialog({
       error={error || undefined}
       designNode="AnwtH"
       footer={
-        v8 ? (
-          <div className="flex w-full flex-wrap items-center justify-end gap-2">
-            <Button onClick={onClose} disabled={uploading}>キャンセル</Button>
-            <Button
-              variant="primary"
-              onClick={() => void takeIn()}
-              disabled={!file || !projectId || loading || uploading}
-              busy={uploading}
-              busyLabel="取り込み中…"
-            >
-              <Upload aria-hidden="true" className="h-4 w-4" />
-              取り込む
-            </Button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <UploadButton
-              disabled={!projectId || loading}
-              onError={setError}
-              onUpload={async (input) => {
-                const res = await api.hqBanners.projects.upload(projectId, input)
-                if (!res.success) throw new Error(res.error)
-                onPick(projectId)
-              }}
-            />
-          </div>
-        )
+        <div className="flex w-full flex-wrap items-center justify-end gap-2">
+          <Button onClick={onClose} disabled={uploading}>キャンセル</Button>
+          <Button
+            variant="primary"
+            onClick={() => void takeIn()}
+            disabled={!file || !projectId || loading || uploading}
+            busy={uploading}
+            busyLabel="取り込み中…"
+          >
+            <Upload aria-hidden="true" className="h-4 w-4" />
+            取り込む
+          </Button>
+        </div>
       }
     >
       {projects.length === 0 && !loading ? (
         <p className="text-caption text-ink-secondary">まずプロジェクトを作ってください。画像はプロジェクトの中に入ります。</p>
-      ) : v8 ? (
+      ) : (
         <div className="flex flex-col gap-4">
           {projectField}
           <div
@@ -204,8 +187,6 @@ export default function UploadTargetDialog({
             />
           </div>
         </div>
-      ) : (
-        projectField
       )}
     </Dialog>
   )

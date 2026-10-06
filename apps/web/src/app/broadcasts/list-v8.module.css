@@ -12,6 +12,19 @@
   container-type: inline-size;
 }
 
+/* 板 `NtCE3`：閲覧のみの帯。数の帯の上。 */
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-control, 8px);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 /* 見出しブロック：画面名＋一行の説明。 */
 .head {
   display: flex;
@@ -280,7 +293,7 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   height: 30px;
   padding: 0 12px;
   border: 1px solid var(--color-hairline);
@@ -378,6 +391,12 @@
 
 .rowClick td {
   transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
+/* 消える行は 150ms で薄くなる（V8 の動き §8）。 */
+.rowClick[data-leaving='true'] {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease-out);
 }
 
 .rowClick:hover td {

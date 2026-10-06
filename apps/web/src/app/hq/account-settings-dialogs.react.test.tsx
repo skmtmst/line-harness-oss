@@ -52,6 +52,7 @@ beforeEach(() => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
     calls.push({ url: url.pathname, method: init?.method ?? 'GET', body: typeof init?.body === 'string' ? init.body : '' })
     if (url.pathname === '/api/auth/step-up') return response({ success: true, data: { token: 'step-up-token', purpose: 'line_account.archive', expiresAt: '2026-10-03T00:00:00' } })
+    if (url.pathname === '/api/line-account-tags') return response({ success: true, data: [{ id: 't1', name: '渋谷エリア', color: '#2563eb' }] })
     return response({ success: true, data: { id: 'account-a' } })
   }))
   host = document.createElement('div')
@@ -118,6 +119,45 @@ test('保存の窓は板 D6ljr・理由と6桁で保存の口へ送る', async (
   expect(calls.some((call) => call.url === '/api/auth/step-up')).toBe(true)
   expect(calls.some((call) => call.url === '/api/line-accounts/account-a/archive')).toBe(true)
   expect(done).toBe(true)
+})
+
+test('設定の窓はタグを付けて保存すると付け替え口へ送る（板 HMpVx）', async () => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
+    calls.push({ url: url.pathname, method: init?.method ?? 'GET', body: typeof init?.body === 'string' ? init.body : '' })
+    if (url.pathname === '/api/line-account-tags' && (init?.method ?? 'GET') === 'GET') {
+      return response({ success: true, data: [{ id: 'tag-area', name: '渋谷エリア', color: null, displayOrder: 0 }] })
+    }
+    return response({ success: true, data: { id: 'account-a' } })
+  }))
+  let saved = false
+  const tagged = { ...account, tags: [] as Array<{ id: string; name: string; color: string | null }> }
+  await act(async () => root.render(
+    <AccountSettingsDialog
+      account={tagged}
+      accounts={[tagged, parent]}
+      archived={false}
+      onClose={() => {}}
+      onSaved={() => { saved = true }}
+      onArchive={() => {}}
+      onShowDetails={() => {}}
+    />,
+  ))
+  await settle()
+  await settle()
+  const chip = Array.from(document.body.querySelectorAll('button'))
+    .find((button) => (button.textContent ?? '') === '渋谷エリア')
+  expect(chip?.getAttribute('aria-pressed')).toBe('false')
+  await act(async () => { chip!.click() })
+  expect(chip?.getAttribute('aria-pressed')).toBe('true')
+  const save = Array.from(document.body.querySelectorAll('button'))
+    .find((button) => (button.textContent ?? '') === '保存')
+  expect(save).toBeTruthy()
+  await act(async () => { save!.click() })
+  await settle()
+  const put = calls.find((call) => call.url === '/api/line-accounts/account-a/tags' && call.method === 'PUT')
+  expect(put?.body).toContain('tag-area')
+  expect(saved).toBe(true)
 })
 
 test('戻す窓は板 HFsO9・6桁で復帰の口へ送る', async () => {

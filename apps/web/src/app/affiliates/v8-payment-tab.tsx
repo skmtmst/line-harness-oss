@@ -36,7 +36,7 @@ import {
   currentAffiliateSettlementPeriod,
 } from './payment-tab'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
-import styles from './list-v8.module.css'
+import './list-v8.css'
 
 type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
 
@@ -57,6 +57,18 @@ function monthDay(value: string | null): { month: number | null; dayUnit: string
   if (Number.isNaN(date.getTime())) return { month: null, dayUnit: '' }
   const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
   return { month: jst.getUTCMonth() + 1, dayUnit: `/${jst.getUTCDate()}` }
+}
+
+/** 締め日（periodToの暦日・JST）までの残り日数。取れなければ null。 */
+function daysUntilClose(periodTo: string | null | undefined): number | null {
+  if (!periodTo) return null
+  const end = new Date(periodTo)
+  if (Number.isNaN(end.getTime())) return null
+  const nowJst = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  const today = Date.UTC(nowJst.getUTCFullYear(), nowJst.getUTCMonth(), nowJst.getUTCDate())
+  const endJst = new Date(end.getTime() + 9 * 60 * 60 * 1000)
+  const closing = Date.UTC(endJst.getUTCFullYear(), endJst.getUTCMonth(), endJst.getUTCDate())
+  return Math.round((closing - today) / (24 * 60 * 60 * 1000))
 }
 
 /** `accountId` は必須。どのLINEアカウントの支払いかで、ほかの店の額を混ぜない。 */
@@ -234,6 +246,7 @@ export default function PaymentTabV8({
   const shownPage = Math.min(page, shownPageCount)
   const paged = shown.slice((shownPage - 1) * pageSize, shownPage * pageSize)
   const closeDate = monthDay(preview?.periodTo ?? null)
+  const closeInDays = useMemo(() => daysUntilClose(preview?.periodTo), [preview?.periodTo])
   const issuedCount = resumed?.affiliates.filter((item) => item.statementIssued).length ?? 0
   const listState = loading ? 'loading' : error ? 'error' : rows.length === 0 ? 'empty' : shown.length === 0 ? 'zero' : 'ready'
 
@@ -253,9 +266,9 @@ export default function PaymentTabV8({
           type="button"
           onClick={() => { void preparePayout() }}
           disabled={!canEdit || !closed || operationBusy || Boolean(resumed?.batch)}
-          title={!canEdit ? '閲覧のみのため変更できません' : resumed?.batch ? '振込用CSVの準備は作成済みです' : missingBanks > 0 ? '振込先が未登録の人がいる場合は、誰に依頼するかを確認できます' : undefined}
+          title={!canEdit ? '閲覧のみのため変更できません' : resumed?.batch ? '銀行用CSVの準備は作成済みです' : missingBanks > 0 ? '振込先が未登録の人がいる場合は、誰に依頼するかを確認できます' : undefined}
         >
-          振込用CSVを書き出す
+          銀行用 CSV…
         </Button>
       </span>,
     )
@@ -267,10 +280,9 @@ export default function PaymentTabV8({
       <KpiStrip>
         <KpiCell
           icon={<Wallet size={14} aria-hidden="true" />}
-          label="まだ払っていない"
-          value={summaryUnavailable ? null : preview?.totalAmount ?? 0}
-          unit="円"
-          sub={summaryUnavailable ? '読み込めませんでした' : `${formatNumber(rows.length)}人ぶん・締める前の報酬`}
+          label="今回 払う額"
+          value={summaryUnavailable || preview == null ? null : `¥${formatNumber(Math.round(preview.totalAmount))}`}
+          sub={summaryUnavailable ? '読み込めませんでした' : `${formatNumber(rows.length)}人・${formatNumber(preview?.conversionCount ?? 0)}件`}
           info="今回の締めで払う見込みの合計です。締める前なので、成果を却下すると減ります。"
         />
         <KpiCell
@@ -278,7 +290,7 @@ export default function PaymentTabV8({
           label="次の締め"
           value={summaryUnavailable ? null : closeDate.month}
           unit={closeDate.dayUnit}
-          sub={summaryUnavailable ? '読み込めませんでした' : '締めると金額が固定されます'}
+          sub={summaryUnavailable ? '読み込めませんでした' : closeInDays == null ? '締めると金額が固定されます' : closeInDays < 0 ? '締め日を過ぎています' : `あと${formatNumber(closeInDays)}日`}
           info="この期間に認めた成果を固定して、支払いの台帳を作る日です。"
         />
         <KpiCell
@@ -298,8 +310,6 @@ export default function PaymentTabV8({
           info="支払い履歴を集める口がまだ無いため、いまは出せません。"
         />
       </KpiStrip>
-
-      <NoticeBar>締める前なら、成果を却下すると今回の支払いから外れます。締めたあとの取消は次の支払いで差し引きます。</NoticeBar>
 
       {preview?.carriedOver && preview.carriedOver.count > 0 ? (
         <NoticeBar>
@@ -339,27 +349,27 @@ export default function PaymentTabV8({
 
       {/* 板 `aINnz`：期間のまとめ行（締めの入口はこの行の右端） */}
       {preview ? (
-        <div className={styles.closeRow}>
-          <div className={styles.closeCell}>
-            <span className={styles.closeTitle}>今回の締め</span>
-            <span className={`${styles.statusBadge} ${closed ? styles.statusOk : styles.statusWarn}`}>
-              <span className={styles.statusDot} aria-hidden="true" />
+        <div className="af-list-closeRow">
+          <div className="af-list-closeCell">
+            <span className="af-list-closeTitle">今回の締め</span>
+            <span className={`af-list-statusBadge ${closed ? 'af-list-statusOk' : 'af-list-statusWarn'}`}>
+              <span className="af-list-statusDot" aria-hidden="true" />
               {closed ? '締め済み' : 'まだ締めていません'}
             </span>
           </div>
-          <div className={styles.closeCell}>
-            <span className={styles.closeLabel}>期間</span>
-            <span className={styles.closeValue}>{dateLabel(preview.periodFrom)}〜{dateLabel(preview.periodTo)}</span>
+          <div className="af-list-closeCell">
+            <span className="af-list-closeLabel">期間</span>
+            <span className="af-list-closeValue">{dateLabel(preview.periodFrom)}〜{dateLabel(preview.periodTo)}</span>
           </div>
-          <div className={styles.closeCell}>
-            <span className={styles.closeLabel}>対象</span>
-            <span className={styles.closeValue}>{formatNumber(rows.length)}人・{formatNumber(preview.conversionCount)}件</span>
+          <div className="af-list-closeCell">
+            <span className="af-list-closeLabel">対象</span>
+            <span className="af-list-closeValue">{formatNumber(rows.length)}人・{formatNumber(preview.conversionCount)}件</span>
           </div>
-          <div className={styles.closeCell}>
-            <span className={styles.closeLabel}>合計</span>
-            <span className={styles.closeValue}>{yen(preview.totalAmount)}</span>
+          <div className="af-list-closeCell">
+            <span className="af-list-closeLabel">合計</span>
+            <span className="af-list-closeValue">{yen(preview.totalAmount)}</span>
           </div>
-          <p className={styles.closeNote}>締めると金額が固定されます。締めたあとの取消は、次の支払いで差し引きます。</p>
+          <p className="af-list-closeNote">締めると金額が固定されます。締めたあとの取消は、次の支払いで差し引きます。</p>
           <Button
             type="button"
             variant="primary"
@@ -372,14 +382,14 @@ export default function PaymentTabV8({
         </div>
       ) : null}
 
-      <div className={styles.tools}>
+      <div className="af-list-tools">
         <SearchField
           placeholder="名前・振込先で探す"
           aria-label="名前・振込先で探す"
           value={query}
           onChange={setQuery}
           onClear={() => setQuery('')}
-          className={styles.toolsSearch}
+          className="af-list-toolsSearch"
         />
         <FilterChip
           selected={filter === 'bank_missing'}
@@ -395,7 +405,7 @@ export default function PaymentTabV8({
         >
           今回払う人
         </FilterChip>
-        <span className={styles.toolsSpacer} />
+        <span className="af-list-toolsSpacer" />
         <Select
           aria-label="よく使う絞り込み"
           value=""
@@ -429,17 +439,17 @@ export default function PaymentTabV8({
       ) : listState === 'zero' ? (
         <ZeroResultState onReset={() => { setQuery(''); setFilter('all') }} />
       ) : (
-        <div className={styles.tableWrap}>
-          <div className={styles.tableScroll}>
-            <table className={styles.table}>
+        <div className="af-list-tableWrap">
+          <div className="af-list-tableScroll">
+            <table className="af-list-table">
               <thead>
                 <tr>
                   <th>払う相手</th>
-                  <th className={styles.numRight}>今回 払う額</th>
-                  <th className={styles.numRight}>中身</th>
+                  <th className="af-list-numRight">今回 払う額</th>
+                  <th className="af-list-numRight">中身</th>
                   <th>振込先</th>
                   <th>状態</th>
-                  <th className={styles.numRight}>操作</th>
+                  <th className="af-list-numRight">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -448,39 +458,40 @@ export default function PaymentTabV8({
                   return (
                     <tr key={item.affiliateId}>
                       <td>
-                        <span className={styles.cellMain} style={{ fontWeight: 600, color: 'var(--color-accent-deep)' }}>{item.affiliateName}</span>
-                        <span className={styles.cellSub}>コード {item.code}</span>
+                        <span className="af-list-cellMain" style={{ fontWeight: 600, color: 'var(--color-accent-deep)' }}>{item.affiliateName}</span>
+                        <span className="af-list-cellSub">コード {item.code}</span>
                       </td>
-                      <td className={styles.numRight}>
+                      <td className="af-list-numRight">
                         <strong>{yen(item.amount)}</strong>
-                        {(item.deduction ?? 0) > 0 ? (
-                          <span className={styles.cellSub}>
-                            元の報酬 {yen(item.grossAmount ?? item.amount + (item.deduction ?? 0))} − 取消の差し引き {yen(item.deduction ?? 0)}
-                          </span>
-                        ) : null}
+                        <span className="af-list-cellSub">
+                          元の報酬 {yen(item.grossAmount ?? item.amount + (item.deduction ?? 0))} − 取消の差し引き {yen(item.deduction ?? 0)}
+                        </span>
                       </td>
-                      <td className={styles.numRight}>認めた {formatNumber(item.conversionCount)}件</td>
+                      <td className="af-list-numRight">{formatNumber(item.conversionCount)}件</td>
                       <td>
                         {item.bankProfileRegistered ? (
                           <>
-                            <span className={styles.cellMain}>登録済み</span>
-                            <span className={styles.cellSub}>口座番号は本人だけに表示</span>
+                            <span className="af-list-cellMain">登録済み</span>
+                            <span className="af-list-cellSub">口座番号は本人だけに表示</span>
                           </>
                         ) : (
-                          <span className={styles.cellMain} style={{ color: 'var(--color-warning)' }}>登録されていません</span>
+                          <span className={`af-list-statusBadge af-list-statusDanger`}>
+                            <span className="af-list-statusDot" aria-hidden="true" />
+                            未登録
+                          </span>
                         )}
                       </td>
                       <td>
-                        <span className={`${styles.statusBadge} ${item.bankProfileRegistered ? styles.statusNeutral : styles.statusWarn}`}>
-                          <span className={styles.statusDot} aria-hidden="true" />
-                          {item.bankProfileRegistered ? 'まだ締めていません' : '振込先が足りません'}
+                        <span className={`af-list-statusBadge ${item.bankProfileRegistered ? 'af-list-statusOk' : 'af-list-statusWarn'}`}>
+                          <span className="af-list-statusDot" aria-hidden="true" />
+                          {item.bankProfileRegistered ? '確定できる' : '振込先待ち'}
                         </span>
-                        {summary?.holdDays ? (
-                          <span className={styles.cellSub}>認めてから{summary.holdDays}日保留</span>
+                        {item.bankProfileRegistered && summary?.holdDays ? (
+                          <span className="af-list-cellSub">認めてから{summary.holdDays}日保留</span>
                         ) : null}
                       </td>
                       <td>
-                        <div className={styles.rowActions}>
+                        <div className="af-list-rowActions">
                           <Button
                             type="button"
                             size="compact"
@@ -488,20 +499,6 @@ export default function PaymentTabV8({
                           >
                             明細を見る
                           </Button>
-                          {item.bankProfileRegistered ? (
-                            <Button
-                              type="button"
-                              size="compact"
-                              aria-label={`${item.affiliateName}の支払いを確定する`}
-                              disabled={!canEdit}
-                              title={!canEdit ? '閲覧のみのため変更できません' : undefined}
-                              onClick={() => setConfirmTarget({ id: item.affiliateId, name: item.affiliateName })}
-                            >
-                              この人を確定
-                            </Button>
-                          ) : (
-                            <span style={{ alignSelf: 'center', color: 'var(--color-warning)', fontSize: 12 }}>本人に登録を依頼</span>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -515,15 +512,15 @@ export default function PaymentTabV8({
 
       {listState === 'ready' && shownPageCount > 1 ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 24px 0' }}>
-          <p className={styles.footNote} style={{ padding: 0 }}>
+          <p className="af-list-footNote" style={{ padding: 0 }}>
             {formatNumber(shown.length)}人
           </p>
           <Pagination page={shownPage} pageCount={shownPageCount} onPageChange={setPage} />
         </div>
       ) : null}
 
-      <p className={styles.footNote}>
-        「明細を見る」で今回の締めの内訳と連絡先を確かめられます。期間を締めると、右上から支払明細の発行と銀行用CSVの書き出しに進めます。
+      <p className="af-list-footNote">
+        口座番号は本人だけに表示します。銀行用 CSV（口座情報を含む）は、6桁コードかパスワードで本人確認したときだけ書き出せます（15分で期限切れ）。
       </p>
 
       <SettlementCloseDialog

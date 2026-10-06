@@ -507,7 +507,7 @@ export function OnCompleteDialog({
                 setSaving(false)
               }
             }}>
-            {saving ? '保存中…' : '変更する'}
+            {saving ? '保存中…' : '編集'}
           </Button>
         </>
       }
@@ -858,7 +858,7 @@ export function TestSendDialog({
   ]
   const recipientLabel =
     recipientClass === 'staff'
-      ? `スタッフ連携のLINE（${staffName ?? '担当者'}）`
+      ? `スタッフ連携のLINE（${staffName ?? 'スタッフ'}）`
       : recipientClass === 'test'
         ? 'テスト受信者'
         : recipientClass === 'general'

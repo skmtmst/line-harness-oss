@@ -2,11 +2,15 @@
 
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowRight, ChevronLeft } from 'lucide-react'
+import { CreatePage } from '@/components/templates'
 import type { FriendField, ReminderDraftSettings, ReminderDraftStep } from '@line-crm/shared'
 import { api, type EventListItem } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import DetailPanel from '@/components/shared/detail-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
@@ -21,7 +25,7 @@ import {
   type BasicsValue,
   type ReminderTemplateV8,
 } from '../basics-form-v8'
-import { SummaryCardV8, WizardFooterV8, WizardHeadV8 } from '../wizard-v8-ui'
+import { SummaryCardV8, WizardFooterV8, ReminderV8Stepper } from '../wizard-v8-ui'
 import styles from '../wizard-v8.module.css'
 
 /**
@@ -33,6 +37,7 @@ export default function NewReminderV8() {
   usePageTitle('リマインダを作成・基本設定')
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [value, setValue] = useState<BasicsValue>(EMPTY_BASICS)
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null)
   const [pendingTemplate, setPendingTemplate] = useState<ReminderTemplateV8 | null>(null)
@@ -178,25 +183,7 @@ export default function NewReminderV8() {
     if (id) router.push(`/reminders/edit?id=${encodeURIComponent(id)}&stage=target`)
   }
 
-  return (
-    <div className={styles.page} data-design-node="VE1u5">
-      <WizardHeadV8 title="リマインダを作る" current="basics" reminderId={savedId} />
-      <p className={styles.subline}>いまは下書きとして作ります。最後の「確認」で有効にします。</p>
-      {error ? <Notice tone="danger" message={error} /> : null}
-      <div className={styles.cols}>
-        <div className={styles.main}>
-          <ReminderBasicsFormV8
-            value={value}
-            onChange={handleChange}
-            appliedTemplateId={appliedTemplateId}
-            onRequestTemplate={requestTemplate}
-            pendingFieldMatch={pendingFieldMatch}
-            onFieldMatchHandled={() => setPendingFieldMatch(null)}
-            onFieldsReady={onFieldsReady}
-            onEventsReady={onEventsReady}
-          />
-        </div>
-        <aside className={styles.side}>
+  const preview = <>
           <SummaryCardV8
             rows={[
               { key: '基準日', value: basicsBaseSummary(value, dateFields, events) },
@@ -208,9 +195,20 @@ export default function NewReminderV8() {
           <p className={styles.sideHint}>
             LINEでの見え方は、届けるメッセージを決める手順から右に出ます。
           </p>
-        </aside>
-      </div>
-      <WizardFooterV8
+        </>
+
+  return (
+    <>
+    <CreatePage
+      boardId="VE1u5"
+      title="リマインダを作る"
+      description="いまは下書きとして作ります。最後の「確認」で有効にします。"
+      identity={<Link href="/reminders" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />リマインダへ</Link>}
+      steps={<ReminderV8Stepper current="basics" reminderId={savedId} />}
+      preview={preview}
+      previewToggle={<Button onClick={() => setPreviewOpen(true)}>設定内容を見る</Button>}
+      footerActions={
+        <WizardFooterV8 embedded
         onCancel={() => router.push('/reminders')}
         cancelDisabled={saving === 'saving'}
         onDraft={() => void save()}
@@ -219,7 +217,24 @@ export default function NewReminderV8() {
         nextIcon={<ArrowRight size={15} aria-hidden="true" />}
         onNext={() => void next()}
         nextDisabled={candidatesPending || saving === 'saving'}
-      />
+        />
+      }
+    >
+      {error ? <Notice tone="danger" message={error} /> : null}
+
+          <ReminderBasicsFormV8
+            value={value}
+            onChange={handleChange}
+            appliedTemplateId={appliedTemplateId}
+            onRequestTemplate={requestTemplate}
+            pendingFieldMatch={pendingFieldMatch}
+            onFieldMatchHandled={() => setPendingFieldMatch(null)}
+            onFieldsReady={onFieldsReady}
+            onEventsReady={onEventsReady}
+          />
+
+
+
       <ConfirmDialog
         open={pendingTemplate !== null}
         title="ひな形の内容で上書きしますか？"
@@ -232,6 +247,8 @@ export default function NewReminderV8() {
         onCancel={() => setPendingTemplate(null)}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="基本設定への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
-    </div>
+    </CreatePage>
+    <DetailPanel open={previewOpen} title="設定内容" onClose={() => setPreviewOpen(false)}>{preview}</DetailPanel>
+    </>
   )
 }

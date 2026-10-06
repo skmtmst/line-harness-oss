@@ -1,0 +1,25 @@
+import { afterEach, expect, test, vi } from 'vitest';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { detectFollowerImportCapability, startFollowerImport, getFollowerImportState } from './follower-import.js';
+import { processPendingFollowerImports } from './follower-import-background.js';
+const fixture=createTestD1({foreignKeys:true}), db=fixture.db, sql=fixture.raw;
+afterEach(()=>sql.close());
+test('cron advances persisted IDs and profiles with no browser, honors locks and skips archived accounts', async()=>{
+  sql.exec("INSERT INTO tenants(id,name) VALUES ('t','試験'); INSERT INTO line_accounts(id,name,channel_id,channel_access_token,channel_secret,tenant_id) VALUES ('a','試験','test-a','fixture','fixture','t'),('b','停止','test-b','fixture','fixture','t')");
+  const client={getFollowerIds:vi.fn().mockResolvedValueOnce({userIds:[]}).mockResolvedValueOnce({userIds:[]}).mockResolvedValueOnce({userIds:['U'+ 'a'.repeat(32)]}),getProfile:vi.fn().mockResolvedValue({displayName:'試験用'})};
+  await detectFollowerImportCapability(db,client,'a'); await startFollowerImport(db,'a');
+  await detectFollowerImportCapability(db,client,'b'); await startFollowerImport(db,'b');
+  sql.exec("UPDATE line_accounts SET archived_at='2026-10-04' WHERE id='b'");
+  const initial=await getFollowerImportState(db,'a');
+  sql.prepare("UPDATE account_settings SET value=? WHERE line_account_id='a' AND key='follower_import_v1'").run(JSON.stringify({...initial,lockUntil:new Date(Date.now()+60_000).toISOString()}));
+  const factory=vi.fn((_id: string, _token: string)=>client);
+  expect(await processPendingFollowerImports(db,{client:factory})).toEqual({processed:0,busy:1,failed:0});
+  sql.prepare("UPDATE account_settings SET value=? WHERE line_account_id='a' AND key='follower_import_v1'").run(JSON.stringify(initial));
+  expect((await processPendingFollowerImports(db,{client:factory})).processed).toBe(1);
+  expect((await getFollowerImportState(db,'a')).phase).toBe('hydrating_profiles');
+  expect((await processPendingFollowerImports(db,{client:factory})).processed).toBe(1);
+  expect((await getFollowerImportState(db,'a')).phase).toBe('completed');
+  expect((sql.prepare('SELECT COUNT(*) n FROM friends').get() as {n:number}).n).toBe(1);
+  expect(factory.mock.calls.map(args=>args[0])).toEqual(['a','a','a']);
+  expect(await processPendingFollowerImports(db,{client:factory})).toEqual({processed:0,busy:0,failed:0});
+});

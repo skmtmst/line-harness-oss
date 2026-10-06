@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Activity,
+  Download,
   Info,
   MoreHorizontal,
   Plus,
@@ -30,6 +31,7 @@ import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
+import { TableHeadRow, Th } from '@/components/shared/table'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -48,13 +50,21 @@ import {
   type ActionScoreSort,
   type FriendScoreDetail,
 } from '@/lib/api'
-import { actionScoreReasonLabel, formatMileageDate, formatMileageNumber } from './mileage-display'
+import { actionScoreReasonLabel, formatMileageChange, formatMileageDate, formatMileageMonthDay, formatMileageNumber } from './mileage-display'
+import { csvCell } from '@/lib/presentation'
 import { actionScoreAdjustmentErrorMessage } from './action-score-adjustment-dialog'
 import styles from './mileage-v8.module.css'
 
 const BAND_LABELS: Record<ActionScoreBand, string> = {
   high: '点が高い',
   normal: '中くらい',
+  low: '低い',
+}
+
+/* 友だちの表の帯の札（絵は「高い・ふつう・低い」）。 */
+const FRIEND_BAND_LABELS: Record<ActionScoreBand, string> = {
+  high: '高い',
+  normal: 'ふつう',
   low: '低い',
 }
 
@@ -181,6 +191,28 @@ export default function V8ScoreTab({
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
   }, [accountId, filter, page, pageSize, search, sort])
+
+  // v7 と同じ6列（友だち・いまの点数・帯・30日間の変化・最後に点数が変わった理由・最終変動）。
+  const exportCurrentPage = () => {
+    if (!overview?.items.length) return
+    const rows = overview.items.map((item) => [
+      item.displayName,
+      item.currentScore ?? '',
+      BAND_LABELS[item.band],
+      item.change30d ?? '',
+      actionScoreReasonLabel(item.lastReason),
+      formatMileageDate(item.lastChangedAt),
+    ])
+    const csv = [['友だち', 'いまの点数', '帯', '30日間の変化', '最後に点数が変わった理由', '最終変動'], ...rows]
+      .map((row) => row.map((value) => csvCell(value)).join(','))
+      .join('\n')
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `action-scores-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   const loadRules = useCallback(async () => {
     const accountAtRequest = accountId
@@ -467,6 +499,9 @@ export default function V8ScoreTab({
           </FilterChip>
         ))}
         <span className={styles.toolbarRight}>
+          <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
+            <Download size={14} aria-hidden="true" /> この頁の行動スコアをCSVで書き出す
+          </Button>
           <Button href={broadcastHref}>
             <Send size={14} aria-hidden="true" /> この帯の人に送る
           </Button>
@@ -544,19 +579,20 @@ export default function V8ScoreTab({
                     <p className={styles.cellMain} title={item.displayName}>{item.displayName}</p>
                   </td>
                   <td><span className={styles.num}>{formatMileageNumber(item.currentScore)}</span></td>
-                  <td><span className={bandPill(item.band)}>{BAND_LABELS[item.band]}</span></td>
+                  <td><span className={bandPill(item.band)}>{FRIEND_BAND_LABELS[item.band]}</span></td>
                   <td>
                     <span className={styles.num}>
                       {typeof item.change30d === 'number' && Number.isFinite(item.change30d)
-                        ? `${item.change30d > 0 ? '+' : ''}${formatMileageNumber(item.change30d)}`
+                        ? formatMileageChange(item.change30d)
                         : '—'}
                     </span>
                   </td>
                   <td>
                     <p className={styles.cellSubDark} title={actionScoreReasonLabel(item.lastReason)}>
-                      {actionScoreReasonLabel(item.lastReason)}
+                      {formatMileageMonthDay(item.lastChangedAt) === '—'
+                        ? actionScoreReasonLabel(item.lastReason)
+                        : `${formatMileageMonthDay(item.lastChangedAt)} ${actionScoreReasonLabel(item.lastReason)}`}
                     </p>
-                    <p className={styles.cellSub}>{formatMileageDate(item.lastChangedAt)}</p>
                   </td>
                   <td>
                     <span className={styles.rowActions}>
@@ -793,7 +829,7 @@ export default function V8ScoreTab({
             </Button>
           </div>
         ) : null}
-        <p className={styles.footnote}>行の「…」から 編集・外す。表の下の「＋できごとを足す」で増やせます。公開中のルールを止めるときは、題の横の「…」から。</p>
+        <p className={styles.footnote}>行の「…」から 編集・外す。表の下の「＋ できごとを足す」で増やせます（30日間反応がない、も選べる）。公開中のルールを止めるときは、題の横の「…」から。</p>
       </section>
 
       {adjustTarget && !readonly ? (
@@ -1071,6 +1107,7 @@ function V8ScoreHistoryDialog({
   const [detail, setDetail] = useState<FriendScoreDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [retry, setRetry] = useState(0)
 
   useEffect(() => {
     let current = true
@@ -1092,7 +1129,7 @@ function V8ScoreHistoryDialog({
         if (current) setLoading(false)
       })
     return () => { current = false }
-  }, [friendId])
+  }, [friendId, retry])
 
   const items = useMemo(
     () => [...(detail?.history ?? [])].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)),
@@ -1102,10 +1139,10 @@ function V8ScoreHistoryDialog({
   return (
     <Dialog
       open
+      designNode="R8NNi"
       title="点数の変化の明細"
       description="いつ・何で点数が変わったかを新しい順に並べています。スコアは配信や対応の順番を決める目安で、お客様には見えず、マイル残高は増えも減りもしません。"
-      confirmLabel="閉じる"
-      onConfirm={onCancel}
+      footer={<div className="flex justify-end"><Button variant="secondary" onClick={onCancel}>閉じる</Button></div>}
       onCancel={onCancel}
       busy={loading}
     >
@@ -1114,7 +1151,7 @@ function V8ScoreHistoryDialog({
         <div>
           <p className={styles.dlgPersonName}>{friendName}</p>
           <p className={styles.dlgPersonSub}>
-            いま {formatMileageNumber(detail?.currentScore ?? currentScore ?? 0)}点・{bandName(band, highMin, normalMin)}
+            いま {detail?.currentScore != null || currentScore != null ? formatMileageNumber(detail?.currentScore ?? currentScore!) : '—'}点・{bandName(band, highMin, normalMin)}
           </p>
         </div>
       </div>
@@ -1122,7 +1159,7 @@ function V8ScoreHistoryDialog({
       {loading ? (
         <ListState kind="loading" title="点数の変化を読み込んでいます" />
       ) : error ? (
-        <ListState kind="error" title="点数の明細を表示できませんでした" description="画面を閉じて、もう一度開き直してください。" />
+        <ListState kind="error" title="点数の明細を表示できませんでした" description="登録した点数は変わっていません。" onRetry={() => setRetry((value) => value + 1)} />
       ) : items.length === 0 ? (
         <ListState
           kind="empty"
@@ -1130,14 +1167,9 @@ function V8ScoreHistoryDialog({
           description="メッセージへの返信やリンクのクリックなど、決めたきっかけがあると記録されます。"
         />
       ) : (
-        <table className={styles.miniTable} style={{ marginTop: 16 }}>
+        <table className={`${styles.miniTable} ${styles.scoreHistoryTable}`}>
           <thead>
-            <tr>
-              <th scope="col">いつ</th>
-              <th scope="col">できごと</th>
-              <th scope="col">点</th>
-              <th scope="col">合計</th>
-            </tr>
+            <TableHeadRow><Th>いつ</Th><Th>できごと</Th><Th align="right">点</Th><Th align="right">合計</Th></TableHeadRow>
           </thead>
           <tbody>
             {items.map((item) => (
@@ -1147,7 +1179,7 @@ function V8ScoreHistoryDialog({
                 </td>
                 <td>{actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}</td>
                 <td>
-                  <span className={styles.num}>
+                  <span className={styles.num} data-score-delta={item.scoreChange > 0 ? 'positive' : item.scoreChange < 0 ? 'negative' : 'zero'}>
                     {item.scoreChange > 0 ? `+${formatMileageNumber(item.scoreChange)}` : `${formatMileageNumber(item.scoreChange)}`}
                   </span>
                 </td>

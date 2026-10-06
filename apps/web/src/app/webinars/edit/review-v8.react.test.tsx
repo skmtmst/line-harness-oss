@@ -47,10 +47,13 @@ const EDITOR = {
   monitoring: { notificationFailures: 0, viewSegmentFailures: 0, actionFailures: 0 },
 } as unknown as WebinarEditor
 
+let mounted: Root[] = []
+
 function render(): HTMLElement {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const root: Root = createRoot(host)
+  mounted.push(root)
   act(() => {
     root.render(
       <ReviewV8
@@ -91,6 +94,7 @@ describe('公開の前に確かめるのV8（XCUNf）', () => {
   })
 
   afterEach(() => {
+    act(() => { mounted.forEach((root) => root.unmount()); mounted = [] })
     document.body.innerHTML = ''
     vi.clearAllMocks()
   })
@@ -114,4 +118,23 @@ describe('公開の前に確かめるのV8（XCUNf）', () => {
     expect((publish as HTMLButtonElement).disabled).toBe(true)
     expect(apiMocks.publish).not.toHaveBeenCalled()
   })
+
+  it('ページのテスト後は更新された保存版で公開し、二重クリックを一回にする', async () => {
+    apiMocks.publishValidation.mockResolvedValue({ data: { checks: [{ key: 'page', label: '公開ページ', status: 'passed' }] } })
+    apiMocks.testPublicPage.mockResolvedValue({ data: { ...EDITOR, version: 5, publicPage: { test: { status: 'passed' } } } })
+    let reject!: (error: Error) => void
+    apiMocks.publish.mockReturnValue(new Promise((_resolve, rejectPromise) => { reject = rejectPromise }))
+    const host = render()
+    await act(async () => undefined)
+    const button = (label: string) => [...host.querySelectorAll('button')].find((element) => element.textContent === label)!
+    await act(async () => { button('ページをテスト').click() })
+    expect(apiMocks.testPublicPage).toHaveBeenCalledWith('webinar-1', 4)
+    await act(async () => { button('この版を公開').click(); button('この版を公開').click() })
+    expect(apiMocks.publish).toHaveBeenCalledTimes(1)
+    expect(apiMocks.publish).toHaveBeenCalledWith('webinar-1', 5)
+    await act(async () => { reject(new Error('通信切れ')) })
+    expect(host.textContent).toContain('公開できませんでした')
+    expect((button('この版を公開') as HTMLButtonElement).disabled).toBe(false)
+  })
+
 })

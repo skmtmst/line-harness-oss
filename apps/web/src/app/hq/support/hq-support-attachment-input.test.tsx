@@ -22,7 +22,7 @@ const calls = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/api', () => ({ api: { hqSupport: calls } }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageChrome: () => ({}) }))
 vi.mock('@/components/tenant-access-context', () => ({ useTenantStatus: () => 'active' }))
 vi.mock('@/components/hq/notice-line-register-dialog', () => ({ default: () => <div data-line-guide /> }))
 

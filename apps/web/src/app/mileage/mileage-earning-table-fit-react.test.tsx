@@ -9,11 +9,13 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccountProvider } from '@/contexts/account-context'
 import MileagePage from './page'
+import V8BalancesTab from './v8-balances-tab'
+import V8RewardsTab from './v8-rewards-tab'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
-  useSearchParams: () => new URLSearchParams('tab=earning-rules'),
+  useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/mileage',
 }))
 
@@ -38,8 +40,8 @@ function ruleFixture() {
       amount: 200,
       initialStatus: 'available',
       validFrom: null,
-      validUntil: null,
-      expiresAfterDays: null,
+      validUntil: '2026-12-31T00:00:00.000Z',
+      expiresAfterDays: 365,
       cancellationEventTypes: [],
       targetConditions: null,
       sortOrder: 0,
@@ -52,9 +54,41 @@ function ruleFixture() {
   }
 }
 
+function rewardFixture(id: string) {
+  return {
+    id,
+    lineAccountId: 'account-1',
+    programId: 'program-1',
+    name: `使い道${id}`,
+    description: null,
+    imageUrl: null,
+    rewardKind: 'coupon' as const,
+    status: 'published' as const,
+    sortOrder: 0,
+    currentDraftVersionId: null,
+    currentPublishedVersionId: null,
+    currentVersion: null,
+    exchangedThisMonth: 0,
+    availableCodeCount: null,
+    benefitName: null,
+    createdAt: '2026-09-10T00:00:00.000Z',
+    updatedAt: '2026-09-10T00:00:00.000Z',
+  }
+}
+
+const createdRulePayloads: Array<unknown> = []
+
 function stubFetch() {
-  globalThis.fetch = (async (input: unknown) => {
+  globalThis.fetch = (async (input: unknown, init?: { method?: string; body?: string }) => {
     const url = String(input)
+    const method = init?.method ?? 'GET'
+    if (url.endsWith('/api/mileage/rules') && method === 'POST') {
+      createdRulePayloads.push(JSON.parse(String(init?.body ?? '{}')))
+      return new Response(JSON.stringify({ success: true, data: { id: 'rule-new' } }), { status: 200 })
+    }
+    if (url.includes('/api/mileage/earning-rules/') && url.includes('/draft') && method !== 'GET') {
+      return new Response(JSON.stringify({ success: true, data: { ruleId: 'rule-new' } }), { status: 200 })
+    }
     if (url.includes('/api/mileage/earning-rules')) {
       return new Response(JSON.stringify({
         success: true,
@@ -94,6 +128,12 @@ function stubFetch() {
           pagination: { total: 1, limit: 1, offset: 0 },
           measuredAt: '2026-09-10T00:00:00.000Z',
         },
+      }), { status: 200 })
+    }
+    if (url.includes('/api/mileage/rewards')) {
+      return new Response(JSON.stringify({
+        success: true,
+        data: { rewards: [rewardFixture('reward-1'), rewardFixture('reward-2')] },
       }), { status: 200 })
     }
     if (url.includes('/api/staff/me')) {
@@ -140,6 +180,7 @@ beforeEach(() => {
   globalThis.localStorage.setItem('lh_selected_account', 'account-1')
   /* V8 の器で描く（`useAdminTheme` は `<html data-theme>` を読む）。 */
   document.documentElement.dataset.theme = 'v8'
+  createdRulePayloads.length = 0
   stubFetch()
   container = document.createElement('div')
   document.body.appendChild(container)
@@ -180,5 +221,110 @@ describe('たまる決めごとの表の器収め', () => {
     const total = widths.reduce((sum, width) => sum + Number.parseFloat(width), 0)
     /* 100 を超えると器からはみ出す。 */
     expect(total).toBeLessThanOrEqual(100)
+  })
+})
+
+/*
+ * タブの名の横の件数（板 `OC0gy`：たまる決めごと・使い道・
+ * 友だちの残高）。数は各タブの読み物から来る。読み直し中・失敗時は出さない。
+ */
+async function waitForTabCount(calls: Array<{ key: string; text: string | null }>, key: string, text: string) {
+  for (let i = 0; i < 60; i += 1) {
+    await act(async () => { await Promise.resolve() })
+    if (calls.some((call) => call.key === key && call.text === text)) return
+  }
+  throw new Error(`タブの件数が出ませんでした: ${key} ${text}`)
+}
+
+describe('有効期間の短さ（板 `E2Any`）', () => {
+  it('1年・12/31 と出す', async () => {
+    await act(async () => {
+      root.render(<AccountProvider><MileagePage /></AccountProvider>)
+    })
+    await waitForTable()
+    expect(container.textContent ?? '').toContain('1年・12/31')
+  })
+})
+
+describe('行の「…」（板 `OC0gy`）', () => {
+  it('編集・止める・複製が並び、複製は止めた状態で写しを作る', async () => {
+    await act(async () => {
+      root.render(<AccountProvider><MileagePage /></AccountProvider>)
+    })
+    await waitForTable()
+    const menuButton = [...container.querySelectorAll('button')].find(
+      (element) => element.getAttribute('aria-label') === 'あいさつでたまるのその他操作',
+    )
+    if (!(menuButton instanceof HTMLButtonElement)) throw new Error('その他操作のボタンがありません')
+    await act(async () => { menuButton.click() })
+    const menu = document.body.textContent ?? ''
+    expect(menu).toContain('編集')
+    /* 動いている見本なので止める側が出る。 */
+    expect(menu).toContain('止める')
+    expect(menu).toContain('複製')
+    const duplicate = [...document.body.querySelectorAll('button')].find(
+      (element) => element.textContent === '複製',
+    )
+    if (!(duplicate instanceof HTMLButtonElement)) throw new Error('複製の項目がありません')
+    await act(async () => { duplicate.click() })
+    for (let i = 0; i < 60; i += 1) {
+      await act(async () => { await Promise.resolve() })
+      if (createdRulePayloads.length > 0) break
+    }
+    expect(createdRulePayloads).toHaveLength(1)
+    const payload = createdRulePayloads[0] as { name: string; isActive: boolean }
+    expect(payload.name).toContain('のコピー')
+    expect(payload.isActive).toBe(false)
+    for (let i = 0; i < 60; i += 1) {
+      await act(async () => { await Promise.resolve() })
+      if ((container.textContent ?? '').includes('止めた状態で作りました')) break
+    }
+    expect(container.textContent ?? '').toContain('止めた状態で作りました')
+  })
+})
+
+describe('タブの名の横の件数', () => {
+  it('たまる決めごとは読み物の件数が殻のタブに出る', async () => {
+    await act(async () => {
+      root.render(<AccountProvider><MileagePage /></AccountProvider>)
+    })
+    await waitForTable()
+    /* 見本1件 → 「たまる決めごと 1」。 */
+    const nav = container.querySelector('nav')
+    expect(nav?.textContent).toContain('たまる決めごと 1')
+  })
+
+  it('使い道は読み物の件数を殻へ載せる', async () => {
+    const calls: Array<{ key: string; text: string | null }> = []
+    await act(async () => {
+      root.render(
+        <AccountProvider>
+          <V8RewardsTab
+            readonly={false}
+            registerHeaderActions={() => {}}
+            registerTabCount={(key, text) => { calls.push({ key, text }) }}
+          />
+        </AccountProvider>,
+      )
+    })
+    /* 見本2件 → 「使い道 2」。 */
+    await waitForTabCount(calls, 'rewards', '2')
+  })
+
+  it('友だちの残高は人数を殻へ載せる', async () => {
+    const calls: Array<{ key: string; text: string | null }> = []
+    await act(async () => {
+      root.render(
+        <AccountProvider>
+          <V8BalancesTab
+            readonly={false}
+            registerHeaderActions={() => {}}
+            registerTabCount={(key, text) => { calls.push({ key, text }) }}
+          />
+        </AccountProvider>,
+      )
+    })
+    /* 見本の人数1 → 「友だちの残高 1」。 */
+    await waitForTabCount(calls, 'balances', '1')
   })
 })

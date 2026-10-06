@@ -178,3 +178,16 @@ describe('レスポンスの中身', () => {
     expect(body.data).not.toHaveProperty('channelAccessToken');
   });
 });
+
+ describe('V8 timezone PUT', () => {
+  const put = (body: unknown) => app.request('/api/line-accounts/acc-1', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, env);
+  it('saves a valid timezone without credential rotation', async () => {
+    expect((await put({ timezone: 'Europe/Paris' })).status).toBe(200);
+    expect(mocks.updateLineAccountFields).toHaveBeenCalledWith(env.DB, 'acc-1', expect.objectContaining({ timezone: 'Europe/Paris' }));
+    expect(mocks.updateLineAccount).not.toHaveBeenCalled();
+  });
+  it('rejects invalid input before saving', async () => {
+    for (const timezone of ['', null, 12, 'Invalid/zone']) expect((await put({ timezone })).status).toBe(422);
+    expect(mocks.updateLineAccountFields).not.toHaveBeenCalled();
+  });
+ });

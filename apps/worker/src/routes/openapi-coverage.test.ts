@@ -15,7 +15,7 @@ import { routeClassification } from '../middleware/feature-enforcement.js';
  * 対象: `/api/*` と `/webhook`、認証なし公開メタデータ 2 件
  * （GET /admin/version、GET /admin/manifest）。
  * 対象外とその理由:
- * - `/api/restaurant-test/*` … 飲食店向けテスト機能（本番では無効）
+ * - `/api/restaurant-test/*` … 飲食店向け機能（`RESTAURANT_TEST_ENABLED` で環境ごとに切替）
  * - `/api/internal/*` … 内部サービス間経路（内部専用口）
  * - `/admin/update/*` … 管理キー必須の内部保守口
  * - `ALL` メソッド … ミドルウェア掛け（同じ path の具体メソッドが別にある）
@@ -128,6 +128,25 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  // V8 integration endpoints.
+  'DELETE /api/hq/templates/folders/{id}',
+  'DELETE /api/notifications/teams/{id}',
+  'GET /api/ad-platforms/mappings',
+  'GET /api/hq/templates/folders',
+  'GET /api/hq/templates/message-references',
+  'GET /api/nen-members/photos/publications/order',
+  'GET /api/notifications/teams',
+  'PATCH /api/hq/templates/folders/{id}',
+  'POST /api/ad-platforms/{id}/connect',
+  'POST /api/events/admin/application-preview',
+  'POST /api/hq/templates/folders',
+  'POST /api/hq/templates/{id}/duplicate',
+  'POST /api/nen-members/photos/{id}/publish',
+  'POST /api/notifications/teams',
+  'PUT /api/ad-platforms/mappings/{pointId}',
+  'PUT /api/nen-members/photos/publications/order',
+  'PUT /api/notifications/teams/{id}',
+
   'DELETE /api/affiliates/{id}',
   'DELETE /api/auth/sessions/{tokenHash}',
   'DELETE /api/booking/admin/bookings/{id}/visit',

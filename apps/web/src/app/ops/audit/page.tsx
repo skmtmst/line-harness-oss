@@ -5,6 +5,7 @@ import { Download } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
 import OpsPageHeader, { ReadonlyDesignNode } from '@/app/ops/readonly-header-v8'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import '@/app/ops/readonly-v8.css'
 import { AUDIT_ACTION_LABEL, auditActionChip, formatDateTime, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
@@ -34,7 +35,31 @@ const PAGE = 50
 const CSV_PAGE = 500
 const CSV_MAX = 20_000
 
+/** 板 `e7ljE` の操作名（絵の5行に出る形。種別ごとの言い方にそろえる）。 */
+const V8_ACTION_LABEL: Record<string, string> = {
+  'tenant.status.change': '契約先の停止',
+  'pii.reveal': '個人情報の表示',
+  'member.invite': '運営メンバー',
+  'member.deactivate': '運営メンバー',
+  'member.activate': '運営メンバー',
+}
+
+function v8AuditActionLabel(action: string): string {
+  return V8_ACTION_LABEL[action] ?? AUDIT_ACTION_LABEL[action]?.label ?? action
+}
+
+/** 板 `e7ljE` の短い日時（10/1 15:20 の形）。 */
+function v8ShortDateTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const full = formatDateTime(value)
+  const m = full.match(/^(\d+)-(\d+)-(\d+) (\d+:\d+)$/)
+  if (!m) return full
+  return `${Number(m[2])}/${Number(m[3])} ${m[4]}`
+}
+
 export default function OpsAuditPage() {
+  const theme = useAdminTheme()
+  const isV8 = theme === 'v8'
   const [rows, setRows] = useState<OpsAuditRow[]>([])
   const [total, setTotal] = useState(0)
   const [filter, setFilter] = useState('')
@@ -104,10 +129,27 @@ export default function OpsAuditPage() {
   return (
     <ReadonlyDesignNode node="e7ljE"><div data-design-node="oEzZz" className="v8-ro-ops-page v8-ro-ops-audit flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <OpsPageHeader title="監査ログ" />
+      <OpsPageHeader
+        title="監査ログ"
+        description={isV8 ? '運営が行った操作の記録です。代理ログイン・個人情報の表示・契約先の停止・運営メンバーの変更が残ります。' : undefined}
+        actions={isV8 ? (
+          <Button onClick={() => void exportCsv()} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
+            <Download aria-hidden="true" className="h-4 w-4" />CSVで書き出す
+          </Button>
+        ) : undefined}
+      />
+      {isV8 ? null : (
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-lead font-bold text-ink">運営が行った操作の記録</h2>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-lead font-bold text-ink">運営が行った操作の記録</h2>
         <div className="flex flex-wrap items-center gap-1.5">
+          {isV8 ? (
+            <FilterChip selected={filter === ''} onChange={() => { setFilter(''); setPage(1) }}>
+              すべて
+            </FilterChip>
+          ) : null}
           {FILTERS.map((f) => (
             <FilterChip key={f.key} selected={filter === f.key} onChange={(selected) => { setFilter(selected ? f.key : ''); setPage(1) }}>
               {f.label}
@@ -120,11 +162,12 @@ export default function OpsAuditPage() {
          * 390px からはみ出す（監査 R158）。
          */}
         <div className="flex w-full min-w-0 flex-wrap items-center gap-2 text-caption text-ink-secondary sm:w-auto">
+          {isV8 ? <span className="shrink-0">開始日</span> : null}
           <div className="w-full min-w-0 sm:w-52">
             <DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" />
           </div>
           <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-            <span className="shrink-0">〜</span>
+            <span className="shrink-0">{isV8 ? '終了日' : '〜'}</span>
             <div className="min-w-0 flex-1 sm:w-52 sm:flex-none">
               <DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} aria-label="終了日" />
             </div>
@@ -134,11 +177,13 @@ export default function OpsAuditPage() {
           m22d: 件数は下の一覧の件数（ListRange）の1か所に集約し、
           見出しの横では繰り返さない。
         */}
-        <div className="flex items-center gap-2">
-          <Button onClick={() => void exportCsv()} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
-            <Download aria-hidden="true" className="h-4 w-4" />CSVで書き出す
-          </Button>
-        </div>
+        {isV8 ? null : (
+          <div className="flex items-center gap-2">
+            <Button onClick={() => void exportCsv()} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
+              <Download aria-hidden="true" className="h-4 w-4" />CSVで書き出す
+            </Button>
+          </div>
+        )}
       </div>
 
       {exportNote ? <p role="status" className="mb-3 text-caption text-accent-deep">{exportNote}</p> : null}
@@ -155,31 +200,62 @@ export default function OpsAuditPage() {
         </div>
       ) : (
         <DataTable>
-          <thead>
-            <TableHeadRow>
-              <Th className="w-40">日時</Th>
-              <Th className="w-40">運営者</Th>
-              <Th className="w-60">契約先</Th>
-              <Th className="w-60">操作</Th>
-              <Th>理由</Th>
-              {/* IP は短い符号なので右へ寄せ、右端の余白を左端とそろえる。 */}
-              <Th className="w-36" align="right">IP</Th>
-            </TableHeadRow>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <Tr key={row.id}>
-                <Td><span className="text-caption text-ink-secondary">{formatDateTime(row.created_at)}</span></Td>
-                <Td><span className="block truncate text-caption font-medium text-ink">{row.staff_name}</span></Td>
-                <Td><span className="block truncate text-caption text-ink" title={row.tenant_name ?? ''}>{row.tenant_name ?? '—'}</span></Td>
-                <Td>{auditActionChip(row.action)}</Td>
-                <Td><span className="block truncate text-caption text-ink-secondary" title={row.reason ?? ''}>{row.reason ?? '—'}</span></Td>
-                <Td align="right"><span className="text-caption text-ink-faint">{row.ip ?? '—'}</span></Td>
-              </Tr>
-            ))}
-          </tbody>
+          {isV8 ? (
+            <>
+              <thead>
+                <TableHeadRow>
+                  <Th className="w-40">日時</Th>
+                  <Th className="w-40">運営者</Th>
+                  <Th className="w-60">操作</Th>
+                  <Th className="w-60">契約先</Th>
+                  <Th>理由</Th>
+                </TableHeadRow>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <Tr key={row.id}>
+                    <Td><span className="text-caption text-ink-secondary">{v8ShortDateTime(row.created_at)}</span></Td>
+                    <Td><span className="block truncate text-caption font-medium text-ink">{row.staff_name}</span></Td>
+                    <Td><span className="block truncate text-caption text-ink">{v8AuditActionLabel(row.action)}</span></Td>
+                    <Td><span className="block truncate text-caption text-ink" title={row.tenant_name ?? ''}>{row.tenant_name ?? '—'}</span></Td>
+                    <Td><span className="block truncate text-caption text-ink-secondary" title={row.reason ?? ''}>{row.reason ?? '—'}</span></Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </>
+          ) : (
+            <>
+              <thead>
+                <TableHeadRow>
+                  <Th className="w-40">日時</Th>
+                  <Th className="w-40">運営者</Th>
+                  <Th className="w-60">契約先</Th>
+                  <Th className="w-60">操作</Th>
+                  <Th>理由</Th>
+                  {/* IP は短い符号なので右へ寄せ、右端の余白を左端とそろえる。 */}
+                  <Th className="w-36" align="right">IP</Th>
+                </TableHeadRow>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <Tr key={row.id}>
+                    <Td><span className="text-caption text-ink-secondary">{formatDateTime(row.created_at)}</span></Td>
+                    <Td><span className="block truncate text-caption font-medium text-ink">{row.staff_name}</span></Td>
+                    <Td><span className="block truncate text-caption text-ink" title={row.tenant_name ?? ''}>{row.tenant_name ?? '—'}</span></Td>
+                    <Td>{auditActionChip(row.action)}</Td>
+                    <Td><span className="block truncate text-caption text-ink-secondary" title={row.reason ?? ''}>{row.reason ?? '—'}</span></Td>
+                    <Td align="right"><span className="text-caption text-ink-faint">{row.ip ?? '—'}</span></Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </>
+          )}
         </DataTable>
       )}
+
+      {isV8 ? (
+        <p className="text-micro text-ink-faint">記録は運営メンバーでも消せません。理由は4文字以上が必須です。</p>
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-caption text-ink-faint">
         <ListRange total={total} first={first} last={last} />

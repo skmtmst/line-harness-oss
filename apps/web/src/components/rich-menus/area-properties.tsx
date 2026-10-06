@@ -119,7 +119,7 @@ function Field({
   return (
     <label className="block">
       <span className="text-ink-secondary text-xs font-medium">{label}</span>
-      {hint && <span className="text-ink-faint block text-[11px]">{hint}</span>}
+      {hint && <span className="text-ink-faint block text-micro">{hint}</span>}
       <div className="mt-1">{children}</div>
     </label>
   )
@@ -211,7 +211,7 @@ export function AreaProperties({
 
       {showManagementDetails ? (
         <div className="border-hairline bg-canvas-sunken rounded-control border px-3 py-2">
-          <div className="text-ink-faint text-[11px]">今月押された回数</div>
+          <div className="text-ink-faint text-micro">今月押された回数</div>
           {isTapCountable(area) ? (
             <>
               <div className="text-ink text-lg font-bold tabular-nums">
@@ -219,14 +219,14 @@ export function AreaProperties({
                 <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>
               </div>
               {taps && taps.viaTrackedLink > 0 && (
-                <p className="text-ink-faint text-[11px]">
+                <p className="text-ink-faint text-micro">
                   うち {taps.viaTrackedLink} 回は計測リンクで数えた分です。
                   同じ計測リンクを他でも使っていると、その分も入ります。
                 </p>
               )}
             </>
           ) : (
-            <p className="text-ink-faint text-[11px] leading-snug">
+            <p className="text-ink-faint text-micro leading-snug">
               この動きは数えられません。
               {intent === 'url'
                 ? '上の「計測リンクを使う」を選ぶと数えられます。'
@@ -261,7 +261,7 @@ export function AreaProperties({
           onChange={(value) => changeIntent(value as RichMenuAreaIntent)}
           options={intentOptions.map((o) => ({ value: o.value, label: o.label }))}
         />
-        <p className="text-ink-faint mt-1 text-[11px]">
+        <p className="text-ink-faint mt-1 text-micro">
           {intentOptions.find((o) => o.value === intent)?.hint}
         </p>
       </Field>
@@ -287,7 +287,7 @@ export function AreaProperties({
           {area.trackedLinkId ? (
             // 計測リンクを選んだら、飛び先はそちらの設定が使われる。
             // URL 欄を残すと「どっちが使われるのか」が分からなくなる。
-            <p className="text-ink-faint text-[11px]">
+            <p className="text-ink-faint text-micro">
               飛び先は、選んだ計測リンクの設定が使われます。変えるときは「計測リンク」の画面で編集してください。
             </p>
           ) : (
@@ -347,7 +347,7 @@ export function AreaProperties({
             size="full"
           />
           {templates.length === 0 && (
-            <p className="mt-1 text-[11px] text-status-warn-deep">
+            <p className="mt-1 text-micro text-status-warn-deep">
               テンプレートがまだありません。先に「テンプレート」で作ってください。
             </p>
           )}
@@ -367,7 +367,7 @@ export function AreaProperties({
             size="full"
           />
           {forms.length === 0 && (
-            <p className="mt-1 text-[11px] text-status-warn-deep">
+            <p className="mt-1 text-micro text-status-warn-deep">
               回答フォームがまだありません。先に「回答フォーム」で作ってください。
             </p>
           )}
@@ -387,7 +387,7 @@ export function AreaProperties({
             size="full"
           />
           {pages.length < 2 && (
-            <p className="mt-1 text-[11px] text-status-warn-deep">
+            <p className="mt-1 text-micro text-status-warn-deep">
               タブの切り替えには2ページ以上必要です。先にページを追加してください。
             </p>
           )}
@@ -476,7 +476,7 @@ export function AreaProperties({
         <p className="text-ink-secondary text-xs font-medium">押されたときに、あわせて行うこと</p>
 
         {!sideEffectsAvailable ? (
-          <p className="text-ink-faint text-[11px]">
+          <p className="text-ink-faint text-micro">
             {intent === 'url'
               ? 'URLを開くボタンでタグを付けたいときは、上の「計測リンクを使う」を選んでください。計測リンク側でタグを設定できます。'
               : 'この動きは LINE の中で完結するため、押されたことがこちらに届きません。タグ付けやスコアは設定できません。'}
@@ -492,7 +492,7 @@ export function AreaProperties({
             <div>
               <span className="text-ink-secondary text-xs font-medium">タグを付ける</span>
               {tags.length === 0 ? (
-                <p className="text-ink-faint mt-1 text-[11px]">タグがまだありません。</p>
+                <p className="text-ink-faint mt-1 text-micro">タグがまだありません。</p>
               ) : (
                 <MultiSelect
                   aria-label="タグを付ける"
@@ -520,7 +520,7 @@ export function AreaProperties({
             </Field>
 
             {intent === 'text' && (area.tagIds?.length || area.scoreChange) ? (
-              <p className="text-ink-faint text-[11px]">
+              <p className="text-ink-faint text-micro">
                 タグかスコアを設定すると、押されたことを受け取るしくみに切り替わります。
                 トークの見え方は変わりません。
               </p>

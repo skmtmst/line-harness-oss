@@ -35,7 +35,7 @@
 | `apps/web/src/app/ops/**` | 画面 |
 | `apps/web/src/components/ops/**` | 外枠・環境帯・代理ログイン帯 |
 | `apps/web/src/components/app-shell.tsx` | `/ops` は運営の外枠、それ以外には代理ログイン帯 |
-| `apps/web/src/components/hq/operator-history.tsx` | 契約先から見える運営の操作（書き込みのみ） |
+| `apps/web/src/components/hq/operator-history.tsx` | 運営の操作（書き込みのみ）の一覧。2026-10-06 から契約先の画面には出していない（部品と API は残置） |
 
 ## 運営マスターの登録（Masato が実行）
 
@@ -74,7 +74,7 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 - 登録した LINE / メールで `/ops` に入れる。どちらのログインも、TOTP登録済みなら6桁の確認、未登録なら設定を終えるまで通常セッションを発行しない。統括のオーナーは `/api/ops/*` が 403
 - 契約先を停止すると `tenants.status = 'suspended'`、`platform_audit_logs` が 1 件（`visible_to_tenant = 1`）
 - 代理ログインで統括の画面が開き、赤い帯が出る。閲覧のみでは書き込み API が 403
-- 理由を入れて書き込みに切り替えると書ける。契約先の `/hq` に「運営による操作」が出る
+- 理由を入れて書き込みに切り替えると書ける。記録は `platform_audit_logs` と `/api/hq/operator-history` に残る（2026-10-06 から契約先の `/hq` には表示しない）
 - 代理ログイン中、`/api/friends` の氏名が `友だち#xxxx`、本文が伏せ字。理由を入れて表示すると戻る
 - `/ops/audit` に上の操作が並ぶ
 

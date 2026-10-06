@@ -35,7 +35,7 @@ import AttributionSection from './attribution-view'
 import { csvCell, pageCountOf, pageOf } from './offer-list-view'
 import { formatDateTime, formatYenNullable, listAllConversionApprovals } from './tabs'
 import { KpiStrip, KpiCell, NoticeBar, EmptyState, ZeroResultState, LoadingRows, LoadError } from './v8-shared'
-import styles from './list-v8.module.css'
+import './list-v8.css'
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 type BulkOutcome = 'approved' | 'rejected'
@@ -47,11 +47,14 @@ type BulkResult = {
   failed: Array<{ id: string; error: string }>
 }
 
-const APPROVAL_FILTER_ALL = 'all'
-const APPROVAL_FILTER_UNASSIGNED = '__unassigned__'
-
 function formatYen(n: number): string {
   return `¥${formatNumber(Math.round(n))}`
+}
+
+/** JSTの今月の始まり（UTCの瞬間で比べる）。 */
+function jstMonthStart(): number {
+  const jst = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  return Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), 1)
 }
 
 export default function ApprovalsTabV8({
@@ -73,15 +76,13 @@ export default function ApprovalsTabV8({
   const [actioning, setActioning] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [flaggedOnly, setFlaggedOnly] = useState(false)
-  const [sort, setSort] = useState<'oldest' | 'newest' | 'amount'>('oldest')
+  const [sort] = useState<'oldest' | 'newest' | 'amount'>('oldest')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [detailItem, setDetailItem] = useState<ConversionApprovalItem | null>(null)
   const [truncatedStatuses, setTruncatedStatuses] = useState<ApprovalStatus[]>([])
   const [loadingMore, setLoadingMore] = useState(false)
-  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
-  const [accountFilter, setAccountFilter] = useState<string>(APPROVAL_FILTER_ALL)
   const [bulkConfirm, setBulkConfirm] = useState<{ action: BulkOutcome; items: ConversionApprovalItem[] } | null>(null)
   const [bulkResult, setBulkResult] = useState<BulkResult | null>(null)
   /* まとめて操作の手順窓（★V8-B `hadfk`）。浮き帯のメニューの代わりにここから選ぶ。 */
@@ -131,16 +132,6 @@ export default function ApprovalsTabV8({
       if (!cancelledRef.current) setLoadingMore(false)
     }
   }, [items, loadingMore, truncatedStatuses])
-
-  useEffect(() => {
-    let cancelled = false
-    void api.lineAccounts.list().then((res) => {
-      if (!cancelled && res.success && Array.isArray(res.data)) {
-        setAccounts(res.data.map((account) => ({ id: account.id, name: account.name })))
-      }
-    }).catch(() => { /* 絞り以外は動かす */ })
-    return () => { cancelled = true }
-  }, [])
 
   const handleApprove = useCallback(async (eventId: string, expectedStatus: 'pending' | 'approved' | 'rejected') => {
     if (actioning) return
@@ -235,30 +226,7 @@ export default function ApprovalsTabV8({
       ?? null)
     : null
 
-  const accountItems = useMemo(() => {
-    if (accountFilter === APPROVAL_FILTER_ALL) return scopedItems
-    if (accountFilter === APPROVAL_FILTER_UNASSIGNED) return scopedItems.filter((item) => !item.lineAccountId)
-    return scopedItems.filter((item) => item.lineAccountId === accountFilter)
-  }, [accountFilter, scopedItems])
-
-  const accountOptions = useMemo(() => {
-    const nameById = new Map<string, string>()
-    for (const account of accounts) nameById.set(account.id, account.name)
-    for (const item of items) {
-      if (item.lineAccountId && !nameById.has(item.lineAccountId)) {
-        nameById.set(item.lineAccountId, item.lineAccountName ?? '名前を確認できません')
-      }
-    }
-    const options = [{ value: APPROVAL_FILTER_ALL, label: 'すべてのアカウント' }]
-    for (const [id, name] of nameById) options.push({ value: id, label: name })
-    if (items.some((item) => !item.lineAccountId)) {
-      options.push({ value: APPROVAL_FILTER_UNASSIGNED, label: 'アカウント未設定' })
-    }
-    if (accountFilter !== APPROVAL_FILTER_ALL && !options.some((option) => option.value === accountFilter)) {
-      options.push({ value: accountFilter, label: accountFilter === APPROVAL_FILTER_UNASSIGNED ? 'アカウント未設定' : '選択中のアカウント' })
-    }
-    return options
-  }, [accountFilter, accounts, items])
+  const accountItems = scopedItems
 
   const retryBulkLeftovers = useCallback(() => {
     if (!bulkResult) return
@@ -284,13 +252,24 @@ export default function ApprovalsTabV8({
   }
   const pendingItems = accountItems.filter((item) => item.approvalStatus === 'pending')
   const flaggedCount = pendingItems.filter((item) => approvalReviewReasons(item).length > 0).length
-  const pendingYen = pendingItems.reduce((sum, item) => sum + (item.value ?? 0), 0)
   const averageWaitDays = pendingItems.length === 0
     ? 0
     : pendingItems.reduce((sum, item) => {
       const createdAt = new Date(item.createdAt).getTime()
       return sum + (Number.isFinite(createdAt) ? Math.max(0, Date.now() - createdAt) / 86_400_000 : 0)
     }, 0) / pendingItems.length
+  /** 板 `OylSV`：いちばん古い承認待ちの経過日数。 */
+  const oldestPendingDays = pendingItems.length === 0
+    ? null
+    : Math.max(...pendingItems.map((item) => {
+      const createdAt = new Date(item.createdAt).getTime()
+      return Number.isFinite(createdAt) ? Math.floor(Math.max(0, Date.now() - createdAt) / 86_400_000) : 0
+    }))
+  /** 板 `OylSV`：今月（JST）に起きた認めた・認めなかった成果。 */
+  const monthStart = jstMonthStart()
+  const approvedThisMonth = accountItems.filter((item) => item.approvalStatus === 'approved' && new Date(item.createdAt).getTime() >= monthStart)
+  const rejectedThisMonth = accountItems.filter((item) => item.approvalStatus === 'rejected' && new Date(item.createdAt).getTime() >= monthStart)
+  const approvedMonthYen = approvedThisMonth.reduce((sum, item) => sum + (item.value ?? 0), 0)
 
   const shownItems = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ja-JP')
@@ -375,26 +354,26 @@ export default function ApprovalsTabV8({
       <KpiStrip>
         <KpiCell
           icon={<ListChecks size={14} aria-hidden="true" />}
-          label="認めるのを待っている"
+          label="承認待ち"
           value={loading || error ? null : counts.pending}
           unit="件"
-          sub={loading ? '読み込んでいます' : error ? '読み込めませんでした' : `合計 ${formatYen(pendingYen)}`}
+          sub={loading ? '読み込んでいます' : error ? '読み込めませんでした' : oldestPendingDays == null ? 'いまはありません' : `いちばん古いもの ${formatNumber(oldestPendingDays)}日前`}
           info="まだ認める・認めないを決めていない成果です。認めると報酬が確定します。"
         />
         <KpiCell
-          label="確認したほうがよい"
-          value={loading || error ? null : flaggedCount}
+          icon={<CheckCircle2 size={14} aria-hidden="true" />}
+          label="今月 認めた"
+          value={loading || error ? null : approvedThisMonth.length}
           unit="件"
-          sub={loading || error ? '' : flaggedCount > 0 ? '中身を確かめてから判断' : 'いまはありません'}
-          info="同じ友だち・同じ注文の重複や、返金・取り消し済みの注文の成果です。まとめて承認の対象からは外れます。"
+          sub={loading ? '読み込んでいます' : error ? '読み込めませんでした' : formatYen(approvedMonthYen)}
+          info="今月（日本時間）に起きて、認めるまで済んだ成果の数です。承認待ちは含みません。"
         />
         <KpiCell
-          icon={<CheckCircle2 size={14} aria-hidden="true" />}
-          label="認めた成果"
-          value={loading || error ? null : counts.approved}
+          label="今月 認めなかった"
+          value={loading || error ? null : rejectedThisMonth.length}
           unit="件"
-          sub={truncatedStatuses.includes('approved') ? 'まだ読み込んでいない分があります' : '絞り込み条件での全件'}
-          info="認めた成果です。承認済みでも、案件の付帯動作（タグ付けなど）が終わっていないものは「やり直す」が出ます。"
+          sub={loading || error ? '' : 'テスト注文・取り消し'}
+          info="今月（日本時間）に起きて、認めないと決めた成果の数です。"
         />
         <KpiCell
           icon={<Timer size={14} aria-hidden="true" />}
@@ -412,48 +391,21 @@ export default function ApprovalsTabV8({
         </NoticeBar>
       ) : !loading && !error ? (
         <NoticeBar>
-          成果を認めると報酬が確定します。確認が必要な成果は、まとめて承認の対象から外れます。
+          認めた成果は、保留期間を過ぎると次の締めで報酬に入ります。締める前なら「認めない」に変えると、今回の支払いから外れます。
         </NoticeBar>
       ) : null}
 
       {actionError ? <NoticeBar tone="warn">{actionError}</NoticeBar> : null}
 
-      <div className={styles.tools}>
+      <div className="af-list-tools">
         <SearchField
-          placeholder="友だち・紹介者・案件・成果地点・注文番号で探す"
-          aria-label="成果承認を探す"
+          placeholder="名前・注文番号で探す"
+          aria-label="名前・注文番号で探す"
           value={query}
           onChange={(value) => { setQuery(value); setPage(1); clearSelections() }}
           onClear={() => { setQuery(''); setPage(1); clearSelections() }}
-          className={styles.toolsSearch}
+          className="af-list-toolsSearch"
         />
-        <Select
-          aria-label="アカウントで絞る"
-          value={accountFilter}
-          options={accountOptions}
-          onChange={(value) => { setAccountFilter(value); setPage(1); clearSelections() }}
-        />
-        <span className={styles.toolsSpacer} />
-        <Select
-          aria-label="並び順"
-          value={sort}
-          options={[
-            { value: 'oldest', label: '古い順' },
-            { value: 'newest', label: '新しい順' },
-            { value: 'amount', label: '金額が高い順' },
-          ]}
-          onChange={(value) => { setSort(value as typeof sort); setPage(1); clearSelections() }}
-        />
-        <Select
-          aria-label="表示件数"
-          value={String(pageSize)}
-          options={[20, 50, 100].map((n) => ({ value: String(n), label: `${n}件表示` }))}
-          onChange={(value) => { setPageSize(Number(value)); setPage(1); clearSelections() }}
-          size="page-size"
-        />
-      </div>
-
-      <div className={styles.tools} style={{ paddingTop: 0 }}>
         {affiliateFilter ? (
           <FilterChip
             selected
@@ -464,10 +416,10 @@ export default function ApprovalsTabV8({
             紹介者：{affiliateFilterName ?? '名前を確認できません'}
           </FilterChip>
         ) : null}
-        {(['pending', 'approved', 'rejected'] as const).map((s) => (
+        {(['pending', 'rejected', 'approved'] as const).map((s) => (
           <FilterChip
             key={s}
-            selected={status === s}
+            selected={status === s && !flaggedOnly}
             onChange={(selectedNow) => {
               if (!selectedNow) return
               setStatus(s)
@@ -480,15 +432,43 @@ export default function ApprovalsTabV8({
             {s === 'pending' ? '承認待ち' : s === 'approved' ? '認めた' : '認めなかった'}
           </FilterChip>
         ))}
-        {status === 'pending' ? (
-          <FilterChip
-            selected={flaggedOnly}
-            onChange={(value) => { setFlaggedOnly(value); setPage(1); clearSelections() }}
-            count={loading || error ? undefined : flaggedCount}
-          >
-            確認したほうがよい
-          </FilterChip>
-        ) : null}
+        <FilterChip
+          selected={flaggedOnly}
+          onChange={(value) => { setFlaggedOnly(value); setPage(1); clearSelections() }}
+          count={loading || error ? undefined : flaggedCount}
+        >
+          確認したほうがよい
+        </FilterChip>
+        <span className="af-list-toolsSpacer" />
+        <Select
+          aria-label="よく使う絞り込み"
+          value={flaggedOnly ? 'flagged' : status}
+          options={[
+            { value: 'pending', label: 'よく使う絞り込み' },
+            { value: 'pending', label: '承認待ち' },
+            { value: 'rejected', label: '認めなかった' },
+            { value: 'approved', label: '認めた' },
+            { value: 'flagged', label: '確認したほうがよい' },
+          ]}
+          onChange={(value) => {
+            if (value === 'flagged') {
+              setStatus('pending')
+              setFlaggedOnly(true)
+            } else {
+              setStatus(value as ApprovalStatus)
+              setFlaggedOnly(false)
+            }
+            setPage(1)
+            clearSelections()
+          }}
+        />
+        <Select
+          aria-label="表示件数"
+          value={String(pageSize)}
+          options={[20, 50, 100].map((n) => ({ value: String(n), label: `${n}件表示` }))}
+          onChange={(value) => { setPageSize(Number(value)); setPage(1); clearSelections() }}
+          size="page-size"
+        />
       </div>
 
       {listState === 'error' ? (
@@ -502,14 +482,14 @@ export default function ApprovalsTabV8({
           description="アフィリエイターの紹介リンクから成果が出ると、ここに認める・認めないを決める行が並びます。"
         />
       ) : listState === 'zero' ? (
-        <ZeroResultState onReset={() => { setQuery(''); setFlaggedOnly(false); setStatus('pending'); setAffiliateFilter(null); setAccountFilter(APPROVAL_FILTER_ALL); setPage(1); clearSelections() }} />
+        <ZeroResultState onReset={() => { setQuery(''); setFlaggedOnly(false); setStatus('pending'); setAffiliateFilter(null); setPage(1); clearSelections() }} />
       ) : (
-        <div className={styles.tableWrap}>
-          <div className={styles.tableScroll}>
-            <table className={styles.table}>
+        <div className="af-list-tableWrap">
+          <div className="af-list-tableScroll">
+            <table className="af-list-table">
               <thead>
                 <tr>
-                  <th className={styles.cellCheck}>
+                  <th className="af-list-cellCheck">
                     {status === 'pending' ? (
                       <Checkbox
                         aria-label="このページの確認不要な成果をすべて選ぶ"
@@ -532,9 +512,9 @@ export default function ApprovalsTabV8({
                   <th>紹介した人</th>
                   <th>アカウント</th>
                   <th>案件と成果地点</th>
-                  <th className={styles.numRight}>報酬</th>
-                  <th className={styles.numCenter}>確認</th>
-                  <th className={styles.numRight}>操作</th>
+                  <th className="af-list-numRight">報酬</th>
+                  <th className="af-list-numCenter">確認</th>
+                  <th className="af-list-numRight">決める</th>
                 </tr>
               </thead>
               <tbody>
@@ -543,7 +523,7 @@ export default function ApprovalsTabV8({
                   const needsReview = reviewReasons.length > 0
                   return (
                     <tr key={item.eventId} style={needsReview ? { background: 'var(--color-status-warn-soft)' } : undefined}>
-                      <td className={styles.cellCheck}>
+                      <td className="af-list-cellCheck">
                         {status === 'pending' ? (
                           <Checkbox
                             aria-label={`${personNameText(item.friendName)}の成果を選ぶ`}
@@ -562,32 +542,32 @@ export default function ApprovalsTabV8({
                         ) : null}
                       </td>
                       <td>
-                        <span className={styles.cellMain} style={{ fontWeight: 600 }}>{personNameText(item.friendName)}</span>
-                        <span className={styles.cellSub}>{formatDateTime(item.createdAt)} に成果</span>
+                        <span className="af-list-cellMain" style={{ fontWeight: 600 }}>{personNameText(item.friendName)}</span>
+                        <span className="af-list-cellSub">{formatDateTime(item.createdAt)} に成果</span>
                       </td>
-                      <td><span className={styles.cellMain}>{item.affiliateName ?? '名前を読み込めませんでした'}</span></td>
-                      <td><span className={styles.cellMain} style={{ color: 'var(--color-ink-secondary)' }}>{item.lineAccountName ?? 'アカウント未設定'}</span></td>
+                      <td><span className="af-list-cellMain">{item.affiliateName ?? '名前を読み込めませんでした'}</span></td>
+                      <td><span className="af-list-cellMain" style={{ color: 'var(--color-ink-secondary)' }}>{item.lineAccountName ?? 'アカウント未設定'}</span></td>
                       <td>
-                        <span className={styles.cellMain}>{item.offerName ?? '未設定'}</span>
-                        <span className={styles.cellSub}>{item.conversionPointName ?? '成果地点は未設定'}</span>
-                        <span className={styles.cellSub}>成果額 {formatYenNullable(item.value)}</span>
+                        <span className="af-list-cellMain">{item.offerName ?? '未設定'}</span>
+                        <span className="af-list-cellSub">{item.conversionPointName ?? '成果地点は未設定'}</span>
+                        <span className="af-list-cellSub">成果額 {formatYenNullable(item.value)}</span>
                       </td>
-                      <td className={styles.numRight}>
+                      <td className="af-list-numRight">
                         <strong>{item.rewardAmount != null ? formatYenNullable(item.rewardAmount) : '未確定'}</strong>
                       </td>
-                      <td className={styles.numCenter}>
+                      <td className="af-list-numCenter">
                         {needsReview ? (
-                          <span className={`${styles.statusBadge} ${styles.statusWarn}`} title={reviewReasons.join('・')}>
-                            <span className={styles.statusDot} aria-hidden="true" />要確認
+                          <span className={`af-list-statusBadge af-list-statusWarn`} title={reviewReasons.join('・')}>
+                            <span className="af-list-statusDot" aria-hidden="true" />要確認
                           </span>
                         ) : (
-                          <span className={`${styles.statusBadge} ${styles.statusOk}`}>
-                            <span className={styles.statusDot} aria-hidden="true" />問題なし
+                          <span className={`af-list-statusBadge af-list-statusOk`}>
+                            <span className="af-list-statusDot" aria-hidden="true" />問題なし
                           </span>
                         )}
                       </td>
                       <td>
-                        <div className={styles.rowActions}>
+                        <div className="af-list-rowActions">
                           {status === 'pending' ? (
                             <>
                               <Button
@@ -636,7 +616,7 @@ export default function ApprovalsTabV8({
 
       {listState === 'ready' ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 24px 0' }}>
-          <p className={styles.footNote} style={{ padding: 0 }}>
+          <p className="af-list-footNote" style={{ padding: 0 }}>
             {formatNumber(shownItems.length)}件 / 全 {formatNumber(counts[status])}件
             {truncatedStatuses.includes(status) ? '（まだ続きがあります）' : ''}
           </p>
@@ -654,16 +634,16 @@ export default function ApprovalsTabV8({
         </NoticeBar>
       ) : null}
 
-      <p className={styles.footNote}>
+      <p className="af-list-footNote">
         却下理由の記録は未接続です。却下状態はまとめて保存できます。行を選ぶと、下にまとめて操作の帯が出ます。
       </p>
 
       {/* まとめて操作の浮き帯（板 `OylSV`：「②件を選択中　☰操作を選ぶ」） */}
       {canEdit && selected.size > 0 ? (
-        <div className={styles.bulkBar} role="region" aria-label="選択中のまとめ操作">
-          <span className={styles.bulkCount}>{formatNumber(selected.size)}</span>
-          <span className={styles.bulkHint}>件を選択中　対象を確認してから操作を選んでください</span>
-          <span className={styles.bulkActions}>
+        <div className="af-list-bulkBar" role="region" aria-label="選択中のまとめ操作">
+          <span className="af-list-bulkCount">{formatNumber(selected.size)}</span>
+          <span className="af-list-bulkHint">件を選択中　対象を確認してから操作を選んでください</span>
+          <span className="af-list-bulkActions">
             <Button type="button" onClick={openBulkWizard}>
               ☰ 操作を選ぶ
             </Button>
@@ -762,7 +742,7 @@ export default function ApprovalsTabV8({
       ) : null}
 
       {bulkResult ? (
-        <div className={styles.notice} role="status" aria-label="まとめて処理の結果" style={{ margin: '12px 24px 0', alignItems: 'flex-start' }}>
+        <div className="af-list-notice" role="status" aria-label="まとめて処理の結果" style={{ margin: '12px 24px 0', alignItems: 'flex-start' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <strong style={{ color: 'var(--color-ink)' }}>まとめて処理の結果</strong>
             <p style={{ margin: '4px 0 0', fontSize: 13 }}>

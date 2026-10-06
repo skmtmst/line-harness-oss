@@ -15,6 +15,7 @@ export interface PhotoRewardPolicyRow {
   version_number: number;
   policy_key: string;
   points: number;
+  publication_points: number;
   summary: string;
   /** 使い始めの日時。空は「公開と同時」。 */
   effective_from: string | null;
@@ -74,6 +75,7 @@ export async function listPhotoRewardPolicies(
     ...row,
     version_number: Number(row.version_number),
     points: Number(row.points),
+    publication_points: Number(row.publication_points ?? 0),
   }));
   const now = jstNow();
   let currentFound = false;
@@ -190,6 +192,7 @@ export async function createPhotoRewardPolicy(
   db: D1Database,
   input: {
     points: number;
+    publicationPoints?: number;
     summary?: string;
     effectiveFrom?: string | null;
     expectedVersion?: number;
@@ -201,6 +204,25 @@ export async function createPhotoRewardPolicy(
     throw new Error('PHOTO_REWARD_POLICY_POINTS_INVALID');
   }
   await ensureLegacyPhotoRewardPolicy(db);
+  // 同じ確認キーの再送は、版が進んでいても保存済みの結果を返す。
+  const replay = await db.prepare('SELECT * FROM photo_reward_policies WHERE idempotency_key = ?')
+    .bind(input.idempotencyKey).first<PhotoRewardPolicyRow>();
+  // V7など掲載点数を送らない呼び出しは、最新の設定を保つ。
+  const previousPoints = input.publicationPoints === undefined && !replay
+    ? await db.prepare('SELECT publication_points FROM photo_reward_policies ORDER BY version_number DESC LIMIT 1').first<{publication_points: number}>()
+    : null;
+  const publicationPoints = input.publicationPoints ?? Number(replay?.publication_points ?? previousPoints?.publication_points ?? 0);
+  if (!Number.isInteger(publicationPoints) || publicationPoints < 0 || publicationPoints > 100000) {
+    throw new Error('PHOTO_REWARD_POLICY_PUBLICATION_POINTS_INVALID');
+  }
+  if (replay) {
+    if (Number(replay.points) !== input.points || Number(replay.publication_points) !== publicationPoints
+      || replay.summary !== String(input.summary ?? '').trim().slice(0, 200)
+      || replay.effective_from !== (input.effectiveFrom || null)) {
+      throw new Error('PHOTO_REWARD_POLICY_IDEMPOTENCY_CONFLICT');
+    }
+    return { created: false, version: replay };
+  }
   // 同時保存は版確認で落とす。負けた側は開き直して確認する。
   if (input.expectedVersion !== undefined) {
     const current = await db
@@ -210,20 +232,6 @@ export async function createPhotoRewardPolicy(
       throw new Error('PHOTO_REWARD_POLICY_VERSION_CONFLICT');
     }
   }
-  const existing = await db
-    .prepare(`SELECT * FROM photo_reward_policies WHERE idempotency_key = ?`)
-    .bind(input.idempotencyKey)
-    .first<PhotoRewardPolicyRow>();
-  if (existing) {
-    return {
-      created: false,
-      version: {
-        ...existing,
-        version_number: Number(existing.version_number),
-        points: Number(existing.points),
-      },
-    };
-  }
   const maxRow = await db
     .prepare(`SELECT MAX(version_number) AS max_version FROM photo_reward_policies`)
     .first<{ max_version: number | null }>();
@@ -231,27 +239,35 @@ export async function createPhotoRewardPolicy(
   const now = jstNow();
   const id = crypto.randomUUID();
   try {
-    await db
+    const inserted = await db
       .prepare(
         `INSERT INTO photo_reward_policies
-          (id, version_number, policy_key, points, summary,
+          (id, version_number, policy_key, points, publication_points, summary,
            effective_from, created_by_staff_id, idempotency_key, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+          WHERE (SELECT MAX(version_number) FROM photo_reward_policies) = ?`,
       )
       .bind(
-        id, versionNumber, photoPolicyKeyForVersion(versionNumber), input.points,
+        id, versionNumber, photoPolicyKeyForVersion(versionNumber), input.points, publicationPoints,
         String(input.summary ?? '').trim().slice(0, 200),
         input.effectiveFrom || null, input.staffId ?? null, input.idempotencyKey, now,
+        input.expectedVersion ?? versionNumber-1,
       )
       .run();
+    if (Number(inserted.meta?.changes ?? 0) !== 1) throw new Error('PHOTO_REWARD_POLICY_VERSION_CONFLICT');
   } catch (error) {
     // 同時保存の勝ち負け。負けた側は保存済みの版を読む。
-    if (String(error).includes('UNIQUE constraint failed')) {
+    if (String(error).includes('UNIQUE constraint failed') || String(error).includes('PHOTO_REWARD_POLICY_VERSION_CONFLICT')) {
       const saved = await db
         .prepare(`SELECT * FROM photo_reward_policies WHERE idempotency_key = ?`)
         .bind(input.idempotencyKey)
         .first<PhotoRewardPolicyRow>();
       if (saved) {
+        if (Number(saved.points) !== input.points || Number(saved.publication_points) !== publicationPoints
+          || saved.summary !== String(input.summary ?? '').trim().slice(0, 200)
+          || saved.effective_from !== (input.effectiveFrom || null)) {
+          throw new Error('PHOTO_REWARD_POLICY_IDEMPOTENCY_CONFLICT');
+        }
         return {
           created: false,
           version: {
@@ -262,6 +278,7 @@ export async function createPhotoRewardPolicy(
         };
       }
     }
+    if (String(error).includes('UNIQUE constraint failed')) throw new Error('PHOTO_REWARD_POLICY_VERSION_CONFLICT');
     throw error;
   }
   const created = await getPhotoRewardPolicy(db, versionNumber);
@@ -282,6 +299,7 @@ export async function revertPhotoRewardPolicyToVersion(
   if (!version) throw new Error('PHOTO_REWARD_POLICY_VERSION_NOT_FOUND');
   return createPhotoRewardPolicy(db, {
     points: version.points,
+    publicationPoints: version.publication_points,
     summary: version.summary,
     effectiveFrom: null,
     idempotencyKey: input.idempotencyKey,

@@ -27,7 +27,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      entryRoutes: { ...actual.api.entryRoutes, create: api.create },
+      entryRoutes: { ...actual.api.entryRoutes, create: api.create, list: async () => ({ success: true, data: [] }) },
       tags: { ...actual.api.tags, list: api.tagsList },
       scenarios: { ...actual.api.scenarios, list: api.scenariosList },
       pools: { ...actual.api.pools, list: api.poolsList },

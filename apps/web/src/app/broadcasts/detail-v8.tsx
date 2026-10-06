@@ -12,7 +12,8 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, Copy, Download, MoreHorizontal, RefreshCw, Trash2 } from 'lucide-react'
+import { Check, Copy, Download, MoreHorizontal, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { notifyToast } from '@/components/shared/toast'
 import {
   api,
   type ApiBroadcast,
@@ -150,6 +151,7 @@ export default function BroadcastDetailV8({
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState('')
+  const [testing, setTesting] = useState(false)
 
   const editHref = `/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`
   const duplicateHref = `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`
@@ -170,6 +172,21 @@ export default function BroadcastDetailV8({
       setDeleteError('この配信を削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  /* テストを送る（`Q28Gb`：下書きの頭出し）。下書きの口がそのまま受け付ける。 */
+  const sendTest = async () => {
+    if (testing) return
+    setTesting(true)
+    try {
+      const res = await api.broadcasts.testSend(broadcast.id)
+      if (!res.success) throw new Error(res.error)
+      notifyToast(`テスト送信が完了しました（成功 ${res.sent ?? 0}件・失敗 ${res.failed ?? 0}件）。`)
+    } catch {
+      notifyToast('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。', { tone: 'error' })
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -273,6 +290,19 @@ export default function BroadcastDetailV8({
             </Button>
           )}
           {isDraft && (
+            <Button
+              size="field"
+              onClick={() => void sendTest()}
+              disabled={!canEdit || testing}
+              busy={testing}
+              busyLabel="テスト送信中…"
+              title={canEdit ? undefined : readonlyReason}
+            >
+              <Send size={14} aria-hidden="true" />
+              テストを送る
+            </Button>
+          )}
+          {isDraft && (
             <Button size="field" variant="primary" onClick={() => router.push(`${editHref}&step=${resumeStep.key}`)} disabled={!canEdit}>
               {resumeStep.order} {resumeStep.label}から続ける
             </Button>
@@ -361,9 +391,9 @@ export default function BroadcastDetailV8({
                   approval.state == null
                     ? (approval.requesterName ? '—' : '要らない')
                     : approval.state.approval.status === 'pending'
-                      ? `${approval.approverName ?? '担当者'}さんの承認待ち`
+                      ? `${approval.approverName ?? 'スタッフ'}さんの承認待ち`
                       : approval.state.approval.status === 'approved'
-                        ? `${approval.approverName ?? '担当者'}（承認済み）`
+                        ? `${approval.approverName ?? 'スタッフ'}（承認済み）`
                         : '要らない'
                 }
               />
@@ -408,9 +438,14 @@ export default function BroadcastDetailV8({
       />
       <ConfirmDialog
         open={cancelOpen}
+        designNode="BeNtj"
         title={`「${broadcast.title}」の予約を取り消しますか？`}
-        description="予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。送信が始まったあとは取り消せません。"
+        description={broadcast.scheduledAt
+          ? `${formatBroadcastDateTime(broadcast.scheduledAt)}に送る予定の${formatNumber(broadcast.totalCount)}人に送らなくなります。取り消すと下書きに戻り、もう一度予約できます。承認はやり直しになります。`
+          : '予約が取り消され、この配信は送られなくなります。書いた内容は下書きとして残るので、作り直しにはなりません。送信が始まったあとは取り消せません。'}
         confirmLabel="予約を取り消す"
+        cancelLabel="予約のまま残す"
+        primaryAction="cancel"
         destructive
         busy={cancelling}
         error={cancelError || undefined}

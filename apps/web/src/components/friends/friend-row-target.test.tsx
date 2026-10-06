@@ -7,7 +7,7 @@ import type { FriendListColumn } from './friend-list-table'
 
 /*
  * 行を押した先は友だちの詳細（/friends/detail?id=…）。
- * 受信箱へは最新メッセージの列の明示のリンクからのみ行く。
+ * 受信箱へは行の「…」のトーク項目から行く。
  * チェックボックス・★では移動しない。実際に押して確かめる。
  */
 
@@ -60,6 +60,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   pushes.length = 0
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -71,11 +72,13 @@ afterEach(() => {
   host.remove()
 })
 
-function render(friend: FriendListItem = BASE) {
+function render(friend: FriendListItem = BASE, canEdit = false, onAction = vi.fn()) {
   act(() => {
     root.render(
       <FriendListRow
         friend={friend}
+        canEdit={canEdit}
+        onAction={onAction}
         visibleColumns={COLUMNS}
         onToggleSelect={() => {}}
         onToggleAttention={() => {}}
@@ -107,21 +110,57 @@ describe('友だち行の行き先', () => {
     expect(pushes).toEqual(['/friends/detail?id=friend-1'])
   })
 
-  it('最新メッセージの列のリンクは受信箱を指す', () => {
-    render()
-    const inbox = host.querySelector('a[aria-label="Kenta Kawano(Obama)さんの会話を受信箱で開く"]')
-    expect(inbox).not.toBeNull()
-    expect(inbox?.getAttribute('href')).toBe('/chats?friend=friend-1')
+  function openMenu(): HTMLElement {
+    const trigger = host.querySelector('button[aria-label="Kenta Kawano(Obama)のその他操作"]')
+    if (!trigger) throw new Error('操作メニューが見つかりません')
+    act(() => trigger.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    const menu = document.body.querySelector<HTMLElement>('[role="menu"]')
+    if (!menu) throw new Error('メニューが開きませんでした')
+    return menu
+  }
+
+  it('メッセージの無い友だちでもトークの行き先を開ける', () => {
+    render({ ...BASE, latestIncomingMessage: null })
+    const menu = openMenu()
+    expect(pushes).toEqual([])
+    const inbox = [...menu.querySelectorAll('button')].find((button) => button.textContent?.includes('トークを開く'))
+    if (!inbox) throw new Error('トーク項目が見つかりません')
+    act(() => inbox.click())
+    expect(pushes).toEqual(['/chats?friend=friend-1'])
   })
 
-  it('受信箱のリンクを押しても行の移動は起きない', () => {
+  it('メニューの項目で移動するときに行の詳細移動を重ねない', () => {
     render()
-    const inbox = host.querySelector('a[aria-label="Kenta Kawano(Obama)さんの会話を受信箱で開く"]')
-    if (!inbox) throw new Error('受信箱リンクが見つかりません')
-    act(() => {
-      inbox.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-    })
+    const menu = openMenu()
+    const detail = [...menu.querySelectorAll('button')].find((button) => button.textContent?.includes('友だちの詳細を見る'))
+    if (!detail) throw new Error('詳細項目が見つかりません')
+    act(() => detail.click())
+    expect(pushes).toEqual(['/friends/detail?id=friend-1'])
+  })
+
+  it('編集項目を選ぶと対象の操作だけを開き、行の移動は起こさない', () => {
+    const onAction = vi.fn()
+    render(BASE, true, onAction)
+    const menu = openMenu()
+    const edit = [...menu.querySelectorAll('button')].find((button) => button.textContent === '担当者を変える')
+    if (!edit) throw new Error('担当者の編集項目がありません')
+    act(() => edit.click())
+    expect(onAction).toHaveBeenCalledWith('operator')
     expect(pushes).toEqual([])
+  })
+
+  it('閲覧のみは変更項目を押せず、トークと詳細へは移動できる', () => {
+    const onAction = vi.fn()
+    render(BASE, false, onAction)
+    const menu = openMenu()
+    const buttons = [...menu.querySelectorAll('button')]
+    expect(buttons.find((button) => button.textContent === 'トークを開く')?.disabled).toBe(false)
+    expect(buttons.find((button) => button.textContent === '友だちの詳細を見る')?.disabled).toBe(false)
+    const changes = buttons.filter((button) => !['トークを開く', '友だちの詳細を見る'].includes(button.textContent ?? ''))
+    expect(changes.length).toBe(8)
+    expect(changes.every((button) => button.disabled)).toBe(true)
+    expect(menu.textContent).toContain('閲覧のみでは変更できません')
+    expect(onAction).not.toHaveBeenCalled()
   })
 
   it('チェックボックスを押しても移動しない', () => {
@@ -140,4 +179,14 @@ describe('友だち行の行き先', () => {
     expect(name).not.toBeNull()
     expect(name?.className).toContain('truncate')
   })
+})
+
+it('省略したタグの件数から、隠れたすべてのタグ名を確認できる', () => {
+  render({ ...BASE, tags: [
+    { id: 'tag-1', name: '表示するタグ' },
+    { id: 'tag-2', name: '省略したタグ1' },
+    { id: 'tag-3', name: '省略したタグ2' },
+  ] })
+  const count = [...host.querySelectorAll('span')].find((span) => span.textContent === '+2')!
+  expect(count.title).toBe('省略したタグ1・省略したタグ2')
 })

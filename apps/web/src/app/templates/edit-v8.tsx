@@ -20,6 +20,7 @@ import { api, ApiError } from '@/lib/api'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import SegmentedControl from '@/components/shared/segmented'
+import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import LinePreview from '@/components/shared/line-preview'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -38,6 +39,7 @@ import {
   type TemplateReferenceState,
 } from '@/components/templates/message-template-editor'
 import EditorV8, { EditorCard } from './editor-v8'
+import { describeTemplateDiff, type TemplateDraftSide } from './edit/template-conflict-diff'
 import styles from './editor-v8.module.css'
 import { isTemplateDetailData } from './template-detail-data'
 import {
@@ -104,6 +106,12 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
   /** 「保存して公開」の使用先確認窓。null の間は閉じている。 */
   const [publishCheck, setPublishCheck] = useState<{ id: string; entries: { key: string; href: string | null; label: string }[] } | null>(null)
   const [publishError, setPublishError] = useState('')
+  // 編集の競合（`NCbYn`：公開の409）。入力は捨てず、比べる・読み込むを選んでもらう。
+  const [publishConflict, setPublishConflict] = useState(false)
+  const [compareTarget, setCompareTarget] = useState<TemplateDraftSide | null>(null)
+  const [compareBusy, setCompareBusy] = useState(false)
+  const [compareError, setCompareError] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
 
   /* v7 と同じく、URL の id が変わった瞬間に前の中身を描画中に捨てる。 */
   let editor = editorState
@@ -211,7 +219,7 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
       })
       .catch(() => accept((prev) => ({ ...prev, status: 'failed' })))
     return () => { templateGeneration.current += 1 }
-  }, [id])
+  }, [id, reloadKey])
 
   /* 本文への差し込み（カーソル位置へ入れる）。v7 のエディタと同じ動き。 */
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
@@ -305,17 +313,52 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
       }
     } catch (caught) {
       /*
-       * 409 = 他の人が先に更新した。状態を読み直してからやり直してもらう
-       * （一覧の詳細パネルと同じ扱い）。
+       * 409 = 他の人が先に更新した。`NCbYn` の帯を出して、比べるか
+       * 最新の読み込みかを選んでもらう（一覧の詳細パネルと同じ扱い）。
        */
       if (caught instanceof ApiError && caught.status === 409) {
-        setPublishError('他の人が先に更新したため、公開を止めました。画面を読み直して、もう一度お試しください。')
+        setPublishConflict(true)
+        setPublishError('他の人が先に更新したため、公開を止めました。比べるか、最新を読み込んでから続けてください。')
       } else {
         setPublishError('公開できませんでした。もう一度お試しください。')
       }
       return false
     }
     return true
+  }
+
+  // `NCbYn`「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
+  const reloadAfterConflict = () => {
+    setPublishConflict(false)
+    setCompareTarget(null)
+    setCompareError('')
+    setPublishError('')
+    setReloadKey((key) => key + 1)
+  }
+
+  // `NCbYn`「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
+  const openCompare = async () => {
+    if (!id || compareBusy) return
+    setCompareBusy(true)
+    setCompareError('')
+    try {
+      const detail = await api.templates.get(id)
+      if (!detail.success || !isTemplateDetailData(detail.data)) {
+        setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+        return
+      }
+      setCompareTarget({
+        name: detail.data.name,
+        category: detail.data.category ?? '',
+        folderId: detail.data.folderId ?? null,
+        messageType: detail.data.messageType,
+        messageContent: detail.data.messageContent,
+      })
+    } catch {
+      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
+    } finally {
+      setCompareBusy(false)
+    }
   }
 
   const onSaveDraft = async () => {
@@ -366,8 +409,26 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
         saveBlockedReason={loadFailed ? '読み込めませんでした。開き直してください。' : saveGuard}
         status={publishedVersion >= 1 ? `版${publishedVersion}が使われています` : '下書き（まだ誰にも送られません）'}
         onSaveDraft={() => void onSaveDraft()}
-        onPublish={() => void onPublish()}
-        error={error || publishError || undefined}
+        onPublish={publishConflict ? () => void openCompare() : () => void onPublish()}
+        publishLabel={publishConflict ? '比べてから保存' : undefined}
+        error={publishConflict ? (
+          <div className="border-accent bg-accent-soft rounded-card flex flex-wrap items-center gap-3 border p-4" data-design-node="NCbYn" role="alert">
+            <p className="text-ink min-w-0 flex-1 text-sm">
+              ほかの人が先に更新しました。
+              <span className="text-ink-secondary mt-0.5 block text-xs">
+                あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。
+              </span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
+                {compareBusy ? '比べています...' : '違いを比べる'}
+              </Button>
+              <Button type="button" variant="primary" onClick={() => reloadAfterConflict()}>
+                最新を読み込んで続ける
+              </Button>
+            </div>
+          </div>
+        ) : (error || publishError || undefined)}
         guide={(
           <>
             <section className={styles.card}>
@@ -382,8 +443,10 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
           </>
         )}
         preview={(
-          <LinePreview
-            note={messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
+          <>
+            <h2 className={styles.previewTitle}>届き方</h2>
+            <LinePreview
+              note={messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
             accountName={accountName(editorAccountId) ?? undefined}
             caption="配信日 10:00"
           >
@@ -400,7 +463,8 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
             ) : (
               <TemplatePreviewMessage preview={preview} />
             )}
-          </LinePreview>
+            </LinePreview>
+          </>
         )}
       >
         {loading ? (
@@ -511,6 +575,37 @@ function MessageEditorV8({ id, visual }: { id: string | null; visual: boolean })
           </>
         )}
       </EditorV8>
+
+      <ConfirmDialog
+        open={compareTarget !== null || compareError !== ''}
+        title="最新の保存と比べる"
+        description="あなたの下書きと、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
+        confirmLabel="最新を読み込んで続ける"
+        busy={compareBusy}
+        error={compareError || undefined}
+        onConfirm={() => reloadAfterConflict()}
+        onCancel={() => {
+          setCompareTarget(null)
+          setCompareError('')
+        }}
+      >
+        {compareTarget && (() => {
+          const mine: TemplateDraftSide = { name, category, folderId, messageType, messageContent }
+          const lines = describeTemplateDiff(mine, compareTarget)
+          return lines.length === 0 ? (
+            <p className="text-ink-secondary mt-3 text-sm">違いは見つかりませんでした。そのまま読み込めます。</p>
+          ) : (
+            <ul className="mt-3 space-y-1.5 text-sm">
+              {lines.map((line, index) => (
+                <li key={index} className="flex items-start gap-2">
+                  <span aria-hidden className="text-accent-deep font-bold">・</span>
+                  <span className="text-ink">{line}</span>
+                </li>
+              ))}
+            </ul>
+          )
+        })()}
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={publishCheck !== null}

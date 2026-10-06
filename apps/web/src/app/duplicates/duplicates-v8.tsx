@@ -267,7 +267,12 @@ export default function DuplicatesV8() {
                         </Button>
                       </>
                     ) : (
-                      <p className={styles.stateDesc}>同じ人の疑いが見つかると、ここに並びます。</p>
+                      <>
+                        <p className={styles.stateDesc}>同じ人が別の友だちとして登録されていそうなときに、ここに出ます。</p>
+                        <Button type="button" variant="secondary" onClick={() => void d.loadCandidates()}>
+                          もう一度見直す
+                        </Button>
+                      </>
                     )}
                   </div>
                 </td>

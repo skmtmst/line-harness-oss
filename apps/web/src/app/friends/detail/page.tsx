@@ -13,6 +13,7 @@ import {
   describeSaveFailure,
   fetchApi,
   type FriendDetail,
+  type FriendUpcoming,
   type FriendFormSubmission,
   type MileageConnectedAccount,
   type MileageSelfInsights,
@@ -24,7 +25,6 @@ import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { loadOperators } from '@/lib/operators-cache'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import TagBadge from '@/components/friends/tag-badge'
-import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
@@ -33,9 +33,12 @@ import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import KpiCard from '@/components/shared/kpi-card'
+import kpiStyles from '@/components/shared/kpi-card.module.css'
+import styles from './friend-detail-v8.module.css'
 import { loadFailureKind } from './load-failure-kind'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
  * 友だち詳細。
@@ -423,14 +426,14 @@ function SectionHead({
 function SupportMarkBadge({ status }: { status?: 'unread' | 'in_progress' | 'on_hold' | 'resolved' }) {
   if (!status) return <span className="text-ink-faint text-xs">やり取りなし</span>
   const map = {
-    unread: { label: '未対応', className: 'bg-warning-bg text-warning' },
-    in_progress: { label: '対応中', className: 'bg-info-bg text-info' },
+    unread: { label: '未対応', className: 'bg-status-danger-soft text-danger' },
+    in_progress: { label: '対応中', className: 'bg-status-warn-soft text-status-warn-deep' },
     on_hold: { label: '保留', className: 'bg-action-soft text-action' },
     resolved: { label: '対応済み', className: 'bg-success-bg text-success' },
   } as const
   const s = map[status]
   return (
-    <span className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${s.className}`}>
+    <span className={`rounded-pill px-2 py-0.5 text-micro font-medium ${s.className}`}>
       {s.label}
     </span>
   )
@@ -438,15 +441,33 @@ function SupportMarkBadge({ status }: { status?: 'unread' | 'in_progress' | 'on_
 
 function FriendDetailInner() {
   usePageTitle('友だち詳細')
-  // ★V8 `Q5F2QE`：情報欄タブだけ2列・板ID。v7 はそのまま。
-  const adminTheme = useAdminTheme()
-  const v8 = adminTheme === 'v8'
   const params = useSearchParams()
   const friendId = params.get('id') ?? ''
   const rawTab = params.get('tab')
   // 既定はタイムライン。設計でも最初に開くのはやり取り。
   const tab: TabKey = (TABS.find((t) => t.key === rawTab)?.key ?? 'timeline') as TabKey
+  // ★V8 `Q5F2QE`：概要・履歴・回答フォームのタブに板ID。v7 はそのまま。
+  // （情報欄タブは #1236 の分。合流したら1枚になる）
+  const adminTheme = useAdminTheme()
+  const v8 = adminTheme === 'v8'
 
+  const [upcoming, setUpcoming] = useState<FriendUpcoming | null>(null)
+  const [upcomingFailed, setUpcomingFailed] = useState(false)
+  const [upcomingLoading, setUpcomingLoading] = useState(true)
+  const [upcomingRetry, setUpcomingRetry] = useState(0)
+  useEffect(() => {
+    let active = true
+    setUpcoming(null)
+    setUpcomingFailed(false)
+    setUpcomingLoading(true)
+    if (!friendId) { setUpcomingLoading(false); return }
+    Promise.resolve().then(() => api.friends.upcoming(friendId)).then((res) => {
+      if (!active) return
+      if (res.success) setUpcoming(res.data)
+      else setUpcomingFailed(true)
+    }).catch(() => { if (active) setUpcomingFailed(true) }).finally(() => { if (active) setUpcomingLoading(false) })
+    return () => { active = false }
+  }, [friendId, upcomingRetry])
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [fields, setFields] = useState<FriendField[]>([])
   const [hiddenPersonalCount, setHiddenPersonalCount] = useState(0)
@@ -539,8 +560,6 @@ function FriendDetailInner() {
   */
   const [canSaveFields] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin() || canEditFeature('attribute.personal_info.edit'))
   const [canManageFieldDefs] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin())
-  /* 前払いのみの印を外せるのは店の管理者だけ（口も owner/admin だけ）。 */
-  const [canClearPrepay] = useState(() => typeof window === 'undefined' ? true : isOwnerOrAdmin())
   // staff は個人情報の項目だけ書ける。それ以外はサーバも受けない。
   const canEditField = (field: FriendField) =>
     canManageFieldDefs || (field.isPersonal && canSaveFields)
@@ -1314,19 +1333,17 @@ function FriendDetailInner() {
   }
 
   return (
-    <div data-friends-detail-design="v4" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav className="text-ink-faint text-xs" data-design="Crumb">
-          <Link href="/friends" className="hover:underline">
-            友だち
-          </Link>
-          <span className="mx-1.5">/</span>
-          <span>{friend?.displayName ?? '詳細'}</span>
-        </nav>
+    <div data-friends-detail-design="v8" data-design-node="Q5F2QE" className={styles.board}>
+      <div className={styles.head}>
+        <div className={styles.identity}>
+          <Link href="/friends" aria-label="友だち一覧へ戻る"><Avatar name={friend?.displayName} src={friend?.pictureUrl} size={56} /></Link>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2"><h2 className={styles.name} title={friend?.displayName}>{friend?.displayName ?? '友だち詳細'}</h2><SupportMarkBadge status={friend?.support?.status} /></div>
+            <p className={styles.subtitle}>LINE 表示名：{friend?.displayName ?? '—'}・{friend?.createdAt ? `${formatDay(friend.createdAt)}に友だち追加` : '—'}・担当 {friend?.support?.operatorName ?? '未割り当て'}</p>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
-          <Button href={inboxHrefForFriend(friendId)} variant="primary">
-            受信箱で開く
-          </Button>
+
           {/*
             NEXT-08: 押しても何も起きないボタンを共通メニューへ接続する。
             「個別操作」はこの友だちへの操作、「…」は関連する画面への移動。
@@ -1370,6 +1387,9 @@ function FriendDetailInner() {
               onClose={() => setMoreMenuOpen(false)}
             />
           </span>
+          <Button href={inboxHrefForFriend(friendId)} variant="primary">
+            受信箱で開く
+          </Button>
         </div>
       </div>
 
@@ -1377,6 +1397,35 @@ function FriendDetailInner() {
       {error && friend && (
         <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
+
+            <div className="relative">
+              <div ref={tabsRowRef} className={styles.tabs}>
+                {visibleTabs.map((t) => (
+                  <Link
+                    key={t.key}
+                    href={`/friends/detail?id=${friendId}&tab=${t.key}${
+                      group === BASIC_GROUP ? '' : `&group=${group}`
+                    }`}
+                    aria-current={tab === t.key ? 'page' : undefined}
+                    className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                      tab === t.key
+                        ? 'border-ink text-ink'
+                        : 'text-ink-secondary hover:text-ink border-transparent'
+                    }`}
+                  >
+                    {t.label}
+                  </Link>
+                ))}
+              </div>
+              {/* #773: はみ出し中だけ右端にフェードを出し、続きがあることを示す。 */}
+              {tabsOverflowing ? (
+                <div
+                  aria-hidden="true"
+                  data-tab-fade="right"
+                  className="from-canvas-sunken pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l to-transparent"
+                />
+              ) : null}
+            </div>
 
       {/*
         NEXT-11: 読み込み中・取得失敗は「本体」だけを見る。マイルなどの
@@ -1387,7 +1436,7 @@ function FriendDetailInner() {
           読み込み中...
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[23.5rem_1fr]">
+        <div className={tab === 'timeline' ? styles.overview : styles.fullWidth}>
           {/* 左：プロフィール（設計の並び：マイル → 対応 → 名前 → タグ →
               ★つき友だち情報 → リッチメニュー → 友だち情報 → フォーム回答） */}
           {/*
@@ -1396,80 +1445,23 @@ function FriendDetailInner() {
             「顧客情報をすべて表示」で展開する（直下にタブが来る）。
             固定高は任意値クラスを増やさないよう scoped style で掛ける。
           */}
-          <style>{`
-            @media (min-width: 1024px) {
-              [data-friend-profile-panel] { min-height: 1234px; }
-            }
-          `}</style>
-          <aside data-design="Left" data-friend-profile-panel className="bg-canvas rounded-card border-hairline overflow-hidden border">
-            <div className="border-hairline border-b px-5 py-3.5">
-              <div className="flex items-center justify-between"><h2 className="text-ink text-sm font-semibold">顧客情報</h2><Link href="/friends" aria-label="友だち一覧へ戻る" title="友だち一覧へ戻る" className="text-ink-faint text-lg">×</Link></div>
-            </div>
-
-            <div className="border-hairline flex flex-col items-center border-b px-5 py-5 text-center">
-              {/* ★V7 友だちの顔：名前が無い時は「?」ではなく人の印。 */}
-              <Avatar name={friend?.displayName} src={friend?.pictureUrl} size={56} />
-              <h2 className="text-ink mt-3 text-sm font-bold">{friend?.displayName ?? '名前未登録'}</h2>
-              <p className="text-ink-faint mt-1 text-xs">LINE表示名</p>
-              <div className="mt-3 flex flex-wrap justify-center gap-1.5"><SupportMarkBadge status={friend?.support?.status} /><span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-micro">{friend?.support?.operatorName ?? '未割り当て'}</span><span className="bg-accent-soft text-accent-deep rounded-pill px-2 py-0.5 text-micro">表示中</span></div>
-              {/* 同じ画面の「情報欄」タブへ移る。今いる画面と同じ名前・チェスの駒の記号は紛らわしかった（★V7）。 */}
-              <Button href={`/friends/detail?id=${friendId}&tab=info`} className="mt-3">情報欄を見る</Button>
-            </div>
-            {selectedAccountId && friendId ? (
-              <div className="border-hairline border-b px-5 py-3">
-                <PrepayBadgeV8 accountId={selectedAccountId} friendId={friendId} canEdit={canClearPrepay} />
+          <aside data-design="Left" data-friend-profile-panel className={styles.profile} hidden={tab !== 'timeline'}>
+            <div className={styles.profileSections}>
+              {/* ---- 名前 ---- */}
+              <div>
+                <SectionHead label="顧客情報" actionLabel="編集" href={inboxHrefForFriend(friendId)} />
+                <dl className="space-y-1 text-xs">
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-ink-faint">本名</dt>
+                    <dd className="text-ink-secondary truncate">{realName || '未登録'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-ink-faint">システム表示名</dt>
+                    <dd className="text-ink-secondary truncate">{friend?.displayName ?? '未登録'}</dd>
+                  </div>
+                </dl>
               </div>
-            ) : null}
 
-            {/* FRIEND-31: lg未満ではここから下（マイル以降の補助プロフィール）を畳む。 */}
-            <button
-              type="button"
-              onClick={() => setProfileExpanded((v) => !v)}
-              aria-expanded={profileExpanded}
-              className="text-action w-full px-5 py-2.5 text-center text-xs font-semibold hover:bg-canvas-sunken lg:hidden"
-            >
-              {profileExpanded ? '顧客情報を閉じる' : '顧客情報をすべて表示'}
-            </button>
-            <div className={profileExpanded ? '' : 'max-lg:hidden'}>
-
-            {/*
-              マイル。設計どおり、見出しの下に利用可能残高を1行で置く。
-              読み込みは独立しているため、遅くても他の表示を止めない。
-              取り損ねは「取得できませんでした」＋再試行で「—」と区別する。
-            */}
-            <div className="border-hairline border-b bg-canvas px-5 py-4">
-              <div className="flex items-center justify-between"><p className="text-ink text-xs font-medium">マイル</p><Link href="/mileage" className="text-action text-xs">詳細を見る →</Link></div>
-              <div className="bg-canvas-sunken mt-2 flex items-center justify-between rounded-control px-3 py-3">
-                <span className="text-ink-faint text-xs">
-                  利用可能
-                  {mileage && mileage.pending > 0
-                    ? ` ・ 確定待ち ${formatNumber(mileage.pending)}`
-                    : ''}
-                </span>
-                <strong className="text-ink text-base font-bold tabular-nums">
-                  {mileageStatus === 'loading'
-                    ? '…'
-                    : mileage
-                      ? formatNumber(mileage.available)
-                      : '—'}
-                  <span className="ml-1 text-xs font-semibold">mile</span>
-                </strong>
-              </div>
-              {mileageStatus === 'error' ? (
-                <p className="text-ink-faint mt-2 flex items-center justify-between gap-2 text-xs">
-                  マイルを取得できませんでした
-                  <button
-                    type="button"
-                    onClick={() => void loadMileage()}
-                    className="text-action shrink-0 hover:underline"
-                  >
-                    再試行
-                  </button>
-                </p>
-              ) : null}
-            </div>
-
-            <div className="space-y-4 p-5">
               {/* ---- 対応 ---- */}
               <div>
                 {/*
@@ -1564,28 +1556,7 @@ function FriendDetailInner() {
                 {supportError && !supportEditing ? (
                   <p className="text-danger mt-2 text-xs" role="alert">{supportError}</p>
                 ) : null}
-                <p className="text-ink-faint mt-2 mb-1 text-xs">個別メモ</p>
-                {/* 個別メモの書き換えは受信箱側が持っている。ここは読むだけ。 */}
-                <p className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-h-[3.5rem] border px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap">
-                  {friend?.support?.notes || 'メモはありません'}
-                </p>
               </div>
-
-              {/* ---- 名前 ---- */}
-              <div>
-                <SectionHead label="名前" actionLabel="編集" href={inboxHrefForFriend(friendId)} />
-                <dl className="space-y-1 text-xs">
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-ink-faint">本名</dt>
-                    <dd className="text-ink-secondary truncate">{realName || '未登録'}</dd>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-ink-faint">システム表示名</dt>
-                    <dd className="text-ink-secondary truncate">{friend?.displayName ?? '未登録'}</dd>
-                  </div>
-                </dl>
-              </div>
-
               {/* ---- タグ ---- */}
               {/* 設計では名前の下。以前はいちばん上にあり、名前より先に
                   タグが目に入っていた。 */}
@@ -1597,13 +1568,88 @@ function FriendDetailInner() {
                   ) : (
                     <span className="text-ink-faint text-xs">タグはありません</span>
                   )}
-                  <Button variant="secondary" className="text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] h-auto whitespace-normal" href={inboxHrefForFriend(friendId)}>
+                  <Button variant="secondary" className="text-ink-secondary rounded-pill px-2 py-0.5 text-micro h-auto whitespace-normal" href={inboxHrefForFriend(friendId)}>
                     ＋ 追加
                   </Button>
                 </div>
               </div>
 
-              {/* ---- ★つき友だち情報 ---- */}
+            {/*
+              マイル。設計どおり、見出しの下に利用可能残高を1行で置く。
+              読み込みは独立しているため、遅くても他の表示を止めない。
+              取り損ねは「取得できませんでした」＋再試行で「—」と区別する。
+            */}
+            <div className="border-hairline border-b bg-canvas px-5 py-4">
+              <div className="flex items-center justify-between"><p className="text-ink text-xs font-medium">マイル</p><Link href="/mileage" className="text-action text-xs">詳細を見る →</Link></div>
+              <div className="bg-canvas-sunken mt-2 flex items-center justify-between rounded-control px-3 py-3">
+                <span className="text-ink-faint text-xs">
+                  利用可能
+                  {mileage && mileage.pending > 0
+                    ? ` ・ 確定待ち ${formatNumber(mileage.pending)}`
+                    : ''}
+                </span>
+                <strong className="text-ink text-base font-bold tabular-nums">
+                  {mileageStatus === 'loading'
+                    ? '…'
+                    : mileage
+                      ? formatNumber(mileage.available)
+                      : '—'}
+                  <span className="ml-1 text-xs font-semibold">mile</span>
+                </strong>
+              </div>
+              {mileageStatus === 'error' ? (
+                <p className="text-ink-faint mt-2 flex items-center justify-between gap-2 text-xs">
+                  マイルを取得できませんでした
+                  <button
+                    type="button"
+                    onClick={() => void loadMileage()}
+                    className="text-action shrink-0 hover:underline"
+                  >
+                    再試行
+                  </button>
+                </p>
+              ) : null}
+            </div>
+
+              {/* ---- リッチメニュー ---- */}
+              <div>
+                <SectionHead label="リッチメニュー" actionLabel="変更" href="/rich-menus" />
+                <dl className="space-y-1 text-xs">
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-ink-faint">現在の設定</dt>
+                    <dd className="text-ink-secondary truncate text-right">
+                      {richMenuStatus === 'loading'
+                        ? '読み込み中…'
+                        : richMenuStatus === 'error'
+                          ? '取得できませんでした'
+                          : (richMenu?.name ?? '既定のメニュー')}
+                      {richMenuStatus === 'ready' && richMenu?.isDefault && (
+                        <span className="text-ink-faint ml-1">（全員に出しているもの）</span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+                {richMenuStatus === 'error' ? (
+                  <p className="text-ink-faint mt-1 text-right text-xs">
+                    <button
+                      type="button"
+                      onClick={() => void loadRichMenu()}
+                      className="text-action hover:underline"
+                    >
+                      再試行
+                    </button>
+                  </p>
+                ) : null}
+              </div>
+
+<div><SectionHead label="メモ" actionLabel="編集" href={inboxHrefForFriend(friendId)} />
+                {/* 個別メモの書き換えは受信箱側が持っている。ここは読むだけ。 */}
+                <p className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-h-[3.5rem] border px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap">
+                  {friend?.support?.notes || 'メモはありません'}
+                </p>
+</div>
+              <Button onClick={() => setProfileExpanded((value) => !value)} aria-expanded={profileExpanded}>{profileExpanded ? '顧客情報を閉じる' : '顧客情報をすべて表示'}</Button>
+              {profileExpanded && <div className="space-y-4">              {/* ---- ★つき友だち情報 ---- */}
               {starred.length > 0 && (
                 <div>
                   <SectionHead
@@ -1643,37 +1689,6 @@ function FriendDetailInner() {
                 </div>
               )}
 
-              {/* ---- リッチメニュー ---- */}
-              <div>
-                <SectionHead label="リッチメニュー" actionLabel="変更" href="/rich-menus" />
-                <dl className="space-y-1 text-xs">
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-ink-faint">現在の設定</dt>
-                    <dd className="text-ink-secondary truncate text-right">
-                      {richMenuStatus === 'loading'
-                        ? '読み込み中…'
-                        : richMenuStatus === 'error'
-                          ? '取得できませんでした'
-                          : (richMenu?.name ?? '既定のメニュー')}
-                      {richMenuStatus === 'ready' && richMenu?.isDefault && (
-                        <span className="text-ink-faint ml-1">（全員に出しているもの）</span>
-                      )}
-                    </dd>
-                  </div>
-                </dl>
-                {richMenuStatus === 'error' ? (
-                  <p className="text-ink-faint mt-1 text-right text-xs">
-                    <button
-                      type="button"
-                      onClick={() => void loadRichMenu()}
-                      className="text-action hover:underline"
-                    >
-                      再試行
-                    </button>
-                  </p>
-                ) : null}
-              </div>
-
               {/* ---- 友だち情報 ---- */}
               <div>
                 <p className="text-ink-faint mb-1.5 text-xs font-semibold">友だち情報</p>
@@ -1712,7 +1727,7 @@ function FriendDetailInner() {
                       : '回答はまだありません'}
                 </p>
               </div>
-            </div>
+</div>}
             </div>
           </aside>
 
@@ -1722,50 +1737,29 @@ function FriendDetailInner() {
             画面からはみ出していた。grid の子に min-w-0 を付け、幅の決定を
             グリッドに任せてタブ帯だけ中で横に流す。
           */}
-          <div data-design="Right" className="flex min-w-0 flex-col gap-4">
+          <div data-design="Right" className={styles.content}>
             {/*
               ★V7: 10個のタブが 1440px で2段に折れていた。折らずに1段にし、
               入り切らない分は横に送る。リンクで移動するタブなので
               aria-current="page" で現在地を示す（role="tab" は付けない）。
             */}
-            <div className="relative">
-              <div ref={tabsRowRef} className="border-hairline flex gap-1 overflow-x-auto border-b">
-                {visibleTabs.map((t) => (
-                  <Link
-                    key={t.key}
-                    href={`/friends/detail?id=${friendId}&tab=${t.key}${
-                      group === BASIC_GROUP ? '' : `&group=${group}`
-                    }`}
-                    aria-current={tab === t.key ? 'page' : undefined}
-                    className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-                      tab === t.key
-                        ? 'border-accent text-accent-deep'
-                        : 'text-ink-secondary hover:text-ink border-transparent'
-                    }`}
-                  >
-                    {t.label}
-                  </Link>
-                ))}
-              </div>
-              {/* #773: はみ出し中だけ右端にフェードを出し、続きがあることを示す。 */}
-              {tabsOverflowing ? (
-                <div
-                  aria-hidden="true"
-                  data-tab-fade="right"
-                  className="from-canvas-sunken pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l to-transparent"
-                />
-              ) : null}
-            </div>
+
 
             {tab === 'timeline' && (
-              <div className="space-y-4">
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
+              <div className={styles.summary}>
+                <div data-kpi-strip className={`grid grid-cols-3 ${kpiStyles.strip}`}>
+                  <KpiCard title="配信を開いた率" value={null} unit="%" detail="未取得" description="この友だちの開封率を集計する機能はまだ接続されていません" variant="v6" />
+                  <KpiCard title="この90日の購入" value={null} unit="回" detail="未取得" description="この友だちの90日間の購入数を集計する機能はまだ接続されていません" variant="v6" />
+                  <KpiCard title="次の予約" value={null} unit="" loading={upcomingLoading} valueText={upcoming?.nextBooking && !upcoming.nextBookingError ? formatDay(upcoming.nextBooking.startsAt) : undefined} detail={upcomingFailed || upcoming?.nextBookingError ? '取得できませんでした' : upcomingLoading ? '読み込んでいます' : upcoming?.nextBooking?.title ?? '予定なし'} onRetry={upcomingFailed || upcoming?.nextBookingError ? () => setUpcomingRetry((value) => value + 1) : undefined} variant="v6" />
+                </div>
+                <div className={styles.summarySections}>
+                  <section className={styles.section}>
                     <h2 className="text-ink text-sm font-bold">進行中の配信・自動処理</h2>
-                    <dl className="text-ink-secondary mt-3 space-y-2 text-xs"><div className="flex gap-5"><dt className="font-semibold">シナリオ</dt><dd>取得元を接続後に表示</dd></div><div className="flex gap-5"><dt className="font-semibold">リマインド</dt><dd>取得元を接続後に表示</dd></div><div className="flex gap-5"><dt className="font-semibold">対象ルール</dt><dd>—</dd></div></dl>
+                    {upcomingLoading ? <p className="mt-3 text-xs text-ink-faint">読み込んでいます…</p> : upcomingFailed || upcoming?.nextAutoDeliveryError ? <p role="alert" className="mt-3 text-xs text-ink-faint">配信予定を取得できませんでした <button className="text-action" onClick={() => setUpcomingRetry((value) => value + 1)}>再試行</button></p> : upcoming?.nextAutoDelivery ? <div className="mt-3 flex items-center justify-between gap-3 text-xs"><div><p className="font-semibold">{upcoming.nextAutoDelivery.name}</p><p className="mt-1 text-ink-faint">{formatDateTime(upcoming.nextAutoDelivery.scheduledAt)} に送信予定</p></div><Link className="text-action" href={upcoming.nextAutoDelivery.kind === 'scenario' ? `/scenarios/detail?id=${upcoming.nextAutoDelivery.id}` : `/reminders/detail?id=${upcoming.nextAutoDelivery.id}`}>詳細を見る</Link></div> : <p className="mt-3 text-xs text-ink-faint">確定した配信予定はありません</p>}
+                    <p className="mt-2 text-xs text-ink-faint">現在進行中の処理全体は、まだ一覧で取得できません。</p>
                     {/* ★V7：押せないまま置かれていた「配信状態を確認」は外した。 */}
                   </section>
-                  <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
+                  <section className={styles.section}>
                     <h2 className="text-ink text-sm font-bold">同じ人としてつながる情報</h2>
                     {/*
                       NEXT-10: 固定の「現在は1アカウントのみ」ではなく、
@@ -1815,14 +1809,13 @@ function FriendDetailInner() {
                   0件・取得失敗・読み込み中はそれぞれ区別して表示する。
                 */}
                 {/* #773: 行の表組みは「カードの幅」で切り替える（画面幅ではない）。 */}
-                <section className="@container bg-canvas rounded-card border-hairline overflow-hidden border shadow-card">
+                <section className="@container min-w-0 bg-canvas">
                   <div className="flex items-center justify-between px-4 py-3"><h2 className="text-ink text-sm font-bold">最近の履歴</h2><Link href={`/friends/detail?id=${friendId}&tab=history`} className="text-action text-xs font-semibold">すべてを見る →</Link></div>
                   {/*
                     #985 CHK-04: 140+160+140pxの固定列は狭い幅で
                     親の overflow-hidden に欠ける。md 未満では見出しを
                     畳み、各行は折り返すカードにする。
                   */}
-                  <div className="bg-canvas-sunken border-hairline hidden border-y px-4 py-3 text-xs font-semibold text-ink-faint @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span></div>
                   {historyStatus === 'loading' ? (
                     <p className="text-ink-faint px-4 py-5 text-xs">履歴を読み込んでいます…</p>
                   ) : historyStatus === 'error' ? (
@@ -1839,13 +1832,13 @@ function FriendDetailInner() {
                   ) : (
                     <>
                       {historyItems.slice(0, 5).map((item) => (
-                        <FriendTimelineRow key={`${item.source?.kind ?? item.type}:${item.id}`} item={item} friendId={friendId} />
+                        <div key={`${item.source?.kind ?? item.type}:${item.id}`} className="flex min-w-0 items-start gap-3 py-3 text-xs">
+                          <CircleDot aria-hidden size={18} className="mt-0.5 shrink-0 text-ink-faint" />
+                          <div className="min-w-0 flex-1"><p className="font-medium text-ink">{item.summary}</p><p className="mt-1 text-ink-faint">{item.type}{item.lineAccount?.name ? `・${item.lineAccount.name}` : ''}</p>{timelineSourceHref(item, friendId) ? <a className="text-action hover:underline" href={timelineSourceHref(item, friendId)!.href} target={timelineSourceHref(item, friendId)!.external ? '_blank' : undefined} rel="noreferrer">元の記録を開く</a> : null}</div>
+                          <span className="shrink-0 text-ink-faint">{formatDay(item.occurredAt)}</span>
+                        </div>
                       ))}
-                      {/*
-                        友だち追加の記録は本体の作成日時から出す実データ。
-                        活動履歴が0件のときは、この記録だけが履歴になる。
-                      */}
-                      <div className="text-ink-secondary border-hairline flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t px-4 py-3 text-xs @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}><span>{friend.createdAt ? formatDay(friend.createdAt) : '—'}</span><span>友だち追加</span><span className="min-w-0 flex-1 basis-full @lg:basis-auto">{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span><span>システム</span><span /></div>
+                      <div className="flex items-start gap-3 py-3 text-xs"><CircleDot aria-hidden size={18} className="shrink-0 text-ink-faint" /><div className="min-w-0 flex-1"><p>友だちに追加されました</p><p className="mt-1 text-ink-faint">{friend.firstTrackedLinkName ?? 'システム'}</p></div><span className="shrink-0 text-ink-faint">{friend.createdAt ? formatDay(friend.createdAt) : '—'}</span></div>
                       {historyStatus === 'ready' && historyItems.length === 0 ? (
                         <p className="text-ink-faint px-4 pb-4 text-xs">
                           上の「友だち追加の記録」以外の活動履歴はまだありません。
@@ -1859,7 +1852,7 @@ function FriendDetailInner() {
                   「シナリオに登録する」はこの友だちを対象に選んで実行できる。
                   一覧へ行くだけのものは名前を「一覧を見る」に変えて混同させない。
                 */}
-                <section className="bg-canvas rounded-card border-hairline border p-4 shadow-card">
+                <section className={styles.section}>
                   <h2 className="text-ink text-sm font-bold">この友だちに行う操作</h2>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {/* 「受信箱で開く」は画面右上にもあるので、ここでは重ねない（★V7）。 */}
@@ -1942,7 +1935,7 @@ function FriendDetailInner() {
               0件・取得失敗・読み込み中を分け、続きは「さらに読み込む」。
             */}
             {tab === 'history' && (
-              <div className="@container bg-canvas rounded-card border-hairline overflow-hidden border">
+              <div className="@container bg-canvas rounded-card border-hairline overflow-hidden border" data-design-node={v8 ? 'Q5F2QE' : undefined}>
                 {/* #985 CHK-04 / #773: 見出しの表組みはカード幅(@lg)で切り替える。 */}
                 <div className="bg-canvas-sunken border-hairline hidden border-b px-4 py-3 text-xs font-semibold text-ink-faint @lg:grid" style={{ gridTemplateColumns: TIMELINE_ROW_COLUMNS }}>
                   <span>日時</span><span>種別</span><span>内容</span><span>アカウント</span><span>元</span>
@@ -2026,7 +2019,7 @@ function FriendDetailInner() {
 
             {tab === 'info' && !fieldsEnabled && <FeatureDisabledScreen featureId="friend_fields" />}
             {tab === 'info' && fieldsEnabled && (
-              <div className="bg-canvas rounded-card border-hairline border p-5" data-design-node={v8 ? 'Q5F2QE' : undefined}>
+              <div className="bg-canvas rounded-card border-hairline border p-5" data-design-node="Q5F2QE">
                 {/* 情報欄は独立して読み込む。取り損ねは0件と区別して再試行口を出す。 */}
                 {fieldsStatus === 'loading' || fieldsStatus === 'idle' ? (
                   <p className="text-ink-faint py-6 text-center text-sm">情報欄を読み込んでいます…</p>
@@ -2111,12 +2104,12 @@ function FriendDetailInner() {
                 ) : (
                   <>
                     {/* ★V8 `Q5F2QE`：項目は2列に並べる。v7 は縦1列のまま。 */}
-                    <div className={v8 ? 'mb-4 grid gap-x-4 gap-y-4 sm:grid-cols-2' : undefined}>
+                    <div className="mb-4 grid gap-x-4 gap-y-4 sm:grid-cols-2">
                     {[...groupStarred, ...rest].map((field) => {
                       // FRIEND-22: 項目名ラベルと入力欄を結び付ける一意ID。
                       const inputId = `ff-${field.id}`
                       return (
-                      <div key={field.id} className={v8 ? 'min-w-0' : 'mb-4'}>
+                      <div key={field.id} className="min-w-0">
                         <label htmlFor={inputId} id={`${inputId}-label`} className="text-ink-secondary mb-1 block text-sm font-medium">
                           {field.isStarred && <span className="text-warning mr-1">★</span>}
                           {field.name}
@@ -2124,7 +2117,7 @@ function FriendDetailInner() {
                             {FIELD_TYPE_LABELS[field.type] ?? field.type}
                           </span>
                           {field.isPersonal && (
-                            <span className="bg-warning-bg text-warning rounded-pill ml-1.5 px-1.5 py-0.5 text-[10px]">
+                            <span className="bg-warning-bg text-warning rounded-pill ml-1.5 px-1.5 py-0.5 text-nano">
                               個人情報
                             </span>
                           )}
@@ -2193,7 +2186,7 @@ function FriendDetailInner() {
             )}
 
             {tab === 'forms' && (
-              <div className="bg-canvas rounded-card border-hairline border p-5">
+              <div className="bg-canvas rounded-card border-hairline border p-5" data-design-node={v8 ? 'Q5F2QE' : undefined}>
                 {submissionsStatus === 'loading' || submissionsStatus === 'idle' ? (
                   <p className="text-ink-faint py-6 text-center text-sm">回答を読み込んでいます…</p>
                 ) : submissionsStatus === 'error' ? (

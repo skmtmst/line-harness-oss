@@ -247,4 +247,62 @@
 [data-theme='v8'] .option {
   font-size: var(--text-label);
 }
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .trigger { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; padding: 0 10px 0 12px; gap: 6px; box-shadow: none; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .value { font-size: 13px; font-weight: 500; line-height: 20px; }
+[data-theme='v8'] .chevron { width: 14px; height: 14px; }
+[data-theme='v8'] .trigger:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .invalid .trigger { outline-color: var(--color-danger); }
+[data-theme='v8'] .chevron { flex-basis: 14px; }
+}
+/* ★V8 表示件数の選ぶ欄は幅96（c4n9Kr「選ぶ 表示件数」）。司令塔 2026-10-06 */
+[data-theme='v8'] .pageSize { width: 96px; min-width: 96px; }
+
+/*
+ * ★V8「枠なしの並び替え」（x6QsVz：枠なし文字＋上下矢印）。
+ * treatment="text" のときだけ枠を消す。箱の合格は変えない。
+ * 焦点の輪は .trigger:focus-visible が枠なしでも出す。
+ */
+[data-theme='v8'] .textTrigger {
+  height: 32px;
+  gap: 4px;
+  padding: 0 2px;
+  border: 0;
+  outline-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+
+[data-theme='v8'] .textTrigger .chevron {
+  display: none;
+}
+
+[data-theme='v8'] .directionIcon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--color-ink-secondary);
+}
+
+/*
+ * 箱の先頭の図柄（v19Ivv のよく使う絞り込みの栞）。
+ * 渡さないときは出ない。v7 は変えない。
+ */
+.leadingIcon {
+  display: none;
+}
+
+[data-theme='v8'] .leadingIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--color-ink);
+}
+
+[data-theme='v8'] .leadingIcon svg {
+  width: 15px;
+  height: 15px;
 }

@@ -3,6 +3,7 @@
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import NotificationsV8 from '@/v8/notifications/list'
 
 /*
  * 通知一覧（V6 1-1 ダッシュボードの通知パネルからの全件行き先）。
@@ -278,11 +279,17 @@ function NotificationsPageInner() {
   )
 }
 
+function NotificationsPageSwitch() {
+  // ★V8 は src/v8/notifications/list.tsx（絵 y8QQV）。v7 は今の画面のまま。
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <NotificationsV8 /> : <NotificationsPageInner />
+}
+
 export default function NotificationsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={null}>
-      <NotificationsPageInner />
+      <NotificationsPageSwitch />
     </Suspense>
   )
 }

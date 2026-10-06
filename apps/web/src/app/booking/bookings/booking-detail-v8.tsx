@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingAdminDetail, type BookingRequest } from '@/lib/api'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
@@ -109,7 +110,7 @@ export default function BookingDetailV8({
         </div>
         <div>
           <dt className="text-ink-faint text-xs">これまでの来店</dt>
-          <dd className="text-ink mt-0.5">
+          <dd className="text-ink mt-0.5" aria-busy={historyTotal === null && !historyError}>
             {historyError ? (
               <>
                 来店履歴を読み込めませんでした
@@ -117,10 +118,10 @@ export default function BookingDetailV8({
                   もう一度読み込む
                 </button>
               </>
-            ) : historyTotal === null ? (
-              '来店履歴を読み込んでいます'
             ) : (
-              `${historyTotal}回`
+              <DelayedSkeleton loading={historyTotal === null} skeleton={<Skeleton width={48} />}>
+                {historyTotal === null ? null : `${historyTotal}回`}
+              </DelayedSkeleton>
             )}
           </dd>
         </div>

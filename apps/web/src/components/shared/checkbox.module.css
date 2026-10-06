@@ -185,4 +185,15 @@
 [data-theme='v8'] .line:active .box {
   scale: 0.92;
 }
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .label { line-height: 20px; font-weight: 400; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .box { border: 0; border-radius: 5px; outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
+[data-theme='v8'] .input:checked + .box, [data-theme='v8'] .input:indeterminate + .box { outline-color: var(--color-accent-deep); }
+[data-theme='v8'] .input[aria-invalid='true']:not(:checked) + .box { outline-color: var(--color-status-danger); }
+[data-theme='v8'] .input:focus-visible + .box { outline: 2px solid var(--color-action); outline-offset: 2px; }
+[data-theme='v8'] .mark { width: 12px; height: 12px; stroke-width: 2; }
+
+[data-theme='v8'] .root { gap: 8px; }
+[data-theme='v8'] .box { gap: 0; }
 }

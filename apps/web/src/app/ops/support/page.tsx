@@ -21,6 +21,7 @@ import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatDateTime, planLabel, PLAN_STATUS_LABEL, ROLE_LABEL, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
+import FilterChip from '@/components/shared/filter-chip'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
@@ -50,6 +51,38 @@ const STAGE_TABS: Array<{ key: OpsSupportStage | 'all'; label: string }> = [
 const STAGE_TONE: Record<OpsSupportStage, ChipTone> = {
   new: 'info', in_progress: 'warn', waiting: 'neutral', resolved: 'ok', closed: 'neutral',
 }
+
+/**
+ * 板 `P0jhqO` の左の札。絵の7つのうち「保留」は口（stage）に無いので
+ * 出さない（司令塔へ報告）。「確認待ち」は waiting、「解決」は resolved。
+ */
+const V8_STAGE_CHIPS: Array<{ key: OpsSupportStage | 'all'; label: string }> = [
+  { key: 'all', label: 'すべて' },
+  { key: 'new', label: '新規' },
+  { key: 'in_progress', label: '対応中' },
+  { key: 'waiting', label: '確認待ち' },
+  { key: 'resolved', label: '解決' },
+  { key: 'closed', label: 'クローズ' },
+]
+
+/** V8 の札・行に出す段階名（waiting は確認待ち、resolved は解決）。 */
+function v8StageLabel(stage: OpsSupportStage, fallback: string): string {
+  if (stage === 'waiting') return '確認待ち'
+  if (stage === 'resolved') return '解決'
+  return fallback
+}
+
+const V8_PRIORITY_OPTIONS = [
+  { value: '', label: '優先度：すべて' },
+  { value: 'high', label: '高' },
+  { value: 'medium', label: '中' },
+  { value: 'low', label: '低' },
+]
+const V8_SORT_OPTIONS = [
+  { value: 'priority', label: '並び替え：優先度' },
+  { value: 'newest', label: '並び替え：新しい順' },
+  { value: 'oldest', label: '並び替え：古い順' },
+]
 const PRIORITY_TONE: Record<OpsSupportPriority, ChipTone> = { high: 'danger', medium: 'warn', low: 'neutral' }
 
 const PRIORITY_OPTIONS = [
@@ -326,10 +359,29 @@ export default function OpsSupportPage() {
   const ticket = detail?.ticket ?? null
   const closed = ticket?.stage === 'closed'
 
+  const isV8 = theme === 'v8'
+  // 板 `P0jhqO`：V8 の既定は「すべて・優先度順」。深いリンク（?id=）があるときは触らない。
+  const v8DefaultsApplied = useRef(false)
+  useEffect(() => {
+    if (!isV8 || v8DefaultsApplied.current) return
+    v8DefaultsApplied.current = true
+    if (!deepLink.current) { setStage('all'); setSort('priority') }
+  }, [isV8])
+
   return (
     <div className={knowledgeStyles.supportPage} data-design-node={theme === 'v8' ? 'P0jhqO' : replyFromAi && references.length > 0 && !aiBusy ? 'F3zoq' : 'IjIFa'}>
-      <OpsPageHeader title={replyFromAi ? 'お問い合わせ ／ AIの下書き' : 'お問い合わせ'} />
+      <OpsPageHeader
+        title={replyFromAi ? 'お問い合わせ ／ AIの下書き' : 'お問い合わせ'}
+        description={isV8 ? '統括の管理画面「お問い合わせ」から送られたものが新規として並びます。電話やLINEで受けた相談は、運営が代わりに起票できます。' : undefined}
+        actions={isV8 ? (
+          <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}>
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            代わりに起票する
+          </Button>
+        ) : undefined}
+      />
 
+      {isV8 ? null : (
       <div className="mb-4">
         <Tabs
           className={knowledgeStyles.supportTabs}
@@ -350,7 +402,9 @@ export default function OpsSupportPage() {
           }
         />
       </div>
+      )}
 
+      {isV8 ? null : (
       <div className={knowledgeStyles.supportMetrics} data-design-node="beOJV">
         <div className={knowledgeStyles.supportMetric}><Inbox aria-hidden="true" className="text-danger" />
         <KpiCard variant="v6" title="未対応のチケット" value={kpis ? kpis.untouched : null} unit="" detail={kpis ? `LINEから受付 ${kpis.untouchedFromLine}件` : '—'} loading={!summary} />
@@ -365,14 +419,17 @@ export default function OpsSupportPage() {
         <KpiCard variant="v6" title="平均の解決時間" value={null} unit="" detail={kpis ? compareLabel(kpis.avgResolutionMinutes, kpis.prevAvgResolutionMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgResolutionMinutes) : undefined} />
         </div>
       </div>
+      )}
 
       {/* 作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。 */}
+      {isV8 ? null : (
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}>
           <Plus aria-hidden="true" className="h-4 w-4" />
           代わりに起票する
         </Button>
       </div>
+      )}
 
       <Dialog
         open={creating}
@@ -464,6 +521,183 @@ export default function OpsSupportPage() {
       */}
       {error && !listFailed && !detailFailed ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
+      {isV8 ? (
+      <div className="flex items-start gap-4">
+        {/* 左：探す・札・絞り・チケットの一覧 */}
+        <section aria-label="チケットの一覧" className="w-80 max-w-full shrink-0">
+          <SearchField value={q} onChange={setQ} onClear={() => setQ('')} placeholder="チケットを探す" aria-label="チケットを探す" />
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {V8_STAGE_CHIPS.map((c) => (
+              <FilterChip
+                key={c.key}
+                selected={stage === c.key}
+                count={summary ? summary.byStage[c.key] : undefined}
+                onChange={() => setStage(c.key)}
+              >
+                {c.label}
+              </FilterChip>
+            ))}
+          </div>
+          <div className="mt-2 grid gap-2">
+            <Select
+              aria-label="優先度で絞る"
+              options={V8_PRIORITY_OPTIONS}
+              value={priority}
+              onChange={(value) => setPriority(value as '' | OpsSupportPriority)}
+            />
+            <Select
+              aria-label="並び替え"
+              options={V8_SORT_OPTIONS}
+              value={sort}
+              onChange={(value) => setSort(value as typeof sort)}
+            />
+          </div>
+          <div className="mt-2">
+            {loading && tickets.length === 0 ? (
+              <ListState kind="loading" title="チケットを読み込んでいます" />
+            ) : listFailed && tickets.length === 0 ? (
+              <ListState
+                kind="error"
+                title="チケットを読み込めませんでした"
+                description="通信が切れたか、サーバが応えませんでした。"
+                onRetry={() => void loadList()}
+              />
+            ) : tickets.length === 0 ? (
+              <ListState kind="empty" title="チケットがありません" description="統括の管理画面「お問い合わせ」から送られると、ここに新規として並びます。" />
+            ) : (
+              <ul className="grid gap-2">
+                {tickets.map((t) => {
+                  const selected = t.id === selectedId
+                  return (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        aria-current={selected ? 'true' : undefined}
+                        onClick={() => { deepLink.current = null; if (aiAbort.current) aiAbort.current.cancelled = true; setSelectedId(t.id) }}
+                        className={`block w-full rounded-card border bg-canvas p-3 text-left ${selected ? 'border-accent-deep bg-accent-soft' : 'border-hairline'}`}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="text-micro font-bold text-ink">{t.ticketLabel}</span>
+                          {stageChip(t.stage, v8StageLabel(t.stage, t.stageLabel))}
+                        </span>
+                        <span className="mt-1 block text-label font-medium text-ink">{t.subject}</span>
+                        <span className="mt-1 block text-micro text-ink-secondary">{t.tenantName}・優先度 {t.priorityLabel}</span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        {/* 右：内容と返信 */}
+        <section aria-label="内容と返信" className="min-w-0 flex-1">
+          {!ticket ? (
+            detailLoading ? <ListState kind="loading" title="内容を読み込んでいます" /> : detailFailed ? (
+              <ListState
+                kind="error"
+                title="内容を読み込めませんでした"
+                description="通信が切れたか、サーバが応えませんでした。"
+                onRetry={selectedId ? () => void loadDetail(selectedId) : undefined}
+              />
+            ) : <ListState kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
+          ) : (
+            <div className="grid gap-3 rounded-card border border-hairline bg-canvas p-4">
+              <div>
+                <span className="text-label font-medium text-ink-secondary">{ticket.ticketLabel}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="min-w-0 flex-1 text-body font-bold text-ink">{ticket.subject}</h2>
+                  <span className="flex items-center gap-2">
+                    <Button size="field" href={tenantDetailHref(ticket.tenantId)}>契約先を開く</Button>
+                    <Button size="field" disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)}>代理ログイン</Button>
+                  </span>
+                </div>
+                {ticket.subjectAuto ? <Chip tone="neutral">自動で付けた件名</Chip> : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {stageChip(ticket.stage, v8StageLabel(ticket.stage, ticket.stageLabel))}
+                <p className="text-caption text-ink-secondary">
+                  {ticket.tenantName}・{planLabel(ticket.tenantPlanKey)}・LINE登録{detail && detail.tenant.staffWithLine > 0 ? 'あり' : 'なし'}・{ticket.kindLabel}・優先度 {ticket.priorityLabel}
+                </p>
+              </div>
+              {detail && <TicketKnowledge key={ticket.id} detail={detail} onRefresh={() => void loadDetail(ticket.id)} />}
+              <ol className={knowledgeStyles.supportMessages} aria-label="やり取り">
+                <Message side="left" author={`${ticket.tenantName} ／ ${ticket.staffName || '—'}`} at={ticket.createdAt} body={ticket.body} attachments={ticket.attachments} />
+                {detail?.messages.map((m) => (
+                  <Message
+                    key={m.id}
+                    side={m.authorKind === 'ops' ? 'right' : 'left'}
+                    author={m.authorKind === 'ops' ? `musubo 運営 ／ ${m.authorName}` : `${ticket.tenantName} ／ ${m.authorName}`}
+                    at={m.createdAt}
+                    body={m.body}
+                    attachments={m.attachments}
+                  />
+                ))}
+              </ol>
+              <div className={knowledgeStyles.supportReply}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-label font-semibold text-ink">{aiBusy ? '返信' : replyFromAi ? 'AIの下書き' : '返信'}</h3>
+                  {aiBusy ? (
+                    <Chip tone="info">作成中…</Chip>
+                  ) : replyFromAi ? (
+                    <>
+                      <Button size="field" onClick={() => void generateAi()} disabled={busy || !detail?.ai.available}>作り直す</Button>
+                      <Button size="field" onClick={() => void discardAi()} disabled={busy}>下書きを削除する</Button>
+                    </>
+                  ) : (
+                    <Button size="field" onClick={() => void generateAi()} disabled={busy || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'}>
+                      <Sparkles aria-hidden="true" className="h-4 w-4" />
+                      AIで下書きを作る
+                    </Button>
+                  )}
+                </div>
+                {aiBusy ? (
+                  <div className="flex items-center justify-between rounded-control border border-hairline bg-canvas-sunken px-4 py-3">
+                    <p className="text-caption text-ink-secondary" role="status">AIが下書きを作っています。5〜15秒ほどかかります。</p>
+                    <Button size="field" onClick={skipAi}>待たずに手で書く</Button>
+                  </div>
+                ) : replyFromAi ? (
+                  <div className={knowledgeStyles.draftNotice}>
+                    <Sparkles aria-hidden="true" />
+                    <p>お客様の状況・やり取りとナレッジをもとに作った下書きです。内容を確認してから送ってください。</p>
+                    <span className="text-micro text-ink-faint">{formatDateTime(replyFromAi.generatedAt)} に作成</span>
+                  </div>
+                ) : null}
+                {aiBusy ? null : (
+                  <KnowledgeReferences key={ticket.id} references={replyFromAi ? references : []} requestId={ticket.id} busy={busy} onExclude={id => {
+                    const next = [...new Set([...excluded, id])]; setExcluded(next); void generateAi(next)
+                  }} />
+                )}
+                {aiBusy ? null : (
+                  <TextArea
+                    rows={6}
+                    value={reply}
+                    onChange={(e) => setReply(e.target.value)}
+                    placeholder="返信を入力します。「AIで下書きを作る」を押すと、これまでのやり取りから下書きを作ります。"
+                    aria-label="返信"
+                    disabled={closed}
+                    maxLength={4000}
+                  />
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {ticket.stage === 'resolved' || ticket.stage === 'closed' ? (
+                    <Button size="field" disabled={busy} onClick={() => void changeStage('in_progress')}>対応中に戻す</Button>
+                  ) : (
+                    <Button size="field" disabled={busy} onClick={() => void changeStage('resolved')}>解決済みにする</Button>
+                  )}
+                  {closed ? null : <Button size="field" disabled={busy} onClick={() => void changeStage('closed')}>クローズする</Button>}
+                  <span className="ml-auto flex items-center gap-2">
+                    <Button size="field" onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
+                    <Button size="field" variant="primary" onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || closed || aiBusy || !reply.trim()}>返信する</Button>
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+      ) : (
       <div className={`${knowledgeStyles.supportColumns} v8-ro-ops-supportColumns`} data-design-node="WmMDh">
         {/* 左：チケット一覧 */}
         <section aria-label={listTitle} className={`${knowledgeStyles.supportList} v8-ro-ops-supportList`}>
@@ -640,6 +874,7 @@ export default function OpsSupportPage() {
           )}
         </section>
       </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,7 @@
 'use client'
 
+import { Th } from '@/components/shared/table'
+
 /*
  * ★V8 共通情報の一覧（Pencil「★V8 画面の地図」の共通情報の行：
  * 一覧 `FM94M`、止める窓 `Hhl9M`、削除の窓 `xxKtW`、状態 `RqO7O`、
@@ -16,7 +18,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Braces, CalendarClock, Eye, Link2, TriangleAlert } from 'lucide-react'
+import { Braces, CalendarClock, Eye, Link2, Pause, TriangleAlert } from 'lucide-react'
 import type { CommonVar, CommonVarDeleteImpact, Folder } from '@line-crm/shared'
 import {
   api,
@@ -53,7 +55,17 @@ import BulkBar from '@/components/shared/bulk-bar'
 import NoPermissionV8 from '@/app/no-permission/no-permission-v8'
 import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars'
-import { formatNumber } from '@/lib/format'
+import { formatDay, formatNumber } from '@/lib/format'
+
+/*
+ * 一覧の更新日は、次回変更と同じセルに収まる短い形で出す（v7 と同じ）。
+ * 更新日は UTC の ISO で来るので JST 固定で出す。
+ */
+function formatListDate(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return formatDay(date)
+}
 import {
   blockedReason,
   canDelete as canDeleteVar,
@@ -86,10 +98,10 @@ const MAX_BATCH_DELETE_COUNT = 20
 const EXPIRING_SOON_MS = 7 * 24 * 3600_000
 
 /*
- * 道具の段の絞り込み。期限切れは「期限つき」にまとめ、状態の札で見分ける。
+ * 道具の段の絞り込み。v7 と同じ7枚（期限切れは単独の札に戻す）。
  * 「下書き・止めた」は1枚の札にまとめる（板 `FM94M`）。
  */
-type VarsChip = 'all' | 'empty' | 'scheduled' | 'unused' | 'draftStopped'
+type VarsChip = 'all' | 'empty' | 'scheduled' | 'unused' | 'draftStopped' | 'expired'
 
 const CHIPS: Array<{ value: VarsChip; label: string; filter: CommonVarFilter }> = [
   { value: 'all', label: 'すべて', filter: 'all' },
@@ -97,6 +109,7 @@ const CHIPS: Array<{ value: VarsChip; label: string; filter: CommonVarFilter }> 
   { value: 'scheduled', label: '期限つき', filter: 'scheduled' },
   { value: 'unused', label: '使われていない', filter: 'unused' },
   { value: 'draftStopped', label: '下書き・止めた', filter: 'all' },
+  { value: 'expired', label: '期限切れ', filter: 'expired' },
 ]
 
 /** 「10/7まで」の札の日付。年月は要らず、月日だけ出す。 */
@@ -370,6 +383,8 @@ function CommonVarsListV8Inner() {
   const [panelStatus, setPanelStatus] = useState(false)
   /* 右クリックされた行（「…」と同じ項目を出す）。 */
   const [contextId, setContextId] = useState<string | null>(null)
+  /* 板 `Hhl9M`：予約中の配信があるときだけ出す帯。読めなくても止める操作は止めない。 */
+  const [statusScheduled, setStatusScheduled] = useState<CommonVarDeleteImpact['items']>([])
 
   const openStatusDialog = (item: CommonVar, action: 'stop' | 'resume') => {
     setPanelStatus(item.id === activeId)
@@ -377,6 +392,19 @@ function CommonVarsListV8Inner() {
     setStatusAction(action)
     setStatusReason('')
     setStatusError('')
+    setStatusScheduled([])
+    if (action === 'stop' && selectedAccountId) {
+      const varId = item.id
+      const accountId = selectedAccountId
+      void api.commonVars.deleteImpact(varId, accountId)
+        .then((res) => {
+          if (!res.success) return
+          setStatusScheduled(res.data.items.filter((usage) => usage.status === '配信予約中'))
+        })
+        .catch(() => {
+          /* 読めないときは帯を出さない。 */
+        })
+    }
   }
 
   const closeStatusDialog = () => {
@@ -912,7 +940,7 @@ function CommonVarsListV8Inner() {
   const firstEmpty = stats.emptyInUse[0] ?? null
 
   return (
-    <div data-design-node="FM94M" className={styles.board}>
+    <div data-design-node="FM94M XIzkJ" className={styles.board}>
       <div className={styles.head}>
         <div className={styles.headText}>
           <h1 className={styles.headTitle}>共通情報</h1>
@@ -1070,6 +1098,52 @@ function CommonVarsListV8Inner() {
                     options={folderOptions}
                   />
                 </span>
+                {/*
+                  板が狭いときは縦パネルが出ないため、選んでいるフォルダの
+                  追加・名前変更・削除を選べる口をここに置く（v7 と同じ）。
+                  PCの「…」と同じ窓へ届く。
+                */}
+                {canWrite ? (
+                  <span className={styles.folderNarrowActions}>
+                    {addingFolder ? (
+                      <>
+                        <input
+                          type="text"
+                          value={folderName}
+                          onChange={(e) => setFolderName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') void addFolder()
+                            if (e.key === 'Escape') setAddingFolder(false)
+                          }}
+                          placeholder="フォルダ名を入力"
+                          aria-label="フォルダ名"
+                          className="border-hairline rounded-control focus:ring-accent w-40 border px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
+                        />
+                        <Button type="button" variant="primary" onClick={() => void addFolder()} disabled={!folderName.trim() || savingFolder}>
+                          決定
+                        </Button>
+                        <Button type="button" onClick={() => { setAddingFolder(false); setFolderName('') }}>
+                          キャンセル
+                        </Button>
+                      </>
+                    ) : (
+                      <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加する</Button>
+                    )}
+                    {(() => {
+                      const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
+                      return selectedUserFolder && !addingFolder ? (
+                        <>
+                          <Button type="button" onClick={() => setEditingFolder(selectedUserFolder)}>
+                            フォルダ名を変える
+                          </Button>
+                          <Button type="button" onClick={() => { setFolderError(''); setDeletingFolder(selectedUserFolder) }}>
+                            フォルダを削除する
+                          </Button>
+                        </>
+                      ) : null
+                    })()}
+                  </span>
+                ) : null}
                 <span className={styles.searchWrap}>
                   <SearchField
                     value={query}
@@ -1167,7 +1241,7 @@ function CommonVarsListV8Inner() {
                     <thead>
                       <tr>
                         {canWrite ? (
-                          <th className={styles.cellCheck} scope="col">
+                          <Th className={styles.cellCheck} scope="col">
                             <Checkbox
                               checked={allOnPageSelected}
                               onCheckedChange={() =>
@@ -1182,15 +1256,16 @@ function CommonVarsListV8Inner() {
                               }
                               aria-label="このページの共通情報をすべて選ぶ"
                             />
-                          </th>
+                          </Th>
                         ) : null}
-                        <th scope="col">共通情報（差し込み名）</th>
-                        <th scope="col">中身</th>
-                        <th scope="col">状態</th>
-                        <th scope="col">使っている所</th>
-                        <th scope="col" className={styles.cellMenu}>
+                        <Th scope="col">共通情報（差し込み名）</Th>
+                        <Th scope="col" className={styles.cellValue}>中身</Th>
+                        <Th scope="col" className={styles.cellStatus}>状態</Th>
+                        <Th scope="col" className={styles.cellUsage}>使っている所</Th>
+                        <Th scope="col">更新・次回</Th>
+                        <Th scope="col" className={styles.cellMenu}>
                           <span className="sr-only">操作</span>
-                        </th>
+                        </Th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1263,6 +1338,18 @@ function CommonVarsListV8Inner() {
                                 </Link>
                               )}
                             </td>
+                            {(() => {
+                              const pending = item.nextSchedule ?? null
+                              const short = pending
+                                ? `${formatListDate(item.updatedAt)} ／ ${formatStamp(pending.effectiveFrom)}に変更`
+                                : `${formatListDate(item.updatedAt)} ／ 予定なし`
+                              const full = `最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`
+                              return (
+                                <td className={styles.updateCell} title={full}>
+                                  {short}
+                                </td>
+                              )
+                            })()}
                             <td className={styles.cellMenu} onClick={(event) => event.stopPropagation()}>
                               <RowActions
                                 subjectName={item.name}
@@ -1282,7 +1369,12 @@ function CommonVarsListV8Inner() {
 
               {listFailed ? null : (
                 <div className={styles.foot}>
-                  <span className={styles.footCount}>{formatNumber(filtered.length)}件</span>
+                  <ListRange
+                    className={styles.footCount}
+                    total={filtered.length}
+                    first={filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}
+                    last={Math.min(page * pageSize, filtered.length)}
+                  />
                   <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
                 </div>
               )}
@@ -1432,7 +1524,12 @@ function CommonVarsListV8Inner() {
               busy={statusBusy}
               busyLabel={statusAction === 'stop' ? '止めています…' : '再開しています…'}
             >
-              {statusAction === 'stop' ? '止める' : '再開する'}
+              {statusAction === 'stop' ? (
+                <>
+                  <Pause size={14} aria-hidden="true" />
+                  止める
+                </>
+              ) : '再開する'}
             </Button>
           </div>
         }
@@ -1458,6 +1555,15 @@ function CommonVarsListV8Inner() {
                 className={styles.dialogInput}
               />
             </label>
+            {statusAction === 'stop' && statusScheduled.length > 0 ? (
+              <p className={styles.dialogWarn} role="note">
+                <TriangleAlert size={14} aria-hidden="true" />
+                <span>
+                  予約中の{statusScheduled[0].kindLabel}「{statusScheduled[0].name}」が送られなくなります。
+                  {statusScheduled.length > 1 ? `ほか${formatNumber(statusScheduled.length - 1)}件` : ''}
+                </span>
+              </p>
+            ) : null}
           </div>
         ) : null}
       </Dialog>
@@ -1494,7 +1600,7 @@ function CommonVarsListV8Inner() {
                 busy={deleteBusy}
                 busyLabel="差し替え中…"
               >
-                差し替えて削除
+                差し替えて消す
               </Button>
             ) : null}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete && deleteChoice === 'stop' ? (
@@ -1585,7 +1691,7 @@ function CommonVarsListV8Inner() {
                         }
                       }}
                     >
-                      <p className={styles.choiceTitle}>別の共通情報に差し替えて削除（おすすめ）</p>
+                      <p className={styles.choiceTitle}>別の共通情報に差し替えて消す（おすすめ）</p>
                       <p className={styles.choiceNote}>
                         {formatNumber(deleteImpact.blockingTotal)}か所の差し込みを、選んだ別のキーへ置き換えます。置き換え後は元の共通情報を履歴が残る形で保管します。
                       </p>

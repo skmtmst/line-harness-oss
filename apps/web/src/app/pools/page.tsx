@@ -2,9 +2,12 @@
 
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
-import { useAdminTheme } from '@/lib/use-admin-theme'
+import { SettingsNavV8 } from '../settings/settings-nav-v8'
+import './pools-v8.css'
 
-import { X } from 'lucide-react'
+import { X, Copy, MoreHorizontal, Plus } from 'lucide-react'
+import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import Select from '@/components/shared/select'
 import { useEffect, useState } from 'react'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
@@ -17,14 +20,14 @@ import HelpTip from '@/components/shared/help-tip'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import StatusBadge from '@/components/shared/status-badge'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 
+type AccountWithStats = LineAccount & { stats?: { friendCount: number } }
+
 export default function PoolsPage() {
-  const theme = useAdminTheme()
   usePageTitle('プール管理')
   const [pools, setPools] = useState<TrafficPool[]>([])
-  const [accounts, setAccounts] = useState<LineAccount[]>([])
+  const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -82,56 +85,27 @@ export default function PoolsPage() {
   const isEmpty = !loading && !error && sortedPools.length === 0
 
   return (
-    <div className="flex flex-col gap-4 v8-ro-notifications-page" data-design-node={theme === 'v8' ? 'u3iab3' : undefined}>
-      {theme === 'v8' && <ReadonlyHeaderV8 title="プール管理" description="公開URLから追加された人を、稼働中の所属先からランダムに振り分けます。" />}
-      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      {isEmpty ? (
-        <section className="bg-canvas rounded-card border-hairline border">
-          <ListState
-            kind="empty"
-            title="まだプールがありません"
-            description="プールは、来たお客様を振り分けるLINEアカウントをまとめる入れ物です。"
-            action={
-              <Button variant="primary" onClick={() => setShowCreate(true)}>
-                ＋ プールをつくる
-              </Button>
-            }
-          />
-        </section>
-      ) : (
-        <>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-ink-secondary">{pools.length} プール</span>
-            <Button variant="primary" onClick={() => setShowCreate(true)}>
-              ＋ プールをつくる
-            </Button>
-          </div>
-
-          {loading && pools.length === 0 ? (
-            <ListState kind="loading" />
-          ) : error && pools.length === 0 ? (
-            <ListState
-              kind="error"
-              title="プール一覧を表示できませんでした"
-              description="プール一覧の取得に失敗しました。もう一度読み込んでください。"
-              onRetry={() => { void load() }}
-            />
+    <div className="pool-fid-page" data-design-node="u3iab3">
+      <ReadonlyHeaderV8 title="プール管理" description="来たお客さまを振り分けるLINEアカウントをまとめる入れ物です。公開URLから来た人を、稼働中の所属アカウントからランダムに振り分けます。"
+        actions={!isEmpty && !showCreate ? <Button variant="primary" onClick={() => setShowCreate(true)}><Plus size={15} aria-hidden="true" />新規プール</Button> : undefined} />
+      <div className="pool-fid-layout">
+        <SettingsNavV8 />
+        <div className="pool-fid-main">
+          {loading ? <ListState kind="loading" /> : error ? (
+            <ListState kind="error" title="プール一覧を表示できませんでした" description={error} onRetry={() => { void load() }} />
+          ) : isEmpty ? (
+            <ListState kind="empty" title="まだプールがありません" description="プールは、来たお客様を振り分けるLINEアカウントをまとめる入れ物です。"
+              action={<Button variant="primary" onClick={() => setShowCreate(true)}><Plus size={15} aria-hidden="true" />新規プール</Button>} />
           ) : (
-            <div className="flex flex-col gap-4 v8-ro-notifications-poolCards">
-              {error ? (
-                <Notice
-                  tone="danger"
-                  message={error}
-                  action={<button type="button" onClick={() => { void load() }} className="shrink-0 font-medium underline">もう一度読み込む</button>}
-                />
-              ) : null}
-              {sortedPools.map((pool) => (
-                <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />
-              ))}
-            </div>
+            <>
+              <div className="pool-fid-cards">
+                {sortedPools.map((pool) => <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />)}
+              </div>
+              <Notice tone="info" message="「外す」と、これから来たお客さまはそのアカウントへ振り分けられなくなります。アカウント自体と、これまでの流入の記録は残ります。" />
+            </>
           )}
-        </>
-      )}
+        </div>
+      </div>
 
       {showCreate && (
         <CreatePoolModal
@@ -153,20 +127,23 @@ function PoolCard({
   onChange,
 }: {
   pool: TrafficPool
-  accounts: LineAccount[]
+  accounts: AccountWithStats[]
   onChange: () => void
 }) {
   const isMain = pool.slug === 'main'
   const apiBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const publicUrl = `${apiBase}/pool/${pool.slug}`
   const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
   const onCopy = async () => {
     try {
+      setCopyError('')
       await navigator.clipboard.writeText(publicUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 1200)
     } catch {
-      // clipboard requires secure context — silent fallback
+      setCopyError('コピーできませんでした。公開URLを選んでコピーしてください。')
     }
   }
   /**
@@ -198,34 +175,22 @@ function PoolCard({
   }
 
   return (
-    <div className="bg-canvas border-hairline rounded-card border p-4">
-      <div className="flex items-center justify-between gap-3 mb-2">
+    <section className="pool-fid-card">
+      <div className="pool-fid-cardHead">
         <div className="min-w-0">
-          <h3 className="flex items-center gap-2 font-semibold">
-            <span className="min-w-0 truncate" title={pool.name}>{pool.name}</span>
-            {isMain && (
-              <StatusBadge tone="info" size="compact">
-                既定
-              </StatusBadge>
-            )}
-          </h3>
-          <p className="text-xs text-ink-faint font-mono truncate" title={pool.slug}>{pool.slug}</p>
+          <h2 className="pool-fid-name" title={pool.name}>{pool.name}</h2>
+          <p className="pool-fid-slug" title={pool.slug}>slug：{pool.slug}{isMain ? '・既定' : ''}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button variant="secondary" onClick={onCopy}>
-            {copied ? '✓ コピー済' : '公開 URL コピー'}
-          </Button>
-          {!isMain && (
-            <button
-              type="button"
-              onClick={() => { setDeleteError(''); setConfirmOpen(true) }}
-              className="text-danger hover:bg-danger-bg rounded-mini px-2 py-1 text-xs"
-            >
-              削除する
-            </button>
-          )}
-        </div>
+        {!isMain && <div>
+          <IconButton aria-label={`${pool.name}の操作`} onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen}><MoreHorizontal size={16} /></IconButton>
+          <ActionMenu open={menuOpen} onClose={() => setMenuOpen(false)} items={[{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } }]} />
+        </div>}
       </div>
+      <div className="pool-fid-urlRow">
+        <span className="pool-fid-url" title={publicUrl}>{publicUrl}</span>
+        <Button variant="secondary" onClick={onCopy}><Copy size={15} aria-hidden="true" />{copied ? 'コピー済' : '公開 URL コピー'}</Button>
+      </div>
+      {copyError && <p role="alert" className="text-xs text-ink-secondary">{copyError}</p>}
       <PoolAccountList poolId={pool.id} accounts={accounts} onChange={onChange} />
 
       <ConfirmDialog
@@ -243,7 +208,7 @@ function PoolCard({
           setDeleteError('')
         }}
       />
-    </div>
+    </section>
   )
 }
 
@@ -253,7 +218,7 @@ function PoolAccountList({
   onChange,
 }: {
   poolId: string
-  accounts: LineAccount[]
+  accounts: AccountWithStats[]
   onChange: () => void
 }) {
   const [members, setMembers] = useState<PoolAccount[]>([])
@@ -325,26 +290,22 @@ function PoolAccountList({
   }
 
   return (
-    <div className="mt-2">
-      <ul className="text-sm space-y-1">
+    <div className="pool-fid-members">
+      <div className="pool-fid-membersLabel">所属アカウント<HelpTip label="所属アカウントの説明">来たお客さまを稼働中の所属先へランダムに振り分けます。</HelpTip></div>
+      <ul className="pool-fid-memberList">
         {members.map((m) => {
           const acc = accounts.find((a) => a.id === m.lineAccountId)
           return (
             <li
               key={m.id}
-              className="bg-canvas-sunken rounded-mini flex items-center justify-between gap-2 px-2 py-1"
+              className="pool-fid-member"
             >
               <span className="min-w-0 truncate" title={acc?.name ?? m.lineAccountId}>{acc?.name ?? m.lineAccountId}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setRemoveError('')
-                  setRemoveTarget({ id: m.id, name: acc?.name ?? m.lineAccountId })
-                }}
-                className="text-danger shrink-0 text-xs hover:underline"
-              >
-                外す
-              </button>
+              <span className="shrink-0 text-xs text-ink-secondary">友だち {acc?.stats?.friendCount == null ? '—' : acc.stats.friendCount.toLocaleString('ja-JP')}</span>
+              <Button variant="secondary" onClick={() => {
+                setRemoveError('')
+                setRemoveTarget({ id: m.id, name: acc?.name ?? m.lineAccountId })
+              }}>外す</Button>
             </li>
           )
         })}
@@ -353,7 +314,7 @@ function PoolAccountList({
         )}
       </ul>
       {listError && (
-        <p className="text-danger mt-1 text-xs">{listError}</p>
+        <p role="alert" className="mt-1 text-xs text-ink-secondary">{listError} <button type="button" onClick={() => void reload()} className="text-action underline">読み直す</button></p>
       )}
       {candidates.length > 0 && (
         <div className="mt-2">
@@ -393,7 +354,7 @@ function CreatePoolModal({
   onClose,
   onCreated,
 }: {
-  accounts: LineAccount[]
+  accounts: AccountWithStats[]
   onClose: () => void
   onCreated: () => void
 }) {

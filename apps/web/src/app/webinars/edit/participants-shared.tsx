@@ -32,7 +32,7 @@ export function ParticipantAvatar({
   pictureUrl: string | null
   size?: 'sm' | 'md' | 'lg'
 }) {
-  const sizeClass = size === 'lg' ? 'h-11 w-11 text-sm' : size === 'sm' ? 'h-7 w-7 text-[10px]' : 'h-9 w-9 text-xs'
+  const sizeClass = size === 'lg' ? 'h-11 w-11 text-sm' : size === 'sm' ? 'h-7 w-7 text-nano' : 'h-9 w-9 text-xs'
   // 外部 URL は https だけ読み、http 等は頭文字表示に落とす。
   if (pictureUrl && pictureUrl.startsWith('https://')) {
     return (

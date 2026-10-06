@@ -304,6 +304,7 @@ webhook.post('/webhook', async (c) => {
       c.env.NEN_EC_BASE_URL && c.env.ECCUBE_WEBHOOK_SECRET
         ? { baseUrl: c.env.NEN_EC_BASE_URL, secret: c.env.ECCUBE_WEBHOOK_SECRET }
         : undefined,
+      c.env,
       );
     },
   });
@@ -459,6 +460,7 @@ async function handleEvent(
   liffUrl?: string,
   r2?: R2Bucket,
   ecommerce?: { baseUrl: string; secret: string },
+  operatorMailEnv?: Env['Bindings'],
 ): Promise<void> {
   if (event.type === 'unsend') {
     await recordLineMessageUnsend(db, {
@@ -1317,6 +1319,7 @@ async function handleEvent(
             logContext: 'postback',
             messageKind: 'postback',
             incomingEventId: event.webhookEventId,
+            operatorMailEnv,
             incomingMessageLogId: postbackIncomingLogId,
             occurredAt: new Date(event.timestamp).toISOString(),
           })
@@ -1437,6 +1440,7 @@ async function handleEvent(
         logContext: 'non-text-message',
         messageKind: msg.type,
         incomingEventId: event.webhookEventId,
+            operatorMailEnv,
         incomingMessageLogId: logId,
         occurredAt: new Date(event.timestamp).toISOString(),
       },
@@ -1566,6 +1570,7 @@ async function handleEvent(
         workerUrl,
         messageKind: event.message?.type ?? 'text',
         incomingEventId: event.webhookEventId,
+            operatorMailEnv,
         incomingMessageLogId: logId,
         occurredAt: new Date(event.timestamp).toISOString(),
       },

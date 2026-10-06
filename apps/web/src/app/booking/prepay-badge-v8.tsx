@@ -85,7 +85,7 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
   const dates = decision.recentDates.map(jstMonthDay).filter((text) => text !== '')
 
   return (
-    <div className={styles.badge}>
+    <div className={styles.badge} data-design="PrepayBadge">
       <svg className={styles.icon} aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none">
         <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
         <line x1="2" y1="8" x2="18" y2="8" stroke="currentColor" strokeWidth="1.5" />

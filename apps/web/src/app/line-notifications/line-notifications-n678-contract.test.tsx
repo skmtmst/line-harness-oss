@@ -42,6 +42,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: fixture.routerReplace }),
   useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/line-notifications',
 }))
 
 /*
@@ -1201,13 +1202,21 @@ describe('#678 実DOMへマウントした画面全体', () => {
     render(<LineNotificationsPage />)
 
     await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
-    // 行の「今日」「この30日」は送信履歴の2通・7通。
-    expect(screen.getByText('2通')).toBeTruthy()
+    // 板 g3iDs：行は「この30日」だけ（送信履歴の7通）。「今日」の列は置かない。
+    // 数カード「この30日」も同じ7通。
+    // V8は数字と単位を別要素へ出す。表と数カードの両方の実データを守る。
     expect(screen.getByText('7通')).toBeTruthy()
+    const number = document.querySelector('[data-kpi-number]')
+    const numbers = [...document.querySelectorAll('[data-kpi-number]')].map((node) => node.parentElement?.textContent)
+    expect(number).toBeTruthy()
+    expect(numbers).toContain('7通')
+    expect(numbers).toContain('2通')
+    expect(numbers).not.toContain('5通')
+    expect(numbers).not.toContain('9通')
     expect(screen.queryByText('5通')).toBeNull()
     expect(screen.queryByText('9通')).toBeNull()
-    // KPIの「今日 送った」も送信履歴の合計。
-    expect(screen.getByText('今日 送った')).toBeTruthy()
+    // KPIの「今日送った」も送信履歴の合計。
+    expect(screen.getByText('今日送った')).toBeTruthy()
   })
 
   it('403: 顧客のお知らせは「表示する権限がありません」を出し、読み直す口は出さない', async () => {

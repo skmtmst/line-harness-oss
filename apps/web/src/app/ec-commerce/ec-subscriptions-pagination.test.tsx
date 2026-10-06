@@ -71,9 +71,10 @@ function page(offset: number, limit: number, total = 900) {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  fixture.theme = "v7"
+  /* 完全切り替え：V8 だけ。1ページ10件が既定。 */
+  fixture.theme = "v8"
   fixture.subscriptions.mockImplementation(async (params: { offset?: number; limit?: number }) =>
-    page(params.offset ?? 0, params.limit ?? 100))
+    page(params.offset ?? 0, params.limit ?? 10))
   fixture.overview.mockResolvedValue({ success: true, data: { total: 12, subscriptions: 900 } })
   fixture.identities.mockResolvedValue({ success: true, data: { summary: { unmatched: 3 } } })
 })
@@ -86,8 +87,8 @@ describe('#731 定期便のページ送りとタブの件数', () => {
     await screen.findByText(/900件中/)
     const footer = screen.getByText(/900件中/).textContent ?? ''
     console.log('AUDIT-WEB フッター(1ページ目) =', footer)
-    expect(footer).toContain('1〜100件を表示')
-    expect(fixture.subscriptions.mock.calls[0][0]).toMatchObject({ limit: 100, offset: 0 })
+    expect(footer).toContain('1〜10件を表示')
+    expect(fixture.subscriptions.mock.calls[0][0]).toMatchObject({ limit: 10, offset: 0 })
 
     // 2ページ目へ。**offset が乗ること**が要点。
     const next = screen.getByRole('button', { name: '2ページ目へ' })
@@ -97,21 +98,24 @@ describe('#731 定期便のページ送りとタブの件数', () => {
     })
     const second = fixture.subscriptions.mock.calls.at(-1)![0]
     console.log('AUDIT-WEB 2ページ目の要求 =', JSON.stringify(second))
-    expect(second).toMatchObject({ limit: 100, offset: 100 })
-    await screen.findByText(/101〜200件を表示/)
+    expect(second).toMatchObject({ limit: 10, offset: 10 })
+    await screen.findByText(/11〜20件を表示/)
   })
 
-  test('9ページ目(801件目以降)へも行ける', async () => {
+  test('9ページ目(81件目以降)へも行ける', async () => {
+    /* 10件×9ページ=90件で、最終ページへ直接行ける。 */
+    fixture.subscriptions.mockImplementation(async (params: { offset?: number; limit?: number }) =>
+      page(params.offset ?? 0, params.limit ?? 10, 90))
     render(<SubscriptionsPanel accountId="account-a" />)
-    await screen.findByText(/900件中/)
+    await screen.findByText(/90件中/)
     const last = screen.getByRole('button', { name: '9ページ目へ' })
     await act(async () => { fireEvent.click(last) })
     await waitFor(() => {
-      expect(fixture.subscriptions.mock.calls.at(-1)![0]).toMatchObject({ offset: 800 })
+      expect(fixture.subscriptions.mock.calls.at(-1)![0]).toMatchObject({ offset: 80 })
     })
-    const footer = await screen.findByText(/801〜900件を表示/)
+    const footer = await screen.findByText(/81〜90件を表示/)
     console.log('AUDIT-WEB フッター(9ページ目) =', footer.textContent)
-    expect(footer.textContent).toContain('801〜900件を表示')
+    expect(footer.textContent).toContain('81〜90件を表示')
   })
 
   test('タブの件数は overview から取り、定期便の口を別に叩かない', async () => {

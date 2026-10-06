@@ -40,7 +40,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
 }))
 
-import FormSubmissionsPage from './page'
+import FormSubmissionsPage from './list-v8'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -96,15 +96,15 @@ describe('フォーム全体の複製（R230・実マウント）', () => {
     })
     await act(async () => {})
 
-    // 1. 行の「…」に「複製する」がある
-    const menuButton = host.querySelector('button[aria-label="元のフォームのその他操作"]')
+    // 1. 行の「…」に「複製」がある
+    const menuButton = host.querySelector('button[aria-label^="「元のフォーム」のその他の操作"]')
     expect(menuButton).toBeTruthy()
     await act(async () => {
       menuButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     // メニューは最上層の portal に出る（一覧の表で切られないため）。document で探す。
     const duplicateItem = Array.from(document.querySelectorAll('[role="menuitem"]'))
-      .find((el) => el.textContent === '複製する')
+      .find((el) => el.textContent === '複製')
     expect(duplicateItem).toBeTruthy()
 
     // 2. 確認窓に引き継ぐもの・引き継がないものが出る

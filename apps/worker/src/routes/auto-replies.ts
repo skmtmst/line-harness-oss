@@ -47,6 +47,8 @@ import {
   type AutoReplyCandidateReasonCode,
 } from '../services/auto-reply.js';
 import { isOperatorHandling } from '../services/auto-reply-conditions.js';
+import { validateAutoReplyOperatorAction } from '../services/auto-reply-operator-action.js';
+import { isScenarioActionComplete } from '../services/scenario-actions.js';
 import { validateFlexContent } from '@line-crm/shared';
 
 const autoReplies = new Hono<Env>();
@@ -631,6 +633,10 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
     if (parsedActions.length !== extras.value.actions.length) {
       return { ok: false, error: '応答したあとにすることの設定を確認してください' };
     }
+    for (const action of parsedActions) {
+      const error = await validateAutoReplyOperatorAction(db,action,body.lineAccountId as string,false);
+      if (error) return {ok:false,error};
+    }
     // 失敗したら止めるか続けるかは stop/continue のどちらかだけ受け付ける。
     // 読めない値は実行側が続けるに倒すが、保存時には書き直しを促す。
     for (const [index, item] of (extras.value.actions as unknown[]).entries()) {
@@ -914,6 +920,18 @@ async function validateDraft(
   }
   if (settings.templateId && !await getTemplateById(db, settings.templateId)) {
     errors.push('選んだテンプレートを確認できません');
+  }
+  for (const action of parseAutoReplyActions(settings.actions)) {
+    if (action.action_type === 'notify_staff') {
+      const error = await validateAutoReplyOperatorAction(db,action,settings.lineAccountId ?? '',true);
+      if (error) errors.push(error);
+    } else if (action.action_type === 'tag') {
+      let config: Record<string,unknown> = {}; try { config=JSON.parse(action.config_json) } catch {}
+      if (!isScenarioActionComplete('tag',config)) errors.push('応答後に付けるタグを選んでください');
+      if (Array.isArray(config.tagIds)) for (const id of config.tagIds) {
+        if (typeof id !== 'string' || !await db.prepare('SELECT id FROM tags WHERE id = ? AND line_account_id = ?').bind(id,settings.lineAccountId).first()) errors.push('応答後に付けるタグが対象アカウントにありません');
+      }
+    }
   }
   const conflicts = await conflictsForDraft(db, version.auto_reply_id, settings);
   return {

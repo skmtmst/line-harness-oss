@@ -508,7 +508,22 @@
     "559_booking_plus_repeat_waitlist_visit.sql",
     "560_booking_sales_noshow.sql",
     "564_form_versions_purge_delete.sql",
-    "565_booking_noshow_settings_reasons.sql"
+    "565_booking_noshow_settings_reasons.sql",
+    "567_restaurant_reservation_holds.sql",
+    "568_restaurant_inventory_occupancy.sql",
+    "569_restaurant_booking_policy.sql",
+    "570_hq_template_folders.sql",
+    "571_hq_scenario_templates.sql",
+    "572_hq_template_text_overrides.sql",
+    "573_ad_event_mappings.sql",
+    "574_operator_notification_teams.sql",
+    "575_photo_publication_daily_views.sql",
+    "576_v8_event_venue_address.sql",
+    "577_v8_site_receipt.sql",
+    "578_v8_photo_publication_rewards.sql",
+    "579_banner_color_roles.sql",
+    "580_banner_reference_images.sql",
+    "581_banner_emphasis_lines.sql"
   ],
-  "migrationCount": 509
+  "migrationCount": 524
 }

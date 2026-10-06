@@ -3,6 +3,7 @@
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import TemplatesPage from './page'
 
 const mockState = vi.hoisted(() => ({
   selectedAccountId: 'account-a',
@@ -104,7 +105,6 @@ const tableFindText = async (name: string | RegExp) =>
   within(await screen.findByRole('table')).findByText(name)
 
 async function renderPage(waitForName: string | RegExp = '本文の行') {
-  const { default: TemplatesPage } = await import('./page')
   const rendered = render(<TemplatesPage />)
   await tableFindText(waitForName)
   return {
@@ -216,7 +216,6 @@ describe('テンプレート一覧の検索', () => {
         data: [template({ id: 'account-b', name: 'B社テンプレート', messageContent: '切替後の本文' })],
       })
 
-    const { default: TemplatesPage } = await import('./page')
     const rendered = render(<TemplatesPage />)
     mockState.selectedAccountId = 'account-b'
     rendered.rerender(<TemplatesPage />)

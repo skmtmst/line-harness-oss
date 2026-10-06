@@ -40,13 +40,13 @@ describe('一斉配信の最終確認', () => {
     expect(FORM).toContain('const audienceDisplayCount = audienceCount')
     expect(FORM).not.toContain('api.segments.count(')
     expect(FORM).toContain("formatNumber(audienceDisplayCount)")
-    expect(FORM).toContain("audienceDisplayCount === null ? '—' : `${formatNumber(audienceDisplayCount)}人`")
+    expect(FORM).toContain("audienceDisplayCount !== null ? `${formatNumber(audienceDisplayCount)}人`")
   })
 
   it('数えられていないときは送らせない', () => {
     expect(FORM).toContain('const canConfirm = audienceCount !== null && audienceCount > 0')
     // `onConfirm` を渡さないと、確認のボタンごと出ない（`Dialog` の作り）。
-    expect(FORM).toContain('onConfirm={canConfirm ? () => void save() : undefined}')
+    expect(FORM).toContain("onConfirm={canConfirm && (!currentStep || approvalConfigState === 'ready') ? () => void save() : undefined}")
   })
 
   it('未取得は「—」。0人と書かない', () => {
@@ -79,7 +79,7 @@ describe('一斉配信の最終確認', () => {
 describe('最終確認へのまとめ（IDEA-06）', () => {
   // 画面内の「最終確認」節だけを切り出す。
   const SECTION = FORM.slice(
-    FORM.indexOf('>最終確認</h3>'),
+    FORM.indexOf('<div id="broadcast-step-confirm"'),
     FORM.indexOf("shows('message') && lengthNotice.tone === 'error'"),
   )
   // 予約の確認窓（ConfirmDialog の中身）だけを切り出す。
@@ -132,11 +132,12 @@ describe('最終確認へのまとめ（IDEA-06）', () => {
 
   it('今すぐ配信・予約・下書きを混同しない', () => {
     // 段つき画面の確定ボタンは、予約のときだけ「予約」と言う。
-    expect(FORM).toContain("sendMode === 'scheduled' ? 'この内容で予約' : '保存して送信画面へ'")
+    expect(FORM).toContain("sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'")
     // 「今すぐ」は日時を持たない。「未設定」とは書かず、次の操作場所を書く。
-    expect(FORM).toContain("'今すぐ（保存後に詳細画面で送信）'")
-    expect(FORM).toContain('今すぐ配信を選んでいます')
-    // 保存した下書きは、送信ボタンのある詳細画面へ進める。
+    expect(FORM).toContain("'今すぐ（確認してから送信）'")
+    expect(FORM).toContain('onClick={openConfirm}')
+    expect(FORM).toContain('api.broadcasts.send(saved.id')
+    // 送信した配信は詳細画面へ進める。
     // 旧詳細（`/broadcasts?id=`）ではなく新しい詳細へ連れていく。
     const NEW_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'broadcasts', 'new', 'page.tsx'), 'utf8')
     expect(NEW_PAGE).toContain('`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`')

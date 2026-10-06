@@ -188,4 +188,123 @@
 [data-theme='v8'] .invalid .radio {
   border-color: var(--color-status-danger);
 }
+
 }
+
+/* 正本 fNPdg / r3xz1W。v7 の行配置はそのまま。 */
+.topIcon { display: none; }
+[data-theme='v8'] .card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  height: auto;
+  min-height: 98px;
+  padding: 14px;
+  border: 0;
+  border-radius: 12px;
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+  background: var(--color-canvas);
+  font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
+}
+[data-theme='v8'] .topIcon { display: flex; height: 16px; width: 100%; color: var(--color-ink-secondary); }
+[data-theme='v8'] .topIcon svg { width: 16px; height: 16px; flex-shrink: 0; }
+[data-theme='v8'] .checked .topIcon { color: var(--color-accent-deep); }
+[data-theme='v8'] .body { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+[data-theme='v8'] .title { font-size: 13px; line-height: 20px; font-weight: 600; }
+[data-theme='v8'] .note { font-size: 12px; line-height: 18px; color: var(--color-ink-secondary); }
+[data-theme='v8'] .radio {
+  position: absolute; top: 14px; right: 14px;
+  width: 16px; height: 16px; margin: 0; border: 0;
+  outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px;
+  background: var(--color-canvas); box-shadow: none;
+}
+[data-theme='v8'] .radio:checked { background: var(--color-canvas); outline: 5px solid var(--color-accent-deep); outline-offset: -2.5px; box-shadow: none; }
+[data-theme='v8'] .radio:focus-visible { outline: 2px solid var(--color-action); outline-offset: 3px; }
+[data-theme='v8'] .checked, [data-theme='v8'] .checked:hover { background: var(--color-accent-soft); outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
+[data-theme='v8'] .disabled { background: var(--color-canvas-sunken); outline-color: var(--color-ink-disabled); }
+[data-theme='v8'] .disabled .radio { outline-color: var(--color-ink-disabled); }
+[data-theme='v8'] .invalid, [data-theme='v8'] .invalid .radio { outline-color: var(--color-status-danger); }
+
+[data-theme='v8'] .radio { border-radius: 999px; }
+
+/*
+ * V8 の小さい箱（compact・バナー生成の脇のパネル）は装飾の丸を出さない。
+ * 普通の箱（card）は絵（A0pDt・VE1u5・選ぶカード fNPdg/r3xz1W）どおり右上に丸を出す（2026-10-06 オーナー）。
+ * 小さい箱では、選んだことは枠と面の色で
+ * 分かる（[data-theme='v8'] .checked）。読み上げ・矢印キー・Space のために
+ * 本物の input は残し、見えない大きさで同じ位置に置く。キーボードで来たことは
+ * 箱の枠に出す（:has）。行（row）の丸は下の .row 側でそのまま出す。
+ *
+ * 輪郭を消す指定（outline: 0）は書かない。`opacity: 0` は輪郭も含めて
+ * 透明にするので、丸の輪郭はそれだけで見えなくなる。消す指定を足すと
+ * 共通の約束（focus-visible-contract）に反し、将来 opacity を外したときに
+ * キーボードの輪郭が本当に消える。
+ */
+[data-theme='v8'] .compact > .radio,
+[data-theme='v8'] .compact > .radio:checked {
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 1px;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+[data-theme='v8'] .compact:has(> .radio:focus-visible) {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+/*
+ * 小さい箱（★BG-B 出力サイズ o2XyUk/aCyxg）。
+ * 角 8・枠 1・余白 8/10・間 3・題 11/600・補足 10。狭い脇のパネル（390px）に
+ * 2列で並べる大きさ。箱（card）の寸法は変えない。
+ *
+ * 角は数字で書かず $radius-segment を使う。この約束の値は :root でも
+ * [data-theme='v8'] でも 8 のままなので、承認した角 8 がそのまま出る。
+ * （$radius-control は v8 で 10 になるため、ここでは使えない。）
+ */
+[data-theme='v8'] .compact {
+  gap: 3px;
+  min-height: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-segment);
+}
+[data-theme='v8'] .compact .body { gap: 3px; }
+[data-theme='v8'] .compact .title { font-size: 11px; line-height: 16px; font-weight: 600; }
+[data-theme='v8'] .compact .note { font-size: 10px; line-height: 14px; }
+[data-theme='v8'] .compact.checked .title { color: var(--color-accent-deep); }
+
+/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+[data-theme='v8'] .card { -webkit-font-smoothing: auto; }
+
+/*
+ * 変わり形：行（BHEl9 の素のラジオ行）。箱・選んだ面・上段の印なし。
+ * 丸 18・文字 13/400・間 8・縦は中身の高さ（fit-content）。
+ * 丸の輪郭（1.5px・選ぶと 5px の濃い緑）は v8 の .radio のまま。
+ * 箱（fNPdg/r3xz1W）の合格は変えない。
+ */
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.row:hover { background: transparent; }
+.row.checked, .row.checked:hover { border-color: transparent; background: transparent; }
+.row.disabled { background: transparent; }
+.row.invalid { border-color: transparent; }
+.row .topIcon { display: none; }
+.row .title { font-size: 13px; font-weight: 400; line-height: 20px; }
+[data-theme='v8'] .row .body { gap: 2px; }
+[data-theme='v8'] .row .radio { position: static; width: 18px; height: 18px; margin: 0; }
+[data-theme='v8'] .row:active { filter: none; }
+[data-theme='v8'] .row { -webkit-font-smoothing: auto; }

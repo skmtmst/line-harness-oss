@@ -30,7 +30,7 @@ function pages(dir: string, out: string[] = []): string[] {
 }
 
 /**
- * 画面が読み込んでいるものも一緒に見る。
+ * 画面が読み込んでいるものも一緒に見る（親フォルダの相対importも含む）。
  *
  * **帯は部品の中にあることがある。** `tags/edit` は
  * `components/friend-fields/edit-tag-page-v4.tsx` に、
@@ -56,8 +56,8 @@ function readWithParts(file: string, depth = 0, seen = new Set<string>()): strin
       }
     }
   }
-  for (const m of source.matchAll(/from '\.\/([^']+)'/g)) {
-    const base = path.join(path.dirname(file), m[1])
+  for (const m of source.matchAll(/from '(\.\/|\.\.\/)([^']+)'/g)) {
+    const base = path.join(path.dirname(file), m[1], m[2])
     for (const ext of ['.tsx', '.ts']) {
       if (fs.existsSync(base + ext)) {
         combined += readWithParts(base + ext, depth + 1, seen)
@@ -105,6 +105,8 @@ const EDIT_PAGES = pages(path.join(SRC, 'app'))
  */
 const NOT_YET: string[] = []
 
+// アカウント登録は保存フォームの帯ではなく、5段のウィザードの進む操作を使う。
+const WIZARD_PAGES = new Set(['accounts/new/page.tsx'])
 const uses = (s: string) => /StickyBar|CreatePage/.test(s)
 
 describe('下部追従バーの並びを部品で固定する', () => {
@@ -113,8 +115,16 @@ describe('下部追従バーの並びを部品で固定する', () => {
   })
 
   it('帯を使っていない画面を増やさない', () => {
-    const found = EDIT_PAGES.filter((f) => !uses(f.s)).map((f) => f.p).sort()
+    const found = EDIT_PAGES.filter((f) => !WIZARD_PAGES.has(f.p) && !uses(f.s)).map((f) => f.p).sort()
     expect(found, '作成・編集画面が自前で帯を書いている').toEqual([...NOT_YET].sort())
+  })
+
+  it('登録ウィザードの進む操作と接続確認の保存制限を残す', () => {
+    const wizard = readWithParts(path.join(SRC, 'app/accounts/new/page.tsx'))
+    expect(wizard).toContain('V8_STEPS')
+    expect(wizard).toContain('type="submit"')
+    expect(wizard).toContain('!connectionPassed')
+    expect(wizard).toContain('api.lineAccounts.connect(')
   })
 
   it('削除は左端、ほかは中央、右端は空ける', () => {

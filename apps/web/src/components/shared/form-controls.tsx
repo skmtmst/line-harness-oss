@@ -26,6 +26,14 @@ export function RequiredBadge() {
   return <span className={styles.required}>必須</span>
 }
 
+/**
+ * 「任意」の札（Td4TN・RaMf3：括弧なし・11px/17・左に6・文と同じ行）。
+ * 必須のような丸い地は付けず、薄い灰の文字だけ。
+ */
+export function OptionalBadge() {
+  return <span className={styles.optional}>任意</span>
+}
+
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */
 export function Field({
   label,

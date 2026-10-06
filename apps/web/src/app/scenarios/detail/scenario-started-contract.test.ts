@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const LIST_PAGE = readFileSync(new URL('../page.tsx', import.meta.url), 'utf8')
+/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+const LIST_PAGE = readFileSync(new URL('../list-v8.tsx', import.meta.url), 'utf8')
 const DETAIL_PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const DETAIL = readFileSync(new URL('./scenario-detail-client.tsx', import.meta.url), 'utf8')
 
 describe('V6 シナリオ開始完了', () => {
   it('開始成功時だけ実Node NrBkW の完了画面へ進む', () => {
-    expect(LIST_PAGE).toContain("router.push(`/scenarios/detail?id=${encodeURIComponent(target.id)}&started=1`)")
+    // 一覧からの開始は詳細画面で行う（V8 の一覧に開始の口は無い）。
     expect(DETAIL_PAGE).toContain("searchParams.get('started') === '1'")
     expect(DETAIL_PAGE).toContain('showStarted={showStarted}')
     expect(DETAIL).toContain('data-design-node="NrBkW"')
@@ -33,7 +34,8 @@ describe('V6 シナリオ開始完了', () => {
   })
 
   it('停止時は完了画面へ移動せず一覧を読み直す', () => {
-    expect(LIST_PAGE).toContain('if (target.isActive)')
+    // V8 の一覧はまとめての帯で止める・再開する。読み直しは一覧の口で行う。
     expect(LIST_PAGE).toContain('void loadScenarios()')
+    expect(LIST_PAGE).toContain('まとめて止める')
   })
 })

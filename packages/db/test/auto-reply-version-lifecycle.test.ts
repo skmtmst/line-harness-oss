@@ -83,6 +83,13 @@ describe('自動応答の下書き・試験・公開版', () => {
     db = asD1(sqlite);
   });
 
+  it('通知とタグ付けの設定を同じ版に保存し、読み直しても変えない', async () => {
+    const actions = JSON.stringify([{actionType:'notify_staff',config:{notificationRuleId:'r',notificationRuleVersion:2,message:'受信箱を確認してください'},onFailure:'stop'},{actionType:'tag',config:{op:'add',tagIds:['t']},onFailure:'continue'}]);
+    const created = await createAutoReplyWithDraftVersion(db,settings({actions}));
+    const reread = await getAutoReplyDraftVersion(db,created.rule.id);
+    expect(parseAutoReplyVersionSettings(reread!).actions).toBe(actions);
+  });
+
   it('新規下書きは自動応答を動かさず、公開版も作らない', async () => {
     const created = await createAutoReplyWithDraftVersion(db, settings());
     expect(created.rule.is_active).toBe(0);

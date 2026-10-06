@@ -24,6 +24,15 @@
   padding: 18px;
 }
 
+/*
+ * 画面の絵での段の箱（d9xoI「段 基本」・T9gblG「箱 CSVで書き出す」・
+ * JB8V1「推薦カード」）：内側の余白 20px。既定（16・18）の合格は
+ * 変えない。変わり形として足す。
+ */
+.paddingSpacious {
+  padding: 20px;
+}
+
 .header {
   display: flex;
   min-height: 48px;

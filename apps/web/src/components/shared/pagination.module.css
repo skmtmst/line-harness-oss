@@ -104,6 +104,7 @@ button.item:disabled {
 [data-theme='v8'] .pagination {
   gap: 6px;
   padding: 10px 20px;
+  font-variant-numeric: normal;
 }
 
 [data-theme='v8'] .summary {
@@ -145,4 +146,17 @@ button.item:disabled {
 [data-theme='v8'] .controlGlyph {
   display: inline;
 }
+
+[data-theme='v8'] .item {
+  border: 0; border-radius: 8px; color: var(--color-ink-secondary);
+  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+  font-family: var(--font-inter), Inter, sans-serif; line-height: 20px;
+}
+[data-theme='v8'] .current {
+  outline-color: transparent; background: var(--color-ink); color: var(--color-canvas);
+}
+[data-theme='v8'] span.item { outline-color: transparent; }
+[data-theme='v8'] .summary { font-family: var(--font-inter), Inter, system-ui, sans-serif; line-height: 20px; }
+
+[data-theme='v8'] .summary { flex: 1; gap: 0; }
 }

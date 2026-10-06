@@ -35,6 +35,7 @@ vi.mock('@/contexts/account-context', () => ({
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
+  usePageCrumbs: () => {},
 }))
 
 vi.mock('@/components/shared/list-kpis', () => ({
@@ -91,7 +92,7 @@ async function flush() {
 }
 
 function typeSearch(value: string) {
-  const input = host.querySelector('input[aria-label="名前・内容で検索"]') as HTMLInputElement | null
+  const input = host.querySelector('input[aria-label="名前・内容で探す"]') as HTMLInputElement | null
   expect(input, '検索欄が見つかりません').toBeTruthy()
   act(() => {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
@@ -114,27 +115,27 @@ describe('リマインダ一覧の絞り込み0件 (#635)', () => {
     await flush()
 
     // 「0件」と分かる表示＋次の行動提案（別の言葉・絞り込み解除）。
-    expect(host.textContent).toContain('この条件に合うリマインダはありません。')
-    expect(host.textContent).toContain('検索語や絞り込みを変えてください。')
+    expect(host.textContent).toContain('条件に合うリマインダはありません')
+    expect(host.textContent).toContain('検索を外すと、すべて出ます')
     expect(host.textContent).not.toContain('まだリマインダがありません')
-    expect(buttonByText('検索と絞り込みを解除')).toBeTruthy()
+    expect(buttonByText('条件を外す')).toBeTruthy()
   })
 
-  it('「検索と絞り込みを解除」で検索語を外して一覧へ戻る', async () => {
+  it('「条件を外す」で検索語を外して一覧へ戻る', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
 
     typeSearch('存在しない言葉xyz')
     await flush()
-    expect(host.textContent).toContain('この条件に合うリマインダはありません。')
+    expect(host.textContent).toContain('条件に合うリマインダはありません')
 
-    const clear = buttonByText('検索と絞り込みを解除')
+    const clear = buttonByText('条件を外す')
     expect(clear).toBeTruthy()
     await act(async () => { clear!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
     await flush()
 
     // 検索欄が空に戻り、q の付かない取り直しで一覧が復活する。
-    const input = host.querySelector('input[aria-label="名前・内容で検索"]') as HTMLInputElement
+    const input = host.querySelector('input[aria-label="名前・内容で探す"]') as HTMLInputElement
     expect(input.value).toBe('')
     expect(listCalls().at(-1)).not.toContain('q=')
     expect(host.textContent).toContain('予約前のお知らせ')

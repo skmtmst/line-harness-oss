@@ -417,7 +417,11 @@ function FriendAddEditorV8Inner({ ruleId }: { ruleId?: string }) {
   }
   if (error && !rule.name && ruleId) return <ListState kind="error" title="設定を表示できませんでした" description={error} onRetry={() => void load()} />
 
-  const node = STEPS[currentIndex].node
+  /*
+   * ★V8 `xHpkS` 作る②（1152）は流入リンク段と同じ画面の幅違い。
+   * 板1100px未満で右の列を下へ畳む（CSSで押さえる）。
+   */
+  const node = step === 'routes' ? 'h8uNW xHpkS' : STEPS[currentIndex].node
   const nextLabel = step === 'preview' ? '' : STEPS[Math.min(currentIndex + 1, 4)].label
   return (
     <div className={styles.board} data-design-node={node}>
@@ -513,7 +517,7 @@ function FriendAddEditorV8Inner({ ruleId }: { ruleId?: string }) {
       <div className={styles.bottomBar}>
         <div className={styles.bottomActions}>
           <Button href="/friend-add-settings" variant="secondary">キャンセル</Button>
-          <Button type="button" variant="secondary" disabled={!canEdit || saving || enabling} title={!canEdit ? readonlyReason : undefined} onClick={() => void save()}>下書きを保存</Button>
+          <Button type="button" variant="secondary" disabled={!canEdit || saving || enabling} title={!canEdit ? readonlyReason : undefined} onClick={() => void save()}>下書きのまま保存</Button>
           {step === 'preview' ? (
             <Button
               type="button"

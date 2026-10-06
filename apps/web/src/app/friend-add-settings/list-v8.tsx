@@ -16,12 +16,17 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
+  Activity,
   AlertCircle,
+  Clock,
   Eye,
+  FileText,
+  FolderPlus,
   History,
   Link2,
   Lock,
   MoreHorizontal,
+  Pause,
   Pencil,
   Route,
   Send,
@@ -57,10 +62,11 @@ const KIND_LABELS: Record<FriendAddRuleKind, string> = {
 
 /** 未分類の印。V7 の一覧と同じく、サーバでは '__uncategorized' を使う。 */
 const UNFILED = '__uncategorized'
-const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string }> = [
-  { key: 'published', label: '有効' },
-  { key: 'draft', label: '下書き' },
-  { key: 'stopped', label: '停止中' },
+/* 板 `LEwkJ`：状態の札には印を付ける（選んでいないときも意味が読める）。 */
+const STATUS_CHIPS: Array<{ key: FriendAddRuleStatus; label: string; icon: typeof Clock }> = [
+  { key: 'published', label: '有効', icon: Clock },
+  { key: 'draft', label: '下書き', icon: FileText },
+  { key: 'stopped', label: '停止中', icon: Pause },
 ]
 
 function countText(value: number | null, unit: string) {
@@ -393,7 +399,7 @@ function FriendAddListV8Inner() {
   const rowMenuItems = (rule: FriendAddRule): ActionMenuItem[] => [
     {
       id: 'edit',
-      label: '編集する',
+      label: '編集',
       icon: <Pencil size={15} />,
       disabled: !canEdit,
       disabledReason: canEdit ? undefined : readonlyReason,
@@ -577,13 +583,14 @@ function FriendAddListV8Inner() {
       </span>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
+          {/* 列幅は板 `MRhef`：順 28・設定は伸び縮み・最初に送るもの 170・状態 80・直近7日 64・操作 28 */}
           <colgroup>
-            <col style={{ width: 72 }} />
+            <col style={{ width: 28 }} />
             <col />
-            <col style={{ width: 200 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 80 }} className={styles.recentCol} />
-            <col style={{ width: 44 }} />
+            <col style={{ width: 170 }} />
+            <col style={{ width: 80 }} />
+            <col style={{ width: 64 }} className={styles.recentCol} />
+            <col style={{ width: 28 }} />
           </colgroup>
           <thead>
             <tr>
@@ -623,12 +630,12 @@ function FriendAddListV8Inner() {
                     {rule.name}
                   </Link>
                   <p className={styles.cellSub} title={rule.routeNames.join('、') || '未選択'}>
-                    <Link2 size={11} aria-hidden="true" className={styles.cellSubIcon} />
+                    <Link2 size={11} aria-hidden="true" className="shrink-0 text-ink-faint" />
                     {rule.routeNames.join('、') || '未選択'}
                   </p>
                 </td>
                 <td>
-                  <span className={styles.countMain}>{firstSendLabel(rule)}</span>
+                  <span className="text-ink tabular-nums">{firstSendLabel(rule)}</span>
                   {actionLines(rule).map((line) => (
                     <p key={line} className={styles.cellSub}>{line}</p>
                   ))}
@@ -640,7 +647,7 @@ function FriendAddListV8Inner() {
                   </span>
                 </td>
                 <td className={`${styles.countCell} ${styles.recentCol}`}>
-                  <span className={styles.countMain}>
+                  <span className="text-ink tabular-nums">
                     {rule.status === 'draft' ? '—' : countText(rule.matchedLast7Days, '人')}
                   </span>
                 </td>
@@ -678,12 +685,12 @@ function FriendAddListV8Inner() {
                     {sinkRule.name}
                   </Link>
                   <p className={styles.cellSub}>
-                    <Route size={11} aria-hidden="true" className={styles.cellSubIcon} />
+                    <Route size={11} aria-hidden="true" className="shrink-0 text-ink-faint" />
                     基本の追加URL・素のQR・検索など｜いちばん最後に動く・消せない
                   </p>
                 </td>
                 <td>
-                  <span className={styles.countMain}>{firstSendLabel(sinkRule)}</span>
+                  <span className="text-ink tabular-nums">{firstSendLabel(sinkRule)}</span>
                   {actionLines(sinkRule).map((line) => (
                     <p key={line} className={styles.cellSub}>{line}</p>
                   ))}
@@ -695,15 +702,19 @@ function FriendAddListV8Inner() {
                   </span>
                 </td>
                 <td className={`${styles.countCell} ${styles.recentCol}`}>
-                  <span className={styles.countMain}>{countText(sinkRule.matchedLast7Days, '人')}</span>
+                  <span className="text-ink tabular-nums">{countText(sinkRule.matchedLast7Days, '人')}</span>
                 </td>
-                <td className={styles.menuCell}>
+                <td
+                  className={styles.menuCell}
+                  data-design-node={openMenuId === sinkRule.id ? 'C0lfUP' : undefined}
+                >
                   <button
                     type="button"
                     className={styles.menuButton}
                     title={`設定「${sinkRule.name}」の操作`}
                     aria-label={`設定「${sinkRule.name}」の操作`}
                     aria-haspopup="menu"
+                    aria-expanded={openMenuId === sinkRule.id}
                     onClick={() =>
                       setOpenMenuId((current) => (current === sinkRule.id ? null : sinkRule.id))
                     }
@@ -748,7 +759,7 @@ function FriendAddListV8Inner() {
           </p>
         </div>
         <Button href="/friend-add-settings/runs" variant="secondary">
-          <History size={14} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />
+          <Activity size={14} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />
           実行結果を見る
         </Button>
       </div>
@@ -812,7 +823,7 @@ function FriendAddListV8Inner() {
             activeId={folder ?? ''}
             onSelect={(id) => selectFolder(id || null)}
             onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
-            addFolderDisabled={folderBusy || !canEdit}
+            addFolderDisabled={folderBusy}
             rows={[
               { id: '', label: 'すべて', count: data?.total ?? items.length },
               ...folders.map((entry) => ({
@@ -821,7 +832,15 @@ function FriendAddListV8Inner() {
                 count: entry.count,
               })),
             ]}
-          />
+          >
+            {/* 板 `LEwkJ`：閲覧のみでも「フォルダを追加」は文字の口で置く（押せない形）。 */}
+            {canEdit ? null : (
+              <span className="mt-2 inline-flex items-center gap-2 text-xs text-ink-faint" aria-disabled="true" title={readonlyReason}>
+                <FolderPlus size={14} aria-hidden="true" />
+                フォルダを追加
+              </span>
+            )}
+          </FolderPanel>
           <p className={styles.folderNote}>フォルダを消しても、中の設定は未分類に残ります</p>
         </div>
 
@@ -875,6 +894,7 @@ function FriendAddListV8Inner() {
                 selected={statusFilter === chip.key}
                 onChange={(on) => selectStatus(on ? chip.key : '')}
               >
+                <chip.icon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />
                 {chip.label}
               </FilterChip>
             ))}

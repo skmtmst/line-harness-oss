@@ -6,7 +6,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyLayout } from '@line-crm/shared'
 
@@ -102,6 +102,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
   usePageCrumbs: () => {},
+  usePageChrome: () => ({ title: '' }),
 }))
 
 import FormSubmissionsPage from './page'
@@ -181,6 +182,21 @@ beforeEach(() => {
   if (!g.crypto) g.crypto = {}
   if (!g.crypto.randomUUID) g.crypto.randomUUID = () => 'test-uuid-1'
   document.documentElement.dataset.theme = 'v8'
+  // 板 JV2oR（閲覧のみ）：作る操作は localStorage の役職で決まる。試験では店長として通す。
+  // このファイルの happy-dom には localStorage が無いので、無ければ小さな置き換えを置く。
+  const w = window as unknown as { localStorage?: Storage }
+  if (!w.localStorage) {
+    const bag = new Map<string, string>()
+    w.localStorage = {
+      getItem: (k: string) => bag.get(k) ?? null,
+      setItem: (k: string, v: string) => { bag.set(k, String(v)) },
+      removeItem: (k: string) => { bag.delete(k) },
+      clear: () => { bag.clear() },
+      key: () => null,
+      get length() { return bag.size },
+    } as Storage
+  }
+  window.localStorage.setItem('lh_staff_role', 'owner')
   store.forms = [formRow('form-1', '流れのフォーム')]
   fetchApiMock.mockImplementation(async (url: string) => {
     if (typeof url === 'string' && url.startsWith('/api/forms')) {
@@ -211,6 +227,7 @@ afterEach(() => {
   host.remove()
   clearToastsForTest()
   delete document.documentElement.dataset.theme
+  window.localStorage.removeItem('lh_staff_role')
   vi.clearAllMocks()
 })
 
@@ -219,7 +236,8 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
     renderNode(<FormSubmissionsPage />)
     await flush()
     await screen.findByText('流れのフォーム')
-    const creates = screen.getAllByRole('button', { name: '＋ フォームを作る' })
+    // 一覧は src/v8/forms/list（「＋」は印。読み上げ名は「フォームを作る」）。
+    const creates = screen.getAllByRole('button', { name: 'フォームを作る' })
     expect(creates.length).toBeGreaterThan(0)
     fireEvent.click(creates[0])
     await waitFor(() => expect(formsCreateDraft).toHaveBeenCalledTimes(1))
@@ -227,19 +245,23 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
   })
 
   it('下書き保存→知らせ→公開→知らせ・一覧に戻ると増えている', async () => {
-    navigation.query = 'id=form-1&tab=basic'
+    // V8 の編集（src/v8/form-edit）。フォーム名の欄は「受付と見た目」のタブにある。
+    navigation.query = 'id=form-1&tab=appearance'
     navigation.pathname = '/form-submissions/edit'
     renderNode(<EditFormPage />)
     await flush()
     await screen.findByDisplayValue('流れのフォーム')
 
     // 下書きを保存する（画面の知らせとトーストの両方に出る）。
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await waitFor(() => expect(formsUpdate).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getAllByText('下書きを保存しました')).toHaveLength(2))
 
-    // この版を公開する（画面の知らせとトーストの両方に出る）。
+    // この版を公開する（公開の確かめ Z9wXm が出るので窓の中でもう一度押す。
+    // 画面の知らせとトーストの両方に出る）。
     fireEvent.click(screen.getByRole('button', { name: 'この版を公開' }))
+    const publishDialog = await screen.findByRole('dialog', { name: 'この版を公開する' })
+    fireEvent.click(within(publishDialog).getByRole('button', { name: 'この版を公開' }))
     await waitFor(() => expect(formsPublish).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getAllByText('この版を公開しました')).toHaveLength(2))
 

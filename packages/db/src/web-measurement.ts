@@ -21,6 +21,7 @@ export interface MeasurementSite {
   stopped_at: string | null;
   /** R275: 停止の理由(画面で入力)。履歴として残す。 */
   stopped_reason: string | null;
+  last_received_at: string | null;
 }
 
 export interface MeasurementSiteWithDomains extends MeasurementSite {
@@ -387,4 +388,12 @@ export async function getReversalMetricsByPoint(
   return new Map(
     rows.results.map((r) => [r.conversion_point_id, { count: Number(r.cnt), value: Number(r.val) }]),
   );
+}
+
+/** 許可ドメイン・同意済みの受信。URLや訪問者情報は保存しない。 */
+export async function recordMeasurementSiteReceipt(db: D1Database, siteId: string, lineAccountId: string, at = jstNow()): Promise<void> {
+  await db.prepare(`UPDATE measurement_sites SET last_received_at = ?
+    WHERE id = ? AND line_account_id = ? AND stopped_at IS NULL
+      AND (last_received_at IS NULL OR julianday(last_received_at) < julianday(?))`)
+    .bind(at, siteId, lineAccountId, at).run();
 }

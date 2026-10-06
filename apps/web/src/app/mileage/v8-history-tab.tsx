@@ -12,11 +12,12 @@
  * 見方として残す（操作を落とさない）。
  */
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { CalendarRange, Download, History, Plus, TrendingDown, TrendingUp } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
@@ -36,7 +37,7 @@ import {
 import { csvCell } from '@/lib/presentation'
 import {
   formatMileageChange,
-  formatMileageDate,
+  formatMileageShortDateTime,
   mileageEntryTypeLabel,
   mileageSourceLabel,
   mileageSourceNoteText,
@@ -85,6 +86,8 @@ export default function V8HistoryTab({
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const requestRef = useRef(0)
   const [result, setResult] = useState<MileageAdminHistory | null>(null)
+  const [loadedAccountId, setLoadedAccountId] = useState<string | null>(null)
+  const [exportError, setExportError] = useState('')
   const [pendingAction, setPendingAction] = useState<{ kind: 'confirm' | 'void'; item: MileageAdminHistoryItem } | null>(null)
   const [pendingReason, setPendingReason] = useState('')
   const [pendingBusy, setPendingBusy] = useState(false)
@@ -118,6 +121,7 @@ export default function V8HistoryTab({
     const request = ++requestRef.current
     setLoading(true)
     setError(false)
+    setExportError('')
     try {
       const response = await api.mileage.history({
         accountId: selectedAccountId ?? '',
@@ -138,6 +142,7 @@ export default function V8HistoryTab({
         response.data.items = response.data.items.filter((item) => !isGranted(item))
       }
       setResult(response.data)
+      setLoadedAccountId(selectedAccountId)
     } catch (caught) {
       if (request !== requestRef.current) return
       setResult(null)
@@ -162,7 +167,7 @@ export default function V8HistoryTab({
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
-  const items = result?.items ?? []
+  const items = useMemo(() => result?.items ?? [], [result])
   const total = mileagePaginationTotal(result)
   const pageCount = Math.max(1, Math.ceil((total ?? 0) / pageSize))
   const byType = result?.summary.byType ?? []
@@ -173,32 +178,39 @@ export default function V8HistoryTab({
   const grantedCount = countOf('grant')
   const reversalCount = countOf('reversal')
 
-  const exportCsv = () => {
-    if (items.length === 0) return
-    const rows = items.map((item) => [
-      item.occurredAt,
-      viewName(item),
-      item.amount,
-      item.reason,
-      item.balanceAfter ?? '',
-      item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : '自動',
-    ])
-    const csv = [['日時', '友だち', '増減', '理由', '残高', 'だれが'], ...rows]
-      .map((row) => row.map((value) => csvCell(value)).join(','))
-      .join('\n')
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `mileage-history-${new Date().toISOString().slice(0, 10)}.csv`
-    anchor.click()
-    URL.revokeObjectURL(url)
-  }
+  const canExport = !accountLoading && !loading && !error && !!selectedAccountId
+    && loadedAccountId === selectedAccountId && items.length > 0
+  const exportCsv = useCallback(() => {
+    if (!canExport) return
+    setExportError('')
+    try {
+      const rows = items.map((item) => [
+        item.occurredAt,
+        viewName(item),
+        item.amount,
+        item.reason,
+        item.balanceAfter ?? '',
+        item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : '自動',
+      ])
+      const csv = [['日時', '友だち', '増減', '理由', '残高', 'だれが'], ...rows]
+        .map((row) => row.map((value) => csvCell(value)).join(','))
+        .join('\n')
+      const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `mileage-history-${new Date().toISOString().slice(0, 10)}.csv`
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setExportError('CSVを書き出せませんでした。もう一度お試しください。')
+    }
+  }, [canExport, items])
 
   useEffect(() => {
     registerHeaderActions(
       <>
-        <Button onClick={exportCsv} disabled={items.length === 0}>
-          <Download size={14} aria-hidden="true" /> CSVで書き出す
+        <Button onClick={exportCsv} disabled={!canExport}>
+          <Download size={14} aria-hidden="true" /> CSV で書き出す
         </Button>
         {!readonly ? (
           <Button href="/mileage?tab=balances" title="友だちを選んで増減します">
@@ -208,8 +220,7 @@ export default function V8HistoryTab({
       </>,
     )
     return () => registerHeaderActions(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length, readonly, registerHeaderActions])
+  }, [canExport, exportCsv, readonly, registerHeaderActions])
 
   const runPendingAction = async () => {
     if (!pendingAction || pendingBusy || !selectedAccountId) return
@@ -266,7 +277,6 @@ export default function V8HistoryTab({
             <span className={styles.kpiLabel}>付けた</span>
           </div>
           <p className={styles.kpiValue}>{loading || error ? '—' : formatNumber(amountOf('grant'))}</p>
-          <p className={styles.kpiSub}>この期間に付けた合計</p>
         </div>
         <div className={styles.kpi}>
           <div className={styles.kpiTop}>
@@ -288,6 +298,8 @@ export default function V8HistoryTab({
           <p className={styles.kpiSub}>注文の取り消しで引いた</p>
         </div>
       </div>
+
+      {exportError ? <Notice tone="danger" message={exportError} /> : null}
 
       <p className={styles.band} role="note">
         明細はあとから消せません。間違えて付けたときは「減らす」で取り消しの明細を足します。
@@ -405,7 +417,7 @@ export default function V8HistoryTab({
                         <Link href={friendHref} style={{ color: 'inherit', textDecoration: 'none' }}>{viewName(item)}</Link>
                       </p>
                       <p className={styles.cellSub}>
-                        <time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time>
+                        <time dateTime={item.occurredAt}>{formatMileageShortDateTime(item.occurredAt)}</time>
                         {item.lineAccountName ? `・${item.lineAccountName}` : ''}
                       </p>
                     </td>
