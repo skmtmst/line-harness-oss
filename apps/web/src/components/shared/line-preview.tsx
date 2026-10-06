@@ -80,10 +80,11 @@ export default function LinePreview({
    */
   if (v8) {
     return (
-      <section aria-label="LINEプレビュー" className={styles.phoneRoot}>
+      <section aria-label="LINEでの見え方" className={styles.phoneRoot}>
+        {/* 絵（JeINq・A0pDt ほか24枚）はすべて「LINEでの見え方」。列の左に寄せ、スマホはその下の真ん中。 */}
         <p className={styles.phoneTitle}>
-          <span>LINEプレビュー</span>
-          {note ? <HelpTip label="LINEプレビューの説明">{note}</HelpTip> : null}
+          <span>LINEでの見え方</span>
+          {note ? <HelpTip label="LINEでの見え方の説明">{note}</HelpTip> : null}
         </p>
         <div className={styles.phone}>
           <div className={styles.screen}>
