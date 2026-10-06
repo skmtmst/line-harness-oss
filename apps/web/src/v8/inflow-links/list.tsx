@@ -618,7 +618,8 @@ export default function InflowListV8({
     listBody = (
       <ListState
         kind="error"
-        title={loadFailure?.title}
+        /* URzvC：分からない失敗のときだけ「流入リンクを読み込めませんでした」と言う（権限・混雑は言い分けたまま）。 */
+        title={loadFailure && loadFailure.title !== '表示できませんでした' ? loadFailure.title : '流入リンクを読み込めませんでした'}
         description={loadFailure?.description}
         error={loadError ?? undefined}
         onRetry={loadFailure === null || loadFailure.retryable ? () => void load() : undefined}
@@ -630,16 +631,16 @@ export default function InflowListV8({
       ? (
         <ListState
           kind="empty"
-          title="条件に合う流入経路がありません"
-          description="検索や絞り込みの条件を変えてください。"
+          title="条件に合うものはありません"
+          description="検索や絞り込みを外すと、すべて出ます"
           action={<Button onClick={() => { setSearch(''); setFilter('all'); setSelectedGenre(''); setPage(1) }}>条件を外す</Button>}
         />
       )
       : (
         <ListState
           kind="empty"
-          title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
-          description="「流入リンクを作る」から作ると、ここに出ます。QRコード・URLごとに、どこから友だちになったかを数えます。"
+          title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入リンクはありません'}
+          description="QR コードや URL ごとに、どこから友だちになったかを数えられます"
           action={readonly ? undefined : createButton}
         />
       )
