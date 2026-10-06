@@ -22,6 +22,8 @@ describe('V8 の窓：絵の幅を画面が渡せる', () => {
     expect(html).toContain('data-design-width=""')
     expect(html).toContain('--dialog-design-width:600px')
     expect(css).toMatch(/\[data-theme='v8'\] \.panel\[data-design-width\] \{\s*width: min\(var\(--dialog-design-width\), 100%\);/)
+    // 層（@layer components）の外で、「幅 560」「大きい窓 800」の規則より後ろに置く（前に置くと負けて効かない）。
+    expect(css.indexOf("[data-theme='v8'] .panel[data-design-width]")).toBeGreaterThan(css.indexOf("[data-theme='v8'] .panel[data-size='large']"))
   })
 
   it('渡さなければ今までどおり（幅の印も付かない）', () => {

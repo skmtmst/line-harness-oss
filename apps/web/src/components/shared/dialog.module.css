@@ -285,16 +285,6 @@
   width: min(560px, 100%);
 }
 
-/* 絵の窓の幅・上からの位置を画面が渡したとき（designWidth・designTop）。狭い画面では画面の幅まで。 */
-[data-theme='v8'] .panel[data-design-width] {
-  width: min(var(--dialog-design-width), 100%);
-}
-
-[data-theme='v8'] .overlay[data-design-top] {
-  align-items: flex-start;
-  padding-top: var(--dialog-design-top);
-}
-
 /*
  * ★V8 仕上げ（M10）「窓」：開くとき背景が薄く出て、窓は少し下から
  * ふわっと（opacity＋translateY 4px→0、scale 0.98→1、200ms ease-out）。
@@ -376,6 +366,10 @@
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }
 [data-theme='v8'] .panel[data-size='large'] { width: min(800px, 100%); }
+/* 絵の窓の幅・上からの位置を画面が渡したとき（designWidth・designTop）。狭い画面では画面の幅まで。
+   層（@layer components）の中に置くと、この層の外の「幅 560」に負けて効かない。必ずこの後ろに置く。 */
+[data-theme='v8'] .panel[data-design-width] { width: min(var(--dialog-design-width), 100%); }
+[data-theme='v8'] .overlay[data-design-top] { align-items: flex-start; padding-top: var(--dialog-design-top); }
 [data-theme='v8'] .headerRow { width: 100%; padding: 20px 24px 8px; gap: 12px; }
 [data-theme='v8'] .headerContent { gap: 2px; }
 [data-theme='v8'] .title { font-size: 18px; font-weight: 600; line-height: 24px; }
