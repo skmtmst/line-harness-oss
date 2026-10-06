@@ -1199,3 +1199,33 @@
 .funnelSide[data-w='cross'] { width: var(--tpl-an-flow-w); }
 .legend[data-size='grid'] { margin-top: var(--tpl-an-grid-legend-gap); }
 .legend[data-size='grid'] > span::before { width: var(--tpl-an-grid-swatch-w); }
+
+/* Search Console（h1G4d）：表は 9/14・間10、プロパティ 300、デバイス別 200。 */
+.thead[data-size='compact'],
+.trow[data-size='compact'] {
+  gap: var(--tpl-an-sc-col-gap);
+  padding: var(--tpl-an-sc-row-pad);
+}
+.num[data-w^='sc'] { padding-right: var(--tpl-an-sc-col-gap); }
+.num[data-w='sc60'] { width: var(--tpl-an-col-60); }
+.num[data-w='sc70'] { width: var(--tpl-an-col-70); }
+.num[data-w='sc64'] { width: var(--tpl-an-sc-col-64); }
+.controls[data-gap='narrow'] { gap: var(--tpl-an-wide-gap); }
+.field[data-w='property'] { width: var(--tpl-an-search-w); }
+.pillSlot { display: inline-flex; }
+.hourBar[data-empty] { background: var(--color-surface-pearl); }
+.scAxis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  line-height: var(--tpl-an-sc-tick-lh);
+}
+.funnelSide[data-w='devices'] { width: var(--tpl-an-sc-devices-w); }
+.compareRow > strong[data-weight='bold'] { font-weight: 700; }
+.table[data-kind='page'] .num[data-w='sc60'] { width: var(--tpl-an-sc-page-col-a); }
+.table[data-kind='page'] .num[data-w='sc70'] { width: var(--tpl-an-sc-page-col-b); }
+.table[data-kind='page'] .num[data-w='sc64'] { width: var(--tpl-an-sc-page-col-a); }
+.table[data-kind='page'] .thead[data-size='compact'],
+.table[data-kind='page'] .trow[data-size='compact'] { gap: var(--tpl-an-report-col-gap); }
+.table[data-kind='page'] .num[data-w^='sc'] { padding-right: var(--tpl-an-num-pad-end); }

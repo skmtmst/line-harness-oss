@@ -14,6 +14,7 @@
 | クロス分析 | `u5CuB8` | `cross.tsx` |
 | 使われ方 | `N8ZrUl` | `usage.tsx` |
 | 保存した分析 | `bglah` | `saved.tsx` |
+| Search Console（`/search-console`） | `h1G4d` | `search-console.tsx`（入口は `app/search-console/page.tsx`） |
 
 ## 受け付ける URL と指定（今の画面と同じ）
 - `/analytics?tab=friends|reactions|routes|usage|cross|funnel|url-clicks|saved`（知らない値・無しは友だちの増減）
@@ -30,6 +31,7 @@
 - 保存した分析：`api.analytics.saved.list`・`saved.snapshots`、定期レポート：`reportSchedules.list`・`setStatus`（版ずれは読み直してから知らせる・アカウント切替の世代で古い応答を捨てる）
 - ファネル：`v6Funnels.list(includeInactive)`・`latestRun`・`run`・`get`（編集の下書き）・`setStatus`、対象者：`createResultAudience`
 - クロス分析：`friendFields.list`・`runCross`・`crossResult`（待ち順の確認・打ち切り・再接続、run ID は sessionStorage `lh:analytics:cross-run:v1:<account>` に1日）・`createResultAudience`
+- Search Console：`api.searchConsole.performance(7|28|90)`（403 は権限の案内、それ以外の失敗は読み直し）
 - CSV の名前・列は今と同じ（`analytics-friends.csv`・`analytics-reactions.csv`・`analytics-routes.csv`・`analytics-url-clicks.csv`・`conversion-report.csv`）。板の頭の「CSV で書き出す」は開いている見かたの書き出し
 
 ## 今の画面と違うところ（見せ方だけ）
@@ -47,3 +49,4 @@
 - 定期レポート：動いている行は「止める・しまう・内容を変える」、止めている行は「また送る・しまう・内容を変える」（動いている行の「また送る」は口が無いので置かない）
 - ファネル：選んだ段の既定は、いちばん落ちる段の手前（そこで止まった人）。「対象者を開く」「この対象者へ配信を作成」は押した時に24時間の対象者を作り、その先へ進む。期間・再集計・定義の編集・停止・保管は「定義の操作と集計の詳細」、結果の保存は「この結果を保存する」、停止中のファネルは下の一覧
 - クロス分析：開いただけでは集計しない（重い集計を待ち順に積まない）。「集計する」で受け付け、結果が出たら表を出す。よこの軸は流入経路・タグ・スコア帯・成果地点・予約状態・購入状態・友だち情報から選べる（たてとよこに同じ軸は不可）。期間は選ぶ欄（この7日・30日・90日）。選んだマスの既定はいちばん多い組み合わせ。列の合計は見出しの title と CSV（表には行の合計だけ）
+- Search Console：見かたの注意は下の箱に常に出す（今は畳んでいた）。集計期間・最終更新は注の title。表は上位をそのまま（キーワード・ページ・デバイス別の3つを横に並べる）
