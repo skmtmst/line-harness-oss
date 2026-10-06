@@ -1563,6 +1563,21 @@ describe('V8 フロア配置と結合グループ',()=>{
 
 describe('枠の自動調整ルールと媒体閉鎖通知のAPI',()=>{
  const input={storeId:'store-ginza',threshold:2,stopLine:true,stopSameDay:true,notify:true,expectedVersion:0};
+ it('担当者は閲覧と媒体閉鎖の報告ができるが、在庫画面の権限があってもルールを保存できない',async()=>{
+  seedRestaurantFixture();
+  testDb.raw.exec(`INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity) VALUES('rules-slot','store-ginza','2027-01-01T10:00:00Z',4);
+   INSERT INTO rt_channel_close_tasks(id,store_id,slot_id,channel,status,reason,remaining_seats) VALUES('rules-task','store-ginza','rules-slot','hotpepper','close','full',0);`);
+  const staff={id:'operator',name:'担当者',role:'staff' as const,access_level:'full' as const,permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:0};
+  authMocks.getStaffByApiKey.mockResolvedValue(staff);
+  for(const path of ['inventory-rules','channel-close-tasks']) {
+   expect((await requestWithMethod(`/api/restaurant-test/${path}?account_id=account-1&storeId=store-ginza`,'GET',undefined,'operator-key')).status).toBe(200);
+  }
+  expect((await requestWithMethod('/api/restaurant-test/channel-close-tasks/rules-task/done?account_id=account-1','POST',{},'operator-key')).status).toBe(200);
+  expect(testDb.raw.prepare("SELECT status FROM rt_channel_close_tasks WHERE id='rules-task'").get()).toEqual({status:'done'});
+  authMocks.getStaffByApiKey.mockResolvedValue({...staff,permission_keys:'["/restaurant-test/inventory"]'});
+  expect((await requestWithMethod('/api/restaurant-test/inventory-rules?account_id=account-1','PUT',input,'operator-key')).status).toBe(403);
+  expect(testDb.raw.prepare("SELECT COUNT(*) AS total FROM rt_inventory_rules").get()).toEqual({total:0});
+ });
  it('保存・読み直し・古い版409を返す',async()=>{
   seedRestaurantFixture();
   const path='/api/restaurant-test/inventory-rules?account_id=account-1';
