@@ -1452,6 +1452,10 @@ export interface IncomingWebhookCreated extends Omit<IncomingWebhook, 'hasSecret
 // -----------------------------------------------------------------------------
 
 export interface OutgoingWebhook {
+  /** 編集の版。旧サーバーとの互換性のため省略を許す。 */
+  version?: number;
+  /** 最後に設定を更新した担当のID。記録のない旧行・自動停止はnull。 */
+  updatedBy?: string | null;
   id: string;
   name: string;
   url: string;
