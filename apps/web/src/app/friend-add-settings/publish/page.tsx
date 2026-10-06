@@ -18,6 +18,7 @@ import { api, ApiError, type FriendAddRule } from '@/lib/api'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useAccount } from '@/contexts/account-context'
 import FriendAddDoneV8 from './done-v8'
+import FriendAddPublishV8 from '@/v8/friend-add-publish/publish'
 import {
   audienceText,
   blockedReason,
@@ -588,6 +589,9 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function FriendAddPublishPage() {
+  const theme = useAdminTheme()
+  // ★V8（U8Xm3X 確認・e0FD1J 完了）は src/v8 の新しい画面。v7 はこのファイルのまま。
+  if (theme === 'v8') return <FriendAddPublishV8 />
   return (
     <Suspense fallback={<ListState kind="loading" />}>
       <FriendAddPublishInner />

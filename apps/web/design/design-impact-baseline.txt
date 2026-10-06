@@ -710,3 +710,8 @@ shared-button-importer components/friends/schedule-dialog.tsx
 # ★V8 予約スタッフの登録（CcA4k）・勤務とシフト（d5fmnM・E3YDK・wvGke）を src/v8/booking-staff に一から書いた。
 shared-button-importer v8/booking-staff/shifts.tsx
 shared-button-importer v8/booking-staff/staff-new.tsx
+shared-button-importer v8/scenario-first-step/first-step.tsx
+shared-button-importer v8/friend-add-publish/publish.tsx
+shared-button-importer v8/friend-add-publish/done.tsx
+shared-button-importer v8/automations/create/create.tsx
+shared-button-importer v8/automations/create/friend-multi-select.tsx

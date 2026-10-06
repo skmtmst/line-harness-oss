@@ -47,7 +47,7 @@ import {
 } from './first-step-form'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import ScenarioFirstStepV8 from '../first-step-v8'
+import ScenarioFirstStepV8 from '@/v8/scenario-first-step/first-step'
 
 /**
  * ステップの作成（設計の3段目）。

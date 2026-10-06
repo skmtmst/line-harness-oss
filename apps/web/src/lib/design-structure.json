@@ -2701,15 +2701,13 @@
           1440,
           1920
         ],
-        "reason": "★V8（オーナー決定 2026-10-01、Pencil V6xAo）へ V8 版 first-step-v8 を実装。左に段（誰に送るか・いつ・1通目の内容）、右の欄に本物のスマホ（StepPreview）。節の印は v7 側との和集合。同条件の画像比較は未実施"
+        "reason": "★V8（Pencil V6xAo・1152 U5rxyH）は src/v8/scenario-first-step に一から書いた（2026-10-07）。枠・頭・右の列は型（CreatePage）が持つので、節の印は v7 側（Crumb・Form・Head・Notice・Steps）だけ。measure.sh で V6xAo 98%・U5rxyH 100%"
       },
       "sections": [
-        "Body",
         "Crumb",
         "Form",
         "Head",
         "Notice",
-        "Right",
         "Steps"
       ],
       "parts": [
