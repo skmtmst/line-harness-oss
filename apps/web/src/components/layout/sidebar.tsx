@@ -836,30 +836,19 @@ export default function Sidebar({
         </div>
       )}
       {/*
-        ★V8 殻合わせ（絵 `V8-B/JKjsE`）：統括の脇の下にも「統括の設定」
-        （歯車）を出す。行き先は統括の設定（/hq/settings）。
-        オーナー・管理者にだけ出す。v7 の統括には出さない。
+        統括（/hq）の脇の下には歯車の入口を置かない
+        （Pencil 承認 2026-10-06・`LINE-Harness-V8-B.pen` の `s6kZt/wCdWg`）。
+        統括の情報の画面へは左下のアカウントの行から行く。店舗側（上の枠）はそのまま。
       */}
-      {isV8 && isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
-        <div className={`${styles.settingsEntry} v8-only`}>
-          <Link
-            href="/hq/settings"
-            title="統括の設定"
-            className={styles.item}
-          >
-            <span className="shrink-0"><NavIcon d={SETTINGS_GEAR_ICON} /></span>
-            <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>統括の設定</span>
-          </Link>
-        </div>
-      )}
 
       {/*
         メニューの下の版の表示（★V7 監査の直し E）。いま動いている版・
         commit・配備日時と環境。取れないときは「版の情報なし」。
         移行中の見た目承認（preview）は版の取得をしない。
+        統括（/hq）には出さない（同じ承認・`s6kZt/wCdWg`）。
         V8 でメニューを畳んだときは枠ごと隠す（`styles.collapseHide`）。
       */}
-      {preview ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
+      {preview || isHq ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
