@@ -84,9 +84,11 @@ describe('進む操作は下の操作の帯に1つだけ', () => {
     expect(confirm).not.toContain('>戻る<');
   });
 
-  it('確定・待ちは次の行き先が1つ', () => {
+  it('確定・待ちは下の帯に「LINEに戻る」と「自分のイベントを見る」(★V8 qVdiX)', () => {
+    expect(done).toContain('<BottomBar>');
+    expect(done).toContain('LINEに戻る');
     expect(done).toContain('自分のイベントを見る');
-    expect(done.match(/<Button/g)?.length ?? 0).toBe(1);
+    expect(done.match(/<Button/g)?.length ?? 0).toBe(2);
   });
 });
 

@@ -191,9 +191,9 @@ export default function EventBookings() {
   }
 
   return (
-    <LiffLookScope className="min-h-screen bg-ground" designNode="y1bs9A">
+    <LiffLookScope className="min-h-screen bg-canvas" designNode="y1bs9A">
       <LiffHeader title="自分のイベント" />
-      <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-3 pb-10">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-3.5 p-4 pb-10">
         <h1 className="text-xl font-bold text-ink">自分のイベント</h1>
         {loading ? (
           <LoadingView />
@@ -251,10 +251,10 @@ export default function EventBookings() {
                             className="flex w-14 shrink-0 flex-col items-center rounded-(--liff-radius) bg-liff-off-bg py-1.5"
                             aria-label={`${utcToJstMd(b.slot_starts_at)} ${utcToJstHm(b.slot_starts_at)}`}
                           >
-                            <span className="text-[15px] font-bold whitespace-nowrap text-ink">
+                            <span className="liff-num text-[15px] font-bold whitespace-nowrap text-ink">
                               {utcToJstMd(b.slot_starts_at)}
                             </span>
-                            <span className="text-[11px] text-liff-sub">
+                            <span className="liff-num text-[11px] text-liff-sub">
                               {utcToJstHm(b.slot_starts_at)}
                             </span>
                           </div>
@@ -270,7 +270,7 @@ export default function EventBookings() {
                                 {b.venue_name}
                               </div>
                             )}
-                            <div className="mt-[3px]">
+                            <div className="mt-[3px] flex">
                               <Badge tone={meta.tone}>{meta.text}</Badge>
                             </div>
                             {/* 板 y1bs9A：変える・キャンセルは文の列の下に小さく並べる。 */}
@@ -282,7 +282,7 @@ export default function EventBookings() {
                                     void openChange(b);
                                   }}
                                   disabled={busy}
-                                  className="inline-flex items-center justify-center rounded-lg border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                                  className="inline-flex items-center justify-center rounded-lg border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                                 >
                                   時間を変える
                                 </button>
@@ -293,7 +293,7 @@ export default function EventBookings() {
                                     setPendingCancel(b);
                                   }}
                                   disabled={busy}
-                                  className="inline-flex items-center justify-center rounded-lg border border-danger/30 bg-canvas px-3 py-1.5 text-xs font-semibold text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                                  className="inline-flex items-center justify-center rounded-lg border border-danger/40 bg-canvas px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                                 >
                                   キャンセルする
                                 </button>
@@ -306,9 +306,9 @@ export default function EventBookings() {
                             onClick={() =>
                               navigate({ pathname: `/events/${b.event_id}`, search })
                             }
-                            className="flex h-11 w-8 shrink-0 items-center justify-center text-ink-faint focus-visible:outline-2 focus-visible:outline-ink"
+                            className="relative flex h-11 w-[18px] shrink-0 items-center justify-center text-ink-faint after:absolute after:inset-y-0 after:-right-2 after:-left-2 focus-visible:outline-2 focus-visible:outline-ink"
                           >
-                            <Icon name="chevron-right" className="h-5 w-5" />
+                            <Icon name="chevron-right" className="h-[18px] w-[18px]" />
                           </button>
                         </div>
                       </Card>
