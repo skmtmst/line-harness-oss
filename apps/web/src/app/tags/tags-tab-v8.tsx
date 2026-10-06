@@ -8,6 +8,7 @@
  * 同じ関数を使う。変えたのは置き場だけ——作る口はフォルダの列の上、
  * フォルダの追加は列の下、行の操作は右端の「…」、人数はリンク。
  */
+import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
@@ -733,7 +734,7 @@ export default function TagsTabV8({
                       <Th className={styles.menuCell}><span className="sr-only">操作</span></Th>
                     </TableHeadRow>
                   </thead>
-                  <tbody>
+                  <RovingTbody>
                     {visible.map((tag) => {
                       const group = groups.find((item) => item.id === tag.groupId)
                       const chips = tagLinkChips(tag)
@@ -830,7 +831,7 @@ export default function TagsTabV8({
                         </tr>
                       )
                     })}
-                  </tbody>
+                  </RovingTbody>
                 </table>
               </div>
 

@@ -10,6 +10,7 @@
  * 「シナリオを作る」は左のフォルダの列の上、行の右端は「…」（複製・配信結果・削除）、
  * 行の左の □ を選ぶと表の下にまとめての帯（止める・再開・フォルダへ移す）。
  */
+import { RovingTbody } from '@/components/shared/row-roving'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
@@ -862,7 +863,7 @@ export default function ScenariosListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <tbody>
+            <RovingTbody>
               {scenarios.map((s) => {
                 const folderName = s.folderId
                   ? folders.find((f) => f.id === s.folderId)?.name ?? 'フォルダ'
@@ -978,7 +979,7 @@ export default function ScenariosListV8() {
                   </Tr>
                 )
               })}
-            </tbody>
+            </RovingTbody>
           </DataTable>
         </div>
 

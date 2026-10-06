@@ -7,6 +7,7 @@
  * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { RovingTbody } from '@/components/shared/row-roving'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
@@ -941,7 +942,7 @@ export default function BroadcastListV8() {
   ) : (
     <DataTable className={styles.table}>
       {tableHead}
-      <tbody>
+      <RovingTbody>
         {visibleBroadcasts.map((broadcast) => {
           const insight = insights[broadcast.id] ?? summaryInsight(broadcast.insightSummary)
           const audience = audienceSummary(broadcast, getTagName, getScenarioName)
@@ -1042,7 +1043,7 @@ export default function BroadcastListV8() {
             </Tr>
           )
         })}
-      </tbody>
+      </RovingTbody>
     </DataTable>
   )
 

@@ -1,6 +1,8 @@
 'use client'
 
 
+import { RovingTbody } from '@/components/shared/row-roving'
+import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { ListPageBody } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
@@ -450,6 +452,9 @@ export default function RemindersListV8() {
 
   const allOnPageSelected = reminders.length > 0 && reminders.every((row) => selectedIds.has(row.id))
   const selectedCount = selectedIds.size
+  // 選んでいる間は Esc で選択を外す（動きの点検 12・20 番）。
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+  useEscapeToClearSelection(selectedCount > 0, clearSelection)
   const selectedRows = reminders.filter((row) => selectedIds.has(row.id))
   const stoppableIds = selectedRows.filter((row) => statusKeyOf(row) === 'active').map((row) => row.id)
   const resumableIds = selectedRows.filter((row) => statusKeyOf(row) === 'stopped').map((row) => row.id)
@@ -834,7 +839,7 @@ export default function RemindersListV8() {
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
-            <tbody>
+            <RovingTbody>
               {reminders.map((row) => {
                 const view = rowView(row)
                 const planned =
@@ -965,7 +970,7 @@ export default function RemindersListV8() {
                   </Tr>
                 )
               })}
-            </tbody>
+            </RovingTbody>
           </DataTable>
         </div>
 

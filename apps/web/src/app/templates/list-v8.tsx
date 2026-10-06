@@ -14,6 +14,8 @@
  * 移る（v7 の引き出しは V8 の詳細画面に置き換わる）。
  * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
+import { RovingTbody } from '@/components/shared/row-roving'
+import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state'
 import Link from 'next/link'
@@ -674,6 +676,9 @@ export default function TemplatesListV8() {
     })
   }
   const selectedCount = selectedIds.size
+  // 選んでいる間は Esc で選択を外す（動きの点検 12・20 番）。
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+  useEscapeToClearSelection(selectedCount > 0, clearSelection)
   const selectedTemplates = templates.filter((t) => selectedIds.has(t.id))
   /** まとめて削除は「使っていない」ものだけ。使用中が混ざると止める。 */
   const removableSelected = selectedTemplates.filter((t) => t.usageCount === 0)
@@ -1142,7 +1147,7 @@ export default function TemplatesListV8() {
               <th aria-label="操作" />
             </tr>
           </thead>
-          <tbody>
+          <RovingTbody>
             {shownItems.map((t) => {
               const publish = publishStateOf(t)
               const kindLabel = t.question ? 'question' : t.messageType
@@ -1247,7 +1252,7 @@ export default function TemplatesListV8() {
                 </tr>
               )
             })}
-          </tbody>
+          </RovingTbody>
         </table>
       </div>
       </ContextMenu>

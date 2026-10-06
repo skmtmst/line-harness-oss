@@ -1,6 +1,7 @@
 'use client'
 
 
+import { RovingTbody } from '@/components/shared/row-roving'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
@@ -1162,7 +1163,7 @@ export default function AutoRepliesListV8() {
               {tableHeadCells}
             </TableHeadRow>
           </thead>
-          <tbody>
+          <RovingTbody>
             {shownItems.map((r) => {
               const name = displayName(r)
               const conflicts = r.conflictAttentionCount ?? 0
@@ -1337,7 +1338,7 @@ export default function AutoRepliesListV8() {
                 </Tr>
               )
             })}
-          </tbody>
+          </RovingTbody>
         </DataTable>
       </div>
 
