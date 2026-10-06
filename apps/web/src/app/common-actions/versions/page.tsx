@@ -18,7 +18,7 @@ import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/com
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import { CommonActionVersionsV8 } from '../common-action-versions-v8'
+import CommonActionVersionsV8 from '@/v8/automations/versions'
 import { useManualHref } from '@/lib/use-manual-href'
 
 /* 監査 R468: 処理名と版の変わり方は version-diff.ts に集める。 */

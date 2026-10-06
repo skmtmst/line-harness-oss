@@ -574,6 +574,10 @@ shared-button-importer v8/affiliates/payment.tsx
 shared-button-importer v8/affiliates/payment-dialogs.tsx
 shared-button-importer v8/affiliates/report.tsx
 shared-button-importer v8/affiliates/create.tsx
+shared-button-importer v8/automations/list.tsx
+shared-button-importer v8/automations/runs.tsx
+shared-button-importer v8/automations/common-actions.tsx
+shared-button-importer v8/automations/versions.tsx
 shared-button-importer v8/friend-add/list.tsx
 shared-button-importer v8/friend-add/editor.tsx
 shared-button-importer v8/notifications/list.tsx

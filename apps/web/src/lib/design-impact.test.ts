@@ -282,6 +282,10 @@ describe('共通部品の影響範囲', () => {
       'v8/webhooks/interactions.tsx',
       // ★V8 会員一覧（AOWoJ）を src/v8 に一から書いた。ページ送りは共通のまま。
       'v8/nen-members/list.tsx',
+      // ★V8 オートメーション（LWQXd・g98F9・LnGNw）。新しい置き場（src/v8）に一から書いた。
+      'v8/automations/list.tsx',
+      'v8/automations/runs.tsx',
+      'v8/automations/common-actions.tsx',
       // ★V8 友だち（x6QsVz 一覧・ADjK8 統合ユーザー・hn6Y8 重複検出・Z0jHp UID移行）を src/v8/friends に一から書いた。
       'v8/friends/list/list.tsx',
       'v8/friends/merged/merged.tsx',

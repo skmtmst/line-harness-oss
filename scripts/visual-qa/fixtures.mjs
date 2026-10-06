@@ -5434,29 +5434,29 @@ export const AFFILIATE_LINKS = [
   **呼ばれていない1**。全部が公開中・呼ばれている状態だと、その4つが撮れない。
   版が見えないと「直してよいか」が判断できない、というのが設計の言いたいこと。
 */
+/*
+ * 共通アクションの一覧（V8 の板 `LnGNw`）。公開中5・下書き1・保管2。
+ * 呼び出し元の合計12か所・今月動いた 3,210 回・失敗 2 件（数の帯と同じ）。
+ */
 const COMMON_ACTION_METRICS = {
-  'ca-1': [1_284, 2, '2026-08-25T10:31:00+09:00'],
-  'ca-2': [620, 2, '2026-08-25T09:42:00+09:00'],
-  'ca-3': [360, 0, '2026-08-25T09:05:00+09:00'],
-  'ca-4': [210, 1, '2026-08-24T18:40:00+09:00'],
-  'ca-5': [0, 0, null], 'ca-6': [160, 1, '2026-08-24T14:02:00+09:00'],
-  'ca-7': [90, 0, '2026-08-24T11:18:00+09:00'], 'ca-8': [55, 0, '2026-08-23T20:00:00+09:00'],
-  'ca-9': [40, 0, '2026-08-23T18:12:00+09:00'], 'ca-10': [20, 0, '2026-08-22T15:25:00+09:00'],
-  'ca-11': [8, 0, '2026-08-20T10:10:00+09:00'], 'ca-12': [0, 0, null],
-  'ca-13': [0, 0, null], 'ca-14': [0, 0, null],
+  'ca-2': [52, 0, '2026-09-30T10:31:00+09:00'],
+  'ca-3': [1_800, 1, '2026-09-30T09:42:00+09:00'],
+  'ca-1': [900, 1, '2026-09-29T09:05:00+09:00'],
+  'ca-6': [248, 0, '2026-09-29T14:02:00+09:00'],
+  'ca-5': [210, 0, '2026-09-28T18:40:00+09:00'],
+  'ca-7': [0, 0, null],
+  'ca-8': [0, 0, null], 'ca-9': [0, 0, null],
 }
 
 export const COMMON_ACTIONS = [
-  { id: 'ca-1', name: '体験申込を受けたとき', description: 'タグ・シナリオ・担当の3つ', status: 'published', draftVersion: null, publishedVersion: 4, actionCount: 5, bindingCount: 5, oldVersionBindingCount: 1, updatedAt: '2026-08-25T01:00:00.000Z' },
-  { id: 'ca-2', name: '購入のお礼', description: 'お礼＋マイル＋タグ', status: 'published', draftVersion: 8, publishedVersion: 7, actionCount: 3, bindingCount: 3, oldVersionBindingCount: 2, updatedAt: '2026-08-24T10:00:00.000Z' },
-  { id: 'ca-3', name: '予約が入ったとき', description: '前日・当日の通知を用意', status: 'published', draftVersion: null, publishedVersion: 2, actionCount: 2, bindingCount: 1, oldVersionBindingCount: 0, updatedAt: '2026-08-20T09:00:00.000Z' },
-  { id: 'ca-6', name: '写真を通したとき', description: 'お礼＋マイル＋置き場へ', status: 'published', draftVersion: null, publishedVersion: 3, actionCount: 3, bindingCount: 5, oldVersionBindingCount: 0, updatedAt: '2026-08-21T09:00:00.000Z' },
-  { id: 'ca-7', name: '解約を止めたいとき', description: '相談の案内を送る', status: 'published', draftVersion: null, publishedVersion: 3, actionCount: 2, bindingCount: 4, oldVersionBindingCount: 0, updatedAt: '2026-08-19T09:00:00.000Z' },
-  { /* 設計の「下書き 3」のうち1本。 */ id: 'ca-5', name: 'アンケートの回収', description: '回答をタグにする', status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 1, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-08-22T09:00:00.000Z' },
-  { /* 設計の「呼ばれていない 1」。 */ id: 'ca-4', name: '休業のお知らせ', description: 'メッセージ ほか1つ', status: 'published', draftVersion: null, publishedVersion: 3, actionCount: 2, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-07-30T09:00:00.000Z' },
-  ...Array.from({ length: 5 }, (_, index) => ({ id: `ca-${index + 8}`, name: `定期運用 ${index + 1}`, description: 'よく使う処理をまとめたアクション', status: 'published', draftVersion: null, publishedVersion: 2, actionCount: 2, bindingCount: [4, 4, 3, 3, 3][index], oldVersionBindingCount: 0, updatedAt: '2026-08-18T09:00:00.000Z' })),
-  { id: 'ca-13', name: '会員登録後の処理', description: '公開前の下書き', status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 2, bindingCount: 2, oldVersionBindingCount: 0, updatedAt: '2026-08-17T09:00:00.000Z' },
-  { id: 'ca-14', name: '担当者への通知', description: '公開前の下書き', status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 1, bindingCount: 1, oldVersionBindingCount: 0, updatedAt: '2026-08-16T09:00:00.000Z' },
+  { id: 'ca-2', name: '購入のお礼', description: '買ってくれた人へのお礼とフォロー', status: 'published', draftVersion: null, publishedVersion: 3, actionCount: 3, bindingCount: 3, oldVersionBindingCount: 0, updatedAt: '2026-09-30T01:00:00.000Z' },
+  { id: 'ca-3', name: '予約が入ったとき', description: '予約のお礼と担当への連絡', status: 'published', draftVersion: null, publishedVersion: 5, actionCount: 3, bindingCount: 4, oldVersionBindingCount: 1, updatedAt: '2026-09-29T01:00:00.000Z' },
+  { id: 'ca-1', name: '体験申込を受けたとき', description: '申込の内容で案内を分ける', status: 'published', draftVersion: null, publishedVersion: 2, actionCount: 3, bindingCount: 2, oldVersionBindingCount: 0, updatedAt: '2026-09-28T01:00:00.000Z' },
+  { id: 'ca-6', name: '写真を通したとき', description: '掲載のお知らせ', status: 'published', draftVersion: null, publishedVersion: 1, actionCount: 2, bindingCount: 1, oldVersionBindingCount: 0, updatedAt: '2026-09-27T01:00:00.000Z' },
+  { id: 'ca-5', name: 'アンケートの回収', description: '回答を友だち情報へ', status: 'published', draftVersion: 5, publishedVersion: 4, actionCount: 2, bindingCount: 2, oldVersionBindingCount: 0, updatedAt: '2026-09-26T01:00:00.000Z' },
+  { id: 'ca-7', name: '解約を止めたいとき', description: '引き止めの案内', status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 3, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-09-25T01:00:00.000Z' },
+  { /* 保管（通常の一覧には出ない）。 */ id: 'ca-8', name: '旧キャンペーンのお礼', description: '保管した処理', status: 'archived', draftVersion: null, publishedVersion: 2, actionCount: 2, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-08-01T01:00:00.000Z' },
+  { id: 'ca-9', name: '休業のお知らせ', description: '保管した処理', status: 'archived', draftVersion: null, publishedVersion: 3, actionCount: 1, bindingCount: 0, oldVersionBindingCount: 0, updatedAt: '2026-07-30T01:00:00.000Z' },
 ].map((action) => ({
   ...action,
   executionCountThisMonth: COMMON_ACTION_METRICS[action.id][0],
@@ -5464,27 +5464,25 @@ export const COMMON_ACTIONS = [
   lastRunAt: COMMON_ACTION_METRICS[action.id][2],
 }))
 
-/** 機能25の一覧。14本稼働・4本停止を同じAPI契約で返す。 */
+/**
+ * 機能25の一覧。V8 の板（`LWQXd`・`En14p`・`nH9L8`）の6本（動いている5・止めている1）。
+ * この30日に動いた数の合計は 2,988 回・失敗は 6 回（数の帯と同じ）。
+ * 並びは更新が新しい順（絵の上から）。
+ */
 const AUTOMATION_METRICS = {
-  'au-1': [56, 0], 'au-2': [486, 0], 'au-3': [42, 0], 'au-4': [12, 6], 'au-5': [124, 0],
-  'au-6': [1_000, 0], 'au-7': [950, 0], 'au-8': [900, 0], 'au-9': [850, 0],
-  'au-10': [800, 0], 'au-11': [750, 0], 'au-12': [700, 0], 'au-13': [650, 0], 'au-14': [600, 0],
-  'au-15': [0, 0], 'au-16': [0, 0], 'au-17': [0, 0], 'au-18': [500, 0],
+  'au-1': [312, 0], 'au-2': [128, 0], 'au-3': [52, 1], 'au-4': [2_410, 5], 'au-5': [86, 0], 'au-6': [0, 0],
 }
 
 export const AUTOMATIONS = [
-  { id: 'au-1', name: '友だち追加から案内を始める', description: '流入リンクを通っていない人に、はじめての方へをご案内', eventType: 'friend_add', conditions: { inflow: 'none' }, actions: [{ type: 'start_scenario', params: { scenarioId: 'scenario-0' } }], isActive: true, priority: 100, lineAccountId: 'visual-qa-account', createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
-  { id: 'au-2', name: '「予約」で予約画面を出す', description: 'すべての友だちに予約用メニューを表示', eventType: 'message_received', conditions: { keyword: '予約' }, actions: [{ type: 'switch_rich_menu', params: { richMenuId: 'rmg-1' } }], isActive: true, priority: 90, lineAccountId: 'visual-qa-account', createdAt: '2026-07-02T00:00:00.000Z', updatedAt: '2026-08-24T00:00:00.000Z' },
-  { id: 'au-3', name: '体験申込のフォローを始める', description: '30日買っていない人に体験前フォローを開始', eventType: 'tag_change', conditions: { tagId: 'tag-trial', purchaseDays: 30 }, actions: [{ type: 'start_scenario', params: { scenarioId: 'scenario-trial' } }], isActive: true, priority: 80, lineAccountId: 'visual-qa-account', createdAt: '2026-07-03T00:00:00.000Z', updatedAt: '2026-08-23T00:00:00.000Z' },
-  { id: 'au-4', name: '初回注文をSlackへ知らせる', description: '定期便を初めて買った人を外部連携へ通知', eventType: 'ec.order.confirmed', conditions: { firstSubscription: true }, actions: [{ type: 'send_webhook', params: { webhookId: 'wh-1' } }], isActive: true, priority: 70, lineAccountId: 'visual-qa-account', createdAt: '2026-07-04T00:00:00.000Z', updatedAt: '2026-08-22T00:00:00.000Z' },
-  { id: 'au-5', name: '反応がない人を気にかける', description: '最終接触から7日たった人に対応タグを付ける', eventType: 'tag_change', conditions: { inactiveDays: 7 }, actions: [{ type: 'add_tag', params: { tagId: 'tag-care' } }], isActive: true, priority: 60, lineAccountId: 'visual-qa-account', createdAt: '2026-07-05T00:00:00.000Z', updatedAt: '2026-08-21T00:00:00.000Z' },
-  { id: 'au-15', name: '誕生日の7日前になったとき', description: 'ペットの誕生日に合わせてクーポンを送信', eventType: 'calendar_booked', conditions: { birthdayRegistered: true }, actions: [{ type: 'send_message', params: { templateId: 'birthday-coupon' } }], isActive: false, priority: 55, lineAccountId: 'visual-qa-account', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'au-6', name: '問い合わせを担当へ知らせる', description: 'メッセージを受けたら担当用タグを付ける', eventType: 'message_received', conditions: {}, actions: [{ type: 'add_tag', params: { tagId: 'tag-support' } }], isActive: true, priority: 50, lineAccountId: null, createdAt: '2026-07-06T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z' },
-  ...Array.from({ length: 8 }, (_, index) => ({ id: `au-${index + 7}`, name: `定期フォロー ${index + 1}`, description: '条件に合う友だちへ順番に案内', eventType: 'tag_change', conditions: { group: index + 1 }, actions: [{ type: 'add_tag', params: { tagId: `tag-${index + 1}` } }], isActive: true, priority: 40 - index, lineAccountId: 'visual-qa-account', createdAt: '2026-07-10T00:00:00.000Z', updatedAt: '2026-08-19T00:00:00.000Z' })),
-  ...Array.from({ length: 3 }, (_, index) => ({ id: `au-${index + 16}`, name: `停止中の案内 ${index + 1}`, description: '設定を残して停止中', eventType: 'tag_change', conditions: {}, actions: [{ type: 'add_tag', params: { tagId: `tag-old-${index + 1}` } }], isActive: false, priority: 10 - index, lineAccountId: 'visual-qa-account', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' })),
+  { id: 'au-1', name: '問い合わせを担当へ知らせる', description: 'メッセージを受けたら担当へ知らせ、問い合わせのタグを付ける', eventType: 'message_received', triggerConfig: {}, conditions: {}, actions: [{ type: 'notify_staff', params: { notifyStaffIds: ['staff-1'] } }, { type: 'add_tag', params: { tagId: 'tag-support' } }], isActive: true, priority: 100, lineAccountId: 'visual-qa-account', createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-09-30T01:00:00.000Z' },
+  { id: 'au-2', name: '予約が入ったらお礼', description: '予約が確定したらお礼を送り、予約済みのタグを付ける', eventType: 'calendar_booked', triggerConfig: {}, conditions: {}, actions: [{ type: 'send_message', params: { templateId: 'booking-thanks' } }, { type: 'add_tag', params: { tagId: 'tag-booked' } }], isActive: true, priority: 90, lineAccountId: 'visual-qa-account', createdAt: '2026-07-02T00:00:00.000Z', updatedAt: '2026-09-29T01:00:00.000Z' },
+  { id: 'au-3', name: '購入のお礼とフォロー', description: 'はじめて買った人に共通アクション「購入のお礼」を呼ぶ', eventType: 'ec.order.confirmed', triggerConfig: {}, conditions: { firstOrder: true }, actions: [{ type: 'common_action', params: { commonActionId: 'ca-2' } }], isActive: true, priority: 80, lineAccountId: 'visual-qa-account', createdAt: '2026-07-03T00:00:00.000Z', updatedAt: '2026-09-28T01:00:00.000Z' },
+  { id: 'au-4', name: '定期フォロー 1', description: '友だちになって7日たった購入前の人に使い方のコツを送る', eventType: 'friend_add', triggerConfig: {}, conditions: { tagId: 'tag-before-purchase' }, actions: [{ type: 'send_message', params: { templateId: 'tips' } }], isActive: true, priority: 70, lineAccountId: 'visual-qa-account', createdAt: '2026-07-04T00:00:00.000Z', updatedAt: '2026-09-27T01:00:00.000Z' },
+  { id: 'au-5', name: 'アンケートの回答でタグ', description: '来店アンケートに答えた人に回答済みのタグを付ける', eventType: 'form_submitted', triggerConfig: {}, conditions: {}, actions: [{ type: 'add_tag', params: { tagId: 'tag-answered' } }], isActive: true, priority: 60, lineAccountId: 'visual-qa-account', createdAt: '2026-07-05T00:00:00.000Z', updatedAt: '2026-09-26T01:00:00.000Z' },
+  { id: 'au-6', name: '旧キャンペーンの自動返信', description: '「キャンペーン」と送られたら案内を返す（止めている）', eventType: 'message_received', triggerConfig: { keyword: 'キャンペーン' }, conditions: {}, actions: [{ type: 'send_message', params: { templateId: 'campaign-old' } }], isActive: false, priority: 50, lineAccountId: 'visual-qa-account', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-09-01T01:00:00.000Z' },
 ].map((automation) => ({
   ...automation,
-  triggerConfig: automation.conditions,
+  triggerConfig: automation.triggerConfig ?? automation.conditions,
   status: automation.isActive ? 'active' : 'stopped',
   versionId: `${automation.id}-version-3`,
   version: 3,
@@ -5544,21 +5542,20 @@ const automationRun = ({
  */
 export const AUTOMATION_RUNS = {
   summary: {
-    total: 4234,
+    total: 9666,
     executed: 2988,
     skipped: 1240,
     failed: 6,
-    mostRunName: '「予約」で予約画面を出す',
-    mostRunCount: 486,
+    mostRunName: '問い合わせを担当へ知らせる',
+    mostRunCount: 312,
   },
+  /* 板 `g98F9` の5行（動いた3・失敗1・条件に外れた1。5行目はテスト実行）。 */
   items: [
-    automationRun({ id: 'run-1', occurredAt: '2026-08-25T11:42:00+09:00', subject: '石田 未来', accountLabel: 'LINE 二号店', triggerLabel: '注文が確定したとき', status: 'succeeded', detail: '外部連携（Slack）／マイル 1,000', durationMs: 1200, automationId: 'au-order', automationName: '初回注文をSlackへ知らせる', domainStatus: 'success', successfulActions: ['外部連携（Slack）', 'マイル 1,000'] }),
-    automationRun({ id: 'run-2', occurredAt: '2026-08-25T10:31:00+09:00', subject: '新田 遥', accountLabel: 'LINE 本店', triggerLabel: 'タグが変わったとき', status: 'succeeded', detail: 'シナリオ開始／担当者 佐々木', durationMs: 800, automationId: 'au-trial', automationName: '体験申込のフォローを始める', domainStatus: 'success', successfulActions: ['シナリオ開始', '担当者 佐々木'] }),
-    automationRun({ id: 'run-3', occurredAt: '2026-08-25T09:12:00+09:00', subject: '松本 圭', accountLabel: 'LINE 本店', triggerLabel: 'タグが変わったとき', status: 'skipped', detail: '対象条件に当てはまりませんでした', durationMs: null, automationId: 'au-trial', automationName: '体験申込のフォローを始める', domainStatus: 'skipped_condition' }),
-    automationRun({ id: 'run-4', occurredAt: '2026-08-24T18:40:00+09:00', subject: '木村 亮', accountLabel: 'LINE 二号店', triggerLabel: '注文が確定したとき', status: 'permanent_failed', detail: 'マイル 1,000 は付きました', durationMs: 30000, automationId: 'au-order', automationName: '初回注文をSlackへ知らせる', domainStatus: 'partial', successfulActions: ['マイル 1,000'], failedAction: '外部連携（Slack）', failureReason: '外部連携先が応答しませんでした' }),
-    automationRun({ id: 'run-5', occurredAt: '2026-08-24T14:02:00+09:00', subject: '佐藤 千尋', accountLabel: 'LINE 本店', triggerLabel: 'メッセージが届いたとき', status: 'succeeded', detail: 'メニュー切替／回答フォーム送信', durationMs: 400, automationId: 'au-reserve', automationName: '「予約」で予約画面を出す', domainStatus: 'success', successfulActions: ['メニュー切替', '回答フォーム送信'] }),
-    automationRun({ id: 'run-6', occurredAt: '2026-08-24T09:05:00+09:00', subject: '高橋 直人', accountLabel: 'LINE 本店', triggerLabel: '毎日決まった時刻', status: 'succeeded', detail: '対応マーク「気にかける」', durationMs: 300, automationId: 'au-inactive', automationName: '反応がない人を気にかける', domainStatus: 'success', successfulActions: ['対応マーク「気にかける」'] }),
-    automationRun({ id: 'run-7', occurredAt: '2026-08-23T20:00:00+09:00', subject: '前田 さくら', accountLabel: 'LINE 本店', triggerLabel: '友だちが追加されたとき', status: 'skipped', detail: '対象条件に当てはまりませんでした', durationMs: null, automationId: 'au-welcome', automationName: '友だち追加から案内を始める', domainStatus: 'skipped_condition' }),
+    { ...automationRun({ id: 'run-1', occurredAt: '2026-09-30T14:12:00+09:00', subject: 'Kenta Kawano', accountLabel: '然 本店', triggerLabel: 'メッセージが届いたとき', status: 'succeeded', detail: '担当者通知／タグを追加', durationMs: 800, automationId: 'au-1', automationName: '問い合わせを担当へ知らせる', domainStatus: 'success', successfulActions: ['担当へ知らせる', 'タグ'] }), versionNumber: 4 },
+    { ...automationRun({ id: 'run-2', occurredAt: '2026-09-30T11:05:00+09:00', subject: 'Masato S.', accountLabel: '然 本店', triggerLabel: '注文が確定したとき', status: 'permanent_failed', detail: 'ブロック中で送れず', durationMs: 300, automationId: 'au-3', automationName: '購入のお礼とフォロー', domainStatus: 'failed', successfulActions: ['購入のお礼'], failedAction: null, failureReason: 'ブロック中で送れず' }), versionNumber: 2 },
+    automationRun({ id: 'run-3', occurredAt: '2026-09-30T09:40:00+09:00', subject: '菅野 亮', accountLabel: '然 渋谷店', triggerLabel: '予約が確定したとき', status: 'succeeded', detail: 'メッセージ／タグ', durationMs: 1100, automationId: 'au-2', automationName: '予約が入ったらお礼', domainStatus: 'success', successfulActions: ['メッセージ', 'タグ'] }),
+    { ...automationRun({ id: 'run-4', occurredAt: '2026-09-29T21:18:00+09:00', subject: '山田 太郎', accountLabel: '然 本店', triggerLabel: '友だちが追加されたとき', status: 'skipped', detail: 'タグ「購入前」がない', durationMs: 100, automationId: 'au-4', automationName: '定期フォロー 1', domainStatus: 'skipped_condition' }), versionNumber: 6 },
+    { ...automationRun({ id: 'run-5', occurredAt: '2026-09-29T19:22:00+09:00', subject: '坂本 真人', accountLabel: '然 本店', triggerLabel: 'フォームに回答したとき', status: 'succeeded', detail: 'タグ「回答済み」', durationMs: 400, automationId: 'au-5', automationName: 'アンケートの回答でタグ', domainStatus: 'success', successfulActions: ['タグ「回答済み」'] }), isTest: true, versionNumber: 1 },
   ],
   pagination: { total: 4234, limit: 20, offset: 0 },
 }
@@ -5608,6 +5605,26 @@ export const COMMON_ACTION_DETAIL = {
     { id: 'cab-3', consumerType: 'auto_reply', consumerId: 'ar-1', consumerPath: '「体験」と送られたとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-08-23T00:00:00.000Z' },
     { id: 'cab-4', consumerType: 'rich_menu', consumerId: 'rm-1', consumerPath: '体験を申し込む を押したとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-08-22T00:00:00.000Z' },
     { id: 'cab-5', consumerType: 'automation', consumerId: 'au-3', consumerPath: 'タグ「体験申込」が付いたとき', versionId: 'cav-4', versionNumber: 4, latestVersionNumber: 4, hasNewerVersion: false, runningCount: 2, waitingCount: 1, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-08-21T00:00:00.000Z' },
+  ],
+}
+
+/*
+ * 「購入のお礼」の版と使われている場所（V8 の板 `ziSgL`）。
+ * 下書き v4・いまの版 v3（9/24 公開）・古い版 v2。呼び出し元4か所（うち1か所は v2 のまま＝新版あり）。
+ */
+export const COMMON_ACTION_DETAIL_PURCHASE = {
+  id: 'ca-2', name: '購入のお礼', description: '買ってくれた人へのお礼とフォロー', status: 'published',
+  currentDraftVersionId: 'cav2-4', currentPublishedVersionId: 'cav2-3',
+  versions: [
+    { id: 'cav2-4', versionNumber: 4, status: 'draft', draftRevision: 2, actions: [caStep('p41', 'add_tag', { tagId: 'tag-purchased' }), caStep('p42', 'wait', { minutes: 1440 }), caStep('p43', 'send_message', { templateId: 'template-thanks-autumn', templateName: 'お礼（秋）' })], createdBy: '中川 由美', createdAt: '2026-09-29T01:00:00.000Z', publishedAt: null },
+    { id: 'cav2-3', versionNumber: 3, status: 'published', draftRevision: 1, actions: [caStep('p31', 'add_tag', { tagId: 'tag-purchased' }), caStep('p32', 'wait', { minutes: 1440 }), caStep('p33', 'send_message', { templateId: 'template-thanks', templateName: 'お礼' })], createdBy: '高田 誠', createdAt: '2026-09-24T01:00:00.000Z', publishedAt: '2026-09-24T01:00:00.000Z' },
+    { id: 'cav2-2', versionNumber: 2, status: 'published', draftRevision: 1, actions: [caStep('p21', 'add_tag', { tagId: 'tag-purchased' }), caStep('p22', 'send_message', { templateId: 'template-thanks', templateName: 'お礼' })], createdBy: '高田 誠', createdAt: '2026-08-30T06:20:00.000Z', publishedAt: '2026-08-30T06:20:00.000Z' },
+  ],
+  bindings: [
+    { id: 'cab2-1', consumerType: 'automation', consumerId: 'au-3', consumerPath: '購入のお礼とフォロー', versionId: 'cav2-3', versionNumber: 3, latestVersionNumber: 3, hasNewerVersion: false, runningCount: 0, waitingCount: 4, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-09-28T00:00:00.000Z' },
+    { id: 'cab2-2', consumerType: 'automation', consumerId: 'au-mile', consumerPath: '初回購入でマイル付与', versionId: 'cav2-3', versionNumber: 3, latestVersionNumber: 3, hasNewerVersion: false, runningCount: 0, waitingCount: 0, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-09-27T00:00:00.000Z' },
+    { id: 'cab2-3', consumerType: 'scenario', consumerId: 'scenario-sub', consumerPath: '定期便のはじめての方', versionId: 'cav2-3', versionNumber: 3, latestVersionNumber: 3, hasNewerVersion: false, runningCount: 1, waitingCount: 12, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-09-26T00:00:00.000Z' },
+    { id: 'cab2-4', consumerType: 'automation', consumerId: 'au-6', consumerPath: '旧キャンペーンの自動返信', versionId: 'cav2-2', versionNumber: 2, latestVersionNumber: 3, hasNewerVersion: true, runningCount: 0, waitingCount: 0, olderRunningCount: 0, olderWaitingCount: 0, updatedAt: '2026-09-01T00:00:00.000Z' },
   ],
 }
 

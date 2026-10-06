@@ -688,6 +688,18 @@
   --tpl-hq-home-account-pad: 18px; --tpl-hq-logo: 40px; --tpl-hq-logo-font: 15px; --tpl-hq-name-lh: 22px; --tpl-hq-stat-lh: 23px; --tpl-hq-col-actions: 260px;
   --tpl-hq-pill-gap: 5px; --tpl-hq-pill-pad: 2px 8px; --tpl-hq-pill-lh: 18px; --tpl-hq-dot: 6px; --tpl-hq-confirm-gap: 6px; --tpl-hq-confirm-label: 64px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
+  /* オートメーション（LWQXd・En14p・nH9L8・LnGNw・g98F9・ziSgL・M4torY・tJqST）。 */
+  --tpl-am-tab-h: 28.5px; --tpl-am-band-top-line: inset 0 1px 0 var(--color-hairline); --tpl-am-ro-row-pad: 12px 24px;
+  --tpl-am-create-after: 14px; --tpl-am-create-w: 135px; --tpl-am-add-space: 31px; --tpl-am-note-lh: 17px; --tpl-am-notice-after: 5px;
+  --tpl-am-col-gap: 16px; --tpl-am-head-h: 43.5px; --tpl-am-head-pad: 13px 20px; --tpl-am-row-h: 54px; --tpl-am-narrow-row-h: 55.5px; --tpl-am-row-pad: 9px 20px; --tpl-am-cell-gap: 3px; --tpl-am-num-pad-end: 8px;
+  --tpl-am-col-trigger: 130px; --tpl-am-col-who: 110px; --tpl-am-col-do: 140px; --tpl-am-col-runs: 80px; --tpl-am-col-state: 92px; --tpl-am-col-ops: 110px;
+  --tpl-am-pill-gap: 5px; --tpl-am-pill-pad: 2px 8px; --tpl-am-pill-lh: 18px; --tpl-am-ops-gap: 6px; --tpl-am-edit-w: 81px; --tpl-am-foot-pad: 12px 24px;
+  --tpl-am-run-row-h: 56px; --tpl-am-run-col-rule: 170px; --tpl-am-run-col-result: 110px; --tpl-am-run-col-done: 150px; --tpl-am-run-col-time: 84px; --tpl-am-run-col-ops: 120px; --tpl-am-pager-h: 32px; --tpl-am-pager-pad: 12px 20px; --tpl-am-run-foot-pad: 34px 0 0;
+  --tpl-am-ca-row-h: 56px; --tpl-am-ca-col-steps: 200px; --tpl-am-ca-col-used: 96px; --tpl-am-ca-col-version: 90px;
+  --tpl-am-ver-back-lh: 19px; --tpl-am-ver-card-gap: 12px; --tpl-am-ver-history-gap: 12px; --tpl-am-ver-history-pad: 20px; --tpl-am-ver-title-size: 15px; --tpl-am-ver-lead-lh: 18px;
+  --tpl-am-ver-row-h: 54.5px; --tpl-am-ver-content-gap: 14px; --tpl-am-ver-body-shift: -4px -4px 0; --tpl-am-ver-cards-trim: 5px; --tpl-am-ver-name-w: 40px; --tpl-am-ver-usage-gap: 14px; --tpl-am-ver-usage-title-lh: 20px; --tpl-am-ver-head-pad: 9px 16px; --tpl-am-ver-head-h: 34px; --tpl-am-ver-use-row-h: 55px; --tpl-am-ver-use-row-pad: 9px 16px;
+  --tpl-am-ver-use-row-line: inset 0 1px 0 var(--color-control-border); --tpl-am-ver-num-pad-end: 12px; --tpl-am-ver-col-pinned: 90px; --tpl-am-ver-col-num: 70px; --tpl-am-ver-col-state: 100px; --tpl-am-ver-col-ops: 150px; --tpl-am-ver-foot-pad: 10px 12px;
+  --tpl-am-saved-w: 153px; --tpl-am-folder-w: 150px; --tpl-am-search-w: 240px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
   /* 友だち属性 タグの一覧（絵 I1E7Bt・aPeD8・fkGUR）。 */
   --tpl-tag-search-w: 240px; --tpl-tag-search-w-narrow: 200px;

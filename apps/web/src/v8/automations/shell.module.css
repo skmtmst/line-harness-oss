@@ -1,0 +1,41 @@
+/*
+ * ★V8 オートメーションの外枠（LWQXd・En14p・nH9L8・LnGNw・g98F9）。
+ * 枠・見出し・タブの段・帯の並びは型（ListPage）が持つ。ここはタブの高さと閲覧のみの帯だけ。
+ */
+
+/* 閲覧のみの帯（nH9L8：タブの下に上下12・左右24の段、薄い青の帯）。 */
+.viewerRow {
+  padding: var(--tpl-am-ro-row-pad);
+}
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* タブ（絵：高さ28・文字の下10・文字 13/18）。共通のタブの V8 の値より詰める。 */
+:global([data-theme='v8']) .tabs [role='tab'] {
+  box-sizing: border-box;
+  height: var(--tpl-am-tab-h);
+  min-height: 0;
+  align-items: flex-start;
+  padding-bottom: 0;
+  line-height: var(--tpl-tabs-text-lh);
+}
+
+/* 数の帯（絵：タブの直下・高さ115。上の線はマスの外枠で、高さを取らない）。
+ * 帯の下の線は型の段が持つので重ねない。上の線は場所を取らない内側の影で引く。 */
+:global([data-theme='v8']) .stats :global([data-kpi-strip][data-kpi-presentation='band']) {
+  border-block-width: 0;
+  box-shadow: var(--tpl-am-band-top-line);
+}
