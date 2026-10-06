@@ -48,6 +48,20 @@
   margin-inline: auto;
 }
 
+/* 題「LINEでの見え方」はスマホの外の上。? は題の横。（#1482 で一緒に消えていたのを戻す・2026-10-06） */
+.phoneTitle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--text-lh, 1.4);
+  color: var(--color-ink);
+}
+
+
 /* v8 のスマホに内の題は置かない（cfVyj・j7PP04 どおり）。題は外が担う。 */
 
 /* 器 330×690・黒・縁 2px・内側 10・角丸 52・下への影。 */

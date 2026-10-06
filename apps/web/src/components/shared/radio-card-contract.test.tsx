@@ -184,3 +184,10 @@ describe('V8 の丸（2026-10-06 オーナー：絵どおり丸を出す。バ�
     expect(css()).toMatch(/\[data-theme='v8'\] \.compact > \.radio[^{]*\{[^}]*opacity:\s*0/)
   })
 })
+
+describe('LINEでの見え方の題（#1482 で基本の見た目が消えた再発を防ぐ）', () => {
+  it('題の基本（横並び・下の間）が部品の CSS にある', () => {
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'line-preview.module.css'), 'utf8')
+    expect(css).toMatch(/(^|\n)\.phoneTitle \{[^}]*display:\s*flex[^}]*margin:\s*0 0 10px/)
+  })
+})
