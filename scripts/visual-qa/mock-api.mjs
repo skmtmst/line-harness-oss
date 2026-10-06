@@ -839,6 +839,17 @@ const ARRAY_PREFIXES = [
   '/api/users/',
 ]
 
+/** プール管理（設計 `u3iab3`）の2つのプールと所属アカウント。 */
+const TRAFFIC_POOLS = [
+  { id: 'pool-shibuya', slug: 'shibuya', name: '渋谷エリア', activeAccountId: 'visual-qa-account-prod', isActive: true, createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' },
+  { id: 'pool-event', slug: 'event', name: 'イベント用', activeAccountId: 'visual-qa-account-event-2025', isActive: true, createdAt: '2026-06-02T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' },
+]
+const TRAFFIC_POOL_ACCOUNTS = [
+  { id: 'pool-shibuya-prod', poolId: 'pool-shibuya', lineAccountId: 'visual-qa-account-prod', isActive: true, createdAt: '2026-06-01T00:00:00.000Z' },
+  { id: 'pool-shibuya-store', poolId: 'pool-shibuya', lineAccountId: 'visual-qa-account-store', isActive: true, createdAt: '2026-06-01T00:00:00.000Z' },
+  { id: 'pool-event-2025', poolId: 'pool-event', lineAccountId: 'visual-qa-account-event-2025', isActive: true, createdAt: '2026-06-02T00:00:00.000Z' },
+]
+
 /** 機能31の固定応答。本物と同じ全ID・既定値・版を返す。 */
 const FEATURES = {
   scenarios: true, broadcasts: true, templates: true, reminders: true,
@@ -1450,7 +1461,9 @@ const SHAPES = {
   },
   // 左メニューの出し分け。無いと汎用の空一覧が返り「機能設定を読み込めませんでした」になり、
   // メニューが基本の9項目だけになる（2026-09-24 の点検で発覚）。
-  '/api/settings/features/visibility': { features: FEATURES },
+  // 設定の画面（★V8 設定の中のメニュー・プール管理 u3iab3）は「プール管理」が見える統括で描かれている。
+  // 機能設定の既定（multi_store_hierarchy は既定オフ）はそのまま、表示の出し分けだけオンで返す。
+  '/api/settings/features/visibility': { features: { ...FEATURES, multi_store_hierarchy: true } },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
   '/api/nen-members/overview': { pets: 6, healthLogs: 12, activeCare: 2, pendingPhotos: 3, members: 6, consultations: 1 },
@@ -2202,7 +2215,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const status = query.get('status')
     const roleBundle = query.get('roleBundle')
     const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')
-    const filtered = ACCESS_USERS.items.filter((user) => {
+    // いま入っている本人（visual-qa-owner）は「いま」入った形で返す（設計 nku0f の「いま」）。
+    const now = new Date(Date.now() - 60_000).toISOString()
+    const filtered = ACCESS_USERS.items.map((user) => (user.id === STAFF.id ? { ...user, lastLoginAt: now, lastActionAt: now } : user)).filter((user) => {
       if (status && user.status !== status) return false
       if (roleBundle && user.roleBundle !== roleBundle) return false
       if (!search) return true
@@ -2391,6 +2406,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       success: true,
       data: status ? CONVERSION_APPROVALS.filter((item) => item.approvalStatus === status) : CONVERSION_APPROVALS,
     }
+  }
+  /*
+    プール管理（設計 `u3iab3`）。渋谷エリア（本店・渋谷店）とイベント用（2025年イベント）の2つ。
+    表示の出し分けで multi_store_hierarchy をオンにしたので、口も中身を返す（空だと「まだプールがありません」で撮れる）。
+  */
+  if (pathname === '/api/traffic-pools') {
+    return { success: true, data: TRAFFIC_POOLS }
+  }
+  if (/^\/api\/traffic-pools\/[^/]+\/accounts$/.test(pathname)) {
+    return { success: true, data: TRAFFIC_POOL_ACCOUNTS.filter((member) => member.poolId === pathname.split('/')[3]) }
   }
   if (pathname === `/api/line-accounts/${ACCOUNT.id}/handovers`) {
     return { success: true, data: [ACCOUNT_HANDOVER] }

@@ -1,0 +1,189 @@
+/*
+ * ★V8 プール管理（u3iab3）。寸法は globals.css の --tpl-sa-*。
+ * 外側（設定の型の中身の幅）は ../sa-frame.module.css。
+ */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-sa-pair-gap);
+}
+
+/* カード：枠1本・角丸 12・余白 18・間 10。並ぶカードは同じ高さ。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sa-pool-gap);
+  min-width: 0;
+  padding: var(--tpl-sa-pool-pad);
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-sa-ring);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sa-row-gap);
+}
+
+.cardTitleBox {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-sa-step-text-gap);
+  min-width: 0;
+}
+
+.cardTitle {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-sa-pool-name-size);
+  font-weight: 700;
+  line-height: var(--tpl-sa-pool-name-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slug {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-sa-pool-slug-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 行の「…」：開いたメニューの目印が行の中で段を取らないよう、箱で包む。 */
+.menuBox {
+  display: flex;
+  align-items: center;
+}
+
+.urlRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sa-row-gap);
+  padding: var(--tpl-sa-row-pad);
+  border-radius: var(--tpl-sa-row-radius);
+  background: var(--color-surface-pearl);
+}
+
+.url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-sa-url-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.membersLabel {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-sa-label-lh);
+  white-space: nowrap;
+}
+
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-sa-pool-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sa-row-gap);
+  padding: var(--tpl-sa-row-pad);
+  border-radius: var(--tpl-sa-row-radius);
+  box-shadow: var(--tpl-sa-ring);
+}
+
+.memberName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-sa-member-name-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberFriends {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+}
+
+.empty {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.addLink {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-sa-link-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.addLink:hover {
+  text-decoration: underline;
+}
+
+.addLink:focus-visible,
+.textButton:focus-visible {
+  outline: var(--tpl-sa-focus-w) solid var(--color-accent);
+  outline-offset: var(--tpl-sa-focus-w);
+}
+
+.inlineError {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.textButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 下の案内の帯：薄い青の地・印 16・文 13/20。 */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sa-notice-gap);
+  margin: 0;
+  padding: var(--tpl-sa-notice-pad);
+  border-radius: var(--tpl-sa-notice-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-sa-notice-lh);
+}
+
+.noticeIcon {
+  flex-shrink: 0;
+  color: var(--color-status-info);
+}
