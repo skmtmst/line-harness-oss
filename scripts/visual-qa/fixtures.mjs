@@ -951,9 +951,9 @@ export const FORM_DELETE_IMPACT_FIXTURES = {
 /* 回答フォームのフォルダ。板 `I3L41O` の総数18件と内訳（来店・予約6・
  * 資料請求4・アンケート5・未分類3）。一覧は `itemCount` を見て数を出す。 */
 export const FORM_FOLDERS = [
-  { id: 'form-folder-visit', kind: 'form', name: '来店・予約', parentId: null, displayOrder: 0, color: null, formCount: 6, itemCount: 6, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'form-folder-request', kind: 'form', name: '資料請求', parentId: null, displayOrder: 1, color: null, formCount: 4, itemCount: 4, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
-  { id: 'form-folder-survey', kind: 'form', name: 'アンケート', parentId: null, displayOrder: 2, color: null, formCount: 5, itemCount: 5, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'form-folder-visit', kind: 'form', name: '来店・予約', parentId: null, displayOrder: 0, color: '#2f6fde', formCount: 6, itemCount: 6, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'form-folder-request', kind: 'form', name: '資料請求', parentId: null, displayOrder: 1, color: '#1f9d55', formCount: 4, itemCount: 4, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
+  { id: 'form-folder-survey', kind: 'form', name: 'アンケート', parentId: null, displayOrder: 2, color: '#e07b24', formCount: 5, itemCount: 5, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z' },
 ]
 
 const FORM_BASE_LAYOUT = {
@@ -991,11 +991,11 @@ const formRow = (id, name, description, folderId, isActive, submitCount, monthly
  * 付く。帯の数（公開中5・下書き2・今月712・先月640・完了74%・未完2）は
  * `LIST_STATS.forms` が返す。 */
 export const FORMS = [
-  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, { submitCount: 186, openCount: 248, rate: 75 }, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 0 }, 2),
+  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-survey', true, 1284, { submitCount: 186, openCount: 248, rate: 75 }, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 0 }, 2),
   formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, { submitCount: 402, openCount: 536, rate: 75 }, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 0 }),
   formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, { submitCount: 12, openCount: 20, rate: 60 }, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', { friendFieldCount: 1, tagCount: 0 }),
-  formRow('form-4', 'イベント申込（10月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, { submitCount: 88, openCount: 110, rate: 80 }, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
-  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, { submitCount: 0, openCount: 0, rate: null }, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
+  formRow('form-4', 'イベント申込（10月）', '日時の希望と人数・7ブロック', null, true, 220, { submitCount: 88, openCount: 110, rate: 80 }, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
+  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-visit', false, 0, { submitCount: 0, openCount: 0, rate: null }, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
   { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, { submitCount: 0, openCount: 5, rate: 0 }, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
   /* NEN-07: NEN配信「口コミのお願い」がつなぐフォーム。編集画面の選択肢と
    * 「つながる先」へ出る公開中フォームとして見本へ置く。 */
@@ -2095,6 +2095,8 @@ export const RICH_MENU_GROUPS = [
     ...RICH_MENU_BASE,
     id: 'rmg-1',
     name: '会員ランク上位',
+    /* 板 `rZEGN` の丸：通常・通常・キャンペーン・未分類（上から）。 */
+    folderId: 'rich-menu-folder-normal',
     targetingPriority: 0,
     displayOrder: 0,
     monthlyStats: {
@@ -2130,7 +2132,7 @@ export const RICH_MENU_GROUPS = [
     targetingPriority: 3,
     targetingEnabled: false,
     targetingCondition: null,
-    folderId: 'rich-menu-folder-store',
+    folderId: null,
     displayOrder: 3,
   },
   {
@@ -4473,10 +4475,11 @@ export const INCOMING_WEBHOOK_UNMATCHED = [
 /* 板 `xbHxg`（流入と計測一覧）の6行。フォルダは広告1・SNS1・店頭1・
  * 未分類3（紹介と紙の分類は絵に無いので `genre: null`）。メール署名は
  * 未登録（`orphan` の行）のため経路自体を持たない。動きが未設定の2件は
- * Google広告とチラシ（タグもシナリオも無い行）。 */
+ * Google広告とチラシ（タグもシナリオも無い行）。
+ * 「友だちになったら」は絵どおり、Instagram と紹介リンクはシナリオ無し（1行目が「—」）・タグだけ。 */
 export const ENTRY_ROUTES = [
-  { id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿', tagId: 'tag-vip', scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-25T00:12:00.000Z' },
-  { id: 'er-2', refCode: 'ref-tanaka', genre: null, name: '紹介リンク 田中 明', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
+  { id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿', tagId: 'tag-vip', scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-25T00:12:00.000Z' },
+  { id: 'er-2', refCode: 'ref-tanaka', genre: null, name: '紹介リンク 田中 明', tagId: 'tag-purchase', scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
   { id: 'er-3', refCode: 'shop-pop', genre: '店頭', name: '店頭POPのQRコード', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-25T02:30:00.000Z' },
   { id: 'er-4', refCode: 'ad-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
   { id: 'er-6', refCode: 'flyer-26s', genre: null, name: 'チラシ計測リンク（2026春）', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, stoppedAt: '2026-06-30T00:00:00.000Z', stoppedReason: '春の配布が終わった', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
@@ -4490,7 +4493,9 @@ export const INFLOW_SUMMARY = {
     { refCode: 'ad-summer', name: 'Google広告 夏キャンペーン', friendCount: 42, clickCount: 1204, latestAt: '2026-09-30T14:12:00+09:00' },
     { refCode: 'summer-ig', name: '夏のInstagram投稿', friendCount: 31, clickCount: 880, latestAt: '2026-09-30T09:40:00+09:00' },
     { refCode: 'shop-pop', name: '店頭POPのQRコード', friendCount: 27, clickCount: null, latestAt: '2026-09-29T18:40:00+09:00' },
-    { refCode: 'mail-sign', name: 'メール署名', friendCount: 3, clickCount: 96, latestAt: '2026-09-26T11:02:00+09:00' },
+    /* 絵（xbHxg）の並びは メール署名 → 紹介リンク の順。一覧は友だち追加が多い順なので、
+     * メール署名を紹介リンク（12人）より1人多くして絵の並びにそろえる（絵の数「3人」はデータの違いとして残る）。 */
+    { refCode: 'mail-sign', name: 'メール署名', friendCount: 13, clickCount: 96, latestAt: '2026-09-26T11:02:00+09:00' },
     { refCode: 'ref-tanaka', name: '紹介リンク 田中 明', friendCount: 12, clickCount: 230, latestAt: '2026-09-29T10:21:00+09:00' },
     { refCode: 'flyer-26s', name: 'チラシ計測リンク（2026春）', friendCount: 0, clickCount: null, latestAt: '2026-05-31T18:00:00+09:00' },
   ],
@@ -6192,7 +6197,22 @@ export const ADMIN_EVENTS = [
   adminEvent('ev-3', '爪切り体験', '2026-10-02T06:00:00.000Z', 10, 1, 0),
   /* 設計の「受付前 2」。公開していないので、埋まり具合の分母にも入らない。 */
   adminEvent('ev-4', '冬のしつけ教室', '2026-12-05T05:00:00.000Z', 12, 0, 0, 0),
-]
+].map((event, index) => ({
+  ...event,
+  /* 板 `e2ekFu` の名前の前の丸：教室・体験・相談会・未分類（上から）。 */
+  folderId: ['event-folder-class', 'event-folder-trial', 'event-folder-consult', null][index] ?? null,
+}))
+
+/** イベントのフォルダ（kind=event）。板 `e2ekFu` の左の列の名前と、行の丸の色。件数は上の4件から数える。 */
+export const EVENT_FOLDERS = [
+  ['event-folder-class', '教室', '#2f6fde'],
+  ['event-folder-trial', '体験', '#1f9d55'],
+  ['event-folder-consult', '相談会', '#e07b24'],
+].map(([id, name, color], index) => ({
+  id, kind: 'event', name, parentId: null, displayOrder: index, color,
+  itemCount: ADMIN_EVENTS.filter((event) => event.folderId === id).length,
+  createdAt: '2026-09-01T01:00:00.000Z', updatedAt: '2026-09-01T01:00:00.000Z',
+}))
 
 /** 機能29の編集画面。詳細・枠・待ち列はID入りの動的URLから読む。 */
 export const EVENT_DETAIL = {
@@ -6958,12 +6978,13 @@ export function mileageWriteResponse(method, pathname, body = {}, headers = {}) 
  * `count` は全18件を取得しなくても左の絞り込み件数を描ける一覧集計値。
  */
 export const WEBINAR_FOLDERS = [
-  ['webinar-folder-seminars', 'セミナー', 2],
-  ['webinar-folder-products', '商品説明', 1],
-  ['webinar-folder-cases', '導入事例', 1],
-].map(([id, name, count], index) => ({
+  /* 色は板 `UyUMw` の行の名前の前の丸（フォルダの色）。 */
+  ['webinar-folder-seminars', 'セミナー', 2, '#2f6fde'],
+  ['webinar-folder-products', '商品説明', 1, '#1f9d55'],
+  ['webinar-folder-cases', '導入事例', 1, '#e07b24'],
+].map(([id, name, count, color], index) => ({
   id, kind: 'webinar', accountId: 'visual-qa-account', name, parentId: null, displayOrder: index, count,
-  color: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
+  color, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
 }))
 
 export const WEBINAR_FOLDER_SUMMARY = { rows: 5, total: 18 }
@@ -7146,7 +7167,7 @@ export const OPERATION_HISTORY = [
  * 申込・視聴の未取得は0で埋めず null にする。
  */
 export const WEBINARS = [
-  /* 並びは設計 `UyUMw` の上から（更新が新しい順）。未分類は 2件（旧機能説明会・秋の新商品説明会）。 */
+  /* 並びは設計 `UyUMw` の上から（更新が新しい順）。行のフォルダは絵の丸の並び（セミナー・商品説明・導入事例・未分類・セミナー・商品説明）。 */
   {
     id: 'webinar-1', title: 'NEN活用スタートセミナー', slug: 'nen-start', status: 'active',
     folderId: 'webinar-folder-seminars', folderName: 'セミナー',
@@ -7170,21 +7191,21 @@ export const WEBINARS = [
   },
   {
     id: 'webinar-4', title: '顧客対応の自動化', slug: 'automation', status: 'active',
-    folderId: 'webinar-folder-seminars', folderName: 'セミナー',
+    folderId: null, folderName: null,
     durationSeconds: 1_800, registrationCount: 24, viewerCount: 20,
     publicationState: 'always', publicationStartsAt: null, publicationEndsAt: null,
     updatedAt: '2026-08-25T03:00:00.000Z',
   },
   {
     id: 'webinar-5', title: '旧機能説明会', slug: 'old', status: 'draft',
-    folderId: null, folderName: null,
+    folderId: 'webinar-folder-seminars', folderName: 'セミナー',
     durationSeconds: 1_500, registrationCount: 85, viewerCount: 99,
     publicationState: 'ended', publicationStartsAt: '2026-08-01T00:00:00+09:00', publicationEndsAt: '2026-08-20T23:59:59+09:00',
     updatedAt: '2026-08-25T02:00:00.000Z',
   },
   {
     id: 'webinar-6', title: '秋の新商品説明会', slug: 'autumn', status: 'draft',
-    folderId: null, folderName: null,
+    folderId: 'webinar-folder-products', folderName: '商品説明',
     durationSeconds: 0, registrationCount: 0, viewerCount: null,
     publicationState: 'unset', publicationStartsAt: null, publicationEndsAt: null,
     updatedAt: '2026-08-25T01:00:00.000Z',
