@@ -49,6 +49,7 @@ import SaveConflictBar from '@/components/shared/save-conflict-bar'
 import TargetMissing from '@/components/shared/target-missing'
 import { AfterActionsSection, ReceptionSection, ThanksSection, WordsSection } from '@/components/forms/options-sections'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import FormEditV8 from '@/v8/form-edit/edit'
 import Toggle from '@/components/shared/toggle'
 import { conflictMessage } from './form-conflict-message'
 import { describeConflictDiff, type ConflictSide } from './form-conflict-diff'
@@ -1780,6 +1781,10 @@ function FormEditInner() {
 }
 
 export default function FormEditPage() {
+  // V8 は src/v8/form-edit に一から書いた画面（動きは同じ場所の BEHAVIOR.md）。
+  // ここの renderV8Edit は切り替えの日まで残す（契約の試験が読む）。
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <FormEditV8 />
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

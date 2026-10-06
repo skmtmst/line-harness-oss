@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
+import { Activity, BellRing, Layers, MessageCircle, Rocket, ShoppingCart, SlidersHorizontal, Users, type LucideIcon } from 'lucide-react'
+import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
 
 /*
@@ -22,17 +24,32 @@ import styles from './settings-inner-nav.module.css'
  * 今までどおり行ける）。
  */
 
-/** 夕41 の絵の並び。左のメニュー（menu.ts）の並びとは違うので、ここで明示する。 */
-const SETTINGS_TOP_ORDER = [
-  '/accounts', // LINEアカウント
-  '/staff', // ログインユーザー
+/**
+ * ★V8 設定の板（ihjfd・u3iab3・V7vn3 ほか 8 枚）の並び。左のメニュー（menu.ts）の並びとは違うので、ここで明示する。
+ * 2026-10-06：夕41 の並び（専用の小見出し・プール管理なし）から、今の絵の並びへ。
+ */
+const SETTINGS_ORDER = [
   '/getting-started', // はじめの設定
+  '/accounts', // LINEアカウント
+  '/pools', // プール管理
+  '/staff', // ログインユーザー
   '/settings', // 機能設定
   '/emergency', // 運用状態
+  '/ec-commerce', // EC連携
+  '/line-notifications', // LINE通知
 ] as const
 
-/** 「専用」の小見出しの下に並ぶ項目。 */
-const SETTINGS_DEDICATED = ['/ec-commerce', '/line-notifications'] as const
+/** 絵の印（lucide）。 */
+const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
+  '/getting-started': Rocket,
+  '/accounts': MessageCircle,
+  '/pools': Layers,
+  '/staff': Users,
+  '/settings': SlidersHorizontal,
+  '/emergency': Activity,
+  '/ec-commerce': ShoppingCart,
+  '/line-notifications': BellRing,
+}
 
 /** 機能設定の下に付く2つの画面（絵の「下にマニュアルの正本表・ファイルの検査」）。 */
 const SETTINGS_CHILDREN = [
@@ -41,10 +58,7 @@ const SETTINGS_CHILDREN = [
 ] as const
 
 /** この中のメニューを出す画面（左のメニューの「設定」が光る画面と同じ範囲）。 */
-const SETTINGS_AREA_PATHS = [
-  ...SETTINGS_TOP_ORDER,
-  ...SETTINGS_DEDICATED,
-]
+const SETTINGS_AREA_PATHS = [...SETTINGS_ORDER]
 
 /** いまのパスが設定の中のメニューを出す画面か。 */
 export function isSettingsAreaPath(pathname: string): boolean {
@@ -62,7 +76,12 @@ function isBooleanRecord(value: unknown): value is Record<string, boolean> {
 
 const settingsSectionItems = MENU_SECTION_BY_ID.get('settings')?.items ?? []
 
-export default function SettingsInnerNav() {
+/**
+ * inline：画面が白い板の中（題の下の左）に置くとき true。枠の側は外のメニューを出さない。
+ * 置き方の例：`<SettingsPage navigation={<SettingsInnerNav inline />} …>`
+ */
+export default function SettingsInnerNav({ inline = false }: { inline?: boolean } = {}) {
+  useSettingsNavInline(inline)
   const pathname = usePathname() ?? ''
   const { selectedAccountId } = useAccount()
   const [staffRole, setStaffRole] = useState<string | null>(null)
@@ -115,11 +134,7 @@ export default function SettingsInnerNav() {
   }
 
   const byHref = new Map(settingsSectionItems.map((item) => [item.href, item]))
-  const topItems = SETTINGS_TOP_ORDER
-    .map((href) => byHref.get(href))
-    .filter((item): item is MenuItem => Boolean(item))
-    .filter(itemVisible)
-  const dedicatedItems = SETTINGS_DEDICATED
+  const items = SETTINGS_ORDER
     .map((href) => byHref.get(href))
     .filter((item): item is MenuItem => Boolean(item))
     .filter(itemVisible)
@@ -131,13 +146,17 @@ export default function SettingsInnerNav() {
     const active = item.href === '/settings'
       ? pathname === '/settings'
       : itemActive(item.href)
-    const children = item.href === '/settings' ? SETTINGS_CHILDREN : []
+    // 機能設定の下の2つは絵に無いが、ここからしか行けないので消さない。機能設定とその2つを開いているときだけ出す。
+    const children = item.href === '/settings' && (pathname === '/settings' || pathname.startsWith('/settings/')) ? SETTINGS_CHILDREN : []
+    const Icon = SETTINGS_ICONS[item.href as (typeof SETTINGS_ORDER)[number]]
     return (
       <li key={item.href}>
         <Link
           href={item.href}
           className={`${styles.item} ${active ? styles.itemActive : ''}`}
+          aria-current={active ? 'page' : undefined}
         >
+          {Icon ? <Icon size={14} aria-hidden="true" className={styles.icon} /> : null}
           {item.label}
         </Link>
         {children.length > 0 && (
@@ -159,18 +178,11 @@ export default function SettingsInnerNav() {
   }
 
   return (
-    <nav className={styles.root} aria-label="設定の中のメニュー">
+    <nav className={`${styles.root} ${inline ? styles.inline : ''}`} aria-label="設定の中のメニュー" data-settings-nav={inline ? 'inline' : 'outer'}>
+      <p className={styles.heading}>設定</p>
       <ul className={styles.list}>
-        {topItems.map(renderItem)}
+        {items.map(renderItem)}
       </ul>
-      {dedicatedItems.length > 0 && (
-        <>
-          <p className={styles.groupLabel}>専用</p>
-          <ul className={styles.list}>
-            {dedicatedItems.map(renderItem)}
-          </ul>
-        </>
-      )}
     </nav>
   )
 }
