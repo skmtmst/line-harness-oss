@@ -110,6 +110,7 @@ import {
   GETTING_STARTED, RECIPES, MANUAL_LINKS,
   TEST_RECIPIENT_LOGIN_USERS,
   HQ_BANNER_PRESETS, HQ_BANNER_USAGE, HQ_BANNER_STATS, HQ_BANNER_PROJECTS, HQ_BANNER_IMAGES,
+  HQ_BANNER_ARCHIVED_PROJECTS, HQ_BANNER_IMAGE_COUNTS,
   NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST,
   FRIEND_ADD_RUN_DETAIL, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
 } from './fixtures.mjs'
@@ -2293,11 +2294,36 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/hq/banners/projects') {
     const archived = query.get('archived') === '1'
-    const items = archived ? [] : HQ_BANNER_PROJECTS
+    const items = archived ? HQ_BANNER_ARCHIVED_PROJECTS : HQ_BANNER_PROJECTS
     return { success: true, data: items }
   }
+  if (method === 'GET' && pathname.startsWith('/api/hq/banners/projects/')) {
+    // プロジェクトの中（絵 iMnph）。本物は `{project, images, generations}`。
+    const id = decodeURIComponent(pathname.slice('/api/hq/banners/projects/'.length))
+    const project = [...HQ_BANNER_PROJECTS, ...HQ_BANNER_ARCHIVED_PROJECTS].find((p) => p.id === id)
+    if (!project) return { success: false, error: 'プロジェクトが見つかりません' }
+    // 絵 iMnph の並び（秋の味覚がいちばん後ろ）。並びは本物でも新しい順とは限らない（取り込み・再生成）。
+    const order = (i) => (i.id === 'banner-image-qa-12' ? 1 : 0)
+    const images = HQ_BANNER_IMAGES.filter((i) => i.projectId === id).sort((a, b) => order(a) - order(b))
+    const generations = [...new Map(images.filter((i) => i.generation).map((i) => [i.generation.id, i.generation])).values()]
+    return { success: true, data: { project, images, generations } }
+  }
   if (pathname === '/api/hq/banners/images') {
-    return { success: true, data: HQ_BANNER_IMAGES, nextBefore: null }
+    // 画像ライブラリ（絵 W5Wxr）は 12 枚ずつ。数（withCounts）は全体の数。
+    let items = HQ_BANNER_IMAGES
+    if (query.get('projectId')) items = items.filter((i) => i.projectId === query.get('projectId'))
+    if (query.get('favorite') === '1') items = items.filter((i) => i.isFavorite)
+    if (query.get('delivered') === '1') items = items.filter((i) => i.deliveredAccountIds.length > 0)
+    if (query.get('delivered') === '0') items = items.filter((i) => i.deliveredAccountIds.length === 0)
+    const before = query.get('before')
+    if (before) items = items.filter((i) => i.createdAt < before)
+    const limit = Number(query.get('limit') ?? '') || items.length
+    const page = items.slice(0, limit)
+    const nextBefore = items.length > limit ? page[page.length - 1].createdAt : null
+    return {
+      success: true, data: page, nextBefore,
+      ...(query.get('withCounts') === '1' ? { counts: HQ_BANNER_IMAGE_COUNTS } : {}),
+    }
   }
   if (method === 'DELETE' && pathname === '/api/hq/templates/media') {
     return { success: true, data: { deleted: true } }
