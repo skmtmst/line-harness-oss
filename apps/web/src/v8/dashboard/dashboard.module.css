@@ -77,10 +77,11 @@
 .noteBody { color: var(--color-ink-secondary); }
 .updated, .updatedDanger {
   margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-db-small-lh); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
 }
 .updatedDanger { color: var(--color-danger); }
 .small { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-db-small-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.caption { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); white-space: nowrap; }
+.caption { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .strong, .faintStrong { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-db-text-lh); white-space: nowrap; }
 .faintStrong { color: var(--color-ink-faint); }
@@ -196,7 +197,7 @@ a.kv:hover .kvKey { text-decoration: underline; }
 .planText { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .planTitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-db-text-lh); }
 a.planTitle:hover { text-decoration: underline; }
-.planKind { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-db-small-lh); white-space: nowrap; }
+.planKind { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-db-small-lh); white-space: nowrap; text-overflow: ellipsis; }
 .planTime { flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-db-caption-lh); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .figure { display: flex; align-items: flex-end; gap: var(--tpl-db-tag-gap); margin: 0; white-space: nowrap; }
 .bigNum { color: var(--color-ink); font-family: var(--font-inter), Inter, sans-serif; font-size: var(--tpl-db-num-size); font-weight: 600; line-height: var(--tpl-db-num-lh); letter-spacing: var(--tpl-db-num-ls); }

@@ -22,7 +22,7 @@ type Section = NonNullable<DashboardOverview['sections']>[keyof NonNullable<Dash
 /** 段の下の「更新 9:30」。取れないときは何も出さない。 */
 export function Updated({ children }: { children: ReactNode }) {
   if (!children) return null
-  return <p className={styles.updated}>{children}</p>
+  return <p className={styles.updated} title={typeof children === 'string' ? children : undefined}>{children}</p>
 }
 
 export function sectionUpdated(section: Section | undefined): string | null {
@@ -91,6 +91,7 @@ export function SendQuota({ delivery, metric, section, onRetry }: {
   const rate = remaining !== null && limit ? Math.max(0, Math.min(100, remaining / limit * 100)) : null
   const low = rate !== null && rate <= 10
   const updated = sectionUpdated(section)
+  const quotaText = [unlimited ? '契約種別：無制限' : rate === null ? null : `残り ${rate.toFixed(1)}%`, updated].filter(Boolean).join('・')
   return (
     <div className={styles.asideBlock}>
       <SectionHeader
@@ -127,8 +128,8 @@ export function SendQuota({ delivery, metric, section, onRetry }: {
       ) : failed ? (
         <button type="button" onClick={onRetry} className={styles.retryDanger}>{`送信枠を${STATE_TEXT.error}。もう一度読み込む`}</button>
       ) : (
-        <p className={low ? styles.updatedDanger : styles.updated}>
-          {[unlimited ? '契約種別：無制限' : rate === null ? null : `残り ${rate.toFixed(1)}%`, updated].filter(Boolean).join('・')}
+        <p className={low ? styles.updatedDanger : styles.updated} title={quotaText}>
+          {quotaText}
         </p>
       )}
     </div>
@@ -171,6 +172,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
     { label: '保留', value: inbox?.onHold ?? null, href: '/chats?status=on_hold' },
     { label: '対応済み', value: inbox?.resolved ?? null, href: '/chats?status=resolved' },
   ]
+  const autoText = `メッセージ受信時の自動変更：${autoOnInbound === null ? '—' : autoOnInbound ? '有効' : '無効'}`
   return (
     <div className={styles.asideBlock}>
       <SectionHeader
@@ -190,7 +192,7 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
           title={`${row.label}で絞った受信箱を開く`}
         />
       ))}
-      <p className={styles.caption}>{`メッセージ受信時の自動変更：${autoOnInbound === null ? '—' : autoOnInbound ? '有効' : '無効'}`}</p>
+      <p className={styles.caption} title={autoText}>{autoText}</p>
     </div>
   )
 }
@@ -283,7 +285,7 @@ export function Upcoming({ accountId, bookings, loading, today, jstDay, startLoa
           <div key={`${item.kind}-${item.id}`} className={styles.plan}>
             <span className={styles.planText}>
               <Link href={item.href} className={styles.planTitle} title={item.title}>{item.title}</Link>
-              <span className={styles.planKind}>{upcomingKindLabel[item.kind] ?? '予定'}</span>
+              <span className={styles.planKind} title={upcomingKindLabel[item.kind] ?? '予定'}>{upcomingKindLabel[item.kind] ?? '予定'}</span>
             </span>
             <span className={styles.planTime}>{upcomingTime(item.startsAt, today, jstDay)}</span>
           </div>
@@ -305,7 +307,7 @@ export function Upcoming({ accountId, bookings, loading, today, jstDay, startLoa
         <div key={booking.id} className={styles.plan}>
           <span className={styles.planText}>
             <span className={styles.planTitle} title={booking.menu_name}>{booking.menu_name}</span>
-            <span className={styles.planKind}>{booking.friend_name ?? '名前未設定'}</span>
+            <span className={styles.planKind} title={booking.friend_name ?? '名前未設定'}>{booking.friend_name ?? '名前未設定'}</span>
           </span>
           <span className={styles.planTime}>{upcomingTime(booking.starts_at, today, jstDay)}</span>
         </div>
