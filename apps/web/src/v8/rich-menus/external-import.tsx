@@ -140,7 +140,7 @@ export function ExternalImportWorkspace({
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-ink-faint mt-2 text-xs leading-5">LINEから面ごとの動きを取得できませんでした。読み直してから取り込んでください。</p>
+                  <p className="text-ink-faint mt-2 text-xs leading-5">LINEから面ごとの動きを読み込めませんでした。読み直してから取り込んでください。</p>
                 )}
                 <Button type="button" variant="primary" className="mt-4" onClick={() => onImport(selected)}>この内容で取り込む</Button>
               </section>
