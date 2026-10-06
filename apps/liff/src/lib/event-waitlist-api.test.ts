@@ -13,4 +13,17 @@ describe('イベント待ちのAPI呼び出し', () => {
     expect(new URL(String(url)).searchParams.get('liffId')).toBe('試験用LIFF');
     expect(init.headers).toMatchObject({ Authorization: 'Bearer 試験用本人確認' });
   });
+  test('本人の待ち一覧・個別取得・取り下げは専用の口へ送る', async () => {
+    vi.stubGlobal('window', { location: { origin: 'https://example.test' } });
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ ok: true })));
+    vi.stubGlobal('fetch', fetcher);
+    await api.myEventWaitlist();
+    await api.myEventWaitlistEntry('待ち/1');
+    await api.cancelMyEventWaitlist('待ち/1');
+    const calls = fetcher.mock.calls as unknown as [URL, RequestInit][];
+    expect(new URL(String(calls[0][0])).pathname).toBe('/api/liff/events/me/waitlist');
+    expect(new URL(String(calls[1][0])).pathname).toBe('/api/liff/events/me/waitlist/%E5%BE%85%E3%81%A1%2F1');
+    expect(new URL(String(calls[2][0])).pathname).toBe('/api/liff/events/me/waitlist/%E5%BE%85%E3%81%A1%2F1/cancel');
+    expect(calls[2][1]).toMatchObject({ method: 'POST', body: '{}' });
+  });
 });

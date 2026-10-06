@@ -48,3 +48,30 @@ test('未認証は401、別人と存在しない案内は404', async () => {
   expect((await request(`waitlist/${token}`)).status).toBe(404);
   expect((await request('waitlist/missing')).status).toBe(404);
 });
+test('待ち一覧と個別取得は本人の行だけを返し、案内中の順番はnull', async () => {
+  const res = await request('me/waitlist');
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ items: [{ id: 'w', queue_position: null, source: 'waitlist' }] });
+  expect((await request('me/waitlist/w')).status).toBe(200);
+  auth.verifyCallerLineUserId.mockResolvedValue('Uother');
+  expect(await (await request('me/waitlist')).json()).toEqual({ items: [] });
+  expect((await request('me/waitlist/w')).status).toBe(404);
+  expect((await request('me/waitlist/w/cancel', 'POST')).status).toBe(404);
+});
+test('取り下げは再送しても成功し、一度だけ次候補のjobを残す', async () => {
+  expect(await (await request('me/waitlist/w/cancel', 'POST')).json()).toEqual({ ok: true });
+  expect(await (await request('me/waitlist/w/cancel', 'POST')).json()).toEqual({ ok: true });
+  expect(fixture.raw.prepare(`SELECT status FROM event_waitlist WHERE id = 'w'`).get()).toEqual({ status: 'cancelled' });
+  expect(fixture.raw.prepare(`SELECT COUNT(*) AS count FROM event_waitlist_promotion_jobs`).get()).toEqual({ count: 1 });
+});
+test('別店・未認証・受諾中の取り下げを拒否する', async () => {
+  const foreign = await app.request('/api/liff/events/me/waitlist/w/cancel?liffId=L2',
+    { method: 'POST' }, { DB: fixture.db } as Env['Bindings']);
+  expect(foreign.status).toBe(404);
+  auth.verifyCallerLineUserId.mockResolvedValue(null);
+  expect((await request('me/waitlist')).status).toBe(401);
+  expect((await request('me/waitlist/w/cancel', 'POST')).status).toBe(401);
+  auth.verifyCallerLineUserId.mockResolvedValue('Utest');
+  fixture.raw.exec(`UPDATE event_waitlist SET status = 'accepted' WHERE id = 'w'`);
+  expect((await request('me/waitlist/w/cancel', 'POST')).status).toBe(409);
+});

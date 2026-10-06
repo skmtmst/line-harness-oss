@@ -1,6 +1,6 @@
 import type { FormLayout } from '@line-crm/shared';
-import type { EventWaitlistOfferDetail } from '@line-crm/shared';
-export type { EventWaitlistOfferDetail } from '@line-crm/shared';
+import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
+export type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
 import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
 import { getIdToken, getLiffId } from './liff-auth.js';
 import type { LiffLookApiSettings } from './liff-look.js';
@@ -318,6 +318,11 @@ export const api = {
     ),
   myEventBookings: (tab: 'upcoming' | 'past') =>
     get<{ items: EventBookingMine[] }>(`/api/liff/events/me?tab=${tab}`),
+  myEventWaitlist: () => get<{ items: EventWaitlistMine[] }>('/api/liff/events/me/waitlist'),
+  myEventWaitlistEntry: (waitlistId: string) =>
+    get<EventWaitlistMine>(`/api/liff/events/me/waitlist/${encodeURIComponent(waitlistId)}`),
+  cancelMyEventWaitlist: (waitlistId: string) =>
+    post<{ ok: true }>(`/api/liff/events/me/waitlist/${encodeURIComponent(waitlistId)}/cancel`, {}),
   cancelMyEventBooking: (bookingId: string) =>
     post<{ ok: true }>(`/api/liff/events/me/${bookingId}/cancel`, {}),
   /**

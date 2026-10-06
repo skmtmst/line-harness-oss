@@ -54,6 +54,8 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   acceptEventWaitlistOffer,
   getEventWaitlistOffer,
+  getMyEventWaitlist,
+  cancelMyEventWaitlist,
   createEventWaitlistOfferSender,
   enqueueEventWaitlistPromotion,
   getEventOccurrenceApplicants,
@@ -2187,6 +2189,38 @@ events.get('/api/liff/events/me', async (c) => {
     .bind(friend.id, account_id, nowIso)
     .all();
   return c.json({ items: results ?? [] });
+});
+
+async function eventWaitlistCaller(c: Context<Env>) {
+  const lineAccountId = await resolveAccountIdFromLiff(c);
+  if (!lineAccountId) return bad(c, 'liff_account_resolution_failed', 400);
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  return { lineAccountId, callerLineUserId };
+}
+
+events.get('/api/liff/events/me/waitlist', async (c) => {
+  const caller = await eventWaitlistCaller(c);
+  if (caller instanceof Response) return caller;
+  const items = await getMyEventWaitlist(c.env.DB, caller);
+  return c.json({ items });
+});
+
+events.get('/api/liff/events/me/waitlist/:waitlistId', async (c) => {
+  const caller = await eventWaitlistCaller(c);
+  if (caller instanceof Response) return caller;
+  const items = await getMyEventWaitlist(c.env.DB, { ...caller, waitlistId: c.req.param('waitlistId') });
+  if (!items[0]) return bad(c, 'not_found', 404);
+  return c.json(items[0]);
+});
+
+events.post('/api/liff/events/me/waitlist/:waitlistId/cancel', async (c) => {
+  const caller = await eventWaitlistCaller(c);
+  if (caller instanceof Response) return caller;
+  const result = await cancelMyEventWaitlist(c.env.DB, { ...caller, waitlistId: c.req.param('waitlistId') });
+  if (result === 'not_found') return bad(c, 'not_found', 404);
+  if (result === 'conflict') return bad(c, 'waitlist_not_cancellable', 409);
+  return c.json({ ok: true });
 });
 
 events.get('/api/liff/events/me/:bookingId', async (c) => {
