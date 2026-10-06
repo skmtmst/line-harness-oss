@@ -14,7 +14,7 @@ import { logoutAndGoToLogin } from '@/lib/logout'
  * 統括メニューの下端「ログイン中のアカウント」と、押すと上に開くアカウントメニュー。
  * Pencil ★V6 36-1 `qAvlC/X6G9j6`（ブロック）と `qAvlC/bfhe6`（メニュー）。
  *
- * `docs/v6-common-rules.md` §1-2 の統括だけの例外。アカウントの画面には置かない。
+ * `docs/v8-design-rules.md` §5 の統括だけの例外。アカウントの画面には置かない。
  *
  * プランの札（無料トライアル）は課金の状態（`api.hqBilling.summary`）から出す。
  * 課金対象外（運営）の統括には札を出さず、役割の札だけにする。

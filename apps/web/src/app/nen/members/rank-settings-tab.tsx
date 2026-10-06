@@ -33,7 +33,7 @@ const RULE_LABELS = {
  *
  * 左：ランクの表（名前・通年のしきい値・マイル還元・自動で付くタグ・会員数）。
  * 右：ランクの決まり方（今回は表示だけ。値は固定）と、ECとの同期状態。
- * 保存は下部追従バー（`docs/v6-common-rules.md` §1-6：保存はここにしか置かない）。
+ * 保存は下部追従バー（`docs/v8-design-rules.md` §5：保存はここにしか置かない）。
  */
 export default function RankSettingsTab({
   accountId,

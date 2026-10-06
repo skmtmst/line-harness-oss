@@ -20,7 +20,7 @@ import './hq-banners-v8.css'
  * バナー生成。板 B9ZAr（一覧）・W5Wxr（ライブラリ）（V8 のみ）。
  *
  * 左に操作と「見る」案内、右に数値カード帯 → 案内帯 → タブ → 中身。
- * タブの切り替えは `?tab=` で、履歴を積まない（`docs/v6-common-rules.md` §2-2）。
+ * タブの切り替えは `?tab=` で、履歴を積まない（`docs/v8-design-rules.md` §5）。
  */
 export default function HqBannersPage() {
   // V8 は src/v8/hq-banners に一から書いた画面（B9ZAr・W5Wxr）。v7 は今の画面のまま。

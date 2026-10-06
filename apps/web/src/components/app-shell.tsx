@@ -186,7 +186,7 @@ function AccountCreateWorkspace({ children }: { children: React.ReactNode }) {
  *
  * `PageChromeProvider` の中でしか使えない（`usePageChrome` を読むため）。
  * 本文の幅は既定で `--container-shell` までにし、**ページが明示したときだけ**外す。
- * ルート名で自動判定しない（`docs/v6-common-rules.md` §1）。
+ * ルート名で自動判定しない（`docs/v8-design-rules.md` §5）。
  */
 export function Workspace({ children }: { children: React.ReactNode }) {
   const { fullWidth, settingsNavInline } = usePageChrome()
