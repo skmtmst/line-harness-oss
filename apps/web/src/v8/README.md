@@ -34,3 +34,8 @@ design/v8/PASSED.tsv の画面（リマインダ一覧 apLqS・自動応答の�
 2. 型と部品だけで絵どおりに書く。合格した見本：`src/app/auto-replies/edit/wizard-v8.tsx`（作る）・`src/app/reminders/list-v8.tsx`（一覧）
 3. 今の画面の**動き**（どの API を呼ぶ・保存・権限・失敗時・読み直し）を一覧にし、全部を新しい画面に持ってくる（落とさない）
 4. `measure.sh` で 90% 以上・目視で崩れなし → 申告
+
+## 切り替えの日に困らないために（2026-10-06）
+- **同じ URL と同じ指定を受け付ける**：今の画面が読んでいる `?id=` `?tab=` `?step=` `?folder=` などの指定は、新しい画面でも同じ名前・同じ意味で読む。BEHAVIOR.md に「受け付ける URL と指定」の節を作って書き出す
+- **同じ保存先・同じ API**：localStorage の名前、呼ぶ API、送る形は今と同じにする（変えるなら BEHAVIOR.md に理由）
+- 準備表：`design/v8/SWITCH-READINESS.md`（全ページの入口に V8 の画面があるか・合格したか）。本番の切り替えは、絵のあるページがすべて合格してから、環境変数 `NEXT_PUBLIC_ADMIN_THEME=v8` で一度に行う（外せば v7 に戻る）
