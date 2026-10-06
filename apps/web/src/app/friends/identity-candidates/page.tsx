@@ -17,7 +17,7 @@ import {
 import { IdentityStateBlock } from '@/components/identity/identity-state'
 import { useIdentityReview } from '@/components/identity/identity-review'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import FriendIdentityCandidatesV8 from './identity-candidates-v8'
+import FriendIdentityCandidatesV8 from '@/v8/friends/compare/compare'
 import styles from '@/components/identity/identity-review.module.css'
 import './issue481-height.css'
 

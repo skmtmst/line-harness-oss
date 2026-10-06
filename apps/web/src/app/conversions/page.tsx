@@ -25,6 +25,7 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import styles from './list-v8.module.css'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import ConversionPointsV8 from './conversion-points-v8'
+import ConversionListV8 from '@/v8/conversions/list'
 import { ConversionDetailDialog, ConversionEditDialog, ConversionReversalDialog } from './_components/conversion-dialogs'
 
 /**
@@ -1910,7 +1911,9 @@ function ConversionsPageHost() {
   const target = AFFILIATE_TABS.has(tab) ? `/affiliates?${params.toString()}` : null
   useEffect(() => { if (target) router.replace(target) }, [target, router])
   if (target) return <ListState kind="loading" title="成果とアフィリエイトへ移動しています" />
-  return <div data-design-node="r6dJFy"><ConversionsPageInner accountId={selectedAccountId} v8={theme === 'v8'} /></div>
+  // ★V8 は src/v8 に一から書いた一覧（r6dJFy・BygrU・WSGvo）。v7 は今のまま。
+  if (theme === 'v8') return <ConversionListV8 accountId={selectedAccountId} />
+  return <div data-design-node="r6dJFy"><ConversionsPageInner accountId={selectedAccountId} v8={false} /></div>
 }
 
 export default function ConversionsPage() {
