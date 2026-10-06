@@ -293,6 +293,8 @@ describe('共通部品の影響範囲', () => {
       'v8/ops/knowledge.tsx',
       // ★V8 テンプレートのクーポンを作る（S6FEuB）。登録メディアの選ぶ窓を src/v8 に写した。
       'v8/template-edit/media-picker.tsx',
+      // ★V8 リマインダの詳細（rbAig・loVfW）。配信予定・実行結果・登録者の表の下にページ送り。
+      'v8/reminders/detail.tsx',
       // ★V8 友だち（x6QsVz 一覧・ADjK8 統合ユーザー・hn6Y8 重複検出・Z0jHp UID移行）を src/v8/friends に一から書いた。
       'v8/friends/list/list.tsx',
       'v8/friends/merged/merged.tsx',

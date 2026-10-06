@@ -624,6 +624,10 @@ shared-button-importer v8/hq-banners/image-detail.tsx
 shared-button-importer v8/hq-banners/limit-notice.tsx
 shared-button-importer v8/hq-banners/list.tsx
 shared-button-importer v8/hq-banners/project.tsx
+shared-button-importer v8/reminders/basics-form.tsx
+shared-button-importer v8/reminders/detail.tsx
+shared-button-importer v8/reminders/edit.tsx
+shared-button-importer v8/reminders/ui.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx
