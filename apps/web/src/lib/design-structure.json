@@ -349,7 +349,7 @@
     },
     "/tags": {
       "node": "hqrOv HBTk0 rIhbN QKx8Q",
-      "name": "V6 4 友だち属性（4タブ）",
+      "name": "V6 4 友だち属性（4タブ・タグの表は★V8 I1E7Bt）",
       "visualVerification": {
         "status": "unverified",
         "referenceNodeIds": [
@@ -371,7 +371,8 @@
         "Body",
         "GroupTabs",
         "Head",
-        "KPIs"
+        "KPIs",
+        "TagTable"
       ],
       "parts": [
         "タグ数",
