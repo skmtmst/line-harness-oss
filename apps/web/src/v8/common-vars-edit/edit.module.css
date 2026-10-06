@@ -1,0 +1,258 @@
+/*
+ * ★V8 共通情報の編集（Pencil AYc6O・1152 の C67dE・競合 piWhz）。
+ * 頭・左右の列・下の帯の余白は型（CreatePage）が持つ。ここはカードの中身と右の列の箱だけ。
+ */
+.backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }
+
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-info-bg);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-ro-band-lh);
+}
+
+/* カード：枠1本・角12・余白20・間14。題 15/700・説明 12。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-section-gap);
+  padding: var(--tpl-section-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.cardHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
+.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-ar-cv-title-lh); }
+.cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+
+.field { display: flex; flex-direction: column; gap: var(--tpl-field-gap-basic); min-width: 0; }
+.nameRow { display: flex; gap: var(--tpl-rule-row-gap); }
+.nameRow > .field:first-child { flex: 1 1 0; }
+.folderField { width: var(--tpl-ar-cv-folder-w); flex-shrink: 0; }
+.folderError { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-sub-gap); }
+.fieldLabelStrong { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-chip-label-lh); }
+.fieldLabel { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-text-sm-lh); }
+.optional { margin-left: var(--tpl-label-tag-gap); color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; }
+.required { color: var(--color-danger); }
+.fieldInput,
+.fieldArea {
+  width: 100%;
+  min-width: 0;
+  padding: var(--tpl-kw-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--tpl-body-lh);
+}
+.fieldInput { height: var(--tpl-chip-h); }
+.fieldArea { padding-block: var(--tpl-body-gap); resize: vertical; }
+.fieldHint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-text-sm-lh); }
+.fieldError { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
+.selectBox { min-width: 0; }
+.selectBox :global(*) { max-width: 100%; }
+.selectBox :global(button) { width: 100%; }
+
+
+.valueRow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: var(--tpl-rule-row-gap); }
+.valueArrow { display: inline-flex; align-items: center; height: var(--tpl-chip-h); color: var(--color-ink-faint); }
+.savedNote { margin: 0; color: var(--color-success); font-size: var(--text-label); }
+
+/* 変える前に影響を見る：行は 余白12/0・間6・下に線。前は薄い赤、後は薄い緑（角8・余白10）。 */
+.impactState { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-body-gap); }
+.impactList { display: flex; flex-direction: column; gap: var(--tpl-section-gap); }
+.impactRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-field-gap-basic);
+  padding: var(--tpl-rule-row-gap) 0;
+  box-shadow: var(--shadow-row-line);
+}
+.impactHead { display: flex; align-items: baseline; gap: var(--tpl-body-gap); min-width: 0; }
+.impactKind { flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-micro); }
+.impactName { min-width: 0; overflow: hidden; color: var(--color-action); font-size: var(--text-label); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.impactSpacer { flex: 1 1 0; }
+.impactStatus { flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-micro); font-weight: 600; }
+.impactStatusWarn { flex-shrink: 0; color: var(--color-warning); font-size: var(--text-micro); font-weight: 600; }
+.impactPair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-body-gap); }
+.impactBefore,
+.impactAfter {
+  margin: 0;
+  overflow: hidden;
+  padding: var(--tpl-ar-cv-impact-pad);
+  border-radius: var(--tpl-ar-cv-impact-radius);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.impactBefore { background: var(--color-danger-bg); }
+.impactAfter { background: var(--color-success-bg); }
+.impactFoot { display: flex; align-items: center; gap: var(--tpl-body-gap); }
+.validNote {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: 0;
+  padding: var(--tpl-ar-cv-valid-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+}
+.validNote > svg { flex-shrink: 0; color: var(--color-success); }
+.blockList { margin: 0; padding-left: var(--tpl-ar-cv-list-indent); color: var(--color-danger); font-size: var(--text-caption); }
+
+/* 右の列：名前とフォルダ・使える期間・社内メモをひとまとまり（間12）。箱は 余白16・間12・題14/700。 */
+.sideGroup { display: flex; flex-direction: column; align-self: stretch; gap: var(--tpl-rule-row-gap); }
+.sideCard {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-side-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.sideTitle { margin: 0; color: var(--color-ink); font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-chip-label-lh); }
+.sideFields { display: flex; flex-direction: column; gap: var(--tpl-body-gap); }
+/* 使える期間：日付の欄（共通部品）は高さ40、絵は36。欄の間を 4 ずつ詰めて下の行を絵にそろえる。 */
+.periodCard { gap: var(--tpl-body-gap); }
+.periodCard .sideFields:first-of-type { gap: var(--tpl-sub-gap); }
+.inlineError { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-sub-gap); }
+
+/* 決めた日に変える：箱 余白16・間6・題13/700。行は 34.5（線は下）。 */
+.schedCard {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: var(--tpl-field-gap-basic);
+  padding: var(--tpl-side-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.schedTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-ar-cv-sched-title-lh); }
+.schedNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+.schedActions { display: flex; flex-wrap: wrap; gap: var(--tpl-body-gap); }
+.kv { display: flex; flex-direction: column; margin: 0; }
+.kvRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-body-gap);
+  padding: var(--tpl-side-row-pad) 0;
+  box-shadow: var(--shadow-row-line);
+}
+.kvRow > dt { flex: 1 1 auto; color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
+.kvRow > dd { min-width: 0; margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.kvRemove {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+/* これまでの変更：行は 余白8/0・間12・下に線。日付 幅100。 */
+.historyList { display: flex; flex-direction: column; gap: var(--tpl-rule-row-gap); margin: 0; padding: 0; list-style: none; }
+.historyItem {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-body-gap) 0;
+  box-shadow: var(--shadow-row-line);
+  font-size: var(--text-label);
+}
+.historyDate { flex: 0 0 var(--tpl-ar-cv-history-date-w); color: var(--color-ink); white-space: nowrap; }
+.historyText { min-width: 0; color: var(--color-ink); }
+.historyTextQuiet { min-width: 0; color: var(--color-ink-secondary); }
+.statusBox { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-body-gap); }
+.statusBox :global(button[disabled]) { opacity: 1; color: var(--color-ink-faint); }
+.statusLabel { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
+
+/* スマホの中の届いた吹き出し（アイコン34・名前10・吹き出し 幅200・11.5/18・時刻9）。 */
+.talkRow { display: flex; gap: var(--tpl-label-tag-gap); }
+.talkIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-ar-cv-talk-icon);
+  height: var(--tpl-ar-cv-talk-icon);
+  border-radius: var(--radius-pill);
+  background: var(--color-success);
+  color: var(--v8-line-chrome);
+  font-size: var(--text-body);
+  font-weight: 700;
+}
+.talkCol { display: flex; flex-direction: column; gap: var(--tpl-ar-cv-talk-gap); min-width: 0; }
+.talkName { color: var(--v8-line-sender); font-size: var(--tpl-ar-cv-talk-name-size); }
+.talkBubbleRow { display: flex; align-items: flex-end; gap: var(--tpl-sub-gap); }
+.talkBubble {
+  width: var(--tpl-ar-cv-talk-bubble-w);
+  margin: 0;
+  padding: var(--tpl-ar-cv-talk-bubble-pad);
+  border-radius: var(--v8-line-bubble-in-radius);
+  background: var(--v8-line-chrome);
+  color: var(--color-ink);
+  font-size: var(--tpl-ar-cv-talk-text-size);
+  line-height: var(--tpl-ar-cv-talk-text-lh);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.talkTime { color: var(--v8-line-time); font-size: var(--tpl-ar-cv-talk-time-size); white-space: nowrap; }
+
+
+/* 競合の帯（piWhz）：頭の「使っています」の行の下に横いっぱい。 */
+.conflictBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+  margin: var(--tpl-ar-ed-band-mt) 0 var(--tpl-ar-ed-band-mb);
+  padding: var(--tpl-ar-ed-band-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-warning);
+  outline-offset: -1px;
+  background: var(--color-warning-bg);
+}
+.conflictIcon { flex-shrink: 0; color: var(--color-warning); }
+.conflictText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
+.conflictTitle { margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; line-height: var(--tpl-chip-label-lh); text-overflow: ellipsis; white-space: nowrap; }
+.conflictSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-ar-ed-band-note-lh); }
+
+/* 1152 の板（C67dE）：右の列は 幅280・余白16。上に「LINEでの見え方を見る」。 */
+:global([data-page-template='create']):has(.narrowPhoneOpen) {
+  --tpl-preview-pad: var(--tpl-ar-ed-narrow-pad);
+  --tpl-preview-narrow-content-width: var(--tpl-ar-ed-narrow-side-w);
+}
+.narrowPhoneOpen { display: flex; flex-direction: column; align-self: stretch; }
+.narrowPhoneOpen > :global(*) { width: 100%; }
+
+/* 見え方：絵はスマホの上の題との間が 14（部品は 10）。右の列の中だけ 4 下げてそろえる。 */
+.phoneWrap { align-self: stretch; padding-top: var(--tpl-ar-cv-phone-nudge); }
+
+/* 窓の中身。 */
+.dialogBody { display: flex; flex-direction: column; gap: var(--tpl-rule-row-gap); }
+.dialogPair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-rule-row-gap); }
+.dialogActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--tpl-body-gap); }
+.compareBox { margin: 0; padding: var(--tpl-ar-cv-impact-pad); border-radius: var(--tpl-ar-cv-impact-radius); color: var(--color-ink); font-size: var(--text-label); white-space: pre-wrap; }
+.compareServer { background: var(--color-surface-pearl); }
+.compareMine { background: var(--color-success-bg); }
