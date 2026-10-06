@@ -619,6 +619,7 @@
   --tpl-op-dash-stat-gap: 2px; --tpl-op-dash-stat-pad: 10px 12px; --tpl-op-dash-stat-lh: 23px; --tpl-op-dash-chart-h: 120px; --tpl-op-dash-col-gap: 4px; --tpl-op-dash-label-h: 14px;
   --tpl-op-mem-invite-w: 340px; --tpl-op-mem-mail-w: 200px; --tpl-op-mem-totp-w: 110px; --tpl-op-mem-state-w: 90px; --tpl-op-mem-login-w: 100px; --tpl-op-mem-ops-w: 80px; --tpl-op-mem-self-h: 39.5px; --tpl-op-tab-pad-bottom: 10px; --tpl-op-tab-lh: 16.5px; --tpl-op-note-pad: 10px 12px; --tpl-op-note-lh: 17px;
   --tpl-op-audit-date-w: 130px; --tpl-op-control-h: 36px; --tpl-op-audit-at-w: 120px; --tpl-op-audit-what-w: 140px; --tpl-op-audit-tenant-w: 150px; --tpl-op-audit-what-pad: 4px;
+  --tpl-op-ann-form-w: 460px; --tpl-op-ann-form-pad: 18px; --tpl-op-ann-small-lh: 17px; --tpl-op-ann-body-h: 110px; --tpl-op-ann-tenants-h: 192px; --tpl-op-ann-warn-pad: 8px 10px; --tpl-op-ann-state-w: 80px; --tpl-op-ann-ops-w: 70px; --tpl-op-ann-fact-w: 150px; --tpl-op-ann-body-lh: 19px; --tpl-op-dialog-pull-top: -14px; --tpl-op-dialog-pull-bottom: -10px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
   /* ウェビナーの一覧（UyUMw・uBMuB・jiNg0）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16）。 */

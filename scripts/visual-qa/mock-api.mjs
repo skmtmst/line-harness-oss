@@ -461,7 +461,29 @@ const OPS_KNOWLEDGE = [
 ]
 const OPS_ANNOUNCEMENTS = [
   {
-    id: 'visual-announcement-1', subject: '検証用のお知らせ', body: '画面確認用のお知らせ本文。',
+    id: 'visual-announcement-sent', subject: '9/20 深夜のメンテナンス', body: '画面確認用のお知らせ本文。',
+    audienceKind: 'all', audiencePlans: [], audienceTenantIds: [], audienceLabel: 'すべて',
+    channels: ['screen', 'email'], channelLabels: ['画面', 'メール'],
+    status: 'sent', statusLabel: '配信済み',
+    publishAt: null, sentAt: '2026-09-18T10:00:00+09:00',
+    recipientsTotal: 6, lineSent: 0, lineFailed: 0, mailSent: 6, mailFailed: 0,
+    screenRead: 5, screenTotal: 6, lastError: null,
+    createdByName: '検証 太郎',
+    createdAt: '2026-09-17T10:00:00+09:00', updatedAt: '2026-09-18T10:00:00+09:00',
+  },
+  {
+    id: 'visual-announcement-scheduled', subject: '10月の新機能のお知らせ', body: '10/12（月）2:00〜4:00 に管理画面が使えなくなります。配信は止まりません。',
+    audienceKind: 'plan', audiencePlans: ['standard', 'pro'], audienceTenantIds: [], audienceLabel: 'プラン別',
+    channels: ['screen', 'email'], channelLabels: ['画面', 'メール'],
+    status: 'scheduled', statusLabel: '予約',
+    publishAt: '2026-10-05T10:00:00+09:00', sentAt: null,
+    recipientsTotal: 0, lineSent: 0, lineFailed: 0, mailSent: 0, mailFailed: 0,
+    screenRead: 0, screenTotal: 0, lastError: null,
+    createdByName: '検証 太郎',
+    createdAt: '2026-10-01T10:00:00+09:00', updatedAt: '2026-10-01T10:00:00+09:00',
+  },
+  {
+    id: 'visual-announcement-1', subject: '検証用のお知らせ（下書き）', body: '画面確認用のお知らせ本文。',
     audienceKind: 'all', audiencePlans: [], audienceTenantIds: [], audienceLabel: 'すべて',
     channels: ['screen'], channelLabels: ['画面'],
     status: 'draft', statusLabel: '下書き',
@@ -2125,7 +2147,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       success: true,
       data: OPS_ANNOUNCEMENTS,
       linked: OPS_NOTICE_LINE.linked,
-      noticeLineConfigured: true,
+      // 絵（tQ2MJ）は契約者専用LINE が未設定の形（作る欄に琥珀の帯が出る）。
+      noticeLineConfigured: false,
     }
   }
   if (method === 'GET' && pathname === '/api/ops/notice-line-account') {
@@ -4790,6 +4813,11 @@ const server = createServer((req, res) => {
     )
     if (formWriteRequest) {
       res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
+      return
+    }
+    // 運営のお知らせ（V8 tQ2MJ・TJUUl）の宛先の見込み。数えるだけで何も変えない。
+    if (method === 'POST' && url.pathname === '/api/ops/announcements/preview') {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: { tenants: 18, staff: 18, lineLinked: 11, withEmail: 18 } }))
       return
     }
     // 運営の 2要素認証（V8 qod6X）の QR の用意。読みだけの見本を返す。

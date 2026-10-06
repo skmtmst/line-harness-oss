@@ -185,3 +185,15 @@
   font-size: var(--text-micro);
   line-height: var(--tpl-op-note-lh);
 }
+
+/*
+ * 確認の窓の中身。共通の窓は頭の下8＋中身の上24・下24だが、運営の確認の窓の絵
+ * （VUyYu・TJUUl・okXoi）は頭の下14・操作の上14。中身の側で差を詰める（共通の窓は変えない）。
+ */
+.dialogBody {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--tpl-op-section-gap);
+  margin: var(--tpl-op-dialog-pull-top) 0 var(--tpl-op-dialog-pull-bottom);
+}
