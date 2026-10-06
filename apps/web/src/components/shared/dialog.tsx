@@ -114,13 +114,14 @@ export default function Dialog({
   const titleNode = (
     <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{title}</h2>
   )
-  /* YZ57z 解除の桃箱は「題は箱の外・説明だけ箱の中」のため、題と説明を分けておく。 */
-  const titlePart = titleIcon ? (
+  /* YZ57z 解除の桃箱は「題は箱の外・説明だけ箱の中」のため、題と説明を分けておく。
+     かけらは描画に出ない（囲み要素なし）。渡さないときは h2 そのまま。 */
+  const titlePart = (<>{titleIcon ? (
     <div className={styles.titleRow}>
       <span className={styles.titleIcon} aria-hidden="true">{titleIcon}</span>
       {titleNode}
     </div>
-  ) : titleNode
+  ) : titleNode}</>)
   const descriptionNode = description ? <p id={descriptionId} className={styles.description}>{description}</p> : null
   const heading = (
     <>
