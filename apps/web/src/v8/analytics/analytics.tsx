@@ -30,6 +30,7 @@ import UrlClicksV8 from './url-clicks'
 import ConversionReportV8 from './conversion-report'
 import UsageV8 from './usage'
 import SavedV8 from './saved'
+import FunnelV8, { type FunnelFormSlot, type FunnelSaveSlot } from './funnel'
 import styles from './analytics.module.css'
 
 export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved'] as const
@@ -48,6 +49,13 @@ const hrefOf = (key: string) => `/analytics?tab=${key}`
 const BOARD: Record<string, string> = {
   reactions: 'yvOtn', routes: 'PFe9c', usage: 'N8ZrUl', cross: 'u5CuB8', funnel: 'DkRDE',
   'url-clicks': 'iK4cQ', saved: 'bglah', 'conversion-report': 'AzrZq',
+}
+
+/** 作る・編集のフォームと結果の保存欄は、入口が今の部品を渡す（src/v8 から @/app を読めないため）。 */
+export type AnalyticsSlotsV8 = {
+  renderFunnelForm?: (props: Parameters<FunnelFormSlot>[0] & { accountId: string }) => ReactNode
+  renderSave?: (props: Parameters<FunnelSaveSlot>[0] & { accountId: string; sourceKind: 'cross' | 'funnel' }) => ReactNode
+  funnelStepKindsLabel?: string
 }
 
 export type LegacyTabContext = {
@@ -81,7 +89,7 @@ function Navigation({ active, savedCount }: { active: AnalyticsTabV8; savedCount
   </div>
 }
 
-function AnalyticsInnerV8({ renderLegacy }: { renderLegacy?: (context: LegacyTabContext) => ReactNode }) {
+function AnalyticsInnerV8({ renderLegacy, slots }: { renderLegacy?: (context: LegacyTabContext) => ReactNode; slots?: AnalyticsSlotsV8 }) {
   const params = useSearchParams()
   const tab = readTab(params)
   usePageTitle('分析')
@@ -116,6 +124,11 @@ function AnalyticsInnerV8({ renderLegacy }: { renderLegacy?: (context: LegacyTab
     : tab === 'reactions' ? <ReactionsV8 key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'routes' ? <RoutesV8 key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'conversion-report' ? <ConversionReportV8 key={selectedAccountId} accountId={selectedAccountId} />
+    : tab === 'funnel' ? <FunnelV8 key={selectedAccountId} accountId={selectedAccountId} canManage={canManage}
+      presetConversion={params.get('conversionPointId') ? { id: params.get('conversionPointId') ?? '', name: params.get('conversionPointName') ?? '' } : null}
+      renderForm={slots?.renderFunnelForm ? (props) => slots.renderFunnelForm?.({ ...props, accountId: selectedAccountId }) : undefined}
+      renderSave={slots?.renderSave ? (props) => slots.renderSave?.({ ...props, accountId: selectedAccountId, sourceKind: 'funnel' }) : undefined}
+      stepKindsLabel={slots?.funnelStepKindsLabel} />
     : tab === 'saved' ? <SavedV8 key={selectedAccountId} accountId={selectedAccountId} onCountChange={setSavedCount} canManage={canManage} />
     : tab === 'usage' ? <UsageV8 key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'url-clicks' ? <UrlClicksV8 key={selectedAccountId} accountId={selectedAccountId} />
@@ -134,7 +147,7 @@ function AnalyticsInnerV8({ renderLegacy }: { renderLegacy?: (context: LegacyTab
   </AnalyticsExportContextV8.Provider>
 }
 
-export default function AnalyticsV8({ renderLegacy }: { renderLegacy?: (context: LegacyTabContext) => ReactNode }) {
+export default function AnalyticsV8({ renderLegacy, slots }: { renderLegacy?: (context: LegacyTabContext) => ReactNode; slots?: AnalyticsSlotsV8 }) {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
-  return <Suspense fallback={<div className={styles.waiting}>読み込み中...</div>}><AnalyticsInnerV8 renderLegacy={renderLegacy} /></Suspense>
+  return <Suspense fallback={<div className={styles.waiting}>読み込み中...</div>}><AnalyticsInnerV8 renderLegacy={renderLegacy} slots={slots} /></Suspense>
 }
