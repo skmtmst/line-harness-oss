@@ -25,7 +25,7 @@ describe('空き知らせカード', () => {
     expect(waitlistBookUrl(LIFF_BASE, 'wait-1'))
       .toBe('https://liff.line.me/test123/booking?waitlist=wait-1');
     expect(waitlistDeclineUrl(LIFF_BASE, 'wait-1'))
-      .toBe('https://liff.line.me/test123/booking/waitlist/wait-1/decline');
+      .toBe('https://liff.line.me/test123/booking?waitlist=wait-1&action=decline');
   });
 
   it('吹き出しに見出し・中身・押し先2つが入る', () => {
@@ -44,6 +44,6 @@ describe('空き知らせカード', () => {
     expect(json).toContain('この時間で予約する');
     expect(json).toContain('今回は見送る');
     expect(json).toContain('waitlist=wait-1');
-    expect(json).toContain('/booking/waitlist/wait-1/decline');
+    expect(json).toContain('/booking?waitlist=wait-1&action=decline');
   });
 });

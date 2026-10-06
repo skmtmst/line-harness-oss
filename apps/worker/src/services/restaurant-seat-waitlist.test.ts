@@ -1,143 +1,18 @@
-/**
- * 席の空き待ちの繰り上げ。
- *
- * - 空いた卓に入る組の早い順に1組だけ招く。入らない組は飛ばす。
- * - 仮押さえ中は招かない。期限切れは列の後ろへ回す。
- */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import Database from 'better-sqlite3';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { waitlistFixture, futureSlot } from '../test-utils/waitlist-fixture.js';
+import type { SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { promoteSeatWaitlist } from './restaurant-seat-waitlist.js';
-
-const migration = readFileSync(
-  join(import.meta.dirname, '..', '..', '..', '..', 'packages', 'db', 'migrations', '559_booking_plus_repeat_waitlist_visit.sql'),
-  'utf8',
-);
-
-function asD1(sqlite: Database.Database): D1Database {
-  const wrap = (sql: string, params: unknown[]) => ({
-    first: async <T>() => (sqlite.prepare(sql).get(...params) as T | undefined) ?? null,
-    all: async <T>() => ({ success: true, results: sqlite.prepare(sql).all(...params) as T[], meta: {} }),
-    run: async <T>() => {
-      const info = sqlite.prepare(sql).run(...params);
-      return { success: true, results: [], meta: { changes: info.changes } } as T;
-    },
-    raw: async () => [],
-  });
-  return {
-    prepare: (sql: string) => {
-      const bound = (params: unknown[]): D1PreparedStatement => ({
-        bind: (...next: unknown[]) => bound(next),
-        ...wrap(sql, params),
-      } as unknown as D1PreparedStatement);
-      return bound([]);
-    },
-    async batch<T>(statements: D1PreparedStatement[]) {
-      const results = [];
-      sqlite.exec('BEGIN');
-      try {
-        for (const statement of statements) results.push(await statement.run());
-        sqlite.exec('COMMIT');
-      } catch (error) {
-        sqlite.exec('ROLLBACK');
-        throw error;
-      }
-      return results as T;
-    },
-  } as unknown as D1Database;
-}
-
-let sqlite: Database.Database;
-let db: D1Database;
-const sender = vi.fn();
-
-const SLOT = '2026-10-10T05:00:00.000Z';
-const LIFF_BASE = 'https://liff.line.me/test123';
-
-function addWait(id: string, guests: number, lineUid: string, createdAt: string) {
-  sqlite.prepare(`INSERT INTO rt_seat_waitlist
-    (id, store_id, starts_at, guest_count, customer_name, line_uid, identity_key, created_at)
-    VALUES (?, 'store-a', ?, ?, ?, ?, ?, ?)`)
-    .run(id, SLOT, guests, `組-${id}`, lineUid, `line:${lineUid}`, createdAt);
-}
-
-function promote(tableId: string) {
-  return promoteSeatWaitlist(
-    db, { storeId: 'store-a', startsAt: SLOT, tableId }, sender, LIFF_BASE);
-}
-
-beforeEach(() => {
-  sqlite = new Database(':memory:');
-  sqlite.pragma('foreign_keys = ON');
-  sqlite.exec(`
-    CREATE TABLE line_accounts (id TEXT PRIMARY KEY, name TEXT NOT NULL,
-      channel_access_token TEXT, channel_access_token_encrypted TEXT);
-    CREATE TABLE staff (id TEXT PRIMARY KEY);
-    CREATE TABLE menus (id TEXT PRIMARY KEY);
-    CREATE TABLE friends (id TEXT PRIMARY KEY);
-    CREATE TABLE booking_customers (id TEXT PRIMARY KEY);
-    CREATE TABLE bookings (id TEXT PRIMARY KEY);
-    CREATE TABLE rt_organizations (id TEXT PRIMARY KEY, account_id TEXT NOT NULL);
-    CREATE TABLE rt_stores (id TEXT PRIMARY KEY,
-      organization_id TEXT NOT NULL, line_account_id TEXT, timezone TEXT);
-    CREATE TABLE rt_tables (id TEXT PRIMARY KEY, store_id TEXT NOT NULL,
-      label TEXT NOT NULL, min_capacity INTEGER NOT NULL, max_capacity INTEGER NOT NULL,
-      is_active INTEGER NOT NULL DEFAULT 1);
-    CREATE TABLE rt_menu_items (id TEXT PRIMARY KEY);
-    CREATE TABLE rt_reservations (id TEXT PRIMARY KEY, store_id TEXT NOT NULL);
-    CREATE TABLE booking_settings (id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL UNIQUE);
-    INSERT INTO line_accounts (id, name, channel_access_token)
-      VALUES ('account-a', 'S店', 'token');
-    INSERT INTO rt_organizations (id, account_id) VALUES ('org-a', 'account-a');
-    INSERT INTO rt_stores (id, organization_id, line_account_id, timezone)
-      VALUES ('store-a', 'org-a', 'account-a', 'Asia/Tokyo');
-    INSERT INTO rt_tables (id, store_id, label, min_capacity, max_capacity, is_active)
-      VALUES ('table-1', 'store-a', 'テーブル1', 1, 2, 1),
-             ('table-2', 'store-a', 'テーブル2', 2, 6, 1);
-    INSERT INTO booking_settings (id, line_account_id) VALUES ('settings-a', 'account-a');
-  `);
-  sqlite.exec(migration);
-  db = asD1(sqlite);
-  sender.mockClear();
-});
-
-describe('席の空き待ちの繰り上げ', () => {
-  it('入る組の早い順に1組だけ招き、入らない組は飛ばす', async () => {
-    addWait('wait-big', 6, 'U-big', '2026-09-01T01:00:00.000Z');
-    addWait('wait-fit', 2, 'U-fit', '2026-09-02T01:00:00.000Z');
-    const result = await promote('table-1');
-    expect(result.promoted).toBe(true);
-    if (result.promoted) {
-      expect(result.entry.id).toBe('wait-fit');
-      expect(result.entry.table_id).toBe('table-1');
-    }
-    expect(sender).toHaveBeenCalledTimes(1);
-    expect(sender.mock.calls[0]?.[0]).toMatchObject({ toLineUserId: 'U-fit' });
-    expect(sqlite.prepare(`SELECT status FROM rt_seat_waitlist WHERE id = 'wait-big'`).get())
-      .toMatchObject({ status: 'waiting' });
-  });
-
-  it('仮押さえ中は招かず、期限切れは列の後ろへ回す', async () => {
-    addWait('wait-1', 2, 'U-1', '2026-09-01T01:00:00.000Z');
-    addWait('wait-2', 2, 'U-2', '2026-09-02T01:00:00.000Z');
-    await promote('table-1');
-    const held = await promote('table-1');
-    expect(held).toMatchObject({ promoted: false, reason: 'hold_active' });
-    expect(sender).toHaveBeenCalledTimes(1);
-    sqlite.prepare(`UPDATE rt_seat_waitlist SET hold_expires_at = '2020-01-01T00:00:00.000Z'
-      WHERE id = 'wait-1'`).run();
-    const result = await promote('table-1');
-    expect(result.promoted).toBe(true);
-    if (result.promoted) expect(result.entry.id).toBe('wait-2');
-    expect(sender).toHaveBeenCalledTimes(2);
-  });
-
-  it('止めている卓には招かない', async () => {
-    addWait('wait-1', 2, 'U-1', '2026-09-01T01:00:00.000Z');
-    sqlite.prepare(`UPDATE rt_tables SET is_active = 0 WHERE id = 'table-1'`).run();
-    const result = await promote('table-1');
-    expect(result).toMatchObject({ promoted: false, reason: 'no_fitting_table' });
-    expect(sender).not.toHaveBeenCalled();
-  });
+let test: SqliteD1, slot: string; beforeEach(() => { test = waitlistFixture(); slot = futureSlot(); }); afterEach(() => test.raw.close());
+function add(id: string, count = 2, uid = 'test-user-0', start = slot) { test.raw.prepare(`INSERT INTO rt_seat_waitlist(id,store_id,starts_at,guest_count,customer_name,line_uid,identity_key) VALUES(?,'store',?,?,'試験の組',?,?)`).run(id, start, count, uid, 'line:' + uid); }
+function promote(table = 't') { return promoteSeatWaitlist(test.db, { storeId: 'store', startsAt: slot, tableId: table }); }
+function reserve(id: string, uid: string, waitlistId: string | null = null, table = 't') { test.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,waitlist_entry_id) VALUES(?,'store','line','試験の組',?,2,?,?,?,'confirmed',?)`).run(id, uid, slot, new Date(Date.parse(slot) + 7200000).toISOString(), table, waitlistId); }
+describe('席のキャンセル待ち・先着順', () => {
+  it('先頭に入らない卓では後ろの小さい組も追い越さない', async () => { add('first', 6); add('second', 2, 'test-user-1'); expect(await promote()).toMatchObject({ promoted: false, reason: 'no_fitting_table' }); expect((await promote('large')).promoted).toBe(true); expect((await promote()).promoted).toBe(true); });
+  it('卓の滞在時間を仮押さえし、別の人の予約は拒否する', async () => { add('w0'); await promote(); expect(() => reserve('steal', 'test-user-1')).toThrow('restaurant_table_conflict'); expect(() => reserve('ok', 'test-user-0', 'w0')).not.toThrow(); expect(test.raw.prepare("SELECT status FROM rt_seat_waitlist WHERE id='w0'").get()).toMatchObject({ status: 'converted' }); });
+  it('予約が残る卓には案内を出さない', async () => { reserve('full', 'test-user-7'); add('w0'); expect((await promote()).promoted).toBe(false); });
+  it('仮押さえ期限が切れた組を終わりにして次の組へ', async () => { add('w0'); add('w1', 2, 'test-user-1'); await promote(); test.raw.prepare("UPDATE rt_seat_waitlist SET hold_expires_at=? WHERE id='w0'").run(new Date(Date.now() - 1000).toISOString()); await promote(); expect(test.raw.prepare("SELECT status FROM rt_seat_waitlist WHERE id='w0'").get()).toMatchObject({ status: 'finished' }); expect(test.raw.prepare("SELECT status FROM rt_seat_waitlist WHERE id='w1'").get()).toMatchObject({ status: 'invited' }); });
+  it('止めた卓には案内しない', async () => { add('w0'); test.raw.exec("UPDATE rt_tables SET is_active=0 WHERE id='t'"); expect(await promote()).toMatchObject({ promoted: false, reason: 'no_fitting_table' }); });
+  it('人と席を合わせて同時3件まで、同時要求をDBで止める', () => { test.raw.prepare(`INSERT INTO booking_waitlist(id,line_account_id,staff_id,menu_id,starts_at,friend_id,identity_key) VALUES('human','a','s','m',?,'f0','friend:f0')`).run(slot); add('one'); add('two', 2, 'test-user-0', futureSlot(3)); expect(() => add('four', 2, 'test-user-0', futureSlot(4))).toThrow('waitlist_limit'); });
+  it('開始まで1時間の席は登録できない', () => { expect(() => add('closed', 2, 'test-user-0', new Date(Date.now() + 59 * 60000).toISOString())).toThrow('waitlist_registration_closed'); });
+  it('時刻変更でも別の組の仮押さえへ割り込めない', async () => { add('w0'); await promote(); const later = new Date(Date.parse(slot) + 14400000).toISOString(); test.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,table_id,status) VALUES('later','store','manual','試験の組',2,?,?,'t','confirmed')`).run(later, new Date(Date.parse(later) + 7200000).toISOString()); expect(() => test.raw.prepare("UPDATE rt_reservations SET starts_at=?,ends_at=? WHERE id='later'").run(slot, new Date(Date.parse(slot) + 7200000).toISOString())).toThrow('restaurant_table_conflict'); });
 });

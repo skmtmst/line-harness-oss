@@ -85,7 +85,7 @@ describe('WaitlistSheet', () => {
     cancelWaitlist.mockResolvedValue({ status: 'cancelled' });
     renderSheet();
 
-    expect(await screen.findByText('登録ずみです。空いたらLINEで1通だけ知らせます。知らせてからしばらくは、あなただけが取れます。')).toBeTruthy();
+    expect(await screen.findByText('登録ずみです。空いたらLINEで1通だけ知らせます。案内後30分は、あなただけが取れます。開始まで2時間を切ると10分です。')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '取り消す' }));
     expect(await screen.findByText('取り消しました。')).toBeTruthy();
     expect(cancelWaitlist).toHaveBeenCalledWith('w1');

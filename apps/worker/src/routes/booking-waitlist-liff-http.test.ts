@@ -23,13 +23,10 @@ vi.mock('../services/booking-notifier.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/booking-notifier.js')>();
   return { ...actual, sendBookingNotification: vi.fn(async () => {}) };
 });
-vi.mock('../services/booking-waitlist-card.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../services/booking-waitlist-card.js')>();
-  return { ...actual, sendWaitlistInviteCard: vi.fn(async () => {}) };
-});
-import { sendWaitlistInviteCard } from '../services/booking-waitlist-card.js';
+vi.mock('../services/booking-automatic-line.js',()=>({sendAutomaticBookingLine:vi.fn(async()=>true)}));
+import { sendAutomaticBookingLine } from '../services/booking-automatic-line.js';
 
-const cardSender = vi.mocked(sendWaitlistInviteCard);
+const cardSender = vi.mocked(sendAutomaticBookingLine);
 
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (sql: string, params: unknown[]) => ({
@@ -105,6 +102,10 @@ beforeEach(async () => {
   sqlite.prepare(`INSERT INTO menus
     (id, line_account_id, name, duration_minutes, base_price, is_active)
     VALUES ('menu-a', 'account-a', 'カット', 60, 5000, 1)`).run();
+  sqlite.exec(`INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('staff-a','menu-a',1);INSERT INTO booking_settings(id,line_account_id,business_hours_configured,cutoff_minutes_before,booking_window_days) VALUES('settings-a','account-a',1,0,365);`);
+  for(let i=0;i<7;i++)sqlite.prepare(`INSERT INTO booking_business_hours(id,booking_settings_id,weekday,start_time,end_time,capacity) VALUES(?,'settings-a',?,'00:00','23:59',10)`).run('h'+i,i);
+  sqlite.exec(`INSERT INTO bookings(id,line_account_id,friend_id,staff_id,menu_id,starts_at,ends_at,block_ends_at,status,price_at_booking,requested_at) VALUES('full','account-a','friend-b','staff-a','menu-a','${SLOT}','2026-11-10T06:00:00.000Z','2026-11-10T06:00:00.000Z','confirmed',0,'${SLOT}');`);
+  for(let i=0;i<7;i++)sqlite.prepare(`INSERT INTO staff_availability_rules(id,staff_id,weekday,start_time,end_time) VALUES(?,'staff-a',?,'00:00','23:59')`).run('staff-h'+i,i);
   db = asD1(sqlite);
   ({ default: bookingRoute } = await import('./booking.js'));
   access.canAccessAllLineAccounts.mockClear();
@@ -168,9 +169,10 @@ describe('待ちのお客さま側の口', () => {
     sqlite.prepare(`INSERT INTO booking_waitlist
       (id, line_account_id, staff_id, menu_id, starts_at, friend_id, identity_key)
       VALUES ('wait-b', 'account-a', 'staff-a', 'menu-a', '${SLOT}', 'friend-b', 'friend:friend-b')`).run();
-    // 1番目を招待ずみにする。
+    // キャンセルで空いた枠を1番目へ案内。
+    sqlite.exec("DELETE FROM bookings WHERE id='full'");
     sqlite.prepare(`UPDATE booking_waitlist SET status = 'invited',
-      invited_at = '2026-10-04T00:00:00.000Z',
+      ends_at='2026-11-10T06:00:00.000Z',block_ends_at='2026-11-10T06:00:00.000Z',invited_at = '2026-10-04T00:00:00.000Z',
       hold_expires_at = '2099-01-01T00:00:00.000Z' WHERE id = ?`).run(firstId);
 
     const declined = await app.request(selfUrl(`/api/liff/booking/waitlist/${firstId}`), {
@@ -179,7 +181,7 @@ describe('待ちのお客さま側の口', () => {
     expect(declined.status).toBe(200);
     // 次の人（friend-b）にカードが1通。
     expect(cardSender).toHaveBeenCalledTimes(1);
-    expect(cardSender.mock.calls[0]?.[0]).toMatchObject({ toLineUserId: 'U-b' });
+    expect(cardSender.mock.calls[0]?.[1]).toMatchObject({ to: 'U-b' });
     expect(sqlite.prepare(`SELECT status FROM booking_waitlist WHERE id = 'wait-b'`).get())
       .toMatchObject({ status: 'invited' });
   });

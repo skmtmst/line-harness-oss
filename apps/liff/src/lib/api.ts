@@ -1,3 +1,4 @@
+import type { CustomerBookingWaitlist,CustomerSeatWaitlist,RegisterSeatWaitlistInput,AcceptBookingWaitlistInput } from '@line-crm/shared';
 import type { FormLayout } from '@line-crm/shared';
 import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
 import { getIdToken, getLiffId } from './liff-auth.js';
@@ -125,6 +126,10 @@ async function get<T>(path: string): Promise<T> {
   return res.json();
 }
 
+async function remove<T>(path:string):Promise<T>{
+ const url=new URL(`${BASE}${path}`,window.location.origin);url.searchParams.set('liffId',getLiffId());
+ const res=await fetch(url,{method:'DELETE',headers:authHeaders()});if(!res.ok)throw new Error(`API ${res.status}`);return res.json();
+}
 async function post<T>(path: string, body: unknown, headers: Record<string, string> = {}): Promise<T> {
   const url = new URL(`${BASE}${path}`, window.location.origin);
   url.searchParams.set('liffId', getLiffId());
@@ -322,7 +327,7 @@ export const api = {
   bookingSettings: () => get<LiffBookingSettings>('/api/liff/booking/settings'),
   // Worker 側で id_token を verify するので lineUserId は body に入れない。
   createRequest: (
-    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string },
+    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string;waitlist_id?:string },
     idempotencyKey: string,
   ) =>
     post<CreateBookingResponse>(
@@ -346,6 +351,12 @@ export const api = {
   /** 満席の枠に「空いたら知らせる」を登録する。 */
   registerWaitlist: (body: { staff_id: string; menu_id: string; starts_at: string }) =>
     post<{ id: string }>('/api/liff/booking/waitlist', body),
+  bookingWaitlists:(id?:string)=>get<{waitlist:CustomerBookingWaitlist[]}>(`/api/liff/booking/waitlist${id?'?id='+encodeURIComponent(id):''}`),
+  seatWaitlists:(id?:string)=>get<{waitlist:CustomerSeatWaitlist[]}>(`/api/liff/booking/seat-waitlist${id?'?id='+encodeURIComponent(id):''}`),
+  registerSeatWaitlist:(body:RegisterSeatWaitlistInput)=>post<{id:string}>('/api/liff/booking/seat-waitlist',body),
+  acceptWaitlist:(body:AcceptBookingWaitlistInput,key:string)=>post<CreateBookingResponse>('/api/liff/booking/requests',body,{'Idempotency-Key':key}),
+  acceptSeatWaitlist:(id:string,key:string)=>post<{reservation_id:string;status:string}>(`/api/liff/booking/seat-waitlist/${encodeURIComponent(id)}/accept`,{}, {'Idempotency-Key':key}),
+  cancelSeatWaitlist:(id:string)=>remove<{status:string}>(`/api/liff/booking/seat-waitlist/${encodeURIComponent(id)}`),
   /** 枠を指定して自分の待ち登録を返す。 */
   waitlistMine: (staffId: string, menuId: string, startsAt: string) => {
     const qs = new URLSearchParams({ staff_id: staffId, menu_id: menuId, starts_at: startsAt });

@@ -523,7 +523,8 @@
     "578_v8_photo_publication_rewards.sql",
     "579_banner_color_roles.sql",
     "580_banner_reference_images.sql",
-    "581_banner_emphasis_lines.sql"
+    "581_banner_emphasis_lines.sql",
+    "585_booking_seat_waitlist_fifo.sql"
   ],
-  "migrationCount": 524
+  "migrationCount": 525
 }

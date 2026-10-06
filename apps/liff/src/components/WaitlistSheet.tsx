@@ -41,6 +41,7 @@ export default function WaitlistSheet({
   const [entryId, setEntryId] = useState<string | null | undefined>(undefined);
   const [working, setWorking] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [errorMessage,setErrorMessage]=useState<string|null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
   const startsAt = waitlistStartsAt(date, start);
 
@@ -71,6 +72,8 @@ export default function WaitlistSheet({
       setDoneMessage('登録しました。空いたらLINEで知らせます。');
     } catch (e) {
       logFailure('waitlist-register', e);
+      const code=(e as {body?:{error?:string}}).body?.error;
+      if(code==='waitlist_limit'||code==='registration_closed'||code==='slot_not_full'){setErrorMessage(code==='waitlist_limit'?'待ちは同時に3件までです。ほかの待ちを取り消してから登録してください。':code==='registration_closed'?'開始1時間前を過ぎたため、受付を締めました。':'この時間には空きがあります。予約の時刻を選び直してください。');return;}
       // 二重登録（409）は、もう待っているという意味。入り直して取り消せる形にする。
       if ((e as { status?: number }).status === 409) {
         try {
@@ -125,13 +128,14 @@ export default function WaitlistSheet({
           <p className="mt-3 text-[13px] font-semibold text-ink" role="status">{doneMessage}</p>
         ) : entryId ? (
           <p className="mt-3 text-[13px] text-ink">
-            登録ずみです。空いたらLINEで1通だけ知らせます。知らせてからしばらくは、あなただけが取れます。
+            登録ずみです。空いたらLINEで1通だけ知らせます。案内後30分は、あなただけが取れます。開始まで2時間を切ると10分です。
           </p>
         ) : (
           <p className="mt-3 text-[13px] text-ink">
-            満席の枠に登録すると、空いたらLINEで1通だけ知らせます。知らせてからしばらくは、あなただけが取れます。
+            満席の枠に登録すると、空いたらLINEで1通だけ知らせます。案内後30分は、あなただけが取れます。開始まで2時間を切ると10分です。
           </p>
         )}
+        {errorMessage&&<p className="mt-3 text-[13px] font-semibold text-danger" role="alert">{errorMessage}</p>}
         {failed && (
           <p className="mt-3 text-[13px] font-semibold text-danger" role="alert">
             読み込めませんでした。電波の良い所でもう一度開いてください。
@@ -153,7 +157,7 @@ export default function WaitlistSheet({
         </div>
         <p className="mt-3 flex items-center gap-1 text-[11.5px] text-liff-sub">
           <Icon name="bell" className="h-[14px] w-[14px]" />
-          1つの枠に1人1つまで登録できます。
+          先着順で案内します。同時に3件まで。開始1時間前に受付を締めます。
         </p>
       </div>
     </div>

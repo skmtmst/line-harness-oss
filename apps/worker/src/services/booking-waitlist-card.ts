@@ -33,7 +33,7 @@ export function waitlistBookUrl(liffBaseUrl: string, waitlistId: string): string
 
 /** 待ちの取り消し確認の URL。 */
 export function waitlistDeclineUrl(liffBaseUrl: string, waitlistId: string): string {
-  return `${liffBaseUrl.replace(/\/$/, '')}${WAITLIST_DECLINE_PATH(waitlistId)}`;
+  return `${waitlistBookUrl(liffBaseUrl,waitlistId)}&action=decline`;
 }
 
 /** 店の時間帯で「10月2日（金）13:00」を作る。曜日は暦で確かめたもの。 */

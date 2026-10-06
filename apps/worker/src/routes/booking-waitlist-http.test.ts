@@ -27,13 +27,10 @@ vi.mock('../services/booking-notifier.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/booking-notifier.js')>();
   return { ...actual, sendBookingNotification: vi.fn(async () => {}) };
 });
-vi.mock('../services/booking-waitlist-card.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../services/booking-waitlist-card.js')>();
-  return { ...actual, sendWaitlistInviteCard: vi.fn(async () => {}) };
-});
-import { sendWaitlistInviteCard } from '../services/booking-waitlist-card.js';
+vi.mock('../services/booking-automatic-line.js',()=>({sendAutomaticBookingLine:vi.fn(async()=>true)}));
+import { sendAutomaticBookingLine } from '../services/booking-automatic-line.js';
 
-const cardSender = vi.mocked(sendWaitlistInviteCard);
+const cardSender = vi.mocked(sendAutomaticBookingLine);
 
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (sql: string, params: unknown[]) => ({
@@ -122,6 +119,9 @@ beforeEach(async () => {
     (id,channel_id,name,channel_access_token,channel_secret)
     VALUES ('account-a','channel-a','A店','token','secret')`).run();
   seedSlot();
+  sqlite.exec(`INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('staff-a','menu-a',1);INSERT INTO booking_settings(id,line_account_id,business_hours_configured,cutoff_minutes_before,booking_window_days) VALUES('settings-a','account-a',1,0,365);`);
+  for(let i=0;i<7;i++)sqlite.prepare(`INSERT INTO booking_business_hours(id,booking_settings_id,weekday,start_time,end_time,capacity) VALUES(?,'settings-a',?,'00:00','23:59',10)`).run('h'+i,i);
+  for(let i=0;i<7;i++)sqlite.prepare(`INSERT INTO staff_availability_rules(id,staff_id,weekday,start_time,end_time) VALUES(?,'staff-a',?,'00:00','23:59')`).run('staff-h'+i,i);
   db = asD1(sqlite);
   ({ default: bookingRoute } = await import('./booking.js'));
   access.canAccessAllLineAccounts.mockClear();
@@ -177,13 +177,13 @@ describe('キャンセル待ちの口', () => {
 
     // 早い順の1人（friend-a）にだけカードが1通。
     expect(cardSender).toHaveBeenCalledTimes(1);
-    const sent = cardSender.mock.calls[0]?.[0] as { toLineUserId: string; bubble: unknown };
-    expect(sent.toLineUserId).toBe('U-a');
-    const card = JSON.stringify(sent.bubble);
+    const sent = cardSender.mock.calls[0]?.[1] as { to: string; text: string };
+    expect(sent.to).toBe('U-a');
+    const card = sent.text;
     expect(card).toContain('この時間で予約する');
     expect(card).toContain('今回は見送る');
-    expect(card).toContain('/booking/waitlist/');
-    expect(card).toContain('/decline');
+    expect(card).toContain('waitlist=');
+    expect(card).toContain('action=decline');
     const rows = sqlite.prepare(
       `SELECT friend_id, status, notified_at FROM booking_waitlist ORDER BY created_at`).all() as Array<{
       friend_id: string; status: string; notified_at: string | null;
@@ -203,6 +203,7 @@ describe('キャンセル待ちの口', () => {
       VALUES ('booking-new', 'account-a', 'friend-a', 'staff-a', 'menu-a',
         '${SLOT}', '${SLOT}', '${SLOT}', 'confirmed', 5000, '2026-10-01T00:00:00.000Z')`).run();
 
+    sqlite.prepare(`UPDATE booking_waitlist SET status='invited',ends_at='2026-10-10T06:00:00.000Z',block_ends_at='2026-10-10T06:00:00.000Z',hold_expires_at='2099-01-01T00:00:00Z' WHERE id=?`).run(id);
     const converted = await app.request(`/api/booking/admin/waitlist/${id}/convert?account_id=account-a`, {
       method: 'POST',
       headers: JSON_HEADERS,

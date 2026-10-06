@@ -118,7 +118,11 @@ import {
   getBookingAdminDetail,
   getBookingCustomerContext,
 } from '../services/booking-admin-detail.js';
-import { promoteBookingWaitlist } from '../services/booking-waitlist.js';
+import { finishExpiredWaitlists, promoteBookingWaitlist } from '../services/booking-waitlist.js';
+import { processBookingWaitlists } from '../services/waitlist-tick.js';
+import { insertSeatWaitlistEntry } from './restaurant-test.js';
+import { restaurantTestEnabled } from '../lib/environment-features.js';
+import { validateInboundReservation } from '../services/restaurant-test.js';
 
 import {
   getBookingAutoAssign,
@@ -130,6 +134,9 @@ import {
 } from '../services/booking-channels.js';
 
 const booking = new Hono<Env>();
+booking.onError((error,c)=>{if(/waitlist_hold_conflict|restaurant_table_conflict/.test(String(error)))return c.json({error:'slot_conflict'},409);throw error;});
+booking.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(/\/waitlist$|\/seat-waitlist$/.test(c.req.path)&&c.req.method==='POST')){try{const accountId=c.req.path.startsWith('/api/liff/')?await resolveAccountIdFromLiff(c):await resolveAccountIdAdmin(c);if(accountId)await processBookingWaitlists(c.env,accountId);}catch{console.error(JSON.stringify({event:'waitlist_reconcile_failed'}));}}});
+
 
 // 予約の作成・変更・承認の成功後に、同じ店舗内の重なりを確認する。
 booking.use('*', async (c, next) => {
@@ -236,6 +243,8 @@ async function reverifyLatestSlot(
     applyStoreRules?: boolean;
     /** 予約変更時は変更対象を重なり判定から外す（自予約と衝突しないように）。 */
     excludeBookingId?: string;
+    excludeWaitlistId?: string;
+    waitlistOffer?: boolean;
   },
 ): Promise<boolean> {
   const timeZone = await getAccountTimeZone(db, input.lineAccountId);
@@ -251,6 +260,7 @@ async function reverifyLatestSlot(
     applyStoreRules: input.applyStoreRules,
     googleCredentials: googleCredentials(env),
     excludeBookingId: input.excludeBookingId,
+    excludeWaitlistId:input.excludeWaitlistId,waitlistOffer:input.waitlistOffer,
   });
   const slots = latest.by_staff.find((item) => item.staff_id === input.staffId)?.slots;
   return findLatestSlotForInstant(slots, input.startsAt) !== null;
@@ -871,6 +881,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
     starts_at: string; // UTC ISO8601
     customer_note?: string;
     party_size?: unknown;
+    waitlist_id?: string;
   }>();
   if (body.party_size !== undefined && body.party_size !== 1) return c.json({ error: 'unsupported_party_size' }, 422);
   if (!body.menu_id || !body.starts_at) {
@@ -891,6 +902,11 @@ booking.post('/api/liff/booking/requests', async (c) => {
     return c.json(cached.body as Record<string, unknown>, cached.status as 200 | 201 | 400 | 409 | 422);
   }
 
+  // 案内を受けた本人・枠・有効期限を確認してから、通常の予約確定処理を使う。
+  if(body.waitlist_id){
+   const offer=await c.env.DB.prepare(`SELECT id FROM booking_waitlist WHERE id=? AND line_account_id=? AND friend_id=? AND staff_id=? AND menu_id=? AND julianday(starts_at)=julianday(?) AND status='invited' AND julianday(hold_expires_at)>julianday('now')`).bind(body.waitlist_id,accountId,friendId,body.staff_id,body.menu_id,body.starts_at).first();
+   if(!offer)return c.json({error:'offer_expired'},409);
+  }
   // Block check: customer cannot book
   const friend = await c.env.DB
     .prepare(`SELECT is_following FROM friends WHERE id = ?`)
@@ -952,6 +968,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
     startsAt,
     minLeadTimeMinutes: DEFAULT_ACCOUNT_SETTINGS.min_lead_time_minutes,
     applyStoreRules: true,
+    excludeWaitlistId:body.waitlist_id,waitlistOffer:!!body.waitlist_id,
   });
   if (!slotMatched) return c.json({ error: 'slot_not_available' }, 422);
 
@@ -973,8 +990,8 @@ booking.post('/api/liff/booking/requests', async (c) => {
         (id, line_account_id, friend_id, staff_id, menu_id,
          starts_at, ends_at, block_ends_at, status,
          customer_note, price_at_booking, requested_at, decided_at,
-         menu_version_number, menu_snapshot_json)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+         menu_version_number, menu_snapshot_json,waitlist_entry_id)
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
         WHERE NOT EXISTS (
           -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
           -- 1対1の施術とグループを同じ時間に入れることはできない。
@@ -1014,6 +1031,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
       decidedAt,
       menuSnapshot.version,
       menuSnapshot.json,
+      body.waitlist_id??null,
       // 別メニューの重なりを見る副問い合わせ
       body.staff_id,
       blockEndsAt.toISOString(),
@@ -1594,7 +1612,7 @@ booking.post('/api/liff/booking/:id/cancel', async (c) => {
       lineAccountId: accountId,
       staffId: row.staff_id,
       startsAt: row.starts_at,
-    }, undefined, c.env.LIFF_URL ?? '');
+    }, undefined, c.env.LIFF_URL ?? '',c.env);
   } catch (error) {
     console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId }));
   }
@@ -1640,7 +1658,7 @@ async function runSelfBookingCancelSideEffects(
       lineAccountId: self.accountId,
       staffId: row.staff_id,
       startsAt: row.starts_at,
-    }, undefined, c.env.LIFF_URL ?? '');
+    }, undefined, c.env.LIFF_URL ?? '',c.env);
   } catch {
     console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: row.id }));
   }
@@ -3496,7 +3514,7 @@ async function insertWaitlistEntry(
   },
 ): Promise<
   | { ok: true; id: string }
-  | { ok: false; error: 'invalid_slot' | 'missing_customer' | 'customer_not_found' | 'invalid_starts_at' | 'starts_at_in_past' | 'already_waiting' }
+  | { ok: false; error: 'invalid_slot' | 'missing_customer' | 'customer_not_found' | 'invalid_starts_at' | 'starts_at_in_past' | 'already_waiting' | 'registration_closed' | 'waitlist_limit' | 'slot_not_full' }
 > {
   const staffId = input.staffId.trim();
   const menuId = input.menuId.trim();
@@ -3504,6 +3522,8 @@ async function insertWaitlistEntry(
   const startsAtMs = Date.parse(input.startsAt);
   if (Number.isNaN(startsAtMs)) return { ok: false, error: 'invalid_starts_at' };
   if (startsAtMs <= Date.now()) return { ok: false, error: 'starts_at_in_past' };
+  if(startsAtMs<=Date.now()+60*60_000)return {ok:false,error:'registration_closed'};
+  await finishExpiredWaitlists(db,input.lineAccountId);
   const startsAt = new Date(startsAtMs).toISOString();
   const { friendId, bookingCustomerId } = input;
   if ((!friendId && !bookingCustomerId) || (friendId && bookingCustomerId)) {
@@ -3547,6 +3567,8 @@ async function insertWaitlistEntry(
       .run();
   } catch (error) {
     // 同時登録の race は部分一致キーが止める。
+    if (/waitlist_limit/.test(String(error)))return {ok:false,error:'waitlist_limit'};
+    if(/waitlist_registration_closed/.test(String(error)))return {ok:false,error:'registration_closed'};
     if (error instanceof Error && /UNIQUE/i.test(error.message)) {
       return { ok: false, error: 'already_waiting' };
     }
@@ -3562,6 +3584,7 @@ const WAITLIST_ERROR_STATUS: Record<string, number> = {
   starts_at_in_past: 400,
   customer_not_found: 404,
   already_waiting: 409,
+  registration_closed:409,waitlist_limit:409,slot_not_full:409,
 };
 
 booking.post('/api/booking/admin/waitlist', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -3590,6 +3613,7 @@ booking.post('/api/booking/admin/waitlist', requireRole('owner', 'admin', 'staff
 booking.get('/api/booking/admin/waitlist', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  await finishExpiredWaitlists(c.env.DB,accountId);
   const conditions = ['w.line_account_id = ?'];
   const values: unknown[] = [accountId];
   const staffId = c.req.query('staff_id')?.trim();
@@ -3602,7 +3626,7 @@ booking.get('/api/booking/admin/waitlist', async (c) => {
     values.push(new Date(startsAtMs).toISOString());
   }
   const status = c.req.query('status')?.trim();
-  if (status && ['waiting', 'invited', 'converted', 'cancelled'].includes(status)) {
+  if (status && ['waiting', 'invited', 'converted', 'cancelled','finished'].includes(status)) {
     conditions.push('w.status = ?'); values.push(status);
   }
   const rows = await c.env.DB
@@ -3619,13 +3643,20 @@ booking.get('/api/booking/admin/waitlist', async (c) => {
     )
     .bind(...values)
     .all();
-  return c.json({ waitlist: rows.results });
+  const slots=await c.env.DB.prepare(`SELECT staff_id,starts_at,SUM(status='waiting') waiting,SUM(status='invited') invited,SUM(status IN ('finished','converted','cancelled')) finished FROM booking_waitlist WHERE line_account_id=? GROUP BY staff_id,starts_at ORDER BY starts_at DESC LIMIT 100`).bind(accountId).all();
+  const seats=await c.env.DB.prepare(`SELECT w.store_id,w.starts_at,SUM(w.status='waiting') waiting,SUM(w.status='invited') invited,SUM(w.status IN ('finished','converted','cancelled')) finished FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=? GROUP BY w.store_id,w.starts_at ORDER BY w.starts_at DESC LIMIT 100`).bind(accountId).all();
+  return c.json({waitlist:rows.results,slots:slots.results,seatSlots:seats.results,seatWaitlist:(await c.env.DB.prepare(`SELECT w.*,s.name store_name FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=? ORDER BY w.starts_at DESC,w.created_at LIMIT 100`).bind(accountId).all()).results});
 });
 
 booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const id = c.req.param('id');
+  if(c.req.query('kind')==='seat'){
+   const result=await c.env.DB.prepare(`UPDATE rt_seat_waitlist SET status='cancelled',updated_at=? WHERE id=? AND status IN ('waiting','invited') AND store_id IN (SELECT id FROM rt_stores WHERE line_account_id=?)`).bind(new Date().toISOString(),id,accountId).run();
+   return result.meta.changes?c.json({status:'cancelled'}):c.json({error:'not_found'},404);
+  }
+
   const entry = await c.env.DB
     .prepare(`SELECT staff_id, starts_at, status FROM booking_waitlist
       WHERE id = ? AND line_account_id = ?`)
@@ -3649,7 +3680,7 @@ booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 
         lineAccountId: accountId,
         staffId: entry.staff_id,
         startsAt: entry.starts_at,
-      }, undefined, c.env.LIFF_URL ?? '');
+      }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
       console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', waitlistId: id }));
     }
@@ -3673,31 +3704,35 @@ booking.post('/api/booking/admin/waitlist/:id/convert', requireRole('owner', 'ad
     .bind(id, accountId)
     .first<WaitlistEntryLike>();
   if (!entry) return c.json({ error: 'not_found' }, 404);
-  if (entry.status !== 'waiting' && entry.status !== 'invited') {
+  if(entry.status!=='invited'||!entry.hold_expires_at||Date.parse(entry.hold_expires_at)<=Date.now()) {
     return c.json({ error: 'already_closed' }, 409);
   }
   const booking = await c.env.DB
-    .prepare(`SELECT staff_id, starts_at, friend_id, booking_customer_id FROM bookings
+    .prepare(`SELECT staff_id,menu_id, starts_at, friend_id, booking_customer_id FROM bookings
       WHERE id = ? AND line_account_id = ? AND status NOT IN ('cancelled', 'rejected', 'expired')`)
     .bind(bookingId, accountId)
-    .first<{ staff_id: string; starts_at: string; friend_id: string | null; booking_customer_id: string | null }>();
+    .first<{ staff_id: string; menu_id:string; starts_at: string; friend_id: string | null; booking_customer_id: string | null }>();
   if (!booking
+    || booking.menu_id !== entry.menu_id
     || booking.staff_id !== entry.staff_id
     || booking.starts_at !== entry.starts_at
     || booking.friend_id !== entry.friend_id
     || booking.booking_customer_id !== entry.booking_customer_id) {
     return c.json({ error: 'booking_mismatch' }, 409);
   }
-  await c.env.DB
+  const updated=await c.env.DB
     .prepare(`UPDATE booking_waitlist SET status = 'converted',
                   updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-      WHERE id = ? AND status IN ('waiting', 'invited')`)
+      WHERE id = ? AND status='invited' AND julianday(hold_expires_at)>julianday('now')`)
     .bind(id)
     .run();
+  if(!updated.meta.changes)return c.json({error:'offer_expired'},409);
   return c.json({ status: 'converted' });
 });
 
 interface WaitlistEntryLike {
+  hold_expires_at:string|null;
+  menu_id:string;
   staff_id: string;
   starts_at: string;
   friend_id: string | null;
@@ -3710,6 +3745,14 @@ booking.post('/api/liff/booking/waitlist', async (c) => {
   if (!caller.ok) return c.json({ error: caller.error }, caller.status);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   if (!body) return c.json({ error: 'invalid_json' }, 400);
+  const start=typeof body.starts_at==='string'?new Date(body.starts_at):new Date(NaN);
+  if(!Number.isFinite(start.getTime()))return c.json({error:'invalid_starts_at'},400);
+  if(start.getTime()<=Date.now()+60*60_000)return c.json({error:'registration_closed'},409);
+  const tz=await getAccountTimeZone(c.env.DB,caller.accountId),date=tzDateStr(tz,start);
+  const check=await explainBookingSlot(c.env.DB,{lineAccountId:caller.accountId,menuId:String(body.menu_id??''),staffId:String(body.staff_id??''),date,time:tzHHMM(tz,start),now:new Date(),minLeadTimeMinutes:0,waitlistOffer:true,applyStoreRules:true,googleCredentials:googleCredentials(c.env)});
+  const full=check.per_staff.find(s=>s.staff_id===body.staff_id);
+  const fullReasons=new Set(['other_booking','capacity_full','google_busy','store_full','resource_shortage']);
+  if(!full||full.bookable||!full.reasons.length||full.reasons.some(reason=>!fullReasons.has(reason)))return c.json({error:'slot_not_full'},409);
   const result = await insertWaitlistEntry(c.env.DB, {
     lineAccountId: caller.accountId,
     staffId: typeof body.staff_id === 'string' ? body.staff_id : '',
@@ -3749,7 +3792,7 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
         lineAccountId: caller.accountId,
         staffId: entry.staff_id,
         startsAt: entry.starts_at,
-      }, undefined, c.env.LIFF_URL ?? '');
+      }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
       console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', waitlistId: id }));
     }
@@ -3764,23 +3807,78 @@ booking.delete('/api/liff/booking/waitlist/:id', async (c) => {
 booking.get('/api/liff/booking/waitlist', async (c) => {
   const caller = await resolveSelfBookingCaller(c);
   if (!caller.ok) return c.json({ error: caller.error }, caller.status);
+  await finishExpiredWaitlists(c.env.DB,caller.accountId);
   const rows = await c.env.DB
     .prepare(
       `SELECT w.id, w.staff_id, w.menu_id, w.starts_at, w.status,
-              w.hold_minutes, w.invited_at, w.hold_expires_at, w.created_at,
+              w.hold_minutes, w.invited_at, w.hold_expires_at, w.created_at,w.ends_at,
               m.name AS menu_name, s.display_name AS staff_name
          FROM booking_waitlist w
          INNER JOIN menus m ON m.id = w.menu_id
          INNER JOIN staff s ON s.id = w.staff_id
-        WHERE w.line_account_id = ? AND w.friend_id = ?
-          AND w.status IN ('waiting', 'invited')
-        ORDER BY w.starts_at ASC, w.created_at ASC LIMIT 50`,
+        WHERE w.line_account_id = ? AND w.friend_id = ? AND (? IS NULL OR w.id=?)
+
+        ORDER BY w.starts_at DESC, w.created_at ASC LIMIT 50`,
     )
-    .bind(caller.accountId, caller.friendId)
+    .bind(caller.accountId, caller.friendId,c.req.query('id')??null,c.req.query('id')??null)
     .all();
   return c.json({ waitlist: rows.results });
 });
 
+
+booking.get('/api/liff/booking/seat-waitlist',async(c)=>{
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+ if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
+ await finishExpiredWaitlists(c.env.DB,caller.accountId);
+ const rows=await c.env.DB.prepare(`SELECT w.id,w.store_id,w.starts_at,w.ends_at,w.guest_count,w.status,w.hold_minutes,w.hold_expires_at,w.created_at,s.name store_name FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE s.line_account_id=? AND w.line_uid=? AND (? IS NULL OR w.id=?) ORDER BY w.starts_at DESC,w.created_at LIMIT 100`).bind(caller.accountId,caller.lineUserId,c.req.query('id')??null,c.req.query('id')??null).all();
+ return c.json({waitlist:rows.results});
+});
+booking.post('/api/liff/booking/seat-waitlist',async(c)=>{
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+ if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
+ const body=await c.req.json<{store_id?:string;starts_at?:string;guest_count?:number}>().catch(()=>null);if(!body)return c.json({error:'invalid_json'},400);
+ const store=await c.env.DB.prepare(`SELECT id FROM rt_stores WHERE id=? AND line_account_id=? AND status='active'`).bind(body.store_id??'',caller.accountId).first<{id:string}>();
+ if(!store)return c.json({error:'not_found'},404);
+ const starts=typeof body.starts_at==='string'?Date.parse(body.starts_at):NaN;
+ if(!Number.isFinite(starts))return c.json({error:'invalid_starts_at'},400);
+ if(starts<=Date.now()+60*60_000)return c.json({error:'registration_closed'},409);
+ const count=body.guest_count;if(!Number.isInteger(count)||!count||count<1||count>100)return c.json({error:'invalid_party'},400);
+ const end=new Date(starts+120*60_000).toISOString(),start=new Date(starts).toISOString();
+ // 人数に合う卓が存在し、その滞在中に全卓が予約か仮押さえで埋まっている枠だけ。
+ const fitting=await c.env.DB.prepare(`SELECT t.id,NOT EXISTS(SELECT 1 FROM rt_reservations r WHERE r.store_id=t.store_id AND r.table_id=t.id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR julianday(r.hold_expires_at)>julianday('now')) AND julianday(r.starts_at)<julianday(?) AND julianday(r.ends_at)>julianday(?)) AND NOT EXISTS(SELECT 1 FROM rt_seat_waitlist w WHERE w.store_id=t.store_id AND w.table_id=t.id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND julianday(w.starts_at)<julianday(?) AND julianday(w.ends_at)>julianday(?)) available FROM rt_tables t WHERE t.store_id=? AND t.is_active=1 AND t.min_capacity<=? AND t.max_capacity>=?`).bind(end,start,end,start,store.id,count,count).all<{id:string;available:number}>();
+ if(!fitting.results.length)return c.json({error:'invalid_slot'},400);
+ if(fitting.results.some(t=>t.available))return c.json({error:'slot_not_full'},409);
+ const friend=await c.env.DB.prepare('SELECT display_name FROM friends WHERE id=? AND line_account_id=?').bind(caller.friendId,caller.accountId).first<{display_name:string|null}>();
+ const result=await insertSeatWaitlistEntry(c.env.DB,{storeId:store.id,startsAt:start,endsAt:end,guestCount:count,customerName:friend?.display_name||'LINEのお客さま',customerPhone:null,lineUid:caller.lineUserId});
+ return result.ok?c.json({id:result.id},201):c.json({error:result.error},result.error==='already_waiting'||result.error==='registration_closed'||result.error==='waitlist_limit'?409:400);
+});
+booking.delete('/api/liff/booking/seat-waitlist/:id',async(c)=>{
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+ if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
+ const result=await c.env.DB.prepare(`UPDATE rt_seat_waitlist SET status='cancelled',updated_at=? WHERE id=? AND line_uid=? AND store_id IN (SELECT id FROM rt_stores WHERE line_account_id=?) AND status IN ('waiting','invited')`).bind(new Date().toISOString(),c.req.param('id'),caller.lineUserId,caller.accountId).run();
+ return result.meta.changes?c.json({status:'cancelled'}):c.json({error:'not_found'},404);
+});
+booking.post('/api/liff/booking/seat-waitlist/:id/accept',async(c)=>{
+ const caller=await resolveSelfBookingCaller(c);if(!caller.ok)return c.json({error:caller.error},caller.status);
+ if(!restaurantTestEnabled(c.env))return c.json({error:'not_found'},404);
+ const key=c.req.header('Idempotency-Key');if(!key)return c.json({error:'missing_idempotency_key'},400);
+ const id=c.req.param('id');
+ const entry=await c.env.DB.prepare(`SELECT w.* FROM rt_seat_waitlist w JOIN rt_stores s ON s.id=w.store_id WHERE w.id=? AND w.line_uid=? AND s.line_account_id=? AND s.status='active'`).bind(id,caller.lineUserId,caller.accountId).first<{store_id:string;table_id:string;starts_at:string;ends_at:string;guest_count:number;customer_name:string;status:string;hold_expires_at:string}>();
+ if(!entry)return c.json({error:'not_found'},404);
+ const existing=await c.env.DB.prepare('SELECT id,status FROM rt_reservations WHERE store_id=? AND waitlist_entry_id=? AND line_uid=?').bind(entry.store_id,id,caller.lineUserId).first<{id:string;status:string}>();
+ if(existing)return c.json({reservation_id:existing.id,status:existing.status});
+ if(entry.status!=='invited'||Date.parse(entry.hold_expires_at)<=Date.now())return c.json({error:'offer_expired'},409);
+ const checked=validateInboundReservation({externalId:`waitlist:${id}`,customerName:entry.customer_name,lineUid:caller.lineUserId,guestCount:entry.guest_count,startsAt:entry.starts_at,endsAt:entry.ends_at,status:'confirmed'});
+ if(!checked.ok)return c.json({error:checked.error},400);
+ const table=await c.env.DB.prepare('SELECT id FROM rt_tables WHERE id=? AND store_id=? AND is_active=1 AND min_capacity<=? AND max_capacity>=?').bind(entry.table_id,entry.store_id,entry.guest_count,entry.guest_count).first();
+ if(!table)return c.json({error:'slot_conflict'},409);
+ const reservationId=crypto.randomUUID();
+ await c.env.DB.batch([
+ c.env.DB.prepare(`INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,waitlist_entry_id) VALUES(?,?,'line',?,?,?,?,?,?,?,'confirmed',?)`).bind(reservationId,entry.store_id,`waitlist:${id}`,entry.customer_name,caller.lineUserId,entry.guest_count,entry.starts_at,entry.ends_at,entry.table_id,id),
+ c.env.DB.prepare(`UPDATE rt_inventory_slots SET reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND julianday(r.starts_at)<julianday(rt_inventory_slots.starts_at,'+'||rt_inventory_slots.slot_minutes||' minutes') AND julianday(r.ends_at)>julianday(rt_inventory_slots.starts_at)),0) WHERE store_id=?`).bind(entry.store_id),
+ ]);
+ return c.json({reservation_id:reservationId,status:'confirmed'},201);
+});
 /**
  * 前回と同じで予約（LIFF）：本人の「前回の予約（メニュー・担当）」を返す。
  *
@@ -3862,7 +3960,7 @@ booking.get('/api/liff/booking/waitlist/mine', async (c) => {
   if (Number.isNaN(startsAtMs)) return c.json({ error: 'invalid_starts_at' }, 400);
   const entry = await c.env.DB
     .prepare(
-      `SELECT id, status, created_at FROM booking_waitlist
+      `SELECT id, status, created_at,hold_expires_at,hold_minutes FROM booking_waitlist
         WHERE line_account_id = ? AND staff_id = ? AND menu_id = ?
           AND starts_at = ? AND friend_id = ?
           AND status IN ('waiting', 'invited')
@@ -7638,7 +7736,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         lineAccountId: accountId,
         staffId: row.staff_id,
         startsAt: row.starts_at,
-      }, undefined, c.env.LIFF_URL ?? '');
+      }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
       console.error(JSON.stringify({ event: 'booking_waitlist_promote_failed', bookingId: id }));
     }

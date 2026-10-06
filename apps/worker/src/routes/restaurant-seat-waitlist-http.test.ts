@@ -31,13 +31,10 @@ vi.mock('@line-crm/db', async () => {
   };
 });
 
-vi.mock('../services/booking-waitlist-card.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../services/booking-waitlist-card.js')>();
-  return { ...actual, sendWaitlistInviteCard: vi.fn(async () => {}) };
-});
-import { sendWaitlistInviteCard } from '../services/booking-waitlist-card.js';
+vi.mock('../services/booking-automatic-line.js',()=>({sendAutomaticBookingLine:vi.fn(async()=>true)}));
+import { sendAutomaticBookingLine } from '../services/booking-automatic-line.js';
 
-const cardSender = vi.mocked(sendWaitlistInviteCard);
+const cardSender = vi.mocked(sendAutomaticBookingLine);
 
 const { authMiddleware } = await import('../middleware/auth.js');
 const { restaurantTest } = await import('./restaurant-test.js');
@@ -188,16 +185,17 @@ describe('席の空き待ち', () => {
       customerName: '入らない組', lineUid: 'U-unfit',
     });
 
+    testDb.raw.exec(`INSERT INTO friends(id,line_account_id,line_user_id,display_name,is_following) VALUES('friend-fit','account-9','U-fit','試験の組',1)`);
     const cancelled = await patch('/api/restaurant-test/reservations/res-full', { status: 'cancelled' });
     expect(cancelled.status).toBe(200);
 
     expect(cardSender).toHaveBeenCalledTimes(1);
-    const sent = cardSender.mock.calls[0]?.[0] as { toLineUserId: string; bubble: unknown };
-    expect(sent.toLineUserId).toBe('U-fit');
-    const card = JSON.stringify(sent.bubble);
+    const sent = cardSender.mock.calls[0]?.[1] as { to: string; text: string };
+    expect(sent.to).toBe('U-fit');
+    const card = sent.text;
     expect(card).toContain('この時間で予約する');
     expect(card).toContain('今回は見送る');
-    expect(card).toContain('seat-waitlist');
+    expect(card).toContain('seat_waitlist=');
     const rows = testDb.raw.prepare(
       `SELECT customer_name, status, table_id FROM rt_seat_waitlist ORDER BY created_at`).all() as Array<{
       customer_name: string; status: string; table_id: string | null;

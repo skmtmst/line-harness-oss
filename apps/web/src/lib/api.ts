@@ -1,3 +1,4 @@
+import type { BookingWaitlistSlotSummary,SeatWaitlistSlotSummary,CustomerSeatWaitlist } from '@line-crm/shared';
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
 import type {
@@ -14104,7 +14105,7 @@ export interface BookingWaitlistEntry {
   starts_at: string;
   friend_id: string | null;
   booking_customer_id: string | null;
-  status: 'waiting' | 'invited' | 'converted' | 'cancelled';
+  status: 'waiting' | 'invited' | 'converted' | 'cancelled'|'finished';
   hold_minutes: number;
   invited_at: string | null;
   hold_expires_at: string | null;
@@ -15138,10 +15139,11 @@ export const bookingApi = {
     if (params.staffId) query.set('staff_id', params.staffId)
     if (params.startsAt) query.set('starts_at', params.startsAt)
     if (params.status) query.set('status', params.status)
-    return fetchApi<{ waitlist: BookingWaitlistEntry[] }>(
+    return fetchApi<{ waitlist: BookingWaitlistEntry[];slots:BookingWaitlistSlotSummary[];seatSlots:SeatWaitlistSlotSummary[];seatWaitlist:CustomerSeatWaitlist[] }>(
       withAccount(`/api/booking/admin/waitlist?${query.toString()}`, accountId),
     )
   },
+  cancelWaitlist:(accountId:string,id:string,kind:'staff'|'seat'='staff')=>fetchApi<{status:'cancelled'}>(withAccount(`/api/booking/admin/waitlist/${encodeURIComponent(id)}?kind=${kind}`,accountId),{method:'DELETE'}),
   /** 今日の予約に印を付ける（来店した・遅れる・来なかった）。 */
   postVisitMark: (
     accountId: string,

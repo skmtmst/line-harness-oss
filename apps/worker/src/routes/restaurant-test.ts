@@ -18,6 +18,8 @@ import {
 } from '../services/account-access.js';
 import { sendRestaurantLineConfirmation, type RestaurantLineNotice } from '../services/restaurant-line-confirmation.js';
 import { promoteSeatWaitlist } from '../services/restaurant-seat-waitlist.js';
+import { finishExpiredWaitlists } from '../services/booking-waitlist.js';
+import { processBookingWaitlists } from '../services/waitlist-tick.js';
 import { dbFor } from '../services/db-router.js';
 import {
   issueRestaurantIntakeAddress,
@@ -55,6 +57,8 @@ restaurantTest.onError((error, c) => {
   if (String(error).includes('restaurant_table_conflict')) return c.json({ success: false, error: '同じ卓に重なる予約または仮押さえがあります' }, 409);
   throw error;
 });
+
+restaurantTest.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&c.res.status<400&&!(c.req.path.endsWith('/seat-waitlist')&&c.req.method==='POST')){try{const org=await organizationFor(c);if(org)await processBookingWaitlists(c.env,org.account_id);}catch{console.error(JSON.stringify({event:'seat_waitlist_reconcile_failed'}));}}});
 
 const RESTAURANT_TERMS_DOCUMENT_KEY = 'musubo-terms';
 const RESTAURANT_TERMS_DOCUMENT_VERSION = 'v0.1-draft';
@@ -1341,7 +1345,7 @@ restaurantTest.patch('/api/restaurant-test/reservations/:id', requireRole('owner
         storeId: current.store_id,
         startsAt: next.starts_at,
         tableId: next.table_id,
-      }, undefined, c.env.LIFF_URL ?? '');
+      }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
       console.error(JSON.stringify({ event: 'seat_waitlist_promote_failed', reservationId: current.id }));
     }
@@ -1355,7 +1359,7 @@ restaurantTest.patch('/api/restaurant-test/reservations/:id', requireRole('owner
  * 開始時刻は UTC ISO (Z) にそろえる（取り消し時の突き合わせ用）。
  * 満席の判定は空き照会の表示側で行い、登録口は受け付ける。
  */
-async function insertSeatWaitlistEntry(
+export async function insertSeatWaitlistEntry(
   db: D1Database,
   input: {
     storeId: string;
@@ -1364,14 +1368,18 @@ async function insertSeatWaitlistEntry(
     customerName: string;
     customerPhone: string | null;
     lineUid: string | null;
+    endsAt?:string;
   },
 ): Promise<
   | { ok: true; id: string }
-  | { ok: false; error: 'invalid_slot' | 'invalid_party' | 'invalid_starts_at' | 'starts_at_in_past' | 'missing_customer' | 'already_waiting' }
+  | { ok: false; error: 'invalid_slot' | 'invalid_party' | 'invalid_starts_at' | 'starts_at_in_past' | 'missing_customer' | 'already_waiting' | 'registration_closed' | 'waitlist_limit' }
 > {
   const startsAtMs = Date.parse(input.startsAt);
   if (Number.isNaN(startsAtMs)) return { ok: false, error: 'invalid_starts_at' };
   if (startsAtMs <= Date.now()) return { ok: false, error: 'starts_at_in_past' };
+  if(startsAtMs<=Date.now()+60*60_000)return {ok:false,error:'registration_closed'};
+  const account=await db.prepare('SELECT line_account_id FROM rt_stores WHERE id=?').bind(input.storeId).first<{line_account_id:string}>();
+  if(account)await finishExpiredWaitlists(db,account.line_account_id);
   if (!Number.isInteger(input.guestCount) || input.guestCount < 1 || input.guestCount > 100) {
     return { ok: false, error: 'invalid_party' };
   }
@@ -1395,13 +1403,15 @@ async function insertSeatWaitlistEntry(
     await db
       .prepare(`INSERT INTO rt_seat_waitlist
         (id, store_id, starts_at, guest_count, customer_name, customer_phone,
-         line_uid, identity_key)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+         line_uid, identity_key,ends_at,created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?)`)
       .bind(id, input.storeId, startsAt, input.guestCount, customerName,
-        input.customerPhone, input.lineUid, identityKey)
+        input.customerPhone, input.lineUid, identityKey,input.endsAt??new Date(startsAtMs+DEFAULT_STAY_MINUTES*60_000).toISOString(),new Date().toISOString())
       .run();
   } catch (error) {
     // 同時登録の race は部分一致キーが止める。
+    if (/waitlist_limit/.test(String(error)))return {ok:false,error:'waitlist_limit'};
+    if(/waitlist_registration_closed/.test(String(error)))return {ok:false,error:'registration_closed'};
     if (error instanceof Error && /UNIQUE/i.test(error.message)) {
       return { ok: false, error: 'already_waiting' };
     }
@@ -1417,6 +1427,7 @@ const SEAT_WAITLIST_ERROR_STATUS: Record<string, number> = {
   starts_at_in_past: 400,
   missing_customer: 400,
   already_waiting: 409,
+  registration_closed:409,waitlist_limit:409,
 };
 
 /** 店舗が組織のものか確かめる。違えば null。 */
@@ -1476,7 +1487,7 @@ restaurantTest.get('/api/restaurant-test/seat-waitlist', requireRole('owner', 'a
     values.push(new Date(startsAtMs).toISOString());
   }
   const status = c.req.query('status')?.trim();
-  if (status && ['waiting', 'invited', 'converted', 'cancelled'].includes(status)) {
+  if (status && ['waiting', 'invited', 'converted', 'cancelled','finished'].includes(status)) {
     conditions.push('w.status = ?');
     values.push(status);
   }
@@ -1524,7 +1535,7 @@ restaurantTest.delete('/api/restaurant-test/seat-waitlist/:id', requireRole('own
         storeId: entry.store_id,
         startsAt: entry.starts_at,
         tableId: entry.table_id,
-      }, undefined, c.env.LIFF_URL ?? '');
+      }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
       console.error(JSON.stringify({ event: 'seat_waitlist_promote_failed', waitlistId: id }));
     }
@@ -1552,27 +1563,34 @@ restaurantTest.post('/api/restaurant-test/seat-waitlist/:id/convert', requireRol
   ).bind(id, organization.id, organization.scopedStoreId, organization.scopedStoreId)
     .first<SeatWaitlistEntryLike>();
   if (!entry) return c.json({ success: false, error: '見つかりません' }, 404);
-  if (entry.status !== 'waiting' && entry.status !== 'invited') {
+  if (entry.status !== 'invited'||!entry.hold_expires_at||Date.parse(entry.hold_expires_at)<=Date.now()) {
     return c.json({ success: false, error: 'すでに終わっています' }, 409);
   }
   const reservation = await dbFor(c.env, entry.store_id).prepare(
-    `SELECT store_id, starts_at, guest_count, status FROM rt_reservations
+    `SELECT store_id, starts_at, guest_count, status,line_uid,customer_phone,table_id FROM rt_reservations
       WHERE id = ? AND store_id = ? AND status NOT IN ('cancelled')`,
   ).bind(reservationId, entry.store_id)
-    .first<{ store_id: string; starts_at: string; guest_count: number; status: string }>();
+    .first<{ store_id: string; starts_at: string; guest_count: number; status: string;line_uid:string|null;customer_phone:string|null;table_id:string|null }>();
   if (!reservation
     || reservation.starts_at !== entry.starts_at
-    || reservation.guest_count !== entry.guest_count) {
+    || reservation.guest_count !== entry.guest_count
+    || reservation.table_id!==entry.table_id
+    || (entry.line_uid?reservation.line_uid!==entry.line_uid:reservation.customer_phone!==entry.customer_phone)) {
     return c.json({ success: false, error: '予約が待ちと合いません' }, 409);
   }
-  await dbFor(c.env, entry.store_id).prepare(
+  const updated=await dbFor(c.env, entry.store_id).prepare(
     `UPDATE rt_seat_waitlist SET status = 'converted', updated_at = datetime('now')
-      WHERE id = ? AND status IN ('waiting', 'invited')`,
+      WHERE id = ? AND status='invited' AND julianday(hold_expires_at)>julianday('now')`,
   ).bind(id).run();
+  if(!updated.meta.changes)return c.json({success:false,error:'案内の期限または状態が変わりました'},409);
   return c.json({ success: true, data: { status: 'converted' } });
 });
 
 interface SeatWaitlistEntryLike {
+  hold_expires_at:string|null;
+  table_id:string|null;
+  line_uid:string|null;
+  customer_phone:string|null;
   store_id: string;
   starts_at: string;
   guest_count: number;
