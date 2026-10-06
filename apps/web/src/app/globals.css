@@ -617,10 +617,12 @@
   --tpl-op-row-gap: 12px; --tpl-op-panel-gap: 10px; --tpl-op-panel-pad: 16px; --tpl-op-panel-title-lh: 20px; --tpl-op-mini-gap: 14px; --tpl-op-mini-pad: 9px 14px; --tpl-op-mini-head-lh: 16px; --tpl-op-mini-row-lh: 15.5px; --tpl-op-mini-num-pad: 12px;
   --tpl-op-dash-count-w: 60px; --tpl-op-dash-open-w: 70px; --tpl-op-dash-alert-h: 53.5px; --tpl-op-dash-plan-w: 80px; --tpl-op-dash-rate-w: 80px; --tpl-op-dash-media-w: 90px; --tpl-op-dash-tickets-w: 400px;
   --tpl-op-dash-stat-gap: 2px; --tpl-op-dash-stat-pad: 10px 12px; --tpl-op-dash-stat-lh: 23px; --tpl-op-dash-chart-h: 120px; --tpl-op-dash-col-gap: 4px; --tpl-op-dash-label-h: 14px;
-  --tpl-op-mem-invite-w: 340px; --tpl-op-mem-mail-w: 200px; --tpl-op-mem-totp-w: 110px; --tpl-op-mem-state-w: 90px; --tpl-op-mem-login-w: 100px; --tpl-op-mem-ops-w: 80px; --tpl-op-mem-self-h: 39.5px; --tpl-op-tab-pad-bottom: 10px; --tpl-op-tab-lh: 16.5px; --tpl-op-note-pad: 10px 12px; --tpl-op-note-lh: 17px;
+  --tpl-op-mem-invite-w: 340px; --tpl-op-mem-mail-w: 200px; --tpl-op-mem-totp-w: 110px; --tpl-op-mem-state-w: 90px; --tpl-op-mem-login-w: 100px; --tpl-op-mem-ops-w: 80px; --tpl-op-mem-self-h: 39.5px; --tpl-op-tab-pad-bottom: 10px; --tpl-op-tab-lh: 16.5px; --tpl-op-tab-gap: 20px; --tpl-op-note-pad: 10px 12px; --tpl-op-note-lh: 17px;
   --tpl-op-audit-date-w: 130px; --tpl-op-control-h: 36px; --tpl-op-audit-at-w: 120px; --tpl-op-audit-what-w: 140px; --tpl-op-audit-tenant-w: 150px; --tpl-op-audit-what-pad: 4px;
   --tpl-op-ann-form-w: 460px; --tpl-op-ann-form-pad: 18px; --tpl-op-ann-small-lh: 17px; --tpl-op-ann-body-h: 110px; --tpl-op-ann-tenants-h: 192px; --tpl-op-ann-warn-pad: 8px 10px; --tpl-op-ann-state-w: 80px; --tpl-op-ann-ops-w: 70px; --tpl-op-ann-fact-w: 150px; --tpl-op-ann-body-lh: 19px;
-  --tpl-op-kn-search-w: 300px; --tpl-op-kn-select-w: 150px; --tpl-op-kn-question-h: 56px; --tpl-op-kn-side-w: 360px; --tpl-op-dialog-pull-top: -14px; --tpl-op-dialog-pull-bottom: -10px;
+  --tpl-op-kn-search-w: 300px; --tpl-op-kn-select-w: 150px; --tpl-op-kn-question-h: 56px; --tpl-op-kn-side-w: 360px;
+  --tpl-op-tn-row-h: 52.5px; --tpl-op-tn-stores-w: 50px; --tpl-op-tn-staff-w: 60px; --tpl-op-tn-billing-w: 120px;
+  --tpl-op-dt-kv-h: 30.5px; --tpl-op-dt-key-w: 120px; --tpl-op-dt-at-w: 110px; --tpl-op-dt-what-w: 120px; --tpl-op-dialog-pull-top: -14px; --tpl-op-dialog-pull-bottom: -10px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
   /* ウェビナーの一覧（UyUMw・uBMuB・jiNg0）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16）。 */

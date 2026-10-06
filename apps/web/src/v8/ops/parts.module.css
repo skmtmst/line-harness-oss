@@ -197,3 +197,16 @@
   gap: var(--tpl-op-section-gap);
   margin: var(--tpl-op-dialog-pull-top) 0 var(--tpl-op-dialog-pull-bottom);
 }
+
+/* 運営の画面のタブは絵どおり文字13・下10（共通のタブより低い）。包んだタブだけに効く。 */
+.tabs.tabs :global([role="tab"]) {
+  height: auto;
+  min-height: 0;
+  padding-bottom: var(--tpl-op-tab-pad-bottom);
+  font-size: var(--text-label);
+  line-height: var(--tpl-op-tab-lh);
+}
+
+.tabs.tabs :global([role="tablist"]) {
+  gap: var(--tpl-op-tab-gap);
+}

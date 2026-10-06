@@ -65,12 +65,3 @@
     display: none;
   }
 }
-
-/* 絵のタブは文字13・下10（共通のタブより低い）。この画面のタブだけ。 */
-.tabs.tabs :global([role="tab"]) {
-  height: auto;
-  min-height: 0;
-  padding-bottom: var(--tpl-op-tab-pad-bottom);
-  font-size: var(--text-label);
-  line-height: var(--tpl-op-tab-lh);
-}

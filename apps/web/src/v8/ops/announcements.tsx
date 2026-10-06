@@ -29,6 +29,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { OpsHead } from './shell'
+import { useOpsReadOnly } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './announcements.module.css'
 
@@ -154,7 +155,7 @@ export default function OpsAnnouncementsV8() {
   const [confirmSend, setConfirmSend] = useState(false)
   const [deleting, setDeleting] = useState<OpsAnnouncement | null>(null)
   const [baseline, setBaseline] = useState<Form>(EMPTY)
-  const [readOnly, setReadOnly] = useState(false)
+  const readOnly = useOpsReadOnly()
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -172,11 +173,6 @@ export default function OpsAnnouncementsV8() {
   }, [])
 
   useEffect(() => { void load() }, [load])
-  useEffect(() => {
-    let active = true
-    void opsCall(api.ops.me()).then((res) => { if (active && res.success) setReadOnly(res.data.readOnly) })
-    return () => { active = false }
-  }, [])
   useEffect(() => {
     if (form.audienceKind !== 'tenants' || tenants.length > 0) return
     void opsCall(api.ops.tenants()).then((res) => { if (res.success) setTenants(res.data.filter((t) => t.status !== 'archived')) })

@@ -102,7 +102,7 @@ export default function OpsMembersV8() {
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
       />
       <div className={parts.stack}>
-        <div className={styles.tabs}>
+        <div className={parts.tabs}>
         <Tabs
           label="メンバー管理の中身"
           items={[

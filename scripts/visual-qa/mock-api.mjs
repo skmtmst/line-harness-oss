@@ -207,26 +207,47 @@ const OPS_TENANTS = [
   {
     id: 'visual-tenant-1', name: '検証商事', status: 'active', featurePacks: [],
     plan_key: 'standard', plan_status: 'active', trial_ends_at: null,
-    current_period_ends_at: '2026-10-01T00:00:00+09:00',
+    current_period_ends_at: '2027-03-31T00:00:00+09:00',
     created_at: '2026-04-01T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
-    account_count: 2, staff_count: 5, last_login_at: '2026-09-07T08:00:00+09:00',
+    account_count: 2, staff_count: 5, last_login_at: '2026-10-02T08:00:00+09:00',
   },
   {
-    id: 'visual-tenant-2', name: '見本物産', status: 'active', featurePacks: [],
-    plan_key: null, plan_status: 'trialing', trial_ends_at: '2026-09-14T00:00:00+09:00',
+    id: 'visual-tenant-4', name: '見本サロン', status: 'active', featurePacks: [],
+    plan_key: 'pro', plan_status: 'past_due', trial_ends_at: null,
+    current_period_ends_at: '2026-10-12T00:00:00+09:00',
+    created_at: '2026-06-12T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 2, staff_count: 3, last_login_at: '2026-10-01T10:00:00+09:00',
+  },
+  {
+    id: 'visual-tenant-5', name: '見本牧場', status: 'active', featurePacks: [],
+    plan_key: 'light', plan_status: 'active', trial_ends_at: null,
+    current_period_ends_at: '2026-10-20T00:00:00+09:00',
+    created_at: '2026-08-20T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 1, staff_count: 1, last_login_at: '2026-09-29T10:00:00+09:00',
+  },
+  {
+    id: 'visual-tenant-2', name: '見本物産', status: 'active', featurePacks: ['restaurant'],
+    plan_key: null, plan_status: 'trialing', trial_ends_at: '2026-10-04T00:00:00+09:00',
     current_period_ends_at: null,
-    created_at: '2026-08-20T10:00:00+09:00', updated_at: '2026-09-02T10:00:00+09:00',
-    account_count: 1, staff_count: 2, last_login_at: '2026-09-06T10:00:00+09:00',
+    created_at: '2026-09-20T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 1, staff_count: 2, last_login_at: '2026-10-02T10:00:00+09:00',
+  },
+  {
+    id: 'visual-tenant-6', name: '見本食堂', status: 'active', featurePacks: ['restaurant'],
+    plan_key: 'light', plan_status: 'active', trial_ends_at: null,
+    current_period_ends_at: '2026-10-01T00:00:00+09:00',
+    created_at: '2026-09-01T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 1, staff_count: 1, last_login_at: '2026-09-30T10:00:00+09:00',
   },
   {
     id: 'visual-tenant-3', name: 'サンプル商店', status: 'suspended', featurePacks: [],
-    plan_key: 'light', plan_status: 'past_due', trial_ends_at: null,
-    current_period_ends_at: '2026-09-01T00:00:00+09:00',
-    created_at: '2026-02-01T10:00:00+09:00', updated_at: '2026-08-20T10:00:00+09:00',
-    account_count: 1, staff_count: 1, last_login_at: '2026-08-10T10:00:00+09:00',
+    plan_key: null, plan_status: 'canceled', trial_ends_at: null,
+    current_period_ends_at: null,
+    created_at: '2025-12-01T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 0, staff_count: 1, last_login_at: '2026-06-10T10:00:00+09:00',
   },
 ]
-const OPS_TENANT_SUMMARY = { active: 1, trialing: 1, suspended: 1, pastDue: 1 }
+const OPS_TENANT_SUMMARY = { active: 3, trialing: 1, suspended: 1, pastDue: 1 }
 const OPS_AUDIT = [
   {
     id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
@@ -2121,20 +2142,22 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         success: true,
         data: {
           tenant: { ...tenant, id: tenant.id },
+          // 絵（Oub6x）の店舗の並び：4つつながっていて、1つはアーカイブ。
           accounts: [
-            {
-              id: 'visual-qa-account', name: '画面確認アカウント', is_active: 1,
-              archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 231,
-            },
+            { id: 'visual-qa-account', name: '画面確認アカウント', is_active: 1, archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 1284 },
+            { id: 'visual-qa-account-2', name: '見本アカウント 2', is_active: 1, archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 612 },
+            { id: 'visual-qa-account-3', name: '見本アカウント 3', is_active: 1, archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 14 },
+            { id: 'visual-qa-account-4', name: '見本アカウント 4', is_active: 1, archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 238 },
+            { id: 'visual-qa-account-5', name: '見本アカウント 5', is_active: 0, archived_at: '2026-08-01T10:00:00+09:00', updated_at: '2026-08-01T10:00:00+09:00', friend_count: 0 },
           ],
           members: [
             {
-              id: 'visual-staff-1', name: '検証 一郎', email: null, role: 'owner',
+              id: 'visual-staff-1', name: '検証 一郎', email: 'owner@example.com', role: 'owner',
               access_level: 'admin', is_active: 1, invite_status: 'accepted',
               last_login_at: '2026-09-07T08:00:00+09:00',
             },
           ],
-          audit: OPS_AUDIT,
+          audit: OPS_AUDIT.filter((row) => row.tenant_id === tenant.id),
         },
       }
     }
