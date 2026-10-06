@@ -172,7 +172,7 @@
   height: var(--text-metric);
   border-radius: var(--radius-mini);
   background: var(--color-canvas-sunken);
-  animation: kpi-card-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: kpi-card-pulse var(--motion-pulse) var(--motion-ease-in-out) infinite;
 }
 
 @keyframes kpi-card-pulse {
