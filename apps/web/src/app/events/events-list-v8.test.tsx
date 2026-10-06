@@ -131,6 +131,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   await act(async () => { root.unmount() })
   host.remove()
   document.body.innerHTML = ''
@@ -182,12 +183,14 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
 
   it('読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {
     fetchApi.mockImplementation(() => new Promise(() => {}))
+    // 待ちは偽の時計で進める（本物の時間を待たない）。骨組みの 0.3 秒は描いた瞬間から数えるので、描く前に替える。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await renderList()
     expect(document.querySelector('[aria-busy="true"]'), '場所取りがある').toBeTruthy()
     expect(document.body.textContent).toContain('イベントの一覧を読み込んでいます')
     expect(document.body.textContent).not.toContain('読み込み中')
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 350))
+      await vi.advanceTimersByTimeAsync(350)
     })
     expect(
       document.querySelectorAll('[data-skeleton]').length,

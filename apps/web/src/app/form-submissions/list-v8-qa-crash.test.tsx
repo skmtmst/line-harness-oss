@@ -101,10 +101,15 @@ let host: HTMLDivElement
 let root: Root
 const errors: unknown[] = []
 let spy: ReturnType<typeof vi.spyOn> | null = null
+/*
+ * 待ちは偽の時計で進める（本物の時間を待たない。重いときに落ちないように）。
+ * 1回 25ms ずつ進めるのは前と同じ（検索の 300ms 待ち・骨組みの 0.3 秒もこの中で過ぎる）。
+ */
 const flush = async (n = 20) => {
-  for (let i = 0; i < n; i += 1) await act(async () => { await new Promise((r) => setTimeout(r, 25)) })
+  for (let i = 0; i < n; i += 1) await act(async () => { await vi.advanceTimersByTimeAsync(25) })
 }
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
   unassignedData = []
   formsDeleteImpact.mockReset()
   formsUpdate.mockReset()
@@ -139,6 +144,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   act(() => root.unmount()); host.remove(); delete document.documentElement.dataset.theme
+  vi.useRealTimers()
   spy?.mockRestore(); errors.length = 0
 })
 
@@ -300,7 +306,7 @@ describe('V8 サクサク感 A・B', () => {
     expect(host.textContent).toContain('回答フォームの一覧を読み込んでいます')
     expect(host.textContent).not.toContain('読み込み中')
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 350))
+      await vi.advanceTimersByTimeAsync(350)
     })
     expect(host.querySelectorAll('[data-skeleton]').length).toBeGreaterThanOrEqual(5)
   })
