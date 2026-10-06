@@ -1,0 +1,402 @@
+/*
+ * ★V8 コンバージョンの一覧（Pencil `r6dJFy`・1152 `BygrU`・閲覧のみ `WSGvo`）。
+ * 枠・見出し・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
+ */
+
+/* 案内の帯と道具の段：この板は表より一段内側（左右に 24 足す）。 */
+.wideTools {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  min-width: 0;
+  margin-bottom: var(--tpl-cn-tools-after);
+  padding: 0 var(--tpl-cn-tools-indent);
+}
+.wideTools :global([data-toolbar-layout]) {
+  row-gap: var(--tpl-cn-toolbar-row-gap);
+}
+/* 札は1つずつ帯に並べる（入りきらない札だけが2段目へ回る。札の束ごと落とさない）。 */
+:global([data-theme='v8']) .wideTools [role='group'] {
+  display: contents;
+}
+.noticeRow {
+  flex-basis: 100%;
+  margin-bottom: var(--tpl-cn-notice-after);
+}
+
+/* 表：絵の列の並び（見出し 13/20・行 9/20・欄の間16）。表は左右 24 の内側に、細い枠と角丸 12。 */
+.tableWrap {
+  min-width: 0;
+  margin: var(--tpl-cn-table-margin);
+  border-radius: var(--tpl-cn-table-radius);
+  box-shadow: var(--tpl-cn-table-ring);
+  overflow: hidden;
+}
+.tableWrapNarrow {
+  margin: 0;
+  border-radius: var(--radius-none);
+  box-shadow: none;
+}
+.table {
+  border: 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+  gap: var(--tpl-cn-col-gap);
+  height: var(--tpl-cn-head-h);
+  padding: var(--tpl-cn-head-pad);
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  gap: var(--tpl-cn-col-gap);
+  height: auto;
+  min-height: var(--tpl-cn-row-h);
+  padding: var(--tpl-cn-row-pad);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
+  cursor: pointer;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: normal;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colCount,
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colValue,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colCount,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colValue {
+  padding-right: var(--tpl-cn-num-pad-end);
+  text-align: right;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+  flex: 1 1 0;
+  min-width: 0;
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colTrigger,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colUsage {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-cn-cell-gap);
+}
+.colTrigger { width: var(--tpl-cn-col-trigger); min-width: 0; }
+.colCount { width: var(--tpl-cn-col-count); }
+.colValue { width: var(--tpl-cn-col-value); }
+.colUsage { width: var(--tpl-cn-col-usage); min-width: 0; }
+.colOps { width: var(--tpl-cn-col-ops); }
+
+/* 名前（緑の 13/600）。 */
+.nameButton {
+  max-width: 100%;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-deep);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-name-lh);
+  text-align: left;
+  /* 絵どおり、列に入りきらない名前は2行まで折り返す（3行目からは省略。全文は title）。 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  cursor: pointer;
+}
+.nameButton:hover {
+  text-decoration: underline;
+}
+
+/* 何が起きたら数えるか・使われている場所（1行目 12・2行目 11）。 */
+.cellMain,
+.usageMain {
+  display: block;
+  max-width: 100%;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+}
+.cellMain {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.usageMain {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.cellSub {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-cn-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.num {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-main-lh);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状態の札（点つき）。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-cn-pill-gap);
+  padding: var(--tpl-cn-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-cn-pill-lh);
+  white-space: nowrap;
+}
+.pillDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.pill[data-tone='active'] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.pill[data-tone='warn'] {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+.pill[data-tone='neutral'] {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+/* 行の右端：使う場所を足すと「…」。メニューの位置の目印が行を1段増やさないよう横に並べる。 */
+.opsBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cn-ops-gap);
+}
+/* 閲覧のみ：押せないボタンは置かず、場所だけ空ける。 */
+.opsSpace {
+  display: block;
+  width: var(--tpl-cn-ops-space-w);
+  height: var(--tpl-cn-control-h);
+}
+.createSpace {
+  display: block;
+  height: var(--tpl-cn-control-h);
+  margin-bottom: var(--tpl-cn-create-after);
+}
+.createSpaceRow {
+  display: block;
+  flex-shrink: 0;
+  width: var(--tpl-cn-create-w);
+  height: var(--tpl-cn-control-h);
+}
+
+/* 表の下の小窓（詳細・止める）。左右に並べる。 */
+.panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--tpl-cn-panel-gap);
+  margin: var(--tpl-cn-panels-margin);
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-panel-inner-gap);
+  padding: var(--tpl-cn-panel-pad);
+  border-radius: var(--tpl-cn-table-radius);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-cn-panel-ring);
+}
+.panelTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-panel-title-lh);
+}
+.panelLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-cn-pill-gap);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-panel-text-lh);
+}
+.panelText {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cn-panel-text-lh);
+  overflow-wrap: anywhere;
+}
+.panelButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-cn-ops-gap);
+}
+.panelActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-cn-ops-gap);
+}
+.secretBox {
+  margin: 0;
+  padding: var(--tpl-cn-secret-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+}
+.fieldBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-field-gap);
+}
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+.reasonInput {
+  width: 100%;
+  height: var(--tpl-cn-control-h);
+  padding: var(--tpl-cn-input-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+/* 表の下の案内。 */
+.footNote {
+  margin: 0;
+  padding: var(--tpl-cn-foot-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-cn-sub-lh);
+}
+.footNoteNarrow {
+  padding: var(--tpl-cn-foot-pad-narrow);
+}
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+.inlineNotice {
+  margin: var(--tpl-cn-table-margin);
+  margin-bottom: var(--tpl-cn-notice-after);
+}
+.stateBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-panel-inner-gap);
+  margin: var(--tpl-cn-table-margin);
+  padding: var(--tpl-cn-panel-pad);
+  border-radius: var(--tpl-cn-table-radius);
+  box-shadow: var(--tpl-cn-panel-ring);
+}
+.stateNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+/* 道具の段の右：よく使う絞り込み（左に印）・並び。 */
+.sortBox { width: var(--tpl-cn-sort-w); }
+.sortBox :global(*) { max-width: 100%; }
+.savedBox { position: relative; width: var(--tpl-cn-saved-w); }
+.savedBox :global(*) { max-width: 100%; }
+.savedBox :global(button) { width: 100%; padding-left: var(--tpl-cn-saved-pad-start); }
+.savedBox :global(button) > svg:last-child { display: none; }
+.savedIcon {
+  position: absolute;
+  top: 50%;
+  left: var(--tpl-cn-saved-icon-left);
+  z-index: 1;
+  color: var(--color-ink-secondary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* 1152 の板（BygrU）：案内の帯 → 1段目 → 2段目。 */
+.narrowTools {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+}
+.narrowTools > .noticeRow {
+  margin-bottom: var(--tpl-cn-narrow-notice-after);
+}
+.narrowRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+}
+.narrowChips {
+  min-width: 0;
+  overflow: hidden;
+}
+.narrowChips > div[role='group'] {
+  display: flex;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowFolder { width: var(--tpl-narrow-folder-w); }
+.narrowFolder :global(*) { max-width: 100%; }
+.narrowFolder :global(button) { width: 100%; }
+.narrowSearch { width: var(--tpl-cn-search-w); }
+.spacer { flex: 1 1 0; }
+
+/* 閲覧のみの帯（数の帯の上）。薄い青の地・目の印・枠なし。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: var(--tpl-cn-ro-margin);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+.statsNotice {
+  padding: var(--tpl-cn-stats-notice-pad);
+}
+
+/* 骨組みの棒。 */
+.skeletonName { display: block; width: 75%; height: var(--tpl-cn-skeleton-h); }
+.skeletonNum { display: block; width: 60%; height: var(--tpl-cn-skeleton-h); margin-left: auto; }

@@ -1,0 +1,340 @@
+/*
+ * ★V8 友だち追加時の配信の一覧（MRhef・LEwkJ・P20kYU・C0lfUP・cFo2p・kFz4b）。
+ * 枠・見出し・数の帯・フォルダの列は型（ListPage）が持つ。ここは帯・道具・表の中身だけ。
+ */
+
+/* 閲覧のみの帯（見出しとタブの間）。薄い青の地・目の印・枠なし。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin-bottom: var(--tpl-ro-band-after);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+.kindTabs {
+  min-width: 0;
+}
+/* タブの段は 30.5（文字18・下12・選んだタブの線は段の線に重ねる）。 */
+.kindList :global([role='tab']) {
+  line-height: var(--tpl-tabs-text-lh);
+  margin-bottom: calc(var(--tpl-fa-tab-overlap) * -1);
+}
+
+/* 作るボタン（フォルダの列の先頭・1152 では道具の1段目）。 */
+.createButton {
+  gap: var(--tpl-fa-create-gap);
+}
+
+/* 案内の帯（表の上の主列）。 */
+.noticeRow {
+  flex-basis: 100%;
+  margin-bottom: var(--tpl-fa-notice-after);
+}
+
+.searchBox { width: var(--tpl-fa-search-w); }
+.folderSelect { width: var(--tpl-fa-folder-w); }
+.folderSelect :global(*) { max-width: 100%; }
+.folderSelect :global(button) { width: 100%; }
+.chips {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.spacer { flex: 1 1 0; }
+
+.narrowTools {
+  display: flex;
+  flex-basis: 100%;
+  margin-bottom: calc(var(--tpl-fa-narrow-trim) * -1);
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+
+.errorBand {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+/* 表：見出し 39・行 62（上下12・左右24・欄の間16）。 */
+.tableWrap { min-width: 0; }
+.table { border: 0; }
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+  gap: var(--tpl-fa-col-gap);
+  height: var(--tpl-fa-head-h);
+  padding: var(--tpl-fa-head-pad);
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-fa-col-gap);
+  height: var(--tpl-fa-row-h);
+  padding: var(--tpl-fa-row-pad);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+  display: block;
+  flex-shrink: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: normal;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sinkRow { background: var(--color-table-head); }
+.colOrder { width: var(--tpl-fa-col-order); }
+.colSend { width: var(--tpl-fa-col-send); min-width: 0; }
+.colStatus { width: var(--tpl-fa-col-status); }
+.colRecent { width: var(--tpl-fa-col-recent); }
+.colMenu { width: var(--tpl-fa-col-menu); }
+
+/* 順：つまみ＋番号。 */
+.orderBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sub-gap);
+  color: var(--color-ink-faint);
+}
+.grip {
+  font-size: var(--text-caption);
+}
+.orderNum {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-fa-order-lh);
+  font-variant-numeric: tabular-nums;
+}
+.lock { color: var(--color-ink-faint); }
+
+/* 名前（青の 13/600）と流入リンク（11）。 */
+.name {
+  display: block;
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: var(--tpl-row-name-size);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.name:hover { text-decoration: underline; }
+.sub {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-fa-sub-icon-gap);
+  margin-top: var(--tpl-fa-sub-gap);
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-row-sub-lh);
+}
+.sub > svg {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+}
+.subText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 最初に送るもの：主（12）と副（11）を1行ずつ。 */
+.sendMain {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-fa-send-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sendSub {
+  display: block;
+  margin-top: var(--tpl-fa-send-gap);
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.num {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-fa-send-lh);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状態の札（点つき）。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-wb-pill-gap);
+  padding: var(--tpl-wb-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-wb-pill-lh);
+  white-space: nowrap;
+}
+.pillDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.pill[data-tone='active'] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.pill[data-tone='always'] {
+  background: var(--color-status-info-soft);
+  color: var(--color-action);
+}
+.pill[data-tone='neutral'] {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+/* 行の右端の「…」。メニューの位置の目印が行を1段増やさないよう横に並べる。 */
+.menuBox {
+  display: flex;
+  align-items: center;
+}
+.menuButton {
+  width: var(--tpl-fa-col-menu);
+  height: var(--tpl-fa-col-menu);
+}
+
+.footNote {
+  margin: 0;
+  padding: var(--tpl-fa-foot-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+
+.folderNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-fa-folder-note-lh);
+}
+
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+.pagerButtons {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+
+/* 状態の板（kFz4b）：読み込み中・失敗・空。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-fa-state-gap);
+  padding: var(--tpl-fa-state-pad);
+  text-align: center;
+}
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-fa-state-icon);
+  height: var(--tpl-fa-state-icon);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+.stateIcon[data-tone='error'] {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+/* 受け皿は止められない（cFo2p）の注意の1行。 */
+.warnNote {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-fa-sub-icon-gap);
+  margin: 0;
+  color: var(--color-status-warn-deep);
+  font-size: var(--text-caption);
+}
+.warnNote > svg { flex-shrink: 0; }
+
+.folderDialogBody {
+  display: grid;
+  gap: var(--tpl-fa-sub-icon-gap);
+}
+.folderDialogLabel {
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.folderDialogInput {
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-chip-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+/* 1152 の板（P20kYU）：直近7日の列は出さない（設定・送るもの・状態・…）。 */
+@container v8-page (max-width: 1099px) {
+  .colRecent { display: none !important; }
+}
+
+/* 数の帯の補足（折れたときの行の高さ）。 */
+.kpiDetail {
+  display: block;
+  line-height: var(--tpl-fa-kpi-detail-lh);
+}
+
+/* 閲覧のみ：隠した作るボタンとつまみの場所だけ空けて、並びを絵どおりに保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-fa-viewer-create-h); }
+.gripSpace { visibility: hidden; }
