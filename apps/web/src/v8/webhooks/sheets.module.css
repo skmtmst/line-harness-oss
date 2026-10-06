@@ -1,0 +1,180 @@
+/*
+ * ★V8 外部連携「Google Sheets」（DxAAA・解除の窓 YZ57z）。
+ * 枠・見出し・タブ・数の帯は型（ListPage）が持つ。本文：左のカード2枚・右 320 の気をつけること。
+ */
+.body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-wh-sheets-gap);
+  padding: var(--tpl-wh-body-pad);
+}
+.mainCol {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-wh-card-gap);
+  min-width: 0;
+}
+.spacer {
+  flex: 1 1 0;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wh-card-gap);
+  padding: var(--tpl-wh-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.sideCard {
+  flex-shrink: 0;
+  width: var(--tpl-wh-sheets-side-w);
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-wh-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-wh-card-title-lh);
+}
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.careText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-care-lh);
+}
+
+/* 状態の行（左に題・右に太字の値）。 */
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.statusLabel {
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+}
+.statusValue,
+.statusStrong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+a.statusValue:hover {
+  text-decoration: underline;
+}
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.targetForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wh-ops-gap);
+}
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+}
+.targetRow {
+  display: flex;
+  gap: var(--tpl-toolbar-gap);
+}
+.input {
+  flex: 1;
+  min-width: 0;
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-kw-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+
+/* 同期の記録（見出しの帯＋行。行の間はカードの間12）。 */
+.runHead,
+.runRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+}
+.runHead {
+  padding: var(--tpl-wh-mini-head-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-row-sub-lh);
+}
+.runRow {
+  min-height: var(--tpl-wh-run-row-h);
+  padding: var(--tpl-wh-mini-row-pad);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wh-cell-lh);
+}
+.colWhen { width: var(--tpl-wh-run-when); }
+.colKind { width: var(--tpl-wh-run-kind); }
+.colWhat {
+  width: var(--tpl-wh-run-what);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.colResult { width: var(--tpl-wh-mini-ops); }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-wb-pill-gap);
+  padding: var(--tpl-wb-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-wb-pill-lh);
+  white-space: nowrap;
+}
+.pillDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.pill[data-tone='active'] { background: var(--color-success-bg); color: var(--color-success); }
+.pill[data-tone='warn'] { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
+.pill[data-tone='danger'] { background: var(--color-danger-bg); color: var(--color-danger); }
+.pill[data-tone='neutral'] { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
+
+.dialogNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-wh-note-lh);
+}
+.skeletonTitle { display: block; width: 40%; height: var(--tpl-rule-row-gap); }
+.skeletonRow { display: block; width: 100%; height: var(--tpl-wh-skel-bar); }
