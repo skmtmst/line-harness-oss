@@ -578,6 +578,9 @@ shared-button-importer v8/automations/list.tsx
 shared-button-importer v8/automations/runs.tsx
 shared-button-importer v8/automations/common-actions.tsx
 shared-button-importer v8/automations/versions.tsx
+shared-button-importer v8/nen-campaigns/list.tsx
+shared-button-importer v8/nen-campaigns/edit.tsx
+shared-button-importer v8/nen-campaigns/column-new.tsx
 shared-button-importer v8/friend-add/list.tsx
 shared-button-importer v8/friend-add/editor.tsx
 shared-button-importer v8/notifications/list.tsx

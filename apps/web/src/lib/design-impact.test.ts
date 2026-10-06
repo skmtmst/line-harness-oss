@@ -276,6 +276,8 @@ describe('共通部品の影響範囲', () => {
       'v8/affiliates/offers.tsx',
       'v8/affiliates/approvals.tsx',
       'v8/affiliates/payment.tsx',
+      // ★V8-B NEN配信の一覧（MuhWR・Jxmqh・Tj7n4）。新しい置き場（src/v8）に一から書いた。表の下にページ送りを置く。
+      'v8/nen-campaigns/list.tsx',
       // ★V8 外部連携の送る一覧（ZSbFY）。新しい置き場（src/v8）に一から書いた。
       'v8/webhooks/outgoing.tsx',
       // ★V8 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りを置く。

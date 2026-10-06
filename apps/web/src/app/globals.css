@@ -710,6 +710,19 @@
   --tpl-tag-ro-pad: 0 24px 8px; --tpl-tag-ro-band-pad: 10px 14px; --tpl-tag-ro-gap: 10px; --tpl-tag-ro-lh: 20px; --tpl-tag-ro-icon: 16px;
   --tpl-tag-pager-pad: 10px 20px; --tpl-tag-pager-size: 13px; --tpl-tag-pager-lh: 20px;
   --tpl-tag-other-pad: 16px 24px 24px; --tpl-tag-other-gap: 16px; --tpl-tag-note-size: 11px; --tpl-tag-note-lh: 17px; --tpl-tag-ring: 2px; --tpl-tag-tabs-h: 30px; --tpl-tag-tabs-pad-bottom: 9px;
+  /* NEN配信の一覧（MuhWR・Jxmqh・Tj7n4・oqSJP）。表は見出し36・行56・欄の間16。 */
+  --tpl-nc-tab-h: 28.5px; --tpl-nc-tab-pull: -1.5px; --tpl-nc-band-top-line: inset 0 1px 0 var(--color-hairline); --tpl-nc-inset: 24px; --tpl-nc-note-pad: 14px 24px 0; --tpl-nc-viewer-margin: 12px 24px;
+  --tpl-nc-col-gap: 16px; --tpl-nc-head-h: 36px; --tpl-nc-head-pad: 10px 24px; --tpl-nc-row-h: 56px; --tpl-nc-row-pad: 10px 24px; --tpl-nc-num-pad-end: 16px; --tpl-nc-sub-gap: 2px;
+  --tpl-nc-col-trigger: 170px; --tpl-nc-col-target: 140px; --tpl-nc-col-sent: 80px; --tpl-nc-col-orders: 64px; --tpl-nc-col-state: 110px; --tpl-nc-menu-size: 36px;
+  --tpl-nc-col-category: 110px; --tpl-nc-col-date: 90px; --tpl-nc-col-line: 130px; --tpl-nc-col-when: 200px; --tpl-nc-col-result: 130px; --tpl-nc-col-cause: 140px;
+  --tpl-nc-pill-pad: 2px 8px; --tpl-nc-pill-gap: 5px; --tpl-nc-pill-dot: 6px; --tpl-nc-pill-lh: 18px;
+  --tpl-nc-pager-pad: 12px 24px; --tpl-nc-pager-inner-pad: 10px 20px; --tpl-nc-pager-gap: 6px; --tpl-nc-pager-h: 52px; --tpl-nc-pager-lh: 20px; --tpl-nc-hint-pad: 12px 24px; --tpl-nc-text-lh: 20px;
+  --tpl-nc-detail-pad: 10px 24px; --tpl-nc-sample-gap: 4px; --tpl-nc-sample-pad: 12px 14px; --tpl-nc-form-gap: 16px; --tpl-nc-field-gap: 6px; --tpl-nc-pair-gap: 12px;
+  --tpl-nc-drawer-w: 520px; --tpl-nc-drawer-head-pad: 24px 24px 0; --tpl-nc-drawer-body-pad: 16px 24px; --tpl-nc-drawer-foot-pad: 0 24px 24px; --tpl-nc-switch-gap: 10px; --tpl-nc-switch-pad: 12px 14px; --tpl-nc-select-pad: 16px 24px;
+  /* NEN配信のコラムを書く（yRDwW）・配信を直す（w5pwG）。カードは余白20・角12、右の列のカードは余白14。 */
+  --tpl-nc-back-gap: 2px; --tpl-nc-back-lh: 19px; --tpl-nc-card-pad: 20px; --tpl-nc-card-gap: 12px; --tpl-nc-card-gap-wide: 14px; --tpl-nc-card-title-size: 14px; --tpl-nc-card-title-size-lg: 15px;
+  --tpl-nc-flow-gap: 6px; --tpl-nc-flow-pad: 6px 10px; --tpl-nc-focus-ring: 2px; --tpl-nc-body-h: 72px; --tpl-nc-body-pad: 10px 12px; --tpl-nc-body-lh: 19px;
+  --tpl-nc-side-gap: 14px; --tpl-nc-side-pad: 14px; --tpl-nc-side-lh: 19px; --tpl-nc-control-h: 36px; --tpl-nc-static-pad: 0 10px 0 12px;
   /* コンバージョン・流入の作成（r6dJFy・BygrU・WSGvo・j8p3yj・cXqlS・KMaMk・E14GFm・vWJEm）。 */
   --tpl-cn-tools-indent: 24px; --tpl-cn-toolbar-row-gap: 14px; --tpl-cn-tools-after: -6px; --tpl-cn-notice-after: 11px; --tpl-cn-search-w: 240px; --tpl-cn-sort-w: 160px; --tpl-cn-saved-w: 154px; --tpl-cn-saved-pad-start: 36px; --tpl-cn-saved-icon-left: 14px;
   --tpl-cn-table-margin: 0 24px; --tpl-cn-table-radius: 12px; --tpl-cn-table-ring: inset 0 0 0 1px var(--color-hairline);
