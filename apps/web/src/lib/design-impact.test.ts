@@ -239,8 +239,12 @@ describe('共通部品の影響範囲', () => {
        * シナリオ・外部連携のやり取りと送る・受信一覧の旧部品）は 2026-10-06 に外した。
        * 代わりは下の src/v8 の新しい画面。
        */
+      // ★V8 一斉配信の一覧（l5V9a）。新しい置き場（src/v8）に一から書いた。
+      'v8/broadcasts/list.tsx',
       // ★V8 回答フォームの一覧（I3L41O）。新しい置き場（src/v8）に一から書いた。
       'v8/forms/list.tsx',
+      // ★V8 回答フォームの編集（m1cWEy ほか）。登録メディアから選ぶ窓の写しにページ送り。
+      'v8/form-edit/media-picker.tsx',
       // V8 のリッチメニュー一覧（src/v8 に一から書いた）。
       'v8/rich-menus/list.tsx',
       // ★V8 自動応答の一覧（uE9gf）。新しい置き場（src/v8）に一から書いた。
@@ -253,6 +257,8 @@ describe('共通部品の影響範囲', () => {
       'v8/webhooks/outgoing.tsx',
       // ★V8 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りを置く。
       'v8/webhooks/interactions.tsx',
+      // ★V8 コンバージョンの一覧（r6dJFy）。新しい置き場（src/v8）に一から書いた。
+      'v8/conversions/list.tsx',
     ].sort())
   })
 
