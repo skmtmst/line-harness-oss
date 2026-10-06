@@ -170,4 +170,82 @@ describe('V8 回答フォーム一覧', () => {
     expect(listCall).toContain('sort=latest-answer')
     expect(listCall).toContain('with_list_summary=1')
   })
+
+  it('件数が1ページを超えるときは共通の ListRange で「N件中 X〜Y件を表示」と出す', async () => {
+    fetchApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/forms?')) {
+        return {
+          success: true,
+          data: {
+            items: [
+              { ...baseForm, id: 'f-1', name: '来店アンケート', folderId: null },
+              { ...baseForm, id: 'f-2', name: '予約後アンケート', folderId: null },
+            ],
+            total: 45, all_total: 45, page: 1, limit: 20,
+          },
+        }
+      }
+      return { success: true, data: {} }
+    })
+    await mount()
+    expect(host.textContent).toContain('45件中 1〜2件を表示')
+  })
+})
+
+/*
+ * 2026-10-06 点検：表全体を1つの右クリックで包み、押した行を state に入れてから項目を作っていたので、
+ * 1回目の右クリックでは空で開かず、2回目は前に押した行の項目が出ていた。
+ */
+describe('V8 回答フォーム一覧の右クリック', () => {
+  beforeEach(() => {
+    fetchApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/forms?')) {
+        return {
+          success: true,
+          data: {
+            items: [
+              { ...baseForm, id: 'f-1', name: '来店アンケート', folderId: null },
+              { ...baseForm, id: 'f-2', name: '受付を終えたアンケート', folderId: null, isActive: false },
+            ],
+            total: 2, all_total: 2, page: 1, limit: 20,
+          },
+        }
+      }
+      return { success: true, data: {} }
+    })
+  })
+
+  const rowCell = (id: string) => {
+    const row = host.querySelector(`tr[data-row-id="${id}"]`)
+    expect(row, `${id} の行がある`).toBeTruthy()
+    return row!.querySelector('td')!
+  }
+  const openMenu = () => document.body.querySelector('[data-context-menu] [role="menu"]')
+
+  it('1回目の右クリックで、押した行の項目のメニューが開く', async () => {
+    await mount()
+    await act(async () => { fireEvent.contextMenu(rowCell('f-2'), { clientX: 80, clientY: 140 }) })
+    await flush()
+    const menu = openMenu()
+    expect(menu, '1回目で開く').toBeTruthy()
+    expect(menu!.getAttribute('aria-label')).toBe('「受付を終えたアンケート」の操作')
+    // 止まっているフォームには「受付を止める」が無い（押した行の中身で作っている）。
+    expect(menu!.textContent).toContain('フォルダへ移す')
+    expect(menu!.textContent).not.toContain('受付を止める')
+  })
+
+  it('続けて別の行を右クリックすると、前の行ではなくその行の項目が出る', async () => {
+    await mount()
+    await act(async () => { fireEvent.contextMenu(rowCell('f-2'), { clientX: 80, clientY: 140 }) })
+    await flush()
+    await act(async () => { fireEvent.keyDown(openMenu()!, { key: 'Escape' }) })
+    await flush()
+    expect(openMenu()).toBeNull()
+    await act(async () => { fireEvent.contextMenu(rowCell('f-1'), { clientX: 80, clientY: 100 }) })
+    await flush()
+    const menu = openMenu()
+    expect(menu, '2回目も開く').toBeTruthy()
+    expect(menu!.getAttribute('aria-label')).toBe('「来店アンケート」の操作')
+    expect(menu!.textContent).toContain('受付を止める')
+  })
 })
