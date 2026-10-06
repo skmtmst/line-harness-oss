@@ -1,0 +1,475 @@
+/*
+ * ★V8 シナリオ配信の一覧（Pencil `axFrW`・狭い板 `wjfLe`・閲覧のみ `X0QrW0`・複製の窓 `Al4Ek`、状態は `BxGhV`）。
+ * 枠・見出し・帯・フォルダ列・道具の段の並びは型（ListPage・ListToolbar）が持つ。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-scn-*` と共通の `--tpl-*` だけを使う。
+ */
+.folderNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: 1.6;
+  /* 絵は字の途中で折る（全体の言葉のまとまりで折ると3行になる）。 */
+  word-break: normal;
+}
+
+/* 案内の帯と件数の行は toolbar 枠の中で1行を取る。 */
+.noteRow {
+  flex-basis: 100%;
+}
+
+.filteredCount {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 操作の失敗の帯。 */
+.errorBand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  margin: 0;
+  padding: var(--tpl-ro-band-pad);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-control);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
+
+.errorBand button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 表。見出しと行の区切り線だけ（`axFrW`）。外側の枠は作らない。 */
+.tableWrap {
+  min-width: 0;
+}
+
+.colSelect { width: var(--tpl-scn-col-select); }
+.colGrip { width: var(--tpl-scn-col-grip); }
+.colName { width: var(--tpl-scn-col-name); }
+.colCount { width: var(--tpl-scn-col-count); }
+.colState { width: var(--tpl-scn-col-state); }
+.colMenu { width: var(--tpl-scn-col-menu); }
+
+/* 絵 axFrW の行は 61 ごと。札や長い説明があっても同じ高さに。 */
+.row > td {
+  height: var(--tpl-scn-row-h);
+}
+
+.rowClick {
+  cursor: pointer;
+}
+
+.rowClick td {
+  transition: background-color var(--motion-fast) var(--motion-ease-out);
+}
+
+.selectCell {
+  text-align: center;
+}
+
+.gripCell {
+  color: var(--color-hairline);
+  text-align: center;
+}
+
+.headCell {
+  text-align: left;
+}
+
+.nameRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+}
+
+.cellTitle {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-action);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellTitle:hover {
+  text-decoration: underline;
+}
+
+/* 補足は1行（長い説明は「…」＋title で全文）。名前との間は絵の 2（型の 3 から詰める）。 */
+.cellSub {
+  display: block;
+  margin-top: calc(var(--tpl-scn-sub-gap) - var(--tpl-row-sub-gap));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 「全アカウント共通」の札。 */
+.miniBadge {
+  flex-shrink: 0;
+  padding: 1px var(--tpl-cell-gap-half);
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: var(--text-micro);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 「購読中 / 読み終えた」列。 */
+.countCell {
+  white-space: nowrap;
+}
+
+.countMain {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-row-name-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+.countSub {
+  margin-top: var(--tpl-scn-count-gap);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状態の札。 */
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-sub-gap);
+  padding: var(--tpl-compact-gap) var(--tpl-cell-gap-half);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statePillActive {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.statePillStopped {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.stateDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.menuCell {
+  text-align: right;
+}
+
+.menuBox {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* まとめての帯（選択中に表の下へ出る）。 */
+.bulkRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  padding: var(--tpl-ro-band-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.bulkCount {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.skeletonGap {
+  display: block;
+  height: var(--tpl-scn-skeleton-gap);
+}
+
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 表の下の使い方の文。 */
+.footNote {
+  margin: 0;
+  padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: 1.6;
+}
+
+/* 空・失敗の1枚。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  margin: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side);
+  padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-chip-h);
+  height: var(--tpl-chip-h);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+}
+
+.stateIconError {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-card-title-size);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-label);
+  line-height: 1.3;
+}
+
+/* フォルダへ移す窓の中身。 */
+.moveBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cell-gap-half);
+}
+
+.moveLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+/* 削除の窓の中身。 */
+.deleteBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cell-gap-half);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+
+.deleteBody p {
+  margin: 0;
+}
+
+.deleteWarn {
+  color: var(--color-warning);
+  font-weight: 500;
+}
+
+.deleteFaint {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+/* 複製の窓（`Al4Ek`）：名前の欄 → 引き継ぐもの → 引き継がないもの → 案内の帯。 */
+.dupBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-scn-dup-gap);
+  text-align: left;
+}
+
+.dupField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-scn-dup-field-gap);
+}
+
+.dupLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.dupBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-scn-dup-box-gap);
+  padding: var(--tpl-scn-dup-box-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+}
+
+.dupBoxTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+
+.dupBoxText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: 1.45;
+}
+
+.dupNote {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-scn-dup-note-gap);
+  padding: var(--tpl-scn-dup-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: 1.55;
+}
+
+.dupNote > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* 閲覧のみの帯（X0QrW0）。数の帯の上。薄い青の地・目の印・枠なし。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* 状態の札の並び。 */
+.chipGroup {
+  display: flex;
+  gap: var(--tpl-toolbar-gap);
+}
+
+/* 道具の段の右：よく使う絞り込み（左に印）。 */
+.savedBox {
+  position: relative;
+  width: var(--tpl-scn-saved-w);
+}
+
+.savedBox :global(*) {
+  max-width: 100%;
+}
+
+.savedBox :global(button) {
+  width: 100%;
+  padding-left: calc(var(--tpl-chip-row-gap) * 8);
+}
+
+/* 絵は印＋「よく使う絞り込み」だけのボタン。右の矢印は出さず、文字を切らない。 */
+.savedBox :global(button) > svg {
+  display: none;
+}
+
+.savedIcon {
+  position: absolute;
+  top: 50%;
+  left: var(--tpl-rule-row-gap);
+  z-index: 1;
+  color: var(--color-ink-secondary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* 1152 の板（wjfLe）の道具の段：案内の帯 → 1段目 → 2段目。 */
+.narrowTools {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-pad-block);
+}
+
+.narrowRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+
+.narrowRow + .narrowRow {
+  margin-top: calc(var(--tpl-toolbar-gap) - var(--tpl-toolbar-pad-block));
+}
+
+.narrowFolder {
+  width: var(--tpl-scn-folder-w);
+}
+
+.narrowFolder :global(*) {
+  max-width: 100%;
+}
+
+.narrowFolder :global(button) {
+  width: 100%;
+}
+
+.narrowSearch {
+  width: var(--tpl-kw-input-w);
+}
+
+.narrowSpacer {
+  flex: 1 1 0;
+}
+
+.savedIconOnly > .savedBox { width: var(--tpl-scn-saved-icon-w); }
+.savedIconOnly > .savedBox :global(button) { padding: 0; color: transparent; }
+.savedIconOnly > .savedBox :global(button) * { visibility: hidden; }
+.savedIconOnly > .savedBox :global(button) > svg { display: none; }
+.savedIconOnly > .savedBox .savedIcon { left: 50%; transform: translate(-50%, -50%); }
+
+/* 1152 の板：見出しの行は絵の 40 に対して道具の段の2段ぶん詰める。 */
+.narrowTable thead th {
+  height: var(--tpl-scn-narrow-head-h);
+}
