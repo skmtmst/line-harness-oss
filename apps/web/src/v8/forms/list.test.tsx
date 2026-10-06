@@ -170,6 +170,26 @@ describe('V8 回答フォーム一覧', () => {
     expect(listCall).toContain('sort=latest-answer')
     expect(listCall).toContain('with_list_summary=1')
   })
+
+  it('件数が1ページを超えるときは共通の ListRange で「N件中 X〜Y件を表示」と出す', async () => {
+    fetchApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/forms?')) {
+        return {
+          success: true,
+          data: {
+            items: [
+              { ...baseForm, id: 'f-1', name: '来店アンケート', folderId: null },
+              { ...baseForm, id: 'f-2', name: '予約後アンケート', folderId: null },
+            ],
+            total: 45, all_total: 45, page: 1, limit: 20,
+          },
+        }
+      }
+      return { success: true, data: {} }
+    })
+    await mount()
+    expect(host.textContent).toContain('45件中 1〜2件を表示')
+  })
 })
 
 /*

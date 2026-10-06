@@ -55,6 +55,7 @@ import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-m
 import { withViewTransition } from '@/components/shared/view-transition'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { notifyToast } from '@/components/shared/toast'
@@ -1354,19 +1355,24 @@ export default function FormsListV8() {
 
   /* ページ送り（絵：左に件数、右に頁）。1ページに収まるときは件数だけ。 */
   const showPager = !loading && !loadError && visibleForms.length > 0
-  const pagerSummary = pageCount > 1
-    ? `${formatNumber(listTotal)}件中 ${pageStart + 1}〜${Math.min(pageStart + visibleForms.length, listTotal)}件`
-    : `${formatNumber(listTotal)}件`
   const listPager = !showPager ? null : pageCount > 1 ? (
     <Pagination
       page={visiblePage}
       pageCount={pageCount}
       onPageChange={(next) => updateListState({ page: next })}
       ariaLabel="回答フォームのページ送り"
-      summary={<span className={styles.pagerCount}>{pagerSummary}</span>}
+      summary={(
+        <ListRange
+          bare
+          className={styles.pagerCount}
+          total={listTotal}
+          first={pageStart + 1}
+          last={Math.min(pageStart + visibleForms.length, listTotal)}
+        />
+      )}
     />
   ) : (
-    <p className={styles.pagerSolo}>{pagerSummary}</p>
+    <p className={styles.pagerSolo}>{`${formatNumber(listTotal)}件`}</p>
   )
 
   /* 閲覧のみの帯（`JV2oR`）。見出しの下・数の帯の上。 */
