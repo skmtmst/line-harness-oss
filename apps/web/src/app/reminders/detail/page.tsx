@@ -11,7 +11,7 @@ import {
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import ReminderDetailV8Page from './detail-v8'
+import ReminderDetailV8Page from '@/v8/reminders/detail'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Card, { CardHeader } from '@/components/shared/card'

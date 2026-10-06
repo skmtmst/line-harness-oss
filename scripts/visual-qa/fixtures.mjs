@@ -3817,11 +3817,23 @@ export const REMINDER_PREVIEW = {
 
 /*
  * 板 `ltAaq`（確認）の配信予定の行は `今後7日 124通（重なり 3件はまとめる）`。
- * `T0nis` の表の行（友だち名・日時）は実時計の未来絞りのため固定データでは
- * 出せず、撮影の state で撮る（`.measure/claims.txt` に申し送り済み）。
+ * `T0nis` の表は「今後7日」を実時計で絞るため、行の日時は見本の API を立てた
+ * 時刻から数える（明日 18:00 ×2〈重なり〉・明後日 13:00・明後日 18:00 の4行）。
  */
+function reminderNewPreviewAt(dayOffset, hour) {
+  const at = new Date()
+  at.setDate(at.getDate() + dayOffset)
+  at.setHours(hour, 0, 0, 0)
+  return at.toISOString()
+}
 export const REMINDER_NEW_PREVIEW = {
   ...REMINDER_PREVIEW,
+  items: [
+    { stableStepId: 'day-before', stepNumber: 1, scheduledAt: reminderNewPreviewAt(1, 18), label: '前日のお知らせ', state: 'scheduled' },
+    { stableStepId: 'day-before', stepNumber: 1, scheduledAt: reminderNewPreviewAt(1, 18), label: '前日のお知らせ', state: 'duplicate' },
+    { stableStepId: 'hour-before', stepNumber: 2, scheduledAt: reminderNewPreviewAt(2, 13), label: '1時間前のお知らせ', state: 'scheduled' },
+    { stableStepId: 'day-before', stepNumber: 1, scheduledAt: reminderNewPreviewAt(2, 18), label: '前日のお知らせ', state: 'scheduled' },
+  ],
   summary: { audience: 172, next7Days: 124, next30Days: 1194, duplicateCount: 3 },
 }
 
