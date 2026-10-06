@@ -35,7 +35,7 @@ export default function HqSettingsPage() {
 
   return (
     <div data-design-node="K7HYu" className="flex flex-col gap-4">
-      <ReadonlyHeader title="統括の情報" description="統括の名前を確認します。" />
+      <ReadonlyHeader title="統括の情報" description="統括の名前です。各アカウントの画面の上と、メンバーへの招待メールに出ます。" />
       <div className="hq-settings-v8">
         <HqSettingsNav active="info" />
         <div className="hq-settings-v8__main">
