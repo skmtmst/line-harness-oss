@@ -153,10 +153,10 @@ describe('V8 テンプレートの通し', () => {
   it('作る画面で名と本文を入れて保存すると知らせが出て一覧へ戻る', async () => {
     mocks.query = ''
     await mount(<TemplateEditPage />)
-    const nameInput = document.getElementById('tp8-name') as HTMLInputElement
+    const nameInput = document.getElementById('te-name') as HTMLInputElement
     expect(nameInput).not.toBeNull()
     fireEvent.change(nameInput, { target: { value: '流れの型' } })
-    const bodyInput = document.getElementById('tp8-content') as HTMLTextAreaElement
+    const bodyInput = document.getElementById('te-content') as HTMLTextAreaElement
     fireEvent.change(bodyInput, { target: { value: 'こんにちは' } })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
@@ -169,9 +169,9 @@ describe('V8 テンプレートの通し', () => {
   it('作る画面で保存して公開すると知らせが出て一覧へ戻る', async () => {
     mocks.query = ''
     await mount(<TemplateEditPage />)
-    const nameInput = document.getElementById('tp8-name') as HTMLInputElement
+    const nameInput = document.getElementById('te-name') as HTMLInputElement
     fireEvent.change(nameInput, { target: { value: '流れの型' } })
-    const bodyInput = document.getElementById('tp8-content') as HTMLTextAreaElement
+    const bodyInput = document.getElementById('te-content') as HTMLTextAreaElement
     fireEvent.change(bodyInput, { target: { value: 'こんにちは' } })
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
