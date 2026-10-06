@@ -85,17 +85,18 @@ const QA_EVENT_WAITLIST = {
   slot_ends_at: '2026-10-11T12:00:00+09:00',
 };
 
+// 紹介のリンク・案件は ★V8 S3uBl の言葉に合わせる (秋の定期便キャンペーン・鹿肉ふりかけ)。
 const QA_LINK = {
   refCode: 'QA1234',
   label: 'ブログ用',
-  url: 'https://example.com/r/QA1234',
+  url: 'https://lin.ee/ref-QA1234',
   clickCount: 12,
   friendAdds: 4,
   conversions: 2,
   conversionsPending: 0,
-  conversionsApproved: 1,
-  offerId: null,
-  offerName: null,
+  conversionsApproved: 2,
+  offerId: 'qa-offer-1',
+  offerName: '秋の定期便キャンペーン',
 };
 
 function json(res, status, body) {
@@ -145,13 +146,18 @@ function webinarLive() {
     sessionStartAt: now - 120,
     offsetSeconds: 120,
     playlistUrl: 'https://example.com/qa/master.m3u8',
-    cta: { label: '申し込む', url: 'https://example.com/qa', showAtSeconds: 300 },
+    cta: { label: '個別相談を申し込む', url: 'https://example.com/qa', showAtSeconds: 60 },
     comments: [
       { atSeconds: 5, authorName: 'QA はなこ', body: '楽しみにしていました！' },
       { atSeconds: 8, authorName: 'まる', body: 'トイレの話が知りたいです' },
     ],
   };
 }
+
+/** 表紙の画像 (B8rCt の「画像」：地 #e9e2d4・店名)。外へ取りに行かないよう data URL で持つ。 */
+const QA_FORM_COVER = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="343" height="96" viewBox="0 0 343 96"><rect width="343" height="96" fill="#e9e2d4"/><text x="171.5" y="54" text-anchor="middle" font-family="Noto Sans JP, sans-serif" font-size="16" font-weight="700" fill="#6b5b3e">然 - NEN -</text></svg>',
+)}`;
 
 /** 来店アンケート (★V8 の B8rCt・g9osGN・aNZKe)。2ページ目に予約の欄。 */
 function qaForm() {
@@ -167,6 +173,13 @@ function qaForm() {
           id: 'qa-section-1',
           name: '今日のご来店',
           blocks: [
+            // ページ先頭の画像は題の上の表紙になる (B8rCt の「画像」)。
+            {
+              id: 'qa-b0',
+              kind: 'image',
+              size: 'full',
+              mediaUrl: QA_FORM_COVER,
+            },
             {
               id: 'qa-b1',
               kind: 'input',
@@ -205,7 +218,8 @@ function qaForm() {
               name: '次回の予約',
               label: '次回のご希望の日時を選んでください',
               required: true,
-              booking: { menuId: 'qa-menu-1', staffId: 'qa-staff-any', daysAhead: 14 },
+              // g9osGN は 10/14(水)〜18(日) の5日。16日は満席。
+              booking: { menuId: 'qa-menu-1', staffId: 'qa-staff-form', daysAhead: 5 },
             },
             {
               id: 'qa-b4',
@@ -395,15 +409,24 @@ const server = createServer(async (req, res) => {
     // 10:00 と 16:00 は埋まっている。
     const from = url.searchParams.get('from') ?? '2026-10-01';
     const to = url.searchParams.get('to') ?? '2026-10-01';
-    const FULL_DAYS = [4, 10, 15, 20, 25, 30];
-    const TIMES = [
-      ['09:00', 3],
-      ['10:00', 0],
-      ['13:00', 3],
-      ['14:00', 3],
-      ['15:00', 3],
-      ['16:00', 0],
-    ];
+    // フォームの「予約を入れる」(担当 qa-staff-form・g9osGN) は、絵どおり
+    // 16日だけ満席・時刻は 10:00 (埋まり)・13:00・15:00 の3つ。
+    const formBlock = staffId === 'qa-staff-form';
+    const FULL_DAYS = formBlock ? [16] : [4, 10, 15, 20, 25, 30];
+    const TIMES = formBlock
+      ? [
+          ['10:00', 0],
+          ['13:00', 3],
+          ['15:00', 3],
+        ]
+      : [
+          ['09:00', 3],
+          ['10:00', 0],
+          ['13:00', 3],
+          ['14:00', 3],
+          ['15:00', 3],
+          ['16:00', 0],
+        ];
     const slots = [];
     const closed = [];
     const end = new Date(`${to}T00:00:00Z`);
@@ -612,10 +635,32 @@ const server = createServer(async (req, res) => {
       offers: [
         {
           id: 'qa-offer-1',
-          name: 'QA 紹介特典',
-          description: '撮影用の見本特典です。',
-          rewardAmount: 1000,
-          rewardMiles: 50,
+          name: '秋の定期便キャンペーン',
+          description: '紹介した人が予約すると、あなたに 500マイル。',
+          rewardAmount: 0,
+          rewardMiles: 500,
+          windowDays: null,
+          receptionFrom: null,
+          receptionTo: null,
+          halted: false,
+          totalRemaining: null,
+          monthlyRemaining: null,
+          enrolled: true,
+          refCode: 'QA1234',
+          url: 'https://lin.ee/ref-QA1234',
+        },
+        {
+          id: 'qa-offer-2',
+          name: '鹿肉ふりかけ',
+          description: '鹿肉ふりかけを紹介すると、1件 100マイル。',
+          rewardAmount: 0,
+          rewardMiles: 100,
+          windowDays: null,
+          receptionFrom: null,
+          receptionTo: null,
+          halted: false,
+          totalRemaining: null,
+          monthlyRemaining: null,
           enrolled: false,
           refCode: null,
           url: null,

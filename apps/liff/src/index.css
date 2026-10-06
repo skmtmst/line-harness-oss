@@ -45,6 +45,8 @@
   --color-liff-star: #f5a623;
   /* マイルの貯まった箱の深い緑 (S3uBl)。主の緑より濃い。 */
   --color-liff-deep: #0f3d24;
+  /* 深い緑の箱の上の小さな字 (S3uBl の「使えるマイル」「マイル」)。 */
+  --color-liff-deep-sub: #d7dbe0;
   --color-liff-wait-bg: #fff6e5;
   --color-liff-wait-ink: #b26b00;
   --color-liff-ok-bg: #e8f8ee;
@@ -62,6 +64,12 @@
   /* ── ウェビナー配信中 (RpW2h。値は板の書き出しから) ── */
   --color-night-body: #e6e8eb;
   --color-night-dim: #8a9098;
+  /* ── ウェビナー配信中 ★V8 (RpW2h) の地・動画の枠・副の字・途中のボタン。
+   * 途中のボタン (個別相談を申し込む) は板どおり LINE の緑。ここだけで使う。 ── */
+  --color-night-deep: #111214;
+  --color-night-panel: #2a2c30;
+  --color-night-sub: #a8adb4;
+  --color-night-cta: #06c755;
   /* 押せない枠の地。設計の満席の枠 (2-event.png の 14:00〜15:00) の灰色。 */
   --color-shell-gray: #ebedf1;
   /* 空きの点の金 (残りわずか)。型ごとに替える。 */
