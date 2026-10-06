@@ -714,12 +714,8 @@ export default function WebhooksOutgoingV8() {
           description="新しい鍵（合言葉）を設定します。保存したあとは二度と全部は表示されません。前の鍵は24時間だけ使えるので、相手側の切り替え中も送信は止まりません。"
           error={rotateError || undefined}
           onCancel={() => { setRotateTarget(null); setRotateSecret('') }}
-          footer={(
-            <div className={styles.dialogFooter}>
-              <Button type="button" onClick={() => { setRotateTarget(null); setRotateSecret('') }}>キャンセル</Button>
-              <Button type="button" variant="primary" onClick={() => void runRotate()}>保存する</Button>
-            </div>
-          )}
+          onConfirm={() => void runRotate()}
+          confirmLabel="保存する"
         >
           <div className={styles.secretRow}>
             <input

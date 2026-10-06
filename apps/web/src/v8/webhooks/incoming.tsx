@@ -802,19 +802,16 @@ export default function WebhooksIncomingV8() {
           open={showCreate && canManage}
           title="受け取る設定を追加"
           designNode="H031gC"
+          designWidth={540}
+          designTop={200}
           busy={creating}
           error={createFieldError.form}
           onCancel={() => { if (!creating) setShowCreate(false) }}
-          footer={(
-            <div className={styles.dialogFooter}>
-              <Button type="button" disabled={creating} onClick={() => setShowCreate(false)}>キャンセル</Button>
-              <Button type="button" variant="primary" disabled={creating} busy={creating} onClick={() => void runCreate()}>
-                <Plus size={15} aria-hidden="true" />作る
-              </Button>
-            </div>
-          )}
+          onConfirm={() => void runCreate()}
+          confirmLabel="作る"
+          confirmIcon={<Plus size={15} aria-hidden="true" />}
         >
-          <div className={styles.form}>
+          <div className={`${styles.form} ${styles.formTight}`}>
             <label className={styles.formField}>
               <span className={styles.fieldLabel}>名前</span>
               <input
@@ -871,12 +868,9 @@ export default function WebhooksIncomingV8() {
           title="届いたつもりで試す"
           description="見本のJSONで、どの人に届くかと何が動くかを確かめます。実際の処理は動きません。"
           onCancel={() => setTestOpen(false)}
-          footer={(
-            <div className={styles.dialogFooter}>
-              <Button onClick={() => setTestOpen(false)}>閉じる</Button>
-              <Button variant="primary" onClick={() => void runTest()} disabled={testBusy || !testJson.trim()} busy={testBusy}>試す</Button>
-            </div>
-          )}
+          onConfirm={() => { if (testJson.trim()) void runTest() }}
+          busy={testBusy}
+          confirmLabel="試す"
         >
           <label className={styles.formField}>
             <span className={styles.fieldLabel}>届いたつもりのJSON</span>
@@ -923,12 +917,8 @@ export default function WebhooksIncomingV8() {
           description="新しい合言葉を設定します。保存したあとは二度と全部は表示されません。前の合言葉は24時間だけ使えるので、相手側の切り替え中も受け取りは止まりません。"
           error={rotateError || undefined}
           onCancel={() => { setRotateTarget(null); setRotateSecret('') }}
-          footer={(
-            <div className={styles.dialogFooter}>
-              <Button type="button" onClick={() => { setRotateTarget(null); setRotateSecret('') }}>キャンセル</Button>
-              <Button type="button" variant="primary" onClick={() => void runRotate()}>保存する</Button>
-            </div>
-          )}
+          onConfirm={() => void runRotate()}
+          confirmLabel="保存する"
         >
           <div className={styles.fieldRow}>
             <input
@@ -949,17 +939,14 @@ export default function WebhooksIncomingV8() {
             title="受け取り口を作りました"
             description="合言葉はこの画面で1回だけ表示します。相手のサービスに書き写してから閉じてください。"
             onCancel={() => setCreatedSecret(null)}
-            footer={(
-              <div className={styles.dialogFooter}>
-                <Button onClick={() => void navigator.clipboard.writeText(createdSecret.secret)}><Copy size={15} aria-hidden="true" />写す</Button>
-                <Button variant="primary" onClick={() => setCreatedSecret(null)}>閉じる</Button>
-              </div>
-            )}
           >
             <span className={styles.fieldLabel}>名前</span>
             <p className={styles.cardNote}>{createdSecret.name}</p>
             <span className={styles.fieldLabel}>合言葉（今回だけ表示）</span>
-            <p className={`${styles.valueBox} ${styles.mono}`}>{createdSecret.secret}</p>
+            <div className={styles.fieldRow}>
+              <p className={`${styles.valueBox} ${styles.mono} ${styles.grow}`}>{createdSecret.secret}</p>
+              <Button onClick={() => { void navigator.clipboard.writeText(createdSecret.secret); notifyToast('合言葉を写しました') }}><Copy size={15} aria-hidden="true" />写す</Button>
+            </div>
           </Dialog>
         ) : null}
         {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}

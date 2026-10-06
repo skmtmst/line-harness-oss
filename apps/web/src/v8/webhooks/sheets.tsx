@@ -499,6 +499,8 @@ export default function WebhooksSheetsV8() {
           confirmation
           compact
           designNode="YZ57z"
+          designWidth={500}
+          designTop={280}
           busy={busy === 'disconnect'}
           confirmLabel="接続を解除する"
           onConfirm={() => void handleDisconnect()}
