@@ -689,6 +689,28 @@
   --tpl-setnav-w: 200px; --tpl-setnav-pad: 16px 12px; --tpl-setnav-gap: 2px; --tpl-setnav-item-pad: 8px 10px; --tpl-setnav-item-gap: 8px; --tpl-setnav-radius: 8px; --tpl-setnav-child-indent: 22px; --tpl-setnav-band-pad: 8px 16px;
   --tpl-settings-content-pad-block: 24px; --tpl-settings-content-pad-side: 28px; --tpl-settings-content-gap: 16px;
   --tpl-settings-gap: 16px;
+  /* ★V8 設定の板（機能設定・マニュアルの正本表・ファイルの検査・運用状態・EC連携・LINE通知）。sb の作業役が足した値。 */
+  --tpl-sb-nav-w: 183px; --tpl-sb-head-gap: 8px; --tpl-sb-head-pad-bottom: 16px; --tpl-sb-desc-size: 12px; --tpl-sb-desc-lh: 17px; --tpl-sb-footer-side: 12px;
+  --tpl-sb-band-pad: 10px 14px; --tpl-sb-band-gap: 10px; --tpl-sb-band-radius: 10px; --tpl-sb-band-icon: 16px; --tpl-sb-band-text: 13px; --tpl-sb-band-lh: 20px;
+  --tpl-sb-ctl-h: 36px; --tpl-sb-ctl-radius: 10px; --tpl-sb-ctl-pad: 0 12px; --tpl-sb-ctl-gap: 8px; --tpl-sb-search-w: 220px; --tpl-sb-search-w-wide: 240px; --tpl-sb-icon-s: 14px; --tpl-sb-icon-m: 15px;
+  --tpl-sb-card-radius: 12px; --tpl-sb-group-gap: 12px; --tpl-sb-group-head-pad: 12px 14px; --tpl-sb-group-head-gap: 8px; --tpl-sb-group-title: 14px; --tpl-sb-group-title-lh: 20px;
+  --tpl-sb-row-pad: 10px 14px; --tpl-sb-row-gap: 10px; --tpl-sb-row-name: 13px; --tpl-sb-row-name-lh: 19px; --tpl-sb-row-sub: 11px; --tpl-sb-row-sub-lh: 16px; --tpl-sb-row-sub-gap: 2px; --tpl-sb-row-badge-gap: 6px;
+  --tpl-sb-pill-pad: 3px 8px; --tpl-sb-pill-gap: 4px; --tpl-sb-pill-pad-sm: 2px 8px; --tpl-sb-chip-pad: 0 10px; --tpl-sb-chip-gap: 5px; --tpl-sb-chip-text: 12px; --tpl-sb-chip-lh: 18px;
+  --tpl-sb-field-gap: 6px; --tpl-sb-field-value: 14px; --tpl-sb-field-value-lh: 21px; --tpl-sb-seg-pad: 2px; --tpl-sb-seg-item-pad: 6px 12px; --tpl-sb-seg-radius: 8px;
+  --tpl-sb-conflict-pad: 12px 16px; --tpl-sb-conflict-gap: 12px; --tpl-sb-conflict-icon: 18px; --tpl-sb-conflict-title: 14px; --tpl-sb-conflict-title-lh: 20px; --tpl-sb-conflict-lh: 19px; --tpl-sb-conflict-band-top: 16px; --tpl-sb-conflict-band-bottom: -8px;
+  --tpl-sb-dlg-w: 520px; --tpl-sb-dlg-max-h: 720px; --tpl-sb-dlg-head-pad: 14px 18px 10px; --tpl-sb-dlg-title: 15px; --tpl-sb-dlg-desc: 12px; --tpl-sb-dlg-gap: 4px; --tpl-sb-dlg-body-pad: 8px 0; --tpl-sb-dlg-group-pad: 10px 18px 4px; --tpl-sb-dlg-row-pad: 6px 18px; --tpl-sb-dlg-move: 26px; --tpl-sb-dlg-foot-pad: 12px 18px; --tpl-sb-overlay-pad: 24px; --tpl-sb-dlg-link-pad: 6px 4px;
+  --tpl-sb-usage-text: 10px; --tpl-sb-usage-pad: 1px 7px; --tpl-sb-state-pad: 24px; --tpl-sb-skeleton-gap: 12px;
+  --tpl-sb-note-pad: 12px 16px; --tpl-sb-note-text: 12px; --tpl-sb-tbl-pad: 4px 12px; --tpl-sb-tbl-row-pad: 11px 8px; --tpl-sb-tbl-gap: 12px; --tpl-sb-tbl-head: 12px;
+  --tpl-sb-ml-col-id: 70px; --tpl-sb-ml-col-name: 150px; --tpl-sb-ml-col-checked: 130px; --tpl-sb-ml-col-status: 90px; --tpl-sb-ml-col-action: 76px; --tpl-sb-ml-edit-w: 240px;
+  --tpl-sb-fs-col-uploader: 120px; --tpl-sb-fs-col-action: 200px; --tpl-sb-more: 28px; --tpl-sb-ext-pad: 16px; --tpl-sb-form-w: 420px;
+  --tpl-sb-nav-w-narrow: 175px; --tpl-sb-narrow-pad-top: 16px; --tpl-sb-narrow-pad-bottom: 24px; --tpl-sb-narrow-pad-side: 24px; --tpl-sb-narrow-gap: 14px;
+  --tpl-sb-tab-gap: 20px; --tpl-sb-tab-pad-bottom: 8px; --tpl-sb-tab-line: 2px; --tpl-sb-ec-head-pad: 9px 16px; --tpl-sb-ec-row-pad: 10px 16px; --tpl-sb-ec-gap: 14px; --tpl-sb-ec-lh: 17px; --tpl-sb-dot: 6px; --tpl-sb-sort-w: 120px;
+  --tpl-sb-ec-col-when: 170px; --tpl-sb-ec-col-who: 150px; --tpl-sb-ec-col-what: 222px; --tpl-sb-ec-col-done: 170px; --tpl-sb-ec-col-status: 90px; --tpl-sb-ec-col-menu: 36px;
+  --tpl-sb-kpi-pad: 14px; --tpl-sb-kpi-gap: 4px; --tpl-sb-kpi-num: 20px; --tpl-sb-kpi-num-lh: 24px;
+  --tpl-sb-ln-col-when: 150px; --tpl-sb-ln-col-who: 184px; --tpl-sb-ln-col-count: 58px; --tpl-sb-ln-col-status: 110px; --tpl-sb-ln-col-toggle: 54px; --tpl-sb-ln-col-edit: 94px;
+  --tpl-sb-hc-banner-pad: 14px 18px; --tpl-sb-hc-banner-icon: 20px; --tpl-sb-hc-banner-title: 15px; --tpl-sb-hc-banner-title-lh: 22px; --tpl-sb-hc-body-lh: 17px; --tpl-sb-hc-alert-pad: 8px 0; --tpl-sb-hc-row-pad: 12px 16px; --tpl-sb-hc-col-judge: 90px; --tpl-sb-hc-col-time: 110px; --tpl-sb-hc-col-how: 220px;
+  --tpl-sb-ln-preview-w: 390px; --tpl-sb-ln-brand-track: 0.22em; --tpl-sb-focus-ring: 2px solid var(--color-accent); --tpl-sb-dot-radius: 50%;
+  --tpl-sb-line-top: inset 0 1px 0 var(--color-hairline); --tpl-sb-line-top-soft: inset 0 1px 0 var(--color-divider); --tpl-sb-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-sb-line-bottom-soft: inset 0 -1px 0 var(--color-divider);
   --tpl-inbox-list-width: 372px; --tpl-inbox-summary-width: 260px;
   --tpl-inbox-summary-pad: 20px; --tpl-inbox-summary-gap: 16px;
   --tpl-conv-head-pad-block: 12px; --tpl-conv-head-pad-side: 20px; --tpl-conv-head-gap: 8px;
