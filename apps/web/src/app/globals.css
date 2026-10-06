@@ -537,6 +537,8 @@
   --color-controls-swatch-line: #1d1d1f1f;
   --shadow-controls-primary: 0 1px 2px #087a3e40, 0 1px 0 #ffffff26;
   --shadow-controls-toggle: 0 1px 2px #1d1d1f33;
+  /* 表の行の下の線を行の内側に描く（線を含めて1行の高さ。data-table）。@theme に置くと CSS Modules だけが読む値は消えるので、ここ。 */
+  --shadow-row-line: inset 0 -1px 0 var(--color-divider);
   --shadow-controls-selected: 0 0 0 #087a3e33;
   --shadow-controls-pop: 0 8px 24px #1d1d1f1f;
   --radius-control: 10px;
@@ -594,6 +596,10 @@
   --tpl-tl-state-pad: 28px 24px; --tpl-tl-state-icon: 32px; --tpl-tl-usage-gap: 12px; --tpl-tl-usage-pad: 8px 0; --tpl-tl-usage-kind-w: 96px; --tpl-tl-control-h: 36px; --tpl-tl-ghost-pad: 0 14px; --tpl-tl-usage-more-pad: 6px; --tpl-tl-kind-card-pad: 14px; --tpl-tl-dialog-actions-pad: 14px 24px;
   --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
   --tpl-band-gap: 0;
+  /* 自動応答の一覧（uE9gf・Q5lOCc・WPrd5）。 */
+  --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: 64px; --tpl-ar-narrow-head-h: 34px;
+  --tpl-badge-h: 22px; --tpl-badge-dot: 6px;
+  --tpl-ro-band-pad: 10px 14px; --tpl-ro-band-gap: 10px; --tpl-ro-band-radius: 10px; --tpl-ro-band-lh: 20px; --tpl-ro-band-after: 8px;
   --tpl-band-number-size: 22px; --tpl-band-number-lh: 26px;
   --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 20px; --tpl-band-cell-gap: 8px;
   --tpl-large-title-size: 22px; --tpl-large-title-lh: 33px; --tpl-large-gap: 16px;
