@@ -518,6 +518,8 @@ shared-button-importer v8/rich-menus/list.tsx
 shared-button-importer v8/rich-menus/external-import.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
+shared-button-importer v8/common-vars/export-panel.tsx
+shared-button-importer v8/common-vars/list.tsx
 shared-button-importer v8/inflow-links/bulk-dialog.tsx
 shared-button-importer v8/inflow-links/edit-route-dialog.tsx
 shared-button-importer v8/inflow-links/list.tsx

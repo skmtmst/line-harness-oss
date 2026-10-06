@@ -44,6 +44,10 @@ import {
   COMMON_VAR_REPLACEMENT_CANDIDATES,
   COMMON_VAR_REPLACEMENT_PREVIEW,
   COMMON_VAR_REPLACEMENT_RESULT,
+  COMMON_VAR_DELETE_IMPACT_PHONE,
+  COMMON_VAR_DELETE_IMPACT_CAMPAIGN,
+  COMMON_VAR_REPLACEMENT_CANDIDATES_PHONE,
+  COMMON_VAR_REPLACEMENT_PREVIEW_PHONE,
   MEDIA_DELETE_IMPACT,
   MEDIA_DELETE_IMPACT_EMPTY,
   MEDIA_REPLACEMENT_IMPACT,
@@ -4016,7 +4020,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ? COMMON_VAR_DELETE_IMPACT_EMPTY
       : commonVarDeleteImpact[1] === COMMON_VAR_HOURS_DETAIL.id
         ? COMMON_VAR_HOURS_DELETE_IMPACT
-        : COMMON_VAR_DELETE_IMPACT
+        : commonVarDeleteImpact[1] === COMMON_VAR_DELETE_IMPACT_PHONE.variable.id
+          ? COMMON_VAR_DELETE_IMPACT_PHONE
+          : commonVarDeleteImpact[1] === COMMON_VAR_DELETE_IMPACT_CAMPAIGN.variable.id
+            ? COMMON_VAR_DELETE_IMPACT_CAMPAIGN
+            : COMMON_VAR_DELETE_IMPACT
     return { success: true, data: impact }
   }
   /*
@@ -5359,6 +5367,18 @@ const server = createServer((req, res) => {
       共通情報の差し替え（PR #1131）。候補取得・影響確認・実行完了を
       同じPOSTの入力で分けるが、モックは保存せず固定結果だけ返す。
     */
+    /* 板 `xxKtW`：「電話番号」の差し替え候補（問い合わせ先が先頭）と、差し替えたときの影響。 */
+    if (method === 'POST' && url.pathname === `/api/common-vars/${COMMON_VAR_DELETE_IMPACT_PHONE.variable.id}/replace`) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const data = !body.replacementId ? COMMON_VAR_REPLACEMENT_CANDIDATES_PHONE : COMMON_VAR_REPLACEMENT_PREVIEW_PHONE
+        res.writeHead(200).end(JSON.stringify({ success: true, data }))
+      })
+      return
+    }
     if (method === 'POST' && url.pathname === `/api/common-vars/${COMMON_VAR_DETAIL.id}/replace`) {
       let raw = ''
       req.on('data', (chunk) => { raw += chunk })

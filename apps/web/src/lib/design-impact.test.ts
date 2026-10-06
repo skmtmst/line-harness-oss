@@ -249,6 +249,8 @@ describe('共通部品の影響範囲', () => {
       'v8/rich-menus/list.tsx',
       // ★V8 自動応答の一覧（uE9gf）。新しい置き場（src/v8）に一から書いた。
       'v8/auto-replies/list.tsx',
+      // ★V8 共通情報の一覧（FM94M）。新しい置き場（src/v8）に一から書いた。
+      'v8/common-vars/list.tsx',
       // ★V8-B 流入と計測の一覧（xbHxg）。新しい置き場（src/v8）に一から書いた。
       'v8/inflow-links/list.tsx',
       // ★V8 自動応答の実行結果（nWmLg）。表の下にページ送りを置く。
