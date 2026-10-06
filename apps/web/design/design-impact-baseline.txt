@@ -322,7 +322,6 @@ shared-button-importer app/staff/email-change/page.tsx
 shared-button-importer app/staff/invite/page.tsx
 shared-button-importer app/staff/page.tsx
 shared-button-importer app/tags/edit-field-page-v8.tsx
-shared-button-importer app/tags/edit-tag-page-v8.tsx
 shared-button-importer app/tags/field-editor-v8.tsx
 shared-button-importer app/tags/field-migrate-v8.tsx
 shared-button-importer app/tags/fields-tab-v8.tsx
@@ -342,7 +341,6 @@ shared-button-importer app/templates/asset-editor-v8.tsx
 shared-button-importer app/templates/carousel/page.tsx
 shared-button-importer app/templates/detail/detail-v8.tsx
 shared-button-importer app/templates/detail/page.tsx
-shared-button-importer app/templates/edit-v8.tsx
 shared-button-importer app/templates/edit/page.tsx
 shared-button-importer app/templates/editor-v8.tsx
 shared-button-importer app/templates/list-v8.tsx
