@@ -387,11 +387,13 @@ async function waitForFormList(page) {
     await page.waitForFunction(() => {
       const root = document.querySelector('[data-design-node="I3L41O"]')
       if (!root) return false
-      if (root.dataset.listState === 'loading') return false
+      // 2026-10-06：一覧は src/v8/forms/list。板の印は型の枠に、状態はそれを包む要素に付く。
+      const state = root.closest('[data-list-state]')?.dataset.listState ?? root.dataset.listState
+      if (state === 'loading') return false
       return Boolean(
         root.querySelector('tbody tr')
-        || root.dataset.listState === 'empty'
-        || root.dataset.listState === 'error',
+        || state === 'empty'
+        || state === 'error',
       )
     }, undefined, { timeout: 15_000 })
   } catch (error) {
