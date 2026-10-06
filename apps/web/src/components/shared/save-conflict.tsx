@@ -129,13 +129,17 @@ export function SaveConflictBand({
   description = SAVE_CONFLICT_DESCRIPTION,
   compareBusy = false,
   onCompare,
+  compareHref,
   onReload,
   designNode,
 }: {
   title: string
   description?: string
   compareBusy?: boolean
-  onCompare: () => void
+  /** 「違いを比べる」を押したとき（窓を開くなど）。compareHref と どちらかを渡す。 */
+  onCompare?: () => void
+  /** 比べる先が別の画面のときは、ボタンをその画面へのリンクにする（新しいタブでも開ける）。 */
+  compareHref?: string
   onReload: () => void
   /** 絵の板の印（J1pdB・k32cn など）。 */
   designNode?: string
@@ -147,10 +151,17 @@ export function SaveConflictBand({
         <span className={styles.title}>{title}</span>
         <span className={styles.desc}>{description}</span>
       </span>
-      <Button onClick={onCompare} disabled={compareBusy} busy={compareBusy} busyLabel="比べています…">
-        <GitCompare aria-hidden="true" className={styles.buttonIcon} />
-        違いを比べる
-      </Button>
+      {compareHref ? (
+        <Button href={compareHref}>
+          <GitCompare aria-hidden="true" className={styles.buttonIcon} />
+          違いを比べる
+        </Button>
+      ) : (
+        <Button onClick={onCompare} disabled={compareBusy} busy={compareBusy} busyLabel="比べています…">
+          <GitCompare aria-hidden="true" className={styles.buttonIcon} />
+          違いを比べる
+        </Button>
+      )}
       <Button variant="primary" onClick={onReload}>
         <RefreshCw aria-hidden="true" className={styles.buttonIcon} />
         最新を読み込んで続ける

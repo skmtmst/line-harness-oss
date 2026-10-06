@@ -140,3 +140,11 @@ describe('帯の題', () => {
     expect(saveConflictTitle('2026-10-07T05:02:00Z', 'リマインダ', 'A')).toMatch(/^ほかの人が .+ にリマインダ「A」を保存しました$/)
   })
 })
+
+describe('比べる先が別の画面のとき', () => {
+  it('compareHref を渡すと「違いを比べる」はその画面へのリンクになる', () => {
+    render(<SaveConflictBand title="同じ名前があります" compareHref="/conversions?highlight=cv-1" onReload={() => {}} />)
+    const link = screen.getByRole('link', { name: /違いを比べる/ })
+    expect(link.getAttribute('href')).toBe('/conversions?highlight=cv-1')
+  })
+})

@@ -1,5 +1,6 @@
 'use client'
 
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { CreatePage } from '@/components/templates'
 /*
  * ★V8 リッチメニューを作る（作る①〜④のウィザード）。
@@ -1491,21 +1492,16 @@ export default function RichMenuCreateV8() {
 
 
       {conflict && (
-        <div className={styles.conflictBar} data-design-node="r8dGXT" role="alert">
-          <div>
-            <p className={styles.conflictTitle}>ほかの人がこのメニューを更新しました</p>
-            <p className={styles.conflictBody}>
-              あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
-            </p>
-          </div>
-          <div className={styles.conflictActions}>
-            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)} disabled={!conflictLatest}>
-              違いを比べる
-            </Button>
-            <Button type="button" variant="primary" onClick={acceptLatestAndContinue}>
-              最新を読み込んで続ける
-            </Button>
-          </div>
+        /* 帯は共通部品（save-conflict）に寄せた。比べる窓はこの画面の要約の比べ（VersionCompare）を使う。 */
+        <div className={styles.conflictSlot}>
+          <SaveConflictBand
+            title="ほかの人がこのメニューを更新しました"
+            description="あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。"
+            designNode="r8dGXT"
+            compareBusy={!conflictLatest}
+            onCompare={() => setCompareOpen(true)}
+            onReload={acceptLatestAndContinue}
+          />
         </div>
       )}
 
