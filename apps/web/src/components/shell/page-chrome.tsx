@@ -34,12 +34,15 @@ export interface PageChrome {
   fullWidth: boolean
   /** ★V8 パンくずの手前の段。null なら題だけ（アカウント名は出さない）。 */
   crumbs: PageCrumb[] | null
+  /** ★V8：画面が「設定の中のメニュー」を白い板の中に置いているとき true（枠の側は外に出さない）。 */
+  settingsNavInline: boolean
 }
 
 interface PageChromeStore extends PageChrome {
   setTitle: (title: string | null) => void
   setFullWidth: (full: boolean) => void
   setCrumbs: (crumbs: PageCrumb[] | null) => void
+  setSettingsNavInline: (inline: boolean) => void
 }
 
 const PageChromeContext = createContext<PageChromeStore | null>(null)
@@ -48,10 +51,11 @@ export function PageChromeProvider({ children }: { children: ReactNode }) {
   const [title, setTitle] = useState<string | null>(null)
   const [fullWidth, setFullWidth] = useState(false)
   const [crumbs, setCrumbs] = useState<PageCrumb[] | null>(null)
+  const [settingsNavInline, setSettingsNavInline] = useState(false)
 
   const value = useMemo<PageChromeStore>(
-    () => ({ title, fullWidth, crumbs, setTitle, setFullWidth, setCrumbs }),
-    [title, fullWidth, crumbs],
+    () => ({ title, fullWidth, crumbs, settingsNavInline, setTitle, setFullWidth, setCrumbs, setSettingsNavInline }),
+    [title, fullWidth, crumbs, settingsNavInline],
   )
 
   return <PageChromeContext.Provider value={value}>{children}</PageChromeContext.Provider>
@@ -60,7 +64,7 @@ export function PageChromeProvider({ children }: { children: ReactNode }) {
 /** 枠の側（app-shell）が読む。 */
 export function usePageChrome(): PageChrome {
   const store = useContext(PageChromeContext)
-  return { title: store?.title ?? null, fullWidth: store?.fullWidth ?? false, crumbs: store?.crumbs ?? null }
+  return { title: store?.title ?? null, fullWidth: store?.fullWidth ?? false, crumbs: store?.crumbs ?? null, settingsNavInline: store?.settingsNavInline ?? false }
 }
 
 /**
@@ -135,4 +139,21 @@ export function usePageCrumbs(crumbs: PageCrumb[] | null) {
     return () => setCrumbs(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serialized, setCrumbs])
+}
+
+/**
+ * ★V8：画面が「設定の中のメニュー」を白い板の中（題の下の左）に置くと、枠に知らせる。
+ * 枠（app-shell）はそのあいだ外のメニューを出さない。まだ移っていない画面は今までどおり外に出る。
+ * `SettingsInnerNav inline` がこれを呼ぶので、画面側は部品を置くだけでよい。
+ */
+export function useSettingsNavInline(enabled = true) {
+  const store = useContext(PageChromeContext)
+  const setInline = store?.setSettingsNavInline
+  useEffect(() => {
+    // 外に置くメニュー（enabled=false）は印に触らない。外のメニューが出る・消えるたびに
+    // 印を false に戻すと、板の中のメニューと外のメニューが2つ並ぶ（2026-10-07 設定の作業で見つかった）。
+    if (!setInline || !enabled) return
+    setInline(true)
+    return () => setInline(false)
+  }, [enabled, setInline])
 }

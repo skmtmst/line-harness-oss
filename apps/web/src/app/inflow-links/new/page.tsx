@@ -17,6 +17,8 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import styles from './inflow-create-v8.module.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import InflowCreateV8 from '@/v8/inflow-links/new/create'
 
 /** 流入元の情報と、友だち追加時の動きをまとめて設定する。 */
 
@@ -37,7 +39,16 @@ function suggestRef(name: string): string {
   return /^[a-z0-9]/.test(ascii) ? ascii.slice(0, 64) : ''
 }
 
+/*
+ * 入口：★V8 は src/v8 に一から書いた作る画面（KMaMk・vWJEm・E14GFm）。v7 の画面は下のまま。
+ */
 export default function NewInflowLinkPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <InflowCreateV8 />
+  return <NewInflowLinkPageV7 />
+}
+
+function NewInflowLinkPageV7() {
   const router = useRouter()
   const { selectedAccountId, selectedAccount } = useAccount()
   const [saving, setSaving] = useState(false)

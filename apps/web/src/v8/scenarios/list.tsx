@@ -55,6 +55,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
+import PageSizeSelect from '@/components/ui/page-size-select'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
@@ -77,11 +78,8 @@ import styles from './list.module.css'
 const UNFILED = '__unfiled__'
 const READONLY_REASON = '閲覧のみのため、この操作はできません'
 
-const PAGE_SIZE_OPTIONS = [
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-  { value: '100', label: '100件表示' },
-]
+/** 1ページに出す件数の選択肢（表示は PageSizeSelect が「N件表示」にする）。 */
+const PAGE_SIZE_OPTIONS = [20, 50, 100]
 
 /** よく使う絞り込み（数えられるものだけ）。札の「停止中のみ」と対になる「稼働中のみ」。 */
 const SAVED_FILTER_OPTIONS = [
@@ -1078,14 +1076,7 @@ export default function ScenariosListV8() {
 
   const perPageBox = (
     <div data-per-page-select>
-      <Select
-        className="w-full"
-        aria-label="1ページに出す件数"
-        size="page-size"
-        value={String(perPage)}
-        onChange={(value) => setPerPage(Number(value))}
-        options={PAGE_SIZE_OPTIONS}
-      />
+      <PageSizeSelect className="w-full" value={perPage} onChange={setPerPage} options={PAGE_SIZE_OPTIONS} label={null} />
     </div>
   )
 

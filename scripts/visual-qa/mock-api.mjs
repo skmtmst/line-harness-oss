@@ -35,6 +35,9 @@ import {
   COMMON_VAR_DETAIL,
   COMMON_VAR_DELETE_IMPACT,
   COMMON_VAR_SCHEDULES,
+  COMMON_VAR_HOURS_DETAIL,
+  COMMON_VAR_HOURS_DELETE_IMPACT,
+  COMMON_VAR_HOURS_SCHEDULES,
   commonVarChangeImpact,
   commonVarChangeImpactHours,
   COMMON_VAR_DELETE_IMPACT_EMPTY,
@@ -496,16 +499,18 @@ const FRIEND_ADD_RULE = {
 }
 
 const FRIEND_ADD_RULE_OPTIONS = {
+  // 作る②（h8uNW・xHpkS）の絵の4つ。秋フェアの2つは下書き rule-autumn が選んでいる。
   routes: [
+    { id: 'route-autumn-flyer', name: '秋フェア チラシ', kind: 'チラシ' },
+    { id: 'route-autumn-poster', name: '秋フェア 店頭ポスター', kind: 'ポスター' },
     { id: 'route-shop', name: '店頭QRコード', kind: 'QR' },
-    { id: 'route-instagram', name: 'Instagramプロフィール', kind: '広告' },
-    { id: 'route-referral', name: '紹介キャンペーン', kind: '紹介' },
+    { id: 'route-instagram', name: 'Instagram プロフィール', kind: '広告' },
   ],
   scenarios: [
     { id: 'scenario-welcome', name: '新規登録7日間フォロー' },
     { id: 'scenario-common', name: '共通のあいさつ' },
   ],
-  tags: [{ id: 'tag-new', name: '新規友だち' }, { id: 'tag-delivered', name: '配信済み' }],
+  tags: [{ id: 'tag-new', name: '新規友だち' }, { id: 'tag-delivered', name: '配信済み' }, { id: 'tag-member', name: 'NEN会員' }],
   folders: [
     { id: 'friend-add-folder-store', name: '店頭' },
     { id: 'friend-add-folder-ads', name: '広告' },
@@ -515,10 +520,13 @@ const FRIEND_ADD_RULE_OPTIONS = {
 
 const FRIEND_ADD_RULES = {
   items: [
-    { ...FRIEND_ADD_RULE, id: 'rule-shop', name: '店頭QRの初回案内', folderName: '店頭', priority: 1, matchedLast7Days: 41, routeNames: ['店頭QRコード'], definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-shop'], messageText: '来店クーポンをご案内します。' } },
-    { ...FRIEND_ADD_RULE, id: 'rule-instagram', name: '広告からの初回案内', folderName: '広告', priority: 2, matchedLast7Days: 24, routeNames: ['Instagramプロフィール'], definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-instagram'], messageText: '資料をダウンロードできます。' } },
+    // 一覧の板（MRhef・LEwkJ・P20kYU）の「最初に送るもの」の副行は1つずつ（シナリオ／タグ）。
+    { ...FRIEND_ADD_RULE, id: 'rule-shop', name: '店頭QRの初回案内', folderName: '店頭', priority: 1, matchedLast7Days: 41, routeNames: ['店頭QRコード'], scenarioName: '7日間フォロー', definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-shop'], messageText: '来店クーポンをご案内します。', actions: [FRIEND_ADD_RULE.definition.actions[1]] } },
+    { ...FRIEND_ADD_RULE, id: 'rule-instagram', name: '広告からの初回案内', folderName: '広告', priority: 2, matchedLast7Days: 24, routeNames: ['Instagram プロフィール'], scenarioName: null, definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-instagram'], scenarioId: null, messageText: '資料をダウンロードできます。', actions: [{ type: 'add_tag', label: 'タグ「広告から」を付ける', targetId: 'tag-ads' }] } },
     FRIEND_ADD_RULE,
-    { ...FRIEND_ADD_RULE, id: 'rule-fallback', name: '経路が分からなかった人', folderName: null, priority: 999999, isFallback: true, matchedLast7Days: 12, routeNames: [], scenarioName: '共通のあいさつ', definition: { ...FRIEND_ADD_RULE.definition, routeIds: [], scenarioId: 'scenario-common', messageText: '友だち追加ありがとうございます。' } },
+    // 作る①〜③・競合（wDzkc・h8uNW・al47K・h5rm8t）は、この下書きを開いた絵。
+    { ...FRIEND_ADD_RULE, id: 'rule-autumn', name: '秋フェアの初回案内', folderName: null, priority: 4, status: 'draft', versionStatus: 'draft', publishedAt: null, matchedLast7Days: null, routeNames: ['秋フェア チラシ'], scenarioName: null, definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-autumn-flyer', 'route-autumn-poster'], scenarioId: 'scenario-welcome', messageText: '友だち追加ありがとうございます！\n秋フェアのチラシから来てくださった方へ、会場で使えるクーポンをお送りします。', activeFrom: '2026-10-01T00:00', activeUntil: '2026-11-30T23:59', friendCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_not_exists', value: 'tag-member' }] }), timeWindows: [], actions: [{ type: 'add_tag', label: 'タグ「秋フェア」を付ける', targetId: 'tag-autumn' }] } },
+    { ...FRIEND_ADD_RULE, id: 'rule-fallback', name: '経路が分からなかった人', folderName: null, priority: 999999, isFallback: true, matchedLast7Days: 12, routeNames: [], scenarioName: '共通のあいさつ', definition: { ...FRIEND_ADD_RULE.definition, routeIds: [], scenarioId: 'scenario-common', messageText: '友だち追加ありがとうございます。', actions: [FRIEND_ADD_RULE.definition.actions[1]] } },
   ],
   summary: { rules: 4, active: 3, recentAdds: 86, captured: 74, unknownRoute: 12, delivered: 84, failed: 2 },
   options: FRIEND_ADD_RULE_OPTIONS,
@@ -530,6 +538,7 @@ const FRIEND_ADD_RULE_MATCHES = new Map([
   ['rule-shop', 241],
   ['rule-instagram', 382],
   ['rule-referral', 214],
+  ['rule-autumn', 0],
   ['rule-fallback', 12],
 ])
 
@@ -2871,7 +2880,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       data: {
         ...AUTO_REPLY_RUNS,
         items: AUTO_REPLY_RUNS.items.slice(offset, offset + limit),
-        pagination: { total: AUTO_REPLY_RUNS.items.length, limit, offset },
+        /* 板 nWmLg の「214件中 1〜20件」とページ送り。見本の行は5件だけだが、件数は絵の数を返す。 */
+        pagination: { total: Math.max(AUTO_REPLY_RUNS.items.length, AUTO_REPLY_RUNS.pagination.total), limit, offset },
       },
     }
   }
@@ -3941,11 +3951,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
   if (pathname === `/api/common-vars/${COMMON_VAR_DETAIL.id}`) return { success: true, data: COMMON_VAR_DETAIL }
+  /* 板 `AYc6O`・`C67dE`・`piWhz`：営業時間の編集（使っている8か所・予定1件・履歴2件）。 */
+  if (pathname === `/api/common-vars/${COMMON_VAR_HOURS_DETAIL.id}`) return { success: true, data: COMMON_VAR_HOURS_DETAIL }
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {
     const impact = commonVarDeleteImpact[1] === COMMON_VAR_DELETE_IMPACT_EMPTY.variable.id
       ? COMMON_VAR_DELETE_IMPACT_EMPTY
-      : COMMON_VAR_DELETE_IMPACT
+      : commonVarDeleteImpact[1] === COMMON_VAR_HOURS_DETAIL.id
+        ? COMMON_VAR_HOURS_DELETE_IMPACT
+        : COMMON_VAR_DELETE_IMPACT
     return { success: true, data: impact }
   }
   /*
@@ -3956,7 +3970,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (commonVarSchedules) {
     return {
       success: true,
-      data: commonVarSchedules[1] === COMMON_VAR_DETAIL.id ? COMMON_VAR_SCHEDULES : [],
+      data: commonVarSchedules[1] === COMMON_VAR_DETAIL.id
+        ? COMMON_VAR_SCHEDULES
+        : commonVarSchedules[1] === COMMON_VAR_HOURS_DETAIL.id ? COMMON_VAR_HOURS_SCHEDULES : [],
     }
   }
   const mediaDeleteImpact = /^\/api\/media\/([^/]+)\/delete-impact$/.exec(pathname)
@@ -4094,19 +4110,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       `isDashboardNotificationData` が `items` と `counts.{all,error,update,unread}`
       と `unreadCount` を見ていて、既定の器（空配列）だと通らず
       「通知を読み込めませんでした」になっていた。
-      中身は設計 `Alekb` の6件をそのまま置く。
+
+      通知の画面（y8QQV）の6件。種類（eventType）は行の右の「〇〇を開く」が絵どおりに出る形。
+      未読は3件（ベルの数「3」も全部の板でこの数）。
     */
-    const item = (id, category, title, body, isRead, createdAt) => ({
-      id, eventType: `visual_qa.${category}`, category, title, body,
+    const item = (id, eventType, category, title, body, isRead, createdAt) => ({
+      id, eventType, category, title, body,
       metadata: null, isRead, createdAt,
     })
     const items = [
-      item('nc-1', 'error', '一斉配信「8月号のご案内」で12件が送信失敗', '配信結果を開く', false, '2026-09-02T01:04:00.000Z'),
-      item('nc-2', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, '2026-08-21T09:32:00.000Z'),
-      item('nc-3', 'error', 'EC連携の取り込みが3件失敗しています', 'EC連携を開く', false, '2026-08-21T00:15:00.000Z'),
-      item('nc-4', 'update', 'v0.25 の更新が利用できます', '更新履歴を見る', false, '2026-08-20T00:00:00.000Z'),
-      item('nc-5', 'update', 'v0.24.1 を適用しました', '更新履歴を見る', true, '2026-08-14T00:00:00.000Z'),
-      item('nc-6', 'update', 'メンテナンス予定　8/30 2:00〜4:00', '詳細を見る', true, '2026-08-12T00:00:00.000Z'),
+      item('nc-3', 'ec.import_failed', 'error', 'EC連携の取り込みが 3 件失敗しています', 'EC連携を開く', false, '2026-08-21T00:15:00.000Z'),
+      item('nc-2', 'account_health_webhook_delay', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, '2026-08-21T09:32:00.000Z'),
+      item('nc-1', 'broadcast.send_failed', 'error', '一斉配信「8月号のご案内」で 12 件が送信失敗', '配信結果を開く', false, '2026-08-20T11:05:00.000Z'),
+      item('nc-4', 'visual_qa.update', 'update', 'v0.25 の更新が利用できます', '更新履歴を見る', true, '2026-08-20T00:00:00.000Z'),
+      item('nc-5', 'visual_qa.update', 'update', 'v0.24.1 を適用しました', '更新履歴を見る', true, '2026-08-14T00:00:00.000Z'),
+      item('nc-6', 'maintenance.scheduled', 'update', 'メンテナンス予定 8/30 2:00〜4:00', '詳細を見る', true, '2026-08-12T00:00:00.000Z'),
     ]
     const category = query.get('category')
     const shown = category && category !== 'all' ? items.filter((x) => x.category === category) : items
