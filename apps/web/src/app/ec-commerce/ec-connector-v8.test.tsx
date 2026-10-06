@@ -54,6 +54,7 @@ vi.mock('@/contexts/account-context', () => ({
 
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
+  useSettingsNavInline: () => {},
 }))
 
 import EcConnectorV8 from './ec-connector-v8'

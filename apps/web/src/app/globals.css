@@ -579,6 +579,12 @@
  */
 [data-theme="v8"] {
   --tpl-head-pad-top: 20px; --tpl-head-pad-side: 24px; --tpl-head-pad-bottom: 12px;
+  /* 一斉配信の一覧（l5V9a・jjFNi・NtCE3）。 */
+  --tpl-bc-note-lh: 17px; --tpl-bc-tools-gap: 10px; --tpl-bc-search-w: 280px; --tpl-bc-narrow-search-w: 180px; --tpl-bc-status-select-w: 152px; --tpl-bc-page-size-w: 96px;
+  --tpl-bc-control-gap: 6px; --tpl-bc-date-pad: 0 10px; --tpl-bc-ghost-pad: 0 14px; --tpl-bc-sort-h: 30px; --tpl-bc-popover-w: 260px; --tpl-bc-save-input-w: 240px;
+  --tpl-bc-cell-pad-block: 9px; --tpl-bc-head-pad-block: 13px; --tpl-bc-col-gap: 16px; --tpl-bc-edge-pad: 20px; --tpl-bc-cell-lh: 18px; --tpl-bc-result-lh: 19px;
+  --tpl-bc-col-status: 126px; --tpl-bc-col-audience: 186px; --tpl-bc-col-date: 176px; --tpl-bc-col-result: 246px; --tpl-bc-col-menu: 56px;
+  --tpl-bc-badge-gap: 5px; --tpl-bc-badge-pad: 2px 8px; --tpl-bc-menu-size: 28px; --tpl-bc-pager-lh: 21px; --tpl-bc-state-pad: 28px 24px; --tpl-bc-state-icon: 32px;
   --tpl-title-size: 22px; --tpl-title-weight: 700; --tpl-title-lh: 32px;
   --tpl-head-gap: 4px; --tpl-desc-size: 13px; --tpl-desc-lh: 19px;
   /* 通知（y8QQV）。 */
@@ -662,6 +668,19 @@
   --tpl-wh-dialog-pull-top: 14px; --tpl-wh-dialog-pull-bottom: 10px; --tpl-wh-sheets-gap: 16px; --tpl-wh-small-select-w: 104px; --tpl-wh-log-row-h: 53.5px; --tpl-wh-log-body-w: 180px; --tpl-wh-log-reply-w: 100px; --tpl-wh-log-time-w: 84px; --tpl-wh-log-ops-w: 130px; --tpl-wh-detail-row-pad: 8px 0; --tpl-wh-pager-margin: 12px 24px; --tpl-wh-pager-lead-pad: 20px; --tpl-wh-new-card-gap: 14px; --tpl-wh-check-gap: 16px; --tpl-wh-event-pad: 12px 14px; --tpl-wh-sample-line-gap: 1px; --tpl-wh-sheets-side-w: 320px; --tpl-wh-care-lh: 19px; --tpl-wh-run-row-h: 45.5px; --tpl-wh-run-when: 140px; --tpl-wh-run-kind: 80px; --tpl-wh-run-what: 220px; --tpl-wh-skel-dot: 32px; --tpl-wh-skel-bar: 10px;
   --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 20px; --tpl-band-cell-gap: 8px;
   --tpl-large-title-size: 22px; --tpl-large-title-lh: 33px; --tpl-large-gap: 16px;
+  /* 友だち追加時の配信（MRhef・LEwkJ・P20kYU・C0lfUP・cFo2p・kFz4b）。表は 見出し39・行62・欄の間16。 */
+  --tpl-fa-create-gap: 6px; --tpl-fa-notice-after: 6px; --tpl-fa-search-w: 220px; --tpl-fa-folder-w: 150px;
+  --tpl-fa-viewer-create-h: 49px; /* 閲覧のみで隠した作るボタン（＋下の間）の高さ */
+  --tpl-fa-col-gap: 16px; --tpl-fa-head-h: 39px; --tpl-fa-head-pad: 12px 24px; --tpl-fa-row-h: 62px; --tpl-fa-row-pad: 12px 24px;
+  --tpl-fa-col-order: 28px; --tpl-fa-col-send: 170px; --tpl-fa-col-status: 80px; --tpl-fa-col-recent: 64px; --tpl-fa-col-menu: 28px;
+  --tpl-fa-order-lh: 15px; --tpl-fa-sub-icon-gap: 6px; --tpl-fa-sub-gap: 3px; --tpl-fa-send-lh: 17px; --tpl-fa-send-gap: 2px;
+  --tpl-fa-foot-pad: 10px 24px; --tpl-fa-folder-note-lh: 17px; --tpl-fa-state-gap: 8px; --tpl-fa-state-pad: 48px 24px; --tpl-fa-state-icon: 36px; --tpl-fa-tab-overlap: 1px; --tpl-fa-kpi-detail-lh: 18px;
+  /* 友だち追加時の配信を作る（wDzkc・h8uNW・xHpkS・al47K・h5rm8t）。段は 余白20・間14、選ぶカード 高さ98、流入リンクの行 余白10/12。 */
+  --tpl-fa-ed-head-gap: 2px; --tpl-fa-ed-title-lh: 22px; --tpl-fa-ed-field-gap: 6px; --tpl-fa-ed-folder-w: 220px;
+  --tpl-fa-ed-kind-h: 98px; --tpl-fa-ed-search-pad: 0 12px; --tpl-fa-ed-route-pad: 10px 12px;
+  --tpl-fa-ed-sub-pad: 16px; --tpl-fa-ed-cond-w: 420px; --tpl-fa-ed-select-pad: 0 10px 0 12px;
+  --tpl-fa-ed-chip-row-gap: 6px; --tpl-fa-ed-confirm-label-w: 120px; --tpl-fa-ed-conflict-pad: 14px 16px 6px; --tpl-fa-ed-conflict-act-gap: 34px;
+  --tpl-fa-ed-body-gap: 28px; --tpl-fa-ed-narrow-grow: 16px; --tpl-fa-ed-narrow-pull: 9px; --tpl-fa-ed-narrow-lift: 8px; --tpl-fa-narrow-trim: 4px;
   --tpl-create-title-size: 22px; --tpl-create-title-lh: 32px;
   --tpl-create-desc-size: 12px; --tpl-create-desc-lh: 17px;
   /* 作る画面の右の列の箱（K7HWG「右の箱 設定内容」）と、本文の小さい文字の行の高さ */
@@ -696,6 +715,8 @@
   --tpl-steps-gap: 8px; --tpl-steps-dot: 20px; --tpl-steps-dot-gap: 6px; --tpl-steps-text-size: 12px; --tpl-steps-text-lh: 17px;
   --tpl-footer-pad-block: 12px; --tpl-footer-pad-side: 24px; --tpl-footer-gap: 8px;
   --tpl-settings-nav-width: 208px; --tpl-settings-nav-pad-block: 16px; --tpl-settings-nav-pad-side: 12px;
+  /* 設定の中のメニュー（設定の板 ihjfd ほか 8 枚）。 */
+  --tpl-setnav-w: 200px; --tpl-setnav-pad: 16px 12px; --tpl-setnav-gap: 2px; --tpl-setnav-item-pad: 8px 10px; --tpl-setnav-item-gap: 8px; --tpl-setnav-radius: 8px; --tpl-setnav-child-indent: 22px; --tpl-setnav-band-pad: 8px 16px;
   --tpl-settings-content-pad-block: 24px; --tpl-settings-content-pad-side: 28px; --tpl-settings-content-gap: 16px;
   --tpl-settings-gap: 16px;
   --tpl-inbox-list-width: 372px; --tpl-inbox-summary-width: 260px;
