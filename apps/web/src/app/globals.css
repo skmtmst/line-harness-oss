@@ -593,6 +593,25 @@
   --tpl-fm-option-gap: 2px; --tpl-fm-option-pad: 14px; --tpl-fm-option-outline: 1.5px; --tpl-fm-menu-size: 28px; --tpl-fm-band-after: 8px; --tpl-fm-narrow-after: -2px; --tpl-fm-dialog-actions-pad: 0 24px 24px; --tpl-fm-focus-ring: 2px;
   --tpl-compact-gap: 2px; --tpl-compact-desc-lh: 20px;
   --tpl-folder-width: 200px; --tpl-folder-pad-block: 16px; --tpl-folder-pad-side: 12px;
+  /* 統括（/hq）の画面（r4ARpV・JB8V1・b8xBtZ ほか）。 */
+  --tpl-hq-nav-gap: 2px; --tpl-hq-nav-label-lh: 16px; --tpl-hq-nav-item-gap: 8px; --tpl-hq-nav-item-pad: 8px 10px; --tpl-hq-nav-item-lh: 19px; --tpl-hq-nav-icon: 14px;
+  --tpl-hq-body-gap: 14px; --tpl-hq-body-pad: 16px 24px 24px; --tpl-hq-button-icon: 15px; --tpl-hq-note-pad: 10px 14px;
+  --tpl-hq-cards-gap: 12px; --tpl-hq-card-gap: 4px; --tpl-hq-card-pad: 12px 16px; --tpl-hq-small-lh: 16px; --tpl-hq-metric-lh: 27px; --tpl-hq-unit-drop: 4px;
+  --tpl-hq-col-gap: 14px; --tpl-hq-col-mail: 190px; --tpl-hq-col-role: 100px; --tpl-hq-col-scope: 150px; --tpl-hq-col-state: 80px; --tpl-hq-col-login: 100px; --tpl-hq-col-action: 80px;
+  --tpl-hq-head-pad: 9px 16px; --tpl-hq-row-h: 56px; --tpl-hq-row-pad: 0 16px; --tpl-hq-cell-lh: 17px; --tpl-hq-action-pad: 12px;
+  --tpl-hq-control-h: 36px; --tpl-hq-contract-pad: 10px 12px; --tpl-hq-contract-lh: 18px; --tpl-hq-seg-pad: 3px; --tpl-hq-seg-item-pad: 5px 14px; --tpl-hq-seg-item-lh: 17px;
+  --tpl-hq-plans-gap: 16px; --tpl-hq-plan-gap: 10px; --tpl-hq-plan-h: 355px; --tpl-hq-plan-pad: 20px; --tpl-hq-plan-head-gap: 8px; --tpl-hq-plan-name-lh: 24px; --tpl-hq-plan-current-bg: #f6fcf8;
+  --tpl-hq-price-size: 24px; --tpl-hq-price-lh: 36px; --tpl-hq-price-unit-lh: 17px; --tpl-hq-feature-gap: 6px; --tpl-hq-feature-pad: 6px 0; --tpl-hq-check: 14px;
+  --tpl-hq-col-date: 110px; --tpl-hq-col-amount: 110px; --tpl-hq-col-paystate: 90px; --tpl-hq-col-receipt: 100px; --tpl-hq-pay-row-pad: 10px 16px;
+  --tpl-hq-form-gap: 12px; --tpl-hq-field-gap: 6px; --tpl-hq-nav-item-lh-20: 20px; --tpl-hq-textarea-h: 100px; --tpl-hq-attach-gap: 10px; --tpl-hq-attach-pad: 12px 14px; --tpl-hq-attach-icon: 16px;
+  --tpl-hq-thumb-w: 112px; --tpl-hq-thumb-h: 80px; --tpl-hq-thumb-inset: 4px; --tpl-hq-col-ticket: 100px;
+  --tpl-hq-dialog-head-pad: 24px 24px 0; --tpl-hq-dialog-title-size: 17px; --tpl-hq-dialog-title-lh: 36px; --tpl-hq-dialog-desc-gap: 2px; --tpl-hq-dialog-content-pad: 14px 24px 0; --tpl-hq-dialog-foot-margin: 14px 24px 24px;
+  --tpl-hq-qr-box: 140px; --tpl-hq-qr: 120px; --tpl-hq-lead-lh: 19px; --tpl-hq-code-pad: 14px; --tpl-hq-digit-w: 40px; --tpl-hq-digit-h: 48px;
+  --tpl-hq-side-w: 300px; --tpl-hq-thread-pad: 16px; --tpl-hq-bubble-w: 560px; --tpl-hq-bubble-pad: 10px 14px; --tpl-hq-compose-h: 80px; --tpl-hq-compose-pad: 8px 10px; --tpl-hq-side-row-pad: 10px 14px;
+  --tpl-hq-code-box-w: 44px;
+  --tpl-hq-folder-inset: 12px; --tpl-hq-home-pad: 16px 24px 24px 16px; --tpl-hq-home-card-pad: 14px; --tpl-hq-home-value-lh: 24px; --tpl-hq-search-w: 280px;
+  --tpl-hq-home-account-pad: 18px; --tpl-hq-logo: 40px; --tpl-hq-logo-font: 15px; --tpl-hq-name-lh: 22px; --tpl-hq-stat-lh: 23px; --tpl-hq-col-actions: 260px;
+  --tpl-hq-pill-gap: 5px; --tpl-hq-pill-pad: 2px 8px; --tpl-hq-pill-lh: 18px; --tpl-hq-dot: 6px; --tpl-hq-confirm-gap: 6px; --tpl-hq-confirm-label: 64px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
   /* ウェビナーの一覧（UyUMw・uBMuB・jiNg0）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16）。 */

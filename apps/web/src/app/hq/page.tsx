@@ -18,8 +18,15 @@ import { AccountArchiveDialog, AccountRestoreDialog, AccountSettingsDialog } fro
 import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import PlatformNotices from '@/components/hq/platform-notices'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import HqHomeV8 from '@/v8/hq/home'
 
 export default function HqPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <HqHomeV8 /> : <HqPageV7 />
+}
+
+function HqPageV7() {
   // 左のメニューと同じ名前を見出しにする（バナー生成・課金プランなどと同じ書き方）。
   usePageTitle('アカウント')
   const router = useRouter()

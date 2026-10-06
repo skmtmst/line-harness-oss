@@ -510,3 +510,10 @@ shared-button-importer v8/rich-menus/external-import.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
 shared-button-importer v8/webinars/list.tsx
+shared-button-importer v8/hq/account-dialogs.tsx
+shared-button-importer v8/hq/billing.tsx
+shared-button-importer v8/hq/home.tsx
+shared-button-importer v8/hq/members.tsx
+shared-button-importer v8/hq/notice-line-dialog.tsx
+shared-button-importer v8/hq/support-detail.tsx
+shared-button-importer v8/hq/support.tsx
