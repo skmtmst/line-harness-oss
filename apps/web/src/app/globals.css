@@ -651,6 +651,19 @@
   --tpl-wh-dialog-pull-top: 14px; --tpl-wh-dialog-pull-bottom: 10px; --tpl-wh-sheets-gap: 16px; --tpl-wh-small-select-w: 104px; --tpl-wh-log-row-h: 53.5px; --tpl-wh-log-body-w: 180px; --tpl-wh-log-reply-w: 100px; --tpl-wh-log-time-w: 84px; --tpl-wh-log-ops-w: 130px; --tpl-wh-detail-row-pad: 8px 0; --tpl-wh-pager-margin: 12px 24px; --tpl-wh-pager-lead-pad: 20px; --tpl-wh-new-card-gap: 14px; --tpl-wh-check-gap: 16px; --tpl-wh-event-pad: 12px 14px; --tpl-wh-sample-line-gap: 1px; --tpl-wh-sheets-side-w: 320px; --tpl-wh-care-lh: 19px; --tpl-wh-run-row-h: 45.5px; --tpl-wh-run-when: 140px; --tpl-wh-run-kind: 80px; --tpl-wh-run-what: 220px; --tpl-wh-skel-dot: 32px; --tpl-wh-skel-bar: 10px;
   --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 20px; --tpl-band-cell-gap: 8px;
   --tpl-large-title-size: 22px; --tpl-large-title-lh: 33px; --tpl-large-gap: 16px;
+  /* 友だち追加時の配信（MRhef・LEwkJ・P20kYU・C0lfUP・cFo2p・kFz4b）。表は 見出し39・行62・欄の間16。 */
+  --tpl-fa-create-gap: 6px; --tpl-fa-notice-after: 6px; --tpl-fa-search-w: 220px; --tpl-fa-folder-w: 150px;
+  --tpl-fa-viewer-create-h: 49px; /* 閲覧のみで隠した作るボタン（＋下の間）の高さ */
+  --tpl-fa-col-gap: 16px; --tpl-fa-head-h: 39px; --tpl-fa-head-pad: 12px 24px; --tpl-fa-row-h: 62px; --tpl-fa-row-pad: 12px 24px;
+  --tpl-fa-col-order: 28px; --tpl-fa-col-send: 170px; --tpl-fa-col-status: 80px; --tpl-fa-col-recent: 64px; --tpl-fa-col-menu: 28px;
+  --tpl-fa-order-lh: 15px; --tpl-fa-sub-icon-gap: 6px; --tpl-fa-sub-gap: 3px; --tpl-fa-send-lh: 17px; --tpl-fa-send-gap: 2px;
+  --tpl-fa-foot-pad: 10px 24px; --tpl-fa-folder-note-lh: 17px; --tpl-fa-state-gap: 8px; --tpl-fa-state-pad: 48px 24px; --tpl-fa-state-icon: 36px; --tpl-fa-tab-overlap: 1px; --tpl-fa-kpi-detail-lh: 18px;
+  /* 友だち追加時の配信を作る（wDzkc・h8uNW・xHpkS・al47K・h5rm8t）。段は 余白20・間14、選ぶカード 高さ98、流入リンクの行 余白10/12。 */
+  --tpl-fa-ed-head-gap: 2px; --tpl-fa-ed-title-lh: 22px; --tpl-fa-ed-field-gap: 6px; --tpl-fa-ed-folder-w: 220px;
+  --tpl-fa-ed-kind-h: 98px; --tpl-fa-ed-search-pad: 0 12px; --tpl-fa-ed-route-pad: 10px 12px;
+  --tpl-fa-ed-sub-pad: 16px; --tpl-fa-ed-cond-w: 420px; --tpl-fa-ed-select-pad: 0 10px 0 12px;
+  --tpl-fa-ed-chip-row-gap: 6px; --tpl-fa-ed-confirm-label-w: 120px; --tpl-fa-ed-conflict-pad: 14px 16px 6px; --tpl-fa-ed-conflict-act-gap: 34px;
+  --tpl-fa-ed-body-gap: 28px; --tpl-fa-ed-narrow-grow: 16px; --tpl-fa-ed-narrow-pull: 9px; --tpl-fa-ed-narrow-lift: 8px; --tpl-fa-narrow-trim: 4px;
   --tpl-create-title-size: 22px; --tpl-create-title-lh: 32px;
   --tpl-create-desc-size: 12px; --tpl-create-desc-lh: 17px;
   /* 作る画面の右の列の箱（K7HWG「右の箱 設定内容」）と、本文の小さい文字の行の高さ */
