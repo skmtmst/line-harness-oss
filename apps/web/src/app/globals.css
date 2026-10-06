@@ -585,6 +585,20 @@
   --tpl-nt-body-pad: 16px 24px 24px; --tpl-nt-body-gap: 16px; --tpl-nt-tab-gap: 20px; --tpl-nt-tab-pad: 8px; --tpl-nt-tab-lh: 19px; --tpl-nt-button-icon: 16px; --tpl-nt-box-radius: 12px;
   --tpl-nt-row-pad: 14px 20px; --tpl-nt-row-gap: 12px; --tpl-nt-icon: 32px; --tpl-nt-icon-glyph: 16px; --tpl-nt-text-gap: 2px; --tpl-nt-dot-gap: 6px; --tpl-nt-dot: 8px;
   --tpl-nt-title-lh: 19px; --tpl-nt-small-lh: 16px; --tpl-nt-go-lh: 17px; --tpl-nt-unread-bg: #f7faff; --tpl-nt-error-bg: #fdecea; --tpl-nt-focus-ring: 2px; --tpl-nt-focus-offset: -2px; --tpl-nt-row-line: inset 0 1px 0 var(--color-hairline);
+  /* 分析（ws9wt・eEhYU・L4Uov）：二段の切り替え・数の帯・棒・右の列。 */
+  --tpl-an-nav-gap: 8px; --tpl-an-group-gap: 2px; --tpl-an-group-pad: 2px; --tpl-an-group-item-pad: 5px 12px; --tpl-an-seg-radius: 8px; --tpl-an-seg-item-radius: 6px; --tpl-an-seg-lh: 17px; --tpl-an-seg-thumb-shadow: 0 1px 2px #1d1d1f14;
+  --tpl-an-tabs-gap: 24px; --tpl-an-tab-pad-bottom: 8px; --tpl-an-tab-line: 2px; --tpl-an-tab-lh: 19px; --tpl-an-ro-margin: 12px 0 13px; --tpl-an-kpi-menu: 24px; --tpl-an-actions-extra: 4px;
+  --tpl-an-body-pad: 14px 24px 24px; --tpl-an-split-gap: 16px; --tpl-an-side-gap: 12px; --tpl-an-side-w: 320px; --tpl-an-card-pad: 20px; --tpl-an-card-gap: 14px; --tpl-an-routes-gap: 12px; --tpl-an-removed-gap: 10px; --tpl-an-head-gap: 6px;
+  --tpl-an-card-title-size: 15px; --tpl-an-card-title-lh: 22px; --tpl-an-sub-lh: 16px; --tpl-an-text-lh: 17px; --tpl-an-range-pad: 3px; --tpl-an-range-item-pad: 5px 14px;
+  --tpl-an-legend-gap: 16px; --tpl-an-swatch: 10px; --tpl-an-swatch-gap: 6px; --tpl-an-day-pad: 0 3px; --tpl-an-bar-up-h: 110px; --tpl-an-bar-down-h: 36px; --tpl-an-bar-radius: 3px; --tpl-an-mark: 8px; --tpl-an-mark-gap: 4px; --tpl-an-mark-radius: 4px;
+  --tpl-an-notes-pad: 12px 14px; --tpl-an-notes-gap: 6px; --tpl-an-notes-radius: 10px; --tpl-an-note-dot-gap: 8px; --tpl-an-route-bar-gap: 4px; --tpl-an-track-h: 6px;
+  --tpl-an-tab-gap: 14px; --tpl-an-tab-pad: 14px 24px 24px; --tpl-an-toolbar-gap: 8px; --tpl-an-col-gap: 16px; --tpl-an-thead-pad: 9px 16px; --tpl-an-row-pad: 10px 16px; --tpl-an-row-two-h: 55px; --tpl-an-row-one-h: 37px; --tpl-an-cell-gap: 2px; --tpl-an-num-pad-end: 12px; --tpl-an-col-type: 150px;
+  --tpl-an-col-58: 58px; --tpl-an-col-70: 70px; --tpl-an-col-80: 80px; --tpl-an-col-88: 88px; --tpl-an-col-100: 100px; --tpl-an-col-116: 116px;
+  --tpl-an-hours-gap: 10px; --tpl-an-hours-pad: 16px; --tpl-an-hours-title-lh: 20px; --tpl-an-hour-gap: 4px; --tpl-an-hours-h: 90px; --tpl-an-tick-size: 9px; --tpl-an-tick-lh: 13px;
+  --tpl-an-flow-w: 300px; --tpl-an-flow-gap: 10px; --tpl-an-flow-pad: 16px; --tpl-an-flow-track-h: 8px; --tpl-an-flow-track-radius: 4px; --tpl-an-routes-split-gap: 12px; --tpl-an-routes-main-gap: 8px; --tpl-an-link-gap: 4px; --tpl-an-link-lh: 18px;
+  --tpl-an-search-w: 300px; --tpl-an-select-w: 150px; --tpl-an-col-170: 170px; --tpl-an-col-90: 90px; --tpl-an-note-box-pad: 10px 12px; --tpl-an-pill-gap: 5px; --tpl-an-pill-pad: 2px 8px; --tpl-an-pill-dot: 6px;
+  --tpl-an-report-gap: 12px; --tpl-an-report-bar-gap: 6px; --tpl-an-report-bars-h: 140px; --tpl-an-report-bars-pad: 8px 0; --tpl-an-report-col-gap: 12px; --tpl-an-report-head-pad: 13px 20px; --tpl-an-report-row-pad: 9px 20px; --tpl-an-icon-btn: 36px; --tpl-an-col-48: 48px; --tpl-an-col-62: 62px; --tpl-an-col-200: 200px; --tpl-an-col-110: 110px; --tpl-an-col-150: 150px; --tpl-an-col-60: 60px; --tpl-an-col-130: 130px; --tpl-an-col-ops: 230px; --tpl-an-saved-search-w: 280px; --tpl-an-history-w: 460px; --tpl-an-pill-row-h: 42px; --tpl-an-button-row-h: 56px; --tpl-an-wide-gap: 8px; --tpl-an-field-funnel-w: 280px; --tpl-an-field-window-w: 180px; --tpl-an-field-group-w: 260px; --tpl-an-funnel-step-pad: 8px 10px; --tpl-an-funnel-num: 22px; --tpl-an-funnel-label-w: 130px; --tpl-an-funnel-drop-w: 56px; --tpl-an-field-measure-w: 220px; --tpl-an-field-axis-w: 200px; --tpl-an-field-period-w: 140px; --tpl-an-wait-pad: 32px; --tpl-an-grid-label-w: 110px; --tpl-an-grid-cell-h: 40px; --tpl-an-grid-legend-gap: 6px; --tpl-an-grid-swatch-w: 16px; --tpl-an-sc-col-gap: 10px; --tpl-an-sc-row-pad: 9px 14px; --tpl-an-sc-col-64: 64px; --tpl-an-sc-tick-lh: 14px; --tpl-an-sc-devices-w: 200px; --tpl-an-sc-page-col-a: 70px; --tpl-an-sc-page-col-b: 80px; --tpl-an-cell-active: inset 0 0 0 2px var(--color-ink); --tpl-an-swatch-mid: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  --tpl-an-ring: inset 0 0 0 1px var(--color-hairline); --tpl-an-line-top: inset 0 1px 0 var(--color-hairline); --tpl-an-bar-top-radius: 3px 3px 0 0; --tpl-an-bar-bottom-radius: 0 0 3px 3px; --tpl-an-head-radius: 12px 12px 0 0;
   --tpl-compact-title-size: 20px; --tpl-compact-title-weight: 600; --tpl-compact-title-lh: 27px;
   /* 回答フォームの一覧（I3L41O・GrnO4・JV2oR・GVizd）。 */
   --tpl-fm-note-lh: 17px; --tpl-fm-text-button-gap: 6px; --tpl-fm-band-gap: 10px; --tpl-fm-band-pad: 10px 14px; --tpl-fm-band-lh: 20px;
@@ -606,6 +620,10 @@
   --tpl-wb-num-pad-end: 8px; --tpl-wb-pill-pad: 2px 8px; --tpl-wb-pill-gap: 5px; --tpl-wb-pill-lh: 18px;
   --tpl-wb-foot-pad: 12px 24px; --tpl-wb-ro-gap: 12px; --tpl-wb-notice-after: 6px; --tpl-wb-target-pad: 10px 12px; --tpl-wb-after-gap: 16px;
   --tpl-thead-pad-block: 12px; --tpl-thead-pad-side: 24px; --tpl-thead-lh: 16px;
+  /* シナリオ配信の一覧（axFrW・wjfLe・X0QrW0・Al4Ek）。 */
+  --tpl-scn-col-select: 48px; --tpl-scn-col-grip: 30px; --tpl-scn-col-name: 608px; --tpl-scn-col-count: 146px; --tpl-scn-col-state: 96px; --tpl-scn-col-menu: 60px;
+  --tpl-scn-row-h: 61px; --tpl-scn-saved-w: 151px; --tpl-scn-saved-icon-w: 48px; --tpl-scn-folder-w: 150px; --tpl-scn-skeleton-gap: 4px; --tpl-scn-sub-gap: 2px; --tpl-scn-count-gap: 1px; --tpl-scn-narrow-head-h: 34px;
+  --tpl-scn-dup-gap: 14px; --tpl-scn-dup-field-gap: 6px; --tpl-scn-dup-box-pad: 12px; --tpl-scn-dup-box-gap: 4px; --tpl-scn-dup-note-pad: 10px 14px; --tpl-scn-dup-note-gap: 10px;
   --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
   /* リッチメニューの一覧（rZEGN・Y9ASp・ZoKow・yOyCg）。 */
   --tpl-rml-col-order: 60px; --tpl-rml-col-thumb: 80px; --tpl-rml-col-audience: 146px; --tpl-rml-col-state: 96px; --tpl-rml-col-count: 106px; --tpl-rml-col-menu: 60px; --tpl-rml-row-h: 67px; --tpl-rml-alone-shift: 11px;
