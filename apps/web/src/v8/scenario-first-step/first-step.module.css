@@ -1,0 +1,214 @@
+/*
+ * ★V8 シナリオを作る②：1通目を設定（V6xAo・1152 U5rxyH）。
+ * 枠・頭・手順の輪・右の列・下の帯は型（CreatePage）が持つ。ここは左の段（カード）の中身だけ。
+ */
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-label);
+}
+
+.viewerBand {
+  margin: 0;
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+
+/* 段（カード）：枠1・角12・余白20・中の間14。共通カードの枠（1）は内側に入るので、余白は 20−1。 */
+.card {
+  gap: var(--tpl-section-gap);
+  min-width: 0;
+}
+:global([data-theme='v8']) .card {
+  padding: var(--tpl-cfl-card-pad);
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cfl-head-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-cfl-title-lh);
+}
+.cardDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+
+/* だれに送るか：3枚の選ぶカード（高さ98・余白14・間10）。 */
+.targetRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-cfl-target-gap);
+}
+.targetCard {
+  min-height: var(--tpl-cfl-target-h);
+}
+
+.inlineField {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-cfl-when-gap);
+}
+.inlineLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-chip-label-lh);
+}
+
+/* いつ：購読開始から［0］日後の［10:00］ → 例 */
+.whenRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cfl-when-gap);
+  min-width: 0;
+}
+.whenText {
+  flex-shrink: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-row-name-lh);
+  white-space: nowrap;
+}
+.whenSelectDay,
+.whenSelectTime {
+  flex-shrink: 0;
+  display: inline-flex;
+}
+.whenExample {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+
+/* 種類：選んだ札は薄い緑の地に緑の枠・濃い緑の太字。 */
+.kindRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-cfl-kind-gap);
+}
+.kindChip {
+  min-height: 0;
+  padding: var(--tpl-cfl-kind-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-text-sm-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.kindChip[data-active] {
+  outline-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-weight: 700;
+}
+.kindChip:disabled {
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+}
+.kindBreak {
+  display: none;
+}
+@container v8-page (max-width: 1099px) {
+  .kindBreak {
+    display: block;
+    flex-basis: 100%;
+    height: var(--tpl-cfl-kind-break-h);
+  }
+  /* 1152 の右の列は余白16（型の24より詰める）。 */
+  .previewOpen {
+    margin-top: calc(var(--tpl-cfl-narrow-pad) - var(--tpl-preview-pad));
+  }
+}
+.kindBody {
+  max-width: var(--tpl-cfl-image-w);
+}
+
+.bodyField {
+  display: block;
+  width: 100%;
+  height: var(--tpl-cfl-body-h);
+  padding: var(--tpl-cfl-body-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-row-name-lh);
+  resize: vertical;
+}
+.bodyField:focus-visible {
+  outline-color: var(--color-accent);
+}
+
+/* 差し込み：小さな札（余白2/8・角6・12/18）。右端に字数。 */
+.insertRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cfl-insert-gap);
+  min-width: 0;
+}
+.insertTools {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.insertTools > div {
+  gap: var(--tpl-cfl-insert-gap);
+}
+.insertTools > div > span:first-child {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.insertTools :global(button) {
+  height: auto;
+  min-height: 0;
+  padding: var(--tpl-cfl-insert-pad);
+  border-radius: var(--radius-mini);
+  font-size: var(--text-caption);
+  font-weight: 400;
+  line-height: var(--tpl-wb-pill-lh);
+}
+.counter {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-cfl-counter-lh);
+}
+.counter[data-over] {
+  color: var(--color-danger);
+}
+
+/* 1152：右の列は「LINEでの見え方を見る」だけ。 */
+.previewOpen {
+  display: flex;
+  width: 100%;
+}
+.previewOpen > * {
+  flex: 1 1 auto;
+}
