@@ -23,12 +23,15 @@ export default function NoteBar({
   help,
   helpLabel,
   helpHref,
+  icon,
   children,
 }: {
   tone?: NoteTone
   /** 帯の右に置く操作。 */
   action?: ReactNode
   className?: string
+  /** 左の図柄の差し替え（Notice と同じ）。省略時は種類の既定印。 */
+  icon?: ReactNode
   /**
    * 読まなくても操作できる定義だけの補足。帯の文のすぐ右の「？」へ入れる
    * （★V7・§2-1b）。帯自体は残す。警告・失敗・操作の結果は入れない。
@@ -48,6 +51,7 @@ export default function NoteBar({
       help={help}
       helpLabel={helpLabel}
       helpHref={helpHref}
+      icon={icon}
     >
       {children}
     </Notice>

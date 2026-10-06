@@ -7,20 +7,26 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'page-header.module.css'), 'utf8')
 
 /*
- * 板の頭は部品 EnlYo の値どおり。
- * 題 20px/600/行27・間 2px・説明 13px/400/行20・上の余白 20。
+ * 板の頭は 379 板の多数派（JKjsE）が既定。値は --tpl-* で読む。
+ * 部品 EnlYo どおりの小さい形は data-header-size="compact" に残す。
  * v7 は変えない。
  */
-describe('板の頭（v8・部品 EnlYo）', () => {
-  it('題は 20・行27・間 2・説明は 13・行20', () => {
-    expect(css).toMatch(/\[data-theme='v8'\] \.title \{[^}]*font-size:\s*20px/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.title \{[^}]*line-height:\s*27px/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.heading \{[^}]*gap:\s*2px/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.description \{[^}]*font-size:\s*var\(--text-label\)/s)
-    expect(css).toMatch(/\[data-theme='v8'\] \.description \{[^}]*line-height:\s*20px/s)
+describe('板の頭（v8・JKjsE既定＋EnlYo compact）', () => {
+  it('既定は題 22/700/32・間 4・説明 13/19・余白 20/24/12・枠なし', () => {
+    expect(css).toMatch(/\[data-theme='v8'\] \.title \{[^}]*font-size:\s*var\(--tpl-title-size\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.title \{[^}]*font-weight:\s*var\(--tpl-title-weight\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.title \{[^}]*line-height:\s*var\(--tpl-title-lh\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.heading \{[^}]*gap:\s*var\(--tpl-head-gap\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.description \{[^}]*font-size:\s*var\(--tpl-desc-size\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.description \{[^}]*line-height:\s*var\(--tpl-desc-lh\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.header \{[^}]*padding:\s*var\(--tpl-head-pad-top\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.header \{[^}]*border:\s*0/s)
   })
 
-  it('頭の上の余白は 20', () => {
-    expect(css).toMatch(/\[data-theme='v8'\] \.header \{[^}]*padding:\s*20px 24px/s)
+  it('compact は EnlYo どおり（20/27・間 2・説明 13/20）', () => {
+    expect(css).toMatch(/\[data-theme='v8'\] \.header\[data-header-size='compact'\] \.title \{[^}]*font-size:\s*var\(--tpl-compact-title-size\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.header\[data-header-size='compact'\] \.title \{[^}]*line-height:\s*var\(--tpl-compact-title-lh\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.header\[data-header-size='compact'\] \.heading \{[^}]*gap:\s*var\(--tpl-compact-gap\)/s)
+    expect(css).toMatch(/\[data-theme='v8'\] \.header\[data-header-size='compact'\] \.description \{[^}]*line-height:\s*var\(--tpl-compact-desc-lh\)/s)
   })
 })

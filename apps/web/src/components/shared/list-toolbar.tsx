@@ -20,6 +20,8 @@ export type ListToolbarSearch = {
   width?: number
   /** 検索中。渡すと虫眼鏡の代わりに回る印が出る。 */
   loading?: boolean
+  /** 箱の右端の近道の印（例 '⌘K'）。渡すと探す欄へ飛べる。v8 だけ。 */
+  shortcut?: string
 }
 
 /**
@@ -42,6 +44,7 @@ export default function ListToolbar({
   actions,
   filters,
   trailing,
+  layout = 'band',
 }: {
   search: ListToolbarSearch
   /** 1行目。検索の右に置く、動くものだけ（保存した検索・この条件を保存）。 */
@@ -50,10 +53,16 @@ export default function ListToolbar({
   filters?: ReactNode
   /** 2行目・右端。並び順と表示件数。 */
   trailing?: ReactNode
+  /**
+   * 並べ方。既定 'band' は1本の帯（c4n9Kr）。
+   * 'stacked' は2段（acRIl 予約管理：1段目＝探す・担当・経路・CSV、
+   * 2段目＝札）。段の間10・段の中の間6。
+   */
+  layout?: 'band' | 'stacked'
 }) {
   const label = search.label ?? search.placeholder
   return (
-    <div className={styles.toolbar} style={search.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
+    <div className={styles.toolbar} data-toolbar-layout={layout} style={search.width ? ({ '--list-search-width': `${search.width}px` } as React.CSSProperties) : undefined}>
       <div className={styles.row1}>
         <SearchField
           placeholder={search.placeholder}
@@ -63,6 +72,7 @@ export default function ListToolbar({
           onClear={() => search.onChange('')}
           maxLength={search.maxLength}
           loading={search.loading}
+          shortcut={search.shortcut}
           className={styles.search}
         />
         {actions}

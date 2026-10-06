@@ -167,6 +167,48 @@
   color: var(--color-status-danger);
 }
 
+/*
+ * 琥珀の呼びかけ（CFAyf 送受信を止める・YZ57z 解除：説明文を帯で囲む）。
+ * v7 は変えない。地はトークン表の warn-soft（#fdf3e1。板 CFAyf #fff4e0
+ * とほぼ同じ。--color-warning-bg #faf0dc は濃すぎるため使わない）。
+ * 板どおり角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
+ */
+[data-theme='v8'] .calloutWarning {
+  border-color: var(--color-status-warn-soft);
+  border-radius: var(--radius-segment);
+  background: var(--color-status-warn-soft);
+  padding: 10px 12px;
+}
+
+[data-theme='v8'] .calloutWarning .title,
+[data-theme='v8'] .calloutWarning .description {
+  color: var(--color-warning);
+}
+
+[data-theme='v8'] .calloutWarning .description {
+  font-size: 11px;
+  line-height: 17px;
+}
+
+/*
+ * 桃の呼びかけ（YZ57z 解除：説明文だけを桃箱で囲む。題は箱の外）。
+ * 板どおり地 #fdecea≒--color-danger-bg（#fce9e7）・文 #b42318≒--color-danger
+ * （#b3261e）・角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
+ * v7 は変えない。VsSyu 式（箱なし）の既定の破壊的トーンはそのまま。
+ */
+[data-theme='v8'] .calloutDanger {
+  border-color: var(--color-danger-bg);
+  border-radius: var(--radius-segment);
+  background: var(--color-danger-bg);
+  padding: 10px 12px;
+}
+
+[data-theme='v8'] .calloutDanger .description {
+  color: var(--color-danger);
+  font-size: 11px;
+  line-height: 17px;
+}
+
 .callout .title {
   font-size: var(--text-body);
 }

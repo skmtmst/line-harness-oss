@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { api, type ListStats } from '@/lib/api'
 import KpiCard, { type KpiCardProps } from './kpi-card'
 import KpiBand from './kpi-band'
@@ -22,6 +22,11 @@ export interface KpiSpec {
   value: number | null
   unit: string
   detail: string
+  /**
+   * 題の右の「？」に入れる文（I1E7Bt の絵どおり）。
+   * KpiCard の `help` へそのまま渡す。渡さなければ「？」は出ない。
+   */
+  help?: ReactNode
 }
 
 export default function ListKpis({

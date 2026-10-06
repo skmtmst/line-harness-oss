@@ -11,6 +11,7 @@ import { formatNumber } from '@/lib/format'
 
 export type KpiCardProps = {
   title: string
+  /** 図柄。省略時は棒グラフ。`null` で図柄なし（X4STXS の絵どおり）。 */
   icon?: ReactNode
   /** V8: 数の右に出す増減の札。 */
   delta?: ReactNode
@@ -157,14 +158,16 @@ export default function KpiCard({
           className={[styles.label, labelVariantClass].filter(Boolean).join(' ')}
           title={title || undefined}
         >
-          <span className={`${styles.icon} v8-only`} aria-hidden="true">
-            {icon ?? <ChartNoAxesColumn size={14} />}
-          </span>
+          {icon === null ? null : (
+            <span className={`${styles.icon} v8-only`} aria-hidden="true">
+              {icon ?? <ChartNoAxesColumn size={14} />}
+            </span>
+          )}
           <span className={styles.labelText}>
             {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
           </span>
           {hasTip ? (
-            <HelpTip label={descriptionLabel ?? `${helpLabel ?? title}の説明`}>
+            <HelpTip label={descriptionLabel ?? `${helpLabel ?? title}の説明`} className={styles.tip}>
               {tip}
               {helpHref ? <a href={helpHref}>{helpHrefLabel ?? 'くわしく'}</a> : null}
             </HelpTip>

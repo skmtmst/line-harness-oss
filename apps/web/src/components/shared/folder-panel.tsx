@@ -157,9 +157,15 @@ export default function FolderPanel({
       <nav className={`${styles.rows} v7:p-2`}>
         {rows.map((row) => {
           const hasActions = Boolean(row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
+          const isActive = activeId === row.id
 
           return (
-            <div key={row.id} className={`${styles.row} group relative flex items-center`} data-active={activeId === row.id || undefined}>
+            <div
+              key={row.id}
+              className={`${styles.row} group relative flex items-center`}
+              data-active={isActive || undefined}
+              data-menu-open={openMenuId === row.id || undefined}
+            >
               <button
                 type="button"
                 onClick={() => {
@@ -203,6 +209,11 @@ export default function FolderPanel({
               </button>
               {/* 操作は設計どおり1つの「…」へまとめる。行に5個の小さな口を
                   並べると、選択との押し間違いが増え、短い名前も狭くなる。 */}
+              {/* I3L41O：選んだ行には絵どおり「…」の場所を取る。操作なしの
+                  選んだ行（すべて・未分類）は空きの場所取りを置く。 */}
+              {isActive && !hasActions ? (
+                <div className={styles.menuSlot} aria-hidden="true" />
+              ) : null}
               {hasActions && (
                 <div className={`${styles.menu} relative shrink-0`}>
                   <button

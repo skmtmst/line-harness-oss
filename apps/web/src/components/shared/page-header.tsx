@@ -44,6 +44,7 @@ export default function PageHeader({
   titleDisplay = 'auto',
   actions,
   className,
+  size = 'regular',
 }: {
   breadcrumb: Crumb[]
   title: string
@@ -59,6 +60,12 @@ export default function PageHeader({
   /** 右に並べる操作。最後は「マニュアル」。 */
   actions?: ReactNode
   className?: string
+  /**
+   * 頭の大きさ。既定 'regular' は 379 板の多数派（JKjsE：題 22/700/32・
+   * 間 4・説明 13/19・余白 20/24/12・枠なし）。
+   * 'compact' は部品 EnlYo どおりの小さい形（20/27・間 2）。
+   */
+  size?: 'regular' | 'compact'
 }) {
   const pathname = usePathname() ?? ''
   const { title: chromeTitle } = usePageChrome()
@@ -66,7 +73,10 @@ export default function PageHeader({
   const shown = titleDisplay === 'always' || barTitle !== title
 
   return (
-    <div className={[styles.header, className].filter(Boolean).join(' ')}>
+    <div
+      className={[styles.header, className].filter(Boolean).join(' ')}
+      data-header-size={size}
+    >
       <div className={styles.heading}>
         <Breadcrumb items={breadcrumb} />
         <h2 className={`${styles.title} ${shown ? '' : 'v8-only'}`} title={title}>{title}</h2>
