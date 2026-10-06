@@ -44,6 +44,7 @@ import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel from '@/components/shared/folder-panel'
+import { FolderDot, type FolderDotFolder } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -166,6 +167,11 @@ export default function MediaLibraryListV8() {
   // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
   // kind=media は件数未対応のため来ない。来ないときは null（「—」表示）。
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
+  /* カードの名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。無ければ未分類の輪。 */
+  const folderDotOf = (folderId: string | null | undefined): FolderDotFolder | null => {
+    const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
   /*
     R587: フォルダの取得失敗は一覧・容量と切り分ける。フォルダだけ503でも
     取得済みのメディアと容量は見せ、フォルダ欄だけ失敗と再試行を示す。
@@ -1389,6 +1395,7 @@ export default function MediaLibraryListV8() {
                   view={view}
                   displaySrc={displaySrc(item)}
                   kindLabel={KINDS.find((k) => k.key === item.kind)?.label ?? 'ファイル'}
+                  folder={folderDotOf(item.folderId)}
                   canManageMedia={canManageMedia}
                   managementPermissionReason={managementPermissionReason}
                   selected={selected.has(item.id)}
@@ -1776,6 +1783,8 @@ type MediaCardV8Props = {
   view: MediaView
   displaySrc: string
   kindLabel: string
+  /** 名前の前の丸に出すフォルダ（左のフォルダの列と同じもの）。未分類は null。 */
+  folder: FolderDotFolder | null
   canManageMedia: boolean
   managementPermissionReason: string
   selected: boolean
@@ -1812,6 +1821,7 @@ function MediaCardV8({
   view,
   displaySrc,
   kindLabel,
+  folder,
   canManageMedia,
   managementPermissionReason,
   selected,
@@ -1909,6 +1919,9 @@ function MediaCardV8({
                   退避済み
                 </span>
               ) : null}
+              <span className={styles.nameDot}>
+                <FolderDot folder={folder} />
+              </span>
               <span className={styles.fileName} title={item.filename}>
                 {item.filename}
               </span>
