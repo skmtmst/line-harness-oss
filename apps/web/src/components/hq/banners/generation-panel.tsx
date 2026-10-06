@@ -4,8 +4,8 @@ import { ChevronDown, Images, Plus, Sparkles, Upload, X } from 'lucide-react'
 import { useId, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import ColorWell from '@/components/shared/color-well'
-import HelpTip from '@/components/shared/help-tip'
 import LimitState from './limit-state'
+import styles from './generation-panel.module.css'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -15,17 +15,15 @@ import {
   BANNER_REFERENCE_MODE_DESCRIPTION,
   BANNER_REFERENCE_MODE_LABEL,
   COLOR_ROLES,
-  CROP_POSITION_OPTIONS,
   CUSTOM_PROMPT_MAX,
-  FREE_PROMPT_MAX,
   TEXT_LINE_LENGTH_MAX,
   TEXT_LINE_MAX,
+  alignEmphasis,
   groupPresets,
   presetCardLabel,
   presetSizeLabel,
   tileCaption,
   type BannerColorRoleKey,
-  type BannerCropPosition,
   type BannerGenerationInput,
   type BannerImage,
   type BannerPreset,
@@ -39,7 +37,12 @@ import {
  * 運用者に見せるのは「用途・参照画像・テキスト・色・人物・追加の指示・枚数」だけ。
  * 品質やクレジットの選択は置かない（2026-09-12 決定、`docs/hq-banner-generation.md`）。
  *
- * 単一選択（モード・人物・枚数・色の見本）は radio で組む。見た目は label が持つ。
+ * 2026-10-06（オーナー指示）：
+ * - 「バナー／自由入力」の切替は使い分けが分かりにくいので置かない。入力は1種類だけ。
+ * - 「切り抜きの位置」と点線の枠は機能外なので画面に出さない（中央で整形する）。
+ * - 選択肢は小さい箱（`variant="compact"`）で細く並べる。印・丸は出さない。
+ *
+ * 単一選択（人物・枚数・色の見本）は radio で組む。見た目は label が持つ。
  */
 export default function GenerationPanel({
   presets,
@@ -75,7 +78,12 @@ export default function GenerationPanel({
   const set = <K extends keyof BannerGenerationInput>(key: K, next: BannerGenerationInput[K]) =>
     onChange({ ...value, [key]: next })
 
-  const selectedPreset = presets.find((p) => p.key === value.presetKey)
+  /*
+   * テキストの行と「強調」は必ず一緒に動かす（Pencil ★修正案 `g64HOD` 決まり1）。
+   * 片方だけ足す・消すと、2行目の強調が3行目に付くような取り違えが起きる。
+   */
+  const setLines = (textLines: string[], emphasisLines: boolean[]) =>
+    onChange({ ...value, textLines, emphasisLines: alignEmphasis(textLines, emphasisLines) })
 
   return (
     <aside
@@ -87,25 +95,6 @@ export default function GenerationPanel({
       <div className="flex min-h-14 flex-wrap items-center gap-2 px-4 py-2">
         <Sparkles aria-hidden="true" className="h-4.5 w-4.5 text-ink-faint" />
         <h2 className="text-body font-bold text-ink">画像を生成</h2>
-        <span className="flex-1" />
-        <RadioCardGroup legend="生成のしかた" className="flex flex-wrap gap-1">
-          <ModeOption
-            name={`${uid}-mode`}
-            value="banner"
-            checked={value.mode === 'banner'}
-            disabled={disabled}
-            onSelect={() => set('mode', 'banner')}
-            label="バナー"
-          />
-          <ModeOption
-            name={`${uid}-mode`}
-            value="free"
-            checked={value.mode === 'free'}
-            disabled={disabled}
-            onSelect={() => set('mode', 'free')}
-            label="自由入力"
-          />
-        </RadioCardGroup>
       </div>
       <div className="border-t border-hairline" />
 
@@ -117,33 +106,6 @@ export default function GenerationPanel({
           disabled={disabled}
           onSelect={(key) => set('presetKey', key)}
         />
-
-        {selectedPreset ? (
-          <Field
-            label="切り抜きの位置"
-            note="生成後に用途の寸法へ整える"
-            help={
-              <HelpTip label="切り抜きの位置の説明">
-                生成は3種類の大きさだけなので、用途の寸法に合うよう切り抜きます。選んだ側を残します。
-              </HelpTip>
-            }
-          >
-            <fieldset className="grid grid-cols-3 gap-1.5" disabled={disabled}>
-              <legend className="sr-only">切り抜きの位置</legend>
-              {CROP_POSITION_OPTIONS.map((option) => (
-                <SegmentOption
-                  key={option.value}
-                  name={`${uid}-crop`}
-                  value={option.value}
-                  checked={value.cropPosition === option.value}
-                  onSelect={() => set('cropPosition', option.value)}
-                  label={option.label}
-                />
-              ))}
-            </fieldset>
-            <CropPreview preset={selectedPreset} crop={value.cropPosition} />
-          </Field>
-        ) : null}
 
         {/*
           参照画像（承認済み ★BG-B `L1ax1Y`）。最大 3 枚で、1 枚ずつ使い方を決める。
@@ -248,92 +210,96 @@ export default function GenerationPanel({
           </div>
         </Field>
 
-        {value.mode === 'banner' ? (
-          <>
-            <Field label="画像に入れるテキスト" note={`1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで`}>
-              <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
-                {value.textLines.map((line, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="w-3 text-micro font-semibold text-ink-faint" aria-hidden="true">{i + 1}</span>
-                    <TextField
-                      aria-label={`テキスト ${i + 1}行目`}
-                      value={line}
-                      maxLength={TEXT_LINE_LENGTH_MAX}
-                      disabled={disabled}
-                      placeholder={i === 0 ? '例: 2周年 春の感謝祭' : i === value.textLines.length - 1 ? '行動を促す文言（例: 今すぐチェック）' : ''}
-                      onChange={(event) => {
-                        const next = [...value.textLines]
-                        next[i] = event.target.value
-                        set('textLines', next)
-                      }}
-                      className="min-w-0 flex-1"
-                    />
-                    {value.textLines.length > 1 ? (
-                      <button
-                        type="button"
-                        disabled={disabled}
-                        aria-label={`${i + 1}行目を消す`}
-                        onClick={() => set('textLines', value.textLines.filter((_, j) => j !== i))}
-                        className="rounded-mini p-1 text-ink-faint hover:bg-canvas-sunken disabled:opacity-50"
-                      >
-                        <X aria-hidden="true" className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                {value.textLines.length < TEXT_LINE_MAX ? (
+        {/*
+          * ★修正案 `g64HOD`（2026-10-06 承認）：行ごとに「強調」を入れ切りできる。
+          * 入れた行だけを強調カラーで目立たせる。丸やタグの印は出さず、
+          * 入っていることは地と枠と文字の色で示す。
+          */}
+        <Field label="画像に入れるテキスト" note={`1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」`}>
+          <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
+            {value.textLines.map((line, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="w-3 text-micro font-semibold text-ink-faint" aria-hidden="true">{i + 1}</span>
+                <TextField
+                  aria-label={`テキスト ${i + 1}行目`}
+                  value={line}
+                  maxLength={TEXT_LINE_LENGTH_MAX}
+                  disabled={disabled}
+                  placeholder={i === 0 ? '例: 2周年 春の感謝祭' : i === value.textLines.length - 1 ? '行動を促す文言（例: 今すぐチェック）' : ''}
+                  onChange={(event) => {
+                    const next = [...value.textLines]
+                    next[i] = event.target.value
+                    setLines(next, value.emphasisLines)
+                  }}
+                  className="min-w-0 flex-1"
+                />
+                <EmphasisToggle
+                  index={i}
+                  on={value.emphasisLines[i] === true}
+                  disabled={disabled}
+                  onToggle={() => {
+                    const next = alignEmphasis(value.textLines, value.emphasisLines)
+                    next[i] = !next[i]
+                    set('emphasisLines', next)
+                  }}
+                />
+                {value.textLines.length > 1 ? (
                   <button
                     type="button"
                     disabled={disabled}
-                    onClick={() => set('textLines', [...value.textLines, ''])}
-                    className="inline-flex items-center gap-1 self-start text-caption font-semibold text-action hover:underline disabled:opacity-50"
+                    aria-label={`${i + 1}行目を消す`}
+                    onClick={() =>
+                      setLines(
+                        value.textLines.filter((_, j) => j !== i),
+                        alignEmphasis(value.textLines, value.emphasisLines).filter((_, j) => j !== i),
+                      )
+                    }
+                    className="rounded-mini p-1 text-ink-faint hover:bg-canvas-sunken disabled:opacity-50"
                   >
-                    <Plus aria-hidden="true" className="h-3.5 w-3.5" />
-                    行を足す
+                    <X aria-hidden="true" className="h-3.5 w-3.5" />
                   </button>
                 ) : null}
               </div>
-            </Field>
-
-            <ColorRoles value={value} onPick={(key, next) => set(key, next)} disabled={disabled} />
-
-            <Field label="人物">
-              <fieldset className="grid grid-cols-2 gap-1.5" disabled={disabled}>
-                <legend className="sr-only">人物</legend>
-                <SegmentOption name={`${uid}-person`} value="without" checked={value.personOption === 'without'} onSelect={() => set('personOption', 'without')} label="入れない" />
-                <SegmentOption name={`${uid}-person`} value="with" checked={value.personOption === 'with'} onSelect={() => set('personOption', 'with')} label="入れる" />
-              </fieldset>
-            </Field>
-
-            {/* ★BG-B `dT1xq`: 任意であることと上限を同じ行に出す */}
-            <Field label="追加の指示" note={`任意・${CUSTOM_PROMPT_MAX}文字まで`} htmlFor={`${uid}-custom`}>
-              <TextArea
-                id={`${uid}-custom`}
-                rows={2}
-                maxLength={CUSTOM_PROMPT_MAX}
+            ))}
+            {value.textLines.length < TEXT_LINE_MAX ? (
+              <button
+                type="button"
                 disabled={disabled}
-                value={value.customPrompt}
-                placeholder="例: 桜の花びらと餃子・生ビールの写真風。和風で温かみのある雰囲気"
-                onChange={(event) => set('customPrompt', event.target.value)}
-                className="w-full"
-              />
-            </Field>
-          </>
-        ) : (
-          <Field label="作りたい画像の説明" note={`${FREE_PROMPT_MAX}文字まで`} htmlFor={`${uid}-free`}>
-            <TextArea
-              id={`${uid}-free`}
-              rows={6}
-              maxLength={FREE_PROMPT_MAX}
-              disabled={disabled}
-              value={value.freePrompt}
-              placeholder="例: 餃子と生ビールの写真風ビジュアル。木のテーブル、温かい照明、文字は入れない"
-              onChange={(event) => set('freePrompt', event.target.value)}
-              className="w-full"
-            />
-            <p className="text-micro text-ink-faint">書いた文がそのまま生成の指示になります。文字を入れたいときはその文字も書いてください。</p>
-          </Field>
-        )}
+                onClick={() =>
+                  setLines([...value.textLines, ''], [...alignEmphasis(value.textLines, value.emphasisLines), false])
+                }
+                className="inline-flex items-center gap-1 self-start text-caption font-semibold text-action hover:underline disabled:opacity-50"
+              >
+                <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+                行を足す
+              </button>
+            ) : null}
+          </div>
+        </Field>
+
+        <ColorRoles value={value} onPick={(key, next) => set(key, next)} disabled={disabled} />
+
+        <Field label="人物">
+          <fieldset className="grid grid-cols-2 gap-1.5" disabled={disabled}>
+            <legend className="sr-only">人物</legend>
+            <SegmentOption name={`${uid}-person`} value="without" checked={value.personOption === 'without'} onSelect={() => set('personOption', 'without')} label="入れない" />
+            <SegmentOption name={`${uid}-person`} value="with" checked={value.personOption === 'with'} onSelect={() => set('personOption', 'with')} label="入れる" />
+          </fieldset>
+        </Field>
+
+        {/* ★BG-B `dT1xq`: 任意であることと上限を同じ行に出す */}
+        <Field label="追加の指示" note={`任意・${CUSTOM_PROMPT_MAX}文字まで`} htmlFor={`${uid}-custom`}>
+          <TextArea
+            id={`${uid}-custom`}
+            rows={2}
+            maxLength={CUSTOM_PROMPT_MAX}
+            disabled={disabled}
+            value={value.customPrompt}
+            placeholder="例: 桜の花びらと餃子・生ビールの写真風。和風で温かみのある雰囲気"
+            onChange={(event) => set('customPrompt', event.target.value)}
+            className="w-full"
+          />
+        </Field>
 
         <Field label="枚数">
           <fieldset className="grid grid-cols-4 gap-1.5" disabled={disabled}>
@@ -390,6 +356,43 @@ function referenceTitle(image: BannerImage): string {
   return image.media.filename.replace(/\.[a-z0-9]+$/i, '') || '画像'
 }
 
+/*
+ * 行ごとの「強調」（Pencil ★修正案 `g64HOD`・2026-10-06 承認、決まり 2〜4）。
+ *
+ * 高さ 26・左右の余白 9・角丸 999・文字 11/600。行番号と入力欄の右、同じ行に置く。
+ * 入っていないとき＝地 canvas・枠 hairline・文字 ink-secondary。
+ * 入っているとき＝地 accent-soft・枠 accent-deep 1.5・文字 accent-deep。
+ * 丸やタグの印は出さない（押した状態は地と枠と文字の色だけで示す）。
+ * 読み上げには `aria-pressed` で入り切りを伝え、名前は「1行目を強調」にする。
+ *
+ * 見た目は `generation-panel.module.css` にまとめる。承認した見え方は同じで、
+ * 直書きの色と任意の大きさを画面側に残さないため（共通の約束 design-debt）。
+ */
+function EmphasisToggle({
+  index,
+  on,
+  disabled,
+  onToggle,
+}: {
+  index: number
+  on: boolean
+  disabled?: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      aria-label={`${index + 1}行目を強調`}
+      disabled={disabled}
+      onClick={onToggle}
+      className={`${styles.emphasis} ${on ? styles.emphasisOn : styles.emphasisOff}`}
+    >
+      強調
+    </button>
+  )
+}
+
 function Field({
   label,
   note,
@@ -419,45 +422,11 @@ function Field({
 }
 
 /**
- * 切り抜きのプレビュー（R120）。生成元の枠（APIの大きさの比率）の中に、
- * 用途の寸法の比率の窓を、選んだ位置（上・中央・下）で置く。
- * 縦横比が同じ用途では窓が枠いっぱいになる（切り抜き無し・拡大だけ）。
- */
-export function CropPreview({ preset, crop }: { preset: BannerPreset; crop: BannerCropPosition }) {
-  const api = /^(\d+)x(\d+)$/.exec(preset.apiSize)
-  const sourceW = api ? Number(api[1]) : preset.targetWidth
-  const sourceH = api ? Number(api[2]) : preset.targetHeight
-  // cover で用途寸法へ拡大したとき、元画像のどの範囲が残るか。
-  const scale = Math.max(preset.targetWidth / sourceW, preset.targetHeight / sourceH)
-  const windowW = Math.min((preset.targetWidth / (sourceW * scale)) * 100, 100)
-  const windowH = Math.min((preset.targetHeight / (sourceH * scale)) * 100, 100)
-  const top = crop === 'top' ? 0 : crop === 'bottom' ? 100 - windowH : (100 - windowH) / 2
-  const left = (100 - windowW) / 2
-  return (
-    <div>
-      <div
-        role="img"
-        aria-label={`生成後にこの範囲で${preset.targetWidth}×${preset.targetHeight}に整えます`}
-        className="relative w-full overflow-hidden rounded-mini bg-canvas-sunken"
-        style={{ aspectRatio: `${sourceW} / ${sourceH}` }}
-      >
-        <div
-          aria-hidden="true"
-          className="absolute border-2 border-dashed border-ink-faint bg-canvas"
-          style={{ width: `${windowW}%`, height: `${windowH}%`, top: `${top}%`, left: `${left}%` }}
-        />
-      </div>
-      <p className="mt-1 text-micro text-ink-faint">
-        生成後にこの範囲で{preset.targetWidth}×{preset.targetHeight}に整えます
-      </p>
-    </div>
-  )
-}
-
-/**
- * 出力サイズ。Pencil ★BG-B `xy4EW`。
+ * 出力サイズ。Pencil ★BG-B `xy4EW` の小さい箱（`o2XyUk`/`aCyxg`）。
  *
- * LINE の規格を2列のカードで並べ、選んだカードを淡い緑にする（共通のラジオカード）。
+ * LINE の規格を2列の小さいカードで並べ、選んだカードを淡い緑にする（共通のラジオカード）。
+ * 390px の脇のパネルに収まる細さにするため `variant="compact"` を使う
+ * （2026-10-06 オーナー指示「出力サイズのボタンが大きい。もっとスマートな幅に」）。
  * Instagram・X・OGP などは普段使わないので、最初は畳んで「ほかの用途から選ぶ」の
  * 1行だけ置く。畳んだ中に選択中の規格が入っている場合（「同じ設定でもう一度」など）は
  * 開いた状態で出す。選べない選択肢は描かない（`docs/v6-common-rules.md` §5-5）。
@@ -487,7 +456,7 @@ function OutputSize({
         <span className="text-label font-medium text-ink">出力サイズ</span>
         <span className="text-micro text-ink-faint">LINEの規格から選ぶ</span>
       </div>
-      <RadioCardGroup legend="出力サイズ" className="grid grid-cols-2 gap-2">
+      <RadioCardGroup legend="出力サイズ" className="grid grid-cols-2 gap-1.5">
         {[...line, ...(showOthers ? others : [])].map((preset) => (
           <RadioCard
             key={preset.key}
@@ -496,6 +465,7 @@ function OutputSize({
             checked={value === preset.key}
             disabled={disabled}
             onChange={onSelect}
+            variant="compact"
             title={presetCardLabel(preset)}
             note={presetSizeLabel(preset)}
           />
@@ -517,17 +487,25 @@ function OutputSize({
   )
 }
 
-/** モード切替の1つ。Pencil `h9nAp5`。共通の選ぶ部品で出す。 */
-function ModeOption({ name, value, checked, disabled, onSelect, label }: { name: string; value: string; checked: boolean; disabled?: boolean; onSelect: () => void; label: string }) {
-  return (
-    <RadioCard name={name} value={value} checked={checked} disabled={disabled} onChange={onSelect} title={label} />
-  )
-}
-
-/** 人物・枚数の選択肢。Pencil `UgooV` / `ndNQM`。共通の選ぶ部品で出す。 */
+/**
+ * 人物・枚数の選択肢。Pencil `UgooV` / `ndNQM`。共通の選ぶ部品で出す。
+ *
+ * 1語だけの短い選択肢なので小さい箱（compact）で細く出し、文字は中央に置く
+ * （2026-10-06 オーナー指示「人物のボタンも太くてスマートじゃない」）。
+ * `items-center text-center` は utilities 層なので CSS Module の
+ * `align-items: flex-start` に勝つ（各 module の @layer 宣言順）。
+ */
 function SegmentOption({ name, value, checked, onSelect, label }: { name: string; value: string; checked: boolean; onSelect: () => void; label: string }) {
   return (
-    <RadioCard name={name} value={value} checked={checked} onChange={onSelect} title={label} />
+    <RadioCard
+      name={name}
+      value={value}
+      checked={checked}
+      onChange={onSelect}
+      variant="compact"
+      title={label}
+      className="items-center text-center"
+    />
   )
 }
 
