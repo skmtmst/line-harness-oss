@@ -1,3 +1,4 @@
+import { getFriendUpcomingItems } from '../services/friend-upcoming-items.js';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getFriends,
@@ -1121,14 +1122,17 @@ friends.get('/api/friends/:id/upcoming', requireVisibleFriend, async (c) => {
       return candidates[0] ?? null;
     };
 
-    const [bookingResult, autoDeliveryResult] = await Promise.allSettled([
+    const [bookingResult, autoDeliveryResult, itemsResult] = await Promise.allSettled([
       fetchNextBooking(),
       fetchNextAutoDelivery(),
+      getFriendUpcomingItems(db, friendId, accountId, nowIso),
     ]);
 
     return c.json({
       success: true,
       data: {
+        items: itemsResult.status === 'fulfilled' ? itemsResult.value : [],
+        itemsError: itemsResult.status === 'rejected',
         nextBooking: bookingResult.status === 'fulfilled' ? bookingResult.value : null,
         nextBookingError: bookingResult.status === 'rejected',
         nextAutoDelivery: autoDeliveryResult.status === 'fulfilled' ? autoDeliveryResult.value : null,

@@ -2703,3 +2703,16 @@ export type PhotoPublicationOrderInput = {
   items: Array<{ id: string; expectedVersion: number }>;
 };
 export type PhotoPublicationPublishResult = { id: string; version: number; status: 'published' };
+
+/** 友だちに進行中の配信・処理。日時未確定と件数不明は null。 */
+export interface FriendUpcomingItem {
+  kind: 'scenario' | 'reminder' | 'broadcast' | 'automation';
+  id: string;
+  name: string;
+  scheduledAt: string | null;
+  sentCount: number | null;
+  totalCount: number | null;
+  href: string;
+  /** 一斉配信の対象条件を評価した日時。送信時には再判定される。 */
+  audienceEvaluatedAt?: string;
+}

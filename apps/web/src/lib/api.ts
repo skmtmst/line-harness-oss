@@ -30,6 +30,7 @@ import type {
   AutoReplyPublishResult,
   AutoReplyValidationResult,
   Friend,
+  FriendUpcomingItem,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
   FriendAddEventRoutingStatus,
@@ -3165,6 +3166,8 @@ export type FriendDetail = FriendWithTags & {
  * 確定した予定だけを返す。動的条件の将来配信は含まない。
  */
 export type FriendUpcoming = {
+  items?: FriendUpcomingItem[]
+  itemsError?: boolean
   nextBooking: {
     kind: 'booking' | 'event_booking' | 'meet_consultation'
     /** booking は予約ID、event_booking はイベントID、meet_consultation は相談ID */
