@@ -2188,7 +2188,19 @@ events.get('/api/liff/events/me', async (c) => {
     .prepare(sql)
     .bind(friend.id, account_id, nowIso)
     .all();
-  return c.json({ items: results ?? [] });
+  const waiting = await getMyEventWaitlist(c.env.DB, { lineAccountId: account_id, callerLineUserId });
+  const waitlistItems = waiting.filter(row => {
+    // 予約化済みは予約の行に出るため二重に載せない。
+    if (row.status === 'converted') return false;
+    const upcoming = ['waiting', 'offered', 'accepted'].includes(row.status) && row.slot_starts_at >= nowIso;
+    return tab === 'upcoming' ? upcoming : !upcoming;
+  });
+  // 予約の返しの項目はそのまま。待ちの行だけ source と順番を追加する。
+  const items = [...(results ?? []), ...waitlistItems] as Array<Record<string, unknown> & { slot_starts_at: string }>;
+  items.sort((a, b) => tab === 'upcoming'
+    ? a.slot_starts_at.localeCompare(b.slot_starts_at)
+    : b.slot_starts_at.localeCompare(a.slot_starts_at));
+  return c.json({ items });
 });
 
 async function eventWaitlistCaller(c: Context<Env>) {

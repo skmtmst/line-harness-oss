@@ -75,3 +75,41 @@ test('別店・未認証・受諾中の取り下げを拒否する', async () =>
   fixture.raw.exec(`UPDATE event_waitlist SET status = 'accepted' WHERE id = 'w'`);
   expect((await request('me/waitlist/w/cancel', 'POST')).status).toBe(409);
 });
+test('自分のイベントに予約の旧形式と順番つきの待ちを日時順で返す', async () => {
+  fixture.raw.exec(`
+    UPDATE event_waitlist SET status = 'waiting' WHERE id = 'w';
+    INSERT INTO event_waitlist (id, line_account_id, event_id, slot_id, friend_id, identity_key, status, sort_order, created_at, updated_at)
+      VALUES ('ahead', 'a', 'e', 's', 'g', 'g', 'waiting', -1, '2026-10-02', '2026-10-02');
+    INSERT INTO event_slots (id, event_id, starts_at, ends_at) VALUES ('earlier', 'e', '2099-05-01T00:00:00.000Z', '2099-05-01T01:00:00.000Z');
+    INSERT INTO event_bookings (id, line_account_id, event_id, slot_id, friend_id, identity_key, status, requested_at)
+      VALUES ('booking', 'a', 'e', 'earlier', 'f', 'f', 'confirmed', '2026-10-01');
+  `);
+  const res = await request('me?tab=upcoming');
+  expect(res.status).toBe(200);
+  const { items } = await res.json() as { items: Record<string, unknown>[] };
+  expect(items.map(row => row.id)).toEqual(['booking', 'w']);
+  expect(items[0]).not.toHaveProperty('source');
+  expect(items[0]).toMatchObject({ status: 'confirmed', customer_note: null, event_name: '試験イベント' });
+  expect(items[1]).toMatchObject({ source: 'waitlist', queue_position: 2, party_size: 2 });
+});
+test('終了・取消の待ちは過去に出し、予約化済みは二重表示しない', async () => {
+  fixture.raw.exec(`UPDATE event_waitlist SET status = 'cancelled' WHERE id = 'w'`);
+  expect(await (await request('me?tab=upcoming')).json()).toEqual({ items: [] });
+  expect(await (await request('me?tab=past')).json()).toMatchObject({ items: [{ id: 'w', status: 'cancelled', queue_position: null }] });
+  fixture.raw.exec(`UPDATE event_waitlist SET status = 'expired' WHERE id = 'w'`);
+  expect(await (await request('me?tab=past')).json()).toMatchObject({ items: [{ id: 'w', status: 'expired' }] });
+  fixture.raw.exec(`UPDATE event_waitlist SET status = 'waiting' WHERE id = 'w';
+    UPDATE event_slots SET starts_at = '2020-06-01T00:00:00.000Z' WHERE id = 's'`);
+  expect(await (await request('me?tab=past')).json()).toMatchObject({ items: [{ id: 'w' }] });
+  fixture.raw.exec(`UPDATE event_waitlist SET status = 'converted' WHERE id = 'w'`);
+  expect(await (await request('me?tab=past')).json()).toEqual({ items: [] });
+});
+test('イベント編集後も待ち一覧の日時と名称は申込時のsnapshotに従う', async () => {
+  fixture.raw.prepare(`UPDATE event_waitlist SET status = 'waiting', event_snapshot_json = ?`).run(JSON.stringify({
+    eventName: '申込時の体験会', slotStartsAt: '2099-07-01T00:00:00.000Z', slotEndsAt: '2099-07-01T01:00:00.000Z',
+    eventImageUrl: null, venueName: '申込時の会場', venueAddress: null,
+  }));
+  expect(await (await request('me?tab=upcoming')).json()).toMatchObject({ items: [{
+    id: 'w', event_name: '申込時の体験会', slot_starts_at: '2099-07-01T00:00:00.000Z', queue_position: 1,
+  }] });
+});

@@ -185,6 +185,8 @@ export type CreateEventBookingResponse =
   | { waitlisted: true; slot_id: string };
 
 export interface EventBookingMine {
+  /** 従来の予約行は未指定。待ちの行は source: 'waitlist'。 */
+  source?: 'booking';
   id: string;
   event_id: string;
   status: string;
@@ -198,6 +200,8 @@ export interface EventBookingMine {
   slot_starts_at: string;
   slot_ends_at: string;
 }
+
+export type EventMine = EventBookingMine | EventWaitlistMine;
 
 // ===== Webinar =====
 
@@ -317,7 +321,7 @@ export const api = {
       { 'Idempotency-Key': idempotencyKey },
     ),
   myEventBookings: (tab: 'upcoming' | 'past') =>
-    get<{ items: EventBookingMine[] }>(`/api/liff/events/me?tab=${tab}`),
+    get<{ items: EventMine[] }>(`/api/liff/events/me?tab=${tab}`),
   myEventWaitlist: () => get<{ items: EventWaitlistMine[] }>('/api/liff/events/me/waitlist'),
   myEventWaitlistEntry: (waitlistId: string) =>
     get<EventWaitlistMine>(`/api/liff/events/me/waitlist/${encodeURIComponent(waitlistId)}`),
