@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { act, cleanup, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  flushListUrlState,
   nextListUrl,
   parseListUrlState,
   readListUrlParam,
@@ -19,6 +20,7 @@ import {
  */
 
 beforeEach(() => {
+  flushListUrlState()
   window.history.replaceState(null, '', '/scenarios')
   window.sessionStorage.clear()
 })
@@ -71,6 +73,9 @@ describe('useListUrlParam・useListUrlFlag・useListUrlState', () => {
     act(() => screen.getByText('検索').click())
     act(() => screen.getByText('停止中').click())
     act(() => screen.getByText('フォルダ').click())
+    // 見た目は押した瞬間に変わり、URL は描いた後に書く。
+    expect(screen.getByTestId('folder').textContent).toBe('f1')
+    flushListUrlState()
     expect(new URLSearchParams(window.location.search).get('q')).toBe('フォロー')
     expect(window.location.search).toContain('stopped=1')
     expect(window.location.search).toContain('folder=f1')
@@ -85,6 +90,7 @@ describe('useListUrlParam・useListUrlFlag・useListUrlState', () => {
     window.history.replaceState(null, '', '/scenarios?id=7&q=a&stopped=1&folder=f&page=4')
     render(<Probe />)
     act(() => screen.getByText('解除').click())
+    flushListUrlState()
     expect(window.location.search).toBe('?id=7')
     expect(readListUrlParam('q')).toBe('')
   })
@@ -137,8 +143,25 @@ describe('useOffsetServerList の pageUrlKey', () => {
     expect(screen.getByTestId('list-page').textContent).toBe('3')
     expect(pages.at(-1)).toBe(3)
     act(() => screen.getByText('2ページ').click())
+    flushListUrlState()
     expect(window.location.search).toBe('?page=2')
     act(() => screen.getByText('1ページ').click())
+    flushListUrlState()
     expect(window.location.search).toBe('')
+  })
+})
+
+describe('URL への書き込みは描いた後', () => {
+  it('押した処理の中では書かず、次のコマの後にまとめて 1 回書く', async () => {
+    render(<Probe />)
+    const spy = vi.spyOn(window.history, 'replaceState')
+    act(() => screen.getByText('検索').click())
+    act(() => screen.getByText('停止中').click())
+    expect(spy).not.toHaveBeenCalled()
+    expect(screen.getByTestId('q').textContent).toBe('フォロー')
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)) })
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(window.location.search).toContain('stopped=1')
+    spy.mockRestore()
   })
 })

@@ -31,7 +31,53 @@ function subscribe(onChange: () => void): () => void {
   }
 }
 
-const readSearch = () => window.location.search
+/*
+ * 押した瞬間は手元の値（pending）を先に描き、URL への書き込みは描いた後へ回す。
+ * Next.js の router は replaceState を受けると画面の木を描き直すので、押した処理の中で
+ * 書くと、絞り込みの見た目が変わるまでが 50ms から 90ms へ延びていた（動きの点検で計測）。
+ */
+let pending: { pathname: string; search: string } | null = null
+let scheduled = false
+
+function currentLocation(): { pathname: string; search: string; hash: string } {
+  const { pathname, hash } = window.location
+  const search = pending && pending.pathname === pathname ? pending.search : window.location.search
+  return { pathname, search, hash }
+}
+
+const readSearch = () => currentLocation().search
+
+function flushPending(): void {
+  scheduled = false
+  const next = pending
+  pending = null
+  if (!next || next.pathname !== window.location.pathname) return
+  if (next.search === window.location.search) return
+  // Next.js（14.1 以降）は history.replaceState を受け取って router と同期する。
+  window.history.replaceState(null, '', `${next.pathname}${next.search}${window.location.hash}`)
+}
+
+function commitUrl(url: string): void {
+  const parsed = new URL(url, window.location.origin)
+  pending = { pathname: parsed.pathname, search: parsed.search }
+  window.dispatchEvent(new Event(LOCAL_EVENT))
+  if (scheduled) return
+  scheduled = true
+  // 描いた後（次のコマの後）に書く。rAF が無い環境ではすぐ後。
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(flushPending, 0))
+  else setTimeout(flushPending, 0)
+}
+
+/** 書きかけの URL をすぐ書く（離れる直前・試験用）。 */
+export function flushListUrlState(): void {
+  flushPending()
+}
+
+if (typeof window !== 'undefined') {
+  // 別の画面へ移る・戻るときは、書きかけを先に書いてから。
+  window.addEventListener('popstate', () => { pending = null })
+  window.addEventListener('pagehide', flushListUrlState)
+}
 const readServerSearch = () => ''
 
 export function parseListUrlState<T extends Record<string, string>>(search: string, defaults: T): T {
@@ -69,12 +115,10 @@ export function useListUrlState<T extends Record<string, string>>(defaults: T): 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const state = useMemo(() => parseListUrlState(search, defaultsRef.current), [search, defaultsKey])
   const set = useCallback((patch: Partial<T>) => {
-    const url = nextListUrl(window.location, defaultsRef.current, patch)
-    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
-    if (url === current) return
-    // Next.js（14.1 以降）は history.replaceState を受け取って router と同期する。
-    window.history.replaceState(null, '', url)
-    window.dispatchEvent(new Event(LOCAL_EVENT))
+    const location = currentLocation()
+    const url = nextListUrl(location, defaultsRef.current, patch)
+    if (url === `${location.pathname}${location.search}${location.hash}`) return
+    commitUrl(url)
   }, [])
   return [state, set]
 }
@@ -101,11 +145,10 @@ export function useListUrlFlag(key: string): [boolean, (next: boolean) => void] 
 /** 1 つの鍵をその場で URL に書く（空なら消す）。フックの外（ページ送りなど）から使う。 */
 export function writeListUrlParam(key: string, value: string): void {
   if (typeof window === 'undefined') return
-  const url = nextListUrl(window.location, { [key]: '' }, { [key]: value })
-  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
-  if (url === current) return
-  window.history.replaceState(null, '', url)
-  window.dispatchEvent(new Event(LOCAL_EVENT))
+  const location = currentLocation()
+  const url = nextListUrl(location, { [key]: '' }, { [key]: value })
+  if (url === `${location.pathname}${location.search}${location.hash}`) return
+  commitUrl(url)
 }
 
 /**
@@ -114,7 +157,7 @@ export function writeListUrlParam(key: string, value: string): void {
  */
 export function readListUrlParam(key: string, fallback = ''): string {
   if (typeof window === 'undefined') return fallback
-  return new URLSearchParams(window.location.search).get(key) ?? fallback
+  return new URLSearchParams(currentLocation().search).get(key) ?? fallback
 }
 
 /* ── スクロール位置を戻す ─────────────────────────────── */
