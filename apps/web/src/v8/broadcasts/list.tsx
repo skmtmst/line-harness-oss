@@ -29,6 +29,7 @@ import {
   Send,
   SendHorizontal,
   UserCheck,
+  X,
 } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
@@ -922,10 +923,10 @@ export default function BroadcastListV8() {
       <Button type="button" onClick={() => void loadList((page - 1) * pageSize)}>もう一度試す</Button>, true)
   ) : visibleBroadcasts.length === 0 ? (
     filterActive
-      ? stateCard(null, '条件に合う配信はありません', '「予約中のみ」「下書き」や配信日を外すと、すべて出ます。',
-        <Button type="button" onClick={clearFilters}>条件を外す</Button>)
-      : stateCard(<Send size={20} aria-hidden="true" />, 'まだ一斉配信はありません', '友だちにまとめてお知らせを送れます。',
-        <Button type="button" variant="primary" disabled={!canEdit} onClick={() => openCreate(false)}>＋ 配信を作る</Button>)
+      ? stateCard(null, '条件に合う配信はありません', '「予約中のみ」「下書き」や配信日を外すと、すべて出ます',
+        <Button type="button" onClick={clearFilters}><X size={14} aria-hidden="true" />条件を外す</Button>)
+      : stateCard(<Send size={20} aria-hidden="true" />, 'まだ一斉配信はありません', '友だちにまとめてお知らせを送れます',
+        <Button type="button" variant="primary" disabled={!canEdit} title={!canEdit ? READONLY_REASON : undefined} onClick={() => openCreate(false)}><Plus size={15} aria-hidden="true" />配信を作る</Button>)
   ) : (
     <DataTable className={styles.table}>
       {tableHead}
