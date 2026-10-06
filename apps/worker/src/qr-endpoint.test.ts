@@ -198,6 +198,8 @@ const QR_CALL_SITES = [
   { file: 'apps/web/src/app/inflow-links/detail/page.tsx', kind: 'bounded', fixedSize: '320x320' },
   { file: 'apps/web/src/app/inflow-links/referral-qr-modal.tsx', kind: 'bounded', fixedSize: '320x320' },
   { file: 'apps/web/src/components/dashboard/qr-dialog.tsx', kind: 'bounded', fixedSize: null },
+  // ★V8 流入と計測の QR 小窓（GtI4Y）。data は今の小窓と同じ「土台のURL + /r/ + 合言葉」。
+  { file: 'apps/web/src/v8/inflow-links/qr-dialog.tsx', kind: 'bounded', fixedSize: '320x320' },
   { file: 'apps/worker/src/index.ts', kind: 'passthrough', fixedSize: '240x240' },
   { file: 'apps/worker/src/routes/liff.ts', kind: 'passthrough', fixedSize: '240x240' },
 ] as const;
