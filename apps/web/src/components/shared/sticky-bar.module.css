@@ -34,6 +34,7 @@
  */
 [data-theme='v8'] .bar {
   bottom: 12px;
+  min-height: 60px; /* 絵 K7HWG ほか：padding 12・ボタン36 で高さ60 */
   border: 0;
   box-shadow: var(--shadow-bar-float);
 }

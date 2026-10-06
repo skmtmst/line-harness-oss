@@ -3916,6 +3916,60 @@ export const AUTO_REPLY_RUNS = {
 }
 
 /** 機能8の公開フロー。設計 g46ja / Yj6CQ / e6iJG と同じ1件を通す。 */
+/* ★V8 作る②〜⑤（A0pDt・rfhIf・Guoye）の絵：作りかけの下書き「予約の日程変更」。
+   一覧（uE9gf）の絵には出ないので AUTO_REPLIES には入れない。/api/auto-replies/ar-new だけが返す。 */
+export const AUTO_REPLY_NEW_DRAFT = {
+  autoReplyId: 'ar-new',
+  versionId: 'ar-new-draft-v1',
+  versionNumber: 1,
+  status: 'draft',
+  lastTestStatus: null,
+  lastTestedAt: null,
+  publishedAt: null,
+  matchedLast28Days: null,
+  conflictAttentionCount: 0,
+  settings: {
+    ...AR_BASE,
+    name: '予約の日程変更',
+    folderId: 'arf-booking',
+    internalMemo: '',
+    keyword: '予約変更',
+    matchType: 'contains',
+    keywords: [
+      { keyword: '予約変更', matchType: 'contains' },
+      { keyword: '日程変更', matchType: 'contains' },
+      { keyword: '予約をずらしたい', matchType: 'contains' },
+    ],
+    keywordMatchMode: 'any',
+    respondToAll: false,
+    messageKinds: ['text'],
+    responseWeekdays: [1, 2, 3, 4, 5],
+    responseHolidayRule: 'ignore',
+    friendConditions: null,
+    responseType: 'text',
+    templateId: null,
+    responseContent: '{{name}}さん、ご連絡ありがとうございます。\n予約の変更は、下のボタンから日時を選び直せます。担当からも折り返しご連絡します。',
+    lineAccountId: 'visual-qa-account',
+    actions: [
+      { actionType: 'support_mark', config: { label: '予約変更' }, onFailure: 'continue' },
+      { actionType: 'notify_staff', config: { notificationRuleId: '', notificationRuleVersion: 0, message: '予約の日程変更のお問い合わせがありました。' }, onFailure: 'stop' },
+    ],
+    replyDelaySeconds: 0,
+    cooldownMinutes: 60,
+    skipWhenOperatorActive: true,
+    oncePerFriend: false,
+    unmatchedAction: null,
+    receiveSources: ['line'],
+    priority: 6,
+  },
+}
+export const AUTO_REPLY_NEW_LIVE = {
+  ...AR_BASE, id: 'ar-new', name: '予約の日程変更', keyword: '予約変更', matchType: 'contains',
+  responseType: 'text', responseContent: '', isActive: false, lifecycleStatus: 'draft', priority: 6,
+  folderId: 'arf-booking', keywords: [], actions: [], hits: { period: 0, total: 0 },
+  actionExecutionCount: 0, conflictAttentionCount: 0, createdAt: '2026-10-05T00:00:00.000Z',
+}
+
 export const AUTO_REPLY_PUBLISH_DRAFT = {
   autoReplyId: 'ar-2',
   versionId: 'ar-2-draft-v3',
