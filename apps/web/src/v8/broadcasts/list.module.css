@@ -1,0 +1,347 @@
+/*
+ * ★V8 一斉配信の一覧（Pencil `l5V9a`・1152 `jjFNi`・閲覧のみ `NtCE3`）。
+ * 枠・見出し・数の帯・フォルダの列・道具の段の外側は型（ListPage）が持つ。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-bc-*`。
+ */
+
+/* 閲覧のみの帯（NtCE3）。数の帯の上。薄い青の地・目の印・枠なし。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg { color: var(--color-action); flex-shrink: 0; }
+
+.createFull { width: 100%; }
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-bc-note-lh);
+}
+
+.inlineRetry {
+  margin-left: var(--tpl-cell-gap-half);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 道具の段：2段（段の間 10）。 */
+.tools {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-bc-tools-gap);
+  min-width: 0;
+}
+
+.toolRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+}
+
+.spacer { flex: 1 1 0; }
+
+.searchBox { width: var(--tpl-bc-search-w); flex-shrink: 1; min-width: 0; }
+.searchNarrow { width: var(--tpl-bc-narrow-search-w); }
+
+.folderSelect { width: var(--tpl-narrow-folder-w); }
+.folderSelect :global(*) { max-width: 100%; }
+.folderSelect :global(button) { width: 100%; }
+
+.statusSelect { width: var(--tpl-bc-status-select-w); }
+.statusSelect :global(*) { max-width: 100%; }
+.statusSelect :global(button) { width: 100%; }
+
+.pageSizeBox { width: var(--tpl-bc-page-size-w); }
+.pageSizeBox :global(*) { max-width: 100%; }
+.pageSizeBox :global(button) { width: 100%; }
+
+.savedBox { position: relative; flex-shrink: 0; }
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+
+/* 「配信日：指定なし」。字のあとに暦の印。 */
+.datePopoverWrap { position: relative; flex-shrink: 0; }
+
+.dateButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bc-control-gap);
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-bc-date-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -0.5px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-chip-label-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dateButton > svg { color: var(--color-ink-faint); }
+.dateButton[data-active='true'] { outline-color: var(--color-action); color: var(--color-action); }
+
+.datePopover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + var(--tpl-sub-gap));
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cell-gap-half);
+  width: var(--tpl-bc-popover-w);
+  padding: var(--tpl-rule-row-gap);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--v8-popover-shadow);
+}
+
+.datePopoverLabel {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+
+.datePopoverActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-cell-gap-half);
+}
+
+/* 枠の無い文字のボタン（この条件を保存する）。 */
+.ghostButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bc-control-gap);
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-bc-ghost-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-chip-label-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ghostButton:hover:not(:disabled) { background: var(--color-canvas-sunken); }
+.ghostButton:disabled { cursor: not-allowed; opacity: 0.5; }
+
+/* 並び（新しい順）：押すと古い順と入れ替わる。 */
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bc-control-gap);
+  height: var(--tpl-bc-sort-h);
+  padding: var(--tpl-bc-ghost-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-bc-cell-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sortButton:hover { background: var(--color-canvas-sunken); }
+
+.saveRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+}
+
+.saveInput {
+  min-width: var(--tpl-bc-save-input-w);
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-kw-input-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  font-size: var(--text-label);
+}
+
+.createForm { padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-pad-block); }
+
+/* 表：見出し 13/20・行 9/20・列の間 16（l5V9a）。 */
+.table table { table-layout: fixed; }
+.table th,
+.table td {
+  padding: var(--tpl-bc-cell-pad-block) calc(var(--tpl-bc-col-gap) / 2);
+  vertical-align: middle;
+}
+.table thead th {
+  padding-block: var(--tpl-bc-head-pad-block);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-bc-cell-lh);
+}
+.table th:first-child,
+.table td:first-child { padding-left: var(--tpl-bc-edge-pad); }
+.table th:last-child,
+.table td:last-child { padding-right: var(--tpl-bc-edge-pad); }
+
+.colTitle { width: auto; }
+.colStatus { width: var(--tpl-bc-col-status); }
+.colAudience { width: var(--tpl-bc-col-audience); }
+.colDate { width: var(--tpl-bc-col-date); }
+.colResult { width: var(--tpl-bc-col-result); }
+.colMenu { width: var(--tpl-bc-col-menu); text-align: right; }
+
+.row { height: auto; cursor: pointer; }
+
+.cellTitle {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-bc-cell-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cellTitle:hover { color: var(--color-action); text-decoration: underline; }
+
+.cellMain {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-bc-cell-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cellSub {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audience {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-bc-cell-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resultMain {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-bc-result-lh);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 状態の札：点＋字（12/600・上下2・左右8）。 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bc-badge-gap);
+  padding: var(--tpl-bc-badge-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-bc-cell-lh);
+  white-space: nowrap;
+}
+.badgeDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentcolor;
+}
+.badge[data-tone='neutral'] { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
+.badge[data-tone='info'] { background: var(--color-info-bg); color: var(--color-info); }
+.badge[data-tone='warning'] { background: var(--color-warning-bg); color: var(--color-warning); }
+.badge[data-tone='success'] { background: var(--color-success-bg); color: var(--color-success); }
+.badge[data-tone='danger'] { background: var(--color-danger-bg); color: var(--color-danger); }
+
+/* 行の「…」：28 の四角・薄い線。メニューの目印が行を伸ばさないよう箱で包む。 */
+.menuBox { display: flex; align-items: center; justify-content: flex-end; }
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-bc-menu-size);
+  height: var(--tpl-bc-menu-size);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -0.5px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+.menuButton:hover { background: var(--color-canvas-sunken); }
+
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-bc-pager-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 空・失敗の1枚。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  margin: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side);
+  padding: var(--tpl-bc-state-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  text-align: center;
+}
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-bc-state-icon);
+  height: var(--tpl-bc-state-icon);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  color: var(--color-ink-secondary);
+}
+.stateIconError { background: var(--color-danger-bg); color: var(--color-danger); }
+.stateTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 600; }
+.stateDesc { margin: 0; color: var(--color-ink-faint); font-size: var(--text-label); }
