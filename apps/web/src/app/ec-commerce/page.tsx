@@ -40,7 +40,7 @@ import { FAILURE_KIND_TEXT } from './ec-failure'
 import { formatEcDateTime as dateTime } from './ec-datetime'
 import styles from './ec-commerce-v6.module.css'
 import { formatNumber } from '@/lib/format'
-import { useAdminThemeNow } from '@/lib/use-admin-theme-now'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import EcCommerceScreen from '@/v8/settings/ec-commerce/screen'
 import ConnectorPanel from './connector-panel'
@@ -594,7 +594,7 @@ function EcCommercePageV8() {
 
 function EcCommercePageSwitch() {
   /* 付け直しのたびに v7 を挟まない読み方（lib/use-admin-theme-now.ts の説明）。 */
-  const theme = useAdminThemeNow()
+  const theme = useAdminTheme()
   return theme === 'v8' ? <EcCommercePageV8 /> : <EcCommercePageInner />
 }
 

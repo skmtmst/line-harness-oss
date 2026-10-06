@@ -9,7 +9,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationRunList from '@/components/line-notifications/notification-run-list'
 import OperatorNotificationRules from './operator-notification-rules'
 import LineNotificationsScreen from '@/v8/settings/line-notifications/screen'
-import { useAdminThemeNow } from '@/lib/use-admin-theme-now'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -1284,7 +1284,7 @@ function LineNotificationsPage() {
  */
 /* ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/line-notifications）。運用者へのお知らせの一覧は今の部品を差し込む。 */
 function LineNotificationsEntry() {
-  const theme = useAdminThemeNow()
+  const theme = useAdminTheme()
   return theme === 'v8'
     ? <LineNotificationsScreen renderOperatorRules={(lineAccountId) => <OperatorNotificationRules lineAccountId={lineAccountId} />} />
     : <LineNotificationsPage />

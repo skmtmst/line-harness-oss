@@ -3,7 +3,6 @@
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import { useAdminThemeNow } from '@/lib/use-admin-theme-now'
 import EmergencyScreen from '@/v8/settings/emergency/screen'
 
 import { X } from 'lucide-react'
@@ -1617,7 +1616,7 @@ function EmergencyPageInner() {
 
 /* ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/emergency）。更新履歴・緊急コントロールは今の部品を差し込む。 */
 function EmergencyEntry() {
-  const theme = useAdminThemeNow()
+  const theme = useAdminTheme()
   if (theme !== 'v8') return <EmergencyPageInner />
   return (
     <EmergencyScreen
