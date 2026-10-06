@@ -1,0 +1,176 @@
+/* 運営の画面で使い回す枠（区画・小さな表・数のマス）。値は globals.css の --tpl-op-*。 */
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-section-gap);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-op-row-gap);
+}
+
+.row > * {
+  min-width: 0;
+  flex: 1;
+}
+
+.panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--tpl-op-panel-gap);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  padding: var(--tpl-op-panel-pad);
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-op-panel-title-lh);
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+}
+
+.panelHead > .panelTitle {
+  flex: 1;
+}
+
+/* 小さな表（絵の「表」：角丸12・薄い枠・見出し行は #fafafc）。 */
+.mini {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.miniHead,
+.miniRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-mini-gap);
+  padding: var(--tpl-op-mini-pad);
+}
+
+.miniHead {
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-op-mini-head-lh);
+}
+
+.miniRow {
+  border-top: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-op-mini-row-lh);
+}
+
+.grow {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.num {
+  flex-shrink: 0;
+  padding-right: var(--tpl-op-mini-num-pad);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.fixed {
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link {
+  color: var(--color-ink);
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.textLink {
+  align-self: flex-start;
+  padding: 0;
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-op-mini-row-lh);
+}
+
+.textLink:hover {
+  text-decoration: underline;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.line {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-op-mini-row-lh);
+}
+
+.alert {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+.status {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+}
+
+/* 数のマス（4つ並び・間12）。KpiCard の cell を並べる。 */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tpl-op-row-gap);
+}
+
+.kpis > * {
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+@media (max-width: 1023.98px) {
+  .row {
+    flex-direction: column;
+  }
+
+  .row > * {
+    width: 100%;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

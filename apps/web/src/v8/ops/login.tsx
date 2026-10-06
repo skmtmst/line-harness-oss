@@ -1,18 +1,16 @@
 'use client'
 
-import { MessageCircle } from 'lucide-react'
+import { LogIn, MessageCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useState, type FormEvent } from 'react'
-import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
 import { authRequest, emailError, internalAuthFailureCopy } from '@/lib/auth-email'
-import { useAdminTheme } from '@/lib/use-admin-theme'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
-import OpsLoginV8 from '@/v8/ops/login'
+import styles from './auth.module.css'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -23,19 +21,13 @@ const LINE_LOGIN_FAILURE_CODES = new Set([
 ])
 
 /**
- * 運営コンソールのログイン。★V6 37-1（`InTGF`）。
+ * 運営コンソールのログイン V8（絵 `D9JALJ`）。
  *
- * 見た目は統括のログイン（★V6 0-1）にそろえる。メール＋パスワードが主、
- * LINE ログインが副。どちらで入っても、platform_admins に登録された人だけが
- * /ops へ進める。新規登録の導線は出さない（運営は招待制）。
+ * 動きは v7（app/ops/login）と同じ：メール＋パスワードが主、LINE が副。
+ * 入れた後に /api/auth/session で運営メンバーかを確かめてから /ops へ進む。
+ * 2要素認証が要る人は /login/two-factor（設定がまだなら setup）へ送る。
  */
-export default function OpsLoginPage() {
-  // ★V8 は src/v8/ops/login.tsx（絵 D9JALJ）。v7 は下のまま。
-  return useAdminTheme() === 'v8' ? <OpsLoginV8 /> : <OpsLoginV7 />
-}
-
-function OpsLoginV7() {
-  const v8 = false
+export default function OpsLoginV8() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
@@ -82,19 +74,14 @@ function OpsLoginV7() {
       return
     }
     if (res.data.twoFactor && res.data.challengeToken) {
-      // `next=ops` は URL に残す。シークレットモードで別サイト Cookie が止まっても、
-      // 二段階認証のあと通常ログインへ戻らず、運営コンソールへ確実に戻す。
       window.location.assign(`/login/two-factor?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
-    // M041：保存に投げても（シークレットモードの制限など）固まらない。
-    // Cookie のセッションで足りるので、ここでは進める。
     else if (res.csrfToken) {
-      try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie session is sufficient */ }
+      try { localStorage.setItem('lh_csrf', res.csrfToken) } catch { /* Cookie のセッションで足りる */ }
     }
 
-    // 運営メンバーかどうかをサーバーに確かめてから /ops へ。
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     try {
       const session = await fetch(`${apiUrl}/api/auth/session`, { credentials: 'include', headers: adminSessionHeaders() })
@@ -125,67 +112,53 @@ function OpsLoginV7() {
   }
 
   return (
-    <AuthCard
-      node={v8 ? 'D9JALJ' : 'InTGF'}
-      cardNode="aHJXA"
-      title="ログイン"
-      description={
-        <>
-          <span className="mb-1 block text-micro text-ink-secondary">運営コンソール</span>
-          メールアドレスとパスワードでログインします。LINE で登録した運営メンバーは LINE でログインしてください。
-        </>
-      }
-    >
-      <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
-        {error ? (
-          <Notice tone="danger" message={error} />
-        ) : null}
-        <AuthField label="メールアドレス" htmlFor="ops-login-email" error={emailMessage}>
-          <TextField
-            id="ops-login-email"
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            invalid={Boolean(emailMessage)}
-            autoComplete="email"
-            inputMode="email"
-            placeholder="you@example.com"
-          />
-        </AuthField>
-        <AuthField label="パスワード" htmlFor="ops-login-password">
-          <PasswordField id="ops-login-password" value={password} onChange={setPassword} autoComplete="current-password" />
-        </AuthField>
-        <div className="flex justify-end">
-          <Link href="/password/forgot" className="text-caption font-semibold text-action hover:underline">
-            パスワードを忘れた方はこちら
-          </Link>
+    <main className={styles.page} data-design-node="D9JALJ">
+      <div className={styles.brand}>
+        <span className={styles.mark} aria-hidden="true">m</span>
+        <span className={styles.brandText}>
+          <span className={styles.brandName}>musubo</span>
+          <span className={styles.brandSub}>運営コンソール</span>
+        </span>
+      </div>
+      <section className={styles.card} aria-labelledby="ops-login-title">
+        <h1 id="ops-login-title" className={styles.title}>ログイン</h1>
+        <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>
+          {error ? <Notice tone="danger" message={error} /> : null}
+          <div className={styles.field}>
+            <label htmlFor="ops-login-email" className={styles.label}>メールアドレス</label>
+            <TextField
+              id="ops-login-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              invalid={Boolean(emailMessage)}
+              aria-describedby={emailMessage ? 'ops-login-email-error' : undefined}
+              autoComplete="email"
+              inputMode="email"
+              placeholder="you@example.com"
+            />
+            {emailMessage ? <p id="ops-login-email-error" className={styles.error}>{emailMessage}</p> : null}
+          </div>
+          <div className={styles.field}>
+            <label htmlFor="ops-login-password" className={styles.label}>パスワード</label>
+            <PasswordField id="ops-login-password" value={password} onChange={setPassword} autoComplete="current-password" />
+          </div>
+          <Button type="submit" variant="primary" disabled={busy !== null} className={styles.wide} busy={busy === 'password'} busyLabel="ログインしています…">
+            <LogIn aria-hidden="true" />ログイン
+          </Button>
+        </form>
+        <div className={styles.or} aria-hidden="true">
+          <span className={styles.rule} />
+          <span>または</span>
+          <span className={styles.rule} />
         </div>
-        <Button type="submit" variant="primary" disabled={busy !== null} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
+        <Button onClick={lineLogin} disabled={busy !== null} className={styles.wide} busy={busy === 'line'} busyLabel="LINEへ移動中…">
+          <MessageCircle aria-hidden="true" />LINE でログイン
         </Button>
-      </form>
-
-      {v8 ? (
-        <p className="w-full text-center text-caption text-ink-faint">
-          ログインの次に、認証アプリの6桁の数字を入れます
-        </p>
-      ) : (
-        <div className="flex w-full items-center gap-3" aria-hidden="true">
-          <span className="h-px flex-1 bg-hairline" />
-          <span className="text-caption text-ink-faint">または</span>
-          <span className="h-px flex-1 bg-hairline" />
-        </div>
-      )}
-
-      <Button onClick={lineLogin} disabled={busy !== null} className="w-full" busy={busy === 'line'} busyLabel="LINEへ移動中…">
-        <MessageCircle aria-hidden="true" className="h-4.5 w-4.5 text-line-choice" />LINE でログイン
-      </Button>
-
-      <p className="text-center text-caption text-ink-faint">
-        運営メンバーの招待を受けた方は、招待メールのリンクから設定してください
-      </p>
-      <p className="text-center text-caption text-ink-faint">
-        この画面は運営メンバーだけが開けます。操作はすべて記録されます。
-      </p>
-    </AuthCard>
+        <Link href="/password/forgot" className={styles.forgot}>パスワードを忘れた方はこちら</Link>
+        <p className={styles.note}>運営メンバーの招待を受けた方は、招待メールのリンクから設定してください</p>
+      </section>
+      <p className={styles.foot}>この画面は運営メンバーだけが開けます。操作はすべて記録されます。</p>
+    </main>
   )
 }

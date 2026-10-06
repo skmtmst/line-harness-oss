@@ -264,17 +264,17 @@ const OPS_DASHBOARD = {
   periodLabel: '2026年9月',
   pricing: 'list_price',
   lastSyncedAt: null,
-  ai: { callsThisMonth: 12, draftsThisMonth: 9, articlesActive: 3 },
+  ai: { callsThisMonth: 312, draftsThisMonth: 9, articlesActive: 3 },
   plans: [
     { key: 'light', label: 'ライト', monthlyYen: 9800 },
     { key: 'standard', label: 'スタンダード', monthlyYen: 29800 },
     { key: 'pro', label: 'プロ', monthlyYen: 59800 },
   ],
   kpis: {
-    revenueThisMonth: 129200, revenueDelta: 9800, refundsThisMonth: 0,
-    contractMonthlyTotal: 129200, filledByListPriceCount: 2, active: 4,
-    byPlan: { light: 1, standard: 2, pro: 1 },
-    trialing: 2, newInPeriod: 1, newTrialsInPeriod: 1,
+    revenueThisMonth: 39600, revenueDelta: 9800, refundsThisMonth: 0,
+    contractMonthlyTotal: 99400, filledByListPriceCount: 2, active: 3,
+    byPlan: { light: 1, standard: 1, pro: 1 },
+    trialing: 1, newInPeriod: 1, newTrialsInPeriod: 1,
     churnInPeriod: 0, churnRate: 0,
   },
   revenueByMonth: [
@@ -283,7 +283,8 @@ const OPS_DASHBOARD = {
     { month: '2026-06', label: '6月', yen: 109200, current: false },
     { month: '2026-07', label: '7月', yen: 119400, current: false },
     { month: '2026-08', label: '8月', yen: 119400, current: false },
-    { month: '2026-09', label: '9月', yen: 129200, current: true },
+    { month: '2026-09', label: '9月', yen: 119400, current: false },
+    { month: '2026-10', label: '10月', yen: 129200, current: true },
   ],
   planShare: {
     total: 6,
@@ -294,8 +295,8 @@ const OPS_DASHBOARD = {
       { key: 'trial', label: 'トライアル', count: 2, percent: 33 },
     ],
   },
-  alerts: { pastDue: 1, trialEndingSoon: 1, lineTokenExpiring: 0, unansweredTickets: 2 },
-  tickets: { newCount: 2, inProgressCount: 1, avgFirstReplyMinutes: 95, closedInPeriod: 5 },
+  alerts: { pastDue: 1, trialEndingSoon: 1, lineTokenExpiring: 2, unansweredTickets: 2 },
+  tickets: { newCount: 2, inProgressCount: 3, avgFirstReplyMinutes: 144, closedInPeriod: 5 },
   lineRegistration: { registered: 8, total: 10, unregisteredCount: 2 },
   usage: [
     {
@@ -2010,6 +2011,19 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 運営コンソール（`/ops/*`）。画面側は変えない。見本データは上の `OPS_*`。
    * 更新系は従来どおり405で、撮影では読みの画面だけを見る。
    */
+  /*
+   * 運営の入口（V8 の 2要素認証 qod6X・招待 tVaUh）。QR の用意と招待の確認だけ
+   * 固定で返す。キーは作り物（RFC の見本の値）で、本物の秘密ではない。
+   */
+  if (method === 'POST' && /^\/api\/staff\/[^/]+\/two-factor\/setup$/.test(pathname)) {
+    return {
+      success: true,
+      data: { provisioningUri: 'otpauth://totp/musubo:visual-qa?secret=JBSWY3DPEHPK3PXP&issuer=musubo', manualKey: 'JBSW Y3DP EHPK 3PXP' },
+    }
+  }
+  if (method === 'GET' && pathname === '/api/auth/ops-invite/check') {
+    return { success: true, data: { email: 'invited@example.com', name: '', needsPassword: true } }
+  }
   if (method === 'GET' && pathname === '/api/ops/me') {
     return { success: true, data: OPS_ME }
   }
@@ -4751,6 +4765,11 @@ const server = createServer((req, res) => {
       || (method === 'DELETE' && url.pathname === `/api/forms/${FORM_DETAIL.id}`)
     )
     if (formWriteRequest) {
+      res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
+      return
+    }
+    // 運営の 2要素認証（V8 qod6X）の QR の用意。読みだけの見本を返す。
+    if (method === 'POST' && /^\/api\/staff\/[^/]+\/two-factor\/setup$/.test(url.pathname)) {
       res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
       return
     }
