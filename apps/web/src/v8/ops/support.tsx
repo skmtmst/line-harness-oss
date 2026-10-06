@@ -316,7 +316,7 @@ export default function OpsSupportV8() {
   const chip = (c: { key: OpsSupportStage | 'all'; label: string }) => (
     <FilterChip
       key={c.key}
-      icon={c.key === 'all' ? <CircleDot aria-hidden="true" /> : <Star aria-hidden="true" />}
+      icon={c.key === 'all' ? <CircleDot size={13} aria-hidden="true" /> : <Star size={13} aria-hidden="true" />}
       selected={stage === c.key}
       onChange={() => setStage(c.key)}
     >

@@ -163,11 +163,11 @@ export default function OpsTenantsV8() {
           <div className={styles.search}>
             <SearchField value={q} onChange={setQ} onClear={() => setQ('')} placeholder="統括名・メール・店舗名で探す" aria-label="契約先を探す" />
           </div>
-          <FilterChip icon={<CircleDot aria-hidden="true" />} selected={filter === ''} onChange={() => setFilter('')}>
+          <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => setFilter('')}>
             {loading || listLoadError ? 'すべて' : `すべて ${rows.length}`}
           </FilterChip>
           {STATUS_FILTERS.map((f) => (
-            <FilterChip key={f.key} icon={<Star aria-hidden="true" />} selected={filter === f.key} onChange={(selected) => setFilter(selected ? f.key : '')}>
+            <FilterChip key={f.key} icon={<Star size={13} aria-hidden="true" />} selected={filter === f.key} onChange={(selected) => setFilter(selected ? f.key : '')}>
               {f.label}
             </FilterChip>
           ))}

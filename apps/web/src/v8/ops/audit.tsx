@@ -130,9 +130,9 @@ export default function OpsAuditV8() {
       />
       <div className={parts.stack}>
         <div className={styles.tools}>
-          <FilterChip icon={<CircleDot aria-hidden="true" />} selected={filter === ''} onChange={() => { setFilter(''); setPage(1) }}>すべて</FilterChip>
+          <FilterChip icon={<CircleDot size={13} aria-hidden="true" />} selected={filter === ''} onChange={() => { setFilter(''); setPage(1) }}>すべて</FilterChip>
           {FILTERS.map((f) => (
-            <FilterChip key={f.key} icon={<Star aria-hidden="true" />} selected={filter === f.key} onChange={(selected) => { setFilter(selected ? f.key : ''); setPage(1) }}>
+            <FilterChip key={f.key} icon={<Star size={13} aria-hidden="true" />} selected={filter === f.key} onChange={(selected) => { setFilter(selected ? f.key : ''); setPage(1) }}>
               {f.label}
             </FilterChip>
           ))}
