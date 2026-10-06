@@ -190,6 +190,12 @@
   border-color: var(--color-border-soft);
 }
 
+/* ★V8：絵の行の「…」のメニューは項目の高さ 34・印と字の間 8（IIesG・SkY9V・C0lfUP）。 */
+[data-theme="v8"] .item:not(.itemTall) {
+  height: var(--tpl-menu-item-h);
+  gap: var(--tpl-menu-item-gap);
+}
+
 /*
  * ★V8 仕上げ（M10）：開くときに少し下から（opacity＋translateY 4px→0、
  * 200ms ease-out）。全画面の規定（globals の lh-surface-in は上から）に
