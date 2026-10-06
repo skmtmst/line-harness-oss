@@ -235,6 +235,8 @@ describe('共通部品の影響範囲', () => {
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
+      // V8 のリッチメニュー一覧（src/v8 に一から書いた）。
+      'v8/rich-menus/list.tsx',
       // ★V8 自動応答の一覧（uE9gf）。新しい置き場（src/v8）に一から書いた。
       'v8/auto-replies/list.tsx',
       // ★V8 共通情報の一覧（FM94M）。新しい置き場（src/v8）に一から書いた。
