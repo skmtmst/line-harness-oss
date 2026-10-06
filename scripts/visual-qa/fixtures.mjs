@@ -2093,7 +2093,9 @@ export const RICH_MENU_GROUPS = [
   },
   {
     ...RICH_MENU_BASE,
-    id: 'rmg-1',
+    /* 編集の見本（RICH_MENU_GROUP_DETAILS の rmg-1 ＝通常メニュー（会員向け）の下書き）と ID を分ける。
+     * 同じ ID だと、作る③の「出す順番」が自分と取り違えて、この行を消していた。 */
+    id: 'rmg-gold',
     name: '会員ランク上位',
     targetingPriority: 0,
     displayOrder: 0,
@@ -2148,11 +2150,16 @@ export const RICH_MENU_GROUPS = [
 
 export const RICH_MENU_GROUP_DETAILS = {
   'rmg-1': {
-    ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-1'),
+    ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-gold'),
+    id: 'rmg-1',
     /* 板 `kmTab`・`Z0uO6`（作る②）の頭は `名前：通常メニュー（会員向け）・
      * いまは下書きです`。一覧の `rmg-1`（会員ランク上位）は変えない。 */
     name: '通常メニュー（会員向け）',
     status: 'draft',
+    /* 板 `OxEMM`・`F4gELj`（作る③④）は「すべての友だち」（既定）で出す下書き。 */
+    isDefaultForAll: true,
+    targetingEnabled: false,
+    targetingCondition: null,
     defaultPageId: 'rmg-1-top',
     pages: [
       richMenuPage('rmg-1-top', 0, 'トップ', [
@@ -2166,6 +2173,17 @@ export const RICH_MENU_GROUP_DETAILS = {
       richMenuPage('rmg-1-booking', 2, '予約する', [
         richMenuArea('rmg-1-booking-product', '商品を見る', 'rmg-1-product', 833),
       ], null),
+    ],
+  },
+  /* 板 `hKr8f`（公開した・公開の進み）：公開中で「すべての友だち」の既定。 */
+  'rich-menu-target': {
+    ...RICH_MENU_GROUPS.find((group) => group.id === 'rich-menu-target'),
+    status: 'published',
+    defaultPageId: 'rmt-top',
+    pages: [
+      richMenuPage('rmt-top', 0, 'トップ', [
+        richMenuArea('rmt-top-product', '商品を見る', 'rmt-top', 0),
+      ], 'visual-qa/rich-menus/rmg-1-top.png'),
     ],
   },
   'rmg-2': {
@@ -2205,7 +2223,7 @@ export const RICH_MENU_TAP_STATS = {
   byArea: [],
   byGroup: [
     { groupId: 'rich-menu-target', taps: 12480 },
-    { groupId: 'rmg-1', taps: 3210 },
+    { groupId: 'rmg-gold', taps: 3210 },
   ],
   total: 15690,
 }
