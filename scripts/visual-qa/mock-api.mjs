@@ -35,6 +35,9 @@ import {
   COMMON_VAR_DETAIL,
   COMMON_VAR_DELETE_IMPACT,
   COMMON_VAR_SCHEDULES,
+  COMMON_VAR_HOURS_DETAIL,
+  COMMON_VAR_HOURS_DELETE_IMPACT,
+  COMMON_VAR_HOURS_SCHEDULES,
   commonVarChangeImpact,
   commonVarChangeImpactHours,
   COMMON_VAR_DELETE_IMPACT_EMPTY,
@@ -2871,7 +2874,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       data: {
         ...AUTO_REPLY_RUNS,
         items: AUTO_REPLY_RUNS.items.slice(offset, offset + limit),
-        pagination: { total: AUTO_REPLY_RUNS.items.length, limit, offset },
+        /* 板 nWmLg の「214件中 1〜20件」とページ送り。見本の行は5件だけだが、件数は絵の数を返す。 */
+        pagination: { total: Math.max(AUTO_REPLY_RUNS.items.length, AUTO_REPLY_RUNS.pagination.total), limit, offset },
       },
     }
   }
@@ -3941,11 +3945,15 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
   if (pathname === `/api/common-vars/${COMMON_VAR_DETAIL.id}`) return { success: true, data: COMMON_VAR_DETAIL }
+  /* 板 `AYc6O`・`C67dE`・`piWhz`：営業時間の編集（使っている8か所・予定1件・履歴2件）。 */
+  if (pathname === `/api/common-vars/${COMMON_VAR_HOURS_DETAIL.id}`) return { success: true, data: COMMON_VAR_HOURS_DETAIL }
   const commonVarDeleteImpact = /^\/api\/common-vars\/([^/]+)\/delete-impact$/.exec(pathname)
   if (commonVarDeleteImpact) {
     const impact = commonVarDeleteImpact[1] === COMMON_VAR_DELETE_IMPACT_EMPTY.variable.id
       ? COMMON_VAR_DELETE_IMPACT_EMPTY
-      : COMMON_VAR_DELETE_IMPACT
+      : commonVarDeleteImpact[1] === COMMON_VAR_HOURS_DETAIL.id
+        ? COMMON_VAR_HOURS_DELETE_IMPACT
+        : COMMON_VAR_DELETE_IMPACT
     return { success: true, data: impact }
   }
   /*
@@ -3956,7 +3964,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (commonVarSchedules) {
     return {
       success: true,
-      data: commonVarSchedules[1] === COMMON_VAR_DETAIL.id ? COMMON_VAR_SCHEDULES : [],
+      data: commonVarSchedules[1] === COMMON_VAR_DETAIL.id
+        ? COMMON_VAR_SCHEDULES
+        : commonVarSchedules[1] === COMMON_VAR_HOURS_DETAIL.id ? COMMON_VAR_HOURS_SCHEDULES : [],
     }
   }
   const mediaDeleteImpact = /^\/api\/media\/([^/]+)\/delete-impact$/.exec(pathname)
