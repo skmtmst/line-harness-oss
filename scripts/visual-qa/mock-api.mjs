@@ -128,6 +128,12 @@ let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
 // J-1・N 撮影用。動画の準備の段と開催回の定員を同じプロセス内で保存結果として返す。
 let mockVideoAsset = WEBINAR_VIDEO_ASSET ? { ...WEBINAR_VIDEO_ASSET } : null
 let mockSessionCapacity = 50
+/* 日時指定の見本（LPOe7）の開催回：日時・定員（null は無制限）・申込。 */
+const SCHEDULED_SESSIONS = [
+  ['2026-10-08T20:00:00+09:00', 50, 38],
+  ['2026-10-15T20:00:00+09:00', 50, 20],
+  ['2026-10-22T12:00:00+09:00', null, 0],
+]
 
 // R25専用。回答フォームの箱も作る・直す・消すを見本で返す。
 let formFolders = FORM_FOLDERS.map((folder) => ({ ...folder }))
@@ -4492,6 +4498,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/webinars/overview') return { success: true, data: WEBINAR_OVERVIEW }
+  /*
+    日時指定のウェビナー（板 LPOe7）。一覧には出さない ID で、開催回3つ・動画は準備の途中（配信の形）。
+    撮影は /webinars/edit?id=webinar-scheduled&pane=video。
+  */
+  if (pathname === '/api/webinars/webinar-scheduled/editor') return { success: true, data: { ...WEBINAR_EDITOR, deliveryKind: 'scheduled' } }
   if (/^\/api\/webinars\/[^/]+\/editor$/.test(pathname)) return { success: true, data: WEBINAR_EDITOR }
   if (/^\/api\/webinars\/[^/]+\/publish-validation$/.test(pathname)) return { success: true, data: WEBINAR_PUBLISH_VALIDATION }
   if (/^\/api\/webinars\/[^/]+\/participants$/.test(pathname)) return { success: true, data: WEBINAR_PARTICIPANTS }
@@ -4502,10 +4513,28 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (/^\/api\/webinars\/[^/]+\/user-comments$/.test(pathname)) return { success: true, data: [] }
   if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) return { success: true, data: WEBINAR_ANALYTICS }
   if (/^\/api\/webinars\/[^/]+\/video-asset$/.test(pathname)) {
-    return { success: true, data: { asset: mockVideoAsset } }
+    /* 準備の途中を見せるのは日時指定の見本（LPOe7）だけ。ほかは準備が済んだ動画（VWNaA は段を出さない）。 */
+    if (pathname.split('/')[3] === 'webinar-scheduled') return { success: true, data: { asset: mockVideoAsset } }
+    return { success: true, data: { asset: mockVideoAsset ? { ...WEBINAR_VIDEO_ASSET, stage: 'ready', stageLabel: '準備完了' } : null } }
   }
   if (/^\/api\/webinars\/[^/]+\/sessions\/[^/]+$/.test(pathname)) {
     const startAt = Number(pathname.split('/').pop())
+    const scheduledIndex = pathname.split('/')[3] === 'webinar-scheduled'
+      ? SCHEDULED_SESSIONS.findIndex(([at]) => Math.floor(Date.parse(at) / 1000) === startAt)
+      : -1
+    if (scheduledIndex >= 0) {
+      const [, capacity, reservedCount] = SCHEDULED_SESSIONS[scheduledIndex]
+      return {
+        success: true,
+        data: {
+          session: {
+            sessionStartAt: startAt, capacity, reservedCount,
+            state: capacity !== null && reservedCount >= capacity ? 'full' : 'open',
+            remaining: capacity === null ? null : Math.max(0, capacity - reservedCount),
+          },
+        },
+      }
+    }
     const capacity = mockSessionCapacity
     const reservedCount = 3
     return {
@@ -4525,9 +4554,23 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       既定の器だと `analytics.participants.length` の手前で落ちて、
       `/webinars/edit` が丸ごと「画面を表示できませんでした」になっていた。
     */
+    const webinarId = pathname.split('/').pop()
+    if (webinarId === 'webinar-scheduled') {
+      return {
+        data: {
+          ...WEBINARS[0], id: webinarId,
+          schedule: SCHEDULED_SESSIONS.map(([at]) => ({ type: 'once', at })),
+          publicationState: 'scheduled', publicationStartsAt: SCHEDULED_SESSIONS[0][0], publicationEndsAt: null,
+        },
+      }
+    }
+    /* 板 VWNaA の配信枠3件（毎日・毎週・単発）。毎日を先に置き、公開完了の面が読む時刻は今までどおり。 */
     return {
       data: {
-        ...WEBINARS[0], id: pathname.split('/').pop(),
+        ...WEBINARS[0], id: webinarId,
+        schedule: webinarId === 'webinar-1'
+          ? [...WEBINARS[0].schedule, { type: 'weekly', days: [6], time: '14:00' }, { type: 'once', at: '2026-10-08T20:00:00+09:00' }]
+          : WEBINARS[0].schedule,
       },
     }
   }
