@@ -29,7 +29,7 @@ describe('リッチメニューの残り板', () => {
 
   it('編集の競合は帯・比べる・読み直しを出す（r8dGXT）', () => {
     expect(CREATE).toContain('data-design-node="r8dGXT"')
-    expect(CREATE).toContain('ほかの人がこのメニューを更新しました')
+    expect(CREATE).toContain('ほかの人がこのメニューを先に保存しました')
     expect(CREATE).toContain('違いを比べる')
     expect(CREATE).toContain('最新を読み込んで続ける')
   })

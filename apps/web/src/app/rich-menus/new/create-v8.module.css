@@ -29,35 +29,35 @@
 /* 画面名＋手順の段は型に任せる。画面側に見出しの箱・文字の大きさを書かない。 */
 
 /* 板 `r8dGXT` の競合の帯：薄い黄色の地・濃い黄色の線・角丸 10。題は太字にしすぎない。 */
+/* 競合の帯（r8dGXT）：頭の説明の下に横いっぱい。印・文・違いを比べる・最新を読み込んで続ける。 */
 .conflictBar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: var(--tpl-row-pad-block) var(--tpl-large-gap);
-  border: 1px solid var(--color-warning);
-  border-radius: var(--radius-control, 10px);
-  background: var(--color-status-warn-soft, #fdf3e1);
+  gap: var(--tpl-eds-band-gap);
+  margin: var(--tpl-eds-band-mt) 0 var(--tpl-eds-band-mb);
+  padding: var(--tpl-eds-band-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-warning);
+  outline-offset: -1px;
+  background: var(--color-status-warn-soft);
 }
+
+.conflictIcon { flex-shrink: 0; color: var(--color-warning); }
+.conflictText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-eds-title-gap); min-width: 0; }
 
 .conflictTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 14px;
+  font-size: var(--text-body);
   font-weight: 600;
+  line-height: var(--tpl-eds-band-title2-lh);
 }
 
 .conflictBody {
-  margin: var(--tpl-head-gap) 0 0;
+  margin: 0;
   color: var(--color-ink-secondary);
-  font-size: 13px;
-}
-
-.conflictActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  font-size: var(--text-label);
+  line-height: var(--tpl-eds-band-sub-lh);
 }
 
 /* 左=白カードの縦積み、右=説明カード＋スマホ。 */
@@ -521,14 +521,16 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border: 1px solid var(--color-hairline);
+  border: 0;
   border-radius: var(--radius-control, 8px);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
   background: var(--color-canvas);
   font-size: 13px;
 }
 
 .orderRowSelf {
-  border-color: var(--color-accent-deep);
+  outline-color: var(--color-accent-deep);
   background: var(--color-accent-soft);
 }
 
@@ -587,6 +589,7 @@
 .checkList {
   display: flex;
   flex-direction: column;
+  gap: var(--tpl-eds-tag-card-gap);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -598,7 +601,8 @@
   align-items: center;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--color-divider);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
 }
 
 .checkIcon {
@@ -631,11 +635,13 @@
   flex: 1;
 }
 
-/* 板 `F4gELj`：1・2行目の「見直す」は箱にせず文字だけの押しボタン。 */
+/* 板 `F4gELj`：1・2行目の「見直す」は枠の無い押しボタン（高さ36・左右14）。 */
 .checkRetry {
   flex: none;
-  padding: 0;
+  height: var(--tpl-eds-ghost-h);
+  padding: var(--tpl-eds-ghost-pad);
   border: 0;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--color-ink-secondary);
   font-size: 13px;
@@ -655,20 +661,28 @@
   color: var(--color-ink);
   font-size: 13px;
   font-weight: 600;
+  line-height: var(--tpl-eds-name-lh);
 }
 
 .checkNote {
   margin: 0;
   color: var(--color-ink-faint);
   font-size: 11px;
-  line-height: 1.5;
+  line-height: var(--tpl-eds-hint-lh);
 }
 
 .checkAction {
   flex: none;
 }
 
-/* 「終わりを決める」の入力行（トグルの下）。 */
+/* 「終わりを決める」の箱（枠・角10・余白12/14・間8）。上の行は題とトグル。 */
+.endBox { display: flex; flex-direction: column; gap: var(--tpl-eds-head-gap); padding: var(--tpl-eds-end-pad); border-radius: var(--radius-control); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+.endHead { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-eds-head-gap); }
+.endTitle { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; }
+.endDate { flex: none; width: var(--tpl-eds-end-date-w); }
+.endDate > * { width: 100%; }
+.endDate button { height: var(--tpl-eds-ghost-h); min-height: 0; }
+/* 「終わりを決める」の入力行（題の下）。 */
 .endRow {
   display: flex;
   align-items: center;
@@ -708,3 +722,11 @@
 /* 段の中の間（絵どおり14・題と説明の間2）。Tailwind の半端な段の代わりに型の変数。 */
 .stackSection { gap: var(--tpl-section-gap); }
 .stackCompact { gap: var(--tpl-compact-gap); }
+
+/* 直すとき（/rich-menus/edit）：下書きを読み込むまでの一行。 */
+.editLoading { margin: 0; padding: var(--tpl-eds-loading-pad); color: var(--color-ink-faint); font-size: var(--text-label); }
+
+/* 作る③④の段（絵：枠1本は内側の線・影なし）。共通のカードは外側の線で2px 高くなるので、この画面の段だけ線を内側へ。 */
+.flatCard { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; box-shadow: none; }
+/* 段の題は 15/700・行の高さ 22（共通の見出しは 23）。 */
+.flatCard h3 { line-height: var(--tpl-eds-card-title-lh); }

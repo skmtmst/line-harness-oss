@@ -1778,7 +1778,9 @@
       "node": "XtfO3",
       "name": "V6 12-1-A メニューを作る・形とボタン",
       "sections": [
-        "Crumb"
+        "Crumb",
+        "Head",
+        "Steps"
       ],
       "parts": [
         "メニューを作る",

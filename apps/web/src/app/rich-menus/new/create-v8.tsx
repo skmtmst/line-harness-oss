@@ -21,6 +21,13 @@ import Link from 'next/link'
 import {
   ArrowRight,
   BookOpen,
+  CalendarClock,
+  CircleHelp,
+  GitCompare,
+  RefreshCw,
+  Send,
+  Users,
+  Zap,
   ChevronDown,
   Circle,
   CircleCheck,
@@ -39,6 +46,7 @@ import {
   type MediaItem,
 } from '@line-crm/shared'
 import Card from '@/components/shared/card'
+import TargetMissing from '@/components/shared/target-missing'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
@@ -410,7 +418,23 @@ function MenuPreview({
 
 /* ---------- 本体 ---------- */
 
-export default function RichMenuCreateV8() {
+/**
+ * URL の手順の名前を、作るウィザードの手順へ読み替える。
+ * 編集画面（/rich-menus/edit）は昔から `targeting`・`publish` を使っているので、同じ指定で同じ所を開く。
+ */
+function stepFromParam(key: string | null): StepKey | null {
+  if (!key) return null
+  if ((STEP_KEYS as readonly string[]).includes(key)) return key as StepKey
+  if (key === 'targeting') return 'audience'
+  if (key === 'actions' || key === 'areas') return 'buttons'
+  return null
+}
+
+/**
+ * `editGroupId` を渡すと、その下書き（またはいまのメニュー）を読み込んで同じウィザードで直す
+ * （/rich-menus/edit の V8）。読み込むまでは手順の中身を出さず、すべての手順へ戻れる。
+ */
+export default function RichMenuCreateV8({ editGroupId }: { editGroupId?: string } = {}) {
   usePageTitle('リッチメニューを作る')
   const { selectedAccount } = useAccount()
   const publishAttempt = useRef(new ManualPublishAttempt())
@@ -423,10 +447,12 @@ export default function RichMenuCreateV8() {
    */
   const [step, setStep] = useState<StepKey>(() => {
     if (typeof window === 'undefined') return 'shape'
-    const key = new URLSearchParams(window.location.search).get('step')
-    return (STEP_KEYS as readonly string[]).includes(key ?? '') ? (key as StepKey) : 'shape'
+    return stepFromParam(new URLSearchParams(window.location.search).get('step')) ?? 'shape'
   })
-  const [maxStepIndex, setMaxStepIndex] = useState(0)
+  /* 直すときは、すでに下書きがあるので全部の手順へ戻れる。 */
+  const [maxStepIndex, setMaxStepIndex] = useState(editGroupId ? STEP_KEYS.length - 1 : 0)
+  /* 直すとき：下書きを読み込めたか（読み込むまで中身を出さない）。 */
+  const [editLoad, setEditLoad] = useState<'idle' | 'loading' | 'ready' | 'missing' | 'error'>(editGroupId ? 'loading' : 'idle')
 
   /* 作った下書き。手順①の「次へ」で create → get で埋まる。 */
   const [group, setGroup] = useState<Group | null>(null)
@@ -630,6 +656,29 @@ export default function RichMenuCreateV8() {
   useEffect(() => {
     void load()
   }, [load])
+
+  /* 直すとき：下書きを読み込み、手順①〜④の入力に入れる。基準の署名も読み込んだ内容で取り直す。 */
+  const loadEditGroup = useCallback(async () => {
+    if (!editGroupId) return
+    setEditLoad('loading')
+    try {
+      const res = await api.richMenuGroups.get(editGroupId)
+      if (!res.success || !res.data || !Array.isArray((res.data as Group).pages)) {
+        setEditLoad('missing')
+        return
+      }
+      hydrate(res.data as Group)
+      setEditLoad('ready')
+    } catch (caught) {
+      setEditLoad(caught instanceof ApiError && caught.status === 404 ? 'missing' : 'error')
+    }
+    // hydrate は state の setter だけを使う。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editGroupId])
+
+  useEffect(() => {
+    void loadEditGroup()
+  }, [loadEditGroup])
 
   /* ---------- 下書きの作成・保存 ---------- */
 
@@ -1111,6 +1160,10 @@ export default function RichMenuCreateV8() {
       const res = await api.richMenuGroups.prepublishCheck(group.id)
       if (!res.success) throw new Error(res.error)
       const data = res.data
+      /* 形が違う応答（古い口・途中の応答）で画面ごと落とさない。読めなかったものとして扱う。 */
+      if (!data || typeof data.selfCheck !== 'object' || data.selfCheck === null || typeof data.pageCount !== 'number') {
+        throw new Error('prepublish-check response malformed')
+      }
       setChecks((prev) => ({
         self: { state: data.selfCheck.ok ? 'ok' : 'ng', message: data.selfCheck.ok ? null : data.selfCheck.message },
         // LINEの検査結果は別口（validatePublish）で確かめた分だけ残す。
@@ -1434,10 +1487,38 @@ export default function RichMenuCreateV8() {
 
   const busy = saving || publishing
 
+  if (editGroupId && editLoad !== 'ready') {
+    if (editLoad === 'missing') {
+      return <TargetMissing kind="not-found" title="このリッチメニューは見つかりません" description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。" backHref="/rich-menus" backLabel="リッチメニュー一覧へ戻る" />
+    }
+    if (editLoad === 'error') {
+      return <TargetMissing kind="error" title="リッチメニューを読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。" onRetry={() => void loadEditGroup()} />
+    }
+    return <p className={styles.editLoading} role="status">読み込み中…</p>
+  }
+
   return (
     <CreatePage boardId={
         step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
-      } title={<>リッチメニューを作る</>} description={<>{headNote}</>} identity={<Link href="/rich-menus" className={styles.backLink}>
+      } title={<>リッチメニューを作る</>} description={<>{headNote}{conflict ? (
+          <div className={styles.conflictBar} data-design-node="r8dGXT" role="alert">
+            <CircleAlert size={18} aria-hidden="true" className={styles.conflictIcon} />
+            <div className={styles.conflictText}>
+              <p className={styles.conflictTitle}>ほかの人がこのメニューを先に保存しました</p>
+              <p className={styles.conflictBody}>
+                あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
+              </p>
+            </div>
+            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)} disabled={!conflictLatest}>
+              <GitCompare size={14} aria-hidden="true" />
+              違いを比べる
+            </Button>
+            <Button type="button" variant="primary" onClick={acceptLatestAndContinue}>
+              <RefreshCw size={14} aria-hidden="true" />
+              最新を読み込んで続ける
+            </Button>
+          </div>
+        ) : null}</>} identity={<Link href="/rich-menus" className={styles.backLink}>
           ← リッチメニューへ
         </Link>} steps={<Stepper label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} />}  preview={renderRail()} previewToggle={<Button type="button" onClick={() => setPreviewOpen(true)}>見え方を確認</Button>} footerActions={
           <>
@@ -1463,6 +1544,7 @@ export default function RichMenuCreateV8() {
                     busyLabel={publishPlan.mode === 'now' ? '公開しています…' : '予約しています…'}
                     onClick={() => void handlePublishSubmit()}
                   >
+                    {publishPlan.mode === 'now' ? <Send size={14} aria-hidden="true" /> : <CalendarClock size={14} aria-hidden="true" />}
                     {publishPlan.mode === 'now' ? '公開する' : '予約する'}
                   </Button>
                 </>
@@ -1490,24 +1572,6 @@ export default function RichMenuCreateV8() {
         } status={dirty ? '未保存の変更があります' : undefined} >
 
 
-      {conflict && (
-        <div className={styles.conflictBar} data-design-node="r8dGXT" role="alert">
-          <div>
-            <p className={styles.conflictTitle}>ほかの人がこのメニューを更新しました</p>
-            <p className={styles.conflictBody}>
-              あなたが直した所はまだ保存されていません。このまま保存すると、ほかの人の変更が消えます。
-            </p>
-          </div>
-          <div className={styles.conflictActions}>
-            <Button type="button" variant="secondary" onClick={() => setCompareOpen(true)} disabled={!conflictLatest}>
-              違いを比べる
-            </Button>
-            <Button type="button" variant="primary" onClick={acceptLatestAndContinue}>
-              最新を読み込んで続ける
-            </Button>
-          </div>
-        </div>
-      )}
 
       {error ? (
         <Notice
@@ -1869,7 +1933,8 @@ export default function RichMenuCreateV8() {
             </div>
           </div>
           </Card>
-          <div className={`flex min-w-0 flex-col ${styles.stackSection}`}>
+          {/* 板 `Z0uO6`・`r8dGXT`：画像と面の一覧は段の箱（枠・余白20）の中。 */}
+          <Card padding="spacious" layout="vertical" className={`min-w-0 ${styles.stackSection} ${styles.flatCard}`}>
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="画像の上で面を選ぶ" />
             <p className={styles.cardNote}>面を押すと、下に動きを決める欄が出ます。線を動かして区切り直せます</p>
@@ -1917,7 +1982,7 @@ export default function RichMenuCreateV8() {
           ) : (
             <p className={styles.cardNote}>画像の上をドラッグすると、面を足せます。</p>
           )}
-          </div>
+          </Card>
 
         {/* 面の動き */}
         {selectedArea && activeIndex >= 0 ? (
@@ -1951,7 +2016,7 @@ export default function RichMenuCreateV8() {
     return (
       <>
         {/* 出す相手 */}
-        <Card padding="roomy" layout="vertical">
+        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <SectionHeader title="出す相手" />
           <RadioCardGroup legend="出す相手" className="grid grid-cols-2 gap-3">
             <RadioCard
@@ -1960,6 +2025,7 @@ export default function RichMenuCreateV8() {
               checked={audience === 'all'}
               onChange={() => setAudience('all')}
               title="すべての友だち"
+              icon={<Users aria-hidden="true" />}
               note="ほかの出し分けに当てはまらない人に出る（既定）"
             />
             <RadioCard
@@ -1975,17 +2041,21 @@ export default function RichMenuCreateV8() {
                 }
               }}
               title="条件に当てはまる友だちだけ"
+              icon={<CircleHelp aria-hidden="true" />}
               note="タグ・友だち情報などで絞る"
             />
           </RadioCardGroup>
 
           {audience === 'all' ? (
-            <Notice tone="info">
-              公開すると LINE の既定のメニューになります。
-              {currentDefaultMenu
-                ? `いまの既定「${currentDefaultMenu.name}」と入れ替わります。`
-                : 'いま既定のメニューはありません。'}
-            </Notice>
+            <div className={styles.infoBand}>
+              <span className={styles.infoBandIcon}><Repeat size={16} aria-hidden /></span>
+              <span>
+                公開すると LINE の既定のメニューになります。
+                {currentDefaultMenu
+                  ? `いまの既定「${currentDefaultMenu.name}」と入れ替わります。`
+                  : 'いま既定のメニューはありません。'}
+              </span>
+            </div>
           ) : (
             <div className={styles.field}>
               <span className={styles.fieldLabel}>どんな人に出すか</span>
@@ -2003,7 +2073,7 @@ export default function RichMenuCreateV8() {
         </Card>
 
         {/* 出す順番 */}
-        <Card padding="roomy" layout="vertical">
+        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="出す順番" />
             <p className={styles.cardNote}>ほかの出し分けにも当てはまる人には、順番が早いメニューが出ます</p>
@@ -2026,7 +2096,7 @@ export default function RichMenuCreateV8() {
         </Card>
 
         {/* トークを開いたとき */}
-        <Card padding="roomy" layout="vertical">
+        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <SectionHeader title="トークを開いたとき" />
           <div className={styles.segRow}>
             <span className={`${styles.segLabel} ${styles.segLabelPlain}`}>メニューを</span>
@@ -2050,7 +2120,7 @@ export default function RichMenuCreateV8() {
     const timingIsScheduled = publishPlan.mode !== 'now'
     if (done) {
       return (
-        <Card padding="roomy" layout="vertical">
+        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <h2 className={styles.cardTitle}>
             {done === 'published' ? 'LINEへの登録が終わりました' : '公開予約を受け付けました'}
           </h2>
@@ -2071,7 +2141,7 @@ export default function RichMenuCreateV8() {
     return (
       <>
         {/* いつ公開するか */}
-        <Card padding="roomy" layout="vertical">
+        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <SectionHeader title="いつ公開するか" />
           <RadioCardGroup legend="いつ公開するか" className="grid grid-cols-2 gap-3">
             <RadioCard
@@ -2084,6 +2154,7 @@ export default function RichMenuCreateV8() {
                 setPublishPlan({ ...publishPlan, mode: 'now' })
               }}
               title="すぐ公開する"
+              icon={<Zap aria-hidden="true" />}
               note="確認が済んだらすぐLINEに出す"
             />
             <RadioCard
@@ -2092,6 +2163,7 @@ export default function RichMenuCreateV8() {
               checked={timingIsScheduled}
               onChange={() => setPublishPlan({ ...publishPlan, mode: endEnabled ? 'period' : 'scheduled' })}
               title="日時を決めて公開する"
+              icon={<CalendarClock aria-hidden="true" />}
               note="キャンペーンの始まりに合わせる"
             />
           </RadioCardGroup>
@@ -2105,43 +2177,49 @@ export default function RichMenuCreateV8() {
               />
             </div>
           ) : null}
-          {/* 板 `F4gELj`：終わりを決めるは1行（入力＋トグル）。オフのときは入力を無効化。 */}
-          <div className={styles.endRow}>
-            <span className={styles.fieldLabel}>終わりを決める（任意）</span>
-            <DateTimeField
-              value={publishPlan.endsAt}
-              onChange={(v) => setPublishPlan({ ...publishPlan, endsAt: v })}
-              aria-label="終わる日時"
-              disabled={!endEnabled}
-            />
-            <span>に終わり、</span>
-            <Select
-              aria-label="終わったらどうする"
-              value={publishPlan.restoreGroupId}
-              onChange={(v) => setPublishPlan({ ...publishPlan, restoreGroupId: v })}
-              disabled={!endEnabled}
-              options={[
-                { value: '', label: '前のメニューに戻す（実行開始時に確定）' },
-                ...restoreMenus.map((item) => ({ value: item.id, label: item.name })),
-              ]}
-            />
-            <span>に戻す</span>
-            <Toggle
-              label="終わりを決める"
-              checked={endEnabled}
-              onChange={(on) => {
-                setEndEnabled(on)
-                setPublishPlan({
-                  ...publishPlan,
-                  mode: on ? 'period' : publishPlan.mode === 'now' ? 'now' : 'scheduled',
-                })
-              }}
-            />
+          {/* 板 `F4gELj`：終わりを決めるは枠の箱。上の行に題とトグル、下の行に「日時 に終わり、［戻す先］に戻す」。オフのときは入力を無効化。 */}
+          <div className={styles.endBox}>
+            <div className={styles.endHead}>
+              <span className={styles.endTitle}>終わりを決める（任意）</span>
+              <Toggle
+                label="終わりを決める"
+                checked={endEnabled}
+                onChange={(on) => {
+                  setEndEnabled(on)
+                  setPublishPlan({
+                    ...publishPlan,
+                    mode: on ? 'period' : publishPlan.mode === 'now' ? 'now' : 'scheduled',
+                  })
+                }}
+              />
+            </div>
+            <div className={styles.endRow}>
+              <span className={styles.endDate}>
+                <DateTimeField
+                  value={publishPlan.endsAt}
+                  onChange={(v) => setPublishPlan({ ...publishPlan, endsAt: v })}
+                  aria-label="終わる日時"
+                  disabled={!endEnabled}
+                />
+              </span>
+              <span>に終わり、</span>
+              <Select
+                aria-label="終わったらどうする"
+                value={publishPlan.restoreGroupId}
+                onChange={(v) => setPublishPlan({ ...publishPlan, restoreGroupId: v })}
+                disabled={!endEnabled}
+                options={[
+                  { value: '', label: '前のメニューに戻す（実行開始時に確定）' },
+                  ...restoreMenus.map((item) => ({ value: item.id, label: item.name })),
+                ]}
+              />
+              <span>に戻す</span>
+            </div>
           </div>
         </Card>
 
         {/* 公開の前の確認 */}
-        <Card padding="roomy" layout="vertical">
+        <Card padding="spacious" layout="vertical" className={`${styles.stackSection} ${styles.flatCard}`}>
           <div className={`flex flex-col ${styles.stackCompact}`}>
             <SectionHeader title="公開の前の確認" />
             <p className={styles.cardNote}>3つそろうと公開できます</p>
@@ -2318,7 +2396,6 @@ export default function RichMenuCreateV8() {
                 label: '出る人',
                 value: audience === 'targeted' && conditionEmpty ? '0人' : targetPreviewLoading ? '確認中…' : <MetricValue metric={targetPreview?.effective} />,
               },
-              { key: 'pages', label: 'ページ', value: `${pages.length}枚` },
             ]}
           />
         ) : null}
