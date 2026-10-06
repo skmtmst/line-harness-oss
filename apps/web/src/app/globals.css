@@ -704,6 +704,16 @@
   --tpl-fa-ed-chip-row-gap: 6px; --tpl-fa-ed-confirm-label-w: 120px; --tpl-fa-ed-conflict-pad: 14px 16px 6px; --tpl-fa-ed-conflict-act-gap: 34px;
   --tpl-fa-ed-body-gap: 28px; --tpl-fa-ed-narrow-grow: 16px; --tpl-fa-ed-narrow-pull: 9px; --tpl-fa-ed-narrow-lift: 8px; --tpl-fa-narrow-trim: 4px;
   --tpl-create-title-size: 22px; --tpl-create-title-lh: 32px;
+  /* 流入と計測の一覧（xbHxg・y1ztx・EMUl9）と QR の小窓（GtI4Y）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16・行 78）。 */
+  --tpl-il-col-gap: 16px; --tpl-il-head-h: 44px; --tpl-il-head-pad: 13px 20px; --tpl-il-row-h: 78px; --tpl-il-row-pad: 9px 20px;
+  --tpl-il-col-check: 24px; --tpl-il-col-pool: 92px; --tpl-il-col-became: 150px; --tpl-il-col-friends: 72px; --tpl-il-col-clicks: 60px;
+  --tpl-il-col-latest: 72px; --tpl-il-col-url: 96px; --tpl-il-col-ops: 84px; --tpl-il-num-pad-end: 8px; --tpl-il-ops-gap: 6px;
+  --tpl-il-name-gap: 3px; --tpl-il-ref-lh: 13px; --tpl-il-cell-lh: 17px; --tpl-il-cell-sub-lh: 16px;
+  --tpl-il-pill-pad: 2px 8px; --tpl-il-pill-gap: 5px; --tpl-il-pill-lh: 18px;
+  --tpl-il-foot-pad: 12px 24px; --tpl-il-folder-note-lh: 17px; --tpl-il-notice-after: 6px; --tpl-il-ro-gap: 12px;
+  --tpl-il-head-actions-gap: 12px; --tpl-il-search-w: 240px; --tpl-il-preset-w: 280px; --tpl-il-preset-pad: 12px;
+  --tpl-il-qr-gap: 14px; --tpl-il-qr-wrap-pad: 12px 0; --tpl-il-qr-size: 220px; --tpl-il-qr-pad: 12px; --tpl-il-qr-radius: 12px;
+  --tpl-il-qr-url-pad: 8px 12px; --tpl-il-qr-url-radius: 8px; --tpl-il-qr-note-lh: 19px; --tpl-il-qr-actions-top: 6px;
   --tpl-create-desc-size: 12px; --tpl-create-desc-lh: 17px;
   /* 作る画面の右の列の箱（K7HWG「右の箱 設定内容」）と、本文の小さい文字の行の高さ */
   /* タブ（画面の板 72 枚が 高さ28・文字の下10。部品見本 clV5c の 35 は少数） */
