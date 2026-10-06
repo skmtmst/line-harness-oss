@@ -258,6 +258,11 @@ describe('共通部品の影響範囲', () => {
       // ★V8 運営の監査ログ（e7ljE）・ナレッジ（h114s）。src/v8/ops に一から書いた。
       'v8/ops/audit.tsx',
       'v8/ops/knowledge.tsx',
+      // ★V8 友だち（x6QsVz 一覧・ADjK8 統合ユーザー・hn6Y8 重複検出・Z0jHp UID移行）を src/v8/friends に一から書いた。
+      'v8/friends/list/list.tsx',
+      'v8/friends/merged/merged.tsx',
+      'v8/friends/duplicates/list.tsx',
+      'v8/friends/migrations/uid.tsx',
       // ★V8 コンバージョンの一覧（r6dJFy）。新しい置き場（src/v8）に一から書いた。
       'v8/conversions/list.tsx',
     ].sort())

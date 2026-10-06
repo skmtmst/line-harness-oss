@@ -284,7 +284,9 @@ describe('本人照合候補の画面確認データ', () => {
 
   it('通常・空・失敗を別の形で用意する', () => {
     expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate).toMatchObject({ total: 18, limit: 20, offset: 0 });
-    expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate.items).toHaveLength(4);
+    // ★V8 重複検出 hn6Y8：絵どおり3組（最高・高・低）。状態別の数と根拠不足の数も持つ。
+    expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate.items).toHaveLength(3);
+    expect(IDENTITY_CANDIDATE_LISTS.friend_duplicate).toMatchObject({ statusCounts: { pending: 11, deferred: 2, linked: 5, different: 0 }, lowConfidenceCount: 2 });
     expect(IDENTITY_CANDIDATE_LISTS.empty).toEqual({ items: [], total: 0, limit: 20, offset: 0 });
     expect(IDENTITY_CANDIDATE_ERROR).toMatchObject({ success: false, code: 'VISUAL_QA_ERROR' });
     expect(IDENTITY_CANDIDATE_DETECTION.normal).toEqual({

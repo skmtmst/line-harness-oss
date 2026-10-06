@@ -69,6 +69,7 @@ import {
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
+  FRIEND_DUPLICATE_DETAIL,
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
@@ -1661,6 +1662,18 @@ const SHAPES = {
  * 画面確認だけで完結する、保存を伴わない固定の返事。
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
+
+/* ★V8 L48eY：本移行と照合が終わった UID 移行の履歴。 */
+const UID_MIGRATION_DONE = {
+  id: 'visual-uid-run-done', fromAccountId: 'visual-qa-account-old', toAccountId: 'visual-qa-account',
+  purpose: '友だち情報と配信停止の状態を新しいLINEアカウントへ引き継ぐ', sourceKind: 'csv',
+  sourceFilename: 'uid-map-2026-10-01.csv', status: 'completed', dryRunRevision: 2,
+  counts: { total: 1856, auto: 1820, review: 24, unmatched: 9, conflict: 2, applied: 1844, failed: 0 },
+  createdBy: 'visual-qa-admin', approvedBy: 'visual-qa-owner', createdAt: '2026-10-01T01:20:00.000Z',
+  reviewedAt: '2026-10-01T01:40:00.000Z', executedAt: '2026-10-01T02:00:00.000Z', completedAt: '2026-10-01T02:05:00.000Z',
+  rolledBackAt: null, failureReason: null, rollbackable: true,
+}
+
 function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && (pathname === '/api/notifications/operator-rules/recipients-preview' || pathname === '/api/line-notifications/operator-rules/recipients-preview')) {
     /*
@@ -2594,7 +2607,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: LINE_ACCOUNTS }
   }
   if (pathname === '/api/friends/migrations') {
-    return { success: true, data: [{
+    return { success: true, data: [UID_MIGRATION_DONE, {
       id: 'visual-uid-run', fromAccountId: ACCOUNT.id, toAccountId: 'visual-qa-account-new',
       purpose: '友だち情報・タグ・配信停止状態を新アカウントへ引き継ぐ', sourceKind: 'csv',
       sourceFilename: 'uid-map-2026-09-06.csv', status: 'review', dryRunRevision: 1,
@@ -2602,6 +2615,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       createdBy: STAFF.id, approvedBy: null, createdAt: '2026-09-06T05:20:00.000Z',
       reviewedAt: null, executedAt: null, completedAt: null, rolledBackAt: null, failureReason: null,
     }] }
+  }
+  // ★V8 L48eY：本移行と照合が終わった履歴（/friends/migrations?tab=uid&run=visual-uid-run-done）。
+  if (pathname === '/api/friends/migrations/visual-uid-run-done') {
+    return { success: true, data: { ...UID_MIGRATION_DONE, items: [], itemTotal: 0, decisionCounts: { pending: 0, link: 1844, create: 0, exclude: 3 } } }
   }
   if (pathname === '/api/friends/migrations/visual-uid-run') {
     return { success: true, data: {
@@ -2619,10 +2636,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     } }
   }
   if (pathname === '/api/friends/migration-jobs') {
+    // ★V8 T9gblG の履歴：確認までの取り込み・反映ずみの書き出し（期限切れでダウンロードの口は出ない）。
     return { success: true, data: [
-      { id: 'import-1', kind: 'import', line_account_id: ACCOUNT.id, total_count: 231, update_count: 34, conflict_count: 3, status: 'completed', created_by_name: '河野 健太', created_at: '2026-09-03T05:20:00.000Z' },
-      { id: 'import-2', kind: 'import', line_account_id: ACCOUNT.id, total_count: 231, update_count: 34, conflict_count: 3, status: 'previewed', created_by_name: '河野 健太', created_at: '2026-09-03T02:05:00.000Z' },
-      { id: 'export-1', kind: 'export', line_account_id: ACCOUNT.id, row_count: 231, status: 'expired', created_by_name: '坂本 真人', created_at: '2026-09-02T10:40:00.000Z', expires_at: '2026-09-09T10:40:00.000Z' },
+      { id: 'import-2', kind: 'import', line_account_id: ACCOUNT.id, total_count: 1843, update_count: 48, conflict_count: 2, status: 'previewed', created_by_name: 'Kenta Kawano', created_at: '2026-10-01T01:20:00.000Z' },
+      { id: 'export-1', kind: 'export', line_account_id: ACCOUNT.id, row_count: 1840, status: 'completed', created_by_name: 'Kenta Kawano', created_at: '2026-09-30T09:02:00.000Z', expires_at: '2026-10-01T09:02:00.000Z' },
     ] }
   }
   if (pathname === '/api/friend-add-rules') {
@@ -2711,7 +2728,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const friendDuplicate = /^\/api\/friends\/duplicates\/([^/]+)$/.exec(pathname)
   if (friendDuplicate) {
     if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
-    return { success: true, data: IDENTITY_CANDIDATE_FRIEND }
+    return { success: true, data: FRIEND_DUPLICATE_DETAIL }
   }
   const mergedPerson = /^\/api\/friends\/people\/([^/]+)$/.exec(pathname)
   if (mergedPerson) {
