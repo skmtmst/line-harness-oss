@@ -594,6 +594,7 @@
   --tpl-compact-gap: 2px; --tpl-compact-desc-lh: 20px;
   /* マイルの V8（OC0gy・ZJIyl・E2Any・S35pO・CJlf4・oRbJi・IRPw8）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16・行 56）。 */
   --tpl-ml-col-gap: 16px; --tpl-ml-head-h: 44px; --tpl-ml-head-pad: 13px 20px; --tpl-ml-row-h: 56px; --tpl-ml-row-pad: 9px 20px;
+  --tpl-ml-viewer-create-h: 55px; /* 閲覧のみで隠した作るボタン（＋下の間）の高さ */
   --tpl-ml-col-event: 140px; --tpl-ml-col-miles: 72px; --tpl-ml-col-validity: 96px; --tpl-ml-col-recent: 64px; --tpl-ml-col-state: 92px; --tpl-ml-col-ops: 108px;
   --tpl-ml-col-need: 88px; --tpl-ml-col-gives: 150px; --tpl-ml-col-month: 92px; --tpl-ml-col-state-wide: 96px; --tpl-ml-col-ops-wide: 160px;
   --tpl-ml-col-rank: 72px; --tpl-ml-col-balance: 76px; --tpl-ml-col-change: 72px; --tpl-ml-col-last: 140px; --tpl-ml-col-ops-balance: 150px;

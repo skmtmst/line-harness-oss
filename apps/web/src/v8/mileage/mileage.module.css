@@ -818,3 +818,6 @@
 
 /* 詳細の型の頭では操作が「マイルへ」の段のぶん下がる。絵は題の列の真ん中なので、その半分だけ上げる。 */
 .headActionsPulled { margin-top: var(--tpl-ml-head-actions-pull); }
+
+/* 閲覧のみで隠した作るボタン（フォルダの列の上）の場所だけ空ける。 */
+.viewerCreateSpace { display: block; height: var(--tpl-ml-viewer-create-h); }

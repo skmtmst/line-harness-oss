@@ -78,7 +78,8 @@ export function CreateButton({
   full?: boolean
   children: ReactNode
 }) {
-  if (readonly) return null
+  // 閲覧のみ：押せない作るボタンは置かない。フォルダの列の上（full）は場所だけ空けて並びを絵どおりに保つ。
+  if (readonly) return full ? <span className={styles.viewerCreateSpace} aria-hidden="true" /> : null
   return (
     <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href={href}>
       {children}
