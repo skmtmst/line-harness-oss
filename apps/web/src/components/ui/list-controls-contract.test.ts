@@ -58,7 +58,13 @@ const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
   // 板 `apLqS`：検索 → 札 → 並び → 件数。部品は変数にまとめ（1152 の Iffil と共用）、広い板の道具の段で並べる。
   ['リマインダ', REMINDERS_V8, ['<ListToolbar', '{statusChips}', '{sortSelect}', '{perPageSelect}']],
   ['自動応答', '../../app/auto-replies/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
-  ['ウェビナー', '../../app/webinars/page.tsx', ['<SearchField', '<FilterChip', '<SortSelect', '<PageSizeSelect']],
+  /*
+   * ウェビナーの入口（page.tsx）は v7 と V8（src/v8/webinars/list.tsx）を出し分ける。readUiSource が
+   * `@/v8/` もたどるようになった（2026-10-06）ので、v7 の並びは v7 の本体（list-v8.tsx。名前は v8 だが
+   * 今は v7 のときに描かれる）で見て、V8 は部品を変数にまとめて並べる道具の段（wideToolbar）で見る。
+   */
+  ['ウェビナー', '../../app/webinars/list-v8.tsx', ['<SearchField', '<FilterChip', '<SortSelect', '<PageSizeSelect']],
+  ['ウェビナー（V8）', '../../v8/webinars/list.tsx', ["search={{ placeholder: 'ウェビナー名で探す'", 'filters={filterChips}', 'trailing={<>{sortBox}', '{perPageBox}</>}']],
   ['共通情報', '../../app/contents/vars/page.tsx', ['data-search-row', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
 ]
 
