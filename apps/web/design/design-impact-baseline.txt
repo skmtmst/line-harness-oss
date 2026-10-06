@@ -544,6 +544,14 @@ shared-button-importer v8/hq-banners/image-detail.tsx
 shared-button-importer v8/hq-banners/limit-notice.tsx
 shared-button-importer v8/hq-banners/list.tsx
 shared-button-importer v8/hq-banners/project.tsx
+shared-button-importer v8/friends/list/list.tsx
+shared-button-importer v8/friends/merged/merged.tsx
+shared-button-importer v8/friends/merged/person.tsx
+shared-button-importer v8/friends/duplicates/list.tsx
+shared-button-importer v8/friends/compare/compare.tsx
+shared-button-importer v8/friends/migrations/csv.tsx
+shared-button-importer v8/friends/migrations/uid.tsx
+shared-button-importer v8/friends/migrations/uid-dialogs.tsx
 shared-button-importer v8/conversions/list.tsx
 shared-button-importer v8/conversions/dialogs.tsx
 shared-button-importer v8/conversions/create.tsx
