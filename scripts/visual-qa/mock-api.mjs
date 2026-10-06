@@ -77,7 +77,7 @@ import {
   TAG_IMPORT_SAMPLE_ROWS, tagImportPreview, tagImportResult, REMINDER_RUNS,
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_ARCHIVE_IMPACT, SUPPORT_MARK_AUTOMATION_RULES,
-  OUTGOING_WEBHOOKS, OUTGOING_WEBHOOK_TEST_RESULT, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, ENTRY_ROUTES, INFLOW_SUMMARY,
+  OUTGOING_WEBHOOKS, OUTGOING_WEBHOOK_TEST_RESULT, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, INCOMING_WEBHOOK_UNMATCHED, ENTRY_ROUTES, INFLOW_SUMMARY,
   SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS, TRACKED_LINKS,
   AD_COST_ROWS, AD_COST_PLATFORMS,
   STAFF_MEMBERS, LOGIN_AUDIT,
@@ -2813,6 +2813,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // 板 `rZEGN`：通常・会員向け・キャンペーン＋未分類（各1件）。
     return { success: true, data: RICH_MENU_FOLDERS, unfiledCount: RICH_MENU_GROUPS.filter((group) => !group.folderId).length }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'webhook') {
+    // 板 `ZSbFY`：送り先の箱。送り先にフォルダの列がまだ無いので、件数（itemCount）は本物と同じく返さない（#730）。
+    return {
+      success: true,
+      data: [
+        { id: 'whf-member', kind: 'webhook', name: '顧客・会員', parentId: null, displayOrder: 1, color: '#2563eb' },
+        { id: 'whf-order', kind: 'webhook', name: '注文・在庫', parentId: null, displayOrder: 2, color: '#059669' },
+        { id: 'whf-notify', kind: 'webhook', name: '通知', parentId: null, displayOrder: 3, color: '#ea580c' },
+      ],
+    }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
     // 板 `uE9gf`：未分類は `folderId: null` の1件（旧キーワードルール）。
     return { success: true, data: AUTO_REPLY_FOLDERS, unfiledCount: AUTO_REPLIES.filter((rule) => !rule.folderId).length }
@@ -3319,6 +3330,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null } }
   }
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
+  const incomingUnmatched = /^\/api\/webhooks\/incoming\/([^/]+)\/unmatched$/.exec(pathname)
+  if (incomingUnmatched) {
+    // 人が見つからなかった届物（絵 gW0F2）。詳細のある口だけ2件。口は配列と total を返す。
+    const items = INCOMING_WEBHOOK_DETAILS[incomingUnmatched[1]] ? INCOMING_WEBHOOK_UNMATCHED : []
+    return { success: true, data: items, total: items.length }
+  }
   const incomingWebhookDetail = /^\/api\/webhooks\/incoming\/([^/]+)$/.exec(pathname)
   if (incomingWebhookDetail) {
     const detail = INCOMING_WEBHOOK_DETAILS[incomingWebhookDetail[1]]
@@ -3342,16 +3359,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   // Google Sheets 連携の見本。名前は packages/shared の型どおり（data 包み）。
   if (pathname === '/api/integrations/google-sheets/connection') {
+    // V8 の絵 `DxAAA`：接続しています・k***@gmail.com・musubo 友だち台帳・前回 9/30 03:00 定期・完了。
     return {
       success: true,
       data: {
         connection: {
           status: 'connected',
-          googleAccountEmail: 'owner@example.com',
+          googleAccountEmail: 'k***@gmail.com',
           spreadsheetId: 'sheet-123',
-          spreadsheetTitle: 'LINE連携シート',
+          spreadsheetTitle: 'musubo 友だち台帳',
           spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet-123',
-          lastSyncedAt: '2026-09-26T03:00:00.000Z',
+          lastSyncedAt: '2026-09-29T18:00:00.000Z',
           lastSyncStatus: 'ok',
           lastSyncError: null,
           consecutiveFailures: 0,
@@ -3364,20 +3382,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/integrations/google-sheets/runs') {
+    // 同期の記録（絵 `DxAAA` の4行）。同じ開始時刻の行は画面で1行に束ねる。
+    const run = (id, kind, dataType, status, rowsWritten, startedAt) => ({
+      id, kind, dataType, status, rowsWritten, error: status === 'error' ? '書き出し先に書き込めませんでした' : null,
+      startedAt, finishedAt: startedAt,
+    })
     return {
       success: true,
       data: {
         runs: [
-          {
-            id: 'run-1',
-            kind: 'scheduled',
-            dataType: 'friends',
-            status: 'ok',
-            rowsWritten: 120,
-            error: null,
-            startedAt: '2026-09-26T03:00:00.000Z',
-            finishedAt: '2026-09-26T03:01:00.000Z',
-          },
+          run('run-1', 'scheduled', 'friends', 'ok', 1284, '2026-09-29T18:00:00.000Z'),
+          run('run-2', 'scheduled', 'form_answers', 'ok', 312, '2026-09-29T18:00:00.000Z'),
+          run('run-3', 'manual', 'friends', 'ok', 1280, '2026-09-29T06:42:00.000Z'),
+          run('run-4', 'scheduled', 'friends', 'ok', 1280, '2026-09-28T18:00:00.000Z'),
+          run('run-5', 'scheduled', 'form_answers', 'partial', 0, '2026-09-28T18:00:00.000Z'),
+          run('run-6', 'scheduled', 'friends', 'error', 0, '2026-09-27T18:00:00.000Z'),
         ],
       },
     }
@@ -4287,64 +4306,59 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       やり取りの記録。**`summary` が丸ごと要る。**
       既定の器だと `data.summary.total` で落ち、画面が
       「画面を表示できませんでした」になっていた。
-      数は設計 `KNG00` に合わせる（この30日 1,972回・成功 1,966・失敗 6）。
+      数と行は V8 の絵 `Uv9AA` に合わせる（この30日 2,146回・送った 1,734・
+      受け取った 412・失敗 2）。帯は送るタブ `ZSbFY` も同じ数を読む。
     */
     return {
       success: true,
       data: {
-        total: 1_972,
+        total: 2_146,
         page: 1,
         limit: 20,
-        summary: { total: 1_972, outgoing: 1_486, incoming: 486, succeeded: 1_966, failed: 6, averageDurationMs: 400 },
+        summary: {
+          total: 2_146, outgoing: 1_734, incoming: 412, succeeded: 2_144, failed: 2,
+          resultUnknown: 0, outgoingFailed: 2, retryable: 2, averageDurationMs: 400,
+        },
         items: [
           {
-            id: 'wi-1', direction: 'outgoing', webhookName: 'Slack ／ #注文チャンネル',
-            eventType: 'order.created', triggerSummary: '注文 #12492・¥12,800・石田 未来',
+            id: 'wi-1', direction: 'outgoing', webhookName: '顧客台帳（CRM）',
+            eventType: 'friend.added', triggerSummary: 'タグが付いた・Kenta Kawano',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
-            attemptCount: 1, durationMs: 300, failureReason: null, canRetry: false,
-            startedAt: '2026-08-25T02:42:00.000Z', completedAt: '2026-08-25T02:42:00.300Z', retryOfId: null,
+            attemptCount: 1, durationMs: 400, failureReason: null, failureReasonCode: null, canRetry: false,
+            retryBlockReason: null, autoRetryNextAt: null,
+            startedAt: '2026-09-30T01:12:00.000Z', completedAt: '2026-09-30T01:12:00.400Z', retryOfId: null,
           },
           {
-            id: 'wi-2', direction: 'outgoing', webhookName: 'Slack ／ #アラート',
-            eventType: 'inventory.low', triggerSummary: '定期便パンフ 残り 3',
-            status: 'failed', responseLabel: '503 Service Unavailable', responseStatus: 503,
-            attemptCount: 3, durationMs: 10_000, failureReason: '相手が応答しませんでした', canRetry: true,
-            startedAt: '2026-08-24T05:10:00.000Z', completedAt: '2026-08-24T05:10:10.000Z', retryOfId: null,
+            id: 'wi-2', direction: 'outgoing', webhookName: '予約台帳',
+            eventType: 'incoming_webhook.reservation', triggerSummary: '予約が入った・Masato S.',
+            status: 'failed', responseLabel: '500 エラー', responseStatus: 500,
+            attemptCount: 3, durationMs: 30_000, failureReason: '3回やり直して失敗', failureReasonCode: 'response_5xx', canRetry: true,
+            retryBlockReason: null, autoRetryNextAt: null,
+            startedAt: '2026-09-30T00:58:00.000Z', completedAt: '2026-09-30T00:58:30.000Z', retryOfId: null,
           },
           {
-            id: 'wi-3', direction: 'incoming', webhookName: '予約サービス',
-            eventType: 'incoming_webhook.reservation', triggerSummary: '8/26 14:00 トリミング（小型犬）',
+            id: 'wi-3', direction: 'outgoing', webhookName: '在庫システム',
+            eventType: 'order.created', triggerSummary: '注文が確定・菅野 亮',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
-            attemptCount: 1, durationMs: 180, failureReason: null, canRetry: false,
-            startedAt: '2026-08-24T01:05:00.000Z', completedAt: '2026-08-24T01:05:00.180Z', retryOfId: null,
+            attemptCount: 1, durationMs: 600, failureReason: null, failureReasonCode: null, canRetry: false,
+            retryBlockReason: null, autoRetryNextAt: null,
+            startedAt: '2026-09-30T00:40:00.000Z', completedAt: '2026-09-30T00:40:00.600Z', retryOfId: null,
           },
           {
-            id: 'wi-4', direction: 'outgoing', webhookName: 'Google スプレッドシート ／ 注文一覧',
-            eventType: 'order.created', triggerSummary: '注文 #12491・¥8,400・佐藤 陽子',
-            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
-            attemptCount: 1, durationMs: 520, failureReason: null, canRetry: false,
-            startedAt: '2026-08-23T09:30:00.000Z', completedAt: '2026-08-23T09:30:00.520Z', retryOfId: null,
+            id: 'wi-4', direction: 'incoming', webhookName: 'フォームの受け口',
+            eventType: 'incoming_webhook.survey', triggerSummary: '申込・山田 太郎',
+            status: 'succeeded', responseLabel: '受け取った', responseStatus: 200,
+            attemptCount: 1, durationMs: 200, failureReason: null, failureReasonCode: null, canRetry: false,
+            retryBlockReason: null, autoRetryNextAt: null,
+            startedAt: '2026-09-30T00:31:00.000Z', completedAt: '2026-09-30T00:31:00.200Z', retryOfId: null,
           },
           {
-            id: 'wi-5', direction: 'outgoing', webhookName: 'kintone ／ 顧客管理',
-            eventType: 'friend.added', triggerSummary: '友だち U9a81…・流入 QRコード',
+            id: 'wi-5', direction: 'outgoing', webhookName: 'Slack への通知',
+            eventType: 'message_received', triggerSummary: '問い合わせ・坂本 真人',
             status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
-            attemptCount: 1, durationMs: 260, failureReason: null, canRetry: false,
-            startedAt: '2026-08-22T07:15:00.000Z', completedAt: '2026-08-22T07:15:00.260Z', retryOfId: null,
-          },
-          {
-            id: 'wi-6', direction: 'incoming', webhookName: 'アンケートツール',
-            eventType: 'incoming_webhook.survey', triggerSummary: '回答 #A-1842・満足度 5',
-            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
-            attemptCount: 1, durationMs: 140, failureReason: null, canRetry: false,
-            startedAt: '2026-08-21T03:20:00.000Z', completedAt: '2026-08-21T03:20:00.140Z', retryOfId: null,
-          },
-          {
-            id: 'wi-7', direction: 'outgoing', webhookName: 'Chatwork ／ 発送連絡',
-            eventType: 'shipment.completed', triggerSummary: '注文 #12480・追跡 1234…',
-            status: 'succeeded', responseLabel: '200 OK', responseStatus: 200,
-            attemptCount: 1, durationMs: 390, failureReason: null, canRetry: false,
-            startedAt: '2026-08-20T11:05:00.000Z', completedAt: '2026-08-20T11:05:00.390Z', retryOfId: null,
+            attemptCount: 1, durationMs: 300, failureReason: null, failureReasonCode: null, canRetry: false,
+            retryBlockReason: null, autoRetryNextAt: null,
+            startedAt: '2026-09-29T23:02:00.000Z', completedAt: '2026-09-29T23:02:00.300Z', retryOfId: null,
           },
         ],
       },
