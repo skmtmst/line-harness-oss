@@ -218,7 +218,7 @@ permission = domain.resource.action
 設計との画像比較、実Node ID、対象状態一覧は**工程の条件**であり、各機能の要件の完了条件には含めない。理由は、Pencilの画像書き出しが不安定な期間に「原理的に満たせない完了条件」を32本へ埋め込まないためである。工程ゲートは次で担保する。
 
 - PRテンプレートのVisual Parity欄(対象ルート、Pencilファイル、実Node ID、1920px設計画像、1920px・1440px実装画像、並べて比較した結果)
-- `scripts/visual-qa/screens.mjs`を正本とする画面台帳と、`docs/design-qa/v6-progress-ledger.md`(機械生成)
+- `scripts/visual-qa/screens.mjs`を正本とする画面台帳と、V6 の進捗台帳（2026-10-07 にリポジトリから外した）(機械生成)
 - 「一致」は文言一致・寸法一致・全状態撮影済みのときだけ。撮れなかった画面は空欄のまま残す
 - Pencilを直したら書き出しHTMLを置き直し、その画面の判定を未判定へ戻す
 

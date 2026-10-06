@@ -4,7 +4,7 @@
 - 対象: Lステップ、Liny、LINE Harness 管理画面
 - 想定利用者: 中小企業のLINE運用担当者、問い合わせ担当者、管理者
 - 目的: 競合の画面を似せるのではなく、各画面で起きる裏側の処理まで再現可能な仕様へ落とす
-- この文書は `lstep-gap-analysis.md`、`lstep-behavior-research.md`、`lstep-scenario-research.md`、`lstep-reminder-research.md` を更新する横断版。過去資料を消さず、2026-08-22時点の判断はこちらを優先する
+- この文書は 8月の Lステップとの差の調べ（2026-10-07 にリポジトリから外した）、`lstep-behavior-research.md`、`lstep-scenario-research.md`、`lstep-reminder-research.md` を更新する横断版。過去資料を消さず、2026-08-22時点の判断はこちらを優先する
 
 ## 1. 結論
 
