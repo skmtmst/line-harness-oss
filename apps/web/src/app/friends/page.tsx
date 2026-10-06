@@ -37,6 +37,8 @@ import { FriendsListHeadV8 } from './friends-nav-v8'
 import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
 import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import FriendsHostV8 from '@/v8/friends/host'
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 /* ★V8 ywJ5H：検索と絞り込みを同じ段に、表示設定を次の段に置く。 */
 const SEARCH_ROW_SECONDARY = 'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-label font-semibold text-ink hover:bg-canvas-sunken'
@@ -864,9 +866,10 @@ function FriendsPageHost() {
 }
 
 export default function FriendsPage() {
+  const theme = useAdminTheme()
   return (
     <Suspense fallback={<div className="text-sm text-ink-faint">読み込み中…</div>}>
-      <FriendsPageHost />
+      {theme === 'v8' ? <FriendsHostV8 /> : <FriendsPageHost />}
     </Suspense>
   )
 }
