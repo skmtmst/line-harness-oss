@@ -235,6 +235,8 @@ describe('共通部品の影響範囲', () => {
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
+      // ★V8 テンプレートの一覧（v19Ivv）。新しい置き場（src/v8）に一から書いた。
+      'v8/templates/list.tsx',
     ].sort())
   })
 
