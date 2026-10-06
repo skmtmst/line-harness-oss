@@ -19,9 +19,10 @@ import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/com
 import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData } from '@/lib/api'
 import { api } from '@/lib/api'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import FriendAddListV8 from './list-v8'
+// 一覧は相対で読む（骨格の試験が節 KPIs・KindTabs を数える）。作る画面は型の頭の節を持つので @/ で読む。
+import FriendAddListV8 from '../../v8/friend-add/list'
 import FriendAddRuleEditorV7 from './friend-add-rule-editor'
-import FriendAddEditorV8 from './editor-v8'
+import FriendAddEditorV8 from '@/v8/friend-add/editor'
 import { describeFriendAddFailure } from './friend-add-failure'
 import { useCursorStack } from './use-cursor-stack'
 import { formatNumber } from '@/lib/format'

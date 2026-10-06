@@ -509,3 +509,5 @@ shared-button-importer v8/rich-menus/external-import.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
 shared-button-importer v8/webinars/list.tsx
+shared-button-importer v8/friend-add/list.tsx
+shared-button-importer v8/friend-add/editor.tsx
