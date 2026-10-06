@@ -166,3 +166,4 @@ export * from './ad-event-mappings.js';
 export * from './photo-publications';
 
 export * from './friend-summary.js';
+export * from './dashboard-activity.js';

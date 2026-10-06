@@ -32,6 +32,7 @@ import type {
   Friend,
   FriendUpcomingItem,
   FriendSummary,
+  DashboardActivityItem,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
   FriendAddEventRoutingStatus,
@@ -10831,6 +10832,10 @@ export const api = {
       fetchApi<ApiResponse<Array<{ id: string; name: string }>>>('/api/operators'),
   },
   dashboard: {
+    activity: (accountId: string, limit = 10) =>
+      fetchApi<ApiResponse<{ items: DashboardActivityItem[] }>>(
+        `/api/dashboard/activity?account_id=${encodeURIComponent(accountId)}&limit=${encodeURIComponent(String(limit))}`,
+      ),
     overview: (params: { period?: 'today' | 'last7' | 'last28'; accountId: string }) => {
       const query = new URLSearchParams()
       if (params?.period) query.set('period', params.period)

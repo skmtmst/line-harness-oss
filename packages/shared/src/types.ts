@@ -2732,3 +2732,11 @@ export interface FriendSummary {
     byCurrency: Array<{ currency: string; count: number; totalAmountMinor: number | null }>;
   } | null;
 }
+
+export interface DashboardActivityItem {
+  id: string;
+  kind: 'broadcast_sent' | 'booking_created' | 'event_booking_created' | 'form_submitted' | 'friend_added';
+  summary: string;
+  occurredAt: string;
+  href: string;
+}
