@@ -1,6 +1,7 @@
 'use client'
 
 import { CreatePage } from '@/components/templates'
+import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
 import { CreatePreviewNote, CreateStarterCards, CreateSummaryCard } from '@/components/templates/create-parts'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -15,6 +16,27 @@ import {
   Play,
   Power,
   X,
+  PenLine,
+  FileText,
+  LayoutTemplate,
+  Image as ImageIcon,
+  CircleCheck,
+  User,
+  IdCard,
+  Braces,
+  CalendarDays,
+  TextQuote,
+  MessagesSquare,
+  Users,
+  ListFilter,
+  Search,
+  Type,
+  Sticker,
+  MapPin,
+  Video,
+  Mic,
+  File,
+  MousePointerClick,
 } from 'lucide-react'
 import type {
   AutoReplyConflict,
@@ -53,7 +75,7 @@ import ImageUploader from '@/components/shared/image-uploader'
 import { TimeField } from '@/components/shared/date-time-field'
 import { loadFailureCopy } from '@/components/shared/api-error-message'
 import { formatNumber } from '@/lib/format'
-import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
+import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import {
   applyMatchType,
   emptyKeywordRule,
@@ -330,11 +352,17 @@ function weekdaySummary(days: number[]): string {
 }
 
 /** 差し込みに使える札。本文の末尾へトークンを足す。 */
+/** 絵 A0pDt「反応するメッセージの種類」：絵の4つを先に並べ、ほかは「ほかの種類」で出す（機能は残す）。 */
+const MAIN_KINDS = ['テキスト', 'スタンプ', '画像', '位置情報']
+const kindOrder = (label: string) => { const i = MAIN_KINDS.indexOf(label); return i < 0 ? 99 : i }
+/** 絵 A0pDt「反応するメッセージの種類」の札の印。 */
+const KIND_ICONS: Record<string, typeof Type> = { テキスト: Type, スタンプ: Sticker, 画像: ImageIcon, 位置情報: MapPin, 動画: Video, 音声: Mic, ファイル: File, ボタンのタップ: MousePointerClick }
+
 const INSERT_CHIPS = [
-  { label: '名前', token: '{name}' },
-  { label: '友だち情報', token: '{field}' },
-  { label: '共通情報', token: '{var}' },
-  { label: '予約日時', token: '{booking_at}' },
+  { label: '名前', token: '{name}', icon: User },
+  { label: '友だち情報', token: '{field}', icon: IdCard },
+  { label: '共通情報', token: '{var}', icon: Braces },
+  { label: '予約日時', token: '{booking_at}', icon: CalendarDays },
 ] as const
 
 /** 「返すまで待つ時間」の選択肢。 */
@@ -446,6 +474,7 @@ function AutoReplyWizardV8Inner() {
   const [saveDone, setSaveDone] = useState(false)
   const [error, setError] = useState('')
   const [weekdayNotice, setWeekdayNotice] = useState('')
+  const [showMoreKinds, setShowMoreKinds] = useState(false)
   const actionOptions = useActionOptions()
   /** 作成・公開の確認キーは画面ごとに1つ振り、成功するまで変えない。 */
   const createKeyRef = useRef(crypto.randomUUID())
@@ -1049,6 +1078,19 @@ function AutoReplyWizardV8Inner() {
               : 'カードの内容（JSON）を読めていません。'
             : form.responseContent || '返す内容を入れると、ここに出ます。'
 
+  /** 手順②の右の列の試し：いまの言葉と合い方で、例の文に当たるか。 */
+  const triggerSamples = (() => {
+    const words = effectiveKeywords.map((r) => r.keyword.trim()).filter(Boolean)
+    const hits = (text: string) => {
+      if (form.respondToAll) return true
+      if (words.length === 0) return false
+      const one = (w: string) => (form.matchType === 'exact' ? text === w : text.includes(w))
+      return form.keywordMatchMode === 'all' ? words.every(one) : words.some(one)
+    }
+    const first = words[0] ? (form.matchType === 'exact' ? words[0] : `${words[0]}したいです`) : 'こんにちは'
+    return [first, '日程を変えられますか'].map((text) => ({ text, hit: hits(text) }))
+  })()
+
   const thisRuleName = form.ruleName.trim() || effectiveKeywords[0]?.keyword.trim() || '名前なしのルール'
   const myPositionLabel = myIndex >= 0 ? `${myIndex + 1}番目` : 'いちばん下'
 
@@ -1168,24 +1210,27 @@ function AutoReplyWizardV8Inner() {
             <>
               <Card padding="roomy" layout="vertical" className={styles.sideCard}>
                 <h2 className={styles.sideTitle}>保存したあとに、過去28日で当たった数が出ます</h2>
-                <p className={styles.hint}>
+                {/* 絵 A0pDt：数（— 件）→ 説明 → 試しの文2つ（いまの言葉で当たるか）。 */}
+                <p className={styles.countRow} aria-label="当たった受信（過去28日）">
+                  <span className={styles.countNum}>{matchedLast28Days == null ? '—' : formatNumber(matchedLast28Days)}</span>
+                  <span className={styles.countUnit}>件</span>
+                </p>
+                <p className={styles.sideHint}>
                   いまの作りでは、保存する前の条件は数えられません。保存すると、このルールが動いた回数がここに出ます。
                 </p>
                 <dl className={styles.kvList}>
-                  <div className={styles.kvRow}>
-                    <dt className="text-ink-faint text-xs">当たった受信（過去28日）</dt>
-                    <dd className={styles.kvVal}>
-                      {matchedLast28Days == null ? '—' : `${formatNumber(matchedLast28Days)}件`}
-                    </dd>
-                  </div>
+                  {triggerSamples.map((sample) => (
+                    <div key={sample.text} className={styles.kvRow}>
+                      <dt>「{sample.text}」</dt>
+                      <dd className={sample.hit ? styles.sampleHit : styles.sampleMiss}>{sample.hit ? '当たる' : '当たらない'}</dd>
+                    </div>
+                  ))}
                 </dl>
               </Card>
               <LinePreview accountName="公式アカウント">
                 <div className={styles.talkStack}>
-                  <p className={styles.bubbleIn}>
-                    {effectiveKeywords[0]?.keyword.trim()
-                      ? `${effectiveKeywords[0].keyword.trim()}（例）`
-                      : '届いたメッセージ'}
+                  <p className={styles.bubbleReply}>
+                    {triggerSamples[0].text}
                   </p>
                   <p className={styles.bubbleMeta}>届いた側の見え方</p>
                 </div>
@@ -1519,8 +1564,11 @@ function AutoReplyWizardV8Inner() {
 
           {step === 'trigger' && (
             <>
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
-                <h2 className={styles.cardTitle}>1. どのメッセージに反応するか</h2>
+              <Card padding="roomy" layout="vertical" className={`${styles.cardContent} ${styles.stepTrigger}`}>
+                <div className={styles.cardHeading}>
+                  <h2 className={styles.cardTitle}>1. どのメッセージに反応するか</h2>
+                  <p className={styles.cardDesc}>届いた言葉で決めます。</p>
+                </div>
                 <RadioCardGroup legend="反応するメッセージ" className={styles.radioPair}>
                   <RadioCard
                     name="trigger-kind"
@@ -1528,6 +1576,7 @@ function AutoReplyWizardV8Inner() {
                     checked={!form.respondToAll}
                     onChange={() => patch({ respondToAll: false })}
                     title="言葉で反応する"
+                    icon={<TextQuote size={16} />}
                     note="決めた言葉が入っていたら返す"
                   />
                   <RadioCard
@@ -1536,15 +1585,16 @@ function AutoReplyWizardV8Inner() {
                     checked={form.respondToAll}
                     onChange={() => patch({ respondToAll: true })}
                     title="すべてのメッセージ"
+                    icon={<MessagesSquare size={16} />}
                     note="届いたものすべてに返す"
                   />
                 </RadioCardGroup>
 
                 {!form.respondToAll && (
                   <>
-                    <div className={styles.field}>
+                    <div className={`${styles.field} ${styles.kwField}`}>
                       <span className={styles.label} id="wiz-keywords-label">反応する言葉</span>
-                      <div className={styles.chips} role="group" aria-labelledby="wiz-keywords-label">
+                      <div className={styles.kwRow} role="group" aria-labelledby="wiz-keywords-label">
                         {effectiveKeywords.map((rule, index) => (
                           <span key={`${rule.keyword}-${index}`} className={styles.chip}>
                             {rule.keyword.trim()}
@@ -1558,10 +1608,11 @@ function AutoReplyWizardV8Inner() {
                                 })
                               }
                             >
-                              <X size={13} aria-hidden="true" />
+                              <X size={12} aria-hidden="true" />
                             </button>
                           </span>
                         ))}
+                        <span className={styles.kwSpacer} />
                         <KeywordInput
                           onAdd={(word) => {
                             const trimmed = word.trim()
@@ -1577,6 +1628,7 @@ function AutoReplyWizardV8Inner() {
                         />
                       </div>
                     </div>
+                    <div className={styles.pairRow}>
                     <div className={styles.field}>
                       <span className={styles.label}>言葉の合い方</span>
                       <div className={styles.seg} role="group" aria-label="言葉の合い方">
@@ -1631,44 +1683,17 @@ function AutoReplyWizardV8Inner() {
                         </div>
                       </div>
                     )}
+                    </div>
                   </>
                 )}
 
                 <div className={styles.field}>
-                  <span className={styles.label}>反応するメッセージの種類</span>
-                  <div className={styles.chips} role="group" aria-label="反応するメッセージの種類">
-                    {MESSAGE_KIND_WORDS.map((kind) => {
-                      const on = form.messageKinds.includes(kind.key)
-                      return (
-                        <button
-                          key={kind.key}
-                          type="button"
-                          className={styles.pickChip}
-                          aria-pressed={on}
-                          onClick={() =>
-                            patch({
-                              messageKinds: on
-                                ? form.messageKinds.filter((k) => k !== kind.key)
-                                : [...form.messageKinds, kind.key],
-                            })
-                          }
-                        >
-                          {kind.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <p className={styles.hint}>
-                    {form.messageKinds.length === 0
-                      ? '何も選ばなければ、どの種類のメッセージにも反応します。'
-                      : '言葉で反応するときは、テキストだけに絞るのがおすすめです。'}
-                  </p>
-                </div>
-
-                <div className={styles.field}>
-                  <span className={styles.label}>受け取る場所</span>
-                  <div className={styles.chips} role="group" aria-label="受け取る場所">
-                    <Checkbox
+                  <div className={styles.labelRow}>
+                    <span className={styles.label}>反応するメッセージの種類</span>
+                    {/* 受け取る場所（LINE・メール）は機能として残す。絵に場所が無いので題の行の右に小さく。 */}
+                    <span className={styles.sourceInline} role="group" aria-label="受け取る場所">
+                      受け取る場所
+                      <Checkbox
                       checked={form.receiveSources.includes('line')}
                       onCheckedChange={(on) =>
                         patch({
@@ -1692,16 +1717,58 @@ function AutoReplyWizardV8Inner() {
                     >
                       メール
                     </Checkbox>
+                    </span>
+                  </div>
+                  <div className={styles.kindsRow} role="group" aria-label="反応するメッセージの種類">
+                    {[...MESSAGE_KIND_WORDS]
+                      .sort((p, q) => kindOrder(p.label) - kindOrder(q.label))
+                      .filter((kind) => showMoreKinds || MAIN_KINDS.includes(kind.label) || form.messageKinds.includes(kind.key))
+                      .map((kind) => {
+                      const on = form.messageKinds.includes(kind.key)
+                      return (
+                        <button
+                          key={kind.key}
+                          type="button"
+                          className={styles.pickChip}
+                          aria-pressed={on}
+                          onClick={() =>
+                            patch({
+                              messageKinds: on
+                                ? form.messageKinds.filter((k) => k !== kind.key)
+                                : [...form.messageKinds, kind.key],
+                            })
+                          }
+                        >
+                          {(() => { const Icon = KIND_ICONS[kind.label]; return Icon ? <Icon size={12} aria-hidden="true" /> : null })()}
+                          {kind.label}
+                        </button>
+                      )
+                    })}
+                    {!showMoreKinds && MESSAGE_KIND_WORDS.some((k) => !MAIN_KINDS.includes(k.label) && !form.messageKinds.includes(k.key)) ? (
+                      <button type="button" className={styles.moreKinds} onClick={() => setShowMoreKinds(true)}>ほかの種類</button>
+                    ) : null}
+                    <span className={styles.kindsNote}>
+                      {form.messageKinds.length === 0
+                        ? '何も選ばなければ、どの種類にも反応'
+                        : '言葉で反応するときは、テキストだけ'}
+                    </span>
                   </div>
                 </div>
+
               </Card>
 
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
-                <h2 className={styles.cardTitle}>2. いつ反応するか</h2>
+              <Card padding="roomy" layout="vertical" className={`${styles.cardContent} ${styles.stepTrigger}`}>
+                <div className={styles.cardHeading}>
+                  <h2 className={styles.cardTitle}>2. いつ反応するか</h2>
+                  <p className={styles.cardDesc}>曜日と時間帯を決めます。祝日は「営業日」の設定に従います。</p>
+                </div>
                 <div className={styles.field}>
                   <span className={styles.label}>曜日</span>
+                  <div className={styles.weekdayRow}>
                   <div className={styles.weekdays} role="group" aria-label="反応する曜日">
-                    {WEEKDAY_LABELS.map((label, index) => {
+                    {/* 絵 A0pDt は月曜はじまり。保存する値（0=日〜6=土）は変えない。 */}
+                    {[1, 2, 3, 4, 5, 6, 0].map((index) => {
+                      const label = WEEKDAY_LABELS[index]
                       const on = form.weekdays.includes(index)
                       return (
                         <button
@@ -1741,28 +1808,16 @@ function AutoReplyWizardV8Inner() {
                         {preset.label}
                       </button>
                     ))}
-                    <span className={styles.weekdayNow}>
+                    <span className={styles.weekdaySummary}>
                       {weekdaySummary(form.weekdays)}
                     </span>
                   </div>
+                  </div>
                   {weekdayNotice ? <p className={styles.hint}>{weekdayNotice}</p> : null}
-                  <p className={styles.hint}>祝日は「営業日」の設定に従います。</p>
-                  <RadioCardGroup legend="祝日の扱い" className={styles.radioPair}>
-                    {HOLIDAY_RULE_LABELS.map((option) => (
-                      <RadioCard
-                        key={option.value}
-                        name="holiday-rule"
-                        value={option.value}
-                        checked={form.holidayRule === option.value}
-                        onChange={(v) => patch({ holidayRule: v as HolidayRuleValue })}
-                        title={option.label}
-                        note={option.hint}
-                      />
-                    ))}
-                  </RadioCardGroup>
                 </div>
                 <div className={styles.field}>
                   <span className={styles.label}>時間帯</span>
+                  <div className={styles.weekdayRow}>
                   <div className={styles.seg} role="group" aria-label="反応する時間帯">
                     <button
                       type="button"
@@ -1790,6 +1845,17 @@ function AutoReplyWizardV8Inner() {
                       時刻を決める
                     </button>
                   </div>
+                  {/* 祝日の扱いは機能として残す（絵は説明の1行だけ）。場所を取らないよう時間帯の横に小さく。 */}
+                  <label className={styles.inlineSelect}>
+                    祝日
+                    <Select
+                      aria-label="祝日の扱い"
+                      value={form.holidayRule}
+                      onChange={(v) => patch({ holidayRule: v as HolidayRuleValue })}
+                      options={HOLIDAY_RULE_LABELS.map((o) => ({ value: o.value, label: o.label }))}
+                    />
+                  </label>
+                  </div>
                   {form.timeMode === 'custom' && (
                     <div className={styles.chips}>
                       <TimeField
@@ -1808,7 +1874,7 @@ function AutoReplyWizardV8Inner() {
                 </div>
               </Card>
 
-              <Card padding="roomy" layout="vertical" className={styles.cardContent}>
+              <Card padding="roomy" layout="vertical" className={`${styles.cardContent} ${styles.stepTrigger}`}>
                 <h2 className={styles.cardTitle}>3. 誰に反応するか</h2>
                 <RadioCardGroup legend="反応する相手" className={styles.radioPair}>
                   <RadioCard
@@ -1817,6 +1883,7 @@ function AutoReplyWizardV8Inner() {
                     checked={form.friendTarget === 'all'}
                     onChange={() => patch({ friendTarget: 'all' })}
                     title="すべての友だち"
+                    icon={<Users size={16} />}
                     note="届いた人みんなに返す"
                   />
                   <RadioCard
@@ -1825,6 +1892,7 @@ function AutoReplyWizardV8Inner() {
                     checked={form.friendTarget === 'filtered'}
                     onChange={() => patch({ friendTarget: 'filtered' })}
                     title="条件に合う友だち"
+                    icon={<ListFilter size={16} />}
                     note="タグ・友だち情報・予約などで絞る"
                   />
                 </RadioCardGroup>
@@ -1848,13 +1916,13 @@ function AutoReplyWizardV8Inner() {
                 <div className={styles.chips} role="group" aria-label="返すもの">
                   {(
                     [
-                      ['inline-text', 'この画面で書く'],
-                      ['template', 'テンプレートから'],
-                      ['inline-flex', 'カード'],
-                      ['inline-image', '画像'],
-                      ['silent', '返信しない（後の処理だけ）'],
-                    ] as Array<[ResponseMode, string]>
-                  ).map(([value, label]) => (
+                      ['inline-text', 'この画面で書く', PenLine],
+                      ['template', 'テンプレートから', FileText],
+                      ['inline-flex', 'カード', LayoutTemplate],
+                      ['inline-image', '画像', ImageIcon],
+                      ['silent', '返信しない（後の処理だけ）', CircleCheck],
+                    ] as Array<[ResponseMode, string, typeof PenLine]>
+                  ).map(([value, label, Icon]) => (
                     <button
                       key={value}
                       type="button"
@@ -1862,24 +1930,26 @@ function AutoReplyWizardV8Inner() {
                       aria-pressed={form.mode === value}
                       onClick={() => patch({ mode: value })}
                     >
+                      <Icon size={14} aria-hidden="true" />
                       {label}
                     </button>
                   ))}
                 </div>
 
                 {form.mode === 'inline-text' && (
-                  <div className={styles.field}>
-                    <label htmlFor="wiz-content" className={styles.label}>
-                      返す文
-                    </label>
-                    <TextArea
+                  <div className={styles.bodyBox}>
+                    <textarea
                       id="wiz-content"
+                      aria-label="返す文"
+                      className={styles.bodyText}
                       value={form.responseContent}
                       onChange={(e) => patch({ responseContent: e.target.value })}
                       placeholder="例：予約の変更を承りました。担当者が確認次第ご連絡します。"
                       maxLength={5000}
+                      rows={2}
                     />
                     <div className={styles.insertChips}>
+                      <span className={styles.insertLabel}>差し込む</span>
                       {INSERT_CHIPS.map((chip) => (
                         <button
                           key={chip.token}
@@ -1888,6 +1958,7 @@ function AutoReplyWizardV8Inner() {
                           title={`${chip.label}を差し込む`}
                           onClick={() => patch({ responseContent: form.responseContent + chip.token })}
                         >
+                          <chip.icon size={16} aria-hidden="true" />
                           {chip.label}
                         </button>
                       ))}
@@ -1966,18 +2037,16 @@ function AutoReplyWizardV8Inner() {
                   <h2 className={styles.cardTitle}>返したあとに行うこと</h2>
                   <p className={styles.cardNote}>上から順に動きます。失敗したときの動きも決められます。</p>
                 </div>
-                <InlineActionList
+                <InlineActionRowsV8
                   actions={form.actions}
                   onChange={(next) => patch({ actions: next })}
                   {...actionOptions}
                 />
-                <p className={styles.hint}>
-                  例：タグを付ける・担当者へ知らせる・シナリオを始める。何もなければ空のままで構いません。
-                </p>
               </Card>
 
               <Card padding="roomy" layout="vertical" className={styles.cardContent}>
                 <h2 className={styles.cardTitle}>細かい決まり</h2>
+                <div className={styles.ruleRows}>
                 <div className={styles.toggleRow}>
                   <div className={styles.toggleText}>
                     <p className={styles.toggleTitle}>返すまで待つ時間</p>
@@ -1992,21 +2061,23 @@ function AutoReplyWizardV8Inner() {
                 <div className={styles.toggleRow}>
                   <div className={styles.toggleText}>
                     <p className={styles.toggleTitle}>同じ人へ続けて返さない</p>
-                    <p className={styles.toggleNote}>
-                      {form.cooldownOn ? `${form.cooldownMinutes}分あけます` : 'オフのときは何度でも返します'}
-                    </p>
                   </div>
                   <div className={styles.toggleExtra}>
-                    {form.cooldownOn && (
-                      <TextField
-                        type="number"
-                        className={styles.toggleNum}
-                        aria-label="あける時間（分）"
-                        min={1}
-                        max={10080}
-                        value={form.cooldownMinutes}
-                        onChange={(e) => patch({ cooldownMinutes: e.target.value })}
-                      />
+                    {form.cooldownOn ? (
+                      <span className={styles.toggleUnit}>
+                        <input
+                          type="number"
+                          className={styles.toggleNum}
+                          aria-label="あける時間（分）"
+                          min={1}
+                          max={10080}
+                          value={form.cooldownMinutes}
+                          onChange={(e) => patch({ cooldownMinutes: e.target.value })}
+                        />{' '}
+                        分あける
+                      </span>
+                    ) : (
+                      <span className={styles.toggleNote}>何度でも返す</span>
                     )}
                     <Toggle
                       label="同じ人へ続けて返さない"
@@ -2037,6 +2108,7 @@ function AutoReplyWizardV8Inner() {
                     checked={form.oncePerFriend}
                     onChange={(on) => patch({ oncePerFriend: on })}
                   />
+                </div>
                 </div>
                 <div className={styles.field}>
                   <span className={styles.label}>条件に合わなかったとき</span>
@@ -2445,19 +2517,22 @@ function KeywordInput({ onAdd }: { onAdd: (word: string) => void }) {
     }
   }
   return (
-    <TextField
-      value={value}
-      placeholder="言葉を入れて Enter"
-      aria-label="反応する言葉を足す"
-      onChange={(e) => setValue(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ',') {
-          e.preventDefault()
-          commit()
-        }
-      }}
-      onBlur={commit}
-    />
+    <label className={styles.kwInput}>
+      <Search size={14} aria-hidden="true" />
+      <input
+        value={value}
+        placeholder="言葉を入れて Enter"
+        aria-label="反応する言葉を足す"
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault()
+            commit()
+          }
+        }}
+        onBlur={commit}
+      />
+    </label>
   )
 }
 
