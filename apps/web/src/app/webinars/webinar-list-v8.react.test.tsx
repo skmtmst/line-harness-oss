@@ -138,7 +138,8 @@ test('v8 では UyUMw の一覧（帯・表・視聴の2行）が出る', async 
   expect(board?.textContent).toContain('編集')
 })
 
-test('v8 の公開予定・終了の札が出る', async () => {
+/* 公開期間が終わった行の札は、一覧の絵（UyUMw・uBMuB・jiNg0）どおり「非公開」。 */
+test('v8 の公開予定・非公開の札が出る', async () => {
   listItems = [
     webinar({ id: 'w-future', title: 'EC連携実践講座', publicationState: 'scheduled' }),
     webinar({ id: 'w-ended', title: '旧機能説明会', publicationState: 'ended' }),
@@ -147,7 +148,7 @@ test('v8 の公開予定・終了の札が出る', async () => {
   await renderPage()
   const board = host.querySelector('[data-design-node="UyUMw"]')
   expect(board?.textContent).toContain('公開予定')
-  expect(board?.textContent).toContain('終了')
+  expect(board?.textContent).toContain('非公開')
 })
 
 test('v8 で何も無いときは eAQ3t の「まだ無い」が出る', async () => {
@@ -235,7 +236,7 @@ test('v8 で詳細パネルの名前をその場で変えると保存口へ届�
 test('v8 でフォルダの追加を押すと右のパネルで名前を入れられる', async () => {
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
-  const add = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('フォルダを追加する'))
+  const add = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('フォルダを追加'))
   expect(add).toBeTruthy()
   await act(async () => { (add as HTMLButtonElement).click() })
   const panel = host.querySelector('[data-design-part="detail-panel"]')
