@@ -716,6 +716,20 @@
   --tpl-row-name-size: 13px; --tpl-row-name-lh: 19px; --tpl-row-sub-gap: 3px; --tpl-row-sub-size: 11px; --tpl-row-sub-lh: 16px;
   --tpl-steps-gap: 8px; --tpl-steps-dot: 20px; --tpl-steps-dot-gap: 6px; --tpl-steps-text-size: 12px; --tpl-steps-text-lh: 17px;
   --tpl-footer-pad-block: 12px; --tpl-footer-pad-side: 24px; --tpl-footer-gap: 8px;
+  /* 友だち詳細（Q5F2QE・JCDRm）。src/v8/friend-detail だけが読む。 */
+  --tpl-fdt-head-pad: 20px 24px; --tpl-fdt-head-gap: 14px; --tpl-fdt-name-size: 20px; --tpl-fdt-name-lh: 26px; --tpl-fdt-name-gap: 8px; --tpl-fdt-title-gap: 4px; --tpl-fdt-sub-size: 13px; --tpl-fdt-sub-lh: 20px; --tpl-fdt-square: 36px;
+  --tpl-fdt-tabs-gap: 23px; --tpl-fdt-pad-side: 24px;
+  --tpl-fdt-summary-w: 320px; --tpl-fdt-summary-pad: 20px 24px; --tpl-fdt-summary-gap: 18px; --tpl-fdt-group-gap: 8px; --tpl-fdt-small-size: 12px; --tpl-fdt-small-lh: 18px; --tpl-fdt-text-size: 13px; --tpl-fdt-text-lh: 20px;
+  --tpl-fdt-tag-pad: 2px 8px; --tpl-fdt-tag-radius: 6px; --tpl-fdt-tag-gap: 6px;
+  --tpl-fdt-mile-size: 22px; --tpl-fdt-mile-lh: 33px; --tpl-fdt-mile-gap: 4px; --tpl-fdt-mile-track: -0.4px;
+  --tpl-fdt-content-pad: 20px 28px; --tpl-fdt-content-gap: 22px; --tpl-fdt-sec-size: 15px; --tpl-fdt-sec-lh: 23px; --tpl-fdt-sec-gap: 10px; --tpl-fdt-recent-gap: 4px; --tpl-fdt-link-gap: 4px;
+  --tpl-fdt-row-radius: 12px; --tpl-fdt-row-pad: 12px 14px; --tpl-fdt-row-gap: 12px; --tpl-fdt-row-min-h: 56px; --tpl-fdt-icon-box: 32px; --tpl-fdt-icon-radius: 9px; --tpl-fdt-row-text-gap: 6px; --tpl-fdt-bar-h: 4px; --tpl-fdt-bar-radius: 3px;
+  --tpl-fdt-recent-h: 50px; --tpl-fdt-dot: 24px; --tpl-fdt-line-h: 26px;
+  --tpl-fdt-hist-pad: 16px 24px 24px; --tpl-fdt-hist-gap: 16px; --tpl-fdt-seg-pad: 3px; --tpl-fdt-seg-gap: 2px; --tpl-fdt-seg-radius: 10px; --tpl-fdt-seg-btn-pad: 6px 12px; --tpl-fdt-seg-btn-radius: 8px;
+  --tpl-fdt-col-time: 130px; --tpl-fdt-col-type: 130px; --tpl-fdt-col-account: 150px; --tpl-fdt-col-source: 90px; --tpl-fdt-cell-pad: 0 16px; --tpl-fdt-head-cell-pad: 10px 16px; --tpl-fdt-hist-row-h: 48px; --tpl-fdt-day-pad: 8px 16px; --tpl-fdt-type-dot: 22px;
+  --tpl-fdt-info-pad: 16px 24px 24px; --tpl-fdt-info-gap: 16px; --tpl-fdt-info-col-gap: 24px; --tpl-fdt-info-row-gap: 14px; --tpl-fdt-field-gap: 6px; --tpl-fdt-chip-pad: 4px 12px;
+  --tpl-fdt-form-pad: 16px 24px 24px; --tpl-fdt-form-gap: 14px; --tpl-fdt-card-pad: 16px; --tpl-fdt-card-head-gap: 10px; --tpl-fdt-form-icon: 28px; --tpl-fdt-form-label-w: 216px; --tpl-fdt-form-row-pad: 10px 0; --tpl-fdt-orphan-size: 11px; --tpl-fdt-changed-line: 2px;
+  --tpl-fdt-empty-pad: 40px 24px; --tpl-fdt-empty-gap: 8px; --tpl-fdt-empty-icon: 40px;
   --tpl-settings-nav-width: 208px; --tpl-settings-nav-pad-block: 16px; --tpl-settings-nav-pad-side: 12px;
   /* 設定の中のメニュー（設定の板 ihjfd ほか 8 枚）。 */
   --tpl-setnav-w: 200px; --tpl-setnav-pad: 16px 12px; --tpl-setnav-gap: 2px; --tpl-setnav-item-pad: 8px 10px; --tpl-setnav-item-gap: 8px; --tpl-setnav-radius: 8px; --tpl-setnav-child-indent: 22px; --tpl-setnav-band-pad: 8px 16px;

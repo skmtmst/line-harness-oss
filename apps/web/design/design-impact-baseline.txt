@@ -520,6 +520,12 @@ shared-button-importer v8/scenarios/list.tsx
 shared-button-importer v8/webinars/list.tsx
 shared-button-importer v8/friend-add/list.tsx
 shared-button-importer v8/friend-add/editor.tsx
+shared-button-importer v8/friend-detail/detail.tsx
+shared-button-importer v8/friend-detail/empty-tab.tsx
+shared-button-importer v8/friend-detail/forms-tab.tsx
+shared-button-importer v8/friend-detail/history-tab.tsx
+shared-button-importer v8/friend-detail/info-tab.tsx
+shared-button-importer v8/friend-detail/overview-tab.tsx
 shared-button-importer v8/notifications/list.tsx
 shared-button-importer v8/analytics/analytics.tsx
 shared-button-importer v8/analytics/reactions.tsx
