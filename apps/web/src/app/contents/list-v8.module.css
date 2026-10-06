@@ -260,6 +260,13 @@ button.kpi {
   line-height: 1;
 }
 
+/* 名前の前のフォルダの丸。名前の行の高さの真ん中に置く（絵 O7hUt7）。 */
+.nameDot {
+  display: inline-flex;
+  align-self: center;
+  flex-shrink: 0;
+}
+
 .fileName {
   flex: 1 1 0;
   min-width: 0;
