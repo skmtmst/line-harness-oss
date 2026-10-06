@@ -629,6 +629,10 @@
   --tpl-fe-add-pad: 14px; --tpl-fe-add-card-h: 58px; --tpl-fe-add-card-gap: 4px; --tpl-fe-add-card-pad: 8px 10px;
   --tpl-fe-limit-w: 120px; --tpl-fe-booking-cols: 31fr 31fr 20fr; --tpl-fe-wells-gap: 6px; --tpl-fe-words-gap: 8px; --tpl-fe-url-pad: 0 10px; --tpl-fe-change-gap: 6px; --tpl-fe-changes-pad: 12px 14px; --tpl-fe-notes-gap: 12px;
   --tpl-fe-band-slot-pad: 0 24px 8px; --tpl-fe-band-gap: 12px; --tpl-fe-band-pad: 12px 16px; --tpl-fe-band-title-size: 14px; --tpl-fe-band-title-lh: 20px;
+  /* 保存がぶつかったときの帯・比べる窓（共通 save-conflict。J1pdB・k32cn）。回答フォームの編集の値と同じ。 */
+  --save-conflict-gap: var(--tpl-fe-band-gap); --save-conflict-pad: var(--tpl-fe-band-pad); --save-conflict-ring: var(--tpl-fe-ring-warning); --save-conflict-head-gap: var(--tpl-fe-head-gap);
+  --save-conflict-title-size: var(--tpl-fe-band-title-size); --save-conflict-title-lh: var(--tpl-fe-band-title-lh); --save-conflict-desc-size: var(--tpl-fe-body-size); --save-conflict-desc-lh: var(--tpl-fe-body-lh);
+  --save-conflict-icon: 18px; --save-conflict-button-icon: 15px; --save-conflict-change-gap: var(--tpl-fe-change-gap); --save-conflict-changes-pad: var(--tpl-fe-changes-pad); --save-conflict-change-size: var(--tpl-fe-note-size); --save-conflict-change-lh: var(--tpl-fe-note-lh);
   --tpl-fe-rail-narrow-w: 280px; --tpl-fe-rail-narrow-pad: 16px; --tpl-fe-rail-narrow-content-w: 247px;
   --tpl-fe-phone-title-lh: 23px; --tpl-fe-phone-w: 330px; --tpl-fe-phone-h: 690px; --tpl-fe-phone-pad: 10px; --tpl-fe-phone-radius: 52px; --tpl-fe-phone-screen-radius: 42px; --tpl-fe-phone-ring: 2px; --tpl-fe-phone-body: #111214; --tpl-fe-phone-ring-color: #3a3b3f; --tpl-fe-phone-black: #000000;
   --tpl-fe-phone-bar-h: 44px; --tpl-fe-phone-status-pad: 14px 26px 0 30px; --tpl-fe-phone-head-pad: 0 12px; --tpl-fe-phone-clock-lh: 18px; --tpl-fe-phone-island-w: 96px; --tpl-fe-phone-island-h: 28px; --tpl-fe-phone-icon-gap: 5px; --tpl-fe-phone-name-lh: 21px;
