@@ -24,6 +24,8 @@ export type KpiCardProps = {
    */
   value: number | null | undefined
   unit: string
+  /** 増減の数（差し引きなど）。true のとき、プラスの数に「+」を付ける（単位はそのまま出す）。 */
+  signed?: boolean
   /**
    * 数では表せない値（「1時間24分」「96.7%」など）をそのまま出す。
    * 渡したときは value と unit を使わない（★V6 37-6 の数値カード帯）。
@@ -99,6 +101,7 @@ export default function KpiCard({
   menu,
   value,
   unit,
+  signed = false,
   detail,
   description,
   descriptionLabel,
@@ -196,7 +199,7 @@ export default function KpiCard({
             .filter(Boolean)
             .join(' ')}
         >
-          <span data-kpi-number className={styles.number}>{valueText !== undefined ? valueText : isCountableValue(value) ? formatNumber(value) : '—'}</span>
+          <span data-kpi-number className={styles.number}>{valueText !== undefined ? valueText : isCountableValue(value) ? `${signed && value > 0 ? '+' : ''}${formatNumber(value)}` : '—'}</span>
           {valueText !== undefined ? null : <span className={styles.unit}>{unit}</span>}
         </p>
       )}

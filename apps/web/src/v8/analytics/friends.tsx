@@ -113,7 +113,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
     <KpiBand className={styles.band}>
       <KpiCard presentation="band" title="増えた" icon={<Users size={13} aria-hidden="true" />} menu={menu('増えた')} value={addedValue} unit="人" {...metricCardState(overview.metrics.added, { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)}人` }, state.retry)} />
       <KpiCard presentation="band" title="減った" icon={<UserMinus size={13} aria-hidden="true" />} menu={menu('減った')} value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, { detail: `この${days}日・解除を含む` }, state.retry)} />
-      <KpiCard presentation="band" title="差し引き" icon={<ArrowLeftRight size={13} aria-hidden="true" />} menu={menu('差し引き')} value={netValue} unit="人" {...metricCardState(overview.metrics.net, { detail: `友だちは ${metricText(overview.metrics.currentFriends)} 人` }, state.retry)} />
+      <KpiCard presentation="band" title="差し引き" icon={<ArrowLeftRight size={13} aria-hidden="true" />} menu={menu('差し引き')} value={netValue} unit="人" signed {...metricCardState(overview.metrics.net, { detail: `友だちは ${metricText(overview.metrics.currentFriends)} 人` }, state.retry)} />
       <KpiCard presentation="band" title="ブロック率" icon={<CircleHelp size={13} aria-hidden="true" />} menu={menu('ブロック率')} value={null} unit="%" detail="ブロックの数は未取得" />
     </KpiBand>
     <div className={styles.body}>
