@@ -226,6 +226,8 @@ function ArchiveConfirm({
     <ConfirmDialog
       open
       designNode="VXZ6T"
+      designWidth={500}
+      designTop={380}
       title={restoring ? 'ウェビナーを下書きに戻しますか？' : 'ウェビナーをアーカイブしますか？'}
       description={restoring ? '通常の一覧に戻します。公開するまでは、新しい申込は受け付けません。' : 'アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。'}
       confirmLabel={restoring ? '下書きに戻す' : 'アーカイブする'}
