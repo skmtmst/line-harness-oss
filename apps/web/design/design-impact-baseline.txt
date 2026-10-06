@@ -550,6 +550,14 @@ shared-button-importer v8/webinar-edit/notifications.tsx
 shared-button-importer v8/webinar-edit/participants.tsx
 shared-button-importer v8/webinar-edit/review.tsx
 shared-button-importer v8/webinar-edit/video.tsx
+shared-button-importer v8/friends/list/list.tsx
+shared-button-importer v8/friends/merged/merged.tsx
+shared-button-importer v8/friends/merged/person.tsx
+shared-button-importer v8/friends/duplicates/list.tsx
+shared-button-importer v8/friends/compare/compare.tsx
+shared-button-importer v8/friends/migrations/csv.tsx
+shared-button-importer v8/friends/migrations/uid.tsx
+shared-button-importer v8/friends/migrations/uid-dialogs.tsx
 shared-button-importer v8/conversions/list.tsx
 shared-button-importer v8/conversions/dialogs.tsx
 shared-button-importer v8/conversions/create.tsx
