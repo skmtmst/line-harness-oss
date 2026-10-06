@@ -202,7 +202,7 @@ function DaySlots({
 }) {
   return (
     <section aria-label={`${formatJpLong(day)}の空き`}>
-      <h3 className="mb-2 text-sm font-bold text-ink">{formatJpLong(day)} の空き</h3>
+      <h3 className="mb-3.5 text-sm font-bold text-ink">{formatJpLong(day)}の空き</h3>
       {times.length === 0 ? (
         <p className="text-[13px] leading-6 text-liff-sub">この日は満席です。別の日を選んでください。</p>
       ) : (
@@ -591,6 +591,7 @@ export default function DateTimePicker({
 
   const monthLabel = `${Number(month.slice(0, 4))}年${Number(month.slice(5, 7))}月`;
   const monthHasOpen = monthDays.some((d) => calByDate[d]?.some((t) => t.open));
+  const monthHasFew = monthDays.some((d) => calLimited[d]);
   const listTimes = listDay ? (weekByDate?.[listDay] ?? []) : [];
 
   const slotEnd =
@@ -652,8 +653,8 @@ export default function DateTimePicker({
     <div className="space-y-3.5" data-design-node={view === 'calendar' ? 'k3aJKU' : wide ? 'xvtSz' : 'M2p63S'}>
       <div>
         <h2 className="text-xl font-bold text-ink">日時を選んでください</h2>
-        <p className="mt-1 text-xs text-liff-sub">
-          {menu.name}・{staff.display_name}
+        <p className="mt-3.5 text-xs leading-[18px] text-liff-sub">
+          {`${menu.name}・${staff.display_name}`}
         </p>
       </div>
       {hint && <p className="text-xs leading-5 text-liff-sub">{hint}</p>}
@@ -699,13 +700,13 @@ export default function DateTimePicker({
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-1.5" role="group" aria-label="週をえらぶ">
+            <div className="flex items-center gap-[5px]" role="group" aria-label="週をえらぶ">
               <button
                 type="button"
                 onClick={() => moveWeek(-1)}
                 disabled={!canPrevWeek}
                 aria-label="前の週"
-                className="flex h-10 w-6 shrink-0 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
+                className="flex h-10 w-[18px] shrink-0 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
               >
                 <Icon name="chevron-left" className="h-[18px] w-[18px]" />
               </button>
@@ -775,7 +776,7 @@ export default function DateTimePicker({
                 onClick={() => moveWeek(1)}
                 disabled={!canNextWeek}
                 aria-label="次の週"
-                className="flex h-10 w-6 shrink-0 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
+                className="flex h-10 w-[18px] shrink-0 items-center justify-center text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:text-liff-off-ink"
               >
                 <Icon name="chevron-right" className="h-[18px] w-[18px]" />
               </button>
@@ -806,7 +807,8 @@ export default function DateTimePicker({
       ) : (
         <>
           <div>
-            <div aria-label="月をえらぶ" className="mb-2 flex items-center justify-between">
+            {/* 板 k3aJKU：月・曜日・各週・凡例の間は 14。行の高さは月の名前の字の高さ (押す所は 36 のまま上下へはみ出す)。 */}
+            <div aria-label="月をえらぶ" className="mb-3.5 flex h-[22px] items-center justify-between">
               <button
                 type="button"
                 onClick={() => setMonth(addMonths(month, -1))}
@@ -833,17 +835,17 @@ export default function DateTimePicker({
               <LoadingView />
             ) : (
               <>
-                <div className="grid grid-cols-7" aria-label={`${monthLabel}の曜日`}>
+                <div className="mb-3.5 grid grid-cols-7" aria-label={`${monthLabel}の曜日`}>
                   {WEEKDAY_JP.split('').map((w, i) => (
                     <span
                       key={w}
-                      className={`py-1 text-center text-[11px] ${i === 0 ? 'text-liff-sun' : i === 6 ? 'text-liff-sat' : 'text-liff-sub'}`}
+                      className={`text-center text-[11px] ${i === 0 ? 'text-liff-sun' : i === 6 ? 'text-liff-sat' : 'text-liff-sub'}`}
                     >
                       {w}
                     </span>
                   ))}
                 </div>
-                <div className="grid grid-cols-7" aria-label={`${monthLabel}の日付`}>
+                <div className="grid grid-cols-7 gap-y-3.5" aria-label={`${monthLabel}の日付`}>
                   {Array.from({ length: firstWeekday }).map((_, i) => (
                     <span key={`pad-${i}`} aria-hidden="true" />
                   ))}
@@ -897,13 +899,16 @@ export default function DateTimePicker({
                   })}
                 </div>
                 {settings.vacancyDots && (
-                  <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-liff-sub">
+                  <p className="mt-3.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-liff-sub">
                     <span>
                       <span className="text-liff-primary">●</span> 空きあり
                     </span>
-                    <span>
-                      <span className="text-liff-dot-few">●</span> 残りわずか
-                    </span>
+                    {/* 残りわずかの日がある月だけ出す (板 k3aJKU は空きありと灰色の2つ)。 */}
+                    {monthHasFew && (
+                      <span>
+                        <span className="text-liff-dot-few">●</span> 残りわずか
+                      </span>
+                    )}
                     <span>灰色：満席・休み</span>
                   </p>
                 )}

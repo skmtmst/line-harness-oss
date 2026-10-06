@@ -72,7 +72,7 @@ describe('進む操作は下の操作の帯に1つだけ', () => {
     expect(event).toContain('allFull');
     // 待ちを受けるイベントでは満席の枠を選べ、選んだら待ちに入る文言になる。
     expect(event).toContain('waitlistOpen');
-    expect(event).toContain('キャンセル待ちに入る');
+    expect(event).toContain('キャンセル待ちで申し込む');
   });
 
   it('確認は申し込む1つ (戻るボタンは見出しの ← だけ)', () => {
@@ -140,8 +140,8 @@ describe('自分のイベントは期限まで取り消せる', () => {
     expect(bookings).toContain('invalid_state');
   });
 
-  it('札は文字で出す (参加・承認待ち)', () => {
-    expect(bookings).toContain("'参加'");
+  it('札は文字で出す (申し込み済み・承認待ち)', () => {
+    expect(bookings).toContain("'申し込み済み'");
     expect(bookings).toContain("'承認待ち'");
     expect(bookings).toContain('<Badge');
   });

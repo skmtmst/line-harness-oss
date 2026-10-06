@@ -14,9 +14,10 @@ import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 
-/** 札の文字は設計どおり (参加・承認待ち…)。意味は今の状態名のまま変えない。 */
+/** 札の文字は設計どおり (★V8 y1bs9A：申し込み済み・キャンセル待ち…)。意味は今の状態名のまま変えない。 */
 const statusMeta: Record<string, { text: string; tone: 'confirmed' | 'pending' | 'neutral' }> = {
-  confirmed: { text: '参加', tone: 'confirmed' },
+  confirmed: { text: '申し込み済み', tone: 'confirmed' },
+  waitlisted: { text: 'キャンセル待ち', tone: 'pending' },
   requested: { text: '承認待ち', tone: 'pending' },
   rejected: { text: '見送り', tone: 'neutral' },
   cancelled: { text: 'キャンセル', tone: 'neutral' },
@@ -239,7 +240,7 @@ export default function EventBookings() {
                 <StatusView icon="calendar" title="これまでのイベントはありません" />
               )
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-3.5">
                 {items.map((b) => {
                   const meta = statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
                   return (
@@ -247,7 +248,7 @@ export default function EventBookings() {
                       <Card className="p-3.5">
                         <div className="flex items-center gap-3">
                           <div
-                            className="flex w-14 shrink-0 flex-col items-center"
+                            className="flex w-14 shrink-0 flex-col items-center rounded-(--liff-radius) bg-liff-off-bg py-1.5"
                             aria-label={`${utcToJstMd(b.slot_starts_at)} ${utcToJstHm(b.slot_starts_at)}`}
                           >
                             <span className="text-[15px] font-bold whitespace-nowrap text-ink">
@@ -258,7 +259,7 @@ export default function EventBookings() {
                             </span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-semibold text-ink" title={b.event_name}>
+                            <div className="truncate text-sm font-bold text-ink" title={b.event_name}>
                               {b.event_name}
                             </div>
                             {b.venue_name && (
@@ -272,6 +273,32 @@ export default function EventBookings() {
                             <div className="mt-[3px]">
                               <Badge tone={meta.tone}>{meta.text}</Badge>
                             </div>
+                            {/* 板 y1bs9A：変える・キャンセルは文の列の下に小さく並べる。 */}
+                            {canCancel(b) && (
+                              <div className="flex items-center gap-2 pt-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void openChange(b);
+                                  }}
+                                  disabled={busy}
+                                  className="inline-flex items-center justify-center rounded-lg border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                                >
+                                  時間を変える
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionError(null);
+                                    setPendingCancel(b);
+                                  }}
+                                  disabled={busy}
+                                  className="inline-flex items-center justify-center rounded-lg border border-danger/30 bg-canvas px-3 py-1.5 text-xs font-semibold text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                                >
+                                  キャンセルする
+                                </button>
+                              </div>
+                            )}
                           </div>
                           <button
                             type="button"
@@ -284,31 +311,6 @@ export default function EventBookings() {
                             <Icon name="chevron-right" className="h-5 w-5" />
                           </button>
                         </div>
-                        {canCancel(b) && (
-                          <div className="mt-3 flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                void openChange(b);
-                              }}
-                              disabled={busy}
-                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-hairline bg-canvas px-3 text-xs font-semibold text-ink focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
-                            >
-                              時間を変える
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setActionError(null);
-                                setPendingCancel(b);
-                              }}
-                              disabled={busy}
-                              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-danger/30 bg-canvas px-3 text-xs font-semibold text-danger focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
-                            >
-                              キャンセルする
-                            </button>
-                          </div>
-                        )}
                       </Card>
                     </li>
                   );
