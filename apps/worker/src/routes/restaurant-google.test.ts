@@ -689,20 +689,36 @@ describe('Googleビジネス：口コミ', () => {
     expect(testDb.raw.prepare('SELECT reply_draft FROM rt_google_reviews WHERE id = ?').get(id)).toEqual({ reply_draft: 'う'.repeat(70) });
   });
 
-  it('短くする：作り直しても足りないときは、より大きく変わった方を残す', async () => {
+  it('書き換え：作り直しても十分に変わらなければ保存せず、やり直しを促す', async () => {
     await seedReviews();
-    const baseText = 'あ'.repeat(130);
-    // どちらも目安（65字）に届かないが、1回目（100字）の方が変化が大きいのでそれを残す。
-    const run = vi
-      .fn()
-      .mockResolvedValueOnce({ response: 'い'.repeat(100) })
-      .mockResolvedValueOnce({ response: 'う'.repeat(120) });
-    env.AI = { run } as unknown as Ai;
     const id = reviewIdOf('r1');
-    const response = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: 'shorter', baseText } });
-    expect(response.status).toBe(200);
-    expect(run).toHaveBeenCalledTimes(2);
-    expect(await response.json()).toMatchObject({ draft: 'い'.repeat(100) });
+    const draftOf = () => (testDb.raw.prepare('SELECT reply_draft, reply_status FROM rt_google_reviews WHERE id = ?').get(id) as { reply_draft: string | null; reply_status: string });
+    const before = draftOf();
+
+    const cases: Array<{ mode: 'shorter' | 'polite'; base: string; first: string; second: string | null }> = [
+      // 目安（65字）から遠い緩い縮み。作り直しも悪化（120字）なので保存しない。
+      { mode: 'shorter', base: 'あ'.repeat(130), first: 'い'.repeat(100), second: 'う'.repeat(120) },
+      // 短くするのに元と同じ長さのまま。
+      { mode: 'shorter', base: 'あ'.repeat(40), first: 'い'.repeat(40), second: 'う'.repeat(40) },
+      // 丁寧にするのに元より長くなっていない。
+      { mode: 'polite', base: 'あ'.repeat(400), first: 'い'.repeat(400), second: 'う'.repeat(400) },
+      // 作り直し自体が失敗したときも、不十分な1回目を保存しない。
+      { mode: 'shorter', base: 'あ'.repeat(130), first: 'い'.repeat(100), second: null },
+    ];
+
+    for (const item of cases) {
+      const run = vi.fn();
+      run.mockResolvedValueOnce({ response: item.first });
+      if (item.second === null) run.mockRejectedValueOnce(new Error('ai down'));
+      else run.mockResolvedValueOnce({ response: item.second });
+      env.AI = { run } as unknown as Ai;
+      const response = await call(`/api/restaurant-test/google/reviews/${id}/draft/generate?account_id=account-2`, { body: { mode: item.mode, baseText: item.base } });
+      expect(response.status).toBe(502);
+      expect(await response.json()).toMatchObject({ code: 'rewrite_failed' });
+      expect(run).toHaveBeenCalledTimes(2);
+      // 不十分な文章は下書きに残さない。
+      expect(draftOf()).toEqual(before);
+    }
   });
 
   it('AI下書き：AI が無い環境は 503、返信済みの口コミは 409', async () => {

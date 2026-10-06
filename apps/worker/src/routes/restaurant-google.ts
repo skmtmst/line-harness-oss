@@ -1105,12 +1105,18 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
   try {
     text = await generateOnce(false);
     // 1回目で目に見えて変わらなかったときだけ、条件を厳しくして作り直す。
-    // 再試行しても目安に届かないことがあるが、その場合でも変化が大きい方を必ず採用し、
-    // 不十分な1回目の結果をそのまま成功として保存しない。
+    // 2回のうち変化が大きい方を採用する。
     if (replyDraftRewriteFellShort(mode, base, text)) {
       const retried = await generateOnce(true).catch(() => '');
       if (retried && replyDraftRewriteChangeScore(mode, base, retried) > replyDraftRewriteChangeScore(mode, base, text)) {
         text = retried;
+      }
+      // 作り直しても元から十分に変わらなかった（無変化・逆方向・目安から遠い）結果は
+      // 書き換えの失敗として扱い、下書きには保存しない。画面は既存のエラー表示で
+      // やり直しを促す。不十分な文章を成功として保存しないため。
+      if (replyDraftRewriteFellShort(mode, base, text)) {
+        console.error('[restaurant-google] AI rewrite fell short', { mode, baseLength: base.length, resultLength: text.trim().length });
+        return fail(c, 502, '元の文章から十分に書き換えられませんでした。もう一度お試しください', { code: 'rewrite_failed' });
       }
     }
   } catch (error) {
