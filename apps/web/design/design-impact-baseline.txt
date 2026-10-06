@@ -528,3 +528,7 @@ shared-button-importer v8/analytics/saved.tsx
 shared-button-importer v8/analytics/funnel.tsx
 shared-button-importer v8/analytics/cross.tsx
 shared-button-importer v8/analytics/search-console.tsx
+shared-button-importer v8/settings/getting-started/getting-started.tsx
+shared-button-importer v8/settings/pools/pools.tsx
+shared-button-importer v8/settings/accounts/accounts.tsx
+shared-button-importer v8/settings/staff/staff.tsx
