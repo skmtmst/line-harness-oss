@@ -1,0 +1,101 @@
+/* ★V8 友だちの段の頭とタブ（x6QsVz「タブの段」・ADjK8/hn6Y8「板の頭」）。値は globals.css の --tpl-fr-*。 */
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--tpl-fr-head-gap);
+  padding: var(--tpl-fr-head-pad);
+  border-bottom: 1px solid var(--color-hairline);
+  flex-shrink: 0;
+}
+
+.back {
+  align-self: flex-start;
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-fr-back-lh);
+  white-space: nowrap;
+}
+
+.back:hover { text-decoration: underline; }
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-metric);
+  font-weight: 700;
+  line-height: var(--tpl-fr-title-lh);
+  white-space: nowrap;
+}
+
+.description {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-fr-desc-lh);
+}
+
+.tabRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-fr-tab-gap);
+  min-width: 0;
+}
+
+/* 一覧の板：タブの段は下に細い線（x6QsVz。左右24は型のタブ枠が持つ）。 */
+.tabRowLine {
+  border-bottom: 1px solid var(--color-hairline);
+  align-items: flex-end;
+}
+
+.tabs {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-fr-tab-gap);
+  min-width: 0;
+}
+
+.tab {
+  padding-bottom: var(--tpl-fr-tab-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-fr-tab-lh);
+  white-space: nowrap;
+}
+
+.tab:hover { color: var(--color-ink); }
+
+.tabCurrent {
+  color: var(--color-ink);
+  font-weight: 600;
+  box-shadow: var(--tpl-fr-shadow-tab);
+}
+
+.tabRowLine .tab { line-height: var(--tpl-fr-tab-lh-list); }
+
+.tabAction {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-fr-head-gap);
+  flex-shrink: 0;
+}
+
+.note {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-fr-note-gap);
+  margin: 0;
+  padding: 0 var(--tpl-fr-note-indent) var(--tpl-fr-note-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-fr-desc-lh);
+}
+
+.noteIcon {
+  width: var(--tpl-fr-note-icon);
+  height: var(--tpl-fr-note-icon);
+  flex-shrink: 0;
+}

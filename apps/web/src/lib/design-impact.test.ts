@@ -245,6 +245,8 @@ describe('共通部品の影響範囲', () => {
       'v8/rich-menus/list.tsx',
       // ★V8 自動応答の一覧（uE9gf）。新しい置き場（src/v8）に一から書いた。
       'v8/auto-replies/list.tsx',
+      // ★V8 自動応答の実行結果（nWmLg）。表の下にページ送りを置く。
+      'v8/auto-replies/runs.tsx',
       // ★V8 シナリオ配信の一覧（axFrW）を src/v8 に一から書いた。ページ送りは共通のまま。
       'v8/scenarios/list.tsx',
       // ★V8 ウェビナーの一覧（UyUMw）。新しい置き場（src/v8）に一から書いた。
@@ -253,6 +255,11 @@ describe('共通部品の影響範囲', () => {
       'v8/webhooks/outgoing.tsx',
       // ★V8 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りを置く。
       'v8/webhooks/interactions.tsx',
+      // ★V8 友だち（x6QsVz 一覧・ADjK8 統合ユーザー・hn6Y8 重複検出・Z0jHp UID移行）を src/v8/friends に一から書いた。
+      'v8/friends/list/list.tsx',
+      'v8/friends/merged/merged.tsx',
+      'v8/friends/duplicates/list.tsx',
+      'v8/friends/migrations/uid.tsx',
       // ★V8 コンバージョンの一覧（r6dJFy）。新しい置き場（src/v8）に一から書いた。
       'v8/conversions/list.tsx',
     ].sort())
