@@ -499,16 +499,18 @@ const FRIEND_ADD_RULE = {
 }
 
 const FRIEND_ADD_RULE_OPTIONS = {
+  // 作る②（h8uNW・xHpkS）の絵の4つ。秋フェアの2つは下書き rule-autumn が選んでいる。
   routes: [
+    { id: 'route-autumn-flyer', name: '秋フェア チラシ', kind: 'チラシ' },
+    { id: 'route-autumn-poster', name: '秋フェア 店頭ポスター', kind: 'ポスター' },
     { id: 'route-shop', name: '店頭QRコード', kind: 'QR' },
-    { id: 'route-instagram', name: 'Instagramプロフィール', kind: '広告' },
-    { id: 'route-referral', name: '紹介キャンペーン', kind: '紹介' },
+    { id: 'route-instagram', name: 'Instagram プロフィール', kind: '広告' },
   ],
   scenarios: [
     { id: 'scenario-welcome', name: '新規登録7日間フォロー' },
     { id: 'scenario-common', name: '共通のあいさつ' },
   ],
-  tags: [{ id: 'tag-new', name: '新規友だち' }, { id: 'tag-delivered', name: '配信済み' }],
+  tags: [{ id: 'tag-new', name: '新規友だち' }, { id: 'tag-delivered', name: '配信済み' }, { id: 'tag-member', name: 'NEN会員' }],
   folders: [
     { id: 'friend-add-folder-store', name: '店頭' },
     { id: 'friend-add-folder-ads', name: '広告' },
@@ -518,10 +520,13 @@ const FRIEND_ADD_RULE_OPTIONS = {
 
 const FRIEND_ADD_RULES = {
   items: [
-    { ...FRIEND_ADD_RULE, id: 'rule-shop', name: '店頭QRの初回案内', folderName: '店頭', priority: 1, matchedLast7Days: 41, routeNames: ['店頭QRコード'], definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-shop'], messageText: '来店クーポンをご案内します。' } },
-    { ...FRIEND_ADD_RULE, id: 'rule-instagram', name: '広告からの初回案内', folderName: '広告', priority: 2, matchedLast7Days: 24, routeNames: ['Instagramプロフィール'], definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-instagram'], messageText: '資料をダウンロードできます。' } },
+    // 一覧の板（MRhef・LEwkJ・P20kYU）の「最初に送るもの」の副行は1つずつ（シナリオ／タグ）。
+    { ...FRIEND_ADD_RULE, id: 'rule-shop', name: '店頭QRの初回案内', folderName: '店頭', priority: 1, matchedLast7Days: 41, routeNames: ['店頭QRコード'], scenarioName: '7日間フォロー', definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-shop'], messageText: '来店クーポンをご案内します。', actions: [FRIEND_ADD_RULE.definition.actions[1]] } },
+    { ...FRIEND_ADD_RULE, id: 'rule-instagram', name: '広告からの初回案内', folderName: '広告', priority: 2, matchedLast7Days: 24, routeNames: ['Instagram プロフィール'], scenarioName: null, definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-instagram'], scenarioId: null, messageText: '資料をダウンロードできます。', actions: [{ type: 'add_tag', label: 'タグ「広告から」を付ける', targetId: 'tag-ads' }] } },
     FRIEND_ADD_RULE,
-    { ...FRIEND_ADD_RULE, id: 'rule-fallback', name: '経路が分からなかった人', folderName: null, priority: 999999, isFallback: true, matchedLast7Days: 12, routeNames: [], scenarioName: '共通のあいさつ', definition: { ...FRIEND_ADD_RULE.definition, routeIds: [], scenarioId: 'scenario-common', messageText: '友だち追加ありがとうございます。' } },
+    // 作る①〜③・競合（wDzkc・h8uNW・al47K・h5rm8t）は、この下書きを開いた絵。
+    { ...FRIEND_ADD_RULE, id: 'rule-autumn', name: '秋フェアの初回案内', folderName: null, priority: 4, status: 'draft', versionStatus: 'draft', publishedAt: null, matchedLast7Days: null, routeNames: ['秋フェア チラシ'], scenarioName: null, definition: { ...FRIEND_ADD_RULE.definition, routeIds: ['route-autumn-flyer', 'route-autumn-poster'], scenarioId: 'scenario-welcome', messageText: '友だち追加ありがとうございます！\n秋フェアのチラシから来てくださった方へ、会場で使えるクーポンをお送りします。', activeFrom: '2026-10-01T00:00', activeUntil: '2026-11-30T23:59', friendCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_not_exists', value: 'tag-member' }] }), timeWindows: [], actions: [{ type: 'add_tag', label: 'タグ「秋フェア」を付ける', targetId: 'tag-autumn' }] } },
+    { ...FRIEND_ADD_RULE, id: 'rule-fallback', name: '経路が分からなかった人', folderName: null, priority: 999999, isFallback: true, matchedLast7Days: 12, routeNames: [], scenarioName: '共通のあいさつ', definition: { ...FRIEND_ADD_RULE.definition, routeIds: [], scenarioId: 'scenario-common', messageText: '友だち追加ありがとうございます。', actions: [FRIEND_ADD_RULE.definition.actions[1]] } },
   ],
   summary: { rules: 4, active: 3, recentAdds: 86, captured: 74, unknownRoute: 12, delivered: 84, failed: 2 },
   options: FRIEND_ADD_RULE_OPTIONS,
@@ -533,6 +538,7 @@ const FRIEND_ADD_RULE_MATCHES = new Map([
   ['rule-shop', 241],
   ['rule-instagram', 382],
   ['rule-referral', 214],
+  ['rule-autumn', 0],
   ['rule-fallback', 12],
 ])
 
