@@ -174,3 +174,13 @@ describe('選ぶカードの行型（BHEl9・変わり形）', () => {
     expect(css).toMatch(/\[data-theme='v8'\]\s*\.card\s*{[^}]*min-height:\s*98px/s)
   })
 })
+
+describe('V8 の丸（2026-10-06 オーナー：絵どおり丸を出す。バナーの小さい箱だけ丸なし）', () => {
+  const css = () => readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'radio-card.module.css'), 'utf8')
+  it('普通の箱（card）の丸は消さない', () => {
+    expect(css()).not.toMatch(/\[data-theme='v8'\] \.card > \.radio[^{]*\{[^}]*opacity:\s*0/)
+  })
+  it('小さい箱（compact）だけ丸を見えなくする（input は残す）', () => {
+    expect(css()).toMatch(/\[data-theme='v8'\] \.compact > \.radio[^{]*\{[^}]*opacity:\s*0/)
+  })
+})
