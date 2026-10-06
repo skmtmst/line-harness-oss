@@ -910,6 +910,24 @@ export const FORM_DELETE_IMPACT_FIXTURES = {
     recommendedAction: 'archive',
     blockers: ['published', 'has_submissions', 'has_opens', 'in_use'],
   },
+  /* 板 `GVizd`：一覧の3行目「休止の理由」を開いたとき（回答96件・リッチメニューとシナリオが開く）。 */
+  archiveSurvey: {
+    form: { id: 'form-3', name: '休止の理由', isActive: true, status: 'active' },
+    submissionCount: 96,
+    openCount: 20,
+    references: [
+      { kind: 'rich_menu', name: '通常メニュー', href: '/rich-menus/edit?id=rich-menu-main', state: 'available' },
+      { kind: 'scenario', name: '休止フォロー', href: '/scenarios?id=scenario-pause', state: 'available' },
+    ],
+    referenceCount: 2,
+    answerUrl: 'https://liff.line.me/visual-qa/?page=form&id=form-3',
+    revision: 3,
+    checkedAt: '2026-08-31T11:00:00.000',
+    canDelete: false,
+    canArchive: true,
+    recommendedAction: 'archive',
+    blockers: ['published', 'has_submissions', 'has_opens', 'in_use'],
+  },
   delete: {
     form: { id: 'form-empty', name: '下書きフォーム', isActive: false, status: 'active' },
     submissionCount: 0,
@@ -984,9 +1002,13 @@ export const FORMS = [
   formRow('form-review', '口コミ', '星の評価とひとこと・2ブロック', null, true, 210, { submitCount: 24, openCount: 30, rate: 80 }, '2026-08-24T03:00:00.000Z', '2026-08-24T03:00:00.000Z', { friendFieldCount: 1, tagCount: 1 }),
 ]
 
-/** 機能13 `EMBIK`。一覧6行と、画面全体18件の集計を同じ応答で返す。 */
+/**
+ * 機能13 `EMBIK`。一覧の1ページ目と、画面全体18件の集計を同じ応答で返す。
+ * 板 `I3L41O`・`GrnO4` の表は上の5行のあとすぐ「18件」なので、一覧の口（with_list_summary）だけ5行にする。
+ * 編集画面の選択肢など、ほかの口は `FORMS` の全部のまま。
+ */
 export const FORM_LIST = {
-  items: FORMS,
+  items: FORMS.slice(0, 5),
   total: 18,
   page: 1,
   limit: 20,
