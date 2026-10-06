@@ -699,7 +699,11 @@ export default function TagsTabV8({
               <p className={styles.stateDesc}>再読み込みしても直らない場合はエラー報告へ。</p>
               <Button type="button" onClick={() => void load()}>もう一度試す</Button>
             </div>
-          ) : items.length === 0 ? (
+          ) : status === 'ready' && !staleAccount && items.length === 0 ? (
+            /*
+             * 読み込み中は「まだタグがありません」と言わない（動きの点検 15 番）。
+             * 以前は最初の読み込みの間ずっと空の案内が出ていた。読み込み中は下の骨組みへ。
+             */
             <div className={styles.stateCard} data-design-node="U0aKD">
               <span className={styles.stateIcon}>
                 <TagIcon size={20} aria-hidden="true" />
@@ -707,7 +711,7 @@ export default function TagsTabV8({
               <p className={styles.stateTitle}>まだタグがありません</p>
               <p className={styles.stateDesc}>「＋ タグを作る」から最初の1つを作ると、ここに並びます。</p>
             </div>
-          ) : visible.length === 0 ? (
+          ) : status === 'ready' && !staleAccount && visible.length === 0 ? (
             <div className={styles.stateCard} data-design-node="U0aKD">
               <p className={styles.stateTitle}>条件に合うタグはありません</p>
               <p className={styles.stateDesc}>検索語・フォルダ・絞り込みを変えてください。</p>
