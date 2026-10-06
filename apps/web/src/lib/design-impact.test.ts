@@ -249,6 +249,9 @@ describe('共通部品の影響範囲', () => {
       'v8/webhooks/outgoing.tsx',
       // ★V8 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りを置く。
       'v8/webhooks/interactions.tsx',
+      // ★V8 設定のEC連携（GmVR5）・ファイルの検査（PfA4o）。src/v8/settings に一から書いた。表の下にページ送りを置く。
+      'v8/settings/ec-commerce/screen.tsx',
+      'v8/settings/file-scan/screen.tsx',
     ].sort())
   })
 

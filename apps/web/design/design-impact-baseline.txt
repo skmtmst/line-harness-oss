@@ -528,3 +528,10 @@ shared-button-importer v8/analytics/saved.tsx
 shared-button-importer v8/analytics/funnel.tsx
 shared-button-importer v8/analytics/cross.tsx
 shared-button-importer v8/analytics/search-console.tsx
+shared-button-importer v8/settings/features/screen.tsx
+shared-button-importer v8/settings/manual-links/screen.tsx
+shared-button-importer v8/settings/file-scan/screen.tsx
+shared-button-importer v8/settings/ec-commerce/screen.tsx
+shared-button-importer v8/settings/line-notifications/screen.tsx
+shared-button-importer v8/settings/emergency/screen.tsx
+shared-button-importer v8/settings/emergency/health.tsx
