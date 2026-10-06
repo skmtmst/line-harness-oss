@@ -77,3 +77,12 @@ describe('友だちの90日集計', () => {
     expect((await app.request('/api/friends/missing/summary', {}, { DB: db.db })).status).toBe(404);
   });
 });
+
+
+test('返金の記録がある部分返金は購入に残し、全額返金は除く', async () => {
+  connect();
+  order('partial-refund', { status: 'refunded', amount: 2000, refund: 500 });
+  order('full-refund', { status: 'refunded', amount: 2000, refund: 2000 });
+  order('full-current', { amount: 1000, refund: 1000 });
+  expect((await summary()).purchases90Days).toMatchObject({ count: 1, totalAmountMinor: 1500 });
+});

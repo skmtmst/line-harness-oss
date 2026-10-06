@@ -13,10 +13,10 @@ beforeEach(() => {
   }
 });
 afterEach(() => db.raw.close());
-function app(auth = true) {
+function app(auth = true, allowedAccountIds?: string[]) {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    if (auth) c.set('staff', { id: 'owner-test', name: '試験', role: 'owner', readOnly: false });
+    if (auth) c.set('staff', { id: 'owner-test', name: '試験', role: 'owner', readOnly: false, featureEnabledLineAccountIds: allowedAccountIds });
     await next();
   });
   app.route('/', dashboard);
@@ -71,4 +71,11 @@ describe('ダッシュボードの最近の動き', () => {
     expect((await app(false).request('/api/dashboard/activity?account_id=a1', {}, { DB: db.db })).status).toBe(403);
     expect(await (await get('account_id=a1')).json()).toMatchObject({ data: { items: [] } });
   });
+});
+
+
+test('閲覧範囲の外のアカウントの最近の動きを読ませない', async () => {
+  broadcast('hidden', '2026-10-01T00:00:00Z', 'a2');
+  const res = await app(true, ['a1']).request('/api/dashboard/activity?account_id=a2', {}, { DB: db.db });
+  expect(res.status).toBe(404);
 });

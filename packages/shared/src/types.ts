@@ -2767,3 +2767,25 @@ export interface FormSubmissionDetail {
   postActions: FormSubmissionPostActions | null;
   createdAt: string;
 }
+
+/** 送り先の409応答のdata。ApiError.dataから読み取る。 */
+export interface OutgoingWebhookVersionConflict {
+  currentVersion: number;
+  updatedBy: string | null;
+  updatedAt: string;
+}
+export interface FormSubmissionPage {
+  items: FormSubmissionDetail[];
+  total: number;
+  page: number;
+  limit: number;
+  summary: {
+    startedUnique: number;
+    submitted: number;
+    completionRate: number | null;
+    destinationWrites: Record<FormSubmissionDetail['destinationWrite']['status'], number>;
+    dateAnsweredUniqueFriends: number;
+    dateFields: Array<{ key: string; label: string; answered: number; uniqueFriends: number; minDate: string | null; maxDate: string | null }>;
+    ratingFields: Array<{ key: string; label: string; answered: number; average: number | null }>;
+  };
+}

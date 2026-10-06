@@ -287,3 +287,48 @@ test('一斉配信の条件判定とアカウント境界を守る', async () =>
   expect(body.data?.itemsError).toBe(false);
   expect(body.data?.items.map(i => i.id)).toEqual(['included']);
 });
+
+
+test('シナリオは登録時の公開版で全体を数え、複数メッセージも1工程として数える', async () => {
+  seedScenario('published', 'active', FUTURE.mid);
+  const snapshot = JSON.stringify([{ version_step_id: 'v1:0', step_order: 0 }, { version_step_id: 'v1:1', step_order: 1 }]);
+  db.raw.prepare(`INSERT INTO scenario_versions (id, scenario_id, version_number, steps_snapshot,
+    published_at, created_at, updated_at) VALUES ('v1', 'scenario-published', 1, ?, ?, ?, ?)`)
+    .run(snapshot, PAST, PAST, PAST);
+  db.raw.prepare(`UPDATE friend_scenarios SET published_version_id = 'v1', started_at = ?`).run(PAST);
+  for (const id of ['message-1', 'message-2']) {
+    db.raw.prepare(`INSERT INTO messages_log (id, friend_id, direction, message_type, content,
+      scenario_version_step_id, created_at) VALUES (?, 'friend-1', 'outgoing', 'text', '試験', 'v1:0', ?)`)
+      .run(id, FUTURE.soon);
+  }
+  const { body } = await upcoming();
+  expect(body.data?.items[0]).toMatchObject({ sentCount: 1, totalCount: 2 });
+});
+
+test('リマインダの再試行は次の再試行日時を返す', async () => {
+  seedReminderRun('retry', FUTURE.soon, 'retry_wait');
+  db.raw.prepare(`INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date)
+    VALUES ('fr-retry', 'friend-1', 'reminder-retry', '2999-01-12')`).run();
+  db.raw.prepare(`UPDATE reminder_delivery_runs SET next_retry_at = ?`).run(FUTURE.mid);
+  const { body } = await upcoming();
+  expect(body.data?.items[0].scheduledAt).toBe(FUTURE.mid);
+});
+
+test('複数アカウントの予約配信は重複除外後の対象だけを返す', async () => {
+  db.raw.prepare(`INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+    VALUES ('account-b', 'channel-b', '別の試験', 'fixture-token', 'fixture-secret')`).run();
+  db.raw.prepare(`INSERT INTO friends (id, line_user_id, line_account_id)
+    VALUES ('friend-2', 'U-friend-2', 'account-b')`).run();
+  db.raw.prepare('UPDATE friends SET picture_url = ?').run('https://profile.line-scdn.net/' + 'fixture'.repeat(20));
+  db.raw.prepare(`INSERT INTO broadcasts (id, title, message_type, message_content, status,
+    scheduled_at, target_type, account_ids, dedup_priority)
+    VALUES ('dedup', '重複除外配信', 'text', '試験', 'scheduled', ?, 'multi-account-dedup',
+      '["account-a","account-b"]', '["account-b","account-a"]')`).run(FUTURE.mid);
+  expect((await upcoming()).body.data?.items).toEqual([]);
+  db.raw.prepare(`UPDATE broadcasts SET dedup_priority = '["account-a","account-b"]'`).run();
+  const { body } = await upcoming();
+  expect(body.data?.itemsError).toBe(false);
+  expect(body.data?.items.map(i => i.id)).toEqual(['dedup']);
+  db.raw.prepare(`UPDATE line_accounts SET is_active = 0 WHERE id = 'account-a'`).run();
+  expect((await upcoming()).body.data?.items).toEqual([]);
+});

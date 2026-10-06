@@ -15,7 +15,11 @@ export async function getFriendSummary(
       CASE WHEN COUNT(total_amount_minor) = COUNT(*) THEN
         SUM(MAX(0, total_amount_minor - COALESCE(refunded_amount_minor, 0))) ELSE NULL END AS amount
       FROM ec_orders WHERE friend_id = ? AND line_account_id = ?
-        AND normalized_status = 'current'
+        AND (normalized_status = 'current' OR (normalized_status = 'refunded'
+          AND refunded_amount_minor IS NOT NULL AND total_amount_minor IS NOT NULL
+          AND refunded_amount_minor < total_amount_minor))
+        AND (COALESCE(refunded_amount_minor, 0) = 0 OR total_amount_minor IS NULL
+          OR refunded_amount_minor < total_amount_minor)
         AND julianday(ordered_at) >= julianday(?) AND julianday(ordered_at) <= julianday(?)
       GROUP BY currency ORDER BY currency`).bind(friendId, accountId, from, to)
       .all<{ currency: string; count: number; amount: number | null }>();

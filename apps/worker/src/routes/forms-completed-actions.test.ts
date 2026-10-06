@@ -94,3 +94,17 @@ describe('フォームの済んだ工程と完了日時', () => {
     expect((await get()).status).toBe(404);
   });
 });
+
+
+test('完了済みの後処理の再実行応答にも済みと元の日時を残す', async () => {
+  await claim();
+  await appendFormSubmitClaimStep(db.db, scope, 'test-owner', 'answer', 1);
+  db.raw.prepare(`UPDATE form_submit_claims SET status = 'completed'`).run();
+  const res = await app().request('/api/forms/form1/submissions/s1/retry-effects?account_id=a1', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+  }, { DB: db.db });
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ data: { complete: true, submission: {
+    postActions: { state: 'completed', completed: [{ step: 'answer', completedAt: expect.any(String) }] },
+  } } });
+});

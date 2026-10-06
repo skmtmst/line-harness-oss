@@ -27,8 +27,9 @@ export async function getFriendUpcomingItems(
   }>();
   const reminders = await db.prepare(`
     SELECT fr.id, fr.reminder_id, r.name,
-      (SELECT MIN(rr.scheduled_at) FROM reminder_delivery_runs rr
-       WHERE rr.friend_reminder_id = fr.id AND rr.status IN ('queued', 'claimed', 'retry_wait')) AS scheduledAt,
+      (SELECT COALESCE(rr.next_retry_at, rr.scheduled_at) FROM reminder_delivery_runs rr
+       WHERE rr.friend_reminder_id = fr.id AND rr.status IN ('queued', 'claimed', 'retry_wait')
+       ORDER BY julianday(COALESCE(rr.next_retry_at, rr.scheduled_at)), rr.id LIMIT 1) AS scheduledAt,
       (SELECT COUNT(*) FROM friend_reminder_deliveries WHERE friend_reminder_id = fr.id) AS sentCount,
       CASE WHEN fr.reminder_version_id IS NOT NULL THEN
         (SELECT COUNT(*) FROM reminder_version_steps WHERE reminder_version_id = fr.reminder_version_id)
@@ -61,11 +62,13 @@ export async function getFriendUpcomingItems(
     while (matched < 20) {
       const page = await db.prepare(`SELECT b.* FROM broadcasts b
         WHERE b.status = 'scheduled' AND b.stopped_at IS NULL
-          AND b.scheduled_at IS NOT NULL AND (b.line_account_id = ? OR
+          AND b.scheduled_at IS NOT NULL
+          AND EXISTS (SELECT 1 FROM line_accounts la WHERE la.id = ? AND la.is_active = 1)
+          AND (b.line_account_id = ? OR
             (b.target_type = 'multi-account-dedup' AND EXISTS
               (SELECT 1 FROM json_each(b.account_ids) WHERE value = ?)))
         ORDER BY julianday(b.scheduled_at), b.id LIMIT 100 OFFSET ?`)
-        .bind(accountId, accountId, offset).all<Broadcast>();
+        .bind(accountId, accountId, accountId, offset).all<Broadcast>();
       for (const b of page.results) {
         let included = false;
         if (b.target_type === 'multi-account-dedup') {

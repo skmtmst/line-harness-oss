@@ -34,6 +34,7 @@ import type {
   FriendSummary,
   DashboardActivityItem,
   FormSubmissionDetail,
+  FormSubmissionPage,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
   FriendAddEventRoutingStatus,
@@ -7420,7 +7421,7 @@ export const api = {
     submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string } = {}) => {
       const query = new URLSearchParams({ account_id: accountId, page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
       if (params.query) query.set('q', params.query)
-      return fetchApi<ApiResponse<{ items: FormSubmissionDetail[]; total: number; page: number; limit: number }>>(
+      return fetchApi<ApiResponse<FormSubmissionPage>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions?${query}`,
       )
     },
