@@ -708,34 +708,59 @@ function friend(overrides) {
   }
 }
 
+/* 板 `x6QsVz` の6行。タグは行だけの見せ方（`+2` の数えと先頭の名前が絵と
+ * 合うようにする）。一覧の絞り込みの選択肢（`/api/tags`）は変えない。 */
+const FRIEND_ROW_TAG_TEIKI_PROPOSAL = { id: 'friend-tag-teiki-proposal', name: '定期便の提案', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' }
+const FRIEND_ROW_TAG_VIP = { id: 'friend-tag-vip', name: 'VIP', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' }
+const FRIEND_ROW_TAG_TEIKI = { id: 'friend-tag-teiki', name: '定期便', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' }
+
 export const FRIENDS = [
   friend({
     id: 'friend-kyohei', lineUserId: 'U-visual-1', displayName: 'Kyohei Yamamoto',
     metadata: { __attention: '1' }, createdAt: '2026-08-14T00:00:00.000Z',
     chatStatus: 'unread', handled: false,
-    latestIncomingMessage: { content: '🚚♨', messageType: 'text', createdAt: '2026-08-14T07:58:00.000Z' },
+    latestIncomingMessage: { content: '🚚💐', messageType: 'text', createdAt: '2026-08-14T07:58:00.000Z' },
     supportMark: { id: 'mark-unread', name: '未対応', color: '#D34851' },
-    tags: [FRIEND_TAGS.subscription, FRIEND_TAGS.uncontracted],
+    tags: [FRIEND_ROW_TAG_TEIKI_PROPOSAL, FRIEND_TAGS.uncontracted, FRIEND_TAGS.delivery],
   }),
   friend({
     id: 'friend-masato', lineUserId: 'U-visual-2', displayName: 'Masato.S',
     chatStatus: 'resolved', operator: OPERATORS[0],
     supportMark: { id: 'mark-progress', name: '対応中', color: '#A66A00' },
-    tags: [FRIEND_TAGS.staff],
+    tags: [FRIEND_TAGS.staff], createdAt: '2026-08-13T00:00:00.000Z',
   }),
   friend({
     id: 'friend-kanno', lineUserId: 'U-visual-3', displayName: '菅野 亮',
     metadata: { __attention: '1' }, chatStatus: 'resolved', operator: OPERATORS[1],
     latestIncomingMessage: { content: '', messageType: 'sticker', createdAt: '2026-08-13T20:52:00.000Z' },
+    latestOutgoingAt: '2026-08-14T09:00:00.000Z',
+    firstTrackedLinkName: '広告',
     supportMark: { id: 'mark-progress', name: '担当中', color: '#A66A00' },
-    tags: [FRIEND_TAGS.nen, FRIEND_TAGS.delivery], createdAt: '2026-08-13T00:00:00.000Z',
+    tags: [FRIEND_TAGS.nen, FRIEND_TAGS.delivery, FRIEND_TAGS.uncontracted], createdAt: '2026-08-13T00:00:00.000Z',
   }),
   friend({
-    id: 'friend-kenta', lineUserId: 'U-visual-4', displayName: 'Kenta Kawano(Obama)',
+    id: 'friend-kenta', lineUserId: 'U-visual-4', displayName: 'Kenta Kawano',
     chatStatus: 'in_progress', operator: OPERATORS[1],
     latestIncomingMessage: { content: '登録しました！', messageType: 'text', createdAt: '2026-08-13T16:16:00.000Z' },
+    latestOutgoingAt: '2026-08-14T10:00:00.000Z',
+    firstTrackedLinkName: 'QR',
     supportMark: { id: 'mark-progress', name: '対応中', color: '#A66A00' },
-    tags: [FRIEND_TAGS.login, FRIEND_TAGS.ec], createdAt: '2026-08-13T00:00:00.000Z',
+    tags: [FRIEND_TAGS.login], createdAt: '2026-08-13T00:00:00.000Z',
+  }),
+  friend({
+    id: 'friend-hanako', lineUserId: 'U-visual-5', displayName: '山田 花子',
+    chatStatus: 'resolved', operator: OPERATORS[1],
+    activeScenario: { name: '稼働中', status: 'active' },
+    latestIncomingMessage: { content: 'ありがとうございます', messageType: 'text', createdAt: '2026-08-12T11:03:00.000Z' },
+    firstTrackedLinkName: '紹介',
+    tags: [FRIEND_ROW_TAG_VIP, FRIEND_ROW_TAG_TEIKI, FRIEND_TAGS.uncontracted], createdAt: '2026-08-12T00:00:00.000Z',
+  }),
+  friend({
+    id: 'friend-sakamoto', lineUserId: 'U-visual-6', displayName: '坂本 真人',
+    chatStatus: 'resolved', operator: OPERATORS[0],
+    activeScenario: { name: '稼働中', status: 'active' },
+    latestIncomingMessage: { content: '発送について', messageType: 'text', createdAt: '2026-08-16T09:12:00.000Z' },
+    tags: [FRIEND_ROW_TAG_TEIKI], createdAt: '2026-08-10T00:00:00.000Z',
   }),
 ]
 
@@ -2082,6 +2107,10 @@ export const RICH_MENU_GROUPS = [
 export const RICH_MENU_GROUP_DETAILS = {
   'rmg-1': {
     ...RICH_MENU_GROUPS.find((group) => group.id === 'rmg-1'),
+    /* 板 `kmTab`・`Z0uO6`（作る②）の頭は `名前：通常メニュー（会員向け）・
+     * いまは下書きです`。一覧の `rmg-1`（会員ランク上位）は変えない。 */
+    name: '通常メニュー（会員向け）',
+    status: 'draft',
     defaultPageId: 'rmg-1-top',
     pages: [
       richMenuPage('rmg-1-top', 0, 'トップ', [
@@ -3702,6 +3731,28 @@ export const REMINDER_DRAFT = {
   publishedAt: null,
 }
 
+/*
+ * 板 `YChR6`・`p5YuP`・`T0nis`・`ltAaq`（リマインダを作る②〜⑤、
+ * `id=reminder-new`）。名前・2通の本文・最終テスト日時を絵に合わせる。
+ * 他IDは `REMINDER_DRAFT` のまま（`apLqS` の一覧に影響させない）。
+ */
+export const REMINDER_NEW_DRAFT = {
+  ...REMINDER_DRAFT,
+  reminderId: 'reminder-new',
+  versionId: 'reminder-new-draft-v1',
+  versionNumber: 1,
+  settings: {
+    ...REMINDER_DRAFT.settings,
+    name: '予約前日のご案内',
+    description: '前日・1時間前の2回で案内する',
+    steps: [
+      { stableStepId: 'day-before', offsetMinutes: 0, messageType: 'text', messageContent: '{名前}さん\n明日 {予約日時} からのご相談のご案内です。\n時間になったら下のURLから参加してください。\n{Google Meet の URL}', offsetDays: -1, sendAtTime: '18:00' },
+      { stableStepId: 'hour-before', offsetMinutes: -60, messageType: 'text', messageContent: 'まもなくご予約のお時間です。', offsetDays: null, sendAtTime: null },
+    ],
+  },
+  lastTestedAt: '2026-09-30T17:42:00+09:00',
+}
+
 /** 機能7の公開前チェック（`POST /api/reminders/:id/validate` の固定の返事）。 */
 export const REMINDER_VALIDATE = {
   valid: true,
@@ -3732,6 +3783,16 @@ export const REMINDER_PREVIEW = {
     { stableStepId: 'same-day', stepNumber: 3, scheduledAt: '2026-08-25T00:00:00.000Z', label: '当日のご案内', state: 'scheduled' },
   ],
   summary: { audience: 398, next7Days: 124, next30Days: 1194, duplicateCount: 2 },
+}
+
+/*
+ * 板 `ltAaq`（確認）の配信予定の行は `今後7日 124通（重なり 3件はまとめる）`。
+ * `T0nis` の表の行（友だち名・日時）は実時計の未来絞りのため固定データでは
+ * 出せず、撮影の state で撮る（`.measure/claims.txt` に申し送り済み）。
+ */
+export const REMINDER_NEW_PREVIEW = {
+  ...REMINDER_PREVIEW,
+  summary: { audience: 172, next7Days: 124, next30Days: 1194, duplicateCount: 3 },
 }
 
 /** 機能7のテスト送信（`POST /api/reminders/:id/test-send` の固定の返事）。 */
@@ -5563,41 +5624,53 @@ for (const staff of BOOKING_AVAILABILITY.by_staff) {
   現行APIが持つのは1曜日1区間と特別営業で、休けい・店舗上限・
   明示休業はまだ返せない。その項目は画面側で作らず「—」にする。
 */
+/* 板 `d5fmnM`・`E3YDK` のいつもの勤務時間。月火水金 10:00-19:00・
+ * 土 10:00-17:00・木日は休み（行を作らない）。 */
 export const BOOKING_AVAILABILITY_RULES = [
-  { id: 'bar-1', weekday: 1, start_time: '09:00', end_time: '19:00' },
-  { id: 'bar-2', weekday: 2, start_time: '09:00', end_time: '19:00' },
-  { id: 'bar-3', weekday: 4, start_time: '09:00', end_time: '19:00' },
-  { id: 'bar-4', weekday: 5, start_time: '09:00', end_time: '20:00' },
-  { id: 'bar-5', weekday: 6, start_time: '09:00', end_time: '18:00' },
-  { id: 'bar-6', weekday: 0, start_time: '10:00', end_time: '17:00' },
+  { id: 'bar-1', weekday: 1, start_time: '10:00', end_time: '19:00' },
+  { id: 'bar-2', weekday: 2, start_time: '10:00', end_time: '19:00' },
+  { id: 'bar-3', weekday: 3, start_time: '10:00', end_time: '19:00' },
+  { id: 'bar-4', weekday: 5, start_time: '10:00', end_time: '19:00' },
+  { id: 'bar-5', weekday: 6, start_time: '10:00', end_time: '17:00' },
 ]
 
 /*
   担当者の休憩(N-405 #655)。本番の GET breaks と同じ器で返す。
   枠への差し引きは #1471 合流まで効かないので、画面は保存のみを約束する。
 */
+/* 板 `d5fmnM`・`E3YDK` のいつもの休憩。月〜金 13:00-14:00。 */
 export const BOOKING_BREAKS = {
   breaks: [
-    { id: 'bb-1', weekday: 1, start_time: '12:00', end_time: '13:00', time_zone: 'Asia/Tokyo' },
-    { id: 'bb-2', weekday: 5, start_time: '12:00', end_time: '13:00', time_zone: 'Asia/Tokyo' },
+    { id: 'bb-1', weekday: 1, start_time: '13:00', end_time: '14:00', time_zone: 'Asia/Tokyo' },
+    { id: 'bb-2', weekday: 2, start_time: '13:00', end_time: '14:00', time_zone: 'Asia/Tokyo' },
+    { id: 'bb-3', weekday: 3, start_time: '13:00', end_time: '14:00', time_zone: 'Asia/Tokyo' },
+    { id: 'bb-4', weekday: 4, start_time: '13:00', end_time: '14:00', time_zone: 'Asia/Tokyo' },
+    { id: 'bb-5', weekday: 5, start_time: '13:00', end_time: '14:00', time_zone: 'Asia/Tokyo' },
   ],
   version: 'mock-breaks-v1',
 }
 
+/* 板 `d5fmnM` のこの日だけは休み1件とシフト1件だけ。この日だけの休憩は無い。 */
 export const BOOKING_BREAK_DATES = {
-  breaks: [
-    {
-      id: 'bbd-1', work_date: '2026-09-23', start_time: '12:00', end_time: '13:00',
-      time_zone: 'Asia/Tokyo', start_utc_offset: '+09:00', end_utc_offset: '+09:00',
-    },
-  ],
+  breaks: [],
   version: 'mock-break-dates-v1',
 }
 
 export const BOOKING_STAFF_SHIFTS = [
-  { id: 'bss-1', work_date: '2026-09-23', start_time: '10:00', end_time: '17:00' },
-  { id: 'bss-2', work_date: '2026-12-29', start_time: '10:00', end_time: '15:00' },
+  { id: 'bss-1', work_date: '2026-10-17', start_time: '13:00', end_time: '19:00' },
 ]
+
+/* 板 `d5fmnM` のこの日だけの休み。10/12（月）は研修のため休み。 */
+export const BOOKING_EXCEPTIONS = {
+  items: [
+    {
+      id: 'bex-1', lineAccountId: 'visual-qa-account', scopeKind: 'staff', scopeId: 'bs-1',
+      date: '2026-10-12', dateFrom: '2026-10-12', dateTo: '2026-10-12', kind: 'closed',
+      intervals: [], reason: '研修のため', note: null, version: 1,
+      createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
+    },
+  ],
+}
 
 export const BOOKING_GOOGLE_CALENDAR = {
   connection: {
@@ -7394,10 +7467,14 @@ export const NEN_RANK_SETTINGS = {
     yearStartMonth: 1, applyOnReach: 'immediate', keepUntil: 'next_year_end', countOrders: 'paid',
     version: 3, syncStatus: 'synced', syncError: null, syncedAt: '2026-09-07T09:00:00+09:00', updatedAt: '2026-09-07T09:00:00+09:00',
   },
+  /* 板 `zQ5vY`（ライフタイム）の節目の3行。称号・特典・到達人数を絵に合わせる。
+   * `最上位` の小さい札は今の画面に無い（画面担当へ）。 */
   milestones: [
-    { id: 'nen-milestone-1', thresholdYen: 100000, title: '10万円到達', benefitKind: null, benefitNote: null, notifyOnReach: true, reachedCount: 4 },
+    { id: 'nen-milestone-1', thresholdYen: 50000, title: 'なかよし', benefitKind: null, benefitNote: '送料無料クーポン 1 枚', notifyOnReach: true, reachedCount: 5 },
+    { id: 'nen-milestone-2', thresholdYen: 100000, title: 'だいすき', benefitKind: null, benefitNote: '鹿肉ジャーキー 1 袋', notifyOnReach: true, reachedCount: 2 },
+    { id: 'nen-milestone-3', thresholdYen: 300000, title: 'ずっといっしょ', benefitKind: null, benefitNote: '限定グッズ（決まり次第ここで設定）', notifyOnReach: true, reachedCount: 1 },
   ],
-  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 5620000, balanceTotal: 48200, usedThisMonth: 3200, byRank: { platinum: 1, gold: 3, silver: 2, bronze: 6 }, linkedMembers: 9, petMembers: 8, monthPurchaseYen: 186400, monthBuyers: 7 },
+  kpis: { members: 12, annualTotalYen: 1840000, lifetimeTotalYen: 772800, balanceTotal: 48200, usedThisMonth: 3200, byRank: { platinum: 1, gold: 3, silver: 2, bronze: 6 }, linkedMembers: 9, petMembers: 8, monthPurchaseYen: 186400, monthBuyers: 7 },
 }
 
 /** 然-NEN- 会員の一覧。本物は `GET /api/nen/members` の形。 */
