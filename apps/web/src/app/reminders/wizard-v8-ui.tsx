@@ -3,18 +3,12 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-  BatteryFull,
-  ChevronDown,
-  ChevronLeft,
-  Menu,
-  Phone,
-  Search,
-  Signal,
-  Wifi,
-} from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import Stepper, { type StepperStep } from '@/components/shared/stepper'
+import RadioCard from '@/components/shared/radio-card'
+import LinePreview from '@/components/shared/line-preview'
 import StickyBar from '@/components/shared/sticky-bar'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
 import Button from '@/components/shared/button'
 import styles from './wizard-v8.module.css'
 
@@ -130,7 +124,7 @@ export function WizardHeadV8({
   )
 }
 
-/** 右欄の「設定内容」。名まえと値の行を並べる。 */
+/** 右欄の「設定内容」。共通部品 CreateSummaryCard に載せる（#1487）。 */
 export function SummaryCardV8({
   title = '設定内容',
   rows,
@@ -139,27 +133,14 @@ export function SummaryCardV8({
   rows: Array<{ key: string; value: ReactNode; strong?: boolean; danger?: boolean }>
 }) {
   return (
-    <section className={styles.card} aria-label={title}>
-      <h2 className={styles.cardTitle}>{title}</h2>
-      <dl className={styles.kvRows}>
-        {rows.map((row) => (
-          <div key={row.key} className={styles.kvRow}>
-            <dt className={styles.kvKey}>{row.key}</dt>
-            <dd
-              className={[
-                styles.kvVal,
-                row.strong ? styles.kvValStrong : null,
-                row.danger ? styles.kvValDanger : null,
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            >
-              {row.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </section>
+    <CreateSummaryCard
+      title={title}
+      rows={rows.map((row) => ({
+        key: row.key,
+        label: row.key,
+        value: row.danger ? <span className={styles.kvValDanger}>{row.value}</span> : row.value,
+      }))}
+    />
   )
 }
 
@@ -182,112 +163,26 @@ export function PhoneMockV8({
   /** 本文がまだ無いとき true。吹き出しを出さず札だけにする。 */
   empty?: boolean
 }) {
-  const initial = accountName.trim().charAt(0) || '然'
   return (
-    <div className={styles.phone} aria-label="LINEでの見え方の見本">
-      <div className={styles.phoneScreen}>
-        <div className={styles.phoneStatus}>
-          <span>9:41</span>
-          <span className={styles.phoneIsland} aria-hidden="true" />
-          <span className={styles.phoneStatusIcons} aria-hidden="true">
-            <Signal size={13} />
-            <Wifi size={13} />
-            <BatteryFull size={15} />
-          </span>
-        </div>
-        <div className={styles.phoneHeader}>
-          <ChevronLeft size={18} aria-hidden="true" />
-          <span className={styles.phoneName}>{accountName}</span>
-          <span className={styles.phoneHeaderIcons} aria-hidden="true">
-            <Search size={15} />
-            <Phone size={15} />
-            <Menu size={15} />
-          </span>
-        </div>
-        <div className={styles.phoneBody}>
-          {chip ? <span className={styles.phoneChip}>{chip}</span> : null}
-          {empty ? null : (
-            <>
-              <div className={styles.phoneSender}>
-                <span className={styles.phoneAvatar} aria-hidden="true">
-                  {initial}
-                </span>
-                <span className={styles.phoneSenderName}>{accountName}</span>
-              </div>
-              <div className={styles.phoneBubble}>{message ?? '本文はまだありません'}</div>
-            </>
-          )}
-        </div>
-        <div className={styles.phoneFooter}>
-          <span>
-            メニュー{' '}
-            <ChevronDown size={10} style={{ display: 'inline', verticalAlign: '-1px' }} aria-hidden="true" />
-          </span>
-          <span className={styles.phoneHome} aria-hidden="true" />
-        </div>
-      </div>
-    </div>
+    <LinePreview accountName={accountName} caption={chip} empty={empty}>
+      {empty ? null : <div className={styles.phoneBubble}>{message ?? '本文はまだありません'}</div>}
+    </LinePreview>
   )
 }
 
 /** 「LINEでの見え方」見出し＋スマホ。右欄に置く。 */
 export function PhoneAsideV8(props: Parameters<typeof PhoneMockV8>[0]) {
-  return (
-    <>
-      <h2 className={styles.sideLabel}>LINEでの見え方</h2>
-      <PhoneMockV8 {...props} />
-    </>
-  )
+  return <PhoneMockV8 {...props} />
 }
 
-/**
- * 選ぶカード（板の形：アイコン左上・丸右上・名まえ・補足）。
- * 共通 RadioCard は丸が左でアイコンの口が無いので、機能内で本物の
- * input[type=radio] を持つ同じ意味の形を作る。
- */
-export function ChoiceCardV8({
-  name,
-  value,
-  checked,
-  onChange,
-  title,
-  note,
-  icon,
-  disabled = false,
-}: {
-  name: string
-  value: string
-  checked: boolean
-  onChange: (value: string) => void
-  title: string
-  note?: ReactNode
-  icon?: ReactNode
-  disabled?: boolean
-}) {
-  return (
-    <label className={[styles.choice, checked ? styles.choiceChecked : null].filter(Boolean).join(' ')}>
-      <span className={styles.choiceTop}>
-        <span className={styles.choiceIcon} aria-hidden="true">
-          {icon}
-        </span>
-        <input
-          type="radio"
-          className={styles.choiceRadio}
-          name={name}
-          value={value}
-          checked={checked}
-          disabled={disabled}
-          onChange={() => onChange(value)}
-        />
-      </span>
-      <span className={styles.choiceTitle}>{title}</span>
-      {note ? <span className={styles.choiceNote}>{note}</span> : null}
-    </label>
-  )
+/** 選択の操作は共通RadioCardに委ねる。印は呼び出し側の指定どおり出す（板どおりの印のため）。 */
+export function ChoiceCardV8({ icon, ...props }: Parameters<typeof RadioCard>[0] & { icon?: ReactNode }) {
+  return <RadioCard icon={icon} {...props} />
 }
 
 /** 下の操作帯。中央に「キャンセル → 下書き → 次へ・有効にする」。 */
 export function WizardFooterV8({
+  embedded = false,
   onCancel,
   cancelDisabled = false,
   draftLabel = '下書きを保存',
@@ -299,6 +194,7 @@ export function WizardFooterV8({
   nextDisabled = false,
   nextBusy = false,
 }: {
+  embedded?: boolean
   onCancel: () => void
   cancelDisabled?: boolean
   /** 真ん中のボタン。「下書きを保存」か「下書きのまま保存」。 */
@@ -312,9 +208,7 @@ export function WizardFooterV8({
   nextDisabled?: boolean
   nextBusy?: boolean
 }) {
-  return (
-    <StickyBar
-      actions={
+  const actions = (
         <>
           <Button type="button" onClick={onCancel} disabled={cancelDisabled}>
             キャンセル
@@ -343,7 +237,6 @@ export function WizardFooterV8({
             {nextLabel}
           </Button>
         </>
-      }
-    />
   )
+  return embedded ? actions : <StickyBar actions={actions} />
 }
