@@ -1,3 +1,5 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
 /* ★V8 フォルダの色の丸（絵 I1E7Bt・axFrW ほか一覧の行）。大きさ 8・名前との間 8。 */
 .dot {
   display: inline-block;
@@ -5,7 +7,7 @@
   box-sizing: border-box;
   width: var(--tpl-folder-dot-size);
   height: var(--tpl-folder-dot-size);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-ink-faint);
 }
 
@@ -28,4 +30,5 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
 }
