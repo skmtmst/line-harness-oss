@@ -622,7 +622,8 @@
   --tpl-op-ann-form-w: 460px; --tpl-op-ann-form-pad: 18px; --tpl-op-ann-small-lh: 17px; --tpl-op-ann-body-h: 110px; --tpl-op-ann-tenants-h: 192px; --tpl-op-ann-warn-pad: 8px 10px; --tpl-op-ann-state-w: 80px; --tpl-op-ann-ops-w: 70px; --tpl-op-ann-fact-w: 150px; --tpl-op-ann-body-lh: 19px;
   --tpl-op-kn-search-w: 300px; --tpl-op-kn-select-w: 150px; --tpl-op-kn-question-h: 56px; --tpl-op-kn-side-w: 360px;
   --tpl-op-tn-row-h: 52.5px; --tpl-op-tn-stores-w: 50px; --tpl-op-tn-staff-w: 60px; --tpl-op-tn-billing-w: 120px;
-  --tpl-op-dt-kv-h: 30.5px; --tpl-op-dt-key-w: 120px; --tpl-op-dt-at-w: 110px; --tpl-op-dt-what-w: 120px; --tpl-op-dialog-pull-top: -14px; --tpl-op-dialog-pull-bottom: -10px;
+  --tpl-op-dt-kv-h: 30.5px; --tpl-op-dt-key-w: 120px; --tpl-op-dt-at-w: 110px; --tpl-op-dt-what-w: 120px;
+  --tpl-op-sp-list-w: 360px; --tpl-op-sp-priority-w: 140px; --tpl-op-sp-ticket-gap: 4px; --tpl-op-sp-title-size: 15px; --tpl-op-sp-reply-h: 38px; --tpl-op-sp-confirm-pad: 14px 24px; --tpl-op-sp-create-h: 90px; --tpl-op-sp-fact-w: 64px; --tpl-op-dialog-pull-top: -14px; --tpl-op-dialog-pull-bottom: -10px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
   /* ウェビナーの一覧（UyUMw・uBMuB・jiNg0）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16）。 */
