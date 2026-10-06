@@ -347,6 +347,8 @@ const UNTRIAGED: Record<string, string> = {
     'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/inflow-links/_components/edit-route-modal.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
+  'v8/inflow-links/edit-route-dialog.tsx':
+    's3: 上の edit-route-modal.tsx の ★V8 の写し（src/v8/inflow-links/list.tsx から開く）。元と一緒に決める',
   'app/nen/pets/pet-editor.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/ops/support/page.tsx':
