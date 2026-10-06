@@ -11,9 +11,10 @@ import WebhooksPage from './page'
 import type { OutgoingWebhookOverview } from '@/lib/api'
 
 /*
- * ★V8-B 外部連携の一覧（板 `ZSbFY`・状態 `wWrpY`・閲覧のみ `l5SRfT`）の契約。
- * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
- * 見本が決めた帯・表・札・押せない形が出ることを実DOMで固定する。
+ * ★V8 外部連携の一覧（板 `ZSbFY`・状態 `wWrpY`・閲覧のみ `l5SRfT`）の契約。
+ * `<html data-theme="v8">` の下でだけ新しい一覧（src/v8/webhooks/outgoing）に
+ * 切り替わり、見本が決めた帯・表・札が出ることを実DOMで固定する。
+ * 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
  * v7 では従来の一覧が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
@@ -24,6 +25,9 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
   selectedAccountId: 'account-a', selectedAccount: null, accounts: [], loading: false,
 }) }))
+
+// 1440 の板（ZSbFY）で見る。狭い幅の板（AsfFB）は道具の段の並びだけが違う。
+vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
 
 let staffRole = 'owner'
 vi.mock('@/lib/staff-role', async (importOriginal) => {
@@ -114,7 +118,7 @@ test('v8 では ZSbFY の一覧（帯・表・動いているの札）が出る'
   // 数の帯：口にある数だけ出す（送り先 6→1件・今月送った 1,734回）。
   expect(board?.textContent).toContain('1,734')
   // 表の行：いつ送るか・送るもの・ようすの札。
-  expect(board?.textContent).toContain('友だちが追加されたとき')
+  expect(board?.textContent).toContain('友だちになった')
   expect(board?.textContent).toContain('動いている')
   // 板 `ZSbFY` 全行の操作欄に「中身を見る」「設定」。
   expect(board?.textContent).toContain('中身を見る')
@@ -147,14 +151,18 @@ test('v8 で何も無いときは wWrpY の「まだ無い」が出る', async (
   expect(board?.textContent).toContain('まだ、送り先はありません')
 })
 
-test('v8 の閲覧のみ（l5SRfT）は作るが押せない形になる', async () => {
+test('v8 の閲覧のみ（l5SRfT）は帯が出て、押せない作るボタン・設定は置かない', async () => {
   staffRole = 'staff'
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="ZSbFY"]')
   expect(board).not.toBeNull()
-  const createButton = [...board!.querySelectorAll('button')].find((button) => button.textContent?.includes('送り先を作る'))
-  expect(createButton?.disabled).toBe(true)
+  expect(board?.textContent).toContain('閲覧のみで見ています')
+  const clickable = [...board!.querySelectorAll('a, button')]
+  expect(clickable.some((element) => element.textContent?.includes('送り先を作る'))).toBe(false)
+  expect(clickable.some((element) => element.textContent === '設定')).toBe(false)
+  // 見るだけの操作（中身を見る）は残る。
+  expect(clickable.some((element) => element.textContent?.includes('中身を見る'))).toBe(true)
 })
 
 test('v7 では従来の一覧が出て ZSbFY は出ない', async () => {
@@ -233,7 +241,7 @@ test('v8 で行を右クリックすると「設定」と同じ操作が押し�
   expect(layer?.getAttribute('style')).toContain('left: 300px')
   expect(layer?.getAttribute('style')).toContain('top: 200px')
   // 「設定」と同じ中身が出る。
-  for (const label of ['止める', '直す', '合言葉を作り直す', '削除する', '試しに送る']) {
+  for (const label of ['止める', '直す', '鍵を作り直す', '削除する', '試しに送る']) {
     expect(menu?.textContent).toContain(label)
   }
   // 右クリックから「止める」を押すと「設定」と同じく札が変わる。
