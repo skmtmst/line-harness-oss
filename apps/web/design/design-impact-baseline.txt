@@ -556,3 +556,5 @@ shared-button-importer v8/conversions/dialogs.tsx
 shared-button-importer v8/conversions/create.tsx
 shared-button-importer v8/inflow-links/new/create.tsx
 shared-button-importer v8/scenario-first-step/first-step.tsx
+shared-button-importer v8/friend-add-publish/publish.tsx
+shared-button-importer v8/friend-add-publish/done.tsx

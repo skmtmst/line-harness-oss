@@ -1,0 +1,236 @@
+/*
+ * ★V8 友だち追加時の配信 作る⑤ 確認（U8Xm3X）・完了（e0FD1J）。
+ * 枠・頭・手順の輪・右の列・下の帯は型（CreatePage / PageHeading）が持つ。ここは段（カード）の中身だけ。
+ */
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-label);
+}
+
+.viewerBand {
+  margin: 0;
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+
+/* 段（カード）：枠1・角12・余白20・中の間14。共通カードの枠（1）は内側に入るので、余白は 20−1。 */
+.card {
+  gap: var(--tpl-section-gap);
+  min-width: 0;
+}
+:global([data-theme='v8']) .card {
+  padding: var(--tpl-cfl-card-pad);
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cfl-head-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-card-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-cfl-title-lh);
+}
+.cardDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+
+/* 設定の確認：鍵（140）・値・変える。行は余白10・下に線。 */
+.confirmRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-section-gap);
+  margin: 0;
+}
+.confirmRow {
+  display: grid;
+  grid-template-columns: var(--tpl-cfl-key-w) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+  min-height: var(--tpl-cfl-row-h);
+  padding: var(--tpl-cfl-row-pad) 0;
+  box-shadow: var(--shadow-row-line);
+}
+.confirmRow dt {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.confirmRow dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--tpl-cfl-value-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.confirmRow dd.rowAction {
+  overflow: visible;
+}
+
+/* テストする：送り先（伸びる）＋テストのボタン。 */
+.testRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+}
+.testTarget {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.testTarget :global(*) {
+  max-width: 100%;
+}
+
+/* 有効にする前の確認：印・題と説明・見直す。行は余白10・下に線。 */
+.checkList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-section-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cfl-check-gap);
+  min-height: var(--tpl-cfl-check-h);
+  padding: var(--tpl-cfl-row-pad) 0;
+  box-shadow: var(--shadow-row-line);
+}
+.checkMark {
+  display: inline-flex;
+  color: var(--color-status-warn-deep);
+}
+.checkMark[data-ok] {
+  color: var(--color-accent-deep);
+}
+.checkText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-cfl-head-gap);
+  min-width: 0;
+}
+.checkText strong {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+}
+.checkText small {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+
+/* 右の列（1152）：見え方を開くボタン＋設定内容。 */
+.narrowSide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-section-gap);
+  width: 100%;
+}
+/* スマホの中の「友だち追加しました」の札。 */
+.talkChip {
+  display: flex;
+  justify-content: center;
+  margin: 0;
+}
+.talkChip > span {
+  padding: var(--tpl-wb-pill-pad);
+  border-radius: var(--radius-pill);
+  background: var(--v8-bphone-chip);
+  color: var(--v8-bphone-chip-ink);
+  font-size: var(--text-micro);
+}
+
+/* ===== 完了（e0FD1J）：真ん中に白いカードを1枚（幅560・余白32・間12） ===== */
+.doneBody {
+  display: flex;
+  justify-content: center;
+  padding: var(--tpl-cfl-done-pad) 0;
+}
+.doneCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+  width: min(var(--tpl-cfl-done-w), 100%);
+  padding: var(--tpl-cfl-done-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.doneMark {
+  display: inline-grid;
+  place-items: center;
+  width: var(--tpl-cfl-done-mark);
+  height: var(--tpl-cfl-done-mark);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+.doneTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-cfl-done-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-cfl-done-title-lh);
+  text-align: center;
+}
+.doneDesc {
+  width: 100%;
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-cfl-done-desc-lh);
+}
+.doneRows {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin: 0;
+}
+.doneRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-body-gap);
+  padding: var(--tpl-cfl-done-row-pad) 0;
+  box-shadow: var(--shadow-row-line);
+}
+.doneRow dt {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.doneRow dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-text-sm-lh);
+}
+.doneActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--tpl-body-gap);
+  width: 100%;
+  padding-top: var(--tpl-body-gap);
+}
