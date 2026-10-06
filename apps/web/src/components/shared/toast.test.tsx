@@ -214,3 +214,90 @@ describe('読み上げの入れ物（動きの点検 14 番）', () => {
     expect(screen.getAllByRole('status')).toHaveLength(1)
   })
 })
+
+describe('消えるときの動き（動きの点検 13 番）', () => {
+  const setReduced = (reduce: boolean) => {
+    window.matchMedia = ((query: string) => ({
+      matches: reduce && query.includes('reduce'),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+  }
+  const originalMatchMedia = window.matchMedia
+
+  beforeEach(() => {
+    document.documentElement.dataset.theme = 'v8'
+  })
+
+  afterEach(() => {
+    delete document.documentElement.dataset.theme
+    window.matchMedia = originalMatchMedia
+  })
+
+  it('V8 では消えかけ（data-closing）を --motion-exit ぶん見せてから外す', () => {
+    setReduced(false)
+    vi.useFakeTimers()
+    render(<ToastHost />)
+    act(() => {
+      notifyToast('タグを保存しました')
+    })
+    act(() => {
+      vi.advanceTimersByTime(4000)
+    })
+    const leaving = toastByText('タグを保存しました')!
+    expect(leaving).not.toBeNull()
+    expect(leaving.hasAttribute('data-closing')).toBe(true)
+    // 消えかけは読み上げ・押す対象から外す
+    expect(leaving.getAttribute('aria-hidden')).toBe('true')
+    act(() => {
+      vi.advanceTimersByTime(149)
+    })
+    expect(toastByText('タグを保存しました')).not.toBeNull()
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(toastByText('タグを保存しました')).toBeNull()
+  })
+
+  it('続けて消えても、先の1件は自分の期限で外れる', () => {
+    setReduced(false)
+    vi.useFakeTimers()
+    render(<ToastHost />)
+    let first = () => {}
+    let second = () => {}
+    act(() => {
+      first = notifyToast('1件目')
+      second = notifyToast('2件目')
+    })
+    act(() => first())
+    act(() => {
+      vi.advanceTimersByTime(100)
+    })
+    act(() => second())
+    act(() => {
+      vi.advanceTimersByTime(50)
+    })
+    expect(toastByText('1件目')).toBeNull()
+    expect(toastByText('2件目')).not.toBeNull()
+    act(() => {
+      vi.advanceTimersByTime(100)
+    })
+    expect(toastByText('2件目')).toBeNull()
+  })
+
+  it('動きを減らす設定ではすぐ消える', () => {
+    setReduced(true)
+    render(<ToastHost />)
+    let dismiss = () => {}
+    act(() => {
+      dismiss = notifyToast('タグを保存しました')
+    })
+    act(() => dismiss())
+    expect(toastByText('タグを保存しました')).toBeNull()
+  })
+})

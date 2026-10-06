@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { CircleAlert, CircleCheck, X } from 'lucide-react'
 import { humanizeErrorText } from './human-error-text'
+import { useV8LeaveList } from './overlay-utils'
 import styles from './toast.module.css'
 
 /** 知らせの種類。白地に印の色で分ける（緑=うまくいった、赤=できなかった）。 */
@@ -217,9 +218,12 @@ export function undoLatestToast(): boolean {
 export function Toast({
   item,
   onDismiss,
+  leaving = false,
 }: {
   item: Omit<ToastItem, 'id'> & { id?: number }
   onDismiss?: () => void
+  /** 消えかけ（閉じる動きの間）。読み上げ・押す対象から外す。 */
+  leaving?: boolean
 }) {
   const Icon = item.tone === 'success' ? CircleCheck : CircleAlert
   const dismiss = onDismiss ?? (item.id !== undefined ? () => dismissToast(item.id as number) : undefined)
@@ -233,6 +237,9 @@ export function Toast({
     <div
       className={styles.toast}
       data-toast=""
+      data-closing={leaving || undefined}
+      aria-hidden={leaving || undefined}
+      inert={leaving || undefined}
       onPointerEnter={item.id !== undefined ? () => pauseToast(item.id as number, 'pointer') : undefined}
       onPointerLeave={item.id !== undefined ? () => resumeToast(item.id as number, 'pointer') : undefined}
       onFocus={
@@ -305,6 +312,8 @@ export default function ToastHost() {
       resumeAllLifecycles()
     }
   }, [])
+  /* 消えるときは窓と同じ「消えかけ」で薄く消す（動きの点検 13 番）。 */
+  const shown = useV8LeaveList(live)
   /*
    * 読み上げの入れ物は空でも最初から置いておく（動きの点検 14 番）。
    * 入れ物ごと後から差し込むと、読み上げ側が見張り始める前に中身が入り、
@@ -313,8 +322,8 @@ export default function ToastHost() {
    */
   return (
     <div className={styles.host} role="status" aria-live="polite" aria-atomic="false" aria-label="知らせ">
-      {live.map((item) => (
-        <Toast key={item.id} item={item} />
+      {shown.map(({ item, leaving }) => (
+        <Toast key={item.id} item={item} leaving={leaving} />
       ))}
     </div>
   )
