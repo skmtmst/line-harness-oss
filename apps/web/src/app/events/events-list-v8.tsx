@@ -32,6 +32,7 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import IconButton from '@/components/shared/icon-button'
 import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import DetailPanel from '@/components/shared/detail-panel'
 import InlineEdit from '@/components/shared/inline-edit'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
@@ -279,6 +280,11 @@ export default function EventsListV8() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [foldersError, setFoldersError] = useState(false)
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。無ければ未分類の輪。 */
+  const folderDotOf = (folderId: string | null | undefined) => {
+    const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   /** 「承認待ちあり」の札に出す件数。`null` は数えていない。 */
   const [pendingTotal, setPendingTotal] = useState<number | null>(null)
@@ -687,18 +693,20 @@ export default function EventsListV8() {
                         <tr key={e.id} data-row-id={e.id} className="group hover:bg-canvas-sunken">
                           <td className="px-4 py-3">
                             <ContextMenu label={`「${e.name}」の操作`} items={toContextMenuItems(menuItems)}>
-                              <button
-                                type="button"
-                                onClick={() => openDetail(e.id)}
-                                title={`${e.name}の詳細を見る`}
-                                aria-label={`「${e.name}」の詳細を見る`}
-                                className="text-ink block w-full truncate text-left font-medium hover:underline"
-                              >
-                                {e.name}
-                              </button>
+                              <FolderDotName folder={folderDotOf(e.folderId)}>
+                                <button
+                                  type="button"
+                                  onClick={() => openDetail(e.id)}
+                                  title={`${e.name}の詳細を見る`}
+                                  aria-label={`「${e.name}」の詳細を見る`}
+                                  className="text-ink block w-full truncate text-left font-medium hover:underline"
+                                >
+                                  {e.name}
+                                </button>
+                              </FolderDotName>
                             </ContextMenu>
                             {e.venue_name ? (
-                              <span className={styles.venue} title={e.venue_name}>{e.venue_name}</span>
+                              <span className={`${styles.venue} ${styles.nameSub}`} title={e.venue_name}>{e.venue_name}</span>
                             ) : null}
                           </td>
                           <td className="truncate px-2 py-3 tabular-nums" title={formatJpDate(e.next_slot_starts_at)}>
