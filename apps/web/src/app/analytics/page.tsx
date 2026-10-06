@@ -6,6 +6,8 @@ import AnalyticsNavigationV8 from './navigation-v8'
 import ConversionReportV8 from './conversion-report-v8'
 
 import ReadonlyHeaderV8 from './readonly-header-v8'
+import AnalyticsV8, { type LegacyTabContext } from '@/v8/analytics/analytics'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import Select from '@/components/shared/select'
 import SegmentedControl from '@/components/shared/segmented'
 import { RowActions } from '@/components/shared/row-actions'
@@ -3294,7 +3296,34 @@ function AnalyticsInner() {
   )
 }
 
+/*
+ * V8 のときだけ新しい分析（src/v8/analytics）。作り直していない見かたは、
+ * 今の中身をそのまま渡して新しい枠の中に出す（機能を落とさない）。
+ */
+function renderLegacyTabV8({ tab, accountId, canManage, registerExport, onSavedCountChange }: LegacyTabContext) {
+  return <AnalyticsExportContext.Provider value={registerExport}><div className="v8-ro-analytics-content">
+    {tab === 'conversion-report' && <ConversionReportV8 accountId={accountId} />}
+    {tab === 'reactions' && <ReactionsOverviewTab key={accountId} accountId={accountId} />}
+    {tab === 'routes' && <RoutesOverviewTab key={accountId} accountId={accountId} />}
+    {tab === 'usage' && <UsageOverviewTab key={accountId} accountId={accountId} />}
+    {tab === 'cross' && <CrossTab key={accountId} accountId={accountId} canManage={canManage} />}
+    {tab === 'funnel' && <FunnelTabFromUrl accountId={accountId} canManage={canManage} />}
+    {tab === 'url-clicks' && <UrlClicksOverviewTab key={accountId} accountId={accountId} />}
+    {tab === 'saved' && <SavedAnalyticsTab accountId={accountId} onCountChange={onSavedCountChange} canManage={canManage} />}
+  </div></AnalyticsExportContext.Provider>
+}
+
+/** `?tab=funnel&conversionPointId=…` で渡された成果地点をファネル作成へ引き渡す（今の画面と同じ）。 */
+function FunnelTabFromUrl({ accountId, canManage }: { accountId: string; canManage: boolean }) {
+  const params = useSearchParams()
+  const id = params.get('conversionPointId')
+  const presetConversion = id ? { id, name: params.get('conversionPointName') ?? '' } : null
+  return <FunnelTab accountId={accountId} canManage={canManage} presetConversion={presetConversion} />
+}
+
 export default function AnalyticsPage() {
+  const theme = useAdminTheme()
+  if (theme === 'v8') return <AnalyticsV8 renderLegacy={renderLegacyTabV8} />
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
