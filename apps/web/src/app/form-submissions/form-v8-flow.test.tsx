@@ -236,7 +236,8 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
     renderNode(<FormSubmissionsPage />)
     await flush()
     await screen.findByText('流れのフォーム')
-    const creates = screen.getAllByRole('button', { name: '＋ フォームを作る' })
+    // 一覧は src/v8/forms/list（「＋」は印。読み上げ名は「フォームを作る」）。
+    const creates = screen.getAllByRole('button', { name: 'フォームを作る' })
     expect(creates.length).toBeGreaterThan(0)
     fireEvent.click(creates[0])
     await waitFor(() => expect(formsCreateDraft).toHaveBeenCalledTimes(1))
@@ -244,14 +245,15 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
   })
 
   it('下書き保存→知らせ→公開→知らせ・一覧に戻ると増えている', async () => {
-    navigation.query = 'id=form-1&tab=basic'
+    // V8 の編集（src/v8/form-edit）。フォーム名の欄は「受付と見た目」のタブにある。
+    navigation.query = 'id=form-1&tab=appearance'
     navigation.pathname = '/form-submissions/edit'
     renderNode(<EditFormPage />)
     await flush()
     await screen.findByDisplayValue('流れのフォーム')
 
     // 下書きを保存する（画面の知らせとトーストの両方に出る）。
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
+    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
     await waitFor(() => expect(formsUpdate).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getAllByText('下書きを保存しました')).toHaveLength(2))
 

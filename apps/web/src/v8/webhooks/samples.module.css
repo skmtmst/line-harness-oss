@@ -1,0 +1,129 @@
+/*
+ * ★V8 外部連携「見本」タブ（SAUCs）。枠・見出し・タブ・数の帯は型（ListPage）が持つ。
+ * 本文：上16・左右24・下24、段の間14。カードは高さ156・中の余白14・間12。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wh-sample-gap);
+  padding: var(--tpl-wh-body-pad);
+}
+.section {
+  display: contents;
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.sectionTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: var(--tpl-chip-label-lh);
+}
+.count,
+.note {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.spacer {
+  flex: 1 1 0;
+}
+.cards {
+  display: grid;
+  gap: var(--tpl-rule-row-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cards[data-cols='5'] {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.cards[data-cols='4'] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+  height: var(--tpl-wh-sample-card-h);
+  padding: var(--tpl-body-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-row-name-lh);
+}
+.cardHead > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cardHead > svg {
+  flex-shrink: 0;
+}
+.cardDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.cardSpacer {
+  flex: 1 1 0;
+}
+.cardButton {
+  width: 100%;
+}
+.cardButtonSpace {
+  display: block;
+  height: var(--tpl-chip-h);
+}
+.meta {
+  display: flex;
+  gap: var(--tpl-toolbar-gap);
+  margin: 0;
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.meta dt {
+  flex-shrink: 0;
+  width: var(--tpl-wh-sample-key-w);
+  color: var(--color-ink-faint);
+}
+.meta dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.meta dd.code {
+  color: var(--color-ink-faint);
+}
+.askNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+.footNote {
+  margin: 0;
+  padding: var(--tpl-wh-foot-box-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-wb-pill-lh);
+}

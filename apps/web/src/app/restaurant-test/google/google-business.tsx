@@ -24,7 +24,7 @@ import { TextArea } from '@/components/shared/text-field'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { errorMessage, formatDate, formatDateTime } from './google-format'
+import { errorMessage, formatDate, formatDateTime, reviewReceivedAt } from './google-format'
 import { ChangeConfirmScreen, HistoryScreen, HoursEditor, PROFILE_DESIGN_NODES, ProfileEditScreen, ProfileTab, type HoursMode } from './google-profile'
 import { POSTS_DESIGN_NODES, PostConfirmScreen, PostEditor, PostsTab } from './google-posts'
 import { PERFORMANCE_DESIGN_NODES, PerformanceTab } from './google-performance'
@@ -328,14 +328,14 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
                 <p className="text-ink-faint text-label leading-relaxed">未接続</p>
               </div>
             </div>
-            <p className="text-ink-secondary whitespace-pre-line text-sm leading-relaxed">店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。</p>
+            <p className="text-ink-secondary whitespace-pre-line text-sm leading-relaxed">{'店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。'}</p>
             {!data.oauthConfigured ? <NoteBar tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</NoteBar> : null}
             {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
             <div>
               <Button className="v7:min-h-11 px-5" variant="primary" onClick={() => void startConnect()} disabled={busy || !canManage || !data.oauthConfigured}><Link2 size={17} />Googleアカウントを接続</Button>
             </div>
             <div className="border-hairline border-t pt-5">
-              <p className="text-ink-secondary text-label whitespace-pre-line leading-relaxed">初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。\n接続後は、このLINEアカウントの店舗だけを表示します。</p>
+              <p className="text-ink-secondary text-label whitespace-pre-line leading-relaxed">{'初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。\n接続後は、このLINEアカウントの店舗だけを表示します。'}</p>
               {!canManage ? <p className="text-ink-faint mt-3 text-xs">Googleアカウントの接続は、統括の管理者へ依頼してください。</p> : null}
             </div>
           </section>
@@ -582,7 +582,7 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
                 <Tr key={review.id}>
                   <NameCell name={review.reviewerDisplayName ?? '匿名'} sub={<Stars rating={review.starRating} />} />
                   <Td><span className="line-clamp-2 text-sm" title={review.comment ?? undefined}>{review.comment ?? '（本文なし・評価のみ）'}</span></Td>
-                  <Td><span className="text-ink-secondary whitespace-nowrap text-sm">{formatDateTime(review.createTime)}</span></Td>
+                  <Td><span className="text-ink-secondary whitespace-nowrap text-sm">{formatDateTime(reviewReceivedAt(review))}</span></Td>
                   <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
                   <ActionCell>
                     {actionable ? (
@@ -647,7 +647,8 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
     setActionError('')
     setSaved('')
     try {
-      const response = await restaurantGoogleApi.generateDraft(accountId, reviewId, mode)
+      // 書き換えは、保存前に画面で直した内容をそのまま元にする。
+      const response = await restaurantGoogleApi.generateDraft(accountId, reviewId, mode, text)
       setText(response.draft)
       setAiGenerated(true)
     } catch (err) {
@@ -720,7 +721,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
             <p className="text-ink-secondary mb-4 text-sm">返信先と内容を確認してください。公開後、Googleの口コミに表示されます。</p>
             <dl className="gb-confirm-details mb-4 grid grid-cols-1 gap-x-8 gap-y-2 text-sm">
               <dt className="text-ink-secondary">返信先の店舗</dt><dd className="min-w-0 truncate font-semibold" title={data.connection.locationTitle ?? data.store.name}>{data.connection.locationTitle ?? data.store.name}</dd>
-              <dt className="text-ink-secondary">返信する口コミ</dt><dd><span className="font-semibold">{review.reviewerDisplayName ?? '匿名'}</span> <Stars rating={review.starRating} /> <span className="text-ink-faint text-xs">{formatDate(review.createTime)}</span></dd>
+              <dt className="text-ink-secondary">返信する口コミ</dt><dd><span className="font-semibold">{review.reviewerDisplayName ?? '匿名'}</span> <Stars rating={review.starRating} /> <span className="text-ink-faint text-xs">{formatDate(reviewReceivedAt(review))}</span></dd>
               <dt className="text-ink-secondary">公開のタイミング</dt><dd>送信後、Googleの処理を経て表示</dd>
             </dl>
             <div className="border-hairline mb-3 rounded-card border p-4">
@@ -766,7 +767,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
               <h2 className="text-base font-bold">返信する口コミ</h2>
               <Stars rating={review.starRating} />
             </div>
-            <p className="text-sm font-semibold">{review.reviewerDisplayName ?? '匿名'} <span className="text-ink-faint text-xs font-normal">{formatDateTime(review.createTime)}</span></p>
+            <p className="text-sm font-semibold">{review.reviewerDisplayName ?? '匿名'} <span className="text-ink-faint text-xs font-normal">{formatDateTime(reviewReceivedAt(review))}</span></p>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{review.comment ?? '（本文なし・評価のみ）'}</p>
             <p className="text-ink-faint mt-4 text-xs">Googleの口コミ原文です。投稿者の個人情報や来店履歴を返信に追加しないでください。</p>
             <a href={googleReviewSourceUrl} target="_blank" rel="noreferrer" className="text-action mt-3 inline-flex items-center gap-1 text-xs font-semibold" data-gb3-action="open-google-review">Googleで原文を確認 <ExternalLink size={12} /></a>

@@ -220,7 +220,8 @@ describe('V8 シナリオの通し：作る→1通目→詳細', () => {
     renderNode(<ScenariosPage />)
     await flush()
     await screen.findByText('流れのシナリオ')
-    const creates = screen.getAllByRole('button', { name: '＋ シナリオを作る' })
+    // 絵（axFrW）では「＋」は文字ではなく印。読み上げ名は「シナリオを作る」。
+    const creates = screen.getAllByRole('button', { name: 'シナリオを作る' })
     expect(creates.length).toBeGreaterThan(0)
     fireEvent.click(creates[0])
     expect(navigation.push).toHaveBeenCalledWith('/scenarios/mode')

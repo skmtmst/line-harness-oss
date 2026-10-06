@@ -65,6 +65,14 @@
 .menuSlot { display: none; }
 [data-theme='v8'] .menuSlot { display: block; width: 14px; height: 14px; flex-shrink: 0; }
 [data-theme='v8'] .menuButton { position: absolute; left: -9px; top: -9px; width: 32px; height: 32px; opacity: 1; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+/* 絵（uE9gf・apLqS・I1E7Bt）：「…」の場所を取るのは選んでいる行だけ。ほかの行は件数が右端に来る。
+   乗せたとき・キーボードで中へ入ったときだけ場所を取って出す（押せなくはしない）。 */
+[data-theme='v8'] .row:not([data-active]) .menu { width: 0; margin-inline-start: -8px; }
+[data-theme='v8'] .row:not([data-active]) .menuButton { opacity: 0; }
+[data-theme='v8'] .row:not([data-active]):hover .menu,
+[data-theme='v8'] .row:not([data-active]):focus-within .menu { width: 14px; margin-inline-start: 0; }
+[data-theme='v8'] .row:not([data-active]):hover .menuButton,
+[data-theme='v8'] .row:not([data-active]):focus-within .menuButton { opacity: 1; }
 [data-theme='v8'] .row .select { min-height: 0; height: auto; }
 }
 
