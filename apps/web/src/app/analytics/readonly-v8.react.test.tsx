@@ -20,7 +20,7 @@ vi.mock('@/lib/api', () => ({
         state.calls.push(`${account}:${JSON.stringify(range)}`)
         return { success: true, data: { period: { from: '2026-09-01', to: '2026-09-30' }, dataCutoffAt: '2026-09-30T00:00:00Z', data: { state: 'available', stateReason: null, metrics: { added: metric(48), removed: metric(11), net: metric(37), currentFriends: metric(1284), firstTime: metric(45) }, days: [{ date: '2026-09-01', added: 2, removed: 1, net: 1 }], campaigns: [] } } }
       },
-      routesOverview: async () => ({ success: true, data: { data: { routes: [] } } }),
+      routesOverview: async () => ({ success: true, data: { period: { from: '2026-09-01', to: '2026-09-30' }, dataCutoffAt: '2026-09-30T00:00:00Z', data: { attributionModel: 'first_touch', attributionLabel: '最初に触れた経路', routes: [], searchConsoleHref: '/search-console' } } }),
     },
     conversions: { definitionReport: async (params: { lineAccountId: string }) => { state.calls.push(`report:${params.lineAccountId}`); return { success: false } } },
   },
@@ -38,9 +38,10 @@ async function render() { await act(async () => { root.render(<AnalyticsPage />)
 describe('V8の閲覧と実測値の保護', () => {
   it('閲覧者は作成できず、集計値と閲覧の切り替えは残る', async () => {
     await render()
-    expect(host.querySelector('[data-analytics-design]')?.getAttribute('data-design-node')).toBe('L4Uov')
-    const create = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('レポートを作る'))
-    expect(create?.disabled).toBe(true)
+    expect(host.querySelector('[data-page-template]')?.getAttribute('data-design-node')).toBe('L4Uov')
+    // 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。帯で閲覧のみと伝える。
+    expect([...host.querySelectorAll('a, button')].some((el) => el.textContent?.includes('レポートを作る'))).toBe(false)
+    expect(host.textContent).toContain('閲覧のみで見ています')
     expect(host.querySelector('nav[aria-label="分析の組"] a[aria-current]')?.textContent).toBe('ふだん見る')
     expect(host.querySelector('a[href="/analytics?tab=routes"]')).not.toBeNull()
     expect(host.textContent).toContain('37')

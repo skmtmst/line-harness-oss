@@ -188,8 +188,8 @@ function AccountCreateWorkspace({ children }: { children: React.ReactNode }) {
  * 本文の幅は既定で `--container-shell` までにし、**ページが明示したときだけ**外す。
  * ルート名で自動判定しない（`docs/v6-common-rules.md` §1）。
  */
-function Workspace({ children }: { children: React.ReactNode }) {
-  const { fullWidth } = usePageChrome()
+export function Workspace({ children }: { children: React.ReactNode }) {
+  const { fullWidth, settingsNavInline } = usePageChrome()
   const pathname = usePathname()
   /*
    * ★V8（夕41）：設定の画面は、白い板の中の左に「設定の中のメニュー」
@@ -197,7 +197,9 @@ function Workspace({ children }: { children: React.ReactNode }) {
    * SSR・最初の描画は v7 の形で、レイアウト効果の中で v8 に揃える。
    */
   const isV8 = useAdminTheme() === 'v8'
-  const withSettingsNav = isV8 && !fullWidth && isSettingsAreaPath(pathname ?? '')
+  // 画面がメニューを白い板の中に置いたら（settingsNavInline）、外には出さない。
+  const settingsArea = isSettingsAreaPath(pathname ?? '')
+  const withSettingsNav = isV8 && !fullWidth && !settingsNavInline && settingsArea
   return (
     <div className={styles.side}>
       <AppTopBar />
@@ -208,10 +210,16 @@ function Workspace({ children }: { children: React.ReactNode }) {
           data-design-node="J33xq"
           className={`${styles.content} ${fullWidth ? styles.contentFull : ''} ${withSettingsNav ? styles.contentSettings : ''}`}
         >
-          {withSettingsNav ? (
-            <div className={styles.settingsSplit}>
-              <SettingsInnerNav />
-              <div className={styles.settingsBody}>{children}</div>
+          {/*
+            設定の住所では、外のメニューの有る無しで包みの形を変えない（本文を作り直さない）。
+            形を変えると本文が作り直され、テーマが v7 から読み直されて、板の中のメニュー
+            （settingsNavInline）が出る・消えるを繰り返し、画面が落ちる。外のメニューだけを出し入れし、
+            出さないときの包みは display: contents で並びに影響させない。
+          */}
+          {settingsArea ? (
+            <div className={withSettingsNav ? styles.settingsSplit : styles.settingsPass} data-settings-split={withSettingsNav ? '' : undefined}>
+              {withSettingsNav ? <SettingsInnerNav /> : null}
+              <div className={withSettingsNav ? styles.settingsBody : styles.settingsPass}>{children}</div>
             </div>
           ) : (
             children

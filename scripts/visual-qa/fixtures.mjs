@@ -910,6 +910,24 @@ export const FORM_DELETE_IMPACT_FIXTURES = {
     recommendedAction: 'archive',
     blockers: ['published', 'has_submissions', 'has_opens', 'in_use'],
   },
+  /* 板 `GVizd`：一覧の3行目「休止の理由」を開いたとき（回答96件・リッチメニューとシナリオが開く）。 */
+  archiveSurvey: {
+    form: { id: 'form-3', name: '休止の理由', isActive: true, status: 'active' },
+    submissionCount: 96,
+    openCount: 20,
+    references: [
+      { kind: 'rich_menu', name: '通常メニュー', href: '/rich-menus/edit?id=rich-menu-main', state: 'available' },
+      { kind: 'scenario', name: '休止フォロー', href: '/scenarios?id=scenario-pause', state: 'available' },
+    ],
+    referenceCount: 2,
+    answerUrl: 'https://liff.line.me/visual-qa/?page=form&id=form-3',
+    revision: 3,
+    checkedAt: '2026-08-31T11:00:00.000',
+    canDelete: false,
+    canArchive: true,
+    recommendedAction: 'archive',
+    blockers: ['published', 'has_submissions', 'has_opens', 'in_use'],
+  },
   delete: {
     form: { id: 'form-empty', name: '下書きフォーム', isActive: false, status: 'active' },
     submissionCount: 0,
@@ -984,9 +1002,13 @@ export const FORMS = [
   formRow('form-review', '口コミ', '星の評価とひとこと・2ブロック', null, true, 210, { submitCount: 24, openCount: 30, rate: 80 }, '2026-08-24T03:00:00.000Z', '2026-08-24T03:00:00.000Z', { friendFieldCount: 1, tagCount: 1 }),
 ]
 
-/** 機能13 `EMBIK`。一覧6行と、画面全体18件の集計を同じ応答で返す。 */
+/**
+ * 機能13 `EMBIK`。一覧の1ページ目と、画面全体18件の集計を同じ応答で返す。
+ * 板 `I3L41O`・`GrnO4` の表は上の5行のあとすぐ「18件」なので、一覧の口（with_list_summary）だけ5行にする。
+ * 編集画面の選択肢など、ほかの口は `FORMS` の全部のまま。
+ */
 export const FORM_LIST = {
-  items: FORMS,
+  items: FORMS.slice(0, 5),
   total: 18,
   page: 1,
   limit: 20,
@@ -1002,45 +1024,46 @@ export const FORM_DETAIL = {
     { name: 'opinion', label: 'ご意見', type: 'textarea' },
     { name: 'next_visit', label: '次回来店の希望日', type: 'date' },
   ],
+  /* 編集画面（m1cWEy・ijxur・XXFT4・tpRRT・J1pdB・Z9wXm・ITBAB）の絵の中身。
+   * 1ページ目：店のロゴ・見出し・本文・ラジオ・5段階。2ページ目：見出し・予約を入れる・自由に書く。 */
+  contentRevision: 7,
+  publishedVersionId: 'form-1-version-3',
+  publishedContentRevision: 6,
   layout: {
     version: 2,
-    header: [{ id: 'form-header-image', kind: 'image', mediaUrl: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400"><rect width="1200" height="400" fill="%23eaf5ee"/></svg>', size: 'full' }],
+    header: [],
     sections: [{
       id: 'form-section-visit', name: '来店について', blocks: [
-        { id: 'form-heading', kind: 'heading', text: 'ご来店ありがとうございました', level: 1 },
-        { id: 'form-intro', kind: 'text', text: '30秒で終わります' },
-        { id: 'form-name', kind: 'input', type: 'text', name: 'real_name', label: 'お名前（漢字）', required: true, destinations: { realName: true } },
-        { id: 'form-satisfaction', kind: 'input', type: 'radio', name: 'satisfaction', label: '満足度', required: true, choiceMode: 'tag', choices: [
-          { id: 'sat-1', label: '大変満足', tagId: 'tag-satisfaction-great' },
-          { id: 'sat-2', label: '満足', tagId: 'tag-satisfaction-good' },
-          { id: 'sat-3', label: 'ふつう', tagId: 'tag-satisfaction-normal' },
-          { id: 'sat-4', label: '不満', tagId: 'tag-satisfaction-low' },
+        { id: 'form-logo', kind: 'image', mediaUrl: 'https://example.co.jp/nen-logo.png', size: 'full' },
+        { id: 'form-heading', kind: 'heading', text: '来店アンケート', level: 1 },
+        { id: 'form-intro', kind: 'text', text: 'ご来店ありがとうございました。1分で終わります。' },
+        { id: 'form-purpose', kind: 'input', type: 'radio', name: 'visit_purpose', label: '今日のご来店の目的は？', required: true, choiceMode: 'friendField', choiceFriendFieldId: null, destinations: { friendFieldIds: ['field-plan'] }, choices: [
+          { id: 'purpose-1', label: 'トリミング' },
+          { id: 'purpose-2', label: 'シャンプーのみ' },
+          { id: 'purpose-3', label: 'ご相談' },
         ] },
-        { id: 'form-good-points', kind: 'input', type: 'checkbox', name: 'good_points', label: 'よかった点', destinations: { friendFieldIds: ['friend-field-good-points'] }, choices: [
-          { id: 'good-1', label: '接客' }, { id: 'good-2', label: '仕上がり' },
-          { id: 'good-3', label: '店内' }, { id: 'good-4', label: '説明' },
-        ] },
-        { id: 'form-opinion', kind: 'input', type: 'textarea', name: 'opinion', label: 'ご意見', destinations: { friendFieldIds: ['friend-field-opinion'] } },
-        { id: 'form-next-visit', kind: 'input', type: 'date', name: 'next_visit', label: '次回来店の希望日', destinations: { friendFieldIds: ['friend-field-next-visit'] } },
-        { id: 'form-button', kind: 'button', label: '送信する', url: 'https://example.co.jp/thanks', style: 'default' },
+        { id: 'form-staff-rating', kind: 'input', type: 'rating', name: 'staff_rating', label: '担当の対応はいかがでしたか？' },
       ],
     }, {
-      /* 2ページ目の押す先のタブ。中身は絵に見えないため空にしておく。 */
-      id: 'form-section-next', name: '次回について', blocks: [],
+      id: 'form-section-next', name: '次回について', blocks: [
+        { id: 'form-next-heading', kind: 'heading', text: '次回について', level: 1 },
+        { id: 'form-next-booking', kind: 'input', type: 'booking', name: 'next_booking', label: '次回のご希望の日時を選んでください', required: true, booking: { menuId: 'bm-1', staffId: null, daysAhead: 14 } },
+        { id: 'form-next-request', kind: 'input', type: 'textarea', name: 'request', label: 'ご要望があればお書きください' },
+      ],
     }],
     options: {
-      thanksUrl: 'https://example.co.jp/thanks',
-      thanksText: 'ありがとうございました。またのご来店をお待ちしています。',
-      restorePrevious: true, pageTitle: '来店アンケート｜然', submitLabel: '送る',
-      prevLabel: '前へ', nextLabel: '次へ', sectionHeader: 'name',
+      thanksUrl: null,
+      thanksText: 'ご回答ありがとうございました！次回のご来店をお待ちしています。',
+      restorePrevious: true, pageTitle: '来店アンケート｜然', submitLabel: '答えを送る',
+      prevLabel: '戻る', nextLabel: '次へ', sectionHeader: 'name',
       confirmDialog: { enabled: true, text: 'この内容で送信しますか？', okLabel: '送信する', cancelLabel: '戻る' },
-      deadline: { enabled: true, endsAt: '2026-09-30T23:59', message: '受付は終了しました。またのご来店をお待ちしています' },
+      deadline: { enabled: false, endsAt: null, message: '受付は終了しました。またのご来店をお待ちしています' },
       oncePerFriend: { enabled: true, message: 'このフォームには回答済みです。' },
-      totalLimit: { enabled: true, max: 300 },
+      totalLimit: { enabled: false, max: 300 },
       afterActions: [
+        { kind: 'send_text', text: 'ご回答ありがとうございます' },
         { kind: 'tag', op: 'add', tagIds: ['tag-visit-survey-answered'] },
-        { kind: 'reminder', reminderId: 'reminder-next-visit' },
-        { kind: 'send_text', text: 'ありがとうございました。またのご来店をお待ちしています。' },
+        { kind: 'friend_field', fieldId: 'field-plan', value: '{{answer}}' },
       ],
     },
   },
@@ -2943,6 +2966,20 @@ export const IDENTITY_CANDIDATE_FRIEND = {
   canDecide: true, canUndo: false, undoNote: '判定を取り消すと、根拠を確認する候補へ戻ります。',
 }
 
+/** ★V8 比べて決める fcg2D：友だち同士の詳細（/api/friends/duplicates/:id）。判定の履歴を1件持つ。 */
+export const FRIEND_DUPLICATE_DETAIL = {
+  ...IDENTITY_CANDIDATE_FRIEND,
+  left: { ...IDENTITY_CANDIDATE_FRIEND.left, detail: '支店' },
+  right: { ...IDENTITY_CANDIDATE_FRIEND.right, detail: '本店' },
+  history: [
+    {
+      id: 'identity-history-1', fromStatus: 'pending', toStatus: 'deferred', actorName: 'Kenta',
+      reason: '本人に確認中', decidedAt: '2026-09-30T01:12:00.000Z', reprocessMode: null,
+    },
+  ],
+  detectedAt: '2026-09-28T09:40:00.000Z',
+}
+
 export const IDENTITY_CANDIDATE_EC = {
   ...IDENTITY_CANDIDATE_FRIEND,
   id: 'identity-ec-1', kind: 'ec_member',
@@ -2970,29 +3007,41 @@ function identityListItem(candidate) {
 }
 
 export const IDENTITY_CANDIDATE_LISTS = {
+  /*
+   * ★V8 重複検出 hn6Y8・G9C4Uw：候補3組（最高・高・低）、根拠とアカウントは絵の文。
+   * 数の帯は statusCounts（未確認11・保留2・結び付けた5 ＝18組）と lowConfidenceCount（2組）から出す。
+   */
   friend_duplicate: {
     items: [
-      identityListItem(IDENTITY_CANDIDATE_FRIEND),
-      identityListItem({
-        ...IDENTITY_CANDIDATE_FRIEND,
-        id: 'identity-friend-2', status: 'pending',
-        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: '山田 太郎', lineAccountName: '公式A（予約）' },
-        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'Yamada', lineAccountName: '然-NEN-TEST' },
-      }),
-      identityListItem({
-        ...IDENTITY_CANDIDATE_FRIEND,
-        id: 'identity-friend-3', status: 'deferred',
-        confidence: { ...IDENTITY_CANDIDATE_FRIEND.confidence, label: 'low', score: 42 },
-        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: 'テスト太郎', lineAccountName: 'ECサポート' },
-        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'test', lineAccountName: 'MAIL 配信' },
-      }),
-      identityListItem({
-        ...IDENTITY_CANDIDATE_FRIEND,
-        id: 'identity-friend-4', status: 'linked',
-        left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: '坂本 真人', lineAccountName: 'MAIL 配信' },
-        right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: '坂本真人', lineAccountName: '然-NEN-TEST' },
-      }),
+      {
+        ...identityListItem(IDENTITY_CANDIDATE_FRIEND),
+        left: { ...IDENTITY_CANDIDATE_FRIEND.left, lineAccountName: '支店' },
+        right: { ...IDENTITY_CANDIDATE_FRIEND.right, lineAccountName: '本店' },
+        evidenceSummary: ['確認済みのメールが同じ'],
+      },
+      {
+        ...identityListItem({
+          ...IDENTITY_CANDIDATE_FRIEND,
+          id: 'identity-friend-2', status: 'pending',
+          confidence: { ...IDENTITY_CANDIDATE_FRIEND.confidence, label: 'high', score: 78 },
+          left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: '山田 太郎', lineAccountName: '公式A' },
+          right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'Yamada', lineAccountName: '然-NEN-TEST' },
+        }),
+        evidenceSummary: ['電話番号が同じ'],
+      },
+      {
+        ...identityListItem({
+          ...IDENTITY_CANDIDATE_FRIEND,
+          id: 'identity-friend-3', status: 'deferred',
+          confidence: { ...IDENTITY_CANDIDATE_FRIEND.confidence, label: 'low', score: 42 },
+          left: { ...IDENTITY_CANDIDATE_FRIEND.left, label: 'テスト太郎', lineAccountName: 'EC' },
+          right: { ...IDENTITY_CANDIDATE_FRIEND.right, label: 'test', lineAccountName: 'MAIL配信' },
+        }),
+        evidenceSummary: ['表示名が似ている（参考）'],
+      },
     ], total: 18, limit: 20, offset: 0,
+    statusCounts: { pending: 11, deferred: 2, linked: 5, different: 0 },
+    lowConfidenceCount: 2,
   },
   ec_member: {
     items: [identityListItem(IDENTITY_CANDIDATE_EC)], total: 1, limit: 20, offset: 0,
@@ -4324,10 +4373,14 @@ export const OUTGOING_WEBHOOKS = [
     createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
   },
   {
-    /* 2ページ目の1本。設計の先頭5件へ割り込まないよう、送信実績は0件。 */
+    /*
+      2ページ目の1本。設計の先頭5件へ割り込まないよう、送信実績は0件。
+      V8 の一覧（ZSbFY）は名前順で先頭に来るので、絵の1行目と同じ
+      「友だちになった・タグが付いた」を送る形にする。
+    */
     id: 'owh-chatwork', name: 'Chatwork ／ 店舗連絡',
     url: 'https://api.chatwork.com/v2/rooms/000000/messages',
-    eventTypes: ['booking.created'], hasSecret: true, isActive: true,
+    eventTypes: ['friend_add', 'tag_change'], hasSecret: true, isActive: true,
     maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
     deliverySummary: {
       periodDays: 30, total: 0, succeeded: 0, failed: 0, pending: 0,
@@ -4340,60 +4393,76 @@ export const OUTGOING_WEBHOOKS = [
 /** 機能26。外部送信は行わず、本番APIと同じ成功の器だけを返す。 */
 export const OUTGOING_WEBHOOK_TEST_RESULT = { delivered: true, responseStatus: 204 }
 
-/** 受け取る口。設計 `M0Gb7` の3本。 */
+/**
+ * 受け取る口。V8 の絵 `gW0F2` の3本（申込フォーム・ネットショップの注文・旧予約システム）。
+ * id は前と同じ（詳細・試しの見本が id で引くため）。
+ */
 export const INCOMING_WEBHOOKS = [
   {
-    id: 'iwh-booking', name: '予約サービスから', sourceType: 'booking',
+    id: 'iwh-booking', name: '申込フォーム', sourceType: 'form',
     hasSecret: true, isActive: true,
     createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
   },
   {
-    id: 'iwh-survey', name: 'アンケートツールから', sourceType: 'form',
+    id: 'iwh-survey', name: 'ネットショップの注文', sourceType: 'ec',
     hasSecret: true, isActive: true,
     createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z',
   },
   {
-    id: 'iwh-accounting', name: '会計ソフトから', sourceType: 'payment',
+    id: 'iwh-accounting', name: '旧予約システム', sourceType: 'booking',
     hasSecret: false, isActive: false,
-    createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+    createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-31T00:00:00.000Z',
   },
 ]
 
-/** 受け取り口1件。本文は構造だけ残し、値をすべてマスクする。 */
+/**
+ * 受け取り口1件。本文は構造だけ残し、値をすべてマスクする。
+ * 絵 `gW0F2`：メールアドレスで探す・見つからないときは友だち候補を作る・
+ * 届いたらすること2つ・人が見つからなかった届物2件。
+ */
 export const INCOMING_WEBHOOK_DETAILS = {
   'iwh-booking': {
     ...INCOMING_WEBHOOKS[0],
     version: 3,
     identityMatching: {
       methods: [{ kind: 'verified_email', path: '$.email' }],
-      onNotFound: 'do_nothing',
+      onNotFound: 'create_candidate',
     },
     actions: [
-      { refKind: 'tag', refId: 'tag-external-booking', refVersionId: null, displayName: '外部予約あり' },
-      { refKind: 'template', refId: 'template-booking-received', refVersionId: 'template-booking-received-v2', displayName: 'ご予約を承りました' },
+      { refKind: 'tag', refId: 'tag-form-entry', refVersionId: null, displayName: 'フォーム申込' },
+      { refKind: 'automation', refId: 'au-entry-thanks', refVersionId: null, displayName: '申込のお礼' },
     ],
     actionExecution: {
       state: 'connected',
       reason: null,
     },
-    latestSample: {
-      receivedAt: '2026-08-25T01:12:00.000Z',
-      fields: [
-        { path: '$.email', type: 'string', maskedValue: '••••' },
-        { path: '$.booked_at', type: 'string', maskedValue: '••••' },
-        { path: '$.menu', type: 'string', maskedValue: '••••' },
-        { path: '$.staff', type: 'string', maskedValue: '••••' },
-      ],
-      truncated: false,
-    },
+    latestSample: null,
     templateFields: [
       { path: '$.email', type: 'string', token: '{{payload.email}}' },
-      { path: '$.booked_at', type: 'string', token: '{{payload.booked_at}}' },
-      { path: '$.menu', type: 'string', token: '{{payload.menu}}' },
-      { path: '$.staff', type: 'string', token: '{{payload.staff}}' },
+      { path: '$.form', type: 'string', token: '{{payload.form}}' },
     ],
+    pendingUnmatched: 2,
+    previousSecretUsableUntil: null,
   },
 }
+
+/** 人が見つからなかった届物（絵 `gW0F2` の2行）。値は伏せた形だけ。 */
+export const INCOMING_WEBHOOK_UNMATCHED = [
+  {
+    id: 'iwu-1', kind: 'candidate', status: 'pending',
+    identityAttempts: [{ kind: 'verified_email', path: '$.email', value: 'm.sakamoto@…' }],
+    maskedShape: null,
+    candidates: [{ friendId: 'friend-1', displayName: '坂本 真人' }],
+    resolvedFriendId: null, resolvedAt: null, receivedAt: '2026-09-30T00:31:00.000Z',
+  },
+  {
+    id: 'iwu-2', kind: 'unmatched', status: 'pending',
+    identityAttempts: [{ kind: 'verified_phone', path: '$.tel', value: '090-****-1234' }],
+    maskedShape: null,
+    candidates: [],
+    resolvedFriendId: null, resolvedAt: null, receivedAt: '2026-09-29T09:02:00.000Z',
+  },
+]
 
 /*
   流入経路。設計 `Q4bkTg` の6本そのまま。
@@ -4920,7 +4989,7 @@ const CONVERSION_PREVIOUS_RANGE = {
 }
 
 const CONVERSION_USAGE_COUNTS = new Map([
-  ['cp-1', 3], ['cp-4', 1], ['cp-3', 1], ['cp-2', 1], ['cp-5', 0], ['cp-6', 1],
+  ['cp-1', 3], ['cp-4', 2], ['cp-3', 1], ['cp-2', 1], ['cp-5', 0], ['cp-6', 1],
 ])
 
 const CONVERSION_CURRENT_BY_ID = new Map(CONVERSION_REPORT_CURRENT.map((row) => [row.conversionPointId, row]))
@@ -4943,11 +5012,17 @@ export const CONVERSION_DEFINITIONS = {
       attributionDays: point.attributionDays,
       lineAccountId: point.lineAccountId,
       status: point.isActive ? 'active' : 'stopped',
+      // 一覧の状態の札・取り消しの決め方・受け口（本物の口と同じ形。V8 の一覧 r6dJFy が読む）。
+      state: point.isActive ? 'active' : 'stopped',
+      stateReason: null,
+      sourceConfig: {},
+      reversalPolicy: point.eventType === 'ec_order_confirmed' ? 'source_cancelled' : 'manual',
+      ingest: { configured: point.measureMethod === 'webhook', disabledAt: null },
       version: 1,
       usageCount: CONVERSION_USAGE_COUNTS.get(point.id) ?? 0,
       usageNames: {
         'cp-1': ['ファネル 2', 'アフィリエイト 1', 'マイル「商品を買った」'],
-        'cp-4': ['アフィリエイト 1'],
+        'cp-4': ['アフィリエイト 1', '広告への送信'],
         'cp-3': ['オートメーション 1'],
         'cp-2': ['ファネル 1'],
         'cp-5': [],
@@ -4977,6 +5052,9 @@ export const CONVERSION_DEFINITIONS = {
 export const CONVERSION_DEFINITION_PREVIEW = {
   range: CONVERSION_RANGE,
   matchedCount: 386,
+  // 条件に合う人数と、数えない条件で除いた件数（V8 の作る画面 j8p3yj の右の列が読む）。
+  uniqueFriendCount: 47,
+  excludedCount: 3,
   estimatedCount: 214,
   estimatedValue: 402800,
   duplicateExcludedCount: 172,
@@ -7716,4 +7794,52 @@ export const REMINDER_REGISTRANTS = [
       cancelledAt: cancelled ? '2026-09-15T09:00:00+09:00' : null, lockVersion: 1,
     }
   }),
+]
+
+/*
+ * 板 `AYc6O`・`C67dE`・`piWhz`（共通情報「営業時間」の編集）。撮影は
+ * `/contents/vars/edit?id=common-var-hours`。使っている場所は影響の8件と同じ。
+ * 期間外は「代わりの値を出す」、決めた日の予定が1件（10/1 から 18:00 まで）。
+ */
+const COMMON_VAR_HOURS_IMPACT = commonVarChangeImpactHours('平日 10:00〜19:00')
+export const COMMON_VAR_HOURS_DELETE_IMPACT = {
+  variable: { id: 'common-var-hours', name: '営業時間', varKey: 'shop_hours' },
+  total: 8,
+  blockingTotal: 8,
+  historicalTotal: 0,
+  unscopedFormTotal: 0,
+  canDelete: false,
+  byKind: COMMON_VAR_HOURS_IMPACT.byKind,
+  unavailableReferences: [],
+  items: COMMON_VAR_HOURS_IMPACT.items.map(({ kind, kindLabel, name, status, blocksDeletion, currentPreview }) => ({
+    kind, kindLabel, name, status, blocksDeletion, currentPreview,
+  })),
+  checkedAt: '2026-09-07T10:00:00.000+09:00',
+}
+export const COMMON_VAR_HOURS_DETAIL = {
+  ...COMMON_VARS.find((variable) => variable.id === 'common-var-hours'),
+  memo: '',
+  version: 2,
+  archivedAt: null,
+  status: 'active',
+  validFrom: null,
+  validUntil: null,
+  expiryBehavior: 'fallback',
+  fallbackValue: 'お問い合わせください',
+  usageByKind: COMMON_VAR_HOURS_DELETE_IMPACT.byKind,
+  usages: COMMON_VAR_HOURS_DELETE_IMPACT.items,
+  usagePage: { total: 8, shown: 8, hasMore: false, unavailableCount: 0 },
+  history: [
+    {
+      id: 'common-var-hours-version-2', version: 2, name: '営業時間', value: '平日 10:00〜19:00', memo: '',
+      changeReason: '夏の営業時間', actorId: 'staff-2', actorName: '高田 誠', createdAt: '2026-09-01T10:00:00.000+09:00',
+    },
+    {
+      id: 'common-var-hours-version-1', version: 1, name: '営業時間', value: '平日 10:00〜20:00', memo: '',
+      changeReason: '初回登録', actorId: 'staff-3', actorName: '中川 由美', createdAt: '2026-04-01T09:00:00.000+09:00',
+    },
+  ],
+}
+export const COMMON_VAR_HOURS_SCHEDULES = [
+  { id: 'common-var-hours-schedule-1', varId: 'common-var-hours', effectiveFrom: '2026-10-01T00:00', value: '平日 10:00〜18:00', appliedAt: null },
 ]
