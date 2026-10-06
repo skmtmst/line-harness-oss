@@ -547,3 +547,13 @@
 }
 /* ★V8 行の名前の横の「失敗 n」は札の高さ22（apLqS 行の「名と注意」）。押せるボタンでも行を押し広げない */
 :global([data-theme='v8']) .miniBadgeDanger { min-height: 0; height: 22px; }
+
+/* 1152 の板（Iffil）の道具の段：1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び」。 */
+.narrowTools { display: flex; flex-basis: 100%; flex-direction: column; gap: var(--tpl-toolbar-gap); }
+.narrowRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+.narrowRow > div[role='group'] { display: flex; gap: var(--tpl-toolbar-gap); }
+.narrowFolder { width: var(--tpl-narrow-folder-w); }
+.narrowFolder :global(*) { max-width: 100%; }
+.narrowFolder :global(button) { width: 100%; }
+.narrowSearch { width: var(--tpl-kw-input-w); }
+.narrowSpacer { flex: 1 1 0; }
