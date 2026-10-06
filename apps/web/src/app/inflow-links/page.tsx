@@ -24,8 +24,9 @@ import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import type { FeatureKey } from '@/lib/feature-settings'
 import AdIntegration from './ad-integration'
-import { AdConnectionsV8, AdHistoryV8, AdMetricsV8 } from './ad-integration-v8'
-import SiteScriptV8 from '@/components/inflow-links/site-script-v8'
+import { AdConnectionsV8, AdHistoryV8 } from './ad-integration-v8'
+import SiteScriptV8 from '@/v8/inflow-links/site-script'
+import AdsV8 from '@/v8/inflow-links/ads'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import InflowListV8 from '@/v8/inflow-links/list'
 import ReferralQrModal, { type ReferralQrRoute } from './referral-qr-modal'
@@ -1663,9 +1664,13 @@ function InflowLinksPageHost() {
   */
   const v8List = theme === 'v8' && tab === 'links' && !tabBlocked
   if (v8List) return <InflowListV8 onRouteCountChange={setLinksCount} />
+  /*
+    ★V8 のサイトスクリプト（XjOte）・広告連携（qSTVR）の絵にもタブは無い。見出しの「流入と計測へ」で戻る。
+  */
+  const v8NoTabs = theme === 'v8' && !tabBlocked
   return (
     <div>
-      <MergedTabs basePath="/inflow-links" tabs={visibleTabs} active={tab} />
+      {v8NoTabs ? null : <MergedTabs basePath="/inflow-links" tabs={visibleTabs} active={tab} />}
       {tabBlocked ? (
         <FeatureDisabledScreen featureId={tabFeature} />
       ) : (
@@ -1675,7 +1680,7 @@ function InflowLinksPageHost() {
               一瞬に計測APIを呼ぶと、offのaccountで403が画面全体のゲートを
               起こしてしまう。 */}
           {tab === 'script' && visibility.status === 'ready' && (theme === 'v8' ? <SiteScriptV8 /> : <SiteScript />)}
-          {tab === 'ads' && (theme === 'v8' ? <AdMetricsV8 /> : <AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />)}
+          {tab === 'ads' && (theme === 'v8' ? <AdsV8 /> : <AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />)}
           {tab === 'connections' && (theme === 'v8' ? adView === 'history' ? <AdHistoryV8 /> : <AdConnectionsV8 /> : <AdIntegration view={adView} onPlatformCountsChange={handleAdCounts} />)}
         </>
       )}
