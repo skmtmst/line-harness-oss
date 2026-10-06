@@ -502,6 +502,14 @@
   --shadow-bar-line: 0 -4px 12px rgb(29 29 31 / 0.08);
   /* 骨組みの明滅 1 周期（★V7 仕上げ §3）。transition ではなく animation の周期専用。 */
   --motion-pulse: 1.2s;
+  /*
+   * 押したときの手応え（動きの点検 6 番・2026-10-07）。押すと乗せたときより
+   * 少し暗く（塗りのボタンは 0.88、白地のボタンは 0.96）、ごく少し縮む（0.98）。
+   * 以前は乗せる 0.92・押す 0.95 で、押した瞬間に明るく戻る逆の手応えだった。
+   */
+  --press-scale: 0.98;
+  --press-dim: brightness(0.88);
+  --press-dim-soft: brightness(0.96);
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
@@ -1276,9 +1284,18 @@ select[aria-invalid='true'] {
     transition: scale var(--motion-instant) var(--motion-ease-out);
   }
 
+  /*
+   * 押せるものは全部「指」の形（動きの点検 7 番）。Tailwind v4 の土台は button を
+   * default にするので、部品が書き忘れた所（フォルダの行など）が矢印のままだった。
+   * 層の中に置くので、選ばれているタブなど部品が決めた形はそのまま勝つ。
+   */
+  :is(button, [role='button'], [role='tab'], [role='menuitem'], [role='option'], summary):not(:disabled, [aria-disabled='true']) {
+    cursor: pointer;
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     :is(button, [role='button']):not(:disabled, [aria-disabled='true'], .w-full, [role='tab'], [role='option'], [role='menuitem'], [role='switch'], [role='gridcell'] *):active {
-      scale: 0.98;
+      scale: var(--press-scale);
     }
   }
 }
