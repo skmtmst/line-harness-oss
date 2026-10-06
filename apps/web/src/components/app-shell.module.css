@@ -185,6 +185,11 @@
   padding: 0;
 }
 
+/* 設定の住所で外のメニューを出さないときの包み。並びには影響させない（本文を作り直さないためだけの箱）。 */
+.settingsPass {
+  display: contents;
+}
+
 [data-theme="v8"] .settingsBody {
   min-width: 0;
   padding: 24px 16px;
