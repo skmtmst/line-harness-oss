@@ -26,8 +26,11 @@ export const FOLDER_COUNTS = [
   ['', '未分類', 20],
 ]
 
-/** フォルダ。 */
-export const TAG_GROUPS = [
+/**
+ * フォルダ。全部で6つ（CSV取込の判定・埋め草の行先に使う）。
+ * 画面の `/api/tag-groups` が返すのは下の `TAG_GROUPS`（★V8 の絵の3つ）。
+ */
+const TAG_GROUPS_ALL = [
   { id: 'g-vip', name: 'VIP', sortOrder: 0, color: '#F59E0B', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
   { id: 'g-pet', name: 'ペット', sortOrder: 1, color: '#EC4899', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
   { id: 'g-member', name: '会員', sortOrder: 2, color: '#10B981', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
@@ -35,6 +38,14 @@ export const TAG_GROUPS = [
   { id: 'g-purchase', name: '購入', sortOrder: 4, color: '#3B82F6', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
   { id: 'g-inquiry-follow', name: 'お問い合わせフォロー', sortOrder: 5, color: '#7C3AED', createdAt: '2026-08-25T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
 ]
+
+/**
+ * `/api/tag-groups` の返事。★V8 友だち属性の絵（I1E7Bt・aPeD8・fkGUR）の
+ * フォルダの列は VIP・ペット・会員・未分類の3つ＋未分類。
+ * 健康・購入・お問い合わせフォローは返さない（その中のタグは一覧では「未分類」の
+ * フォルダ名で出るが、件数の「未分類 20」は groupId が空のタグだけを数えるので変わらない）。
+ */
+export const TAG_GROUPS = TAG_GROUPS_ALL.slice(0, 3)
 
 /** 機能4のCSV取込。DBを変えず、同じ入力には同じ判定を返す。 */
 export const TAG_IMPORT_SAMPLE_ROWS = [
@@ -51,7 +62,7 @@ export const TAG_IMPORT_SAMPLE_ROWS = [
 const EXISTING_TAG_NAMES = new Set(['VIP', 'EC顧客連携済み', 'NEN会員'])
 
 export function tagImportPreview(rows = TAG_IMPORT_SAMPLE_ROWS) {
-  const knownFolders = new Set(TAG_GROUPS.map((folder) => folder.name))
+  const knownFolders = new Set(TAG_GROUPS_ALL.map((folder) => folder.name))
   const seen = new Set()
   const planned = rows.map((input, index) => {
     const line = Number.isInteger(input?.line) && input.line > 0 ? input.line : index + 2
@@ -113,15 +124,16 @@ export function tagImportResult(rows = TAG_IMPORT_SAMPLE_ROWS) {
 
 /**
  * タグ6件。設計の表（`HrwyW`）の6行そのまま。
+ * フォルダと登録日は ★V8 の絵（I1E7Bt）に合わせた：1行目・4行目は VIP、1行目の登録日は 1月13日。
  *
  * `mileageMultiplierBps` は 10000 で 1.0倍。設計の「1.2倍」は 12000。
  */
 const DESIGN_ROWS = [
   // 名前, フォルダ, 付与人数, 本人マイル, 紹介マイル, 倍率, ★, 登録日, 付与元, 使用先, 他N
-  ['EC顧客連携済み', 'g-purchase', 64, 10, 0, 12000, true, '2026-01-11T00:00:00.000Z', 'ec', { broadcasts: 3, forms: 1 }, 1],
+  ['EC顧客連携済み', 'g-vip', 64, 10, 0, 12000, true, '2026-01-13T00:00:00.000Z', 'ec', { broadcasts: 3, forms: 1 }, 1],
   ['LINEログイン連携済み', 'g-member', 198, 0, 0, null, true, '2026-01-13T00:00:00.000Z', 'line_login', { scenarios: 2 }, 0],
   ['NEN会員', 'g-member', 128, 10, 5, 15000, false, '2026-01-13T00:00:00.000Z', 'form', { broadcasts: 4 }, 3],
-  ['商品到着確認対象', 'g-purchase', 41, 3, 0, null, false, '2026-01-13T00:00:00.000Z', 'ec_purchase', { autoReplies: 1 }, 1],
+  ['商品到着確認対象', 'g-vip', 41, 3, 0, null, false, '2026-01-13T00:00:00.000Z', 'ec_purchase', { autoReplies: 1 }, 1],
   ['未契約', '', 37, 0, 0, null, true, '2026-01-13T00:00:00.000Z', 'manual', { savedSearches: 2 }, 0],
   ['誕生日クーポン対象', 'g-vip', 0, 20, 0, null, false, '2026-01-13T00:00:00.000Z', 'birthday', { broadcasts: 1 }, 2],
 ].map(([name, groupId, friendCount, mileageReward, referralMileageReward, mileageMultiplierBps, isStarred, createdAt, assignSource, usedIn, otherActionCount], index) => ({
