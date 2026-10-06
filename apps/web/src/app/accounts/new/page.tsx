@@ -15,7 +15,7 @@ import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialo
 import { CHECK_STATE_LABEL, canSave, stoppedAt, toSteps } from '../connection-check-view'
 import { isDuplicateChannelError, matchRegisteredAccountId } from './account-recovery'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import RegisterV8 from './register-v8'
+import RegisterV8 from '@/v8/account-new/register'
 
 /* 手順の順番は絵が正本（板 JYfda・GwKE2）：LINE準備→チャネル設定→基本情報→接続確認→完了。 */
 const WIZARD_STEPS = [

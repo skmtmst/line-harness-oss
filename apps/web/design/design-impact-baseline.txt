@@ -724,3 +724,6 @@ shared-button-importer v8/automations/create/friend-multi-select.tsx
 shared-button-importer v8/accounts-detail/detail.tsx
 shared-button-importer v8/accounts-detail/dialogs.tsx
 shared-button-importer v8/accounts-detail/handover.tsx
+shared-button-importer v8/account-new/register.tsx
+shared-button-importer v8/hq-templates/console.tsx
+shared-button-importer v8/hq-templates/message-form.tsx
