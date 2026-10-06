@@ -3027,6 +3027,52 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /*
+   * 友だち詳細（★V8 Q5F2QE・JCDRm）の履歴・次の予定・回答。friend-1 だけ。
+   * 絵の「最近の履歴」3行・「進行中」1行・回答カード2枚と同じ形にする（2026-10-07）。
+   */
+  if (pathname === '/api/friends/friend-1/timeline') {
+    const item = (id, type, summary, occurredAt, source, account = { id: 'visual-qa-account', name: '然-NEN-TEST' }) => ({
+      id, type, summary, status: null, source, occurredAt, lineAccount: account,
+    })
+    const message = (id) => ({ kind: 'message', id, parentId: null, url: null })
+    const items = [
+      item('tl-1', 'message_received', '『秋の新商品はいつ届きますか？』', '2026-10-01T10:12:00+09:00', message('msg-1')),
+      item('tl-2', 'message_sent', '『10月5日に発送予定です』（Kenta）', '2026-10-01T10:20:00+09:00', message('msg-2')),
+      item('tl-3', 'url_clicked', '一斉配信『秋の新商品のお知らせ』', '2026-09-30T18:02:00+09:00', null),
+      item('tl-4', 'form_submitted', '『ご愛犬アンケート』に回答', '2026-09-30T14:30:00+09:00', { kind: 'form_submission', id: 'submission-1', parentId: 'form-1', url: null }),
+      item('tl-5', 'scenario_started', '『新規登録7日間フォロー』', '2026-09-30T09:00:00+09:00', null),
+      item('tl-6', 'tag_change', 'タグ『VIP』が付いた（購入3回で自動）', '2026-09-26T12:40:00+09:00', null),
+      item('tl-7', 'ec_order', '定期便 ¥6,200', '2026-09-26T12:38:00+09:00', { kind: 'ec_order', id: 'NEN-12492', parentId: null, url: 'https://example.com/orders/NEN-12492' }, { id: 'ec', name: 'EC' }),
+    ]
+    return { success: true, data: { items: query.get('cursor') ? [] : items, nextCursor: query.get('cursor') ? null : 'tl-cursor-1' } }
+  }
+  if (pathname === '/api/friends/friend-1/upcoming') {
+    return {
+      success: true,
+      data: {
+        nextBooking: { kind: 'booking', id: 'bk-1', title: 'トリミング（小型犬）', startsAt: '2026-10-04T10:00:00+09:00', status: 'confirmed' },
+        nextBookingError: false,
+        nextAutoDelivery: { kind: 'scenario', id: 'scenario-1', name: '新規登録7日間フォロー', scheduledAt: '2026-10-01T10:00:00+09:00' },
+        nextAutoDeliveryError: false,
+      },
+    }
+  }
+  if (pathname === '/api/friends/friend-1/form-submissions') {
+    const items = [
+      {
+        id: 'fs-1', formId: 'form-1', formName: 'ご愛犬アンケート', createdAt: '2026-09-30T14:30:00+09:00',
+        fields: [{ name: 'dog_name', label: '犬の名前' }, { name: 'age', label: '年齢' }, { name: 'concern', label: '気になること' }],
+        data: { dog_name: 'こむぎ', age: '3歳', concern: '最近ごはんを残す' },
+      },
+      {
+        id: 'fs-2', formId: 'form-2', formName: '定期便の申し込み', createdAt: '2026-09-12T10:05:00+09:00',
+        fields: [{ name: 'interval', label: 'お届け間隔' }, { name: 'weekday', label: 'お届け曜日' }],
+        data: { interval: '2週間', weekday: '土曜日', 配送メモ: '置き配希望' },
+      },
+    ]
+    return { success: true, data: { items: query.get('cursor') ? [] : items, total: 2, nextCursor: query.get('cursor') ? null : 'fs-cursor-1' } }
+  }
   if (pathname === '/api/friends/friend-1/rich-menu') {
     return { success: true, data: { id: 'rich-menu-main', name: '通常メニュー・予約', isDefault: false } }
   }

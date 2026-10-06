@@ -2464,10 +2464,15 @@ export const FRIEND_DETAILS = {
     createdAt: '2026-08-13T00:00:00.000Z',
     metadata: {},
     tags: [
-      { id: 'friend-tag-kubun', name: '顧客区分：既存顧客', color: '#8B938D', createdAt: '2026-08-13T00:00:00.000Z' },
-      { id: 'friend-tag-store', name: '来店店舗：渋谷店', color: '#8B938D', createdAt: '2026-08-13T00:00:00.000Z' },
+      // 友だち詳細（★V8 JCDRm）のタグ欄は短い札3つで1行。長い名前だと2行に折れて下が全部ずれる。
+      { id: 'friend-tag-vip', name: 'VIP', color: '#8B938D', createdAt: '2026-08-13T00:00:00.000Z' },
+      { id: 'friend-tag-teiki', name: '定期便', color: '#8B938D', createdAt: '2026-08-13T00:00:00.000Z' },
+      { id: 'friend-tag-member', name: 'NEN会員', color: '#8B938D', createdAt: '2026-08-13T00:00:00.000Z' },
     ],
     formSubmissions: [],
+    formSubmissionTotal: 2,
+    // 友だち詳細の札・担当・メモ（JCDRm）。無いと「やり取りなし」になり、メモ欄が1行になる。
+    support: { status: 'resolved', operatorName: 'Kenta', notes: '定期便を月2回。秋の新商品に興味あり（9/20 の問い合わせより）。' },
   },
 }
 
