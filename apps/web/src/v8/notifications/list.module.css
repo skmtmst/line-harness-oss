@@ -1,0 +1,201 @@
+/*
+ * ★V8 通知（Pencil `y8QQV`）。枠・見出しは型（ListPage）が持つ。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-nt-*`。
+ */
+
+/* 中身 V8：上16・左右24・下24、段の間16。 */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nt-body-gap);
+  padding: var(--tpl-nt-body-pad);
+}
+
+.buttonIcon {
+  width: var(--tpl-nt-button-icon);
+  height: var(--tpl-nt-button-icon);
+  flex-shrink: 0;
+}
+
+/* タブの間は 20（部品の既定 24 より狭い絵）。 */
+.tabs > span {
+  gap: var(--tpl-nt-tab-gap);
+}
+
+/* タブは文字の高さ19・下線まで含めて29（部品の既定は 20・12、ボタンの最低の高さ 32）。 */
+.tabs [role='tab'],
+.tabs [role='tab'] * {
+  line-height: var(--tpl-nt-tab-lh);
+}
+
+.tabs [role='tab'] {
+  min-height: 0;
+  padding-bottom: var(--tpl-nt-tab-pad);
+}
+
+.retry {
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* 一覧の箱：角丸12・細い枠。 */
+.box {
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--tpl-nt-box-radius);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item + .item {
+  box-shadow: var(--tpl-nt-row-line);
+}
+
+.item[data-unread='true'] {
+  background: var(--tpl-nt-unread-bg);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nt-row-gap);
+  width: 100%;
+  padding: var(--tpl-nt-row-pad);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.row:focus-visible {
+  outline: var(--tpl-nt-focus-ring) solid var(--color-status-info);
+  outline-offset: var(--tpl-nt-focus-offset);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-nt-icon);
+  height: var(--tpl-nt-icon);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-info-soft);
+  color: var(--color-action);
+}
+
+.icon[data-category='error'] {
+  background: var(--tpl-nt-error-bg);
+  color: var(--color-danger);
+}
+
+.icon > svg {
+  width: var(--tpl-nt-icon-glyph);
+  height: var(--tpl-nt-icon-glyph);
+}
+
+.text {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--tpl-nt-text-gap);
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nt-dot-gap);
+  min-width: 0;
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-nt-title-lh);
+}
+
+.item[data-unread='true'] .title {
+  font-weight: 700;
+}
+
+.dot {
+  width: var(--tpl-nt-dot);
+  height: var(--tpl-nt-dot);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+}
+
+.time {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-nt-small-lh);
+  white-space: nowrap;
+}
+
+.go {
+  flex-shrink: 0;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-nt-go-lh);
+  white-space: nowrap;
+}
+
+.loading {
+  margin: 0;
+  padding: var(--tpl-nt-row-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  text-align: center;
+}
+
+/* 下の注記と、絵に無い「通知設定」への小さな道（今の画面の機能を落とさない）。 */
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-nt-row-gap);
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-nt-small-lh);
+}
+
+.settingsLink {
+  flex-shrink: 0;
+  color: var(--color-action);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-nt-small-lh);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+}
