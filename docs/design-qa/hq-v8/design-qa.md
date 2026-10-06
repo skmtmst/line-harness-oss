@@ -41,6 +41,38 @@ Codex の画像比較で、絵と実装のカードが3点ずれていた（受�
 - 直した後の試験: `vitest run src/app/hq src/components/hq` 53ファイル / 239件 合格、`tsc --noEmit` 合格、変更ファイルの `eslint` 指摘なし
 - 実機の画面写真による再照合は、検証環境へ配備した後に Codex が撮る
 
+## 2026-10-06 寸法の不一致を直した（1440px の画像比較）
+
+上の3点を直した後も、Codex の 1440px 画像比較で**位置と幅**が合っていなかった（受け渡し `5002c5a9…` の返答）。絵 `K7HYu` を Pencil で読み直し、白い板の中の余白の持ち方から作り直した。デザインは変えていないので、これも承認済みの姿へ戻す不具合直しにあたる。
+
+| 1440px で測った値 | 絵 `K7HYu` | 直す前 | 直した後 |
+|---|---:|---:|---:|
+| 左の設定メニューの幅 | 200px | 176px | **200px**（差 0） |
+| カードの幅 | 940px | 916px | **940px**（差 0） |
+| カードの上端 | 163px | 205.8px | **163px**（差 0） |
+| 保存ボタン列の上端 | 285px | 322.8px | **285px**（差 0） |
+
+絵の組み立て（左端 240 の白い板は幅 1188）:
+
+- 板の頭 `uSFzp` は高さ **87** ＝ 上20 ＋ 題 `jGYsj` 32 ＋ 間 `v2Dv66` 4 ＋ 説明 `gG3Is` 19 ＋ 下12
+- 中のメニュー `jbGiQ` は幅 **200**・間2・余白[16,12]、項目 `BCMxg` は高さ35
+- 中身 `jpCyy` は余白[16,24,24,24] → カードの左端 240＋200＋24＝**464**、幅 1188−200−24−24＝**940**、上端 60＋87＋16＝**163**
+- カード `P1fiZn` の中は 余白20 ＋ 入力欄の組 `iY5pm` 62（名札20＋間6＋欄36）＋ 間12 ＋ 説明 `TnzJK` 16 ＋ 間12 → 保存列 `j1XNfw` は 163＋122＝**285**
+
+直した中身（4つの仕掛け）:
+
+| ずれていた理由 | 直し方 | 場所 |
+|---|---|---|
+| 共通の白い板が左右に 24px の余白を持つので、メニューが板の左端から始まらない | 画面側が付けた目印 `data-board-bleed` を見て、板の余白だけ 0 にする。余白は画面側（頭と中身）が持つ | `components/app-shell.module.css`（既にある `.contentSettings { padding: 0 }` と同じ考え方） |
+| 頭が共通の飾りのままで高さ 93.8px（題20px・間6・下余白20）だった | この画面の中だけ、題22px/太字/高さ32・説明の行高19・間4・余白[20,24,12,24] に上書きして **87px** にした | `app/hq/settings/hq-settings-v8.css` |
+| 左メニューが共通の `min-width:176px` のままだった | この画面の中だけ幅 200px に固定（仕切り線1pxを含む）。項目の間2・絵14角・字の高さ19も絵に合わせた | 同上（共通の `hq-settings-nav-v8.css` は触っていない） |
+| カードの枠を `border` で持つと中身が1px下がる（Pencil の線は中身を押さない） | 共通の頭（`page-header.module.css` の V8）と同じく `outline` ＋ `outline-offset:-1px` で描く | 同上 |
+
+- 上書きはすべて `[data-board-bleed]` か `.hq-settings-v8` の中だけ。共通の `readonly-v8.css`・`hq-settings-nav-v8.css`・`page-header.module.css` は変えていないので、`/hq/members`・`/hq/billing`・`/hq/support`・`/hq/banners`・`/hq/templates` と v7 の見た目は動かない
+- 既知の差: メニューの項目は絵の176pxに対して175px。メニュー全体の200pxに仕切り線1pxが含まれるため。カードの左端・幅を絵どおりにするには 200px が必要なので、こちらを優先した
+- 画像（絵と同じ 1440×1160）: `K7HYu-implementation-dim-1440.png`（実装）、`K7HYu-overlay-dim-1440.png`（重ね合わせ・差分表示）、`K7HYu-side-by-side-dim-1440.png`（左右並べ）。重ね合わせで板の頭・メニュー・カード・保存ボタンの輪郭はほぼ消えている（残る色は字の描画差と、模擬データで統括名が空なこと）
+- 直した後の確認: `tsc --noEmit` 合格、`vitest run src/app/hq src/components/hq` 53ファイル / 239件 合格、変更ファイルの `eslint` 指摘なし、`design:debt:check` 合格、`next build` 成功後の `verify:design` 456件すべて一致（不一致0）
+
 - 残置の確認: 部品 `apps/web/src/components/hq/operator-history.tsx`、`/api/hq/operator-history`、`platform_audit_logs` への記録づくり、既存試験 `apps/web/src/app/hq/operator-history-v8.react.test.tsx` はすべて残っている
 - 試験: `vitest run src/app/hq src/components/hq` 53ファイル / 239件 合格、`tsc --noEmit` 合格
 
