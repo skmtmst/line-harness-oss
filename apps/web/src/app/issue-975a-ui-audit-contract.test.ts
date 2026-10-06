@@ -122,7 +122,8 @@ describe('U063: 長い選択肢のプルダウンは欄いっぱいに広げる'
     expect(page).toContain('[data-example-select] .min-w-48 { width: auto; max-width: 100%; }')
   })
   it('特典の選択は部品が持つ full 指定を使う（Select側は既存のprop）', () => {
-    const rewards = read('mileage/rewards/edit/page.tsx')
+    /* 入口は V8 の画面（src/v8/mileage/reward-edit.tsx）を出すだけ。選ぶ欄はそちらにある。 */
+    const rewards = read('../v8/mileage/reward-edit.tsx')
     expect(rewards.match(/size="full"/g)?.length).toBeGreaterThanOrEqual(2)
   })
 })

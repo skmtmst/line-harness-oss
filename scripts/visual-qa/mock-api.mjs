@@ -1226,7 +1226,8 @@ const SHAPES = {
   '/api/action-scores/rules': ACTION_SCORE_RULES,
   '/api/action-scores/friends': {
     summary: {
-      scoredFriends: 5, high: 1, normal: 3, low: 1, decreased30d: 0,
+      /* 帯ごとの人数は V8 行動スコア `IRPw8` の数の帯（312・540・432）。表に出す5人は見本の先頭だけ。 */
+      scoredFriends: 1284, high: 312, normal: 540, low: 432, decreased30d: 0,
       /* `packages/db` の `DEFAULT_BANDS` と同じ 30 / 70。40 は根拠が無く、
          決めごとの画面と一覧で同じ人が別の帯に入って見えていた。 */
       highMin: 70, normalMin: 30,
@@ -3985,6 +3986,22 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/mileage/friends') return { success: true, data: MILEAGE_FRIENDS }
   if (pathname === '/api/mileage/earning-rules') return { success: true, data: MILEAGE_EARNING_RULES }
   if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
+  /*
+    承認待ちのマイル変更（V8 友だちの残高 `CJlf4` の黄の板）。境界（5,000）以上の手での変更が1件。
+    承認済み・差し戻しを聞かれたときは空を返す。
+  */
+  if (pathname === '/api/mileage/adjustment-approvals') {
+    if (query.get('status') !== 'pending') return { success: true, data: [] }
+    return {
+      success: true,
+      data: [{
+        id: 'maa-1', line_account_id: 'visual-qa-account', friend_id: 'friend-1', friend_display_name: 'Kenta Kawano',
+        direction: 'increase', amount: 5000, reason_category: 'campaign', reason: 'イベント運営のお礼',
+        status: 'pending', requested_by_staff_id: 'staff-2', requested_by_staff_name: '佐藤 直人',
+        decided_by_staff_name: null, decided_at: null, decision_reason: null, created_at: '2026-10-02T06:20:00.000Z',
+      }],
+    }
+  }
   if (pathname === '/api/mileage/adjustment-policy') {
     return { success: true, data: { configured: true, approvalThreshold: 10_000 } }
   }

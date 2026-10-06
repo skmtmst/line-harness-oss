@@ -54,7 +54,9 @@ const GUARDED = [
   'app/mileage/earning-rules/new/page.tsx',
   'app/mileage/earning-rules/new/v8-earning-rule-new.tsx',
   'app/mileage/page.tsx',
-  'app/mileage/rewards/edit/page.tsx',
+  /* 入口 page.tsx は V8 の画面を出すだけ。番兵は src/v8 の画面が持つ。 */
+  'v8/mileage/reward-edit.tsx',
+  'v8/mileage/earning-rules.tsx',
   'app/mileage/rewards/edit/v8-reward-edit.tsx',
   'app/mileage/v8-earning-rules-tab.tsx',
   'app/nen-campaigns/columns/new/column-new-v8.tsx',

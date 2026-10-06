@@ -4960,54 +4960,60 @@ const mileageEarningRule = ({
   id, name, eventType, source, amount, initialStatus = 'available', granted,
   excluded = 0, status = 'published', expiresAfterDays = 365,
   cancellationEventTypes = [], targetConditions = null, sortOrder,
+  grantedMiles = granted * amount, validUntil = null, draftVersion = 3,
+  publishedVersion = status === 'published' ? draftVersion : null,
 }) => {
   const definition = {
     name, eventType, source, amount, initialStatus,
-    validFrom: null, validUntil: null, expiresAfterDays,
+    validFrom: null, validUntil, expiresAfterDays,
     cancellationEventTypes, targetConditions, sortOrder,
   }
   return {
     id,
     published: {
       name, eventType, source, amount, initialStatus,
-      validFrom: null, validUntil: null, status,
+      validFrom: null, validUntil, status,
       updatedAt: '2026-08-25T00:00:00.000Z',
     },
     draft: definition,
-    draftVersion: 3,
+    draftVersion,
+    publishedVersion,
     draftUpdatedAt: '2026-08-25T00:00:00.000Z',
-    metrics30d: { eligible: granted + excluded, granted, excluded },
+    metrics30d: { eligible: granted + excluded, granted, grantedMiles, excluded },
   }
 }
 
-/** 機能17の公開版・下書き版・直近30日集計を同じ行で返す新契約。 */
+/*
+  機能17の公開版・下書き版・直近30日集計を同じ行で返す新契約。
+  並びと数は V8 たまる決めごと `OC0gy` の表（6行。誕生日だけ止めている下書き）。
+  有効期間は「1年・12/31」（1年で消える・12/31 まで）。
+*/
+const RULE_UNTIL = '2026-12-31T00:00:00+09:00'
 export const MILEAGE_EARNING_RULES = {
   items: [
-    mileageEarningRule({ id: 'mer-1', name: '友だち登録してくれた', eventType: 'friend_added', source: 'line', amount: 100, granted: 62, excluded: 3, sortOrder: 1 }),
-    mileageEarningRule({ id: 'mer-2', name: 'LINEでメッセージを送ってくれた', eventType: 'message_received', source: 'line', amount: 5, granted: 964, excluded: 12, sortOrder: 2 }),
-    mileageEarningRule({ id: 'mer-3', name: '紹介の成果が認められた', eventType: 'affiliate_conversion_approved', source: 'affiliate', amount: 500, granted: 7, excluded: 1, sortOrder: 3 }),
-    mileageEarningRule({ id: 'mer-4', name: '予約してくれた', eventType: 'booking_created', source: 'booking', amount: 300, granted: 8, cancellationEventTypes: ['booking_cancelled'], sortOrder: 4 }),
-    mileageEarningRule({ id: 'mer-5', name: '配信のリンクを押した', eventType: 'broadcast_link_clicked', source: 'broadcast', amount: 10, granted: 214, excluded: 9, sortOrder: 5 }),
-    mileageEarningRule({ id: 'mer-6', name: '回答フォームに答えた', eventType: 'form_submitted', source: 'form', amount: 100, granted: 18, excluded: 2, sortOrder: 6 }),
-    mileageEarningRule({ id: 'mer-7', name: 'ウェビナーを最後まで見た', eventType: 'webinar_completed', source: 'webinar', amount: 200, granted: 8, sortOrder: 7 }),
-    mileageEarningRule({ id: 'mer-8', name: 'Instagramから戻ってきた', eventType: 'inflow_return', source: 'instagram', amount: 50, granted: 0, status: 'stopped', sortOrder: 8 }),
-    mileageEarningRule({ id: 'mer-9', name: '旧キャンペーン（終了）', eventType: 'campaign_2025', source: null, amount: 1000, granted: 0, status: 'stopped', expiresAfterDays: null, sortOrder: 9 }),
+    mileageEarningRule({ id: 'mer-1', name: '友だち追加', eventType: 'friend_added', source: 'line', amount: 100, granted: 124, grantedMiles: 12400, excluded: 0, sortOrder: 1, validUntil: RULE_UNTIL }),
+    mileageEarningRule({ id: 'mer-2', name: '商品を買った', eventType: 'purchase_completed', source: 'stripe', amount: 1, initialStatus: 'pending', granted: 182, grantedMiles: 18200, excluded: 4, sortOrder: 2, validUntil: RULE_UNTIL, draftVersion: 5 }),
+    mileageEarningRule({ id: 'mer-3', name: '紹介した', eventType: 'friend_registered', source: 'tag_referral', amount: 300, granted: 12, grantedMiles: 3600, excluded: 1, sortOrder: 3, validUntil: RULE_UNTIL, draftVersion: 2 }),
+    mileageEarningRule({ id: 'mer-4', name: '回答フォームに答えた', eventType: 'form_submitted', source: 'form', amount: 50, granted: 38, grantedMiles: 1900, excluded: 12, sortOrder: 4, validUntil: RULE_UNTIL, draftVersion: 1 }),
+    mileageEarningRule({ id: 'mer-5', name: '予約した', eventType: 'booking_created', source: 'booking', amount: 100, initialStatus: 'pending', granted: 47, grantedMiles: 4700, excluded: 3, cancellationEventTypes: ['booking_cancelled'], sortOrder: 5, validUntil: RULE_UNTIL, draftVersion: 2 }),
+    mileageEarningRule({ id: 'mer-6', name: '誕生日', eventType: 'birthday', source: null, amount: 200, granted: 0, status: 'stopped', sortOrder: 6, validUntil: RULE_UNTIL, draftVersion: 2 }),
   ],
-  pagination: { total: 9, limit: 20, offset: 0 },
+  pagination: { total: 6, limit: 20, offset: 0 },
   unassignedLegacyCount: 0,
   measuredAt: '2026-08-25T01:00:00.000Z',
 }
 
-/** 機能17の全体履歴。新契約の行に期間集計を添える。 */
+/*
+  機能17の全体履歴。新契約の行に期間集計を添える。並びと数は V8 履歴 `oRbJi` の表（6行：確定待ち・交換・紹介・友だち追加・回答・手で直した取り消し）。
+*/
 export const MILEAGE_HISTORY = {
   items: [
-    ['ml-1', 'friend-1', '高橋 直人', 'grant', 'available', 100, '回答フォームに答えた', 'form', '夏のアンケート', 'automatic', null, '2026-08-25T00:12:00.000Z'],
-    ['ml-2', 'friend-4', '佐藤 千尋', 'spend', 'available', -1000, '使い道と交換した', 'reward', '500円ぶんのクーポン', 'automatic', null, '2026-08-24T09:40:00.000Z'],
-    ['ml-3', 'friend-3', '木村 亮', 'grant', 'available', 500, '紹介の成果が認められた', 'affiliate', '無料体験の申込', 'automatic', '佐々木', '2026-08-24T05:02:00.000Z'],
-    ['ml-4', 'friend-2', '前田 さくら', 'adjustment', 'available', 2000, '手で増やした', 'manual', null, 'manual', '山本', '2026-08-23T02:00:00.000Z'],
-    ['ml-5', 'friend-5', '大西 健一', 'reversal', 'available', -300, '予約が取り消された', 'booking', '予約 #B-204', 'automatic', null, '2026-08-22T07:20:00.000Z'],
-    ['ml-6', 'friend-6', '石田 未来', 'grant', 'available', 100, '友だち登録してくれた', 'line', null, 'automatic', null, '2026-08-22T01:05:00.000Z'],
-    ['ml-7', 'friend-1', '高橋 直人', 'grant', 'available', 10, '配信のリンクを押した', 'broadcast', '夏のご案内', 'automatic', null, '2026-08-21T11:31:00.000Z'],
+    ['ml-1', 'friend-1', 'Kenta Kawano', 'grant', 'pending', 128, '商品を買った', 'stripe', '注文 #10482', 'automatic', null, '2026-09-30T05:12:00.000Z'],
+    ['ml-2', 'friend-2', 'Masato S.', 'spend', 'available', -500, '交換：送料無料クーポン', 'reward', null, 'automatic', null, '2026-09-30T02:05:00.000Z'],
+    ['ml-3', 'friend-3', '菅野 亮', 'grant', 'available', 300, '紹介した（山田 花子さん）', 'tag_referral', null, 'automatic', null, '2026-09-29T09:40:00.000Z'],
+    ['ml-4', 'friend-4', '山田 太郎', 'grant', 'available', 100, '友だち追加', 'friend_add_routing', null, 'automatic', null, '2026-09-29T01:21:00.000Z'],
+    ['ml-5', 'friend-5', '坂本 真人', 'grant', 'available', 50, '回答フォームに答えた', 'form', '来店アンケート', 'automatic', null, '2026-09-28T11:02:00.000Z'],
+    ['ml-6', 'friend-6', '田中 花子', 'adjustment', 'available', -80, '取り消し：注文 #10422', 'manual', '注文 #10422', 'manual', 'オーナー', '2026-09-28T00:15:00.000Z'],
   ].map(([
     id, primaryFriendId, displayName, entryType, status, amount, reason, source,
     sourceReferenceId, mode, executedByStaffName, occurredAt,
@@ -5015,16 +5021,16 @@ export const MILEAGE_HISTORY = {
     id, primaryFriendId, displayName, pictureUrl: null, entryType, status, amount, reason, source,
     hasSourceEvent: sourceReferenceId !== null, sourceReferenceId,
     ruleName: reason, mode, executedByStaffName, occurredAt,
-    lineAccountName: primaryFriendId === 'friend-3' || primaryFriendId === 'friend-6' ? 'LINE 二号店' : 'LINE 本店',
-    balanceAfter: ({ 'ml-1': 8420, 'ml-2': 2480, 'ml-3': 3900, 'ml-4': 6150, 'ml-5': 620, 'ml-6': 100, 'ml-7': 8320 })[id],
+    lineAccountName: primaryFriendId === 'friend-3' || primaryFriendId === 'friend-6' ? '然 渋谷店' : '然 本店',
+    balanceAfter: ({ 'ml-1': 2340, 'ml-2': 1820, 'ml-3': 1560, 'ml-4': 640, 'ml-5': 450, 'ml-6': 200 })[id],
   })),
-  pagination: { total: 4180, limit: 20, offset: 0 },
+  pagination: { total: 1245, limit: 20, offset: 0 },
   summary: {
     from: '2026-08-01',
     to: '2026-08-25',
     byType: [
-      { entryType: 'grant', count: 4122, amount: 32400 },
-      { entryType: 'spend', count: 55, amount: -18900 },
+      { entryType: 'grant', count: 1206, amount: 40800 },
+      { entryType: 'spend', count: 36, amount: -33100 },
       { entryType: 'reversal', count: 3, amount: -900 },
     ],
     totalAmount: 12600,
