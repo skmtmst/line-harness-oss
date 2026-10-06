@@ -48,6 +48,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import FolderPanel from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -286,6 +287,12 @@ function FriendAddList() {
     setPerPage(next)
     resetCursor()
   }
+
+  /*
+   * 行の名前の前の丸は、左のフォルダの列と同じフォルダを名前で引く（設定はフォルダを名前で持つ）。
+   * この口はフォルダの色を返さないので、丸は色の無いフォルダの灰になる。無ければ未分類の輪。
+   */
+  const folderDotOf = (name: string | null | undefined) => (name ? { name } : null)
 
   /* フォルダ欄の件数はサーバの全ページ合計 (folderCounts)。 */
   const folders = useMemo(() => {
@@ -713,8 +720,10 @@ function FriendAddList() {
                     </span>
                   </Td>
                   <Td className={styles.colName}>
-                    <Link href={editHref(rule.id)} title={rule.name} className={styles.name}>{rule.name}</Link>
-                    <span className={styles.sub} title={rule.routeNames.join('、') || '未選択'}>
+                    <FolderDotName folder={folderDotOf(rule.folderName)}>
+                      <Link href={editHref(rule.id)} title={rule.name} className={styles.name}>{rule.name}</Link>
+                    </FolderDotName>
+                    <span className={`${styles.sub} ${styles.nameSub}`} title={rule.routeNames.join('、') || '未選択'}>
                       <Link2 size={12} aria-hidden="true" />
                       <span className={styles.subText}>{rule.routeNames.join('、') || '未選択'}</span>
                     </span>
@@ -735,8 +744,10 @@ function FriendAddList() {
                     </span>
                   </Td>
                   <Td className={styles.colName}>
-                    <Link href={editHref(sinkRule.id)} title={sinkRule.name} className={styles.name}>{sinkRule.name}</Link>
-                    <span className={styles.sub} title={SINK_NOTE}>
+                    <FolderDotName folder={folderDotOf(sinkRule.folderName)}>
+                      <Link href={editHref(sinkRule.id)} title={sinkRule.name} className={styles.name}>{sinkRule.name}</Link>
+                    </FolderDotName>
+                    <span className={`${styles.sub} ${styles.nameSub}`} title={SINK_NOTE}>
                       <CircleHelp size={12} aria-hidden="true" />
                       <span className={styles.subText}>{SINK_NOTE}</span>
                     </span>
