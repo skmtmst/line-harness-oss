@@ -1,9 +1,10 @@
 @layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
 
 /*
- * ★V8-B Googleビジネス（板 `j0Wcg`）。
- * 口コミタブだけのV8。頭（店舗を選ぶ欄）・タブ・数4・道具の段・表・足元の帯。
- * 投稿・パフォーマンス・プロフィール・設定タブと下書き画面は今の作り（v7）のまま。
+ * ★V8-B Googleビジネス（板 `j0Wcg`＋子板6枚）。
+ * 外枠（頭の店舗を選ぶ欄・タブ・数4）は全部のタブで同じ。
+ * この板の中身は口コミタブの分：道具の段・表・足元の帯。
+ * 他のタブの中身はデータの口が同じ v7 を外枠なしで入れる。
  */
 .tabs {
   display: flex;
@@ -28,6 +29,12 @@
   color: var(--color-ink);
   font-weight: 600;
   border-bottom-color: var(--color-ink);
+}
+
+/* 未接続のときは設定タブ以外を押せない（v7 と同じ）。 */
+.tab:disabled {
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
 }
 
 .toolbar {

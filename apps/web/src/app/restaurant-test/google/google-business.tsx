@@ -81,15 +81,20 @@ function replyBadge(review: GoogleReview): { label: string; tone: StatusBadgeTon
   return { label: '未返信', tone: 'warning' }
 }
 
-export default function GoogleBusinessPage() {
+/**
+ * `embedded` のとき：外枠（枠線の箱・上のタブ・内側の余白）を出さず、中身だけを返す。
+ * V8 の外枠（見出し・帯・タブ・数の並び）は `../v8/google.tsx` が持っているので、
+ * そこに入れるときは二重に出さないため。
+ */
+export default function GoogleBusinessPage({ embedded = false }: { embedded?: boolean }) {
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <GoogleBusinessInner />
+      <GoogleBusinessInner embedded={embedded} />
     </Suspense>
   )
 }
 
-function GoogleBusinessInner() {
+function GoogleBusinessInner({ embedded = false }: { embedded?: boolean }) {
   usePageTitle('Googleビジネス')
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const searchParams = useSearchParams()
@@ -177,12 +182,10 @@ function GoogleBusinessInner() {
   const performanceNode = tab === 'performance' && connected ? PERFORMANCE_DESIGN_NODES.performance : null
   const panelNode = profileNode ?? postsNode ?? performanceNode ?? designNode
 
-  return (
-    <section className="border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border" data-design-node={panelNode}>
-      <GoogleBusinessTabs items={tabItems} mapsUrl={connected ? data.connection.locationMapsUrl : null} />
-      <div className="border-hairline border-t p-5 sm:p-6 lg:p-8">
-        {banner && data.connection.status !== 'pending_location' ? <NoteBar tone={banner.tone} className="mb-4" action={<button type="button" className="text-sm font-semibold" onClick={() => setBanner(null)}>閉じる</button>}>{banner.text}</NoteBar> : null}
-        {reviewEditorOpen && reviewId ? (
+  const inner = (
+    <>
+      {banner && data.connection.status !== 'pending_location' ? <NoteBar tone={banner.tone} className="mb-4" action={<button type="button" className="text-sm font-semibold" onClick={() => setBanner(null)}>閉じる</button>}>{banner.text}</NoteBar> : null}
+      {reviewEditorOpen && reviewId ? (
           <ReviewDraftScreen accountId={selectedAccountId} reviewId={reviewId} data={data} canPublish={canPublish} backHref="/restaurant-test/google?tab=reviews" onPublished={() => { void load() }} />
         ) : profileView === 'hours' ? (
           <HoursEditor accountId={selectedAccountId} mode={hoursMode} initialDate={searchParams.get('date')} go={go} />
@@ -207,7 +210,16 @@ function GoogleBusinessInner() {
         ) : (
           <ReviewsTab accountId={selectedAccountId} data={data} canPublish={canPublish} onOpen={(id) => go({ tab: 'reviews', view: 'draft', id })} onSynced={() => { void load() }} />
         )}
-      </div>
+    </>
+  )
+
+  // V8 の外枠の中に入れるときは、中身だけ。板の印は V8 側の外枠が付ける。
+  if (embedded) return <div className="text-ink min-w-0">{inner}</div>
+
+  return (
+    <section className="border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border" data-design-node={panelNode}>
+      <GoogleBusinessTabs items={tabItems} mapsUrl={connected ? data.connection.locationMapsUrl : null} />
+      <div className="border-hairline border-t p-5 sm:p-6 lg:p-8">{inner}</div>
     </section>
   )
 }

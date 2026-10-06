@@ -3,25 +3,29 @@
 /*
  * ★V8-B Googleビジネス（板 `j0Wcg`＋子板6枚）。
  *
- * 口コミタブだけをV8の板に積み替える。データの口（一覧・絞り込み・並び順・
- * 同期・下書き画面への行き先）は v7（google-business.tsx）と同じ。
- * 投稿・パフォーマンス・プロフィール・設定タブと返信作成の画面は今の作りのまま
- * v7 を出す（V8 完成までの二重管理）。子板の印は V8 の外枠に付ける：
+ * 外枠（見出し・店舗の選び・検証環境の帯・タブ・数の並び）は V8 の板のとおりで、
+ * 全部のタブで同じものを出す（`GoogleShell`）。板6枚の中身 V8 はどれも
+ * 「帯／タブ／数の並び／中身」の同じ積み方なので、外枠を1つにまとめている。
+ * 口コミタブの中身（絞り込み・表・ページ送り）は V8 に積み替え済み。
+ * 投稿・パフォーマンス・プロフィール・設定タブと返信作成・投稿作成の中身は、
+ * データの口が同じ v7（google-business.tsx）を外枠なし（`embedded`）で入れる。
+ * 子板の印は V8 の外枠に付ける：
  * - `SrmVs` パフォーマンス：?tab=performance
  * - `JUTGz` プロフィール：?tab=profile（営業時間・変更履歴の状態を含む）
  * - `Cfed0` 投稿：?tab=posts（view なしの一覧）
  * - `T1j2Sw` 投稿を作る：?tab=posts&view=new|edit|confirm
  * - `CuHXG` 設定：?tab=settings（未接続のときも設定タブなので同じ印）
  * - `x9HIR` 返信を作る：?tab=reviews&view=draft
- * 見た目の V8 化（タブの中身の積み替え）は別段でやる。共通部品そのものは
- * 仕上げ係 M10 だけが変える。
+ * 共通部品そのものは仕上げ係 M10 だけが変える。
+ * 板に無いものは出さない：タブの右にあった「Google マップで見る」は V8 の板に
+ * 無いので外枠には置かない（返信を作る画面の中には今までどおり出る）。
  *
  * 見本と今の作りが合わない所（API が無い所は作らず。今の形のまま）：
  * - 「Google経由の予約」の数：結ぶ口が無いので「—」にする。
  * - 平均の評価の「この30日・24件」：期間別の集計が無いので、接続の
  *   平均と取得済みの件数を出す。
  */
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Star } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
@@ -90,9 +94,90 @@ function replyBadge(review: GoogleReview): { label: string; tone: StatusBadgeTon
   return { label: '未返信', tone: 'warning' }
 }
 
-function GoogleReviewsBoard({ data, stores }: { data: GoogleConnectionData; stores: RestaurantStore[] }) {
+/**
+ * 板6枚で共通の外枠。見出し・店舗の選び・検証環境の帯・タブ・数の並び。
+ * 中身（`children`）だけがタブごとに変わる。
+ * 数の並びは結ぶ口がある所だけ数字を出し、無い所は「—」にする。
+ */
+function GoogleShell({
+  node,
+  data,
+  stores,
+  tab,
+  connected,
+  children,
+}: {
+  node: string
+  data: GoogleConnectionData
+  stores: RestaurantStore[]
+  tab: TabKey
+  connected: boolean
+  children: ReactNode
+}) {
   const router = useRouter()
   const { selectedAccountId, setSelectedAccountId } = useAccount()
+  const accountId = selectedAccountId ?? ''
+  const { connection } = data
+  const currentStoreId = stores.find((item) => item.line_account_id === accountId)?.id
+    ?? stores.find((item) => item.id === data.store.id)?.id ?? ''
+  const average = connection.averageRating
+  const reviewTotal = connection.totalReviewCount ?? data.summary.storedCount
+
+  const goTab = (next: TabKey) => {
+    router.push(`/restaurant-test/google${next === 'reviews' ? '' : `?tab=${next}`}`)
+  }
+
+  return (
+    <div data-design-node={node}>
+      <div className={shellStyles.head}>
+        <div className={shellStyles.headText}>
+          <h1 className={shellStyles.headTitle}>Googleビジネス</h1>
+          <p className={shellStyles.headDescription}>Googleの口コミ・投稿・営業時間を、店舗ごとに管理します。</p>
+        </div>
+        {stores.length > 0 ? (
+          <Select
+            aria-label="店舗を選ぶ"
+            className={shellStyles.storePicker}
+            value={currentStoreId}
+            onChange={(value) => {
+              const next = stores.find((item) => item.id === value)
+              if (next?.line_account_id && next.line_account_id !== accountId) setSelectedAccountId(next.line_account_id)
+            }}
+            options={stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` }))}
+          />
+        ) : null}
+      </div>
+      <div className={shellStyles.body}>
+        <BoundaryBanner />
+        <nav className={styles.tabs} aria-label="Googleビジネスの機能">
+          {(Object.keys(TAB_LABELS) as TabKey[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={styles.tab}
+              aria-selected={key === tab}
+              disabled={!connected && key !== 'settings'}
+              onClick={() => goTab(key)}
+            >
+              {TAB_LABELS[key]}{key === 'reviews' && connected ? ` ${data.summary.storedCount}` : ''}
+            </button>
+          ))}
+        </nav>
+        <div className={shellStyles.stats}>
+          <Stat label="未返信" value={`${data.summary.unrepliedCount}`} note="返信を待っている口コミ" warning={data.summary.unrepliedCount > 0} />
+          <Stat label="平均の評価" value={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} note={`この30日・${reviewTotal}件`} />
+          <Stat label="要確認" value={`${data.summary.attentionCount}`} note="評価2以下" warning={data.summary.attentionCount > 0} />
+          <Stat label="Google経由の予約" value="—" note="この30日" />
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function GoogleReviewsBoard({ data, stores }: { data: GoogleConnectionData; stores: RestaurantStore[] }) {
+  const router = useRouter()
+  const { selectedAccountId } = useAccount()
   const [filter, setFilter] = useState<GoogleReviewFilter>('all')
   const [rating, setRating] = useState('')
   const [order, setOrder] = useState<GoogleReviewOrder>('newest')
@@ -152,56 +237,10 @@ function GoogleReviewsBoard({ data, stores }: { data: GoogleConnectionData; stor
   }, [connection.status, data.summary.syncStale, sync, syncedOnce])
 
   const pageCount = list ? Math.max(1, Math.ceil(list.total / list.perPage)) : 1
-  const currentStoreId = stores.find((item) => item.line_account_id === accountId)?.id
-    ?? stores.find((item) => item.id === data.store.id)?.id ?? ''
-  const average = connection.averageRating
-  const reviewTotal = connection.totalReviewCount ?? data.summary.storedCount
-
-  const goTab = (tab: TabKey) => {
-    router.push(`/restaurant-test/google${tab === 'reviews' ? '' : `?tab=${tab}`}`)
-  }
 
   return (
-    <div data-design-node="j0Wcg">
-      <div className={shellStyles.head}>
-        <div className={shellStyles.headText}>
-          <h1 className={shellStyles.headTitle}>Googleビジネス</h1>
-          <p className={shellStyles.headDescription}>Googleの口コミ・投稿・営業時間を、店舗ごとに管理します。</p>
-        </div>
-        {stores.length > 0 ? (
-          <Select
-            aria-label="店舗を選ぶ"
-            className={shellStyles.storePicker}
-            value={currentStoreId}
-            onChange={(value) => {
-              const next = stores.find((item) => item.id === value)
-              if (next?.line_account_id && next.line_account_id !== accountId) setSelectedAccountId(next.line_account_id)
-            }}
-            options={stores.map((item) => ({ value: item.id, label: `店舗：${item.name}` }))}
-          />
-        ) : null}
-      </div>
-      <div className={shellStyles.body}>
-        <BoundaryBanner />
-        <nav className={styles.tabs} aria-label="Googleビジネスの機能">
-          {(Object.keys(TAB_LABELS) as TabKey[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              className={styles.tab}
-              aria-selected={key === 'reviews'}
-              onClick={() => goTab(key)}
-            >
-              {TAB_LABELS[key]}{key === 'reviews' ? ` ${data.summary.storedCount}` : ''}
-            </button>
-          ))}
-        </nav>
-        <div className={shellStyles.stats}>
-          <Stat label="未返信" value={`${data.summary.unrepliedCount}`} note="返信を待っている口コミ" warning={data.summary.unrepliedCount > 0} />
-          <Stat label="平均の評価" value={average === null || average === undefined ? '—' : `${Math.round(average * 10) / 10}`} note={`この30日・${reviewTotal}件`} />
-          <Stat label="要確認" value={`${data.summary.attentionCount}`} note="評価2以下" warning={data.summary.attentionCount > 0} />
-          <Stat label="Google経由の予約" value="—" note="この30日" />
-        </div>
+    <GoogleShell node="j0Wcg" data={data} stores={stores} tab="reviews" connected>
+      <>
         <div className={styles.toolbar}>
           <span className={styles.toolbarSearch}>
             <SearchField placeholder="口コミを探す" aria-label="口コミを探す" value={search} onChange={setSearch} onClear={() => setSearch('')} />
@@ -266,8 +305,8 @@ function GoogleReviewsBoard({ data, stores }: { data: GoogleConnectionData; stor
           </>
         ) : null}
         <p className={styles.footNote}>返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。</p>
-      </div>
-    </div>
+      </>
+    </GoogleShell>
   )
 }
 
@@ -324,13 +363,15 @@ function GoogleV8Inner() {
     return <ListState kind="empty" title="LINE公式アカウントを選んでください" description={accounts.length ? '上のバーで店舗のLINEアカウントを選ぶと表示します。' : '先にLINE公式アカウントを登録してください。'} />
   }
   if (error || !data) return <ListState kind="error" title="Googleビジネスを表示できませんでした" description={error} onRetry={() => void load()} />
-  // 口コミタブ以外・下書きの画面・未接続は今の作り（v7）のまま出す。
-  // 外枠に子板の印を付ける（中身の V8 化は別段）。
+  // 口コミタブ以外・下書きの画面・未接続も、外枠は口コミタブと同じ V8 にする。
+  // 中身だけ v7（外枠なし）を入れる。外枠に子板の印を付ける。
   if ((tab && tab !== 'reviews') || view || !connected) {
+    // 未接続のとき v7 は設定の中身を出すので、選んでいるタブも設定に合わせる。
+    const shellTab: TabKey = !connected ? 'settings' : tab && tab in TAB_LABELS ? (tab as TabKey) : 'reviews'
     return (
-      <div data-design-node={googleFallbackNode(tab, view, connected)}>
-        <GoogleBusinessPage />
-      </div>
+      <GoogleShell node={googleFallbackNode(tab, view, connected)} data={data} stores={stores} tab={shellTab} connected={connected}>
+        <GoogleBusinessPage embedded />
+      </GoogleShell>
     )
   }
   return <GoogleReviewsBoard data={data} stores={stores} />

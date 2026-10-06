@@ -16,8 +16,10 @@ vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { snapshot: fix
 vi.mock('@/lib/restaurant-google-api', () => ({
   restaurantGoogleApi: { connection: fixture.connection },
 }))
-// 中身（v7）は置き換え、外枠の板IDだけを確かめる。
-vi.mock('../google/google-business', () => ({ default: () => <div>フォールバック画面</div> }))
+// 中身（v7）は置き換え、外枠（V8）だけを確かめる。外枠なしで呼ばれていることも見る。
+vi.mock('../google/google-business', () => ({
+  default: ({ embedded = false }: { embedded?: boolean }) => <div>{embedded ? '中身だけ' : '外枠つき'}</div>,
+}))
 
 import GoogleV8 from './google'
 
@@ -42,34 +44,60 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
+/** 外枠（V8）が出ていて、選んでいるタブが合っていることを見る。 */
+function expectShell(selectedLabel: string) {
+  // 見出し・検証環境の帯
+  expect(screen.getByRole('heading', { name: 'Googleビジネス' })).not.toBeNull()
+  expect(screen.getByText('検証環境専用')).not.toBeNull()
+  // タブは5つで、選んでいるものは1つだけ
+  const tabs = screen.getByRole('navigation', { name: 'Googleビジネスの機能' })
+  const buttons = Array.from(tabs.querySelectorAll('button'))
+  expect(buttons.map((button) => button.textContent?.replace(/\s+\d+$/, ''))).toEqual([
+    '口コミ', '投稿', 'パフォーマンス', 'プロフィール', '設定',
+  ])
+  const selected = buttons.filter((button) => button.getAttribute('aria-selected') === 'true')
+  expect(selected).toHaveLength(1)
+  expect(selected[0]?.textContent?.replace(/\s+\d+$/, '')).toBe(selectedLabel)
+  // 数の並びは4つ
+  for (const label of ['未返信', '平均の評価', '要確認', 'Google経由の予約']) {
+    expect(screen.getByText(label)).not.toBeNull()
+  }
+}
+
 /*
  * Googleビジネス子板6枚の契約。タブ・状態ごとに外枠の板IDが出ることを固定する。
- * 中身は今の作り（v7）のまま。
+ * 外枠（見出し・帯・タブ・数4）は口コミタブと同じものを全部のタブで出す。
+ * 中身は今の作り（v7）を外枠なし（embedded）で入れる。
  */
 describe('Googleビジネス子板の印', () => {
   it.each([
-    ['performance', null, 'SrmVs'],
-    ['profile', null, 'JUTGz'],
-    ['profile', 'hours', 'JUTGz'],
-    ['posts', null, 'Cfed0'],
-    ['posts', 'new', 'T1j2Sw'],
-    ['posts', 'confirm', 'T1j2Sw'],
-    ['settings', null, 'CuHXG'],
-    ['reviews', 'draft', 'x9HIR'],
-  ])('tab=%s view=%s → %s', async (tab, view, node) => {
+    ['performance', null, 'SrmVs', 'パフォーマンス'],
+    ['profile', null, 'JUTGz', 'プロフィール'],
+    ['profile', 'hours', 'JUTGz', 'プロフィール'],
+    ['posts', null, 'Cfed0', '投稿'],
+    ['posts', 'new', 'T1j2Sw', '投稿'],
+    ['posts', 'confirm', 'T1j2Sw', '投稿'],
+    ['settings', null, 'CuHXG', '設定'],
+    ['reviews', 'draft', 'x9HIR', '口コミ'],
+  ])('tab=%s view=%s → %s', async (tab, view, node, selectedLabel) => {
     search.tab = tab
     search.view = view
     render(<GoogleV8 />)
-    await screen.findByText('フォールバック画面')
+    await screen.findByText('中身だけ')
     expect(document.querySelector(`[data-design-node="${node}"]`)).not.toBeNull()
+    expectShell(selectedLabel)
   })
 
-  it('未接続は設定の印 CuHXG', async () => {
+  it('未接続は設定の印 CuHXG・設定タブ以外は押せない', async () => {
     search.tab = null
     search.view = null
     fixture.connection.mockResolvedValue({ ...connectionData, connection: { ...connectionData.connection, status: 'new' } })
     render(<GoogleV8 />)
-    await screen.findByText('フォールバック画面')
+    await screen.findByText('中身だけ')
     expect(document.querySelector('[data-design-node="CuHXG"]')).not.toBeNull()
+    expectShell('設定')
+    const tabs = screen.getByRole('navigation', { name: 'Googleビジネスの機能' })
+    const disabled = Array.from(tabs.querySelectorAll('button')).filter((button) => button.hasAttribute('disabled'))
+    expect(disabled.map((button) => button.textContent)).toEqual(['口コミ', '投稿', 'パフォーマンス', 'プロフィール'])
   })
 })
