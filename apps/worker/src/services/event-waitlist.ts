@@ -566,7 +566,7 @@ export async function cancelMyEventWaitlist(
         params.waitlistId, params.lineAccountId, row.version + 1, now),
     db.prepare(`UPDATE event_slots SET version = version + 1, updated_at = ?
       WHERE id = (SELECT slot_id FROM event_waitlist WHERE id = ?)
-        AND EXISTS (SELECT 1 FROM event_waitlist_promotion_jobs WHERE id = ?)` )
+        AND EXISTS (SELECT 1 FROM event_waitlist_promotion_jobs WHERE id = ?)`)
       .bind(now, params.waitlistId, jobId),
   ]);
   return (results[0].meta?.changes ?? 0) > 0 ? 'cancelled' : 'conflict';

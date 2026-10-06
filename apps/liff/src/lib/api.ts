@@ -1,6 +1,8 @@
 import type { FormLayout } from '@line-crm/shared';
 import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
+import type { WebinarAudience } from '@line-crm/shared';
 export type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
+export type { WebinarAudience } from '@line-crm/shared';
 import { buildFormSubmitHeaders, toFormIdempotencyKey } from '@line-crm/shared';
 import { getIdToken, getLiffId } from './liff-auth.js';
 import type { LiffLookApiSettings } from './liff-look.js';
@@ -429,6 +431,8 @@ export const api = {
 
   // ===== Webinar =====
   webinarState: (slug: string) => get<WebinarState>(`/api/liff/webinars/${slug}`),
+  webinarAudience: (slug: string) =>
+    get<WebinarAudience>(`/api/liff/webinars/${encodeURIComponent(slug)}/audience`),
   webinarHeartbeat: (
     slug: string,
     sessionStartAt: number,

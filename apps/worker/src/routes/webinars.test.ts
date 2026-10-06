@@ -119,6 +119,11 @@ const accountAccessMock = {
 };
 vi.mock('../services/account-access.js', () => accountAccessMock);
 
+const audienceMock = vi.hoisted(() => ({ countRecentWebinarViewers: vi.fn(async () => 0) }));
+vi.mock('../services/webinar-audience.js', () => ({
+  ...audienceMock, WEBINAR_AUDIENCE_WINDOW_SECONDS: 60,
+}));
+
 const { webinarRoutes } = await import('./webinars.js');
 const { signWebinarToken } = await import('../lib/webinar-token.js');
 
@@ -177,6 +182,8 @@ function adminReq(path: string, init?: RequestInit) {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  audienceMock.countRecentWebinarViewers.mockClear();
+  audienceMock.countRecentWebinarViewers.mockResolvedValue(0);
   vi.useFakeTimers();
   // ライブ開始3分後（予約済み本人が途中参加できる5分窓内）
   vi.setSystemTime(new Date((SESSION_START + 180) * 1000));
@@ -2459,5 +2466,55 @@ describe('webinar published mutations role guard (D001)', () => {
     }, env, execCtx);
 
     expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/liff/webinars/:slug/audience', () => {
+  test('現在回を予約した本人に視聴人数と未設定の講師名を返す', async () => {
+    audienceMock.countRecentWebinarViewers.mockResolvedValue(2);
+    const res = await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      live: true, sessionStartAt: SESSION_START, viewerCount: 2, activeWindowSeconds: 60, lecturerName: null,
+    });
+    expect(audienceMock.countRecentWebinarViewers).toHaveBeenCalledWith(env.DB, 'w1', SESSION_START, SESSION_START + 180);
+  });
+  test('開始前と終了後は未取得のnullを返す', async () => {
+    for (const offset of [-1, 7200]) {
+      vi.setSystemTime((SESSION_START + offset) * 1000);
+      const res = await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } });
+      expect(await res.json()).toMatchObject({ live: false, sessionStartAt: null, viewerCount: null });
+    }
+    expect(audienceMock.countRecentWebinarViewers).not.toHaveBeenCalled();
+  });
+  test('未予約者には配信中でも人数を返さない', async () => {
+    dbMocks.getWebinarRegistration.mockResolvedValue(null);
+    const res = await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } });
+    expect(await res.json()).toMatchObject({ live: false, viewerCount: null });
+    expect(audienceMock.countRecentWebinarViewers).not.toHaveBeenCalled();
+  });
+  test('オンデマンドは共通の回を数え、外部配信は未取得', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar({ created_at: new Date(SESSION_START * 1000).toISOString() }));
+    dbMocks.getWebinarEditorSettings.mockResolvedValue({ delivery_kind: 'on_demand' });
+    expect(await (await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } })).json())
+      .toMatchObject({ live: true, sessionStartAt: SESSION_START, viewerCount: 0 });
+    dbMocks.getWebinarEditorSettings.mockResolvedValue({ delivery_kind: 'external' });
+    expect(await (await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } })).json())
+      .toMatchObject({ live: false, viewerCount: null });
+  });
+  test('未認証・所属外・非公開のウェビナーを拒否する', async () => {
+    authMock.verifyCallerLineUserId.mockResolvedValue(null);
+    expect((await req('/api/liff/webinars/test-webinar/audience')).status).toBe(401);
+    authMock.verifyCallerLineUserId.mockResolvedValue('U123');
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
+    expect((await req('/api/liff/webinars/test-webinar/audience')).status).toBe(403);
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue({ id: 'friend-1' });
+    dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar({ status: 'draft' }));
+    expect((await req('/api/liff/webinars/test-webinar/audience')).status).toBe(404);
+  });
+  test('公開期間外なら予約者にも人数を返さない', async () => {
+    dbMocks.getWebinarBySlug.mockResolvedValue(makeWebinar({ publication_ends_at: new Date(SESSION_START * 1000).toISOString() }));
+    expect((await req('/api/liff/webinars/test-webinar/audience', { headers: { Authorization: 'Bearer t' } })).status).toBe(404);
+    expect(audienceMock.countRecentWebinarViewers).not.toHaveBeenCalled();
   });
 });

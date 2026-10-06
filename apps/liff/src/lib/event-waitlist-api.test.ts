@@ -26,4 +26,12 @@ describe('イベント待ちのAPI呼び出し', () => {
     expect(new URL(String(calls[2][0])).pathname).toBe('/api/liff/events/me/waitlist/%E5%BE%85%E3%81%A1%2F1/cancel');
     expect(calls[2][1]).toMatchObject({ method: 'POST', body: '{}' });
   });
+  test('ウェビナーの人数取得は視聴状態とは別の口を読む', async () => {
+    vi.stubGlobal('window', { location: { origin: 'https://example.test' } });
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ viewerCount: 2, lecturerName: null })));
+    vi.stubGlobal('fetch', fetcher);
+    expect(await api.webinarAudience('試験/配信')).toEqual({ viewerCount: 2, lecturerName: null });
+    const [url] = fetcher.mock.calls[0] as unknown as [string];
+    expect(new URL(url).pathname).toBe('/api/liff/webinars/%E8%A9%A6%E9%A8%93%2F%E9%85%8D%E4%BF%A1/audience');
+  });
 });
