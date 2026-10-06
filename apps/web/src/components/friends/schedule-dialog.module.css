@@ -66,3 +66,9 @@
   gap: var(--tpl-footer-gap);
   width: 100%;
 }
+
+/* 送るものの欄（絵：高さ 96）。 */
+.textBox :global(textarea) {
+  height: var(--tpl-hb2-sd-text-h);
+  min-height: 0;
+}

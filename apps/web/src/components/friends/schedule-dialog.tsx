@@ -133,13 +133,15 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
       <div className={styles.body}>
         <div className={styles.group}>
           <p className={styles.label}>送るもの</p>
-          <TextArea
-            aria-label="送るもの"
-            rows={3}
-            value={content}
-            onChange={(event) => setContent(event.target.value)}
-            placeholder="送る文を書きます"
-          />
+          <div className={styles.textBox}>
+            <TextArea
+              aria-label="送るもの"
+              rows={3}
+              value={content}
+              onChange={(event) => setContent(event.target.value)}
+              placeholder="送る文を書きます"
+            />
+          </div>
           <div className={styles.row}>
             <Button
               ref={templateAnchor}
