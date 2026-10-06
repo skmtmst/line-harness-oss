@@ -58,24 +58,40 @@ describe('★V8 設定の中のメニュー', () => {
 
   afterEach(() => cleanup())
 
-  it('絵の並びで出す：LINEアカウント・ログインユーザー・はじめの設定・機能設定・運用状態・専用', async () => {
+  // 2026-10-06：設定の板（ihjfd ほか 8 枚）の並びへ。見出し「設定」・印つき・プール管理あり・「専用」の小見出しなし。
+  it('絵の並びで出す：はじめの設定・LINEアカウント・プール管理・ログインユーザー・機能設定・運用状態・EC連携・LINE通知', async () => {
+    fixture.visibility.mockResolvedValue({
+      success: true,
+      data: { features: { ec_commerce: true, line_notifications: true, multi_store_hierarchy: true } },
+    })
     const view = render(<SettingsInnerNav />)
-    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    await waitFor(() => expect(view.queryByRole('link', { name: 'プール管理' })).toBeTruthy())
     const links = view.getAllByRole('link').map((link) => link.textContent)
     expect(links).toEqual([
-      'LINEアカウント',
-      'ログインユーザー',
       'はじめの設定',
+      'LINEアカウント',
+      'プール管理',
+      'ログインユーザー',
       '機能設定',
+      // 機能設定を開いているときだけ下の2つを出す（絵には無いが、ここからしか行けない）
       'マニュアルの正本表',
       'ファイルの検査',
       '運用状態',
       'EC連携',
       'LINE通知',
     ])
-    expect(view.getByText('専用')).toBeTruthy()
+    expect(view.getByText('設定')).toBeTruthy()
+    expect(view.queryByText('専用')).toBeNull()
     // 「会社とロゴ」は API ができるまで出さない
     expect(view.queryByText('会社とロゴ')).toBeNull()
+  })
+
+  it('機能設定の下の2つは、ほかの設定の画面では出さない', async () => {
+    fixture.pathname = '/accounts'
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: 'マニュアルの正本表' })).toBeNull()
+    expect(view.getByRole('link', { name: 'LINEアカウント' }).className).toContain('itemActive')
   })
 
   it('いまの画面は選ばれた形（aria ではなく className の薄い地）になる', async () => {
