@@ -612,6 +612,7 @@
   --tpl-large-title-size: 22px; --tpl-large-title-lh: 33px; --tpl-large-gap: 16px;
   --tpl-create-title-size: 22px; --tpl-create-title-lh: 32px;
   --tpl-create-desc-size: 12px; --tpl-create-desc-lh: 17px;
+  /* 予約設定（src/v8/booking-menus）の寸法。絵 owaS3・yRPxl・KRgTQ・x1OZS6・QqER7・ooufy の書き出しの値。 */ --tpl-bm-1: 1px; --tpl-bm-2: 2px; --tpl-bm-3: 3px; --tpl-bm-4: 4px; --tpl-bm-5: 5px; --tpl-bm-6: 6px; --tpl-bm-7: 7px; --tpl-bm-8: 8px; --tpl-bm-9: 9px; --tpl-bm-10: 10px; --tpl-bm-11: 11px; --tpl-bm-11-5: 11.5px; --tpl-bm-12: 12px; --tpl-bm-13: 13px; --tpl-bm-14: 14px; --tpl-bm-15: 15px; --tpl-bm-16: 16px; --tpl-bm-17: 17px; --tpl-bm-18: 18px; --tpl-bm-19: 19px; --tpl-bm-20: 20px; --tpl-bm-21: 21px; --tpl-bm-22: 22px; --tpl-bm-24: 24px; --tpl-bm-26: 26px; --tpl-bm-28: 28px; --tpl-bm-29: 29px; --tpl-bm-30: 30px; --tpl-bm-32: 32px; --tpl-bm-35: 35px; --tpl-bm-36: 36px; --tpl-bm-40: 40px; --tpl-bm-44: 44px; --tpl-bm-46: 46px; --tpl-bm-48: 48px; --tpl-bm-49: 49px; --tpl-bm-56: 56px; --tpl-bm-64: 64px; --tpl-bm-70: 70px; --tpl-bm-72: 72px; --tpl-bm-84: 84px; --tpl-bm-88: 88px; --tpl-bm-96: 96px; --tpl-bm-110: 110px; --tpl-bm-120: 120px; --tpl-bm-150: 150px; --tpl-bm-160: 160px; --tpl-bm-200: 200px; --tpl-bm-220: 220px; --tpl-bm-280: 280px; --tpl-bm-330: 330px; --tpl-bm-380: 380px; --tpl-bm-714: 714px;
   /* 作る画面の右の列の箱（K7HWG「右の箱 設定内容」）と、本文の小さい文字の行の高さ */
   /* タブ（画面の板 72 枚が 高さ28・文字の下10。部品見本 clV5c の 35 は少数） */
   --tpl-preview-title-size: 15px; --tpl-preview-title-lh: 23px;
