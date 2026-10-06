@@ -3904,7 +3904,8 @@ export const AUTO_REPLIES = [
     responseWeekdays: [0, 1, 2, 3, 4, 5, 6], respondToAll: true,
     actions: [{ actionType: 'support_mark' }],
     keywords: [], hits: { period: 214, total: 1842 },
-    actionExecutionCount: 86, conflictAttentionCount: 1,
+    // 絵 uE9gf：1行目（営業時間外）には「重なり」の札が無い。要確認の数（3）は別の口（集計）から出る。
+    actionExecutionCount: 86, conflictAttentionCount: 0,
     createdAt: '2026-03-04T00:00:00.000Z',
   },
   {

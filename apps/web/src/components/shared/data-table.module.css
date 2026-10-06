@@ -163,7 +163,11 @@
 
 
 [data-theme='v8'] .bodyCell {
-  border-bottom: 1px solid var(--color-divider); font-size: 13px; line-height: 20px;
+  /*
+   * 行の下の線は行の内側に描く（絵：線を含めて1行 62）。border だと1行ごとに 1px 増えて
+   * 下へ行くほどずれ、しかも読み込み順で Tailwind の border:0 に負けて線ごと消える画面があった。
+   */
+  border-bottom: 0; box-shadow: var(--shadow-row-line); font-size: 13px; line-height: 20px;
 }
 [data-theme='v8'] .row + .row .bodyCell { border-top: 0; }
 [data-theme='v8'] .name { line-height: 18px; }
