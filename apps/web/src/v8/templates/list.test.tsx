@@ -64,7 +64,7 @@ const base = {
   updatedAt: '2026-08-22T00:00:00.000Z',
 }
 const used = { ...base, id: 't-used', name: '予約前日のご案内', messageContent: '明日のご予約です', usageCount: 11, publishedAt: '2026-08-01T00:00:00.000Z', hasDraft: true }
-const unused = { ...base, id: 't-unused', name: '秋の新商品（画像）', messageType: 'image', messageContent: '画像 1枚', usageCount: 0, publishedAt: null, hasDraft: true }
+const unused = { ...base, id: 't-unused', name: '秋の新商品（画像）', messageType: 'image', messageContent: '{"originalContentUrl":"https://example.com/a.jpg"}', monthlySendCount: 0, totalSendCount: 0, usageCount: 0, publishedAt: null, hasDraft: true }
 
 async function renderList() {
   await act(async () => {
@@ -107,6 +107,14 @@ describe('V8 テンプレートの一覧', () => {
     expect(screen.getByText('未公開の変更')).toBeTruthy()
     expect(screen.getByText('下書きだけ')).toBeTruthy()
     expect(screen.getByText('11か所')).toBeTruthy()
+  })
+
+  it('画像は中身の JSON を出さず「画像 1枚」、一度も公開していないものの送信数は「—」', async () => {
+    await renderList()
+    expect(screen.getByText('画像 1枚')).toBeTruthy()
+    expect(screen.queryByText(/originalContentUrl/)).toBeNull()
+    expect(screen.getByText('—')).toBeTruthy()
+    expect(screen.queryByText('0通')).toBeNull()
   })
 
   it('サーバの役割が staff なら閲覧のみの帯が出て、作るボタンは押せない', async () => {

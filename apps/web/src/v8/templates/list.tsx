@@ -48,7 +48,8 @@ import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatDateTime, formatNumber } from '@/lib/format'
-import { ListPage, ListPagePagination } from '@/components/templates'
+import { contentExcerpt } from '@/lib/broadcast-summary'
+import { ListPage } from '@/components/templates'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
@@ -178,6 +179,19 @@ function formatMonthDay(iso: string): string {
 /** 一覧・検索は「いまの最新」を対象にする（下書きがあれば下書き）。 */
 function latestContentOf(t: Template): string {
   return t.draftMessageContent ?? t.messageContent
+}
+
+/** 一覧の本文の抜粋。テキスト以外は中身が JSON なので見て分かる1行にする（画像は「画像 1枚」）。 */
+function excerptOf(t: Template): string {
+  if (t.messageType === 'image') return '画像 1枚'
+  return contentExcerpt(t.messageType, latestContentOf(t), 60)
+}
+
+/** 今月送った数。数えられていないもの・一度も公開していない（送れない）ものは「—」（絵 v19Ivv の下書きだけの行）。 */
+function sendCountText(t: Template): string {
+  if (typeof t.monthlySendCount !== 'number') return '—'
+  if (t.publishedAt == null && t.monthlySendCount === 0) return '—'
+  return `${formatNumber(t.monthlySendCount)}通`
 }
 
 /** 公開の札（`v19Ivv`：公開中／未公開の変更／下書きだけ）。 */
@@ -1080,7 +1094,7 @@ export default function TemplatesListV8() {
               {shownItems.map((t) => {
                 const publish = publishStateOf(t)
                 const kindLabel = t.question ? 'question' : t.messageType
-                const excerpt = latestContentOf(t)
+                const excerpt = excerptOf(t)
                 return (
                   <Tr
                     interactive
@@ -1141,7 +1155,7 @@ export default function TemplatesListV8() {
                         className={styles.cellPlain}
                         title={typeof t.totalSendCount === 'number' ? `累計 ${formatNumber(t.totalSendCount)}通` : undefined}
                       >
-                        {typeof t.monthlySendCount === 'number' ? `${formatNumber(t.monthlySendCount)}通` : '—'}
+                        {sendCountText(t)}
                       </Td>
                     )}
                     {!narrow && (
@@ -1217,16 +1231,14 @@ export default function TemplatesListV8() {
     </>
   )
 
-  /* ページ送りは型の pagination 枠へ（絵：左に「26件中 1〜20件」、右に頁）。 */
+  /* ページ送りは型の pagination 枠へ。件数は部品の summary に入れる（絵：左に「26件中 1〜20件」、右に頁。帯の内側は部品の 10・20）。 */
   const showPager = view === 'ready' && filteredTemplates.length > 0
-  const listPager = showPager ? (
-    <ListPagePagination>
-      <span className={styles.pagerCount}>
-        {`${formatNumber(filteredTemplates.length)}件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(safePage * pageSize, filteredTemplates.length)}件`}
-      </span>
-      {pageCount > 1 ? <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} /> : null}
-    </ListPagePagination>
-  ) : null
+  const pagerSummary = `${formatNumber(filteredTemplates.length)}件中 ${(safePage - 1) * pageSize + 1}〜${Math.min(safePage * pageSize, filteredTemplates.length)}件`
+  const listPager = !showPager ? null : pageCount > 1 ? (
+    <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} summary={<span className={styles.pagerCount}>{pagerSummary}</span>} />
+  ) : (
+    <p className={styles.pagerSolo}>{pagerSummary}</p>
+  )
 
   const isTemplateSection = activeSection === 'message' || activeSection === 'question'
   const switchSection = (next: Section) => {
