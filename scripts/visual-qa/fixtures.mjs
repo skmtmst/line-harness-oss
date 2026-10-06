@@ -6113,8 +6113,10 @@ export const OPERATOR_NOTIFICATION_RECIPIENTS = {
     { id: 'staff-owner', name: '高橋 直人', lineLinked: true, emailVerified: true, channels: { line: true, email: false, dashboard: true }, canReceive: true },
     { id: 'staff-support', name: '佐々木 花', lineLinked: true, emailVerified: false, channels: { line: true, email: false, dashboard: true }, canReceive: true },
     { id: 'staff-store', name: '中川 誠', lineLinked: false, emailVerified: true, channels: { line: false, email: false, dashboard: true }, canReceive: true },
+    // 絵 hiBO8 の4人目（選んでいない人）。なおす画面で「選ばない人も並ぶ」を見せる。
+    { id: 'staff-part', name: '佐藤 杏', lineLinked: true, emailVerified: false, channels: { line: true, email: false, dashboard: true }, canReceive: true },
   ],
-  summary: { staff: 3, canReceive: 3, line: 2, email: 0, dashboard: 3, unavailable: 0 },
+  summary: { staff: 4, canReceive: 4, line: 3, email: 0, dashboard: 4, unavailable: 0 },
 }
 
 const operatorRule = (id, name, eventType, recipientLabel, occurredToday, status = 'published', recipientIds = ['staff-owner', 'staff-support']) => ({
