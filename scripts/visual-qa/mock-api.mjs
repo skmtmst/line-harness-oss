@@ -144,6 +144,70 @@ let commonVarFolders = COMMON_VAR_FOLDERS.map((folder) => ({ ...folder }))
 // `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
 const mediaUploadSessionTargets = new Map()
 
+/** 統括のテンプレートの見本（★V8-B LRc93・X4JcOf・meBRB）。 */
+const HQ_TEMPLATES_HTN = [
+  { id: 'visual-hq-tpl-autumn', name: '秋の新商品のお知らせ', description: '本文・画像 1', template_type: 'template', folder_id: null, revision: 2, updated_at: '2026-09-30T01:12:00.000Z', reference_summary: '', distributed_account_count: 3 },
+  { id: 'visual-hq-tpl-thanks', name: '来店のお礼', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-22T09:40:00.000Z', reference_summary: '', distributed_account_count: 2 },
+  { id: 'visual-hq-tpl-booking', name: '予約の受付', description: '本文・ボタン', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-09-12T00:00:00.000Z', reference_summary: '回答フォーム「予約」', distributed_account_count: 1 },
+  { id: 'visual-hq-tpl-holiday', name: '定休日のご案内', description: '本文', template_type: 'template', folder_id: null, revision: 1, updated_at: '2026-08-30T06:20:00.000Z', reference_summary: '', distributed_account_count: 0 },
+  { id: 'visual-hq-tpl-menu', name: '基本のメニュー', description: null, template_type: 'rich_menu', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
+  { id: 'visual-hq-tpl-form', name: '予約', description: null, template_type: 'form', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
+  { id: 'visual-hq-tpl-tag-vip', name: 'VIP', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
+  { id: 'visual-hq-tpl-tag-new', name: '新規', description: null, template_type: 'tag', folder_id: null, revision: 1, updated_at: '2026-09-01T00:00:00.000Z', reference_summary: '', distributed_account_count: 0 },
+]
+const HQ_TEMPLATE_ACCOUNTS_HTN = [
+  { id: 'visual-qa-account-prod', name: '然 -NEN- 本店' },
+  { id: 'visual-qa-account-store', name: '然 -NEN- 渋谷店' },
+  { id: 'visual-qa-account-event-2025', name: '2025年イベント' },
+  { id: 'visual-qa-account', name: '然 -NEN- TEST' },
+]
+function hqTemplateDefinitionHtn(row) {
+  const media = row.id === 'visual-hq-tpl-autumn' ? [{
+    id: 'visual-hq-media-autumn', kind: 'image', filename: 'autumn-venison.jpg', mimeType: 'image/jpeg', sizeBytes: 182000, width: 1040, height: 1040, durationMs: null,
+    r2Key: 'hq-templates/visual-tenant-1/autumn-venison.jpg', publicUrl: null, versionId: 'v1', versionNo: 1, contentHash: 'visual',
+  }] : []
+  const card = { format: 'flex', title: '秋の新商品、はじまりました', body: '鹿肉の旨みをぎゅっと閉じ込めた秋限定のコースです。10/31 まで送料無料でお届けします。', buttons: [{ id: 'visual-btn-1', label: '詳しく見る', action: 'url', value: 'https://nen-shop.jp/autumn' }], ...(media.length ? { imageMediaId: media[0].id } : {}) }
+  return {
+    schemaVersion: 1, card,
+    template: { id: 'hq-authored-message', name: row.name, category: '季節のお知らせ', messageType: 'flex', messageContent: card.body, carouselActionsJson: null, carouselTapLimitMode: 'none', carouselTapLimitText: null, questionJson: null, questionStatus: 'draft' },
+    media,
+  }
+}
+/** 配る前の確認（本店・渋谷店は配布済みで重複、2025年イベントは未配布）。 */
+const HQ_TEMPLATE_PREFLIGHT_HTN = {
+  preflightId: 'visual-hq-run-1', expiresAt: '2099-01-01T00:00:00.000Z',
+  stores: [
+    { accountId: 'visual-qa-account-prod', accountName: '然 -NEN- 本店', items: [{ sourceId: 'hq-authored-message', itemKind: 'template', name: '秋の新商品のお知らせ', expectedRevision: 2, duplicate: true, allowedModes: ['overwrite', 'alias'] }] },
+    { accountId: 'visual-qa-account-store', accountName: '然 -NEN- 渋谷店', items: [{ sourceId: 'hq-authored-message', itemKind: 'template', name: '秋の新商品のお知らせ', expectedRevision: 1, duplicate: true, allowedModes: ['overwrite', 'alias'] }] },
+    { accountId: 'visual-qa-account-event-2025', accountName: '2025年イベント', items: [{ sourceId: 'hq-authored-message', itemKind: 'template', name: '秋の新商品のお知らせ', expectedRevision: null, duplicate: false, allowedModes: ['create'] }] },
+  ],
+}
+
+/** 統括 LINEアカウントを登録の見本（★V8-B GwKE2 のタグ・qw80E の5段）。 */
+const LINE_ACCOUNT_TAGS_HTN = [
+  { id: 'visual-lat-shibuya', name: '渋谷エリア', color: null, displayOrder: 0 },
+  { id: 'visual-lat-event', name: 'イベント', color: null, displayOrder: 1 },
+]
+const LINE_ACCOUNT_CONNECT_HTN = {
+  steps: [
+    { order: 1, state: 'passed', message: 'チャネルIDとシークレットでアクセストークンを発行' },
+    { order: 2, state: 'passed', message: '公式アカウントの名前とアイコンを取得' },
+    { order: 3, state: 'passed', message: 'Webhook URLを登録して、実際に届くかテスト' },
+    { order: 4, state: 'passed', message: 'LINE Loginチャネルを確認して、LIFFアプリを作成' },
+    { order: 5, state: 'passed', message: '認証済みアカウントかを判定' },
+  ],
+  verification: {
+    tokenOk: true, loginOk: true, sameProvider: true,
+    webhook: { expectedUrl: 'https://api.example/webhook', registeredUrl: 'https://api.example/webhook', active: true, testPassed: true },
+    followerTotal: 1284,
+  },
+  displayName: '然 NEN',
+  pictureUrl: null,
+  basicId: '@nen-kichijoji',
+  followerImport: { capability: 'available', phase: 'not_started' },
+  remainingActions: [],
+}
+
 /** 画面を見るだけなので、いちばん権限のある人で固定する。実在しない名前。 */
 const STAFF = {
   id: 'visual-qa-owner',
@@ -1530,6 +1594,13 @@ const UID_MIGRATION_DONE = {
 }
 
 function visualQaWriteBody(method, pathname) {
+  // 統括のテンプレート（★V8-B meBRB）：配る前の確認。
+  if (method === 'POST' && /^\/api\/hq\/templates\/visual-hq-tpl-[^/]+\/preflight$/.test(pathname)) return HQ_TEMPLATE_PREFLIGHT_HTN
+  // 統括 LINEアカウントを登録（★V8-B v2KMj・qw80E・TvXII）。接続確認は5段すべて通った返事、登録は取り込み中。
+  if (method === 'POST' && pathname === '/api/line-accounts/connect/check') return LINE_ACCOUNT_CONNECT_HTN
+  if (method === 'POST' && pathname === '/api/line-accounts/connect') {
+    return { ...LINE_ACCOUNT_CONNECT_HTN, id: 'visual-qa-account-new', followerImport: { capability: 'available', phase: 'importing_ids' } }
+  }
   if (method === 'POST' && (pathname === '/api/notifications/operator-rules/recipients-preview' || pathname === '/api/line-notifications/operator-rules/recipients-preview')) {
     /*
      * 本物は両方の名で同じ候補を返す（`notifications.ts`）。
@@ -2320,6 +2391,36 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/hq/banners/images') {
     return { success: true, data: HQ_BANNER_IMAGES, nextBefore: null }
+  }
+  /*
+   * 統括 LINEアカウントを登録（★V8-B xj3zz〜TvXII・結果の窓 qw80E）。
+   * 接続確認は5段すべて通った返事。登録の返事は取り込み中（820人 / 前日の友だち 1,240人）。
+   * 止まった段を撮る板（v2KMj）は対応表の api で Webhook だけ止めた返事に差し替える。
+   */
+  if (pathname === '/api/line-account-tags' && method === 'GET') {
+    return { success: true, data: LINE_ACCOUNT_TAGS_HTN }
+  }
+  if (pathname === '/api/line-accounts/visual-qa-account-new/follower-import') {
+    return { success: true, data: { version: 1, capability: 'available', phase: 'importing_ids', eligibilityCheckedAt: null, startedAt: '2026-10-07T01:00:00.000Z', completedAt: null, updatedAt: '2026-10-07T01:02:00.000Z', received: 820, imported: 820, reactivated: 0, claimedUnassigned: 0, alreadyPresent: 0, conflicts: 0, invalid: 0, profilesProcessed: 0, profilesUpdated: 0, profileErrors: 0, lastError: null } }
+  }
+  if (pathname === '/api/line-accounts/visual-qa-account-new/follower-insight') {
+    return { success: true, data: { lineAccountId: 'visual-qa-account-new', date: query.get('date') ?? '', status: 'ready', followers: 1240, targetedReaches: null, blocks: null } }
+  }
+  /*
+   * 統括のテンプレート（★V8-B LRc93・X4JcOf・meBRB）。一覧4件・種類ごとの数（リッチメニュー1・回答フォーム1・タグ2）・
+   * 配り先4アカウント・1件目の中身（カード型・画像1・ボタン1）。配る前の確認は書き込み側（visualQaWriteBody）。
+   */
+  if (pathname === '/api/hq/templates' && method === 'GET') {
+    const type = query.get('type')
+    return { success: true, data: type ? HQ_TEMPLATES_HTN.filter((row) => row.template_type === type) : HQ_TEMPLATES_HTN }
+  }
+  if (pathname === '/api/hq/templates/folders' && method === 'GET') return { success: true, data: [] }
+  if (pathname === '/api/hq/templates/accounts' && method === 'GET') return { success: true, data: HQ_TEMPLATE_ACCOUNTS_HTN }
+  if (pathname === '/api/hq/templates/message-references' && method === 'GET') return { success: true, data: [] }
+  const hqTemplateDetail = /^\/api\/hq\/templates\/(visual-hq-tpl-[^/]+)$/.exec(pathname)
+  if (hqTemplateDetail && method === 'GET') {
+    const row = HQ_TEMPLATES_HTN.find((item) => item.id === hqTemplateDetail[1])
+    return row ? { success: true, data: { template: row, definition: hqTemplateDefinitionHtn(row) } } : { success: false, error: 'Not found' }
   }
   if (method === 'DELETE' && pathname === '/api/hq/templates/media') {
     return { success: true, data: { deleted: true } }
@@ -3354,7 +3455,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     既定の器が返っていたので、固定データを足しても押し口が出なかった。
   */
   if (pathname === '/api/staff/me') {
-    return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null } }
+    // tenantId は統括のテンプレート（LRc93）の所属先の確認に要る（無いと「所属先を確認できません」で止まる）。
+    return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null, tenantId: 'visual-tenant-1' } }
   }
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
   const incomingUnmatched = /^\/api\/webhooks\/incoming\/([^/]+)\/unmatched$/.exec(pathname)
