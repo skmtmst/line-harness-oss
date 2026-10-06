@@ -113,7 +113,8 @@ function importedFiles(file: string, source: string): string[] {
   };
   // lib も辿る。選択肢の定義（リッチメニューのレイアウトなど）を lib に
   // 置いている画面があり、@/components と @/app だけでは中身を読めない。
-  for (const m of source.matchAll(/from '@\/(components|app|lib)\/([^']+)'/g)) {
+  // V8 の新しい画面（src/v8）も辿る。入口の page.tsx が `@/v8/...` を読むようになった画面の中身を見るため。
+  for (const m of source.matchAll(/from '@\/(components|app|lib|v8)\/([^']+)'/g)) {
     push(join(SRC, m[1], m[2]));
   }
   // 画面の中身を同じフォルダのファイルに出していることがある
