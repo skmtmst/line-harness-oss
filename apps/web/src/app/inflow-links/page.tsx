@@ -27,6 +27,7 @@ import AdIntegration from './ad-integration'
 import { AdConnectionsV8, AdHistoryV8, AdMetricsV8 } from './ad-integration-v8'
 import SiteScriptV8 from '@/components/inflow-links/site-script-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import InflowListV8 from '@/v8/inflow-links/list'
 import ReferralQrModal, { type ReferralQrRoute } from './referral-qr-modal'
 import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -1655,6 +1656,13 @@ function InflowLinksPageHost() {
   // 直URL（?tab=script）でも本文へ進ませず、機能設定への導線を出す。
   const tabBlocked =
     !!tabFeature && visibility.status === 'ready' && !visibility.enabled(tabFeature)
+  /*
+    ★V8 の一覧（src/v8/inflow-links）は絵（xbHxg）どおりタブを出さない。
+    ほかのページへは見出しの「広告とのつなぎ」「サイトスクリプト」と、
+    数の帯の「広告連携」から行く。V8 以外と、ほかのタブは今のまま。
+  */
+  const v8List = theme === 'v8' && tab === 'links' && !tabBlocked
+  if (v8List) return <InflowListV8 onRouteCountChange={setLinksCount} />
   return (
     <div>
       <MergedTabs basePath="/inflow-links" tabs={visibleTabs} active={tab} />
