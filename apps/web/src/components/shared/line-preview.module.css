@@ -248,3 +248,8 @@
 
 /* LINEの時刻は正本のInterと同じ比例幅。管理画面の等幅数字を継承しない。 */
 [data-theme='v8'] .messageTime { font-variant-numeric: normal; }
+
+/* ★V8 絵（JeINq「段の題 LINEでの見え方」）：題は右の列の幅いっぱいで左寄せ・15px/600/23・? との間6。スマホは下の真ん中。 */
+[data-theme='v8'] .phoneRoot { width: 100%; }
+[data-theme='v8'] .phoneTitle { justify-content: flex-start; font-size: var(--tpl-preview-title-size); font-weight: 600; line-height: var(--tpl-preview-title-lh); }
+[data-theme='v8'] .phone { margin-inline: auto; }
