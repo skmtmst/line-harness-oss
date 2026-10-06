@@ -1170,9 +1170,9 @@ export const NEN_CAMPAIGN_SETTINGS = [
   nenCampaignSetting('order_thanks', '注文ありがとうございます', 'transactional', 'ec.order.confirmed', 0, '09:00', true, 'ご注文ありがとうございます', 'ご注文の内容を確認しました。'),
   nenCampaignSetting('shipping_notice', 'お荷物を送りました', 'transactional', 'ec.shipping.shipped', 0, '09:00', true, 'お荷物を発送しました', '追跡番号から配送状況をご確認いただけます。', '配送状況を見る'),
   nenCampaignSetting('arrival_check', '使い方のご案内', 'follow_up', 'ec.order.arrived', 1, '10:00', true, '商品は無事に届きましたか？', '使い方のポイントを3つにまとめました。', '使い方を見る'),
-  nenCampaignSetting('care_check', '困っていませんか', 'follow_up', 'ec.order.arrived', 3, '19:00', true, 'お困りのことはありませんか？', '気になることを、2つの選択肢から教えてください。', '回答する'),
-  nenCampaignSetting('review_request', '口コミのお願い', 'follow_up', 'ec.order.arrived', 7, '20:00', true, '口コミのお願い', '{{ペットの名前}}ちゃん、{{商品名}}はいかがでしたか。よろしければ、ひとことだけ感想を聞かせてください。星をえらぶだけでも大丈夫です。', '感想を書く（30秒）'),
-  nenCampaignSetting('cross_sell', 'そろそろ無くなるころ', 'follow_up', 'ec.order.arrived', 30, '10:00', false, 'そろそろ無くなるころです', '次回のお買い物に使えるご案内をお送りします。', '商品を見る'),
+  nenCampaignSetting('care_check', '困っていませんか', 'follow_up', 'ec.order.arrived', 3, '19:00', false, 'お困りのことはありませんか？', '気になることを、2つの選択肢から教えてください。', '回答する'),
+  nenCampaignSetting('review_request', '口コミのお願い', 'follow_up', 'ec.order.arrived', 10, '10:00', true, '口コミのお願い', '{{ペットの名前}}ちゃん、{{商品名}}はいかがでしたか。よろしければ、ひとことだけ感想を聞かせてください。星をえらぶだけでも大丈夫です。', '感想を書く（30秒）'),
+  nenCampaignSetting('cross_sell', 'そろそろ無くなるころ', 'follow_up', 'ec.order.arrived', 30, '10:00', true, 'そろそろ無くなるころです', '次回のお買い物に使えるご案内をお送りします。', '商品を見る'),
   nenCampaignSetting('birthday_coupon', 'お誕生日クーポン', 'birthday', 'pet.birthday', 0, '10:00', true, '{{pet_name}}、お誕生日おめでとうございます', '{{coupon_code}} を {{coupon_expiry}} までお使いいただけます。', 'クーポンを受け取る'),
   nenCampaignSetting('column', 'NENコラム', 'column', 'column.scheduled', 0, '10:00', false, '今週のNENコラム', '愛犬・愛猫との暮らしに役立つ読みものをお届けします。', 'コラムを読む'),
 ]
@@ -1190,8 +1190,8 @@ const nenColumn = (id, title, category, excerpt, deliveryStatus, publishedAt, de
   publishedAt,
   deliveryStatus,
   deliveryAt,
-  targetMode: id === 'nen-column-water' ? 'tag' : 'all',
-  targetTagId: id === 'nen-column-water' ? 'tag-2' : null,
+  targetMode: id === 'nen-column-autumn' ? 'tag' : 'all',
+  targetTagId: id === 'nen-column-autumn' ? 'tag-2' : null,
   completionEventName: `${title}を読了`,
   completionTagId: 'tag-3',
   sourceColumnId: null,
@@ -1199,18 +1199,23 @@ const nenColumn = (id, title, category, excerpt, deliveryStatus, publishedAt, de
   updatedAt: '2026-08-25T10:00:00+09:00',
 })
 
+/*
+ * ★V8-B `Jxmqh` の表の上から6行（題・分類・公開日・LINE 配信の状態）。並びは一覧の口の並び（新しい順）。
+ * 1行目は予約中の下書き（公開日は「10/10 予定」）、5行目は公開したが LINE では送っていないコラム。
+ */
 const NEN_COLUMN_DESIGN_ROWS = [
-  nenColumn('nen-column-tooth', '歯みがきのコツ、3つだけ', '口の中のケア', '写真2枚・1,200字', 'sent', '2026-07-14T10:00:00+09:00'),
-  nenColumn('nen-column-water', '夏の水分補給、どれくらい？', '季節のこと', '写真1枚・900字', 'scheduled', null, '2026-08-28T10:00:00+09:00'),
-  nenColumn('nen-column-food', 'フードの切り替えかた', '食べもの', '写真3枚・1,600字', 'sent', '2026-06-30T10:00:00+09:00'),
-  nenColumn('nen-column-nail', '爪切りが苦手な子へ', 'お手入れ', '動画1本・700字', 'sent', '2026-06-16T10:00:00+09:00'),
-  nenColumn('nen-column-toilet', 'トイレの回数、気にしていますか', 'からだのこと', '写真1枚・1,100字', 'sent', '2026-06-02T10:00:00+09:00'),
-  nenColumn('nen-column-rain', '雨の日の遊びかた', '季節のこと', '写真2枚・800字', 'draft', null),
+  nenColumn('nen-column-autumn', '秋の食事、量はどれくらい？', '季節のこと', '写真1枚・900字', 'scheduled', null, '2026-10-10T10:00:00+09:00'),
+  nenColumn('nen-column-toilet', 'トイレの回数、気にしていますか', 'からだのこと', '写真1枚・1,100字', 'sent', '2026-09-26T10:00:00+09:00'),
+  nenColumn('nen-column-water', '夏の水分補給、どれくらい？', '季節のこと', '写真1枚・900字', 'sent', '2026-08-08T10:00:00+09:00'),
+  nenColumn('nen-column-tooth', '歯みがきのコツ、3つだけ', 'お手入れ', '写真2枚・1,200字', 'sent', '2026-07-22T10:00:00+09:00'),
+  nenColumn('nen-column-nail', '爪切りが苦手な子へ', 'お手入れ', '動画1本・700字', 'draft', '2026-07-01T10:00:00+09:00'),
+  nenColumn('nen-column-food', 'フードの切り替えかた', 'ごはん', '写真3枚・1,600字', 'sent', '2026-06-14T10:00:00+09:00'),
 ]
 
 export const NEN_COLUMNS = [
   ...NEN_COLUMN_DESIGN_ROWS,
-  ...Array.from({ length: 14 }, (_, index) => nenColumn(
+  // 全部で24本（公開中20・下書き4）。★V8-B の数の帯とタブの件数。
+  ...Array.from({ length: 15 }, (_, index) => nenColumn(
     `nen-column-sent-${index + 1}`,
     `暮らしのコラム ${index + 1}`,
     '暮らし',
@@ -1218,7 +1223,7 @@ export const NEN_COLUMNS = [
     'sent',
     `2026-${String(5 - Math.floor(index / 9)).padStart(2, '0')}-${String(28 - (index % 9)).padStart(2, '0')}T10:00:00+09:00`,
   )),
-  ...Array.from({ length: 4 }, (_, index) => nenColumn(
+  ...Array.from({ length: 3 }, (_, index) => nenColumn(
     `nen-column-draft-${index + 1}`,
     `下書きのコラム ${index + 1}`,
     '下書き',
@@ -1251,6 +1256,7 @@ const nenJob = (id, campaignKey, label, friendName, scheduledAt, status, attempt
   lineAccountName,
 })
 
+// ★V8-B `Tj7n4` の送った履歴は1ページ目に6行（表のすぐ下にページ送り）。
 export const NEN_JOBS = [
   nenJob('nen-job-1', 'care_check', '困っていませんか', '前田 さくら', '2026-08-25T19:00:00+09:00', 'pending', 0, null, '8/22 の注文が到着', '—'),
   nenJob('nen-job-2', 'birthday_coupon', 'ももちゃんのお誕生日', '高橋 直人', '2026-08-25T10:00:00+09:00', 'sent', 1, '2026-08-25T10:00:02+09:00', 'ペットの誕生日 9/02', '開きました'),
@@ -1258,7 +1264,6 @@ export const NEN_JOBS = [
   nenJob('nen-job-4', 'shipping_notice', 'お荷物を送りました', '木村 亮', '2026-08-24T18:00:00+09:00', 'sent', 1, '2026-08-24T18:00:03+09:00', '発送を登録', '押しました', 'LINE 二号店'),
   nenJob('nen-job-5', 'arrival_check', '使い方のご案内', '林 里佳', '2026-08-24T10:00:00+09:00', 'failed', 3, null, '8/22 の注文が到着', '—'),
   nenJob('nen-job-6', 'review_request', '口コミのお願い', '大西 健一', '2026-08-23T20:00:00+09:00', 'sent', 1, '2026-08-23T20:00:04+09:00', '8/16 の注文が到着', '開きました'),
-  nenJob('nen-job-7', 'column', '夏の水分補給、どれくらい？', '中村 彩', '2026-08-23T10:00:00+09:00', 'sent', 1, '2026-08-23T10:00:01+09:00', '毎週 月曜の予約', '開きました'),
 ]
 
 /*
@@ -1277,9 +1282,9 @@ const NEN_FLOW_COUNTS = {
   order_thanks: { planned: 486, sent: 486, failed: 0, skipped: 0, associatedConversions: 28, associatedConversionAmount: 156800 },
   shipping_notice: { planned: 462, sent: 462, failed: 0, skipped: 0, associatedConversions: 22, associatedConversionAmount: 118400 },
   arrival_check: { planned: 424, sent: 418, failed: 6, skipped: 0, associatedConversions: 18, associatedConversionAmount: 86400 },
-  care_check: { planned: 550, sent: 402, failed: 0, skipped: 148, associatedConversions: 20, associatedConversionAmount: 72000 },
+  care_check: { planned: 0, sent: 0, failed: 0, skipped: 0, associatedConversions: 0, associatedConversionAmount: 0 },
   review_request: { planned: 386, sent: 386, failed: 0, skipped: 0, associatedConversions: 28, associatedConversionAmount: 96400 },
-  cross_sell: { planned: 0, sent: 0, failed: 0, skipped: 0, associatedConversions: 0, associatedConversionAmount: 0 },
+  cross_sell: { planned: 550, sent: 402, failed: 0, skipped: 148, associatedConversions: 20, associatedConversionAmount: 72000 },
   birthday_coupon: { planned: 148, sent: 148, failed: 0, skipped: 0, associatedConversions: 12, associatedConversionAmount: 32400 },
   column: { planned: 184, sent: 184, failed: 0, skipped: 0, associatedConversions: 14, associatedConversionAmount: 50000 },
 }
@@ -1299,17 +1304,17 @@ export const NEN_FLOW_METRICS = {
 }
 
 const NEN_COLUMN_RESULTS = {
-  'nen-column-tooth': { targeted: 1_248, sent: 1_248, opened: 976, completed: 842, rate: 0.782, conversions: 12, conversionAmount: 48000 },
-  'nen-column-water': { targeted: 1_284, sent: 0, pending: 1_284, opened: null, completed: 0, rate: null, conversions: 0, conversionAmount: 0 },
-  'nen-column-food': { targeted: 1_196, sent: 1_196, opened: 854, completed: 731, rate: 0.714, conversions: 14, conversionAmount: 56000 },
-  'nen-column-nail': { targeted: 1_180, sent: 1_180, opened: 812, completed: 684, rate: 0.688, conversions: 8, conversionAmount: 32000 },
-  'nen-column-toilet': { targeted: 1_164, sent: 1_164, opened: 490, completed: 318, rate: 0.421, conversions: 1, conversionAmount: 6000 },
-  'nen-column-rain': { targeted: 0, sent: 0, opened: null, completed: 0, rate: null, conversions: 0, conversionAmount: 0 },
+  'nen-column-autumn': { targeted: 1_284, sent: 0, pending: 1_284, opened: null, completed: 0, rate: null, conversions: 0, conversionAmount: 0 },
+  'nen-column-toilet': { targeted: 1_102, sent: 1_102, opened: 612, completed: 488, rate: 0.555, conversions: 9, conversionAmount: 36000 },
+  'nen-column-water': { targeted: 1_040, sent: 1_040, opened: 580, completed: 462, rate: 0.558, conversions: 7, conversionAmount: 28000 },
+  'nen-column-tooth': { targeted: 998, sent: 998, opened: 451, completed: 380, rate: 0.452, conversions: 12, conversionAmount: 48000 },
+  'nen-column-nail': { targeted: 0, sent: 0, opened: 88, completed: 41, rate: null, conversions: 0, conversionAmount: 0 },
+  'nen-column-food': { targeted: 960, sent: 960, opened: 530, completed: 431, rate: 0.552, conversions: 14, conversionAmount: 56000 },
 }
 
 export const NEN_COLUMN_METRICS = {
   range: NEN_METRICS_RANGE,
-  summary: { total: 24, sent: 18, drafts: 5, scheduled: 1, unread: 1_656, associatedConversions: 38, associatedConversionAmount: 142000 },
+  summary: { total: 24, sent: 19, drafts: 4, scheduled: 1, unread: 1_927, associatedConversions: 38, associatedConversionAmount: 142000 },
   columns: NEN_COLUMNS.map((column) => {
     const result = NEN_COLUMN_RESULTS[column.id] ?? {
       targeted: 0,
