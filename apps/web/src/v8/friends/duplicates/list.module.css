@@ -1,0 +1,152 @@
+/* ★V8 重複検出（Pencil hn6Y8・1152 は G9C4Uw）。値は globals.css の --tpl-fr-*。 */
+.body { display: flex; flex-direction: column; gap: var(--tpl-fr-area-gap); padding: var(--tpl-fr-area-pad); min-width: 0; }
+
+.band {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-fm-band-gap);
+  margin: 0;
+  padding: var(--tpl-fm-band-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-fm-band-lh);
+}
+
+.band > svg { flex-shrink: 0; color: var(--color-action); }
+
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-fr-stack-gap); }
+
+:global([data-theme='v8']) .card.card { gap: var(--tpl-compact-gap); padding: var(--tpl-fr-dup-card-pad); }
+:global([data-theme='v8']) .card.card > div:first-child { min-height: 0; }
+:global([data-theme='v8']) .card.card p:first-child { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 400; line-height: var(--tpl-fr-desc-lh); }
+:global([data-theme='v8']) .card.card [data-kpi-number] { font-size: var(--tpl-fr-card-num-size); font-weight: 700; line-height: var(--tpl-fr-dup-num-lh); }
+:global([data-theme='v8']) .card.card > p:last-child { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-fr-sub-lh); }
+
+.notice { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.linkButton { margin-left: var(--tpl-toolbar-gap); color: var(--color-action); font-weight: 600; }
+.linkButton:hover { text-decoration: underline; }
+
+.tools { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); min-width: 0; }
+.search { width: var(--tpl-fr-search-sm); flex-shrink: 1; min-width: 0; }
+.chips { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-fr-control-h);
+  padding: 0 var(--tpl-fr-chip-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  box-shadow: inset 0 0 0 1px var(--color-hairline);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-fr-delta-lh);
+  white-space: nowrap;
+}
+
+.chip:hover { background: var(--color-canvas-sunken); }
+.chipOn, .chipOn:hover { background: var(--color-ink); box-shadow: inset 0 0 0 1px var(--color-ink); color: var(--color-canvas); }
+
+.spacer { flex: 1; min-width: 0; }
+.reviewed { color: var(--color-ink-faint); font-size: var(--text-micro); white-space: nowrap; }
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-fr-stack-gap);
+  padding: var(--tpl-fr-panel-pad);
+  border-radius: var(--radius-card);
+  box-shadow: inset 0 0 0 1px var(--color-hairline);
+  min-width: 0;
+}
+
+.panelHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
+.panelTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-fr-panel-title-size); font-weight: 700; line-height: var(--tpl-fr-panel-title-lh); }
+.panelSub { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-fr-desc-lh); }
+
+.colConfidence { width: var(--tpl-fr-dup-col-confidence); }
+.colEvidence { width: var(--tpl-fr-dup-col-evidence); }
+.colAccount { width: var(--tpl-fr-dup-col-account); }
+.colStatus { width: var(--tpl-fr-dup-col-status); }
+.colAction { width: var(--tpl-fr-dup-col-action); }
+.colNum { width: var(--tpl-fr-dup-col-num); }
+.colNumLast { width: var(--tpl-fr-dup-col-num-last); }
+
+:global([data-theme='v8']) .table thead tr { background: transparent; border-top: 0; }
+
+:global([data-theme='v8']) .table thead th.th {
+  height: var(--tpl-fr-dup-thead-h);
+  padding: var(--tpl-fr-dup-thead-pad);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-fr-desc-lh);
+  vertical-align: top;
+}
+
+:global([data-theme='v8']) .table thead th.th:first-child { padding-left: var(--tpl-fr-cell-inset); }
+:global([data-theme='v8']) .table thead th.th:last-child { padding-right: var(--tpl-fr-cell-inset); }
+
+:global([data-theme='v8']) .table td.td,
+:global([data-theme='v8']) .table td.tdAction {
+  height: var(--tpl-fr-mu-row-h);
+  padding: 0 var(--tpl-fr-stack-gap) 0 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-fr-desc-lh);
+  vertical-align: middle;
+}
+
+:global([data-theme='v8']) .table tr.rowCompact td.td { height: var(--tpl-fr-dup-row-compact-h); }
+:global([data-theme='v8']) .table td.td:first-child { padding-left: var(--tpl-fr-cell-inset); }
+:global([data-theme='v8']) .table td.tdAction,
+:global([data-theme='v8']) .table td.td:last-child { padding-right: var(--tpl-fr-cell-inset); }
+
+.pair {
+  display: block;
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-fr-back-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pair:hover { text-decoration: underline; }
+
+.cellText { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--tpl-fr-status-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  line-height: var(--tpl-fr-sub-lh);
+  white-space: nowrap;
+}
+
+.pill_ok { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.pill_warn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
+.pill_muted { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
+
+.rateHigh { color: var(--color-status-warn-deep); font-weight: 700; }
+.faint { color: var(--color-ink-disabled); }
+
+.stateCell { padding: var(--tpl-fr-state-pad); }
+.empty { display: flex; flex-direction: column; align-items: center; gap: var(--tpl-fr-stack-gap); }
+
+.pager { min-height: var(--tpl-fr-dup-pager-h); display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-toolbar-gap); padding-left: var(--tpl-fr-panel-pad); }
+.pagerCount { color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-fr-pager-lh); }
+
+/* 1152 の板（G9C4Uw）：白い板が 1000 未満のときの列と探す欄。 */
+@container v8-page (max-width: 1000px) {
+  .search { width: var(--tpl-fr-search-xs); }
+  .colEvidence { width: var(--tpl-fr-dup-col-account); }
+  .colAccount { width: var(--tpl-fr-dup-n-col-account); }
+}
