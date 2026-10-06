@@ -323,6 +323,9 @@ describe('共通部品の影響範囲', () => {
       // ★V8 登録メディア一覧（O7hUt7）と、写した差し替えの窓（候補のページ送り）。
       'v8/contents/list.tsx',
       'v8/contents/media-replacement-dialog.tsx',
+      // ★V8 流入と計測の詳細（Q5le3）。来た友だちの表と注文の明細（写し）の下にページ送り。
+      'v8/inflow-links/detail.tsx',
+      'v8/inflow-links/ref-orders.tsx',
     ].sort())
   })
 

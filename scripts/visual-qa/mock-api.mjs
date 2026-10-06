@@ -86,8 +86,8 @@ import {
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_ARCHIVE_IMPACT, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, OUTGOING_WEBHOOK_TEST_RESULT, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, INCOMING_WEBHOOK_UNMATCHED, ENTRY_ROUTES, INFLOW_SUMMARY,
-  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, AD_PLATFORMS, AD_CONVERSION_LOGS, TRACKED_LINKS,
-  AD_COST_ROWS, AD_COST_PLATFORMS,
+  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, MEASUREMENT_SITES, AD_PLATFORMS, AD_CONVERSION_LOGS, TRACKED_LINKS,
+  AD_COST_ROWS, AD_COST_PLATFORMS, AD_COST_MANUAL_ENTRIES, AD_CONVERSION_COST,
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
@@ -3971,6 +3971,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/site/summary') return { success: true, data: SITE_TRACKING_SUMMARY }
   if (pathname === '/api/site/pages') return { success: true, data: SITE_TRACKING_PAGES }
+  /* ★V8 サイトスクリプト（XjOte）：成果を数えるサイト3件（動いている2・止めている1）。 */
+  if (pathname === '/api/measurement-sites') return { success: true, data: MEASUREMENT_SITES }
   if (pathname === '/api/site/tracking-key') {
     // アカウントごとに違う鍵を返す。乱数は使わない(毎回同じ絵にする)。
     // 画面は account_id で送る（旧 accountId も受ける）。
@@ -4026,12 +4028,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   /*
    * #818 流入元ごとの広告費の台帳。数は V8 の板（`qSTVR`・`ZxKL5`）にそろえる。
    * この30日の広告費 ¥86,000・友だち追加 73 人・つないだ広告 2 件。
-   * 手入力の記録は無い（板にも無い）ので空で返す。
+   * 手で入れた費用は板（qSTVR）どおり2件。
    */
   if (pathname === '/api/ad-costs') {
     return {
       success: true,
-      data: { rows: AD_COST_ROWS, platforms: AD_COST_PLATFORMS, manualEntries: [] },
+      data: { conversionCost: AD_CONVERSION_COST, rows: AD_COST_ROWS, platforms: AD_COST_PLATFORMS, manualEntries: AD_COST_MANUAL_ENTRIES },
     }
   }
   if (pathname === '/api/ad-platforms/logs') {
@@ -4113,8 +4115,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         friends: [
           { id: 'friend-inflow-1', displayName: '石田 未来', trackedAt: '2026-08-25T09:12:00.000Z', currentStatus: '友だち中' },
           { id: 'friend-inflow-2', displayName: '新田 遥', trackedAt: '2026-08-24T21:40:00.000Z', currentStatus: '友だち中' },
-          { id: 'friend-inflow-3', displayName: '松本 圭', trackedAt: '2026-08-22T12:05:00.000Z', currentStatus: '友だち中' },
-          { id: 'friend-inflow-4', displayName: '林 里佳', trackedAt: '2026-08-20T18:22:00.000Z', currentStatus: 'ブロック済み' },
+          { id: 'friend-inflow-3', displayName: '松本 圭', trackedAt: '2026-08-22T12:05:00.000Z', currentStatus: 'ブロック済み' },
+          { id: 'friend-inflow-4', displayName: '林 里佳', trackedAt: '2026-08-20T18:22:00.000Z', currentStatus: '友だち中' },
           { id: 'friend-inflow-5', displayName: '大村 真', trackedAt: '2026-08-18T10:44:00.000Z', currentStatus: '友だち中' },
         ],
       },

@@ -4737,6 +4737,13 @@ export const SITE_TRACKING_PAGES = [
   { host: null, path: '/blog/old-page/', views: 620, visitors: 0 },
 ]
 
+/* ★V8 サイトスクリプト（XjOte）：本番の GET /api/measurement-sites と同じ形。 */
+export const MEASUREMENT_SITES = [
+  { id: 'site-1', label: '然 公式サイト', domains: ['nen.example'], createdAt: '2026-06-01T00:00:00.000Z', rejectedCount: 0, lastRejectedHost: null, lastRejectedAt: null, stoppedAt: null, stoppedReason: null, lastReceivedAt: '2026-10-01T12:14:00.000Z' },
+  { id: 'site-2', label: '然 オンラインショップ', domains: ['shop.nen.example'], createdAt: '2026-06-01T00:00:00.000Z', rejectedCount: 0, lastRejectedHost: null, lastRejectedAt: null, stoppedAt: null, stoppedReason: null, lastReceivedAt: '2026-10-01T11:58:00.000Z' },
+  { id: 'site-3', label: '秋のキャンペーン LP', domains: ['lp.nen.example'], createdAt: '2026-08-01T00:00:00.000Z', rejectedCount: 0, lastRejectedHost: null, lastRejectedAt: null, stoppedAt: '2026-09-20T00:00:00.000Z', stoppedReason: 'キャンペーン終了', lastReceivedAt: '2026-09-15T01:02:00.000Z' },
+]
+
 export const AD_PLATFORMS = [
   { id: 'ad-meta', name: 'meta', displayName: 'Meta広告', config: { pixel_id: 'PIXEL-8420', monthly_cost: 170000, synced_at: '2026-08-25T11:20:00.000Z', sent_count: 866, pending_count: 12, failed_count: 7, retry_success_count: 23 }, isActive: true, createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-25T11:20:00.000Z' },
   { id: 'ad-google', name: 'google', displayName: 'Google広告', config: { customer_id: '123-456-7890', monthly_cost: 312000, synced_at: '2026-08-25T11:20:00.000Z' }, isActive: true, createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-25T11:20:00.000Z' },
@@ -4745,15 +4752,24 @@ export const AD_PLATFORMS = [
 
 /*
  * #818 流入元ごとの広告費の台帳。数は V8 の板（`qSTVR`・`ZxKL5`）にそろえる。
- * この30日の広告費 ¥86,000（Google ¥54,000＋Meta ¥32,000）・
- * 友だち追加 73 人（45＋28）・つないだ広告 2 件。
+ * この30日の広告費 ¥86,000（Google ¥52,000＋Meta ¥34,000）・
+ * 友だち追加 73 人（42＋31）・つないだ広告 2 件。
  * 友だち1人あたりは ¥1,178（86,000÷73、四捨五入）で板と合う。
  * 通貨は円（JPYは最小単位が円そのもの）。日時は固定。
  */
 export const AD_COST_ROWS = [
-  { sourceLabel: 'Google広告', adPlatformId: 'ad-google', entryRouteId: 'ad-summer', source: 'import', totals: [{ currency: 'JPY', amountMinor: 54000 }], friendAdds: 45, costPerFriendMinor: 1200, lastImportedAt: '2026-10-01T06:00:00+09:00' },
-  { sourceLabel: 'Meta広告', adPlatformId: 'ad-meta', entryRouteId: 'summer-ig', source: 'import', totals: [{ currency: 'JPY', amountMinor: 32000 }], friendAdds: 28, costPerFriendMinor: 1143, lastImportedAt: '2026-10-01T06:00:00+09:00' },
+  { sourceLabel: 'Google広告', adPlatformId: 'ad-google', entryRouteId: 'er-4', source: 'import', totals: [{ currency: 'JPY', amountMinor: 52000 }], friendAdds: 42, costPerFriendMinor: 1238, lastImportedAt: '2026-10-01T06:00:00+09:00' },
+  { sourceLabel: 'Meta広告', adPlatformId: 'ad-meta', entryRouteId: 'er-1', source: 'import', totals: [{ currency: 'JPY', amountMinor: 34000 }], friendAdds: 31, costPerFriendMinor: 1097, lastImportedAt: '2026-10-01T06:00:00+09:00' },
+  /* ★V8 広告連携（qSTVR）の3行目：手入力だけの流入元。この30日に費用が無いので「—」。 */
+  { sourceLabel: 'チラシ計測リンク（2026春）', adPlatformId: null, entryRouteId: 'er-6', source: 'manual', totals: [], friendAdds: 0, costPerFriendMinor: null, lastImportedAt: null },
 ]
+
+/* ★V8 広告連携（qSTVR）の「手で入れた費用」2件と、成果1件あたり（86,000÷15＝¥5,733）。 */
+export const AD_COST_MANUAL_ENTRIES = [
+  { id: 'adc-1', sourceLabel: 'チラシ計測リンク（2026春）', day: '2026-09-15', amountMinor: 12000, currency: 'JPY', entryRouteId: 'er-6', cancelledAt: null, cancelReason: null, createdAt: '2026-09-15T09:00:00+09:00' },
+  { id: 'adc-2', sourceLabel: '店頭ポスター', day: '2026-09-01', amountMinor: 4500, currency: 'JPY', entryRouteId: null, cancelledAt: null, cancelReason: null, createdAt: '2026-09-01T09:00:00+09:00' },
+]
+export const AD_CONVERSION_COST = { from: '2026-09-01', to: '2026-09-30', confirmedConversionCount: 15, costPerConversionMinor: 5733, currency: 'JPY' }
 
 export const AD_COST_PLATFORMS = [
   { id: 'ad-google', name: 'google', displayName: 'Google広告', lastSuccessAt: '2026-10-01T06:00:00+09:00', lastRunStatus: 'success', lastRunAt: '2026-10-01T06:00:00+09:00', lastError: null },
