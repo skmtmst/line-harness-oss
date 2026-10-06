@@ -20,6 +20,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
+import StickyBar from '@/components/shared/sticky-bar'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
@@ -577,17 +578,21 @@ function OperatorEditInner() {
             </aside>
           </div>
 
-          <div className={styles.footer}>
-            <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
-            {canWrite ? (
+          <StickyBar
+            actions={(
               <>
-                <Button onClick={() => void saveDraft()} disabled={saveDisabled} busy={saving}>{editId ? '下書きを保存する' : '下書きを保存'}</Button>
-                <Button onClick={() => void openPublishConfirm()} disabled={saveDisabled} variant="primary">
-                  <Check size={15} aria-hidden="true" />運用者へのお知らせを公開
-                </Button>
+                <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
+                {canWrite ? (
+                  <>
+                    <Button onClick={() => void saveDraft()} disabled={saveDisabled} busy={saving}>{editId ? '下書きを保存する' : '下書きを保存'}</Button>
+                    <Button onClick={() => void openPublishConfirm()} disabled={saveDisabled} variant="primary">
+                      <Check size={15} aria-hidden="true" />運用者へのお知らせを公開
+                    </Button>
+                  </>
+                ) : null}
               </>
-            ) : null}
-          </div>
+            )}
+          />
         </div>
       </div>
 

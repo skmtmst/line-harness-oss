@@ -339,18 +339,6 @@
   font-size: var(--text-label);
 }
 
-/* いちばん下の帯：上に線、ボタンは真ん中。長い画面では下に付いてくる。 */
-.footer {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  justify-content: center;
-  gap: var(--tpl-footer-gap);
-  padding-top: var(--tpl-hb2-op-footer-pad);
-  border-top: 1px solid var(--color-hairline);
-  background: var(--color-canvas);
-}
-
 .confirmActions {
   display: flex;
   flex-wrap: wrap;
