@@ -39,6 +39,8 @@ function setup(): Database.Database {
       stopped_at TEXT,
       -- N-270: 外部受信の鍵(暗号化)と受け口の停止時刻。
       ingest_secret_encrypted TEXT, ingest_disabled_at TEXT,
+      -- F-13(582): 成果のフォルダ。
+      folder_id TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     -- N-265: 経路別の母数は ref_tracking を見る。最小構成だけ用意する。
