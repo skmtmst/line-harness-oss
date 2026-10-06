@@ -3026,6 +3026,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /* 板 `ARuZ4`（停止中）：止めたシナリオは購読中 0 人。一覧に出ない ID（scenario-0-paused）でだけ返す。 */
+  if (pathname === '/api/scenarios/scenario-0-paused/stats') return { success: true, data: { ...SCENARIO_STATS, activeNow: 0, paused: 116 } }
   if (/^\/api\/scenarios\/[^/]+\/stats$/.test(pathname)) return { success: true, data: SCENARIO_STATS }
   if (/^\/api\/scenarios\/[^/]+\/simulate$/.test(pathname)) return { success: true, data: SCENARIO_SIMULATION }
   if (/^\/api\/scenarios\/[^/]+\/runs$/.test(pathname)) return { success: true, data: SCENARIO_RUNS }
@@ -3048,6 +3050,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const scenario = pathname.match(/^\/api\/scenarios\/([^/]+)$/)
   if (scenario) {
     // 通を配列で返す。`{items,total}` のままだと `scenario.steps` で落ちる。
+    /* 板 `ARuZ4`：「新規登録7日間フォロー」を止めた形（停止中・最後の1通の後は1つ前のシナリオを再開）。一覧には出さない。 */
+    if (scenario[1] === 'scenario-0-paused') {
+      const paused = { ...FRIEND_SCENARIOS[0], id: 'scenario-0-paused', isActive: false, onCompleteMode: 'resume_previous' }
+      return { success: true, data: { ...paused, steps: SCENARIO_STEPS.map((step) => ({ ...step, scenarioId: paused.id })) } }
+    }
     const row = FRIEND_SCENARIOS.find((r) => r.id === scenario[1]) ?? FRIEND_SCENARIOS[0]
     return { success: true, data: { ...row, steps: SCENARIO_STEPS.map((step) => ({ ...step, scenarioId: row.id })) } }
   }
