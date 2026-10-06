@@ -17,7 +17,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { OpsHead } from './shell'
 import parts from './parts.module.css'
-import styles from './knowledge.module.css'
+import styles from './ops-knowledge-v8.module.css'
 
 /**
  * ナレッジの記事 V8（絵 `R5ckwJ`）。一覧の「開く」から出す。

@@ -19,7 +19,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { OpsHead } from './shell'
 import KnowledgeArticleV8 from './knowledge-article'
 import parts from './parts.module.css'
-import styles from './knowledge.module.css'
+import styles from './ops-knowledge-v8.module.css'
 
 /**
  * 運営のナレッジ V8（絵 `h114s`・記事 `R5ckwJ`）。
