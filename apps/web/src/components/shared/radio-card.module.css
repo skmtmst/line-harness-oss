@@ -230,6 +230,48 @@
 
 [data-theme='v8'] .radio { border-radius: 999px; }
 
+/*
+ * V8 の箱（card・compact）は装飾の丸を出さない。選んだことは枠と面の色で
+ * 分かる（[data-theme='v8'] .checked）。読み上げ・矢印キー・Space のために
+ * 本物の input は残し、見えない大きさで同じ位置に置く。キーボードで来たことは
+ * 箱の枠に出す（:has）。行（row）の丸は下の .row 側でそのまま出す。
+ *
+ * 輪郭を消す指定（outline: 0）は書かない。`opacity: 0` は輪郭も含めて
+ * 透明にするので、丸の輪郭はそれだけで見えなくなる。消す指定を足すと
+ * 共通の約束（focus-visible-contract）に反し、将来 opacity を外したときに
+ * キーボードの輪郭が本当に消える。
+ */
+[data-theme='v8'] .card > .radio,
+[data-theme='v8'] .card > .radio:checked {
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 1px;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+[data-theme='v8'] .card:has(> .radio:focus-visible) {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+/*
+ * 小さい箱（★BG-B 出力サイズ o2XyUk/aCyxg）。
+ * 角 8・枠 1・余白 8/10・間 3・題 11/600・補足 10。狭い脇のパネル（390px）に
+ * 2列で並べる大きさ。箱（card）の寸法は変えない。
+ */
+[data-theme='v8'] .compact {
+  gap: 3px;
+  min-height: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+[data-theme='v8'] .compact .body { gap: 3px; }
+[data-theme='v8'] .compact .title { font-size: 11px; line-height: 16px; font-weight: 600; }
+[data-theme='v8'] .compact .note { font-size: 10px; line-height: 14px; }
+[data-theme='v8'] .compact.checked .title { color: var(--color-accent-deep); }
+
 /* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
 [data-theme='v8'] .card { -webkit-font-smoothing: auto; }
 
