@@ -3987,7 +3987,7 @@ export const AUTO_REPLY_RUNS = {
     autoReplyRun('1', 'Kenta Kawano', '2026-08-25T10:32:00+09:00', '予約を変更したい', 'succeeded', '返信＋対応マーク「予約変更」', { replyStatus: 'sent', durationMs: 600 }),
     autoReplyRun('2', 'Masato S.', '2026-08-25T10:28:00+09:00', '予約の確認', 'succeeded', '返信＋対応マーク「予約変更」', { replyStatus: 'sent', durationMs: 700, matchedKeyword: '予約の確認' }),
     autoReplyRun('3', '菅野 亮', '2026-08-25T10:21:00+09:00', '予約キャンセル', 'pending', '返信＋担当者へ引き継ぎ', { replyStatus: 'not_attempted', domainStatus: 'actions_running', durationMs: 900, matchedKeyword: 'キャンセル' }),
-    autoReplyRun('4', '山田 太郎', '2026-08-25T10:14:00+09:00', '予約', 'permanent_failed', '返信は届いた・担当者へ知らせられなかった', { durationMs: 1_200 }),
+    autoReplyRun('4', '山田 太郎', '2026-08-25T10:14:00+09:00', '予約', 'failed', 'LINEへの返信を受け付けてもらえませんでした', { durationMs: 1_200 }),
     autoReplyRun('5', '坂本 真人', '2026-08-25T10:02:00+09:00', '日程変更したい', 'skipped', '上のルール「営業時間外の自動返信」が先に動いた', { replyStatus: 'not_attempted', domainStatus: 'skipped', durationMs: null, matchedKeyword: '日程変更' }),
   ],
   pagination: { total: 214, limit: 20, offset: 0 },
