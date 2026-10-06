@@ -181,6 +181,20 @@ function parseTextLines(value: string): string[] {
   }
 }
 
+/**
+ * 行ごとの「強調」（★修正案 `Svmg0`・2026-10-06 承認）。列が無い古い生成は
+ * null なので空配列になり、「同じ条件で作る」で戻したときは全部オフになる。
+ */
+function parseEmphasisLines(value: string | null | undefined): boolean[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.map((v) => v === true) : [];
+  } catch {
+    return [];
+  }
+}
+
 function serializeGeneration(g: BannerGeneration) {
   return {
     id: g.id,
@@ -192,6 +206,7 @@ function serializeGeneration(g: BannerGeneration) {
     apiSize: g.api_size,
     quality: g.quality,
     textLines: parseTextLines(g.text_lines),
+    emphasisLines: parseEmphasisLines(g.emphasis_lines),
     baseColor: g.base_color,
     mainColor: g.main_color,
     subColor: g.sub_color,
@@ -472,6 +487,7 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
       preset: v.preset,
       references: v.references,
       textLines: v.textLines,
+      emphasisLines: v.emphasisLines,
       baseColor: v.baseColor,
       mainColor: v.mainColor,
       subColor: v.subColor,
@@ -489,6 +505,7 @@ hqBanners.post('/api/hq/banners/projects/:id/generations', async (c) => {
       apiSize: v.preset.apiSize,
       quality,
       textLines: v.textLines,
+      emphasisLines: v.emphasisLines,
       baseColor: v.baseColor,
       mainColor: v.mainColor,
       subColor: v.subColor,

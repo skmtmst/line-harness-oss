@@ -183,8 +183,13 @@ export default function ReferencePickerDialog({
       onCancel={onClose}
       error={error || undefined}
       designNode="cOgWE"
+      /*
+       * 下の段。余白と区切り線（★V8 の窓 `q3DPdz` の下段と同じ 14/24）は
+       * 共通の窓が自前の footer には付けないので、ここで持つ
+       * （2026-10-06 オーナー指示「枠の隅までボタンがあり余白がない」）。
+       */
       footer={
-        <div className="flex w-full flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 border-t border-hairline px-6 py-3.5">
           <Button onClick={() => fileRef.current?.click()}>
             <Upload aria-hidden="true" className="h-4 w-4" />
             ファイルを選ぶ

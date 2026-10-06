@@ -95,6 +95,12 @@ export interface BannerPromptInput {
   /** 参照画像（最大3枚）。画像ごとに使い方を持つ。無いときは空配列。 */
   references?: BannerReference[] | null;
   textLines: string[];
+  /**
+   * 行ごとの「強調」（Pencil ★修正案 `g64HOD`・2026-10-06 承認の決まり5）。
+   * `textLines` と同じ順・同じ長さ。true の行だけを強調カラーで目立たせる。
+   * 強調を知らない古い生成は空配列・未指定で、そのときは今までどおりになる。
+   */
+  emphasisLines?: boolean[] | null;
   /** 色の4つの役割（★BG-B `KkTNS`）。指定なしは null。 */
   baseColor: string | null;
   mainColor: string | null;
@@ -150,16 +156,21 @@ export function buildBannerPrompt(input: BannerPromptInput): string {
   } else {
     parts.push(`${input.preset.medium}のためのプロモーション画像を1枚デザインしてください。`);
 
-    const lines = input.textLines.map((line) => line.trim()).filter(Boolean);
-    if (lines.length > 0) {
+    // 空の行を落とすときは「強調」も同じ行と一緒に落とす（先に片方だけ詰めると番号がずれる）。
+    const kept = input.textLines
+      .map((line, index) => ({ line: line.trim(), emphasis: input.emphasisLines?.[index] === true }))
+      .filter((entry) => entry.line.length > 0);
+    if (kept.length > 0) {
       parts.push('画像の中に、次の日本語テキストを「この順番で」「一字一句そのまま」「誤字なく」大きく読みやすい日本語フォントで配置してください。テキストはこれ以外に一切追加しないでください。');
-      lines.forEach((line, index) => {
+      kept.forEach((entry, index) => {
         const role = ROLE_HINTS[Math.min(index, ROLE_HINTS.length - 1)];
-        parts.push(`${index + 1}. 「${line}」（${role}）`);
+        // 強調した行は、どの行かが分かるようにここで印を付ける（決まり5）。
+        parts.push(`${index + 1}. 「${entry.line}」（${role}${entry.emphasis ? '・特に目立たせる' : ''}）`);
       });
     } else {
       parts.push('文字は入れないでください。');
     }
+    const emphasized = kept.filter((entry) => entry.emphasis);
 
     // 色の4つの役割（★BG-B `KkTNS`）。使う場所まで言い切る。
     if (input.baseColor) {
@@ -173,6 +184,12 @@ export function buildBannerPrompt(input: BannerPromptInput): string {
     }
     if (input.accentColor) {
       parts.push(`特に目立たせたい文字には強調カラー ${input.accentColor} を使ってください。`);
+      // 強調した行があるときは、どの行をその色で目立たせるかまで言い切る（決まり5）。
+      if (emphasized.length > 0) {
+        parts.push(
+          `そのうち ${emphasized.map((entry) => `「${entry.line}」`).join('・')} は、強調カラー ${input.accentColor} を使って他の行よりはっきり目立たせてください。`,
+        );
+      }
     }
     parts.push(
       input.personOption === 'with'
@@ -209,6 +226,8 @@ export interface BannerRequestValidation {
     mode: BannerMode;
     preset: BannerPreset;
     textLines: string[];
+    /** 行ごとの「強調」。`textLines` と同じ順・同じ長さ（★修正案 `g64HOD`）。 */
+    emphasisLines: boolean[];
     baseColor: string | null;
     mainColor: string | null;
     subColor: string | null;
@@ -235,11 +254,20 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
     return { ok: false, error: `枚数は1〜${BANNER_MAX_COUNT}枚で指定してください` };
   }
 
+  /*
+   * テキストと行ごとの「強調」（★修正案 `g64HOD`）は同じ番号で対になっている。
+   * 空の行を落とすときは強調も同じ行と一緒に落とす。先に片方だけ詰めると、
+   * 2行目の強調が3行目に付くような取り違えが起きる。
+   */
   const rawLines = Array.isArray(body.textLines) ? body.textLines : [];
-  const textLines = rawLines
-    .filter((line): line is string => typeof line === 'string')
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const rawEmphasis = Array.isArray(body.emphasisLines) ? body.emphasisLines : [];
+  const keptLines = rawLines
+    .map((line, index) => ({ line, emphasis: rawEmphasis[index] === true }))
+    .filter((entry): entry is { line: string; emphasis: boolean } => typeof entry.line === 'string')
+    .map((entry) => ({ line: entry.line.trim(), emphasis: entry.emphasis }))
+    .filter((entry) => entry.line.length > 0);
+  const textLines = keptLines.map((entry) => entry.line);
+  const emphasisLines = keptLines.map((entry) => entry.emphasis);
   if (textLines.length > BANNER_MAX_TEXT_LINES) {
     return { ok: false, error: `テキストは${BANNER_MAX_TEXT_LINES}行までにしてください` };
   }
@@ -324,6 +352,7 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
       mode,
       preset,
       textLines,
+      emphasisLines,
       baseColor: colors.baseColor,
       mainColor: colors.mainColor,
       subColor: colors.subColor,
