@@ -587,6 +587,10 @@
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
   --tpl-thead-pad-block: 12px; --tpl-thead-pad-side: 24px; --tpl-thead-lh: 16px;
+  /* シナリオ配信の一覧（axFrW・wjfLe・X0QrW0・Al4Ek）。 */
+  --tpl-scn-col-select: 48px; --tpl-scn-col-grip: 30px; --tpl-scn-col-name: 608px; --tpl-scn-col-count: 146px; --tpl-scn-col-state: 96px; --tpl-scn-col-menu: 60px;
+  --tpl-scn-row-h: 61px; --tpl-scn-saved-w: 151px; --tpl-scn-saved-icon-w: 48px; --tpl-scn-folder-w: 150px; --tpl-scn-skeleton-gap: 4px; --tpl-scn-sub-gap: 2px; --tpl-scn-count-gap: 1px; --tpl-scn-narrow-head-h: 34px;
+  --tpl-scn-dup-gap: 14px; --tpl-scn-dup-field-gap: 6px; --tpl-scn-dup-box-pad: 12px; --tpl-scn-dup-box-gap: 4px; --tpl-scn-dup-note-pad: 10px 14px; --tpl-scn-dup-note-gap: 10px;
   --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
   --tpl-band-gap: 0;
   /* 自動応答の一覧（uE9gf・Q5lOCc・WPrd5）。 */
