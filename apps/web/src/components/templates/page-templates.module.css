@@ -65,6 +65,7 @@
 :global([data-theme='v8']) .inboxSummary { width: var(--tpl-inbox-summary-width); flex-shrink: 0; padding: var(--tpl-inbox-summary-pad); border-left: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--tpl-inbox-summary-gap); }
 :global([data-theme='v8']) .settings { display: flex; flex: 1; gap: var(--tpl-settings-gap); padding: 0; min-width: 0; }
 :global([data-theme='v8']) .settingsNav { width: var(--tpl-settings-nav-width); flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; padding: var(--tpl-settings-nav-pad-block) var(--tpl-settings-nav-pad-side); }
+:global([data-theme='v8']) .settingsNav:has(> [data-settings-nav='inline']) { width: auto; padding: 0; }
 :global([data-theme='v8']) .settingsContent { flex: 1; max-width: 720px; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-settings-content-gap); padding: var(--tpl-settings-content-pad-block) var(--tpl-settings-content-pad-side); }
 :global([data-theme='v8']) .period { padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 :global([data-theme='v8']) .analyticsContent { flex: 1; min-width: 0; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
