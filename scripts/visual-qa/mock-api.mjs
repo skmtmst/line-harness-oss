@@ -1529,7 +1529,7 @@ const UID_MIGRATION_DONE = {
   rolledBackAt: null, failureReason: null, rollbackable: true,
 }
 
-function visualQaWriteBody(method, pathname) {
+function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   if (method === 'POST' && (pathname === '/api/notifications/operator-rules/recipients-preview' || pathname === '/api/line-notifications/operator-rules/recipients-preview')) {
     /*
      * 本物は両方の名で同じ候補を返す（`notifications.ts`）。
@@ -3629,6 +3629,31 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
        * だけでは赤い帯が別の画面へ移るだけになる（1920px見直し③）。
        */
       const id = decodeURIComponent(automationDraftDetail[1])
+      /*
+       * ★V8 ルールを作る（M4torY・tJqST）の撮影用の下書き。絵と同じ形（メッセージを受け取ったとき・
+       * 含まれる言葉「予約」・することが3つ）。一覧には出ない番号で持つ（ar-new と同じ扱い）。
+       */
+      if (id === 'automation-v8-new') {
+        return {
+          success: true,
+          data: {
+            id,
+            draftVersionId: `${id}-version`,
+            name: '「予約」と送られたら担当へ知らせる',
+            description: null,
+            eventType: 'message_received',
+            triggerConfig: { keyword: '予約' },
+            conditions: {},
+            actions: [
+              { id: `${id}-action-1`, type: 'add_tag', params: { tagId: 'tag-trial' }, onFailure: 'stop' },
+              { id: `${id}-action-2`, type: 'send_message', params: { messageType: 'text', content: '予約の受付をはじめます。ご希望の日時を送ってください。' }, onFailure: 'stop' },
+              { id: `${id}-action-3`, type: 'start_scenario', params: { scenarioId: 'scenario-trial' }, onFailure: 'stop' },
+            ],
+            commonActionRefs: [],
+            commonActionVersions: {},
+          },
+        }
+      }
       const source = AUTOMATIONS.find((item) => `${item.id}-draft` === id || `${item.id}-copy-draft` === id)
         ?? (id === 'automation-visual-draft' ? AUTOMATIONS[0] : null)
       if (!source) return { success: false, error: '下書きが見つかりません' }
@@ -5629,7 +5654,7 @@ const server = createServer((req, res) => {
       )
       return
     }
-    const fixedResult = visualQaWriteBody(method, url.pathname)
+    const fixedResult = visualQaWriteBody(method, url.pathname, url.searchParams)
     if (fixedResult) {
       res.writeHead(200).end(JSON.stringify({ success: true, data: fixedResult }))
       return
