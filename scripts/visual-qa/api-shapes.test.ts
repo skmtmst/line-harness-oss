@@ -79,7 +79,7 @@ describe('画面確認モックの口の形', () => {
 
 describe('ウェビナーフォルダの画面確認データ', () => {
   it('選択中アカウントと件数を持つ', () => {
-    expect(WEBINAR_FOLDERS).toHaveLength(4);
+    expect(WEBINAR_FOLDERS).toHaveLength(3);
     for (const folder of WEBINAR_FOLDERS) {
       expect(folder).toMatchObject({
         kind: 'webinar', accountId: 'visual-qa-account', count: expect.any(Number),
