@@ -235,14 +235,22 @@ describe('共通部品の影響範囲', () => {
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
+      // ★V8 回答フォームの一覧（I3L41O）。新しい置き場（src/v8）に一から書いた。
+      'v8/forms/list.tsx',
       // V8 のリッチメニュー一覧（src/v8 に一から書いた）。
       'v8/rich-menus/list.tsx',
       // ★V8 自動応答の一覧（uE9gf）。新しい置き場（src/v8）に一から書いた。
       'v8/auto-replies/list.tsx',
       // ★V8-B 流入と計測の一覧（xbHxg）。新しい置き場（src/v8）に一から書いた。
       'v8/inflow-links/list.tsx',
+      // ★V8 シナリオ配信の一覧（axFrW）を src/v8 に一から書いた。ページ送りは共通のまま。
+      'v8/scenarios/list.tsx',
       // ★V8 ウェビナーの一覧（UyUMw）。新しい置き場（src/v8）に一から書いた。
       'v8/webinars/list.tsx',
+      // ★V8 外部連携の送る一覧（ZSbFY）。新しい置き場（src/v8）に一から書いた。
+      'v8/webhooks/outgoing.tsx',
+      // ★V8 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りを置く。
+      'v8/webhooks/interactions.tsx',
     ].sort())
   })
 

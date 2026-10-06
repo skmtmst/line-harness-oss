@@ -113,7 +113,8 @@ function importedFiles(file: string, source: string): string[] {
   };
   // lib も辿る。選択肢の定義（リッチメニューのレイアウトなど）を lib に
   // 置いている画面があり、@/components と @/app だけでは中身を読めない。
-  for (const m of source.matchAll(/from '@\/(components|app|lib)\/([^']+)'/g)) {
+  // V8 の画面は src/v8 に一から書く（2026-10-06）。入口の page.tsx は @/v8 を読むだけなので、そこも辿る。
+  for (const m of source.matchAll(/from '@\/(components|app|lib|v8)\/([^']+)'/g)) {
     push(join(SRC, m[1], m[2]));
   }
   // 画面の中身を同じフォルダのファイルに出していることがある
@@ -177,7 +178,8 @@ describe('画面の骨格が設計と一致する', () => {
 
   it.each([
     ['/broadcasts/new', 'data-design-node="FU2aU"'],
-    ['/form-submissions', "data-design-node={narrow ? 'GrnO4' : 'I3L41O'}"],
+    // 2026-10-06：一覧は src/v8/forms/list に一から書いた。板の印は型（ListPage）の boardId で付ける。
+    ['/form-submissions', "boardId={narrow ? 'GrnO4' : 'I3L41O'}"],
   ])('%s はV8の画面を読み込む', (route, marker) => {
     expect(readWithParts(route)).toContain(marker);
   });
