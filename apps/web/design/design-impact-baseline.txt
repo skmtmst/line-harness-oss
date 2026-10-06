@@ -720,3 +720,7 @@ shared-button-importer v8/friend-add-publish/publish.tsx
 shared-button-importer v8/friend-add-publish/done.tsx
 shared-button-importer v8/automations/create/create.tsx
 shared-button-importer v8/automations/create/friend-multi-select.tsx
+# ★V8 LINEアカウントの詳細（ihjfd）・窓（CFAyf・Msb1j・WOfBN・n9Z2P）・乗り換え（x2dSNv）。src/v8 に一から書いた。
+shared-button-importer v8/accounts-detail/detail.tsx
+shared-button-importer v8/accounts-detail/dialogs.tsx
+shared-button-importer v8/accounts-detail/handover.tsx

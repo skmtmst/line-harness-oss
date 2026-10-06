@@ -105,7 +105,7 @@ import {
   NEN_PHOTO_REWARD_POLICY_VERSIONS,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
   FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS, FORM_VISIT_DETAIL, FORM_VISIT_SUBMISSIONS,
-  LINE_ACCOUNTS, LINE_ACCOUNT_TAGS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
+  LINE_ACCOUNTS, LINE_ACCOUNT_TAGS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_DETAIL_STOPPED, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
   ACCOUNT_HEALTH_LOGS,
   CONVERSION_POINTS, CONVERSION_REPORT_CURRENT, CONVERSION_REPORT_PREVIOUS,
   CONVERSION_DEFINITIONS, CONVERSION_DEFINITION_REPORT, CONVERSION_EXPORT_CSV,
@@ -2418,7 +2418,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
      */
     return {
       success: true,
-      data: { ...STAFF, platformAdmin: true, platformAdminState: null, impersonation: null },
+      // 再確認の聞き方は認証アプリの6桁（★V8 WOfBN アーカイブの窓は6マスで描かれている）。
+      data: { ...STAFF, platformAdmin: true, platformAdminState: null, impersonation: null, stepUpMethod: 'totp' },
       csrfToken: 'visual-qa-csrf',
     }
   }
@@ -2888,8 +2889,12 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === `/api/account-handovers/${ACCOUNT_HANDOVER.id}`) {
     return {
       success: true,
-      data: { ...ACCOUNT_HANDOVER, decisions: ACCOUNT_HANDOVER_DECISIONS, unresolvedReviews: 20 },
+      data: { ...ACCOUNT_HANDOVER, decisions: ACCOUNT_HANDOVER_DECISIONS, unresolvedReviews: 1 },
     }
+  }
+  // 止めている間に送らなかった配信（★V8 WOfBN の窓の後ろ）。本物は配列を返す。
+  if (/^\/api\/line-accounts\/[^/]+\/skipped-deliveries$/.test(pathname)) {
+    return { success: true, data: [] }
   }
   if (pathname.startsWith('/api/line-accounts/') && pathname.split('/').length === 4) {
     /*
@@ -2903,6 +2908,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       data: {
         ...(LINE_ACCOUNTS.find((account) => account.id === pathname.split('/')[3]) ?? LINE_ACCOUNT_DETAIL),
         ...(pathname.split('/')[3] === LINE_ACCOUNT_DETAIL.id ? LINE_ACCOUNT_DETAIL : {}),
+        ...(pathname.split('/')[3] === LINE_ACCOUNT_DETAIL_STOPPED.id ? LINE_ACCOUNT_DETAIL_STOPPED : {}),
       },
     }
   }

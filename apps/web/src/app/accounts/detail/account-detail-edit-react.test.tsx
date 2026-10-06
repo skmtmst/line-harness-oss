@@ -13,7 +13,9 @@ import AccountDetailPage from './page'
  * 統括・管理者だけに開く。
  */
 
-vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v8' }))
+// v7 の画面（AccountDetail と AccountEditModal）の試験。V8 の画面（src/v8/accounts-detail）は入口が分けるので、
+// ここは v7 に固定する。V8 の同じ動きは src/v8/accounts-detail/detail.test.tsx が見る。
+vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => 'v7' }))
 
 const fixture = vi.hoisted(() => ({
   tab: 'overview' as string | null,
