@@ -730,6 +730,7 @@
   --tpl-create-content-pad-block: 24px; --tpl-create-content-pad-side: 28px; --tpl-create-content-gap: 16px;
   --tpl-section-pad: 20px; --tpl-section-gap: 14px;
   /* 行の「…」のメニューの項目（絵 IIesG・SkY9V・C0lfUP）。 */
+  --tpl-menu-item-h: 34px; --tpl-menu-item-gap: 8px; --tpl-menu-divider-margin: 0; --tpl-create-notice-pad: 12px 24px;
   --tpl-menu-item-h: 34px; --tpl-menu-item-gap: 8px;
   /* フォルダの色の丸（一覧の行の名前の前）。説明の行は丸と間の分 16 を下げて名前にそろえる。 */
   --tpl-folder-dot-size: 8px; --tpl-folder-dot-gap: 8px; --tpl-folder-dot-indent: 16px;
