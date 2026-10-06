@@ -367,7 +367,7 @@ function FriendDetailInner() {
       </div>}
     >
       <div className={styles.kpiBox}>
-        <KpiBand data-design="KPIs">
+        <KpiBand>
           <KpiCard presentation="band" density="compact" icon={null} title="使える残高" value={available} unit="マイル"
             detail={v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${formatNumber(v6Friend.monthChange)}` : `生涯 ${formatNumber(mileage.summary.lifetimeEarned)}・使用 ${formatNumber(mileage.summary.spent)}`} />
           <KpiCard presentation="band" density="compact" icon={null} title="確定待ち" value={pendingMiles} unit="マイル"

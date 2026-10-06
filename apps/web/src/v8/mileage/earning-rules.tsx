@@ -497,7 +497,7 @@ export default function EarningRulesTab() {
 
   /* ===== 数の帯（4マス） ===== */
   const stats = (
-    <KpiBand data-design="KPIs">
+    <KpiBand>
       <KpiCard
         presentation="band"
         title="たまる決めごと"

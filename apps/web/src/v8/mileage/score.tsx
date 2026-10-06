@@ -415,7 +415,7 @@ export default function ScoreTab() {
     />
   )
   const stats = (
-    <KpiBand data-design="KPIs">
+    <KpiBand>
       {bandCard('high', summary?.high, 'よく動く', <Star size={14} aria-hidden="true" />)}
       {bandCard('normal', summary?.normal, 'ふつう', <Activity size={14} aria-hidden="true" />)}
       {bandCard('low', summary?.low, 'しばらく動いていない', <TrendingDown size={14} aria-hidden="true" />)}

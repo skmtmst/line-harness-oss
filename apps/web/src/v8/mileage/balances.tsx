@@ -290,7 +290,7 @@ export default function BalancesTab() {
   const ready = !loading && !loadError && summary !== null
 
   const stats = (
-    <KpiBand data-design="KPIs">
+    <KpiBand>
       <KpiCard
         presentation="band"
         title="友だち"

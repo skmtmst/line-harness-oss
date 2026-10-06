@@ -238,7 +238,7 @@ export default function HistoryTab() {
   const ready = !loading && !error
 
   const stats = (
-    <KpiBand data-design="KPIs">
+    <KpiBand>
       <KpiCard
         presentation="band"
         title="今月の動き"

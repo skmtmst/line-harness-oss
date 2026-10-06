@@ -446,7 +446,7 @@ export default function RewardsTab() {
   const failedReason = failed[0] ? (failed[0].failureMessage || failed[0].rewardName) : null
 
   const stats = (
-    <KpiBand data-design="KPIs">
+    <KpiBand>
       <KpiCard
         presentation="band"
         title="使い道"
