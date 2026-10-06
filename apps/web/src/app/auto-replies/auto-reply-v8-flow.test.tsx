@@ -106,6 +106,8 @@ vi.mock('@/components/auto-replies/inline-action-list', () => ({
   default: () => null,
   useActionOptions: () => ({ tags: [], fields: [], marks: [], scenarios: [], vars: [] }),
 }))
+// 手順③の処理の行（V8）も、今までの処理の並びと同じく通しの試験では空にする（中身は部品の試験で見る）。
+vi.mock('@/components/auto-replies/inline-action-rows-v8', () => ({ default: () => null, actionRowTitle: () => '' }))
 vi.mock('@/components/shared/condition-builder', () => ({ default: () => null }))
 vi.mock('@/components/shared/image-uploader', () => ({ default: () => null }))
 
@@ -343,7 +345,8 @@ describe('V8 自動応答の通し：作って有効にする', () => {
     const keywordInput = screen.getByLabelText('反応する言葉を足す')
     fireEvent.change(keywordInput, { target: { value: '予約変更' } })
     fireEvent.keyDown(keywordInput, { key: 'Enter' })
-    await screen.findByText('予約変更')
+    // 右の列の試しの文・スマホにも同じ言葉が出るので、反応する言葉の並びの中で探す。
+    await within(screen.getByRole('group', { name: '反応する言葉' })).findByText('予約変更')
     fireEvent.click(screen.getByRole('button', { name: /^次へ：/ }))
     await goStep(navState.replaces[navState.replaces.length - 1])
 
