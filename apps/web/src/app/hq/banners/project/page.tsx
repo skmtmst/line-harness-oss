@@ -28,6 +28,7 @@ import {
   EMPTY_GENERATION_INPUT,
   activeGeneration,
   inputFromGeneration,
+  packedTextLines,
   progressBadgeText,
   readFileAsBase64,
   usageRefusal,
@@ -229,7 +230,8 @@ function ProjectInner() {
     try {
       const res = await api.hqBanners.projects.createGeneration(project.id, {
         ...input,
-        textLines: input.textLines.map((l) => l.trim()).filter(Boolean),
+        // 空の行を落とすときは「強調」も同じ行と一緒に落とす（先に片方だけ詰めると番号がずれる）。
+        ...packedTextLines(input),
         customPrompt: input.customPrompt.trim(),
         freePrompt: input.freePrompt.trim(),
       })

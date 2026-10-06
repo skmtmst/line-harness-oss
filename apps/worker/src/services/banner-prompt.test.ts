@@ -125,6 +125,91 @@ describe('バナー生成のプロンプト組み立て', () => {
   });
 });
 
+/*
+ * 行ごとの「強調」（承認: musubo-design/バナー生成.pen フレーム `g64HOD`・
+ * 2026-10-06・利用者回答「この案で承認する」）。強調した行だけを強調カラーで
+ * 目立たせる。空の行を落としても、強調が別の行へずれないことを押さえる。
+ */
+describe('行ごとの「強調」（承認 g64HOD・2026-10-06）', () => {
+  const preset = findBannerPreset('line_rich_message')!;
+
+  it('強調した行にだけ「特に目立たせる」を付ける', () => {
+    const prompt = buildBannerPrompt({
+      mode: 'banner',
+      preset,
+      textLines: ['春の感謝祭', '8/10〜8/23', '今すぐチェック'],
+      emphasisLines: [false, false, true],
+      baseColor: null,
+      mainColor: null,
+      subColor: null,
+      accentColor: null,
+      personOption: 'without',
+      customPrompt: '',
+      freePrompt: '',
+    });
+    expect(prompt).toContain('1. 「春の感謝祭」（メインのキャッチコピー）');
+    expect(prompt).toContain('2. 「8/10〜8/23」（サブコピー）');
+    expect(prompt).toContain('3. 「今すぐチェック」（訴求ポイント・特に目立たせる）');
+  });
+
+  it('強調カラーがあるときは、どの行をその色で目立たせるかまで言い切る', () => {
+    const prompt = buildBannerPrompt({
+      mode: 'banner',
+      preset,
+      textLines: ['春の感謝祭', '8/10〜8/23', '今すぐチェック'],
+      emphasisLines: [true, false, true],
+      baseColor: null,
+      mainColor: null,
+      subColor: null,
+      accentColor: '#FFD400',
+      personOption: 'without',
+      customPrompt: '',
+      freePrompt: '',
+    });
+    expect(prompt).toContain('「春の感謝祭」・「今すぐチェック」 は、強調カラー #FFD400 を使って他の行よりはっきり目立たせてください。');
+  });
+
+  it('強調が無いときは今までどおり（行に印を付けない）', () => {
+    const prompt = buildBannerPrompt({
+      mode: 'banner',
+      preset,
+      textLines: ['春の感謝祭'],
+      baseColor: null,
+      mainColor: null,
+      subColor: null,
+      accentColor: '#FFD400',
+      personOption: 'without',
+      customPrompt: '',
+      freePrompt: '',
+    });
+    expect(prompt).toContain('1. 「春の感謝祭」（メインのキャッチコピー）');
+    expect(prompt).not.toContain('特に目立たせる');
+    expect(prompt).not.toContain('そのうち');
+  });
+
+  it('空の行を落としても、強調が同じ行に付いてくる', () => {
+    const result = validateBannerRequest({
+      presetKey: 'line_rich_message',
+      count: 1,
+      textLines: ['  ', '送料無料', 'A'],
+      emphasisLines: [true, true, false],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.value?.textLines).toEqual(['送料無料', 'A']);
+    expect(result.value?.emphasisLines).toEqual([true, false]);
+  });
+
+  it('強調の指定が無い依頼でも通り、全部オフになる', () => {
+    const result = validateBannerRequest({
+      presetKey: 'line_rich_message',
+      count: 1,
+      textLines: ['送料無料'],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.value?.emphasisLines).toEqual([false]);
+  });
+});
+
 describe('生成条件の検査', () => {
   it('用途・品質・枚数がそろえば通る', () => {
     const result = validateBannerRequest({
