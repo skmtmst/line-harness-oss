@@ -639,6 +639,17 @@ shared-button-importer v8/webinar-edit/notifications.tsx
 shared-button-importer v8/webinar-edit/participants.tsx
 shared-button-importer v8/webinar-edit/review.tsx
 shared-button-importer v8/webinar-edit/video.tsx
+# ★V8 飲食店向け（担当 a：CHz31・t8WgD8・bSp4h・xLpnS・Googleビジネス j0Wcg ほか・店舗を追加 ao15G/faGn4・利用規約 VdKOK）。src/v8/restaurant に一から書いた。
+shared-button-importer v8/restaurant/approvals/approvals.tsx
+shared-button-importer v8/restaurant/dashboard/dashboard.tsx
+shared-button-importer v8/restaurant/google/posts.tsx
+shared-button-importer v8/restaurant/google/profile.tsx
+shared-button-importer v8/restaurant/google/reviews.tsx
+shared-button-importer v8/restaurant/google/settings.tsx
+shared-button-importer v8/restaurant/line-followup/line-followup.tsx
+shared-button-importer v8/restaurant/organization/organization.tsx
+shared-button-importer v8/restaurant/store-new/store-new.tsx
+shared-button-importer v8/restaurant/terms/terms.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx

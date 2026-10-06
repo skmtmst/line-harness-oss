@@ -1,0 +1,346 @@
+/*
+ * ★V8 店舗を追加（ao15G・faGn4）。値は globals.css の `--tpl-rt-*`。
+ * 中身：上16・左右24・下24、段の間16。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-body-gap);
+  padding: var(--tpl-rt-body-pad);
+  min-width: 0;
+}
+
+.icon13 { width: var(--tpl-rt-icon-13); height: var(--tpl-rt-icon-13); }
+.icon15 { width: var(--tpl-rt-icon-15); height: var(--tpl-rt-icon-15); flex-shrink: 0; }
+
+.spacer {
+  flex: 1 1 0;
+}
+
+/* 手順の帯：上4・下8、間8。手順は同じ幅、上下8・左右12、角10。いまの手順は緑の2px。 */
+.steps {
+  display: flex;
+  gap: var(--tpl-rt-chip-row-gap);
+  margin: 0;
+  padding: var(--tpl-rt-step-strip-pad);
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  min-width: 0;
+  padding: var(--tpl-rt-step-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.stepCurrent {
+  outline: var(--tpl-rt-step-current);
+  outline-offset: -2px;
+}
+
+.stepLink {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.stepDot {
+  display: inline-flex;
+  flex: 0 0 var(--tpl-rt-step-dot);
+  align-items: center;
+  justify-content: center;
+  height: var(--tpl-rt-step-dot);
+  border-radius: var(--radius-pill);
+  background: var(--color-table-head);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.stepDotCurrent,
+.stepDotDone {
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+}
+
+.stepLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.stepCurrent .stepLabel {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.stepDone .stepLabel {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+/* 左の手順の中身（残り）と右の「わからないときは」（340）。 */
+.split {
+  display: flex;
+  align-items: stretch;
+  gap: var(--tpl-rt-half-gap);
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rt-section-gap);
+  min-width: 0;
+  padding: var(--tpl-rt-panel-body-pad);
+  border-radius: var(--tpl-rt-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-rt-wizard-title-size);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.cardText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+/* ①の規約の枠：高さ220・上下14・左右16、地 #fafafc、角10。中は流れる。 */
+.termsBox {
+  height: var(--tpl-rt-terms-box-h);
+  overflow-y: auto;
+  padding: var(--tpl-rt-terms-box-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-table-head);
+}
+
+.termsBox:focus-visible {
+  outline: var(--tpl-rt-focus-ring);
+}
+
+.termsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+}
+
+.reason {
+  margin: 0;
+  color: var(--color-warning);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.errorBox {
+  margin: 0;
+  padding: var(--tpl-rt-notice-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--text-label);
+}
+
+/* ②の入力欄：見出し 13/500/20・間6、欄の下の補足 11。 */
+.fieldBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-section-gap);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-rt-label-lh);
+}
+
+.help {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.warnBox {
+  margin: 0;
+  padding: var(--tpl-rt-gray-note-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--tpl-rt-comment-bg);
+  color: var(--color-warning);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rt-kind-lh);
+}
+
+.agreed {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.checkIcon {
+  width: var(--tpl-rt-check-icon);
+  height: var(--tpl-rt-check-icon);
+  flex-shrink: 0;
+  color: var(--color-accent-deep);
+}
+
+.grayBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+  padding: var(--tpl-rt-stat-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  background: var(--color-table-head);
+}
+
+.grayTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.infoBox {
+  margin: 0;
+  padding: var(--tpl-rt-notice-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+  margin: 0;
+}
+
+.summary dd {
+  margin: 0;
+}
+
+.summaryValue {
+  overflow-wrap: anywhere;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.doneBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+  padding: var(--tpl-rt-stat-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+  background: var(--color-success-bg);
+}
+
+.doneTitle {
+  margin: 0;
+  color: var(--color-success);
+  font-size: var(--tpl-rt-mini-title-size);
+  font-weight: 700;
+}
+
+/* 右の「わからないときは」：幅340・余白18・段の間10・地 #fafafc。 */
+.helpPanel {
+  display: flex;
+  flex: 0 0 var(--tpl-rt-side-w);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-rt-card-gap);
+  padding: var(--tpl-rt-help-pad);
+  border-radius: var(--tpl-rt-card-radius);
+  background: var(--color-table-head);
+}
+
+.helpTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.helpText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.helpButton {
+  flex: 0 0 auto;
+}
+
+.helpSub {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+}
+
+.faq {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rt-draft-lh);
+  white-space: pre-line;
+}
+
+/* 下：上に細い線・上14、ボタンは中央・間8。 */
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  padding-top: var(--tpl-rt-footer-pad-top);
+  box-shadow: var(--tpl-rt-line-top);
+}

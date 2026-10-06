@@ -1,0 +1,300 @@
+/*
+ * ★V8 LINE来店フォロー（xLpnS）。値は globals.css の `--tpl-rt-*`。
+ */
+
+/* 確認用の注意の帯：上下10・左右14・間8・地 #fff4e0・角8・印16・文12。 */
+.caution,
+.readOnly {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  padding: var(--tpl-rt-notice-pad);
+  border-radius: var(--tpl-rt-inner-radius);
+  background: var(--tpl-rt-caution-bg);
+  color: var(--tpl-rt-caution-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+
+.readOnly {
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+}
+
+.cautionIcon {
+  width: var(--tpl-rt-icon-16);
+  height: var(--tpl-rt-icon-16);
+  flex-shrink: 0;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+/* 流れのカード：2列・間16・同じ行は高い方に合わせる。 */
+.flowGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-rt-half-gap);
+}
+
+.flow {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: var(--tpl-rt-card-radius);
+  outline: 1px solid var(--tpl-rt-band-line);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+/* 頭：上下12・左右16・地 #faf6ec・下に細い線。 */
+.flowHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  padding: var(--tpl-rt-flow-head-pad);
+  background: var(--tpl-rt-band-bg);
+  box-shadow: var(--tpl-rt-flow-head-line);
+}
+
+.flowHeadText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rt-cell-gap);
+  min-width: 0;
+}
+
+.kicker {
+  margin: 0;
+  color: var(--tpl-rt-kicker-ink);
+  font-size: var(--tpl-rt-kicker-size);
+  font-weight: 600;
+  letter-spacing: var(--tpl-rt-kicker-tracking);
+  line-height: normal;
+}
+
+.flowTitle {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: normal;
+}
+
+.flowBody {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-rt-dialog-gap);
+  padding: var(--tpl-rt-stat-pad);
+}
+
+.form {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rt-card-gap);
+  min-width: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-rt-label-lh);
+}
+
+/* 本文の枠：高さ56・左右12・文は上下の中央。 */
+.bodyBox {
+  display: flex;
+  align-items: center;
+  height: var(--tpl-rt-body-box-h);
+  padding: var(--tpl-rt-body-box-pad);
+  border-radius: var(--tpl-rt-band-radius);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  cursor: text;
+}
+
+.bodyBox:focus-within {
+  outline: var(--tpl-rt-focus-ring);
+}
+
+.bodyInput {
+  width: 100%;
+  max-height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  word-break: normal;
+  field-sizing: content;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--tpl-rt-input-lh);
+}
+
+.flowFoot {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-chip-row-gap);
+  min-height: var(--tpl-rt-control-h);
+}
+
+.timing {
+  color: var(--tpl-rt-kicker-ink);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: normal;
+}
+
+/* LINEでの見え方：幅210・余白10・間6・青い地・角12。 */
+.preview {
+  display: flex;
+  flex: 0 0 var(--tpl-rt-preview-w);
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+  padding: var(--tpl-rt-card-gap);
+  border-radius: var(--tpl-rt-card-radius);
+  background: var(--tpl-rt-preview-bg);
+}
+
+.previewHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-payload-gap);
+}
+
+.previewIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-rt-preview-icon);
+  height: var(--tpl-rt-preview-icon);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-size: var(--text-nano);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.previewAccount {
+  color: var(--color-on-accent);
+  font-size: var(--text-nano);
+  line-height: normal;
+}
+
+.rich {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--tpl-rt-rich-radius);
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+.photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--tpl-rt-photo-h);
+  color: var(--color-on-accent);
+}
+
+.photoA { background: var(--tpl-rt-photo-a); }
+.photoB { background: var(--tpl-rt-photo-b); }
+.photoC { background: var(--tpl-rt-photo-c); }
+.photoD { background: var(--tpl-rt-photo-d); }
+
+.photoIcon {
+  width: var(--tpl-rt-photo-icon);
+  height: var(--tpl-rt-photo-icon);
+}
+
+.richText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+  padding: var(--tpl-rt-rich-pad);
+}
+
+.richTitle {
+  margin: 0;
+  word-break: normal;
+  color: var(--tpl-rt-rich-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.richBody {
+  margin: 0;
+  word-break: normal;
+  color: var(--tpl-rt-rich-sub);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-rt-rich-body-lh);
+}
+
+.richAction {
+  margin: 0;
+  padding: var(--tpl-rt-rich-action-pad);
+  box-shadow: var(--tpl-rt-line-top);
+  color: var(--tpl-rt-rich-link);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+  text-align: center;
+}
+
+/* LINE ミニアプリ連携：中身は2列・間16・余白20。カードは余白18・間6。 */
+.miniGrid {
+  display: flex;
+  gap: var(--tpl-rt-half-gap);
+}
+
+.miniCard {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rt-payload-gap);
+  min-width: 0;
+  padding: var(--tpl-rt-mini-pad);
+  border-radius: var(--tpl-rt-card-radius);
+  outline: 1px solid var(--tpl-rt-band-line);
+  outline-offset: -1px;
+  background: var(--tpl-rt-band-bg);
+}
+
+.miniKicker {
+  margin: 0;
+  color: var(--tpl-rt-kicker-ink);
+  font-size: var(--text-nano);
+  font-weight: 700;
+  letter-spacing: var(--tpl-rt-kicker-tracking);
+  line-height: normal;
+}
+
+.miniTitle {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-rt-mini-title-size);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.miniText {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+}

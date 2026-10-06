@@ -297,6 +297,9 @@ describe('共通部品の影響範囲', () => {
       'v8/reminders/detail.tsx',
       // ★V8 ウェビナーの参加者（uNsEy）。表の下にページ送りを置く。
       'v8/webinar-edit/participants.tsx',
+      // ★V8 Googleビジネスの口コミ・投稿（j0Wcg・Cfed0）。2ページ以上のときだけ表の下にページ送り。
+      'v8/restaurant/google/reviews.tsx',
+      'v8/restaurant/google/posts.tsx',
       // ★V8 友だち（x6QsVz 一覧・ADjK8 統合ユーザー・hn6Y8 重複検出・Z0jHp UID移行）を src/v8/friends に一から書いた。
       'v8/friends/list/list.tsx',
       'v8/friends/merged/merged.tsx',
