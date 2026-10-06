@@ -66,6 +66,7 @@ import {
   DUPLICATE_STATS, FRIENDS, FRIEND_BULK_RUN, FRIEND_SCENARIOS, FRIEND_STATS,
   IDENTITY_CANDIDATE_DETECTION, IDENTITY_CANDIDATE_EC, IDENTITY_CANDIDATE_ERROR, IDENTITY_CANDIDATE_FRIEND,
   IDENTITY_CANDIDATE_LISTS,
+  FRIEND_DUPLICATE_DETAIL,
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
@@ -2541,7 +2542,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const friendDuplicate = /^\/api\/friends\/duplicates\/([^/]+)$/.exec(pathname)
   if (friendDuplicate) {
     if (query.get('visualState') === 'error') return IDENTITY_CANDIDATE_ERROR
-    return { success: true, data: IDENTITY_CANDIDATE_FRIEND }
+    return { success: true, data: FRIEND_DUPLICATE_DETAIL }
   }
   const mergedPerson = /^\/api\/friends\/people\/([^/]+)$/.exec(pathname)
   if (mergedPerson) {

@@ -718,6 +718,10 @@
   --tpl-fr-dup-col-confidence: 92px; --tpl-fr-dup-col-evidence: 212px; --tpl-fr-dup-col-account: 162px; --tpl-fr-dup-col-status: 102px;
   --tpl-fr-dup-col-action: 118px; --tpl-fr-dup-col-num: 102px; --tpl-fr-dup-col-num-last: 98px; --tpl-fr-dup-row-compact-h: 51px; --tpl-fr-chip-pad: 10px;
   --tpl-fr-search-xs: 200px; --tpl-fr-dup-n-col-account: 132px; --tpl-fr-dup-pager-h: 42px;
+  --tpl-fr-cmp-subject-pad: 18px; --tpl-fr-cmp-name-gap: 6px; --tpl-fr-cmp-name-size: 17px; --tpl-fr-cmp-name-lh: 25px; --tpl-fr-cmp-sub-gap: 6px;
+  --tpl-fr-cmp-attrs-gap: 2px; --tpl-fr-cmp-attr-h: 34px; --tpl-fr-cmp-attr-label: 86px; --tpl-fr-cmp-card-gap: 6px; --tpl-fr-cmp-line-h: 47px;
+  --tpl-fr-cmp-panel-pad: 16px; --tpl-fr-cmp-panel-lh: 20px; --tpl-fr-cmp-radio-gap: 17px; --tpl-fr-cmp-check-gap: 6px;
+  --tpl-fr-cmp-history-date: 259px; --tpl-fr-cmp-col-item: 160px; --tpl-fr-cmp-col-use: 208px; --tpl-fr-cmp-card-min: 220px; --tpl-fr-cmp-attr-label-n: 82px;
 }
 
 /*

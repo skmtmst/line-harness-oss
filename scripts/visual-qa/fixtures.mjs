@@ -2965,6 +2965,20 @@ export const IDENTITY_CANDIDATE_FRIEND = {
   canDecide: true, canUndo: false, undoNote: '判定を取り消すと、根拠を確認する候補へ戻ります。',
 }
 
+/** ★V8 比べて決める fcg2D：友だち同士の詳細（/api/friends/duplicates/:id）。判定の履歴を1件持つ。 */
+export const FRIEND_DUPLICATE_DETAIL = {
+  ...IDENTITY_CANDIDATE_FRIEND,
+  left: { ...IDENTITY_CANDIDATE_FRIEND.left, detail: '支店' },
+  right: { ...IDENTITY_CANDIDATE_FRIEND.right, detail: '本店' },
+  history: [
+    {
+      id: 'identity-history-1', fromStatus: 'pending', toStatus: 'deferred', actorName: 'Kenta',
+      reason: '本人に確認中', decidedAt: '2026-09-30T01:12:00.000Z', reprocessMode: null,
+    },
+  ],
+  detectedAt: '2026-09-28T09:40:00.000Z',
+}
+
 export const IDENTITY_CANDIDATE_EC = {
   ...IDENTITY_CANDIDATE_FRIEND,
   id: 'identity-ec-1', kind: 'ec_member',
