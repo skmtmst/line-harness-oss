@@ -4102,6 +4102,69 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /* Search Console（絵 h1G4d）。つないだ状態の検索の数字。 */
+  if (pathname === '/api/search-console/performance') {
+    return {
+      success: true,
+      data: {
+        status: 'connected', siteUrl: 'sc-domain:nen.example', startDate: '2026-09-02', endDate: '2026-10-01', rangeDays: Number(query.get('days') ?? 28),
+        summary: { clicks: 1846, impressions: 48210, ctr: 0.038, position: 12.4 },
+        previousSummary: { clicks: 1634, impressions: 44310, ctr: 0.037, position: 12.9 },
+        daily: [
+        { key: '2026-09-02', clicks: 55, impressions: 1430, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-03', clicks: 50, impressions: 1300, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-04', clicks: 64, impressions: 1664, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-05', clicks: 58, impressions: 1508, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-06', clicks: 73, impressions: 1898, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-07', clicks: 69, impressions: 1794, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-08', clicks: 42, impressions: 1092, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-09', clicks: 40, impressions: 1040, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-10', clicks: 61, impressions: 1586, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-11', clicks: 66, impressions: 1716, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-12', clicks: 74, impressions: 1924, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-13', clicks: 72, impressions: 1872, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-14', clicks: 78, impressions: 2028, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-15', clicks: 47, impressions: 1222, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-16', clicks: 43, impressions: 1118, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-17', clicks: 63, impressions: 1638, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-18', clicks: 69, impressions: 1794, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-19', clicks: 76, impressions: 1976, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-20', clicks: 71, impressions: 1846, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-21', clicks: 83, impressions: 2158, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-22', clicks: 53, impressions: 1378, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-23', clicks: 49, impressions: 1274, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-24', clicks: 67, impressions: 1742, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-25', clicks: 73, impressions: 1898, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-26', clicks: 79, impressions: 2054, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-27', clicks: 77, impressions: 2002, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-28', clicks: 86, impressions: 2236, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-29', clicks: 59, impressions: 1534, ctr: 0.038, position: 12.4 },
+        { key: '2026-09-30', clicks: 51, impressions: 1326, ctr: 0.038, position: 12.4 },
+        { key: '2026-10-01', clicks: 0, impressions: 0, ctr: 0, position: 12.4 },
+        ],
+        queries: [
+        { key: '鹿肉 ドッグフード', clicks: 412, impressions: 6120, ctr: 0.0673, position: 3.2 },
+        { key: '犬 手作りごはん', clicks: 238, impressions: 9800, ctr: 0.0243, position: 8.9 },
+        { key: '然 nen', clicks: 201, impressions: 640, ctr: 0.3141, position: 1.0 },
+        { key: 'ペット 定期便', clicks: 96, impressions: 4210, ctr: 0.0228, position: 11.6 },
+        { key: '鹿肉ふりかけ', clicks: 88, impressions: 1020, ctr: 0.0863, position: 4.1 },
+        ],
+        pages: [
+        { key: 'https://nen.example/', clicks: 522, impressions: 12400, ctr: 0.0421, position: 6.1 },
+        { key: 'https://nen.example/products/venison', clicks: 388, impressions: 8950, ctr: 0.0434, position: 4.8 },
+        { key: 'https://nen.example/guide/homemade', clicks: 241, impressions: 10300, ctr: 0.0234, position: 9.2 },
+        { key: 'https://nen.example/teiki', clicks: 119, impressions: 5020, ctr: 0.0237, position: 10.4 },
+        { key: 'https://nen.example/column/autumn', clicks: 74, impressions: 3880, ctr: 0.0191, position: 14.0 },
+        ],
+        devices: [
+          { key: 'MOBILE', clicks: 1420, impressions: 36000, ctr: 0.039, position: 12.1 },
+          { key: 'DESKTOP', clicks: 371, impressions: 10500, ctr: 0.035, position: 13.0 },
+          { key: 'TABLET', clicks: 55, impressions: 1710, ctr: 0.032, position: 13.4 },
+        ],
+        fetchedAt: '2026-10-01T06:00:00+09:00',
+      },
+    }
+  }
   if (pathname === '/api/analytics/url-clicks') {
     /*
       分析のURLクリック。**入れ子の器で返す。**
