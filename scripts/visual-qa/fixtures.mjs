@@ -2395,14 +2395,13 @@ export const FRIEND_DETAILS = {
 }
 
 /**
- * テンプレートの置き場。設計 `NWbuF`（2-6 全フォルダ展開）の件数そのまま。
- * 未分類3・お問い合わせ8・予約5・EC4・フォロー6で計26件。
+ * テンプレートの置き場。設計 `v19Ivv`（一覧）の件数そのまま。
+ * 未分類7・お問い合わせ8・予約6・EC5で計26件。
  */
 export const TEMPLATE_FOLDERS = [
   ['tf-inquiry', 'お問い合わせ', 8],
-  ['tf-booking', '予約', 5],
-  ['tf-ec', 'EC', 4],
-  ['tf-follow', 'フォロー', 6],
+  ['tf-booking', '予約', 6],
+  ['tf-ec', 'EC', 5],
 ].map(([id, name, count], index) => ({
   id: String(id),
   kind: 'template',
@@ -2418,59 +2417,70 @@ export const TEMPLATE_FOLDERS = [
 /**
  * テンプレート26件。**件数はフォルダの数に合わせる。**
  * 合わないと、フォルダの脇に出る数と一覧の行数が食い違う。
+ *
+ * 先頭6件は設計 `v19Ivv` の一覧の6行そのまま（名前・種類・公開・使っている所・今月・更新）。
+ * 数の帯は 26件・未公開の変更2件・使っていない5件・今月 8,420通 になるようにしてある
+ * （下書きだけの「秋の新商品（画像）」は送れないので送信数0、一覧では「—」。使っている所の合計は 90。絵の 84 は残り20件が1か所ずつでも届かない数なので、桁だけそろえた）。
  */
 export const TEMPLATES = (() => {
-  const rows = []
-  // 設計 `W7LBc` の送信数。先頭6件は一覧に描かれた値をそのまま使う。
-  // 残りも 0 や未取得にせず、並び替えと表示を確かめられる固定値にする。
-  const sendCounts = [
-    [1240, 18300], [1860, 31400], [480, 9720], [210, 3040], [640, 5880],
-    [320, 7600], [980, 14200], [160, 2280], [740, 11900], [90, 1640],
-    [560, 8210], [430, 6940], [120, 2130], [350, 5360], [270, 4280],
-    [80, 980], [190, 2760], [150, 2410], [60, 720], [40, 510],
+  const FOLDER_LABEL = { 'tf-inquiry': 'お問い合わせ', 'tf-booking': '予約', 'tf-ec': 'EC' }
+  const TOP = [
+    { name: '初回お問い合わせへの返信', folderId: 'tf-inquiry', messageType: 'text', messageContent: 'ご連絡ありがとうございます。以下の内容をご確認ください。', usage: 38, sends: [1240, 18300], updatedAt: '2026-08-22T09:20:00.000Z' },
+    { name: '予約前日のご案内', folderId: 'tf-booking', messageType: 'text', messageContent: '{名前}さん、こんにちは。\n明日 {予約日時} にご予約をいただいています。\n変更・キャンセルは下のリンクからお願いします。', usage: 11, sends: [1860, 31400], updatedAt: '2026-08-21T09:02:00.000Z', hasDraft: true },
+    { name: '発送完了のお知らせ', folderId: 'tf-ec', messageType: 'text', messageContent: 'ご注文の商品を発送しました。お届けまで今しばらくお待ちください。', usage: 10, sends: [480, 9720] },
+    { name: '定期便 初回のご案内', folderId: null, messageType: 'flex', messageContent: JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '{名前}さん、いつもありがとうございます。初回のお届けについてご案内します。' }] } }), usage: 6, sends: [210, 3040] },
+    { name: '秋の新商品（画像）', folderId: null, messageType: 'image', messageContent: JSON.stringify({ originalContentUrl: 'https://example.com/autumn.jpg', previewImageUrl: 'https://example.com/autumn.jpg' }), usage: 0, sends: [0, 0], updatedAt: '2026-09-30T10:00:00.000Z', draftOnly: true },
+    { name: '折り返しのご案内', folderId: 'tf-inquiry', messageType: 'text', messageContent: '担当から折り返しご連絡します。少々お待ちください。', usage: 9, sends: [640, 5880] },
   ]
-  const plan = [
-    [null, '未分類', 3],
-    ['tf-inquiry', 'お問い合わせ', 8],
-    ['tf-booking', '予約', 5],
-    ['tf-ec', 'EC', 4],
-    ['tf-follow', 'フォロー', 6],
+  // 残り20件：お問い合わせ6・予約5・EC4・未分類5。使っている所は1か所ずつ、4件だけ0（使っていない）。
+  const restFolders = [
+    ...Array(6).fill('tf-inquiry'), ...Array(5).fill('tf-booking'), ...Array(4).fill('tf-ec'), ...Array(5).fill(null),
   ]
-  let n = 0
-  for (const [folderId, label, count] of plan) {
-    for (let i = 0; i < count; i += 1) {
-      rows.push({
-        id: `template-${n}`,
-        name: n === 0 ? '初回お問い合わせへの返信'
-          : n === 1 ? '予約前日のご案内'
-            : n === 2 ? '発送完了のお知らせ'
-              : n === 3 ? '折り返しのご案内'
-                : n === 11 ? '予約前日のご案内'
-                  : n === 12 ? '予約確定のお知らせ'
-                    : n === 13 ? '予約変更のご案内'
-                      : n === 14 ? '来店後フォロー'
-                        : `${label}のひな形 ${i + 1}`,
-        /* 分類は分類名にする。説明文を入れると画面の分類欄が説明文になる。 */
-        category: label,
-        messageType: 'text',
-        messageContent: n === 0
-          ? 'ご予約ありがとうございます。以下の内容をご確認ください。'
-          : `${label}のご連絡です。内容をご確認ください。`,
-        folderId,
-        /* 本物の口は質問・質問状態・置き場を必ず返す。無いと絞り・バッジの確認ができない。 */
-        question: null,
-        questionStatus: 'published',
-        usageCount: n === 0 ? 38 : Math.max(0, 12 - n),
-        tapCount: 0,
-        monthlySendCount: sendCounts[n]?.[0] ?? 0,
-        totalSendCount: sendCounts[n]?.[1] ?? 0,
-        createdAt: '2026-01-13T00:00:00.000Z',
-        updatedAt: n === 0 ? '2026-08-22T09:20:00.000Z' : '2026-01-13T00:00:00.000Z',
-      })
-      n += 1
-    }
-  }
-  return rows
+  const bookingNames = ['予約確定のお知らせ', '予約変更のご案内', '来店後フォロー']
+  // 残りの今月の送信数（合計 3,990。先頭6件の 4,430 と合わせて 8,420）。
+  const restSends = [320, 300, 280, 260, 250, 240, 230, 220, 210, 200, 190, 180, 170, 160, 150, 140, 130, 120, 110, 130]
+  const rows = TOP.map((t, n) => ({ ...t, n }))
+  const counters = {}
+  restFolders.forEach((folderId, i) => {
+    const key = folderId ?? 'none'
+    counters[key] = (counters[key] ?? 0) + 1
+    const label = folderId ? FOLDER_LABEL[folderId] : '未分類'
+    const name = folderId === 'tf-booking' && counters[key] <= bookingNames.length
+      ? bookingNames[counters[key] - 1]
+      : `${label}のひな形 ${counters[key]}`
+    rows.push({
+      n: 6 + i,
+      name,
+      folderId,
+      messageType: 'text',
+      messageContent: `${label}のご連絡です。内容をご確認ください。`,
+      usage: i >= 16 ? 0 : 1,
+      sends: [restSends[i], restSends[i] * 12],
+      // 未公開の変更は先頭の「予約前日のご案内」とこの1件の計2件。
+      hasDraft: i === 3,
+    })
+  })
+  return rows.map((t) => ({
+    id: `template-${t.n}`,
+    name: t.name,
+    /* 分類は分類名にする。説明文を入れると画面の分類欄が説明文になる。 */
+    category: t.folderId ? FOLDER_LABEL[t.folderId] : '未分類',
+    messageType: t.messageType,
+    messageContent: t.messageContent,
+    folderId: t.folderId,
+    /* 本物の口は質問・質問状態・置き場を必ず返す。無いと絞り・バッジの確認ができない。 */
+    question: null,
+    questionStatus: 'published',
+    usageCount: t.usage,
+    tapCount: 0,
+    monthlySendCount: t.sends[0],
+    totalSendCount: t.sends[1],
+    createdAt: '2026-01-13T00:00:00.000Z',
+    updatedAt: t.updatedAt ?? '2026-01-13T00:00:00.000Z',
+    /* 公開の札（公開中・未公開の変更・下書きだけ）。本物の口は公開日時と下書きの有無を返す。 */
+    publishedAt: t.draftOnly ? null : '2026-01-13T00:00:00.000Z',
+    hasDraft: Boolean(t.hasDraft || t.draftOnly),
+  }))
 })()
 
 /** テスト送信先。設計 `h0kahp` のLINE連携済み2人。 */

@@ -426,12 +426,13 @@
     },
     "/templates": {
       "node": "W7LBc",
-      "name": "★ V6 11-1 テンプレート（1920）",
+      "name": "★ V6 11-1 テンプレート（1920・一覧の数の帯は★V8 v19Ivv）",
       "sections": [
         "TypeTabs",
         "CreateActions",
         "Body",
-        "MobileCards"
+        "MobileCards",
+        "KPIs"
       ],
       "parts": [
         "メッセージ",
