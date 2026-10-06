@@ -2601,7 +2601,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (templateDetail) {
     const template = TEMPLATES.find((item) => item.id === templateDetail[1])
     if (template) {
-      const usedBy = template.id === 'template-9' ? {
+      /* 設計 UTbi1・Z0g3si：「予約前日のご案内」は 11 か所で使われている（版を決めた一斉配信と自動応答を含む）。 */
+      const usedBy = template.id === 'template-1' ? {
+        broadcasts: [{ broadcastId: 'bc-1', title: '9月の予約リマインド', status: 'scheduled', scheduledAt: '2026-09-30T09:00:00+09:00', templateVersionNumber: 2, referenceMode: 'fixed' }],
+        autoReplies: [{ id: 'ar-2', keyword: '予約変更のお問い合わせ', matchType: 'contains', lineAccountId: 'visual-qa-account', templateVersion: 2 }],
+        scenarioSteps: [{ scenarioId: 'scenario-1', scenarioName: '予約フォロー', stepId: 'step-booking-1', stepOrder: 1, templateVersion: null }],
+        reminderSteps: [
+          { reminderId: 'reminder-1', reminderName: '来店前日（あおい）', stepId: 'rstep-1' },
+          ...Array.from({ length: 7 }, (_, i) => ({ reminderId: `reminder-${i + 2}`, reminderName: `来店前日（店舗${i + 2}）`, stepId: `rstep-${i + 2}` })),
+        ],
+        automations: [], richMenuAreas: [], trackedLinks: [],
+      } : template.id === 'template-9' ? {
         scenarioSteps: [{ scenarioId: 'scenario-welcome', scenarioName: '新規登録7日間フォロー', stepId: 'step-1', stepOrder: 1, templateVersion: 3 }],
         autoReplies: [{ id: 'auto-reply-document', keyword: '資料請求', matchType: 'exact', lineAccountId: 'visual-qa-account', templateVersion: 3 }],
         automations: [{ id: 'automation-inbox-favorite', name: '受信箱の「よく使う」（担当3人が登録）', eventType: 'inbox_favorite' }],
