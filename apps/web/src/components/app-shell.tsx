@@ -189,7 +189,7 @@ function AccountCreateWorkspace({ children }: { children: React.ReactNode }) {
  * ルート名で自動判定しない（`docs/v6-common-rules.md` §1）。
  */
 function Workspace({ children }: { children: React.ReactNode }) {
-  const { fullWidth } = usePageChrome()
+  const { fullWidth, settingsNavInline } = usePageChrome()
   const pathname = usePathname()
   /*
    * ★V8（夕41）：設定の画面は、白い板の中の左に「設定の中のメニュー」
@@ -197,7 +197,8 @@ function Workspace({ children }: { children: React.ReactNode }) {
    * SSR・最初の描画は v7 の形で、レイアウト効果の中で v8 に揃える。
    */
   const isV8 = useAdminTheme() === 'v8'
-  const withSettingsNav = isV8 && !fullWidth && isSettingsAreaPath(pathname ?? '')
+  // 画面がメニューを白い板の中に置いたら（settingsNavInline）、外には出さない。
+  const withSettingsNav = isV8 && !fullWidth && !settingsNavInline && isSettingsAreaPath(pathname ?? '')
   return (
     <div className={styles.side}>
       <AppTopBar />
