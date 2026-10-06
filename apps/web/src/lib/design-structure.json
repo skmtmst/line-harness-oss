@@ -497,12 +497,10 @@
       }
     },
     "/reminders": {
-      "node": "M1EXwB",
-      "name": "V6 7-1 リマインダ",
+      "node": "apLqS",
+      "name": "★V8 リマインダ 一覧（apLqS・Pencil と照合済み 2026-10-06）",
       "sections": [
-        "Head",
-        "KPIs",
-        "Body"
+        "KPIs"
       ],
       "parts": [
         "リマインダ",

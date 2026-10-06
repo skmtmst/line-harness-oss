@@ -1456,7 +1456,7 @@ export type ConversionDefinitionEvent = {
 }
 
 /** #819: 計測サイト。公開ID・許可ドメイン・許可外ドメインの拒否集計。 */
-export type MeasurementSite = {
+export type MeasurementSite = Partial<import('@line-crm/shared').MeasurementSiteReceipt> & {
   id: string
   label: string
   domains: string[]
@@ -4410,6 +4410,9 @@ export type BroadcastListKpis = Pick<
 
 /** 友だち画面の上部に出す数（設計 `V2 2-2 友だち`）。 */
 export type FriendStats = {
+  activeLastMonth?: number | null
+  activeMonthDelta?: number | null
+  activeComparisonDate?: string
   active: number
   total: number
   blockedByThem: number
@@ -4818,14 +4821,7 @@ export type EcOrderDetail = {
   }
 }
 
-export type EcIdentityCandidateSummary = {
-  unmatched: number
-  candidates: number
-  candidateExternalCustomers: number
-  duplicateSuspicions: number
-  linked: number
-  potentialRevenue: number | null
-}
+export type EcIdentityCandidateSummary = import('@line-crm/shared').EcIdentityCandidateSummary
 
 export type EcIdentityCandidateOperationsList = {
   items: Array<{
@@ -5313,6 +5309,7 @@ export type NenPhotoPublicationRecord = {
   photo_id?: string
   status: 'published' | 'withdrawn'
   view_count: number | null
+  view_count_30_days?: number | null
   version?: number
   published_at: string | null
   withdrawn_at: string | null
@@ -5350,6 +5347,7 @@ export type NenPhotoDetail = Record<string, unknown> & {
 
 /** #817: 報酬の決まりの版の1行。 */
 export type PhotoRewardPolicyVersion = {
+  publicationPoints?: number
   versionNumber: number
   policyKey: string
   points: number
@@ -5370,6 +5368,7 @@ export type NenPhotoPublicationList = {
     publishedCount: number
     placementCount: number
     topPhoto: Record<string, unknown> | null
+    topPhoto30Days?: (Record<string, unknown> & import('@line-crm/shared').PublicationThirtyDayCount) | null
     consentedCount: number
     attentionCount: number
     withdrawnCount: number
@@ -5443,6 +5442,8 @@ export type PhotoBulkReviewResult = {
 }
 
 export type AdPlatform = {
+  secretKeys?: string[]
+  verifiedAt?: string | null
   id: string
   /** meta / x / google / tiktok */
   name: string
@@ -5510,14 +5511,7 @@ function rangeQuery(params?: { from?: string; to?: string; accountId?: string })
 
 
 /** はじめの設定の段。設計 ★V6 34-1（`RAW35`）。 */
-export interface GettingStartedStep {
-  key: 'accounts' | 'attributes' | 'friendAdd' | 'scenario' | 'firstMessage'
-  state: 'done' | 'stalled' | 'todo' | 'forbidden' | 'unknown'
-  href: string | null
-  reason: string | null
-  /** 段1だけ。Webhook をアカウントごとに確かめた結果。 */
-  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'; active?: boolean | null }>
-}
+export type GettingStartedStep = import('@line-crm/shared').GettingStartedStep
 
 /** レシピ。設計 ★V6 34-2（`y0P0Qx`）。 */
 export interface Recipe {
@@ -8407,6 +8401,8 @@ export const api = {
       }),
     list: (params?: {
       accountId?: string
+      from?: string
+      to?: string
       limit?: number
       cursor?: string | number
       status?: string
@@ -8420,6 +8416,8 @@ export const api = {
       sort?: 'newest' | 'oldest'
     }) => {
       const query = new URLSearchParams()
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.cursor !== undefined && params.cursor !== '') query.set('cursor', String(params.cursor))
@@ -9105,16 +9103,19 @@ export const api = {
         }),
     },
     images: {
-      list: (params?: { projectId?: string; favorite?: boolean; preset?: string; q?: string; before?: string; limit?: number }) => {
+      list: (params?: import("@line-crm/shared").HqBannerImageQuery) => {
         const q = new URLSearchParams()
         if (params?.projectId) q.set('projectId', params.projectId)
         if (params?.favorite) q.set('favorite', '1')
+        if (params?.delivered !== undefined) q.set('delivered', params.delivered ? '1' : '0')
+        if (params?.shape) q.set('shape', params.shape)
+        if (params?.withCounts) q.set('withCounts', '1')
         if (params?.preset) q.set('preset', params.preset)
         if (params?.q) q.set('q', params.q)
         if (params?.before) q.set('before', params.before)
         if (params?.limit) q.set('limit', String(params.limit))
         const query = q.toString()
-        return fetchApi<ApiResponse<BannerImage[]> & { nextBefore?: string | null }>(
+        return fetchApi<ApiResponse<BannerImage[]> & { nextBefore?: string | null; counts?: import("@line-crm/shared").HqBannerImageCounts }>(
           `/api/hq/banners/images${query ? `?${query}` : ''}`,
         )
       },
@@ -9137,7 +9138,7 @@ export const api = {
   },
   /** はじめの設定の順路。台帳 #134。**毎回いまの中身を数える（キャッシュしない）。** */
   gettingStarted: {
-    get: (accountId?: string) =>
+    get: (accountId?: string, version?: 'v8') =>
       fetchApi<ApiResponse<{
         steps: GettingStartedStep[]
         doneCount: number
@@ -9145,7 +9146,7 @@ export const api = {
         allDone: boolean
         /** 進捗帯を閉じたか（本人単位）。**完了判定には使わない。** */
         dismissed: boolean
-      }>>(`/api/getting-started${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`),
+      }>>(`/api/getting-started?${new URLSearchParams({ ...(accountId ? { account_id: accountId } : {}), ...(version ? { version } : {}) })}`),
     /** 進捗帯を閉じる。**閉じた日時は帯を出さないためだけの記憶。** */
     dismiss: () =>
       fetchApi<ApiResponse<{ dismissed: boolean }>>('/api/getting-started/dismiss', {
@@ -9373,10 +9374,10 @@ export const api = {
       ),
 
     list: () => fetchApi<ApiResponse<LineAccountTag[]>>('/api/line-account-tags'),
-    create: (name: string) =>
+    create: (input: string | import('@line-crm/shared').LineAccountTagInput) =>
       fetchApi<ApiResponse<LineAccountTag>>('/api/line-account-tags', {
         method: 'POST',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify(typeof input === 'string' ? { name: input } : input),
       }),
     remove: (id: string) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: 'DELETE' }),
@@ -9385,6 +9386,7 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ tagIds }),
       }),
+    update: (id: string, input: Partial<import("@line-crm/shared").LineAccountTagInput>) => fetchApi<ApiResponse<import("@line-crm/shared").LineAccountTagSummary>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
   },
   lineAccounts: {
     list: (live = false) =>
@@ -9416,22 +9418,10 @@ export const api = {
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
       }),
-    connectCheck: (data: {
-      name?: string
-      channelId: string
-      channelSecret: string
-      loginChannelId: string
-      loginChannelSecret: string
-    }) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect/check', {
+    connectCheck: (data: import('@line-crm/shared').LineAccountConnectInput) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect/check', {
       method: 'POST', body: JSON.stringify(data),
     }),
-    connect: (data: {
-      name?: string
-      channelId: string
-      channelSecret: string
-      loginChannelId: string
-      loginChannelSecret: string
-    }, stepUpToken?: string) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
+    connect: (data: import('@line-crm/shared').LineAccountConnectInput, stepUpToken?: string) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
       method: 'POST',
       headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
       body: JSON.stringify(data),
@@ -9464,6 +9454,7 @@ export const api = {
           | 'ogDefaultImageUrl'
           | 'friendCapacity'
           | 'capacityWarnAt'
+          | 'timezone'
           | 'iconUrl'
         >
       >,
@@ -9472,7 +9463,7 @@ export const api = {
       const touchesMessagingCredentials =
         data.channelAccessToken !== undefined || data.channelSecret !== undefined
       return fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}`, {
-        method: touchesMessagingCredentials ? 'PUT' : 'PATCH',
+        method: touchesMessagingCredentials || data.timezone !== undefined ? 'PUT' : 'PATCH',
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
       })
@@ -10259,8 +10250,10 @@ export const api = {
      * **どのルールが、いつ、誰へ、どう返したか。** 設定だけ見ても、
      * 実際に返したのかは分からない。
      */
-    runs: (params?: { ruleId?: string; limit?: number; offset?: number }) => {
+    runs: (params?: { ruleId?: string; limit?: number; offset?: number; from?: string; to?: string }) => {
       const query = new URLSearchParams()
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
       if (params?.ruleId) query.set('rule_id', params.ruleId)
       if (params?.limit !== undefined) query.set('limit', String(params.limit))
       if (params?.offset !== undefined) query.set('offset', String(params.offset))
@@ -11490,6 +11483,19 @@ export const api = {
     photoPublications: (accountId: string) => fetchApi<ApiResponse<NenPhotoPublicationList>>(
       `/api/nen-members/photos/publications?accountId=${encodeURIComponent(accountId)}`,
     ),
+    photoPublicationOrder: (accountId: string) =>
+      fetchApi<ApiResponse<{ items: Array<{id: string; version: number; pet_name: string}> }>>(
+        `/api/nen-members/photos/publications/order?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    savePhotoPublicationOrder: (data: import('@line-crm/shared').PhotoPublicationOrderInput) =>
+      fetchApi<ApiResponse<{ items: Array<{id: string; version: number; sortOrder: number}> }>>(
+        '/api/nen-members/photos/publications/order', { method: 'PUT', body: JSON.stringify(data) },
+      ),
+    publishPhoto: (id: string, data: { accountId: string; expectedVersion: number }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<import('@line-crm/shared').PhotoPublicationPublishResult>>(
+        `/api/nen-members/photos/${encodeURIComponent(id)}/publish`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
+      ),
     withdrawPhotoPublication: (id: string, data: { accountId: string; expectedVersion: number }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ status: 'withdrawn'; version: number }>>(
         `/api/nen-members/photos/publications/${encodeURIComponent(id)}/withdraw`,
@@ -11534,6 +11540,7 @@ export const api = {
       '/api/nen-members/photo-reward-policy/versions',
     ),
     createPhotoRewardPolicyVersion: (data: {
+      publicationPoints?: number
       points: number
       summary?: string
       effectiveFrom?: string | null
@@ -12529,6 +12536,12 @@ export const api = {
     },
   },
   notifications: {
+    teams: {
+      list: (lineAccountId: string) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam[]>>(`/api/notifications/teams?lineAccountId=${encodeURIComponent(lineAccountId)}`),
+      create: (data: { lineAccountId: string; name: string; staffIds: string[] }) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam>>('/api/notifications/teams', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: { lineAccountId: string; name: string; staffIds: string[]; expectedVersion: number }) => fetchApi<ApiResponse<import('@line-crm/shared').OperatorNotificationTeam>>(`/api/notifications/teams/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+      archive: (id: string, lineAccountId: string, expectedVersion: number) => fetchApi<ApiResponse<null>>(`/api/notifications/teams/${encodeURIComponent(id)}`, { method: 'DELETE', body: JSON.stringify({ lineAccountId, expectedVersion }) }),
+    },
     operatorRules: {
       list: (lineAccountId: string) =>
         fetchApi<ApiResponse<{
@@ -13312,7 +13325,7 @@ export const api = {
         options,
       ),
     get: (id: string) => fetchApi<ApiResponse<TrafficPool>>(`/api/traffic-pools/${id}`),
-    create: (data: { slug: string; name: string; activeAccountId: string }) =>
+    create: (data: import('@line-crm/shared').CreateTrafficPoolRequest) =>
       fetchApi<ApiResponse<TrafficPool>>('/api/traffic-pools', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -13689,6 +13702,11 @@ export const api = {
       ),
   },
   adPlatforms: {
+    mappings: (accountId: string) => fetchApi<ApiResponse<import('@line-crm/shared').AdEventMapping[]>>(`/api/ad-platforms/mappings?account_id=${encodeURIComponent(accountId)}`),
+    saveMapping: (pointId: string, data: import('@line-crm/shared').SaveAdEventMappingRequest) => fetchApi<ApiResponse<import('@line-crm/shared').AdEventMapping>>(`/api/ad-platforms/mappings/${encodeURIComponent(pointId)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    create: (data: {name: string;displayName?: string;lineAccountId: string;config: Record<string,unknown>}) => fetchApi<ApiResponse<AdPlatform>>('/api/ad-platforms',{method:'POST',body:JSON.stringify(data)}),
+    update: (id: string,data: {config?: Record<string,unknown>;displayName?: string;isActive?: boolean}) => fetchApi<ApiResponse<AdPlatform>>(`/api/ad-platforms/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify(data)}),
+    connect: (id: string) => fetchApi<ApiResponse<import('@line-crm/shared').AdPlatformConnectResult>>(`/api/ad-platforms/${encodeURIComponent(id)}/connect`,{method:'POST'}),
     list: (lineAccountId?: string | null) =>
       fetchApi<ApiResponse<AdPlatform[]>>(`/api/ad-platforms${lineAccountId ? `?lineAccountId=${encodeURIComponent(lineAccountId)}` : ''}`),
     logsPage: (params?: { page?: number; limit?: number; status?: string; query?: string; lineAccountId?: string | null }) => {
@@ -13732,6 +13750,7 @@ export const api = {
       if (params?.to) query.set('to', params.to)
       const suffix = query.size > 0 ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<{
+        conversionCost?: import('@line-crm/shared').AdConversionCostSummary
         rows: Array<{
           sourceLabel: string
           adPlatformId: string | null
@@ -14967,6 +14986,7 @@ export interface EventQuestion {
 }
 
 export interface EventDetail {
+  venue_address?: string | null;
   id: string;
   name: string;
   venue_name: string | null;
@@ -15287,6 +15307,8 @@ export interface EventLifecycleResult {
 }
 
 export const eventsApi = {
+  applicationPreview: (accountId: string, body: Partial<EventDetail> & { slot: { starts_at: string; ends_at: string; capacity: number } }) =>
+    fetchApi<import('@line-crm/shared').EventApplicationPreview>(withAccount('/api/events/admin/application-preview', accountId), { method: 'POST', body: JSON.stringify(body) }),
   listEvents: (
     accountId: string,
     options: { page?: number; limit?: number; q?: string; filter?: 'all' | 'open' | 'pending' | 'full'; sort?: 'soon' | 'name' } = {},

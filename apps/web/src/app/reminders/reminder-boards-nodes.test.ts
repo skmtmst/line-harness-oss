@@ -29,7 +29,7 @@ describe('リマインダの残りの板ID', () => {
   })
 
   it('狭い幅で一覧が Iffil になる', () => {
-    expect(LIST).toContain("data-design-node={narrow ? 'Iffil' : 'apLqS'}")
+    expect(LIST).toContain("boardId={narrow ? 'Iffil' : 'apLqS'}")
     expect(LIST).toContain('useNarrowViewport()')
   })
 

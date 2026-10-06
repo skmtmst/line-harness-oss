@@ -86,12 +86,11 @@
 }
 
 /*
- * ★V8「絞り込みの札」（O2fCAt・XGJDa）：高さ30・文字12/500。
- * 選んだ札は白＋緑（オーナー「黒がいや」。地 accent-soft・
- * 枠と字は accent-deep。v7 は濃い緑の地のまま）。
+ * ★V8「絞り込みの札」（O2fCAt・XGJDa）：高さ36・文字12/500。
+ * 選んだ札は書き出し正本 XGJDa の墨の地＋白文字。v7 は濃い緑の地。
  */
 [data-theme='v8'] .v6-filter-chip {
-  height: 30px;
+  height: 36px;
   gap: 5px;
   padding: 0 10px;
   font-size: var(--text-caption);
@@ -99,9 +98,9 @@
 }
 
 [data-theme='v8'] .v6-filter-chip[aria-pressed='true'] {
-  border-color: var(--color-accent-deep);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
+  background: var(--color-ink);
+  color: var(--color-on-accent);
+  outline-color: var(--color-ink);
 }
 
 [data-theme='v8'] .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count {
@@ -116,3 +115,12 @@
     border-color var(--motion-fast) var(--motion-ease-out),
     color var(--motion-fast) var(--motion-ease-out);
 }
+
+/* V8 正本 O2fCAt / XGJDa。 */
+[data-theme='v8'] .v6-filter-chip { height: 36px; border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; color: var(--color-ink); line-height: 18px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+[data-theme='v8'] .v6-filter-chip[aria-pressed='true'] { background: var(--color-ink); color: var(--color-on-accent); outline-color: var(--color-ink); }
+[data-theme='v8'] .v6-filter-chip__icon { width: 13px; height: 13px; }
+[data-theme='v8'] .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: var(--color-on-accent); }
+[data-theme='v8'] .v6-filter-chip:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
+
+[data-theme='v8'] .v6-filter-chip { border-radius: 999px; }

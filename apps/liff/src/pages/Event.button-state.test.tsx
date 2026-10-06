@@ -168,3 +168,11 @@ describe('選べる枠がある時', () => {
     expect(after.hasAttribute('disabled')).toBe(false);
   });
 });
+
+it('会場の住所を表示する', async () => {
+  getEvent.mockResolvedValue(eventDetail({ venue_address: 'テスト会場の住所' }));
+  getEventSlots.mockResolvedValue({items:[slot()]});
+  myEventBookings.mockResolvedValue({items:[]});
+  render(<MemoryRouter initialEntries={['/events/e1']}><Routes><Route path="/events/:id" element={<Event />} /></Routes></MemoryRouter>);
+  expect(await screen.findByText('テスト会場の住所')).toBeTruthy();
+});

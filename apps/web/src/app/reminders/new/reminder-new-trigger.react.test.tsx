@@ -36,6 +36,10 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: fixture.routerPush }),
 }))
+vi.mock('next/link', () => ({
+  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
+    React.createElement('a', { href }, children),
+}))
 vi.mock('@/lib/api', () => ({
   api: {
     folders: { list: fixture.foldersList },
@@ -56,6 +60,8 @@ function fieldsOf(accountId: string) {
 }
 
 beforeEach(() => {
+  // V8 の作る画面を見る。本番は v7 のままなので分岐は残す。
+  document.documentElement.dataset.theme = 'v8'
   fixture.account = 'account-1'
   fixture.foldersList.mockResolvedValue({ success: true, data: [] })
   fixture.friendFieldsList.mockImplementation((accountId: string) =>
@@ -80,7 +86,25 @@ afterEach(() => {
 })
 
 function fillName(value = 'テスト用リマインダ') {
-  fireEvent.change(screen.getByPlaceholderText('例：Google Meet相談の前日案内'), { target: { value } })
+  fireEvent.change(screen.getByPlaceholderText('例：予約前日のご案内'), { target: { value } })
+}
+
+function goNext() {
+  fireEvent.click(screen.getByRole('button', { name: '次へ：対象者と止める条件' }))
+}
+
+/** 候補の読み込みが終わり、次へが押せるようになるまで待つ。 */
+async function waitNextEnabled() {
+  await waitFor(() => {
+    const next = screen.getByRole('button', { name: '次へ：対象者と止める条件' }) as HTMLButtonElement
+    expect(next.disabled).toBe(false)
+  })
+}
+
+/** ひな形カード群の中で、指定の順番の「このひな形を使う」を押す（V8は表ではなくカード）。 */
+function useTemplateAt(index: number) {
+  const buttons = screen.getAllByRole('button', { name: 'このひな形を使う' })
+  fireEvent.click(buttons[index])
 }
 
 /** 情報欄プルダウンに accountId の候補が並ぶまで待つ。 */
@@ -111,8 +135,9 @@ describe('起点の実在候補選択', () => {
     fillName()
     fireEvent.click(screen.getByRole('radio', { name: /友だち情報欄の日付/ }))
     await waitFieldOptions('account-1')
+    await waitNextEnabled()
 
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
     await screen.findByText('基準日に使う友だち情報欄を選んでください')
     expect(fixture.createDraft).not.toHaveBeenCalled()
   })
@@ -124,7 +149,7 @@ describe('起点の実在候補選択', () => {
     await waitFieldOptions('account-1')
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-1' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
     await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
     const settings = fixture.createDraft.mock.calls[0][0]
     expect(settings.triggerType).toBe('friend_field')
@@ -147,7 +172,7 @@ describe('起点の実在候補選択', () => {
     })
     fireEvent.change(screen.getByLabelText('基準日にするイベント'), { target: { value: 'event-2' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
     await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
     const settings = fixture.createDraft.mock.calls[0][0]
     expect(settings.triggerType).toBe('event')
@@ -163,8 +188,9 @@ describe('起点の実在候補選択', () => {
       const select = screen.getByLabelText('基準日にするイベント') as HTMLSelectElement
       expect([...select.options].some((option) => option.value === 'event-1')).toBe(true)
     })
+    await waitNextEnabled()
 
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
     await screen.findByText('基準日にするイベントを選んでください')
     expect(fixture.createDraft).not.toHaveBeenCalled()
   })
@@ -194,7 +220,7 @@ describe('アカウント切替', () => {
 
     // Bの候補で保存すれば、保存先アカウントと情報欄IDが一致する
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-B' } })
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
     await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
     const settings = fixture.createDraft.mock.calls[0][0]
     expect(settings.lineAccountId).toBe('account-B')
@@ -246,14 +272,14 @@ describe('アカウント切替', () => {
     await waitFor(() => expect(fixture.friendFieldsList).toHaveBeenCalledWith('account-B'))
 
     // Bの候補が確定するまで「次へ」は無効
-    const next = screen.getByRole('button', { name: /対象設定へ/ }) as HTMLButtonElement
+    const next = screen.getByRole('button', { name: '次へ：対象者と止める条件' }) as HTMLButtonElement
     expect(next.disabled).toBe(true)
     expect(fixture.createDraft).not.toHaveBeenCalled()
 
     await act(async () => {
       resolveB?.({ success: true, data: fieldsOf('account-B') })
     })
-    await waitFor(() => expect((screen.getByRole('button', { name: /対象設定へ/ }) as HTMLButtonElement).disabled).toBe(false))
+    await waitFor(() => expect((screen.getByRole('button', { name: '次へ：対象者と止める条件' }) as HTMLButtonElement).disabled).toBe(false))
   })
 
   it('新しいアカウントに日付型の情報欄が0件なら、前の候補を残さず0件と出す', async () => {
@@ -283,7 +309,7 @@ describe('ひな形から作る', () => {
     await waitFieldOptions('account-1')
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-1' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
     await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
     const settings = fixture.createDraft.mock.calls[0][0]
     /*
@@ -295,12 +321,11 @@ describe('ひな形から作る', () => {
     expect(settings.sendAtTime).toBeNull()
   })
 
-  it('「誕生日のお祝い」を使うと起点・繰り返し・本文・時刻がまとめて入る', async () => {
+  it('「誕生日のお祝い」を使うと起点・繰り返し・時刻がまとめて入る', async () => {
     render(<NewReminderPage />)
     fillName('誕生日のお祝い')
 
-    const row = screen.getByText('誕生日のお祝い').closest('tr') as HTMLElement
-    fireEvent.click(within(row).getByRole('button', { name: 'このひな形を使う' }))
+    useTemplateAt(3)
 
     // friend_field 起点へ切り替わり、「誕生日」の情報欄が自動で選ばれる
     await waitFor(() => expect(fixture.friendFieldsList).toHaveBeenCalledWith('account-1'))
@@ -308,12 +333,12 @@ describe('ひな形から作る', () => {
       expect((screen.getByLabelText('基準日に使う情報欄') as HTMLSelectElement).value).toBe('field-birthday-account-1')
     })
     // 毎年くり返す → 2/29の扱いが出る
-    await screen.findByLabelText('2月29日が基準日のときの平年の扱い')
-    // サマリーとプレビューにも反映される
+    await screen.findByLabelText('2月29日が基準日のとき')
+    expect((screen.getByLabelText('毎年くり返す') as HTMLInputElement).checked).toBe(true)
+    // 右の要点にも反映される
     expect(screen.getByText('1通（当日 10:00）')).toBeTruthy()
-    expect(screen.getByText(/お誕生日おめでとうございます/)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
     await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
     const settings = fixture.createDraft.mock.calls[0][0]
     expect(settings.triggerType).toBe('friend_field')
@@ -326,14 +351,15 @@ describe('ひな形から作る', () => {
     expect(settings.steps[0].messageContent).not.toContain('Google Meet')
   })
 
-  it('「予約の前日案内」を使うと予約起点の前日18時の文面が入る', async () => {
+  it('「予約の前日案内」を使うと予約起点の前日18時が入る', async () => {
     render(<NewReminderPage />)
     fillName('前日案内')
 
-    const row = screen.getByText('予約の前日案内').closest('tr') as HTMLElement
-    fireEvent.click(within(row).getByRole('button', { name: 'このひな形を使う' }))
+    useTemplateAt(0)
+    expect((screen.getByRole('radio', { name: /^予約日時/ }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByText('1通（1日前 18:00）')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
     await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
     const settings = fixture.createDraft.mock.calls[0][0]
     expect(settings.triggerType).toBe('booking')
@@ -349,8 +375,7 @@ describe('ひな形から作る', () => {
     await waitFieldOptions('account-1')
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-1' } })
 
-    const row = screen.getByText('予約の前日案内').closest('tr') as HTMLElement
-    fireEvent.click(within(row).getByRole('button', { name: 'このひな形を使う' }))
+    useTemplateAt(0)
 
     // 確認を出し、承認したときだけ置き換える
     const dialog = await screen.findByRole('dialog')
@@ -359,7 +384,7 @@ describe('ひな形から作る', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'このひな形を使う' }))
 
     await waitFor(() => expect(screen.queryByLabelText('基準日に使う情報欄')).toBeNull())
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
     await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
     expect(fixture.createDraft.mock.calls[0][0].triggerType).toBe('booking')
   })
@@ -371,8 +396,7 @@ describe('ひな形から作る', () => {
     await waitFieldOptions('account-1')
     fireEvent.change(screen.getByLabelText('基準日に使う情報欄'), { target: { value: 'field-birthday-account-1' } })
 
-    const row = screen.getByText('予約の前日案内').closest('tr') as HTMLElement
-    fireEvent.click(within(row).getByRole('button', { name: 'このひな形を使う' }))
+    useTemplateAt(0)
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
 
@@ -380,23 +404,23 @@ describe('ひな形から作る', () => {
   })
 })
 
-// #996 DEEP-27: createDraft未呼出の段階で「下書き保存」と出さない。
+// 右の要点は作る前から「下書き」と出し、作らずに進まない。
 describe('保存状態の表示', () => {
-  it('作成APIを呼ぶ前は「未保存」とだけ出す', async () => {
+  it('作成APIを呼ぶ前は右の要点が「下書き」で、次へ進まない', async () => {
     render(<NewReminderPage />)
-    await screen.findByRole('button', { name: /対象設定へ/ })
+    await screen.findByRole('button', { name: '次へ：対象者と止める条件' })
     expect(fixture.createDraft).not.toHaveBeenCalled()
-    expect(screen.queryByText('下書きを保存する')).toBeNull()
-    expect(screen.getAllByText('未保存').length).toBeGreaterThan(0)
+    expect(fixture.routerPush).not.toHaveBeenCalled()
+    expect(screen.getByText('下書き')).toBeTruthy()
   })
 
   it('保存に失敗したら失敗と出し、次の画面へ進まない', async () => {
     fixture.createDraft.mockResolvedValue({ success: false, error: '保存に失敗しました。通信を確かめて、もう一度お試しください。' })
     render(<NewReminderPage />)
     fillName()
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
 
-    await screen.findByText('下書きを保存できませんでした')
+    await screen.findByText('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     expect(fixture.routerPush).not.toHaveBeenCalled()
   })
 })
@@ -413,10 +437,10 @@ describe('2月29日の扱い（3択）', () => {
     fillName()
     await chooseBirthdayField()
 
-    expect(screen.queryByLabelText('2月29日が基準日のときの平年の扱い')).toBeNull()
+    expect(screen.queryByLabelText('2月29日が基準日のとき')).toBeNull()
     fireEvent.click(screen.getByLabelText('毎年くり返す'))
 
-    const select = await screen.findByLabelText('2月29日が基準日のときの平年の扱い') as HTMLSelectElement
+    const select = await screen.findByLabelText('2月29日が基準日のとき') as HTMLSelectElement
     expect(select.value).toBe('feb28')
     expect([...select.options].map((option) => option.textContent))
       .toEqual(['2月28日に届ける', '3月1日に届ける', 'その年は届けない'])
@@ -427,9 +451,9 @@ describe('2月29日の扱い（3択）', () => {
     fillName()
     await chooseBirthdayField()
     fireEvent.click(screen.getByLabelText('毎年くり返す'))
-    fireEvent.change(await screen.findByLabelText('2月29日が基準日のときの平年の扱い'), { target: { value: 'skip' } })
+    fireEvent.change(await screen.findByLabelText('2月29日が基準日のとき'), { target: { value: 'skip' } })
 
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
     await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
     const settings = fixture.createDraft.mock.calls[0][0]
     expect(settings.repeatYearly).toBe(true)
@@ -441,7 +465,7 @@ describe('2月29日の扱い（3択）', () => {
     fillName()
     await chooseBirthdayField()
 
-    fireEvent.click(screen.getByRole('button', { name: /対象設定へ/ }))
+    goNext()
     await waitFor(() => expect(fixture.createDraft).toHaveBeenCalled())
     const settings = fixture.createDraft.mock.calls[0][0]
     expect(settings.repeatYearly).toBe(false)
@@ -460,7 +484,7 @@ describe('未保存の入力保護', () => {
 
   it('何も入力していなければ確認を出さない', async () => {
     render(<NewReminderPage />)
-    await screen.findByRole('button', { name: /対象設定へ/ })
+    await screen.findByRole('button', { name: '次へ：対象者と止める条件' })
     const event = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(false)

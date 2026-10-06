@@ -76,4 +76,16 @@
 [data-theme='v8'] .item {
   transition: color var(--motion-fast) var(--motion-ease-out);
 }
+
+/* V8 正本HTMLの実寸。v7には適用しない。 */
+[data-theme='v8'] .root { background: var(--color-shell); box-shadow: none; }
+[data-theme='v8'] .item { line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+
+/*
+ * 小型（d8X09 グラフ／表）。器 r8・項目 3/10・文 12/18・
+ * つまみ r6。箱型（dtJVi）の合格は変えない。v8 だけ。
+ */
+[data-theme='v8'] .root[data-size='small'] { border-radius: var(--radius-segment); }
+[data-theme='v8'] .root[data-size='small'] .item { padding: 3px 10px; font-size: var(--text-caption); line-height: 18px; }
+[data-theme='v8'] .root[data-size='small'] .thumb { border-radius: var(--radius-mini); }
 }

@@ -181,78 +181,123 @@
   }
 }
 
-/*
- * ★V8「数のマス」Pp3nS（一覧型のカード型）：余白 16/20・間 8・
- * 題は 13/500。高さは読み込み中・読み込み後で同じ 122 に固定する
- * （数が入って高くなると表が押し下げられる——PERF 0.115 の直し）。
- * 数の帯（strip）は bx1eN の分析型で使う別の形。v7 は変わらない。
- */
-[data-theme='v8'] .cardV6 {
-  min-height: 122px;
-  gap: 8px;
-  padding: 16px 20px;
+/* Pp3nS: the strip owns the boundary; cells have no enclosing box. */
+.valueRow { display: contents; }
+.unit, .labelText, .number { display: contents; }
+[data-theme='v8'] .card {
+  justify-content: flex-start; min-width: 0; min-height: 0;
+  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side); border: 0; border-radius: 12px;
+  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+  background: var(--color-canvas); box-shadow: none;
 }
-
-[data-theme='v8'] .labelV6 {
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 500;
+/* 包みを使わない組み方（画面が strip＋KpiCard を直に並べる所）も、
+   数の大きさ・マスの余白は帯と同じ変数で絵どおりにする。 */
+[data-theme='v8'] .strip .card {
+  gap: var(--tpl-band-cell-gap); padding: var(--tpl-band-cell-pad-block) var(--tpl-band-cell-pad-side);
 }
-
-/*
- * ★V8 G3 はみ出し直し（parity 1004-0513：見出し 81＞86 など 144 件）。
- * 題が狭いマスで器からはみ出す分は「…」で受け、全文は title 属性で
- * 読める（tsx 側で付与）。折り返して2行にしない（数の位置がずれる）。
- * v7 は今までどおり。
- */
+[data-theme='v8'] .strip .number {
+  font-size: var(--tpl-band-number-size); line-height: var(--tpl-band-number-lh);
+}
+[data-theme='v8'] .head { width: 100%; gap: 8px; min-height: 24px; }
 [data-theme='v8'] .label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: flex; align-items: center; min-width: 0; gap: 8px;
+  color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 1.5;
+}
+[data-theme='v8'] .labelText {
+  display: block; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 帯の「？」は題の直後ではなく行の右端（絵のマスの右端どおり）。
+   文が伸びて「？」を右へ押し出す（「…」の扱いは G3 のまま）。 */
+[data-theme='v8'] .tip { flex-shrink: 0; display: inline-flex; }
+[data-theme='v8'] .icon {
+  display: inline-flex; width: 24px; height: 24px; flex-shrink: 0;
+  align-items: center; justify-content: center; border-radius: 9px;
+  background: var(--color-canvas); color: var(--color-ink-secondary);
+  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+}
+[data-theme='v8'] .delta { display: flex; flex-shrink: 0; }
+[data-theme='v8'] .valueRow { display: flex; align-items: center; width: 100%; gap: 6px; }
+[data-theme='v8'] .value {
+  display: flex; align-items: flex-end; flex: 1; gap: 3px; min-height: 0;
   white-space: nowrap;
 }
+[data-theme='v8'] .number {
+  display: inline; font-family: var(--font-inter), Inter, sans-serif; font-size: 28px;
+  font-weight: 600; color: inherit;
+  line-height: 32px; letter-spacing: -0.5px;
+}
+[data-theme='v8'] .unit {
+  display: inline; margin: 0; font-family: var(--font-sans);
+  color: var(--color-ink-secondary); font-size: 12px; font-weight: 400;
+  line-height: 20px; letter-spacing: 0;
+}
+[data-theme='v8'] .detail {
+  display: flex; align-items: center; width: 100%; min-height: 0; gap: 0;
+  color: var(--color-ink-faint); font-size: 12px; font-weight: 400; line-height: 18px;
+}
+[data-theme='v8'] .detailText { min-width: 0; flex: 1; }
+[data-theme='v8'] .link { font-size: 12px; font-weight: 500; line-height: 18px; }
+[data-theme='v8'] .card[data-kpi-presentation='band'] {
+  border-radius: 0; outline-color: transparent;
+}
+[data-theme='v8'] .card[data-kpi-density='compact'] {
+  padding: 10px 16px; gap: 4px;
+}
+[data-theme='v8'] .card[data-kpi-density='compact'] .number {
+  font-size: var(--tpl-band-number-size); line-height: var(--tpl-band-number-lh);
+}
+.strip { min-width: 0; }
+/* 数の帯の v8 指定は層の外（ファイル末尾）に置く。 */
+[data-theme='v8'] .link { display: inline-flex; align-items: center; gap: 4px; }
+[data-theme='v8'] .menu { margin-left: auto; display: inline-flex; flex-shrink: 0; }
+}
 
 /*
- * ★V8「数の帯」（bx1eN の分析型）：4枚のカードをやめ、白い板の
- * 左右いっぱい・区切り線で並べる1本の帯にする。帯の上下にも
- * 細い線を引く。各マスは上下10・左右16・数は 22px。
- * `data-kpi-strip` は list-kpis.tsx が付ける印（v7 では何も変わらない）。
+ * 数の帯（Pp3nS・全画面共通）。マス3〜4個を1本の帯にまとめ、
+ * マスどうしは隙間0・1px の縦線で区切る。角丸は帯の外側だけにし、
+ * マス自体は角を持たない（2板の計測で外側の角も0）。
+ *
+ * 層の外に置く：呼び出し側が渡す並べ方（grid・gap などのユーティリティ）は
+ * ユーティリティ層に属し、部品層の中の指定より常に勝つ。帯の隙間0・
+ * 1列化を効かせるため、ここだけ層の外（どの層より強い）に置く。
+ * v7 には効かない（すべて data-theme v8 限定）。
  */
-[data-theme='v8'] .strip {
-  gap: 0;
-  border-top: 1px solid var(--color-divider);
-  border-bottom: 1px solid var(--color-divider);
+[data-theme='v8'] .strip[data-kpi-presentation='band'] {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-columns: none;
+  gap: var(--tpl-band-gap);
+  /* 絵どおり上下の線だけ（左右の枠なし）。 */
+  border-block: 1px solid var(--color-hairline);
+  border-radius: var(--radius-none);
   background: var(--color-canvas);
 }
-
-[data-theme='v8'] .strip > .card {
-  min-height: 0;
-  /* 見本の小の帯：題と数の間 4。数と補足の間も同じ段にそろえる。 */
-  gap: 4px;
-  padding: 10px 16px;
+/* 子孫まで消す：折りたたみ（KpiCollapse）は後ろのマスを包み div で囲うため。 */
+[data-theme='v8'] .strip[data-kpi-presentation='band'] .card {
   border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  border-radius: var(--radius-none);
+  outline-color: transparent;
 }
-
-/* 2列（xl 未満）：偶数マスに左の線、3・4番目に上の線。 */
-[data-theme='v8'] .strip > .card:nth-child(even) {
-  border-left: 1px solid var(--color-divider);
+[data-theme='v8'] .strip[data-kpi-presentation='band'] > * + * {
+  border-left: 1px solid var(--color-hairline);
 }
-
-[data-theme='v8'] .strip > .card:nth-child(n + 3) {
-  border-top: 1px solid var(--color-divider);
+[data-theme='v8'] .strip[data-kpi-presentation='band'] .number {
+  font-size: var(--tpl-band-number-size);
+  line-height: var(--tpl-band-number-lh);
 }
-
-/* xl 以上で1列4マス：先頭以外に左の線だけ。 */
-@media (min-width: 1280px) {
-  [data-theme='v8'] .strip > .card:nth-child(n + 2) {
-    border-left: 1px solid var(--color-divider);
+@media (max-width: 639px) {
+  [data-theme='v8'] .strip[data-kpi-presentation='band'] {
+    grid-auto-flow: row;
+    grid-template-columns: minmax(0, 1fr);
   }
-
-  [data-theme='v8'] .strip > .card:nth-child(n + 3) {
-    border-top: 0;
+  [data-theme='v8'] .strip[data-kpi-presentation='band'] > * + * {
+    border-left: 0;
+    border-top: 1px solid var(--color-hairline);
   }
 }
-}
+[data-theme='v8'] .card[data-kpi-presentation='cell'] { border-radius: 0; }
+
+/* 印なしの帯の横並びは kpi-band-v8.css（層なしCSS）に置く。 */
+/* ★V8 数のマスの下の段（Pp3nS「下」：高さ18・右に行き先）。行き先のボタンが押せる高さ32で段を押し広げない（司令塔 2026-10-05） */
+[data-theme='v8'] .detail .retry { min-height: 0; height: auto; padding: 0; line-height: 18px; margin-left: auto; }

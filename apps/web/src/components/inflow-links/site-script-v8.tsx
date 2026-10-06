@@ -5,7 +5,7 @@
  *
  * v7 のサイトスクリプト（`site-script.tsx`）とは別の見せ方。
  * 取ってくる口・サイトの追加と直し・止めると再開・コードのコピーは
- * v7 と同じ。口に無い所（サイトごとの最後に届いた日時）は作らない。
+ * v7 と同じ。サイトごとの最後に届いた日時も受信記録から表示する。
  * v7 を直す必要が出たら `site-script.tsx` 側も同じ判断を入れる
  * （V8 完成までの二重管理）。
  */
@@ -357,6 +357,7 @@ export default function SiteScriptV8() {
                                 <span className={styles.cellMain} title={site.label}>
                                   {site.label}
                                 </span>
+                                <span className={styles.cardNote}>{formatLastReceived(site.lastReceivedAt) ? `最後の受信 ${formatLastReceived(site.lastReceivedAt)}` : 'まだ受信記録がありません'}</span>
                               </td>
                               <td>
                                 <span className={styles.cellEllipsis} title={site.domains.join('\n')}>
@@ -372,7 +373,7 @@ export default function SiteScriptV8() {
                                 ) : (
                                   <span className={`${styles.statePill} ${styles.statePillActive}`}>
                                     <span className={styles.statePillDot} aria-hidden="true" />
-                                    届いている
+                                    {site.lastReceivedAt ? '届いている' : '受信待ち'}
                                   </span>
                                 )}
                               </td>

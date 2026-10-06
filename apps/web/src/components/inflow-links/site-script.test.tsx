@@ -259,3 +259,13 @@ describe('R275 計測サイトの停止と再開', () => {
     expect(button('再開する')).toBeFalsy()
   })
 })
+
+it('V8でサイトごとの受信時刻と未受信を分ける', async () => {
+ document.documentElement.dataset.theme = 'v8';
+ try {
+  sites = [{ id:'one',label:'受信したサイト',domains:[],rejectedCount:0,lastReceivedAt:'2026-09-26T09:02:00.000Z' }, {id:'two',label:'未受信サイト',domains:[],rejectedCount:0,lastReceivedAt:null}];
+  await act(async () => { root.render(<SiteScript />) }); await settle(); await settle();
+  expect(text()).toContain('最後に受け取った時刻: 9月26日（土）18:02');
+  expect(text()).toContain('最後に受け取った時刻: まだ受け取っていません');
+ } finally { document.documentElement.dataset.theme = 'v7'; }
+});

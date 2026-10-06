@@ -123,7 +123,7 @@ export default function EcIdentityCandidatesPage() {
   const reviewReady = review.state === 'ready'
   const operationsReady = operationsState === 'ready' && operations !== null
   const candidateCount = operations?.summary.candidateExternalCustomers ?? 0
-  const noneCount = Math.max(0, (operations?.summary.unmatched ?? 0) - candidateCount)
+  const noneCount = operations?.summary.withoutCandidates ?? null
   const conflictCount = operations?.summary.duplicateSuspicions ?? 0
   /*
    * 集計のカード帯の3段目。読めていない数を 0 と書かない（未取得は「—」）。
@@ -235,7 +235,7 @@ export default function EcIdentityCandidatesPage() {
               detail={operationsReady
                 ? `候補 ${formatNumber(candidateCount)} 人の注文`
                 : operationsDetail('分析にも入ります')}
-              help="結びついていない注文・会員の売上見込みです"
+              help="候補全体の注文金額です。同じEC会員は1人分として数えます"
               loading={operationsState === 'loading'}
             />
           </div>
@@ -250,7 +250,7 @@ export default function EcIdentityCandidatesPage() {
             <Tabs items={([
                 ['all', 'すべて', operationsReady ? operations?.summary.unmatched ?? 0 : undefined],
                 ['candidate', '候補あり', operationsReady ? candidateCount : undefined],
-                ['none', '候補なし', operationsReady ? noneCount : undefined],
+                ['none', '候補なし', operationsReady ? noneCount ?? undefined : undefined],
                 ['conflict', '同じ人が2人いる疑い', operationsReady ? conflictCount : undefined],
               ] as const).map(([value, label, count]) => ({
                 label,

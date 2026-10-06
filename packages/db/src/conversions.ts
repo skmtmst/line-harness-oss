@@ -1,3 +1,4 @@
+import { queueMappedAdConversion } from './ad-event-mappings.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { boundedListLimit, jstNow, nonNegativeListOffset, toJstString } from './utils.js';
 import {
@@ -621,6 +622,7 @@ export async function trackConversion(
     if (existing) {
       requireSameIdempotencyContent(existing, input);
       if (out) out.deduplicated = true;
+      await queueMappedAdConversion(db, existing.id);
       return existing;
     }
   }
@@ -764,12 +766,14 @@ export async function trackConversion(
           if (existingByKey) {
             requireSameIdempotencyContent(existingByKey, input);
             if (out) out.deduplicated = true;
+            await queueMappedAdConversion(db, existingByKey.id);
             return existingByKey;
           }
         }
         const claimed = await findClaimedEvent(db, input.conversionPointId, input.friendId);
         if (claimed) {
           if (out) out.deduplicated = true;
+          await queueMappedAdConversion(db, claimed.id);
           return claimed;
         }
         // claimを通らずに直接書かれた成果は claim からは辿れない。
@@ -777,6 +781,7 @@ export async function trackConversion(
         const blocking = await findBlockingEvent(db, input.conversionPointId, input.friendId, cutoff);
         if (blocking) {
           if (out) out.deduplicated = true;
+          await queueMappedAdConversion(db, blocking.id);
           return blocking;
         }
         throw new Error('conversion_dedup_claim_missing');
@@ -791,12 +796,14 @@ export async function trackConversion(
         if (existing) {
           requireSameIdempotencyContent(existing, input);
           if (out) out.deduplicated = true;
+          await queueMappedAdConversion(db, existing.id);
           return existing;
         }
       }
       const claimed = await findClaimedEvent(db, input.conversionPointId, input.friendId);
       if (claimed) {
         if (out) out.deduplicated = true;
+        await queueMappedAdConversion(db, claimed.id);
         return claimed;
       }
       // every地点は何度でも数えるので、既存の成果で置き換えてはいけない。
@@ -811,6 +818,7 @@ export async function trackConversion(
         );
         if (blocking) {
           if (out) out.deduplicated = true;
+          await queueMappedAdConversion(db, blocking.id);
           return blocking;
         }
       }
@@ -833,6 +841,7 @@ export async function trackConversion(
       err: err instanceof Error ? err.message : String(err),
     });
   }
+  await queueMappedAdConversion(db, created.id);
   return created;
 }
 

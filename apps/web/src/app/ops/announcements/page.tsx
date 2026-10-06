@@ -244,7 +244,11 @@ export default function OpsAnnouncementsPage() {
     setForm(loaded)
     setFormError('')
     setNotice('')
-    window.scrollTo({ top: 0 })
+    // 運営コンソールは本文（#ops-main）の中だけが縦に流れる。窓ごと動かしても
+    // 先頭には戻らないので、本文の入れ物を先頭へ戻す（無ければ窓を動かす）。
+    const scroller = document.getElementById('ops-main')
+    if (scroller) scroller.scrollTo({ top: 0 })
+    else window.scrollTo({ top: 0 })
   }
 
   const cancelEdit = () => {

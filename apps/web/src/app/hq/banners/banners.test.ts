@@ -51,9 +51,12 @@ describe('統括 バナー生成', () => {
   it('生成パネルに品質やクレジットの選択を置かない（2026-09-12 決定）', () => {
     const withoutComments = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
     expect(withoutComments).not.toMatch(/品質|クレジット|高精細|quality/)
-    for (const label of ['用途', '画像に入れるテキスト', 'メインカラー', 'サブカラー', '人物', '追加の指示', '枚数']) {
+    for (const label of ['出力サイズ', '画像に入れるテキスト', 'カラー', '人物', '追加の指示', '枚数']) {
       expect(panel).toContain(label)
     }
+    // 色は4つの役割（ベース・メイン・サブ・強調）を COLOR_ROLES から並べる（★BG-B `KkTNS`）
+    expect(panel).toContain('COLOR_ROLES.map')
+    expect(panel).toContain('4つの役割で指定します')
   })
 
   it('生成は「条件を登録 → 1枚ずつ run」を繰り返し、失敗したら止めて理由を出す', () => {
@@ -131,20 +134,45 @@ describe('統括 バナー生成', () => {
     }
   })
 
-  it('参照画像（35-2）: ライブラリから選ぶ／ファイルを選ぶ、使い方の 2 択、条件と詳細から戻せる', () => {
+  it('出力サイズ（★BG-B `xy4EW`）: LINE の規格をカードで並べ、ほかの用途は畳む', () => {
+    expect(panel).toContain('data-design-node="xy4EW"')
+    expect(panel).toContain('LINEの規格から選ぶ')
+    expect(panel).toContain('ほかの用途から選ぶ（Instagram・X・OGPなど）')
+    // プルダウンではなく共通のラジオカードで出す（選択中は淡い緑）
+    expect(panel).toContain('presetCardLabel')
+    expect(panel).toContain('presetSizeLabel')
+    expect(panel).not.toContain('用途を選んでください')
+  })
+
+  it('追加の指示（★BG-B `dT1xq`）: 任意であることと文字数の上限を添える', () => {
+    expect(panel).toContain('note={`任意・${CUSTOM_PROMPT_MAX}文字まで`}')
+    expect(panel).toContain('例: 桜の花びらと餃子・生ビールの写真風。和風で温かみのある雰囲気')
+  })
+
+  it('参照画像（★BG-B `L1ax1Y`）: 最大 3 枚、1 枚ずつ使い方を決められる', () => {
     expect(panel).toContain('ライブラリから選ぶ')
     expect(panel).toContain('ファイルを選ぶ')
-    expect(panel).toContain('土台に描き直す')
-    expect(panel).toContain('雰囲気を参考にする')
-    expect(panel).toContain('data-design-node="jZi2W"')
+    expect(panel).toContain('data-design-node="L1ax1Y"')
+    // 使い方の説明は選ぶ前から読める（★BG-B `R6MBHf`）
+    expect(panel).toContain('data-design-node="R6MBHf"')
+    expect(panel).toContain('BANNER_REFERENCE_MODE_DESCRIPTION')
+    expect(panel).toContain('BANNER_MAX_REFERENCE_IMAGES')
     expect(panel).toContain("accept=\"image/png,image/jpeg,image/webp\"")
     expect(modal).toContain('参照画像にする')
+  })
+
+  it('参照画像を選ぶ（★BG-C `cOgWE`）: 複数選択して使い方つきで返す', () => {
     const picker = read('../../../components/hq/banners/reference-picker-dialog.tsx')
-    expect(picker).toContain('designNode="UcBQ5"')
+    // 板IDは承認時に ★V8 `UcBQ5` から ★BG-C `cOgWE` へ改名した（同じダイアログ）
+    expect(picker).toContain('designNode="cOgWE"')
+    expect(picker).toContain('aria-multiselectable="true"')
+    expect(picker).toContain('data-design-node="JOi8G"')
+    expect(picker).toContain('選んだ画像の使い方')
+    expect(picker).toContain('枚を使う')
     expect(picker).toContain('この画像を使う')
     expect(picker).toContain('ファイルを選ぶ')
     // 手元のファイルはプロジェクトへ取り込んでから参照にする（ライブラリにも残る）
     expect(projectPage).toContain('const uploadReference = async (file: File)')
-    expect(projectPage).toContain('applyReference(uploaded, input.referenceMode)')
+    expect(projectPage).toContain('if (uploaded) addReference(uploaded)')
   })
 })

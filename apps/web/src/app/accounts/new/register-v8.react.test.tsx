@@ -6,8 +6,8 @@ import type { LineAccountConnectData } from '@/lib/api'
 
 const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), list: vi.fn(),
-  stepFollowerImport: vi.fn(), followerInsight: vi.fn(),
-  tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(),
+  followerImportState: vi.fn(), followerInsight: vi.fn(),
+  staffList: vi.fn(), tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(),
 }))
 vi.mock('@/lib/api', () => ({
   api: {
@@ -15,9 +15,10 @@ vi.mock('@/lib/api', () => ({
       connectCheck: calls.connectCheck,
       connect: calls.connect,
       list: calls.list,
-      stepFollowerImport: calls.stepFollowerImport,
+      followerImportState: calls.followerImportState,
       followerInsight: calls.followerInsight,
     },
+    staff: { list: calls.staffList },
     lineAccountTags: { list: calls.tagList, create: calls.tagCreate, setForAccount: calls.tagSet },
   },
 }))
@@ -64,6 +65,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   calls.connectCheck.mockResolvedValue(checked)
   calls.connect.mockResolvedValue({ success: true, data: { ...baseData, id: 'new-account' } })
+  calls.list.mockResolvedValue({ success: true, data: [] })
+  calls.staffList.mockResolvedValue({ success: true, data: [] })
   calls.tagList.mockResolvedValue({ success: true, data: [] })
   calls.followerInsight.mockResolvedValue({ success: true, data: { followers: null } })
 })
@@ -116,6 +119,18 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect((registerButton as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(registerButton)
     await waitFor(() => expect(calls.connect).toHaveBeenCalledOnce())
+    expect(await screen.findByText('登録が完了しました')).toBeTruthy()
+  })
+
+  it('登録後はWorkerで進む取り込みを読み取り、完了を画面へ反映する', async () => {
+    calls.connect.mockResolvedValue({ success: true, data: { ...baseData, id: 'new-account', followerImport: { capability: 'available', phase: 'importing_ids' } } })
+    calls.followerImportState.mockResolvedValue({ success: true, data: { capability: 'available', phase: 'hydrating_profiles', received: 10, imported: 10 } })
+    await enterCheckStep()
+    fireEvent.click(screen.getByRole('button', { name: '接続して設定する' }))
+    const registerButton = await screen.findByRole('button', { name: '確認コードを入れて登録する' })
+    fireEvent.click(screen.getByText('LINE Official Account Manager で「応答メッセージ」をオフにしたことを確かめました'))
+    fireEvent.click(registerButton)
+    await waitFor(() => expect(calls.followerImportState).toHaveBeenCalledWith('new-account'))
     expect(await screen.findByText('登録が完了しました')).toBeTruthy()
   })
 

@@ -169,3 +169,13 @@ export default function Progress({
     </div>
   )
 }
+
+/** V8 tydx2: bare progress track. Full Progress keeps its actions and announcements. */
+export function ProgressBar({ value, label, className }: { value: number; label: string; className?: string }) {
+  const clamped = Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0
+  return (
+    <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={clamped} className={[styles.track, className].filter(Boolean).join(' ')}>
+      <div className={styles.fill} style={{ width: `${clamped}%`, transform: 'none' }} />
+    </div>
+  )
+}

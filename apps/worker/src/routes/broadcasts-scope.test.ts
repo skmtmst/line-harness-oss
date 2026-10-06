@@ -204,3 +204,10 @@ describe('broadcast tenant scope', () => {
     expect(response.status).toBe(403);
   });
 });
+
+test('broadcasts passes date boundaries together with tenant scope', async () => {
+  mocks.getBroadcasts.mockResolvedValue([]);
+  const response = await app().request('/api/broadcasts?from=2026-09-30&to=2026-09-30');
+  expect(response.status).toBe(200);
+  expect(mocks.getBroadcasts).toHaveBeenCalledWith(expect.anything(), undefined, expect.objectContaining({ allowedAccountIds: ['own-account'] }), { order: 'desc', from: '2026-09-30T00:00:00+09:00', until: '2026-10-01T00:00:00+09:00' });
+});

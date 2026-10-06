@@ -15,8 +15,9 @@ const SIDEBAR = readFileSync(join(DIR, 'sidebar.module.css'), 'utf8')
  * ときは nav だけ縦に送る。
  */
 describe('zUg8S 外側のすき間', () => {
-  it('白い板は左メニューと12あける（右12・下12・左12）', () => {
-    expect(SHELL).toContain('margin: 0 12px 12px 12px;')
+  it('白い板は右12・下12。左メニューとの間12は左メニューの内側の余白が持つ（二重にしない）', () => {
+    expect(SHELL).toContain('margin: 0 12px 12px 0;')
+    expect(SHELL).not.toContain('margin: 0 12px 12px 12px;')
   })
 
   it('左メニューは画面の高さいっぱい（100dvh）', () => {

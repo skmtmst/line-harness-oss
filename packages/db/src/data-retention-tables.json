@@ -109,6 +109,13 @@
       "parentColumn": "id"
     }
   },
+  "ad_conversion_event_accounts": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "ad_conversion_logs": {
     "category": "purge",
     "scope": {
@@ -137,6 +144,20 @@
       "column": "ad_platform_id",
       "parent": "ad_platforms",
       "parentColumn": "id"
+    }
+  },
+  "ad_event_mapping_dispatches": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ad_event_mappings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
     }
   },
   "ad_platforms": {
@@ -2239,7 +2260,21 @@
       "column": "line_account_id"
     }
   },
+  "nen_photo_publication_daily_views": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "nen_photo_publication_placements": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "nen_photo_publication_reward_outbox": {
     "category": "purge",
     "scope": {
       "by": "lineAccount",
@@ -2441,6 +2476,13 @@
   },
   "operation_request_receipts": {
     "category": "global"
+  },
+  "operator_notification_teams": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
   },
   "operators": {
     "category": "global"
@@ -3609,6 +3651,13 @@
       "column": "account_id",
       "parent": "line_accounts",
       "parentColumn": "id"
+    }
+  },
+  "hq_template_folders": {
+    "category": "purge",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
     }
   }
 }

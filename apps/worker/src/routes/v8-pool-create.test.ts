@@ -1,0 +1,20 @@
+import { Hono } from 'hono';
+import { describe, expect, it, vi } from 'vitest';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import type { Env } from '../index.js';
+const access = vi.hoisted(() => vi.fn(async () => true));
+vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: access }));
+import { trafficPools } from './traffic-pools.js';
+it('validates all accounts, creates once, and returns slug conflicts', async () => {
+  const {raw,db} = createTestD1();
+  for(const id of ['a','b']) raw.prepare(`INSERT INTO line_accounts (id,channel_id,name,channel_access_token,channel_secret) VALUES (?,?,?,'token','secret')`).run(id,id,id);
+  const app = new Hono<Env>();
+  app.use('*',async(c,next)=>{c.set('staff',{id:'owner',name:'Owner',role:'owner',readOnly:false});await next();});app.route('/',trafficPools);
+  const post = (data:unknown) => app.request('/api/traffic-pools',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)},{DB:db});
+  const body = {slug:'area',name:'Area',activeAccountId:'a',accountIds:['a','b']};
+  expect((await post(body)).status).toBe(201);expect(access).toHaveBeenCalledWith(db,expect.anything(),['a','b']);
+  expect((await post(body)).status).toBe(409);
+  access.mockResolvedValueOnce(false);expect((await post({...body,slug:'other'})).status).toBe(403);
+  expect((await post({...body,accountIds:[]})).status).toBe(422);
+  expect(raw.prepare('SELECT count(*) AS n FROM traffic_pools WHERE slug = ?').get('other')).toEqual({n:0});
+});

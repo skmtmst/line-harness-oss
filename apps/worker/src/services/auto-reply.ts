@@ -1,3 +1,5 @@
+import { runAutoReplyAction, type AutoReplyExecutionAction } from './auto-reply-operator-action.js';
+import type { Env } from '../index.js';
 import type { LineClient } from '@line-crm/line-sdk';
 import { getSendPermissionForAccount } from './send-entitlements.js';
 import {
@@ -240,7 +242,7 @@ export async function previewAutoReplyContent(
  * 自動応答のアクション1件。失敗したら止めるか続けるかを1件ずつ持つ。
  * 無指定・読めない値は `continue`（いまの動き）に倒す。
  */
-export type AutoReplyActionRow = ScenarioActionRow & {
+export type AutoReplyActionRow = AutoReplyExecutionAction & {
   onFailure: 'stop' | 'continue';
 };
 
@@ -278,7 +280,7 @@ export function parseAutoReplyActions(raw: string | null | undefined): AutoReply
         step_id: null,
         choice_index: null,
         sort_order: index,
-        action_type: actionType as ScenarioActionRow['action_type'],
+        action_type: actionType as AutoReplyExecutionAction['action_type'],
         config_json: typeof config === 'string' ? config : JSON.stringify(config),
         condition_json:
           typeof row.condition === 'string'
@@ -483,6 +485,7 @@ export async function matchAndReply(
   replyToken: string,
   opts: {
     lineAccountId?: string | null;
+    operatorMailEnv?: Env['Bindings'];
     workerUrl?: string;
     logContext?: string;
     /** 受け取ったメッセージの種別。省略時は text として扱う */
@@ -626,7 +629,7 @@ export async function matchAndReply(
       // 実行しない。無指定は `continue`（いまの動き）に倒してある。
       let actionFailed = false;
       try {
-        const result = await runActionRows(db, [action], friend.id);
+        const result = await runAutoReplyAction(db, action, friend.id, {lineAccountId,sourceEventId:`auto-reply:${evaluationId}:${action.id}`,env:opts.operatorMailEnv});
         addActionResult(actionSummary, result);
         actionFailed = result.failed > 0;
         try {
@@ -751,7 +754,8 @@ export async function matchAndReply(
   return { matched: true, replyTokenConsumed };
 }
 
-const RETRY_ACTION_TYPES = new Set<ScenarioActionRow['action_type']>([
+const RETRY_ACTION_TYPES = new Set<AutoReplyExecutionAction['action_type']>([
+  'notify_staff',
   'tag',
   'friend_field',
   'support_mark',
@@ -776,7 +780,7 @@ const RETRY_ACTION_HOOKS = new Set<ScenarioActionRow['hook']>([
  * 副作用は起きないが、「何が壊れていたか」を台帳へ区別して残せるよう
  * ここで弾く。
  */
-export function parseAutoReplyActionSnapshot(raw: string): ScenarioActionRow | null {
+export function parseAutoReplyActionSnapshot(raw: string): AutoReplyExecutionAction | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -794,7 +798,7 @@ export function parseAutoReplyActionSnapshot(raw: string): ScenarioActionRow | n
   if (row.choice_index !== null && !Number.isInteger(row.choice_index)) return null;
   if (!Number.isInteger(row.sort_order)) return null;
   if (typeof row.action_type !== 'string'
-    || !RETRY_ACTION_TYPES.has(row.action_type as ScenarioActionRow['action_type'])) {
+    || !RETRY_ACTION_TYPES.has(row.action_type as AutoReplyExecutionAction['action_type'])) {
     return null;
   }
   if (typeof row.config_json !== 'string') return null;
@@ -813,7 +817,7 @@ export function parseAutoReplyActionSnapshot(raw: string): ScenarioActionRow | n
     step_id: row.step_id,
     choice_index: row.choice_index as number | null,
     sort_order: row.sort_order as number,
-    action_type: row.action_type as ScenarioActionRow['action_type'],
+    action_type: row.action_type as AutoReplyExecutionAction['action_type'],
     config_json: row.config_json,
     condition_json: row.condition_json,
     repeat_on_refire: row.repeat_on_refire as number,
@@ -851,6 +855,7 @@ export async function retryAutoReplyActionRuns(
   db: D1Database,
   input: {
     evaluationId: string;
+    operatorMailEnv?: Env['Bindings'];
     allowedAccountIds: string[];
     canSeeUnassigned: boolean;
   },
@@ -896,7 +901,7 @@ export async function retryAutoReplyActionRuns(
     }
     let result: RunActionsResult;
     try {
-      result = await runActionRows(db, [action], evaluation.friend_id);
+      result = await runAutoReplyAction(db, action, evaluation.friend_id, {lineAccountId:evaluation.line_account_id,sourceEventId:`auto-reply:${evaluation.id}:${action.id}`,env:input.operatorMailEnv});
     } catch (error) {
       // 動作そのものが失敗した。失敗のまま戻し、また直せる状態にする。
       try {

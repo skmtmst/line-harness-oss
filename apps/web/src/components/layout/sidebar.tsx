@@ -34,6 +34,8 @@ const V8_GROUPS_OPEN_BY_DEFAULT = new Set(['basic', 'delivery', 'contents', 'boo
 
 /** 組の開閉を覚えるキー（ブラウザごと）。 */
 const SIDEBAR_GROUPS_KEY = 'lh-sidebar-groups'
+/** 保存が無いとき、この幅より狭ければ左メニューを畳んで開く。1152 の絵は開いたまま。 */
+export const SIDEBAR_AUTO_COLLAPSE_BELOW = 1152
 
 /** 左メニューのいちばん下の「設定」（夕41・部品 njl8e）。歯車は予約設定と同じ形。 */
 const SETTINGS_GEAR_ICON = 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31-.826 2.37-2.37 1.04-.6 2.296-.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'
@@ -164,7 +166,7 @@ export default function Sidebar({
    * ★V8 外側：左メニューの畳み（幅 64・アイコンだけ）。
    * 上の帯のボタンと ⌘\ が SIDEBAR_TOGGLE_EVENT を投げ、ここで受ける。
    * 状態はブラウザに覚える（lh-sidebar-collapsed）。保存がなければ
-   * 1280px 未満では畳んだ形で開く。v7 では見た目を変えないので、
+   * 1152px 未満では畳んだ形で開く（1152 の絵 35 枚はどれも開いたまま）。v7 では見た目を変えないので、
    * data-collapsed が立っていても v7 の見た目は動かない。
    */
   const [collapsed, setCollapsed] = useState(false)
@@ -177,7 +179,7 @@ export default function Sidebar({
       if (saved !== null) {
         setCollapsed(saved === '1')
       } else {
-        setCollapsed(window.innerWidth < 1280)
+        setCollapsed(window.innerWidth < SIDEBAR_AUTO_COLLAPSE_BELOW)
       }
     } catch {
       // localStorage が使えないときは展開のまま
@@ -836,30 +838,19 @@ export default function Sidebar({
         </div>
       )}
       {/*
-        ★V8 殻合わせ（絵 `V8-B/JKjsE`）：統括の脇の下にも「統括の設定」
-        （歯車）を出す。行き先は統括の設定（/hq/settings）。
-        オーナー・管理者にだけ出す。v7 の統括には出さない。
+        統括（/hq）の脇の下には歯車の入口を置かない
+        （Pencil 承認 2026-10-06・`LINE-Harness-V8-B.pen` の `s6kZt/wCdWg`）。
+        統括の情報の画面へは左下のアカウントの行から行く。店舗側（上の枠）はそのまま。
       */}
-      {isV8 && isHq && !preview && (staffRole === 'owner' || staffRole === 'admin') && (
-        <div className={`${styles.settingsEntry} v8-only`}>
-          <Link
-            href="/hq/settings"
-            title="統括の設定"
-            className={styles.item}
-          >
-            <span className="shrink-0"><NavIcon d={SETTINGS_GEAR_ICON} /></span>
-            <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>統括の設定</span>
-          </Link>
-        </div>
-      )}
 
       {/*
         メニューの下の版の表示（★V7 監査の直し E）。いま動いている版・
         commit・配備日時と環境。取れないときは「版の情報なし」。
         移行中の見た目承認（preview）は版の取得をしない。
+        統括（/hq）には出さない（同じ承認・`s6kZt/wCdWg`）。
         V8 でメニューを畳んだときは枠ごと隠す（`styles.collapseHide`）。
       */}
-      {preview ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
+      {preview || isHq ? null : <div className={styles.collapseHide}><SidebarVersion /></div>}
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。

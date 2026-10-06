@@ -1,0 +1,189 @@
+/* 正本: NbomF / x6BDY / d8X09 / I1E7Bt。外側の白い板は AppShell が持つ。
+   既存 AppShell の本文余白を型の入口で相殺し、各段が必要な余白を持つ。
+   このファイルは V8 以外へ見た目を適用しない。 */
+
+/* 一覧の型の寸法（--tpl-*）は app/globals.css の [data-theme="v8"] に1か所。
+   型・表・帯・ページ送りは変数だけを使う（module の pure 検査に当たらない層）。 */:global([data-theme='v8']) .frame {
+  display: flex; flex-direction: column; min-width: 0;
+  width: calc(100% + 48px); margin: -20px -24px -28px;
+  min-height: calc(100dvh - 74px); container: v8-page / inline-size;
+  color: var(--color-ink); background: var(--color-canvas);
+}
+:global([data-theme='v8']) .frame[data-standalone] { width: 100%; margin: 0; min-height: 100%; }
+:global([data-theme='v8']) .heading {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom); flex-shrink: 0;
+}
+:global([data-theme='v8']) .headingText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
+:global([data-theme='v8']) .titleRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
+:global([data-theme='v8']) .title { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-title-size); font-weight: var(--tpl-title-weight); line-height: var(--tpl-title-lh); }
+:global([data-theme='v8']) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
+/* 部品どおりの小さい見出し（EnlYo：題20/27・間2・説明13/20）。compact を渡した画面だけが使う。regular は既定（22/32）と同じ。 */
+:global([data-theme='v8']) .heading[data-heading-size='compact'] .headingText { gap: var(--tpl-compact-gap); }
+:global([data-theme='v8']) .heading[data-heading-size='compact'] .title { font-size: var(--tpl-compact-title-size); font-weight: var(--tpl-compact-title-weight); line-height: var(--tpl-compact-title-lh); }
+:global([data-theme='v8']) .heading[data-heading-size='compact'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-compact-desc-lh); }
+:global([data-theme='v8']) .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
+:global([data-theme='v8']) .steps { min-width: 0; display: flex; align-items: center; gap: 14px; }
+:global([data-theme='v8']) .tabs { padding: 0 24px; flex-shrink: 0; }
+:global([data-theme='v8']) .stats { border-block: 1px solid var(--color-hairline); flex-shrink: 0; }
+:global([data-theme='v8']) .notice { padding: 0 24px 16px; }
+:global([data-theme='v8']) .section { padding: var(--tpl-section-pad); min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-section-gap); border-bottom: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .split { display: flex; flex: 1; min-width: 0; }
+:global([data-theme='v8']) .main { min-width: 0; flex: 1; }
+:global([data-theme='v8']) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
+:global([data-theme='v8']) .content { min-width: 0; }
+:global([data-theme='v8']) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
+:global([data-theme='v8']) .folders { width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: 2px; }
+:global([data-theme='v8']) .collapsedFolders { display: none; }
+:global([data-theme='v8']) .listBody { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+:global([data-theme='v8']) [data-page-template='dashboard'] .heading { padding-bottom: 16px; }
+:global([data-theme='v8']) .dashboardRow { display: flex; min-width: 0; border-bottom: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .dashboardCell { min-width: 0; flex: 1; padding: 18px 24px; }
+:global([data-theme='v8']) .dashboardCell + .dashboardCell { border-left: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .dashboardAside { width: 297px; flex-shrink: 0; border-left: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .createContent { padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side); display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; flex: 1; }
+:global([data-theme='v8']) .preview { width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
+:global([data-theme='v8']) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); border-bottom: 1px solid var(--color-hairline); flex-wrap: wrap; }
+:global([data-theme='v8']) [data-page-template='detail'] .heading { padding: var(--tpl-detail-head-pad-top) var(--tpl-detail-head-pad-side) var(--tpl-detail-head-pad-bottom); gap: var(--tpl-detail-head-gap); flex-wrap: wrap; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .identity,
+:global([data-theme='v8']) [data-page-template='detail'] .heading > .identity { flex-basis: 100%; }
+/* 作る型の手順は題と説明の下の行。FU2aU の同行版は stepsPlacement="inline" で残す。 */
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { flex-basis: 100%; order: 3; margin-inline: 0; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 2; margin-left: auto; }
+:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] { flex-wrap: nowrap; }
+:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .steps { flex-basis: auto; order: 0; margin-inline: auto; }
+:global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .actions { order: 0; margin-left: 0; }
+:global([data-theme='v8']) .footer { position: sticky; bottom: 12px; z-index: 20; margin: 12px 24px; } /* 採用 A-1 浮いた下の帯（オーナー 2026-10-04） */
+:global([data-theme='v8']) .detailSummary { width: 320px; padding: 20px 24px; border-right: 1px solid var(--color-hairline); flex-shrink: 0; }
+:global([data-theme='v8']) .detailContent { padding: 20px 28px; display: flex; flex-direction: column; gap: var(--tpl-detail-content-gap); flex: 1; min-width: 0; }
+:global([data-theme='v8']) .inbox { display: flex; flex: 1; min-height: 0; min-width: 0; }
+:global([data-theme='v8']) .inboxList { width: var(--tpl-inbox-list-width); flex-shrink: 0; border-right: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .conversation { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--color-table-head); }
+:global([data-theme='v8']) .conversationHeader { padding: var(--tpl-conv-head-pad-block) var(--tpl-conv-head-pad-side); display: flex; align-items: center; gap: var(--tpl-conv-head-gap); flex-shrink: 0; }
+:global([data-theme='v8']) .messages { flex: 1; min-height: 0; overflow-y: auto; padding: var(--tpl-conv-messages-pad-block) var(--tpl-conv-messages-pad-side); gap: var(--tpl-conv-messages-gap); }
+:global([data-theme='v8']) .composer { flex-shrink: 0; display: flex; flex-direction: column; padding: var(--tpl-composer-pad-top) var(--tpl-composer-pad-side) var(--tpl-composer-pad-bottom); gap: var(--tpl-composer-gap); }
+:global([data-theme='v8']) .inboxSummary { width: var(--tpl-inbox-summary-width); flex-shrink: 0; padding: var(--tpl-inbox-summary-pad); border-left: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--tpl-inbox-summary-gap); }
+:global([data-theme='v8']) .settings { display: flex; flex: 1; gap: var(--tpl-settings-gap); padding: 0; min-width: 0; }
+:global([data-theme='v8']) .settingsNav { width: var(--tpl-settings-nav-width); flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; padding: var(--tpl-settings-nav-pad-block) var(--tpl-settings-nav-pad-side); }
+:global([data-theme='v8']) .settingsContent { flex: 1; max-width: 720px; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-settings-content-gap); padding: var(--tpl-settings-content-pad-block) var(--tpl-settings-content-pad-side); }
+:global([data-theme='v8']) .period { padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+:global([data-theme='v8']) .analyticsContent { flex: 1; min-width: 0; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+:global([data-theme='v8']) .analyticsAside { width: 300px; flex-shrink: 0; padding: 20px; border-left: 1px solid var(--color-divider); display: flex; flex-direction: column; gap: 12px; }
+:global([data-theme='v8']) .asideToggle { display: none; padding: 12px 24px; }
+
+:global([data-theme='v8']) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+
+:global([data-theme='v8']) .dashboardRow[data-row='trend'] { height: 300px; }
+:global([data-theme='v8']) .dashboardRow[data-row='inbox'] { height: 350px; }
+:global([data-theme='v8']) .dashboardRow[data-row='link'] { height: 172px; }
+
+:global([data-theme='v8']) [data-page-template='list'] .stats { border-top: 0; }
+
+:global([data-theme='v8']) .heading[data-heading-size='large'] .title { font-size: var(--tpl-large-title-size); line-height: var(--tpl-large-title-lh); }
+:global([data-theme='v8']) [data-page-template='create'] .title { font-size: var(--tpl-create-title-size); line-height: var(--tpl-create-title-lh); }
+:global([data-theme='v8']) [data-page-template='create'] .description { font-size: var(--tpl-create-desc-size); line-height: var(--tpl-create-desc-lh); }
+:global([data-theme='v8']) [data-page-template='create'] .actions { gap: 14px; }
+:global([data-theme='v8']) [data-page-template='detail'] .tabs { border-bottom: 1px solid var(--color-hairline); }
+:global([data-theme='v8']) .dashboardColumns { min-height: 200px; }
+:global([data-theme='v8']) .dashboardColumns .dashboardCell { padding-inline: 20px; }
+:global([data-theme='v8']) .dashboardRow[data-row] .dashboardCell { display: flex; flex-direction: column; gap: 12px; }
+:global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+
+/* 入力側と各段は中身の高さを保つ。 */
+:global([data-theme='v8']) [data-page-template='create'] > .heading .headingText { flex: 1 1 auto; }
+:global([data-theme='v8']) .preview { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+:global([data-theme='v8']) .detailSummary { display: flex; flex-direction: column; gap: 18px; }
+:global([data-theme='v8']) .heading[data-heading-size='large'] { gap: var(--tpl-large-gap); }
+:global([data-theme='v8']) .heading[data-heading-size='large'] .headingText { gap: var(--tpl-head-gap); }
+:global([data-theme='v8']) .heading[data-heading-size='large'] .description { font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
+:global([data-theme='v8']) .dashboardRow { flex-shrink: 0; }
+
+@container v8-page (min-width: 1100px) {
+  :global([data-theme='v8']) [data-page-template='create'] > .heading[data-steps-placement='inline'][data-has-steps] { flex-wrap: nowrap; }
+}
+
+:global([data-theme='v8']) .dashboardColumns .dashboardCell { display: flex; flex-direction: column; gap: 8px; }
+
+:global([data-theme='v8']) [data-page-template='dashboard'] .actions { gap: 12px; }
+:global([data-theme='v8']) [data-page-template='detail'] .actions { gap: var(--tpl-detail-actions-gap); }
+:global([data-theme='v8']) [data-page-template='detail'] .tabs { padding-bottom: var(--tpl-detail-tabs-pad-bottom); }
+:global([data-theme='v8']) .createContent,
+:global([data-theme='v8']) .detailContent,
+:global([data-theme='v8']) .settingsContent,
+:global([data-theme='v8']) .settingsNav { align-self: flex-start; }
+:global([data-theme='v8']) .messages { display: flex; flex-direction: column; }
+
+/* 保存の帯は短い画面でも見える。本文だけを縦に送り、帯を追い出さない。 */
+:global([data-theme='v8']) .frame[data-has-footer] { height: calc(100dvh - 74px); min-height: 0; }
+:global([data-theme='v8']) .frame[data-has-footer] > .split,
+:global([data-theme='v8']) .frame[data-has-footer] > .settings { min-height: 0; overflow-y: auto; }
+:global([data-theme='v8']) .footer { flex-shrink: 0; }
+
+/* 入力と見え方は別々に送る。本文全体のスクロールバーで左右の列幅を削らない。 */
+:global([data-theme='v8']) [data-page-template='create'][data-has-footer] > .split { overflow: hidden; }
+:global([data-theme='v8']) [data-page-template='create'][data-has-footer] .createContent {
+  max-height: 100%; min-height: 0; overflow-y: auto;
+}
+:global([data-theme='v8']) [data-page-template='create'][data-has-footer] .preview {
+  min-height: 0; overflow-y: auto; overflow-x: hidden;
+  /* 左右に同じ送り幅を確保し、スクロールバーで中央の見え方を片側へ寄せない。 */
+  scrollbar-gutter: stable both-edges;
+}
+:global([data-theme='v8']) .previewContent {
+  /* 欄 − 左右の余白 − 1pxの区切り線。
+     送り幅は余白へ収め、中身の幅を削らない。 */
+  width: var(--tpl-preview-content-width); flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+:global([data-theme='v8']) [data-page-template='create'][data-has-footer] .createContent > *,
+:global([data-theme='v8']) [data-page-template='create'][data-has-footer] .preview > * { flex-shrink: 0; }
+
+/* 幅による切り替えは基本の並びより後に置く。右欄の display を再び上書きしない。 */
+@container v8-page (max-width: 1099px) {
+  :global([data-theme='v8']) .folders { display: none; }
+  :global([data-theme='v8']) .collapsedFolders { display: flex; align-items: center; gap: 8px; }
+  /* 900 の板でも右の列は残す（幅 280）。消すのは狭い幅だけ。 */
+  :global([data-theme='v8']) .preview { width: var(--tpl-preview-narrow-width); }
+  :global([data-theme='v8']) .previewContent { width: var(--tpl-preview-narrow-content-width); }
+  :global([data-theme='v8']) .inboxSummary, :global([data-theme='v8']) .analyticsAside, :global([data-theme='v8']) .dashboardAside { display: none; }
+  :global([data-theme='v8']) .dashboardRow[data-row='link'] .dashboardAside { display: none; }
+  :global([data-theme='v8']) .asideToggle { display: block; }
+  :global([data-theme='v8']) .inboxList { width: 348px; }
+  :global([data-theme='v8']) .settings { flex-direction: column; gap: 16px; }
+  :global([data-theme='v8']) .settingsNav { width: 100%; flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 1023px) {
+  :global([data-theme='v8']) .frame:not([data-standalone]) { margin: 0; width: 100%; min-height: 0; }
+  :global([data-theme='v8']) .split, :global([data-theme='v8']) .dashboardRow { flex-direction: column; }
+  :global([data-theme='v8']) .detailSummary { width: 100%; border-right: 0; border-bottom: 1px solid var(--color-hairline); }
+  :global([data-theme='v8']) .preview { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
+}
+
+/* ★V8 Pencil の座標どおり（司令塔 2026-10-05）：戻るリンクの行の高さ・頭の行の間・詳細の題と説明 */
+:global([data-theme='v8']) .identity, :global([data-theme='v8']) .identity * { line-height: var(--tpl-identity-lh); }
+:global([data-theme='v8']) .identity { display: flex; align-items: center; }
+/* 戻るリンクは青の太字（絵 K7HWG・A0pDt・loVfW ほか「← 〇〇へ」#0b63ce/600）。 */
+:global([data-theme='v8']) .identity > a { color: var(--tpl-identity-color); font-weight: var(--tpl-identity-weight); }
+:global([data-theme='v8']) [data-page-template='create'] .heading { row-gap: var(--tpl-create-head-row-gap); }
+:global([data-theme='v8']) [data-page-template='detail'] .heading { row-gap: var(--tpl-detail-head-row-gap); }
+:global([data-theme='v8']) [data-page-template='detail'] .headingText { gap: var(--tpl-detail-title-gap); }
+:global([data-theme='v8']) [data-page-template='detail'] .description { font-size: var(--tpl-detail-desc-size); line-height: var(--tpl-detail-desc-lh); }
+/* ★V8 作る型の手順の帯（Pencil A0pDt「作る手順」：高さ20・丸20・字12/17・丸と字の間6・線24・間8）。部品 Stepper の v7 の枠・余白を型の中だけ外す（司令塔 2026-10-05）。 */
+:global([data-theme='v8']) .steps :global([data-part='stepper']) { margin: 0; padding: 0; border: 0; border-radius: var(--radius-none); background: transparent; }
+:global([data-theme='v8']) .steps :global([data-part='stepper']) > ol { column-gap: var(--tpl-steps-gap); row-gap: 4px; }
+:global([data-theme='v8']) .steps :global([data-part='stepper']) li { flex: 0 0 auto; gap: var(--tpl-steps-gap); }
+:global([data-theme='v8']) .steps :global([data-part='stepper']) li > span:not([aria-hidden]), :global([data-theme='v8']) .steps :global([data-part='stepper']) li > button { gap: var(--tpl-steps-dot-gap); }
+:global([data-theme='v8']) .steps :global([data-part='stepper']) li > span:not([aria-hidden]) > span:first-child, :global([data-theme='v8']) .steps :global([data-part='stepper']) li > button > span:first-child { width: var(--tpl-steps-dot); height: var(--tpl-steps-dot); font-size: 11px; }
+:global([data-theme='v8']) .steps :global([data-part='stepper']) li span span { font-size: var(--tpl-steps-text-size); line-height: var(--tpl-steps-text-lh); }
+:global([data-theme='v8']) [data-page-template='create'] .steps { min-height: 0; }
+/* 戻れる（済んだ）手順はボタン。共通のボタンの最小の高さ32が付くと帯が下がるので外す（A0pDt 以降の手順で +6 ずれていた）。 */
+:global([data-theme='v8']) .steps :global([data-part='stepper']) li > button { min-height: 0; padding: 0; line-height: var(--tpl-steps-text-lh); }
+:global([data-theme='v8']) .steps :global([data-part='stepper']) li > button > span:not(:first-child) { font-size: var(--tpl-steps-text-size); line-height: var(--tpl-steps-text-lh); }
+/* ★V8 フォルダの列：上の「作る」ボタンの下からフォルダの題まで18（apLqS フォルダの列：間2＋14＋2） */
+:global([data-theme='v8']) .folders > :global(a) + * , :global([data-theme='v8']) .folders > :global(button) + * { margin-top: 16px; }
+/* ★V8 作る型の頭の並び（A0pDt・K7HWG：戻る → 題 → 手順の帯 → 説明の行 12px）。題の下に説明を出さず、手順の帯の下へ（司令塔 2026-10-06） */
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText { display: contents; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .titleRow { flex-basis: 100%; order: 1; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .steps { order: 2; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .headingText > .description { flex-basis: 100%; order: 3; }
+:global([data-theme='v8']) [data-page-template='create'] .heading:not([data-steps-placement='inline']) > .actions { order: 1; }

@@ -1,15 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import KpiCard from '@/components/shared/kpi-card'
-import kpiStyles from '@/components/shared/kpi-card.module.css'
+import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
 
 /** Pencil ★V8（`ywJ5H`）の上部カード。数え方は既存APIのままにする。 */
 export default function FriendKpis() {
+  const theme = useAdminTheme()
   const { selectedAccountId } = useAccount()
   const [stats, setStats] = useState<FriendStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -59,7 +61,7 @@ export default function FriendKpis() {
       title: '有効な友だち',
       value: stats?.active ?? null,
       unit: '人',
-      detail: stats ? `総友だち ${formatNumber(stats.total)}` : '—',
+      detail: stats ? (theme !== 'v8' ? `総友だち ${formatNumber(stats.total)}人` : stats.activeMonthDelta == null ? `総友だち ${formatNumber(stats.total)}人・前月の記録なし` : `前月末 ${formatNumber(stats.activeLastMonth ?? 0)}人（${stats.activeMonthDelta >= 0 ? '+' : ''}${formatNumber(stats.activeMonthDelta)}）`) : '—',
       badge: undefined,
     },
     {
@@ -108,11 +110,12 @@ export default function FriendKpis() {
           友だち集計を読み込めませんでした。
         </Notice>
       ) : null}
-      <div data-kpi-strip className={`grid grid-cols-2 gap-3.5 xl:grid-cols-4 ${kpiStyles.strip}`}>
+      <KpiBand gridClassName="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
         {cards.map((card) => (
-          <KpiCard key={card.title} {...card} loading={loading} variant="v6" />
+          // 数の帯は1本にまとめる（Pp3nS）。v8 の見た目だけ変わり v7 は不変。
+          <KpiCard key={card.title} {...card} loading={loading} variant="v6" presentation="band" />
         ))}
-      </div>
+      </KpiBand>
     </div>
   )
 }

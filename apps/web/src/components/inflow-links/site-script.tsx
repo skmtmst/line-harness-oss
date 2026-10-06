@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Plug } from 'lucide-react'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { api, type MeasurementSite } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -35,6 +36,7 @@ type TrackingSummary = {
 }
 
 export default function SiteScript() {
+  const theme = useAdminTheme()
   const { selectedAccountId } = useAccount()
   const [pages, setPages] = useState<PageRow[]>([])
   const [summary, setSummary] = useState<TrackingSummary | null>(null)
@@ -425,6 +427,7 @@ export default function SiteScript() {
                           <p className="mt-0.5 text-xs text-ink-faint">
                             サイトID <code className="break-all">{site.id}</code>
                           </p>
+                          {theme === 'v8' && <p className="mt-1 text-xs text-ink-secondary">最後に受け取った時刻: {formatLastReceived(site.lastReceivedAt) ?? 'まだ受け取っていません'}</p>}
                         </div>
                         {canManage ? (
                           <div className="flex gap-2">

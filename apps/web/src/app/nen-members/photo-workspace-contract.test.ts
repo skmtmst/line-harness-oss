@@ -55,7 +55,7 @@ describe('V8 写真審査の一枚表示と掲載管理', () => {
 
   it('does not turn an unavailable view count into zero', () => {
     expect(publications).toContain("value == null ? '—'")
-    expect(publications).toContain('view_count_30d')
+    expect(publications).toContain('view_count_30_days')
     expect(publications).toContain('withdrawPhotoPublication')
     expect(publications).toContain('updatePhotoPublicationPlacements')
     expect(publications).toContain('使う場所を保存')

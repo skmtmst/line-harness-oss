@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../components/shared/kpi-band-v8.css";
 
 /*
  * `v7:` / `v8:` バリアント（★V8 移行）。
@@ -497,6 +498,8 @@
    * （0 8px 24px 黒8%）。枠線は持たないので影だけ。
    */
   --shadow-bar-float: 0 8px 24px rgb(0 0 0 / 0.08);
+  /* 板の幅いっぱいの保存の帯（上向き・0 -4px 12px 黒8%）。 */
+  --shadow-bar-line: 0 -4px 12px rgb(29 29 31 / 0.08);
   /* 骨組みの明滅 1 周期（★V7 仕上げ §3）。transition ではなく animation の周期専用。 */
   --motion-pulse: 1.2s;
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -522,7 +525,7 @@
  *     既定値 1.4 が効いて1画素も変わらない）
  *   control-border  操作する部品の枠の色（入力・選ぶ・検索・チェック・
  *     ラジオ・トグルのオフ・OTP・色を選ぶ・カードの中の印）。カードや
- *     表・外側の板の枠は hairline のまま（#868e98、板「枠線の色」）
+ *     表・外側の板の枠は hairline のまま（control-border は #c9ced6、絵の変数）
  *   status-warn-soft  注意の薄い地は #fff7e6 → #fdf3e1（夕13・TOKENS）
  *   track  #1d1d1f0a  進みの棒・切り替えの溝の地（夕13・TOKENS）
  *   border-soft  #1d1d1f14  ダイアログ・ふきだしなど重なる物の縁（同上）
@@ -530,10 +533,18 @@
  *     器の内側1pxの縁と、白いつまみの薄い影（同上）
  */
 [data-theme="v8"] {
+  /* controls レーン：書き出しHTMLの線・成功・浮く色選びの値。 */
+  --color-controls-swatch-line: #1d1d1f1f;
+  --shadow-controls-primary: 0 1px 2px #087a3e40, 0 1px 0 #ffffff26;
+  --shadow-controls-toggle: 0 1px 2px #1d1d1f33;
+  /* 表の行の下の線を行の内側に描く（線を含めて1行の高さ。data-table）。@theme に置くと CSS Modules だけが読む値は消えるので、ここ。 */
+  --shadow-row-line: inset 0 -1px 0 var(--color-divider);
+  --shadow-controls-selected: 0 0 0 #087a3e33;
+  --shadow-controls-pop: 0 8px 24px #1d1d1f1f;
   --radius-control: 10px;
   --radius-panel: 16px;
   --text-lh: 1.5;
-  --color-control-border: #868e98;
+  --color-control-border: #c9ced6; /* 絵の control-border。濃い #868e98 はオーナーが却下 */
   --color-status-warn-soft: #fdf3e1;
   --color-track: #1d1d1f0a;
   --color-border-soft: #1d1d1f14;
@@ -559,6 +570,86 @@
   --v8-bphone-screen-radius: 34px;   /* 画面の角丸 */
   /* 一覧の日付窓（list-v8.module.css の datePopover）が落とす影 */
   --v8-popover-shadow: 0 8px 24px rgb(15 23 32 / 0.12);
+}
+
+/*
+ * 一覧の型の寸法（design/v8/LIST-TEMPLATE-SPEC.md・絵 apLqS）。
+ * 寸法・文字・間はここに1か所にまとめ、型・表・帯・ページ送りは変数だけを使う。
+ * CSS Modules の pure 検査に当たるので、型の module ではなくこの層（①）に置く。
+ */
+[data-theme="v8"] {
+  --tpl-head-pad-top: 20px; --tpl-head-pad-side: 24px; --tpl-head-pad-bottom: 12px;
+  --tpl-title-size: 22px; --tpl-title-weight: 700; --tpl-title-lh: 32px;
+  --tpl-head-gap: 4px; --tpl-desc-size: 13px; --tpl-desc-lh: 19px;
+  --tpl-compact-title-size: 20px; --tpl-compact-title-weight: 600; --tpl-compact-title-lh: 27px;
+  --tpl-compact-gap: 2px; --tpl-compact-desc-lh: 20px;
+  --tpl-folder-width: 200px; --tpl-folder-pad-block: 16px; --tpl-folder-pad-side: 12px;
+  --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
+  --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
+  --tpl-thead-pad-block: 12px; --tpl-thead-pad-side: 24px; --tpl-thead-lh: 16px;
+  --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
+  --tpl-band-gap: 0;
+  /* 自動応答の一覧（uE9gf・Q5lOCc・WPrd5）。 */
+  --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: 64px; --tpl-ar-narrow-head-h: 34px;
+  --tpl-badge-h: 22px; --tpl-badge-dot: 6px;
+  --tpl-ro-band-pad: 10px 14px; --tpl-ro-band-gap: 10px; --tpl-ro-band-radius: 10px; --tpl-ro-band-lh: 20px; --tpl-ro-band-after: 8px;
+  --tpl-band-number-size: 22px; --tpl-band-number-lh: 26px;
+  --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 20px; --tpl-band-cell-gap: 8px;
+  --tpl-large-title-size: 22px; --tpl-large-title-lh: 33px; --tpl-large-gap: 16px;
+  --tpl-create-title-size: 22px; --tpl-create-title-lh: 32px;
+  --tpl-create-desc-size: 12px; --tpl-create-desc-lh: 17px;
+  /* 作る画面の右の列の箱（K7HWG「右の箱 設定内容」）と、本文の小さい文字の行の高さ */
+  /* タブ（画面の板 72 枚が 高さ28・文字の下10。部品見本 clV5c の 35 は少数） */
+  --tpl-preview-title-size: 15px; --tpl-preview-title-lh: 23px;
+  --tpl-tabs-h: 28px; --tpl-tabs-pad-bottom: 10px; --tpl-tabs-text-lh: 18px;
+  --tpl-chip-h: 36px; --tpl-chip-pad: 0 10px; --tpl-chip-gap: 5px; --tpl-body-pad: 14px; --tpl-body-gap: 8px; --tpl-body-lh: 22px; --tpl-insert-pad: 0 14px; --tpl-body-spacer: 24px; --tpl-chip-row-gap: 4px; --tpl-rule-row-gap: 12px; --tpl-chip-label-lh: 20px; --tpl-kw-chip-pad: 4px 6px 4px 10px; --tpl-kw-input-w: 200px; --tpl-kw-input-pad: 0 12px; --tpl-seg-btn-h: 32px; --tpl-seg-btn-pad: 0 12px; --tpl-weekday-w: 48px; --tpl-field-gap-basic: 6px; --tpl-count-num-size: 24px; --tpl-count-num-lh: 29px; --tpl-summary-key-w: 140px; --tpl-summary-val-lh: 21px; --tpl-summary-gap: 13px; --tpl-conflict-desc-lh: 18px; --tpl-rule-note-lh: 16px;
+  --tpl-action-row-pad: 10px 12px; --tpl-action-row-gap: 10px; --tpl-action-select-w: 140px;
+  --tpl-starter-gap: 12px; --tpl-starter-card-h: 168px; --tpl-card-title-size: 15px;
+  --tpl-side-card-pad: 16px; --tpl-side-card-gap: 4px; --tpl-side-row-gap: 3px; --tpl-side-row-pad: 9px;
+  --tpl-side-title-lh: 19px; --tpl-text-sm-lh: 17px; --tpl-side-note-pad: 12px 14px; --tpl-label-tag-gap: 6px;
+  --tpl-create-head-pad-top: 20px; --tpl-create-head-pad-side: 24px; --tpl-create-head-pad-bottom: 16px;
+  --tpl-create-head-gap: 8px;
+  --tpl-detail-head-pad-top: 20px; --tpl-detail-head-pad-side: 24px; --tpl-detail-head-pad-bottom: 16px;
+  --tpl-detail-head-gap: 12px; --tpl-detail-actions-gap: 6px; --tpl-detail-tabs-pad-bottom: 12px;
+  --tpl-create-content-pad-block: 24px; --tpl-create-content-pad-side: 28px; --tpl-create-content-gap: 16px;
+  --tpl-section-pad: 20px; --tpl-section-gap: 14px;
+  /* 行の「…」のメニューの項目（絵 IIesG・SkY9V・C0lfUP）。 */
+  --tpl-menu-item-h: 34px; --tpl-menu-item-gap: 8px;
+  --tpl-preview-pad: 24px; --tpl-preview-narrow-width: 280px;
+  --tpl-preview-content-width: 331px; --tpl-preview-narrow-content-width: 231px;
+  --tpl-detail-content-gap: 20px;
+  /* 戻るリンク（13px・高さ19）と題の間：作る8・詳細6。詳細の説明は 12px/17（X4STXS）。表の見出しは高さ40（H1O0a）。 */
+  --tpl-identity-lh: 19px; --tpl-identity-color: var(--color-action); --tpl-identity-weight: 600; --tpl-create-head-row-gap: 8px; --tpl-detail-head-row-gap: 6px;
+  --tpl-detail-title-gap: 6px; --tpl-detail-desc-size: 12px; --tpl-detail-desc-lh: 17px;
+  --tpl-thead-h: 40px;
+  /* @theme の中だけに置くと Tailwind が使われていない値として落とす（CSS Modules だけが読む）。V8 で部品の線が消えないよう、ここにも置く（司令塔 2026-10-06） */
+  --color-toggle-off: #c9ced6; --color-star-on: #fbbf24; --color-star-on-edge: #f59e0b;
+  --tpl-cell-gap-half: 8px;
+  --tpl-narrow-folder-w: 150px; /* 1152 の一覧の道具の段のフォルダ選び（Iffil） */
+  --tpl-row-name-size: 13px; --tpl-row-name-lh: 19px; --tpl-row-sub-gap: 3px; --tpl-row-sub-size: 11px; --tpl-row-sub-lh: 16px;
+  --tpl-steps-gap: 8px; --tpl-steps-dot: 20px; --tpl-steps-dot-gap: 6px; --tpl-steps-text-size: 12px; --tpl-steps-text-lh: 17px;
+  --tpl-footer-pad-block: 12px; --tpl-footer-pad-side: 24px; --tpl-footer-gap: 8px;
+  --tpl-settings-nav-width: 208px; --tpl-settings-nav-pad-block: 16px; --tpl-settings-nav-pad-side: 12px;
+  --tpl-settings-content-pad-block: 24px; --tpl-settings-content-pad-side: 28px; --tpl-settings-content-gap: 16px;
+  --tpl-settings-gap: 16px;
+  --tpl-inbox-list-width: 372px; --tpl-inbox-summary-width: 260px;
+  --tpl-inbox-summary-pad: 20px; --tpl-inbox-summary-gap: 16px;
+  --tpl-conv-head-pad-block: 12px; --tpl-conv-head-pad-side: 20px; --tpl-conv-head-gap: 8px;
+  --tpl-conv-messages-pad-block: 20px; --tpl-conv-messages-pad-side: 24px; --tpl-conv-messages-gap: 12px;
+  --tpl-composer-pad-top: 12px; --tpl-composer-pad-side: 20px; --tpl-composer-pad-bottom: 16px;
+  --tpl-composer-gap: 8px;
+}
+
+/*
+ * V8 の文字の行の高さ（WHY-DIFFS §6）。絵は 1.5 か既定（Noto Sans JP で
+ * 約1.45）。caption（12px→18）・label（13px→19.5）・body（14px→21）を
+ * 1.5 にそろえ、1行ごとの 2〜3px のずれが下へ溜まらないようにする。
+ * :root の値（v7）は変えない。
+ */
+[data-theme="v8"] {
+  --text-caption--line-height: 1.5;
+  --text-label--line-height: 1.5;
+  --text-body--line-height: 1.5;
 }
 
 /*
@@ -1436,4 +1527,30 @@ select:not([multiple]):not(.appearance-none) {
     justify-content: flex-end;
     padding-bottom: 0;
   }
+}
+
+/* cards レーン：正本HTMLの浮く部品の影。v7には適用しない。 */
+[data-theme="v8"] {
+  --v8-parts-primary-shadow: 0 1px 2px #087a3e40, 0 1px 0px #ffffff26;
+  --v8-parts-toast-shadow: 0 1px 2px #1d1d1f0f, 0 8px 24px #1d1d1f14;
+  --v8-parts-dialog-shadow: 0 2px 4px #1d1d1f14, 0 24px 48px #1d1d1f29;
+  --v8-line-muted: #8a8a8e;
+  --v8-line-sender: #ffffffe6;
+  --v8-line-time: #ffffffd9;
+}
+
+/* zUg8S の白い板は左メニューに接する。余白は右と下だけ。 */
+@media (min-width: 1024px) {
+  [data-theme="v8"] #main-content { margin-left: 0; border: 0; outline: 1px solid var(--color-board-line); outline-offset: -0.5px; }
+}
+
+[data-theme="v8"] { --color-status-warn-deep: #94600a; --shadow-primary-action: 0 1px 2px #087a3e40, 0 1px 0 #ffffff26; }
+[data-theme="v8"] aside[aria-label="フォルダ"] { box-shadow: none; }
+
+[data-theme="v8"] { --shadow-frozen-column: 6px 0 12px #1d1d1f14; --color-scroll-thumb: #1d1d1f40; --gradient-scroll-edge: linear-gradient(-90deg, #1d1d1f00 0%, #1d1d1f14 100%); }
+
+[data-theme="v8"] {
+  --font-sans: var(--font-noto-sans-jp), "Noto Sans JP", var(--font-inter), Inter, sans-serif;
+  --color-avatar-purple-bg: #f3ecfb;
+  --color-avatar-purple-ink: #6b3fa0;
 }

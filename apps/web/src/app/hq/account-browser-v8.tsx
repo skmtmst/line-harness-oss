@@ -106,6 +106,8 @@ export default function AccountBrowser({
   const [tags, setTags] = useState<LineAccountTag[]>([])
   const [tagDialog, setTagDialog] = useState(false)
   const [tagName, setTagName] = useState('')
+  const [tagColor, setTagColor] = useState('')
+  const [deleteTagId, setDeleteTagId] = useState<string | null>(null)
   const [tagError, setTagError] = useState('')
   const [tagSaving, setTagSaving] = useState(false)
 
@@ -162,7 +164,7 @@ export default function AccountBrowser({
     setTagSaving(true)
     setTagError('')
     try {
-      const res = await api.lineAccountTags.create(name)
+      const res = await api.lineAccountTags.create({ name, color: tagColor ? getComputedStyle(document.querySelector('[data-theme="v8"]') ?? document.documentElement).getPropertyValue(tagColor).trim() : null })
       if (!res.success) throw new Error(res.error)
       setTagName('')
       setTagDialog(false)
@@ -174,6 +176,22 @@ export default function AccountBrowser({
     } finally {
       setTagSaving(false)
     }
+  }
+
+  const removeTag = async (id: string) => {
+    if (tagSaving) return
+    setTagSaving(true)
+    setTagError('')
+    try {
+      const response = await api.lineAccountTags.remove(id)
+      if (!response.success) throw new Error(response.error)
+      const list = await api.lineAccountTags.list()
+      if (list.success) setTags(list.data)
+      setDeleteTagId(null)
+      onChanged()
+    } catch (caught) {
+      setTagError(caught instanceof Error ? caught.message : 'タグを消せませんでした')
+    } finally { setTagSaving(false) }
   }
 
   const cardActions = (account: AccountWithStats) => {
@@ -383,7 +401,7 @@ export default function AccountBrowser({
       <Dialog
         open={tagDialog}
         title="タグを追加"
-        description="付けたタグで左のメニューから絞り込めます。"
+        description="付けたタグで左のメニューから絞り込めます。タグを消しても、アカウントは消えません。"
         onCancel={() => setTagDialog(false)}
         designNode="JKjsE"
         footer={
@@ -406,6 +424,8 @@ export default function AccountBrowser({
             onChange={(event) => setTagName(event.target.value)}
             className="w-full"
           />
+          <Select aria-label="タグの色" value={tagColor} onChange={setTagColor} disabled={tagSaving} options={[{value:'',label:'なし'},{value:'--color-status-info',label:'青'},{value:'--color-accent-deep',label:'緑'},{value:'--color-status-warn-deep',label:'橙'},{value:'--color-status-danger',label:'赤'},{value:'--color-chip-alt',label:'紫'}]} />
+          {tags.map(item => <div key={item.id} className="flex items-center justify-between gap-2 text-label"><span>{item.name}</span>{deleteTagId === item.id ? <div className="flex gap-2"><span>消しますか？</span><Button size="compact" disabled={tagSaving} onClick={() => void removeTag(item.id)}>消す</Button><Button size="compact" onClick={() => setDeleteTagId(null)}>やめる</Button></div> : <Button size="compact" disabled={tagSaving} onClick={() => setDeleteTagId(item.id)}>削除</Button>}</div>)}
           {tagError ? <p className="text-label text-danger" role="alert">{tagError}</p> : null}
         </div>
       </Dialog>

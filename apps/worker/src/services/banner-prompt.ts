@@ -1,4 +1,15 @@
-import type { BannerMode, BannerPersonOption, BannerQuality } from '@line-crm/db';
+import {
+  BANNER_MAX_REFERENCE_IMAGES,
+  isBannerReferenceMode,
+  type BannerMode,
+  type BannerPersonOption,
+  type BannerQuality,
+  type BannerReference,
+  type BannerReferenceMode,
+} from '@line-crm/db';
+
+export { BANNER_MAX_REFERENCE_IMAGES, isBannerReferenceMode };
+export type { BannerReference, BannerReferenceMode };
 
 /**
  * バナー生成の「用途」と、生成AIへ渡す文（プロンプト）の組み立て。
@@ -71,28 +82,61 @@ export const BANNER_MAX_FREE_PROMPT_LENGTH = 1200;
 /** 一度に作れる枚数。暴走防止の安全弁の1つ。 */
 export const BANNER_MAX_COUNT = 4;
 
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+/** `#RRGGBB`。すけ具合つき（`#RRGGBBAA`）も受ける。 */
+const HEX_COLOR = /^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/;
 
 export function isHexColor(value: unknown): value is string {
   return typeof value === 'string' && HEX_COLOR.test(value);
 }
 
-export type BannerReferenceMode = 'edit' | 'inspire';
-
 export interface BannerPromptInput {
   mode: BannerMode;
   preset: BannerPreset;
-  /** 参照画像の使い方。参照画像が無いときは null。 */
-  referenceMode?: BannerReferenceMode | null;
+  /** 参照画像（最大3枚）。画像ごとに使い方を持つ。無いときは空配列。 */
+  references?: BannerReference[] | null;
   textLines: string[];
+  /**
+   * 行ごとの「強調」（Pencil ★修正案 `g64HOD`・2026-10-06 承認の決まり5）。
+   * `textLines` と同じ順・同じ長さ。true の行だけを強調カラーで目立たせる。
+   * 強調を知らない古い生成は空配列・未指定で、そのときは今までどおりになる。
+   */
+  emphasisLines?: boolean[] | null;
+  /** 色の4つの役割（★BG-B `KkTNS`）。指定なしは null。 */
+  baseColor: string | null;
   mainColor: string | null;
   subColor: string | null;
+  accentColor: string | null;
   personOption: BannerPersonOption;
   customPrompt: string;
   freePrompt: string;
 }
 
 const ROLE_HINTS = ['メインのキャッチコピー', 'サブコピー', '訴求ポイント', '期間・条件', '行動を促す文言（CTA）', '補足'];
+
+/** 参照画像が1枚だけのときの言い方（承認済み ★BG-C `cOgWE` の3択）。 */
+const REFERENCE_SENTENCE: Record<BannerReferenceMode, string> = {
+  edit: '添付した画像を土台にして描き直してください。構図・配色・雰囲気・主役の配置は元の画像を保ち、下の指示にある部分だけを変えてください。指示に無い要素は増やさないでください。',
+  parts: '添付した画像から素材を一部だけ使ってください。ロゴ・商品・人物などの要素を切り出して取り込み、構図・背景・文字は下の指示に合わせて新しく組み立ててください。元の画像にある文字はそのまま使わないでください。',
+  inspire: '添付した画像は参考です。色使い・トーン・質感・雰囲気を引き継ぎつつ、構図やレイアウトはそのまま写さず、下の指示に合う新しい画像を作ってください。元の画像にある文字は使わないでください。',
+};
+
+/** 参照画像が複数のときは「N枚目」で画像ごとの扱いを言い分ける。 */
+const REFERENCE_CLAUSE: Record<BannerReferenceMode, string> = {
+  edit: '土台にします。構図・配色・雰囲気・主役の配置はこの画像を保ち、下の指示にある部分だけを変えてください。',
+  parts: '素材を一部だけ使います。ロゴ・商品・人物などの要素を切り出して取り込み、構図や背景は下の指示に合わせて組み立ててください。',
+  inspire: '雰囲気の参考にします。色使い・トーン・質感だけを引き継ぎ、構図やレイアウトはそのまま写さないでください。',
+};
+
+/** 参照画像の並びを、画像を添える順と同じ言い方にする。 */
+function referenceParts(references: BannerReference[]): string[] {
+  if (references.length === 0) return [];
+  if (references.length === 1) return [REFERENCE_SENTENCE[references[0].mode]];
+  return [
+    `添付した画像は${references.length}枚あります。順番は添えたとおりで、それぞれ次のように扱ってください。`,
+    ...references.map((reference, index) => `${index + 1}枚目: ${REFERENCE_CLAUSE[reference.mode]}`),
+    '元の画像にある文字はそのまま使わないでください。',
+  ];
+}
 
 /**
  * 画像生成AIへ渡す文を組み立てる。
@@ -103,12 +147,8 @@ const ROLE_HINTS = ['メインのキャッチコピー', 'サブコピー', '訴
 export function buildBannerPrompt(input: BannerPromptInput): string {
   const parts: string[] = [];
 
-  // 参照画像（★V6 35-2）。添えた画像をどう扱うかを最初に言い切る。
-  if (input.referenceMode === 'edit') {
-    parts.push('添付した画像を土台にして描き直してください。構図・配色・雰囲気・主役の配置は元の画像を保ち、下の指示にある部分だけを変えてください。指示に無い要素は増やさないでください。');
-  } else if (input.referenceMode === 'inspire') {
-    parts.push('添付した画像は参考です。色使い・トーン・質感・雰囲気を引き継ぎつつ、構図やレイアウトはそのまま写さず、下の指示に合う新しい画像を作ってください。元の画像にある文字は使わないでください。');
-  }
+  // 参照画像（★V6 35-2・★BG-C `cOgWE`）。添えた画像をどう扱うかを最初に言い切る。
+  parts.push(...referenceParts((input.references ?? []).slice(0, BANNER_MAX_REFERENCE_IMAGES)));
 
   if (input.mode === 'free') {
     parts.push(input.freePrompt.trim());
@@ -116,22 +156,40 @@ export function buildBannerPrompt(input: BannerPromptInput): string {
   } else {
     parts.push(`${input.preset.medium}のためのプロモーション画像を1枚デザインしてください。`);
 
-    const lines = input.textLines.map((line) => line.trim()).filter(Boolean);
-    if (lines.length > 0) {
+    // 空の行を落とすときは「強調」も同じ行と一緒に落とす（先に片方だけ詰めると番号がずれる）。
+    const kept = input.textLines
+      .map((line, index) => ({ line: line.trim(), emphasis: input.emphasisLines?.[index] === true }))
+      .filter((entry) => entry.line.length > 0);
+    if (kept.length > 0) {
       parts.push('画像の中に、次の日本語テキストを「この順番で」「一字一句そのまま」「誤字なく」大きく読みやすい日本語フォントで配置してください。テキストはこれ以外に一切追加しないでください。');
-      lines.forEach((line, index) => {
+      kept.forEach((entry, index) => {
         const role = ROLE_HINTS[Math.min(index, ROLE_HINTS.length - 1)];
-        parts.push(`${index + 1}. 「${line}」（${role}）`);
+        // 強調した行は、どの行かが分かるようにここで印を付ける（決まり5）。
+        parts.push(`${index + 1}. 「${entry.line}」（${role}${entry.emphasis ? '・特に目立たせる' : ''}）`);
       });
     } else {
       parts.push('文字は入れないでください。');
     }
+    const emphasized = kept.filter((entry) => entry.emphasis);
 
+    // 色の4つの役割（★BG-B `KkTNS`）。使う場所まで言い切る。
+    if (input.baseColor) {
+      parts.push(`背景のベースカラーは ${input.baseColor} にしてください。`);
+    }
     if (input.mainColor) {
       parts.push(`メインカラーは ${input.mainColor} を基調にしてください。`);
     }
     if (input.subColor) {
-      parts.push(`アクセントカラーとして ${input.subColor} を組み合わせてください。`);
+      parts.push(`サブカラーとして ${input.subColor} を差し色に組み合わせてください。`);
+    }
+    if (input.accentColor) {
+      parts.push(`特に目立たせたい文字には強調カラー ${input.accentColor} を使ってください。`);
+      // 強調した行があるときは、どの行をその色で目立たせるかまで言い切る（決まり5）。
+      if (emphasized.length > 0) {
+        parts.push(
+          `そのうち ${emphasized.map((entry) => `「${entry.line}」`).join('・')} は、強調カラー ${input.accentColor} を使って他の行よりはっきり目立たせてください。`,
+        );
+      }
     }
     parts.push(
       input.personOption === 'with'
@@ -168,15 +226,18 @@ export interface BannerRequestValidation {
     mode: BannerMode;
     preset: BannerPreset;
     textLines: string[];
+    /** 行ごとの「強調」。`textLines` と同じ順・同じ長さ（★修正案 `g64HOD`）。 */
+    emphasisLines: boolean[];
+    baseColor: string | null;
     mainColor: string | null;
     subColor: string | null;
+    accentColor: string | null;
     personOption: BannerPersonOption;
     customPrompt: string;
     freePrompt: string;
     count: number;
-    /** 参照画像（banner_images.id）。無ければ null。 */
-    referenceImageId: string | null;
-    referenceMode: BannerReferenceMode | null;
+    /** 参照画像（最大3枚）。無ければ空配列。 */
+    references: BannerReference[];
   };
 }
 
@@ -193,11 +254,20 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
     return { ok: false, error: `枚数は1〜${BANNER_MAX_COUNT}枚で指定してください` };
   }
 
+  /*
+   * テキストと行ごとの「強調」（★修正案 `g64HOD`）は同じ番号で対になっている。
+   * 空の行を落とすときは強調も同じ行と一緒に落とす。先に片方だけ詰めると、
+   * 2行目の強調が3行目に付くような取り違えが起きる。
+   */
   const rawLines = Array.isArray(body.textLines) ? body.textLines : [];
-  const textLines = rawLines
-    .filter((line): line is string => typeof line === 'string')
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const rawEmphasis = Array.isArray(body.emphasisLines) ? body.emphasisLines : [];
+  const keptLines = rawLines
+    .map((line, index) => ({ line, emphasis: rawEmphasis[index] === true }))
+    .filter((entry): entry is { line: string; emphasis: boolean } => typeof entry.line === 'string')
+    .map((entry) => ({ line: entry.line.trim(), emphasis: entry.emphasis }))
+    .filter((entry) => entry.line.length > 0);
+  const textLines = keptLines.map((entry) => entry.line);
+  const emphasisLines = keptLines.map((entry) => entry.emphasis);
   if (textLines.length > BANNER_MAX_TEXT_LINES) {
     return { ok: false, error: `テキストは${BANNER_MAX_TEXT_LINES}行までにしてください` };
   }
@@ -206,13 +276,26 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
     return { ok: false, error: `1行は${BANNER_MAX_TEXT_LINE_LENGTH}文字までにしてください（「${tooLong.slice(0, 12)}…」）` };
   }
 
-  const mainColor = body.mainColor == null || body.mainColor === '' ? null : body.mainColor;
-  if (mainColor !== null && !isHexColor(mainColor)) {
-    return { ok: false, error: 'メインカラーは #RRGGBB の形式で指定してください' };
-  }
-  const subColor = body.subColor == null || body.subColor === '' ? null : body.subColor;
-  if (subColor !== null && !isHexColor(subColor)) {
-    return { ok: false, error: 'サブカラーは #RRGGBB の形式で指定してください' };
+  // 色の4つの役割（★BG-B `KkTNS`）。空文字は「指定なし」として扱う。
+  const colorRoles = [
+    { key: 'baseColor', label: 'ベースカラー' },
+    { key: 'mainColor', label: 'メインカラー' },
+    { key: 'subColor', label: 'サブカラー' },
+    { key: 'accentColor', label: '強調カラー' },
+  ] as const;
+  const colors: Record<(typeof colorRoles)[number]['key'], string | null> = {
+    baseColor: null,
+    mainColor: null,
+    subColor: null,
+    accentColor: null,
+  };
+  for (const role of colorRoles) {
+    const raw = body[role.key];
+    if (raw == null || raw === '') continue;
+    if (!isHexColor(raw)) {
+      return { ok: false, error: `${role.label}は #RRGGBB の形式で指定してください` };
+    }
+    colors[role.key] = raw;
   }
 
   const personOption: BannerPersonOption = body.personOption === 'with' ? 'with' : 'without';
@@ -225,22 +308,41 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
     return { ok: false, error: `プロンプトは${BANNER_MAX_FREE_PROMPT_LENGTH}文字までにしてください` };
   }
 
-  const referenceRaw = body.referenceImageId;
-  const referenceImageId = typeof referenceRaw === 'string' && referenceRaw.trim() ? referenceRaw.trim() : null;
-  if (referenceRaw != null && referenceRaw !== '' && !referenceImageId) {
-    return { ok: false, error: '参照画像の指定が正しくありません' };
+  // 参照画像（★BG-C `cOgWE`）。最大3枚で、画像ごとに使い方を1つ選ぶ。
+  // 古い画面が送る referenceImageId / referenceMode の1枚組も受ける。
+  const referencesRaw = Array.isArray(body.references)
+    ? body.references
+    : body.referenceImageId != null && body.referenceImageId !== ''
+      ? [{ imageId: body.referenceImageId, mode: body.referenceMode }]
+      : [];
+  if (referencesRaw.length > BANNER_MAX_REFERENCE_IMAGES) {
+    return { ok: false, error: `参照画像は${BANNER_MAX_REFERENCE_IMAGES}枚までにしてください` };
   }
-  const modeRaw = body.referenceMode;
-  const referenceMode: BannerReferenceMode | null = referenceImageId ? (modeRaw === 'edit' ? 'edit' : 'inspire') : null;
-  if (referenceImageId && modeRaw !== 'edit' && modeRaw !== 'inspire') {
-    return { ok: false, error: '参照画像の使い方（描き直す／参考にする）を選んでください' };
+  const references: BannerReference[] = [];
+  for (const entry of referencesRaw) {
+    if (!entry || typeof entry !== 'object') {
+      return { ok: false, error: '参照画像の指定が正しくありません' };
+    }
+    const raw = entry as { imageId?: unknown; mode?: unknown };
+    const imageId = typeof raw.imageId === 'string' ? raw.imageId.trim() : '';
+    if (!imageId) {
+      return { ok: false, error: '参照画像の指定が正しくありません' };
+    }
+    if (references.some((reference) => reference.imageId === imageId)) {
+      return { ok: false, error: '同じ画像を2回選べません' };
+    }
+    if (!isBannerReferenceMode(raw.mode)) {
+      return { ok: false, error: '参照画像の使い方（土台にする／素材を一部使う／雰囲気を参考にする）を選んでください' };
+    }
+    references.push({ imageId, mode: raw.mode });
   }
 
   if (mode === 'free' && !freePrompt) {
     return { ok: false, error: '作りたい画像の説明を入力してください' };
   }
-  // 「土台に描き直す」は指示だけで成り立つ（文字を入れない差し替えもある）。
-  if (mode === 'banner' && textLines.length === 0 && !customPrompt && referenceMode !== 'edit') {
+  // 「土台にする」は指示だけで成り立つ（文字を入れない差し替えもある）。
+  const hasEditReference = references.some((reference) => reference.mode === 'edit');
+  if (mode === 'banner' && textLines.length === 0 && !customPrompt && !hasEditReference) {
     return { ok: false, error: 'バナーに入れるテキストか、追加の指示を入力してください' };
   }
 
@@ -250,14 +352,16 @@ export function validateBannerRequest(body: Record<string, unknown> | null): Ban
       mode,
       preset,
       textLines,
-      mainColor: mainColor as string | null,
-      subColor: subColor as string | null,
+      emphasisLines,
+      baseColor: colors.baseColor,
+      mainColor: colors.mainColor,
+      subColor: colors.subColor,
+      accentColor: colors.accentColor,
       personOption,
       customPrompt,
       freePrompt,
       count: countRaw,
-      referenceImageId,
-      referenceMode,
+      references,
     },
   };
 }

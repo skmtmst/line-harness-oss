@@ -42,7 +42,8 @@ describe('外側の殻（V8 移行③）', () => {
     expect(board![1]).toContain('border-radius: var(--radius-panel)')
     expect(board![1]).toContain('border: 1px solid var(--color-board-line)')
     expect(board![1]).toContain('box-shadow: var(--shadow-board)')
-    expect(board![1]).toContain('margin: 0 12px 12px 12px')
+    // 左メニューが右に12の余白を持つので、板の左は0（二重にしない）。
+    expect(board![1]).toContain('margin: 0 12px 12px 0')
   })
 
   it('黄色の版の帯は v8 では出さない（v7-only で包む）', () => {

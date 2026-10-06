@@ -75,3 +75,9 @@ export async function replaceLineAccountTags(db: D1Database, tenantId: string, a
   ]);
   return Number(results[0]?.meta?.changes ?? 0) > 0;
 }
+
+/** 新規登録用。版を進めず、途中の失敗はまとめて巻き戻す。 */
+export async function attachLineAccountRegistrationTags(db: D1Database, tenantId: string, accountId: string, tagIds: string[]): Promise<void> {
+  if (!tagIds.length) return;
+  await db.batch(tagIds.map(id => db.prepare('INSERT INTO line_account_tag_links (line_account_id, tag_id, tenant_id) VALUES (?, ?, ?)').bind(accountId, id, tenantId)));
+}

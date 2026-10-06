@@ -176,6 +176,8 @@ describe('共通部品の影響範囲', () => {
       // 2026-09-04: 7-1-H 実行結果。友だち×通の実行が並ぶので、表の下にページ送りが要る。
       'app/reminders/detail/detail-v8.tsx',
       'app/reminders/detail/page.tsx',
+      // ★V8 リマインダの登録者（担当 b の作り直し）。表の下に共通のページ送り。
+      'app/reminders/detail/registrants-panel.tsx',
       // ★V8 リマインダ一覧（apLqS）。表の下にページ送りを置く。
       'app/reminders/list-v8.tsx',
       // 2026-09-23: Googleビジネスの口コミ一覧（★V6 GB-2）。20件ずつのページ送り。
@@ -233,6 +235,8 @@ describe('共通部品の影響範囲', () => {
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
+      // ★V8 自動応答の一覧（uE9gf）。新しい置き場（src/v8）に一から書いた。
+      'v8/auto-replies/list.tsx',
     ].sort())
   })
 

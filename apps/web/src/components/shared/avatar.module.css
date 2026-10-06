@@ -48,4 +48,15 @@
 .t3 { background: var(--color-danger-bg); color: var(--color-danger); }
 .t4 { background: var(--color-info-bg); color: var(--color-info); }
 .t5 { background: var(--color-shell); color: var(--color-ink-secondary); }
+
+/* 28 / 34 / 52 are the V8 small / medium / large face sizes. */
+.s28 { width: 28px; height: 28px; font-size: 11px; }
+.s34 { width: 34px; height: 34px; font-size: 14px; }
+.s52 { width: 52px; height: 52px; font-size: 21px; }
+[data-theme='v8'] .avatar { gap: 0; border-radius: 999px; font-family: var(--font-noto-sans-jp), system-ui, sans-serif; }
+[data-theme='v8'] .s28, [data-theme='v8'] .s24 { width: 28px; height: 28px; font-size: 11px; line-height: 17px; }
+[data-theme='v8'] .s34, [data-theme='v8'] .s32, [data-theme='v8'] .s40 { width: 34px; height: 34px; font-size: 14px; line-height: 21px; }
+[data-theme='v8'] .s52, [data-theme='v8'] .s56 { width: 52px; height: 52px; font-size: 21px; line-height: 32px; }
+[data-theme='v8'] .avatar[data-avatar='initials'] { background: #f3ecfb; color: #6b3fa0; }
+
 }

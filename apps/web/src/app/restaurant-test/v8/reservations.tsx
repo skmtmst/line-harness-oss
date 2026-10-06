@@ -484,7 +484,7 @@ function TodayView({ rows, tables, busy, day, isToday, sideExtra, onAddPreset, o
           <div className={ledger.breakRow}><span>LINEから</span><strong>{bySource.line}件</strong></div>
           <div className={ledger.breakRow}><span>予約媒体から</span><strong>{bySource.media}件</strong></div>
           <div className={ledger.breakRow}><span>電話</span><strong>{bySource.phone}件</strong></div>
-          <div className={ledger.breakRow}><span>押さえ</span><strong>—</strong></div>
+          <div className={ledger.breakRow}><span>押さえ</span><strong>{rows.filter(r => r.status === 'pending' && r.hold_expires_at).length}枠</strong></div>
         </section>
         {sideExtra}
       </div>
@@ -564,6 +564,19 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phoneOpen, p
   const { data, store, selectedStoreId, busy, mutate, reload } = ctx
   const { selectedAccountId } = useAccount()
   const accountId = selectedAccountId || ''
+  const storeId = store?.id || ''
+  const [todayRows, setTodayRows] = useState<RestaurantReservation[] | null>(null)
+  useEffect(() => {
+    let current = true
+    setTodayRows(null)
+    if (view !== 'today' || !storeId || !accountId) return
+    const date = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+    const load = () => restaurantTestApi.reservationsDay(accountId, storeId, date).then(res => { if (current) setTodayRows(res.data.reservations) }).catch(() => { if (current) setTodayRows(null) })
+    void load()
+    const timer = setInterval(() => { void load() }, 30_000)
+    return () => { current = false; clearInterval(timer) }
+  }, [view, storeId, accountId, day, data.reservations])
+  const [lineWarning, setLineWarning] = useState('')
   const [editingId, setEditingId] = useState('')
   const [editTouched, setEditTouched] = useState(false)
   const [cancelId, setCancelId] = useState('')
@@ -596,15 +609,14 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phoneOpen, p
   const rows = useMemo(() => {
     const scopedRows = scoped(data.reservations, selectedStoreId)
     if (view === 'today') {
-      const t = dayRange(day)
-      return scopedRows.filter((r) => r.starts_at >= t.from && r.starts_at < t.to)
+      return todayRows || []
     }
     if (view === 'week') {
       const w = weekRange(day)
       return scopedRows.filter((r) => r.starts_at >= w.from && r.starts_at < w.to)
     }
     return scopedRows
-  }, [data.reservations, selectedStoreId, view, day])
+  }, [data.reservations, selectedStoreId, view, day, todayRows])
 
   const sourceRows = useMemo(
     () => (source === 'all' ? rows : rows.filter((r) => r.source === source)),
@@ -665,7 +677,6 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phoneOpen, p
 
   const editing = rows.find((r) => r.id === editingId) || null
   const cancelling = rows.find((r) => r.id === cancelId) || null
-  const storeId = store?.id || ''
 
   if (phoneOpen) {
     return (
@@ -679,7 +690,12 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phoneOpen, p
         preset={preset}
         onBack={() => onPhone(false)}
         onSaved={() => { void reload(); onPhone(false) }}
-        onSave={(body) => save(() => restaurantTestApi.createReservation(accountId, body), '台帳に入れました。')}
+        onSave={(body) => save(() => body.kind === 'hold'
+          ? restaurantTestApi.holdReservation(accountId, { storeId, startsAt: String(body.startsAt), endsAt: String(body.endsAt), guestCount: Number(body.guestCount), tableId: body.tableId as string | null, holdMinutes: Number(body.holdMinutes), note: String(body.allergyNote || '電話のお客さま用') })
+          : restaurantTestApi.createReservation(accountId, body).then(res => {
+            if (body.notifyLine && !res.data.lineNotice.sent) setLineWarning('予約は保存しました。LINE確認は送れていません。友だちの連携と送信状態を確認してください。')
+            return res
+          }), body.kind === 'hold' ? '枠を押さえました。期限になると解除します。' : '台帳に入れました。')}
       />
     )
   }
@@ -728,7 +744,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phoneOpen, p
       <div className={ledger.toolbarActions}>
         {view === 'today' ? (
           <>
-            <Button disabled title="枠を押さえる口が無いため、今は使えません">枠を押さえる</Button>
+            <Button disabled={busy || !storeId} onClick={() => onPhone(true, { date: day, hold: true })}>枠を押さえる</Button>
             <Button variant="primary" disabled={busy || !storeId} onClick={() => onPhone(true)}>＋ 電話の予約を入れる</Button>
           </>
         ) : (
@@ -744,13 +760,19 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phoneOpen, p
   return (
     <div className={ledger.ledgerBoard}>
       {toolbar}
+      {lineWarning ? <p role="alert">{lineWarning}</p> : null}
+      {rows.filter(r => r.status === 'pending' && r.hold_expires_at).map(r => <div key={r.id} role="status" className={ledger.sideCard}>
+        押さえ・{r.table_label || '未配席'}・解除期限 {new Date(r.hold_expires_at!).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+        <Button size="compact" disabled={busy} onClick={() => void save(() => restaurantTestApi.updateReservation(accountId, r.id, { status: 'cancelled' }), '仮押さえを解除しました。')}>押さえを解除</Button>
+      </div>)}
       {view === 'today' ? (
         <>
+          {todayRows === null ? <p role="status">この日の予約を取得しています。取得できない場合は再読込してください。</p> : null}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Stat label="今日の予約" value={`${sourceRows.length}件`} note={`${sourceRows.reduce((s, r) => s + r.guest_count, 0)}名`} />
             <Stat label="承認待ち" value={`${sourceRows.filter((r) => r.status === 'pending').length}件`} note={sourceRows.find((r) => r.status === 'pending') ? sourceLabel[sourceRows.find((r) => r.status === 'pending')!.source] || '' : '—'} warning={sourceRows.some((r) => r.status === 'pending')} />
             <Stat label="未配席" value={`${sourceRows.filter((r) => !r.table_id).length}件`} note="すべて卓に入っています" />
-            <Stat label="押さえ" value="—" note="押さえの口はAPI待ち" />
+            <Stat label="押さえ" value={`${sourceRows.filter(r => r.status === 'pending' && r.hold_expires_at).length}枠`} note="期限付きの仮押さえ" />
           </div>
           <TodayView
             rows={sourceRows}

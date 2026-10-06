@@ -27,6 +27,7 @@ const CALLBACK_MESSAGES: Record<string, { tone: 'ok' | 'warn' | 'error'; text: s
   'error:oauth_not_configured': { tone: 'error', text: 'この環境にはGoogle接続の設定がまだありません。管理者に確かめてください。' },
   'error:encryption_key_missing': { tone: 'error', text: 'この環境の暗号化設定が不足しています。管理者に確かめてください。' },
   'error:state_cancelled': { tone: 'warn', text: 'この接続操作は、途中で別の接続操作や解除が行われたため取り消されました。接続したい場合はもう一度最初から進めてください。' },
+  'error:no_permission': { tone: 'error', text: 'Googleの許可画面でスプレッドシートの許可が外れていたため、接続していません。もう一度接続して、この許可を付けたままにしてください。' },
 }
 
 const RUN_KIND_LABEL: Record<GoogleSheetsSyncRun['kind'], string> = {

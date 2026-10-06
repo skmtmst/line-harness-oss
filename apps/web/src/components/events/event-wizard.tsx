@@ -12,6 +12,8 @@ import {
   type EventSlot,
   type EventSlotInput,
 } from '@/lib/api'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import EventApplicationPreviewDialog from './event-application-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import LinePreview from '@/components/shared/line-preview'
 import { AsideCard, ChoiceCard, Field, FormSection, inputClass } from '@/components/shared/create-page'
@@ -214,6 +216,7 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
     return {
       name: d.name,
       venue_name: d.venue_name,
+      venue_address: d.venue_address ?? null,
       venue_url: d.venue_url,
       image_url: d.image_url,
       description: d.description,
@@ -392,6 +395,7 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
 
       {step === 1 && (
         <OverviewStep
+          accountId={accountId}
           draft={draft}
           update={update}
           saving={saving}
@@ -494,6 +498,7 @@ function StepFooter({
 // ----------------------------------------------------------------
 
 function OverviewStep({
+  accountId,
   draft,
   update,
   saving,
@@ -502,6 +507,7 @@ function OverviewStep({
   onDraftSave,
   onNext,
 }: {
+  accountId: string
   draft: EventDetail
   update: <K extends keyof EventDetail>(k: K, v: EventDetail[K]) => void
   saving: boolean
@@ -510,6 +516,7 @@ function OverviewStep({
   onDraftSave: () => void
   onNext: () => void
 }) {
+  const theme = useAdminTheme()
   const descLen = (draft.description ?? '').length
   /* 保存前に欄を離れたとき出す直し方（文は保存時と同じ）。 */
   const [nameError, setNameError] = useState<string | null>(null)
@@ -566,6 +573,7 @@ function OverviewStep({
               className={inputClass}
             />
           </Field>
+          {theme === 'v8' && <Field label="会場の住所" htmlFor="ev-address"><input id="ev-address" className="w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink" value={draft.venue_address ?? ''} maxLength={1000} onChange={(e) => update('venue_address', e.target.value || null)} /></Field>}
           <Field label="会場URL" htmlFor="ev-venue-url" note="オンライン開催の場合に入力します。">
             <input
               id="ev-venue-url"
@@ -817,6 +825,7 @@ function OverviewStep({
               </div>
           </div>
         </LinePreview>
+        {theme === 'v8' && <EventApplicationPreviewDialog accountId={accountId} draft={draft} slot={firstSlot} />}
         <div className="bg-warning-bg rounded-card border-warning/30 border p-4">
           <h2 className="text-warning text-sm font-semibold">保存すると起きること</h2>
           <ul className="text-ink-secondary mt-2 space-y-2 text-xs">
