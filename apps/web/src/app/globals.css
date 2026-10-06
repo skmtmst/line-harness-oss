@@ -700,6 +700,8 @@
   --tpl-steps-gap: 8px; --tpl-steps-dot: 20px; --tpl-steps-dot-gap: 6px; --tpl-steps-text-size: 12px; --tpl-steps-text-lh: 17px;
   --tpl-footer-pad-block: 12px; --tpl-footer-pad-side: 24px; --tpl-footer-gap: 8px;
   --tpl-settings-nav-width: 208px; --tpl-settings-nav-pad-block: 16px; --tpl-settings-nav-pad-side: 12px;
+  /* 設定の中のメニュー（設定の板 ihjfd ほか 8 枚）。 */
+  --tpl-setnav-w: 200px; --tpl-setnav-pad: 16px 12px; --tpl-setnav-gap: 2px; --tpl-setnav-item-pad: 8px 10px; --tpl-setnav-item-gap: 8px; --tpl-setnav-radius: 8px; --tpl-setnav-child-indent: 22px; --tpl-setnav-band-pad: 8px 16px;
   --tpl-settings-content-pad-block: 24px; --tpl-settings-content-pad-side: 28px; --tpl-settings-content-gap: 16px;
   --tpl-settings-gap: 16px;
   --tpl-inbox-list-width: 372px; --tpl-inbox-summary-width: 260px;
