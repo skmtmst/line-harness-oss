@@ -666,6 +666,10 @@ shared-button-importer v8/restaurant/reservations/phone.tsx
 shared-button-importer v8/restaurant/reservations/reservations.tsx
 shared-button-importer v8/restaurant/reservations/today.tsx
 shared-button-importer v8/restaurant/tables/tables.tsx
+shared-button-importer v8/settings/getting-started/getting-started.tsx
+shared-button-importer v8/settings/pools/pools.tsx
+shared-button-importer v8/settings/accounts/accounts.tsx
+shared-button-importer v8/settings/staff/staff.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx

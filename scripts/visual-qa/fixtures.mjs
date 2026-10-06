@@ -4791,30 +4791,37 @@ const accessUser = (id, name, roleBundle, status, options = {}) => ({
   updatedAt: options.updatedAt ?? '2026-09-01T00:00:00.000Z',
 })
 
+/*
+ * 設計 `nku0f`（ログインユーザー V8）の5人＋止めた1人＋招待中2人。
+ * メールは権限で伏せ字（***入り）になる形で返す。名寄せは ID で行う（stf-1・stf-3・stf-6 は STAFF_MEMBERS と同じ人）。
+ * Kenta Kawano はいま入っている本人（visual-qa-owner）。「いま」は返す時刻から作る（mock-api.mjs）。
+ */
 export const ACCESS_USERS = {
   items: [
-    accessUser('stf-1', '佐々木 亮太', 'administrator', 'active', {
-      email: 'sasaki@example.com',
-      mfaEnabled: true, policyVersion: 4, jobTitle: '統括責任者',
+    accessUser('visual-qa-owner', 'Kenta Kawano', 'administrator', 'active', {
+      email: 'kenta@***.jp', mfaEnabled: true, policyVersion: 4, jobTitle: '代表',
       accountScope: { type: 'all', assignedLineAccountId: null, lineAccountIds: [], includesDescendants: true },
+      lastLoginAt: '2026-10-01T01:12:00.000Z', lastActionAt: '2026-10-01T01:12:00.000Z',
     }),
-    accessUser('stf-2', '山本 京子', 'administrator', 'active', {
-      email: 'yamamoto@example.com',
-      mfaEnabled: true, policyVersion: 3, jobTitle: '管理責任者',
+    accessUser('stf-masato', 'Masato', 'administrator', 'active', {
+      email: 'masato@***.jp', mfaEnabled: true, policyVersion: 3, jobTitle: '管理責任者',
       accountScope: { type: 'all', assignedLineAccountId: null, lineAccountIds: [], includesDescendants: true },
-      lastLoginAt: '2026-09-06T22:40:00.000Z', lastActionAt: '2026-09-06T23:41:00.000Z',
+      lastLoginAt: '2026-09-30T08:40:00.000Z', lastActionAt: '2026-09-30T09:10:00.000Z',
     }),
-    accessUser('stf-3', '中川 由美', 'operations', 'active', { email: 'nakagawa@example.com', mfaEnabled: true, policyVersion: 2, featureCount: 14, jobTitle: '運用担当' }),
-    accessUser('stf-4', '高田 誠', 'operations', 'active', { email: 'takada@example.com', mfaEnabled: true, policyVersion: 2, featureCount: 12, jobTitle: '配信担当' }),
-    accessUser('stf-8', '森 涼太', 'reception', 'active', { email: 'mori@example.com', mfaEnabled: true, policyVersion: 2, featureCount: 6, jobTitle: '受付担当' }),
-    accessUser('stf-7', '新井 千夏', 'reception', 'active', { email: 'arai@example.com', mfaEnabled: true, policyVersion: 2, featureCount: 6, jobTitle: '予約担当' }),
-    accessUser('stf-5', '外部デザイン', 'view_only', 'active', {
-      email: 'design@partner.example.com',
-      featureCount: 5, jobTitle: '確認担当', lastLoginAt: '2026-09-01T03:20:00.000Z', lastActionAt: null,
+    accessUser('stf-1', '佐々木 亮太', 'operations', 'active', {
+      email: 'sasaki@***.jp', mfaEnabled: true, policyVersion: 2, featureCount: 14, jobTitle: '配信担当',
+      lastLoginAt: '2026-09-30T02:00:00.000Z', lastActionAt: '2026-09-30T02:30:00.000Z',
     }),
-    accessUser('stf-6', '佐野 直人', 'view_only', 'active', {
-      email: 'sano@example.com',
-      featureCount: 4, jobTitle: '閲覧担当', lastLoginAt: '2026-05-20T01:00:00.000Z', lastActionAt: null,
+    accessUser('stf-3', '中川 由美', 'reception', 'active', {
+      email: 'nakagawa@***.jp', mfaEnabled: false, policyVersion: 2, featureCount: 6, jobTitle: '店長',
+      lastLoginAt: '2026-09-29T09:02:00.000Z', lastActionAt: '2026-09-29T09:02:00.000Z',
+    }),
+    accessUser('stf-tax', '外部の税理士', 'view_only', 'active', {
+      email: 'tax@***.jp', featureCount: 1, jobTitle: '請求の確認',
+      lastLoginAt: '2026-09-01T03:20:00.000Z', lastActionAt: null,
+    }),
+    accessUser('stf-6', '佐野 直人', 'view_only', 'suspended', {
+      email: 'sano@***.jp', featureCount: 4, jobTitle: '閲覧担当', lastLoginAt: '2026-05-20T01:00:00.000Z', lastActionAt: null,
     }),
     accessUser('access-user-9', '招待中 運用担当', 'operations', 'invited', {
       featureCount: 10, createdAt: '2026-09-05T00:00:00.000Z', updatedAt: '2026-09-05T00:00:00.000Z',
@@ -4824,11 +4831,11 @@ export const ACCESS_USERS = {
     }),
   ],
   summary: {
-    active: 8, invited: 2, expiredInvitations: 0, unused90Days: 1,
-    mfaEnabled: 6, mfaRate: 75,
-    roleCounts: { administrator: 2, operations: 3, reception: 2, view_only: 2, custom: 1 },
+    active: 5, invited: 2, expiredInvitations: 0, unused90Days: 0,
+    mfaEnabled: 3, mfaRate: 60,
+    roleCounts: { administrator: 2, operations: 2, reception: 1, view_only: 2, custom: 1 },
   },
-  pagination: { total: 10, limit: 200, offset: 0 },
+  pagination: { total: 8, limit: 200, offset: 0 },
 }
 
 export const ACCESS_ROLES = {
