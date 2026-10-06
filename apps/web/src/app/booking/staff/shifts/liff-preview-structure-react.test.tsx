@@ -65,7 +65,7 @@ describe('前提: 実LIFFが「日時を選んでください」＋週／カレ�
     expect(LIFF_USER_MESSAGE_SOURCE).toContain('読み込み中...')
     // 失敗は題「読み込めませんでした」＋本文 LOAD_FAILED_MESSAGE。
     expect(LIFF_USER_MESSAGE_SOURCE).toContain(
-      '電波の良いところで、もう一度お試しください。',
+      '電波のよいところで、もう一度お試しください。',
     )
     expect(LIFF_USER_MESSAGE_SOURCE).toContain('もう一度読み込む')
     // 旧い見せ方（枠ごとの文言・赤いそのまま表示・題と本文の重ね）が復活していない。
@@ -236,7 +236,7 @@ describe('プレビューが実LIFFと同じ構造で描画される', () => {
     )
     // 実LIFFの LoadErrorView と同じ題＋本文（★V7）。
     expect(screen.getByText('読み込めませんでした')).toBeTruthy()
-    expect(screen.getByText('電波の良いところで、もう一度お試しください。')).toBeTruthy()
+    expect(screen.getByText('電波のよいところで、もう一度お試しください。')).toBeTruthy()
     expect(screen.getByText('もう一度読み込む')).toBeTruthy()
     // 実LIFFの失敗表示と同じく赤は使わず、旧い案内文も残さない。
     expect(container.querySelector('.text-danger')).toBeNull()

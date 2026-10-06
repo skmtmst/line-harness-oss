@@ -45,6 +45,8 @@ export default function Webinar() {
   const [unplayable, setUnplayable] = useState(false);
   const [ended, setEnded] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
+  /** 動画が流れているか。流れるまでは動画の真ん中に再生の印を出す。 */
+  const [playing, setPlaying] = useState(false);
   /** 開始までの残り秒。箱 (7-a) に分・秒で出す。 */
   const [remainSec, setRemainSec] = useState(0);
   const [chat, setChat] = useState<ChatItem[]>([]);
@@ -133,6 +135,10 @@ export default function Webinar() {
         hls = instance;
       }
       v.muted = true;
+      // 音なしで始めるので、音声ONの案内は最初から出す。
+      setNeedsTap(true);
+      v.addEventListener('playing', () => setPlaying(true));
+      v.addEventListener('pause', () => setPlaying(false));
       const seekAndPlay = () => {
         v.currentTime = expectedPosition();
         v.play().then(() => setNeedsTap(true)).catch(() => setNeedsTap(true));
@@ -267,7 +273,7 @@ export default function Webinar() {
       <StatusView
         icon="cloud-off"
         title="読み込めませんでした"
-        body="電波の良いところで、もう一度お試しください。"
+        body="電波のよいところで、もう一度お試しください。"
         action={{ label: 'もう一度読み込む', onClick: () => void load() }}
       />,
     );
@@ -383,62 +389,84 @@ export default function Webinar() {
     );
   }
 
-  // ---- ライブ中 (7-b・7-c。RpW2h) ----
+  // ---- ライブ中 (★V8 RpW2h) ----
+  // 暗い地に、16:9 の動画・題と時間・会話・途中のボタン・書く欄を縦に並べる。
+  // 絵の「128人が見ています」「講師：…」は、見ている人数・講師を返す口が API に
+  // 無いため出さない (API が入ったら足す)。
+  const startHm = new Date((state.sessionStartAt + 9 * 3600) * 1000).toISOString().slice(11, 16);
+  const endHm = new Date((state.sessionStartAt + state.durationSeconds + 9 * 3600) * 1000)
+    .toISOString()
+    .slice(11, 16);
   return (
-    <div className="flex h-screen flex-col bg-canvas text-ink" data-design-node="RpW2h">
-      <div className="relative">
-        <video ref={videoRef} className="w-full" playsInline />
-        <span className="absolute top-2 left-2 rounded bg-liff-sun px-2 py-0.5 text-[11px] font-bold text-white">
-          ● ライブ
-        </span>
-        {needsTap && (
-          <button
-            type="button"
-            className="absolute right-2 bottom-2 inline-flex min-h-11 items-center gap-1 rounded-full bg-ink px-3 text-xs font-semibold text-white"
-            onClick={() => {
-              const v = videoRef.current;
-              if (v) {
-                v.muted = false;
-                void v.play().catch(() => undefined);
-              }
-              setNeedsTap(false);
-            }}
-          >
-            <Icon name="volume-x" className="h-4 w-4" />
-            タップで音声ON
-          </button>
-        )}
+    <div className="flex h-screen flex-col bg-night-deep text-night-body" data-design-node="RpW2h">
+      <div className="relative aspect-video w-full shrink-0 bg-night-panel">
+        <video ref={videoRef} className="h-full w-full object-contain" playsInline />
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5">
+          {!playing && <Icon name="play" className="h-9 w-9 text-white" />}
+          <span className="rounded bg-liff-sun px-2 py-0.5 text-[11px] font-bold text-white">
+            ● ライブ
+          </span>
+          {needsTap && (
+            <button
+              type="button"
+              className="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white"
+              onClick={() => {
+                const v = videoRef.current;
+                if (v) {
+                  v.muted = false;
+                  void v.play().catch(() => undefined);
+                }
+                setNeedsTap(false);
+              }}
+            >
+              <Icon name="volume-x" className="h-3.5 w-3.5" />
+              タップで音声ON
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="border-b border-hairline px-4 py-3">
-        <h1 className="truncate text-base font-bold text-ink" title={state.title}>
+      <div className="flex flex-col gap-1 px-4 py-3">
+        <h1 className="truncate text-base font-bold text-white" title={state.title}>
           {state.title}
         </h1>
+        <p className="liff-num text-xs text-night-sub">
+          {startHm}〜{endHm}
+        </p>
       </div>
 
-      <div ref={chatBoxRef} className="flex-1 overflow-y-auto p-3 text-[13px]">
+      <div ref={chatBoxRef} className="flex flex-1 flex-col gap-2.5 overflow-y-auto px-4 py-2 text-[13px]">
         {chat.map((item) => (
-          <div key={item.key} className="mb-2">
-            <span className={item.mine ? 'font-bold text-liff-primary' : 'font-bold text-ink-secondary'}>
-              {item.authorName}
-            </span>{' '}
-            <span className="text-ink">{item.body}</span>
-          </div>
+          <p key={item.key} className="text-night-body">
+            {item.mine ? (
+              <>
+                <span className="text-night-mine">{item.authorName}</span>
+                {`\u3000${item.body}`}
+              </>
+            ) : (
+              `${item.authorName}\u3000${item.body}`
+            )}
+          </p>
         ))}
       </div>
 
       {ctaVisible && state.cta && (
-        <button
-          type="button"
-          onClick={clickCta}
-          className="mx-3 mb-2 flex items-center justify-center gap-2 rounded-lg bg-accent-deep py-3 text-center text-[15px] font-bold text-white"
-        >
-          <Icon name="send" className="h-4 w-4" />
-          {state.cta.label}
-        </button>
+        <div className="px-4 pb-2">
+          <button
+            type="button"
+            onClick={clickCta}
+            className="flex h-12 w-full items-center justify-center rounded-xl bg-night-cta text-[15px] font-bold text-white"
+          >
+            {state.cta.label}
+          </button>
+        </div>
       )}
 
-      <div className="flex items-center gap-2 border-t border-hairline p-2">
+      <div
+        className="flex items-center gap-2 px-4 pt-2.5"
+        // 板 (RpW2h) どおり下に 30 空ける (端末の下の帯の分を含む)。
+        style={{ paddingBottom: 'max(1.875rem, env(safe-area-inset-bottom))' }}
+      >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -448,15 +476,15 @@ export default function Webinar() {
           placeholder="コメントを書く"
           maxLength={500}
           aria-label="コメントを書く"
-          className="min-h-11 flex-1 rounded-full bg-liff-chip px-4 text-[13px] text-ink placeholder-ink-faint"
+          className="h-[42px] min-w-0 flex-1 rounded-full bg-night-panel px-4 text-[13px] text-white placeholder:text-night-dim"
         />
         <button
           type="button"
           onClick={() => void sendComment()}
           aria-label="送信"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-deep text-white"
+          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-liff-primary text-white"
         >
-          <Icon name="send" className="h-4 w-4" />
+          <Icon name="send" className="h-[18px] w-[18px]" />
         </button>
       </div>
     </div>

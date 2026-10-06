@@ -281,7 +281,7 @@ describe('カレンダー', () => {
     ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '10月20日 空きあり' }));
     fireEvent.click(screen.getByRole('button', { name: 'この日の時間を選ぶ' }));
-    expect(await screen.findByText('10月20日（火） の空き')).toBeTruthy();
+    expect(await screen.findByText('10月20日（火）の空き')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '09:00' }));
     expect(onSelect).toHaveBeenCalledWith({ date: '2026-10-20', start: '09:00' });
   });
@@ -357,13 +357,13 @@ describe('枠の二重読み', () => {
     // 自動選択された一番早い日 (10/1) の週へ移って時刻を確かめる。
     await screen.findByRole('button', { name: '10月1日 空きあり', pressed: true });
     fireEvent.click(screen.getByRole('button', { name: 'この日の時間を選ぶ' }));
-    expect(await screen.findByText('10月1日（木） の空き')).toBeTruthy();
+    expect(await screen.findByText('10月1日（木）の空き')).toBeTruthy();
     // 同じ枠が二重に来ても時刻の札は1つずつ。
     expect(screen.getAllByRole('button', { name: '10:00' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: '11:00' })).toHaveLength(1);
     // 別の日も1つずつ。
     fireEvent.click(screen.getByRole('button', { name: '10月5日 空きあり' }));
-    expect(await screen.findByText('10月5日（月） の空き')).toBeTruthy();
+    expect(await screen.findByText('10月5日（月）の空き')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: '10:00' })).toHaveLength(1);
   });
 
@@ -384,7 +384,7 @@ describe('枠の二重読み', () => {
       closed_dates: [],
     }));
     renderPicker();
-    expect(await screen.findByText('10月16日（金） の空き')).toBeTruthy();
+    expect(await screen.findByText('10月16日（金）の空き')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: '10:00' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: '11:00' })).toHaveLength(1);
   });
@@ -464,7 +464,7 @@ describe('選んだ日は遅れて届く応答で上書きしない', () => {
     ).toBeTruthy();
     // 週へ行くと、その日の時刻が出る。カレンダーへ戻っても選んだ日は残る。
     fireEvent.click(within(group).getByRole('radio', { name: '週で見る' }));
-    expect(await screen.findByText('10月20日（火） の空き')).toBeTruthy();
+    expect(await screen.findByText('10月20日（火）の空き')).toBeTruthy();
     fireEvent.click(within(group).getByRole('radio', { name: 'カレンダー' }));
     expect(
       await screen.findByRole('button', { name: '10月20日 空きあり', pressed: true }),
@@ -495,10 +495,10 @@ describe('選んだ日は遅れて届く応答で上書きしない', () => {
 
   it('週：選んだ日は、表示の切り替えで自動選択に戻されない', async () => {
     renderPicker();
-    expect(await screen.findByText('10月16日（金） の空き')).toBeTruthy();
+    expect(await screen.findByText('10月16日（金）の空き')).toBeTruthy();
     // 次の週へ送って 10/20 を選ぶ（読んだ週は窓を越えて残る）。
     fireEvent.click(screen.getByRole('button', { name: '次の週' }));
-    expect(await screen.findByText('10月20日（火） の空き')).toBeTruthy();
+    expect(await screen.findByText('10月20日（火）の空き')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '10月20日 空きあり' }));
     // カレンダーへ行って戻っても、選んだ日 (10/20) のまま。
     // 自動選択で一番早い日 (10/16) に戻されることはない。
@@ -506,8 +506,8 @@ describe('選んだ日は遅れて届く応答で上書きしない', () => {
     fireEvent.click(within(group).getByRole('radio', { name: 'カレンダー' }));
     await screen.findByText('2026年10月');
     fireEvent.click(within(group).getByRole('radio', { name: '週で見る' }));
-    expect(await screen.findByText('10月20日（火） の空き')).toBeTruthy();
-    expect(screen.queryByText('10月16日（金） の空き')).toBeNull();
+    expect(await screen.findByText('10月20日（火）の空き')).toBeTruthy();
+    expect(screen.queryByText('10月16日（金）の空き')).toBeNull();
   });
 });
 
@@ -537,7 +537,7 @@ describe('カレンダーの出し方4択 (店の設定)', () => {
   it('週だけでは切り替えが出ず、週で開く', async () => {
     mockSettings('list', 60, 'week-only');
     renderPicker();
-    expect(await screen.findByText('10月16日（金） の空き')).toBeTruthy();
+    expect(await screen.findByText('10月16日（金）の空き')).toBeTruthy();
     expect(screen.queryByRole('radiogroup', { name: '表示の切り替え' })).toBeNull();
   });
 
@@ -552,7 +552,7 @@ describe('カレンダーの出し方4択 (店の設定)', () => {
     window.localStorage.setItem('liff-booking-date-view', 'calendar');
     mockSettings('list', 60, 'week-only');
     renderPicker();
-    expect(await screen.findByText('10月16日（金） の空き')).toBeTruthy();
+    expect(await screen.findByText('10月16日（金）の空き')).toBeTruthy();
     expect(screen.queryByRole('radiogroup', { name: '表示の切り替え' })).toBeNull();
   });
 });
@@ -569,10 +569,11 @@ describe('空きの点のオン／オフ (店の設定)', () => {
     expect(await screen.findByRole('button', { name: '10月16日 空きあり' })).toBeTruthy();
   });
 
-  it('点があるときは金の見方も出る', async () => {
+  it('残りわずかの日が無い月は、金の見方を出さない (板 k3aJKU)', async () => {
     await openCalendar();
     await screen.findByLabelText('2026年10月の日付');
-    expect(screen.getByText(/残りわずか/)).toBeTruthy();
+    expect(screen.getByText(/空きあり/)).toBeTruthy();
+    expect(screen.queryByText(/残りわずか/)).toBeNull();
   });
 });
 
@@ -599,6 +600,12 @@ describe('残りわずか (金の印)', () => {
     );
   });
 
+  it('残りわずかの日がある月は、金の見方も出る', async () => {
+    await openCalendar();
+    await screen.findByLabelText('2026年10月の日付');
+    expect(screen.getByText(/残りわずか/)).toBeTruthy();
+  });
+
   it('わずかだけの日は金で「残りわずか」と読み、押せる', async () => {
     await openCalendar();
     const cell = await screen.findByRole('button', { name: '10月22日 残りわずか' });
@@ -608,7 +615,7 @@ describe('残りわずか (金の印)', () => {
 
   it('週でも「わずか」の印が出て選べる', async () => {
     renderPicker();
-    expect(await screen.findByText('10月16日（金） の空き')).toBeTruthy();
+    expect(await screen.findByText('10月16日（金）の空き')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '次の週' }));
     const day = await screen.findByRole('button', { name: '10月22日 残りわずか' });
     expect(day.hasAttribute('disabled')).toBe(false);
