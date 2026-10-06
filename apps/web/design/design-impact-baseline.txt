@@ -508,4 +508,8 @@ shared-button-importer v8/rich-menus/list.tsx
 shared-button-importer v8/rich-menus/external-import.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
+shared-button-importer v8/webhooks/incoming.tsx
+shared-button-importer v8/webhooks/outgoing.tsx
+shared-button-importer v8/webhooks/samples.tsx
+shared-button-importer v8/webhooks/sheets.tsx
 shared-button-importer v8/webinars/list.tsx
