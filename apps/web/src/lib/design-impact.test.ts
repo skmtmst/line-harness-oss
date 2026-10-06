@@ -300,6 +300,8 @@ describe('共通部品の影響範囲', () => {
       // ★V8 Googleビジネスの口コミ・投稿（j0Wcg・Cfed0）。2ページ以上のときだけ表の下にページ送り。
       'v8/restaurant/google/reviews.tsx',
       'v8/restaurant/google/posts.tsx',
+      // ★V8 予約台帳の一覧（Z3FoM）。src/v8/restaurant に一から書いた。表の下にページ送りを置く。
+      'v8/restaurant/reservations/list.tsx',
       // ★V8 友だち（x6QsVz 一覧・ADjK8 統合ユーザー・hn6Y8 重複検出・Z0jHp UID移行）を src/v8/friends に一から書いた。
       'v8/friends/list/list.tsx',
       'v8/friends/merged/merged.tsx',

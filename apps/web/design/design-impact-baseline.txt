@@ -650,6 +650,16 @@ shared-button-importer v8/restaurant/line-followup/line-followup.tsx
 shared-button-importer v8/restaurant/organization/organization.tsx
 shared-button-importer v8/restaurant/store-new/store-new.tsx
 shared-button-importer v8/restaurant/terms/terms.tsx
+# ★V8 飲食店テスト（在庫 Y8SjT2・予約台帳 l9NlC0・座席 BERxg・メニュー MJoJR）。src/v8/restaurant に一から書いた。
+shared-button-importer v8/restaurant/inventory/channels.tsx
+shared-button-importer v8/restaurant/inventory/stock.tsx
+shared-button-importer v8/restaurant/menu/menu.tsx
+shared-button-importer v8/restaurant/reservations/dialogs.tsx
+shared-button-importer v8/restaurant/reservations/list.tsx
+shared-button-importer v8/restaurant/reservations/phone.tsx
+shared-button-importer v8/restaurant/reservations/reservations.tsx
+shared-button-importer v8/restaurant/reservations/today.tsx
+shared-button-importer v8/restaurant/tables/tables.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx
