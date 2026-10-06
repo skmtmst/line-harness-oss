@@ -590,6 +590,10 @@ shared-button-importer v8/analytics/search-console.tsx
 shared-button-importer v8/nen-posts/review.tsx
 shared-button-importer v8/nen-posts/policy-history.tsx
 shared-button-importer v8/nen-posts/detail.tsx
+shared-button-importer v8/nen-members/members.tsx
+shared-button-importer v8/nen-members/list.tsx
+shared-button-importer v8/nen-members/ranks.tsx
+shared-button-importer v8/nen-members/lifetime.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx
