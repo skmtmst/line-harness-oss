@@ -586,6 +586,12 @@
   --tpl-folder-width: 200px; --tpl-folder-pad-block: 16px; --tpl-folder-pad-side: 12px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
+  /* ウェビナーの一覧（UyUMw・uBMuB・jiNg0）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16）。 */
+  --tpl-wb-search-w: 240px; --tpl-wb-saved-w: 154px; --tpl-wb-sort-w: 124px;
+  --tpl-wb-col-gap: 16px; --tpl-wb-head-h: 44px; --tpl-wb-head-pad: 13px 20px; --tpl-wb-row-pad: 9px 20px; --tpl-wb-row-h: 56px;
+  --tpl-wb-col-status: 92px; --tpl-wb-col-count: 72px; --tpl-wb-col-view: 96px; --tpl-wb-col-period: 150px; --tpl-wb-col-ops: 110px;
+  --tpl-wb-num-pad-end: 8px; --tpl-wb-pill-pad: 2px 8px; --tpl-wb-pill-gap: 5px; --tpl-wb-pill-lh: 18px;
+  --tpl-wb-foot-pad: 12px 24px; --tpl-wb-ro-gap: 12px; --tpl-wb-notice-after: 6px; --tpl-wb-target-pad: 10px 12px; --tpl-wb-after-gap: 16px;
   --tpl-thead-pad-block: 12px; --tpl-thead-pad-side: 24px; --tpl-thead-lh: 16px;
   --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
   --tpl-band-gap: 0;
