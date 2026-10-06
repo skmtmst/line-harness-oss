@@ -346,3 +346,6 @@
 .skeletonName { display: block; width: 75%; height: var(--tpl-rule-row-gap); }
 .skeletonPill { display: block; width: 60%; height: var(--tpl-wb-pill-lh); }
 .skeletonNum { display: block; width: 60%; height: var(--tpl-rule-row-gap); margin-left: auto; }
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }

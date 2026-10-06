@@ -429,3 +429,6 @@
 .kpiDetailBreak { word-break: normal; }
 /* 1152 の板：見出しの行は絵の 40 に対して表の線ぶん詰める。 */
 .narrowTable thead th { height: var(--tpl-ar-narrow-head-h); }
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
