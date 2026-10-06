@@ -109,7 +109,13 @@ describe('V8 窓・引き出しの閉じ方', () => {
 
   it('全体の CSS の開く動き（lh-surface-in）は V8 の窓に当てない（部品の閉じる動きに勝ってしまう）', () => {
     const css = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8')
-    const rules = [...css.matchAll(/([^{}]*\[data-design-part="dialog"\][^{}]*)\{[^}]*animation:\s*lh-surface-in/g)].map((m) => m[1].trim())
+    /*
+     * 選択子は「直前の { か } の後ろから次の { まで」。始まりを括弧の直後に固定して、
+     * 長い変数の塊（--tpl-*）で探し直しが2乗に膨らむのを避ける（見ている中身は同じ）。
+     */
+    const rules = [...css.matchAll(/(?<=^|[{}])([^{}]*)\{([^}]*)/g)]
+      .filter((m) => m[1].includes('[data-design-part="dialog"]') && /animation:\s*lh-surface-in/.test(m[2]))
+      .map((m) => m[1].trim())
     expect(rules.length).toBeGreaterThan(0)
     for (const selector of rules) expect(selector).toMatch(/:root:not\(\[data-theme="v8"\]\)/)
   })
