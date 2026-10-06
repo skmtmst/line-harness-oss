@@ -4858,16 +4858,17 @@ export const MILEAGE_EARNING_RULES = {
   measuredAt: '2026-08-25T01:00:00.000Z',
 }
 
-/** 機能17の全体履歴。新契約の行に期間集計を添える。 */
+/*
+  機能17の全体履歴。新契約の行に期間集計を添える。並びと数は V8 履歴 `oRbJi` の表（6行：確定待ち・交換・紹介・友だち追加・回答・手で直した取り消し）。
+*/
 export const MILEAGE_HISTORY = {
   items: [
-    ['ml-1', 'friend-1', '高橋 直人', 'grant', 'available', 100, '回答フォームに答えた', 'form', '夏のアンケート', 'automatic', null, '2026-08-25T00:12:00.000Z'],
-    ['ml-2', 'friend-4', '佐藤 千尋', 'spend', 'available', -1000, '使い道と交換した', 'reward', '500円ぶんのクーポン', 'automatic', null, '2026-08-24T09:40:00.000Z'],
-    ['ml-3', 'friend-3', '木村 亮', 'grant', 'available', 500, '紹介の成果が認められた', 'affiliate', '無料体験の申込', 'automatic', '佐々木', '2026-08-24T05:02:00.000Z'],
-    ['ml-4', 'friend-2', '前田 さくら', 'adjustment', 'available', 2000, '手で増やした', 'manual', null, 'manual', '山本', '2026-08-23T02:00:00.000Z'],
-    ['ml-5', 'friend-5', '大西 健一', 'reversal', 'available', -300, '予約が取り消された', 'booking', '予約 #B-204', 'automatic', null, '2026-08-22T07:20:00.000Z'],
-    ['ml-6', 'friend-6', '石田 未来', 'grant', 'available', 100, '友だち登録してくれた', 'line', null, 'automatic', null, '2026-08-22T01:05:00.000Z'],
-    ['ml-7', 'friend-1', '高橋 直人', 'grant', 'available', 10, '配信のリンクを押した', 'broadcast', '夏のご案内', 'automatic', null, '2026-08-21T11:31:00.000Z'],
+    ['ml-1', 'friend-1', 'Kenta Kawano', 'grant', 'pending', 128, '商品を買った', 'stripe', '注文 #10482', 'automatic', null, '2026-09-30T05:12:00.000Z'],
+    ['ml-2', 'friend-2', 'Masato S.', 'spend', 'available', -500, '交換：送料無料クーポン', 'reward', null, 'automatic', null, '2026-09-30T02:05:00.000Z'],
+    ['ml-3', 'friend-3', '菅野 亮', 'grant', 'available', 300, '紹介した（山田 花子さん）', 'tag_referral', null, 'automatic', null, '2026-09-29T09:40:00.000Z'],
+    ['ml-4', 'friend-4', '山田 太郎', 'grant', 'available', 100, '友だち追加', 'friend_add_routing', null, 'automatic', null, '2026-09-29T01:21:00.000Z'],
+    ['ml-5', 'friend-5', '坂本 真人', 'grant', 'available', 50, '回答フォームに答えた', 'form', '来店アンケート', 'automatic', null, '2026-09-28T11:02:00.000Z'],
+    ['ml-6', 'friend-6', '田中 花子', 'adjustment', 'available', -80, '取り消し：注文 #10422', 'manual', '注文 #10422', 'manual', 'オーナー', '2026-09-28T00:15:00.000Z'],
   ].map(([
     id, primaryFriendId, displayName, entryType, status, amount, reason, source,
     sourceReferenceId, mode, executedByStaffName, occurredAt,
@@ -4875,16 +4876,16 @@ export const MILEAGE_HISTORY = {
     id, primaryFriendId, displayName, pictureUrl: null, entryType, status, amount, reason, source,
     hasSourceEvent: sourceReferenceId !== null, sourceReferenceId,
     ruleName: reason, mode, executedByStaffName, occurredAt,
-    lineAccountName: primaryFriendId === 'friend-3' || primaryFriendId === 'friend-6' ? 'LINE 二号店' : 'LINE 本店',
-    balanceAfter: ({ 'ml-1': 8420, 'ml-2': 2480, 'ml-3': 3900, 'ml-4': 6150, 'ml-5': 620, 'ml-6': 100, 'ml-7': 8320 })[id],
+    lineAccountName: primaryFriendId === 'friend-3' || primaryFriendId === 'friend-6' ? '然 渋谷店' : '然 本店',
+    balanceAfter: ({ 'ml-1': 2340, 'ml-2': 1820, 'ml-3': 1560, 'ml-4': 640, 'ml-5': 450, 'ml-6': 200 })[id],
   })),
-  pagination: { total: 4180, limit: 20, offset: 0 },
+  pagination: { total: 1245, limit: 20, offset: 0 },
   summary: {
     from: '2026-08-01',
     to: '2026-08-25',
     byType: [
-      { entryType: 'grant', count: 4122, amount: 32400 },
-      { entryType: 'spend', count: 55, amount: -18900 },
+      { entryType: 'grant', count: 1206, amount: 40800 },
+      { entryType: 'spend', count: 36, amount: -33100 },
       { entryType: 'reversal', count: 3, amount: -900 },
     ],
     totalAmount: 12600,
