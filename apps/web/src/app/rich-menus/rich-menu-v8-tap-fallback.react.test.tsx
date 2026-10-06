@@ -79,6 +79,13 @@ vi.mock('@/lib/api', () => ({
     folders: {
       list: () => Promise.resolve({ success: true, data: [], unfiledCount: 0 }),
     },
+    // V8 一覧は役割をサーバ（/api/staff/me）から読む。
+    staff: {
+      me: () => Promise.resolve({ success: true, data: { id: 'staff-a', name: 'A', role: 'owner', email: null } }),
+    },
+    tags: {
+      list: () => Promise.resolve({ success: true, data: [] }),
+    },
   },
 }))
 

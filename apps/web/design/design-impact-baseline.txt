@@ -504,5 +504,7 @@ shared-button-importer lib/unsaved-leave-dialog.tsx
 shared-button-importer app/inflow-links/ad-connection-dialog.tsx
 shared-button-importer app/inflow-links/ad-event-mappings.tsx
 shared-button-importer components/events/event-application-preview.tsx
+shared-button-importer v8/rich-menus/list.tsx
+shared-button-importer v8/rich-menus/external-import.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx

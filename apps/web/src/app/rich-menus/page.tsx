@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import RichMenusListV8 from './list-v8'
+import RichMenusListV8 from '@/v8/rich-menus/list'
 import { ExternalImportWorkspace, type LineMenu } from './external-import'
 import {
   richMenuError,
