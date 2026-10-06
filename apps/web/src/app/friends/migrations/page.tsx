@@ -17,7 +17,7 @@ import ListRange from '@/components/ui/list-range'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { formatDateTime, formatNumber } from '@/lib/format'
-import FriendMigrationsV8 from './migrations-v8'
+import FriendMigrationsV8 from '@/v8/friends/migrations/page'
 import {
   formatImportBytes,
   JOB_STATUS_LABELS,
