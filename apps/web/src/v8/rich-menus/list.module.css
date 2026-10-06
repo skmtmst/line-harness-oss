@@ -130,6 +130,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 rZEGN の説明の行）。 */
+.nameSub { padding-inline-start: var(--tpl-folder-dot-indent); }
 .audienceMain {
   display: block;
   overflow: hidden;
