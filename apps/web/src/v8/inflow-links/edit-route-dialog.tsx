@@ -1,0 +1,335 @@
+'use client'
+
+/*
+ * ★V8 の一覧（src/v8/inflow-links/list.tsx）用の写し。元は
+ * app/inflow-links/_components/edit-route-modal.tsx（src/v8 からは import できない）。
+ * 中身（保存する口・送る形・失敗の出し方）は元と同じ。元を直したらここも直す。
+ */
+
+import { useEffect, useState } from 'react'
+import Combobox from '@/components/shared/combobox'
+import Select from '@/components/shared/select'
+import { api, describeSaveFailure } from '@/lib/api'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
+import type {
+  EntryRoute,
+  CreateEntryRouteInput,
+  TrafficPool,
+  Scenario,
+  Tag,
+} from '@line-crm/shared'
+
+interface MessageTemplate {
+  id: string
+  name: string
+  messageType: string
+  messageContent: string
+}
+
+interface Props {
+  route: EntryRoute | null
+  pools: TrafficPool[]
+  scenarios: Scenario[]
+  templates: MessageTemplate[]
+  tags: Tag[]
+  existingGenres: string[]
+  initialGenre?: string
+  /** Pre-filled ref_code for "register an unregistered inflow ref" flow. */
+  initialRefCode?: string
+  /**
+   * #514-5: 親が一覧表示のために既に引いたプール別の所属名。渡されたら
+   * 取り直さない。編集窓を開くたびの N+1 を無くす。
+   */
+  poolMemberNames?: Record<string, string[]>
+  /**
+   * R39: 新規作成時に所属させるLINEアカウント。一覧のヘッダー選択を渡す。
+   * 更新では所属を変えないので使わない。
+   */
+  accountId?: string | null
+  onClose: () => void
+  onSaved: (savedRoute: EntryRoute, created: boolean) => void
+}
+
+export default function EditRouteModal({
+  route,
+  pools,
+  scenarios,
+  templates,
+  tags,
+  existingGenres,
+  initialGenre,
+  initialRefCode,
+  poolMemberNames,
+  accountId,
+  onClose,
+  onSaved,
+}: Props) {
+  // Per-pool member account names, loaded lazily so the dropdown can show
+  // "Pool 名 — アカA, アカB" instead of just the pool name.
+  const [poolMembers, setPoolMembers] = useState<Record<string, string[]>>(poolMemberNames ?? {})
+  useEffect(() => {
+    if (poolMemberNames) {
+      setPoolMembers(poolMemberNames)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      const result = pools.length > 0
+        ? await api.pools.listAccounts(
+            pools.map((pool) => pool.id),
+            { suppressFeatureDisabledEvent: true },
+          ).catch(() => ({ success: false as const, data: [] }))
+        : { success: true as const, data: [] }
+      if (!cancelled && result.success) {
+        setPoolMembers(Object.fromEntries(result.data.map(({ poolId, accounts }) => [
+          poolId,
+          accounts.filter((account) => account.isActive).map((account) => account.accountName ?? '—'),
+        ])))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [pools, poolMemberNames])
+  const isNew = !route
+  const mainPool = pools.find((p) => p.slug === 'main')
+  // Unregistered-ref registration flow: refCode is fixed (the actual ref code
+  // that has already been seen in inflow), so we lock the input to prevent
+  // the user from accidentally renaming the ref and orphaning the prior stats.
+  const refCodeLocked = isNew && !!initialRefCode
+  const genreLocked = isNew && !!initialGenre
+  const [form, setForm] = useState<CreateEntryRouteInput>(() => ({
+    refCode: route?.refCode ?? initialRefCode ?? '',
+    genre: route?.genre ?? initialGenre ?? '',
+    name: route?.name ?? '',
+    tagId: route?.tagId ?? null,
+    poolId: route?.poolId ?? mainPool?.id ?? null,
+    scenarioId: route?.scenarioId ?? null,
+    introTemplateId: route?.introTemplateId ?? null,
+    runAccountFriendAddScenarios: route?.runAccountFriendAddScenarios ?? true,
+    redirectUrl: route?.redirectUrl ?? null,
+    isActive: route?.isActive ?? true,
+  }))
+  const [submitting, setSubmitting] = useState(false)
+  const [warning, setWarning] = useState<string | null>(null)
+  const [error, setError] = useState('')
+
+  const validateBeforeSave = () => {
+    const nothingDelivers =
+      !form.runAccountFriendAddScenarios && !form.scenarioId && !form.introTemplateId
+    if (nothingDelivers) {
+      setWarning(
+        '上書きモードかつ起動シナリオも即時 push も未設定です。このリンクで友だち追加した人には何も届きません。続行しますか?',
+      )
+      return false
+    }
+    return true
+  }
+
+  const doSave = async () => {
+    setSubmitting(true)
+    setError('')
+    try {
+      // R39: 新規作成は所属が必須。選んでいなければ送らず理由を出す。
+      if (isNew && !accountId) {
+        setError('LINEアカウントを選んでください（画面上部で選べます）')
+        return
+      }
+      const res = isNew
+        ? await api.entryRoutes.create({ ...form, lineAccountId: accountId ?? null })
+        : await api.entryRoutes.update(route!.id, form)
+      if (res.success) onSaved(res.data, isNew)
+      else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+    } catch (err) {
+      // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
+      setError(describeSaveFailure(err))
+    } finally {
+      // 失敗時に「保存中…」のまま固まらないよう、必ず戻す。
+      setSubmitting(false)
+    }
+  }
+
+  const onSubmit = async () => {
+    // If validation produced a warning, only the explicit "それでも保存"
+    // button (which calls doSave directly) may bypass it. The main save
+    // button must not be a second-click escape hatch.
+    if (!validateBeforeSave()) return
+    await doSave()
+  }
+
+  // R270: 作成と同じくフォルダは任意。空欄は未分類のまま保存する。
+  const saveDisabled = submitting || !form.name.trim() || !form.refCode.trim()
+  return (
+    <Dialog
+      open
+      title={isNew ? '新規リファラルリンク' : 'リファラルリンク編集'}
+      busy={submitting}
+      error={error || undefined}
+      onCancel={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose} disabled={submitting}>
+            キャンセル
+          </Button>
+          <Button
+            variant="primary"
+            onClick={onSubmit}
+            disabled={saveDisabled} busy={submitting}>
+            {isNew ? '作る' : '保存する'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        <Field label="フォルダ（任意）">
+          <input
+            list={genreLocked ? undefined : 'referral-genre-options'}
+            value={form.genre ?? ''}
+            // R270: 空欄は未分類として null で送る。空文字のまま送ると
+            // 口が400ではじくため、ここで null に寄せる。
+            onChange={(e) => setForm({ ...form, genre: e.target.value.trim() ? e.target.value : null })}
+            readOnly={genreLocked}
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+            placeholder="例: SNS（空欄なら未分類）"
+            maxLength={80}
+          />
+          <datalist id="referral-genre-options">
+            {existingGenres.map((genre) => <option key={genre} value={genre} />)}
+          </datalist>
+          <p className="text-ink-faint mt-1 text-xs">
+            {genreLocked
+              ? '左側で選択したフォルダへ登録されます。'
+              : '同じ協力会社や媒体を同じフォルダ名にすると、一覧でまとめて管理できます。空欄のまま保存すると未分類になります。'}
+          </p>
+        </Field>
+
+        <Field label="流入元の名前">
+          <input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+            placeholder="例: Instagram プロフィール"
+            maxLength={120}
+          />
+        </Field>
+
+        <Field label="URLに出る識別子">
+          <input
+            value={form.refCode}
+            onChange={(e) => setForm({ ...form, refCode: e.target.value })}
+            // R271: 作成済みの識別子は口も変更を拒否する。保存時にはじめて
+            // 拒否せず、欄自体を読み取り専用にして理由を近くに出す。
+            disabled={refCodeLocked || !isNew}
+            className="border-hairline rounded-control bg-canvas text-ink disabled:bg-canvas-sunken disabled:text-ink-faint w-full border px-3 py-2 font-mono text-sm"
+            placeholder="例: youtube"
+          />
+          {refCodeLocked && (
+            <p className="text-ink-faint mt-1 text-xs">
+              既に流入があった識別子を登録中のため、URLに出る識別子は変更できません。
+            </p>
+          )}
+          {!isNew && (
+            <p className="text-ink-faint mt-1 text-xs">
+              URLに出る識別子は作成後に変更できません。新しいURLが必要な場合は、新しいリンクを作成してください。
+            </p>
+          )}
+        </Field>
+
+        <Field label="自動付与タグ（任意）">
+          <Combobox
+            aria-label="自動付与タグ（任意）"
+            placeholder="— 設定なし —"
+            value={form.tagId ?? ''}
+            onChange={(next) => setForm({ ...form, tagId: next || null })}
+            options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+            className="w-full"
+          />
+          <p className="text-ink-faint mt-1 text-xs">
+            友だち追加時にこのタグを自動付与します。タグ未作成の場合は先にタグを作成してください。
+          </p>
+        </Field>
+
+        <Field label="送り先 Pool">
+          <Select
+            aria-label="送り先 Pool"
+            value={form.poolId ?? ''}
+            onChange={(value) => setForm({ ...form, poolId: value || null })}
+            size="full"
+            options={pools.map((p) => {
+              const members = poolMembers[p.id] ?? []
+              const memberText =
+                members.length === 0
+                  ? '（アカウント未所属）'
+                  : `— ${members.join(', ')}`
+              return {
+                value: p.id,
+                label: `${p.name}${p.slug === 'main' ? '（既定）' : ''} ${memberText}`,
+              }
+            })}
+          />
+        </Field>
+
+        <Field label="起動シナリオ（任意）">
+          <Combobox
+            aria-label="起動シナリオ（任意）"
+            placeholder="— 設定なし —"
+            value={form.scenarioId ?? ''}
+            onChange={(next) => setForm({ ...form, scenarioId: next || null })}
+            options={scenarios.map((s) => ({ value: s.id, label: s.name }))}
+            className="w-full"
+          />
+        </Field>
+
+        <Field label="即時 push テンプレ（任意）">
+          <Combobox
+            aria-label="即時 push テンプレ（任意）"
+            placeholder="— 設定なし —"
+            value={form.introTemplateId ?? ''}
+            onChange={(next) => setForm({ ...form, introTemplateId: next || null })}
+            options={templates.map((t) => ({ value: t.id, label: t.name }))}
+            className="w-full"
+          />
+        </Field>
+
+        <Checkbox
+          checked={form.runAccountFriendAddScenarios ?? true}
+          onCheckedChange={(checked) => {
+            setForm({
+              ...form,
+              runAccountFriendAddScenarios: checked,
+            })
+            setWarning(null)
+          }}
+          description="OFF にするとアカウント標準シナリオは抑止され、このリンクの設定だけが流れます。"
+        >アカウント標準の友だち追加時設定も実行する（並走モード）</Checkbox>
+
+        {warning && (
+          <Notice
+            tone="warn"
+            message={warning}
+            action={(
+              <Button
+                onClick={doSave}
+                disabled={submitting}
+              >
+                それでも保存する
+              </Button>
+            )}
+          />
+        )}
+      </div>
+    </Dialog>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-ink-secondary mb-1 block text-xs font-medium">{label}</label>
+      {children}
+    </div>
+  )
+}
