@@ -1364,22 +1364,21 @@ const SHAPES = {
   /* 分析・使われ方。`AnalyticsUsageOverview`。 */
   '/api/analytics/usage': {
     lineAccountId: 'visual-qa-account', timeZone: 'Asia/Tokyo',
-    period: { from: '2026-08-04', to: '2026-09-02' }, dataCutoffAt: '2026-09-02T00:00:00+09:00',
+    period: { from: '2026-09-02', to: '2026-10-01' }, dataCutoffAt: '2026-10-01T06:00:00+09:00',
     data: {
       state: 'available', stateReason: null,
-      checkedAt: '2026-09-02T00:00:00+09:00', automaticDeletion: false,
+      checkedAt: '2026-10-01T06:00:00+09:00', automaticDeletion: false,
+      // 絵（N8ZrUl）の6機能。一斉配信は利用中・未使用が未取得（「—」と理由）の形を残す。
       summary: {
-        unusedItems: METRIC(79), automaticRuns: METRIC(214), manualSends: METRIC(12), estimatedHoursSaved: METRIC(1),
+        unusedItems: METRIC(7), brokenReferences: METRIC(1), automaticRuns: METRIC(4812), manualSends: METRIC(312), estimatedHoursSaved: METRIC(40),
       },
       categories: [
-        { key: 'templates', label: 'テンプレート', href: '/templates', created: METRIC(0), inUse: METRIC(0), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC(null, 'unavailable', 'まだ使われていません') },
-        { key: 'scenarios', label: 'シナリオ', href: '/scenarios', created: METRIC(11), inUse: METRIC(11), unused: METRIC(0), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-08-26') },
-        { key: 'forms', label: '回答フォーム', href: '/form-submissions', created: METRIC(8, 'partial', '回答実績から確認できるフォームのみです'), inUse: METRIC(5, 'partial', '回答実績から確認できるフォームのみです'), unused: METRIC(3, 'partial', '回答実績から確認できるフォームのみです'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-29', 'partial', '回答実績から確認できるフォームのみです') },
-        { key: 'rich_menus', label: 'リッチメニュー', href: '/rich-menus', created: METRIC(4), inUse: METRIC(2), unused: METRIC(2), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-30') },
-        { key: 'friend_attributes', label: 'タグ・友だち情報', href: '/tags', created: METRIC(101, 'partial', '旧共通項目を含みます'), inUse: METRIC(22, 'partial', '旧共通項目を含みます'), unused: METRIC(79, 'partial', '旧共通項目を含みます'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-24', 'partial', '旧共通項目を含みます') },
-        { key: 'inflow_conversion', label: '流入リンク・成果地点', href: '/inflow-links', created: METRIC(16), inUse: METRIC(9), unused: METRIC(7), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-08-31') },
-        { key: 'automations', label: 'オートメーション・共通アクション', href: '/automations', created: METRIC(7), inUse: METRIC(3), unused: METRIC(4), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-09-01') },
-        { key: 'media_vars', label: '登録メディア・共通情報', href: '/contents', created: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), inUse: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), unused: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC(null, 'unavailable', '旧データにLINEアカウント所属がありません') },
+        { key: 'scenarios', label: 'シナリオ配信', href: '/scenarios', created: METRIC(8), inUse: METRIC(6), unused: METRIC(2), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-09-30T21:00:00Z') },
+        { key: 'broadcasts', label: '一斉配信', href: '/broadcasts', created: METRIC(24), inUse: METRIC(null, 'unavailable', '一斉配信は送ったら終わりのため数えません'), unused: METRIC(null, 'unavailable', '一斉配信は送ったら終わりのため数えません'), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-09-30T10:00:00Z') },
+        { key: 'auto_replies', label: '自動応答', href: '/auto-replies', created: METRIC(12), inUse: METRIC(10), unused: METRIC(2), brokenReferences: METRIC(0), lastUsedAt: METRIC('2026-09-30T20:41:00Z') },
+        { key: 'templates', label: 'テンプレート', href: '/templates', created: METRIC(31), inUse: METRIC(28), unused: METRIC(3), brokenReferences: METRIC(1), lastUsedAt: METRIC('2026-09-30T09:52:00Z') },
+        { key: 'forms', label: '回答フォーム', href: '/form-submissions', created: METRIC(4, 'partial', '回答実績から確認できるフォームのみです'), inUse: METRIC(4, 'partial', '回答実績から確認できるフォームのみです'), unused: METRIC(0, 'partial', '回答実績から確認できるフォームのみです'), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-09-29T12:10:00Z', 'partial', '回答実績から確認できるフォームのみです') },
+        { key: 'automations', label: 'オートメーション', href: '/automations', created: METRIC(6), inUse: METRIC(6), unused: METRIC(0), brokenReferences: METRIC(null, 'partial', '利用関係台帳で追加します'), lastUsedAt: METRIC('2026-09-30T20:58:00Z') },
       ],
     },
   },
