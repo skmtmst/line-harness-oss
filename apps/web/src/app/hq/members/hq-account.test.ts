@@ -32,16 +32,37 @@ describe('統括の左下アカウントメニュー', () => {
     expect(topBar).not.toContain('auth/logout')
   })
 
-  it('Esc と外側の押下で閉じ、押した要素へフォーカスを戻す', () => {
+  it('Esc で閉じて押した要素へフォーカスを戻し、外側の押下は器（MenuPortal）に任せる', () => {
     expect(menu).toContain("event.key === 'Escape'")
-    expect(menu).toContain("addEventListener('mousedown'")
     expect(menu).toContain('triggerRef.current?.focus()')
+    expect(menu).toContain('onClose={() => setOpen(false)}')
+    expect(menu).not.toContain("addEventListener('mousedown'")
   })
 
-  it('開いたメニューは固定幅にせず、左サイドバーの幅に揃える', () => {
-    expect(menu).toContain('absolute bottom-full left-0')
-    expect(menu).toContain('w-full flex-col')
-    expect(menu).not.toContain('style={{ width: 300 }}')
+  it('開いたメニューは最上層の器に出し、運営コンソールと同じ整え方にする（承認 s6kZt/wmfIZ）', () => {
+    expect(menu).toContain('<MenuPortal')
+    expect(menu).toContain("getAnchor={() => triggerRef.current}")
+    expect(menu).toContain('w-60 rounded-md border border-hairline bg-canvas py-2 shadow-lg')
+    expect(menu).toContain("style={{ position: 'static' }}")
+    expect(menu).toContain('flex h-10 items-center gap-2.5 px-3.5')
+    expect(menu).toContain('h-px bg-divider-soft')
+    // 脇メニューの幅に合わせて下から生やす古い形には戻さない。
+    expect(menu).not.toContain('absolute bottom-full left-0')
+  })
+
+  it('行の右に説明の字を置かず、頭の課金の一言は役目の札のとなりに1行だけ出す', () => {
+    expect(menu).not.toContain('権限者・担当アカウント')
+    expect(menu).not.toContain('プランと支払い')
+    expect(menu).toContain('const planNote = chip ?')
+    expect(menu).toContain('<span className="truncate text-nano text-ink-faint">{planNote}</span>')
+    // 色の付いた札も、下に足す日付の行も開いたメニューの頭には出さない。
+    expect(menu).not.toContain('まで・{daysLeft}')
+    expect(menu).not.toContain('次回の更新 {billing.currentPeriodEndsLabel}')
+  })
+
+  it('統括の脇メニューの下には版の情報も設定の歯車も出さない（承認 s6kZt/wCdWg）', () => {
+    expect(sidebar).toContain('{preview || isHq ? null : <SidebarVersion />}')
+    expect(sidebar).not.toContain('統括の設定')
   })
 })
 

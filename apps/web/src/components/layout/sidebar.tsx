@@ -634,8 +634,12 @@ export default function Sidebar({
         メニューの下の版の表示（★V7 監査の直し E）。いま動いている版・
         commit・配備日時と環境。取れないときは「版の情報なし」。
         移行中の見た目承認（preview）は版の取得をしない。
+
+        統括（/hq）では出さない（Pencil 承認 2026-10-06・
+        `LINE-Harness-V8-B.pen` の `s6kZt/wCdWg`、利用者回答「この内容でOK」）。
+        統括の下端はログイン中のアカウントだけにする。店舗側はこれまでどおり出す。
       */}
-      {preview ? null : <SidebarVersion />}
+      {preview || isHq ? null : <SidebarVersion />}
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
