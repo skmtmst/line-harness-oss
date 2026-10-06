@@ -1,8 +1,8 @@
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
-/* 完全切り替え：v7 の page.tsx は捨て、V8 の list-v8.tsx を見る。 */
-const PAGE = readFileSync(new URL('./list-v8.tsx', import.meta.url), 'utf8')
+/* 完全切り替え：v7 の page.tsx は捨て、V8 の一覧（src/v8/scenarios/list.tsx・page.tsx が描く本体）を見る。 */
+const PAGE = readFileSync(new URL('../../v8/scenarios/list.tsx', import.meta.url), 'utf8')
 
 describe('V6 シナリオ一覧の読込状態', () => {
   it('読込・成功・失敗を別の状態として持つ', () => {
