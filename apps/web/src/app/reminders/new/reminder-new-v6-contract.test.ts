@@ -3,26 +3,23 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const NEW = fs.readFileSync(path.join(__dirname, 'new-v8.tsx'), 'utf8')
+const BASICS = fs.readFileSync(path.join(__dirname, '..', 'basics-form-v8.tsx'), 'utf8')
 
-describe('V6 リマインダ作成の契約', () => {
+describe('V8 リマインダ作成の契約', () => {
   it('既存のリマインダ用フォルダを読み、作成時に選択を保存する', () => {
-    expect(PAGE).toContain("api.folders.list('reminder')")
-    expect(PAGE).toContain('folderId: folderId || null')
-    // 選び欄は共通 Select。onChange は値そのものを受け取る。
-    expect(PAGE).toContain('setFolderId(value)')
+    expect(BASICS).toContain("api.folders.list('reminder')")
+    expect(NEW).toContain('folderId: value.folderId || null')
   })
 
-  it('選択中のLINEアカウントへ作り、未取得のフォルダを0件として見せない', () => {
-    expect(PAGE).toContain('lineAccountId: selectedAccountId!')
-    expect(PAGE).toContain("foldersLoadState === 'error'")
-    expect(PAGE).toContain('フォルダを読み込めませんでした')
-    expect(PAGE).toContain('フォルダを再読み込み')
-    expect(PAGE).toContain("disabled={foldersLoadState !== 'ready'}")
+  it('選択中のLINEアカウントへ作る', () => {
+    expect(NEW).toContain('lineAccountId: selectedAccountId!')
   })
 
-  it('フォルダ選択を準備中に戻さない', () => {
-    expect(PAGE).not.toContain('フォルダ分けは準備中です')
-    expect(PAGE).not.toMatch(/<select disabled[^>]*>[\s\S]*?<option>未分類<\/option>/)
+  it('フォルダの読み込み失敗は選び直せる表示にし、準備中に戻さない', () => {
+    expect(BASICS).toContain('フォルダを読み込めませんでした')
+    expect(BASICS).toContain('再読み込み')
+    expect(BASICS).not.toContain('フォルダ分けは準備中です')
+    expect(BASICS).not.toMatch(/<select disabled[^>]*>[\s\S]*?<option>未分類<\/option>/)
   })
 })

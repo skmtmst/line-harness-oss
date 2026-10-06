@@ -1,14 +1,15 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CalendarClock, CalendarDays, ContactRound } from 'lucide-react'
+import { CalendarDays, IdCard } from 'lucide-react'
 import type { FriendField, ReminderDraftSettings, ReminderDraftStep, ReminderTriggerType } from '@line-crm/shared'
 import { api, eventsApi, type EventListItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
-import { TextArea, TextInput } from '@/components/shared/form-controls'
+import { TextArea, TextField } from '@/components/shared/text-field'
+import Card from '@/components/shared/card'
 import { ChoiceCardV8 } from './wizard-v8-ui'
 import styles from './wizard-v8.module.css'
 
@@ -247,17 +248,16 @@ export function ReminderBasicsFormV8({
 
   return (
     <>
-      <section className={styles.card}>
-        <div>
+      <Card padding="spacious" layout="vertical" className={styles.formCard}>
+        <div className={styles.sectionHeading}>
           <h2 className={styles.cardTitle}>名前とフォルダ</h2>
           <p className={styles.cardNote}>一覧に出る名前です。友だちには見えません。</p>
         </div>
         <div className={styles.fieldGrid}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="v8-reminder-name">リマインダ名（60文字まで）</label>
-            <TextInput
+            <TextField
               id="v8-reminder-name"
-              className={styles.input}
               value={value.name}
               maxLength={60}
               placeholder="例：予約前日のご案内"
@@ -287,20 +287,19 @@ export function ReminderBasicsFormV8({
             <label className={styles.label} htmlFor="v8-reminder-memo">
               社内メモ <span className={styles.labelOptional}>任意</span>
             </label>
-            <TextArea
-              id="v8-reminder-memo"
-              className={styles.input}
-              rows={3}
-              value={value.description}
-              placeholder="運用の目的や注意点"
-              onChange={(event) => patch({ description: event.target.value })}
-            />
+            {value.description.includes('\n') ? (
+              <TextArea id="v8-reminder-memo" rows={3} value={value.description}
+                placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} />
+            ) : (
+              <TextField id="v8-reminder-memo" value={value.description}
+                placeholder="運用の目的や注意点" onChange={(event) => patch({ description: event.target.value })} />
+            )}
           </div>
         </div>
-      </section>
+      </Card>
 
-      <section className={styles.card}>
-        <div>
+      <Card padding="spacious" layout="vertical" className={styles.formCard}>
+        <div className={styles.sectionHeading}>
           <h2 className={styles.cardTitle}>基準日</h2>
           <p className={styles.cardNote}>この日時の前や後に送ります</p>
         </div>
@@ -319,7 +318,7 @@ export function ReminderBasicsFormV8({
             value="friend_field"
             checked={value.triggerType === 'friend_field'}
             onChange={() => patch({ triggerType: 'friend_field' })}
-            icon={<ContactRound size={18} />}
+            icon={<IdCard size={18} />}
             title="友だち情報欄の日付"
             note="誕生日・契約終了日など"
           />
@@ -328,7 +327,7 @@ export function ReminderBasicsFormV8({
             value="event"
             checked={value.triggerType === 'event'}
             onChange={() => patch({ triggerType: 'event' })}
-            icon={<CalendarClock size={18} />}
+            icon={<CalendarDays size={18} />}
             title="イベントの予約日時"
             note="イベントの開始日時"
           />
@@ -398,18 +397,18 @@ export function ReminderBasicsFormV8({
             <p className={styles.fieldNote}>このイベントへの予約の開始日時を起点にします</p>
           </div>
         ) : null}
-      </section>
+      </Card>
 
-      <section className={styles.card}>
-        <div>
+      <Card padding="spacious" layout="vertical" className={styles.formCard}>
+        <div className={styles.sectionHeading}>
           <h2 className={styles.cardTitle}>ひな形から作る（任意）</h2>
           <p className={styles.cardNote}>基準日・送るタイミング・本文がまとめて入ります</p>
         </div>
         <div className={styles.tplGrid}>
           {reminderTemplatesV8.map((template) => (
-            <div key={template.id} className={styles.tplCard}>
-              <p className={styles.tplName}>{template.title}</p>
-              <p className={styles.tplMeta}>{template.baseLabel}・{template.timingLabel}</p>
+            <Card key={template.id} padding="default" layout="vertical" className={styles.templateCard}>
+              <p className={styles.tplName} title={template.title}>{template.title}</p>
+              <p className={styles.tplMeta} title={`${template.baseLabel}・${template.timingLabel}`}>{template.baseLabel.replace('（友だち情報欄）', '')}・{template.timingLabel}</p>
               <p className={styles.tplNote}>{template.note}</p>
               <div className={styles.tplFoot}>
                 <Button
@@ -422,10 +421,10 @@ export function ReminderBasicsFormV8({
                   {appliedTemplateId === template.id ? '入れました' : 'このひな形を使う'}
                 </Button>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
-      </section>
+      </Card>
     </>
   )
 }

@@ -12,14 +12,15 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
   container-type: inline-size;
+  min-width: 0;
 }
 
 .backLink {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--tpl-side-card-gap);
   width: fit-content;
   color: var(--color-accent-deep);
   font-size: 13px;
@@ -32,7 +33,7 @@
 .headText {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--tpl-side-card-gap);
 }
 .headTitle {
   margin: 0;
@@ -44,8 +45,8 @@
 .headMeta {
   margin: 0;
   color: var(--color-ink-secondary);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 12px;
+  line-height: var(--tpl-text-sm-lh);
 }
 
 /* 手順の下の一行。「名前：○○・いまは下書きです」など。 */
@@ -56,9 +57,9 @@
 
 .cols {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-  gap: 24px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 0;
+  align-items: stretch;
 }
 @media (max-width: 1100px) {
   .cols {
@@ -81,13 +82,17 @@
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+  padding: 24px 28px;
 }
 
 .side {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   min-width: 0;
+  padding: 24px;
+  border-left: 1px solid var(--color-hairline);
+  background: var(--color-surface-pearl);
 }
 .sideLabel {
   margin: 0;
@@ -105,23 +110,29 @@
   border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
+.formCard { gap: 14px; }
+/* 右の箱は共通部品 CreateSummaryCard に移した（#1487）。箱・題・行の指定はそちら。 */
+.sectionHeading { display: flex; flex-direction: column; gap: 2px; }
+.templateCard { gap: var(--tpl-label-tag-gap); height: 150px; min-width: 0; }
+
 .cardTitle {
   margin: 0;
   color: var(--color-ink);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.4;
 }
 .cardNote {
   margin: 0;
   color: var(--color-ink-faint);
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.3;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--tpl-label-tag-gap);
   min-width: 0;
 }
 .label {
@@ -130,14 +141,16 @@
   font-weight: 500;
 }
 .labelOptional {
+  margin-left: var(--tpl-label-tag-gap);
   color: var(--color-ink-faint);
-  font-size: 12px;
+  font-size: 11px;
+  line-height: var(--tpl-text-sm-lh);
   font-weight: 400;
 }
 .fieldNote {
   color: var(--color-ink-faint);
   font-size: 12px;
-  line-height: 1.6;
+  line-height: var(--tpl-text-sm-lh);
 }
 .input {
   width: 100%;
@@ -155,7 +168,7 @@
 .fieldGrid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) 220px;
 }
 .fieldGrid > .span2 {
   grid-column: 1 / -1;
@@ -189,7 +202,7 @@
 .choice {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--tpl-label-tag-gap);
   height: 100%;
   padding: 14px;
   border: 1px solid var(--color-hairline);
@@ -274,6 +287,8 @@
   border-radius: var(--radius-card);
   background: var(--color-canvas);
 }
+/* ひな形カードの中は折り返さない1行。入りきらないときだけ「…」＋title で全文（題は切らない・4枚同高）。 */
+.tplName, .tplMeta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tplName {
   margin: 0;
   color: var(--color-ink);
@@ -293,6 +308,8 @@
   line-height: 1.5;
 }
 .tplFoot {
+  display: flex;
+  justify-content: center;
   margin-top: auto;
 }
 
@@ -309,7 +326,7 @@
 .countItem {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--tpl-side-card-gap);
 }
 .countLabel {
   color: var(--color-ink-secondary);
@@ -361,12 +378,12 @@
 }
 .stopTitle {
   color: var(--color-ink);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 .stopNote {
   color: var(--color-ink-faint);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 /* いつも守る決まり。 */
@@ -394,7 +411,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px;
+  padding: var(--tpl-side-card-pad);
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
@@ -430,7 +447,7 @@
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--tpl-side-card-gap);
 }
 .stepAction {
   display: inline-flex;
@@ -635,7 +652,7 @@
   background: var(--color-info-bg);
   color: var(--color-info);
   font-size: 12px;
-  line-height: 1.6;
+  line-height: var(--tpl-text-sm-lh);
 }
 
 /* 設定の確認（ltAaq）：名前と値と「変える」。 */
@@ -737,10 +754,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   max-width: 560px;
-  margin: 40px auto;
-  padding: 40px;
+  margin: 48px auto;
+  padding: 32px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-card);
   background: var(--color-canvas);
@@ -750,8 +767,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-pill);
   background: var(--color-accent-soft);
   color: var(--color-accent-deep);
@@ -760,24 +777,30 @@
   margin: 0;
   color: var(--color-ink);
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: normal;
 }
 .doneNote {
   margin: 0;
   color: var(--color-ink-secondary);
   font-size: 13px;
-  line-height: 1.7;
+  line-height: 22px;
 }
 .doneFacts {
   width: 100%;
   display: flex;
   flex-direction: column;
 }
+.doneFacts .kvRow {
+  gap: 8px;
+  padding: var(--tpl-side-row-pad) 0;
+}
 .doneActions {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
+  padding-top: 8px;
 }
 
 /* 設定内容（右欄）：名まえと値の行。 */
@@ -813,14 +836,14 @@
   color: var(--color-danger);
 }
 
-/* 右欄の小さな案内（「LINEでの見え方は手順3から右に出ます」）。 */
+/* 右欄の小さな案内（CREATE-SCREEN-RECIPE §3：箱の外・surface-pearl・角丸control・余白12/14・12px/17）。 */
 .sideHint {
-  padding: 14px 16px;
-  border-radius: var(--radius-card);
-  background: var(--color-canvas-sunken);
+  padding: var(--tpl-side-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
   color: var(--color-ink-secondary);
   font-size: 12px;
-  line-height: 1.6;
+  line-height: var(--tpl-text-sm-lh);
 }
 
 /*
@@ -896,7 +919,7 @@
 }
 .phoneChip {
   align-self: center;
-  padding: 3px 10px;
+  padding: var(--tpl-side-row-gap) 10px;
   border-radius: var(--radius-pill);
   background: var(--v8-bphone-chip);
   color: var(--v8-bphone-chip-ink);
@@ -942,7 +965,7 @@
 .phoneBubbleTime {
   align-self: flex-end;
   margin-top: -6px;
-  padding-right: 4px;
+  padding-right: var(--tpl-side-card-gap);
   color: var(--v8-bphone-chrome);
   font-size: 10px;
 }
@@ -1085,4 +1108,7 @@
 .statusDotOk::before {
   background: var(--color-accent);
 }
+
+/* 板の頭と本文の段を分ける。共通部品自体の寸法は上書きしない。 */
+.pageHead { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px 24px 16px; border-bottom: 1px solid var(--color-hairline); }
 }
