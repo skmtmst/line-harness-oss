@@ -544,3 +544,4 @@ shared-button-importer v8/conversions/dialogs.tsx
 shared-button-importer v8/conversions/create.tsx
 shared-button-importer v8/inflow-links/new/create.tsx
 shared-button-importer v8/line-notifications/operator-edit.tsx
+shared-button-importer v8/no-permission/no-permission.tsx
