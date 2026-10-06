@@ -1,0 +1,192 @@
+/*
+ * ★V8 共通情報を作る（Pencil p82v9）。
+ * 頭・左右の列・下の帯の余白は型（CreatePage）が持つ。ここはカードの中身と右の列の箱だけ。
+ */
+.backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }
+
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-info-bg);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-ro-band-lh);
+}
+
+/* カード：枠1本・角12・余白20・間14。題 15/700・説明 12。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-section-gap);
+  padding: var(--tpl-section-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.cardHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
+.cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-ar-cv-title-lh); }
+.cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+
+.field { display: flex; flex-direction: column; gap: var(--tpl-field-gap-basic); min-width: 0; }
+.nameRow { display: flex; gap: var(--tpl-rule-row-gap); }
+.nameRow > .field:first-child { flex: 1 1 0; }
+.folderField { width: var(--tpl-ar-cv-folder-w); flex-shrink: 0; }
+.folderError { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-sub-gap); }
+.fieldLabelStrong { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-chip-label-lh); }
+.fieldLabel { color: var(--color-ink-secondary); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-text-sm-lh); }
+.optional { margin-left: var(--tpl-label-tag-gap); color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 400; }
+.required { color: var(--color-danger); }
+.fieldInput,
+.fieldArea {
+  width: 100%;
+  min-width: 0;
+  padding: var(--tpl-kw-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  line-height: var(--tpl-body-lh);
+}
+.fieldInput { height: var(--tpl-chip-h); }
+.fieldArea { padding-block: var(--tpl-body-gap); resize: vertical; }
+.fieldHint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-text-sm-lh); }
+.fieldError { margin: 0; color: var(--color-danger); font-size: var(--text-caption); }
+.selectBox { min-width: 0; }
+.selectBox :global(*) { max-width: 100%; }
+.selectBox :global(button) { width: 100%; }
+
+/* 差し込み名：{{var. と }} を欄の中に置く（等幅 13）。右に文字だけのコピー。 */
+.keyRow { display: flex; align-items: center; gap: var(--tpl-body-gap); }
+.keyBox {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: var(--tpl-sub-gap);
+  min-width: 0;
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-kw-input-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+}
+.keyBox:focus-within { outline: var(--tpl-fm-focus-ring) solid var(--color-action); }
+.keyMark { flex-shrink: 0; color: var(--color-ink-faint); }
+.keyInput {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  field-sizing: content;
+}
+
+/* 種別：4つずつ2段・間8。選んだカードは緑の地・1.5の枠。 */
+.typeGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--tpl-body-gap); }
+.typeCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-sub-gap);
+  min-width: 0;
+  padding: var(--tpl-rule-row-gap);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  text-align: left;
+  cursor: pointer;
+}
+.typeCard[aria-checked='true'] { outline: var(--tpl-fm-option-outline) solid var(--color-accent); background: var(--color-success-bg); }
+.typeTop { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); color: var(--color-ink); }
+.typeCard[aria-checked='true'] .typeTop { color: var(--color-success); }
+.typeLabel { font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-text-sm-lh); }
+.typeDesc {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-ar-cv-type-desc-size);
+  line-height: var(--tpl-ar-cv-type-desc-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 使える期間：見出しの段と欄の段（始まり・終わり・期間の外では 220）。 */
+.periodGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--tpl-ar-cv-expiry-w);
+  column-gap: var(--tpl-body-gap);
+  /* 日付の欄（共通部品）は高さ40、絵は36。見出しとの間を 4 詰めて、欄の中心を絵にそろえる。 */
+  row-gap: var(--tpl-ar-cv-period-row-gap);
+  align-items: center;
+}
+
+/* 右の列：秘密値の注意（琥珀の地・角12・余白16・間6）。 */
+.secretCard {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: var(--tpl-field-gap-basic);
+  padding: var(--tpl-side-card-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-warning-bg);
+}
+.secretTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-chip-label-lh); }
+.secretText { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-ar-cv-secret-lh); word-break: normal; }
+
+/* スマホの中の届いた吹き出し（アイコン34・名前10・吹き出し 幅200・11.5/18・時刻9）。 */
+.talkRow { display: flex; gap: var(--tpl-label-tag-gap); }
+.talkIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-ar-cv-talk-icon);
+  height: var(--tpl-ar-cv-talk-icon);
+  border-radius: var(--radius-pill);
+  background: var(--color-success);
+  color: var(--v8-line-chrome);
+  font-size: var(--text-body);
+  font-weight: 700;
+}
+.talkCol { display: flex; flex-direction: column; gap: var(--tpl-ar-cv-talk-gap); min-width: 0; }
+.talkName { color: var(--v8-line-sender); font-size: var(--tpl-ar-cv-talk-name-size); }
+.talkBubbleRow { display: flex; align-items: flex-end; gap: var(--tpl-sub-gap); }
+.talkBubble {
+  width: var(--tpl-ar-cv-talk-bubble-w);
+  margin: 0;
+  padding: var(--tpl-ar-cv-talk-bubble-pad);
+  border-radius: var(--v8-line-bubble-in-radius);
+  background: var(--v8-line-chrome);
+  color: var(--color-ink);
+  font-size: var(--tpl-ar-cv-talk-text-size);
+  line-height: var(--tpl-ar-cv-talk-text-lh);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.talkTime { color: var(--v8-line-time); font-size: var(--tpl-ar-cv-talk-time-size); white-space: nowrap; }
+
+.formError { margin: 0; color: var(--color-danger); font-size: var(--text-label); font-weight: 600; }
+.secretConfirm {
+  padding: var(--tpl-side-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-danger);
+  outline-offset: -1px;
+  background: var(--color-danger-bg);
+}
+.secretConfirmTitle { margin: 0; color: var(--color-danger); font-size: var(--tpl-card-title-size); font-weight: 700; }
+.secretConfirmText { margin: var(--tpl-body-gap) 0 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-body-lh); }
+.secretConfirmActions { display: flex; flex-wrap: wrap; gap: var(--tpl-body-gap); margin-top: var(--tpl-rule-row-gap); }

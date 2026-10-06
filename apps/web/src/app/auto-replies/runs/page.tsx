@@ -16,7 +16,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { api, ApiError } from '@/lib/api'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import AutoReplyRunsV8 from './runs-v8'
+import AutoReplyRunsV8 from '@/v8/auto-replies/runs'
 import styles from './auto-reply-runs.module.css'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
