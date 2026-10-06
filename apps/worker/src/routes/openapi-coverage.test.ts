@@ -129,6 +129,9 @@ const ALLOWLIST_MAX = 772;
  */
 const BASELINE_DOCUMENTED = new Set<string>([
   // V8 integration endpoints.
+  'GET /api/dashboard/activity',
+  'GET /api/forms/{id}/submissions/{submissionId}',
+  'GET /api/friends/{id}/summary',
   'DELETE /api/hq/templates/folders/{id}',
   'DELETE /api/notifications/teams/{id}',
   'GET /api/ad-platforms/mappings',
