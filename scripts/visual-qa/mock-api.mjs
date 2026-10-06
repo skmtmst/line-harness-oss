@@ -85,7 +85,7 @@ import {
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
   OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
-  COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
+  COMMON_ACTIONS, COMMON_ACTION_DETAIL, COMMON_ACTION_DETAIL_PURCHASE, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
   BOOKING_MENUS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
   BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_EXCEPTIONS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
@@ -2824,6 +2824,28 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ],
     }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'automation') {
+    // 板 `LWQXd`：ルールの箱。ルールにフォルダの列がまだ無いので、件数（itemCount）は本物と同じく返さない（#730）。
+    return {
+      success: true,
+      data: [
+        { id: 'auf-booking', kind: 'automation', name: '予約', parentId: null, displayOrder: 1, color: '#2563eb' },
+        { id: 'auf-purchase', kind: 'automation', name: '購入・フォロー', parentId: null, displayOrder: 2, color: '#059669' },
+        { id: 'auf-inquiry', kind: 'automation', name: '問い合わせ', parentId: null, displayOrder: 3, color: '#ea580c' },
+      ],
+    }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'common_action') {
+    // 板 `LnGNw`：共通アクションの箱。共通アクションにフォルダの列がまだ無いので、件数（itemCount）は返さない（#730）。
+    return {
+      success: true,
+      data: [
+        { id: 'caf-purchase', kind: 'common_action', name: '購入', parentId: null, displayOrder: 1, color: '#2563eb' },
+        { id: 'caf-booking', kind: 'common_action', name: '予約・申込', parentId: null, displayOrder: 2, color: '#059669' },
+        { id: 'caf-follow', kind: 'common_action', name: 'フォロー', parentId: null, displayOrder: 3, color: '#ea580c' },
+      ],
+    }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
     // 板 `uE9gf`：未分類は `folderId: null` の1件（旧キーワードルール）。
     return { success: true, data: AUTO_REPLY_FOLDERS, unfiledCount: AUTO_REPLIES.filter((rule) => !rule.folderId).length }
@@ -3537,10 +3559,27 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const requestedOffset = Number.parseInt(query.get('offset') ?? '', 10)
     const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 500) : null
     const offset = Number.isInteger(requestedOffset) && requestedOffset >= 0 ? requestedOffset : 0
+    // 本番と同じく、数の帯の集計（保管を除いた母集団）も返す。
+    const live = COMMON_ACTIONS.filter((item) => item.status !== 'archived')
+    const summary = {
+      total: live.length,
+      published: live.filter((item) => item.status === 'published').length,
+      draft: live.filter((item) => item.status === 'draft').length,
+      oldVersion: live.filter((item) => item.oldVersionBindingCount > 0).length,
+      unused: live.filter((item) => item.status === 'published' && item.bindingCount === 0).length,
+      archived: COMMON_ACTIONS.length - live.length,
+      actions: live.reduce((sum, item) => sum + item.actionCount, 0),
+      bindings: live.reduce((sum, item) => sum + item.bindingCount, 0),
+      outdated: live.reduce((sum, item) => sum + item.oldVersionBindingCount, 0),
+      outdatedItems: live.filter((item) => item.oldVersionBindingCount > 0).length,
+      executions: live.reduce((sum, item) => sum + item.executionCountThisMonth, 0),
+      failures: live.reduce((sum, item) => sum + item.failureCountThisMonth, 0),
+    }
     return {
       success: true,
       data: limit === null ? filtered : filtered.slice(offset, offset + limit),
       pagination: { total: filtered.length, limit, offset },
+      summary,
       freshness: 'available',
     }
   }
@@ -4392,6 +4431,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         ],
       },
     }
+  }
+  // 板 `ziSgL`：「購入のお礼」の版と使われている場所。ほかの ID は今までどおり COMMON_ACTION_DETAIL。
+  if (pathname === '/api/common-actions/ca-2' && method === 'GET') {
+    return { success: true, data: COMMON_ACTION_DETAIL_PURCHASE }
   }
   if (pathname === '/api/common-actions/ca-broadcast-delivered-tag') {
     return {
