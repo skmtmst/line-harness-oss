@@ -583,6 +583,20 @@
   --tpl-head-gap: 4px; --tpl-desc-size: 13px; --tpl-desc-lh: 19px;
   --tpl-compact-title-size: 20px; --tpl-compact-title-weight: 600; --tpl-compact-title-lh: 27px;
   --tpl-compact-gap: 2px; --tpl-compact-desc-lh: 20px;
+  /* マイルの V8（OC0gy・ZJIyl・E2Any・S35pO・CJlf4・oRbJi・IRPw8）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16・行 56）。 */
+  --tpl-ml-col-gap: 16px; --tpl-ml-head-h: 44px; --tpl-ml-head-pad: 13px 20px; --tpl-ml-row-h: 56px; --tpl-ml-row-pad: 9px 20px;
+  --tpl-ml-col-event: 140px; --tpl-ml-col-miles: 72px; --tpl-ml-col-validity: 96px; --tpl-ml-col-recent: 64px; --tpl-ml-col-state: 92px; --tpl-ml-col-ops: 108px;
+  --tpl-ml-col-need: 88px; --tpl-ml-col-gives: 150px; --tpl-ml-col-month: 92px; --tpl-ml-col-state-wide: 96px; --tpl-ml-col-ops-wide: 160px;
+  --tpl-ml-col-rank: 72px; --tpl-ml-col-balance: 76px; --tpl-ml-col-change: 72px; --tpl-ml-col-last: 140px; --tpl-ml-col-ops-balance: 150px;
+  --tpl-ml-col-delta: 56px; --tpl-ml-col-why: 180px; --tpl-ml-col-after: 62px; --tpl-ml-col-who: 90px; --tpl-ml-col-ops-history: 140px;
+  --tpl-ml-col-score: 80px; --tpl-ml-col-band: 80px; --tpl-ml-col-trend: 100px; --tpl-ml-col-react: 130px; --tpl-ml-col-ops-menu: 60px; --tpl-ml-score-row-h: 54px;
+  --tpl-ml-dlg-gap: 14px; --tpl-ml-dlg-pull: -18px; --tpl-ml-dlg-label-gap: 6px; --tpl-ml-avatar: 32px; --tpl-ml-person-gap: 10px; --tpl-ml-person-pad: 10px 12px; --tpl-ml-seg-pad: 2px; --tpl-ml-seg-btn-pad: 6px 12px; --tpl-ml-seg-lh: 20px; --tpl-ml-textarea-h: 64px; --tpl-ml-delta-pad: 12px 14px; --tpl-ml-delta-size: 18px; --tpl-ml-delta-lh: normal; --tpl-ml-mini-pad: 8px 12px;
+  --tpl-ml-card-pad: 20px; --tpl-ml-card-gap: 14px; --tpl-ml-card-radius: 12px; --tpl-ml-card-title-size: 15px; --tpl-ml-card-title-lh: 22px; --tpl-ml-select-label-h: 17px;
+  --tpl-ml-col-when: 72px; --tpl-ml-col-what: 150px; --tpl-ml-col-source: 170px; --tpl-ml-col-kind: 96px; --tpl-ml-col-delta-detail: 56px; --tpl-ml-col-menu: 28px;
+  --tpl-ml-detail-head-pad: 10px 20px; --tpl-ml-detail-head-h: 36px; --tpl-ml-detail-row-pad: 11px 20px; --tpl-ml-detail-row-h: 50px; --tpl-ml-detail-tools-pad: 12px 20px; --tpl-ml-detail-search-w: 220px; --tpl-ml-summary-line-pad: 9px 0; --tpl-ml-kpi-pull: -4px; --tpl-ml-period-w: 84px; --tpl-ml-head-actions-pull: -25px; --tpl-ml-grid-gap: 12px; --tpl-ml-side-gap: 14px; --tpl-ml-side-pad: 16px; --tpl-ml-side-inner-gap: 6px; --tpl-ml-side-title-size: 14px; --tpl-ml-phone-pad: 12px; --tpl-ml-phone-gap: 4px; --tpl-ml-back-gap: 4px;
+  --tpl-ml-approval-pad: 16px; --tpl-ml-approval-gap: 10px; --tpl-ml-approval-radius: 12px; --tpl-ml-approval-row-pad: 10px 12px; --tpl-ml-approval-row-radius: 8px; --tpl-ml-approval-title-size: 14px; --tpl-ml-flush-pull: -14px; --tpl-ml-foot-after-pager: 23px;
+  --tpl-ml-pill-pad: 2px 8px; --tpl-ml-pill-gap: 5px; --tpl-ml-pill-lh: 18px; --tpl-ml-ops-gap: 8px;
+  --tpl-ml-notice-after: 6px; --tpl-ml-num-pad-end: 8px; --tpl-ml-tab-pad-bottom: 6px; --tpl-ml-ro-before: 8px; --tpl-ml-ro-after: 12px; --tpl-ml-saved-w: 154px; --tpl-ml-search-w: 240px; --tpl-ml-foot-pad: 12px 24px;
   --tpl-folder-width: 200px; --tpl-folder-pad-block: 16px; --tpl-folder-pad-side: 12px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
