@@ -23,7 +23,7 @@ export function KpiMenu({ title, label = 'CSV で書き出す', onExport, disabl
   </span>
 }
 
-const JST = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: false })
+const JST = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 const JST_DAY = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' })
 /** 「9/30 19:00」（日本時間）。 */
 export function shortDateTime(value: string | null): string {
@@ -32,6 +32,11 @@ export function shortDateTime(value: string | null): string {
   if (Number.isNaN(date.getTime())) return '—'
   const parts = Object.fromEntries(JST.formatToParts(date).map((part) => [part.type, part.value]))
   return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`
+}
+/** 日付だけ（YYYY-MM-DD）なら「9/30」、日時なら「9/30 19:00」。 */
+export function shortWhen(value: string | null): string {
+  if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) return shortDay(value)
+  return shortDateTime(value)
 }
 /** 「9/30」（日本時間）。YYYY-MM-DD も日時も受ける。 */
 export function shortDay(value: string | null): string {
@@ -44,7 +49,7 @@ export function shortDay(value: string | null): string {
 }
 /** 道具の段の「9/2〜10/1・10/1 6:00 までのデータ」。 */
 export function dataRangeCaption(from: string, to: string, cutoffAt: string): string {
-  return `${shortDay(from)}〜${shortDay(to)}・${shortDateTime(cutoffAt)} までのデータ`
+  return `${shortDay(from)}〜${shortDay(to)}・${shortDateTime(cutoffAt).replace(/ 0(\d):/, ' $1:')} までのデータ`
 }
 
 /** 表の状態の札（点＋文字・丸い地）。緑＝動いている・灰＝止めている・青＝案内。 */

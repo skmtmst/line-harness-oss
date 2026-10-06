@@ -514,3 +514,4 @@ shared-button-importer v8/analytics/reactions.tsx
 shared-button-importer v8/analytics/routes.tsx
 shared-button-importer v8/analytics/url-clicks.tsx
 shared-button-importer v8/analytics/conversion-report.tsx
+shared-button-importer v8/analytics/usage.tsx

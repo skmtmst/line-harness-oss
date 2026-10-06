@@ -842,3 +842,25 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* 使われ方（N8ZrUl）：行の中の「中身を見る」＋「…」、右の気づいたこと。 */
+.colType[data-w='110'] { width: var(--tpl-an-col-110); }
+.colType[data-w='150'] { width: var(--tpl-an-col-150); }
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-swatch-gap);
+}
+.observation {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-an-text-lh);
+}
+.plainList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}

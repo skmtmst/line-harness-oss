@@ -28,6 +28,7 @@ import ReactionsV8 from './reactions'
 import RoutesV8 from './routes'
 import UrlClicksV8 from './url-clicks'
 import ConversionReportV8 from './conversion-report'
+import UsageV8 from './usage'
 import styles from './analytics.module.css'
 
 export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved'] as const
@@ -114,6 +115,7 @@ function AnalyticsInnerV8({ renderLegacy }: { renderLegacy?: (context: LegacyTab
     : tab === 'reactions' ? <ReactionsV8 key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'routes' ? <RoutesV8 key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'conversion-report' ? <ConversionReportV8 key={selectedAccountId} accountId={selectedAccountId} />
+    : tab === 'usage' ? <UsageV8 key={selectedAccountId} accountId={selectedAccountId} />
     : tab === 'url-clicks' ? <UrlClicksV8 key={selectedAccountId} accountId={selectedAccountId} />
     : <div className={styles.legacy}>{renderLegacy?.({ tab, accountId: selectedAccountId, canManage, registerExport, onSavedCountChange: setSavedCount })}</div>
 
