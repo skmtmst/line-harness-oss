@@ -53,6 +53,7 @@ import { createBroadcast, getBroadcastById, type Broadcast } from '@line-crm/db'
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   acceptEventWaitlistOffer,
+  getEventWaitlistOffer,
   createEventWaitlistOfferSender,
   enqueueEventWaitlistPromotion,
   getEventOccurrenceApplicants,
@@ -2772,6 +2773,14 @@ function startsAtJst(utcIso: string): string {
   const jst = new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
   return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
 }
+
+events.get('/api/liff/events/waitlist/:token', async (c) => {
+  const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+  if (!callerLineUserId) return bad(c, 'unauthorized', 401);
+  const data = await getEventWaitlistOffer(c.env.DB, { token: c.req.param('token'), callerLineUserId });
+  if (!data) return bad(c, 'waitlist_offer_not_found', 404);
+  return c.json({ success: true, data });
+});
 
 events.post('/api/liff/events/waitlist/:token/accept', async (c) => {
   const callerLineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);

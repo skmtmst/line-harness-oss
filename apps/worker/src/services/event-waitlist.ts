@@ -6,6 +6,7 @@ import {
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { sendEventBookingNotification } from './event-booking-notifier.js';
 import { featureJobCanRun } from './feature-enforcement.js';
+import type { EventWaitlistOfferDetail } from '@line-crm/shared';
 
 const DEFAULT_OFFER_HOURS = 24;
 const JOB_RETRY_MAX_MINUTES = 60;
@@ -497,6 +498,37 @@ async function sha256(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** 案内の読み出しでは失効・予約化をしない。URLの所持と本人を両方照合する。 */
+export async function getEventWaitlistOffer(
+  db: D1Database,
+  params: { token: string; callerLineUserId: string; now?: Date },
+): Promise<EventWaitlistOfferDetail | null> {
+  if (params.token.length < 32 || params.token.length > 256) return null;
+  const row = await db.prepare(`
+    SELECT w.id AS waitlistId, w.event_id AS eventId, w.slot_id AS slotId,
+           w.party_size AS partySize, w.status, w.offer_expires_at AS expiresAt,
+           CASE WHEN w.event_snapshot_json IS NOT NULL THEN json_extract(w.event_snapshot_json, '$.eventName') ELSE e.name END AS eventName,
+           CASE WHEN w.event_snapshot_json IS NOT NULL THEN json_extract(w.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS startsAt,
+           CASE WHEN w.event_snapshot_json IS NOT NULL THEN json_extract(w.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS endsAt,
+           CASE WHEN w.event_snapshot_json IS NOT NULL THEN json_extract(w.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venueName
+      FROM event_waitlist w
+      JOIN friends f ON f.id = w.friend_id AND f.line_account_id = w.line_account_id
+      JOIN events e ON e.id = w.event_id AND e.deleted_at IS NULL
+      JOIN event_slots s ON s.id = w.slot_id AND s.deleted_at IS NULL
+     WHERE w.offer_token_hash = ? AND f.line_user_id = ?
+     LIMIT 1
+  `).bind(await sha256(params.token), params.callerLineUserId)
+    .first<Omit<EventWaitlistOfferDetail, 'remainingSeconds' | 'canAccept'>>();
+  if (!row) return null;
+  const expires = row.expiresAt ? Date.parse(row.expiresAt) : NaN;
+  const remainingMs = expires - (params.now ?? new Date()).getTime();
+  return {
+    ...row,
+    remainingSeconds: Number.isFinite(remainingMs) ? Math.max(0, Math.ceil(remainingMs / 1000)) : 0,
+    canAccept: row.status === 'offered' && remainingMs > 0,
+  };
 }
 
 interface WaitlistOfferAcceptanceRow {

@@ -7,6 +7,7 @@ import {
   createEventWaitlistOfferSender,
   enqueueEventWaitlistPromotion,
   getEventOccurrenceApplicants,
+  getEventWaitlistOffer,
   processEventWaitlistPromotionJobs,
   promoteEventWaitlist,
   reorderEventWaitlist,
@@ -308,6 +309,48 @@ describe('V6 event waitlist and applicants', () => {
       event_name: '移行時のイベント名',
       slot_starts_at: '2099-06-01T01:00:00.000Z',
     });
+  });
+
+  test('案内の詳細は本人だけに日時・確保席・残り秒を返し、読み取りでは状態を変えない', async () => {
+    const token = 'detail-offer-token-12345678901234567890123456789';
+    await seedOffered(token);
+    const before = sqlite.prepare(`SELECT * FROM event_waitlist`).all();
+    expect(await getEventWaitlistOffer(db, {
+      token, callerLineUserId: 'Ub', now: new Date('2099-06-01T23:59:00.000Z'),
+    })).toMatchObject({
+      waitlistId: 'wait-a', slotId: 'slot-a', eventName: 'しつけ教室',
+      startsAt: '2099-06-01T01:00:00.000Z', endsAt: '2099-06-01T03:00:00.000Z',
+      partySize: 1, remainingSeconds: 60, canAccept: true,
+    });
+    expect(await getEventWaitlistOffer(db, { token, callerLineUserId: 'Ua' })).toBeNull();
+    expect(await getEventWaitlistOffer(db, { token: '短い鍵', callerLineUserId: 'Ub' })).toBeNull();
+    expect(sqlite.prepare(`SELECT * FROM event_waitlist`).all()).toEqual(before);
+  });
+
+  test('案内期限のちょうど時刻と期限後は残り0秒で確定不可', async () => {
+    const token = 'expired-detail-token-12345678901234567890123456789';
+    await seedOffered(token);
+    for (const now of ['2099-06-02T00:00:00.000Z', '2099-06-03T00:00:00.000Z']) {
+      expect(await getEventWaitlistOffer(db, { token, callerLineUserId: 'Ub', now: new Date(now) }))
+        .toMatchObject({ remainingSeconds: 0, canAccept: false });
+    }
+    sqlite.exec(`UPDATE event_waitlist SET status = 'cancelled'`);
+    expect(await getEventWaitlistOffer(db, {
+      token, callerLineUserId: 'Ub', now: new Date('2099-06-01T00:00:00.000Z'),
+    })).toMatchObject({ status: 'cancelled', canAccept: false });
+  });
+
+  test('案内詳細は申込時のsnapshotを使い、削除済み開催回は返さない', async () => {
+    const token = 'snapshot-detail-token-12345678901234567890123456789';
+    await seedOffered(token);
+    sqlite.prepare(`UPDATE event_waitlist SET event_snapshot_json = ?`).run(JSON.stringify({
+      eventName: '申込時の名前', slotStartsAt: '2099-05-01T01:00:00.000Z',
+      slotEndsAt: '2099-05-01T03:00:00.000Z', venueName: '申込時の会場',
+    }));
+    expect(await getEventWaitlistOffer(db, { token, callerLineUserId: 'Ub' }))
+      .toMatchObject({ eventName: '申込時の名前', startsAt: '2099-05-01T01:00:00.000Z' });
+    sqlite.exec(`UPDATE event_slots SET deleted_at = '2026-10-07' WHERE id = 'slot-a'`);
+    expect(await getEventWaitlistOffer(db, { token, callerLineUserId: 'Ub' })).toBeNull();
   });
 
   test('繰上げURLが漏れても、別のLINEユーザーは承諾できない', async () => {
