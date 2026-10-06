@@ -22,11 +22,16 @@ import { useCallback, useDeferredValue, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
+  Activity,
   AlertCircle,
+  ArrowRight,
   Bell,
   CalendarClock,
   CircleCheck,
+  Copy,
+  Eye,
   Folder as FolderIcon,
+  FolderInput,
   MoreHorizontal,
   Pause,
   Pencil,
@@ -35,7 +40,9 @@ import {
   Search as SearchIcon,
   Send,
   Square,
+  Trash2,
   TriangleAlert,
+  Users,
 } from 'lucide-react'
 import type { ApiResponse, Folder, ReminderTriggerType } from '@line-crm/shared'
 import { api, fetchApi, type ListStats } from '@/lib/api'
@@ -60,6 +67,7 @@ import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
+import SheetDialog from '@/v8/reminders/sheet-dialog'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table'
 import { runUndoable } from '@/lib/undoable'
@@ -162,6 +170,9 @@ function formatNextSend(iso: string | null | undefined): string {
     : ''
   return `${get('month')}/${get('day')}（${weekday}）${get('hour')}:${get('minute')}`
 }
+
+/** 閲覧のみでも出す行の「…」の項目（見るだけのもの）。 */
+const VIEW_ONLY_MENU_IDS = new Set(['detail', 'registrants', 'planned', 'runs'])
 
 export default function RemindersListV8() {
   usePageTitle('リマインダ')
@@ -641,14 +652,16 @@ export default function RemindersListV8() {
 
   const rowMenuItems = (row: ReminderRow): ActionMenuItem[] => {
     const status = statusKeyOf(row)
-    return [
-      { id: 'detail', label: '詳細を見る', onSelect: () => goDetail(detailHref(row.id)) },
-      { id: 'registrants', label: '登録者を管理', onSelect: () => goDetail(detailHref(row.id)) },
-      { id: 'planned', label: '配信予定を見る', onSelect: () => goDetail(`${detailHref(row.id)}&status=planned`) },
-      { id: 'runs', label: '実行結果を見る', onSelect: () => goDetail(detailHref(row.id)) },
+    const items: ActionMenuItem[] = [
+      { id: 'detail', label: '詳細を見る', icon: <ArrowRight size={15} aria-hidden="true" />, onSelect: () => goDetail(detailHref(row.id)) },
+      { id: 'registrants', label: '登録者を管理', icon: <Users size={15} aria-hidden="true" />, onSelect: () => goDetail(detailHref(row.id)) },
+      { id: 'planned', label: '配信予定を見る', icon: <CalendarClock size={15} aria-hidden="true" />, onSelect: () => goDetail(`${detailHref(row.id)}&status=planned`) },
+      { id: 'runs', label: '実行結果を見る', icon: <Activity size={15} aria-hidden="true" />, onSelect: () => goDetail(detailHref(row.id)) },
       {
         id: 'edit',
         label: '編集する',
+        icon: <Pencil size={15} aria-hidden="true" />,
+        dividerBefore: true,
         disabled: !canEdit,
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => goDetail(`/reminders/edit?id=${encodeURIComponent(row.id)}`),
@@ -656,6 +669,7 @@ export default function RemindersListV8() {
       {
         id: 'duplicate',
         label: '複製する',
+        icon: <Copy size={15} aria-hidden="true" />,
         disabled: !canEdit,
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => {
@@ -667,6 +681,7 @@ export default function RemindersListV8() {
         ? {
             id: 'pause',
             label: '一時停止する',
+            icon: <Pause size={15} aria-hidden="true" />,
             disabled: !canEdit,
             disabledReason: canEdit ? undefined : readonlyReason,
             onSelect: () => {
@@ -677,6 +692,7 @@ export default function RemindersListV8() {
           ? {
               id: 'resume',
               label: '再開する',
+              icon: <Play size={15} aria-hidden="true" />,
               disabled: !canEdit,
               disabledReason: canEdit ? undefined : readonlyReason,
               onSelect: () => void runResume(row),
@@ -684,6 +700,7 @@ export default function RemindersListV8() {
           : {
               id: 'pause-none',
               label: '一時停止する',
+              icon: <Pause size={15} aria-hidden="true" />,
               disabled: true,
               disabledReason: '下書きはまだ送っていないため、止める予定がありません',
               onSelect: () => {},
@@ -691,6 +708,7 @@ export default function RemindersListV8() {
       {
         id: 'move',
         label: 'フォルダへ移す',
+        icon: <FolderInput size={15} aria-hidden="true" />,
         disabled: !canEdit,
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => openMove([row.id]),
@@ -698,6 +716,7 @@ export default function RemindersListV8() {
       {
         id: 'delete',
         label: '削除',
+        icon: <Trash2 size={15} aria-hidden="true" />,
         tone: 'danger',
         dividerBefore: true,
         disabled: !canEdit,
@@ -708,6 +727,8 @@ export default function RemindersListV8() {
         },
       },
     ]
+    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見る項目だけ残す。
+    return canEdit ? items : items.filter((item) => VIEW_ONLY_MENU_IDS.has(item.id))
   }
 
   /* ===== 表 ===== */
@@ -807,7 +828,8 @@ export default function RemindersListV8() {
           <DataTable>
             <colgroup>
               {/* ★V8 列の幅＝絵の中身の幅＋欄の間16（左右8ずつ）。端の列は端の24も足す（apLqS：選ぶ16・並べ替え14・状態80・予定90・次120・操作28） */}
-              {canEdit && <col style={{ width: 16 + 24 + 8 }} />}
+              {/* 閲覧のみでも選ぶ列の幅は残す（箱は出さない）。名前の位置を絵どおりに保つ。 */}
+              <col style={{ width: 16 + 24 + 8 }} />
               <col style={{ width: 14 + 16 }} />
               <col />
               <col style={{ width: 80 + 16 }} />
@@ -817,7 +839,7 @@ export default function RemindersListV8() {
             </colgroup>
             <thead>
               <TableHeadRow>
-                {canEdit && (
+                {canEdit ? (
                   <Th className={styles.selectCell} aria-label="選択">
                     <Checkbox
                       checked={allOnPageSelected}
@@ -826,7 +848,7 @@ export default function RemindersListV8() {
                       aria-label="このページのリマインダをすべて選択"
                     />
                   </Th>
-                )}
+                ) : <Th className={styles.selectCell}><span className="sr-only">選択できません</span></Th>}
                 {tableHeadCells}
               </TableHeadRow>
             </thead>
@@ -855,7 +877,7 @@ export default function RemindersListV8() {
                       }
                     }}
                   >
-                    {canEdit && (
+                    {canEdit ? (
                       <Td className={styles.selectCell} onClick={(event) => event.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(row.id)}
@@ -863,7 +885,7 @@ export default function RemindersListV8() {
                           aria-label={`${row.name}を選択`}
                         />
                       </Td>
-                    )}
+                    ) : <Td className={styles.selectCell} />}
                     <Td
                       className={styles.gripCell}
                       onClick={(event) => event.stopPropagation()}
@@ -873,14 +895,15 @@ export default function RemindersListV8() {
                       onDrop={() => dropOn(row.id)}
                       title="上下に動かして並び替え"
                     >
-                      <ReorderGrip
-                        label={row.name}
-                        disabled={!canEdit}
-                        disabledReason={readonlyReason}
-                        onMove={(direction) => keyboardMove(row.id, direction)}
-                      >
-                        <span aria-hidden>⠿</span>
-                      </ReorderGrip>
+                      {/* 閲覧のみ：つまみは隠し、同じ大きさの見えない印で位置を保つ。 */}
+                      {canEdit ? (
+                        <ReorderGrip
+                          label={row.name}
+                          onMove={(direction) => keyboardMove(row.id, direction)}
+                        >
+                          <span aria-hidden>⠿</span>
+                        </ReorderGrip>
+                      ) : <span className={styles.gripSpace} aria-hidden="true">⠿</span>}
                     </Td>
                     <NameCell
                       name={<div className={styles.nameRow}>
@@ -934,6 +957,8 @@ export default function RemindersListV8() {
                       <div className={styles.countMain}>{nextSend}</div>
                     </Td>
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()} data-design-node={openMenuId === row.id ? 'SkY9V' : undefined}>
+                      {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
+                      <div className={styles.menuBox}>
                       <ContextMenu
                         label={`リマインダ「${row.name}」の操作`}
                         items={rowContextItems(row)}
@@ -957,6 +982,7 @@ export default function RemindersListV8() {
                         ariaLabel={`リマインダ「${row.name}」の操作`}
                         items={rowMenuItems(row)}
                       />
+                      </div>
                     </Td>
                   </Tr>
                 )
@@ -1118,9 +1144,10 @@ export default function RemindersListV8() {
             予約日時・誕生日・契約終了日などの「基準日」を決めて、その前や後に自動で送ります。
           </>}  />
 
-      {/* 見るだけの人への帯（`a5C1p`）。操作は押せない形のまま置く。 */}
+      {/* 見るだけの人への帯（`a5C1p`）。押せない操作は置かずに隠す（2026-10-06 オーナー決定）。 */}
       {role !== null && !canEdit && (
-        <p className="border-info bg-info-bg text-ink rounded-control border px-3.5 py-2.5 text-label" data-design-node="a5C1p">
+        <p className={styles.viewerBand} role="status" data-design-node="a5C1p">
+          <Eye size={16} aria-hidden="true" />
           閲覧のみで見ています。変える操作は管理者に頼んでください。
         </p>
       )}
@@ -1164,49 +1191,51 @@ export default function RemindersListV8() {
         )}
       </ConfirmDialog>
 
-      {/* 削除の窓（★V8 `VsSyu`）。 */}
-      <ConfirmDialog
+      {/* 削除の窓（★V8 `VsSyu`）：幅600・上から260。危ない操作は左端、取消と「代わりに一時停止」は真ん中。 */}
+      <SheetDialog
         open={deleteTarget !== null}
         designNode="VsSyu"
         title={deleteTarget ? `「${deleteTarget.name}」を削除する` : ''}
         description="通知の予定と登録者がすべて消えます。すでに送ったメッセージは友だちのトークに残ります。"
-        confirmLabel="削除する"
-        destructive
+        band="削除は元に戻せません。しばらく使わないだけなら「一時停止する」を使ってください。"
+        bandTone="danger"
         busy={deleting}
-        error={deleteError}
-        onConfirm={deleteStillListed ? () => void runDelete() : undefined}
-        onCancel={() => {
+        error={deleteError || (deleteTarget && !deleteStillListed ? 'このリマインダが一覧から外れました。この窓を閉じて、いまの一覧から選び直してください。' : undefined)}
+        onClose={() => {
           if (deleting) return
           setDeleteTarget(null)
           setDeleteError('')
         }}
-      >
-        {deleteTarget && (
-          <div className="space-y-2">
-            <p className={styles.warnNote}>
-              <TriangleAlert size={14} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }} />
-              削除は元に戻せません。しばらく使わないだけなら「一時停止する」を使ってください。
-            </p>
-            {statusKeyOf(deleteTarget) === 'active' ? (
-              <button
-                type="button"
-                className={styles.altAction}
+        destructive={(
+          <Button variant="danger" onClick={() => void runDelete()} disabled={deleting || !deleteStillListed} busy={deleting} busyLabel="削除しています…">
+            削除する
+          </Button>
+        )}
+        actions={(
+          <>
+            <Button
+              onClick={() => {
+                setDeleteTarget(null)
+                setDeleteError('')
+              }}
+              disabled={deleting}
+            >
+              キャンセル
+            </Button>
+            {deleteTarget && statusKeyOf(deleteTarget) === 'active' ? (
+              <Button
                 onClick={() => {
-                                setPauseTarget(deleteTarget)
+                  setPauseTarget(deleteTarget)
                   setDeleteTarget(null)
                 }}
+                disabled={deleting}
               >
-                代わりに一時停止
-              </button>
+                <Pause size={15} aria-hidden="true" />代わりに一時停止
+              </Button>
             ) : null}
-            {!deleteStillListed && (
-              <p className="text-warning text-xs font-medium">
-                このリマインダが一覧から外れました。この窓を閉じて、いまの一覧から選び直してください。
-              </p>
-            )}
-          </div>
+          </>
         )}
-      </ConfirmDialog>
+      />
 
       {/* 複製の窓。下書きとして写し、確認してから有効にする。 */}
       <ConfirmDialog
@@ -1262,15 +1291,13 @@ export default function RemindersListV8() {
               ＋ リマインダを作る
             </Button>
           ) : (
-            <Button type="button" variant="primary" className="v8-folder-create w-full" disabled>
-              ＋ リマインダを作る
-            </Button>
+            /* 閲覧のみ：作るボタンは隠し、場所だけ空ける（並びを絵どおりに保つ）。 */
+            <span className={`v8-folder-create ${styles.viewerCreateSpace}`} aria-hidden="true" />
           )}
           <FolderPanel
             activeId={folderFilter}
             onSelect={setFolderFilter}
             onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
-            addFolderDisabled={!canEdit}
             addFolderLabel="フォルダを追加"
             rows={folderRows}
           >
@@ -1296,11 +1323,7 @@ export default function RemindersListV8() {
             <Button href="/reminders/new" variant="primary">
               ＋ リマインダを作る
             </Button>
-          ) : (
-            <Button type="button" variant="primary" disabled>
-              ＋ リマインダを作る
-            </Button>
-          )}
+          ) : null}
           {folderSelect}
         </>}
         toolbar={!narrow ? <>
@@ -1324,9 +1347,7 @@ export default function RemindersListV8() {
             <div className={styles.narrowRow}>
               {canEdit ? (
                 <Button href="/reminders/new" variant="primary"><Plus size={15} aria-hidden="true" />リマインダを作る</Button>
-              ) : (
-                <Button type="button" variant="primary" disabled><Plus size={15} aria-hidden="true" />リマインダを作る</Button>
-              )}
+              ) : null}
               <div className={styles.narrowFolder}>{folderSelect}</div>
               <div className={styles.narrowSearch}>
                 <SearchField
