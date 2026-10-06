@@ -677,15 +677,16 @@ export default function DateTimePicker({
         ) : weekLoading || !weekByDate || !loadedWins.has(winStart) ? (
           <LoadingView />
         ) : !weekHasOpen ? (
-          <div className="flex flex-col items-center px-6 py-10 text-center" data-design-node="ADutg">
+          // ★V8 (ADutg)：印・題・本文・ボタンを 12 ずつ空け、画面の真ん中の高さに置く。
+          <div className="flex flex-col items-center gap-3 px-2 pt-16 text-center" data-design-node="ADutg">
             <span className="text-liff-idle" aria-hidden="true">
               <Icon name="calendar-x" className="h-10 w-10" />
             </span>
-            <p className="mt-4 text-lg font-bold text-ink">この週は空きがありません</p>
-            <p className="mt-2 text-[13px] leading-6 text-pretty text-liff-sub">
+            <p className="text-lg font-bold text-ink">この週は空きがありません</p>
+            <p className="text-[13px] leading-[21px] text-pretty text-liff-sub">
               次の週を見るか、担当を「指名なし」にすると見つかることがあります。
             </p>
-            <div className="mt-6 flex w-full max-w-55 flex-col gap-2">
+            <div className="flex w-full max-w-55 flex-col gap-2">
               <Button
                 variant="primary"
                 disabled={!canNextWeek}

@@ -34,7 +34,7 @@ describe('受付枠と休業日のV6契約', () => {
     expect(PREVIEW).not.toContain('grid-cols-4')
     // 失敗は実LIFFの LoadErrorView と同じ題＋本文（★V7）。
     expect(PREVIEW).toContain('読み込めませんでした')
-    expect(PREVIEW).toContain('電波の良いところで、もう一度お試しください。')
+    expect(PREVIEW).toContain('電波のよいところで、もう一度お試しください。')
     expect(PREVIEW).not.toContain('時間をおいて、もう一度お試しください。')
     expect(PAGE).not.toContain('ご希望の日をえらんでください')
     expect(PAGE).not.toContain('grid-cols-7')
