@@ -88,11 +88,20 @@ export function BarChart({
   selectedKey,
   onSelect,
   label = '日ごとの増減',
+  legend = [
+    { label: '増えた', tone: 'added' },
+    { label: '減った', tone: 'removed' },
+  ],
 }: {
   items: BarChartItem[]
   selectedKey?: string
   onSelect?: (key: string) => void
   label?: string
+  /**
+   * 凡例の文言（d8X09：登録／ブロック）。渡さないときは今までどおり
+   * 増えた／減った。画面側で手書きしない。
+   */
+  legend?: { label: string; tone: 'added' | 'removed' }[]
 }) {
   const max = Math.max(1, ...items.flatMap((item) => [item.added, item.removed]))
   const ticks = barChartTicks(max)
@@ -101,14 +110,15 @@ export function BarChart({
   return (
     <div className={styles.chart}>
       <ul className={styles.legend} aria-label="凡例">
-        <li className={styles.legendItem}>
-          <span aria-hidden="true" className={[styles.swatch, styles.swatchAdded].join(' ')} />
-          増えた
-        </li>
-        <li className={styles.legendItem}>
-          <span aria-hidden="true" className={[styles.swatch, styles.swatchRemoved].join(' ')} />
-          減った
-        </li>
+        {legend.map((entry) => (
+          <li key={entry.label} className={styles.legendItem}>
+            <span
+              aria-hidden="true"
+              className={[styles.swatch, entry.tone === 'added' ? styles.swatchAdded : styles.swatchRemoved].join(' ')}
+            />
+            {entry.label}
+          </li>
+        ))}
       </ul>
       <div className={styles.plot} role="group" aria-label={label}>
         {ticks.map((tick) => (

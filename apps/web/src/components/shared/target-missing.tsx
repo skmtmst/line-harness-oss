@@ -1,8 +1,18 @@
-import type { ReactNode } from 'react'
+import { useSyncExternalStore, type ReactNode } from 'react'
 import { CloudOff, FileSearch, List, RotateCw, SearchX } from 'lucide-react'
 import Button from './button'
 import { loadFailureCopy } from './api-error-message'
+import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
 import styles from './target-missing.module.css'
+
+const subscribeTheme = (onChange: () => void) => {
+  if (typeof window.addEventListener !== 'function') return () => {}
+  window.addEventListener(ADMIN_THEME_CHANGED_EVENT, onChange)
+  return () => window.removeEventListener(ADMIN_THEME_CHANGED_EVENT, onChange)
+}
+const readIsV8 = () => document.documentElement?.getAttribute('data-theme') === 'v8'
+/* 書き出し（SSR）は常に v7。ブラウザ側で v8 を読み直す（line-preview と同じ形）。 */
+const readIsV8OnServer = () => false
 
 /**
  * ★V7「開き先がない」（設計ノード `x5cgUH`）。
@@ -73,6 +83,8 @@ export default function TargetMissing({
   accountName,
 }: TargetMissingProps) {
   const Icon = ICONS[kind]
+  /* 文言の v8 切り替え用。条件分岐の外で読む（フックの順番を保つ）。 */
+  const v8 = useSyncExternalStore(subscribeTheme, readIsV8, readIsV8OnServer)
   const showBack = (kind === 'unspecified' || kind === 'not-found') && backHref && backLabel
   // 403 は押しても直らないので、再試行の口は出さない。
   // 文言は画面の指定どおり（出し分け文言が要るときは ListState の `error` を使う）。
@@ -91,9 +103,11 @@ export default function TargetMissing({
       </Button>
     )
   } else if (showRetry) {
+    /* RqO7O：v8 の絵は「もう一度試す」。v7（x5cgUH）は読み込むのまま。 */
+    /* 読み上げ名は v7・v8 とも「もう一度読み込む」のまま（試験・操作の目印）。 */
     action = (
-      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">
-        <RotateCw aria-hidden="true" size={16} />もう一度読み込む
+      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます" aria-label="もう一度読み込む">
+        <RotateCw aria-hidden="true" size={16} />{v8 ? 'もう一度試す' : 'もう一度読み込む'}
       </Button>
     )
   }

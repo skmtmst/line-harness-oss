@@ -204,8 +204,11 @@
   color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 1.5;
 }
 [data-theme='v8'] .labelText {
-  display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: block; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* 帯の「？」は題の直後ではなく行の右端（絵のマスの右端どおり）。
+   文が伸びて「？」を右へ押し出す（「…」の扱いは G3 のまま）。 */
+[data-theme='v8'] .tip { flex-shrink: 0; display: inline-flex; }
 [data-theme='v8'] .icon {
   display: inline-flex; width: 24px; height: 24px; flex-shrink: 0;
   align-items: center; justify-content: center; border-radius: 9px;

@@ -60,6 +60,12 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   helpLabel?: string
   /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
   helpHref?: string
+  /**
+   * 左の図柄の差し替え。省略時は種類の既定印。
+   * `null` で図柄なし。rZEGN の帯は順序印（list-ordered）のため口を用意。
+   * 既定の描画は変えない（v7 の画素も不変）。
+   */
+  icon?: ReactNode
 }
 
 /**
@@ -78,6 +84,7 @@ export default function Notice({
   help,
   helpLabel,
   helpHref,
+  icon,
   ...props
 }: NoticeProps) {
   const canonical = CANONICAL[tone]
@@ -92,8 +99,14 @@ export default function Notice({
       data-design-part="notice"
       data-design-node={node}
     >
-      <Icon className={[styles.icon, canonical === 'info' ? styles.infoIconV7 : ''].join(' ')} aria-hidden="true" size={16} />
-      {canonical === 'info' ? <Info className={`${styles.icon} ${styles.infoIconV8}`} aria-hidden="true" size={16} /> : null}
+      {icon === undefined ? (
+        <>
+          <Icon className={[styles.icon, canonical === 'info' ? styles.infoIconV7 : ''].join(' ')} aria-hidden="true" size={16} />
+          {canonical === 'info' ? <Info className={`${styles.icon} ${styles.infoIconV8}`} aria-hidden="true" size={16} /> : null}
+        </>
+      ) : icon === null ? null : (
+        <span className={styles.icon} aria-hidden="true">{icon}</span>
+      )}
       <span className={styles.message}>
         {children ?? message}
         {hasHelp ? (

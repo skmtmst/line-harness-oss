@@ -85,6 +85,22 @@ describe('色は2つまで（増えた=濃い緑・減った=灰色）', () => {
     expect(legend.textContent).toContain('増えた')
     expect(legend.textContent).toContain('減った')
   })
+
+  it('凡例の文言を変えられる（d8X09：登録／ブロック）', () => {
+    render(
+      <BarChart
+        items={SAMPLE}
+        legend={[
+          { label: '登録', tone: 'added' },
+          { label: 'ブロック', tone: 'removed' },
+        ]}
+      />,
+    )
+    const legend = screen.getByRole('list', { name: '凡例' })
+    expect(legend.textContent).toContain('登録')
+    expect(legend.textContent).toContain('ブロック')
+    expect(legend.textContent).not.toContain('増えた')
+  })
 })
 
 describe('数字は文字でも読める（色だけに頼らない）', () => {

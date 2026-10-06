@@ -11,6 +11,17 @@
 .frame {
   display: block;
 }
+
+/*
+ * 電話枠なしの平らなカード（If9Mh お客様にはこう届きます）。
+ * 白・内側12・間4。角丸は絵14にいちばん近い既存トークンを使う。
+ */
+.flat {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px; border-radius: var(--radius-card); background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
+}
+.flatEmpty { margin: 0; color: var(--color-ink-faint); font-size: 12px; line-height: 1.5; }
 }
 
 /*
@@ -37,18 +48,7 @@
   margin-inline: auto;
 }
 
-/* 題「LINEプレビュー」はスマホの外の上。? は題の横。 */
-.phoneTitle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin: 0 0 10px;
-  font-size: var(--text-body);
-  font-weight: 700;
-  line-height: var(--text-lh, 1.4);
-  color: var(--color-ink);
-}
+/* v8 のスマホに内の題は置かない（cfVyj・j7PP04 どおり）。題は外が担う。 */
 
 /* 器 330×690・黒・縁 2px・内側 10・角丸 52・下への影。 */
 .phone {
