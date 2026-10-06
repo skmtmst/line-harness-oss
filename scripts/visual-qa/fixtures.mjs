@@ -1955,18 +1955,11 @@ export const RICH_MENU_DELETE_IMPACT = {
   },
   // #430/#1206: 削除影響でも一覧と同じ固定の割当人数を返す。
   currentAudience: { value: 8140, state: 'available', reason: null },
+  // 全員の既定を消すので、出し分けに当たらない友だちに出るメニューは無い（板 `yOyCg`）。
   nextDisplay: {
     guaranteedGroupId: null,
     reason: 'friend_specific_rules',
-    candidates: [
-      {
-        groupId: 'rich-menu-next',
-        name: '通常メニュー',
-        targetingPriority: 20,
-        isTargetingEnabled: false,
-        isDefaultForAll: true,
-      },
-    ],
+    candidates: [],
   },
   incomingSwitches: [
     {
@@ -1980,17 +1973,16 @@ export const RICH_MENU_DELETE_IMPACT = {
       targetPageName: 'フォロー',
     },
   ],
-  operationalReferences: [
-    { kind: 'automation', ownerId: 'automation-visual', ownerName: '来店後の自動案内' },
-    { kind: 'common_action', ownerId: 'common-action-visual', ownerName: 'フォローを始める' },
-  ],
+  // 絵 `yOyCg` の消せない理由は3行（既定・LINE登録・切替先）。オートメーション等から使われている行は出さない。
+  operationalReferences: [],
+  // 一覧の「通常メニュー（会員向け）」は全員の既定（isDefaultForAll）なので、既定も消せない理由に入る（板 `yOyCg`）。
   lineResources: {
     pageCount: 2,
     pagesWithLineRichMenuId: 2,
-    isDefaultForAll: false,
+    isDefaultForAll: true,
     publishing: false,
   },
-  blockers: ['published', 'line_resources', 'incoming_switches', 'operational_references'],
+  blockers: ['default_for_all', 'published', 'line_resources', 'incoming_switches'],
   canDelete: false,
   recommendedAction: 'unpublish',
 }
@@ -2078,21 +2070,32 @@ const RICH_MENU_BASE = {
   updatedAt: '2026-08-20T00:00:00.000Z',
 }
 
+/* 板 `rZEGN` のフォルダの列（通常・会員向け・キャンペーン＋未分類、各1件）。 */
+export const RICH_MENU_FOLDERS = [
+  { id: 'rich-menu-folder-normal', kind: 'rich_menu', name: '通常', parentId: null, displayOrder: 1, color: '#2563eb' },
+  { id: 'rich-menu-folder-members', kind: 'rich_menu', name: '会員向け', parentId: null, displayOrder: 2, color: '#16a34a' },
+  { id: 'rich-menu-folder-store', kind: 'rich_menu', name: 'キャンペーン', parentId: null, displayOrder: 3, color: '#d97706' },
+]
+
+/* 並びは板 `rZEGN` の上から（出し分けの「会員ランク上位」→ 既定の「通常メニュー」）。 */
 export const RICH_MENU_GROUPS = [
   {
     ...RICH_MENU_BASE,
     id: 'rich-menu-target',
     name: '通常メニュー（会員向け）',
     isDefaultForAll: true,
-    targetingPriority: 0,
+    targetingPriority: 1,
     targetingEnabled: false,
     targetingCondition: null,
-    displayOrder: 0,
+    folderId: 'rich-menu-folder-normal',
+    displayOrder: 1,
   },
   {
     ...RICH_MENU_BASE,
     id: 'rmg-1',
     name: '会員ランク上位',
+    targetingPriority: 0,
+    displayOrder: 0,
     monthlyStats: {
       from: '2026-08-01', to: '2026-08-31', taps: 3210,
       uniqueAudience: { value: 8140, state: 'available', reason: null },
@@ -2101,6 +2104,22 @@ export const RICH_MENU_GROUPS = [
       operator: 'AND',
       rules: [{ type: 'tag_exists', value: 'tag-0' }],
     }),
+  },
+  {
+    ...RICH_MENU_BASE,
+    id: 'rmg-autumn',
+    name: '秋のキャンペーン',
+    size: 'compact',
+    status: 'draft',
+    publishingAt: '2026-10-05T00:00:00.000+09:00',
+    isDefaultForAll: true,
+    targetingPriority: 2,
+    targetingEnabled: false,
+    targetingCondition: null,
+    folderId: 'rich-menu-folder-store',
+    displayOrder: 2,
+    pageCount: 1,
+    defaultPageAreaCount: 2,
   },
   {
     ...RICH_MENU_BASE,
@@ -2186,7 +2205,6 @@ export const RICH_MENU_TAP_STATS = {
   byGroup: [
     { groupId: 'rich-menu-target', taps: 12480 },
     { groupId: 'rmg-1', taps: 3210 },
-    { groupId: 'rmg-2', taps: 0 },
   ],
   total: 15690,
 }
@@ -6884,10 +6902,9 @@ export function mileageWriteResponse(method, pathname, body = {}, headers = {}) 
  * `count` は全18件を取得しなくても左の絞り込み件数を描ける一覧集計値。
  */
 export const WEBINAR_FOLDERS = [
-  ['webinar-folder-products', '商品説明', 6],
-  ['webinar-folder-cases', '導入事例', 4],
-  ['webinar-folder-seminars', 'セミナー', 5],
-  ['webinar-folder-archive', 'アーカイブ', 4],
+  ['webinar-folder-seminars', 'セミナー', 2],
+  ['webinar-folder-products', '商品説明', 1],
+  ['webinar-folder-cases', '導入事例', 1],
 ].map(([id, name, count], index) => ({
   id, kind: 'webinar', accountId: 'visual-qa-account', name, parentId: null, displayOrder: index, count,
   color: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
@@ -7073,35 +7090,48 @@ export const OPERATION_HISTORY = [
  * 申込・視聴の未取得は0で埋めず null にする。
  */
 export const WEBINARS = [
+  /* 並びは設計 `UyUMw` の上から（更新が新しい順）。未分類は 2件（旧機能説明会・秋の新商品説明会）。 */
   {
     id: 'webinar-1', title: 'NEN活用スタートセミナー', slug: 'nen-start', status: 'active',
     folderId: 'webinar-folder-seminars', folderName: 'セミナー',
-    durationSeconds: 2_538, registrationCount: 184, viewerCount: 142,
-    publicationState: 'period', publicationStartsAt: '2026-08-01T00:00:00+09:00', publicationEndsAt: '2026-08-31T23:59:59+09:00',
-  },
-  {
-    id: 'webinar-2', title: '予約機能の使い方', slug: 'booking-guide', status: 'active',
-    folderId: 'webinar-folder-products', folderName: '商品説明',
-    durationSeconds: 1_920, registrationCount: 96, viewerCount: 71,
+    durationSeconds: 2_538, registrationCount: 124, viewerCount: 98,
     publicationState: 'always', publicationStartsAt: null, publicationEndsAt: null,
+    updatedAt: '2026-08-25T06:00:00.000Z',
   },
   {
-    id: 'webinar-3', title: 'EC連携 実践講座', slug: 'ec-guide', status: 'draft',
+    id: 'webinar-2', title: 'EC連携 実践講座', slug: 'ec-practice', status: 'active',
+    folderId: 'webinar-folder-products', folderName: '商品説明',
+    durationSeconds: 2_160, registrationCount: 58, viewerCount: null,
+    publicationState: 'scheduled', publicationStartsAt: '2026-10-08T20:00:00+09:00', publicationEndsAt: null,
+    updatedAt: '2026-08-25T05:00:00.000Z',
+  },
+  {
+    id: 'webinar-3', title: '予約機能の使い方', slug: 'booking', status: 'active',
     folderId: 'webinar-folder-cases', folderName: '導入事例',
-    durationSeconds: 2_160, registrationCount: 63, viewerCount: null,
-    publicationState: 'scheduled', publicationStartsAt: '2026-08-28T20:00:00+09:00', publicationEndsAt: null,
+    durationSeconds: 1_920, registrationCount: 42, viewerCount: 39,
+    publicationState: 'period', publicationStartsAt: '2026-09-01T00:00:00+09:00', publicationEndsAt: '2026-10-31T23:59:59+09:00',
+    updatedAt: '2026-08-25T04:00:00.000Z',
   },
   {
-    id: 'webinar-4', title: '顧客対応の自動化', slug: 'support-automation', status: 'draft',
+    id: 'webinar-4', title: '顧客対応の自動化', slug: 'automation', status: 'active',
     folderId: 'webinar-folder-seminars', folderName: 'セミナー',
-    durationSeconds: 1_800, registrationCount: 0, viewerCount: null,
-    publicationState: 'unset', publicationStartsAt: null, publicationEndsAt: null,
+    durationSeconds: 1_800, registrationCount: 24, viewerCount: 20,
+    publicationState: 'always', publicationStartsAt: null, publicationEndsAt: null,
+    updatedAt: '2026-08-25T03:00:00.000Z',
   },
   {
-    id: 'webinar-5', title: '旧機能説明会', slug: 'legacy-guide', status: 'draft',
-    folderId: 'webinar-folder-archive', folderName: 'アーカイブ',
+    id: 'webinar-5', title: '旧機能説明会', slug: 'old', status: 'draft',
+    folderId: null, folderName: null,
     durationSeconds: 1_500, registrationCount: 85, viewerCount: 99,
-    publicationState: 'ended', publicationStartsAt: '2026-07-01T00:00:00+09:00', publicationEndsAt: '2026-07-31T23:59:59+09:00',
+    publicationState: 'ended', publicationStartsAt: '2026-08-01T00:00:00+09:00', publicationEndsAt: '2026-08-20T23:59:59+09:00',
+    updatedAt: '2026-08-25T02:00:00.000Z',
+  },
+  {
+    id: 'webinar-6', title: '秋の新商品説明会', slug: 'autumn', status: 'draft',
+    folderId: null, folderName: null,
+    durationSeconds: 0, registrationCount: 0, viewerCount: null,
+    publicationState: 'unset', publicationStartsAt: null, publicationEndsAt: null,
+    updatedAt: '2026-08-25T01:00:00.000Z',
   },
 ].map((webinar) => ({
   accountId: 'visual-qa-account', videoPrefix: `webinars/${webinar.slug}`,
@@ -7117,13 +7147,13 @@ export const WEBINAR_OVERVIEW = {
   metrics: {
     webinars: { value: 6, state: 'available', reason: null },
     activeWebinars: { value: 3, state: 'available', reason: null },
-    registrations: { value: 428, state: 'available', reason: null },
-    registrationBookings: { value: 428, state: 'available', reason: null },
-    viewers: { value: 312, state: 'available', reason: null },
-    viewRate: { value: 0.729, state: 'available', reason: null },
+    registrations: { value: 248, state: 'available', reason: null },
+    registrationBookings: { value: 260, state: 'available', reason: null },
+    viewers: { value: 118, state: 'available', reason: null },
+    viewRate: { value: 0.476, state: 'available', reason: null },
     averageWatchSeconds: { value: null, state: 'unavailable', reason: '一覧では未取得' },
-    ctaUniquePeople: { value: 86, state: 'available', reason: null },
-    ctaTotalClicks: { value: 86, state: 'available', reason: null },
+    ctaUniquePeople: { value: 18, state: 'available', reason: null },
+    ctaTotalClicks: { value: 41, state: 'available', reason: null },
   },
 }
 
