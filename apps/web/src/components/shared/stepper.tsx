@@ -69,7 +69,7 @@ export default function Stepper({
           const clickable = (filled || needsFix) && !isCurrent && (step.anchor || step.onSelect)
           const circle = (
             <span
-              className={`flex shrink-0 items-center justify-center rounded-pill text-xs font-medium ${mono ? 'h-[22px] w-[22px]' : 'h-7 w-7'} ${
+              className={`flex shrink-0 items-center justify-center rounded-pill text-xs font-medium ${mono ? 'h-5.5 w-5.5' : 'h-7 w-7'} ${
                 filled
                   ? mono
                     ? 'bg-ink text-canvas'
