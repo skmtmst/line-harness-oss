@@ -15,7 +15,7 @@ export type RestaurantOpeningHours = {
   storeId: string; hours: RestaurantOpeningDay[] | null; version: number;
   updatedBy: string | null; updatedAt: string | null;
 };
-export type RestaurantAllocation = { otaCapacity: number; lineCapacity: number; walkInCapacity: number };
+export type RestaurantAllocation = { otaCapacity: number; lineCapacity: number; walkInCapacity: number; sameDayCapacity?: number };
 export type RestaurantLoginMember = {
   id: string; name: string; role: 'owner' | 'admin' | 'staff'; accessLevel: 'full' | 'read_only';
   isActive: number; accountScope: 'all' | 'accounts'; accountIds: string[]; policyVersion: number;

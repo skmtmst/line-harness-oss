@@ -1560,3 +1560,31 @@ describe('V8 フロア配置と結合グループ',()=>{
   expect((await requestWithMethod('/api/restaurant-test/tables/layout?account_id=account-1','PUT',{storeId:'store-ginza',tables:[table]},'operator-key')).status).toBe(403);
  });
 });
+
+describe('枠の自動調整ルールと媒体閉鎖通知のAPI',()=>{
+ const input={storeId:'store-ginza',threshold:2,stopLine:true,stopSameDay:true,notify:true,expectedVersion:0};
+ it('保存・読み直し・古い版409を返す',async()=>{
+  seedRestaurantFixture();
+  const path='/api/restaurant-test/inventory-rules?account_id=account-1';
+  expect((await requestWithMethod(path,'PUT',input)).status).toBe(200);
+  const read=await request(path+'&storeId=store-ginza');
+  expect(await read.json()).toMatchObject({success:true,data:{storeId:'store-ginza',threshold:2,version:1}});
+  expect((await requestWithMethod(path,'PUT',input)).status).toBe(409);
+ });
+ it('別の組織の店舗・不正なしきい値を拒否する',async()=>{
+  seedRestaurantFixture();
+  expect((await requestWithMethod('/api/restaurant-test/inventory-rules?account_id=account-1','PUT',{...input,storeId:'outside'})).status).toBe(404);
+  expect((await requestWithMethod('/api/restaurant-test/inventory-rules?account_id=account-1','PUT',{...input,threshold:-1})).status).toBe(400);
+ });
+ it('媒体×枠の一覧と済みを返し、席が戻ったタスクの済みは409',async()=>{
+  seedRestaurantFixture();
+  testDb.raw.exec(`INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity) VALUES('rules-slot','store-ginza','2027-01-01T10:00:00Z',4);
+   INSERT INTO rt_channel_close_tasks(id,store_id,slot_id,channel,status,reason,remaining_seats) VALUES('rules-task','store-ginza','rules-slot','hotpepper','close','full',0);`);
+  const list=await request('/api/restaurant-test/channel-close-tasks?account_id=account-1&storeId=store-ginza');
+  expect(await list.json()).toMatchObject({success:true,data:[{id:'rules-task',channel:'hotpepper',remainingSeats:0,status:'close'}]});
+  const done='/api/restaurant-test/channel-close-tasks/rules-task/done?account_id=account-1';
+  expect((await requestWithMethod(done,'POST',{})).status).toBe(200);
+  testDb.raw.exec("UPDATE rt_channel_close_tasks SET status='reopen' WHERE id='rules-task'");
+  expect((await requestWithMethod(done,'POST',{})).status).toBe(409);
+ });
+});

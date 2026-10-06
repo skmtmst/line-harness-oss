@@ -1,3 +1,4 @@
+import { reconcileRestaurantInventory } from './restaurant-inventory-rules.js';
 import PostalMime from 'postal-mime';
 import type { Env } from '../index.js';
 import { dbFor } from './db-router.js';
@@ -176,6 +177,7 @@ async function upsertReservation(
       parsed.mediaStoreCode ?? null, parsed.tableLabel ?? null, input.inboundEmailId,
       input.media.parser_key, parserVersion,
     ).run();
+  if(result.meta.changes) await reconcileRestaurantInventory(input.env,input.storeId);
   return result.meta.changes ? 'inserted_or_updated' : 'stale_ignored';
 }
 
