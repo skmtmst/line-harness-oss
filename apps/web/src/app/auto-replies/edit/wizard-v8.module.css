@@ -270,43 +270,6 @@
   color: var(--color-ink-secondary);
 }
 
-/* ひな形：同じ高さの3枚。 */
-.tplGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-@media (max-width: 900px) {
-  .tplGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-.tplLayout {
-  min-width: 0;
-  min-height: 168px;
-  gap: 6px;
-}
-.tplActions {
-  display: flex;
-  justify-content: center;
-  margin-top: auto;
-}
-.tplName {
-  color: var(--color-ink);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: var(--tpl-side-title-lh);
-}
-.tplDesc {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: 12px;
-  line-height: var(--tpl-text-sm-lh);
-}
-.tplFoot {
-  display: flex;
-  justify-content: flex-end;
-}
 
 /* 手順4「動く順番」の行。 */
 .orderList {
@@ -705,16 +668,6 @@
   line-height: var(--tpl-text-sm-lh);
 }
 .sideCard .kvVal {
-  font-size: 12px;
-  line-height: var(--tpl-text-sm-lh);
-}
-/* 右の列の淡い案内（絵 K7HWG「見え方は次の手順で」）。箱の外に置く。 */
-.sideNote {
-  margin: 0;
-  padding: var(--tpl-side-note-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-pearl);
-  color: var(--color-ink-secondary);
   font-size: 12px;
   line-height: var(--tpl-text-sm-lh);
 }

@@ -1,0 +1,147 @@
+/*
+ * 作る画面の共通の形（create-parts.tsx）。値は globals.css の --tpl-* だけ。
+ * 見本：自動応答の作る① K7HWG（98%）・リマインダを作る① VE1u5（98%）。
+ */
+
+/* 右の列の「設定内容」の箱。枠は outline（border だと中身が1つ下がる）。 */
+.summary {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: var(--tpl-side-card-gap);
+  min-width: 0;
+  padding: var(--tpl-side-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.summaryTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-side-title-lh);
+}
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-side-row-gap);
+  margin: 0;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-label-tag-gap);
+  padding: var(--tpl-side-row-pad) 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.rowLabel {
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+  white-space: nowrap;
+}
+.rowValue {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-text-sm-lh);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 箱の外の淡い案内。 */
+.note {
+  align-self: stretch;
+  margin: 0;
+  padding: var(--tpl-side-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+
+/* ひな形のカード列。カードは同じ高さ・ボタンは下の真ん中にそろえる。 */
+.starter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-side-card-pad);
+  min-width: 0;
+}
+.starterHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-side-card-gap);
+}
+.starterTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-card-title-size);
+  font-weight: 700;
+}
+.starterDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.starterGrid {
+  display: grid;
+  grid-template-columns: repeat(var(--starter-cols, 3), minmax(0, 1fr));
+  gap: var(--tpl-starter-gap);
+}
+.starterCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-label-tag-gap);
+  min-width: 0;
+  min-height: var(--tpl-starter-card-h);
+  padding: var(--tpl-side-card-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+.starterName,
+.starterLine {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.starterName {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: var(--tpl-side-title-lh);
+}
+.starterLine {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-text-sm-lh);
+}
+.starterActions {
+  display: flex;
+  justify-content: center;
+  margin-top: auto;
+}
+.starterFoot {
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 900px) {
+  .starterGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

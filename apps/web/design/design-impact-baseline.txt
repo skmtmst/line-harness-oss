@@ -492,6 +492,7 @@ shared-button-importer components/staff/login-audit.tsx
 shared-button-importer components/store-selection-gate.tsx
 shared-button-importer components/support/email-thread.tsx
 shared-button-importer components/support/support-inbox.tsx
+shared-button-importer components/templates/create-parts.tsx
 shared-button-importer components/templates/message-template-editor.tsx
 shared-button-importer components/tenant-suspended.tsx
 shared-button-importer components/ui/kpi-collapse.tsx
