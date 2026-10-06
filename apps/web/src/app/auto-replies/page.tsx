@@ -26,7 +26,7 @@ import KpiCollapse from '@/components/ui/kpi-collapse'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import AutoRepliesListV8 from './list-v8'
+import AutoRepliesListV8 from '@/v8/auto-replies/list'
 import {
   EFFECTIVE_LEGEND,
   LOAD_STATE_WORDS,
