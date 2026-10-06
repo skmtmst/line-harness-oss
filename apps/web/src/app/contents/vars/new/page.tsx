@@ -18,7 +18,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import NewCommonVarV8 from './new-v8'
+import NewCommonVarV8 from '@/v8/common-vars-edit/new'
 
 /**
  * 共通情報の登録。
