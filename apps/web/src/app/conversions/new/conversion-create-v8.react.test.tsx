@@ -12,7 +12,10 @@ const st = vi.hoisted(() => ({
   role: 'admin',
 }))
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: (url: string) => { st.pushed.push(url) } }) }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: (url: string) => { st.pushed.push(url) } }),
+  useSearchParams: () => new URLSearchParams(''),
+}))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
     selectedAccountId: st.accountId,
@@ -118,11 +121,11 @@ describe('★V8-B 成果地点を作る（j8p3yj・競合cXqlS）', () => {
     expect(host.textContent).toContain('同じ人を何回まで数えるか')
     expect(host.textContent).toContain('金額をどう出すか')
     expect(host.textContent).toContain('数えない条件')
-    expect(host.textContent).toContain('この決めごとをこの30日にあてはめると')
+    expect(host.textContent).toContain('この決めごとを この30日に あてはめると')
     expect(host.textContent).toContain('この成果地点を使う場所')
     // 下の帯の3つ
     expect(screen.getByRole('button', { name: '保存して続けて作る' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '保存して数えはじめる' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /保存して数えはじめる/ })).toBeTruthy()
     // 試算（250ms待ってから読む）
     await eventually(() => {
       expect(host.textContent).toContain('52件')
@@ -137,14 +140,14 @@ describe('★V8-B 成果地点を作る（j8p3yj・競合cXqlS）', () => {
     })
     setName('商品を買った')
     await eventually(() => {
-      expect(host.textContent).toContain('同じ名前の「商品を買った」があります')
+      expect(host.textContent).toContain('同じ名前の「商品を買った」がすでにあります')
     })
     expect(host.textContent).toContain('違いを比べる')
     expect(host.textContent).toContain('最新を読み込んで続ける')
-    const compare = screen.getByRole('link', { name: '違いを比べる' }) as HTMLAnchorElement
+    const compare = screen.getByRole('link', { name: /違いを比べる/ }) as HTMLAnchorElement
     expect(compare.getAttribute('href')).toContain('highlight=cv-1')
     // 競合のあいだ主なボタンは「比べてから保存」になる
-    expect(screen.getByRole('link', { name: '比べてから保存' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: /比べてから保存/ })).toBeTruthy()
   })
 
   it('v8 で名前が空のまま保存すると案内が出て、入れると作って一覧へ戻る', async () => {
@@ -153,20 +156,20 @@ describe('★V8-B 成果地点を作る（j8p3yj・競合cXqlS）', () => {
     await eventually(() => {
       expect(host.querySelector('[data-design-node="j8p3yj"]')).toBeTruthy()
     })
-    fireEvent.click(screen.getByRole('button', { name: '保存して数えはじめる' }))
+    fireEvent.click(screen.getByRole('button', { name: /保存して数えはじめる/ }))
     await eventually(() => {
       expect(host.textContent).toContain('成果地点の名前を入力してください')
     })
     expect(st.created).toHaveLength(0)
     setName('初めての予約')
-    fireEvent.click(screen.getByRole('button', { name: '保存して数えはじめる' }))
+    fireEvent.click(screen.getByRole('button', { name: /保存して数えはじめる/ }))
     await eventually(() => {
       expect(st.created).toHaveLength(1)
     })
     expect(st.pushed).toEqual(['/conversions?tab=points&highlight=cv-new'])
   })
 
-  it('v8 の閲覧のみでは帯が出て保存が押せない形になる', async () => {
+  it('v8 の閲覧のみでは帯が出て、保存のボタンは置かない（押せない形でも置かない・2026-10-06 オーナー）', async () => {
     st.role = 'viewer'
     document.documentElement.dataset.theme = 'v8'
     await renderPage()
@@ -174,7 +177,7 @@ describe('★V8-B 成果地点を作る（j8p3yj・競合cXqlS）', () => {
       expect(host.querySelector('[data-design-node="j8p3yj"]')).toBeTruthy()
     })
     expect(host.textContent).toContain('閲覧のみで見ています')
-    const primary = screen.getByRole('button', { name: '保存して数えはじめる' }) as HTMLButtonElement
-    expect(primary.disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: /保存して数えはじめる/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存して続けて作る' })).toBeNull()
   })
 })
