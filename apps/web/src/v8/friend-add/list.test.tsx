@@ -126,6 +126,18 @@ describe('友だち追加時の配信の一覧（V8）', () => {
     expect(sink).not.toContain('削除する')
   })
 
+  it('行の名前の前に、左のフォルダの列と同じフォルダの丸が付く（未分類は輪）。閲覧のみでも出す', async () => {
+    roleState.role = 'viewer'
+    await render()
+    const filed = host.querySelector('[data-row-id="rule-shop"]')?.querySelectorAll('[data-folder-dot]') ?? []
+    expect(filed).toHaveLength(1)
+    expect(filed[0].getAttribute('data-folder-dot')).toBe('filed')
+    expect(filed[0].getAttribute('aria-label')).toBe('フォルダ：店頭')
+    const unfiled = host.querySelector('[data-row-id="rule-fallback"]')?.querySelectorAll('[data-folder-dot]') ?? []
+    expect(unfiled).toHaveLength(1)
+    expect(unfiled[0].getAttribute('data-folder-dot')).toBe('unfiled')
+  })
+
   it('閲覧のみには変える操作を置かない（押せない形でも出さない）。閲覧のみの帯は出す', async () => {
     roleState.role = 'viewer'
     await render()
