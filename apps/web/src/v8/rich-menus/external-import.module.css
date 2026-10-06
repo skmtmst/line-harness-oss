@@ -1,0 +1,29 @@
+/* 「LINE上にあるメニュー」の作業画面（TL7tp）の決まった幅・列。値は `--tpl-rml-ext-*`。 */
+.wrap { max-width: var(--tpl-rml-ext-max-w); }
+@media (min-width: 1280px) {
+  .columns { grid-template-columns: minmax(0, 1fr) var(--tpl-rml-ext-side-w); }
+}
+.menuRow {
+  grid-template-columns: var(--tpl-rml-ext-thumb-w) minmax(0, 1fr) auto;
+  padding: var(--tpl-rule-row-gap);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+}
+.menuRow[aria-pressed='true'] { border-color: var(--color-accent); }
+@media (min-width: 640px) {
+  .menuRow { grid-template-columns: var(--tpl-rml-ext-thumb-w) minmax(0, 1fr) var(--tpl-rml-ext-col-a) var(--tpl-rml-ext-col-b) var(--tpl-rml-ext-col-c); }
+}
+.areaRow { grid-template-columns: var(--tpl-rml-ext-area-w) minmax(0, 1fr); }
+/* 行の右の「取り込む」は押せる見た目の札（行全体が押せるボタン）。 */
+.importTag {
+  justify-self: end;
+  padding: var(--tpl-cell-gap-half) var(--tpl-rule-row-gap);
+  border: 1px solid var(--color-action);
+  border-radius: var(--radius-control);
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.previewLarge { aspect-ratio: var(--tpl-rml-ext-ratio-large); }
+.previewCompact { aspect-ratio: var(--tpl-rml-ext-ratio-compact); }
