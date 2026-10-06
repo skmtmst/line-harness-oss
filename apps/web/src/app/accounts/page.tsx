@@ -32,6 +32,8 @@ import {
   type AccountFilter,
 } from './account-list-view'
 import AccountMigration from './migration'
+import { useSettingsTheme } from '@/lib/use-settings-theme'
+import AccountsV8 from '@/v8/settings/accounts/accounts'
 
 type AccountWithStats = LineAccount & {
   stats?: { friendCount: number; activeScenarios: number; messagesThisMonth: number }
@@ -46,7 +48,7 @@ type AccountWithStats = LineAccount & {
  * アーカイブ（戻す）を置く。アーカイブの理由入力と本人確認は、
  * 詳しい画面と同じ流れをここでも使う。
  */
-export default function AccountsPage() {
+function AccountsPageV7() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
@@ -426,4 +428,14 @@ const ARCHIVE_BLOCKER_MESSAGES: Record<string, string> = {
   default_account: '既定のアカウントです。先にほかのアカウントを既定にしてください',
   delivery_job_running: '予約・送信中の配信があります。終わるか取り消してからアーカイブしてください',
   traffic_pool_member: 'アクセス振り分けの組に入っています。組から外してからアーカイブしてください',
+}
+
+/**
+ * ★V8：data-theme="v8" のときだけ新しい画面（src/v8/settings/accounts）を出す。
+ * `?tab=migration`（UID の移行）は今までどおり今の画面が受ける。
+ */
+export default function AccountsPage() {
+  const theme = useSettingsTheme()
+  const searchParams = useSearchParams()
+  return theme === 'v8' && searchParams.get('tab') !== 'migration' ? <AccountsV8 /> : <AccountsPageV7 />
 }
