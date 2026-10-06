@@ -26,7 +26,8 @@ import { logoutAndGoToLogin } from '@/lib/logout'
  * ・最上層の器（`MenuPortal`）に出す。脇メニューの幅や `overflow` に切られない。
  * ・幅は 240（`w-60`）で固定。行の右に説明の字を置かない（はみ出しの元）。
  * ・行の高さは 40（`h-10`）、区切りは `h-px bg-divider-soft`。
- * ・残りの日数・次回の更新は札ではなく名前の下の字で出す。
+ * ・頭の課金の一言は、役目の札のとなりに灰色の小さい字で1行だけ
+ *   （例「無料トライアル 残り14日」）。色の付いた札も、下に足す行も作らない。
  */
 const ROLE_LABELS: Record<string, string> = {
   owner: 'オーナー',
@@ -90,15 +91,12 @@ export default function HqAccountMenu() {
   const chip = billing ? billingChip(billing) : null
   const daysLeft = billing ? trialDaysLabel(billing) : null
   /*
-   * 名前の下に出す課金の一言。札にはしない（枠からはみ出す元）。
-   * 無料トライアルは「いつまで・残り何日」、契約中は「次回の更新」。
+   * 開いたメニューの頭に出す課金の一言（承認の絵 `s6kZt/wmfIZ`）。
+   * 役目の札のとなりに灰色の小さい字で1行だけ出す。色の付いた札も、
+   * 下に足す行も作らない（どちらも枠からはみ出す元）。
+   * 例：「無料トライアル 残り14日」。
    */
-  const billingNote =
-    billing?.state === 'trialing' && billing.trialEndsLabel
-      ? `${billing.trialEndsLabel} まで${daysLeft ? `・${daysLeft}` : ''}`
-      : billing?.state === 'active' && billing.currentPeriodEndsLabel
-        ? `次回の更新 ${billing.currentPeriodEndsLabel}`
-        : ''
+  const planNote = chip ? `${chip.label}${daysLeft ? ` ${daysLeft}` : ''}` : ''
   return (
     <div ref={rootRef} className="relative shrink-0 border-t border-hairline" data-design-node="X6G9j6">
       {open ? (
@@ -129,15 +127,14 @@ export default function HqAccountMenu() {
           <div className="px-3.5 pb-2.5 pt-1.5">
             <p className="truncate text-label font-medium text-ink">{name}</p>
             {me?.email ? <p className="truncate text-nano text-ink-faint">{me.email}</p> : null}
-            {role || chip ? (
-              <p className="mt-1 flex flex-wrap items-center gap-1.5">
+            {role || planNote ? (
+              <p className="mt-1 flex items-center gap-1.5">
                 {role ? (
                   <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-nano font-medium text-accent-deep">{role}</span>
                 ) : null}
-                {chip ? <PlanChip chip={chip} /> : null}
+                {planNote ? <span className="truncate text-nano text-ink-faint">{planNote}</span> : null}
               </p>
             ) : null}
-            {billingNote ? <p className="mt-1 text-nano text-ink-faint">{billingNote}</p> : null}
           </div>
           <div className="h-px bg-divider-soft" />
           <MenuLink href="/hq/members" icon={Users}>メンバー管理</MenuLink>

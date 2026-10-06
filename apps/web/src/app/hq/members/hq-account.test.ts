@@ -53,6 +53,18 @@ describe('統括の左下アカウントメニュー', () => {
     expect(menu).not.toContain('権限者・担当アカウント')
     expect(menu).not.toContain('プランと支払い')
   })
+
+  /*
+   * 承認の絵は「管理者」の札のとなりに灰色の小さい字で
+   * 「無料トライアル 残り14日」を1行だけ出す。色の付いた札も、
+   * 下に足す行も無い（`s6kZt/wmfIZ` の右の案）。
+   */
+  it('頭の課金の一言は役目の札のとなりに灰色の字で1行だけ出す', () => {
+    expect(menu).toContain('const planNote = chip ?')
+    expect(menu).toContain('<span className="truncate text-nano text-ink-faint">{planNote}</span>')
+    expect(menu).not.toContain('{chip ? <PlanChip chip={chip} /> : null}')
+    expect(menu).not.toContain('billingNote')
+  })
 })
 
 describe('メンバー管理（36-5）', () => {
