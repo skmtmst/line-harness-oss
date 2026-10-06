@@ -763,6 +763,41 @@
   --tpl-an-rp-railcard-pad: 16px; --tpl-an-rp-railcard-gap: 8px; --tpl-an-rp-rail-title: 14px; --tpl-an-rp-rail-sub: 11px; --tpl-an-rp-preview-pad: 12px; --tpl-an-rp-preview-gap: 6px; --tpl-an-rp-preview-title: 13px; --tpl-an-rp-notes-lh: 19px;
   --tpl-an-create-space-w: 140px; --tpl-an-rp-conflict-wrap-pad: 12px 24px; --tpl-an-rp-conflict-pad: 12px 16px;
   --tpl-composer-gap: 8px;
+  /* ★V8 友だち（一覧 x6QsVz・統合 ADjK8・重複 hn6Y8・比べる fcg2D・移行 T9gblG/L48eY・詳細 Hn9eE） */
+  --tpl-fr-head-pad: 20px 24px 16px; --tpl-fr-head-gap: 8px; --tpl-fr-back-lh: 19px; --tpl-fr-title-lh: 32px; --tpl-fr-desc-lh: 17px;
+  --tpl-fr-tab-gap: 24px; --tpl-fr-tab-pad: 12px; --tpl-fr-tab-lh: 19px; --tpl-fr-tab-lh-list: 20px;
+  --tpl-fr-note-gap: 6px; --tpl-fr-note-icon: 15px; --tpl-fr-note-indent: 24px; --tpl-fr-note-pad: 8px;
+  --tpl-fr-btn-gap: 6px; --tpl-fr-btn-pad: 14px; --tpl-fr-control-h: 36px; --tpl-fr-text-btn-h: 30px;
+  --tpl-fr-delta-pad: 2px 7px; --tpl-fr-delta-lh: 18px; --tpl-fr-tools-gap: 10px; --tpl-fr-search-w: 280px;
+  --tpl-fr-columns-menu-w: 208px; --tpl-fr-menu-pad: 8px; --tpl-fr-menu-item-pad: 8px; --tpl-fr-applied-pad: 8px 12px;
+  --tpl-fr-refresh-opacity: 0.55; --tpl-fr-thead-h: 40px; --tpl-fr-row-block: 9px; --tpl-fr-row-side: 20px; --tpl-fr-cell-gap: 16px;
+  --tpl-fr-col-check: 52px; --tpl-fr-col-star: 36px; --tpl-fr-col-support: 146px; --tpl-fr-col-scenario: 88px; --tpl-fr-col-latest: 206px;
+  --tpl-fr-col-tags: 176px; --tpl-fr-col-source: 88px; --tpl-fr-col-last: 96px; --tpl-fr-col-menu: 48px;
+  --tpl-fr-star: 20px; --tpl-fr-avatar: 32px; --tpl-fr-avatar-gap: 10px; --tpl-fr-sub-lh: 16px; --tpl-fr-support-gap: 3px;
+  --tpl-fr-dot: 6px; --tpl-fr-dot-gap: 5px; --tpl-fr-dot-box: 16px; --tpl-fr-status-pad: 2px 8px; --tpl-fr-tag-gap: 4px; --tpl-fr-tag-pad: 2px 6px;
+  --tpl-fr-state-pad: 40px 24px; --tpl-fr-skel-name: 160px; --tpl-fr-skel-cell: 96px; --tpl-fr-skel-h: 16px;
+  --tpl-fr-pager-pull: -10px -24px; --tpl-fr-pager-lh: 21px;
+  --tpl-fr-stack-gap: 12px; --tpl-fr-card-pad: 16px; --tpl-fr-card-num-size: 22px; --tpl-fr-head-pad-bottom: 16px;
+  --tpl-fr-area-gap: 16px; --tpl-fr-area-pad: 24px 28px; --tpl-fr-search-sm: 220px; --tpl-fr-panel-pad: 20px;
+  --tpl-fr-panel-title-size: 15px; --tpl-fr-panel-title-lh: 22px; --tpl-fr-cell-inset: 8px; --tpl-fr-contact-lh: 15px;
+  --tpl-fr-mu-col-friends: 152px; --tpl-fr-mu-col-state: 192px; --tpl-fr-mu-col-date: 122px; --tpl-fr-mu-col-menu: 36px;
+  --tpl-fr-mu-thead-h: 39px; --tpl-fr-mu-row-h: 70px;
+  --tpl-fr-dup-card-pad: 14px 16px; --tpl-fr-dup-num-lh: 27px; --tpl-fr-dup-thead-h: 45px; --tpl-fr-dup-thead-pad: 11px 12px 0 0;
+  --tpl-fr-dup-col-confidence: 92px; --tpl-fr-dup-col-evidence: 212px; --tpl-fr-dup-col-account: 162px; --tpl-fr-dup-col-status: 102px;
+  --tpl-fr-dup-col-action: 118px; --tpl-fr-dup-col-num: 102px; --tpl-fr-dup-col-num-last: 98px; --tpl-fr-dup-row-compact-h: 51px; --tpl-fr-chip-pad: 10px;
+  --tpl-fr-search-xs: 200px; --tpl-fr-dup-n-col-account: 132px; --tpl-fr-dup-pager-h: 42px;
+  --tpl-fr-cmp-subject-pad: 18px; --tpl-fr-cmp-name-gap: 6px; --tpl-fr-cmp-name-size: 17px; --tpl-fr-cmp-name-lh: 25px; --tpl-fr-cmp-sub-gap: 6px;
+  --tpl-fr-cmp-attrs-gap: 2px; --tpl-fr-cmp-attr-h: 34px; --tpl-fr-cmp-attr-label: 86px; --tpl-fr-cmp-card-gap: 6px; --tpl-fr-cmp-line-h: 47px;
+  --tpl-fr-cmp-panel-pad: 16px; --tpl-fr-cmp-panel-lh: 20px; --tpl-fr-cmp-radio-gap: 17px; --tpl-fr-cmp-check-gap: 6px;
+  --tpl-fr-mig-field-gap: 6px; --tpl-fr-mig-check-gap: 6px; --tpl-fr-mig-legend-gap: 11px; --tpl-fr-mig-drop-pull: -12px; --tpl-fr-mig-card-min: 380px; --tpl-fr-mig-row-h: 54px;
+  --tpl-fr-mig-col-date: 150px; --tpl-fr-mig-col-kind: 102px; --tpl-fr-mig-col-state: 108px; --tpl-fr-mig-col-action: 118px;
+  --tpl-fr-uid-step-h: 24px; --tpl-fr-uid-step-dot: 20px; --tpl-fr-uid-step-line: 16px; --tpl-fr-uid-step-line-gap: 6px;
+  --tpl-fr-uid-col-uid: 410px; --tpl-fr-uid-col-decide: 178px; --tpl-fr-uid-col-state: 122px; --tpl-fr-uid-thead-h: 50px; --tpl-fr-uid-run-h: 62px; --tpl-fr-uid-bullet-indent: 20px; --tpl-fr-uid-band-pad: 14px; --tpl-fr-uid-lines-pad-bottom: 14px; --tpl-fr-uid-head-btn-pull: -4px; --tpl-fr-shadow-step-ring: inset 0 0 0 1.5px var(--color-accent-deep);
+  --tpl-fr-shadow-outline: inset 0 0 0 1px var(--color-hairline); --tpl-fr-shadow-outline-ink: inset 0 0 0 1px var(--color-ink);
+  --tpl-fr-shadow-control: inset 0 0 0 1px var(--color-control-border); --tpl-fr-shadow-tab: inset 0 -2px 0 var(--color-ink);
+  --tpl-fr-mp-rail-w: 364px; --tpl-fr-mp-rail-pad: 24px; --tpl-fr-mp-rail-gap: 14px; --tpl-fr-mp-values-pull: -16px; --tpl-fr-mp-value-h: 39px;
+  --tpl-fr-mp-col-account-wide: 360px; --tpl-fr-mp-col-account: 320px; --tpl-fr-mp-col-name: 152px; --tpl-fr-mp-col-date: 123px;
+  --tpl-fr-cmp-history-date: 259px; --tpl-fr-cmp-col-item: 160px; --tpl-fr-cmp-col-use: 208px; --tpl-fr-cmp-card-min: 220px; --tpl-fr-cmp-attr-label-n: 82px;
 }
 
 /*
