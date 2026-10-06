@@ -4133,19 +4133,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       `isDashboardNotificationData` が `items` と `counts.{all,error,update,unread}`
       と `unreadCount` を見ていて、既定の器（空配列）だと通らず
       「通知を読み込めませんでした」になっていた。
-      中身は設計 `Alekb` の6件をそのまま置く。
+
+      通知の画面（y8QQV）の6件。種類（eventType）は行の右の「〇〇を開く」が絵どおりに出る形。
+      未読は3件（ベルの数「3」も全部の板でこの数）。
     */
-    const item = (id, category, title, body, isRead, createdAt) => ({
-      id, eventType: `visual_qa.${category}`, category, title, body,
+    const item = (id, eventType, category, title, body, isRead, createdAt) => ({
+      id, eventType, category, title, body,
       metadata: null, isRead, createdAt,
     })
     const items = [
-      item('nc-1', 'error', '一斉配信「8月号のご案内」で12件が送信失敗', '配信結果を開く', false, '2026-09-02T01:04:00.000Z'),
-      item('nc-2', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, '2026-08-21T09:32:00.000Z'),
-      item('nc-3', 'error', 'EC連携の取り込みが3件失敗しています', 'EC連携を開く', false, '2026-08-21T00:15:00.000Z'),
-      item('nc-4', 'update', 'v0.25 の更新が利用できます', '更新履歴を見る', false, '2026-08-20T00:00:00.000Z'),
-      item('nc-5', 'update', 'v0.24.1 を適用しました', '更新履歴を見る', true, '2026-08-14T00:00:00.000Z'),
-      item('nc-6', 'update', 'メンテナンス予定　8/30 2:00〜4:00', '詳細を見る', true, '2026-08-12T00:00:00.000Z'),
+      item('nc-3', 'ec.import_failed', 'error', 'EC連携の取り込みが 3 件失敗しています', 'EC連携を開く', false, '2026-08-21T00:15:00.000Z'),
+      item('nc-2', 'account_health_webhook_delay', 'error', 'LINE Webhook の応答遅延を検知しました', '運用状態を開く', false, '2026-08-21T09:32:00.000Z'),
+      item('nc-1', 'broadcast.send_failed', 'error', '一斉配信「8月号のご案内」で 12 件が送信失敗', '配信結果を開く', false, '2026-08-20T11:05:00.000Z'),
+      item('nc-4', 'visual_qa.update', 'update', 'v0.25 の更新が利用できます', '更新履歴を見る', true, '2026-08-20T00:00:00.000Z'),
+      item('nc-5', 'visual_qa.update', 'update', 'v0.24.1 を適用しました', '更新履歴を見る', true, '2026-08-14T00:00:00.000Z'),
+      item('nc-6', 'maintenance.scheduled', 'update', 'メンテナンス予定 8/30 2:00〜4:00', '詳細を見る', true, '2026-08-12T00:00:00.000Z'),
     ]
     const category = query.get('category')
     const shown = category && category !== 'all' ? items.filter((x) => x.category === category) : items
