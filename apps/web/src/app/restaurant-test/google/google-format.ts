@@ -25,6 +25,22 @@ export function formatDate(value: string | null | undefined): string {
   return formatDay(date)
 }
 
+/**
+ * 口コミの「受信」日時。
+ * Googleは口コミが編集されても createTime（最初の投稿時刻）を変えず、updateTime だけを更新する。
+ * createTime だけを出すと、最近書き直された口コミが何年も前の日付で並んでしまうため、
+ * 新しい方を採用する。
+ */
+export function reviewReceivedAt(review: { createTime?: string | null; updateTime?: string | null }): string | null {
+  const created = review.createTime ?? null
+  const updated = review.updateTime ?? null
+  const createdAt = created ? new Date(created).getTime() : Number.NaN
+  const updatedAt = updated ? new Date(updated).getTime() : Number.NaN
+  if (Number.isNaN(updatedAt)) return created
+  if (Number.isNaN(createdAt)) return updated
+  return updatedAt > createdAt ? updated : created
+}
+
 export function errorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError && error.message) return error.message
   return fallback
