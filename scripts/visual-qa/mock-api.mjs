@@ -231,33 +231,57 @@ const OPS_AUDIT = [
   {
     id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
     tenant_id: 'visual-tenant-1', tenant_name: '検証商事',
-    action: 'tenant.status.change', reason: '検証用の記録', detail: '{"from":"suspended","to":"active"}',
-    ip: null, visible_to_tenant: 1, created_at: '2026-09-05T10:00:00+09:00',
+    action: 'impersonation.start', reason: '問い合わせの確認', detail: null,
+    ip: null, visible_to_tenant: 1, created_at: '2026-10-01T15:20:00+09:00',
   },
   {
     id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    tenant_id: 'visual-tenant-3', tenant_name: 'サンプル商店',
+    action: 'tenant.status.change', reason: '検証用の記録', detail: '{"from":"active","to":"suspended"}',
+    ip: null, visible_to_tenant: 1, created_at: '2026-09-30T09:12:00+09:00',
+  },
+  {
+    id: 'visual-audit-3', staff_id: 'visual-ops-member', staff_name: '見本 次郎',
+    tenant_id: 'visual-tenant-2', tenant_name: '見本物産',
+    action: 'impersonation.write', reason: '初期設定の代行（本人の依頼）', detail: null,
+    ip: null, visible_to_tenant: 1, created_at: '2026-09-28T18:40:00+09:00',
+  },
+  {
+    id: 'visual-audit-4', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    tenant_id: 'visual-tenant-1', tenant_name: '検証商事',
+    action: 'pii.reveal', reason: '請求先の確認（本人の依頼）', detail: null,
+    ip: null, visible_to_tenant: 1, created_at: '2026-09-12T10:02:00+09:00',
+  },
+  {
+    id: 'visual-audit-5', staff_id: 'visual-ops-member', staff_name: '見本 次郎',
     tenant_id: null, tenant_name: null,
-    action: 'ticket.view', reason: null, detail: '{"ticketNo":1}',
-    ip: null, visible_to_tenant: 0, created_at: '2026-09-06T10:00:00+09:00',
+    action: 'member.invite', reason: '見本 花子 を招待', detail: null,
+    ip: null, visible_to_tenant: 0, created_at: '2026-09-05T11:30:00+09:00',
   },
 ]
 const OPS_MEMBERS = [
   {
-    staffId: 'visual-qa-ops', name: '検証 太郎', email: null, isActive: true,
+    staffId: 'visual-qa-ops', name: '検証 太郎', email: 'ops@example.com', isActive: true,
     totpEnabled: true, lineLinked: false, inviteStatus: 'accepted', activationState: 'active',
     invitedAt: '2026-04-01T10:00:00+09:00', approvedBy: null,
     lastLoginAt: '2026-09-07T08:00:00+09:00', createdAt: '2026-04-01T10:00:00+09:00',
   },
   {
-    staffId: 'visual-ops-invited', name: '見本 花子', email: null, isActive: true,
+    staffId: 'visual-ops-member', name: '見本 次郎', email: 'member@example.com', isActive: true,
+    totpEnabled: true, lineLinked: false, inviteStatus: 'accepted', activationState: 'active',
+    invitedAt: '2026-05-01T10:00:00+09:00', approvedBy: '検証 太郎',
+    lastLoginAt: '2026-10-01T22:40:00+09:00', createdAt: '2026-05-01T10:00:00+09:00',
+  },
+  {
+    staffId: 'visual-ops-invited', name: '見本 花子', email: 'invited@example.com', isActive: true,
     totpEnabled: false, lineLinked: false, inviteStatus: 'sent', activationState: 'invited',
     invitedAt: '2026-09-06T10:00:00+09:00', approvedBy: '検証 太郎',
     lastLoginAt: null, createdAt: '2026-09-06T10:00:00+09:00',
   },
 ]
 const OPS_MEMBER_SUMMARY = {
-  members: 1, invited: 1, awaitingTotp: 0, totpEnabled: 1,
-  impersonationsThisMonth: 0, writeImpersonationsThisMonth: 0, piiRevealsThisMonth: 0,
+  members: 3, invited: 1, awaitingTotp: 0, totpEnabled: 2,
+  impersonationsThisMonth: 1, writeImpersonationsThisMonth: 0, piiRevealsThisMonth: 0,
 }
 const OPS_DASHBOARD = {
   period: 'month',

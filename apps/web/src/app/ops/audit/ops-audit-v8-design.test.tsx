@@ -64,7 +64,7 @@ describe('e7ljE 監査ログの絵合わせ', () => {
     await settle()
     const body = text()
     expect(body).toContain('運営が行った操作の記録です')
-    expect(body).toContain('CSVで書き出す')
+    expect(body).toContain('CSV で書き出す')
     for (const chip of ['すべて', '代理ログイン', '個人情報の表示', '契約先の停止', '運営メンバー']) {
       expect(body).toContain(chip)
     }

@@ -614,9 +614,11 @@
   --tpl-op-caution-gap: 8px; --tpl-op-caution-pad: 8px 12px; --tpl-op-caution-lh: 16px; --tpl-op-caution-icon: 14px; --tpl-op-caution-radius: 8px; --tpl-op-section-gap: 14px;
   --tpl-op-auth-gap: 16px; --tpl-op-auth-page-pad: 24px 16px; --tpl-op-auth-card-w: 420px; --tpl-op-auth-card-gap: 14px; --tpl-op-auth-card-pad: 28px; --tpl-op-auth-title-lh: 29px; --tpl-op-auth-lead-lh: 19px; --tpl-op-auth-field-gap: 6px; --tpl-op-auth-label-lh: 20px; --tpl-op-auth-icon: 15px;
   --tpl-op-auth-qr: 140px; --tpl-op-auth-qr-gap: 16px; --tpl-op-auth-digit: 48px; --tpl-op-auth-digit-focus: 1.5px;
-  --tpl-op-row-gap: 12px; --tpl-op-panel-gap: 10px; --tpl-op-panel-pad: 16px; --tpl-op-panel-title-lh: 20px; --tpl-op-mini-gap: 14px; --tpl-op-mini-pad: 9px 14px; --tpl-op-mini-head-lh: 16px; --tpl-op-mini-row-lh: 17px; --tpl-op-mini-num-pad: 12px;
+  --tpl-op-row-gap: 12px; --tpl-op-panel-gap: 10px; --tpl-op-panel-pad: 16px; --tpl-op-panel-title-lh: 20px; --tpl-op-mini-gap: 14px; --tpl-op-mini-pad: 9px 14px; --tpl-op-mini-head-lh: 16px; --tpl-op-mini-row-lh: 15.5px; --tpl-op-mini-num-pad: 12px;
   --tpl-op-dash-count-w: 60px; --tpl-op-dash-open-w: 70px; --tpl-op-dash-alert-h: 53.5px; --tpl-op-dash-plan-w: 80px; --tpl-op-dash-rate-w: 80px; --tpl-op-dash-media-w: 90px; --tpl-op-dash-tickets-w: 400px;
   --tpl-op-dash-stat-gap: 2px; --tpl-op-dash-stat-pad: 10px 12px; --tpl-op-dash-stat-lh: 23px; --tpl-op-dash-chart-h: 120px; --tpl-op-dash-col-gap: 4px; --tpl-op-dash-label-h: 14px;
+  --tpl-op-mem-invite-w: 340px; --tpl-op-mem-mail-w: 200px; --tpl-op-mem-totp-w: 110px; --tpl-op-mem-state-w: 90px; --tpl-op-mem-login-w: 100px; --tpl-op-mem-ops-w: 80px; --tpl-op-mem-self-h: 39.5px; --tpl-op-tab-pad-bottom: 10px; --tpl-op-tab-lh: 16.5px; --tpl-op-note-pad: 10px 12px; --tpl-op-note-lh: 17px;
+  --tpl-op-audit-date-w: 130px; --tpl-op-control-h: 36px; --tpl-op-audit-at-w: 120px; --tpl-op-audit-what-w: 140px; --tpl-op-audit-tenant-w: 150px; --tpl-op-audit-what-pad: 4px;
   --tpl-toolbar-pad-block: 14px; --tpl-toolbar-pad-side: 24px; --tpl-toolbar-gap: 8px;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
   /* ウェビナーの一覧（UyUMw・uBMuB・jiNg0）。表は絵の列の並び（見出し 13/20・行 9/20・欄の間16）。 */
