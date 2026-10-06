@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-/* 完全切り替え：v7 の page.tsx は捨て、V8 の list-v8.tsx を見る。 */
-const PAGE = readFileSync(new URL('./list-v8.tsx', import.meta.url), 'utf8')
+/* 完全切り替え：v7 の page.tsx は捨て、V8 の一覧（src/v8/scenarios/list.tsx・page.tsx が描く本体）を見る。 */
+const PAGE = readFileSync(new URL('../../v8/scenarios/list.tsx', import.meta.url), 'utf8')
 
 /**
  * 点検 #495 中6 の再発防止（V8）。

@@ -44,7 +44,7 @@ import {
   type GoogleReviewOrder,
 } from '@/lib/restaurant-google-api'
 import GoogleBusinessPage from '../google/google-business'
-import { errorMessage, formatDateTime } from '../google/google-format'
+import { errorMessage, formatDateTime, reviewReceivedAt } from '../google/google-format'
 import { BoundaryBanner, Stat } from './shell'
 import shellStyles from './shell.module.css'
 import styles from './google.module.css'
@@ -248,7 +248,7 @@ function GoogleReviewsBoard({ data, stores }: { data: GoogleConnectionData; stor
                         <Stars rating={review.starRating} />
                       </Td>
                       <Td><p className={styles.comment} title={review.comment ?? undefined}>{review.comment ?? '（本文なし・評価のみ）'}</p></Td>
-                      <Td><span className={styles.received}>{formatDateTime(review.createTime)}</span></Td>
+                      <Td><span className={styles.received}>{formatDateTime(reviewReceivedAt(review))}</span></Td>
                       <Td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></Td>
                       <Td align="right">
                         <Button size="field" onClick={() => router.push(`/restaurant-test/google?tab=reviews&view=draft&id=${review.id}`)}>
