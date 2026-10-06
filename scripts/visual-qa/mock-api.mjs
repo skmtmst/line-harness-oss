@@ -69,9 +69,9 @@ import {
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
-  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_AUDIENCE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, SCENARIO_TRIGGERS, SCENARIO_PREVIEW, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_NEW_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_AUDIENCE, REMINDER_PREVIEW, REMINDER_NEW_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, SCENARIO_TRIGGERS, SCENARIO_PREVIEW, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
-  RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
+  RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
   TAG_ARCHIVE_RESULT,
   TAG_IMPORT_SAMPLE_ROWS, tagImportPreview, tagImportResult, REMINDER_RUNS,
@@ -87,7 +87,7 @@ import {
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
   BOOKING_MENUS, BOOKING_MENU_VERSIONS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
-  BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
+  BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_EXCEPTIONS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_SEND_COUNTS, LINE_NOTIFICATION_DELIVERIES,
@@ -1478,6 +1478,7 @@ function visualQaWriteBody(method, pathname) {
    */
   if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
     const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
+    if (draftId === 'reminder-new') return { ...REMINDER_NEW_DRAFT }
     return { ...REMINDER_DRAFT, reminderId: draftId || REMINDER_DRAFT.reminderId }
   }
   if (method === 'POST' && pathname === '/api/reminders/drafts') {
@@ -1485,7 +1486,13 @@ function visualQaWriteBody(method, pathname) {
   }
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/validate$/.test(pathname)) {
     if (decodeURIComponent(pathname.split('/')[3] ?? '') === 'reminder-new') {
-      return { ...REMINDER_VALIDATE, audience: { matched: 172, excluded: 14 } }
+      return {
+        ...REMINDER_VALIDATE,
+        checks: REMINDER_VALIDATE.checks.map((check) => (
+          check.key === 'steps' ? { ...check, message: '2件の通知があります' } : check
+        )),
+        audience: { matched: 172, excluded: 14 },
+      }
     }
     return REMINDER_VALIDATE
   }
@@ -1495,7 +1502,10 @@ function visualQaWriteBody(method, pathname) {
     }
     return REMINDER_AUDIENCE
   }
-  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/preview$/.test(pathname)) return REMINDER_PREVIEW
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/preview$/.test(pathname)) {
+    if (decodeURIComponent(pathname.split('/')[3] ?? '') === 'reminder-new') return REMINDER_NEW_PREVIEW
+    return REMINDER_PREVIEW
+  }
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/test-send$/.test(pathname)) return REMINDER_TEST_SEND
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/publish$/.test(pathname)) return REMINDER_PUBLISH
   if (method === 'POST' && /^\/api\/scenarios\/[^/]+\/test-send$/.test(pathname)) return { sent: 1 }
@@ -2737,6 +2747,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // 機能4は利用人数つきの一覧を要求する。他機能の選択肢は従来データを保つ。
     return { success: true, data: query.get('withUsage') === '1' ? FRIEND_ATTRIBUTE_FIELDS : FRIEND_FIELDS }
   }
+  if (pathname === '/api/folders' && query.get('kind') === 'rich_menu') {
+    // 板 `rZEGN`：通常・会員向け・キャンペーン＋未分類（各1件）。
+    return { success: true, data: RICH_MENU_FOLDERS, unfiledCount: RICH_MENU_GROUPS.filter((group) => !group.folderId).length }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
     // 板 `uE9gf`：未分類は `folderId: null` の1件（旧キーワードルール）。
     return { success: true, data: AUTO_REPLY_FOLDERS, unfiledCount: AUTO_REPLIES.filter((rule) => !rule.folderId).length }
@@ -2765,6 +2779,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/booking/admin/settings') {
     return { success: true, data: BOOKING_SETTINGS }
+  }
+  /* この日だけの休み（板 `d5fmnM` の10/12 研修のため）。器は `{success,data:{items}}`。 */
+  if (pathname === '/api/booking/admin/exceptions') {
+    return { success: true, data: BOOKING_EXCEPTIONS }
   }
   if (pathname === '/api/auto-replies') return { success: true, data: AUTO_REPLIES }
   if (pathname === '/api/auto-replies/conflicts') {
@@ -2846,6 +2864,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    */
   if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
     const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
+    if (draftId === 'reminder-new') return { success: true, data: { ...REMINDER_NEW_DRAFT } }
     return { success: true, data: { ...REMINDER_DRAFT, reminderId: draftId || REMINDER_DRAFT.reminderId } }
   }
   const reminderOne = /^\/api\/reminders\/([^/]+)$/.exec(pathname)
@@ -3879,6 +3898,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const impact = richMenuDeleteImpact[1] === RICH_MENU_DELETE_IMPACT_EMPTY.group.id
       ? RICH_MENU_DELETE_IMPACT_EMPTY
       : RICH_MENU_DELETE_IMPACT
+    // 一覧のどの行の「削除」から開いても、その行の影響として返す（板 `yOyCg` は一覧の先頭行で開く）。
+    const asked = RICH_MENU_GROUPS.find((group) => group.id === richMenuDeleteImpact[1])
+    if (asked && impact === RICH_MENU_DELETE_IMPACT && asked.id !== impact.group.id) {
+      // 既定（全員）でない行に「既定になっている」は付けない。
+      const blockers = impact.blockers.filter((key) => key !== 'default_for_all' || asked.isDefaultForAll)
+      return {
+        success: true,
+        data: {
+          ...impact,
+          group: { ...impact.group, id: asked.id, name: asked.name, status: asked.status },
+          lineResources: { ...impact.lineResources, isDefaultForAll: Boolean(asked.isDefaultForAll) },
+          blockers,
+        },
+      }
+    }
     return { success: true, data: impact }
   }
   if (pathname === '/api/rich-menu-groups') {

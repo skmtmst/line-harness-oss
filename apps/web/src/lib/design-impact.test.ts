@@ -237,6 +237,8 @@ describe('共通部品の影響範囲', () => {
       'components/users/users-table.tsx',
       // ★V8 友だち属性 タグの一覧（I1E7Bt）。一から書いた画面。表の下にページ送りを置く。
       'v8/tags/tags-tab.tsx',
+      // V8 のリッチメニュー一覧（src/v8 に一から書いた）。
+      'v8/rich-menus/list.tsx',
       // ★V8 自動応答の一覧（uE9gf）。新しい置き場（src/v8）に一から書いた。
       'v8/auto-replies/list.tsx',
     ].sort())

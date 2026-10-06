@@ -597,6 +597,14 @@
   --tpl-tag-other-pad: 16px 24px 24px; --tpl-tag-other-gap: 16px; --tpl-tag-note-size: 11px; --tpl-tag-note-lh: 17px; --tpl-tag-ring: 2px; --tpl-tag-tabs-h: 30px; --tpl-tag-tabs-pad-bottom: 9px;
   --tpl-thead-pad-block: 12px; --tpl-thead-pad-side: 24px; --tpl-thead-lh: 16px;
   --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
+  /* リッチメニューの一覧（rZEGN・Y9ASp・ZoKow・yOyCg）。 */
+  --tpl-rml-col-order: 60px; --tpl-rml-col-thumb: 80px; --tpl-rml-col-audience: 146px; --tpl-rml-col-state: 96px; --tpl-rml-col-count: 106px; --tpl-rml-col-menu: 60px; --tpl-rml-row-h: 67px; --tpl-rml-alone-shift: 11px;
+  --tpl-rml-thumb-w: 64px; --tpl-rml-thumb-h: 43px; --tpl-rml-thumb-radius: 6px; --tpl-rml-order-gap: 4px; --tpl-rml-main-lh: 17px;
+  --tpl-rml-pill-pad: 2px 8px; --tpl-rml-pill-gap: 5px; --tpl-rml-pill-dot: 6px; --tpl-rml-pill-lh: 18px;
+  --tpl-rml-search-w: 200px; --tpl-rml-folder-w: 150px; --tpl-rml-sort-w: 40px; --tpl-rml-narrow-row2-pad: 12px; --tpl-rml-pager-pad: 10px 20px;
+  --tpl-rml-ro-pad: 10px 14px; --tpl-rml-ro-gap: 10px; --tpl-rml-ro-radius: 10px; --tpl-rml-ro-lh: 20px; --tpl-rml-ro-after: 8px;
+  --tpl-rml-blocker-pad: 9px 0; --tpl-rml-blocker-gap: 8px; --tpl-rml-blocker-lh: 17px; --tpl-rml-dlg-w: 600px; --tpl-rml-dlg-pad: 24px; --tpl-rml-dlg-gap: 14px; --tpl-rml-dlg-top: 240px; --tpl-rml-dlg-title-size: 17px; --tpl-rml-dlg-title-lh: 25px; --tpl-rml-dlg-desc-lh: 22px; --tpl-rml-icon-btn: 28px; --tpl-rml-notice-after: 6px; --tpl-rml-grip-w: 14px; --tpl-rml-row-line: inset 0 -1px 0 var(--color-divider);
+  --tpl-rml-ext-max-w: 1584px; --tpl-rml-ext-side-w: 430px; --tpl-rml-ext-thumb-w: 48px; --tpl-rml-ext-col-a: 100px; --tpl-rml-ext-col-b: 110px; --tpl-rml-ext-col-c: 120px; --tpl-rml-ext-area-w: 24px; --tpl-rml-ext-ratio-large: 2500 / 1686; --tpl-rml-ext-ratio-compact: 2500 / 843;
   --tpl-band-gap: 0;
   /* 自動応答の一覧（uE9gf・Q5lOCc・WPrd5）。 */
   --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: 64px; --tpl-ar-narrow-head-h: 34px;
