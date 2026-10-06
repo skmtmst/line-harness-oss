@@ -487,7 +487,7 @@ export default function FriendsListV8() {
   ] as const
 
   const statsBand = (
-    <KpiBand className={styles.kpiBand} data-design="KPIs">
+    <KpiBand className={styles.kpiBand} data-design="V8FriendKpis">
       {kpis.map((kpi) => (
         <KpiCard
           key={kpi.key}
@@ -533,7 +533,7 @@ export default function FriendsListV8() {
   )
 
   const toolbar = (
-    <div className={styles.tools}>
+    <div className={styles.tools} data-design="V8SearchPanel">
       <form
         className={styles.toolRow}
         onSubmit={(event) => {
@@ -676,7 +676,7 @@ export default function FriendsListV8() {
   const colCount = 4 + [...visible].length
   const table = (
     <div className={refreshing ? `${styles.tableWrap} ${styles.refreshing}` : styles.tableWrap} aria-busy={loadStatus === 'loading' || refreshing || undefined}>
-      <DataTable className={styles.table}>
+      <DataTable className={styles.table} data-design="V8FriendTable">
         <colgroup>
           <col className={styles.colCheck} />
           <col className={styles.colStar} />
@@ -784,7 +784,7 @@ export default function FriendsListV8() {
                   <Td className={styles.td}>
                     <div className={styles.supportCell}>
                       <span className={styles.statusRow}>
-                        <span className={`${styles.status} ${styles[`status_${status.tone}`]}`}><span className={styles.dot} aria-hidden="true" />{status.label}</span>
+                        <span className={status.tone === 'danger' ? `${styles.status} ${styles.status_danger}` : status.tone === 'warn' ? `${styles.status} ${styles.status_warn}` : status.tone === 'info' ? `${styles.status} ${styles.status_info}` : `${styles.status} ${styles.status_ok}`}><span className={styles.dot} aria-hidden="true" />{status.label}</span>
                         {friend.supportMark ? <span className={styles.mark} title={`対応マーク：${friend.supportMark.name}`}>{friend.supportMark.name}</span> : null}
                       </span>
                       <span className={styles.sub}>{`担当：${friend.operator?.name ?? '担当なし'}`}</span>
@@ -871,7 +871,7 @@ export default function FriendsListV8() {
       toolbar={toolbar}
       overlays={(
         <>
-          <span className={styles.bulkWrap}>
+          <span className={styles.bulkWrap} data-design="V8BulkBar">
             <BulkBar count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください">
               {selectedIds.size > 1 && canRunBulk(staffRole) ? (
                 <Button variant="secondary" data-qa-open="IAf7j" onClick={() => setBulkOpen(true)}>操作を選ぶ</Button>

@@ -109,7 +109,7 @@ export default function DuplicatesListV8() {
           <span>自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、名前やプロフィール画像だけの一致は参考です。結び付けても元の友だちと履歴は残ります。</span>
         </p>
 
-        <div className={styles.cards} data-design="KPIs">
+        <div className={styles.cards}>
           {kpis.map((kpi) => (
             <KpiCard
               key={kpi.key}
@@ -218,7 +218,7 @@ export default function DuplicatesListV8() {
                       </Link>
                     </Td>
                     <Td className={styles.td}>
-                      <span className={`${styles.pill} ${styles[`pill_${confidenceTone(candidate.confidence.label)}`]}`}>
+                      <span className={confidenceTone(candidate.confidence.label) === 'ok' ? `${styles.pill} ${styles.pill_ok}` : `${styles.pill} ${styles.pill_muted}`}>
                         {CONFIDENCE_WORD[candidate.confidence.label] ?? candidate.confidence.label}
                       </span>
                     </Td>
@@ -226,7 +226,7 @@ export default function DuplicatesListV8() {
                     <Td className={styles.td}><span className={styles.cellText} title={accounts}>{accounts}</span></Td>
                     <Td className={styles.td}>
                       <span
-                        className={`${styles.pill} ${styles[`pill_${statusTone(candidate.status)}`]}`}
+                        className={statusTone(candidate.status) === 'ok' ? `${styles.pill} ${styles.pill_ok}` : statusTone(candidate.status) === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_muted}`}
                         title={`最終更新 ${slashDateTime(candidate.reviewedAt ?? candidate.detectedAt)}`}
                       >
                         {STATUS_WORD[candidate.status] ?? candidate.status}

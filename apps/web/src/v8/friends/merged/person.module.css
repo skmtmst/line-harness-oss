@@ -18,7 +18,7 @@
   padding: var(--tpl-fr-panel-pad);
   padding-bottom: var(--tpl-fr-uid-lines-pad-bottom);
   border-radius: var(--radius-card);
-  box-shadow: inset 0 0 0 1px var(--color-hairline);
+  box-shadow: var(--tpl-fr-shadow-outline);
 }
 .card:has(> .lines) { gap: var(--tpl-fr-cmp-card-gap); }
 .cardHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }
@@ -87,7 +87,7 @@
   gap: var(--tpl-fr-stack-gap);
   min-height: var(--tpl-fr-cmp-line-h);
   padding-right: var(--tpl-fr-area-gap);
-  box-shadow: inset 0 -1px 0 var(--color-divider);
+  box-shadow: var(--shadow-row-line);
   font-size: var(--text-caption);
   line-height: var(--tpl-fr-desc-lh);
 }
@@ -102,7 +102,7 @@
   margin-left: var(--tpl-fr-mp-values-pull);
   padding: var(--tpl-fr-cmp-panel-pad);
   border-radius: var(--radius-card);
-  box-shadow: inset 0 0 0 1px var(--color-hairline);
+  box-shadow: var(--tpl-fr-shadow-outline);
 }
 .valuesTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-fr-back-lh); }
 .values { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
@@ -112,7 +112,7 @@
   justify-content: space-between;
   gap: var(--tpl-fr-stack-gap);
   min-height: var(--tpl-fr-mp-value-h);
-  box-shadow: inset 0 -1px 0 var(--color-divider);
+  box-shadow: var(--shadow-row-line);
   font-size: var(--text-caption);
   line-height: var(--tpl-fr-desc-lh);
 }
@@ -121,3 +121,6 @@
 
 .dialogActions { display: flex; justify-content: flex-end; gap: var(--tpl-toolbar-gap); }
 .reasonLabel { display: flex; flex-direction: column; gap: var(--tpl-fr-mig-field-gap); margin-top: var(--tpl-toolbar-gap); color: var(--color-ink); font-size: var(--text-label); font-weight: 600; }
+
+/* 行（乗せたときの地の変化は共通の動きの速さ）。 */
+.row { transition: background-color var(--motion-fast) var(--motion-ease-out); }

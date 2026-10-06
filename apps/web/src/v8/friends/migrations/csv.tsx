@@ -27,8 +27,8 @@ import styles from './migrations.module.css'
 
 const COLUMN_CHOICES = [
   ['basic', '基本（LINEユーザーID・表示名・本名・登録日）', false],
-  ['tags_fields', 'タグ・友だち情報（準備中）', true],
-  ['support', '対応状況・対応マーク・担当者（準備中）', true],
+  ['tags_fields', 'タグ・友だち情報（まだ書き出せません）', true],
+  ['support', '対応状況・対応マーク・担当者（まだ書き出せません）', true],
 ] as const
 
 export default function CsvMigrationsV8() {

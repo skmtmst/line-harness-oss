@@ -46,7 +46,6 @@ function historyBadge(run: UidMigrationRun): { tone: 'ok' | 'muted' | 'danger' |
   return { tone: 'muted', label: 'テスト移行' }
 }
 
-const TONE_CLASS = { ok: styles.pillOk, muted: styles.pillMuted, danger: styles.pillDanger, warn: styles.pillWarn }
 
 export default function UidMigrationV8({ initialRunId }: { initialRunId: string | null }) {
   usePageTitle('UID移行')
@@ -330,7 +329,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                           {`${accountName(run.fromAccountId)} → ${accountName(run.toAccountId)}`}
                         </button>
                       </Td>
-                      <Td className={styles.td}><span className={`${styles.pill} ${TONE_CLASS[badge.tone]}`}>{badge.label}</span></Td>
+                      <Td className={styles.td}><span className={badge.tone === 'ok' ? `${styles.pill} ${styles.pillOk}` : badge.tone === 'danger' ? `${styles.pill} ${styles.pillDanger}` : badge.tone === 'warn' ? `${styles.pill} ${styles.pillWarn}` : `${styles.pill} ${styles.pillMuted}`}>{badge.label}</span></Td>
                       <Td className={styles.td}>
                         {run.rollbackable === true && !rollbackBlockedReason ? (
                           <button type="button" className={styles.textButton} disabled={m.busy || m.detailBusy} onClick={() => { m.selectRun(run.id); m.setRollbackError(null); m.setRollbackConflicts([]); m.setConfirmRollback(true) }}>
