@@ -90,6 +90,13 @@
   margin-inline-end: var(--tpl-an-actions-extra);
 }
 
+/* 閲覧のみで隠した「レポートを作る」の場所。 */
+.createSpace {
+  display: block;
+  flex-shrink: 0;
+  width: var(--tpl-an-create-space-w);
+}
+
 /* 数の帯：上下に線（タブの線と重ねる）。 */
 .band {
   border-block: 1px solid var(--color-hairline);
