@@ -7683,10 +7683,10 @@ export const HQ_BANNER_PRESETS = [
   { key: 'sns_youtube_thumbnail', group: 'sns', label: 'YouTube サムネイル', note: '1280×720（16:9）', apiSize: '1536x1024', targetWidth: 1280, targetHeight: 720, aspectRatio: '16:9' },
 ]
 
-/** 統括バナー生成の利用状況。本物は `usageSnapshot` の形。 */
+/** 統括バナー生成の利用状況。本物は `usageSnapshot` の形。絵（B9ZAr）の数：今月 40/150・今日 6/30。 */
 export const HQ_BANNER_USAGE = {
-  month: { used: 7, limit: 100, remaining: 93 },
-  today: { used: 1, limit: 4, remaining: 3 },
+  month: { used: 40, limit: 150, remaining: 110 },
+  today: { used: 6, limit: 30, remaining: 24 },
   paused: false,
   blocked: false,
   blockedReason: null,
@@ -7694,54 +7694,128 @@ export const HQ_BANNER_USAGE = {
   pausedReason: null,
 }
 
-/** 統括バナー生成の集計。本物は `getBannerStats` の形。 */
+/** 統括バナー生成の集計。本物は `getBannerStats` の形。絵（B9ZAr）：5件・アーカイブ1・渡した9枚・3アカウント。 */
 export const HQ_BANNER_STATS = {
-  projects: { active: 2, archived: 1 },
-  deliveredImages: 18,
+  projects: { active: 5, archived: 1 },
+  deliveredImages: 9,
   deliveredAccounts: 3,
 }
 
-/** 統括バナーのプロジェクト。本物は `serializeProject` の形。 */
+/** 統括バナーのプロジェクト。本物は `serializeProject` の形。並びと文言は絵（B9ZAr）。 */
 export const HQ_BANNER_PROJECTS = [
   {
-    id: 'banner-project-qa-1', name: '秋のキャンペーン', description: '10月の友だち追加特典の案内',
-    isFavorite: true, archivedAt: null, imageCount: 2, runningCount: 0,
-    createdBy: '高橋 直人', createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-07T10:00:00+09:00',
+    id: 'banner-project-qa-1', name: '秋のキャンペーン', description: '一斉配信の上の写真・10月',
+    isFavorite: true, archivedAt: null, imageCount: 8, runningCount: 0,
+    createdBy: '高橋 直人', createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-30T10:12:00+09:00',
   },
   {
-    id: 'banner-project-qa-2', name: 'リッチメニューの秋', description: null,
-    isFavorite: false, archivedAt: null, imageCount: 1, runningCount: 0,
-    createdBy: '佐々木 花', createdAt: '2026-09-03T09:00:00+09:00', updatedAt: '2026-09-06T10:00:00+09:00',
+    id: 'banner-project-qa-2', name: 'リッチメニューの秋', description: '2500×1686・6分割',
+    isFavorite: true, archivedAt: null, imageCount: 4, runningCount: 0,
+    createdBy: '佐々木 花', createdAt: '2026-09-03T09:00:00+09:00', updatedAt: '2026-09-28T10:00:00+09:00',
+  },
+  {
+    id: 'banner-project-qa-3', name: '2周年 春の感謝祭', description: 'バナー・リッチメッセージ',
+    isFavorite: false, archivedAt: null, imageCount: 0, runningCount: 1,
+    createdBy: '高橋 直人', createdAt: '2026-09-27T09:00:00+09:00', updatedAt: '2026-09-27T09:00:00+09:00',
+  },
+  {
+    id: 'banner-project-qa-4', name: '定期便のご案内', description: 'LINE のカード 1040×1040',
+    isFavorite: false, archivedAt: null, imageCount: 6, runningCount: 0,
+    createdBy: '佐々木 花', createdAt: '2026-09-05T09:00:00+09:00', updatedAt: '2026-09-12T10:00:00+09:00',
+  },
+  {
+    id: 'banner-project-qa-5', name: '新商品 鹿肉ふりかけ', description: '商品写真の加工',
+    isFavorite: false, archivedAt: null, imageCount: 3, runningCount: 0,
+    createdBy: '高橋 直人', createdAt: '2026-08-28T09:00:00+09:00', updatedAt: '2026-09-02T10:00:00+09:00',
   },
 ]
 
-/** 統括バナーの画像。本物は `serializeImage` の形。 */
-export const HQ_BANNER_IMAGES = [
+/** アーカイブしたプロジェクト（絵 AnwtH の後ろの一覧）。 */
+export const HQ_BANNER_ARCHIVED_PROJECTS = [
   {
-    id: 'banner-image-qa-1', projectId: 'banner-project-qa-1', generationId: 'banner-generation-qa-1',
-    sequence: 1, source: 'generated', parentImageId: null, isFavorite: true,
-    createdBy: '高橋 直人', createdAt: '2026-09-07T10:00:00+09:00',
-    media: { id: 'banner-media-qa-1', filename: 'aki-campaign-1.png', mimeType: 'image/png', sizeBytes: 184320, width: 1040, height: 1040, url: 'https://example.invalid/banners/aki-campaign-1.png' },
-    generation: null,
-    deliveredAccountIds: ['visual-qa-account'],
-  },
-  {
-    id: 'banner-image-qa-2', projectId: 'banner-project-qa-1', generationId: 'banner-generation-qa-1',
-    sequence: 2, source: 'generated', parentImageId: null, isFavorite: false,
-    createdBy: '高橋 直人', createdAt: '2026-09-07T10:01:00+09:00',
-    media: { id: 'banner-media-qa-2', filename: 'aki-campaign-2.png', mimeType: 'image/png', sizeBytes: 172480, width: 1040, height: 1040, url: 'https://example.invalid/banners/aki-campaign-2.png' },
-    generation: null,
-    deliveredAccountIds: [],
-  },
-  {
-    id: 'banner-image-qa-3', projectId: 'banner-project-qa-2', generationId: null,
-    sequence: 1, source: 'uploaded', parentImageId: null, isFavorite: false,
-    createdBy: '佐々木 花', createdAt: '2026-09-06T10:00:00+09:00',
-    media: { id: 'banner-media-qa-3', filename: 'richmenu-aki.png', mimeType: 'image/png', sizeBytes: 512000, width: 2500, height: 1686, url: 'https://example.invalid/banners/richmenu-aki.png' },
-    generation: null,
-    deliveredAccountIds: [],
+    id: 'banner-project-qa-6', name: 'お盆休みのお知らせ', description: 'アーカイブ済み',
+    isFavorite: false, archivedAt: '2026-08-20T10:00:00+09:00', imageCount: 2, runningCount: 0,
+    createdBy: '佐々木 花', createdAt: '2026-08-01T09:00:00+09:00', updatedAt: '2026-08-10T10:00:00+09:00',
   },
 ]
+
+/** 秋のキャンペーンの生成の条件（絵 rI5uh の「生成時の条件」）。 */
+const HQ_BANNER_GENERATION_1 = {
+  id: 'banner-generation-qa-1', projectId: 'banner-project-qa-1', status: 'done', mode: 'banner',
+  presetKey: 'line_rich_message', aspectRatio: '1:1', apiSize: '1024x1024', quality: 'medium',
+  textLines: ['秋の新商品、はじまりました', '10/31 まで 送料無料'], emphasisLines: [false, false],
+  baseColor: null, mainColor: '#8B5A2B', subColor: '#F3E9DC', accentColor: null,
+  personOption: 'without', customPrompt: '木のテーブル、湯気を少し強めに。文字は大きく読みやすく', freePrompt: null,
+  finalPrompt: '', engine: 'openai', modelName: 'gpt-image-1', requestedCount: 4, doneCount: 4, failedCount: 0,
+  unitsPerImage: 1, errorMessage: null, references: [{ imageId: 'banner-image-qa-12', mode: 'inspire' }],
+  createdBy: '高橋 直人', createdAt: '2026-09-30T10:12:00+09:00', startedAt: '2026-09-30T10:12:00+09:00', finishedAt: '2026-09-30T10:14:00+09:00',
+}
+
+const bannerGeneration = (id, projectId, presetKey, aspectRatio, apiSize, textLines) => ({
+  ...HQ_BANNER_GENERATION_1, id, projectId, presetKey, aspectRatio, apiSize, textLines,
+  emphasisLines: textLines.map(() => false), references: null,
+})
+
+const BANNER_GEN_CARD = bannerGeneration('banner-generation-qa-2', 'banner-project-qa-1', 'line_card', '3:2', '1536x1024', ['秋の鹿肉コース'])
+const BANNER_GEN_MENU = bannerGeneration('banner-generation-qa-3', 'banner-project-qa-2', 'line_rich_menu_large', '3:2', '1536x1024', ['秋のメニュー'])
+const BANNER_GEN_TEIKI = bannerGeneration('banner-generation-qa-4', 'banner-project-qa-4', 'line_rich_message', '1:1', '1024x1024', ['定期便のご案内'])
+const BANNER_GEN_INSTA = bannerGeneration('banner-generation-qa-5', 'banner-project-qa-5', 'sns_instagram_portrait', '4:5', '1024x1536', ['鹿肉ふりかけ'])
+const BANNER_GEN_STORY = bannerGeneration('banner-generation-qa-6', 'banner-project-qa-5', 'sns_story', '9:16', '1024x1536', ['鹿肉ふりかけ'])
+const BANNER_GEN_MIKAKU = bannerGeneration('banner-generation-qa-7', 'banner-project-qa-1', 'line_rich_message', '1:1', '1024x1024', ['秋の味覚'])
+
+const bannerImage = (n, projectId, generation, { favorite = false, delivered = [], minutesAgo = n * 10 } = {}) => {
+  const created = new Date(Date.parse('2026-09-30T10:12:00+09:00') - minutesAgo * 60000).toISOString()
+  const [w, h] = generation?.apiSize?.split('x').map(Number) ?? [1040, 1040]
+  return {
+    id: `banner-image-qa-${n}`, projectId, generationId: generation?.id ?? null,
+    sequence: n, source: generation ? 'generated' : 'upload', parentImageId: null, isFavorite: favorite,
+    createdBy: '高橋 直人', createdAt: created,
+    media: { id: `banner-media-qa-${n}`, filename: `banner-${n}.png`, mimeType: 'image/png', sizeBytes: 184320, width: w, height: h, url: `https://example.invalid/banners/banner-${n}.png` },
+    generation,
+    deliveredAccountIds: delivered,
+  }
+}
+
+const DELIVERED = ['visual-qa-account-prod', 'visual-qa-account-old']
+
+/**
+ * 統括バナーの画像。本物は `serializeImage` の形。新しい順。
+ * 先頭12枚が絵 W5Wxr の画像ライブラリ、秋のキャンペーンの8枚が絵 iMnph の一覧。
+ * 全部で23枚・お気に入り3・渡し済み9・未使用14（絵の「見る」の数）。
+ */
+export const HQ_BANNER_IMAGES = [
+  bannerImage(1, 'banner-project-qa-1', HQ_BANNER_GENERATION_1, { favorite: true, delivered: DELIVERED }),
+  bannerImage(2, 'banner-project-qa-1', HQ_BANNER_GENERATION_1, { delivered: DELIVERED }),
+  bannerImage(3, 'banner-project-qa-1', { ...HQ_BANNER_GENERATION_1, textLines: ['10/31 まで 送料無料'] }),
+  bannerImage(4, 'banner-project-qa-1', HQ_BANNER_GENERATION_1, { favorite: true, delivered: DELIVERED }),
+  bannerImage(5, 'banner-project-qa-2', BANNER_GEN_MENU, { favorite: true, delivered: DELIVERED }),
+  bannerImage(6, 'banner-project-qa-2', BANNER_GEN_MENU, { delivered: DELIVERED }),
+  bannerImage(7, 'banner-project-qa-4', BANNER_GEN_TEIKI, { delivered: DELIVERED }),
+  bannerImage(8, 'banner-project-qa-4', BANNER_GEN_TEIKI),
+  bannerImage(9, 'banner-project-qa-5', BANNER_GEN_INSTA),
+  bannerImage(10, 'banner-project-qa-5', BANNER_GEN_STORY),
+  bannerImage(11, 'banner-project-qa-1', BANNER_GEN_CARD),
+  bannerImage(12, 'banner-project-qa-1', BANNER_GEN_MIKAKU),
+  bannerImage(13, 'banner-project-qa-1', BANNER_GEN_CARD),
+  bannerImage(14, 'banner-project-qa-1', BANNER_GEN_CARD),
+  bannerImage(15, 'banner-project-qa-2', BANNER_GEN_MENU, { delivered: DELIVERED }),
+  bannerImage(16, 'banner-project-qa-2', BANNER_GEN_MENU),
+  bannerImage(17, 'banner-project-qa-4', BANNER_GEN_TEIKI, { delivered: DELIVERED }),
+  bannerImage(18, 'banner-project-qa-4', BANNER_GEN_TEIKI, { delivered: DELIVERED }),
+  bannerImage(19, 'banner-project-qa-4', BANNER_GEN_TEIKI),
+  bannerImage(20, 'banner-project-qa-4', BANNER_GEN_TEIKI),
+  bannerImage(21, 'banner-project-qa-5', BANNER_GEN_INSTA),
+  bannerImage(22, 'banner-project-qa-6', null),
+  bannerImage(23, 'banner-project-qa-6', null),
+]
+
+/** 画像ライブラリの「見る」の数。本物は `withCounts=1` で返る。 */
+export const HQ_BANNER_IMAGE_COUNTS = {
+  all: HQ_BANNER_IMAGES.length,
+  favorite: HQ_BANNER_IMAGES.filter((i) => i.isFavorite).length,
+  delivered: HQ_BANNER_IMAGES.filter((i) => i.deliveredAccountIds.length > 0).length,
+  unused: HQ_BANNER_IMAGES.filter((i) => i.deliveredAccountIds.length === 0).length,
+}
 
 /** 然-NEN- 会員のランク設定。本物は `settingsResponse` の形。 */
 export const NEN_RANK_SETTINGS = {

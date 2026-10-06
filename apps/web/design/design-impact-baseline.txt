@@ -619,6 +619,11 @@ shared-button-importer v8/ops/tenant-detail.tsx
 shared-button-importer v8/ops/support.tsx
 shared-button-importer v8/broadcast-detail/detail.tsx
 shared-button-importer v8/broadcast-detail/reserved.tsx
+shared-button-importer v8/hq-banners/dialogs.tsx
+shared-button-importer v8/hq-banners/image-detail.tsx
+shared-button-importer v8/hq-banners/limit-notice.tsx
+shared-button-importer v8/hq-banners/list.tsx
+shared-button-importer v8/hq-banners/project.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx

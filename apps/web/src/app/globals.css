@@ -596,6 +596,20 @@
   --tpl-af-dr-w: 620px; --tpl-af-dr-pad: 24px; --tpl-af-dr-gap: 16px; --tpl-af-dr-shadow: -8px 0 24px rgb(29 29 31 / 0.16); --tpl-af-dr-head-gap: 4px; --tpl-af-dr-close: 36px;
   --tpl-af-dr-tab-gap: 24px; --tpl-af-dr-tab-pad-bottom: 8px; --tpl-af-dr-tab-line: 2px; --tpl-af-dr-kpi-value-lh: 23px; --tpl-af-dr-kpi-sub-lh: 14px; --tpl-af-dr-kpi-gap: 2px; --tpl-af-dr-kpi-pad: 10px 12px; --tpl-af-dr-row-gap: 10px; --tpl-af-dr-row-h: 52px; --tpl-af-dr-row-pad: 8px 12px;
   --tpl-af-dr-card-pad: 12px 14px; --tpl-af-dr-text-lh: 18px; --tpl-af-dr-foot-pad: 12px;
+  /* 統括のバナー生成（B9ZAr・W5Wxr・iMnph と窓）。 */
+  --tpl-hb-folder-inset: 12px; --tpl-hb-button-icon: 15px; --tpl-hb-body-gap: 14px; --tpl-hb-body-pad: 16px 24px 24px 16px; --tpl-hb-kpi-gap: 12px; --tpl-hb-tabs-pull: -6px;
+  --tpl-hb-tool-gap: 8px; --tpl-hb-project-search-w: 280px; --tpl-hb-library-search-w: 230px; --tpl-hb-project-sort-w: 150px; --tpl-hb-library-sort-w: 170px;
+  --tpl-hb-small-lh: 16px; --tpl-hb-label-lh: 20px; --tpl-hb-control-h: 36px; --tpl-hb-control-pad: 0 10px 0 12px;
+  --tpl-hb-card-radius: 12px; --tpl-hb-mosaic-gap: 2px; --tpl-hb-mosaic-h: 120px; --tpl-hb-card-pad: 12px; --tpl-hb-title-lh: 19px; --tpl-hb-star: 24px; --tpl-hb-star-glyph: 16px;
+  --tpl-hb-desc-gap: 6px; --tpl-hb-desc-gap-small: 4px; --tpl-hb-meta-gap: 4px; --tpl-hb-pill-gap: 5px; --tpl-hb-pill-pad: 2px 8px; --tpl-hb-pill-lh: 18px; --tpl-hb-dot: 6px;
+  --tpl-hb-tile-h: 108px; --tpl-hb-tile-radius: 10px; --tpl-hb-tile-gap: 8px;
+  --tpl-hb-project-pad: 16px 24px 24px; --tpl-hb-project-gap: 16px; --tpl-hb-gallery-gap: 12px; --tpl-hb-project-tile-h: 120px; --tpl-hb-project-tile-gap: 6px; --tpl-hb-panel-w: 390px; --tpl-hb-band-pad: 10px 14px; --tpl-hb-pending-gap: 6px; --tpl-hb-pending-icon: 20px;
+  --tpl-hb-stat-gap: 8px; --tpl-hb-stat-pad: 16px 20px; --tpl-hb-stat-icon-radius: 9px; --tpl-hb-stat-glyph: 14px; --tpl-hb-stat-lh: 18px; --tpl-hb-stat-unit-gap: 3px; --tpl-hb-stat-tracking: -0.5px; --tpl-hb-stat-number-lh: 26px;
+  --tpl-hb-dialog-gap: 14px; --tpl-hb-dialog-pad: 24px; --tpl-hb-dialog-radius: 16px; --tpl-hb-dialog-edge: 16px; --tpl-hb-dialog-head-gap: 4px; --tpl-hb-dialog-title-size: 17px; --tpl-hb-dialog-title-lh: 25px; --tpl-hb-close-glyph: 16px; --tpl-hb-actions-pad: 6px; --tpl-hb-actions-pad-confirm: 11px; --tpl-hb-account-list-h: 258px; --tpl-hb-dialog-desc-lh: 18px;
+  --tpl-hb-top-create: 300px; --tpl-hb-top-upload: 240px; --tpl-hb-top-confirm: 380px; --tpl-hb-top-detail: 144px; --tpl-hb-detail-head-push: 6px; --tpl-hb-top-reference: 60px; --tpl-hb-w-form: 560px; --tpl-hb-w-confirm: 520px; --tpl-hb-w-detail: 860px; --tpl-hb-w-reference: 720px; --tpl-hb-field-gap: 6px; --tpl-hb-textarea-h: 72px; --tpl-hb-actions-gap: 8px;
+  --tpl-hb-drop-gap: 8px; --tpl-hb-drop-pad: 22px 16px; --tpl-hb-drop-icon: 24px;
+  --tpl-hb-detail-gap: 16px; --tpl-hb-detail-col-gap: 24px; --tpl-hb-detail-inner-gap: 10px; --tpl-hb-detail-left-w: 300px; --tpl-hb-list-pad: 4px;
+  --tpl-hb-account-gap: 8px; --tpl-hb-account-h: 50px; --tpl-hb-account-pad: 0 12px; --tpl-hb-account-name-lh: 17px; --tpl-hb-condition-gap: 12px; --tpl-hb-condition-label-gap: 12px; --tpl-hb-condition-label-w: 70px; --tpl-hb-condition-lh: 18px; --tpl-hb-detail-foot-pad: 21px;
   /* 一斉配信の一覧（l5V9a・jjFNi・NtCE3）。 */
   --tpl-bc-note-lh: 17px; --tpl-bc-tools-gap: 10px; --tpl-bc-search-w: 280px; --tpl-bc-narrow-search-w: 180px; --tpl-bc-status-select-w: 152px; --tpl-bc-page-size-w: 96px;
   --tpl-bc-control-gap: 6px; --tpl-bc-date-pad: 0 10px; --tpl-bc-ghost-pad: 0 14px; --tpl-bc-sort-h: 30px; --tpl-bc-popover-w: 260px; --tpl-bc-save-input-w: 240px;
