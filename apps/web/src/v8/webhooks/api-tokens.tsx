@@ -40,6 +40,19 @@ import styles from './api-tokens.module.css'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden' | 'disabled'
 
+/** 読み込み中の骨組みの1行（表と同じ列の幅）。 */
+function SkeletonCells({ height, width }: { height: number; width: string }) {
+  return (
+    <>
+      <span className={styles.colName}><Skeleton height={height} width={width} /></span>
+      <span className={styles.colScopes}><Skeleton height={height} width={width} /></span>
+      <span className={styles.colCreated}><Skeleton height={height} width={width} /></span>
+      <span className={styles.colUsed}><Skeleton height={height} width={width} /></span>
+      <span className={styles.colState}><Skeleton height={height} width={width} /></span>
+    </>
+  )
+}
+
 const SCOPES = ['tags:read', 'tags:write'] as const
 const SCOPE_LABELS: Record<string, string> = {
   'tags:read': 'タグを見る',
@@ -448,15 +461,11 @@ export default function WebhooksApiTokensV8() {
               skeleton={(
                 <div className={styles.table} aria-hidden="true">
                   <div className={styles.headRow}>
-                    {['colName', 'colScopes', 'colCreated', 'colUsed', 'colState'].map((col) => (
-                      <span key={col} className={styles[col]}><Skeleton height={12} width="50%" /></span>
-                    ))}
+                    <SkeletonCells height={12} width="50%" />
                   </div>
                   {[0, 1, 2].map((row) => (
                     <div key={row} className={styles.row}>
-                      {['colName', 'colScopes', 'colCreated', 'colUsed', 'colState'].map((col) => (
-                        <span key={col} className={styles[col]}><Skeleton height={14} width="70%" /></span>
-                      ))}
+                      <SkeletonCells height={14} width="70%" />
                     </div>
                   ))}
                 </div>
