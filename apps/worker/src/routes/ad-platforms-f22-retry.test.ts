@@ -48,7 +48,7 @@ describe('F-22 広告の同じ送信をやり直す', () => {
   it('失敗した1件を同じ目印・金額で送り、再操作は再送しない', async () => {
     const original = await failedLog();
     const firstCreatedAt = (testDb.raw.prepare('SELECT created_at FROM ad_conversion_outbox').get() as { created_at: string }).created_at;
-    const response = await post(original.id, 'admin');
+    const response = await post(original.id, 'owner');
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true, data: {
       logId: original.id, status: 'sent', providerEventId: original.provider_event_id, replayed: false,
@@ -89,9 +89,14 @@ describe('F-22 広告の同じ送信をやり直す', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(testDb.raw.prepare('SELECT is_retryable, last_error FROM ad_conversion_outbox').get()).toMatchObject({ is_retryable: 0, last_error: 'retry_expired' });
   });
-  it('別アカウント・存在しない記録・スタッフの操作を拒む', async () => {
+  it.each(['admin', 'staff'] as const)('広告設定を変更できない%sの再送を拒む', async role => {
     const log = await failedLog();
-    expect((await post(log.id, 'staff')).status).toBe(403);
+    expect((await post(log.id, role)).status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare('SELECT status FROM ad_conversion_outbox').get()).toMatchObject({ status: 'failed' });
+  });
+  it('別アカウント・存在しない記録を拒む', async () => {
+    const log = await failedLog();
     expect((await post('missing')).status).toBe(404);
     await expect(retryAdConversion(testDb.db, { logId: log.id, lineAccountId: 'account-b' })).rejects.toMatchObject({ code: 'not_found' });
     expect(fetchMock).not.toHaveBeenCalled();

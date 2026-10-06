@@ -550,7 +550,7 @@ adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'sta
 });
 
 /** F-22: 再送する内容や宛先は引数で受けず、保存済みの1件を使う。 */
-adPlatforms.post('/api/ad-platforms/logs/:id/retry', requireRole('owner', 'admin'), async (c) => {
+adPlatforms.post('/api/ad-platforms/logs/:id/retry', requireRole('owner'), async (c) => {
   try {
     const row = await getAdConversionRetrySource(c.env.DB, c.req.param('id'));
     if (!row?.line_account_id || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [row.line_account_id])) {
