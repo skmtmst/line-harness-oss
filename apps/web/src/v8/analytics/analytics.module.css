@@ -864,3 +864,91 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
 }
+
+/* 保存した分析（bglah）：探す 280、右に履歴 460、定期レポートの見出しの段。 */
+.searchBox[data-w='saved'] { width: var(--tpl-an-saved-search-w); }
+.colType[data-w='60'] { width: var(--tpl-an-col-60); }
+.colType[data-w='80'] { width: var(--tpl-an-col-80); }
+.colType[data-w='90'] { width: var(--tpl-an-col-90); }
+.colType[data-w='100'] { width: var(--tpl-an-col-100); }
+.colType[data-w='130'] { width: var(--tpl-an-col-130); }
+.colOps {
+  display: flex;
+  width: var(--tpl-an-col-ops);
+  flex-shrink: 0;
+  min-width: 0;
+}
+.trow[data-h='pill'] { min-height: var(--tpl-an-pill-row-h); }
+.trow[data-h='button'] { min-height: var(--tpl-an-button-row-h); }
+.rowActions[data-gap='wide'] { gap: var(--tpl-an-wide-gap); }
+:global([data-theme='v8']) .rowButton {
+  min-height: 0;
+}
+.rowButton {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.linkButton {
+  margin-left: var(--tpl-an-wide-gap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.historyCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-flow-gap);
+  width: var(--tpl-an-history-w);
+  flex-shrink: 0;
+  padding: var(--tpl-an-flow-pad);
+  border-radius: var(--radius-card);
+  box-shadow: var(--tpl-an-ring);
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-an-wide-gap);
+  min-width: 0;
+}
+.inlineError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-an-wide-gap);
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+.resultList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-an-cell-gap);
+  margin: 0;
+  font-size: var(--text-caption);
+}
+.resultList > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--tpl-an-wide-gap);
+}
+.resultList dt {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.resultList dd {
+  margin: 0;
+  color: var(--color-ink);
+}
