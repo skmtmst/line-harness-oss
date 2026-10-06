@@ -131,7 +131,6 @@ export function SaveConflictBand({
   onCompare,
   onReload,
   designNode,
-  className,
 }: {
   title: string
   description?: string
@@ -140,10 +139,9 @@ export function SaveConflictBand({
   onReload: () => void
   /** 絵の板の印（J1pdB・k32cn など）。 */
   designNode?: string
-  className?: string
 }) {
   return (
-    <div className={[styles.band, className].filter(Boolean).join(' ')} role="alert" data-design-node={designNode} data-save-conflict="">
+    <div className={styles.band} role="alert" data-design-node={designNode} data-save-conflict="">
       <TriangleAlert aria-hidden="true" className={styles.icon} />
       <span className={styles.text}>
         <span className={styles.title}>{title}</span>
