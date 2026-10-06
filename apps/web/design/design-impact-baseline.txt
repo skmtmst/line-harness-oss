@@ -506,3 +506,5 @@ shared-button-importer app/inflow-links/ad-event-mappings.tsx
 shared-button-importer components/events/event-application-preview.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
+shared-button-importer v8/common-vars/export-panel.tsx
+shared-button-importer v8/common-vars/list.tsx

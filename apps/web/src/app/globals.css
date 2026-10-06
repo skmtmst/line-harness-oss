@@ -588,6 +588,17 @@
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
   --tpl-thead-pad-block: 12px; --tpl-thead-pad-side: 24px; --tpl-thead-lh: 16px;
   --tpl-row-pad-block: 12px; --tpl-row-pad-side: 24px; --tpl-sub-gap: 4px;
+  /* 共通情報の一覧（FM94M・XIzkJ・OxSw8・Hhl9M・xxKtW）。 */
+  --tpl-cv-gap-s: 8px; --tpl-cv-export-w: 320px; --tpl-cv-band-gap: 10px; --tpl-cv-band-after: 8px; --tpl-cv-band-pad: 10px 14px; --tpl-cv-band-lh: 20px; --tpl-cv-fix-gap: 4px; --tpl-cv-note-lh: 17px;
+  --tpl-cv-alert-after: 6px; --tpl-cv-alert-gap: 10px; --tpl-cv-alert-pad: 10px 14px; --tpl-cv-alert-lh: 17px;
+  --tpl-cv-search-w: 200px; --tpl-cv-folder-w: 150px; --tpl-cv-narrow-row-gap: 8px;
+  --tpl-cv-col-select: 48px; --tpl-cv-col-value: 186px; --tpl-cv-col-state: 96px; --tpl-cv-col-usage: 106px; --tpl-cv-col-menu: 60px;
+  --tpl-cv-head-h: 39px; --tpl-cv-row-h: 61px; --tpl-cv-row-pad-block: 12px; --tpl-cv-name-lh: 19px; --tpl-cv-key-gap: 6px; --tpl-cv-key-lh: 15px; --tpl-cv-cell-lh: 17px;
+  --tpl-cv-pill-gap: 5px; --tpl-cv-pill-pad: 2px 8px; --tpl-cv-pill-lh: 18px; --tpl-cv-dot: 6px; --tpl-cv-row-menu: 28px;
+  --tpl-cv-bulk-pad: 10px 24px; --tpl-cv-pager-pad: 10px 20px; --tpl-cv-pager-lh: 20px;
+  --tpl-cv-skeleton-gap: 16px; --tpl-cv-skeleton-pad: 14px 24px; --tpl-cv-skeleton-dot: 32px; --tpl-cv-skeleton-bar: 10px; --tpl-cv-state-pad: 28px 24px; --tpl-cv-state-icon: 32px;
+  --tpl-cv-dialog-gap: 12px; --tpl-cv-dialog-lh: 22px; --tpl-cv-field-gap: 6px; --tpl-cv-control-h: 36px; --tpl-cv-input-pad: 0 12px; --tpl-cv-usage-pad: 9px 0;
+  --tpl-cv-choice-gap: 10px; --tpl-cv-choice-mark: 16px; --tpl-cv-choice-ring: 4px;
   --tpl-band-gap: 0;
   /* 自動応答の一覧（uE9gf・Q5lOCc・WPrd5）。 */
   --tpl-ar-sort-w: 124px; --tpl-ar-saved-w: 151px; --tpl-ar-saved-icon-w: 48px; --tpl-ar-folder-w: 150px; --tpl-ar-row-h: 64px; --tpl-ar-narrow-head-h: 34px;
