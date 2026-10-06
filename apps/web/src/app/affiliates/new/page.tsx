@@ -1,7 +1,7 @@
 'use client'
 
-import { NewAffiliateV8 } from '../new-affiliate-v8'
+import CreateAffiliateV8 from '@/v8/affiliates/create'
 
 export default function NewAffiliatePage() {
-  return <NewAffiliateV8 />
+  return <CreateAffiliateV8 />
 }

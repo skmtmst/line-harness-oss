@@ -510,3 +510,14 @@ shared-button-importer v8/rich-menus/external-import.tsx
 shared-button-importer v8/auto-replies/list.tsx
 shared-button-importer v8/auto-replies/quick-create.tsx
 shared-button-importer v8/webinars/list.tsx
+shared-button-importer v8/affiliates/frame.tsx
+shared-button-importer v8/affiliates/parts.tsx
+shared-button-importer v8/affiliates/affiliators.tsx
+shared-button-importer v8/affiliates/drawer.tsx
+shared-button-importer v8/affiliates/dialogs.tsx
+shared-button-importer v8/affiliates/offers.tsx
+shared-button-importer v8/affiliates/approvals.tsx
+shared-button-importer v8/affiliates/payment.tsx
+shared-button-importer v8/affiliates/payment-dialogs.tsx
+shared-button-importer v8/affiliates/report.tsx
+shared-button-importer v8/affiliates/create.tsx
