@@ -754,6 +754,14 @@
   --tpl-settings-gap: 16px;
   --tpl-inbox-list-width: 372px; --tpl-inbox-summary-width: 260px;
   --tpl-inbox-summary-pad: 20px; --tpl-inbox-summary-gap: 16px;
+  /* 自動応答の作る・完了・実行結果と共通情報の作る・編集（Z2LIUx・UGrd2・V4LjH・nWmLg・AYc6O・C67dE・piWhz・p82v9）。 */
+  --tpl-ar-ed-none: 0; --tpl-ar-ed-narrow-pad: 16px; --tpl-ar-ed-narrow-side-w: 248px; --tpl-ar-ed-holiday-w: 136px; --tpl-ar-ed-chip-x-pull: -7px; --tpl-ar-ed-kw-row-gap: 4px; --tpl-ar-ed-band-mt: 16px; --tpl-ar-ed-band-mb: -8px; --tpl-ar-ed-band-pad: 12px 16px; --tpl-ar-ed-band-note-lh: 19px;
+  --tpl-ar-done-body-pad: 48px 0; --tpl-ar-done-w: 560px; --tpl-ar-done-pad: 32px; --tpl-ar-done-icon: 48px; --tpl-ar-done-title-size: 18px; --tpl-ar-done-title-lh: 26px; --tpl-ar-done-note-lh: 22px; --tpl-ar-done-row-h: 16.5px;
+  --tpl-ar-run-fail-title-lh: 19px; --tpl-ar-run-tools-pad: 12px 20px; --tpl-ar-run-search-w: 220px; --tpl-ar-run-chip-lh: 18px; --tpl-ar-run-period-w: 69px; --tpl-ar-run-size-w: 96px; --tpl-ar-run-kv-row-h: 39px;
+  --tpl-ar-run-head-h: 35px; --tpl-ar-run-head-pad: 10px 20px; --tpl-ar-run-row-h: 49.5px; --tpl-ar-run-row-pad: 11px 20px; --tpl-ar-run-col-when: 72px; --tpl-ar-run-col-friend: 150px; --tpl-ar-run-col-input: 170px; --tpl-ar-run-col-result: 96px; --tpl-ar-run-col-time: 56px; --tpl-ar-run-col-menu: 28px; --tpl-ar-run-face: 26px;
+  --tpl-ar-run-pager-pad: 10px 20px; --tpl-ar-run-bottom-gap: 16px; --tpl-ar-run-box-h: 200px; --tpl-ar-run-box-title-lh: 22px; --tpl-ar-run-foot-pad: 6px; --tpl-ar-run-actions-lift: -12px; --tpl-ar-run-kpi-pad-block: 10px; --tpl-ar-run-kpi-pad-side: 16px; --tpl-ar-run-head-lines: inset 0 1px 0 var(--color-hairline), inset 0 -1px 0 var(--color-hairline); --tpl-ar-run-table-radius: 0;
+  --tpl-ar-cv-title-lh: 22px; --tpl-ar-cv-folder-w: 200px; --tpl-ar-cv-type-desc-size: 10.5px; --tpl-ar-cv-type-desc-lh: 15px; --tpl-ar-cv-expiry-w: 220px; --tpl-ar-cv-period-row-gap: 10px; --tpl-ar-cv-impact-pad: 10px; --tpl-ar-cv-impact-radius: 8px; --tpl-ar-cv-valid-pad: 10px 12px; --tpl-ar-cv-list-indent: 18px; --tpl-ar-cv-sched-title-lh: 19px; --tpl-ar-cv-history-date-w: 100px; --tpl-ar-cv-phone-nudge: 4px; --tpl-ar-cv-secret-lh: 19px;
+  --tpl-ar-cv-talk-icon: 34px; --tpl-ar-cv-talk-gap: 3px; --tpl-ar-cv-talk-name-size: 10px; --tpl-ar-cv-talk-bubble-w: 200px; --tpl-ar-cv-talk-bubble-pad: 8px 11px; --tpl-ar-cv-talk-text-size: 11.5px; --tpl-ar-cv-talk-text-lh: 18px; --tpl-ar-cv-talk-time-size: 9px;
   --tpl-conv-head-pad-block: 12px; --tpl-conv-head-pad-side: 20px; --tpl-conv-head-gap: 8px;
   --tpl-conv-messages-pad-block: 20px; --tpl-conv-messages-pad-side: 24px; --tpl-conv-messages-gap: 12px;
   --tpl-composer-pad-top: 12px; --tpl-composer-pad-side: 20px; --tpl-composer-pad-bottom: 16px;
