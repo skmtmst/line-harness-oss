@@ -62,7 +62,7 @@
 .pendingIcon { width: var(--tpl-hb-pending-icon); height: var(--tpl-hb-pending-icon); color: var(--color-ink-faint); }
 .pendingText { color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); }
 
-.tileMeta { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); height: var(--tpl-hb-star); margin-top: var(--tpl-hb-project-tile-gap); }
+.tileMeta { display: flex; align-items: center; gap: var(--tpl-hb-meta-gap); height: var(--tpl-hb-star); margin-top: var(--tpl-hb-project-tile-gap); }
 .metaText { min-width: 0; overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-hb-small-lh); text-overflow: ellipsis; white-space: nowrap; }
 
 .pillOk {
