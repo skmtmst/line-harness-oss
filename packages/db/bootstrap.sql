@@ -3303,7 +3303,7 @@ CREATE TABLE hq_template_distribution_results (
   error_code TEXT,
   attempt_count INTEGER NOT NULL DEFAULT 1 CHECK (attempt_count >= 1),
   started_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  finished_at TEXT,
+  finished_at TEXT, created_name TEXT,
   PRIMARY KEY (run_id, tenant_id, target_account_id),
   UNIQUE (tenant_id, target_account_id, idempotency_fingerprint),
   UNIQUE (preflight_id, tenant_id),

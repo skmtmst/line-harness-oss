@@ -35,3 +35,4 @@ export * from "./restaurant-booking";
 export * from "./hq-message-card";
 export * from './date-range.js';
 export * from './company-settings';
+export * from './hq-template-distribution-display';
