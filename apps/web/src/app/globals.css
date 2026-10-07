@@ -872,7 +872,7 @@
   --tpl-op-kn-search-w: 300px; --tpl-op-kn-select-w: 150px; --tpl-op-kn-question-h: 56px; --tpl-op-kn-side-w: 360px;
   --tpl-op-tn-row-h: 52.5px; --tpl-op-tn-stores-w: 50px; --tpl-op-tn-staff-w: 60px; --tpl-op-tn-billing-w: 120px;
   --tpl-op-dt-kv-h: 30.5px; --tpl-op-dt-key-w: 120px; --tpl-op-dt-at-w: 110px; --tpl-op-dt-what-w: 120px;
-  --tpl-op-sp-list-w: 360px; --tpl-op-sp-priority-w: 140px; --tpl-op-sp-ticket-gap: 4px; --tpl-op-sp-title-size: 15px; --tpl-op-sp-reply-h: 38px; --tpl-op-sp-confirm-pad: 14px 24px; --tpl-op-sp-create-h: 90px; --tpl-op-sp-fact-w: 64px; --tpl-op-dialog-pull-top: -14px; --tpl-op-dialog-pull-bottom: -10px;
+  --tpl-op-sp-list-w: 360px; --tpl-op-sp-priority-w: 140px; --tpl-op-sp-ticket-gap: 4px; --tpl-op-sp-title-size: 15px; --tpl-op-sp-reply-h: 38px; --tpl-op-sp-confirm-pad: 14px 24px; --tpl-op-sp-create-h: 90px; --tpl-op-sp-fact-w: 150px; --tpl-op-dialog-pull-top: -14px; --tpl-op-dialog-pull-bottom: -10px;
   /* テンプレートの作る・編集（u5YC6・a1k3d・NCbYn・S6FEuB・EsYo4）。 */
   --tpl-te-band-row-pad: 0 24px 8px; --tpl-te-band-pad: 12px 16px; --tpl-te-band-gap: 12px; --tpl-te-band-text-gap: 2px; --tpl-te-band-title-lh: 20px; --tpl-te-band-desc-lh: 19px;
   --tpl-te-head-gap: 2px; --tpl-te-card-title-lh: 22px; --tpl-te-hint-lh: 18px; --tpl-te-folder-w: 220px;
