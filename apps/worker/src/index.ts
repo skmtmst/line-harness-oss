@@ -121,6 +121,8 @@ import { adminAuth } from './routes/admin-auth.js';
 import { resolveCorsOrigin } from './middleware/admin-auth-config.js';
 import { timingMark, timingStart, type ServerTiming } from './lib/server-timing.js';
 import booking from './routes/booking.js';
+import { bookingPayments } from './routes/booking-payments.js';
+import { bookingPlus } from './routes/booking-plus.js';
 import events from './routes/events.js';
 import { trafficPools } from './routes/traffic-pools.js';
 import { meetCallback } from './routes/meet-callback.js';
@@ -309,6 +311,8 @@ export type Env = {
     GOOGLE_SHEETS_OAUTH_CLIENT_ID?: string;
     GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
     ECCUBE_WEBHOOK_SECRET?: string;
+    /** 予約のStripeテストの知らせ署名の検証鍵。値ではなく有無だけ画面に出す。 */
+    STRIPE_TEST_WEBHOOK_SECRET?: string;
     NEN_EC_BASE_URL?: string;
     /** ECの会員別ランクAPIを配備した後だけ true にする。未設定は送信停止。 */
     NEN_EC_MEMBER_RANK_SYNC_ENABLED?: string;
@@ -544,6 +548,8 @@ app.route('/', autoReplyRuns);
 app.route('/', adminAuth);
 app.route('/', trafficPools);
 app.route('/', booking);
+app.route('/', bookingPayments);
+app.route('/', bookingPlus);
 app.route('/', events);
 app.route('/', accountSettings);
 app.route('/', meetCallback);
@@ -1360,6 +1366,7 @@ async function runFrequentHeavyJobs(
   }
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'booking waitlist expiry and promotion',run:async()=>{const {processBookingWaitlists}=await import('./services/waitlist-tick.js');await processBookingWaitlists(env);}},
     {
       name: 'follower import continuation',
       run: async () => {
