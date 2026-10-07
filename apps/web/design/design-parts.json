@@ -2091,17 +2091,17 @@
       "role": "canonical",
       "status": "active",
       "reviewStatus": "confirmed",
-      "code": "src/components/shared/form-controls.tsx",
-      "cssModule": "src/components/shared/form-controls.module.css",
+      "code": "src/components/shared/text-field.tsx",
+      "cssModule": "src/components/shared/text-field.module.css",
       "components": [
-        "Field",
-        "TextInput",
-        "TextArea"
+        "TextField",
+        "TextArea",
+        "TextInput（正本の包み）"
       ],
-      "cssPrefix": "form-controls",
+      "cssPrefix": "text-field",
       "pencilUsage": "スタッフ追加とリマインダ作成へ適用開始",
       "lastCheckedAt": "2026-08-24",
-      "note": "1行と複数行を同じcontrolへまとめ、入力要素の属性と既存保存処理をそのまま渡す。focusはPencil未定義のためブラウザ既定を消さない。",
+      "note": "1行と複数行を同じcontrolへまとめ、入力要素の属性と既存保存処理をそのまま渡す。focusはPencil未定義のためブラウザ既定を消さない。2026-10-08：入力欄を1本化。正本は text-field.tsx（.field／1行 .single／複数行 .multi）。form-controls の TextInput・TextArea は正本を呼ぶ薄い包み。複数行は縦にだけ広げられる。",
       "routes": {
         "active": [
           "/staff/new",
@@ -2121,87 +2121,87 @@
       "declarations": [
         {
           "pencil": "ytG7l/keKe3 width: fill",
-          "class": "control",
+          "class": "field",
           "prop": "width",
           "source": "100%",
           "resolved": "100%"
         },
         {
           "pencil": "ytG7l/keKe3 stroke: $hairline / 1",
-          "class": "control",
+          "class": "field",
           "prop": "border",
           "source": "1px solid var(--color-hairline)",
           "resolved": "1px solid #dadde2"
         },
         {
           "pencil": "ytG7l/keKe3 cornerRadius: $radius-sm",
-          "class": "control",
+          "class": "field",
           "prop": "border-radius",
           "source": "var(--radius-control)",
           "resolved": "8px"
         },
         {
           "pencil": "ytG7l/keKe3 fill: $canvas",
-          "class": "control",
+          "class": "field",
           "prop": "background",
           "source": "var(--color-canvas)",
           "resolved": "#ffffff"
         },
         {
           "pencil": "ytG7l/keKe3 text fill: $ink",
-          "class": "control",
+          "class": "field",
           "prop": "color",
           "source": "var(--color-ink)",
           "resolved": "#1d1d1f"
         },
         {
           "pencil": "ytG7l/keKe3 fontSize: $size-label → #976 U079 で $size-body(14px) へ",
-          "class": "control",
+          "class": "field",
           "prop": "font-size",
           "source": "var(--text-body)",
           "resolved": "14px"
         },
         {
           "pencil": "ytG7l height: 40",
-          "class": "input",
+          "class": "single",
           "prop": "height",
           "source": "40px",
           "resolved": "40px"
         },
         {
           "pencil": "ytG7l padding: [0,12]",
-          "class": "input",
+          "class": "single",
           "prop": "padding",
           "source": "0 12px",
           "resolved": "0 12px"
         },
         {
           "pencil": "keKe3 height: 120",
-          "class": "textarea",
+          "class": "multi",
           "prop": "min-height",
           "source": "120px",
           "resolved": "120px"
         },
         {
           "pencil": "keKe3 padding: 14",
-          "class": "textarea",
+          "class": "multi",
           "prop": "padding",
           "source": "14px",
           "resolved": "14px"
         },
         {
           "pencil": "keKe3 lineHeight: 1.7",
-          "class": "textarea",
+          "class": "multi",
           "prop": "line-height",
           "source": "1.7",
           "resolved": "1.7"
         },
         {
-          "pencil": "keKe3 fixed height",
-          "class": "textarea",
+          "pencil": "keKe3 fixed height → 2026-10-08 縦にだけ広げられる（共通部品の1本化）",
+          "class": "multi",
           "prop": "resize",
-          "source": "none",
-          "resolved": "none"
+          "source": "vertical",
+          "resolved": "vertical"
         }
       ]
     },
