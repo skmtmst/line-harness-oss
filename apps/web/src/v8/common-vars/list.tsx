@@ -70,6 +70,7 @@ import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu
 import { withViewTransition } from '@/components/shared/view-transition'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
+import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
 import { COMMON_VAR_STATE_LABELS, formatStamp } from '@/lib/common-vars'
 import { formatDay, formatNumber } from '@/lib/format'
@@ -953,6 +954,12 @@ function CommonVarsListInner() {
     </div>
   ) : null
 
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。未分類は色の無い輪。 */
+  const folderDotOf = (row: { folderId: string | null }): FolderDotFolder | null => {
+    if (!row.folderId) return null
+    const folder = folders.find((f) => f.id === row.folderId)
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
   /* 並びは絵どおり：すべて → 作ったフォルダ → 未分類（最後）。 */
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: listFailed ? null : items.length },
@@ -1325,17 +1332,21 @@ function CommonVarsListInner() {
                     </Td>
                     <NameCell
                       name={
-                        <Link
-                          href={`/contents/vars/edit?id=${item.id}`}
-                          title={item.name}
-                          className={styles.nameLink}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          {item.name}
-                        </Link>
+                        <div className={styles.dotLine}>
+                          <FolderDotName folder={folderDotOf(item)} dot={!narrow}>
+                            <Link
+                              href={`/contents/vars/edit?id=${item.id}`}
+                              title={item.name}
+                              className={styles.nameLink}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              {item.name}
+                            </Link>
+                          </FolderDotName>
+                        </div>
                       }
                       sub={
-                        <span className={styles.keyRow}>
+                        <span className={narrow ? styles.keyRow : `${styles.keyRow} ${styles.dotIndent}`}>
                           <code title={placeholderText(item.varKey)} className={styles.keyCode}>
                             {placeholderText(item.varKey)}
                           </code>

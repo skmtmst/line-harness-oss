@@ -138,6 +138,10 @@
   gap: var(--tpl-af-stack-gap);
   min-width: 0;
 }
+.dotStack > * + * {
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 h7dmB・v9JWQ の説明の行）。 */
+  margin-inline-start: var(--tpl-folder-dot-indent);
+}
 .stackEnd {
   display: flex;
   flex-direction: column;
