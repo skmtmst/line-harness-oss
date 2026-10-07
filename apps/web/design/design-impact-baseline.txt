@@ -506,6 +506,7 @@ shared-button-importer components/events/event-application-preview.tsx
 shared-button-importer v8/tags/create.tsx
 shared-button-importer v8/tags/field-edit.tsx
 shared-button-importer v8/tags/field-editor.tsx
+shared-button-importer v8/tags/field-migrate.tsx
 shared-button-importer v8/tags/fields-tab.tsx
 shared-button-importer v8/tags/list.tsx
 shared-button-importer v8/tags/mark-editor.tsx

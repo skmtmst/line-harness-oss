@@ -4201,6 +4201,26 @@ export const FRIEND_FIELD_MIGRATION_PREVIEW = {
 }
 
 /**
+ * 板 GobMd：「愛犬のお名前」（1行テキスト）を「1つ選ぶ」へ変えるときの見本。
+ * 種類だけの事前確認（移行先なし）なので確認番号は出ない。値は選ぶ候補に足して移す。
+ */
+export const FRIEND_FIELD_MIGRATION_PREVIEW_DOG = {
+  source: {
+    ...FRIEND_ATTRIBUTE_FIELDS.find((field) => field.id === 'field-dog-name'),
+    status: 'active', version: 2, canInsertText: true,
+  },
+  summary: { total: 69, convertible: 0, review: 69, invalid: 0 },
+  rows: [
+    ...Array.from({ length: 41 }, (_, index) => ({ friendId: `friend-dog-pochi-${index + 1}`, sourceValue: 'ポチ', convertedValue: 'ポチ（選ぶ候補に足す）', status: 'review', reason: '選ぶ候補に足します' })),
+    ...Array.from({ length: 28 }, (_, index) => ({ friendId: `friend-dog-coco-${index + 1}`, sourceValue: 'ココ', convertedValue: 'ココ（選ぶ候補に足す）', status: 'review', reason: '選ぶ候補に足します' })),
+  ],
+  usageTargets: [],
+  runId: null,
+  previewToken: null,
+  previewExpiresAt: null,
+}
+
+/**
  * 機能8 自動応答。設計 `cmDfJ` の5行。
  *
  * **画面が読む形に合わせる。** `packages/shared` の `AutoReply` は
