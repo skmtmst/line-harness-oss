@@ -70,6 +70,7 @@ shared-button-importer app/automations/runs-v8.tsx
 shared-button-importer app/automations/runs/page.tsx
 shared-button-importer app/automations/templates-v8.tsx
 shared-button-importer app/booking/bookings/booking-calendar.tsx
+shared-button-importer app/booking/bookings/booking-day-v8.tsx
 shared-button-importer app/booking/bookings/booking-detail-v8.tsx
 shared-button-importer app/booking/bookings/detail/page.tsx
 shared-button-importer app/booking/bookings/new/page.tsx
@@ -78,6 +79,7 @@ shared-button-importer app/booking/menus/channels-tab-v8.tsx
 shared-button-importer app/booking/menus/new/menu-form-v8.tsx
 shared-button-importer app/booking/menus/new/page.tsx
 shared-button-importer app/booking/menus/page.tsx
+shared-button-importer app/booking/menus/payment-tab-v8.tsx
 shared-button-importer app/booking/menus/settings-tabs/holidays-tab.tsx
 shared-button-importer app/booking/menus/settings-tabs/hours-tab.tsx
 shared-button-importer app/booking/menus/settings-tabs/menus-tab.tsx

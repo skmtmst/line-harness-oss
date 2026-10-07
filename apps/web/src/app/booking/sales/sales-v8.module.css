@@ -1,0 +1,243 @@
+/* 予約からの売上（B-1 X26oo）。色・動きは globals.css の名前だけ。 */
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: var(--tpl-bks-head-mb);
+}
+
+.title {
+  font-size: var(--tpl-bks-title-size);
+  font-weight: 600;
+  margin: var(--tpl-bks-none);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: var(--tpl-bks-tiles-mb);
+}
+
+.tile {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--tpl-bks-tile-radius);
+  box-shadow: var(--shadow-board);
+  padding: var(--tpl-bks-tile-pad);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.tile[aria-expanded='true'] {
+  border-color: var(--color-accent-deep);
+}
+
+.tileLabel {
+  font-size: var(--tpl-bks-tile-label-size);
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+}
+
+.tileValue {
+  font-size: var(--tpl-bks-tile-value-size);
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  font-variant-numeric: tabular-nums;
+  margin-top: var(--tpl-bks-tile-value-mt);
+}
+
+.tileSub {
+  font-size: var(--tpl-bks-tile-sub-size);
+  color: var(--color-ink-faint);
+  margin-top: var(--tpl-bks-tile-sub-mt);
+}
+
+.detail {
+  overflow: hidden;
+  max-height: var(--tpl-bks-none);
+  opacity: 0;
+  transition:
+    max-height var(--motion-base) var(--motion-ease-out),
+    opacity var(--motion-base) var(--motion-ease-out),
+    margin var(--motion-base) var(--motion-ease-out);
+  margin-bottom: var(--tpl-bks-none);
+}
+
+.detailOpen {
+  max-height: var(--tpl-bks-detail-open-max-h);
+  opacity: 1;
+  margin-bottom: var(--tpl-bks-detail-open-mb);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail {
+    transition: none;
+  }
+}
+
+.detailCard {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--tpl-bks-detail-card-radius);
+  padding: var(--tpl-bks-detail-card-pad);
+}
+
+.detailTitle {
+  font-size: var(--tpl-bks-detail-title-size);
+  font-weight: 600;
+  margin: var(--tpl-bks-detail-title-m);
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: var(--tpl-bks-detail-row-pad);
+  border-top: 1px solid var(--color-hairline);
+  font-size: var(--tpl-bks-detail-row-size);
+}
+
+.detailRow:first-of-type {
+  border-top: none;
+}
+
+.detailName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailValue {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.panels {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 12px;
+}
+
+.panel {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--tpl-bks-panel-radius);
+  padding: var(--tpl-bks-panel-pad);
+  min-width: 0;
+}
+
+.panelTitle {
+  font-size: var(--tpl-bks-panel-title-size);
+  font-weight: 600;
+  margin: var(--tpl-bks-panel-title-m);
+}
+
+.menuRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  padding: var(--tpl-bks-menu-row-pad);
+  align-items: center;
+}
+
+.menuName {
+  font-size: var(--tpl-bks-menu-name-size);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menuMeta {
+  font-size: var(--tpl-bks-menu-meta-size);
+  color: var(--color-ink-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.menuTrack {
+  grid-column: 1 / -1;
+  height: var(--tpl-bks-menu-track-h);
+  border-radius: var(--tpl-bks-menu-track-radius);
+  background: var(--tpl-bks-menu-track-bg);
+}
+
+.menuFill {
+  height: var(--tpl-bks-menu-fill-h);
+  border-radius: var(--tpl-bks-menu-fill-radius);
+  background: var(--color-accent-deep);
+}
+
+.weekRow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+  min-height: var(--tpl-bks-week-row-min-h);
+}
+
+.weekCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.weekCount {
+  font-size: var(--tpl-bks-week-count-size);
+  color: var(--color-ink-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.weekTrack {
+  width: 100%;
+  max-width: 56px;
+  height: var(--tpl-bks-week-track-h);
+  display: flex;
+  align-items: flex-end;
+  border-radius: var(--tpl-bks-week-track-radius);
+  background: var(--tpl-bks-week-track-bg);
+}
+
+.weekFill {
+  width: 100%;
+  border-radius: var(--tpl-bks-week-fill-radius);
+  background: var(--color-accent-soft);
+  min-height: var(--tpl-bks-week-fill-min-h);
+}
+
+.weekFillPeak {
+  background: var(--color-accent-deep);
+}
+
+.weekLabel {
+  font-size: var(--tpl-bks-week-label-size);
+  color: var(--color-ink-secondary);
+}
+
+.note {
+  font-size: var(--tpl-bks-note-size);
+  color: var(--color-ink-faint);
+  margin-top: var(--tpl-bks-note-mt);
+}
+
+.center {
+  padding: var(--tpl-bks-center-pad);
+  text-align: center;
+  color: var(--color-ink-secondary);
+}
+
+@media (max-width: 900px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
