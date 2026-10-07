@@ -317,7 +317,7 @@ async function createFriendForRecipient(
  * キーがある送信は内容から決まるIDを使う。初回の200で履歴を書けなかった
  * 場合も、LINEが「受理済み」を返す409の再送で同じIDへ同じ行を補完できる。
  */
-async function deterministicLogId(seed: string): Promise<string> {
+export async function deterministicLogId(seed: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed));
   const bytes = new Uint8Array(digest.slice(0, 16));
   bytes[6] = (bytes[6] & 0x0f) | 0x50;

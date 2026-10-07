@@ -1,3 +1,10 @@
+import { autoReplyUnmatched } from './routes/auto-reply-unmatched.js';
+import { instagram } from './routes/instagram.js';
+import { purgeInstagramTransientData } from './services/instagram.js';
+import { restaurantCustomerBooking } from './routes/restaurant-customer-booking.js';
+import { processRestaurantCustomerNotices } from './services/restaurant-customer-booking.js';
+import { chatMessages } from './routes/chat-messages.js';
+import { scenarioDrafts, purgeExpiredScenarioDrafts } from './routes/scenario-drafts.js';
 import { broadcastMediaDirect } from './routes/broadcast-media-direct.js';
 import { hqBroadcasts } from './routes/hq-broadcasts.js';
 import { visitStamps } from './routes/visit-stamps.js';
@@ -328,6 +335,12 @@ export type Env = {
     ADMIN_COOKIE_SAMESITE?: string; // Optional override: 'Strict' | 'Lax' | 'None'
     ADMIN_ALLOW_CROSS_SITE?: string; // 'true' opts into SameSite=None cross-site cookies
     X_HARNESS_URL?: string;  // Optional: X Harness API URL for account linking
+    META_APP_ID?: string;
+    META_APP_SECRET?: string;
+    META_REDIRECT_URI?: string;
+    META_GRAPH_API_VERSION?: string;
+    META_TOKEN_ENCRYPTION_KEY?: string;
+    META_WEBHOOK_VERIFY_TOKEN?: string;
     IG_HARNESS_URL?: string;  // Optional: IG Harness API URL for cross-platform linking
     IG_HARNESS_LINK_SECRET?: string;  // Shared secret for IG Harness link-line webhook
     // Phase 5 self-update — consumed by /admin/update/*. Defaults live in
@@ -496,6 +509,7 @@ app.route('/', duplicates);
 app.route('/', friends);
 app.route('/', tags);
 app.route('/', scenarios);
+app.route('/', scenarioDrafts);
 // NOTE: 承認の口（approval-threshold 等の固定名）は :id より先に載せる。
 // broadcasts の PUT /:id が先だと approval-threshold を id と読んで404になる。
 app.route('/', broadcastApprovals);
@@ -526,6 +540,7 @@ app.route('/', scoring);
 app.route('/', actionScoreRules);
 app.route('/', templates);
 app.route('/', chats);
+app.route('/', chatMessages);
 app.route('/', conversations);
 app.route('/', notificationCenter);
 // 運用者通知ルール(/api/notifications/rules)。2026-08-29 の下書き画面がこの経路を呼ぶが、
@@ -550,6 +565,7 @@ app.route('/', access);
 app.route('/', capabilities);
 app.route('/', images);
 app.route('/', setup);
+app.route('/', autoReplyUnmatched);
 app.route('/', autoReplies);
 app.route('/', autoReplyRuns);
 app.route('/', adminAuth);
@@ -567,6 +583,7 @@ app.route('/', profileRefresh);
 app.route('/', richMenuGroups);
 app.route('/', webinarRoutes);
 app.route('/', instagramEngagement);
+app.route('/', instagram);
 // LINE Messaging API 互換プロキシ — 外部エージェントの直接送信を messages_log に残す
 app.route('/', lineProxy);
 // EC-CUBEの取引イベント。管理者認証ではなく署名・時刻・重複IDで検証する。
@@ -597,6 +614,7 @@ app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', visitStamps);
 app.route('/', restaurantTest);
+app.route('/', restaurantCustomerBooking);
 app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
 app.route('/', restaurantGooglePosts);
@@ -1380,6 +1398,7 @@ async function runFrequentHeavyJobs(
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'API draft and integration retention',run:async()=>{const now=new Date(event.scheduledTime);await purgeExpiredScenarioDrafts(env.DB,now);await purgeInstagramTransientData(env.DB,now);}},
     {name:'booking waitlist expiry and promotion',run:async()=>{const {processBookingWaitlists}=await import('./services/waitlist-tick.js');await processBookingWaitlists(env);}},
     {
       name: 'follower import continuation',
@@ -1695,6 +1714,7 @@ async function runFrequentHeavyJobs(
         await expireRestaurantHolds(dbFor(env), new Date(event.scheduledTime).toISOString());
         const { processRestaurantInventoryRuleQueue } = await import('./services/restaurant-inventory-rules.js');
         await processRestaurantInventoryRuleQueue(env);
+        await processRestaurantCustomerNotices(env);
         await applyDueRestaurantMenuPrices(dbFor(env));
       },
     });
