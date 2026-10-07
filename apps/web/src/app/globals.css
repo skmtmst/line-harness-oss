@@ -1123,6 +1123,8 @@
   --tpl-detail-head-pad-top: 20px; --tpl-detail-head-pad-side: 24px; --tpl-detail-head-pad-bottom: 16px;
   --tpl-detail-head-gap: 12px; --tpl-detail-actions-gap: 6px; --tpl-detail-tabs-pad-bottom: 12px;
   --tpl-create-content-pad-block: 24px; --tpl-create-content-pad-side: 28px; --tpl-create-content-gap: 16px;
+  /* 作成の型の口 contentSpacing='flush-top'（板の頭のすぐ下から。E-9 p17Qku：上 4・左右 24・下 24、段の間 28）。 */
+  --tpl-create-flush-pad: 4px 24px 24px; --tpl-create-flush-gap: 28px;
   --tpl-section-pad: 20px; --tpl-section-gap: 14px;
   /* 行の「…」のメニューの項目（絵 IIesG・SkY9V・C0lfUP）。 */
   --tpl-menu-item-h: 34px; --tpl-menu-item-gap: 8px; --tpl-menu-divider-margin: 0; --tpl-create-notice-pad: 12px 24px;

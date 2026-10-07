@@ -1,19 +1,6 @@
 /* ★V8 統括 一括配信を作る（E-9 p17Qku）。寸法は globals.css の --tpl-e49-* だけを使う。板の頭・右の列・下の帯は型（CreatePage）が持つ。 */
 
-/* 型の中身の欄は余白 24/28・段の間 16 の既定。絵（上 4・左右 24・下 24、段の間 28）に合わせる。包みは display: contents。 */
-.screen {
-  display: contents;
-}
-
-.screen [data-template-region='body'] > [data-template-region='content'] {
-  padding: var(--tpl-e49-content-pad);
-  gap: var(--tpl-e49-body-gap);
-}
-
-.screen [data-template-region='body'] > [data-template-region='preview'] {
-  padding: var(--tpl-e49-content-pad);
-  background: transparent;
-}
+/* 絵（上 4・左右 24・下 24、段の間 28、右の列は地なし）は型の口（contentSpacing='flush-top'・previewSurface='plain'）で選ぶ。ここで型の余白を上書きしない。 */
 
 .body {
   display: flex;
