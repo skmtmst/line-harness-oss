@@ -526,7 +526,9 @@
     "581_banner_emphasis_lines.sql",
     "582_automation_integration_folders.sql",
     "583_restaurant_inventory_rules.sql",
-    "585_booking_seat_waitlist_fifo.sql"
+    "585_booking_seat_waitlist_fifo.sql",
+    "592_message_type_delivery.sql",
+    "593_imagemap_message_kinds.sql"
   ],
-  "migrationCount": 527
+  "migrationCount": 529
 }

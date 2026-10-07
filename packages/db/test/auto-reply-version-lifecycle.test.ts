@@ -90,6 +90,16 @@ describe('自動応答の下書き・試験・公開版', () => {
     expect(parseAutoReplyVersionSettings(reread!).actions).toBe(actions);
   });
 
+  it('公開した待ち時間・受信経路・キーワードの当て方を読み直しても失わない',async()=>{
+    const created=await createAutoReplyWithDraftVersion(db,settings({normalizeKeywords:false,receiveSources:['email'],replyDelaySeconds:60,unmatchedAction:JSON.stringify({type:'notify_operator'})}));
+    await recordAutoReplyDraftTest(db,created.version.id,{succeeded:true,staffId:'staff-1'});
+    const published=await publishAutoReplyDraftVersion(db,created.rule.id,{staffId:'staff-1',idempotencyKey:'settings'});
+    const row=await getAutoReplyById(db,created.rule.id);
+    const runtime=await ensureAutoReplyPublishedVersion(db,row!);
+    expect(runtime.id).toBe(published.id);
+    expect(parseAutoReplyVersionSettings(runtime)).toMatchObject({normalizeKeywords:false,receiveSources:['email'],replyDelaySeconds:60});
+  });
+
   it('新規下書きは自動応答を動かさず、公開版も作らない', async () => {
     const created = await createAutoReplyWithDraftVersion(db, settings());
     expect(created.rule.is_active).toBe(0);

@@ -1055,6 +1055,21 @@ CREATE TABLE auto_reply_create_requests (
   UNIQUE(idempotency_key)
 );
 
+CREATE TABLE auto_reply_deliveries (
+  id TEXT PRIMARY KEY,
+  evaluation_id TEXT NOT NULL UNIQUE REFERENCES auto_reply_evaluations(id),
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  line_account_id TEXT REFERENCES line_accounts(id),
+  version_id TEXT NOT NULL REFERENCES auto_reply_versions(id),
+  message_json TEXT NOT NULL,
+  action_summary TEXT NOT NULL,
+  due_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','claimed','accepted','failed','skipped')),
+  completed_at TEXT,
+  error_code TEXT,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE auto_reply_evaluation_details (
   id                 TEXT PRIMARY KEY,
   evaluation_id      TEXT NOT NULL,
@@ -1744,6 +1759,20 @@ CREATE TABLE broadcast_lifecycle_events (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE broadcast_media_upload_sessions (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT REFERENCES line_accounts(id),
+  created_by TEXT NOT NULL,
+  r2_key TEXT NOT NULL UNIQUE,
+  public_key TEXT,
+  filename TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  expected_size INTEGER NOT NULL,
+  expires_at TEXT NOT NULL,
+  completed_at TEXT,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE broadcast_message_assets (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -1796,7 +1825,7 @@ CREATE TABLE broadcast_tracked_links (
 CREATE TABLE "broadcasts" (
   id                 TEXT PRIMARY KEY,
   title              TEXT NOT NULL,
-  message_type       TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel')),
+  message_type       TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel', 'imagemap', 'rich_message', 'coupon')),
   message_content    TEXT NOT NULL,
   target_type        TEXT NOT NULL CHECK (target_type IN ('all', 'tag', 'segment', 'multi-account-dedup')) DEFAULT 'all',
   target_tag_id      TEXT REFERENCES tags (id) ON DELETE SET NULL,
@@ -2149,6 +2178,18 @@ CREATE TABLE "conversion_points" (
   ingest_secret_encrypted TEXT,
   ingest_disabled_at TEXT
 , count_anonymous INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
+
+CREATE TABLE coupon_redemptions (
+  id TEXT PRIMARY KEY,
+  -- 素材を削除しても使用履歴を残す。設定はpayload_snapshotに固定する。
+  asset_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL REFERENCES friends(id),
+  line_account_id TEXT REFERENCES line_accounts(id),
+  incoming_event_id TEXT NOT NULL UNIQUE,
+  used_at TEXT NOT NULL,
+  use_number INTEGER NOT NULL,
+  payload_snapshot TEXT NOT NULL
+);
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -3640,6 +3681,13 @@ CREATE TABLE identity_events (
   actor_name TEXT NOT NULL,
   occurred_at TEXT NOT NULL,
   correlation_id TEXT NOT NULL
+);
+
+CREATE TABLE imagemap_images (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT REFERENCES line_accounts(id),
+  r2_key TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL
 );
 
 CREATE TABLE impersonation_sessions (
@@ -6703,7 +6751,7 @@ CREATE TABLE "scenario_steps" (
   scenario_id     TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
   step_order      INTEGER NOT NULL,
   delay_minutes   INTEGER NOT NULL DEFAULT 0,
-  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel')),
+  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel', 'imagemap', 'rich_message', 'coupon')),
   message_content TEXT NOT NULL,
   message_bubbles_json TEXT CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)),
   offset_days     INTEGER,
@@ -7175,11 +7223,11 @@ CREATE TABLE template_versions (
   UNIQUE (template_id, version_number)
 );
 
-CREATE TABLE templates (
+CREATE TABLE "templates" (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
   category        TEXT NOT NULL DEFAULT 'general',
-  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'carousel')),
+  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'carousel', 'imagemap', 'rich_message', 'coupon')),
   message_content TEXT NOT NULL,
   -- 162: カルーセルの選択肢を押したときの動き。
   -- { "0": { "0": [アクションの並び] } }（パネル番号 → 選択肢番号 → 中身）
@@ -7994,6 +8042,8 @@ CREATE INDEX idx_auto_reply_action_runs_evaluation
 CREATE INDEX idx_auto_reply_create_requests_rule
   ON auto_reply_create_requests(auto_reply_id, created_at DESC);
 
+CREATE INDEX idx_auto_reply_deliveries_due ON auto_reply_deliveries(status, due_at);
+
 CREATE INDEX idx_auto_reply_evaluation_details_evaluation
   ON auto_reply_evaluation_details (evaluation_id, evaluation_order);
 
@@ -8331,6 +8381,8 @@ CREATE INDEX idx_conversion_points_ingest ON conversion_points(id)
 CREATE INDEX idx_conversion_points_status ON conversion_points(status, created_at DESC);
 
 CREATE INDEX idx_conversion_points_tenant ON conversion_points(tenant_id);
+
+CREATE INDEX idx_coupon_redemptions_friend ON coupon_redemptions(asset_id, friend_id);
 
 CREATE INDEX idx_customer_notification_definitions_account
   ON customer_notification_definitions(line_account_id, status, category, name, id);

@@ -20,7 +20,10 @@ export type BroadcastMessageType =
   | 'video'
   | 'audio'
   | 'sticker'
-  | 'carousel';
+  | 'carousel'
+  | 'imagemap'
+  | 'rich_message'
+  | 'coupon';
 
 export interface Broadcast {
   id: string;
