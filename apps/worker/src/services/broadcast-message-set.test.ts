@@ -40,7 +40,19 @@ describe('一斉配信の複数吹き出し契約', () => {
     expect(() => parseBroadcastMessageParts({ messageType: 'text', messageContent: 'x', messageBubbles: [{ type: 'unknown_type', content: {} }] }))
       .toThrow('Unsupported');
     expect(() => parseBroadcastMessageParts({ messageType: 'text', messageContent: 'x', messageBubbles: [{ type: 'image', content: {} }] }))
-      .toThrow('originalContentUrl');
+      .toThrow('画像のファイルをアップロードしてください');
+  });
+
+  it('動画・画像はプレビュー画像まで https で揃っていないと人の言葉で止める（2026-10-07 点検）', () => {
+    const parse = (type: string, content: Record<string, unknown>) =>
+      () => parseBroadcastMessageParts({ messageType: 'text', messageContent: 'x', messageBubbles: [{ type, content }] });
+    expect(parse('video', { originalContentUrl: 'https://e.test/v.mp4', previewImageUrl: '' }))
+      .toThrow('動画のプレビュー画像のURLを入れてください');
+    expect(parse('video', { originalContentUrl: 'https://e.test/v.mp4', previewImageUrl: 'http://e.test/p.jpg' }))
+      .toThrow('動画のプレビュー画像のURLは https:// から始めてください');
+    expect(parse('video', { originalContentUrl: 'http://e.test/v.mp4', previewImageUrl: 'https://e.test/p.jpg' }))
+      .toThrow('動画のURLは https:// から始めてください');
+    expect(parse('video', { originalContentUrl: 'https://e.test/v.mp4', previewImageUrl: 'https://e.test/p.jpg' })).not.toThrow();
   });
 
   it('範囲外の緯度・経度を直し方で止める（監査 R210）', () => {
