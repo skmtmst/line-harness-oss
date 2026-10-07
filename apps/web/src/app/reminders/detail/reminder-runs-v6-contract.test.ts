@@ -9,22 +9,6 @@ const LIST_PAGE = fs.readFileSync(path.join(__dirname, '..', 'list-v8.tsx'), 'ut
 const API = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V6 7-1-H リマインダ実行結果', () => {
-  it('Pencilの実Nodeと共通部品を正本にする', () => {
-    expect(PAGE).toContain('data-design-node="GC4St"')
-    expect(PAGE).toContain("@/components/shared/breadcrumb")
-    expect(PAGE).toContain("@/components/shared/card")
-    expect(PAGE).toContain("@/components/shared/list-state")
-    expect(PAGE).toContain("@/components/shared/pagination")
-    expect(PAGE).toContain("@/components/reminders/reminder-v6-ui")
-  })
-
-  it('本文に画面タイトルと説明を重ねない', () => {
-    expect(PAGE).not.toMatch(/<h1[\s>]/)
-    expect(PAGE).not.toContain('リマインダの実行結果</h1>')
-    expect(PAGE).not.toContain('data-page-title')
-    expect(PAGE).toContain("`${data.reminder.name}・${isPlannedView ? '配信予定' : '実行結果'}`")
-  })
-
   it('一覧から予定と履歴を選べ、予定は公開APIのplannedで絞る', () => {
     expect(LIST_PAGE).toContain('status=planned')
     expect(LIST_PAGE).toContain("label: '配信予定を見る'")

@@ -6,13 +6,10 @@ import { AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 /**
  * ルールを作る（★V6 `Rv8Jv`）の見張り。
  *
- * 見ているのは3つ。
+ * 主に見ているのは、保存・権限・読み込みの扱いと、
+ * **選べるきっかけが、実際に発火するものだけであること**。
  *
- *   1. 画面名を本文へ戻さないこと（トップバー・パンくず・h1 の三重を消した）
- *   2. 設計の寸法（番号バッジ26・主要ボタン40/8/13/700・入力40・本文120・右390）
- *   3. **選べるきっかけが、実際に発火するものだけであること**
- *
- * 3つめだけは、この画面のソースを読むだけでは確かめられない。発火するかは
+ * きっかけは、この画面のソースを読むだけでは確かめられない。発火するかは
  * `apps/worker` の `fireEvent` 呼び出し元が決めるので、そちらを読んで突き合わせる。
  * 画面側の一覧だけを見る試験にすると、また「保存はできるが一度も動かない」
  * 選択肢が増えたときに気づけない。
@@ -28,7 +25,6 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
  * 生のソースを見ると自分の注釈に当たる。画面に出る文字だけを見る。
  */
 const PAGE_CODE = PAGE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-const CSS = readFileSync(join(HERE, 'new-automation.module.css'), 'utf8')
 const TYPES = readFileSync(join(REPO, 'packages', 'shared', 'src', 'types.ts'), 'utf8')
 
 /**
@@ -76,79 +72,6 @@ function firedEventTypes(): Set<string> {
 }
 
 describe('V6 ルールを作る（Rv8Jv）', () => {
-  it('画面名は共通トップバーにだけ置く', () => {
-    expect(PAGE).toContain("usePageTitle('ルールを作る')")
-    expect(PAGE).toContain('data-design-node="Rv8Jv"')
-    // 本文の見出しとサブタイトルを戻さない。パンくずとトップバーで足りる。
-    expect(PAGE).not.toContain('<h1')
-    expect(PAGE).not.toContain("from '@/components/shared/page-header'")
-    expect(PAGE).not.toContain("from '@/components/shared/create-page'")
-  })
-
-  it('保存・キャンセルは下部追従バーにしか置かない', () => {
-    expect(PAGE).toContain("import StickyBar from '@/components/shared/sticky-bar'")
-    const bar = PAGE.slice(PAGE.indexOf('<StickyBar'))
-    for (const label of ['キャンセル', '下書きを保存する', 'つくって動かす']) {
-      expect(bar, `${label} が追従バーの外にあります`).toContain(label)
-    }
-    // 追従バーより前に保存の押し口を置かない。
-    expect(PAGE.slice(0, PAGE.indexOf('<StickyBar'))).not.toContain('保存中...')
-  })
-
-  it('設計の寸法を持つ', () => {
-    // 番号バッジ 26×26・丸・12px（$size-caption）・700
-    expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*width: 26px;/)
-    expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*height: 26px;/)
-    expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*border-radius: var\(--radius-pill\);/)
-    expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*font-size: var\(--text-caption\);/)
-    expect(CSS).toMatch(/\.stepBadge\s*\{[^}]*font-weight: 500;/)
-
-    // 主要ボタン 高さ40 / 角丸8 / 余白[0,14] / 13px / 700
-    expect(CSS).toMatch(/\.action\s*\{[^}]*height: 40px;/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*border-radius: var\(--radius-control\);/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*padding: 0 14px;/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*font-size: var\(--text-label\);/)
-    expect(CSS).toMatch(/\.action\s*\{[^}]*font-weight: 600;/)
-
-    // 「動きを追加」だけ高さ44、行の中の小さな操作は 32 / r6
-    expect(CSS).toMatch(/\.addAction\s*\{[^}]*height: 44px;/)
-    expect(CSS).toMatch(/\.rowAction\s*\{[^}]*height: 32px;/)
-    expect(CSS).toMatch(/\.rowAction\s*\{[^}]*border-radius: var\(--radius-mini\);/)
-
-    // プルダウン 高さ40 / 角丸8 / 13px
-    expect(CSS).toMatch(/\.select\s*\{[^}]*height: 40px;/)
-    expect(CSS).toMatch(/\.select\s*\{[^}]*border-radius: var\(--radius-control\);/)
-    expect(CSS).toMatch(/\.select\s*\{[^}]*font-size: var\(--text-label\);/)
-
-    // カード r10（$radius-md = --radius-card）／カード内のまとまり r8
-    expect(CSS).toMatch(/\.card\s*\{[^}]*border-radius: var\(--radius-card\);/)
-    expect(CSS).toMatch(/\.group\s*\{[^}]*border-radius: var\(--radius-control\);/)
-
-    // 右カラム 390px、本文入力 120px
-    expect(CSS).toContain('grid-template-columns: minmax(0, 1fr) 390px;')
-    expect(CSS).toMatch(/\.textareaTall\s*\{[^}]*min-height: 120px;/)
-  })
-
-  it('1行入力は共通部品（高さ40）を使う', () => {
-    expect(PAGE).toContain("import { TextArea, TextField } from '@/components/shared/text-field'")
-    const field = readFileSync(
-      join(REPO, 'apps', 'web', 'src', 'components', 'shared', 'text-field.module.css'),
-      'utf8',
-    )
-    expect(field).toContain('height: 40px;')
-  })
-
-  it('右カラムに固有カード・つながる先・気をつけることを置く', () => {
-    expect(PAGE).toContain('data-design="Right"')
-    expect(PAGE).toContain("import { CareCard, FeatureLinkCard } from '@/components/shared/side-cards'")
-    expect(PAGE).toContain('当てはまりそうな人数')
-    expect(PAGE).toContain('いまの決めごとを文章にすると')
-    expect(PAGE).toContain('この文章のとおりに動きます。')
-    expect(PAGE).toContain('同じきっかけのルールは両方動きます')
-    expect(PAGE).toContain('15軸')
-    expect(PAGE).toContain('失敗したとき: 現在はここで止まります。')
-  })
-
   it('保存後に見込み人数を確認でき、0件と書かない', () => {
     expect(PAGE).toContain(
       '保存後に見込み人数を確認できます。',

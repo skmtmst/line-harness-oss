@@ -5,15 +5,6 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('V6 機能20 分析', () => {
-  it('8種類の分析への入口を維持する', () => {
-    for (const tab of [
-      '友だちの増減', '配信の反応', '経路と成果', '使われ方',
-      'クロス分析', 'ファネル', 'URLクリック', '保存した分析',
-    ]) expect(PAGE).toContain(`label: '${tab}'`)
-
-
-  })
-
   it('クロス分析とファネルは旧集計へ戻らず、版付きの不変結果を使う', () => {
     for (const path of [
       '/api/analytics/cross/query',

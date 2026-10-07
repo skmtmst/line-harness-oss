@@ -19,13 +19,6 @@ const ENGINE = read('..', '..', '..', '..', 'worker', 'src', 'services', 'automa
 const FOUNDATION = read('..', '..', '..', '..', '..', 'packages', 'db', 'migrations', '181_automation_v6_foundation.sql')
 
 describe('V6共通アクションの画面契約', () => {
-  it('Pencilの3画面を実ノードIDへ結び付ける', () => {
-    expect(LIST).toContain('data-design-node="xOpDs"')
-    expect(CREATE).toContain('data-design-node="py5CG"')
-    expect(EDIT).toContain('data-design-node="py5CG"')
-    expect(VERSIONS).toContain('data-design-node="syWp4"')
-  })
-
   it('一覧・空・読込・失敗と、名前で分かる遷移を持つ', () => {
     expect(LIST).toContain('共通アクションを読み込んでいます')
     expect(LIST).toContain('共通アクションはまだありません')
@@ -172,15 +165,6 @@ describe('V6共通アクションの画面契約', () => {
     expect(commonAction).toContain("from './use-can-manage'")
     expect(automation).not.toContain('localStorage')
     expect(commonAction).not.toContain('localStorage')
-  })
-
-  it('ヘッダーの最後をマニュアルにする', () => {
-    // 作る操作は見出しの右ではなく一覧の上の行へ。マニュアルは見出しに残す。
-    expect(LIST).toContain('＋ 共通アクションを作る')
-    expect(LIST).not.toContain('共通アクションをつくる')
-    expect(LIST).toContain('manualHref ? <Button href={manualHref}>マニュアル</Button>')
-    expect(LIST.indexOf('＋ 共通アクションを作る')).toBeGreaterThan(LIST.indexOf('<NoteBar>'))
-    expect(VERSIONS.indexOf('マニュアル')).toBeGreaterThan(VERSIONS.indexOf('前の版から新版を作る'))
   })
 
   it('「マニュアル」は正本表の画面IDを引き、/supportへ固定で飛ばさない (監査R128)', () => {

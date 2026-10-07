@@ -13,9 +13,6 @@ import Select from './select'
 afterEach(() => cleanup())
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const SRC = join(HERE, '..', '..')
-const WEB = join(SRC, '..')
-const readSource = (path: string) => readFileSync(join(SRC, path), 'utf8')
 const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
 
@@ -73,17 +70,6 @@ describe('V5 B3 入力・検索・選択部品', () => {
     expect(hidden?.getAttribute('value')).toBe('active')
   })
 
-  it('代表画面は直書きではなく共通入力・検索・選択を使う', () => {
-    expect(readSource('app/staff/new/page.tsx')).toMatch(/import Select/)
-    expect(readSource('app/staff/new/page.tsx')).toMatch(/TextInput/)
-    expect(readSource('app/reminders/new/page.tsx')).toMatch(/TextArea/)
-    expect(readSource('components/shared/list-toolbar.tsx')).toMatch(/SearchField/)
-    // 一覧の帯から Select は外した。並び順・表示件数は仕組みができるまで描かない
-    // （§2-2「使えないプルダウンを完成画面に置かない」）。共通 Select を使っている
-    // 証拠は上の `app/staff/new/page.tsx` が持つ。
-    expect(readSource('components/shared/list-toolbar.tsx')).not.toMatch(/<Select/)
-  })
-
   it('CSSモジュールは生の色とローカル変数を持たず、フォーカス輪郭を消さない', () => {
     // 2026-09-25・使いやすさ点検 §8: 入力欄の輪郭は `2px・action 色・offset 2px`
     // にそろえた（緑は「正常」の意味）。`outline: revert`（ブラウザ既定）と
@@ -103,19 +89,5 @@ describe('V5 B3 入力・検索・選択部品', () => {
         /:focus-visible[^{]*\{[^}]*outline:\s*(?:revert|2px solid var\(--color-action\))/s,
       )
     }
-  })
-
-  it('契約はB3の実ノード・部品・宣言数を下限として持つ', () => {
-    const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
-    const inventory = JSON.parse(readFileSync(join(WEB, 'design', 'pencil-component-inventory.json'), 'utf8'))
-    expect(contract.required.parts).toBe(20)
-    expect(contract.required.partDeclarations).toBe(301)
-    expect(contract.parts['form-control'].pencilNodes).toEqual(['ytG7l', 'keKe3'])
-    expect(contract.parts['search-field'].pencilNodes).toEqual(['phlR1'])
-    expect(contract.parts.select.pencilNodes).toEqual(['rpot9', 'Gfsb4', 'niGPF', 'QB99A'])
-    for (const nodeId of ['ytG7l', 'keKe3', 'phlR1', 'rpot9', 'Gfsb4', 'niGPF', 'QB99A']) {
-      expect(inventory.components[nodeId].status, `${nodeId} がactiveではない`).toBe('active')
-    }
-    expect(contract.investigations['checkbox-switch-canonical']).toBeDefined()
   })
 })

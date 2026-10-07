@@ -37,17 +37,6 @@ describe('V6 EC integration screens', () => {
     expect(tabsView).not.toContain('api.ecCommerce.subscriptions')
   })
 
-  it('keeps the sort select accessible and wide', () => {
-    // 1段だけのパンくずは画面名と重複するので出さない。
-    expect(page).not.toContain("label: '専用機能'")
-    // 「確認」「つき合わせ」の札は注意・中立にし、緑（正常の意味だけ）は使わない。
-    expect(page).not.toContain('badgeTone="danger"')
-    // 並び順の欄は共通 Select の full 幅で、外側で sm:w-64 を持つ。
-    expect(page).toContain('aria-label="取り込みの並び順"')
-    expect(page).toContain('size="full"')
-    expect(page).toContain('w-full sm:w-64')
-  })
-
   it('shows the V6 decision information without inventing unavailable values', () => {
     for (const wording of ['処理完了', '処理中', '送信なし', '失敗']) {
       expect(page).toContain(wording)

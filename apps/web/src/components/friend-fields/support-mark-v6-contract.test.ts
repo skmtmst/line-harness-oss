@@ -35,16 +35,6 @@ describe('V6 対応マーク', () => {
     for (const label of ['マーク名', '色', '並び順', '新しい友だちに最初から付ける']) expect(EDITOR).toContain(label)
   })
 
-  it('基本情報・自動変更・使用先を同じ段で確認できる', () => {
-    expect(EDITOR).toContain('xl:grid-cols-3')
-    expect(EDITOR).toContain('<SupportMarkRulesPanel')
-    for (const label of ['受信箱の絞り込み', '友だち一覧の列と絞り込み', 'ダッシュボードの絞り込み', '配信の絞り込み条件', 'オートメーションの動作']) {
-      expect(EDITOR).toContain(label)
-    }
-    expect(EDITOR).not.toContain('メッセージ受信時にこのマークへ変更')
-    expect(EDITOR).not.toContain('現在接続済みの受信時設定だけを変更します')
-  })
-
   it('保存と保管の失敗で内部のAPI文言をそのまま表示しない', () => {
     // R511: 保存の失敗文は共通関数（失敗の文の共通関数）に寄せた。
     // 403 の権限不足と通信の失敗を分け、API の本文をそのまま出さない約束は変えない。

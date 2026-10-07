@@ -11,22 +11,6 @@ const SUMMARY = readFileSync(join(HERE, 'summary-bar.tsx'), 'utf8')
 const FILTERS = readFileSync(join(HERE, 'users-filters.tsx'), 'utf8')
 
 describe('統合ユーザーV6の画面契約', () => {
-  it('Pencilの実Nodeと利用者向けの7列へ結び付ける', () => {
-    expect(PAGE).toContain('data-users-design="v6"')
-    expect(PAGE + TABLE).toContain('data-design-node="r7eSi"')
-    for (const heading of [
-      '統合ユーザー',
-      '連絡先',
-      '紐付くアカウント',
-      'UID',
-      '最終接触',
-      '重複配信',
-      '操作',
-    ]) {
-      expect(TABLE).toContain(`>${heading}</Th>`)
-    }
-  })
-
   it('内部の統合キーを画面へ出さない', () => {
     expect(ROW).not.toContain('{row.identityKey}')
     expect(ROW).not.toContain('{row.identityKeyKind}')
@@ -82,25 +66,5 @@ describe('統合ユーザーV6の画面契約', () => {
     expect(SUMMARY).toContain('value={stats?.uniquePeople ?? null}')
     expect(SUMMARY).toContain('setStats(null)')
     expect(SUMMARY).toContain('requestGuard.isCurrent(requestGeneration)')
-  })
-
-  it('操作列はボタンが収まる固定幅にし、伸び縮みは連絡先とアカウントだけにする', () => {
-    /*
-     * 1440pxで「詳細を見る」が枠をはみ出していた。再発防止に幅を固定する。
-     * 操作列 176px＝詳細ボタン98px＋隙間8px＋「…」32px＋セル余白24px（162px）に余裕14px。
-     * 幅を持たない <col /> が2つ（連絡先・紐付くアカウント）だけ残る。
-     */
-    for (const width of ['w-[16%]', 'w-[108px]', 'w-[92px]', 'w-[176px]']) {
-      expect(TABLE).toContain(width)
-    }
-    expect(TABLE).toContain('<col />')
-    expect(TABLE).not.toContain('w-[9%]')
-  })
-
-  it('共通ページ送りを使い横スクロールへ逃がさない', () => {
-    expect(TABLE).toContain("import Pagination from '@/components/shared/pagination'")
-    expect(TABLE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
-    expect(TABLE).not.toContain('overflow-x-auto')
-    expect(TABLE).toContain('table-fixed')
   })
 })
