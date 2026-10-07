@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import PrivacyNote from '../../components/ui/PrivacyNote.js';
 import { changeRule, longDate, remainingText, stayText, zonedParts } from '../../lib/seat-reserve.js';
 
 const FIELD = 'h-9 w-full rounded-(--liff-radius) bg-canvas px-3 text-sm text-ink placeholder:text-liff-sub outline outline-1 -outline-offset-1 outline-liff-line-strong focus-visible:outline-2 focus-visible:outline-ink';
@@ -147,11 +148,12 @@ export default function SeatConfirm({
           {error}
         </p>
       )}
+      <PrivacyNote />
       <div className="flex">
         <button
           type="button"
           onClick={onBack}
-          className="text-xs leading-[18px] text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+          className="liff-hit text-xs leading-[18px] text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
         >
           ← 時刻を選び直す
         </button>

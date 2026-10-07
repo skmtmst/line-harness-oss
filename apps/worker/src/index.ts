@@ -10,6 +10,7 @@ import { hqBroadcasts } from './routes/hq-broadcasts.js';
 import { visitStamps } from './routes/visit-stamps.js';
 import { processVisitStampQueue } from './services/visit-stamps.js';
 import { Hono, type Context } from 'hono';
+import { noindexHeaderMiddleware, robotsTxtHandler } from './lib/robots.js';
 import { cors } from 'hono/cors';
 import { LineClient } from '@line-crm/line-sdk';
 import {
@@ -450,6 +451,10 @@ export const ADMIN_REQUEST_HEADERS = [
 // same-origin requests and origins on the ADMIN_ORIGIN allowlist; everything
 // else gets no Access-Control-Allow-Origin header (browser blocks it). Bearer
 // SDK/MCP callers send no Origin header and are unaffected.
+// 検索に出さない：本物の robots.txt と、全部の応答に X-Robots-Tag（リリース前点検 2026-10-07）。
+app.use('*', noindexHeaderMiddleware);
+app.get('/robots.txt', robotsTxtHandler);
+
 // 段ごとの経過時間を Server-Timing で返す（V6R-CX-a）。ログイン済みの職員への応答だけ。
 app.use('*', timingStart());
 app.use('*', cors({

@@ -2,20 +2,15 @@ import type { Metadata } from 'next'
 import { Inter, Noto_Sans_JP } from 'next/font/google'
 import './globals.css'
 import AppShell from '@/components/app-shell'
-import BrandTitle from '@/components/brand-title'
 import ClientErrorReporter from '@/components/client-error-reporter'
 import ToastHost from '@/components/shared/toast'
 
 /**
  * 書き出しの時点で決まる題。
  *
- * 実際にタブへ出るのは公式アカウントの表示名で、読み込んだあとに
- * BrandTitle が差し替える。ここはそれが取れるまでの間と、取れなかった
- * ときの名前。以前は末尾に「TEST」を足して本番と見分けていたが、
- * 名前そのものを変えると利用者にもテスト用に見える。
- *
- * ここは製品の名前を出す場所なので musubo と書く。契約先の名前は公式
- * アカウントから取れたものだけを出す。
+ * 描いたあとは上の帯（app-top-bar）と usePageTitle が「<画面名> | musubo」に
+ * 差し替える（lib/document-title.ts）。ここはそれまでの間の名前。
+ * 製品の名前を出す場所なので musubo と書く（LINE Harness は出さない）。
  */
 const DEFAULT_TITLE = 'musubo LINE管理システム'
 
@@ -62,6 +57,8 @@ export const metadata: Metadata = {
   icons: {
     icon: '/icon.svg',
   },
+  // 管理画面は検索に出さない（public/robots.txt・_headers の X-Robots-Tag と同じ）。
+  robots: { index: false, follow: false },
   openGraph: {
     title: DEFAULT_TITLE,
     description: DEFAULT_TITLE,
@@ -83,7 +80,6 @@ export default function RootLayout({
         {/* localStorage のテーマ指定を描画前に反映する（白い板のちらつき防止） */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         <ClientErrorReporter />
-        <BrandTitle />
         <AppShell>
           {children}
         </AppShell>

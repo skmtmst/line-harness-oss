@@ -8,6 +8,7 @@ import Button from './Button.js';
  * 印は success だけ緑の丸。それ以外は灰色の線の印をそのまま置く
  * (ADutg・zz9R3 と同じ形)。ウェビナーの暗い地では dark を渡す。
  * 待ち (キャンセル待ち・承認待ち) は tone="wait" で黄土色の丸にする。
+ * 見つからない・開けない (板 aLU3r) は tone="muted" で薄い灰の丸に灰の印。
  * large は ★V8 の終わり・お知らせの板 (aNZKe・BjcuB・qVdiX) の形：
  * 丸・題 (20)・本文 (13/21) の間をすべて 16 空け、children を本文の下に足す。
  */
@@ -22,7 +23,7 @@ export default function StatusView({
   children,
 }: {
   icon: IconName;
-  tone?: 'neutral' | 'success' | 'wait';
+  tone?: 'neutral' | 'success' | 'wait' | 'muted';
   dark?: boolean;
   title: string;
   body?: string;
@@ -44,6 +45,13 @@ export default function StatusView({
         aria-hidden="true"
       >
         <Icon name={icon} className={large ? 'h-[34px] w-[34px]' : 'h-8 w-8'} />
+      </span>
+    ) : tone === 'muted' ? (
+      <span
+        className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-chip text-liff-idle"
+        aria-hidden="true"
+      >
+        <Icon name={icon} className="h-9 w-9" />
       </span>
     ) : (
       <span className={dark ? 'text-night-faint' : 'text-liff-idle'} aria-hidden="true">

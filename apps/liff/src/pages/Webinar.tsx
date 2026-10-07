@@ -6,6 +6,7 @@ import { logFailure } from '../lib/user-message.js';
 import LoadingView from '../components/LoadingView.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
+import { liffDocumentTitle } from '../components/ui/LiffHeader.js';
 
 // 疑似ライブプレーヤー。時刻の権威はサーバー:
 //   期待位置 = state.offsetSeconds + (performance.now() - t0) / 1000
@@ -39,6 +40,10 @@ function formatJp(epoch: number): string {
 export default function Webinar() {
   const { slug } = useParams<{ slug: string }>();
   const [state, setState] = useState<WebinarState | null>(null);
+  // 上の帯の無い画面なので、題はここで付ける（「<ウェビナー名> | musubo」）。
+  useEffect(() => {
+    document.title = liffDocumentTitle(state?.title || 'ウェビナー');
+  }, [state?.title]);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   /** この端末では再生できない (HLS 非対応など)。読み直しても直らない。 */
@@ -409,7 +414,7 @@ export default function Webinar() {
           {needsTap && (
             <button
               type="button"
-              className="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white"
+              className="liff-hit pointer-events-auto inline-flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white"
               onClick={() => {
                 const v = videoRef.current;
                 if (v) {
@@ -482,7 +487,7 @@ export default function Webinar() {
           type="button"
           onClick={() => void sendComment()}
           aria-label="送信"
-          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-liff-primary text-white"
+          className="liff-hit flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-full bg-liff-primary text-white"
         >
           <Icon name="send" className="h-[18px] w-[18px]" />
         </button>

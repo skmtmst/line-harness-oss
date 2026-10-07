@@ -408,7 +408,9 @@ describe('通信例外の結果不明（TECH-07 / FRIEND-33/34）', () => {
     await flush()
     const dialog = openDialog()
     expect(dialog.textContent).not.toContain('応答を確認できませんでした')
-    expect(dialog.textContent).toContain('already executing')
+    // 英語の内部の文はそのまま出さず、日本語の案内にする（リリース前点検 2026-10-07）。
+    expect(dialog.textContent).not.toContain('already executing')
+    expect(dialog.textContent).toContain('本移行を実行できませんでした')
   })
 
   it('切り戻しの通信断も結果不明を示して履歴を読み直す', async () => {

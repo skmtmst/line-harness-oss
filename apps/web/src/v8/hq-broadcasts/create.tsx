@@ -38,6 +38,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { ASSET_KIND, STORE_INSERTS, type HqKind, fromApiContent, preflightBadge, splitPreflightRows, previewText, runTitle, scheduledIso, sendTotals, toApiContent } from './model'
 import styles from './create.module.css'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 type Store = Pick<LineAccount, 'id' | 'name' | 'tags'> & { friendCount: number }
 type Mode = 'tag' | 'store'
@@ -70,10 +71,11 @@ const n = (value: number) => value.toLocaleString('ja-JP')
 function errorText(caught: unknown, fallback: string): string {
   if (caught instanceof ApiError) {
     if (caught.status === 403) return '統括全体の編集権限がある人だけが一括配信を作れます。'
-    if (caught.status === 409) return caught.message && !/^API error: /.test(caught.message) ? caught.message : 'ほかの人が先に操作しました。もう一度確かめてください。'
+    if (caught.status === 409) return japaneseDetailOf(caught) || 'ほかの人が先に操作しました。もう一度確かめてください。'
     return describeSaveFailure(caught)
   }
-  return fallback
+  // 「API error: 500」のような内部の文は出さない。
+  return japaneseDetailOf(caught) || fallback
 }
 
 /** 下書きの日時（ISO）を、選ぶ日と時刻（端末の時刻・30 分ごと）に戻す。 */

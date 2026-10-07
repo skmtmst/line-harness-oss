@@ -6,10 +6,11 @@ import TopBar from '@/components/shared/top-bar'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { usePageChrome } from './page-chrome'
-import { MENU_SECTIONS } from '@/lib/menu'
+import { HQ_MENU_SECTIONS, MENU_SECTIONS } from '@/lib/menu'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useManualHref } from '@/lib/use-manual-href'
 import { ADMIN_THEME_CHANGED_EVENT } from '@/lib/events'
+import { setDocumentTitle } from '@/lib/document-title'
 
 /**
  * 共通トップバーを、いまの画面の値へつなぐ層。
@@ -28,6 +29,28 @@ export function defaultTitleForPath(pathname: string): string {
   for (const [href, label] of MENU_LABELS) {
     if (pathname === href) return label
     if (href !== '/' && pathname.startsWith(`${href}/`)) return label
+  }
+  return ''
+}
+
+/**
+ * タブの題だけに使う画面名（上の帯の文字は変えない）。統括のメニューと、
+ * 左メニューに無い画面。上の帯の名前が無いときだけ使う。
+ */
+const DOCUMENT_ONLY_LABELS: Array<[string, string]> = [
+  ...HQ_MENU_SECTIONS.flatMap((section) => section.items.map((item): [string, string] => [item.href, `${item.label}（統括）`])),
+  ['/hq/support', 'お問い合わせ'] as [string, string],
+  ['/common-actions', '共通アクション'] as [string, string],
+  ['/scoring', 'スコアリング'] as [string, string],
+  ['/updates', 'アップデート履歴'] as [string, string],
+  ['/notifications', '通知'] as [string, string],
+].sort((a, b) => b[0].length - a[0].length)
+
+/** タブの題に使う画面名。上の帯の名前を先に、無ければ上の表から引く。 */
+export function documentTitleForPath(pathname: string, shownTitle: string): string {
+  if (shownTitle) return shownTitle
+  for (const [href, label] of DOCUMENT_ONLY_LABELS) {
+    if (pathname === href || pathname.startsWith(`${href}/`)) return label
   }
   return ''
 }
@@ -100,6 +123,8 @@ export default function AppTopBar() {
   const manualHref = useManualHref(pathname)
 
   const shownTitle = title ?? defaultTitleForPath(pathname)
+  // タブの題も上の帯と同じ画面名にする（「<画面名> | musubo」）。
+  useEffect(() => { setDocumentTitle(documentTitleForPath(pathname, shownTitle)) }, [pathname, shownTitle])
   const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
 
   const options = useMemo(

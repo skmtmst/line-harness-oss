@@ -76,7 +76,7 @@ export default function MenuList({
                 type="button"
                 onClick={() => setCategory(c)}
                 aria-pressed={active}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ink ${
+                className={`liff-hit shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-ink ${
                   active ? 'bg-ink text-canvas' : 'bg-liff-chip text-liff-sub'
                 }`}
               >

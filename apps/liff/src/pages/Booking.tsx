@@ -186,7 +186,7 @@ export default function Booking() {
           <button
             type="button"
             onClick={() => setStep('menu')}
-            className="self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+            className="liff-hit self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
           >
             ← メニューを選び直す
           </button>

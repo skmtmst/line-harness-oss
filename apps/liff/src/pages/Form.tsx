@@ -38,6 +38,7 @@ import LoadingView from '../components/LoadingView.js';
 import Button from '../components/ui/Button.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import BottomBar from '../components/ui/BottomBar.js';
+import PrivacyNote from '../components/ui/PrivacyNote.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
 
@@ -235,9 +236,7 @@ export default function Form() {
         if (cancelled) return;
         setForm(data);
         setAnswers(initialAnswers(data.layout));
-        if (data.layout.options?.pageTitle) {
-          document.title = data.layout.options.pageTitle;
-        }
+        // タブの題は上の帯（LiffHeader）が pageTitle・フォーム名から付ける。
 
         // 前回の回答を出す設定のときだけ、サーバが中身を返す。
         // 試しでは前の試しを書き戻さない（本物の回答も出さない）。
@@ -716,6 +715,9 @@ export default function Form() {
               </Button>
             </div>
           )}
+
+          {/* 送る最後のページだけ、個人情報の取り扱いの一行。 */}
+          {isLast && <PrivacyNote />}
         </div>
       </div>
 
@@ -733,7 +735,7 @@ export default function Form() {
           <button
             type="button"
             onClick={goBack}
-            className="self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+            className="liff-hit self-center px-4 py-1 text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
           >
             ← {options.prevLabel || '前のページへ'}
           </button>
@@ -1176,7 +1178,7 @@ export function BookingSlotPicker({
                   onChange(active ? '' : { menuId, staffId: fixedStaffId ?? staffId, startsAt })
                 }
                 aria-pressed={active}
-                className={`liff-num h-[42px] rounded-[10px] text-sm tabular-nums -outline-offset-1 ${
+                className={`liff-hit liff-num h-[42px] rounded-[10px] text-sm tabular-nums -outline-offset-1 ${
                   active
                     ? 'bg-liff-primary font-bold text-white'
                     : t.open

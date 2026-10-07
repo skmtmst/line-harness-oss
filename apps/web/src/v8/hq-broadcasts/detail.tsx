@@ -26,6 +26,7 @@ import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { type ResultTarget, canRetry, failedCount, failureLines, fromApiContent, jpDateTime, preflightBadge, resultBadge, runBadge, sendTotals } from './model'
 import styles from './detail.module.css'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 const n = (value: number) => value.toLocaleString('ja-JP')
 
@@ -33,11 +34,12 @@ type Ask = { kind: 'send' | 'stop' | 'cancel' | 'retry-all' } | { kind: 'retry';
 
 function errorText(caught: unknown, fallback: string): string {
   if (caught instanceof ApiError) {
-    if (caught.status === 409) return caught.message && !/^API error: /.test(caught.message) ? caught.message : 'ほかの人が先に操作しました。読み直してください。'
+    if (caught.status === 409) return japaneseDetailOf(caught) || 'ほかの人が先に操作しました。読み直してください。'
     if (caught.status === 403) return '統括全体の編集権限がある人だけが操作できます。'
     return describeSaveFailure(caught)
   }
-  return fallback
+  // 「API error: 500」のような内部の文は出さない。
+  return japaneseDetailOf(caught) || fallback
 }
 
 /** ⑤ 送った結果（店ごと）。 */

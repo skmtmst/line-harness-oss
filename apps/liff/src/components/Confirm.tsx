@@ -6,6 +6,7 @@ import { useWideViewport } from '../lib/use-wide-viewport.js';
 import Icon from './ui/Icon.js';
 import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
+import PrivacyNote from './ui/PrivacyNote.js';
 import type { SlotPick } from './DateTimePicker.js';
 
 /**
@@ -117,6 +118,7 @@ export default function Confirm({
             `キャンセルは${menu.cancel_deadline_hours_before}時間前まで。`}
         </p>
       </div>
+      <PrivacyNote />
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
         <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
@@ -125,7 +127,7 @@ export default function Confirm({
         <button
           type="button"
           onClick={onBack}
-          className="self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
+          className="liff-hit self-center text-xs text-liff-sub focus-visible:outline-2 focus-visible:outline-ink"
         >
           ← 日時を選び直す
         </button>
