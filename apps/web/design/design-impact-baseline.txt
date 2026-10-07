@@ -556,6 +556,8 @@ shared-button-importer v8/hq/notice-line-dialog.tsx
 shared-button-importer v8/hq/settings.tsx
 shared-button-importer v8/hq/support-detail.tsx
 shared-button-importer v8/hq/support.tsx
+shared-button-importer v8/inbox-chat/rules-popover.tsx
+shared-button-importer v8/inbox-chat/template-picker-view.tsx
 shared-button-importer v8/affiliates/frame.tsx
 shared-button-importer v8/affiliates/parts.tsx
 shared-button-importer v8/affiliates/affiliators.tsx

@@ -85,6 +85,12 @@ beforeEach(() => {
       return response({ success: true, data: { items: [], summary: { total: 0 } } })
     }
     if (url.pathname === '/api/operators') return response({ success: true, data: [] })
+    if (url.pathname === '/api/chats/quick-counts') {
+      const status = url.searchParams.get('status')
+      const n = status ? lineChats.filter((chat) => chat.status === status).length : lineChats.length
+      const c = { all: n, reply: 0, overdue: 0 }
+      return response({ success: true, data: { ...c, line: c, email: c } })
+    }
     if (url.pathname === '/api/chats/stats') {
       return response({ success: true, data: {
         total: 3, unread: 1, assigneeUnread: [], waiting: 0, waitingOverAnHour: 0,
@@ -164,4 +170,33 @@ test('左右のキーで選ぶ所が動く', async () => {
     expect(host.textContent).toContain('A未対応')
     expect(host.textContent).not.toContain('B対応中')
   })
+})
+
+/* ★V8（M0393 XqSvX「状態」）：「すべて」の所は無く、4つに件数。選んだ所をもう一度押すとすべてに戻る。 */
+test('V8：4つに件数が付き、選んだ所をもう一度押すと絞り込みが外れる', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  try {
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() => expect(host.textContent).toContain('A未対応'))
+    await eventually(() => {
+      const { items } = radios()
+      expect(items.map((item) => item.textContent?.trim())).toEqual(['未対応1', '対応中1', '保留0', '対応済み1'])
+    })
+    const { items } = radios()
+    // 何も選んでいない（すべて）ときは先頭に Tab で入れる。
+    expect(items.map((item) => item.tabIndex)).toEqual([0, -1, -1, -1])
+    await act(async () => items[1].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await eventually(() => {
+      expect(host.textContent).not.toContain('A未対応')
+      expect(radios().items[1].getAttribute('aria-checked')).toBe('true')
+    })
+    await act(async () => radios().items[1].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await eventually(() => {
+      expect(host.textContent).toContain('A未対応')
+      expect(host.textContent).toContain('C対応済み')
+      expect(radios().items.every((item) => item.getAttribute('aria-checked') === 'false')).toBe(true)
+    })
+  } finally {
+    delete document.documentElement.dataset.theme
+  }
 })

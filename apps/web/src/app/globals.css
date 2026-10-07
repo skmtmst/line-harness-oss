@@ -1417,6 +1417,7 @@
   --tpl-inbox-seg-gap: 2px;               /* 状態の切り替えの間 */
   --tpl-inbox-seg-item-pad: 5px 4px;      /* 状態の切り替え1つの内側 */
   --tpl-inbox-seg-item-radius: 8px;       /* 状態の切り替え1つの角丸 */
+  --tpl-inbox-status-count-gap: 4px;      /* 状態の名前と件数の間 */
   --tpl-inbox-row-pad: 12px 16px;         /* 会話の行の内側 */
   --tpl-inbox-row-gap: 10px;              /* 顔と文の間 */
   --tpl-inbox-row-line-gap: 2px;          /* 名前・内容・札の段の間 */
@@ -1427,6 +1428,90 @@
   --tpl-inbox-badge-pad: 1px 6px;         /* 経路の札（LINE・メール）の内側 */
   --tpl-inbox-badge-radius: 5px;          /* 経路の札の角丸 */
   --tpl-inbox-badge-lh: 17px;             /* 経路の札・担当の文字の行の高さ */
+}
+
+/*
+ * ★V8 受信箱の真ん中（会話）と右の列・書く欄・窓（M0393「1. ふだん」XqSvX と段2の
+ * 「2. 送信の設定」「4. テンプレートを選ぶ」「5. 会話の頭のメニュー」「6. 予約して送る」）。
+ * 画面側（src/v8/inbox-chat/*.module.css）は var() で読む。v7 には効かない。
+ */
+[data-theme="v8"] {
+  --tpl-inbox-tool-icon: 14px;            /* 一覧の頭の印のボタンの中の印 */
+  --tpl-inbox-tool-shadow: 0 1px 2px #1d1d1f0a; /* 書く欄の道具の薄い影 */
+  --tpl-inbox-pop-w: 320px;               /* 対応ルールの小窓の幅 */
+  --tpl-inbox-pop-pad: 14px 16px;         /* 小窓の中の余白 */
+  --tpl-inbox-pop-gap: 10px;              /* 小窓の段の間 */
+  --tpl-inbox-pop-row-pad: 6px 0;         /* 小窓の行の上下 */
+  --tpl-inbox-dot: 8px;                   /* 色の丸 */
+  --tpl-inbox-dot-sm: 7px;                /* 頭の対応状況の丸 */
+  --tpl-inbox-chead-pad: 12px 20px;       /* 会話の頭の内側 */
+  --tpl-inbox-chead-gap: 8px;             /* 会話の頭の部品の間 */
+  --tpl-inbox-chead-face: 28px;           /* 会話の頭の顔 */
+  --tpl-inbox-chead-who-min: 120px;       /* 名前の欄の下限。これより狭いと操作を次の行へ */
+  --tpl-inbox-chead-name: 15px;           /* 会話の頭の名前 */
+  --tpl-inbox-chead-name-lh: 23px;
+  --tpl-inbox-chead-sub-lh: 18px;
+  --tpl-inbox-chead-star: 34px;           /* 注目にするの四角 */
+  --tpl-inbox-chead-star-icon: 15px;
+  --tpl-inbox-chead-ctl: 36px;            /* 担当・対応状況・右の列の出し入れの高さ */
+  --tpl-inbox-chead-ctl-pad: 0 10px 0 12px;
+  --tpl-inbox-chead-ctl-icon: 14px;
+  --tpl-inbox-chead-panel-icon: 16px;
+  --tpl-inbox-menu-w: 238px;              /* 担当・対応状況のメニューの幅 */
+  --tpl-inbox-menu-pad: 6px;              /* メニューの内側 */
+  --tpl-inbox-menu-title-pad: 4px 6px 6px;/* メニューの題 */
+  --tpl-inbox-menu-row-h: 36px;           /* メニューの1行 */
+  --tpl-inbox-menu-row-pad: 0 8px;
+  --tpl-inbox-menu-face: 22px;            /* 担当者の頭文字の丸 */
+  --tpl-inbox-menu-pill-pad: 2px 8px;     /* 対応状況の札の内側 */
+  --tpl-inbox-menu-search-h: 32px;        /* 担当者名を検索 */
+  --tpl-inbox-thread-pad: 20px 24px;      /* やりとりの内側 */
+  --tpl-inbox-bubble-w: 340px;            /* 吹き出しの幅の上限 */
+  --tpl-inbox-bubble-pad: 10px 14px;      /* 吹き出しの内側 */
+  --tpl-inbox-bubble-radius: 16px;
+  --tpl-inbox-bubble-text: 13px;
+  --tpl-inbox-bubble-lh: 21px;
+  --tpl-inbox-bubble-out: var(--color-chat-outgoing); /* こちらから送った吹き出しの地 */
+  --tpl-inbox-composer-pad: 12px 20px 16px;/* 書く欄の内側 */
+  --tpl-inbox-composer-gap: 8px;
+  --tpl-inbox-composer-btn-h: 32px;       /* 書く欄の道具・予約・送信の高さ */
+  --tpl-inbox-composer-btn-pad: 0 14px;
+  --tpl-inbox-composer-btn-icon: 15px;
+  --tpl-inbox-composer-input-pad: 10px 12px;
+  --tpl-inbox-composer-input-radius: 12px;
+  --tpl-inbox-composer-input-h: 40px;     /* 書く欄の文の高さ（2行） */
+  --tpl-inbox-sendkey-pad: 12px;          /* 送信の設定の箱の内側 */
+  --tpl-inbox-sendkey-seg-pad: 3px;       /* 送るキーの切り替えの溝 */
+  --tpl-inbox-sendkey-item-pad: 4px 12px; /* 切り替え1つの内側 */
+  --tpl-inbox-sendkey-item-radius: 6px;
+  --tpl-inbox-tp-w: 640px;                /* テンプレートを選ぶ窓の幅 */
+  --tpl-inbox-tp-body-h: 340px;           /* 窓の中の高さ */
+  --tpl-inbox-tp-side-w: 170px;           /* 左のフォルダの列 */
+  --tpl-inbox-tp-side-pad: 12px 10px;
+  --tpl-inbox-tp-side-row-pad: 7px 10px;
+  --tpl-inbox-tp-list-pad: 12px 14px;
+  --tpl-inbox-tp-card-pad: 10px 12px;
+  --tpl-inbox-tp-num: 22px;               /* 続けて送るの番号の丸 */
+  --tpl-inbox-tp-band-pad: 10px 20px;     /* 続けて送る順の帯 */
+  --tpl-inbox-tp-foot-pad: 12px 20px;     /* 窓の下 */
+  --tpl-inbox-tp-head-pad: 16px 20px;     /* 窓の頭 */
+  --tpl-inbox-tp-side-indent: 22px;       /* 子のフォルダの字下げ */
+  --tpl-inbox-tp-body-max: calc(100dvh - 200px); /* 低い画面で窓が切れない */
+  --tpl-inbox-tp-card-on: 1.5px solid var(--color-accent-deep); /* 選んだカードの枠 */
+  --tpl-inbox-tp-card-on-offset: -0.75px;
+  --tpl-inbox-sch-w: 420px;               /* 予約して送るの窓の幅 */
+  --tpl-inbox-sch-box-pad: 10px 12px;     /* 送るものの箱 */
+  --tpl-inbox-sch-chip-h: 28px;           /* すぐ選ぶの札 */
+  --tpl-inbox-sch-chip-pad: 0 12px;
+  --tpl-inbox-st-progress: #b45309;       /* 対応中の札の字と点（絵の 5.） */
+  --tpl-inbox-menu-shadow: 0 8px 24px #1d1d1f1f; /* 会話の頭のメニューの影 */
+  --tpl-inbox-menu-dot: 6px;              /* 対応状況の札の中の点 */
+  --tpl-inbox-menu-check: 13px;           /* 選んでいる行の✓ */
+  --tpl-inbox-menu-search-icon: 12px;
+  --tpl-inbox-quote-line: inset 2px 0 0 var(--color-accent-deep); /* 引用元の左の線 */
+  --tpl-inbox-line-top: inset 0 1px 0 var(--color-hairline);    /* 上の線 */
+  --tpl-inbox-line-right: inset -1px 0 0 var(--color-hairline);  /* 右の線 */
+  --tpl-inbox-line-bottom-soft: inset 0 -1px 0 var(--color-divider); /* 行の間の薄い線 */
 }
 
 /*
