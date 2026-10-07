@@ -131,6 +131,12 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+.dotIndent { display: block; padding-inline-start: var(--tpl-folder-dot-indent); }
+.nameDot { display: block; min-width: 0; max-width: 100%; }
+@container v8-page (max-width: 1099px) {
+  .nameDot :global([data-folder-dot]) { display: none; }
+  .dotIndent { padding-inline-start: 0; }
+}
 .stack {
   display: flex;
   flex-direction: column;

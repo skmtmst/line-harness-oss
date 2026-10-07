@@ -19,6 +19,7 @@ import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
 import BulkBar from '@/components/shared/bulk-bar'
 import Checkbox from '@/components/shared/checkbox'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel from '@/components/shared/folder-panel'
@@ -527,12 +528,14 @@ export default function AffiliatorsTab() {
               </Td>
               <Td className={styles.colName}>
                 <span className={styles.stack}>
-                  <button type="button" className={styles.rowName} title={row.name} onClick={() => openDrawer(row.id, false)}>
-                    {row.name}
-                  </button>
-                  <span className={styles.rowCode} title={row.code}>{row.code}</span>
-                  <span className={styles.rowPlan}>{planText(row)}</span>
-                  <StatusPill tone={row.isActive ? 'active' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</StatusPill>
+                  {/* 左にフォルダの列がある一覧は、名前の前に丸（報酬の決め方の分け方は保存されたフォルダではないので未分類の輪）。
+                      フォルダの列が選ぶ欄に畳まれる幅（1152・KdFRI）では、丸と字下げを CSS で外す（列を畳む型と同じ幅の決まり）。 */}
+                  <span className={styles.nameDot}><FolderDotName folder={null}>{nameButton(row)}</FolderDotName></span>
+                  <span className={`${styles.rowCode} ${styles.dotIndent}`} title={row.code}>{row.code}</span>
+                  <span className={`${styles.rowPlan} ${styles.dotIndent}`}>{planText(row)}</span>
+                  <span className={styles.dotIndent}>
+                    <StatusPill tone={row.isActive ? 'active' : 'neutral'}>{row.isActive ? '計測中' : '停止中'}</StatusPill>
+                  </span>
                 </span>
               </Td>
               <Td className={`${styles.colLinks} ${styles.num}`}><span className={styles.cellNum}>{`${formatNumber(row.linkCount)}本`}</span></Td>
@@ -604,6 +607,13 @@ export default function AffiliatorsTab() {
     </ListPagePagination>
   ) : undefined
 
+  function nameButton(row: { id: string; name: string }) {
+    return (
+      <button type="button" className={styles.rowName} title={row.name} onClick={() => openDrawer(row.id, false)}>
+        {row.name}
+      </button>
+    )
+  }
   const drawerRow = drawerId ? rows.find((row) => row.id === drawerId) ?? null : null
 
   return (
