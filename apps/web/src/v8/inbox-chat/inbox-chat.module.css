@@ -462,3 +462,87 @@
 .dot_in_progress { background: var(--tpl-inbox-st-progress); }
 .dot_on_hold { background: var(--color-ink-secondary); }
 .dot_resolved { background: var(--color-success); }
+
+/* ── やりとり（XqSvX「やりとり」） ───────────────── */
+.thread { padding: var(--tpl-inbox-thread-pad); background: var(--color-table-head); }
+.day {
+  margin: var(--tpl-inbox-pop-gap) 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-inbox-badge-lh);
+  text-align: center;
+}
+.day[data-first] { margin-top: 0; }
+.rowIn, .rowOut { display: flex; align-items: flex-end; gap: var(--tpl-inbox-chead-gap); width: 100%; }
+.rowIn { justify-content: flex-start; }
+.rowOut { justify-content: flex-end; }
+.outCol { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; gap: var(--tpl-inbox-seg-gap); }
+.outLine { display: flex; min-width: 0; align-items: flex-end; gap: var(--tpl-inbox-chead-gap); }
+.bubbleIn, .bubbleOut {
+  min-width: 0;
+  max-width: var(--tpl-inbox-bubble-w);
+  padding: var(--tpl-inbox-bubble-pad);
+  border-radius: var(--tpl-inbox-bubble-radius);
+  color: var(--color-ink);
+  font-size: var(--tpl-inbox-bubble-text);
+  line-height: var(--tpl-inbox-bubble-lh);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bubbleIn { background: var(--color-canvas); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
+.bubbleOut { background: var(--tpl-inbox-bubble-out); }
+.meta { display: inline-flex; flex: none; align-items: center; gap: var(--tpl-inbox-head-tools-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); white-space: nowrap; }
+.quoteBtn { border: 0; background: none; color: var(--color-ink-faint); font-size: var(--text-micro); cursor: pointer; }
+.quoteBtn:hover { color: var(--color-action); text-decoration: underline; }
+.quoted {
+  margin-bottom: var(--tpl-inbox-chip-gap);
+  padding-left: var(--tpl-inbox-chead-gap);
+  box-shadow: var(--tpl-inbox-quote-line);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+.sender { display: inline-flex; max-width: 100%; align-items: center; gap: var(--tpl-inbox-chip-gap); color: var(--color-ink-secondary); font-size: var(--text-micro); font-weight: 600; white-space: nowrap; }
+.senderFace, .senderBot {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-inbox-icon-md);
+  height: var(--tpl-inbox-icon-md);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-nano);
+  font-weight: 700;
+}
+.senderFace { background: var(--color-action); color: var(--color-on-action); }
+.senderBot { background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
+.senderBot svg { width: var(--tpl-inbox-menu-search-icon); height: var(--tpl-inbox-menu-search-icon); }
+
+/* ── 書く欄の箱（XqSvX「書く欄」「入力」） ──────────── */
+.composer { padding: var(--tpl-inbox-composer-pad); }
+.inputBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-inbox-composer-gap);
+  padding: var(--tpl-inbox-composer-input-pad);
+  border-radius: var(--tpl-inbox-composer-input-radius);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+.inputBox:focus-within { outline-color: var(--color-accent-deep); }
+.textarea {
+  width: 100%;
+  min-height: var(--tpl-inbox-composer-input-h);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-inbox-row-preview-lh);
+  resize: none;
+  outline: none;
+}
+.textarea::placeholder { color: var(--color-ink-faint); }
+.countRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-inbox-composer-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); }
+.bottomRow { margin-top: 0; gap: var(--tpl-inbox-composer-gap); }
+.bottomRow > span:first-of-type span { font-size: var(--text-micro); }

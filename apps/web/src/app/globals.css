@@ -1493,6 +1493,7 @@
   --tpl-inbox-menu-dot: 6px;              /* 対応状況の札の中の点 */
   --tpl-inbox-menu-check: 13px;           /* 選んでいる行の✓ */
   --tpl-inbox-menu-search-icon: 12px;
+  --tpl-inbox-quote-line: inset 2px 0 0 var(--color-accent-deep); /* 引用元の左の線 */
 }
 
 /*

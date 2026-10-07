@@ -58,7 +58,7 @@ import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
-import { Bookmark, CheckCircle2, Clock3, Filter, ListFilter, Reply, FileText, Image as ImageIcon, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Paperclip, Search, Send, Settings2, SlidersHorizontal, Star, X } from 'lucide-react'
+import { Bookmark, CheckCircle2, Clock3, Filter, ListFilter, Reply, FileText, Image as ImageIcon, Link2, NotebookPen, Bot, PanelRightClose, PanelRightOpen, Paperclip, Search, Send, Settings2, SlidersHorizontal, Star, X } from 'lucide-react'
 
 type Chat = ChatListItem
 
@@ -333,6 +333,23 @@ function sameYmd(aIso: string, bIso: string): boolean {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
   )
+}
+
+/** ★V8 やりとりの日付の区切り（8月19日（火））。 */
+function formatDayJa(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getMonth() + 1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`
+}
+
+/** ★V8 担当者の名前が無いこちらの吹き出しの「自動：…」。口の source をそのまま言葉にする。 */
+const AUTO_SOURCE_LABEL: Record<string, string> = {
+  auto_reply: '自動応答',
+  'auto-reply': '自動応答',
+  broadcast: '一斉配信',
+  reminder: 'リマインダ',
+  scenario: 'シナリオ配信',
+  automation: 'オートメーション',
+  booking: '予約の通知',
 }
 
 function formatYmdSlash(iso: string): string {
@@ -3357,7 +3374,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 見ている位置は窓分けの側で守るので、ブラウザの自動の位置合わせは切る
                 （二重に直すと飛ぶ）。行の間 8px は行の中に持つので space-y は付けない。
               */}
-              <div ref={messagesScrollRef} data-inbox-thread-scroller="" className={`flex-1 overflow-y-auto p-4 ${searchStyles.hitScope}`} style={{ backgroundColor: 'var(--color-surface-pearl)', overflowAnchor: 'none' }}>
+              <div ref={messagesScrollRef} data-inbox-thread-scroller="" className={`flex-1 overflow-y-auto p-4 ${searchStyles.hitScope} ${isV8 ? chatStyles.thread : ''}`} style={isV8 ? { overflowAnchor: 'none' } : { backgroundColor: 'var(--color-surface-pearl)', overflowAnchor: 'none' }}>
                 {/*
                   古い履歴の続き。直近100件だけ読んでいる会話で出す。
                   押すと今見えている最古の1件より古い分を上に足す。
@@ -3435,6 +3452,81 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始
                             </span>
                             <time className="text-micro text-ink-faint">{startedAt}</time>
+                          </div>
+                        </>
+                      )
+                    }
+
+                    if (isV8) {
+                      /*
+                       * ★V8 やりとり（XqSvX「やりとり」）：日付は真ん中の小さな字、相手の吹き出しは白・薄い枠で
+                       * 顔を置かない、時刻は吹き出しの横（相手は右・こちらは左）、こちらの吹き出しは薄い緑で
+                       * 下に「K Kenta が送信」／「自動：…」。引用・探すの印・取り消しの扱いは v7 と同じ。
+                       */
+                      const quotedNode = msg.quoted ? (
+                        <div data-inbox-v6="quoted-message" className={chatStyles.quoted}>
+                          {msg.quoted.isUnsent
+                            ? '取り消されたメッセージ'
+                            : msg.quoted.messageType === 'text'
+                              ? msg.quoted.content
+                              : `[${msg.quoted.messageType}]`}
+                        </div>
+                      ) : null
+                      const meta = (
+                        <span className={chatStyles.meta}>
+                          <time>{formatTime(msg.createdAt)}</time>
+                          {!msg.isUnsent && (
+                            <button
+                              type="button"
+                              data-inbox-v6="quote-reply"
+                              className={chatStyles.quoteBtn}
+                              onClick={() => {
+                                setQuotedMessage(msg)
+                                textareaRef.current?.focus()
+                              }}
+                            >
+                              引用
+                            </button>
+                          )}
+                        </span>
+                      )
+                      const autoLabel = AUTO_SOURCE_LABEL[msg.source ?? ''] ?? null
+                      return (
+                        <>
+                          {showDateSep && (
+                            <div className={chatStyles.day} data-first={idx === 0 || undefined}>{formatDayJa(msg.createdAt)}</div>
+                          )}
+                          <div className={isOutgoing ? chatStyles.rowOut : chatStyles.rowIn} data-last={isLast || undefined}>
+                            {isOutgoing ? (
+                              <div className={chatStyles.outCol}>
+                                <div className={chatStyles.outLine}>
+                                  {meta}
+                                  <div className={chatStyles.bubbleOut} data-search-hit={searchHit ?? undefined}>
+                                    {quotedNode}
+                                    {bubbleContent}
+                                  </div>
+                                </div>
+                                {msg.sentByStaffName ? (
+                                  <span className={chatStyles.sender} title={msg.sentByStaffName}>
+                                    <span aria-hidden="true" className={chatStyles.senderFace}>{msg.sentByStaffName.charAt(0)}</span>
+                                    {msg.sentByStaffName} が送信
+                                  </span>
+                                ) : (
+                                  <span className={chatStyles.sender}>
+                                    <span aria-hidden="true" className={chatStyles.senderBot}><Bot aria-hidden="true" /></span>
+                                    {autoLabel ? `自動：${autoLabel}` : '自動で送信'}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <>
+                                <div className={chatStyles.bubbleIn} data-search-hit={searchHit ?? undefined}>
+                                  {quotedNode}
+                                  {bubbleContent}
+                                </div>
+                                {meta}
+                              </>
+                            )}
                           </div>
                         </>
                       )
@@ -3580,7 +3672,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 すべて出しっぱなしで、入力欄が縦に伸びてトークが読めなかった。
                 よく使うものだけ出し、設定は畳む。
               */}
-              <div data-inbox-v4="composer" className="sticky bottom-0 z-10 border-t border-hairline bg-canvas px-4 py-3 relative">
+              <div data-inbox-v4="composer" className={`sticky bottom-0 z-10 border-t border-hairline bg-canvas px-4 py-3 relative ${isV8 ? chatStyles.composer : ''}`}>
                 {/* INBOX-12: 定期更新が連続失敗で止まったときの理由と再試行 */}
                 {chatPollStalled && (
                   <p className="text-danger mb-2 text-xs">
@@ -3903,7 +3995,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 )}
 
-                <div className="rounded-card border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
+                <div className={isV8 ? chatStyles.inputBox : 'rounded-card border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15'}>
                   {/* 中段 */}
                   {/*
                     INBOX-20: この入力欄に textareaRef を付ける。
@@ -3917,14 +4009,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   onKeyDown={handleKeyDown}
                   onCompositionStart={() => { isComposingRef.current = true }}
                   onCompositionEnd={() => { isComposingRef.current = false }}
-                  rows={3}
+                  rows={isV8 ? 2 : 3}
                   placeholder="メッセージを入力"
                   aria-label="メッセージを入力"
                   aria-invalid={messageOverLimit}
-                  className="w-full resize-none border-0 px-1 py-1 text-sm outline-none"
+                  className={isV8 ? chatStyles.textarea : 'w-full resize-none border-0 px-1 py-1 text-sm outline-none'}
                   />
 
-                  <p className="mt-1 flex items-center justify-between gap-2 text-xs">
+                  <p className={isV8 ? chatStyles.countRow : 'mt-1 flex items-center justify-between gap-2 text-xs'}>
                     {/* INBOX-29: 残りを送る前に見せる。超えたら送らせない。 */}
                     <span className={messageOverLimit ? 'text-danger font-semibold' : 'text-ink-faint'}>
                       {formatNumber(messageLength)} / {formatNumber(MESSAGE_MAX_LENGTH)}
@@ -3941,7 +4033,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     「送信」が送／信に割れていた。行自体を折り返せるようにし、
                     長い画像エラーが出ても右の操作を圧迫しない。
                   */}
-                  <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                  <div className={`mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 ${isV8 ? chatStyles.bottomRow : ''}`}>
                   {/*
                     画像はここから。以前は「送信の設定」の中に投入枠を出しっぱなし
                     にしていて、入力欄が縦に伸びてトークが読めなかった。
