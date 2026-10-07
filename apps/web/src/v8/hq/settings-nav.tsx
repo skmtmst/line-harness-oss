@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { ListFolderNav } from '@/components/templates'
-import { Building2, Headset, ReceiptText, Users } from 'lucide-react'
+import { Building2, CreditCard, LifeBuoy, Users } from 'lucide-react'
 import styles from './settings-nav.module.css'
 
 export type HqSettingsNavKey = 'members' | 'info' | 'billing' | 'contact'
@@ -11,8 +11,8 @@ export type HqSettingsNavKey = 'members' | 'info' | 'billing' | 'contact'
 const ITEMS: { key: HqSettingsNavKey; label: string; href: string; Icon: typeof Users }[] = [
   { key: 'members', label: 'メンバー', href: '/hq/members', Icon: Users },
   { key: 'info', label: '統括の情報', href: '/hq/settings', Icon: Building2 },
-  { key: 'billing', label: '請求', href: '/hq/billing', Icon: ReceiptText },
-  { key: 'contact', label: 'お問い合わせ', href: '/hq/support', Icon: Headset },
+  { key: 'billing', label: '請求', href: '/hq/billing', Icon: CreditCard },
+  { key: 'contact', label: 'お問い合わせ', href: '/hq/support', Icon: LifeBuoy },
 ]
 
 /**
