@@ -2758,7 +2758,8 @@ CREATE TABLE form_submit_claims (
   effect_stats TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  expires_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL, step_completed_at_json TEXT NOT NULL DEFAULT '{}'
+  CHECK (json_valid(step_completed_at_json) AND json_type(step_completed_at_json) = 'object'),
   PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key)
 );
 
@@ -5403,7 +5404,7 @@ CREATE TABLE outgoing_webhooks (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
+, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), updated_by_staff_id TEXT);
 
 CREATE TABLE photo_reward_policies (
   id TEXT PRIMARY KEY,
@@ -10061,6 +10062,15 @@ WHEN NOT EXISTS (
     AND archived_at IS NULL
 )
 BEGIN SELECT RAISE(ABORT, 'ACCOUNT_TAG_SCOPE_INVALID'); END;
+
+CREATE TRIGGER outgoing_webhook_config_version
+AFTER UPDATE OF name, url, event_types, secret, secret_encrypted, is_active, max_retries, deleted_at
+ON outgoing_webhooks
+WHEN NEW.version = OLD.version
+BEGIN
+  UPDATE outgoing_webhooks SET version = OLD.version + 1, updated_by_staff_id = NULL,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') || '+09:00'
+  WHERE id = NEW.id; END;
 
 CREATE TRIGGER outgoing_webhooks_folder_delete AFTER DELETE ON folders
 BEGIN UPDATE outgoing_webhooks SET folder_id = NULL WHERE folder_id = OLD.id; END;
