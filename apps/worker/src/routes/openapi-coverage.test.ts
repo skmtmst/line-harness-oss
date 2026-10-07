@@ -133,6 +133,10 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'POST /api/chats/{id}/send',
+  'POST /api/chats/{id}/attachments/upload',
+  'POST /api/chats/{id}/attachments/upload-sessions',
+  'POST /api/chats/{id}/attachments/upload-sessions/{sessionId}/complete',
   'GET /api/restaurant-test/opening-hours',
   'PUT /api/restaurant-test/opening-hours',
   'POST /api/restaurant-test/reservation-link',
@@ -1388,7 +1392,6 @@ const ALLOWLIST = new Set<string>([
   'POST /api/chats/read-all',
   'POST /api/chats/{id}/loading',
   'POST /api/chats/{id}/read',
-  'POST /api/chats/{id}/send',
   'PUT /api/chats/{id}',
 
   // 機能「common_vars」の管理画面用API（OpenAPI未記載・順次記載）（12件）

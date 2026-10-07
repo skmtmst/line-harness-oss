@@ -73,6 +73,7 @@ import { tags } from './routes/tags.js';
 import { scenarios } from './routes/scenarios.js';
 import { broadcasts } from './routes/broadcasts.js';
 import { broadcastApprovals } from './routes/broadcast-approvals.js';
+import { chatAttachments } from './routes/chat-attachments.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
 import { lineAccountTags } from './routes/line-account-tags.js';
@@ -525,6 +526,7 @@ app.route('/', scenarioDrafts);
 // broadcasts の PUT /:id が先だと approval-threshold を id と読んで404になる。
 app.route('/', broadcastApprovals);
 app.route('/', broadcasts);
+app.route('/', chatAttachments);
 app.route('/', broadcastMessageAssets);
 app.route('/', broadcastMediaDirect);
 app.route('/', users);
