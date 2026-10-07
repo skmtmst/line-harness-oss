@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, type MenuItem, type StaffItem } from '../lib/api.js';
+import { api, type CreateBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
 import { addMinutesHm, formatJpLong, jstStartsAtIso } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
@@ -28,8 +28,13 @@ export default function Confirm({
   autoConfirm: boolean;
   /** 「← 日時を選び直す」。日時の段へ戻る。 */
   onBack: () => void;
-  /** 送ったあと。引数は作られた予約の状態（requested/confirmed）。 */
-  onSubmitted: (status: string) => void;
+  /** 予約ができたら予約ID・状態・支払い(お支払いありのときだけ付く)を渡す。前払いのみの案内も付く。 */
+  onSubmitted: (result: {
+    bookingId: string;
+    status: string;
+    payment: CreateBookingResponse['payment'];
+    prepayNotice: string | null;
+  }) => void;
 }) {
   // 414 幅の板（`uZqMA`）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
@@ -42,7 +47,7 @@ export default function Confirm({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await api.createRequest(
+      const created = await api.createRequest(
         {
           menu_id: menu.id,
           staff_id: staff.id,
@@ -51,7 +56,12 @@ export default function Confirm({
         },
         idemKey,
       );
-      onSubmitted(res.status);
+      onSubmitted({
+        bookingId: created.booking_id,
+        status: created.status,
+        payment: created.payment ?? null,
+        prepayNotice: created.prepayNotice ?? null,
+      });
     } catch (e) {
       logFailure('create-request', e);
       const err = e as { status?: number; body?: { error?: string } };

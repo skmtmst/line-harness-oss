@@ -35,4 +35,5 @@ export * from "./restaurant-booking";
 export * from "./hq-message-card";
 export * from './date-range.js';
 
+export * from './booking-waitlist.js';
 export * from './restaurant-inventory-rules.js';
