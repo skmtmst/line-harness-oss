@@ -21,10 +21,6 @@ import {
   LayoutTemplate,
   Image as ImageIcon,
   CircleCheck,
-  User,
-  IdCard,
-  Braces,
-  CalendarDays,
   ArrowUp,
   ArrowUpToLine,
   TextQuote,
@@ -105,6 +101,7 @@ import {
 } from '@/app/auto-replies/auto-reply-words'
 import { inEvaluationOrder, PRIORITY_MAX, PRIORITY_MIN, type OrderedRule } from '@/app/auto-replies/auto-reply-order'
 import { canPublish, conflictTone, publishGates } from '@/app/auto-replies/publish/publish-flow'
+import AutoReplyInsertChips, { insertedLabels } from './insert-chips'
 import styles from './wizard-v8.module.css'
 
 /*
@@ -371,12 +368,6 @@ const kindOrder = (label: string) => { const i = MAIN_KINDS.indexOf(label); retu
 /** 絵 A0pDt「反応するメッセージの種類」の札の印。 */
 const KIND_ICONS: Record<string, typeof Type> = { テキスト: Type, スタンプ: Sticker, 画像: ImageIcon, 位置情報: MapPin, 動画: Video, 音声: Mic, ファイル: File, ボタンのタップ: MousePointerClick }
 
-const INSERT_CHIPS = [
-  { label: '名前', token: '{name}', icon: User },
-  { label: '友だち情報', token: '{field}', icon: IdCard },
-  { label: '共通情報', token: '{var}', icon: Braces },
-  { label: '予約日時', token: '{booking_at}', icon: CalendarDays },
-] as const
 
 /** 「返すまで待つ時間」の選択肢。 */
 const REPLY_DELAY_OPTIONS = [
@@ -1307,12 +1298,12 @@ function AutoReplyWizardV8Inner() {
                     <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : 'なし'}</dd>
                   </div>
                   {(() => {
-                    const used = INSERT_CHIPS.filter((chip) => form.responseContent.includes(chip.token))
+                    const used = insertedLabels(form.responseContent)
                     if (form.mode !== 'inline-text' || used.length === 0) return null
                     return (
                       <div className={styles.kvRow}>
                         <dt className="text-ink-faint text-xs">差し込み</dt>
-                        <dd className={styles.kvVal}>{used.map((chip) => chip.label === '名前' ? '名前（無いときは「お客さま」）' : chip.label).join('・')}</dd>
+                        <dd className={styles.kvVal}>{used.map((label) => label === '名前' ? '名前（取れないときは空欄）' : label).join('・')}</dd>
                       </div>
                     )
                   })()}
@@ -1989,18 +1980,10 @@ function AutoReplyWizardV8Inner() {
                     />
                     <div className={styles.insertChips}>
                       <span className={styles.insertLabel}>差し込む</span>
-                      {INSERT_CHIPS.map((chip) => (
-                        <button
-                          key={chip.token}
-                          type="button"
-                          className={styles.insertChip}
-                          title={`${chip.label}を差し込む`}
-                          onClick={() => patch({ responseContent: form.responseContent + chip.token })}
-                        >
-                          <chip.icon size={16} aria-hidden="true" />
-                          {chip.label}
-                        </button>
-                      ))}
+                      <AutoReplyInsertChips
+                        accountId={matchedAccountId}
+                        onInsert={(token) => patch({ responseContent: form.responseContent + token })}
+                      />
                       <span className={styles.counter}>
                         {formatNumber(form.responseContent.length)} / 5,000
                       </span>

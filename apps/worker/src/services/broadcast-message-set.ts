@@ -62,8 +62,18 @@ function contentForBubble(type: string, value: unknown): string {
   const content = record(value);
   if (type === 'text') return nonEmptyString(content.text, 'text');
   if (type === 'image' || type === 'video') {
-    nonEmptyString(content.originalContentUrl, 'originalContentUrl');
-    nonEmptyString(content.previewImageUrl, 'previewImageUrl');
+    /*
+     * LINE は画像・動画とそのプレビュー画像を https の URL でしか受けない。
+     * 空や http のまま保存すると、送る時点で LINE に断られるか、
+     * 中身の JSON が文字のまま届く。保存・配信前検査の時点で人の言葉で止める。
+     */
+    const what = type === 'video' ? '動画' : '画像';
+    const original = typeof content.originalContentUrl === 'string' ? content.originalContentUrl.trim() : '';
+    const preview = typeof content.previewImageUrl === 'string' ? content.previewImageUrl.trim() : '';
+    if (!original) throw new Error(`${what}のファイルをアップロードしてください`);
+    if (!original.toLowerCase().startsWith('https://')) throw new Error(`${what}のURLは https:// から始めてください`);
+    if (!preview) throw new Error(`${what}のプレビュー画像のURLを入れてください（JPEG・PNG、1MBまで）`);
+    if (!preview.toLowerCase().startsWith('https://')) throw new Error(`${what}のプレビュー画像のURLは https:// から始めてください`);
     return JSON.stringify(content);
   }
   if (type === 'flex') {
