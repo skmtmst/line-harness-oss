@@ -3202,6 +3202,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 友だち詳細（★V8 Q5F2QE・JCDRm）の履歴・次の予定・回答。friend-1 だけ。
    * 絵の「最近の履歴」3行・「進行中」1行・回答カード2枚と同じ形にする（2026-10-07）。
    */
+  /* 行動スコアの明細（V8 R8NNi「点数の変化の明細」）。新しい順に5件、合計は上から足し引きが合う。 */
+  const friendScore = pathname.match(/^\/api\/friends\/([^/]+)\/score$/)
+  if (friendScore) {
+    const row = (id, reason, scoreChange, scoreAfter, occurredAt) => ({
+      id, scoringRuleId: null, ruleKey: null, scoreChange, scoreBefore: scoreAfter - scoreChange, scoreAfter,
+      reason, eventType: null, source: null, occurredAt, createdAt: occurredAt, mode: 'automatic', executedByStaffName: null,
+    })
+    return { success: true, data: { friendId: friendScore[1], currentScore: 36, history: [
+      row('fs-1', '配信のURLを押した', 3, 36, '2026-09-30T10:32:00+09:00'),
+      row('fs-2', '購入した', 30, 33, '2026-09-28T21:40:00+09:00'),
+      row('fs-3', '配信のURLを押した', 3, 3, '2026-09-24T08:12:00+09:00'),
+      row('fs-4', '「返信した」の点が消えた（14日）', -5, 0, '2026-09-16T09:00:00+09:00'),
+      row('fs-5', 'メッセージに返信した', 5, 5, '2026-09-02T19:20:00+09:00'),
+    ] } }
+  }
   if (pathname === '/api/friends/friend-1/timeline') {
     const item = (id, type, summary, occurredAt, source, account = { id: 'visual-qa-account', name: '然-NEN-TEST' }) => ({
       id, type, summary, status: null, source, occurredAt, lineAccount: account,

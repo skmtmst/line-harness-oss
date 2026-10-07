@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Activity, Bookmark, ChevronDown, ChevronUp, CircleMinus, CirclePlus, Download, MoreHorizontal, Plus, Send, Settings2, Star, TrendingDown, Upload, UserRound } from 'lucide-react'
+import { Activity, Bookmark, ChevronDown, ChevronUp, CircleMinus, CirclePlus, Download, Minus, MoreHorizontal, Plus, Send, Settings2, Star, TrendingDown, Upload, UserRound } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import {
   ApiError,
@@ -931,6 +931,7 @@ function ScoreAdjustDialog({
       title="点数を手で直す"
       description="記録に残ります。お客様には見えない運用メモとして、あとから理由をたどれるようにしてください。"
       confirmLabel={confirmLabel}
+      confirmIcon={validAmount ? (direction === 'decrease' ? <Minus size={14} aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />) : undefined}
       cancelLabel="キャンセル"
       busy={busy}
       error={error || undefined}
@@ -1003,14 +1004,24 @@ function ScoreAdjustDialog({
           </div>
         </div>
 
-        {bandChanges ? (
-          <p className={styles.dlgWarn} role="note">
-            {`帯が「${BAND_LABELS[band]}」から「${bandName(bandAfter, highMin, normalMin)}」に変わります。帯で選んでいる配信・オートメーションの宛先から外れることがあります。`}
-          </p>
-        ) : null}
+        {/* 帯の行は常に出す（点数を打ち変えても窓の下が上下に動かない。絵 Nv7An は帯が変わる時の形）。 */}
+        <p className={styles.dlgWarn} data-tone={bandChanges ? 'warn' : 'neutral'} role="note">
+          {bandChanges
+            ? `帯が「${BAND_LABELS[band]}」から「${bandName(bandAfter, highMin, normalMin)}」に変わります。帯で選んでいる配信・オートメーションの宛先から外れることがあります。`
+            : `帯は「${bandName(bandAfter, highMin, normalMin)}」のまま変わりません。`}
+        </p>
       </div>
     </Dialog>
   )
+}
+
+/* 明細の日時（絵は「9/02 19:20」。日・時を2桁にそろえ、行の幅をそろえる）。日本時間で出す。 */
+function formatScoreHistoryTime(value: string): string {
+  const time = new Date(value).getTime()
+  if (Number.isNaN(time)) return '—'
+  const jst = new Date(time + 9 * 60 * 60 * 1000)
+  const two = (n: number) => String(n).padStart(2, '0')
+  return `${jst.getUTCMonth() + 1}/${two(jst.getUTCDate())} ${two(jst.getUTCHours())}:${two(jst.getUTCMinutes())}`
 }
 
 /*
@@ -1079,7 +1090,7 @@ function ScoreHistoryDialog({
       onCancel={onCancel}
       busy={loading}
     >
-      <div className={styles.dlgBody}>
+      <div className={`${styles.dlgBody} ${styles.historyBody}`}>
       <div className={styles.dlgPerson}>
         <span className={styles.dlgAvatar} aria-hidden="true">{friendName.slice(0, 1)}</span>
         <div className={styles.dlgPersonText}>
@@ -1096,19 +1107,25 @@ function ScoreHistoryDialog({
         <ListState kind="empty" title="点数が変わった記録はありません" description="メッセージへの返信やリンクのクリックなど、決めたきっかけがあると記録されます。" />
       ) : (
         <table className={styles.miniTable}>
+          <colgroup>
+            <col className={styles.miniColWhen} />
+            <col />
+            <col className={styles.miniColNum} />
+            <col className={styles.miniColNum} />
+          </colgroup>
           <thead>
-            <TableHeadRow>
-              <Th>いつ</Th>
-              <Th>できごと</Th>
-              <Th align="right">点</Th>
-              <Th align="right">合計</Th>
-            </TableHeadRow>
+            <tr>
+              <Th className={styles.miniTh}>いつ</Th>
+              <Th className={styles.miniTh}>できごと</Th>
+              <Th className={`${styles.miniTh} ${styles.miniNum}`} align="right">点</Th>
+              <Th className={`${styles.miniTh} ${styles.miniNum}`} align="right">合計</Th>
+            </tr>
           </thead>
           <tbody>
             {items.map((item) => (
               <tr key={item.id}>
-                <td><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time></td>
-                <td>{actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}</td>
+                <td className={styles.miniOneLine}><time dateTime={item.occurredAt}>{formatScoreHistoryTime(item.occurredAt)}</time></td>
+                <td className={styles.miniOneLine} title={actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}>{actionScoreReasonLabel(item.reason?.trim() ? item.reason : null)}</td>
                 <td className={styles.miniNum}>
                   <span data-score-delta={item.scoreChange > 0 ? 'positive' : item.scoreChange < 0 ? 'negative' : 'zero'}>
                     {formatMileageChange(item.scoreChange)}

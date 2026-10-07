@@ -541,6 +541,10 @@
   font-size: var(--tpl-row-sub-size);
   line-height: var(--tpl-ml-pill-lh);
 }
+.dlgWarn[data-tone='neutral'] {
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+}
 .seg {
   display: inline-flex;
   gap: var(--tpl-ml-seg-pad);
@@ -605,15 +609,24 @@
   line-height: var(--tpl-ml-delta-lh);
   font-variant-numeric: tabular-nums;
 }
-.dlgFooterEnd { display: flex; justify-content: flex-end; gap: var(--tpl-cell-gap-half); }
+.dlgFooterEnd {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  width: 100%;
+  padding: var(--tpl-af2-dlg-foot-pad);
+  border-top: 1px solid var(--color-hairline);
+}
 .miniTable {
   width: 100%;
-  margin-top: var(--tpl-rule-row-gap);
   border-collapse: collapse;
   table-layout: fixed;
 }
-.miniTable th {
-  padding: var(--tpl-ml-mini-pad);
+.miniTable th,
+.miniTable .miniTh {
+  padding: var(--tpl-af2-mini-pad);
+  background: var(--color-table-head);
   border-bottom: 1px solid var(--color-hairline);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-row-sub-size);
@@ -622,14 +635,21 @@
   white-space: nowrap;
 }
 .miniTable td {
-  padding: var(--tpl-ml-mini-pad);
+  padding: var(--tpl-af2-mini-pad);
+  line-height: var(--tpl-af2-mini-lh);
+  vertical-align: middle;
   border-bottom: 1px solid var(--color-hairline);
   color: var(--color-ink);
   font-size: var(--text-caption);
   overflow-wrap: anywhere;
 }
 .miniTable tr:last-child td { border-bottom: 0; }
+.historyBody { margin-bottom: var(--tpl-af2-hist-pull); }
+.miniTable th.miniNum,
 .miniNum { text-align: right; font-variant-numeric: tabular-nums; }
+.miniColWhen { width: var(--tpl-af2-mini-when-w); }
+.miniColNum { width: var(--tpl-af2-mini-num-w); }
+.miniOneLine { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* できごとの決めごとの開け閉め（行動スコアの表の下）。 */
 .rulesToggle {
