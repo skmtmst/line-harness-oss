@@ -504,7 +504,11 @@
     "554_meet_cancel_claim.sql",
     "555_tenant_data_retention.sql",
     "556_f13_folder_kinds.sql",
+    "558_booking_payments.sql",
+    "559_booking_plus_repeat_waitlist_visit.sql",
+    "560_booking_sales_noshow.sql",
     "564_form_versions_purge_delete.sql",
+    "565_booking_noshow_settings_reasons.sql",
     "567_restaurant_reservation_holds.sql",
     "568_restaurant_inventory_occupancy.sql",
     "569_restaurant_booking_policy.sql",
@@ -519,7 +523,15 @@
     "578_v8_photo_publication_rewards.sql",
     "579_banner_color_roles.sql",
     "580_banner_reference_images.sql",
-    "581_banner_emphasis_lines.sql"
+    "581_banner_emphasis_lines.sql",
+    "582_automation_integration_folders.sql",
+    "583_restaurant_inventory_rules.sql",
+    "584_booking_sync_rules.sql",
+    "585_booking_seat_waitlist_fifo.sql",
+    "586_outgoing_webhook_version.sql",
+    "587_form_step_completion_times.sql",
+    "588_company_settings.sql",
+    "589_hq_distribution_created_name.sql"
   ],
-  "migrationCount": 520
+  "migrationCount": 532
 }

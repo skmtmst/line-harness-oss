@@ -77,10 +77,17 @@ const V8_SECTIONS: Record<string, string[]> = {
   '/ec-commerce': ['Head'],
   '/form-submissions': [],
   '/friends/detail': ['Left', 'Right'],
+  // ★V8 友だち属性の作る画面（d9xoI・w9zY5・GobMd）は src/v8/tags に一から書き、型（CreatePage）が節を持つ。
+  // 残る印は v7 の画面（同じ page.tsx の中）のもの。
+  '/tags/new': [],
+  '/tags/fields/new': ['Basic', 'Immutable', 'Value'],
+  '/tags/fields/migrate': ['Fields', 'Preview', 'Result', 'Usage'],
 }
 const V8_COPY: Record<string, Record<string, string>> = {
   '/hq/members': { '担当アカウントの割り当て': '担当範囲' },
   '/staff': { '人の名前・メールで検索': '名前・メールで探す' },
+  // ★V8 ywFJT：区分の頭のボタンは「まとめて」。
+  '/settings': { 'まとめて切替': 'まとめて' },
   '/ec-commerce': { '取り込みの記録を探す': '取り込みの記録を検索' },
   '/form-submissions': {
     '回答の保存先': '保存先',

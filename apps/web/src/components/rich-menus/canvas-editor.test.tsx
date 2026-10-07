@@ -122,3 +122,19 @@ describe('エリアの名前づけ', () => {
     expect(areaDisplayName({ ...AREAS[0], label: '  ' }, 4)).toBe('5番目のボタン')
   })
 })
+
+describe('★V8 の面の名前（絵 Z0uO6・kmTab）', () => {
+  test('v8 の編集では面の真ん中に名前を出し、見本（preview）では出さない', () => {
+    const props = {
+      areas: AREAS, size: 'large' as const, imageUrl: null, selectedAreaId: null,
+      onSelectArea: () => {}, onAddArea: () => {}, onUpdateArea: () => {}, onDeleteArea: () => {},
+      appearance: 'v8' as const, showAreaList: false, showTools: false,
+    }
+    const { unmount } = render(<CanvasEditor {...props} />)
+    const first = screen.getAllByRole('button', { name: /動きは/ })[0]
+    expect(first.textContent).toBe('予約サイトへ')
+    unmount()
+    render(<CanvasEditor {...props} preview />)
+    expect(document.body.textContent ?? '').not.toContain('予約サイトへ')
+  })
+})

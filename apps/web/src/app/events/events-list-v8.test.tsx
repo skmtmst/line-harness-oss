@@ -131,6 +131,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   await act(async () => { root.unmount() })
   host.remove()
   document.body.innerHTML = ''
@@ -154,6 +155,22 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
     expect(document.body.textContent).toContain('イベント予約')
     expect(document.body.textContent).toContain('これからの回')
     expect(document.body.textContent).toContain('申し込みが少ない')
+  })
+
+  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）', async () => {
+    fetchApi.mockImplementation(async (url: string) => {
+      if (url.includes('filter=pending')) return { items: [], total: 0 }
+      return { ...listPayload(), items: [item({ id: 'e1', folderId: 'ef-class' }), item({ id: 'e2', name: '冬のしつけ教室', folderId: null })], total: 2 }
+    })
+    foldersList.mockResolvedValue({ success: true, data: [{ id: 'ef-class', kind: 'event', name: '教室', parentId: null, displayOrder: 0, color: '#2f6fde', itemCount: 1 }], unfiledCount: 1 })
+    await renderList()
+    const filed = document.querySelector('tr[data-row-id="e1"]')?.querySelectorAll('[data-folder-dot]') ?? []
+    expect(filed).toHaveLength(1)
+    expect(filed[0].getAttribute('data-folder-dot')).toBe('filed')
+    expect(filed[0].getAttribute('aria-label')).toBe('フォルダ：教室')
+    const unfiled = document.querySelector('tr[data-row-id="e2"]')?.querySelectorAll('[data-folder-dot]') ?? []
+    expect(unfiled).toHaveLength(1)
+    expect(unfiled[0].getAttribute('data-folder-dot')).toBe('unfiled')
   })
 
   it('行の「…」に中身・申込者・プレビュー・削除がそろう', async () => {
@@ -182,12 +199,14 @@ describe('V8-B イベント予約の一覧（e2ekFu）', () => {
 
   it('読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {
     fetchApi.mockImplementation(() => new Promise(() => {}))
+    // 待ちは偽の時計で進める（本物の時間を待たない）。骨組みの 0.3 秒は描いた瞬間から数えるので、描く前に替える。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await renderList()
     expect(document.querySelector('[aria-busy="true"]'), '場所取りがある').toBeTruthy()
     expect(document.body.textContent).toContain('イベントの一覧を読み込んでいます')
     expect(document.body.textContent).not.toContain('読み込み中')
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 350))
+      await vi.advanceTimersByTimeAsync(350)
     })
     expect(
       document.querySelectorAll('[data-skeleton]').length,

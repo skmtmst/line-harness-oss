@@ -232,7 +232,7 @@ describe('レスポンシブのメニュー名を維持する', () => {
 
   it('先頭は会社名とバージョン。アカウント切替はトップバーへ移した', () => {
     // 2026-08-26 にアカウント切替・名前・権限・ログアウトをトップバーへ移した。
-    // ここに残すと二重に出る（docs/v6-common-rules.md §1）。
+    // ここに残すと二重に出る（`docs/v8-design-rules.md` §5）。
     expect(source).toContain('SidebarIdentity');
     expect(source).not.toContain('AccountSwitcher');
     expect(source).not.toContain('countryFlag');

@@ -130,6 +130,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 rZEGN の説明の行）。 */
+.nameSub { padding-inline-start: var(--tpl-folder-dot-indent); }
 .audienceMain {
   display: block;
   overflow: hidden;
@@ -282,3 +284,8 @@
 }
 .impactDanger { color: var(--color-danger); font-weight: 600; }
 .impactFaint { color: var(--color-ink-faint); font-size: var(--text-caption); }
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-h); }
+/* 閲覧のみ：つまみと同じ大きさの見えない印で、順番の数字の位置を保つ。 */
+.gripSpace { display: inline-flex; padding: var(--tpl-compact-gap); visibility: hidden; }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, type MenuItem, type StaffItem } from '../lib/api.js';
+import { api, type CreateBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
 import { addMinutesHm, formatJpLong, jstStartsAtIso } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
@@ -28,8 +28,13 @@ export default function Confirm({
   autoConfirm: boolean;
   /** 「← 日時を選び直す」。日時の段へ戻る。 */
   onBack: () => void;
-  /** 送ったあと。引数は作られた予約の状態（requested/confirmed）。 */
-  onSubmitted: (status: string) => void;
+  /** 予約ができたら予約ID・状態・支払い(お支払いありのときだけ付く)を渡す。前払いのみの案内も付く。 */
+  onSubmitted: (result: {
+    bookingId: string;
+    status: string;
+    payment: CreateBookingResponse['payment'];
+    prepayNotice: string | null;
+  }) => void;
 }) {
   // 414 幅の板（`uZqMA`）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
@@ -42,7 +47,7 @@ export default function Confirm({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await api.createRequest(
+      const created = await api.createRequest(
         {
           menu_id: menu.id,
           staff_id: staff.id,
@@ -51,7 +56,12 @@ export default function Confirm({
         },
         idemKey,
       );
-      onSubmitted(res.status);
+      onSubmitted({
+        bookingId: created.booking_id,
+        status: created.status,
+        payment: created.payment ?? null,
+        prepayNotice: created.prepayNotice ?? null,
+      });
     } catch (e) {
       logFailure('create-request', e);
       const err = e as { status?: number; body?: { error?: string } };
@@ -72,7 +82,7 @@ export default function Confirm({
         <Row label="メニュー" value={menu.name} />
         <Row
           label="日時"
-          value={`${formatJpLong(slot.date)} ${slot.start}〜${addMinutesHm(slot.start, staff.duration_minutes)}`}
+          value={`${formatJpLong(slot.date)}${slot.start}〜${addMinutesHm(slot.start, staff.duration_minutes)}`}
         />
         <Row label="担当" value={staff.display_name} />
         <Row
@@ -81,13 +91,13 @@ export default function Confirm({
         />
       </dl>
       <label className="block">
-        <span className="text-[13px] font-bold text-ink">
-          ご要望 <span className="text-[11px] font-normal text-liff-sub">任意</span>
+        <span className="flex items-baseline gap-1.5 text-[13px] font-bold text-ink">
+          ご要望<span className="text-[11px] font-normal text-liff-sub">任意</span>
         </span>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="mt-1.5 min-h-18 w-full rounded-(--liff-radius) bg-canvas px-3.5 py-3 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
+          className="mt-1.5 h-18 w-full resize-none rounded-(--liff-radius) bg-canvas p-3 text-[13px] text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong placeholder:text-liff-idle focus-visible:outline-2 focus-visible:outline-ink"
           rows={3}
           placeholder="例：前髪は短めにしたい"
         />
@@ -97,7 +107,7 @@ export default function Confirm({
           {error}
         </p>
       )}
-      <div className="flex gap-2 rounded-(--liff-radius) bg-liff-note p-3 text-xs leading-5 text-ink">
+      <div className="flex gap-2 rounded-(--liff-radius) bg-liff-note p-3 text-xs leading-[18px] text-ink">
         <Icon name="info" className="h-4 w-4 shrink-0 text-liff-sub" />
         <p>
           {autoConfirm
@@ -124,9 +134,10 @@ export default function Confirm({
   );
 }
 
+/** 確認の1行。板 (gLReL) は 1行 40 (線を含む)・鍵と値は上ぞろえ。 */
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline gap-2 py-2.5">
+    <div className="flex h-10 items-start gap-2 py-2.5">
       <dt className="w-18 shrink-0 text-xs text-liff-sub">{label}</dt>
       <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-ink" title={value}>
         {value}

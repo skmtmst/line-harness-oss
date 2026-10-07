@@ -1,0 +1,427 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+
+/*
+ * ★V8 運用者へのお知らせを作る・なおす（板 gjUz3・hiBO8）。
+ * 値は globals.css の [data-theme="v8"] の --tpl-hb2-op-* と共通の --tpl-* から。
+ */
+.board {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: var(--tpl-hb2-board-bleed);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-head-gap);
+  padding: var(--tpl-hb2-head-pad);
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-hb2-head-title);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.headDescription {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: normal;
+}
+
+.body {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.content {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-gap);
+  min-width: 0;
+  padding: var(--tpl-hb2-content-pad);
+}
+
+.roBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hb2-op-chip-gap);
+  padding: var(--tpl-hb2-op-band-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+
+.split {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-hb2-op-gap);
+  min-width: 0;
+}
+
+.main {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-col-gap);
+  min-width: 0;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--tpl-hb2-op-col-gap);
+  width: var(--tpl-hb2-op-side-w);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-col-gap);
+  padding: var(--tpl-hb2-op-card-pad);
+  border-radius: var(--tpl-hb2-op-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-head-gap);
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.cardNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.nameField,
+.field {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-field-gap);
+  min-width: 0;
+}
+
+.nameLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-hb2-op-lh);
+}
+
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+}
+
+.field :global(*) {
+  max-width: 100%;
+}
+
+.input {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--tpl-hb2-op-control-h);
+  padding: var(--tpl-hb2-op-input-pad);
+  border: 0;
+  border-radius: var(--tpl-hb2-op-control-radius);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-body);
+}
+
+.pair {
+  display: flex;
+  gap: var(--tpl-hb2-op-col-gap);
+  min-width: 0;
+}
+
+/* 受け取るスタッフの箱（絵：角 12・余白 16・行は 37.5 で下に線）。 */
+.staffBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-col-gap);
+  padding: var(--tpl-hb2-op-box-pad);
+  border-radius: var(--tpl-hb2-op-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.staffHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-hb2-op-col-gap);
+}
+
+.staffTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.textButton {
+  min-height: 0;
+  padding: 0;
+  line-height: normal;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.staffList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-col-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.staffRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hb2-op-col-gap);
+  height: var(--tpl-hb2-op-row-h);
+  padding: var(--tpl-hb2-op-row-pad);
+  box-shadow: var(--shadow-row-line);
+}
+
+.staffSpacer {
+  flex: 1 1 0;
+}
+
+.staffSummary {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: normal;
+}
+
+.staffNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hb2-op-note-lh);
+}
+
+.teamForm {
+  display: flex;
+  gap: var(--tpl-hb2-op-chip-gap);
+}
+
+.teamError {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hb2-op-chip-gap);
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+.emptyRecipients {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-head-gap);
+}
+
+.emptyTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+
+/* 届き方の見本（LINE のトークの地に吹き出し）。 */
+.previewBack {
+  display: flex;
+  padding: var(--tpl-hb2-op-preview-pad);
+  border-radius: var(--tpl-hb2-op-control-radius);
+  background: var(--tpl-hb2-op-preview-bg);
+}
+
+.previewBubble {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-hb2-op-bubble-gap);
+  padding: var(--tpl-hb2-op-bubble-pad);
+  border-radius: var(--tpl-hb2-op-bubble-radius);
+  background: var(--color-canvas);
+}
+
+.previewName {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.previewBody {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hb2-op-note-lh);
+}
+
+.wideButton {
+  width: 100%;
+}
+
+.careList {
+  margin: 0;
+  padding: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hb2-op-lh);
+  list-style: none;
+}
+
+.linkRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-hb2-op-link-gap);
+  margin: 0;
+  line-height: var(--tpl-hb2-op-lh);
+}
+
+.linkItem {
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.linkItem:hover {
+  text-decoration: underline;
+}
+
+.formError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-label);
+}
+
+.formNotice {
+  margin: 0;
+  color: var(--color-success);
+  font-size: var(--text-label);
+}
+
+/* 公開前の確認の窓（板 sDXNy）：要約の帯（題150・値）→ 宛先の行（名前200・役割・札）→ 注記 → 線の下に右寄せのボタン。 */
+.confirmBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wa-op-dlg-gap);
+  width: 100%;
+}
+
+.confirmSummary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wa-op-sum-gap);
+  padding: var(--tpl-wa-op-sum-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  font-size: var(--text-label);
+  line-height: var(--tpl-wa-op-sum-lh);
+}
+
+.confirmLine {
+  display: flex;
+  gap: var(--tpl-wa-op-col-gap);
+  margin: 0;
+}
+
+.confirmLabel {
+  flex: 0 0 var(--tpl-wa-op-sum-label-w);
+  color: var(--color-ink-secondary);
+}
+
+.confirmValue {
+  min-width: 0;
+  font-weight: 600;
+}
+
+.confirmList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wa-op-col-gap);
+  box-sizing: border-box;
+  height: var(--tpl-wa-op-row-h);
+  padding: var(--tpl-wa-op-row-pad);
+  line-height: var(--tpl-wa-op-row-lh);
+  box-shadow: var(--shadow-row-line);
+}
+
+.confirmName {
+  flex: 0 0 var(--tpl-wa-op-name-w);
+  overflow: hidden;
+  font-size: var(--text-label);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.confirmRole {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+}
+
+.confirmNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wa-op-sum-lh);
+}
+
+.confirmActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-wa-op-col-gap);
+  padding: var(--tpl-wa-op-foot-pad);
+  border-top: 1px solid var(--color-hairline);
+}

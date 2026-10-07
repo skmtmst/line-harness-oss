@@ -1,0 +1,77 @@
+/*
+ * ★V8 QR コードの小窓（Pencil GtI4Y）。窓の枠・題・閉じるは共通の窓（Dialog）が持つ。
+ * 中身：QR（220 の白い箱・角丸12・薄い枠）→ URL の行（薄い灰の地・角丸8）→ 注（12/19）。
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-il-qr-gap);
+  /* 絵は題の下14で QR の段が始まる。共通の窓の頭（64）＋本文の余白（24）との差を、この窓の中身だけ詰める。 */
+  margin-top: var(--tpl-rsa-qr-pull);
+}
+
+.qrWrap {
+  display: flex;
+  justify-content: center;
+  padding: var(--tpl-il-qr-wrap-pad);
+}
+
+.qr {
+  width: var(--tpl-il-qr-size);
+  height: var(--tpl-il-qr-size);
+  padding: var(--tpl-il-qr-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--tpl-il-qr-radius);
+  background: var(--color-canvas);
+}
+
+.urlRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  padding: var(--tpl-il-qr-url-pad);
+  border-radius: var(--tpl-il-qr-url-radius);
+  background: var(--color-canvas-sunken);
+}
+
+.url {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-il-qr-note-lh);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+.stopped {
+  margin: 0;
+  padding: var(--tpl-il-qr-url-pad);
+  border-radius: var(--tpl-il-qr-url-radius);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-il-qr-note-lh);
+}
+
+/* 下の2つのボタンは真ん中に寄せる（絵どおり）。 */
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--tpl-toolbar-gap);
+  width: 100%;
+  padding-top: var(--tpl-rsa-qr-actions-top);
+}

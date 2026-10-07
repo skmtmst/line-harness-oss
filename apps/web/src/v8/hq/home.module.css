@@ -1,0 +1,319 @@
+/*
+ * ★V8 統括のアカウント（ホーム）（Pencil `JKjsE`）。頭・左の列の枠は型（ListPage）。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
+ */
+.folderInset {
+  margin-left: var(--tpl-hq-folder-inset);
+  min-width: 0;
+}
+
+.createButton { width: 100%; }
+.buttonIcon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
+.full { width: 100%; }
+
+.folderNote {
+  margin: 0;
+  word-break: normal;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-price-unit-lh);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-body-gap);
+  padding: var(--tpl-hq-home-pad);
+  min-width: 0;
+}
+
+.progress { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
+
+/* 数のカード4枚（余白14・間4・題/数/単位の3段） */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tpl-hq-cards-gap);
+}
+
+.stat4 {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-card-gap);
+  min-width: 0;
+  padding: var(--tpl-hq-home-card-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.statLabel {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-hq-small-lh);
+}
+
+.statValue {
+  color: var(--color-ink);
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  font-size: var(--text-title);
+  font-weight: 700;
+  line-height: var(--tpl-hq-home-value-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+.statWarn { color: var(--color-status-warn-deep); }
+
+.statSub {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+  white-space: nowrap;
+}
+
+/* 道具の段（1段目：探す欄 280、2段目：札・切り替え・並び・件数） */
+.tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-plan-head-gap);
+}
+
+.searchBox {
+  width: var(--tpl-hq-search-w);
+  max-width: 100%;
+}
+
+.toolRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--tpl-hq-plan-head-gap);
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: var(--tpl-hq-plan-head-gap); }
+.spacer { flex: 1; }
+
+/* アカウントのカード（3列・横の間16・縦の間14・余白18） */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: var(--tpl-hq-plans-gap);
+  row-gap: var(--tpl-hq-body-gap);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-form-gap);
+  min-width: 0;
+  min-height: var(--tpl-hq-home-account-h);
+  padding: var(--tpl-hq-home-account-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.cardWarn { outline-color: var(--color-status-warn); }
+/* 接続の注意の行を持つカードも、ほかのカードと同じ高さ（226）に収める（下の余白を詰める）。 */
+.cardWarn { padding-bottom: var(--tpl-hq-home-warn-pad-end); }
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-attach-gap);
+  min-width: 0;
+}
+
+.logo {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--tpl-hq-logo);
+  height: var(--tpl-hq-logo);
+  border-radius: var(--radius-control);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+  font-size: var(--tpl-hq-logo-font);
+  font-weight: 700;
+}
+
+.card .meta { padding-left: var(--tpl-folder-dot-indent); }
+/* 丸＋名前の行（inline-flex）が行の高さを 2px 押し上げないよう、名前の段を flex にする。 */
+.card .name { display: flex; min-width: 0; }
+
+.cardName {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-nav-gap);
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font-size: var(--tpl-hq-logo-font);
+  font-weight: 700;
+  line-height: var(--tpl-hq-name-lh);
+}
+
+.meta {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-hq-feature-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag {
+  padding: var(--tpl-hq-pill-pad);
+  border-radius: var(--radius-mini);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-pill-lh);
+  white-space: nowrap;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-hq-form-gap);
+  margin: 0;
+}
+
+.stat { display: flex; flex-direction: column; gap: var(--tpl-hq-nav-gap); min-width: 0; }
+.stat dt { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-hq-small-lh); }
+.stat dd { margin: 0; color: var(--color-ink); font-size: var(--text-lead); font-weight: 700; line-height: var(--tpl-hq-stat-lh); font-variant-numeric: tabular-nums; }
+
+.cardButtons {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-plan-head-gap);
+}
+
+.grow { flex: 1; min-width: 0; }
+
+.warnLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-hq-plan-head-gap);
+  margin: 0;
+  color: var(--color-status-warn-deep);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+}
+
+.linkButton {
+  flex-shrink: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: 600;
+  line-height: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.linkButton:hover { text-decoration: underline; }
+.headAction { font-size: var(--text-caption); }
+.linkButton:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--tpl-hq-pill-gap);
+  padding: var(--tpl-hq-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-hq-pill-lh);
+  white-space: nowrap;
+}
+
+.dot { width: var(--tpl-hq-dot); height: var(--tpl-hq-dot); border-radius: var(--radius-pill); background: currentColor; }
+.pill_ok { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.pill_warn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
+.pill_idle { background: var(--color-step-idle); color: var(--color-ink-secondary); }
+
+/* 表で見る */
+.table {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.head,
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-amount) var(--tpl-hq-col-actions);
+  align-items: center;
+  column-gap: var(--tpl-hq-col-gap);
+}
+
+.head {
+  padding: var(--tpl-hq-head-pad);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: var(--tpl-hq-small-lh);
+}
+
+.row {
+  padding: var(--tpl-hq-pay-row-pad);
+  border-top: 1px solid var(--color-hairline);
+  font-size: var(--text-caption);
+}
+
+.rowName { display: flex; align-items: center; gap: var(--tpl-hq-attach-gap); min-width: 0; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 件数と注 */
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-plans-gap);
+}
+
+.range {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-cell-lh);
+}
+
+.footNote {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+}
+
+.dialogFields { display: flex; flex-direction: column; gap: var(--tpl-hq-field-gap); }
+.dialogLabel { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; }

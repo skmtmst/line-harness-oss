@@ -31,7 +31,7 @@ export default function LiffHeader({ title }: { title: string }) {
 
   return (
     <header className="sticky top-0 z-10 border-b border-liff-line bg-canvas">
-      <div className="mx-auto flex h-12 w-full max-w-md items-center gap-2 px-3">
+      <div className="mx-auto flex h-(--liff-header-h) w-full max-w-md items-center gap-2 px-3">
         <button
           type="button"
           aria-label="閉じる"

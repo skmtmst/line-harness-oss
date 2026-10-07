@@ -115,6 +115,8 @@
   display: block;
   margin-top: calc(var(--tpl-scn-sub-gap) - var(--tpl-row-sub-gap));
   overflow: hidden;
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 axFrW の説明の行）。 */
+  padding-inline-start: var(--tpl-folder-dot-indent);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -192,6 +194,10 @@
 
 /* まとめての帯（選択中に表の下へ出る）。 */
 .bulkRow {
+  /* 長い一覧でも画面の下に付いてくる（動きの点検 12 番）。表が短ければ今までどおり表のすぐ下。 */
+  position: sticky;
+  bottom: var(--bulk-bar-float-gap);
+  z-index: 10;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -473,3 +479,6 @@
 .narrowTable thead th {
   height: var(--tpl-scn-narrow-head-h);
 }
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }

@@ -11,6 +11,7 @@
  * データの口・影響確認・保存・予約・削除・状態切替は `app/contents/vars/edit/edit-v8.tsx` から
  * 写した（import はしない）。動きの一覧は同じ場所の BEHAVIOR.md。
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -21,14 +22,12 @@ import {
   ChevronDown,
   ChevronUp,
   CircleCheck,
-  CircleHelp,
   Download,
   Eye,
   GitCompare,
   Pause,
   Play,
   Plus,
-  RefreshCw,
   Smartphone,
   X,
 } from 'lucide-react'
@@ -153,7 +152,7 @@ function EditCommonVarV8Inner() {
 
   /*
    * 保存・削除・状態切替の口は `requireRole('owner', 'admin')` で閉じている。
-   * staff には閲覧のみの帯を出して保存の押し口を押せない形にする（閉さない）。
+   * staff には閲覧のみの帯を出し、保存などの押し口は置かない（2026-10-06 オーナー決定）。
    */
   const [canWrite] = useState(() =>
     typeof window === 'undefined' ? true : isOwnerOrAdmin())
@@ -813,16 +812,20 @@ function EditCommonVarV8Inner() {
               readOnly={!canWrite}
             />
           </div>
-          <Select
-            aria-label="フォルダ"
-            id="cv-folder"
-            {...(narrow ? { size: 'full' as const } : { width: 240 })}
-            value={folderId}
-            onChange={(next) => { setSaved(false); setFolderId(next) }}
-            disabled={!canWrite}
-            // 絵は「フォルダ：お店の情報」を1つの文で見せる。
-            options={[{ value: '', label: 'フォルダ：未分類' }, ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` }))]}
-          />
+          {canWrite ? (
+            <Select
+              aria-label="フォルダ"
+              id="cv-folder"
+              {...(narrow ? { size: 'full' as const } : { width: 240 })}
+              value={folderId}
+              onChange={(next) => { setSaved(false); setFolderId(next) }}
+              // 絵は「フォルダ：お店の情報」を1つの文で見せる。
+              options={[{ value: '', label: 'フォルダ：未分類' }, ...folders.map((folder) => ({ value: folder.id, label: `フォルダ：${folder.name}` }))]}
+            />
+          ) : (
+            // 閲覧のみ：選ぶ部品は置かず、選んでいるフォルダを文字で見せる。
+            <ReadOnlyValue id="cv-folder" label="フォルダ" value={`フォルダ：${folders.find((folder) => folder.id === folderId)?.name ?? '未分類'}`} />
+          )}
           {foldersError ? (
             <div className={styles.inlineError} data-folders-state="error">
               <p className={styles.fieldHint}>フォルダの一覧を読み込めませんでした。いまの設定のまま保存できます。</p>
@@ -844,27 +847,36 @@ function EditCommonVarV8Inner() {
         <div className={styles.sideFields}>
           <div className={styles.field}>
             <label htmlFor="cv-valid-from" className={styles.fieldLabelStrong}>始まり</label>
-            <DateTimeField id="cv-valid-from" value={validFrom} placeholder="指定なし" onChange={(v) => { setSaved(false); setValidFrom(v) }} />
+            {canWrite
+              ? <DateTimeField id="cv-valid-from" value={validFrom} placeholder="指定なし" onChange={(v) => { setSaved(false); setValidFrom(v) }} />
+              : <ReadOnlyValue id="cv-valid-from" value={readOnlyDate(validFrom)} />}
           </div>
           <div className={styles.field}>
             <label htmlFor="cv-valid-until" className={styles.fieldLabelStrong}>終わり</label>
-            <DateTimeField id="cv-valid-until" value={validUntil} placeholder="指定なし" onChange={(v) => { setSaved(false); setValidUntil(v) }} />
+            {canWrite
+              ? <DateTimeField id="cv-valid-until" value={validUntil} placeholder="指定なし" onChange={(v) => { setSaved(false); setValidUntil(v) }} />
+              : <ReadOnlyValue id="cv-valid-until" value={readOnlyDate(validUntil)} />}
           </div>
         </div>
         <div className={styles.sideFields}>
-          <Select
-            size="full"
-            aria-label="期間外の動き"
-            id="cv-expiry-behavior"
-            value={expiryBehavior}
-            onChange={(next) => { setSaved(false); setExpiryBehavior(next as 'stop' | 'fallback') }}
-            disabled={!canWrite}
-            options={[{ value: 'stop', label: '期間外の動き：配信を止める' }, { value: 'fallback', label: '期間外の動き：代わりの値を出す' }]}
-          />
+          {canWrite ? (
+            <Select
+              size="full"
+              aria-label="期間外の動き"
+              id="cv-expiry-behavior"
+              value={expiryBehavior}
+              onChange={(next) => { setSaved(false); setExpiryBehavior(next as 'stop' | 'fallback') }}
+              options={[{ value: 'stop', label: '期間外の動き：配信を止める' }, { value: 'fallback', label: '期間外の動き：代わりの値を出す' }]}
+            />
+          ) : (
+            <ReadOnlyValue id="cv-expiry-behavior" label="期間外の動き" value={expiryBehavior === 'fallback' ? '期間外の動き：代わりの値を出す' : '期間外の動き：配信を止める'} />
+          )}
           {expiryBehavior === 'fallback' && (
             <div className={styles.field}>
               <label htmlFor="cv-fallback-value" className={styles.fieldLabelStrong}>代わりの値</label>
-              {item.type === 'boolean' ? (
+              {!canWrite && (item.type === 'boolean' || (item.type as string) === 'date' || (item.type as string) === 'datetime') ? (
+                <ReadOnlyValue id="cv-fallback-value" label="代わりの値" value={(item.type as string) === 'boolean' ? (fallbackValue || '未選択') : readOnlyDate(fallbackValue)} />
+              ) : item.type === 'boolean' ? (
                 <Select
                   aria-label="代わりの値"
                   id="cv-fallback-value"
@@ -1052,24 +1064,15 @@ function EditCommonVarV8Inner() {
           {`${placeholderText(item.varKey)}・${typeLabel}・${stateLabel}・${usageTotal === null ? '—' : `${formatNumber(usageTotal)}か所で使っています`}`}
           {/* 競合の帯（板 `piWhz`）。頭の下に横いっぱい。入力は残したまま、誰の保存かを見せる。 */}
           {conflict ? (
-            <div data-design-node="piWhz" className={styles.conflictBand} role="alert">
-              <CircleHelp size={18} aria-hidden="true" className={styles.conflictIcon} />
-              <div className={styles.conflictText}>
-                <p className={styles.conflictTitle}>
-                  {`${conflict.actorName ?? '別の担当者'}さんが ${conflict.savedAt && formatHourMinute(conflict.savedAt) ? `${formatHourMinute(conflict.savedAt)} に` : ''}共通情報「${item.name}」を保存しました`}
-                </p>
-                <p className={styles.conflictSub}>
-                  {`あなたが直した所はまだ保存されていません。このまま保存すると、${conflict.actorName ?? '別の担当者'}さんの変更が消えます。`}
-                </p>
-              </div>
-              <Button type="button" onClick={() => setCompareOpen(true)}>
-                <GitCompare size={14} aria-hidden="true" />
-                違いを比べる
-              </Button>
-              <Button type="button" variant="primary" onClick={adoptLatest}>
-                <RefreshCw size={14} aria-hidden="true" />
-                最新を読み込んで続ける
-              </Button>
+            /* 帯は共通部品（save-conflict）に寄せた。誰が・いつ保存したかの文はこの画面のまま。 */
+            <div className={styles.conflictSlot}>
+              <SaveConflictBand
+                title={`${conflict.actorName ?? '別の担当者'}さんが ${conflict.savedAt && formatHourMinute(conflict.savedAt) ? `${formatHourMinute(conflict.savedAt)} に` : ''}共通情報「${item.name}」を保存しました`}
+                description={`あなたが直した所はまだ保存されていません。このまま保存すると、${conflict.actorName ?? '別の担当者'}さんの変更が消えます。`}
+                designNode="piWhz"
+                onCompare={() => setCompareOpen(true)}
+                onReload={adoptLatest}
+              />
             </div>
           ) : null}
         </>
@@ -1151,8 +1154,11 @@ function EditCommonVarV8Inner() {
               <span className={styles.valueArrow} aria-hidden="true"><ArrowRight size={18} /></span>
               <div className={styles.field}>
                 <label htmlFor="cv-value" className={styles.fieldLabelStrong}>新しい中身</label>
-                {item.type === 'boolean' ? (
-                  <Select size="full" aria-label="新しい中身" id="cv-value" value={value} onChange={(next) => { setSaved(false); setValue(next) }} disabled={!canWrite} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
+                {!canWrite && (item.type === 'boolean' || (item.type as string) === 'date' || (item.type as string) === 'datetime') ? (
+                  // 閲覧のみ：選ぶ部品は置かず、中身を文字で見せる。
+                  <ReadOnlyValue id="cv-value" label="新しい中身" value={item.type === 'boolean' ? value : readOnlyDate(value)} />
+                ) : item.type === 'boolean' ? (
+                  <Select size="full" aria-label="新しい中身" id="cv-value" value={value} onChange={(next) => { setSaved(false); setValue(next) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
                 ) : (item.type as string) === 'long_text' ? (
                   <textarea id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className={styles.fieldArea} rows={2} readOnly={!canWrite} />
                 ) : (item.type as string) === 'date' ? (
@@ -1415,16 +1421,18 @@ function EditCommonVarV8Inner() {
             <Button type="button" onClick={adoptLatest} disabled={saving}>
               最新の値で続け直す
             </Button>
-            <Button
-              type="button"
-              variant="danger"
-              onClick={() => void save()}
-              disabled={saving || !canWrite}
-              busy={saving}
-              busyLabel="保存中…"
-            >
-              このまま保存して上書きする
-            </Button>
+            {canWrite ? (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => void save()}
+                disabled={saving}
+                busy={saving}
+                busyLabel="保存中…"
+              >
+                このまま保存して上書きする
+              </Button>
+            ) : null}
           </div>
         }
       >
@@ -1563,5 +1571,25 @@ export default function EditCommonVarV8() {
     <Suspense fallback={<ListState kind="loading" title="共通情報を読み込んでいます" />}>
       <EditCommonVarV8Inner />
     </Suspense>
+  )
+}
+
+/** 閲覧のみで、日時の欄に入っている値を文字で見せる（空なら「指定なし」）。 */
+function readOnlyDate(value: string): string {
+  return value ? value.replace('T', ' ') : '指定なし'
+}
+
+/** 閲覧のみ：選ぶ部品・日付の部品の代わりに、選んでいる値を読み取りだけの欄で見せる。 */
+function ReadOnlyValue({ id, label, value }: { id: string; label?: string; value: string }) {
+  return (
+    <input
+      id={id}
+      type="text"
+      value={value}
+      readOnly
+      aria-readonly="true"
+      aria-label={label}
+      className={styles.fieldInput}
+    />
   )
 }

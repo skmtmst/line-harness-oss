@@ -61,6 +61,8 @@ export interface BookingAdminSettings {
   maxActiveBookingsPerFriend: number;
   approvalMode: 'automatic' | 'manual';
   holdMinutes: number;
+  /** キャンセル待ち：空きを知らせてから、その人だけが取れる仮押さえの分数。 */
+  waitlistHoldMinutes: number;
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
   /** LIFF 予約「日時を選ぶ」段の最初の形。migration 前の行も 'list'。 */
   liffDateView: LiffDateView;
@@ -85,6 +87,11 @@ export interface BookingAdminSettingsInput {
   maxActiveBookingsPerFriend: number;
   approvalMode: 'automatic' | 'manual';
   holdMinutes: number;
+  /**
+   * キャンセル待ちの仮押さえ分数。省いたときは今の値を保つ
+   * （初回作成だけ 30）。営業時間の保存で黙って戻さないため。
+   */
+  waitlistHoldMinutes?: number;
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
   reminderDayBeforeTime: string | null;
   reminderHoursBefore: number | null;
@@ -124,6 +131,7 @@ const DEFAULT_SETTINGS = {
   maxActiveBookingsPerFriend: 1,
   approvalMode: 'automatic' as const,
   holdMinutes: 15,
+  waitlistHoldMinutes: 30,
   slotGranularityMinutes: 15 as const,
   reminderDayBeforeTime: null as string | null,
   reminderHoursBefore: 2,
@@ -185,6 +193,7 @@ export async function getBookingAdminSettings(
         max_active_bookings_per_friend: number;
         approval_mode: 'automatic' | 'manual';
         hold_minutes: number;
+        waitlist_hold_minutes?: number | null;
         slot_granularity_minutes: 5 | 10 | 15 | 30 | 60;
         reminder_day_before_time: string | null;
         reminder_hours_before: number | null;
@@ -237,6 +246,9 @@ export async function getBookingAdminSettings(
     ),
     approvalMode: setting?.approval_mode ?? DEFAULT_SETTINGS.approvalMode,
     holdMinutes: Number(setting?.hold_minutes ?? DEFAULT_SETTINGS.holdMinutes),
+    waitlistHoldMinutes: Number(
+      setting?.waitlist_hold_minutes ?? DEFAULT_SETTINGS.waitlistHoldMinutes,
+    ),
     slotGranularityMinutes: setting?.slot_granularity_minutes ?? DEFAULT_SETTINGS.slotGranularityMinutes,
     reminderDayBeforeTime: setting?.reminder_day_before_time ?? DEFAULT_SETTINGS.reminderDayBeforeTime,
     reminderHoursBefore: Number(
@@ -279,11 +291,11 @@ export async function saveBookingAdminSettings(
     const create = db.prepare(`INSERT INTO booking_settings
       (id, line_account_id, timezone, booking_window_days, cutoff_minutes_before,
        cancel_deadline_minutes_before, max_active_bookings_per_friend,
-       approval_mode, hold_minutes, slot_granularity_minutes,
+       approval_mode, hold_minutes, waitlist_hold_minutes, slot_granularity_minutes,
        reminder_day_before_time, reminder_hours_before, liff_date_view,
        business_hours_configured,
        created_at, updated_at)
-      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       FROM line_accounts
       WHERE id = ?
       ON CONFLICT(line_account_id) DO NOTHING`)
@@ -296,6 +308,7 @@ export async function saveBookingAdminSettings(
         input.maxActiveBookingsPerFriend,
         input.approvalMode,
         input.holdMinutes,
+        input.waitlistHoldMinutes ?? DEFAULT_SETTINGS.waitlistHoldMinutes,
         input.slotGranularityMinutes,
         input.reminderDayBeforeTime,
         input.reminderHoursBefore,
@@ -348,6 +361,7 @@ export async function saveBookingAdminSettings(
       SET timezone = ?, booking_window_days = ?, cutoff_minutes_before = ?,
           cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
           approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
+          waitlist_hold_minutes = COALESCE(?, waitlist_hold_minutes),
           reminder_day_before_time = ?, reminder_hours_before = ?,
           liff_date_view = COALESCE(?, liff_date_view),
           business_hours_configured = 1, version = version + 1, updated_at = ?
@@ -361,6 +375,7 @@ export async function saveBookingAdminSettings(
         input.approvalMode,
         input.holdMinutes,
         input.slotGranularityMinutes,
+        input.waitlistHoldMinutes ?? null,
         input.reminderDayBeforeTime,
         input.reminderHoursBefore,
         input.liffDateView ?? null,
@@ -375,6 +390,7 @@ export async function saveBookingAdminSettings(
       SET timezone = ?, booking_window_days = ?, cutoff_minutes_before = ?,
           cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
           approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
+          waitlist_hold_minutes = COALESCE(?, waitlist_hold_minutes),
           reminder_day_before_time = ?, reminder_hours_before = ?,
           liff_date_view = COALESCE(?, liff_date_view),
           version = version + 1, updated_at = ?
@@ -388,6 +404,7 @@ export async function saveBookingAdminSettings(
         input.approvalMode,
         input.holdMinutes,
         input.slotGranularityMinutes,
+        input.waitlistHoldMinutes ?? null,
         input.reminderDayBeforeTime,
         input.reminderHoursBefore,
         input.liffDateView ?? null,

@@ -36,6 +36,7 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -976,22 +977,17 @@ function ConversionList({ accountId }: { accountId: string | null }) {
         <p className={styles.stateNote}>数の帯は「—」です。検索や絞り込みはそのまま使えます（条件を変えてから試し直せます）。</p>
       </div>
     )
-  } else if (points.length === 0 && !debouncedQuery) {
-    listBody = (
-      <ListState
-        kind="empty"
-        title="まだ成果地点はありません"
-        description="「商品を買った」など、成果として数えるできごとを決めます"
-        action={canEdit ? <Button variant="primary" href="/conversions/new"><Plus size={15} aria-hidden="true" />成果地点を作る</Button> : undefined}
-      />
-    )
   } else if (shown.length === 0) {
+    /* 修正案 D-2：空の一覧。 */
     listBody = (
-      <ListState
-        kind="empty"
-        title="条件に合うものはありません"
-        description="検索や絞り込みを外すと、すべて出ます"
-        action={<Button variant="text" onClick={clearFilters}>条件を外す</Button>}
+      <EmptyList
+        icon={<Target aria-hidden="true" />}
+        title="まだ成果地点がありません"
+        description="「商品を買った」など、成果として数えるできごとを決めます。"
+        create={{ label: '最初の成果地点を作る', href: '/conversions/new' }}
+        canCreate={canEdit}
+        filtered={points.length > 0 || Boolean(debouncedQuery)}
+        onClearFilters={clearFilters}
       />
     )
   } else {

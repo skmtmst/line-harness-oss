@@ -264,6 +264,10 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   // route 側の requirePermission が最終判定を握る。
   ['/api/access', 'access.user.view'],
   ['/api/audit', 'access.audit.view'],
+  // 在庫ルールと媒体受付の操作は、予約枠・在庫画面に帰属する。
+  // 設定変更は route 側でも owner/admin に絞る。
+  ['/api/restaurant-test/inventory-rules', '/restaurant-test/inventory'],
+  ['/api/restaurant-test/channel-close-tasks', '/restaurant-test/inventory'],
 ];
 
 /**
@@ -330,6 +334,8 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['POST', '/api/auth/sessions/revoke-others'],
   ['GET', '/api/staff/me'],
   ['GET', '/api/tenants/me'],
+  // 自社の表示設定だけ読む。PUTは会社全体のowner/adminに限定する。
+  ['GET', '/api/settings/company'],
   ['POST', '/api/client-errors'],
   ['GET', '/api/capabilities'],
   ['GET', '/api/line-accounts'],
@@ -414,11 +420,17 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/menus'],
   ['GET', '/api/restaurant-test/channels'],
   ['POST', '/api/restaurant-test/reservations/manual'],
+  // 席の空き待ち（booking-plus 席版）：担当者も日の帯から印を付ける。
+  ['GET', '/api/restaurant-test/seat-waitlist'],
+  ['POST', '/api/restaurant-test/seat-waitlist'],
   ['POST', '/api/restaurant-test/reservations/holds'],
   ['GET', '/api/restaurant-test/reservations/day'],
   ['GET', '/api/restaurant-test/customers/search'],
   ['GET', '/api/restaurant-test/customers/history'],
   ['GET', '/api/restaurant-test/inventory/day'],
+  // 既存の在庫閲覧と同じく担当者も確認できる。ルールの保存は管理者以上。
+  ['GET', '/api/restaurant-test/inventory-rules'],
+  ['GET', '/api/restaurant-test/channel-close-tasks'],
   // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
   ['GET', '/api/restaurant-test/google/connection'],
   ['GET', '/api/restaurant-test/google/reviews'],
@@ -447,6 +459,12 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
   ['PATCH', /^\/api\/restaurant-test\/reservations\/[^/]+$/],
+  // 席の空き待ちの取り消し・繰り上げ・来店の印（booking-plus 席版）。
+  ['DELETE', /^\/api\/restaurant-test\/seat-waitlist\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/seat-waitlist\/[^/]+\/convert$/],
+  ['POST', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
+  ['DELETE', /^\/api\/restaurant-test\/reservations\/[^/]+\/visit$/],
+  ['POST', /^\/api\/restaurant-test\/channel-close-tasks\/[^/]+\/done$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
   ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],

@@ -1,0 +1,75 @@
+/*
+ * ★V8-B `VtJQ6`：代理ログイン中（閲覧のみ）の帯。琥珀の地・下に線・高さ 48。
+ * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-st2-imp-*）。
+ */
+.banner {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  gap: var(--tpl-st2-imp-gap);
+  min-height: var(--tpl-st2-imp-h);
+  padding: var(--tpl-st2-imp-pad);
+  border-bottom: 1px solid var(--tpl-st2-imp-line);
+  background: var(--tpl-st2-imp-bg);
+  color: var(--tpl-st2-imp-ink);
+}
+
+.icon {
+  flex-shrink: 0;
+  width: var(--tpl-st2-imp-icon);
+  height: var(--tpl-st2-imp-icon);
+  color: var(--tpl-st2-imp-strong);
+}
+
+.title {
+  overflow: hidden;
+  font-size: var(--text-label);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub {
+  flex-shrink: 0;
+  font-size: var(--text-micro);
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.outline,
+.solid {
+  flex-shrink: 0;
+  padding: var(--tpl-st2-imp-btn-pad);
+  border-radius: var(--radius-control);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+}
+
+.outline {
+  outline: 1px solid var(--tpl-st2-imp-btn-line);
+  outline-offset: -1px;
+  background: transparent;
+  color: var(--tpl-st2-imp-ink);
+  font-weight: 600;
+}
+
+.solid {
+  background: var(--tpl-st2-imp-strong);
+  color: var(--color-on-accent);
+  font-weight: 700;
+}
+
+.outline:disabled,
+.solid:disabled {
+  cursor: not-allowed;
+  color: var(--color-ink-disabled);
+}
+
+.outline:focus-visible,
+.solid:focus-visible {
+  outline: var(--tpl-sb-focus-ring);
+  outline-offset: 0;
+}

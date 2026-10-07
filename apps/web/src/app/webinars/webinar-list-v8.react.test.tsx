@@ -108,6 +108,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   act(() => { root.unmount() })
   host.remove()
   vi.unstubAllGlobals()
@@ -156,19 +157,19 @@ test('v8 で何も無いときは eAQ3t の「まだ無い」が出る', async (
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="UyUMw"]')
-  expect(board?.textContent).toContain('まだ、ウェビナーはありません')
+  expect(board?.textContent).toContain('まだウェビナーがありません')
 })
 
-test('v8 の閲覧のみ（jiNg0）は作る・編集が押せない形になる', async () => {
+// 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
+test('v8 の閲覧のみ（jiNg0）は作る・編集を出さず、閲覧のみの帯を出す', async () => {
   staffRole = 'staff'
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="UyUMw"]')
   expect(board).not.toBeNull()
-  const createButton = [...board!.querySelectorAll('button')].find((button) => button.textContent?.includes('ウェビナーを作る'))
-  expect(createButton?.disabled).toBe(true)
-  const editButton = [...board!.querySelectorAll('button')].find((button) => button.textContent === '編集')
-  expect(editButton?.disabled).toBe(true)
+  const texts = [...board!.querySelectorAll('button, a')].map((el) => el.textContent ?? '')
+  expect(texts.some((t) => t.includes('ウェビナーを作る'))).toBe(false)
+  expect(texts.some((t) => t === '編集')).toBe(false)
   expect(board?.textContent).toContain('閲覧のみで見ています')
 })
 
@@ -248,6 +249,8 @@ test('v8 でフォルダの追加を押すと右のパネルで名前を入れ�
 test('v8 の読み込み中は骨組みで場所を取り「読み込み中」の文字は出さない', async () => {
   vi.stubGlobal('fetch', () => new Promise<Response>(() => {}))
   document.documentElement.dataset.theme = 'v8'
+  // 待ちは偽の時計で進める（本物の時間を待たない）。骨組みの 0.3 秒は描いた瞬間から数えるので、描く前に替える。
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
   await act(async () => {
     root.render(<WebinarsPage />)
   })
@@ -257,7 +260,7 @@ test('v8 の読み込み中は骨組みで場所を取り「読み込み中」�
   expect(host.textContent).not.toContain('読み込み中')
   // 0.3秒たつと骨組みの5行が出る（見出し＋行の高さは本物と同じ）。
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 350))
+    await vi.advanceTimersByTimeAsync(350)
   })
   const skeletons = host.querySelectorAll('[data-skeleton]')
   expect(skeletons.length).toBeGreaterThanOrEqual(5)

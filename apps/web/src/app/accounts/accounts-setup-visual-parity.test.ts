@@ -1,10 +1,12 @@
+import { readFileSync as readOwnFile } from 'node:fs'
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const directory = dirname(fileURLToPath(import.meta.url))
-const setupSource = readFileSync(join(directory, 'new/page.tsx'), 'utf8')
+// ★V8 の登録は src/v8 に一から書いた（入口 new/page.tsx は @/v8 から読む）。新しい画面も一緒に読む。
+const setupSource = readFileSync(join(directory, 'new/page.tsx'), 'utf8') + readFileSync(join(directory, '../../v8/account-new/register.tsx'), 'utf8')
 const accountsSource = readFileSync(join(directory, 'page.tsx'), 'utf8')
 const wizardSource = readFileSync(join(directory, '../restaurant-test/stores/new/page.tsx'), 'utf8')
 const orderingSource = readFileSync(join(directory, '../../components/accounts/account-ordering.tsx'), 'utf8')
@@ -67,10 +69,18 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     }
     expect(orderingSource).toContain('api.lineAccounts.updateHierarchy')
     /*
-      板 V7vn3 に並び順の操作は無いので、一覧からは外した。
+      板 V7vn3 に並び順の操作は無いので、v7 の一覧（page.tsx 自身）からは外した。
       部品自体は残し、絵に無い塊を一覧に出さない。
     */
-    expect(accountsSource).not.toContain('AccountOrdering')
+    expect(readOwnFile(join(directory, 'page.tsx'), 'utf8')).not.toContain('AccountOrdering')
+    /*
+      ★V8 の一覧（src/v8/settings/accounts、#1557）は頭の「並び順と親子を変える」で窓を開き、
+      その窓の中だけで並び替えの部品を出す。一覧の本体に塊として並べない。
+    */
+    const v8ListSource = readOwnFile(join(directory, '../../v8/settings/accounts/accounts.tsx'), 'utf8')
+    expect(v8ListSource.match(/<AccountOrdering\b/g) ?? []).toHaveLength(1)
+    expect(v8ListSource).toContain('{orderingOpen ? <AccountOrdering /> : null}')
+    expect(v8ListSource).toMatch(/<Dialog\s+open=\{orderingOpen\}[\s\S]*?title="並び順と親子を変える"[\s\S]*?<AccountOrdering \/>[\s\S]*?<\/Dialog>/)
   })
 
   it('共通アカウント切替部品は確認後に管理対象を切り替える', () => {

@@ -9,6 +9,7 @@
  * 扱いは古い一覧と同じ（BEHAVIOR.md）。
  */
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
+import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -24,11 +25,9 @@ import {
   ListOrdered,
   MoreHorizontal,
   Plus,
-  Search as SearchIcon,
   Split,
   TriangleAlert,
   Trophy,
-  X,
 } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type RichMenuDeleteImpact, type RichMenuGroupListItem, type RichMenuTapStats } from '@/lib/api'
@@ -47,6 +46,7 @@ import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
@@ -55,6 +55,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Pagination from '@/components/shared/pagination'
@@ -209,7 +210,6 @@ export default function RichMenusListV8() {
   const importRequestGenerationRef = useRef(0)
   const externalLoadedRef = useRef(false)
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
-  const [query, setQuery] = useState('')
   const [external, setExternal] = useState<{ currentDefault: string | null; lineMenus: LineMenu[] } | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<unknown>(null)
@@ -217,12 +217,25 @@ export default function RichMenusListV8() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [applyTo, setApplyTo] = useState<RichMenuGroupListItem | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
-  const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
-  const [sortKey, setSortKey] = useState<SortKey>('priority')
-  const [savedFilter, setSavedFilter] = useState('')
-  const [pageSize, setPageSize] = useState(20)
-  const [page, setPage] = useState(1)
+  /*
+   * 検索語・フォルダ・絞り込み・並び順・件数・ページは URL に置く（動きの点検 5 番）。
+   * 詳細・編集へ行って「戻る」と同じ一覧に戻る。絞り込みを変えたらページは 1 へ
+   * （同じ書き込みの中で戻す。効果で戻すと、来た瞬間に URL から戻したページまで消える）。
+   */
+  const [view, setView] = useListUrlState({ q: '', folder: '', view: '', sort: 'priority', size: '20', page: '1' })
+  const query = view.q
+  const folderFilter = view.folder
+  const savedFilter = view.view
+  const sortKey: SortKey = (['taps', 'updated', 'name', 'priority'] as const).includes(view.sort as SortKey) ? view.sort as SortKey : 'priority'
+  const pageSize = [10, 20, 50].includes(Number(view.size)) ? Number(view.size) : 20
+  const page = Math.max(1, Number.parseInt(view.page, 10) || 1)
+  const setPage = useCallback((next: number) => setView({ page: String(next) }), [setView])
+  const setQuery = useCallback((next: string) => setView({ q: next, page: '1' }), [setView])
+  const setFolderFilter = useCallback((next: string) => setView({ folder: next, page: '1' }), [setView])
+  const setSavedFilter = useCallback((next: string) => setView({ view: next, page: '1' }), [setView])
+  const setSortKey = useCallback((next: SortKey) => setView({ sort: next, page: '1' }), [setView])
+  const setPageSize = useCallback((next: number) => setView({ size: String(next), page: '1' }), [setView])
   const [groupTotal, setGroupTotal] = useState(0)
   const [groupFacets, setGroupFacets] = useState<{
     total: number
@@ -298,7 +311,6 @@ export default function RichMenusListV8() {
     impactRequestRef.current = null
     setImpact(null)
     setImpactPhase('idle')
-    setPage(1)
     if (!selectedAccount?.id) setLoading(false)
   }, [selectedAccount?.id])
 
@@ -429,7 +441,7 @@ export default function RichMenusListV8() {
    * 絞り込みが無いときだけ。ページに収まりきらないときは全件を取り直してから計算する。
    */
   const reorderDisabledReason = !canEdit
-    ? NO_MANAGE_NOTE
+    ? '閲覧のみ'
     : sortKey !== 'priority'
       ? '並びを「出す順番」にすると動かせます'
       : query.trim() !== '' || savedFilter !== '' || folderFilter !== ''
@@ -691,18 +703,18 @@ export default function RichMenusListV8() {
   const currentPage = Math.min(page, pageCount)
   const filterActive = query.trim() !== '' || savedFilter !== '' || folderFilter !== ''
   const clearFilters = () => {
-    setQuery('')
-    setSavedFilter('')
-    setFolderFilter('')
+    setView({ q: '', view: '', folder: '', page: '1' })
   }
 
-  useEffect(() => {
-    setPage(1)
-  }, [folderFilter, pageSize, query, savedFilter, sortKey])
+  // アカウントを替えたらページは 1 へ（来た瞬間は URL のまま）。
+  useOnAccountSwitch(selectedAccount?.id, () => setPage(1))
 
+  // 読み終わってから。読み込み中（件数 0）に詰めると、URL から戻したページが 1 になる。
   useEffect(() => {
-    if (page > pageCount) setPage(pageCount)
-  }, [page, pageCount])
+    if (!loading && !error && page > pageCount) setPage(pageCount)
+  }, [loading, error, page, pageCount, setPage])
+
+  useListScrollMemory(!loading)
 
   /* ===== 行の「…」（編集・表示先・切替のつながり・複製・取り下げ／削除） ===== */
   const rowMenuItems = (g: RichMenuGroupListItem): ActionMenuItem[] => {
@@ -713,8 +725,6 @@ export default function RichMenusListV8() {
       items.push({
         id: 'apply',
         label: '表示先を変える',
-        disabled: !canEdit,
-        disabledReason: !canEdit ? NO_MANAGE_NOTE : undefined,
         onSelect: () => setApplyTo(g),
       })
     }
@@ -726,8 +736,6 @@ export default function RichMenusListV8() {
     items.push({
       id: 'duplicate',
       label: '複製する',
-      disabled: !canEdit,
-      disabledReason: !canEdit ? NO_MANAGE_NOTE : undefined,
       onSelect: () => {
         setDuplicateError(null)
         setDuplicateTarget(g)
@@ -738,14 +746,18 @@ export default function RichMenusListV8() {
       label: g.status === 'published' ? '取り下げ・削除する' : '削除する',
       tone: 'danger',
       dividerBefore: true,
-      disabled: !canEdit,
-      disabledReason: !canEdit ? NO_MANAGE_NOTE : undefined,
       onSelect: () => handleDelete(g),
     })
-    return items
+    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見る項目だけ残す。
+    return canEdit ? items : items.filter((item) => item.id === 'edit' || item.id === 'connections')
   }
 
   /* ===== フォルダ ===== */
+  /* 行の名前の前の丸は、左のフォルダの列と同じフォルダ（同じ色）を引く。無ければ未分類の輪。 */
+  const folderDotOf = (folderId: string | null | undefined) => {
+    const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
   const folderRows: FolderPanelRow[] = [
     { id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal },
     ...folders.map((f) => ({
@@ -763,23 +775,21 @@ export default function RichMenusListV8() {
   ]
 
   const goCreate = () => router.push('/rich-menus/new')
-  const createButton = (
+  const createButton = canEdit ? (
     <Button
       type="button"
       variant="primary"
       className={narrow ? undefined : styles.createWide}
-      disabled={!canEdit}
-      title={!canEdit ? NO_MANAGE_NOTE : undefined}
       onClick={goCreate}
     >
       <Plus size={15} aria-hidden="true" />
       メニューを作る
     </Button>
-  )
+  ) : null
 
   const folderPanel = (
     <FolderPanel
-      createAction={createButton}
+      createAction={createButton ?? <span className={styles.viewerCreateSpace} aria-hidden="true" />}
       activeId={folderFilter}
       onSelect={(id) => {
         setFolderFilter(id)
@@ -787,8 +797,6 @@ export default function RichMenusListV8() {
       }}
       onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
       addFolderLabel="フォルダを追加"
-      addFolderDisabled={!canEdit}
-      addFolderTitle={!canEdit ? NO_MANAGE_NOTE : undefined}
       rows={folderRows}
     >
       <p className={styles.folderNote}>フォルダを消しても、中のメニューは未分類に残ります</p>
@@ -971,27 +979,17 @@ export default function RichMenusListV8() {
       'error',
     )
   ) : groups.length === 0 ? (
-    filterActive ? (
-      stateCard(
-        <SearchIcon size={16} aria-hidden="true" />,
-        '条件に合うメニューはありません',
-        '「公開中」「予約」「下書き」「出し分け」や検索を外すと、すべて出ます。',
-        <Button type="button" variant="secondary" onClick={clearFilters}>
-          <X size={14} aria-hidden="true" />
-          条件を外す
-        </Button>,
-      )
-    ) : (
-      stateCard(
-        <ImageIcon size={16} aria-hidden="true" />,
-        'まだリッチメニューはありません',
-        'トーク画面の下にボタンのメニューを出せます。LINEにあるメニューを取り込むこともできます。',
-        <Button type="button" variant="primary" disabled={!canEdit} title={!canEdit ? NO_MANAGE_NOTE : undefined} onClick={goCreate}>
-          <Plus size={15} aria-hidden="true" />
-          メニューを作る
-        </Button>,
-      )
-    )
+    /* 修正案 D-2：空の一覧。 */
+    <EmptyList
+      icon={<ImageIcon aria-hidden="true" />}
+      title="まだリッチメニューがありません"
+      description="トーク画面の下に、ボタンのメニューを出します。"
+      create={{ label: '最初のリッチメニューを作る', onClick: goCreate }}
+      canCreate={canEdit}
+      filtered={filterActive}
+      onClearFilters={clearFilters}
+      filteredDescription="「公開中」「予約」「下書き」「出し分け」や検索を外すと、すべて出ます"
+    />
   ) : (
     <>
       <span className="sr-only" role="status" aria-live="polite">{moveNotice}</span>
@@ -1036,14 +1034,16 @@ export default function RichMenusListV8() {
                     onDrop={() => void dropOn(g.id)}
                   >
                     <span className={styles.orderInner}>
-                      <ReorderGrip
+                      {/* 閲覧のみ：つまみは隠し、幅だけ空けて順番の数字の位置を保つ */}
+                      {!canEdit && <span className={styles.gripSpace} aria-hidden="true">⠿</span>}
+                      {canEdit && <ReorderGrip
                         label={g.name}
                         disabled={reorderDisabledReason !== null}
                         disabledReason={reorderDisabledReason ?? undefined}
                         onMove={(direction) => void keyboardMove(g.id, direction)}
                       >
                         <span aria-hidden>⠿</span>
-                      </ReorderGrip>
+                      </ReorderGrip>}
                       <span className={styles.orderNumber}>{g.targetingPriority + 1}</span>
                     </span>
                   </Td>
@@ -1062,15 +1062,17 @@ export default function RichMenusListV8() {
                     </span>
                   </Td>
                   <Td className={styles.nameCell}>
-                    <Link
-                      href={`/rich-menus/edit?id=${g.id}`}
-                      title={g.name}
-                      className={styles.name}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {g.name}
-                    </Link>
-                    <span className={styles.sub} title={`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}>
+                    <FolderDotName folder={folderDotOf(g.folderId)}>
+                      <Link
+                        href={`/rich-menus/edit?id=${g.id}`}
+                        title={g.name}
+                        className={styles.name}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {g.name}
+                      </Link>
+                    </FolderDotName>
+                    <span className={`${styles.sub} ${styles.nameSub}`} title={`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}>
                       {`${shape}・ボタン「${g.chatBarText}」・${formatDay(g.updatedAt)} 更新`}
                     </span>
                   </Td>

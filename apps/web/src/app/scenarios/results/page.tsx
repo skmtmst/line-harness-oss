@@ -26,7 +26,7 @@ import { FriendPlanDialog } from '@/components/scenarios/scenario-dialogs'
 import { shortDateTime } from '@/lib/hq-banners'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import ScenarioResultsV8 from './results-v8'
+import ScenarioResultsV8 from '@/v8/scenarios/results'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 

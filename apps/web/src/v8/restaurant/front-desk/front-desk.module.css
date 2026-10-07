@@ -1,0 +1,254 @@
+/*
+ * ★V8 電話予約（E-2 wEzuG）とウォークイン（E-3 nNujj）の中身。
+ * 寸法は Pencil の書き出しから読み、globals.css の --tpl-e1-* だけを使う。
+ */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-form-gap);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-field-gap);
+  min-width: 0;
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-e1-lh-20);
+}
+
+.optional {
+  margin-left: var(--tpl-e1-gap-xs);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 500;
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+}
+
+/* LINE の友だちの候補（緑の枠） */
+.friendBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-s);
+  padding: var(--tpl-e1-friend-pad);
+  border: var(--tpl-e1-line-2) solid var(--color-accent);
+  border-radius: var(--tpl-e1-radius-l);
+  background: var(--color-accent-soft);
+}
+
+.friendTitle {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-e1-lh-18);
+}
+
+.friendRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-m);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.friendRow:focus-visible {
+  outline: var(--tpl-e1-line-2) solid var(--color-status-info);
+  outline-offset: var(--tpl-e1-line-2);
+}
+
+.friendFace {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-e1-face);
+  height: var(--tpl-e1-face);
+  border-radius: var(--tpl-e1-radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.friendName {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.friendNameMain {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--tpl-e1-lh-20);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friendNameSub {
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-lh-18);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friendPicked,
+.friendPick {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--tpl-e1-gap-xs);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.friendPicked {
+  color: var(--color-accent-deep);
+}
+
+.friendPick {
+  color: var(--color-status-info);
+}
+
+/* 人数の −/＋ */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-s);
+}
+
+.stepperValue {
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 600;
+  line-height: var(--tpl-e1-lh-24);
+  white-space: nowrap;
+}
+
+.timeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-e1-gap-s);
+}
+
+.tableRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-m);
+}
+
+.tableText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-xs);
+  min-width: 0;
+}
+
+.tableValue {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e1-lh-20);
+}
+
+.notifyRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e1-gap-m);
+  padding-top: var(--tpl-e1-gap-l);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.notifyText {
+  display: flex;
+  flex-direction: column;
+}
+
+.notifyTitle {
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 500;
+  line-height: var(--tpl-e1-lh-20);
+}
+
+.notifySub {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e1-lh-18);
+}
+
+.drawerFoot {
+  display: flex;
+  justify-content: center;
+  gap: var(--tpl-e1-gap-s);
+  width: 100%;
+}
+
+/* ウォークインの窓 */
+.walkIn {
+  display: flex;
+  align-self: stretch;
+  flex-direction: column;
+  gap: var(--tpl-e1-form-gap);
+  min-width: 0;
+}
+
+.tableCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-e1-gap-s);
+}
+
+.full {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e1-gap-xs);
+  padding: var(--tpl-e1-card-pad);
+  border-radius: var(--tpl-e1-radius-l);
+  background: var(--color-canvas-sunken);
+}
+
+.fullTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+/* 中の部品を中身の幅で置く（日付の切り替え）・1列いっぱいに置く（卓のカード）。 */
+.segment {
+  display: flex;
+  align-self: flex-start;
+}
+
+.cardsWrap {
+  display: block;
+  width: 100%;
+}
+
+.cardsWrap > fieldset {
+  width: 100%;
+}

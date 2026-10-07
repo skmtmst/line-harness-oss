@@ -33,6 +33,8 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import OpsAnnouncementsV8 from '@/v8/ops/announcements'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 
 /**
  * お知らせ配信 ★V6 37-7 `q2CokV`。
@@ -107,6 +109,11 @@ function loadDescription(err: unknown): string | undefined {
 }
 
 export default function OpsAnnouncementsPage() {
+  // ★V8 は src/v8/ops/announcements.tsx。v7 は下のまま。
+  return useAdminTheme() === 'v8' ? <OpsAnnouncementsV8 /> : <OpsAnnouncementsV7 />
+}
+
+function OpsAnnouncementsV7() {
   const [rows, setRows] = useState<OpsAnnouncement[]>([])
   const [loaded, setLoaded] = useState(false)
   const [lineConfigured, setLineConfigured] = useState(true)

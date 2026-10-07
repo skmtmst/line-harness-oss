@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const LIST = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
+/* 一覧の入口は V8 のとき src/v8/rich-menus/list.tsx（2026-10-06〜。古い list-v8.tsx・list-v8.module.css はもう描かれない）。 */
+const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'rich-menus', 'list.tsx'), 'utf8')
 const CREATE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
-const LIST_CSS = readFileSync(join(HERE, 'list-v8.module.css'), 'utf8')
 const CREATE_CSS = readFileSync(join(HERE, 'new', 'create-v8.module.css'), 'utf8')
 
 /*
@@ -16,7 +16,8 @@ const CREATE_CSS = readFileSync(join(HERE, 'new', 'create-v8.module.css'), 'utf8
  */
 describe('リッチメニューの残り板', () => {
   it('一覧は板IDを付ける（閲覧のみは ZoKow）', () => {
-    expect(LIST).toContain("data-design-node={canEdit ? 'rZEGN' : 'ZoKow'}")
+    // 新しい一覧は型（ListPage）の boardId で板IDを付ける。1152 は Y9ASp。
+    expect(LIST).toContain("boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}")
   })
 
   it('作る4手順は手順ごとに板IDを付ける', () => {
@@ -28,9 +29,9 @@ describe('リッチメニューの残り板', () => {
   })
 
   it('編集の競合は帯・比べる・読み直しを出す（r8dGXT）', () => {
-    expect(CREATE).toContain('data-design-node="r8dGXT"')
+    // 帯は共通部品（save-conflict）に寄せた（2026-10-07）。ボタンの文言は共通部品が持つ。
+    expect(CREATE).toMatch(/<SaveConflictBand[\s\S]{0,400}designNode="r8dGXT"/)
     expect(CREATE).toContain('ほかの人がこのメニューを更新しました')
-    expect(CREATE).toContain('違いを比べる')
     expect(CREATE).toContain('最新を読み込んで続ける')
   })
 
@@ -40,8 +41,9 @@ describe('リッチメニューの残り板', () => {
   })
 
   it('1152（Y9ASp・kmTab）は板1100px未満で畳む', () => {
-    expect(LIST_CSS).toContain('@container (max-width: 1099px)')
-    expect(LIST_CSS).toContain('.folderCol')
+    // 新しい一覧は CSS の @container ではなく狭い板の判定（narrow）で、フォルダの列を道具の段へ畳む。
+    expect(LIST).toContain('folders={narrow ? undefined : folderPanel}')
+    expect(LIST).toContain('toolbar={narrow ? narrowToolbar : wideToolbar}')
     expect(CREATE_CSS).toContain('@container (max-width: 1100px)')
   })
 })

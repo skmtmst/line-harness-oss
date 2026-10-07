@@ -3,12 +3,23 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import AppShell from './app-shell'
 
-const route = vi.hoisted(() => ({ pathname: '/accounts/new' }))
+/*
+ * LINEアカウントを登録（/accounts/new）の外枠の見張り。
+ * v7：外枠の無い専用の全画面（左メニュー・上の帯を出さない）。
+ * ★V8（絵 xj3zz〜TvXII・2026-10-07 司令塔）：ほかの画面と同じ外枠（左メニュー・上の帯）で出し、
+ * 設定の中のメニューは付けない。どちらも認証と全 gate は保つ。
+ */
+const route = vi.hoisted(() => ({ pathname: '/accounts/new', theme: 'v7' as 'v7' | 'v8' }))
 vi.mock('next/navigation', () => ({
   usePathname: () => route.pathname,
   useRouter: () => ({ push: () => {}, replace: () => {}, back: () => {}, prefetch: () => {} }),
 }))
+vi.mock('@/lib/use-admin-theme', () => ({ useAdminTheme: () => route.theme }))
 vi.mock('./layout/sidebar', () => ({ default: () => <aside data-test="sidebar" /> }))
+vi.mock('./layout/settings-inner-nav', () => ({
+  default: () => <nav data-test="settings-nav" />,
+  isSettingsAreaPath: (pathname: string) => pathname === '/accounts' || pathname.startsWith('/accounts/'),
+}))
 vi.mock('./shell/app-top-bar', () => ({ default: () => <header data-test="topbar" /> }))
 vi.mock('./update/update-banner', () => ({ UpdateBanner: () => null }))
 vi.mock('./session-lost-notice', () => ({ default: () => <div data-test="session" /> }))
@@ -18,14 +29,43 @@ vi.mock('./root-landing-gate', () => ({ default: ({ children }: { children: Reac
 vi.mock('./store-selection-gate', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="store">{children}</div> }))
 vi.mock('./feature-disabled-gate', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="feature">{children}</div> }))
 
-describe('登録専用の画面枠', () => {
-  it.each(['/accounts/new', '/accounts', '/hq', '/accounts/new-other'])('認証と全gateを保持: %s', pathname => {
-    route.pathname = pathname
-    const html = renderToStaticMarkup(<AppShell><p>登録内容</p></AppShell>)
+const render = (pathname: string, theme: 'v7' | 'v8') => {
+  route.pathname = pathname
+  route.theme = theme
+  return renderToStaticMarkup(<AppShell><p>登録内容</p></AppShell>)
+}
+
+describe('登録の画面枠', () => {
+  it.each([
+    ['/accounts/new', 'v7'], ['/accounts/new', 'v8'], ['/accounts', 'v7'], ['/accounts', 'v8'], ['/hq', 'v8'], ['/accounts/new-other', 'v7'],
+  ] as const)('認証と全gateを保持: %s（%s）', (pathname, theme) => {
+    const html = render(pathname, theme)
     expect(html).toContain('<div data-test="auth"><div data-test="account">')
     expect(html).toContain('<div data-test="root"><div data-test="store"><div data-test="feature"><p>登録内容</p>')
     expect(html).toContain('data-test="session"')
-    expect(html.includes('data-test="sidebar"')).toBe(pathname !== '/accounts/new')
-    expect(html.includes('data-test="topbar"')).toBe(pathname !== '/accounts/new')
+  })
+
+  it('v7 の /accounts/new は外枠の無い専用の全画面（左メニュー・上の帯を出さない）', () => {
+    const html = render('/accounts/new', 'v7')
+    expect(html).toContain('data-account-create-shell="true"')
+    expect(html).not.toContain('data-test="sidebar"')
+    expect(html).not.toContain('data-test="topbar"')
+  })
+
+  it('★V8 の /accounts/new はほかの画面と同じ外枠（左メニュー・上の帯）で、設定の中のメニューは付けない', () => {
+    const html = render('/accounts/new', 'v8')
+    expect(html).not.toContain('data-account-create-shell')
+    expect(html).toContain('data-test="sidebar"')
+    expect(html).toContain('data-test="topbar"')
+    expect(html).not.toContain('data-test="settings-nav"')
+  })
+
+  it('ほかの住所の外枠は変えない（設定の住所には設定の中のメニュー）', () => {
+    for (const theme of ['v7', 'v8'] as const) {
+      const html = render('/accounts/new-other', theme)
+      expect(html).toContain('data-test="sidebar"')
+      expect(html).toContain('data-test="topbar"')
+    }
+    expect(render('/accounts', 'v8')).toContain('data-test="settings-nav"')
   })
 })

@@ -19,6 +19,16 @@ export type DialogProps = {
   designWidth?: number
   /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。v7 では効かない。 */
   designTop?: number
+  /**
+   * ★V8：絵の窓の頭（題と×の行）の余白。CSS の padding と同じ書き方（例 `'20px 20px 0'`）。
+   * 小窓だけの絵（MyJP7・F1LK4e・CVz5d など）は頭が今の共通の値（上20・左右24・下8）より
+   * 詰まっているので、絵の値を画面から渡す。渡さなければ今までどおり。v7 では効かない。
+   * 読み方：~/lh-work/design/v8/html/<板>.html の窓（角丸16px の箱）の padding が上と左右、
+   * 窓の gap が頭と次の段の間。
+   */
+  designHeaderPadding?: string
+  /** ★V8：絵の窓の頭の高さ（px）。渡すと頭の行をこの高さに固定する。渡さなければ中身なり。v7 では効かない。 */
+  designHeaderHeight?: number
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
   /** 操作の左に出す現在の手順など。 */
@@ -61,6 +71,8 @@ export type DialogProps = {
    * `'cancel'` を渡す。×と背景は取消と同じ動きのまま変えない。
    */
   primaryAction?: 'confirm' | 'cancel'
+  /** ★V8：下のボタンの並び。省くと今までどおり右寄せ。'center' は中央（E-3 ウォークイン PUWyq）。v7 では効かない。 */
+  footerAlign?: 'center'
 }
 
 /** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
@@ -69,6 +81,8 @@ export default function Dialog({
   size = 'medium',
   designWidth,
   designTop,
+  designHeaderPadding,
+  designHeaderHeight,
   steps,
   footerLead,
   title,
@@ -90,6 +104,7 @@ export default function Dialog({
   confirmation = false,
   compact = false,
   primaryAction = 'confirm',
+  footerAlign,
 }: DialogProps) {
   const titleId = useId()
   const descriptionId = useId()
@@ -151,8 +166,15 @@ export default function Dialog({
       tabIndex={-1}
       data-closing={leaving || undefined}
       data-size={size}
+      data-footer-align={footerAlign}
       data-design-width={designWidth ? '' : undefined}
-      style={designWidth ? ({ '--dialog-design-width': `${designWidth}px` } as CSSProperties) : undefined}
+      data-design-header-padding={designHeaderPadding ? '' : undefined}
+      data-design-header-height={designHeaderHeight ? '' : undefined}
+      style={designWidth || designHeaderPadding || designHeaderHeight ? ({
+        ...(designWidth ? { '--dialog-design-width': `${designWidth}px` } : {}),
+        ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
+        ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
+      } as CSSProperties) : undefined}
       data-design-part="dialog"
       data-design-node={tone === 'destructive' ? 'H2S1T4' : 'J6x4Q'}
     >

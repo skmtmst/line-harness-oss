@@ -27,11 +27,12 @@ export function Tabs({
   actions,
   className,
   label,
+  size,
 }: {
   items: TabItem[]
   /**
    * タブ行の右端に置くもの。ヘッダー操作を独立した行にしないため
-   * （`docs/v6-common-rules.md` §1-4、Pencil `aToSv` は space_between）。
+   * （`docs/v8-design-rules.md` §5、Pencil `aToSv` は space_between）。
    */
   actions?: ReactNode
   className?: string
@@ -40,6 +41,11 @@ export function Tabs({
    * 読み上げソフトが「○○のタブ一覧」と伝えられるようにする。
    */
   label?: string
+  /**
+   * 段の詰め方。省くと今までどおり（v8 は文字20＋下12）。
+   * 'compact' は文字の行を詰めた段（E-1 hKRRF の店のタブ：高さ 30.5）。v7 では効かない。
+   */
+  size?: 'compact'
 }) {
   /*
    * Issue #708（監査6 a11y）: タブは見た目どおり tablist/tab の役割を持つ。
@@ -97,7 +103,7 @@ export function Tabs({
   const sliding = indicator !== null
 
   return (
-    <nav className={[styles.list, className].filter(Boolean).join(' ')}>
+    <nav className={[styles.list, className].filter(Boolean).join(' ')} data-size={size}>
       <span
         ref={itemsRef}
         className={styles.items}

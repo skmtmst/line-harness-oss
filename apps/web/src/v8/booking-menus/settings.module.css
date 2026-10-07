@@ -1,0 +1,1853 @@
+/*
+ * ★V8 予約設定（owaS3・yRPxl・KRgTQ・x1OZS6・VLEaj・xCoDe・P6EdLW・VFxWU）。
+ *
+ * 白い板1枚：頭（戻る・題・説明・タブ）→ 中身（左＝タブの中身、右＝LIFFの見本）→
+ * 下の帯（保存）。折り畳みの基準は板の幅（container）で、画面幅ではない。
+ * 板が狭い（≒1152画面）と右欄はスマホを畳んで操作ボタンだけにする。
+ *
+ * 値は全部トークン（直書きを数える試験がある）。板だけの色は
+ * globals.css の [data-theme="v8"] にある --v8-* を読む。
+ */
+
+/* 白い板自体は app-shell が持つ（板・余白・角16）。ここでは中身だけ。 */
+.shell {
+  display: flex;
+  flex-direction: column;
+  /* 板の幅で折り畳みを決める（画面幅ではない）。 */
+  container-type: inline-size;
+  /* 頭の下線・右欄の区切り・下の帯を板の端まで届かせるため、
+     .content の余白（20px 24px 28px）を打ち消して中で持ち直す。 */
+  margin: calc(var(--tpl-bm-20) * -1) calc(var(--tpl-bm-24) * -1) calc(var(--tpl-bm-28) * -1);
+  /* 中身が短いタブでも下の帯を板の下へ（絵 x1OZS6：帯は画面の下に追従）。 */
+  min-height: var(--tpl-bk2-shell-min-h);
+}
+
+/* 板の頭：戻る・題・説明・タブ。下の線だけ。 */
+.boardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-8);
+  padding: var(--tpl-bm-20) var(--tpl-bm-24) var(--tpl-bm-11);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bm-4);
+  width: fit-content;
+  color: var(--color-action);
+  font-size: var(--tpl-bm-13);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.headTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-22);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.headNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-12);
+  line-height: 1.6;
+}
+
+/* タブ行は頭の下に張り付く（下線が板の頭の線に重なる）。 */
+.boardHead :global([role='tablist']) {
+  margin-bottom: calc(var(--tpl-bm-1) * -1);
+}
+
+/* 休業日：休みにした日に予約がある人への注意（絵 KRgTQ は帯ではなく字だけ）。 */
+.closedNote {
+  margin: 0;
+  color: var(--color-status-warn-deep);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-17);
+}
+
+/* 予約のルール：見出しの段と選ぶ欄の段を3列で（x1OZS6）。 */
+.ruleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-bm-12) var(--tpl-bm-8);
+}
+
+.ruleHead {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bm-4);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  line-height: var(--tpl-bm-17);
+}
+
+/* 予約の受け方の1行（文字・間・トグル）。行の高さはトグルの20。 */
+.ruleLine {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+  min-height: var(--tpl-bm-20);
+}
+
+.ruleLineLabel {
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: var(--tpl-bm-4);
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  line-height: var(--tpl-bm-19);
+}
+
+.ruleLineSelect {
+  display: flex;
+  flex-shrink: 0;
+  height: var(--tpl-bm-20);
+  align-items: center;
+}
+
+/* 閲覧のみの帯の段（頭の下・左右の列をまたぐ）。 */
+.readOnlyRow {
+  padding: 0 var(--tpl-bm-24) var(--tpl-bm-8);
+}
+
+/* 閲覧のみで隠した「作る」ボタンの場所（ボタンと同じ高さ）。 */
+.createSlot {
+  display: block;
+  height: var(--tpl-bm-36);
+}
+
+/* 中身：左＝タブの中身、右＝お客さまの画面の見本。 */
+.body {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: stretch;
+}
+
+.main {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-bm-16);
+  min-width: 0;
+  padding: var(--tpl-bm-24) var(--tpl-bm-28);
+}
+
+/* 予約経路の連携（絵 ZyDd6）は右の列が無い全幅。帯が頭の線のすぐ下から始まり、左右は 24。 */
+.mainChannels {
+  padding: 0 var(--tpl-bm-24) var(--tpl-bm-24);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--tpl-bm-14);
+  width: var(--tpl-bm-380);
+  padding: var(--tpl-bm-24);
+  border-left: 1px solid var(--color-hairline);
+}
+
+.sideActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-10);
+}
+
+/* 板 VFxWU（1152）：畳んだスマホの代わりの「見え方」ボタン。
+   スマホが見えている広い板では出さない。 */
+.sidePhoneButton {
+  display: flex;
+  flex-direction: column;
+}
+
+.sideAction {
+  display: flex;
+}
+
+.sideTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-15);
+  font-weight: 600;
+}
+
+/* 板が狭いとき（≒画面1152）：右欄は細くしてスマホを畳み、操作だけ残す。 */
+@container (max-width: 1080px) {
+  .side {
+    width: var(--tpl-bm-280);
+    padding: var(--tpl-bm-16);
+  }
+
+  /* 板 P6EdLW（1152）：メニューの表は「担当」「30日」を畳み、
+     メニュー・時間・金額・状態だけにする。 */
+  .colStaff,
+  .colCount {
+    display: none;
+  }
+
+  .sidePhone {
+    display: none;
+  }
+
+  .sideTitle {
+    display: none;
+  }
+}
+
+@container (min-width: 1081px) {
+  .sideLineLink {
+    display: none;
+  }
+
+  .sidePhoneButton {
+    display: none;
+  }
+}
+
+/* ===== 帯・段 ===== */
+
+/* 青い案内の帯（ⓘ）。 */
+.hintBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-10);
+  margin: 0;
+  padding: var(--tpl-bm-10) var(--tpl-bm-14);
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-13);
+  line-height: var(--tpl-bm-20);
+}
+
+.hintBand svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* 注意の帯（黄）。 */
+.warnBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-10);
+  margin: 0;
+  padding: var(--tpl-bm-10) var(--tpl-bm-14);
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+  font-size: var(--tpl-bm-13);
+  line-height: 1.6;
+}
+
+.warnBand svg {
+  flex-shrink: 0;
+  color: var(--color-warning);
+}
+
+/* 白い板の中の段（枠付き・角12）。 */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-12);
+  padding: var(--tpl-bm-20);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.sectionHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-2);
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-15);
+  font-weight: 700;
+  line-height: var(--tpl-bm-22);
+}
+
+.sectionDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-17);
+}
+
+/* 段の頭に右はしのボタンを付けるとき（設備の「設備を追加する」）。 */
+.sectionHeadRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--tpl-bm-12);
+}
+
+/* ===== 道具の段（検索・絞り・作る） ===== */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-8);
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+.searchBox {
+  width: var(--tpl-bm-220);
+  min-width: var(--tpl-bm-160);
+}
+
+/* ===== メニュー表 ===== */
+
+.tableHead,
+.menuRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+  padding: var(--tpl-bm-11) var(--tpl-bm-8);
+}
+
+/* タブの中身：帯・道具・段を16の間で縦に積む（全タブ共通）。 */
+.tabStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-16);
+}
+
+.tableHead {
+  padding: 0 var(--tpl-bm-8);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+}
+
+.tableHead > span {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.menuRow {
+  height: var(--tpl-bm-84);
+  box-shadow: var(--shadow-row-line);
+}
+
+.thText {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 列幅：1列目（名）は伸び縮み、ほかは内容幅に合わせる。 */
+.colOrder {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-4);
+  width: var(--tpl-bm-30);
+  flex-shrink: 0;
+}
+
+.grip {
+  width: var(--tpl-bm-14);
+  min-width: 0;
+  height: var(--tpl-bm-18);
+  min-height: 0;
+  padding: 0;
+  color: var(--color-ink-faint);
+  cursor: grab;
+}
+
+/* 閲覧のみ：つまみは置かず、同じ大きさの場所だけ空ける。 */
+.gripSlot {
+  display: block;
+  width: var(--tpl-bm-14);
+  height: var(--tpl-bm-18);
+  flex-shrink: 0;
+}
+
+.grip:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.orderNum {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-12);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.colName {
+  align-self: flex-start;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-bm-3);
+  min-width: 0;
+}
+
+.nameLine {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-bm-2);
+  min-width: 0;
+}
+
+.menuName {
+  min-height: 0;
+  max-width: 100%;
+  padding: 0;
+  line-height: var(--tpl-bm-19);
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: var(--tpl-bm-13);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.menuName:hover {
+  text-decoration: underline;
+}
+
+/* 分類の札。 */
+.tagChip {
+  flex-shrink: 0;
+  padding: var(--tpl-bm-2) var(--tpl-bm-8);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--radius-mini);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+  white-space: nowrap;
+}
+
+.menuDesc {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-11);
+  line-height: var(--tpl-bm-16);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.colTime {
+  width: var(--tpl-bm-64);
+  flex-shrink: 0;
+}
+
+.colPrice {
+  width: var(--tpl-bm-72);
+  flex-shrink: 0;
+}
+
+.colStaff {
+  width: var(--tpl-bm-110);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.colCount {
+  width: var(--tpl-bm-48);
+  flex-shrink: 0;
+}
+
+.colStatus {
+  display: flex;
+  align-items: center;
+  width: var(--tpl-bm-96);
+  flex-shrink: 0;
+}
+
+.colMenu {
+  width: var(--tpl-bm-28);
+  flex-shrink: 0;
+}
+
+.cellText {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellSub {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+}
+
+.cellNum {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  font-variant-numeric: tabular-nums;
+}
+
+.cellWarn {
+  color: var(--color-warning);
+  font-size: var(--tpl-bm-12);
+}
+
+/* 状態の札（公開中/止めている/受付中）。 */
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bm-4);
+  padding: var(--tpl-bm-2) var(--tpl-bm-8);
+  border-radius: var(--radius-pill);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  line-height: var(--tpl-bm-18);
+  white-space: nowrap;
+}
+
+.statePillOn {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.statePillOff {
+  background: var(--color-v8-pill-off);
+  color: var(--color-ink-secondary);
+}
+
+.stateDot {
+  width: var(--tpl-bm-6);
+  height: var(--tpl-bm-6);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: currentcolor;
+}
+
+/* 行末の「…」。28角・細い枠。 */
+.rowMenuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-bm-28);
+  height: var(--tpl-bm-28);
+  padding: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.rowMenuButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.rowMenuButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ===== 状態（空・0件・読込中・失敗） ===== */
+
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-bm-8);
+  padding: var(--tpl-bm-48) var(--tpl-bm-24);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-bm-40);
+  height: var(--tpl-bm-40);
+  margin-bottom: var(--tpl-bm-4);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-14);
+  font-weight: 600;
+}
+
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-12);
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+.stateActions {
+  margin-top: var(--tpl-bm-8);
+}
+
+/* 読み込み中の骨格。 */
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-16);
+  padding: var(--tpl-bm-16) var(--tpl-bm-8);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.skeletonRow:last-child {
+  border-bottom: 0;
+}
+
+.skeletonBar {
+  height: var(--tpl-bm-12);
+  flex: 1;
+  border-radius: var(--radius-mini);
+  background: var(--color-canvas-sunken);
+}
+
+.skeletonBarShort {
+  width: var(--tpl-bm-96);
+  flex: none;
+}
+
+/* ===== 下の帯（保存） ===== */
+
+.saveBarWrap {
+  position: sticky;
+  bottom: var(--tpl-bm-12);
+  z-index: 20;
+  margin: 0 var(--tpl-bm-12) var(--tpl-bm-12);
+}
+
+.saveBarStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+}
+
+.saveBarStatusDot {
+  width: var(--tpl-bm-7);
+  height: var(--tpl-bm-7);
+  border-radius: var(--radius-pill);
+  background: var(--color-warning);
+}
+
+/* ===== 受付枠（曜日の行） ===== */
+
+/* 見本：左に「トグル＋曜日」、右に縦に並ぶ時間帯の行（yRPxl）。 */
+.dayRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-bm-14);
+  padding: var(--tpl-bm-12) 0;
+  box-shadow: var(--shadow-row-line);
+}
+
+.dayRow:last-of-type {
+  box-shadow: none;
+}
+
+.dayName {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+  width: var(--tpl-bm-64);
+  flex-shrink: 0;
+  padding: var(--tpl-bm-6) 0;
+}
+
+.dayLabel {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
+}
+
+.dayBody {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-bm-6);
+  min-width: 0;
+}
+
+.dayOff {
+  padding: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-17);
+}
+
+.intervalLine {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+  min-height: var(--tpl-bm-36);
+}
+
+.intervalTilde {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-12);
+}
+
+.sameTimeLabel {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-11);
+  white-space: nowrap;
+}
+
+/* TimeField は中に自分の欄（枠・時計・消す）を持つ。外には幅だけを当てて、
+   内側の欄を見本の大きさ（高さ32・12px）へ揃える。 */
+.timeInput {
+  width: var(--tpl-bm-84);
+  flex-shrink: 0;
+}
+
+.timeInput > button:first-of-type {
+  height: var(--tpl-bm-32);
+  padding: 0 var(--tpl-bm-10);
+  font-size: var(--tpl-bm-12);
+}
+
+/* 見本の箱は「9:00」だけ。時計アイコンと中の消すボタンは隠す
+   （時間帯の消去は行はしの×でできる）。 */
+.timeInput > button:first-of-type :global(svg) {
+  display: none;
+}
+
+.timeInput > button:not(:first-of-type) {
+  display: none;
+}
+
+.numInput {
+  width: var(--tpl-bm-48);
+  height: var(--tpl-bm-32);
+  padding: 0 var(--tpl-bm-10);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-variant-numeric: tabular-nums;
+}
+
+.numInput:focus-visible {
+  outline: var(--tpl-bm-2) solid var(--color-action);
+  outline-offset: 1px;
+}
+
+.numInput:disabled {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+}
+
+.iconRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-bm-36);
+  height: var(--tpl-bm-36);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.iconRemove:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+  color: var(--color-danger);
+}
+
+.iconRemove:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* 見本：「＋ 時間帯を足す」は文字ボタン（36px・角10・灰の文字）。 */
+.addLine {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: var(--tpl-bm-6);
+  height: var(--tpl-bm-36);
+  padding: 0 var(--tpl-bm-14);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-13);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addLine:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.addLine:disabled {
+  cursor: not-allowed;
+  color: var(--color-ink-faint);
+}
+
+/* ===== 休業日（月の暦） ===== */
+
+.calNav {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+}
+
+.calNavButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-bm-49);
+  height: var(--tpl-bm-36);
+  border: 0;
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.calNavButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.calMonth {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-14);
+  font-weight: 700;
+  line-height: var(--tpl-bm-20);
+  font-variant-numeric: tabular-nums;
+}
+
+.calAdd {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+  height: var(--tpl-bm-36);
+  margin-left: auto;
+  padding: 0 var(--tpl-bm-14);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-13);
+  font-weight: 600;
+  line-height: var(--tpl-bm-20);
+  cursor: pointer;
+}
+
+.calGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--tpl-bm-4);
+}
+
+.calWeekday {
+  padding: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-11);
+  line-height: var(--tpl-bm-16);
+  text-align: center;
+}
+
+.calWeekdaySun {
+  color: var(--color-ink-faint);
+}
+
+.calWeekdaySat {
+  color: var(--color-ink-faint);
+}
+
+.calDay {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-bm-2);
+  height: var(--tpl-bm-46);
+  padding: var(--tpl-bm-6);
+  border: 0;
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  line-height: var(--tpl-bm-17);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+}
+
+.calDay:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.calDayOutside {
+  outline: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.calDayClosed {
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
+
+.calDayToday {
+  box-shadow: var(--shadow-segment-ring);
+  font-weight: 700;
+}
+
+.calMark {
+  font-size: var(--tpl-bm-9);
+  font-weight: 400;
+  line-height: var(--tpl-bm-13);
+}
+
+.calMarkRegular {
+  color: var(--color-status-danger);
+}
+
+.calMarkExtra {
+  color: var(--color-status-danger);
+}
+
+/* 臨時休業の一覧行。 */
+.exceptionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-8);
+  padding: var(--tpl-bm-9) 0;
+  box-shadow: var(--shadow-row-line);
+}
+
+/* 行の中の文字ボタンは全体のボタンの最低の高さ（32）を受けない（絵 KRgTQ の行は 17 の文字1行）。 */
+.exceptionRow > button {
+  min-height: var(--tpl-bm-17);
+  line-height: var(--tpl-bm-17);
+}
+
+.exceptionDates {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-17);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.exceptionReason {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  line-height: var(--tpl-bm-17);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== ルール ===== */
+
+.ruleFields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-bm-12);
+}
+
+.fieldLabel {
+  display: block;
+  margin-bottom: var(--tpl-bm-6);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+}
+
+.fieldLabelOptional {
+  color: var(--color-ink-faint);
+  font-weight: 400;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-bm-12);
+  padding: var(--tpl-bm-10) 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.toggleRow:last-child {
+  border-bottom: 0;
+}
+
+.toggleRowLabel {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+}
+
+.toggleRowLabel b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* お知らせの行（左：いつ、右：送るもの）。 */
+.noticeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-bm-8);
+  padding: var(--tpl-bm-9) 0;
+  box-shadow: var(--shadow-row-line);
+}
+
+.noticeWhen {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-17);
+}
+
+.noticeWhat {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  line-height: var(--tpl-bm-17);
+  text-align: right;
+}
+
+/* ===== 担当スタッフ ===== */
+
+.staffHeadRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-bm-8);
+}
+
+.staffRow > span {
+  min-width: 0;
+}
+
+.staffHeadTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-15);
+  font-weight: 700;
+}
+
+.staffHeadActions {
+  display: flex;
+  gap: var(--tpl-bm-8);
+  margin-left: auto;
+}
+
+.staffRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bk2-staff-gap);
+  min-height: var(--tpl-bk2-staff-row-h);
+  padding: var(--tpl-bk2-staff-row-pad-y) var(--tpl-bk2-staff-pad-x);
+  box-shadow: var(--shadow-row-line);
+}
+
+.staffRow:last-child {
+  box-shadow: none;
+}
+
+/* 表は余白なしの枠（絵 VLEaj：角丸12・線だけ・中は端まで）。 */
+.staffTable {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+/* 頭の段：薄い灰の地・高さ40。 */
+.staffTableHead {
+  min-height: var(--tpl-bk2-staff-head-h);
+  padding-block: 0;
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 500;
+}
+
+.staffTableHead > span {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.staffName {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-bm-2);
+  min-width: 0;
+}
+
+.staffNameLink {
+  width: fit-content;
+  overflow: hidden;
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-bm-13);
+  font-weight: 600;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staffNameLink:hover {
+  text-decoration: underline;
+}
+
+.staffRole {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-11);
+}
+
+.staffColMenus {
+  width: var(--tpl-bk2-staff-col-menus);
+  flex-shrink: 0;
+}
+
+.staffColNoAssign {
+  width: var(--tpl-bk2-staff-col-noassign);
+  flex-shrink: 0;
+}
+
+.staffColWork {
+  width: var(--tpl-bk2-staff-col-work);
+  flex-shrink: 0;
+}
+
+.staffColLink {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-bm-4);
+  width: var(--tpl-bk2-staff-col-link);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.staffColStatus {
+  width: var(--tpl-bk2-staff-col-status);
+  flex-shrink: 0;
+}
+
+.staffColMenu {
+  width: var(--tpl-bk2-staff-col-menu);
+  flex-shrink: 0;
+}
+
+.staffNote {
+  margin: 0;
+  padding: var(--tpl-bm-10) var(--tpl-bm-12);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}
+
+.staffColLink .staffCellSub {
+  margin-top: 0;
+}
+
+/* 絵 VLEaj：小さい字は 16 の行、0 の行は 17（行の高さ 60・二行の警告の行 69）。 */
+.staffRow .staffCellSub {
+  line-height: var(--tpl-bm-16);
+}
+
+.staffRow .cellWarn {
+  display: flex;
+  flex-direction: column;
+  line-height: var(--tpl-bm-17);
+}
+
+.staffCellMain {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  font-variant-numeric: tabular-nums;
+}
+
+.staffCellSub {
+  display: block;
+  margin-top: var(--tpl-bm-2);
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-11);
+}
+
+/* 見本：「つながっている」は薄緑の札＋緑の点。つないでいないは灰。 */
+.linkState {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bm-5);
+  padding: var(--tpl-bm-2) var(--tpl-bm-8);
+  line-height: var(--tpl-bm-18);
+  border-radius: var(--radius-pill);
+  background: var(--color-v8-pill-off);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.linkStateDot {
+  width: var(--tpl-bm-6);
+  height: var(--tpl-bm-6);
+  border-radius: var(--radius-pill);
+  background: var(--color-ink-faint);
+}
+
+.linkStateOn {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.linkStateOn .linkStateDot {
+  background: var(--color-success);
+}
+
+.noteText {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-12);
+  line-height: 1.7;
+}
+
+/* ===== 設備 ===== */
+
+/* 絵 yRPxl：開ける時間の板の中に、設備と空きの確かめを入れ子の箱で置く（曜日の行の下から20・箱の間12）。 */
+.innerStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-12);
+}
+
+.innerSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-12);
+  padding: var(--tpl-bm-16);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+/* 説明の1行と「設備を追加する」を同じ行に（題はその上に1行）。 */
+.innerHeadRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-bm-12);
+}
+
+.innerTitleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-6);
+}
+
+/* 表の頭と行は間を空けずに積む（箱の間12を入れない）。 */
+.equipTable {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 表の頭：灰の帯36・字12。列は 名前（残り）・種類140・受付上限100・…36（間12）。 */
+.equipHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+  height: var(--tpl-bm-36);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+}
+
+/* 行：63。中身の高さ32の中心が行の上から37（絵 yRPxl）なので上21・下9。線は行の下。字14。 */
+.equipRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+  padding: var(--tpl-bm-21) 0 var(--tpl-bm-9);
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-14);
+  line-height: var(--tpl-bm-19);
+}
+
+.equipName {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.equipType {
+  width: var(--tpl-bm-140);
+  flex-shrink: 0;
+}
+
+.equipCap {
+  width: var(--tpl-bm-100);
+  flex-shrink: 0;
+}
+
+.equipHead > .colMenu,
+.equipRow > .colMenu {
+  width: var(--tpl-bm-36);
+}
+
+/* ===== 空きを確かめる ===== */
+
+/* 欄の間は絵 yRPxl で8。日付・時刻の欄が絵より4高い（共通部品の40）ので、間を6にして下の段の位置を合わせる。 */
+.checkGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-6);
+}
+
+.checkGrid > .fieldLabel {
+  margin-bottom: 0;
+  line-height: var(--tpl-bm-20);
+}
+
+/* 見本：「確かめる」ボタンと結果を横に並べる。 */
+.checkAction {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+}
+
+.checkResult {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-bm-8);
+}
+
+.checkOk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-bm-4);
+  padding: var(--tpl-bm-3) var(--tpl-bm-10);
+  border-radius: var(--radius-pill);
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+}
+
+.checkOk::before {
+  width: var(--tpl-bm-6);
+  height: var(--tpl-bm-6);
+  border-radius: var(--radius-pill);
+  background: var(--color-success);
+  content: '';
+}
+
+.checkNg {
+  color: var(--color-status-warn-deep);
+  font-size: var(--tpl-bm-12);
+}
+
+/* ===== LIFF の見本（右のスマホ） ===== */
+
+.phone {
+  display: flex;
+  flex-direction: column;
+  width: var(--tpl-bm-330);
+  height: var(--tpl-bm-714);
+  margin: 0 auto;
+  overflow: hidden;
+  outline: var(--tpl-bm-8) solid var(--color-ink);
+  outline-offset: calc(var(--tpl-bm-4) * -1);
+  border-radius: var(--v8-liff-phone-radius);
+  background: var(--color-canvas);
+}
+
+.phoneStatusBar {
+  display: flex;
+  align-items: center;
+  height: var(--tpl-bm-44);
+  padding: 0 var(--tpl-bm-24);
+}
+
+.phoneTime {
+  color: var(--color-ink);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneStatusIcons {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-4);
+  margin-left: auto;
+  color: var(--color-ink);
+}
+
+.phoneLiffBar {
+  display: flex;
+  align-items: center;
+  height: var(--tpl-bm-44);
+  padding: 0 var(--tpl-bm-12);
+  border-bottom: 1px solid var(--v8-liff-line);
+}
+
+/* 左の×・右の•••（LIFF の共通バー）。 */
+.phoneLiffSide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-bm-28);
+  flex-shrink: 0;
+  color: var(--color-ink);
+}
+
+.phoneLiffTitle {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  text-align: center;
+}
+
+.phoneLiffTitleMain {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 700;
+  line-height: var(--tpl-bm-19);
+}
+
+.phoneLiffTitleShop {
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  line-height: var(--tpl-bm-13);
+}
+
+.phoneSteps {
+  display: flex;
+  gap: var(--tpl-bm-4);
+  padding: var(--tpl-bm-12) var(--tpl-bm-16) var(--tpl-bm-4);
+}
+
+.phoneStep {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-bm-4);
+  min-width: 0;
+}
+
+.phoneStepLine {
+  height: var(--tpl-bm-3);
+  border-radius: var(--v8-liff-step-radius);
+  background: var(--v8-liff-line);
+}
+
+.phoneStepDone .phoneStepLine,
+.phoneStepNow .phoneStepLine {
+  background: var(--v8-liff-primary);
+}
+
+.phoneStepLabel {
+  color: var(--v8-liff-idle);
+  font-size: var(--tpl-bm-10);
+  font-weight: 500;
+  line-height: var(--tpl-bm-14);
+  white-space: nowrap;
+}
+
+.phoneStepNow .phoneStepLabel {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.phoneBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-bm-14);
+  min-height: 0;
+  padding: var(--tpl-bm-12) var(--tpl-bm-16);
+  overflow-y: auto;
+}
+
+.phoneTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-20);
+  font-weight: 700;
+  line-height: var(--tpl-bm-29);
+}
+
+.phoneSub {
+  margin: 0;
+  color: var(--v8-liff-sub);
+  font-size: var(--tpl-bm-12);
+  line-height: var(--tpl-bm-18);
+}
+
+/* メニューの分類札の帯。 */
+.phoneCats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-bm-6);
+}
+
+.phoneCat {
+  padding: var(--tpl-bm-6) var(--tpl-bm-12);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--v8-liff-chip);
+  color: var(--v8-liff-sub);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+}
+
+.phoneCatNow {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+/* 選ぶカード（メニュー・担当）。 */
+.phoneCard {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-12);
+  width: 100%;
+  padding: var(--tpl-bm-14);
+  outline: 1px solid var(--v8-liff-line);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--v8-liff-card-radius);
+  background: var(--color-canvas);
+  text-align: left;
+}
+
+.phoneCardPicked {
+  background: var(--v8-liff-primary-soft);
+  outline: var(--tpl-bm-2) solid var(--v8-liff-primary);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+}
+
+.phoneThumb {
+  width: var(--tpl-bm-56);
+  height: var(--tpl-bm-56);
+  flex-shrink: 0;
+  border-radius: var(--radius-control);
+  background: var(--v8-liff-thumb);
+  color: var(--v8-liff-thumb-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--tpl-bm-15);
+  font-weight: 700;
+}
+
+.phoneCardBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-bm-3);
+  min-width: 0;
+}
+
+.phoneCardName {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-15);
+  font-weight: 700;
+  line-height: var(--tpl-bm-22);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phoneCardDesc {
+  overflow: hidden;
+  min-height: var(--tpl-bm-17);
+  color: var(--v8-liff-sub);
+  font-size: var(--tpl-bm-11-5);
+  line-height: var(--tpl-bm-17);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phoneCardMeta {
+  display: flex;
+  gap: var(--tpl-bm-8);
+  line-height: var(--tpl-bm-17);
+  align-items: baseline;
+}
+
+.phoneCardMin {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneCardPrice {
+  color: var(--v8-liff-primary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 担当の顔の置き場（正円・頭文字）。指名なしは絵文字ではなく人型の印。 */
+.phoneAvatar {
+  width: var(--tpl-bm-48);
+  height: var(--tpl-bm-48);
+  flex-shrink: 0;
+  border-radius: var(--radius-control);
+  background: var(--v8-liff-thumb);
+  color: var(--v8-liff-thumb-ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--tpl-bm-18);
+  font-weight: 700;
+}
+
+.phoneAvatarPlain {
+  background: var(--v8-liff-chip);
+  color: var(--v8-liff-sub);
+}
+
+.phoneCardCheck {
+  flex-shrink: 0;
+  color: var(--v8-liff-primary);
+}
+
+/* 週の日付の札。両はしに週送りの ‹ › 。 */
+.phoneDays {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-bm-5);
+}
+
+.phoneDayNav {
+  flex-shrink: 0;
+  width: var(--tpl-bm-16);
+  color: var(--v8-liff-sub);
+  font-size: var(--tpl-bm-14);
+  font-weight: 600;
+  text-align: center;
+}
+
+.phoneDay {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-bm-2);
+  padding: var(--tpl-bm-8) 0;
+  outline: 1px solid var(--v8-liff-line);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  min-width: 0;
+}
+
+.phoneDayNow {
+  background: var(--v8-liff-primary-soft);
+  outline: var(--tpl-bm-2) solid var(--v8-liff-primary);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+}
+
+.phoneDayOff {
+  background: var(--v8-liff-off);
+}
+
+.phoneDayDow {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-bm-10);
+  line-height: var(--tpl-bm-14);
+}
+
+.phoneDayNum {
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-14);
+  font-weight: 700;
+  line-height: var(--tpl-bm-19);
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneDayState {
+  color: var(--v8-liff-primary);
+  font-size: var(--text-nano);
+  font-weight: 600;
+  line-height: var(--tpl-bm-13);
+}
+
+.phoneDayOff .phoneDayState {
+  color: var(--color-ink-faint);
+}
+
+/* 時刻の札。 */
+.phoneSlots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-bm-8);
+}
+
+.phoneSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--tpl-bm-44);
+  outline: 1px solid var(--v8-liff-slot-line);
+  outline-offset: calc(var(--tpl-bm-1) * -1);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneSlotNow {
+  outline-color: var(--v8-liff-primary);
+  background: var(--v8-liff-primary);
+  color: var(--color-canvas);
+}
+
+.phoneSlotOff {
+  outline-color: var(--v8-liff-off);
+  background: var(--v8-liff-off);
+  color: var(--v8-liff-idle);
+}
+
+.phoneSectionLabel {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-bm-13);
+  font-weight: 600;
+  line-height: var(--tpl-bm-20);
+}
+
+/* 下の帯（固定）。 */
+.phoneFoot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-bm-8);
+  padding: var(--tpl-bm-12) var(--tpl-bm-16) var(--tpl-bm-30);
+  border-top: 1px solid var(--v8-liff-line);
+}
+
+.phoneFootPick {
+  color: var(--v8-liff-primary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneCta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--tpl-bm-48);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--v8-liff-primary);
+  color: var(--color-canvas);
+  font-size: var(--tpl-bm-15);
+  font-weight: 700;
+}
+
+.phoneCtaOff {
+  background: var(--v8-liff-chip);
+  color: var(--v8-liff-idle);
+}
+
+.phoneBack {
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 500;
+  text-align: center;
+}
+
+/* 週で見る／カレンダーの切替。 */
+.phoneViewSwitch {
+  display: flex;
+  border-radius: var(--radius-control);
+  background: var(--v8-liff-chip);
+  padding: var(--tpl-bm-3);
+}
+
+.phoneViewItem {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  height: var(--tpl-bm-32);
+  border: 0;
+  border-radius: var(--radius-segment);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-bm-12);
+  font-weight: 600;
+}
+
+.phoneViewItemNow {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-segment-thumb);
+}

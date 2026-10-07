@@ -100,6 +100,8 @@ let container: HTMLDivElement | null = null
 let root: Root | null = null
 
 beforeEach(() => {
+  // 一覧の読み込みは400ms遅れる。待ちは偽の時計で進める（本物の時間を待たない）。
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
   account.id = 'account-1'
   mockFetch.mockReset()
   mockDownload.mockReset()
@@ -121,6 +123,7 @@ afterEach(async () => {
   container = null
   document.body.innerHTML = ''
   vi.clearAllMocks()
+  vi.useRealTimers()
 })
 
 async function drainMicrotasks(): Promise<void> {
@@ -133,7 +136,7 @@ async function mountPage(): Promise<HTMLDivElement> {
   root = createRoot(container)
   await act(async () => { root!.render(<AutomationRunsPage />) })
   // 一覧の読み込みは400ms遅延する。
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)) })
+  await act(async () => { await vi.advanceTimersByTimeAsync(450) })
   await act(async () => { await drainMicrotasks() })
   if (!container.textContent?.includes('動いた記録')) throw new Error('実行履歴が出ませんでした')
   return container
@@ -158,7 +161,7 @@ describe('R492: 店を替えたら前の店の詳細・確認を残さない', (
     // B店へ。A店の詳細・確認は残らない。
     account.id = 'account-2'
     await act(async () => { root!.render(<AutomationRunsPage />) })
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(450) })
     await act(async () => { await drainMicrotasks() })
     expect(el.textContent).not.toContain('実行記録の中身')
     expect(el.textContent).not.toContain('取りやめますか')
@@ -178,7 +181,7 @@ describe('R492: 店を替えたら前の店の詳細・確認を残さない', (
     account.id = 'account-2'
     await act(async () => { root!.render(<AutomationRunsPage />) })
     await act(async () => { releaseCancel(ok({ runId: 'run-a', status: 'cancelled', alreadyCancelled: false, cancelledStepCount: 1 })) })
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(450) })
     await act(async () => { await drainMicrotasks() })
     // B店の画面にA店の取消結果は書かない。
     expect(el.textContent).not.toContain('実行を取りやめました')
@@ -235,7 +238,7 @@ describe('R494・R495: 再試行の応答消失とCSVの上限', () => {
     await openDetail(el)
     const retry = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === 'もう一度やる')
     await act(async () => { (retry as HTMLButtonElement).click() })
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 450)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(450) })
     await act(async () => { await drainMicrotasks() })
     // 古い失敗のままにせず、受付済みを出す。古い再試行ボタンは残さない。
     expect(el.textContent).toContain('再試行を受け付けています')

@@ -38,7 +38,7 @@ import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import TemplatesListV8 from './list-v8'
+import TemplatesListV8 from '@/v8/templates/list'
 import { ArrowRight, Bot, MessageCircle, Star, TriangleAlert, Workflow, X } from 'lucide-react'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 

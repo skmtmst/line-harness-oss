@@ -44,24 +44,12 @@
 - Screenshots/logs:
 - Not tested:
 
-## Visual Parity（管理画面のV3/V4変更時は必須）
+## V8 照合（管理画面の見た目を変えたとき）
 
-<!-- docs/pendev-v4-implementation-runbook.md に従う。対象外なら理由を書く。 -->
-
-- Target routes / states:
-- Pencil file:
-- Real Pencil node IDs:
-- 1920px reference screenshots:
-- 1920px implementation screenshots:
-- 1440px implementation screenshots:
-- Side-by-side comparison result:
-- Remaining visual differences / unverified states:
-
-- [ ] 画面名ではなく、Pencil MCPで取得した実ノードIDを記録した。
-- [ ] Pen.devと実装を同じ状態・同じ横幅で横に並べて確認した。
-- [ ] 文字、余白、寸法、色、枠、角丸、影、表、モーダル、ドロワーを確認した。
-- [ ] 1440pxと1920pxでページ・表の横スクロールが無いことを確認した。
-- [ ] 機能・文字列テストだけで「V4一致」と判定していない。
+- 板 ID：
+- measure の合う%（1440・1152）：
+- 司令塔の目視：PASSED.tsv に記録済み・未
+- v7 の画面への影響：なし・あり（理由）
 
 ## Security Impact
 

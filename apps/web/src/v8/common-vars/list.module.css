@@ -1,0 +1,798 @@
+/*
+ * ★V8 共通情報の一覧（Pencil `FM94M`・1152 `XIzkJ`・閲覧のみ `OxSw8`、
+ * 止める `Hhl9M`・削除 `xxKtW`、状態は `RqO7O`）。
+ * 枠・見出し・数の帯・フォルダの列・道具の段の外枠は型（ListPage）が持つ。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-cv-*`。
+ */
+
+.suspense {
+  padding: var(--tpl-cv-state-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-label);
+}
+
+/* 頭の右の「CSVで書き出す」。進み具合は箱の下に浮かせ、頭の高さを変えない。 */
+.exportBox {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.exportPop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--tpl-cv-gap-s);
+  min-width: var(--tpl-cv-export-w);
+  margin-top: var(--tpl-cv-gap-s);
+}
+
+/* 閲覧のみの帯（OxSw8）。数の帯の上。薄い青の地・目の印・枠なし。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cv-band-gap);
+  margin-bottom: var(--tpl-cv-band-after);
+  padding: var(--tpl-cv-band-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-cv-band-lh);
+}
+
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/*
+ * 数の帯（FM94M）：上下の線はマスの外枠と重なる（絵は -0.5 の重ね）。帯の下の線は
+ * 型の数の帯の段が持つので、帯自身の下の線は消し、上の線は頭の余白へ1つ重ねる。
+ * 数字は詰めた字幅（「1」が「7」と同じ幅にならない）。
+ */
+:global([data-theme='v8']) .kpiStrip.kpiStrip[data-kpi-presentation='band'] {
+  margin-top: -1px;
+  border-bottom: 0;
+}
+
+:global([data-theme='v8']) .kpiStrip :global([data-kpi-number]) {
+  font-variant-numeric: normal;
+}
+
+/* 数の帯の説明の行と、右端の「直す →」。 */
+.kpiDetailRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cv-gap-s);
+  width: 100%;
+}
+
+.kpiDetailText {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpiFix {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-cv-fix-gap);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: 600;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+/* フォルダの列の注。 */
+.folderNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-cv-note-lh);
+}
+
+.breakAnywhere {
+  word-break: normal;
+}
+
+.folderAlert {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cv-gap-s);
+}
+
+/* 黄色の帯（空のまま使われている）。道具の段の上で1行を取る。 */
+.alertSlot {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+  margin-bottom: var(--tpl-cv-alert-after);
+}
+
+.alertBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cv-alert-gap);
+  padding: var(--tpl-cv-alert-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cv-alert-lh);
+}
+
+.alertBand > svg {
+  flex-shrink: 0;
+  color: var(--color-status-warn);
+}
+
+.alertBand[data-tone='danger'] {
+  background: var(--color-danger-bg);
+}
+
+.alertBand[data-tone='danger'] > svg {
+  color: var(--color-danger);
+}
+
+.alertText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alertSpacer {
+  flex: 1 1 0;
+}
+
+/* 道具の段（広い板）：探す・札4つ … 並び・件数を1本に。 */
+.wideTools {
+  display: flex;
+  flex-basis: 100%;
+  min-width: 0;
+  --list-search-width: var(--tpl-cv-search-w);
+}
+
+.wideTools > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.chipGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+
+.perPageBox {
+  flex-shrink: 0;
+}
+
+/* 1152 の板（XIzkJ）：1段目と2段目。 */
+.narrowTools {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-cv-narrow-row-gap);
+}
+
+.narrowRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+
+.narrowFolder {
+  width: var(--tpl-cv-folder-w);
+}
+
+.narrowFolder :global(*) {
+  max-width: 100%;
+}
+
+.narrowFolder :global(button) {
+  width: 100%;
+}
+
+.narrowSearch {
+  width: var(--tpl-cv-search-w);
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+/* 表。見出しと行の区切り線だけ。外側の枠は作らない。 */
+.tableWrap {
+  min-width: 0;
+}
+
+.colSelect { width: var(--tpl-cv-col-select); }
+.colValue { width: var(--tpl-cv-col-value); }
+.colState { width: var(--tpl-cv-col-state); }
+.colUsage { width: var(--tpl-cv-col-usage); }
+.colMenu { width: var(--tpl-cv-col-menu); }
+
+.headCell {
+  text-align: left;
+}
+
+/* 見出しの段は絵の高さ（39）。中の選ぶ箱（16）でも伸びないよう上下の余白を高さへ寄せる。 */
+:global([data-theme='v8']) .tableWrap thead th {
+  height: var(--tpl-cv-head-h);
+  padding-block: 0;
+  vertical-align: middle;
+}
+
+.selectCell {
+  text-align: left;
+}
+
+.rowClick {
+  cursor: pointer;
+}
+
+.rowClick > td {
+  height: var(--tpl-cv-row-h);
+  padding-block: var(--tpl-cv-row-pad-block);
+}
+
+.nameLink {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cv-name-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameLink:hover {
+  text-decoration: underline;
+}
+
+.dotLine {
+  /* 丸と名前の行。ブロックの flex にして、行の箱が字の高さより伸びないようにする（絵 FM94M の名の行）。 */
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.dotIndent {
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 FM94M の説明の行）。 */
+  padding-inline-start: var(--tpl-folder-dot-indent);
+}
+
+.keyRow {
+  display: flex;
+  height: var(--tpl-cv-key-lh);
+  align-items: center;
+  gap: var(--tpl-cv-key-gap);
+  min-width: 0;
+}
+
+.keyCode {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-cv-key-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copyKey {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  height: var(--tpl-cv-key-lh);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.copyKey:hover {
+  color: var(--color-action);
+}
+
+.copyKey[data-state='copied'] {
+  color: var(--color-success);
+}
+
+.copyKey[data-state='failed'] {
+  color: var(--color-danger);
+}
+
+.valueCell {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cv-cell-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.valueEmpty {
+  color: var(--color-status-warn);
+}
+
+/* 状態の札（使用中・M/dまで・下書き・止めた・期限切れ）。点＋太字。 */
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-cv-pill-gap);
+  padding: var(--tpl-cv-pill-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-cv-pill-lh);
+  white-space: nowrap;
+}
+
+.statePill[data-tone='success'] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.statePill[data-tone='info'] {
+  background: var(--color-status-info-soft);
+  color: var(--color-action);
+}
+
+.statePill[data-tone='warning'] {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.stateDot {
+  width: var(--tpl-cv-dot);
+  height: var(--tpl-cv-dot);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.usageLink {
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-cv-cell-lh);
+  white-space: nowrap;
+}
+
+.usageLink:hover {
+  text-decoration: underline;
+}
+
+.usageNone {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cv-cell-lh);
+  white-space: nowrap;
+}
+
+.menuCell {
+  text-align: right;
+}
+
+.menuBox {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+:global([data-theme='v8']) .menuBox .rowMenuButton {
+  width: var(--tpl-cv-row-menu);
+  min-width: 0;
+  height: var(--tpl-cv-row-menu);
+  min-height: 0;
+}
+
+/* まとめての帯（選ぶと表の下に出る）。 */
+.bulkRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  padding: var(--tpl-cv-bulk-pad);
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+}
+
+.bulkCount {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.bulkHint {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.pagerSolo {
+  margin: 0;
+  padding: var(--tpl-cv-pager-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-cv-pager-lh);
+}
+
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-cv-pager-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 読み込み中の骨の行。 */
+.skeletonRows {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cv-skeleton-gap);
+  padding: var(--tpl-cv-skeleton-pad);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.skeletonDot {
+  width: var(--tpl-cv-skeleton-dot);
+  height: var(--tpl-cv-skeleton-dot);
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+}
+
+.skeletonBar {
+  flex: 1;
+  height: var(--tpl-cv-skeleton-bar);
+  border-radius: var(--radius-chart-bar);
+  background: var(--color-canvas-sunken);
+}
+
+/* 空・失敗の1枚。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-cv-gap-s);
+  padding: var(--tpl-cv-state-pad);
+  text-align: center;
+}
+
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-cv-state-icon);
+  height: var(--tpl-cv-state-icon);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+}
+
+.stateIconError {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-card-title-size);
+  font-weight: 600;
+}
+
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-label);
+}
+
+/* 窓の中身（Hhl9M・xxKtW）。横いっぱい。下の帯は線なし（絵どおり）。 */
+.dialogBody {
+  display: flex;
+  align-self: stretch;
+  flex-direction: column;
+  gap: var(--tpl-cv-dialog-gap);
+  width: 100%;
+}
+
+.splitFooter {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  width: 100%;
+  padding: var(--tpl-cv-dialog-actions-pad);
+}
+
+/* 削除の窓（xxKtW）：理由・キャンセル・空き・実行の4列。本文と下の帯の間は絵の 14。 */
+.deleteFooter {
+  grid-template-columns: 1fr auto 1fr auto;
+  padding-top: 0;
+}
+
+.deleteBody {
+  gap: var(--tpl-tg2-dialog-gap);
+  margin-top: var(--tpl-tg2-dialog-pull-top);
+  margin-bottom: var(--tpl-tg2-dialog-pull);
+}
+
+.deleteBody .usageItem,
+.deleteBody .usageItemLink {
+  line-height: var(--tpl-tg2-usage-lh);
+}
+
+.deleteBody .usageItemLink {
+  height: auto;
+  min-height: 0;
+}
+
+.deleteBody .choiceGroup {
+  gap: var(--tpl-tg2-choice-gap);
+}
+
+.deleteLead {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-cv-dialog-lh);
+}
+
+/* 削除の窓の左の空き：理由の欄（絵に無いが必須）。 */
+.footerReason {
+  justify-self: start;
+  width: var(--tpl-tg2-reason-w);
+  height: var(--tpl-cv-control-h);
+  padding: var(--tpl-cv-input-pad);
+  border: 1px solid var(--color-control-border, var(--color-hairline));
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+}
+
+.footerEnd {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--tpl-toolbar-gap);
+}
+
+.centerFooter {
+  display: flex;
+  justify-content: center;
+  gap: var(--tpl-toolbar-gap);
+  width: 100%;
+  padding: var(--tpl-cv-dialog-actions-pad);
+}
+
+.dialogLead {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-cv-dialog-lh);
+}
+
+.dialogQuestion {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cv-fix-gap);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cv-name-lh);
+}
+
+.dialogWarn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-cv-gap-s);
+  margin: 0;
+  padding: var(--tpl-cv-alert-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cv-alert-lh);
+}
+
+.dialogWarn > svg {
+  flex-shrink: 0;
+  color: var(--color-status-warn);
+}
+
+.dialogField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cv-field-gap);
+}
+
+.dialogLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cv-pager-lh);
+}
+
+.required {
+  color: var(--color-danger);
+}
+
+.dialogInput {
+  width: 100%;
+  height: var(--tpl-cv-control-h);
+  padding: var(--tpl-cv-input-pad);
+  border: 1px solid var(--color-control-border, var(--color-hairline));
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+
+.dialogError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.dialogHint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cv-alert-lh);
+}
+
+/* 削除できない窓（xxKtW）の「使っている所」。 */
+.usageList ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.usageItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-cv-gap-s);
+  padding: var(--tpl-cv-usage-pad);
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: var(--text-caption);
+}
+
+.usageItemName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usageMore {
+  color: var(--color-ink-faint);
+}
+
+.usageItemLink {
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.usageItemLink:hover {
+  text-decoration: underline;
+}
+
+.choiceGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cv-gap-s);
+}
+
+.choiceBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-cv-choice-gap);
+  cursor: pointer;
+}
+
+.choiceMark {
+  width: var(--tpl-cv-choice-mark);
+  height: var(--tpl-cv-choice-mark);
+  flex-shrink: 0;
+  border: 1px solid var(--color-control-border, var(--color-hairline));
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+}
+
+.choiceBox[data-active] .choiceMark {
+  border: var(--tpl-cv-choice-ring) solid var(--color-accent-deep);
+}
+
+.choiceMain {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-cv-gap-s);
+  min-width: 0;
+}
+
+.choiceTitle {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cv-pager-lh);
+}
+
+.choiceBody {
+  display: block;
+}
+
+.choiceNote {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-cv-alert-lh);
+}
+
+/* 詳細パネルの中身。 */
+.panelBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cv-pill-gap);
+}
+
+.panelLabel {
+  margin: var(--tpl-cv-gap-s) 0 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+
+.panelText {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+
+.panelActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-cv-gap-s);
+}
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }

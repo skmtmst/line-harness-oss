@@ -60,6 +60,7 @@ import {
   type DashboardNotificationFilter,
 } from '@/components/dashboard/notification-summary'
 import { formatNumber, formatTime } from '@/lib/format'
+import DashboardV8 from '@/v8/dashboard/dashboard'
 
 /** 共通トップバーの通知ベル。件数と一覧は選択中アカウントの通知センターから読む。 */
 function BellIcon() {
@@ -1826,10 +1827,12 @@ function DashboardPageInner() {
 }
 
 export default function DashboardPage() {
+  /* ★V8（WQmep）は src/v8/dashboard に一から書いた画面。v7 はこのファイルのまま。 */
+  const theme = useAdminTheme()
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={null}>
-      <DashboardPageInner />
+      {theme === 'v8' ? <DashboardV8 /> : <DashboardPageInner />}
     </Suspense>
   )
 }

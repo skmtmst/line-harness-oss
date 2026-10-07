@@ -13,7 +13,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import TemplateEditV8 from '../edit-v8'
+import TemplateEditV8New from '@/v8/template-edit/edit'
 import TemplateAssetEditor from '../template-asset-editor'
 import { isTemplateDetailData } from '../template-detail-data'
 import {
@@ -344,7 +344,9 @@ function TemplateEditPage() {
  */
 function TemplateEditThemed() {
   const theme = useAdminTheme()
-  return theme === 'v8' ? <TemplateEditV8 /> : <TemplateEditInner />
+  if (theme !== 'v8') return <TemplateEditInner />
+  /* メッセージ・リッチメッセージ（EFV8l）・クーポン・リサーチは src/v8 の新しい画面。 */
+  return <TemplateEditV8New />
 }
 
 /*

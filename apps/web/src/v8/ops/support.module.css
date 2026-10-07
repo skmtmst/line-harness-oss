@@ -1,0 +1,332 @@
+/* 運営のお問い合わせ V8（P0jhqO・代わりに起票 Izau1）。値は --tpl-op-*。 */
+
+.notice {
+  margin-bottom: var(--tpl-op-section-gap);
+}
+
+.columns {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-op-section-gap);
+}
+
+.list {
+  display: flex;
+  width: var(--tpl-op-sp-list-w);
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: var(--tpl-op-me-gap);
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-op-auth-field-gap);
+}
+
+/* 絵（P0jhqO）は残りの札を縦に積み、その下に優先度の選ぶ欄。 */
+.chipColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-op-auth-field-gap);
+}
+
+.priority {
+  width: var(--tpl-op-sp-priority-w);
+}
+
+.priority :global(*),
+.sort :global(*),
+.fullSelect :global(*),
+.prioritySelect :global(*) {
+  max-width: 100%;
+}
+
+.sort :global(button),
+.fullSelect :global(button) {
+  width: 100%;
+}
+
+.tickets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-me-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ticket {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--tpl-op-sp-ticket-gap);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  padding: var(--tpl-op-note-pad);
+  text-align: left;
+}
+
+.ticketSelected {
+  background: var(--color-accent-soft);
+  outline-color: var(--color-accent);
+}
+
+.ticketTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-op-auth-field-gap);
+}
+
+.ticketNo {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.ticketSubject {
+  overflow: hidden;
+  line-height: var(--tpl-st2-ticket-subject-lh);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticketMeta {
+  overflow: hidden;
+  line-height: var(--tpl-st2-ticket-meta-lh);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-op-panel-gap);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  padding: var(--tpl-op-panel-pad);
+}
+
+.detailHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+}
+
+.detailHead svg,
+.draftHead svg,
+.actions svg {
+  width: var(--tpl-op-auth-icon);
+  height: var(--tpl-op-auth-icon);
+}
+
+.detailTitle {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-op-sp-title-size);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.prioritySelect {
+  flex-shrink: 0;
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-panel-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-sp-ticket-gap);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+  padding: var(--tpl-op-note-pad);
+}
+
+.messageMine {
+  background: var(--color-accent-soft);
+}
+
+.messageAuthor {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+}
+
+.messageBody {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-op-ann-body-lh);
+  white-space: pre-wrap;
+}
+
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-op-me-gap);
+}
+
+.draft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-auth-field-gap);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+  padding: var(--tpl-op-note-pad);
+}
+
+.draftHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-auth-field-gap);
+}
+
+.draftTitle {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.replyBox.replyBox {
+  min-height: var(--tpl-op-sp-reply-h);
+  border: 0;
+  padding: 0;
+  font-size: var(--text-caption);
+  line-height: var(--tpl-op-ann-body-lh);
+  box-shadow: none;
+}
+
+.draftNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+}
+
+.actions,
+.confirmActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+}
+
+.confirmActions {
+  width: 100%;
+  padding: var(--tpl-op-sp-confirm-pad);
+}
+
+.field {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-op-auth-field-gap);
+}
+
+.pair {
+  display: flex;
+  gap: var(--tpl-op-row-gap);
+}
+
+.label {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-op-auth-label-lh);
+}
+
+.smallLabel {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-op-ann-small-lh);
+}
+
+.createBody.createBody {
+  height: var(--tpl-op-sp-create-h);
+  min-height: var(--tpl-op-sp-create-h);
+  padding: var(--tpl-op-note-pad);
+  font-size: var(--text-caption);
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-auth-field-gap);
+  margin: 0;
+  border-radius: var(--tpl-op-caution-radius);
+  background: var(--color-surface-pearl);
+  padding: var(--tpl-op-note-pad);
+}
+
+.fact {
+  display: flex;
+  gap: var(--tpl-op-me-gap);
+  font-size: var(--text-caption);
+}
+
+.fact dt {
+  width: var(--tpl-op-sp-fact-w);
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+}
+
+.fact dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.confirmBody {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  white-space: pre-wrap;
+}
+
+@media (max-width: 1023.98px) {
+  .columns {
+    flex-direction: column;
+  }
+
+  .list {
+    width: 100%;
+  }
+}

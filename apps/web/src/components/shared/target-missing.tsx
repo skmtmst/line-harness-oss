@@ -85,6 +85,12 @@ export default function TargetMissing({
   const Icon = ICONS[kind]
   /* 文言の v8 切り替え用。条件分岐の外で読む（フックの順番を保つ）。 */
   const v8 = useSyncExternalStore(subscribeTheme, readIsV8, readIsV8OnServer)
+  /*
+   * RqO7O：v8 の絵の失敗の題は「読み込めませんでした」。共通の文（ListState・失敗の言い分け）と、
+   * 画面が渡す「〇〇を表示できませんでした」を、v8 では「〇〇を読み込めませんでした」で出す。
+   * v7（x5cgUH）は今のまま。
+   */
+  const shownTitle = v8 && kind === 'error' ? title.replace(/表示できませんでした$/, '読み込めませんでした') : title
   const showBack = (kind === 'unspecified' || kind === 'not-found') && backHref && backLabel
   // 403 は押しても直らないので、再試行の口は出さない。
   // 文言は画面の指定どおり（出し分け文言が要るときは ListState の `error` を使う）。
@@ -104,9 +110,9 @@ export default function TargetMissing({
     )
   } else if (showRetry) {
     /* RqO7O：v8 の絵は「もう一度試す」。v7（x5cgUH）は読み込むのまま。 */
-    /* 読み上げ名は v7・v8 とも「もう一度読み込む」のまま（試験・操作の目印）。 */
+    /* 読み上げ名は見えている文字と同じにする（別の名前を付けると、声で操作する人が呼べない）。 */
     action = (
-      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます" aria-label="もう一度読み込む">
+      <Button type="button" variant="secondary" onClick={onRetry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">
         <RotateCw aria-hidden="true" size={16} />{v8 ? 'もう一度試す' : 'もう一度読み込む'}
       </Button>
     )
@@ -122,7 +128,7 @@ export default function TargetMissing({
       <div className={styles.mark}>
         <Icon aria-hidden="true" size={20} />
       </div>
-      <p className={styles.title}>{title}</p>
+      <p className={styles.title}>{shownTitle}</p>
       <p className={styles.description}>
         {description}
         {accountLine ? <span> {accountLine}</span> : null}

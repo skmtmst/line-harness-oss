@@ -7,6 +7,8 @@
 
 import {
   AdConversionLeaseError,
+  getAdConversionRetrySource,
+  claimAdConversionRetry,
   claimAdConversionSend,
   claimAdConversionOutboxDue,
   enqueueAdConversionOutbox,
@@ -235,6 +237,12 @@ async function attemptPlatformSend(
     errorMessage: errorMessage ?? null,
     retryable,
   });
+
+  // F-22: 初回の送信要求から90日経ったものは、自動の再試行でも送らない。
+  if (adConversionRetryExpired(outbox.row.created_at)) {
+    await finishOutbox('failed', 'retry_expired', false);
+    return 'failed';
+  }
 
   if (args.platform.name === 'google' && outbox.row.idempotency_key.startsWith('conversion:')) {
     const snapshot = await mappedAdSnapshot(db, outbox.row.idempotency_key.slice('conversion:'.length), args.platform.id);
@@ -626,5 +634,68 @@ async function sendTikTokConversion(
   if (!response.ok) {
     const errorBody = await response.text();
     throw new Error(`TikTok Events API error: ${response.status} ${errorBody}`);
+  }
+}
+
+/** 日時が読めない旧行も、期限内と見なして外へ送らない。 */
+export function adConversionRetryExpired(createdAt: string, now = new Date()): boolean {
+  const timestamp = Date.parse(createdAt.includes('T') ? createdAt : `${createdAt.replace(' ', 'T')}Z`);
+  return !Number.isFinite(timestamp) || timestamp > now.getTime()
+    || now.getTime() - timestamp >= 90 * 86_400_000;
+}
+
+export class AdConversionRetryError extends Error {
+  constructor(public readonly code: string, message: string, public readonly status: 404 | 409 | 410 | 422) {
+    super(message);
+  }
+}
+
+/** F-22: 待ち行列の固定値で1件だけ再送し、送信済みの再操作は同じ結果へ戻す。 */
+export async function retryAdConversion(
+  db: D1Database, input: { logId: string; lineAccountId: string; credentialKey?: string },
+): Promise<import('@line-crm/shared').AdConversionRetryResult> {
+  const row = await getAdConversionRetrySource(db, input.logId);
+  if (!row || row.line_account_id !== input.lineAccountId) {
+    throw new AdConversionRetryError('not_found', '送信記録が見つかりません', 404);
+  }
+  if (adConversionRetryExpired(row.created_at)) {
+    throw new AdConversionRetryError('retry_expired', '初回の送信要求から90日経ったため、やり直せません', 410);
+  }
+  if (!row.provider_event_id || row.log_provider_event_id !== row.provider_event_id) {
+    throw new AdConversionRetryError('retry_snapshot_unavailable', '同じ送信の目印を確認できません', 422);
+  }
+  const result = (status: 'sent' | 'failed' | 'pending', replayed: boolean) => ({
+    logId: row.log_id, outboxId: row.id, providerEventId: row.provider_event_id!, status, replayed,
+  });
+  if (['sent', 'success'].includes(row.log_status)) return result('sent', true);
+  if (row.log_status !== 'failed' || row.status === 'sending') {
+    throw new AdConversionRetryError('retry_busy', '送信中です。結果を読み直してください', 409);
+  }
+  if (row.is_retryable !== 1 || row.selection_reason !== 'eligible' || !refFromOutboxSnapshot(row)) {
+    throw new AdConversionRetryError('not_retryable', '送信の固定情報を確認できないため、やり直せません', 422);
+  }
+  const platform = await getAdPlatformById(db, row.ad_platform_id);
+  if (!platform || platform.line_account_id !== row.line_account_id || platform.is_active !== 1) {
+    throw new AdConversionRetryError('platform_unavailable', '広告の連携が停止中か、所属先が変わっています', 409);
+  }
+  if (await isOperationCapabilityStopped(db, row.line_account_id, 'ad_postback')) {
+    throw new AdConversionRetryError('sending_stopped', '広告への送信を停止しています', 409);
+  }
+  const config = await resolveAdPlatformConfig(platform, input.credentialKey);
+  if (!config) throw new AdConversionRetryError('config_unavailable', '広告の接続設定を確認できません', 422);
+  const lease = await claimAdConversionRetry(db, row);
+  if (!lease) throw new AdConversionRetryError('retry_busy', 'ほかの処理が先に送信しました。結果を読み直してください', 409);
+  try {
+    const status = await attemptPlatformSend(db, {
+      platform, config, friendId: row.friend_id, lineAccountId: row.line_account_id!,
+      eventName: row.event_name, eventValue: row.event_value ?? undefined,
+      currency: row.currency, amountInMinorUnit: row.amount_in_minor_unit === 1,
+      idempotencyKey: row.idempotency_key, providerEventId: row.provider_event_id,
+    }, { row, lease });
+    return result(status, false);
+  } catch {
+    // 例外の本文や接続設定は応答・監査へ出さない。leaseを持つ自分の行だけ閉じる。
+    await finishAdConversionOutbox(db, { id: row.id, lease, status: 'failed', errorMessage: 'retry_send_failed' });
+    return result('failed', false);
   }
 }

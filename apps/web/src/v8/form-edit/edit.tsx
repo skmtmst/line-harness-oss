@@ -12,7 +12,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, Copy, FlaskConical, Smartphone, TriangleAlert, Upload } from 'lucide-react'
+import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react'
 import {
   emptyLayout,
   formThemeContrastError,
@@ -28,6 +28,7 @@ import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { Tabs } from '@/components/shared/tabs'
@@ -43,6 +44,8 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import {
   conflictMessage,
   conflictTitle,
@@ -118,17 +121,37 @@ function FormEditInner() {
   const savedSnapshot = useRef<string | null>(null)
   /** 読み込んだ時点の編集の版(#723)。読み込みと保存成功のときだけ入れ替える。 */
   const [contentRevision, setContentRevision] = useState<number | null>(null)
+  /* 保存の直前に読む版。自動保存のあと描き直す前に手の保存が走っても、新しい版で送る。 */
+  const contentRevisionRef = useRef<number | null>(null)
+  contentRevisionRef.current = contentRevision
   const [publishedVersionId, setPublishedVersionId] = useState<string | null>(null)
   const [publishedContentRevision, setPublishedContentRevision] = useState<number | null>(null)
   const [testToken, setTestToken] = useState<string | null>(null)
   const [testBusy, setTestBusy] = useState(false)
   const [testError, setTestError] = useState('')
-  /** ほかの人が先に保存していたとき（409）。入力は捨てない。 */
-  const [conflict, setConflict] = useState<{ updatedAt: string } | null>(null)
   const [showPublish, setShowPublish] = useState(false)
-  const [compareTarget, setCompareTarget] = useState<ConflictSide | null>(null)
-  const [compareBusy, setCompareBusy] = useState(false)
-  const [compareError, setCompareError] = useState('')
+  /*
+   * 公開の確かめ（Z9wXm）の「変わること」は、いま公開中の版との違い。
+   * 公開中の版は、account_id を付けない取得（お客さまに見えている形）で読む。
+   * 読めないとき（未公開・受付停止・通信失敗）は、保存した下書きとの違いに戻す。
+   */
+  const [publishedSide, setPublishedSide] = useState<ConflictSide | null>(null)
+  /*
+   * ほかの人が先に保存していたとき（409）。入力は捨てない。
+   * 帯・比べる窓・読み直しは共通の save-conflict（動きの点検 16 番）。
+   */
+  const saveConflict = useSaveConflict<ConflictSide>({
+    // 「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
+    fetchLatest: async () => {
+      if (!id || !selectedAccountId) return null
+      const res = await api.forms.get(id, selectedAccountId)
+      if (!res.success) return null
+      return { name: res.data.name, description: res.data.description ?? '', layout: res.data.layout ?? emptyLayout() }
+    },
+    reload: () => reloadAfterConflict(),
+  })
+  const conflict = saveConflict.conflict
+  const clearConflict = saveConflict.clear
   const [previewOpen, setPreviewOpen] = useState(false)
   /** 最初の読み込みで ?page= を当てたか（読み直しでページを戻さない）。 */
   const pageFromUrl = useRef(false)
@@ -173,7 +196,7 @@ function FormEditInner() {
     setContentRevision(res.data.contentRevision ?? null)
     setPublishedVersionId(res.data.publishedVersionId ?? null)
     setPublishedContentRevision(res.data.publishedContentRevision ?? null)
-    setConflict(null)
+    clearConflict()
     if (!pageFromUrl.current) {
       pageFromUrl.current = true
       const index = readPage(params.get('page'), nextLayout.sections.length)
@@ -183,7 +206,7 @@ function FormEditInner() {
     savedSnapshot.current = JSON.stringify(loaded)
     setFormLoaded(true)
     return true
-  }, [id, selectedAccountId, params])
+  }, [id, selectedAccountId, params, clearConflict])
 
   const reloadAfterConflict = async () => {
     setError('')
@@ -196,24 +219,29 @@ function FormEditInner() {
     }
   }
 
-  // 「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
-  const openCompare = async () => {
-    if (!id || !selectedAccountId || compareBusy) return
-    setCompareBusy(true)
-    setCompareError('')
-    try {
-      const res = await api.forms.get(id, selectedAccountId)
-      if (!res.success) {
-        setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
-        return
-      }
-      setCompareTarget({ name: res.data.name, description: res.data.description ?? '', layout: res.data.layout ?? emptyLayout() })
-    } catch {
-      setCompareError('最新の内容を取れませんでした。もう一度お試しください。')
-    } finally {
-      setCompareBusy(false)
+  /* 公開の確かめを開いたら、公開中の版を読む（`?view=published` は印だけ。API は account_id が無いと公開中の版を返す）。 */
+  useEffect(() => {
+    if (!showPublish || !id || !publishedVersionId) {
+      setPublishedSide(null)
+      return
     }
-  }
+    let alive = true
+    void (async () => {
+      try {
+        const res = await fetchApi<{ success: boolean; data?: { name?: string; description?: string | null; layout?: FormLayout } }>(
+          `/api/forms/${encodeURIComponent(id)}?view=published`,
+          { suppressFeatureDisabledEvent: true },
+        )
+        if (!alive) return
+        setPublishedSide(res.success && res.data?.layout
+          ? { name: res.data.name ?? '', description: res.data.description ?? '', layout: res.data.layout }
+          : null)
+      } catch {
+        if (alive) setPublishedSide(null)
+      }
+    })()
+    return () => { alive = false }
+  }, [showPublish, id, publishedVersionId, contentRevision])
 
   useEffect(() => {
     setFormLoadFailed(null)
@@ -444,22 +472,12 @@ function FormEditInner() {
 
   /* ---------------- 保存・公開 ---------------- */
 
-  const save = async (publishAfter = false): Promise<boolean> => {
-    if (!selectedAccountId) {
-      setError('LINE公式アカウントを選んでください')
-      return false
-    }
-    if (!name.trim()) {
-      setError('フォーム名を入力してください')
-      setNameError('フォーム名を入力してください')
-      return false
-    }
-    setNameError(null)
+  /** 保存を断る理由（無ければ null）。自動保存の「通せる形か」にも同じものを使う。 */
+  const saveProblem = (publishAfter: boolean): { message: string; name?: boolean } | null => {
+    if (!selectedAccountId) return { message: 'LINE公式アカウントを選んでください' }
+    if (!name.trim()) return { message: 'フォーム名を入力してください', name: true }
     const allBlocks = layout.header.concat(layout.sections.flatMap((s) => s.blocks))
-    if (allBlocks.find((b) => b.kind === 'input' && !b.label.trim())) {
-      setError('タイトルが空のブロックがあります')
-      return false
-    }
+    if (allBlocks.find((b) => b.kind === 'input' && !b.label.trim())) return { message: 'タイトルが空のブロックがあります' }
     // 回答キーが重なると片方の答えが消える。保存の直前にも止める。
     const seenNames = new Set<string>()
     const dup = allBlocks.find((b) => {
@@ -468,42 +486,51 @@ function FormEditInner() {
       seenNames.add(b.name)
       return false
     })
-    if (dup) {
-      setError('回答キーが重なっています。複製した入力欄を確認してください')
-      return false
-    }
+    if (dup) return { message: '回答キーが重なっています。複製した入力欄を確認してください' }
     const layoutError = validateFormLayoutForSave(layout)
-    if (layoutError) {
-      setError(layoutError)
-      return false
-    }
+    if (layoutError) return { message: layoutError }
     const ogImageError = ogImageUrlError(ogImageUrl)
-    if (ogImageError) {
-      setError(ogImageError)
-      return false
-    }
+    if (ogImageError) return { message: ogImageError }
     // 文字と背景の差が 4.5:1 未満の組み合わせは保存できない（保存APIも同じ検査をする）。
     const contrastError = formThemeContrastError(normalizeFormTheme(layout.options?.theme))
-    if (contrastError) {
-      setError(contrastError)
-      return false
-    }
+    if (contrastError) return { message: contrastError }
     // 公開に進むときだけ、公開前の検査（分岐の循環・消えた行き先など）を通す。
     if (publishAfter) {
       const publishError = validateFormForPublish(layout)
-      if (publishError) {
-        setError(publishError)
-        return false
-      }
+      if (publishError) return { message: publishError }
     }
-    if (contentRevision === null) {
-      setError('読み込みが終わっていません。少し待ってから、もう一度お試しください')
+    if (contentRevisionRef.current === null) return { message: '読み込みが終わっていません。少し待ってから、もう一度お試しください' }
+    return null
+  }
+
+  /*
+   * 自動保存と手の保存が重なると、同じ版を2回送って競合に見える。
+   * 送っている途中の保存を待ち、最新の版で送る。
+   */
+  const saveInFlight = useRef<Promise<unknown> | null>(null)
+
+  /**
+   * 保存する。silent は自動保存：保存中の印・赤い帯・トーストを出さない（失敗は保存の帯に出る）。
+   * 競合（409）だけは自動でも帯を出す（このまま書くと相手の変更が消えるため）。
+   */
+  const save = async (publishAfter = false, { silent = false }: { silent?: boolean } = {}): Promise<boolean> => {
+    const problem = saveProblem(publishAfter)
+    if (problem) {
+      if (silent) return false
+      setError(problem.message)
+      setNameError(problem.name ? problem.message : null)
       return false
     }
-
-    setSaving(true)
-    setError('')
-    setNotice('')
+    if (!silent) setNameError(null)
+    if (!selectedAccountId) return false
+    while (saveInFlight.current) await saveInFlight.current.catch(() => undefined)
+    const expectedRevision = contentRevisionRef.current
+    if (expectedRevision === null) return false
+    if (!silent) {
+      setSaving(true)
+      setError('')
+      setNotice('')
+    }
     // 送った中身。409 のときに「自分の再送か」を確かめるために残す。
     const sentContent: FormSavedContent = {
       name: name.trim(),
@@ -536,10 +563,12 @@ function FormEditInner() {
       }
     }
     let reconciledOwnSave = false
+    let settle: () => void = () => {}
+    saveInFlight.current = new Promise<void>((resolve) => { settle = resolve })
     try {
       let res: Awaited<ReturnType<typeof api.forms.update>>
       try {
-        res = await api.forms.update(id, selectedAccountId, { ...sentContent, expectedContentRevision: contentRevision })
+        res = await api.forms.update(id, selectedAccountId, { ...sentContent, expectedContentRevision: expectedRevision })
       } catch (updateError) {
         if (!(updateError instanceof ApiError) || updateError.status !== 409) throw updateError
         const ownRevision = await confirmOwnSave()
@@ -548,11 +577,12 @@ function FormEditInner() {
         res = { success: true, data: { id, contentRevision: ownRevision, updatedAt: '' } }
       }
       if (!res.success) {
-        setError(res.error)
+        if (!silent) setError(res.error)
         return false
       }
+      contentRevisionRef.current = res.data.contentRevision
       setContentRevision(res.data.contentRevision)
-      setConflict(null)
+      clearConflict()
       if (publishAfter) {
         const published = await api.forms.publish(id, selectedAccountId, res.data.contentRevision)
         if (!published.success) {
@@ -567,8 +597,10 @@ function FormEditInner() {
         notifyToast(message)
         savedSnapshot.current = JSON.stringify({ ...current, isActive: true })
       } else {
-        setNotice(publishedVersionId ? '下書きを保存しました。公開中の内容は変わっていません' : '下書きを保存しました')
-        notifyToast('下書きを保存しました')
+        if (!silent) {
+          setNotice(publishedVersionId ? '下書きを保存しました。公開中の内容は変わっていません' : '下書きを保存しました')
+          notifyToast('下書きを保存しました')
+        }
         savedSnapshot.current = reconciledOwnSave
           ? JSON.stringify({
               name: sentContent.name,
@@ -588,18 +620,35 @@ function FormEditInner() {
       if (e instanceof ApiError && e.status === 409) {
         const data = e.data as { updatedAt?: unknown } | null
         const updatedAt = typeof data?.updatedAt === 'string' ? data.updatedAt : ''
-        setConflict({ updatedAt })
+        saveConflict.mark(updatedAt)
         setError(conflictMessage(updatedAt))
         return false
       }
+      if (silent) return false
       setError(describeApiFailure(e, '保存', {
         forbidden: 'このLINEアカウントや権限では保存できません。選んでいるアカウントと権限を確認してください。',
       }))
       return false
     } finally {
-      setSaving(false)
+      saveInFlight.current = null
+      settle()
+      if (!silent) setSaving(false)
     }
   }
+
+  /*
+   * 入力が止まって2秒で下書きへ静かに保存する（一斉配信と同じ）。保存先は
+   * 下書きなので、公開中の内容は変わらない。閲覧のみの人には動かさない。
+   */
+  const role = useStaffRole()
+  const autosave = useDraftAutosave({
+    fingerprint: currentSnapshot,
+    dirty,
+    active: role === null || canManageRole(role),
+    enabled: formLoaded && !loading && !conflict && saveProblem(false) === null,
+    paused: leaveTarget !== null || saving || showPublish,
+    save: () => save(false, { silent: true }),
+  })
 
   /* 公開前の試し：試し合言葉を取って試しURLを作る。試しは保存済みの下書きに出る。 */
   const startTest = async () => {
@@ -667,7 +716,7 @@ function FormEditInner() {
     const saved = JSON.parse(savedSnapshot.current) as Snapshot
     return { name: saved.name, description: saved.description, layout: saved.layout }
   })()
-  const publishChanges = describePublishChanges(savedSide, { name, description, layout })
+  const publishChanges = describePublishChanges(publishedSide ?? savedSide, { name, description, layout })
 
   const phone = (
     <FormPhone layout={layout} pageIndex={page} accountName={selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} />
@@ -715,11 +764,11 @@ function FormEditInner() {
   const footerActions = (
     <>
       <Button href="/form-submissions">キャンセル</Button>
-      <Button onClick={() => void save(false)} disabled={saving} busy={saving} busyLabel="保存中…" title="フォームを保存（公開中の内容は変わりません）">
+      <Button onClick={() => void save(false).then((ok) => { if (ok) autosave.markSaved() })} disabled={saving} busy={saving} busyLabel="保存中…" title="フォームを保存（公開中の内容は変わりません）">
         下書きを保存
       </Button>
       {conflict ? (
-        <Button variant="primary" onClick={() => void openCompare()} disabled={compareBusy || saving}>
+        <Button variant="primary" onClick={() => void saveConflict.compare()} disabled={saveConflict.compareBusy || saving}>
           比べてから保存
         </Button>
       ) : (
@@ -734,15 +783,13 @@ function FormEditInner() {
   /* 競合の帯（J1pdB）。左右の列の上に横いっぱいで出す。型の「狭い板の切り替え」の置き場を借りる。 */
   const conflictBand = conflict ? (
     <div className={styles.bandSlot} data-fe-band>
-      <div className={styles.conflictBand} role="alert" data-design-node="J1pdB">
-        <TriangleAlert size={18} aria-hidden="true" className={styles.conflictIcon} />
-        <span className={styles.conflictText}>
-          <span className={styles.conflictTitle}>{conflictTitle(conflict.updatedAt, name)}</span>
-          <span className={styles.conflictDesc}>あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。</span>
-        </span>
-        <Button onClick={() => void openCompare()} disabled={compareBusy} busy={compareBusy} busyLabel="比べています…">違いを比べる</Button>
-        <Button variant="primary" onClick={() => void reloadAfterConflict()}>最新を読み込んで続ける</Button>
-      </div>
+      <SaveConflictBand
+        designNode="J1pdB"
+        title={conflictTitle(conflict.updatedAt, name)}
+        compareBusy={saveConflict.compareBusy}
+        onCompare={() => void saveConflict.compare()}
+        onReload={() => void saveConflict.reloadLatest()}
+      />
     </div>
   ) : undefined
 
@@ -751,9 +798,9 @@ function FormEditInner() {
       boardId={narrow ? 'ITBAB' : conflict ? 'J1pdB' : TAB_NODE[editTab]}
       title={name || 'フォーム名未設定'}
       identity={(
+        /* 絵は矢印も文字の1つ（「← 回答フォームへ」）。 */
         <Link href="/form-submissions" className={styles.backLink}>
-          <ArrowLeft size={14} aria-hidden="true" />
-          回答フォームへ
+          {'← 回答フォームへ'}
         </Link>
       )}
       steps={(
@@ -766,7 +813,9 @@ function FormEditInner() {
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}
-      status={dirty ? '保存していない変更があります' : undefined}
+      status={autosave.label
+        ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
+        : dirty ? '保存していない変更があります' : undefined}
     >
       <div className={styles.root} data-fe-root>
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
@@ -824,7 +873,7 @@ function FormEditInner() {
       <Dialog
         open={showPublish}
         title="この版を公開する"
-        description="公開すると、配っている URL を開いた人に新しい内容が出ます。"
+        designHeaderPadding="var(--tpl-fm2-dialog-head-pad)"
         busy={saving}
         error={error || undefined}
         designNode="Z9wXm"
@@ -833,9 +882,15 @@ function FormEditInner() {
         footer={<></>}
         onCancel={() => setShowPublish(false)}
       >
+        {/* 絵は頭（題と×）・説明・変わること・残ること・ボタンを 14 ずつで並べる。共通の窓の中身の余白（上下24）を詰める。 */}
         <div className={styles.publishBody}>
+          <p className={styles.publishLead}>公開すると、配っている URL を開いた人に新しい内容が出ます。</p>
           <div className={styles.changes}>
-            <p className={styles.changesTitle}>変わること</p>
+            <p className={styles.changesTitle}>
+              {publishedContentRevision !== null && contentRevision !== null && publishedContentRevision !== contentRevision
+                ? `変わること（版${publishedContentRevision} → 版${contentRevision}）`
+                : '変わること'}
+            </p>
             {publishChanges.length === 0 ? (
               <p className={styles.changeLine}>保存した下書きをそのまま公開します</p>
             ) : (
@@ -849,7 +904,7 @@ function FormEditInner() {
           </div>
           <ul className={styles.publishNotes}>
             <li>・すでに集まった回答（{submitCount.toLocaleString('ja-JP')}件）は消えません。消した質問の答えも残ります。</li>
-            <li>・公開するまで、いまの版がそのまま使われます。</li>
+            <li>{publishedContentRevision !== null ? `・公開するまで、いまの版${publishedContentRevision}がそのまま使われます。` : '・公開するまで、いまの版がそのまま使われます。'}</li>
           </ul>
           {/* 絵の操作は真ん中（下の帯と同じ）。窓の既定の右寄せの帯は使わない。 */}
           <div className={styles.publishActions}>
@@ -873,40 +928,16 @@ function FormEditInner() {
         </div>
       </Dialog>
 
-      <Dialog
-        open={compareTarget !== null || compareError !== ''}
-        title="最新の保存と比べる"
-        description="あなたの下書きと、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
-        confirmLabel="最新を読み込んで続ける"
-        busy={compareBusy}
-        error={compareError || undefined}
-        onConfirm={() => {
-          setCompareTarget(null)
-          setCompareError('')
-          void reloadAfterConflict()
-        }}
-        onCancel={() => {
-          setCompareTarget(null)
-          setCompareError('')
-        }}
-      >
-        {compareTarget && (() => {
-          const { lines, omitted } = describeConflictDiff({ name, description, layout }, compareTarget)
-          return lines.length === 0 ? (
-            <p className={styles.changeLine}>違いは見つかりませんでした。そのまま読み込めます。</p>
-          ) : (
-            <div className={styles.changes}>
-              {lines.map((line, index) => (
-                <p key={index} className={styles.changeLine} data-kind={line.kind}>
-                  {line.kind === 'remove' ? '－ ' : line.kind === 'add' ? '＋ ' : '・ '}
-                  {line.text}
-                </p>
-              ))}
-              {omitted > 0 ? <p className={styles.changeLine}>ほか{omitted}件の違いがあります</p> : null}
-            </div>
-          )
-        })()}
-      </Dialog>
+      <SaveConflictCompareDialog
+        open={saveConflict.compareOpen}
+        busy={saveConflict.compareBusy}
+        error={saveConflict.compareError}
+        {...(saveConflict.latest
+          ? describeConflictDiff({ name, description, layout }, saveConflict.latest)
+          : { lines: null, omitted: 0 })}
+        onReload={() => void saveConflict.reloadLatest()}
+        onCancel={saveConflict.closeCompare}
+      />
 
       <Dialog open={previewOpen} title="LINEでの見え方" description="お客さまのスマホに出る形です。" onCancel={() => setPreviewOpen(false)}>
         <div className={styles.phoneDialog}>{phone}</div>

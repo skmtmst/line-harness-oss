@@ -114,6 +114,7 @@ import { access } from './routes/access.js';
 import { capabilities } from './routes/capabilities.js';
 import { images } from './routes/images.js';
 import { accountSettings } from './routes/account-settings.js';
+import { companySettings } from './routes/company-settings.js';
 import { setup } from './routes/setup.js';
 import { autoReplies } from './routes/auto-replies.js';
 import { autoReplyRuns } from './routes/auto-reply-runs.js';
@@ -121,6 +122,8 @@ import { adminAuth } from './routes/admin-auth.js';
 import { resolveCorsOrigin } from './middleware/admin-auth-config.js';
 import { timingMark, timingStart, type ServerTiming } from './lib/server-timing.js';
 import booking from './routes/booking.js';
+import { bookingPayments } from './routes/booking-payments.js';
+import { bookingPlus } from './routes/booking-plus.js';
 import events from './routes/events.js';
 import { trafficPools } from './routes/traffic-pools.js';
 import { meetCallback } from './routes/meet-callback.js';
@@ -309,6 +312,8 @@ export type Env = {
     GOOGLE_SHEETS_OAUTH_CLIENT_ID?: string;
     GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
     ECCUBE_WEBHOOK_SECRET?: string;
+    /** 予約のStripeテストの知らせ署名の検証鍵。値ではなく有無だけ画面に出す。 */
+    STRIPE_TEST_WEBHOOK_SECRET?: string;
     NEN_EC_BASE_URL?: string;
     /** ECの会員別ランクAPIを配備した後だけ true にする。未設定は送信停止。 */
     NEN_EC_MEMBER_RANK_SYNC_ENABLED?: string;
@@ -544,8 +549,11 @@ app.route('/', autoReplyRuns);
 app.route('/', adminAuth);
 app.route('/', trafficPools);
 app.route('/', booking);
+app.route('/', bookingPayments);
+app.route('/', bookingPlus);
 app.route('/', events);
 app.route('/', accountSettings);
+app.route('/', companySettings);
 app.route('/', meetCallback);
 app.route('/', messageTemplates);
 app.route('/', dedupPreview);
@@ -1360,6 +1368,7 @@ async function runFrequentHeavyJobs(
   }
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
+    {name:'booking waitlist expiry and promotion',run:async()=>{const {processBookingWaitlists}=await import('./services/waitlist-tick.js');await processBookingWaitlists(env);}},
     {
       name: 'follower import continuation',
       run: async () => {
@@ -1381,6 +1390,13 @@ async function runFrequentHeavyJobs(
         if (result.processed + result.failed > 0) {
           console.log(JSON.stringify({ event: 'ec_event_retry', ...result }));
         }
+      },
+    },
+    {
+      name: 'booking sync notices',
+      run: async () => {
+        const { processBookingSyncNoticeQueue } = await import('./services/booking-sync-rules.js');
+        await processBookingSyncNoticeQueue(env);
       },
     },
     {
@@ -1664,6 +1680,8 @@ async function runFrequentHeavyJobs(
       run: async () => {
         const { expireRestaurantHolds, applyDueRestaurantMenuPrices } = await import('./services/restaurant-booking.js');
         await expireRestaurantHolds(dbFor(env), new Date(event.scheduledTime).toISOString());
+        const { processRestaurantInventoryRuleQueue } = await import('./services/restaurant-inventory-rules.js');
+        await processRestaurantInventoryRuleQueue(env);
         await applyDueRestaurantMenuPrices(dbFor(env));
       },
     });

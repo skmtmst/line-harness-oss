@@ -1,12 +1,12 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowRight, ChevronLeft } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
-import type { FriendField, ReminderDraftSettings, ReminderDraftStep } from '@line-crm/shared'
-import { api, type EventListItem } from '@/lib/api'
+import type { FriendField, ReminderDraftSettings, ReminderDraftStep, ReminderDraftVersion } from '@line-crm/shared'
+import { ApiError, api, type EventListItem } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -15,10 +15,14 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
+import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSaveConflict } from '@/components/shared/save-conflict'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
 import {
   EMPTY_BASICS,
   basicsBaseSummary,
+  basicsFromDraft,
   basicsToDraft,
   reminderTemplatesV8,
   ReminderBasicsFormV8,
@@ -27,6 +31,8 @@ import {
 } from '../basics-form-v8'
 import { SummaryCardV8, WizardFooterV8, ReminderV8Stepper } from '../wizard-v8-ui'
 import styles from '../wizard-v8.module.css'
+import { humanizeErrorText } from '@/components/shared/human-error-text'
+import { describeReminderDiff } from '../edit/reminder-conflict-diff'
 
 /**
  * ★V8 リマインダを作る・手順1「基本設定」（板 VE1u5）。
@@ -50,6 +56,37 @@ export default function NewReminderV8() {
   const [error, setError] = useState('')
   // 一度保存したら下書きの id を持ち、続けて押したときは上書き保存にする。
   const [savedId, setSavedId] = useState<string | null>(null)
+  /*
+   * 最後に保存した版。続けて保存するときは、この版の上に基本設定を重ね、
+   * 版IDと版時刻を送る。別の画面で先に保存されていたら 409 で止まり、
+   * 「違いを比べる／最新を読み込んで続ける」を出す（動きの点検 16 番）。
+   * 以前は保存の直前に最新を読み直して重ねていたので、相手の基本設定を黙って上書きしていた。
+   */
+  const [savedDraft, setSavedDraft] = useState<ReminderDraftVersion | null>(null)
+  const saveConflict = useSaveConflict<ReminderDraftSettings>({
+    fetchLatest: async () => {
+      if (!savedId) return null
+      const response = await api.reminders.getDraft(savedId)
+      if (!response.success || response.data.reminderId !== savedId) return null
+      return response.data.settings
+    },
+    // 「最新を読み込んで続ける」。入力中の基本設定は最新の版で置き換わる。
+    reload: async () => {
+      if (!savedId) return
+      setError('')
+      try {
+        const response = await api.reminders.getDraft(savedId)
+        if (!response.success) throw new Error(response.error)
+        setSavedDraft(response.data)
+        setValue(basicsFromDraft(response.data.settings))
+        setSaving('saved')
+        saveConflict.clear()
+        notifyToast('最新の内容を読み込みました')
+      } catch {
+        setError('最新の内容を読み込めませんでした。もう一度お試しください。')
+      }
+    },
+  })
 
   const dirty = Boolean(
     value.name.trim() ||
@@ -59,7 +96,20 @@ export default function NewReminderV8() {
       value.repeatYearly ||
       appliedTemplateId,
   )
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving === 'saving' })
+  /*
+   * 最後に保存した形の指紋。入れた値がこれと同じ間は「保存済み」（一斉配信と同じ）。
+   * 保存したあとも入力が残る画面なので、入力の有無だけで未保存と見なさない。
+   */
+  const fingerprint = JSON.stringify({ value, appliedTemplateId })
+  const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null)
+  const unsaved = dirty && fingerprint !== savedFingerprint
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: unsaved, busy: saving === 'saving' })
+  /* 自動保存と手の保存が重なって下書きが2件できないよう、送っている途中の保存を待つ。 */
+  const saveInFlight = useRef<Promise<unknown> | null>(null)
+  const savedIdRef = useRef(savedId)
+  savedIdRef.current = savedId
+  const savedDraftRef = useRef(savedDraft)
+  savedDraftRef.current = savedDraft
 
   const appliedTemplate = reminderTemplatesV8.find((template) => template.id === appliedTemplateId) ?? null
 
@@ -114,23 +164,47 @@ export default function NewReminderV8() {
     return null
   }
 
-  /** 下書きを保存する。作成済みなら上書きする。成功したら下書きの id を返す。 */
-  async function save(): Promise<string | null> {
+  /**
+   * 下書きを保存する。作成済みなら上書きする。成功したら下書きの id を返す。
+   * silent は自動保存：保存中の印・赤い帯・トーストを出さない（失敗は保存の帯に出る）。
+   * 競合（409）だけは自動でも帯を出す。
+   */
+  async function save({ silent = false }: { silent?: boolean } = {}): Promise<string | null> {
     const message = validate()
     if (message) {
-      setError(message)
+      if (!silent) setError(message)
       return null
     }
-    setSaving('saving')
-    setError('')
+    if (!silent) {
+      setSaving('saving')
+      setError('')
+      saveConflict.clear()
+    }
+    while (saveInFlight.current) await saveInFlight.current.catch(() => undefined)
+    const savedId = savedIdRef.current
+    const savedDraft = savedDraftRef.current
+    const sentFingerprint = fingerprint
+    let settle: () => void = () => {}
+    saveInFlight.current = new Promise<void>((resolve) => { settle = resolve })
     try {
       if (savedId) {
-        const current = await api.reminders.getDraft(savedId)
-        if (!current.success) throw new Error(current.error)
-        const res = await api.reminders.saveDraft(savedId, basicsToDraft(current.data.settings, value))
+        // 最後に保存した版が手元に無いとき（取れなかったなど）だけ読み直す。
+        const base = savedDraft ?? await (async () => {
+          const current = await api.reminders.getDraft(savedId)
+          if (!current.success) throw new Error(current.error)
+          return current.data
+        })()
+        const res = await api.reminders.saveDraft(
+          savedId,
+          basicsToDraft(base.settings, value),
+          { expectedVersionId: base.versionId, expectedUpdatedAt: base.updatedAt },
+        )
         if (!res.success) throw new Error(res.error)
+        savedDraftRef.current = res.data
+        setSavedDraft(res.data)
+        setSavedFingerprint(sentFingerprint)
         setSaving('saved')
-        notifyToast('下書きを保存しました')
+        if (!silent) notifyToast('下書きを保存しました')
         return savedId
       }
       /*
@@ -167,16 +241,44 @@ export default function NewReminderV8() {
       }
       const res = await api.reminders.createDraft(settings)
       if (!res.success) throw new Error(res.error)
+      savedIdRef.current = res.data.reminderId
+      savedDraftRef.current = res.data
       setSavedId(res.data.reminderId)
+      setSavedDraft(res.data)
+      setSavedFingerprint(sentFingerprint)
       setSaving('saved')
-      notifyToast('下書きを保存しました')
+      if (!silent) notifyToast('下書きを保存しました')
       return res.data.reminderId
     } catch (caught) {
-      setSaving('failed')
-      setError(caught instanceof Error ? caught.message : '下書きを保存できませんでした')
+      if (!silent) setSaving('failed')
+      // 作った下書きが別の画面で先に保存されていた（409）。入力は捨てず、比べる・読み込むを選んでもらう。
+      if (savedId && caught instanceof ApiError && caught.status === 409) {
+        const data = caught.data as { updatedAt?: unknown } | null
+        saveConflict.mark(typeof data?.updatedAt === 'string' ? data.updatedAt : '')
+        return null
+      }
+      // 機械の文（API error: 500）は出さず、何が起きた・どうすればよいかを出す（動きの点検 7 番）。
+      if (!silent) setError(caught instanceof Error ? humanizeErrorText(caught.message) : '下書きを保存できませんでした')
       return null
+    } finally {
+      saveInFlight.current = null
+      settle()
     }
   }
+
+  /*
+   * 入力が止まって2秒で下書きへ静かに保存する（一斉配信と同じ）。最初の1回で
+   * 下書きを作り、あとは同じ下書きへ上書きする。閲覧のみの人には動かさない。
+   */
+  const role = useStaffRole()
+  const autosave = useDraftAutosave({
+    fingerprint,
+    dirty: unsaved,
+    active: role === null || canManageRole(role),
+    enabled: validate() === null && !candidatesPending && !saveConflict.conflict,
+    paused: leaveTarget !== null || saving === 'saving' || pendingTemplate !== null,
+    save: async () => (await save({ silent: true })) !== null,
+  })
 
   async function next() {
     const id = await save()
@@ -205,13 +307,14 @@ export default function NewReminderV8() {
       description="いまは下書きとして作ります。最後の「確認」で有効にします。"
       identity={<Link href="/reminders" className={styles.backLink}><ChevronLeft size={14} aria-hidden="true" />リマインダへ</Link>}
       steps={<ReminderV8Stepper current="basics" reminderId={savedId} />}
+      status={autosave.label ? <span aria-live="polite" data-autosave-status>{autosave.label}</span> : undefined}
       preview={preview}
       previewToggle={<Button onClick={() => setPreviewOpen(true)}>設定内容を見る</Button>}
       footerActions={
         <WizardFooterV8 embedded
         onCancel={() => router.push('/reminders')}
         cancelDisabled={saving === 'saving'}
-        onDraft={() => void save()}
+        onDraft={() => void save().then((id) => { if (id) autosave.markSaved() })}
         draftBusy={saving === 'saving'}
         nextLabel="次へ：対象者と止める条件"
         nextIcon={<ArrowRight size={15} aria-hidden="true" />}
@@ -220,7 +323,15 @@ export default function NewReminderV8() {
         />
       }
     >
-      {error ? <Notice tone="danger" message={error} /> : null}
+      {saveConflict.conflict ? (
+        <SaveConflictBand
+          designNode="k32cn"
+          title={saveConflictTitle(saveConflict.conflict.updatedAt, 'リマインダ', value.name)}
+          compareBusy={saveConflict.compareBusy}
+          onCompare={() => void saveConflict.compare()}
+          onReload={() => void saveConflict.reloadLatest()}
+        />
+      ) : error ? <Notice tone="danger" message={error} /> : null}
 
           <ReminderBasicsFormV8
             value={value}
@@ -247,6 +358,16 @@ export default function NewReminderV8() {
         onCancel={() => setPendingTemplate(null)}
       />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="基本設定への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <SaveConflictCompareDialog
+        open={saveConflict.compareOpen}
+        busy={saveConflict.compareBusy}
+        error={saveConflict.compareError}
+        lines={saveConflict.latest && savedDraft
+          ? describeReminderDiff(basicsToDraft(savedDraft.settings, value), saveConflict.latest).map((text) => ({ text }))
+          : null}
+        onReload={() => void saveConflict.reloadLatest()}
+        onCancel={saveConflict.closeCompare}
+      />
     </CreatePage>
     <DetailPanel open={previewOpen} title="設定内容" onClose={() => setPreviewOpen(false)}>{preview}</DetailPanel>
     </>

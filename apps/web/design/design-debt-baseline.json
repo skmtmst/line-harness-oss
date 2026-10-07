@@ -37,15 +37,8 @@
   "app/auto-replies/edit/wizard-v8.tsx": {
     "unresolved-classname": 1
   },
-  "app/auto-replies/list-v8.tsx": {
-    "direct-th": 7,
-    "unresolved-classname": 1
-  },
   "app/auto-replies/page.tsx": {
     "arbitrary-value": 3
-  },
-  "app/auto-replies/runs/runs-v8.tsx": {
-    "direct-th": 7
   },
   "app/booking/bookings/detail/page.tsx": {
     "unresolved-classname": 1
@@ -81,9 +74,6 @@
   "app/broadcasts/detail/page.tsx": {
     "direct-secondary-button": 1
   },
-  "app/broadcasts/list-v8.tsx": {
-    "unresolved-classname": 1
-  },
   "app/broadcasts/page.tsx": {
     "arbitrary-value": 1,
     "unresolved-classname": 1,
@@ -101,9 +91,6 @@
   },
   "app/conversions/conversion-points-v8.tsx": {
     "unresolved-classname": 2
-  },
-  "app/conversions/new/conversion-create-v8.tsx": {
-    "unresolved-classname": 1
   },
   "app/conversions/new/page.tsx": {
     "unresolved-classname": 5
@@ -139,14 +126,6 @@
   },
   "app/form-submissions/edit/page.tsx": {
     "arbitrary-value": 1
-  },
-  "app/form-submissions/list-v8.tsx": {
-    "direct-th": 6,
-    "unresolved-classname": 1
-  },
-  "app/friend-add-settings/list-v8.tsx": {
-    "direct-th": 6,
-    "unresolved-classname": 1
   },
   "app/friend-add-settings/page.tsx": {
     "arbitrary-value": 2
@@ -191,12 +170,6 @@
   },
   "app/inflow-links/detail/page.tsx": {
     "direct-secondary-button": 1
-  },
-  "app/inflow-links/inflow-list-v8.tsx": {
-    "unresolved-classname": 73
-  },
-  "app/inflow-links/new/inflow-create-v8.tsx": {
-    "unresolved-classname": 71
   },
   "app/inflow-links/new/page.tsx": {
     "direct-th": 4,
@@ -294,10 +267,6 @@
     "arbitrary-value": 5,
     "direct-secondary-button": 1
   },
-  "app/rich-menus/list-v8.tsx": {
-    "direct-th": 6,
-    "arbitrary-value": 1
-  },
   "app/rich-menus/page.tsx": {
     "arbitrary-value": 5
   },
@@ -364,21 +333,11 @@
   "app/webhooks/edit/page.tsx": {
     "unresolved-classname": 4
   },
-  "app/webhooks/incoming-v8.tsx": {
-    "direct-th": 4
-  },
-  "app/webhooks/interactions-v8.tsx": {
-    "direct-th": 6
-  },
   "app/webhooks/new/page.tsx": {
     "unresolved-classname": 5
   },
   "app/webhooks/outgoing-v8.tsx": {
     "direct-th": 6
-  },
-  "app/webhooks/sheets-v8.tsx": {
-    "direct-th": 4,
-    "unresolved-classname": 1
   },
   "app/webinars/edit/page.tsx": {
     "arbitrary-value": 2
@@ -420,9 +379,6 @@
   "components/chats/inbox-filter-panel.tsx": {
     "arbitrary-value": 2,
     "unresolved-classname": 5
-  },
-  "components/chats/inbox-kpis.tsx": {
-    "arbitrary-value": 8
   },
   "components/chats/saved-view-dialog.tsx": {
     "arbitrary-value": 4
@@ -498,14 +454,8 @@
   "components/friends/friend-list-row.tsx": {
     "unresolved-classname": 1
   },
-  "components/friends/friend-timeline.tsx": {
-    "arbitrary-value": 2
-  },
   "components/friends/single-friend-actions.tsx": {
     "unresolved-classname": 2
-  },
-  "components/inbox/inbox-filters.tsx": {
-    "arbitrary-value": 1
   },
   "components/inflow-links/site-script.tsx": {
     "arbitrary-value": 1
@@ -686,5 +636,20 @@
   "components/webinars/webinar-form.tsx": {
     "unresolved-classname": 8,
     "arbitrary-value": 1
+  },
+  "v8/booking-menus/liff-phone.tsx": {
+    "unresolved-classname": 1
+  },
+  "v8/booking-menus/menu-form.tsx": {
+    "unresolved-classname": 2
+  },
+  "v8/booking-menus/staff-edit-dialog.tsx": {
+    "arbitrary-value": 1
+  },
+  "v8/booking-menus/tabs/holidays-tab.tsx": {
+    "unresolved-classname": 1
+  },
+  "v8/booking-menus/tabs/shared.tsx": {
+    "unresolved-classname": 1
   }
 }

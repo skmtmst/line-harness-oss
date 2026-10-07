@@ -127,6 +127,12 @@
 }
 
 /* 条件の行の中の時計の絵（絵どおり・色だけ）。 */
+.dotIndent {
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 uE9gf の説明の行）。 */
+  display: block;
+  padding-inline-start: var(--tpl-folder-dot-indent);
+}
+
 .cellSubIcon {
   color: var(--color-ink-faint);
 }
@@ -215,6 +221,10 @@
 
 /* まとめての帯の内側（選択中に表の下へ出る）。 */
 .bulkRow {
+  /* 長い一覧でも画面の下に付いてくる（動きの点検 12 番）。表が短ければ今までどおり表のすぐ下。 */
+  position: sticky;
+  bottom: var(--bulk-bar-float-gap);
+  z-index: 10;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -429,3 +439,6 @@
 .kpiDetailBreak { word-break: normal; }
 /* 1152 の板：見出しの行は絵の 40 に対して表の線ぶん詰める。 */
 .narrowTable thead th { height: var(--tpl-ar-narrow-head-h); }
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }

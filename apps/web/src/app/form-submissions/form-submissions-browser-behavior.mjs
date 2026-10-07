@@ -533,13 +533,13 @@ try {
       formsByAccount: { 'account-a': [], 'account-b': [form(7, { id: 'prod-form', name: '本店フォーム' })] },
     })
     await openList(page)
-    await page.getByText('まだ回答フォームはありません', { exact: true }).waitFor()
-    await page.getByText('アンケートや申し込みを LINE の中で受け付けられます。答えは友だち情報に保存できます。').waitFor()
+    await page.getByText('まだ回答フォームがありません', { exact: true }).waitFor()
+    await page.getByText('アンケートや申し込みを LINE の中で受け付け、答えを友だち情報に保存します。').waitFor()
     assert.equal(await page.getByText(/見え方です/).count(), 0, '実装事情の文を出さない')
 
     await page.getByLabel('LINEアカウント').selectOption('account-b')
     await page.getByText('本店フォーム', { exact: true }).waitFor()
-    assert.equal(await page.getByText('まだ回答フォームはありません', { exact: true }).count(), 0)
+    assert.equal(await page.getByText('まだ回答フォームがありません', { exact: true }).count(), 0)
     assert.deepEqual([...new Set(state.listCalls)].sort(), ['account-a', 'account-b'], '選んだアカウント以外を読まない')
     await context.close()
   }
@@ -573,7 +573,7 @@ try {
     await openList(page)
     await page.getByText('表示できませんでした', { exact: true }).waitFor()
     assert.equal(await page.getByRole('button', { name: 'もう一度読み込む' }).count(), 1)
-    assert.equal(await page.getByText('まだ回答フォームはありません', { exact: true }).count(), 0, '失敗を0件と言わない')
+    assert.equal(await page.getByText('まだ回答フォームがありません', { exact: true }).count(), 0, '失敗を0件と言わない')
     await context.close()
   }
 

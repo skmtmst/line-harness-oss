@@ -16,7 +16,7 @@
  * `min-height` にする。**高さを 1080px と書かない。** ★V6 の画面の高さは
  * 12種類あり（1080が180枚、1136が49枚、1840が17枚…）、絵の高さは中身の量を
  * 表しているだけで寸法の指定ではない。固定にすると、縦の短いPCで中身が
- * 無いのに縦スクロールが出る（`docs/v6-common-rules.md` §1）。
+ * 無いのに縦スクロールが出る（`docs/v8-design-rules.md` §5）。
  */
 .side {
   display: flex;
@@ -150,6 +150,27 @@
   [data-theme="v8"] .content,
   [data-theme="v8"] .contentFull {
     padding: 20px 24px 28px;
+  }
+}
+
+/*
+ * ★V8：画面の高さを外枠で止め、送るのは白い板（.main）の中だけにする（動きの点検・4回目）。
+ * これまでは .shell が min-height だけで高さの上限が無く、中身が長いとページ全体が送られて、
+ * 作る・編集の画面の下の帯（sticky）が画面の外へ出ていた。.main が送る入れ物になれば、
+ * 下の帯は常に画面の下に、上の帯と左メニューは動かずに残る。
+ * PC 幅（1024px 以上）だけ。スマホは固定ヘッダーとページ全体の送りのまま。
+ */
+@media (min-width: 1024px) {
+  [data-theme="v8"] .shell {
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  /* 中の絶対配置（読み上げ用の隠し文字など）が板の外へ出てページを伸ばさないよう、板を基準にする。 */
+  [data-theme="v8"] .main {
+    position: relative;
+    min-height: 0;
+    overscroll-behavior: contain;
   }
 }
 

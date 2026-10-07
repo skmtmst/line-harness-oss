@@ -97,6 +97,12 @@ export function clearSidebarCountCache(): void {
   sidebarCountCache.clear()
 }
 
+/** 統括の左メニューを出す住所（/hq の下と、統括から開く LINEアカウントの登録）。 */
+export function isHqShellPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new'
+}
+
 export default function Sidebar({
   friendAttributesV2Mode = false,
   preview = false,
@@ -105,8 +111,12 @@ export default function Sidebar({
   preview?: boolean
 } = {}) {
   const pathname = usePathname()
-  const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
-  const { selectedAccountId } = useAccount()
+  /*
+   * 統括の左メニューは住所が /hq のときに出す。LINEアカウントの登録（/accounts/new）は
+   * 統括の「アカウント」から開く統括の画面なので、統括のメニューのままにする（絵 xj3zz・JYfda）。
+   */
+  const isHq = isHqShellPath(pathname)
+  const { selectedAccountId, loading: accountLoading } = useAccount()
   const brand = useBrand()
   /*
    * モバイルの固定ヘッダーに出す現在地（U037）。
@@ -407,6 +417,13 @@ export default function Sidebar({
     }))
     .filter((section) => section.items.length > 0)
     .filter((section) => !attrV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
+    /*
+     * 機能の見え方を読み込んでいる間は、最初の区分だけ出す（動きの点検 8・11 番）。
+     * 以前は機能に縛られない「設定」だけが先に出て、読み込み後にその上へ区分が
+     * 差し込まれ、「設定」が 250px 押し下げられていた（全画面で CLS の主な元）。
+     * 後ろに足すだけにすれば、出ている物は動かない。
+     */
+    .filter((_section, index) => isHq || currentVisibility !== null || visibilityStatus !== 'loading' || (!selectedAccountId && !accountLoading) || index === 0)
 
   /*
    * PERF-08: バッジ用の件数は「出す項目があるもの」だけを購読する。
@@ -854,7 +871,7 @@ export default function Sidebar({
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
-        ここに残すと二重に出る（`docs/v6-common-rules.md` §1）。
+        ここに残すと二重に出る（`docs/v8-design-rules.md` §5）。
         枠だけ残すのは、下端の余白がメニューの最後の項目に食い込まないため。
 
         統括（/hq）だけは例外（2026-09-12、§1-2）。下端にログイン中のアカウントを置き、

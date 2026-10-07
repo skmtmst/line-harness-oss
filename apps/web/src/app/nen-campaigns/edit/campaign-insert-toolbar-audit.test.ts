@@ -7,7 +7,7 @@ const read = (path: string) => readFileSync(resolve(ROOT, path), 'utf8')
 
 describe('NEN配信の差し込み欄監査', () => {
   it('NEN専用品を増やさず、シナリオ・一斉配信と同じInsertToolbarを使う', () => {
-    const campaign = read('app/nen-campaigns/edit/campaign-editor.tsx')
+    const campaign = read('app/nen-campaigns/edit/campaign-editor-v8.tsx')
     const scenario = read('app/scenarios/first-step/page.tsx')
     const broadcast = read('components/broadcasts/broadcast-form.tsx')
     const toolbar = read('components/scenarios/insert-toolbar.tsx')

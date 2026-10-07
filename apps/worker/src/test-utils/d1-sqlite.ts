@@ -24,7 +24,25 @@ function isSelect(sql: string): boolean {
   return /^\s*(SELECT|WITH|PRAGMA)/i.test(sql)
 }
 
+/*
+ * 実 D1 は `?1 ?2` の番号付き束縛に正式対応しているが、手元の
+ * better-sqlite3 は番号付きへ位置で値を渡すと「多すぎる」と投げる。
+ * D1 と同じ意味になるよう、番号順に並べ替えて `?` に直してから渡す。
+ */
+function rewriteNumbered(sql: string, args: unknown[]): { sql: string; args: unknown[] } {
+  if (!/\?\d/.test(sql)) return { sql, args }
+  const order: number[] = []
+  const rewritten = sql.replace(/\?(\d+)/g, (_m, n: string) => {
+    order.push(Number(n))
+    return '?'
+  })
+  return { sql: rewritten, args: order.map((n) => args[n - 1]) }
+}
+
 function wrap(raw: Database.Database, sql: string, args: unknown[]) {
+  const rewritten = rewriteNumbered(sql, args)
+  sql = rewritten.sql
+  args = rewritten.args
   const normalized = args.map((a) => {
     if (a === undefined) return null
     if (typeof a === 'boolean') return a ? 1 : 0

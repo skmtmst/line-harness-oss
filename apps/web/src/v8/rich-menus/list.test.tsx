@@ -39,7 +39,7 @@ const group = (id: string, name: string, extra: Record<string, unknown> = {}) =>
 })
 
 const items = [
-  group('g-default', '通常メニュー', { isDefaultForAll: true, targetingPriority: 0 }),
+  group('g-default', '通常メニュー', { isDefaultForAll: true, targetingPriority: 0, folderId: 'rmf-normal' }),
   group('g-autumn', '秋のキャンペーン', { status: 'draft', isDefaultForAll: true, publishingAt: '2026-10-05T00:00:00.000+09:00', targetingPriority: 1 }),
 ]
 
@@ -83,7 +83,13 @@ vi.mock('@/lib/api', () => ({
       deleteImpact: (id: string) => fixture.deleteImpact(id),
       imageUrl: (key: string) => `/img/${key}`,
     },
-    folders: { list: () => Promise.resolve({ success: true, data: [], unfiledCount: 0 }) },
+    folders: {
+      list: () => Promise.resolve({
+        success: true,
+        data: [{ id: 'rmf-normal', kind: 'rich_menu', name: '通常', parentId: null, displayOrder: 1, color: '#2f6fde' }],
+        unfiledCount: 1,
+      }),
+    },
     tags: { list: () => Promise.resolve({ success: true, data: [] }) },
     staff: {
       me: () => Promise.resolve({ success: true, data: { id: 's', name: 'S', role: fixture.role, email: null } }),
@@ -116,13 +122,23 @@ describe('V8 リッチメニュー一覧', () => {
     expect(second.textContent).toContain('—')
   })
 
-  test('見るだけの人には閲覧のみの帯が出て、メニューを作るは押せない', async () => {
+  test('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）', async () => {
+    const view = render(<RichMenusListV8 />)
+    const filedRow = (await view.findByText('通常メニュー')).closest('tr') as HTMLElement
+    await waitFor(() => expect(filedRow.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('filed'))
+    expect(filedRow.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(filedRow.querySelector('[data-folder-dot]')?.getAttribute('aria-label')).toBe('フォルダ：通常')
+    const unfiledRow = view.getByText('秋のキャンペーン').closest('tr') as HTMLElement
+    expect(unfiledRow.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(unfiledRow.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
+  })
+
+  // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
+  test('見るだけの人には閲覧のみの帯が出て、メニューを作るは出さない', async () => {
     fixture.role = 'staff'
     const view = render(<RichMenusListV8 />)
     await view.findByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')
-    const create = view.getAllByRole('button', { name: /メニューを作る/ })
-    expect(create.length).toBeGreaterThan(0)
-    for (const button of create) expect((button as HTMLButtonElement).disabled).toBe(true)
+    expect(view.queryAllByRole('button', { name: /メニューを作る/ })).toHaveLength(0)
   })
 
   test('消せないメニューは「まだ消せません」の窓で、理由を短く・取り下げで外れる2つを1行に並べる', async () => {

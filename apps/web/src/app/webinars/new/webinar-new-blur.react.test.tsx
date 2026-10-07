@@ -39,7 +39,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-import NewWebinarPage from './page'
+/* 入口（page.tsx）は V8 のとき src/v8/webinar-edit/new を出す。この試験は今の作る画面（new-v8）の動きを見る。 */
+import NewWebinarPage from './new-v8'
 
 /* happy-dom に localStorage は無い。booking 配下と同じ memory stub を置く。 */
 const localStorageValues = new Map<string, string>()

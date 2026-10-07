@@ -6,6 +6,7 @@
 export { jstNow, toJstString, isTimeBefore, jstDateString, nextDateString, nextVersionToken, MAX_LIST_LIMIT } from './utils';
 export { DEFAULT_TENANT_ID } from '@line-crm/shared';
 export * from './credential-crypto';
+export * from './company-settings';
 export * from './friends';
 export * from './tags';
 export * from './tag-definitions';
@@ -30,6 +31,8 @@ export * from './affiliates';
 export * from './webhooks';
 export * from './booking-audit';
 export * from './booking-settings';
+export * from './booking-payments';
+export * from './booking-sales';
 export * from './booking-resources';
 export * from './booking-menu-resources';
 export * from './menu-versions';
@@ -97,6 +100,7 @@ export function createDb(d1: D1Database): D1Database {
   return d1;
 }
 export * from './folders';
+export * from './folder-assignment';
 export * from './getting-started';
 export * from './manual-links';
 export * from './error-messages';
@@ -164,3 +168,8 @@ export * from './operator-notification-teams.js';
 
 export * from './ad-event-mappings.js';
 export * from './photo-publications';
+
+export * from './booking-sync-rules.js';
+export * from './restaurant-inventory-rules.js';
+export * from './friend-summary.js';
+export * from './dashboard-activity.js';

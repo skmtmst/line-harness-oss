@@ -70,15 +70,15 @@ const ALLOWED_H1: Record<string, string> = {
   // 出しているのはテナント名（「株式会社 然」）で、画面名ではない。
   // 画面名の「統括コンソール」は、その上に小さく出る別の行。
   'app/hq/open/page.tsx': '出しているのはテナント名',
-  // 消す予定の画面。docs/v6-directives.md §4「/updates を /emergency へ
-  // 一本化」「V2/V3 の検証島を消す」。触らない。
+  // 消す予定の画面（2026-09 のオーナー決定「/updates を /emergency へ
+  // 一本化」「V2/V3 の検証島を消す」）。触らない。
   'app/updates/page.tsx': '消す予定（/emergency へ一本化）',
   'app/visual-qa/friend-attributes/page.tsx': '消す予定（V2/V3 の検証島）',
 }
 
 describe('画面名を本文とトップバーで2回出さない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(191)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。2026-10-01 に ★V8 新部品の見本画面（visual-qa/v8-parts）を追加。2026-10-03 に /scenarios/new の転送画面を追加。
+    expect(PAGES.length).toBe(194)  // 2026-10-07 に提案 E の枠を閉じる知らせ（/restaurant-test/close-tasks）と SNS 連携（/settings/sns）を追加。情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。2026-10-01 に ★V8 新部品の見本画面（visual-qa/v8-parts）を追加。2026-10-03 に /scenarios/new の転送画面を追加。2026-10-04 に予約からの売上（/booking/sales）を追加。
   })
 
   it('PageHeader は、トップバーと同じ言葉のときだけ題を隠す', () => {

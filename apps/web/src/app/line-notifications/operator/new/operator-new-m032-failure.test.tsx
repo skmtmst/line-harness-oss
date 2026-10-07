@@ -24,7 +24,10 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/link', () => ({
   default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
 }))
+// 設定の中のメニュー（共通部品）はこの試験の対象外。localStorage と機能の出し分けを読むので外す。
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/line-notifications/operator/new',
   useRouter: () => ({ push: fixture.push }),
   useSearchParams: () => new URLSearchParams(''),
 }))
@@ -32,7 +35,7 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
 vi.mock('@/lib/staff-capability', () => ({ isOwnerOrAdmin: () => true }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, useSettingsNavInline: () => undefined }))
 
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -107,10 +110,10 @@ describe('M032 公開・テスト送信の失敗は生文を出さない', () =>
     expect(confirm).toBeTruthy()
     const dialog = document.body.querySelector('[data-design-node="sDXNy"]')
     expect(dialog, '公開前の確認の窓が出ない').not.toBeNull()
-    for (const row of ['お知らせ', '宛先', 'LINEが届く人', '戻って直す', '管理画面のお知らせだけで届きます']) {
+    for (const row of ['お知らせ', '宛先', 'LINE が届く人', '戻って直す', '管理画面のお知らせだけで届きます']) {
       expect(dialog?.textContent ?? '', `「${row}」がない`).toContain(row)
     }
-    const send = screen.getByRole('button', { name: /公開して.*にLINEで送る/ })
+    const send = screen.getByRole('button', { name: /公開して.*に LINE で送る/ })
     fireEvent.click(send)
     await waitFor(() => expect(screen.getByText(/権限がありません/)).toBeTruthy())
     expect(screen.queryByText(/API error/)).toBeNull()

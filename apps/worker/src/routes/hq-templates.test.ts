@@ -48,6 +48,55 @@ beforeEach(() => {
 afterEach(() => sql.close());
 
 describe('HQ tag HTTP and real SQLite boundaries', () => {
+  test('配布先ごとに版1・版2（最新）・未配布を返し、失敗を成功版に数えない', async () => {
+    const t = await create();
+    expect((await preflight(t.id, ['a1'])).stores[0].targetVersion)
+      .toEqual({ version: null, latestVersion: 1, status: 'undistributed', label: '未配布' });
+    await execute(t.id, await preflight(t.id, ['a1']));
+    const changed = await request(`/${t.id}`, 'PATCH', { name: '改訂版', definition, expectedRevision: t.revision });
+    expect(changed.status).toBe(200);
+    await execute(t.id, await preflight(t.id, ['a2']));
+    const p = await preflight(t.id);
+    expect(p.stores.map((s: any) => s.targetVersion)).toEqual([
+      { version: 1, latestVersion: 2, status: 'older', label: '版1' },
+      { version: 2, latestVersion: 2, status: 'latest', label: '版2（最新）' },
+      { version: null, latestVersion: 2, status: 'undistributed', label: '未配布' },
+    ]);
+    sql.exec("INSERT INTO tags(id,name,line_account_id) VALUES ('racing-tag','別のタグ','a3')");
+    const result = await execute(t.id, p);
+    expect(result.body.data.stores.find((s: any) => s.accountId === 'a3')).toMatchObject({ status: 'version_conflict', createdName: null });
+    const next = await preflight(t.id);
+    expect(next.stores[2].targetVersion.version).toBeNull();
+    expect(next.stores[0].targetVersion.label).toBe('版2（最新）');
+  });
+  test('別名の実名を記録し、後の改名・削除・再送でも配布時の名前を返す', async () => {
+    const t = await create(); await execute(t.id, await preflight(t.id, ['a1']));
+    const p = await preflight(t.id, ['a1']);
+    const result = await execute(t.id, p, selections(p, 'alias'));
+    expect(result.body.data.stores[0].createdName).toBe('常連 (2)');
+    const resolution = sql.prepare("SELECT target_id FROM hq_template_preflight_resolutions WHERE idempotency_fingerprint=? AND item_kind='tag'").get(p.preflightId) as { target_id: string };
+    sql.prepare("UPDATE tags SET name='あとから改名',normalized_name='あとから改名' WHERE id=?").run(resolution.target_id);
+    expect((await request(`/${t.id}/distributions/${p.preflightId}`)).body.data).toEqual(result.body.data);
+    sql.prepare('DELETE FROM tags WHERE id=?').run(resolution.target_id);
+    expect((await execute(t.id, p, selections(p, 'alias'))).body.data).toEqual(result.body.data);
+  });
+  test('作った主項目の名前を返し、旧記録と処理中の名前は推測で埋めない', async () => {
+    const t = await create(), p = await preflight(t.id, ['a1', 'a2']);
+    const result = await execute(t.id, p);
+    expect(result.body.data.stores.map((s: any) => s.createdName)).toEqual(['常連', '常連']);
+    sql.prepare("UPDATE hq_template_distribution_results SET created_name=NULL WHERE run_id=? AND target_account_id='a1'").run(p.preflightId);
+    const reread = await request(`/${t.id}/distributions/${p.preflightId}`);
+    expect(reread.body.data.stores[0].createdName).toBeNull();
+    const pending = await preflight(t.id, ['a3']);
+    sql.prepare(`INSERT INTO hq_template_distribution_runs(id,tenant_id,template_id,template_version_id,idempotency_fingerprint,created_by,status)
+      SELECT idempotency_fingerprint,tenant_id,template_id,template_version_id,idempotency_fingerprint,created_by,'running'
+      FROM hq_template_preflights WHERE idempotency_fingerprint=?`).run(pending.preflightId);
+    const waiting = await request(`/${t.id}/distributions/${pending.preflightId}`);
+    expect(waiting.body.data.stores[0]).toMatchObject({ status: 'pending', createdName: null, counts: { created: 0, overwritten: 0, aliased: 0 } });
+    const other = await request('', 'POST', { type: 'tag', name: '別のひな形', definition, requestId: crypto.randomUUID() });
+    expect((await preflight(other.body.data.template.id, ['a1'])).stores[0].targetVersion.version).toBeNull();
+    expect((await request(`/${t.id}/preflight`, 'POST', { accountIds: ['b1'] })).status).toBe(403);
+  });
   test('CRUD, immutable versions, tenant list and logical archive are audited', async () => {
     const t = await create(); expect(t.template_type).toBe('tag');
     expect((await request('')).body.data.map((t: any) => t.id)).toEqual([t.id]);
@@ -291,6 +340,7 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     const distributed = await execute(created.body.data.template.id, checked);
     expect(distributed.status, JSON.stringify(distributed.body)).toBe(200);
     expect(distributed.body.data.status).toBe('completed');
+    expect(distributed.body.data.stores.map((s: any) => s.createdName)).toEqual(['お知らせ', 'お知らせ']);
     expect(sql.prepare("SELECT line_account_id,name FROM templates ORDER BY line_account_id").all()).toEqual([
       { line_account_id: 'a1', name: 'お知らせ' }, { line_account_id: 'a2', name: 'お知らせ' }, { line_account_id: 'a3', name: 'お知らせ' },
     ]);
@@ -304,6 +354,7 @@ describe('HQ tag HTTP and real SQLite boundaries', () => {
     const distributed = await execute(created.body.data.template.id, first);
     expect(distributed.status, JSON.stringify(distributed.body)).toBe(200);
     expect(distributed.body.data.status).toBe('completed');
+    expect(distributed.body.data.stores.map((s: any) => s.createdName)).toEqual(Array(3).fill('ご利用アンケート'));
     expect(count('forms')).toBe(3);
     const mapped = sql.prepare(`SELECT fa.line_account_id AS account_id,f.is_active,t.line_account_id AS tag_account,s.line_account_id AS scenario_account FROM forms f JOIN form_accounts fa ON fa.form_id=f.id JOIN tags t ON t.id=f.on_submit_tag_id JOIN scenarios s ON s.id=f.on_submit_scenario_id ORDER BY fa.line_account_id`).all() as Array<{ account_id: string; is_active: number; tag_account: string; scenario_account: string }>;
     expect(mapped).toEqual(['a1','a2','a3'].map(account_id => ({ account_id, is_active: 0, tag_account: account_id, scenario_account: account_id })));
@@ -393,6 +444,7 @@ describe('V8 scenario templates',()=>{
     expect((await request('?type=scenario')).body.data).toHaveLength(1);expect((await request('?type=template')).body.data).toHaveLength(0);
     const id=first.body.data.template.id,p=await preflight(id,['a1','a2']);
     const sent=await execute(id,p);expect(sent.status).toBe(200);expect(sent.body.data.status).toBe('completed');
+    expect(sent.body.data.stores.map((s: any) => s.createdName)).toEqual(['3日間の案内', '3日間の案内']);
     expect((await execute(id,p)).body.data).toEqual(sent.body.data);
     const targets=sql.prepare('SELECT id,is_active FROM scenarios').all() as {id:string;is_active:number}[];
     expect(targets).toHaveLength(2);expect(targets.every(s=>s.is_active===0)).toBe(true);expect(count('scenario_steps')).toBe(4);

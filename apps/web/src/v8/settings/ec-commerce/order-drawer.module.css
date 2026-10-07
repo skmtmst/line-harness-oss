@@ -1,0 +1,214 @@
+/*
+ * ★V8-B `nAesv`：注文の状況の引き出し。右から 560・余白 24・段の間 16。
+ * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-st2-od-*）。
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--tpl-st2-od-z);
+  display: flex;
+  justify-content: flex-end;
+  background: var(--tpl-st2-od-scrim);
+}
+
+.drawer {
+  display: flex;
+  box-sizing: border-box;
+  width: min(var(--tpl-st2-od-w), 100%);
+  height: 100dvh;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--tpl-st2-od-gap);
+  padding: var(--tpl-st2-od-pad);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-st2-od-shadow);
+  color: var(--color-ink);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-st2-od-head-gap);
+}
+
+.headText {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-st2-od-head-text-gap);
+}
+
+.title {
+  line-height: var(--tpl-st2-od-title-lh);
+  margin: 0;
+  font-size: var(--tpl-st2-od-title);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sub {
+  line-height: var(--tpl-st2-od-text-lh);
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.close {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--tpl-st2-od-close);
+  height: var(--tpl-st2-od-close);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+}
+
+.close:focus-visible {
+  outline: var(--tpl-sb-focus-ring);
+}
+
+.body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-st2-od-gap);
+  overflow-y: auto;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionTitle {
+  line-height: var(--tpl-st2-od-section-lh);
+  margin: 0 0 var(--tpl-st2-od-title-gap);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+
+.facts {
+  margin: 0;
+}
+
+.fact {
+  display: flex;
+  gap: var(--tpl-st2-od-fact-gap);
+  padding: var(--tpl-st2-od-row-pad);
+  box-shadow: var(--tpl-sb-line-top);
+}
+
+.fact dt {
+  line-height: var(--tpl-st2-od-small-lh);
+  flex-shrink: 0;
+  width: var(--tpl-st2-od-fact-label-w);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.fact dd {
+  line-height: var(--tpl-st2-od-text-lh);
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-caption);
+}
+
+.timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeRow {
+  display: flex;
+  gap: var(--tpl-st2-od-time-gap);
+  padding: var(--tpl-st2-od-row-pad);
+}
+
+.time {
+  line-height: var(--tpl-st2-od-small-lh);
+  flex-shrink: 0;
+  width: var(--tpl-st2-od-time-w);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+}
+
+.timeBody {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-st2-od-detail-gap);
+}
+
+.timeText {
+  line-height: var(--tpl-st2-od-text-lh);
+  font-size: var(--text-caption);
+}
+
+.detailBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-st2-od-detail-gap);
+}
+
+.actionLine {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-st2-od-detail-gap);
+}
+
+.note {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
+.note[data-tone='danger'] {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.note[data-tone='warn'] {
+  color: var(--color-warning);
+}
+
+.hint {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.link {
+  color: var(--color-action);
+}
+
+/* 見出しの下のお客さまの名前：文字の色のまま、触れると下線。 */
+.subLink {
+  color: inherit;
+}
+
+.subLink:hover {
+  text-decoration: underline;
+}
+
+.footHint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}

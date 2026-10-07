@@ -12,7 +12,8 @@ import { describe, expect, it } from 'vitest'
 const WEB = join(__dirname, '..', '..')
 const layout = readFileSync(join(WEB, 'src/app/layout.tsx'), 'utf8')
 const globals = readFileSync(join(WEB, 'src/app/globals.css'), 'utf8')
-const settings = readFileSync(join(WEB, 'src/app/settings/page.tsx'), 'utf8')
+// ★V8：入口（app/settings/page.tsx）は src/v8/settings/features の画面を出す。切り替えはその画面の「画面の見た目」。
+const settings = readFileSync(join(WEB, 'src/v8/settings/features/screen.tsx'), 'utf8')
 
 describe('テーマの切り替え（V8 移行②）', () => {
   it('<html> に data-theme が出る。既定は v7、環境変数 NEXT_PUBLIC_ADMIN_THEME=v8 で v8 にできる', () => {
@@ -47,7 +48,9 @@ describe('テーマの切り替え（V8 移行②）', () => {
   })
 
   it('設定画面の奥に切り替えがある', () => {
-    expect(settings).toContain('ThemePreviewSwitch')
+    // 同じ切り替えの本体（applyAdminTheme）を「いまの見た目／新しい見た目」の切り替えから呼ぶ。
+    expect(settings).toContain('applyAdminTheme(next)')
+    expect(settings).toContain('data-design="theme-preview"')
   })
 
   it('G6：検証環境の既定は V8・本番は付けない（v7 のまま）', () => {

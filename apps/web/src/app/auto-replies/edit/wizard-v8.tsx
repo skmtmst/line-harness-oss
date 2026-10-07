@@ -21,10 +21,6 @@ import {
   LayoutTemplate,
   Image as ImageIcon,
   CircleCheck,
-  User,
-  IdCard,
-  Braces,
-  CalendarDays,
   ArrowUp,
   ArrowUpToLine,
   TextQuote,
@@ -39,9 +35,6 @@ import {
   Mic,
   File,
   MousePointerClick,
-  CircleHelp,
-  GitCompare,
-  RefreshCw,
   Smartphone,
   List,
   Activity,
@@ -66,10 +59,10 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import SearchField from '@/components/shared/search-field'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
+import { SaveConflictBand, SaveConflictCompareDialog } from '@/components/shared/save-conflict'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -108,6 +101,7 @@ import {
 } from '@/app/auto-replies/auto-reply-words'
 import { inEvaluationOrder, PRIORITY_MAX, PRIORITY_MIN, type OrderedRule } from '@/app/auto-replies/auto-reply-order'
 import { canPublish, conflictTone, publishGates } from '@/app/auto-replies/publish/publish-flow'
+import AutoReplyInsertChips, { insertedLabels } from './insert-chips'
 import styles from './wizard-v8.module.css'
 
 /*
@@ -374,12 +368,6 @@ const kindOrder = (label: string) => { const i = MAIN_KINDS.indexOf(label); retu
 /** 絵 A0pDt「反応するメッセージの種類」の札の印。 */
 const KIND_ICONS: Record<string, typeof Type> = { テキスト: Type, スタンプ: Sticker, 画像: ImageIcon, 位置情報: MapPin, 動画: Video, 音声: Mic, ファイル: File, ボタンのタップ: MousePointerClick }
 
-const INSERT_CHIPS = [
-  { label: '名前', token: '{name}', icon: User },
-  { label: '友だち情報', token: '{field}', icon: IdCard },
-  { label: '共通情報', token: '{var}', icon: Braces },
-  { label: '予約日時', token: '{booking_at}', icon: CalendarDays },
-] as const
 
 /** 「返すまで待つ時間」の選択肢。 */
 const REPLY_DELAY_OPTIONS = [
@@ -1310,12 +1298,12 @@ function AutoReplyWizardV8Inner() {
                     <dd className={styles.kvVal}>{form.actions.length > 0 ? `${form.actions.length}つ` : 'なし'}</dd>
                   </div>
                   {(() => {
-                    const used = INSERT_CHIPS.filter((chip) => form.responseContent.includes(chip.token))
+                    const used = insertedLabels(form.responseContent)
                     if (form.mode !== 'inline-text' || used.length === 0) return null
                     return (
                       <div className={styles.kvRow}>
                         <dt className="text-ink-faint text-xs">差し込み</dt>
-                        <dd className={styles.kvVal}>{used.map((chip) => chip.label === '名前' ? '名前（無いときは「お客さま」）' : chip.label).join('・')}</dd>
+                        <dd className={styles.kvVal}>{used.map((label) => label === '名前' ? '名前（取れないときは空欄）' : label).join('・')}</dd>
                       </div>
                     )
                   })()}
@@ -1447,20 +1435,15 @@ function AutoReplyWizardV8Inner() {
           )}
           {/* 編集の競合（UGrd2）：頭の下に横いっぱいの帯。入力は捨てず、比べる・読み込むを選んでもらう。 */}
           {saveConflict ? (
-            <div className={styles.conflictBand} data-design-node="UGrd2" role="alert">
-              <CircleHelp size={18} aria-hidden="true" className={styles.conflictBandIcon} />
-              <div className={styles.conflictBandText}>
-                <p className={styles.conflictBandTitle}>{`ほかの人がルール「${thisRuleName}」を先に保存しました`}</p>
-                <p className={styles.conflictBandNote}>あなたが直した所はまだ保存されていません。このまま保存すると、相手の変更が消えます。</p>
-              </div>
-              <Button type="button" variant="secondary" onClick={() => void openCompare()} disabled={compareBusy}>
-                <GitCompare size={14} aria-hidden="true" />
-                {compareBusy ? '比べています...' : '違いを比べる'}
-              </Button>
-              <Button type="button" variant="primary" onClick={() => void reloadAfterConflict()}>
-                <RefreshCw size={14} aria-hidden="true" />
-                最新を読み込んで続ける
-              </Button>
+            /* 帯は共通部品（save-conflict）に寄せた。文はこの画面の絵のまま。 */
+            <div className={styles.conflictBandSlot}>
+              <SaveConflictBand
+                title={`ほかの人がルール「${thisRuleName}」を先に保存しました`}
+                designNode="UGrd2"
+                compareBusy={compareBusy}
+                onCompare={() => void openCompare()}
+                onReload={() => void reloadAfterConflict()}
+              />
             </div>
           ) : null}
         </>} identity={<Link href="/auto-replies" className={styles.backLink}>
@@ -1997,18 +1980,10 @@ function AutoReplyWizardV8Inner() {
                     />
                     <div className={styles.insertChips}>
                       <span className={styles.insertLabel}>差し込む</span>
-                      {INSERT_CHIPS.map((chip) => (
-                        <button
-                          key={chip.token}
-                          type="button"
-                          className={styles.insertChip}
-                          title={`${chip.label}を差し込む`}
-                          onClick={() => patch({ responseContent: form.responseContent + chip.token })}
-                        >
-                          <chip.icon size={16} aria-hidden="true" />
-                          {chip.label}
-                        </button>
-                      ))}
+                      <AutoReplyInsertChips
+                        accountId={matchedAccountId}
+                        onInsert={(token) => patch({ responseContent: form.responseContent + token })}
+                      />
                       <span className={styles.counter}>
                         {formatNumber(form.responseContent.length)} / 5,000
                       </span>
@@ -2466,35 +2441,17 @@ function AutoReplyWizardV8Inner() {
       {/* ===== 下の帯 ===== */}
 
 
-      <ConfirmDialog
+      <SaveConflictCompareDialog
         open={compareTarget !== null || compareError !== ''}
-        title="最新の保存と比べる"
-        description="あなたの下書きと、相手が保存した最新の内容の違いです。読み込むまでは画面は変わりません。"
-        confirmLabel="最新を読み込んで続ける"
         busy={compareBusy}
         error={compareError || undefined}
-        onConfirm={() => void reloadAfterConflict()}
+        lines={compareTarget ? describeAutoReplyDiff(form, compareTarget).map((text) => ({ text })) : null}
+        onReload={() => void reloadAfterConflict()}
         onCancel={() => {
           setCompareTarget(null)
           setCompareError('')
         }}
-      >
-        {compareTarget && (() => {
-          const lines = describeAutoReplyDiff(form, compareTarget)
-          return lines.length === 0 ? (
-            <p className="text-ink-secondary mt-3 text-sm">違いは見つかりませんでした。そのまま読み込めます。</p>
-          ) : (
-            <ul className="mt-3 space-y-1.5 text-sm">
-              {lines.map((line, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <span aria-hidden className="text-accent-deep font-bold">・</span>
-                  <span className="text-ink">{line}</span>
-                </li>
-              ))}
-            </ul>
-          )
-        })()}
-      </ConfirmDialog>
+      />
 
       <Dialog open={previewOpen} title="設定内容とLINEプレビュー" onCancel={() => setPreviewOpen(false)}
         footer={<Button onClick={() => setPreviewOpen(false)}>閉じる</Button>}>

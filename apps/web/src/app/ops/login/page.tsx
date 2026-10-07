@@ -12,6 +12,7 @@ import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
 import { authRequest, emailError, internalAuthFailureCopy } from '@/lib/auth-email'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
+import OpsLoginV8 from '@/v8/ops/login'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -29,8 +30,12 @@ const LINE_LOGIN_FAILURE_CODES = new Set([
  * /ops へ進める。新規登録の導線は出さない（運営は招待制）。
  */
 export default function OpsLoginPage() {
-  const theme = useAdminTheme()
-  const v8 = theme === 'v8'
+  // ★V8 は src/v8/ops/login.tsx（絵 D9JALJ）。v7 は下のまま。
+  return useAdminTheme() === 'v8' ? <OpsLoginV8 /> : <OpsLoginV7 />
+}
+
+function OpsLoginV7() {
+  const v8 = false
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [emailMessage, setEmailMessage] = useState<string | null>(null)

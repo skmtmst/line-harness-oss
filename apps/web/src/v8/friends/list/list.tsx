@@ -47,6 +47,8 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
+import { notifyToast } from '@/components/shared/toast'
+import { useListScrollMemory } from '@/components/shared/list-url-state'
 import MenuPortal from '@/components/shared/menu-portal'
 import BulkBar from '@/components/shared/bulk-bar'
 import Chip from '@/components/shared/chip'
@@ -154,6 +156,7 @@ export default function FriendsListV8() {
   const [refreshing, setRefreshing] = useState(false)
   const [optionsFailed, setOptionsFailed] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   const [bulkOpen, setBulkOpen] = useState(false)
   const [rowAction, setRowAction] = useState<{ friend: FriendListItem; action: FriendAction } | null>(null)
   const [notice, setNotice] = useState<Notice>(null)
@@ -241,6 +244,20 @@ export default function FriendsListV8() {
       attentionOnly, sortMode, page, pageSize, advanced,
     })
   }, [restored, selectedAccountId, searchInput, searchSubmitted, selectedTagId, responseFilter, operatorId, scenarioId, attentionOnly, sortMode, page, pageSize, advanced])
+  /*
+   * 打って 300ms 止まったら自動で絞り込む（Enter 不要。動きの点検・9）。Enter はすぐ絞る。
+   * 控えから戻した直後（入力と絞り込みが同じ）は何もしない。
+   */
+  useEffect(() => {
+    if (!restored) return
+    const next = searchInput.trim()
+    if (next === searchSubmitted) return
+    const timer = window.setTimeout(() => { setSearchSubmitted(next); setPage(1) }, 300)
+    return () => window.clearTimeout(timer)
+  }, [restored, searchInput, searchSubmitted])
+
+  /* 絞り込みは上の控えが戻す。スクロール位置も、戻ったときだけ同じ所へ戻す（動きの点検 5 番）。 */
+  useListScrollMemory(restored && loadStatus === 'ready')
 
   const emptyMessage = emptyMessageOf({
     search: searchSubmitted,
@@ -427,23 +444,34 @@ export default function FriendsListV8() {
     URL.revokeObjectURL(url)
   }, [friends])
 
+  /*
+   * 注目の ★ は押した瞬間に変え、裏で保存する（動きの点検・7）。失敗したら元に戻して知らせる。
+   * ほかの変更と重なった（409）ときは、最新を読み直して知らせる。
+   */
   const toggleAttention = useCallback(async (friend: FriendListItem) => {
     const current = String(friend.metadata?.__attention ?? '') === '1'
+    const apply = (on: boolean) => setFriends((rows) => rows.map((row) => (
+      row.id === friend.id ? { ...row, metadata: { ...(row.metadata ?? {}), __attention: on ? '1' : null } } : row
+    )))
+    apply(!current)
     try {
       await fetchApi<{ success: boolean; data: unknown }>(
         `/api/friends/${friend.id}/metadata?expectedUpdatedAt=${encodeURIComponent(friend.updatedAt)}`,
         { method: 'PUT', body: JSON.stringify({ __attention: current ? null : '1' }) },
       )
-      await loadFriends()
+      void loadFriends()
     } catch (error) {
+      apply(current)
       if (error instanceof ApiError && error.status === 409) {
         await loadFriends()
-        setNotice({ title: '注目がほかの変更と重なりました', message: '最新の状態を読み直しました。確認してもう一度お試しください。' })
+        notifyToast('注目がほかの変更と重なりました。最新の状態を読み直したので、確かめてもう一度押してください。', { tone: 'error' })
       } else {
-        setNotice({ title: '注目の変更に失敗しました。通信を確かめて、もう一度お試しください。', message: '通信状態を確認して、もう一度お試しください。' })
+        notifyToast('注目を変えられませんでした。', { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleAttentionRef.current(friend) } })
       }
     }
   }, [loadFriends])
+  const toggleAttentionRef = useRef(toggleAttention)
+  toggleAttentionRef.current = toggleAttention
 
   const allowedActions: FriendAction[] = [
     ...(canRunBulk(staffRole) || canEditFriends ? ['tag', 'field'] as FriendAction[] : []),
@@ -872,7 +900,7 @@ export default function FriendsListV8() {
       overlays={(
         <>
           <span className={styles.bulkWrap} data-design="V8BulkBar">
-            <BulkBar count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください">
+            <BulkBar count={selectedIds.size} unit="人" hint="対象を確認してから操作を選んでください" onClear={clearSelection}>
               {selectedIds.size > 1 && canRunBulk(staffRole) ? (
                 <Button variant="secondary" data-qa-open="IAf7j" onClick={() => setBulkOpen(true)}>操作を選ぶ</Button>
               ) : null}

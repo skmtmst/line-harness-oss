@@ -11,6 +11,7 @@
  * データの口・保存の口・権限・失敗の扱いは app/friend-add-settings/list-v8.tsx と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ。
  */
+import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -43,11 +44,13 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
+import EmptyList from '@/components/shared/empty-list'
 import IconButton from '@/components/shared/icon-button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import FolderPanel from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -286,6 +289,12 @@ function FriendAddList() {
     setPerPage(next)
     resetCursor()
   }
+
+  /*
+   * 行の名前の前の丸は、左のフォルダの列と同じフォルダを名前で引く（設定はフォルダを名前で持つ）。
+   * この口はフォルダの色を返さないので、丸は色の無いフォルダの灰になる。無ければ未分類の輪。
+   */
+  const folderDotOf = (name: string | null | undefined) => (name ? { name } : null)
 
   /* フォルダ欄の件数はサーバの全ページ合計 (folderCounts)。 */
   const folders = useMemo(() => {
@@ -635,9 +644,26 @@ function FriendAddList() {
 
   let listBody: ReactNode
   if (accountLoading || (loading && items.length === 0 && !error)) {
+    /*
+     * 初回の読み込みにも骨組みを出す（動きの点検 15 番）。0.3 秒以内に届けば出さない。
+     * 読み上げには「読み込んでいます」を残す。
+     */
     listBody = (
-      <div className={styles.stateCard} role="status">
-        <p className={styles.stateTitle}>友だち追加時の配信を読み込んでいます</p>
+      <div role="status" aria-busy="true" className={styles.loadingRows}>
+        <span className="sr-only">友だち追加時の配信を読み込んでいます</span>
+        <DelayedSkeleton
+          loading
+          skeleton={
+            <div aria-hidden="true">
+              {[0, 1, 2, 3, 4].map((row) => (
+                <div key={row} className={styles.loadingRow}>
+                  <Skeleton height={12} width="36%" />
+                  <Skeleton height={10} width="22%" />
+                </div>
+              ))}
+            </div>
+          }
+        />
       </div>
     )
   } else if (!selectedAccountId) {
@@ -655,31 +681,24 @@ function FriendAddList() {
       </div>
     )
   } else if (items.length === 0) {
-    listBody = filterActive ? (
-      <div className={styles.stateCard}>
-        <span className={styles.stateIcon}><UserPlus size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>条件に合う設定はありません</p>
-        <p className={styles.stateDesc}>「有効」「下書き」「停止中」や検索を外すと、すべて出ます。</p>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setSearch('')
-            setAppliedSearch('')
-            setStatusFilter('')
-            setFolder(null)
-            resetCursor()
-          }}
-        >
-          条件を外す
-        </Button>
-      </div>
-    ) : (
-      <div className={styles.stateCard}>
-        <span className={styles.stateIcon}><UserPlus size={18} aria-hidden="true" /></span>
-        <p className={styles.stateTitle}>まだ経路ごとの初回案内はありません</p>
-        <p className={styles.stateDesc}>いまは全員に「経路が分からなかった人」の案内が届きます。流入リンクごとに案内を分けられます。</p>
-        {createButton}
-      </div>
+    /* 修正案 D-2：空の一覧。 */
+    listBody = (
+      <EmptyList
+        icon={<UserPlus aria-hidden="true" />}
+        title="まだ友だち追加時の配信がありません"
+        description="友だちになった直後のあいさつを、流入経路ごとに分けて送ります。"
+        create={{ label: '最初の配信を作る', href: '/friend-add-settings?view=new' }}
+        canCreate={canEdit}
+        filtered={filterActive}
+        onClearFilters={() => {
+          setSearch('')
+          setAppliedSearch('')
+          setStatusFilter('')
+          setFolder(null)
+          resetCursor()
+        }}
+        filteredDescription="「有効」「下書き」「停止中」や検索を外すと、すべて出ます"
+      />
     )
   } else {
     listBody = (
@@ -713,8 +732,10 @@ function FriendAddList() {
                     </span>
                   </Td>
                   <Td className={styles.colName}>
-                    <Link href={editHref(rule.id)} title={rule.name} className={styles.name}>{rule.name}</Link>
-                    <span className={styles.sub} title={rule.routeNames.join('、') || '未選択'}>
+                    <FolderDotName folder={folderDotOf(rule.folderName)}>
+                      <Link href={editHref(rule.id)} title={rule.name} className={styles.name}>{rule.name}</Link>
+                    </FolderDotName>
+                    <span className={`${styles.sub} ${styles.nameSub}`} title={rule.routeNames.join('、') || '未選択'}>
                       <Link2 size={12} aria-hidden="true" />
                       <span className={styles.subText}>{rule.routeNames.join('、') || '未選択'}</span>
                     </span>
@@ -735,8 +756,10 @@ function FriendAddList() {
                     </span>
                   </Td>
                   <Td className={styles.colName}>
-                    <Link href={editHref(sinkRule.id)} title={sinkRule.name} className={styles.name}>{sinkRule.name}</Link>
-                    <span className={styles.sub} title={SINK_NOTE}>
+                    <FolderDotName folder={folderDotOf(sinkRule.folderName)}>
+                      <Link href={editHref(sinkRule.id)} title={sinkRule.name} className={styles.name}>{sinkRule.name}</Link>
+                    </FolderDotName>
+                    <span className={`${styles.sub} ${styles.nameSub}`} title={SINK_NOTE}>
                       <CircleHelp size={12} aria-hidden="true" />
                       <span className={styles.subText}>{SINK_NOTE}</span>
                     </span>
@@ -777,7 +800,8 @@ function FriendAddList() {
         </Button>
       }
       tabs={<>
-        {!canEdit ? (
+        {/* 役割が取れるまで（null）は閲覧のみの帯を出さない。出してから消すと一覧が 48px 跳ねていた（動きの点検 8 番）。 */}
+        {role !== null && !canEdit ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
             <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>

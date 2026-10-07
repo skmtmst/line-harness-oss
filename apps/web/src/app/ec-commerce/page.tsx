@@ -40,6 +40,10 @@ import { FAILURE_KIND_TEXT } from './ec-failure'
 import { formatEcDateTime as dateTime } from './ec-datetime'
 import styles from './ec-commerce-v6.module.css'
 import { formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import EcCommerceScreen from '@/v8/settings/ec-commerce/screen'
+import ConnectorPanel from './connector-panel'
 
 const ACTION_STATUS: Record<EcActionExecutionStatus, { label: string; tone: string }> = {
   pending: { label: '処理中', tone: styles.statusWarn },
@@ -574,6 +578,25 @@ function EcCommercePageInner() {
   )
 }
 
+/* ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/ec-commerce）。定期便・つなぎ先・注文の状況は今の部品を差し込む。 */
+function EcCommercePageV8() {
+  usePageTitle('EC連携')
+  const tab = useMergedTab(EC_TABS, 'tab', 'events') as typeof EC_TABS[number]['key']
+  return (
+    <EcCommerceScreen
+      tab={tab}
+      renderSubscriptions={(accountId) => <SubscriptionsPanel accountId={accountId} />}
+      renderConnector={(accountId, canEdit) => <ConnectorPanel accountId={accountId} canEdit={canEdit} />}
+    />
+  )
+}
+
+function EcCommercePageSwitch() {
+  /* 付け直しのたびに v7 を挟まない読み方（lib/use-admin-theme-now.ts の説明）。 */
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <EcCommercePageV8 /> : <EcCommercePageInner />
+}
+
 export default function EcCommercePage() {
-  return <Suspense fallback={<ListState kind="loading" />}><EcCommercePageInner /></Suspense>
+  return <Suspense fallback={<ListState kind="loading" />}><EcCommercePageSwitch /></Suspense>
 }

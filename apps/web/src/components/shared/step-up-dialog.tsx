@@ -3,7 +3,7 @@
 import React, { useEffect, useId, useState } from 'react'
 import { KeyRound } from 'lucide-react'
 import Dialog from './dialog'
-import OtpInput from './otp-input'
+import OtpInput, { otpFailureMessage } from './otp-input'
 
 interface StepUpDialogProps {
   open: boolean
@@ -66,7 +66,7 @@ export default function StepUpDialog({ open, action, method = 'totp', busy = fal
         : `${action}には、権限を持つ本人の確認が必要です。この操作専用に、5分以内に1回だけ使える確認を発行するため、パスワードを入力してください。`}
       confirmLabel="本人確認して実行"
       busy={busy}
-      error={error}
+      error={error && isTotp ? otpFailureMessage(error) : error}
       titleIcon={<KeyRound size={22} />}
       onConfirm={ready ? () => onSubmit(value) : undefined}
       onCancel={onCancel}
@@ -74,14 +74,15 @@ export default function StepUpDialog({ open, action, method = 'totp', busy = fal
       {isTotp ? (
         <>
           <p id={labelId} className="mt-1 block text-sm font-medium text-ink">認証アプリに表示された6桁コード</p>
-          {/* ★V7 共通 認証コード入力（xHzFK）。実行はこれまでどおり「本人確認して実行」で行う。 */}
+          {/* ★V7 共通 認証コード入力（xHzFK）。6桁目が入った瞬間に確かめる（「本人確認して実行」も残す）。 */}
           <div className="mt-2">
             <OtpInput
               value={value}
               onChange={setValue}
               labelledBy={labelId}
+              onComplete={(code) => onSubmit(code)}
               invalid={Boolean(error)}
-              disabled={busy}
+              busy={busy}
               autoFocus
             />
           </div>

@@ -143,12 +143,23 @@ test('v8 で失敗がある行は失敗ありの札と失敗の内訳が出る',
   expect(board?.textContent).toContain('やり直す')
 })
 
+test('v8 の行の名前の前にフォルダの丸が付く。送り先はまだフォルダへ入れられないので未分類の輪（閲覧のみでも出す）', async () => {
+  staffRole = 'staff'
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const row = host.querySelector('[data-design-node="ZSbFY"] tr[data-row-id="wh-1"]')
+  const dots = row?.querySelectorAll('[data-folder-dot]') ?? []
+  expect(dots).toHaveLength(1)
+  expect(dots[0].getAttribute('data-folder-dot')).toBe('unfiled')
+  expect(dots[0].getAttribute('aria-label')).toBe('フォルダ：未分類')
+})
+
 test('v8 で何も無いときは wWrpY の「まだ無い」が出る', async () => {
   outgoingItems = []
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="ZSbFY"]')
-  expect(board?.textContent).toContain('まだ、送り先はありません')
+  expect(board?.textContent).toContain('まだ送り先がありません')
 })
 
 test('v8 の閲覧のみ（l5SRfT）は帯が出て、押せない作るボタン・設定は置かない', async () => {

@@ -1,0 +1,316 @@
+/*
+ * ★V8 流入と計測の一覧（Pencil xbHxg・1152 y1ztx・閲覧のみ EMUl9）。
+ * 枠・見出し・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
+ * 寸法は app/globals.css の --tpl-il-* に置く。
+ */
+
+/* 見出しの右の2つのボタン（絵の間は12。型の並びは8）。 */
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-il-head-actions-gap);
+}
+
+/* 案内の帯（表の上の主列）。帯の下は道具の段の上の余白と同じだけ空ける。 */
+.noticeRow {
+  flex-basis: 100%;
+  margin-bottom: var(--tpl-il-notice-after);
+}
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+
+/* 表：絵の列の並び（見出し 13/20・行 9/20・欄の間16・行 78）。
+ * 共通の表の「列の並び」（data-table-layout=columns）を使い、この板の寸法だけ上から当てる。 */
+.tableWrap {
+  min-width: 0;
+}
+.table {
+  border: 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+  gap: var(--tpl-il-col-gap);
+  height: var(--tpl-il-head-h);
+  padding: var(--tpl-il-head-pad);
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  gap: var(--tpl-il-col-gap);
+  height: var(--tpl-il-row-h);
+  padding: var(--tpl-il-row-pad);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: normal;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colFriends,
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colClicks,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colFriends,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colClicks {
+  align-items: flex-end;
+  padding-right: var(--tpl-il-num-pad-end);
+  text-align: right;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colName,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colName {
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--tpl-il-name-gap);
+}
+.colCheck { width: var(--tpl-il-col-check); }
+.colPool { width: var(--tpl-il-col-pool); min-width: 0; }
+.colBecame { width: var(--tpl-il-col-became); min-width: 0; gap: var(--tpl-il-name-gap); }
+.colFriends { width: var(--tpl-il-col-friends); gap: var(--tpl-il-name-gap); }
+.colClicks { width: var(--tpl-il-col-clicks); }
+.colLatest { width: var(--tpl-il-col-latest); }
+.colUrl { width: var(--tpl-il-col-url); }
+.colOps { width: var(--tpl-il-col-ops); }
+
+/* 見出しの字（12/500・薄い墨）。 */
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 流入元名（緑の 13/600）・ref（青の 11）・札。 */
+.nameLink,
+.nameText {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-row-name-size);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nameText {
+  color: var(--color-ink);
+}
+.nameLink:hover {
+  text-decoration: underline;
+}
+.refCode {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-il-ref-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 欄の中の1行目（12・墨）と2行目（11・薄い墨）。長い値は1行で「…」。 */
+.cellMain {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-il-cell-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cellSub {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-il-cell-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状態の札（点つき）。計測済＝緑、未登録＝琥珀、停止中＝灰。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-il-pill-gap);
+  padding: var(--tpl-il-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-il-pill-lh);
+  white-space: nowrap;
+}
+.pillDot {
+  width: var(--tpl-badge-dot);
+  height: var(--tpl-badge-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.pill[data-tone='measured'] {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.pill[data-tone='unregistered'] {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+.pill[data-tone='stopped'] {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+/* 行の操作：コピー・「…」、編集。メニューの位置の目印が行を1段増やさないよう横に並べる。 */
+.opsBox {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-il-ops-gap);
+}
+
+/* 数の帯のマスの「…」（16 の印だけ。マスの上の行を高くしない）。 */
+.tileMenu {
+  display: inline-flex;
+  align-items: center;
+}
+.tileMenuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+.tileMenuButton:hover,
+.tileMenuButton[aria-expanded='true'] {
+  color: var(--color-ink);
+}
+
+/* 表の下の案内。 */
+.footNote {
+  margin: 0;
+  padding: var(--tpl-il-foot-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* よく使う絞り込み：押すと下に絞り込みと並び順の箱。 */
+.presetWrap {
+  position: relative;
+}
+.presetPanel {
+  position: absolute;
+  top: calc(100% + var(--tpl-chip-row-gap));
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cell-gap-half);
+  width: var(--tpl-il-preset-w);
+  padding: var(--tpl-il-preset-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--v8-popover-shadow);
+}
+.presetLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.presetChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-chip-row-gap);
+}
+
+/* 1152 の板（y1ztx）：案内の帯 → 1段目 → 2段目。 */
+.narrowTools {
+  display: flex;
+  flex-basis: 100%;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.narrowFolder { width: var(--tpl-narrow-folder-w); }
+.narrowFolder :global(*) { max-width: 100%; }
+.narrowFolder :global(button) { width: 100%; }
+.narrowSearch { width: var(--tpl-il-search-w); }
+.spacer { flex: 1 1 0; }
+
+/* フォルダの列の下の注。 */
+.folderNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-il-folder-note-lh);
+}
+
+/* 閲覧のみの帯（数の帯の上）。薄い青の地・目の印・枠なし。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: var(--tpl-il-ro-gap) var(--tpl-head-pad-side);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* フォルダの窓の中身。 */
+.dialogLabel {
+  display: block;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.dialogInput {
+  width: 100%;
+  min-height: var(--tpl-chip-h);
+  margin-top: var(--tpl-sub-gap);
+  padding: var(--tpl-kw-input-pad);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
+/* 名前の前のフォルダの丸（xbHxg「フォルダの丸」）。2行目・札は名前の頭にそろえる（絵の「説明の行」の左 16）。 */
+.nameLine { display: flex; min-width: 0; max-width: 100%; }
+.dotIndentPad { padding-inline-start: var(--tpl-folder-dot-indent); }
+.dotIndentMargin { margin-inline-start: var(--tpl-folder-dot-indent); }

@@ -11,11 +11,12 @@ import { describe, expect, it } from 'vitest'
 const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'folder-panel.module.css'), 'utf8')
 
 describe('V8 のフォルダの列：「…」の場所', () => {
-  it('選んでいない行は「…」の場所を取らない', () => {
-    expect(css).toMatch(/\[data-theme='v8'\] \.row:not\(\[data-active\]\) \.menu \{ width: 0;/)
+  // 2026-10-07 動きの点検 4 番：場所取りの hack（幅 0・負の余白）をやめ、件数の場所に重ねる形へ。
+  it('選んでいない行は「…」の場所を取らない（件数の場所に重ねる）', () => {
+    expect(css).toMatch(/\[data-theme='v8'\] \.row:not\(\[data-active\]\) \.menu \{\s*position: absolute;/)
   })
   it('乗せたとき・キーボードで入ったときは出す', () => {
     expect(css).toMatch(/\.row:not\(\[data-active\]\):focus-within \.menu/)
-    expect(css).toMatch(/\.row:not\(\[data-active\]\):focus-within \.menuButton \{ opacity: 1; \}/)
+    expect(css).toMatch(/\.row:not\(\[data-active\]\):focus-within \.menuButton,[^{]*\{ opacity: 1; \}/)
   })
 })

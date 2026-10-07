@@ -76,7 +76,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ja" data-theme={ADMIN_THEME} className={`${inter.variable} ${notoSansJp.variable}`}>
+    // 描く前の短いスクリプトが data-theme を v8 へ差し替えるので、html の属性だけは食い違いの警告を出さない（開発時の「1 Issue」）。
+    <html lang="ja" data-theme={ADMIN_THEME} className={`${inter.variable} ${notoSansJp.variable}`} suppressHydrationWarning>
       {/* 書体は globals.css の --font-sans が正本（#976 U080）。inline style はやめる。 */}
       <body className="bg-canvas-sunken text-ink antialiased font-sans">
         {/* localStorage のテーマ指定を描画前に反映する（白い板のちらつき防止） */}

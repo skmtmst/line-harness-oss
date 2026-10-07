@@ -1,9 +1,12 @@
+import WaitlistOfferSheet from '../components/WaitlistOfferSheet.js';
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MenuList from '../components/MenuList.js';
+import RepeatCard from '../components/RepeatCard.js';
 import StaffList from '../components/StaffList.js';
 import DateTimePicker, { type SlotPick } from '../components/DateTimePicker.js';
 import Confirm from '../components/Confirm.js';
+import BookingPayment from '../components/BookingPayment.js';
 import Done from '../components/Done.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
@@ -12,7 +15,7 @@ import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 
-type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'done';
+type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'payment' | 'done';
 
 const STEPS = ['メニュー', '担当', '日時', '確認'];
 
@@ -30,6 +33,9 @@ export default function Booking() {
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
   const [slot, setSlot] = useState<SlotPick | null>(null);
+  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [paymentDue, setPaymentDue] = useState(false);
+  const [prepayNotice, setPrepayNotice] = useState<string | null>(null);
   const [doneStatus, setDoneStatus] = useState('requested');
   // 予約のルール「お店が承認してから確定する」。読めなければ承認あり扱い。
   const [autoConfirm, setAutoConfirm] = useState(false);
@@ -77,16 +83,29 @@ export default function Booking() {
 
   const stepIndex =
     step === 'menu' ? 0 : step === 'staff' ? 1 : step === 'datetime' ? 2 : STEPS.length - 1;
+  /**
+   * メニュー・担当の読み込み中と失敗の間は、手順の印を出さない
+   * (★V8 AcTHQ・zz9R3 は上の帯の下がすぐ骨組み・失敗の案内)。
+   */
+  const waiting = (step === 'menu' || step === 'staff') && !stepReady;
 
   return (
     <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="ご予約" />
-      {step !== 'done' && <Stepper steps={STEPS} current={stepIndex} />}
-      <div className="mx-auto w-full max-w-md px-4 pt-3 pb-40">
+      {(params.get('waitlist')||params.get('seat_waitlist'))&&<WaitlistOfferSheet id={params.get('waitlist')||params.get('seat_waitlist')!} seat={!!params.get('seat_waitlist')} decline={params.get('action')==='decline'} onClose={()=>{const next=new URLSearchParams(params);next.delete('waitlist');next.delete('seat_waitlist');next.delete('action');navigate({pathname:'/booking',search:next.toString()},{replace:true});}}/>}
+      {step !== 'done' && !waiting && <Stepper steps={STEPS} current={stepIndex} />}
+      <div className={`mx-auto w-full max-w-md px-4 pt-3 ${waiting ? 'pb-3' : 'pb-40'}`}>
         {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
         <div key={step} className="liff-step">
         {step === 'menu' && (
-          <div data-design-node="IruGD">
+          <div data-design-node="IruGD" className="space-y-3.5">
+            <RepeatCard
+              onRepeat={(m, s) => {
+                pickMenu(m);
+                pickStaff(s);
+                setStep('datetime');
+              }}
+            />
             <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
           </div>
         )}
@@ -121,18 +140,33 @@ export default function Booking() {
             slot={slot}
             autoConfirm={autoConfirm}
             onBack={() => setStep('datetime')}
-            onSubmitted={(status) => {
-              setDoneStatus(status);
-              setStep('done');
+            onSubmitted={(result) => {
+              setBookingId(result.bookingId);
+              setDoneStatus(result.status);
+              // お支払いありのときだけ支払いの段へ。なしの店では今までどおり完了へ。
+              // 前払いのみの案内があるときは完了の段で案内と支払いへのボタンを出す。
+              setPaymentDue(Boolean(result.payment));
+              setPrepayNotice(result.prepayNotice);
+              setStep(result.payment ? 'payment' : 'done');
             }}
+          />
+        )}
+        {step === 'payment' && menu && staff && slot && bookingId && paymentDue && (
+          <BookingPayment
+            bookingId={bookingId}
+            menuName={menu.name}
+            initialAmount={staff.price}
+            slot={slot}
+            durationMinutes={staff.duration_minutes}
           />
         )}
         {step === 'done' && menu && staff && slot && (
           <Done
             menuName={menu.name}
             slot={slot}
-            durationMinutes={staff.duration_minutes}
             status={doneStatus}
+            bookingId={bookingId}
+            prepayNotice={prepayNotice}
           />
         )}
         </div>

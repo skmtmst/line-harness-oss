@@ -1,16 +1,36 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import Link from 'next/link'
-import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, captureTwoFactorMethod, clearTwoFactorChallenge, takeTwoFactorNextPath, storeAdminSession, type TwoFactorMethod } from '@/lib/admin-session'
+import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, captureTwoFactorMethod, clearTwoFactorChallenge, isOpsTwoFactorReturn, takeTwoFactorNextPath, storeAdminSession, type TwoFactorMethod } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
 import Notice from '@/components/shared/notice'
-import OtpInput from '@/components/shared/otp-input'
+import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { twoFactorFailureMessage } from './two-factor-error'
 import Button from '@/components/shared/button'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import OpsTwoFactorV8 from '@/v8/login/two-factor-ops'
 
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
+
+/*
+ * ★V8 の入口。運営のログイン（next=ops）から来たときだけ、V8 では運営の2段目（板 `tOPeY`）を出す。
+ * 管理画面のログインの2段目と v7 は今のまま（下の TwoFactorLoginPageV7）。
+ */
 export default function TwoFactorLoginPage() {
-  const [code, setCode] = useState('')
+  const theme = useAdminTheme()
+  const [ops, setOps] = useState(false)
+  useIsoLayoutEffect(() => {
+    let stored: string | null = null
+    try { stored = sessionStorage.getItem('lh_2fa_next') } catch { /* 読めなければ URL だけで決める */ }
+    setOps(isOpsTwoFactorReturn(window.location.search, window.location.hash, stored))
+  }, [])
+  if (theme === 'v8' && ops) return <OpsTwoFactorV8 />
+  return <TwoFactorLoginPageV7 />
+}
+
+function TwoFactorLoginPageV7() {
+  const [typedCode, setCode] = useState('')
   /* 認証が通ったあと、緑の輪郭（V8 の動き）を見せてから画面を移す。 */
   const [succeeded, setSucceeded] = useState(false)
   /** 失敗のたびに入力欄を作り直し、1マス目へ戻す。 */
@@ -38,7 +58,10 @@ export default function TwoFactorLoginPage() {
     window.setTimeout(() => window.location.assign(href), 420)
   }
 
-  const submit = async () => {
+  /* 6桁目が入った瞬間に送る（送るボタンも残す）。送っている間・送り終えた後は二重に送らない。 */
+  const submit = async (entered?: string) => {
+    const code = entered ?? typedCode
+    if (loading || succeeded) return
     if (!challenge) return setError('ログインの情報が見つかりませんでした。ログインからやり直してください。')
     if (code.length !== 6) return setError('6桁の認証コードを入力してください')
     setLoading(true)
@@ -79,7 +102,7 @@ export default function TwoFactorLoginPage() {
       finish(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
     } catch (caught) {
       // R506: 通信断の技術文言をそのまま出さない。
-      setError(twoFactorFailureMessage(caught))
+      setError(otpFailureMessage(twoFactorFailureMessage(caught)))
       setCode('')
       setAttempt((current) => current + 1)
     } finally { setLoading(false) }
@@ -114,19 +137,21 @@ export default function TwoFactorLoginPage() {
       <div className="mt-2 flex justify-center" data-design-node="tOPeY">
         <OtpInput
           key={attempt}
-          value={code}
+          value={typedCode}
+          onComplete={(entered) => void submit(entered)}
           onChange={(next) => { setCode(next); if (error) setError('') }}
           labelledBy="two-factor-code-label"
           describedBy={missingChallenge ? 'two-factor-missing' : error ? 'two-factor-error' : undefined}
           invalid={Boolean(error)}
           success={succeeded}
-          disabled={loading || missingChallenge || succeeded}
+          busy={loading}
+          disabled={missingChallenge || succeeded}
           autoFocus
         />
       </div>
       <p className="mt-2 text-xs text-ink-faint">◷ コードは約30秒ごとに更新されます</p>
       {/* R614: 合言葉なしでは押せない（V8移行後も共通Buttonで条件を維持）。 */}
-      <Button variant="primary" className="mt-6 h-12 w-full font-bold disabled:opacity-50 border-0 whitespace-normal" onClick={() => void submit()} disabled={loading || missingChallenge || succeeded || code.length !== 6}>{loading || succeeded ? '確認中…' : '確認してログイン'}</Button>
+      <Button variant="primary" className="mt-6 h-12 w-full font-bold disabled:opacity-50 border-0 whitespace-normal" onClick={() => void submit()} disabled={loading || missingChallenge || succeeded || typedCode.length !== 6}>{loading || succeeded ? '確認中…' : '確認してログイン'}</Button>
       <p className="mt-5 text-center text-xs text-ink-secondary">コードを入力できない場合</p>
       {/* R507残部: メール経路と合言葉なし直リンクの戻り先はLINEに限定しない。LINE経路は既存どおり。 */}
       <Link href="/login" onClick={clearTwoFactorChallenge} className="mt-2 block text-center text-xs font-medium text-action hover:underline">{missingChallenge || method === 'password' ? 'ログインに戻る' : '別のLINEアカウントでログイン'}</Link>

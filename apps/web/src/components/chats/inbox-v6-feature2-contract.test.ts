@@ -70,7 +70,7 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
 })
 
 describe('f0zn6 一覧の未読表示', () => {
-  const row = region(PAGE, 'const waitingLabel = needsAttention', 'return { at: chat.lastMessageAt')
+  const row = region(PAGE, 'const waitingLabel = needsAttention', 'return node')
 
   it('設計に無い右端の「自分の未読」操作を置かない', () => {
     expect(PAGE).not.toContain('data-inbox-v6="mine-unread-toggle"')

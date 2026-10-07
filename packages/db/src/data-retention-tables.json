@@ -721,7 +721,102 @@
       "column": "line_account_id"
     }
   },
+  "booking_sync_notice_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "notice_id",
+      "parent": "booking_sync_notices",
+      "parentColumn": "id"
+    }
+  },
+  "booking_sync_notice_queue": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_sync_notices": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_sync_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_visit_marks": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_waitlist": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_waitlist_resources": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "waitlist_id",
+      "parent": "booking_waitlist",
+      "parentColumn": "id"
+    }
+  },
   "bookings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_payment_configs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_payment_menu_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_payments": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_noshow_thresholds": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_noshow_flags": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_noshow_flag_events": {
     "category": "purge",
     "scope": {
       "by": "lineAccount",
@@ -2790,6 +2885,15 @@
       "parentColumn": "id"
     }
   },
+  "rt_channel_close_tasks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "slot_id",
+      "parent": "rt_inventory_slots",
+      "parentColumn": "id"
+    }
+  },
   "rt_connector_status": {
     "category": "purge",
     "scope": {
@@ -2921,6 +3025,42 @@
       "parentColumn": "id"
     }
   },
+  "rt_inventory_notification_outbox": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "task_id",
+      "parent": "rt_channel_close_tasks",
+      "parentColumn": "id"
+    }
+  },
+  "rt_inventory_rule_log": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_inventory_rule_queue": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
+  "rt_inventory_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
+  },
   "rt_inventory_slots": {
     "category": "purge",
     "scope": {
@@ -3005,6 +3145,24 @@
   },
   "rt_resource_locks": {
     "category": "global"
+  },
+  "rt_seat_visit_marks": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "reservation_id",
+      "parent": "rt_reservations",
+      "parentColumn": "id"
+    }
+  },
+  "rt_seat_waitlist": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "store_id",
+      "parent": "rt_stores",
+      "parentColumn": "id"
+    }
   },
   "rt_stores": {
     "category": "purge",

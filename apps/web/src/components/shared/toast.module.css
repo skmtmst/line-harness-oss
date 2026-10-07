@@ -122,6 +122,33 @@
   animation: toast-v8-enter var(--motion-base) var(--motion-ease-out);
 }
 
+/*
+ * 消えるとき（動きの点検 13 番）：窓と同じ「消えかけ」の印 data-closing の間、
+ * 透明度を 1→0 へ一方向に下げる（--motion-exit）。入りの動きは止め、
+ * 押せないようにする。動きを減らす設定では印が立たず即時に外れる。
+ */
+[data-theme='v8'] .toast[data-closing] {
+  animation: toast-v8-leave var(--motion-exit) var(--motion-ease-out) forwards;
+  pointer-events: none;
+}
+
+@keyframes toast-v8-leave {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='v8'] .toast[data-closing] {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 @keyframes toast-v8-enter {
   from {
     opacity: 0;

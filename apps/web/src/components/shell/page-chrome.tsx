@@ -12,7 +12,7 @@ import type { ReactNode } from 'react'
  * 「タグを作る」「1通目を設定」のようにその画面固有の名前だった。
  * メニュー名で足りるのは約120枚しかない。
  *
- * 詳しくは `docs/v6-common-rules.md` §1。
+ * 詳しくは `docs/v8-design-rules.md` §5。
  */
 /**
  * 上の帯のパンくずの手前の段（★V8）。
@@ -156,4 +156,12 @@ export function useSettingsNavInline(enabled = true) {
     setInline(true)
     return () => setInline(false)
   }, [enabled, setInline])
+}
+
+/**
+ * ★V8：設定の住所の画面でも、絵に「設定の中のメニュー」が無い画面だけ外のメニューを出さない（SNS 連携 y3GGTs）。
+ * 枠への知らせ方は useSettingsNavInline と同じ（外に出さない印）。板の中にもメニューは置かない。
+ */
+export function useHideSettingsNav() {
+  useSettingsNavInline(true)
 }

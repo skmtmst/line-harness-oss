@@ -90,6 +90,20 @@
 .colState { width: var(--tpl-wh-col-state); min-width: 0; }
 .colOps { width: var(--tpl-wh-col-ops); }
 
+/* 1152 の4列（絵 AsfFB）。列の頭の位置は絵の x に合わせ、列の間は幅で持つ。 */
+:global([data-theme='v8']) .tableNarrow .headRow[data-table-layout='columns'],
+:global([data-theme='v8']) .tableNarrow .row[data-table-layout='columns'] {
+  gap: 0;
+  padding-inline: var(--tpl-af2-wh-narrow-pad);
+}
+:global([data-theme='v8']) .tableNarrow .row[data-table-layout='columns'] { height: var(--tpl-af2-wh-narrow-row-h); }
+:global([data-theme='v8']) .tableNarrow .headRow[data-table-layout='columns'] > th.colName,
+:global([data-theme='v8']) .tableNarrow .row[data-table-layout='columns'] > td.colName { padding-inline-end: var(--tpl-af2-wh-name-end); }
+:global([data-theme='v8']) .tableNarrow .headRow[data-table-layout='columns'] > th.nameHead { padding-inline-start: var(--tpl-folder-dot-indent); }
+.colMonth { width: var(--tpl-af2-wh-col-month); display: flex; flex-direction: column; gap: var(--tpl-row-sub-gap); }
+.colStateNarrow { width: var(--tpl-af2-wh-col-state); display: flex; align-items: center; }
+.colOpsNarrow { width: var(--tpl-af2-wh-col-ops); }
+
 .colName,
 .colCount,
 .colState {
@@ -127,6 +141,8 @@ a.name:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 ZSbFY の説明の行）。 */
+.nameSub { padding-inline-start: var(--tpl-folder-dot-indent); }
 .cellText {
   display: -webkit-box;
   overflow: hidden;

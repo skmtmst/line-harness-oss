@@ -36,6 +36,7 @@ const notifierMocks = {
 vi.mock('../services/event-booking-notifier.js', () => notifierMocks);
 
 const waitlistMocks = {
+  getMyEventWaitlist: vi.fn(async () => []),
   createEventWaitlistOfferSender: vi.fn(() => vi.fn()),
   enqueueEventWaitlistPromotion: vi.fn(async () => true),
   getEventOccurrenceApplicants: vi.fn(),
