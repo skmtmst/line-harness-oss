@@ -114,8 +114,8 @@ describe('V8 友だち属性 タグの一覧', () => {
 
   it('タブを押すとそのタブの本文に切り替わる', async () => {
     await render(<TagsList fixture={fixture} renderTab={(tab) => <p>本文:{tab}</p>} />)
-    await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '保存した検索' })) })
-    expect(screen.getByText('本文:searches')).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('tab', { name: '友だち情報欄' })) })
+    expect(screen.getByText('本文:fields')).toBeTruthy()
   })
 
   it('連動は絵の書き方（本人+10・1.2倍 他1）', () => {

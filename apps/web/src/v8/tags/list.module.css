@@ -588,3 +588,25 @@
   color: var(--color-ink-secondary);
   font-size: var(--tpl-tg2-safety-body-size);
 }
+
+/* ★V8 保存した検索のタブ（IWnYX）：行61（名前19＋間2＋要約16、上下12）。つまみの列は無い。 */
+.searchRow > td {
+  height: var(--tpl-tg2-search-row-h);
+  padding-block: 0;
+  vertical-align: middle;
+}
+
+.searchColName { width: auto; }
+.searchColCount { width: var(--tpl-tg2-search-col-count); }
+.searchColShare { width: var(--tpl-tg2-search-col-share); }
+.searchColUsage { width: var(--tpl-tg2-search-col-usage); }
+.searchColUpdated { width: var(--tpl-tg2-search-col-updated); }
+.searchColOpen { width: var(--tpl-tg2-search-col-open); }
+
+/* 表の下の段（左右24・上下12、字11）。 */
+.footNote {
+  margin: 0;
+  padding: var(--tpl-tg2-foot-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tg2-safety-body-size);
+}

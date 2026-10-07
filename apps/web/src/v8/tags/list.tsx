@@ -27,6 +27,7 @@ import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import TagsTab from './tags-tab'
 import MarksTab from './marks-tab'
+import SearchesTab from './searches-tab'
 import styles from './list.module.css'
 
 const TABS = [
@@ -87,7 +88,7 @@ export default function TagsList({
   const currentTabBlocked =
     !fixture && !!currentTabFeature && visibility.status === 'ready' && !visibility.enabled(currentTabFeature)
 
-  const boardId = tab === 'marks' ? 'vKDj5' : tab !== 'tags' ? undefined : readOnly ? 'fkGUR' : narrow ? 'aPeD8' : 'I1E7Bt'
+  const boardId = tab === 'marks' ? 'vKDj5' : tab === 'searches' ? 'IWnYX' : tab !== 'tags' ? undefined : readOnly ? 'fkGUR' : narrow ? 'aPeD8' : 'I1E7Bt'
 
   /* 見出しの右はタブごとの作る口。 */
   const actions = currentTabBlocked ? null : tab === 'tags' ? (
@@ -101,7 +102,7 @@ export default function TagsList({
       <Button href="/tags/marks/new" variant="primary"><Plus size={15} aria-hidden="true" />マークを作る</Button>
     ) : null
   ) : tab === 'searches' ? (
-    <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button>
+    <Button href="/friends" variant="primary"><Plus size={15} aria-hidden="true" />友だち一覧で条件を作る</Button>
   ) : null
 
   return (
@@ -147,6 +148,8 @@ export default function TagsList({
         />
       ) : tab === 'marks' ? (
         <MarksTab accountId={accountId} canEdit={canEdit} />
+      ) : tab === 'searches' ? (
+        <SearchesTab accountId={accountId} canEdit={canEdit} />
       ) : (
         <div className={styles.otherTab}>{renderTab?.(tab, { accountId, canEdit })}</div>
       )}
