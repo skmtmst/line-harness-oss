@@ -73,53 +73,53 @@ chatMessages.get('/api/chats/:friendId/messages/search', async (c) => {
     offset < 0
   )
     return c.json({ success: false, error: 'invalid_search' }, 400);
-  const hits: ConversationSearchHit[] = [];
-  let total = 0,
-    previous: Row | null = null,
-    cursor: ConversationCursor | null = null,
-    pending: ConversationSearchHit | null = null;
-  // D1にはNFKCがないため、安定した順序で500件ずつ読み、JSで表記をそろえて数える。LIMITによる件数の取りこぼしをしない。
+  // 既存の会話も初回だけ正規化。以後は新規・本文変更分だけ（トリガーが無効化）。
+  // 読んだ本文が変わっていたら更新しない。取消済み・テスト送信は保存もしない。
   for (;;) {
-    const args: unknown[] = [friend];
-    if (cursor) args.push(cursor.at, cursor.at, cursor.id);
-    const rows = (
+    const pending = (
       await c.env.DB.prepare(
-        `SELECT ${select} FROM messages_log WHERE friend_id=? AND ${visible} ${cursor ? 'AND (COALESCE(line_event_at,created_at)>? OR (COALESCE(line_event_at,created_at)=? AND id>?))' : ''} ORDER BY at,id LIMIT 500`,
-      )
-        .bind(...args)
-        .all<Row>()
+        `SELECT id,content FROM messages_log WHERE friend_id=? AND search_content IS NULL AND unsent_at IS NULL AND ${visible} ORDER BY id LIMIT 500`,
+      ).bind(friend).all<{ id: string; content: string }>()
     ).results;
-    if (!rows.length) break;
-    for (const row of rows) {
-      if (pending) {
-        pending.after = { id: row.id, excerpt: excerpt(row.content) };
-        pending = null;
-      }
-      if (
-        !row.unsent_at &&
-        normalizeConversationSearch(row.content).includes(needle)
-      ) {
-        if (total >= offset && hits.length < limit) {
-          const hit: ConversationSearchHit = {
-            id: row.id,
-            at: row.at,
-            excerpt: excerpt(row.content, needle),
-            before: previous
-              ? { id: previous.id, excerpt: excerpt(previous.content) }
-              : null,
-            after: null,
-            cursor: point(row),
-          };
-          hits.push(hit);
-          pending = hit;
-        }
-        total++;
-      }
-      previous = row;
-    }
-    cursor = point(rows[rows.length - 1]!);
-    if (rows.length < 500) break;
+    if (!pending.length) break;
+    const normalized = pending.map(r => ({
+      id: r.id, source: r.content, text: normalizeConversationSearch(r.content),
+    }));
+    await c.env.DB.prepare(
+      `WITH normalized AS MATERIALIZED (SELECT json_extract(value,'$.id') id,json_extract(value,'$.source') source,json_extract(value,'$.text') text FROM json_each(?))
+      UPDATE messages_log SET search_content=n.text FROM normalized n
+      WHERE messages_log.id=n.id AND friend_id=? AND search_content IS NULL AND unsent_at IS NULL AND ${visible}
+      AND messages_log.content=n.source`,
+    ).bind(JSON.stringify(normalized), friend).run();
   }
+  const filter = `friend_id=? AND ${visible} AND unsent_at IS NULL AND INSTR(search_content,?)>0`;
+  const total = (await c.env.DB.prepare(
+    `SELECT COUNT(*) total FROM messages_log WHERE ${filter}`,
+  ).bind(friend, needle).first<{ total: number }>())!.total;
+  // 検索結果だけを取り出し、前後は位置の索引からそれぞれ1件。本文の全件読み出しはしない。
+  const neighbour = (after: boolean) => {
+    const op = after ? '>' : '<', order = after ? 'ASC' : 'DESC';
+    return `(SELECT json_object('id',n.id,'content',CASE WHEN n.unsent_at IS NULL THEN n.content ELSE '' END)
+      FROM messages_log n WHERE n.friend_id=m.friend_id AND (n.delivery_type IS NULL OR n.delivery_type!='test')
+      AND (COALESCE(n.line_event_at,n.created_at),n.id) ${op} (m.at,m.id)
+      ORDER BY COALESCE(n.line_event_at,n.created_at) ${order},n.id ${order} LIMIT 1)`;
+  };
+  const rows = (
+    await c.env.DB.prepare(
+      `WITH page AS (SELECT ${select},friend_id FROM messages_log WHERE ${filter} ORDER BY at,id LIMIT ? OFFSET ?)
+      SELECT m.*,${neighbour(false)} before_json,${neighbour(true)} after_json FROM page m ORDER BY m.at,m.id`,
+    ).bind(friend, needle, limit, offset)
+      .all<Row & { before_json: string | null; after_json: string | null }>()
+  ).results;
+  const context = (json: string | null) => {
+    if (!json) return null;
+    const r = JSON.parse(json) as { id: string; content: string };
+    return { id: r.id, excerpt: excerpt(r.content) };
+  };
+  const hits: ConversationSearchHit[] = rows.map(row => ({
+    id: row.id, at: row.at, excerpt: excerpt(row.content, needle),
+    before: context(row.before_json), after: context(row.after_json), cursor: point(row),
+  }));
   return c.json({
     success: true,
     data: {

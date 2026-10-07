@@ -4300,7 +4300,7 @@ CREATE TABLE messages_log (
   sent_by_staff_id TEXT,
   line_event_at    TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT);
+, origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT, search_content TEXT);
 
 CREATE TABLE mileage_adjustment_approval_events (
   id              TEXT PRIMARY KEY,
@@ -9192,6 +9192,8 @@ CREATE INDEX idx_menus_account_sort ON menus (line_account_id, sort_order);
 
 CREATE INDEX idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);
 
+CREATE INDEX idx_messages_conversation_position ON messages_log(friend_id,COALESCE(line_event_at,created_at),id) WHERE delivery_type IS NULL OR delivery_type!='test';
+
 CREATE INDEX idx_messages_log_broadcast_friend_direction
   ON messages_log (broadcast_id, friend_id, direction);
 
@@ -9223,6 +9225,8 @@ CREATE INDEX idx_messages_log_quoted
 CREATE INDEX idx_messages_log_version_step
   ON messages_log (friend_id, scenario_version_step_id)
   WHERE scenario_version_step_id IS NOT NULL;
+
+CREATE INDEX idx_messages_search_pending ON messages_log(friend_id,id) WHERE search_content IS NULL AND unsent_at IS NULL AND (delivery_type IS NULL OR delivery_type!='test');
 
 CREATE INDEX idx_mileage_adj_approval_account
   ON mileage_adjustment_approval_requests (line_account_id, status, created_at DESC);
@@ -10383,6 +10387,10 @@ WHEN NOT EXISTS (
     AND archived_at IS NULL
 )
 BEGIN SELECT RAISE(ABORT, 'ACCOUNT_TAG_SCOPE_INVALID'); END;
+
+CREATE TRIGGER messages_search_invalidate AFTER UPDATE OF content,unsent_at,delivery_type ON messages_log
+WHEN OLD.content IS NOT NEW.content OR OLD.unsent_at IS NOT NEW.unsent_at OR OLD.delivery_type IS NOT NEW.delivery_type
+BEGIN UPDATE messages_log SET search_content=NULL WHERE id=NEW.id; END;
 
 CREATE TRIGGER outgoing_webhook_config_version
 AFTER UPDATE OF name, url, event_types, secret, secret_encrypted, is_active, max_retries, deleted_at
