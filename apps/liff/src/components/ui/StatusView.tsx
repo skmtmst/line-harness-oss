@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import Icon, { type IconName } from './Icon.js';
 import Button from './Button.js';
 
@@ -7,6 +8,8 @@ import Button from './Button.js';
  * 印は success だけ緑の丸。それ以外は灰色の線の印をそのまま置く
  * (ADutg・zz9R3 と同じ形)。ウェビナーの暗い地では dark を渡す。
  * 待ち (キャンセル待ち・承認待ち) は tone="wait" で黄土色の丸にする。
+ * large は ★V8 の終わり・お知らせの板 (aNZKe・BjcuB・qVdiX) の形：
+ * 丸・題 (20)・本文 (13/21) の間をすべて 16 空け、children を本文の下に足す。
  */
 export default function StatusView({
   icon,
@@ -15,6 +18,8 @@ export default function StatusView({
   title,
   body,
   action,
+  large = false,
+  children,
 }: {
   icon: IconName;
   tone?: 'neutral' | 'success' | 'wait';
@@ -22,6 +27,8 @@ export default function StatusView({
   title: string;
   body?: string;
   action?: { label: string; onClick: () => void };
+  large?: boolean;
+  children?: ReactNode;
 }) {
   const mark =
     tone === 'success' ? (
@@ -29,20 +36,30 @@ export default function StatusView({
         className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-soft text-liff-primary"
         aria-hidden="true"
       >
-        <Icon name={icon} className="h-9 w-9" />
+        <Icon name={icon} className={large && icon !== 'check' ? 'h-[34px] w-[34px]' : 'h-9 w-9'} />
       </span>
     ) : tone === 'wait' ? (
       <span
         className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-wait-bg text-liff-wait-ink"
         aria-hidden="true"
       >
-        <Icon name={icon} className="h-8 w-8" />
+        <Icon name={icon} className={large ? 'h-[34px] w-[34px]' : 'h-8 w-8'} />
       </span>
     ) : (
       <span className={dark ? 'text-night-faint' : 'text-liff-idle'} aria-hidden="true">
         <Icon name={icon} className="h-10 w-10" />
       </span>
     );
+  if (large) {
+    return (
+      <div className="flex w-full flex-col items-center gap-4 text-center">
+        {mark}
+        <p className={`w-full text-xl font-bold ${dark ? 'text-canvas' : 'text-ink'}`}>{title}</p>
+        {body && <BodyText text={body} dark={dark} large />}
+        {children}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col items-center px-6 py-10 text-center">
       {mark}
@@ -59,11 +76,11 @@ export default function StatusView({
   );
 }
 
-function BodyText({ text, dark = false }: { text: string; dark?: boolean }) {
+function BodyText({ text, dark = false, large = false }: { text: string; dark?: boolean; large?: boolean }) {
   const lines = text.split('\n');
   return (
     <p
-      className={`mt-2 text-[13px] leading-6 text-pretty ${dark ? 'text-night-faint' : 'text-liff-sub'}`}
+      className={`text-[13px] text-pretty ${large ? 'w-full leading-[21px]' : 'mt-2 leading-6'} ${dark ? 'text-night-faint' : 'text-liff-sub'}`}
     >
       {lines.map((line, i) => (
         <span key={i}>

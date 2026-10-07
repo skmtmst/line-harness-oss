@@ -53,6 +53,8 @@ vi.mock('@/lib/api', () => {
         testSend: vi.fn(),
       },
       accountSettings: { getTestRecipients: vi.fn() },
+      // ★V8 の画面は役割（/api/staff/me）で変える操作を出し分ける。
+      staff: { me: vi.fn(async () => ({ success: true, data: { role: 'owner' } })) },
       lineNotifications: {
         operatorRules: { list: fixture.operatorList },
         definitions: fixture.definitions,
@@ -81,6 +83,8 @@ beforeEach(() => {
     data: { quota: { state: 'available', total: 500, used: 10, remaining: 490, asOf: '2026-09-15T00:00:00Z' } },
   })
   vi.stubGlobal('React', React)
+  // ★V8 の画面は白い板の中に「設定の中のメニュー」を置き、手元の役割（localStorage）を読む。
+  vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
 })
 
 afterEach(() => {

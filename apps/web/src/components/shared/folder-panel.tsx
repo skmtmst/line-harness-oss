@@ -165,6 +165,7 @@ export default function FolderPanel({
               className={`${styles.row} group relative flex items-center`}
               data-active={isActive || undefined}
               data-menu-open={openMenuId === row.id || undefined}
+              data-has-actions={hasActions || undefined}
             >
               <button
                 type="button"
@@ -215,7 +216,7 @@ export default function FolderPanel({
                 <div className={styles.menuSlot} aria-hidden="true" />
               ) : null}
               {hasActions && (
-                <div className={`${styles.menu} relative shrink-0`}>
+                <div className={`${styles.menu} v7:relative shrink-0`}>
                   <button
                     type="button"
                     data-qa-open={row.qaOpen}

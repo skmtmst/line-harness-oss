@@ -1,0 +1,174 @@
+/* ★V8 ウェビナーの編集の頭（uNsEy・z2dgw・Omqd4）と作る手順の帯（j7PP04・VWNaA ほか）。 */
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-wc-back-gap);
+  width: fit-content;
+  color: var(--tpl-identity-color);
+  font-size: var(--text-label);
+  font-weight: var(--tpl-identity-weight);
+  line-height: var(--tpl-identity-lh);
+  text-decoration: none;
+}
+.back:hover { text-decoration: underline; }
+
+/* 板の頭：上20・横24・下12。戻る・題・説明は縦に4ずつ。操作は右で縦の真ん中。 */
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wc-head-gap);
+  padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom);
+}
+.headText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-head-gap);
+  min-width: 0;
+}
+.title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-title-size);
+  font-weight: var(--tpl-title-weight);
+  line-height: var(--tpl-title-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subtitle {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-desc-size);
+  line-height: var(--tpl-desc-lh);
+}
+.headActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--tpl-wc-head-gap);
+}
+
+/* タブ：横24の中で下に1pxの線。字 13/19・字の下10・選んだタブは墨の2px。 */
+.tabsRow {
+  padding: 0 var(--tpl-head-pad-side);
+}
+.tabs {
+  display: flex;
+  gap: var(--tpl-wc-tab-gap);
+  border-bottom: 1px solid var(--color-hairline);
+}
+.tab {
+  min-height: 0;
+  margin-bottom: -1px;
+  padding: 0 0 var(--tpl-wc-tab-pad-bottom);
+  border: 0;
+  border-bottom: var(--tpl-wc-tab-line) solid transparent;
+  background: none;
+  color: var(--color-ink-secondary);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-wc-tab-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tab:hover { color: var(--color-ink); }
+.tab[data-selected] {
+  border-bottom-color: var(--color-ink);
+  color: var(--color-ink);
+  font-weight: 600;
+  cursor: default;
+}
+.tab:focus-visible {
+  outline: var(--tpl-wc-tab-line) solid var(--color-status-info);
+  outline-offset: var(--tpl-wc-tab-line);
+}
+
+/* 作る手順の帯：丸20・丸と字の間6・線24（高さ2）・間8・字 13/19（j7PP04）。 */
+.stepper {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.stepList {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-steps-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stepItem {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-steps-gap);
+}
+.stepLine {
+  width: var(--tpl-wc-step-line-w);
+  height: var(--tpl-wc-step-line-h);
+  background: var(--color-hairline);
+}
+.stepLine[data-done] { background: var(--color-accent-deep); }
+.stepButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-steps-dot-gap);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.stepButton[aria-current] { cursor: default; }
+.stepDot {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-steps-dot);
+  height: var(--tpl-steps-dot);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-wc-step-no-size);
+  font-weight: 600;
+  line-height: 1;
+}
+.stepDot[data-state='current'] {
+  border: var(--tpl-wc-tab-line) solid var(--color-accent-deep);
+  color: var(--color-accent-deep);
+}
+.stepDot[data-state='done'] {
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+}
+.stepLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-wc-tab-lh);
+  white-space: nowrap;
+}
+.stepLabel[data-state='current'] {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+.stepLabel[data-state='done'] { color: var(--color-ink); }
+
+/* 型（作る型）の手順の帯の決まり（字 12/17）より強く、この絵の字 13/19 を当てる。 */
+:global([data-theme='v8']) .stepper .stepList .stepItem > .stepButton > .stepLabel {
+  font-size: var(--text-label);
+  line-height: var(--tpl-wc-tab-lh);
+}
+:global([data-theme='v8']) .stepper .stepList .stepItem > .stepButton > .stepDot {
+  width: var(--tpl-steps-dot);
+  height: var(--tpl-steps-dot);
+  font-size: var(--tpl-wc-step-no-size);
+}

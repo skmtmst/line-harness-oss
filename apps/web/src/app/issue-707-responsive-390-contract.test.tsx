@@ -20,8 +20,9 @@ import { fireEvent } from '@testing-library/react'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SRC = join(HERE, '..')
 const NEN_OVERVIEW = readFileSync(join(HERE, 'nen-campaigns', 'nen-overview.tsx'), 'utf8')
-const SETTINGS_PAGE_SRC = readFileSync(join(HERE, 'settings', 'page.tsx'), 'utf8')
-const SETTINGS_CSS = readFileSync(join(HERE, 'settings', 'settings-v8.module.css'), 'utf8')
+// ★V8：入口（settings/page.tsx）は src/v8/settings/features の画面を出す。読み先をその画面へ向ける。
+const SETTINGS_PAGE_SRC = readFileSync(join(HERE, '..', 'v8', 'settings', 'features', 'screen.tsx'), 'utf8')
+const SETTINGS_CSS = readFileSync(join(HERE, '..', 'v8', 'settings', 'features', 'screen.module.css'), 'utf8')
 const BOOKING_MENUS_SRC = readFileSync(join(HERE, 'booking', 'menus', 'page.tsx'), 'utf8')
 const SCROLLABLE_TABS_SRC = readFileSync(join(SRC, 'components', 'layout', 'scrollable-tabs.tsx'), 'utf8')
 const DATA_TABLE_CSS = readFileSync(join(SRC, 'components', 'shared', 'data-table.module.css'), 'utf8')
@@ -148,7 +149,8 @@ describe('32: 狭幅で1列へ落ち、スイッチが域内に残る', () => {
     // 切替スイッチは狭幅でも描かれ、押せる状態で残る。
     const switches = [...host.querySelectorAll('[role="switch"]')]
     expect(switches.length).toBeGreaterThan(0)
-    expect(host.textContent).toContain('まとめて切替')
+    // ★V8 ywFJT の言い方は「まとめて」（読み上げ名は「〇〇をまとめてオン／オフにする」）。
+    expect(host.textContent).toContain('まとめて')
   })
 })
 

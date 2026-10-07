@@ -20,7 +20,7 @@ export interface TopBarProps {
    * URLは Masato 確定待ちで、いまは `manual-links.ts` が全部空。
    * 空のまま Link にすると `/` へ飛んでしまい、開いた人が画面を見失う。
    * 押せない札を「準備中」の吹き出し付きで置くのもやめた。出す＝使える
-   * （`docs/v6-common-rules.md` §5-5、§7-10）。
+   * （`docs/v8-design-rules.md` §5）。
    */
   manualHref?: string | null
   accounts: TopBarAccount[]

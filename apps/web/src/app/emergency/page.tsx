@@ -3,6 +3,7 @@
 import '@/app/notifications/readonly-v8.css'
 import ReadonlyHeaderV8 from '@/app/notifications/readonly-header-v8'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import EmergencyScreen from '@/v8/settings/emergency/screen'
 
 import { X } from 'lucide-react'
 import Select from '@/components/shared/select'
@@ -1613,8 +1614,20 @@ function EmergencyPageInner() {
             : <EmergencyControlPanel accounts={accounts} />)}{tab === 'history' && <HistoryPanel />}</div>
 }
 
+/* ★V8：見た目が v8 のときだけ新しい画面（src/v8/settings/emergency）。更新履歴・緊急コントロールは今の部品を差し込む。 */
+function EmergencyEntry() {
+  const theme = useAdminTheme()
+  if (theme !== 'v8') return <EmergencyPageInner />
+  return (
+    <EmergencyScreen
+      renderHistory={() => <HistoryPanel />}
+      renderControl={(accounts, controlRef) => <EmergencyControlV8 ref={controlRef} accounts={accounts} />}
+    />
+  )
+}
+
 function EmergencyPage() {
-  return <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}><EmergencyPageInner /></Suspense>
+  return <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}><EmergencyEntry /></Suspense>
 }
 
 EmergencyPage.__test = {

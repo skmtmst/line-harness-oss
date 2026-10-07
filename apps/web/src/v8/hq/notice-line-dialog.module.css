@@ -1,0 +1,95 @@
+/*
+ * ★V8 運営の LINE を登録する窓（Pencil `D6fh3`：幅560・余白24・間14）。
+ * 窓の枠・頭は共通の Dialog。頭の寸法は dialog-head.module.css。
+ * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
+ */
+
+.faint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
+.icon { width: var(--tpl-hq-check); height: var(--tpl-hq-check); }
+
+.qrRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-hq-plans-gap);
+}
+
+.qrBox {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--tpl-hq-qr-box);
+  height: var(--tpl-hq-qr-box);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-table-head);
+}
+
+.qr {
+  width: var(--tpl-hq-qr);
+  height: var(--tpl-hq-qr);
+}
+
+.qrText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-hq-plan-head-gap);
+  min-width: 0;
+  flex: 1;
+}
+
+.lead {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-lead-lh);
+}
+
+.codePanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hq-plan-head-gap);
+  padding: var(--tpl-hq-code-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+}
+
+.codeLead {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-hq-cell-lh);
+}
+
+.digits {
+  display: flex;
+  justify-content: center;
+  gap: var(--tpl-hq-feature-gap);
+  margin: 0;
+}
+
+.digit {
+  display: grid;
+  place-items: center;
+  width: var(--tpl-hq-digit-w);
+  height: var(--tpl-hq-digit-h);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
+  font-size: var(--text-metric);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.linked { margin: 0; color: var(--color-accent-deep); font-size: var(--text-caption); }
+
+.note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-hq-small-lh);
+}

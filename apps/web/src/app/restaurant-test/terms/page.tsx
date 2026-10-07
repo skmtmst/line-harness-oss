@@ -4,8 +4,11 @@ import Link from 'next/link'
 import TermsDocumentContent from '@/components/legal/terms-document'
 import { TERMS_IS_DRAFT } from '@/content/terms/musubo-terms'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import TermsV8 from '@/v8/restaurant/terms/terms'
 
-export default function RestaurantTermsPage() {
+/** v7 の利用規約（V8 は src/v8/restaurant/terms）。 */
+function RestaurantTermsPageV7() {
   usePageTitle('利用規約')
 
   return <div data-design-node="VdKOK">
@@ -19,4 +22,10 @@ export default function RestaurantTermsPage() {
       <TermsDocumentContent />
     </div>
   </div>
+}
+
+/* ★V8 切替（板 `VdKOK`）。v7 の見た目は data-theme="v8" が付くまで変えない。 */
+export default function RestaurantTermsPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <TermsV8 /> : <RestaurantTermsPageV7 />
 }

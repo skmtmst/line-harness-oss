@@ -1,0 +1,76 @@
+@layer properties, theme, base, components, utilities; /* layer-order: V8 移行後に消す */
+@layer components {
+/*
+ * 保存がぶつかったとき（409）の帯と、比べる窓の中身（共通）。
+ * 見た目は回答フォームの編集（J1pdB）の帯をそのまま共通にしたもの。
+ * リマインダの編集（k32cn）も同じ絵。値は globals.css の --save-conflict-*。
+ */
+.band {
+  display: flex;
+  align-items: center;
+  gap: var(--save-conflict-gap);
+  padding: var(--save-conflict-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-warn-soft);
+  box-shadow: var(--save-conflict-ring);
+}
+
+.icon {
+  flex: none;
+  width: var(--save-conflict-icon);
+  height: var(--save-conflict-icon);
+  color: var(--color-warning);
+}
+
+.text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--save-conflict-head-gap);
+}
+
+.title {
+  color: var(--color-ink);
+  font-size: var(--save-conflict-title-size);
+  font-weight: 600;
+  line-height: var(--save-conflict-title-lh);
+}
+
+.desc {
+  color: var(--color-ink-secondary);
+  font-size: var(--save-conflict-desc-size);
+  line-height: var(--save-conflict-desc-lh);
+}
+
+.buttonIcon {
+  flex: none;
+  width: var(--save-conflict-button-icon);
+  height: var(--save-conflict-button-icon);
+}
+
+/* 比べる窓の中身。違いの行を薄い地にまとめる。 */
+.changes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--save-conflict-change-gap);
+  padding: var(--save-conflict-changes-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-pearl);
+}
+
+.changeLine {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--save-conflict-change-size);
+  line-height: var(--save-conflict-change-lh);
+}
+
+.changeLine[data-kind='add'] {
+  color: var(--color-accent-deep);
+}
+
+.changeLine[data-kind='remove'] {
+  color: var(--color-danger);
+}
+}

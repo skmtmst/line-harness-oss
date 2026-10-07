@@ -21,10 +21,10 @@ import {
   addDays,
   formatWeekday,
   jstStartsAtIso,
+  formatJstEventAt,
   jstToday,
   utcToJstHm,
   utcToJstMd,
-  utcToJstWeekday,
 } from '../lib/datetime.js';
 import {
   conflictMessage,
@@ -79,7 +79,7 @@ function initialAnswers(layout: FormLayout): Answers {
  */
 function RequiredMark() {
   return (
-    <span className="ml-1.5 rounded bg-liff-required-bg px-1.5 py-px text-[10px] font-bold whitespace-nowrap text-liff-sun">
+    <span className="rounded bg-liff-required-bg px-1.5 py-px text-[10px] font-bold whitespace-nowrap text-liff-sun">
       必須
     </span>
   );
@@ -387,6 +387,8 @@ export default function Form() {
    */
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingRetrying, setBookingRetrying] = useState(false);
+  /** 確保できた予約 (終わりの画面の一文「次回のご予約（10月14日 13:00）は…」に使う)。 */
+  const [booked, setBooked] = useState<Array<{ startsAt: string; status: string }>>([]);
 
   const submitErrorText = (err: unknown): string => {
     const status = (err as { status?: number }).status;
@@ -408,13 +410,17 @@ export default function Form() {
     const targets = collectInputs(layout)
       .map((block) => ({ block, picked: normalizeBookingValue(answers[block.name]) }))
       .filter((t) => t.block.type === 'booking' && t.picked !== null);
+    const made: Array<{ startsAt: string; status: string }> = [];
+    setBooked([]);
     for (const { block, picked } of targets) {
       const slot = picked as { menuId: string; staffId: string; startsAt: string };
       try {
-        await api.createRequest(
+        const res = await api.createRequest(
           { menu_id: slot.menuId, staff_id: slot.staffId, starts_at: slot.startsAt },
           `${key}:booking:${block.id}`,
         );
+        made.push({ startsAt: slot.startsAt, status: res?.status ?? 'requested' });
+        setBooked([...made]);
       } catch (err) {
         logFailure('form-booking-request', err);
         const code = (err as { body?: { error?: string } }).body?.error;
@@ -530,14 +536,14 @@ export default function Form() {
   const theme = normalizeFormTheme(options.theme);
   /**
    * デザイン設定でフォームの色を決めているときだけ true。
-   * 決めていなければ殻 (bg-ground) の灰色のままにし、既定の薄緑は付けない。
+   * 決めていなければ ★V8 (B8rCt) の白い地のままにし、既定の薄緑は付けない。
    */
   const hasCustomTheme = options.theme !== undefined && options.theme !== null;
 
   // P（試し回答）：試し合言葉があるときは、受付停止の下書きでも試せる。
   if (!form.isActive && !testToken) {
     return (
-      <div className="min-h-screen bg-ground">
+      <div className="min-h-screen bg-canvas">
         <LiffHeader title={options.pageTitle || form.name} />
         <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
           <StatusView icon="calendar" title="このフォームは、いま回答を受け付けていません。" />
@@ -547,16 +553,33 @@ export default function Form() {
   }
 
   if (done) {
+    // ★V8 (aNZKe)：お礼を題に、予約を入れたときはその日時と次の動きを本文に出す。
+    const bookingNote = booked
+      .map((b) => {
+        const [m, d] = utcToJstMd(b.startsAt).split('/');
+        const when = `${m}月${d}日 ${utcToJstHm(b.startsAt)}`;
+        return b.status === 'confirmed'
+          ? `次回のご予約（${when}）が決まりました。`
+          : `次回のご予約（${when}）はお店の確認待ちです。決まったらLINEでお知らせします。`;
+      })
+      .join('\n');
     return (
-      <div className="min-h-screen bg-ground" data-design-node="aNZKe">
+      <div className="min-h-screen bg-canvas" data-design-node="aNZKe">
         <LiffHeader title={options.pageTitle || form.name} />
-        <div className="mx-auto max-w-md pb-28" style={{ backgroundColor: theme.sub }}>
-          <StatusView
-            icon="check"
-            tone="success"
-            title="送信しました"
-            body={layout.options?.thanksText || 'ご回答ありがとうございました。'}
-          />
+        <div
+          className="mx-auto max-w-md pb-[90px]"
+          style={{ backgroundColor: hasCustomTheme ? theme.sub : undefined }}
+        >
+          {/* 上の帯と下の帯の間の真ん中に置く (送信しました)。 */}
+          <div className="flex min-h-[calc(100dvh-var(--liff-header-h)-1px-90px)] flex-col items-center justify-center px-6">
+            <StatusView
+              icon="check"
+              tone="success"
+              large
+              title={layout.options?.thanksText || 'ご回答ありがとうございました'}
+              body={bookingNote || undefined}
+            />
+          </div>
           {testToken ? (
             <p className="px-6 pb-8 text-center text-xs text-ink-faint">
               試しの回答のため、集計には入りません。
@@ -602,75 +625,92 @@ export default function Form() {
   const radius = theme.cornerRadius === 'none' ? '0' : theme.cornerRadius === 'round' ? '1rem' : '0.5rem';
 
   const pageTitle = options.pageTitle || form.name;
+  /**
+   * ★V8 (B8rCt・g9osGN)：1ページ目はフォームの題と説明、2ページ目からは
+   * そのページ (セクション) の名前を題にする。
+   */
+  const firstPage = sectionIndex === 0;
+  const heading = firstPage || !section?.name ? pageTitle : section.name;
+  /**
+   * ページの先頭に並ぶ画像は、題の上の表紙として出す (★V8 B8rCt の「画像」)。
+   * 共通ヘッダは今までどおり題の下・ページの中身の前に出す。
+   */
+  const pageBlocks = section?.blocks ?? [];
+  let coverCount = 0;
+  while (coverCount < pageBlocks.length && pageBlocks[coverCount].kind === 'image') coverCount += 1;
+  const covers = pageBlocks.slice(0, coverCount);
+  const bodyBlocks = [...layout.header, ...pageBlocks.slice(coverCount)];
+  const blockView = (block: FormBlock, cover = false) => (
+    <BlockView
+      key={block.id}
+      block={block}
+      cover={cover}
+      answers={answers}
+      onChange={setValue}
+      onToggle={toggleCheckbox}
+      onUpload={uploadFile}
+      uploading={!!uploading[block.kind === 'input' ? block.name : '']}
+      error={block.kind === 'input' ? (fieldErrors[block.name] ?? null) : null}
+      errorColor={theme.error}
+    />
+  );
 
   return (
-    <div className="min-h-screen bg-ground" data-design-node={wide ? 'wPfqW' : 'B8rCt'}>
+    <div className="min-h-screen bg-canvas" data-design-node={wide ? 'wPfqW' : 'B8rCt'}>
       <LiffHeader title={pageTitle} />
       <div
-        className="mx-auto min-h-screen w-full max-w-md px-4 pt-3 pb-28"
+        className="mx-auto min-h-screen w-full max-w-md pb-28"
         style={{
           color: theme.text,
           backgroundColor: hasCustomTheme ? theme.sub : undefined,
           backgroundImage: theme.backgroundImageUrl ? `url(${theme.backgroundImageUrl})` : undefined,
           backgroundPosition: 'center',
           backgroundSize: 'cover',
-          fontFamily: theme.fontFamily === 'serif' ? 'serif' : 'sans-serif',
+          // 明朝を選んだときだけ書体を替える。ふつうは LIFF の書体 (Noto Sans JP) のまま。
+          fontFamily: theme.fontFamily === 'serif' ? 'serif' : undefined,
         }}
       >
         {multi && options.sectionHeader !== 'none' && (
-          <div className="mb-3">
+          <div className="px-4 pt-3">
             <div className="flex gap-1" aria-hidden="true">
               {layout.sections.map((s, i) => (
                 <span
                   key={s.id}
-                  className={`h-1 flex-1 rounded-full ${i <= sectionIndex ? 'bg-liff-primary' : 'bg-liff-line'}`}
+                  className={`h-1 flex-1 rounded-xs ${i <= sectionIndex ? 'bg-liff-primary' : 'bg-liff-line'}`}
                 />
               ))}
             </div>
-            <p className="mt-1.5 text-[10px] text-liff-sub tabular-nums">
+            <p className="mt-1.5 text-[10px] text-liff-sub">
               {options.sectionHeader === 'name'
                 ? layout.sections[sectionIndex]?.name
-                : `${sectionIndex + 1} / ${layout.sections.length}ページ`}
+                : `${sectionIndex + 1} / ${layout.sections.length} ページ`}
             </p>
           </div>
         )}
-        {testToken ? (
-          <p className="mb-3 rounded-lg border border-hairline bg-canvas px-3 py-2 text-center text-xs text-ink-faint">
-            試し回答中です。この回答は集計に入りません。
-          </p>
-        ) : null}
-        <div>
-          <h1 className="text-xl font-bold text-ink">{pageTitle}</h1>
-          {form.description && (
-            <p className="mt-1 text-xs leading-relaxed whitespace-pre-wrap text-liff-sub">
+        <div className="flex flex-col gap-3.5 p-4">
+          {testToken ? (
+            <p className="rounded-lg border border-hairline bg-canvas px-3 py-2 text-center text-xs text-ink-faint">
+              試し回答中です。この回答は集計に入りません。
+            </p>
+          ) : null}
+          {covers.map((block) => blockView(block, true))}
+          <h1 className="text-xl font-bold text-ink">{heading}</h1>
+          {firstPage && form.description && (
+            <p className="text-xs leading-[18px] whitespace-pre-wrap text-liff-sub">
               {form.description}
             </p>
           )}
 
-          <div className="mt-4 space-y-5">
-            {[...layout.header, ...(section?.blocks ?? [])].map((block) => (
-              <BlockView
-                key={block.id}
-                block={block}
-                answers={answers}
-                onChange={setValue}
-                onToggle={toggleCheckbox}
-                onUpload={uploadFile}
-                uploading={!!uploading[block.kind === 'input' ? block.name : '']}
-                error={block.kind === 'input' ? (fieldErrors[block.name] ?? null) : null}
-                errorColor={theme.error}
-              />
-            ))}
-          </div>
+          {bodyBlocks.map((block) => blockView(block))}
 
           {error && (
-            <p className="mt-4 rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-bold text-danger">
+            <p className="rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-bold text-danger">
               {error}
             </p>
           )}
 
           {conflict && (
-            <div className="mt-2">
+            <div>
               <Button variant="secondary" onClick={resendWithFreshKey} disabled={sending}>
                 {conflict.code === 'idempotency_expired' ? 'もう一度送る' : '別の回答として送り直す'}
               </Button>
@@ -1050,13 +1090,15 @@ export function BookingSlotPicker({
     return <p className="text-sm text-ink-secondary">空き枠を読めませんでした。時間をおいて開き直してください。</p>;
   }
 
-  const dates = Object.keys(byDate).sort().filter((d) => byDate[d].some((t) => t.open));
+  // ★V8 (g9osGN)：枠のある日はすべて並べ、空きの無い日は灰色で押せなくする。
+  const dates = Object.keys(byDate).sort();
+  const hasOpen = (d: string) => byDate[d].some((t) => t.open);
   const daySlots = (selectedDate && byDate[selectedDate]) || [];
 
   return (
-    <div className="space-y-2.5" data-design-node="g9osGN">
+    <div className="flex flex-col gap-2" data-design-node="g9osGN">
       {menu && (
-        <p className="text-sm font-bold text-ink">
+        <p className="text-xs leading-[18px] text-liff-sub">
           {menu.name}・{menu.duration_minutes}分
         </p>
       )}
@@ -1083,25 +1125,41 @@ export function BookingSlotPicker({
           ))}
         </div>
       )}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {dates.map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => setSelectedDate(d)}
-            aria-pressed={selectedDate === d}
-            className={`flex min-h-14 w-14 shrink-0 flex-col items-center justify-center rounded-[10px] border text-sm ${
-              selectedDate === d
-                ? 'border-liff-primary bg-liff-soft font-bold text-ink'
-                : 'border-liff-line-strong bg-canvas text-ink'
-            }`}
-          >
-            <span className="text-xs text-ink-faint">{formatWeekday(d)}</span>
-            <span>{Number(d.slice(8, 10))}</span>
-          </button>
-        ))}
-      </div>
-      {dates.length === 0 && (
+      {dates.length > 0 && (
+        <div className="grid grid-cols-5 gap-[5px]" role="group" aria-label="日付">
+          {dates.map((d) => {
+            const open = hasOpen(d);
+            const active = selectedDate === d;
+            return (
+              <button
+                key={d}
+                type="button"
+                disabled={!open}
+                onClick={() => setSelectedDate(d)}
+                aria-pressed={active}
+                aria-label={`${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日${open ? '' : ' 空きなし'}`}
+                className={`flex flex-col items-center gap-0.5 rounded-[10px] py-2 -outline-offset-1 ${
+                  active
+                    ? 'bg-liff-soft outline-2 outline-liff-primary'
+                    : open
+                      ? 'bg-canvas outline-1 outline-liff-line'
+                      : 'bg-liff-off-bg outline-1 outline-liff-line'
+                }`}
+              >
+                <span className="text-[10px] text-liff-sub">{formatWeekday(d)}</span>
+                <span
+                  className={`liff-num text-base font-bold ${
+                    active ? 'text-liff-primary' : open ? 'text-ink' : 'text-liff-off-ink'
+                  }`}
+                >
+                  {Number(d.slice(8, 10))}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {!dates.some(hasOpen) && (
         <p className="text-sm text-ink-secondary">選べる期間に空きがありません。期間を変えてください。</p>
       )}
       {selectedDate && (
@@ -1118,12 +1176,12 @@ export function BookingSlotPicker({
                   onChange(active ? '' : { menuId, staffId: fixedStaffId ?? staffId, startsAt })
                 }
                 aria-pressed={active}
-                className={`min-h-11 rounded-[10px] border text-sm tabular-nums ${
+                className={`liff-num h-[42px] rounded-[10px] text-sm tabular-nums -outline-offset-1 ${
                   active
-                    ? 'border-liff-primary bg-liff-soft font-bold text-ink'
+                    ? 'bg-liff-primary font-bold text-white'
                     : t.open
-                      ? 'border-liff-line-strong bg-canvas text-ink'
-                      : 'border-liff-line-strong bg-canvas text-ink-faint opacity-50'
+                      ? 'bg-canvas font-medium text-ink outline-1 outline-liff-line-strong'
+                      : 'bg-liff-off-bg font-medium text-liff-off-ink'
                 }`}
               >
                 {t.start}
@@ -1133,9 +1191,8 @@ export function BookingSlotPicker({
         </div>
       )}
       {picked && (
-        <p className="text-sm font-bold text-ink">
-          {utcToJstMd(picked.startsAt)}（{utcToJstWeekday(picked.startsAt)}）
-          {utcToJstHm(picked.startsAt)}〜 を選んでいます
+        <p className="text-xs font-bold text-liff-primary">
+          {formatJstEventAt(picked.startsAt)}〜 を選んでいます
         </p>
       )}
     </div>
@@ -1148,6 +1205,7 @@ export function BookingSlotPicker({
  */
 function BlockView({
   block,
+  cover = false,
   answers,
   onChange,
   onToggle,
@@ -1157,6 +1215,8 @@ function BlockView({
   errorColor,
 }: {
   block: FormBlock;
+  /** ページの先頭の画像 (題の上の表紙)。★V8 B8rCt は高さ 96・角丸 12 の帯。 */
+  cover?: boolean;
   answers: Answers;
   onChange: (name: string, value: unknown) => void;
   onToggle: (name: string, label: string) => void;
@@ -1180,7 +1240,13 @@ function BlockView({
       <img
         src={block.mediaUrl}
         alt=""
-        className={block.size === 'full' ? 'w-full rounded-lg' : 'mx-auto max-w-[70%] rounded-lg'}
+        className={
+          cover
+            ? 'h-24 w-full rounded-xl object-cover'
+            : block.size === 'full'
+              ? 'w-full rounded-lg'
+              : 'mx-auto max-w-[70%] rounded-lg'
+        }
       />
     );
     return block.linkUrl ? (
@@ -1215,21 +1281,22 @@ function BlockView({
   const text = typeof value === 'string' ? value : '';
   const checked = Array.isArray(value) ? (value as string[]) : [];
   const inputClass =
-    'w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3 py-2 text-sm text-ink placeholder:text-liff-idle focus:border-liff-primary focus:outline-none';
+    'w-full rounded-[10px] border border-liff-line-strong bg-canvas px-3.5 py-3 text-sm text-ink placeholder:text-liff-idle focus:border-liff-primary focus:outline-none';
   /** 直しがある欄は枠を直しの色にする (お店のテーマの error)。 */
   const invalidStyle = error ? { borderColor: errorColor } : undefined;
 
   return (
-    <div>
-      <label className="block text-sm font-bold text-ink">
+    <div className="flex flex-col gap-2">
+      {/* ★V8 (B8rCt)：欄名と必須の札を1行に並べ、選択肢まで 8 空ける。 */}
+      <label className="flex items-center gap-1.5 text-sm font-bold text-ink">
         {block.label}
         {block.required && <RequiredMark />}
       </label>
       {block.description && (
-        <p className="mt-0.5 text-xs text-ink-faint">{block.description}</p>
+        <p className="-mt-1 text-xs text-ink-faint">{block.description}</p>
       )}
 
-      <div className="mt-1.5">
+      <div>
         {block.type === 'text' && (
           <input
             type={block.limit?.format === 'email' ? 'email' : block.limit?.format === 'tel' ? 'tel' : 'text'}
@@ -1245,12 +1312,12 @@ function BlockView({
 
         {block.type === 'textarea' && (
           <textarea
-            rows={4}
+            rows={3}
             value={text}
             placeholder={block.placeholder}
             maxLength={block.limit?.max}
             onChange={(e) => onChange(block.name, e.target.value)}
-            className={`${inputClass} resize-y`}
+            className={`${inputClass} min-h-22 resize-y`}
             style={invalidStyle}
             aria-invalid={!!error}
           />
@@ -1329,10 +1396,10 @@ function BlockView({
               return (
                 <div key={choice.id}>
                   <label
-                    className={`flex min-h-12 items-center gap-2.5 rounded-[10px] border px-3.5 py-3 text-sm ${
+                    className={`flex min-h-11 items-center gap-2.5 rounded-[10px] px-3.5 py-3 text-sm text-ink -outline-offset-1 ${
                       checkedRadio
-                        ? 'border-liff-primary bg-liff-soft font-semibold text-ink'
-                        : 'border-liff-line-strong bg-canvas text-ink'
+                        ? 'bg-liff-soft outline-2 outline-liff-primary'
+                        : 'bg-canvas outline-1 outline-liff-line-strong'
                     }`}
                   >
                     <input
@@ -1367,10 +1434,10 @@ function BlockView({
               return (
                 <div key={choice.id}>
                   <label
-                    className={`flex min-h-12 items-center gap-2.5 rounded-[10px] border px-3.5 py-3 text-sm ${
+                    className={`flex min-h-11 items-center gap-2.5 rounded-[10px] px-3.5 py-3 text-sm text-ink -outline-offset-1 ${
                       isChecked
-                        ? 'border-liff-primary bg-liff-soft font-semibold text-ink'
-                        : 'border-liff-line-strong bg-canvas text-ink'
+                        ? 'bg-liff-soft outline-2 outline-liff-primary'
+                        : 'bg-canvas outline-1 outline-liff-line-strong'
                     }`}
                   >
                     <input

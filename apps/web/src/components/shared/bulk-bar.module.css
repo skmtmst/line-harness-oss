@@ -8,6 +8,10 @@
  *   - 件数は濃い緑の太字、操作は白地ボタン（残りは「…」のメニューへ）
  */
 .bar {
+  /* 長い一覧でも画面の下に付いてくる（動きの点検 12 番）。表が短ければ今までどおり表のすぐ下。 */
+  position: sticky;
+  bottom: var(--bulk-bar-float-gap);
+  z-index: 10;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

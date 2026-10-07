@@ -1,15 +1,35 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import Link from 'next/link'
-import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, captureTwoFactorMethod, clearTwoFactorChallenge, takeTwoFactorNextPath, storeAdminSession, type TwoFactorMethod } from '@/lib/admin-session'
+import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, captureTwoFactorMethod, clearTwoFactorChallenge, isOpsTwoFactorReturn, takeTwoFactorNextPath, storeAdminSession, type TwoFactorMethod } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
 import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
 import { twoFactorFailureMessage } from './two-factor-error'
 import Button from '@/components/shared/button'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import OpsTwoFactorV8 from '@/v8/login/two-factor-ops'
 
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
+
+/*
+ * ★V8 の入口。運営のログイン（next=ops）から来たときだけ、V8 では運営の2段目（板 `tOPeY`）を出す。
+ * 管理画面のログインの2段目と v7 は今のまま（下の TwoFactorLoginPageV7）。
+ */
 export default function TwoFactorLoginPage() {
+  const theme = useAdminTheme()
+  const [ops, setOps] = useState(false)
+  useIsoLayoutEffect(() => {
+    let stored: string | null = null
+    try { stored = sessionStorage.getItem('lh_2fa_next') } catch { /* 読めなければ URL だけで決める */ }
+    setOps(isOpsTwoFactorReturn(window.location.search, window.location.hash, stored))
+  }, [])
+  if (theme === 'v8' && ops) return <OpsTwoFactorV8 />
+  return <TwoFactorLoginPageV7 />
+}
+
+function TwoFactorLoginPageV7() {
   const [code, setCode] = useState('')
   /* 認証が通ったあと、緑の輪郭（V8 の動き）を見せてから画面を移す。 */
   const [succeeded, setSucceeded] = useState(false)

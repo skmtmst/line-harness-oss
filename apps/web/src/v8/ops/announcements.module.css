@@ -1,0 +1,258 @@
+/* 運営のお知らせ配信 V8（tQ2MJ・送る前の確認 TJUUl）。値は --tpl-op-*。 */
+
+.notice {
+  margin-bottom: var(--tpl-op-section-gap);
+}
+
+.columns {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-op-section-gap);
+}
+
+.form {
+  display: flex;
+  width: var(--tpl-op-ann-form-w);
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: var(--tpl-op-row-gap);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  padding: var(--tpl-op-ann-form-pad);
+}
+
+.field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--tpl-op-auth-field-gap);
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-auth-field-gap);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-op-auth-label-lh);
+}
+
+.smallLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-auth-field-gap);
+  padding: 0;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-op-ann-small-lh);
+}
+
+/* fieldset の legend は flex の間に入らないので、下の間を自分で持つ。 */
+.legend {
+  margin-bottom: var(--tpl-op-auth-field-gap);
+}
+
+.body.body {
+  height: var(--tpl-op-ann-body-h);
+  min-height: var(--tpl-op-ann-body-h);
+  padding: var(--tpl-op-note-pad);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-op-ann-body-lh);
+}
+
+/* 絵の日時の欄は高さ36（共通の欄は40）。この画面の作る欄だけ。 */
+.dateTime.dateTime :global(button) {
+  height: var(--tpl-op-control-h);
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-op-mini-gap);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-op-auth-field-gap);
+  margin-top: var(--tpl-op-auth-field-gap);
+}
+
+.tenantChips {
+  max-height: var(--tpl-op-ann-tenants-h);
+  overflow-y: auto;
+}
+
+.warn {
+  margin: 0;
+  border-radius: var(--tpl-op-caution-radius);
+  background: var(--color-status-warn-soft);
+  padding: var(--tpl-op-ann-warn-pad);
+  color: var(--color-status-warn-deep);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-op-caution-lh);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tpl-op-me-gap);
+}
+
+.actions svg {
+  width: var(--tpl-op-auth-icon);
+  height: var(--tpl-op-auth-icon);
+}
+
+.list {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-op-me-gap);
+}
+
+.listHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-auth-field-gap);
+}
+
+.row {
+  height: var(--tpl-op-dash-alert-h);
+}
+
+.subject {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-dash-stat-gap);
+}
+
+.subjectText {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.colTo {
+  width: var(--tpl-op-mem-state-w);
+}
+
+.colState {
+  width: var(--tpl-op-ann-state-w);
+}
+
+.colRead {
+  width: var(--tpl-op-ann-state-w);
+}
+
+.colLine {
+  width: var(--tpl-op-ann-ops-w);
+}
+
+.colOps {
+  width: var(--tpl-op-ann-ops-w);
+}
+
+.faint {
+  color: var(--color-ink-faint);
+}
+
+/* --- 送る前の確認（TJUUl） --- */
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-section-gap);
+}
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-auth-field-gap);
+  margin: 0;
+  border-radius: var(--tpl-op-caution-radius);
+  background: var(--color-surface-pearl);
+  padding: var(--tpl-op-note-pad);
+}
+
+.fact {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-op-ann-small-lh);
+}
+
+.fact dt {
+  width: var(--tpl-op-ann-fact-w);
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+}
+
+.fact dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.letter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-auth-field-gap);
+  padding: var(--tpl-op-note-pad);
+}
+
+.letterSubject {
+  margin: 0;
+  line-height: var(--tpl-op-ann-small-lh);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.letterBody {
+  margin: 0;
+  line-height: var(--tpl-op-ann-small-lh);
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.after {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-op-note-lh);
+}
+
+@media (max-width: 1023.98px) {
+  .columns {
+    flex-direction: column;
+  }
+
+  .form {
+    width: 100%;
+  }
+
+  .list {
+    width: 100%;
+  }
+}

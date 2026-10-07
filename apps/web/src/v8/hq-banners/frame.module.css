@@ -1,0 +1,63 @@
+/*
+ * ★V8 バナー生成の窓の枠。幅と上からの位置は窓ごと（data-kind）に globals.css の `--tpl-hb-dialog-*` から読む。
+ * 狭い画面では画面の幅まで・上の位置は余白だけにする。
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: var(--tpl-hb-dialog-top) var(--tpl-hb-dialog-edge) var(--tpl-hb-dialog-edge);
+  background: color-mix(in srgb, var(--color-ink) 40%, transparent);
+}
+
+.overlay[data-kind='create'] { --tpl-hb-dialog-top: var(--tpl-hb-top-create); --tpl-hb-dialog-w: var(--tpl-hb-w-form); }
+.overlay[data-kind='upload'] { --tpl-hb-dialog-top: var(--tpl-hb-top-upload); --tpl-hb-dialog-w: var(--tpl-hb-w-form); }
+.overlay[data-kind='confirm'] { --tpl-hb-dialog-top: var(--tpl-hb-top-confirm); --tpl-hb-dialog-w: var(--tpl-hb-w-confirm); }
+.overlay[data-kind='detail'] { --tpl-hb-dialog-top: var(--tpl-hb-top-detail); --tpl-hb-dialog-w: var(--tpl-hb-w-detail); }
+.overlay[data-kind='reference'] { --tpl-hb-dialog-top: var(--tpl-hb-top-reference); --tpl-hb-dialog-w: var(--tpl-hb-w-reference); }
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-hb-dialog-gap);
+  width: min(var(--tpl-hb-dialog-w), 100%);
+  padding: var(--tpl-hb-dialog-pad);
+  border-radius: var(--tpl-hb-dialog-radius);
+  outline: 1px solid var(--color-border-soft);
+  outline-offset: -0.5px;
+  background: var(--color-canvas);
+  box-shadow: var(--v8-parts-dialog-shadow);
+  color: var(--color-ink);
+}
+
+.overlay[data-kind='detail'] .panel { gap: var(--tpl-hb-detail-gap); }
+.overlay[data-kind='detail'] .head { margin-bottom: var(--tpl-hb-detail-head-push); }
+.panel:focus-visible { outline: revert; }
+
+.head { display: flex; flex-direction: column; gap: var(--tpl-hb-dialog-head-gap); }
+.titleRow { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
+.title { flex: 1; min-width: 0; margin: 0; font-size: var(--tpl-hb-dialog-title-size); font-weight: 700; line-height: var(--tpl-hb-dialog-title-lh); }
+.closeIcon { width: var(--tpl-hb-close-glyph); height: var(--tpl-hb-close-glyph); }
+.description { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-hb-dialog-desc-lh); }
+.error { margin: 0; color: var(--color-status-danger); font-size: var(--text-label); line-height: var(--tpl-hb-label-lh); }
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--tpl-hb-actions-gap);
+  padding-top: var(--tpl-hb-actions-pad);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.actionsSplit { justify-content: flex-start; }
+.overlay[data-kind='confirm'] .actions { padding-top: var(--tpl-hb-actions-pad-confirm); }
+.overlay[data-kind='detail'] .actions { padding-top: var(--tpl-hb-detail-foot-pad); }
+
+@media (max-width: 767px) {
+  .overlay { padding-top: var(--tpl-hb-dialog-edge); }
+}

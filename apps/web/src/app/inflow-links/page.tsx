@@ -24,8 +24,9 @@ import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import type { FeatureKey } from '@/lib/feature-settings'
 import AdIntegration from './ad-integration'
-import { AdConnectionsV8, AdHistoryV8, AdMetricsV8 } from './ad-integration-v8'
-import SiteScriptV8 from '@/components/inflow-links/site-script-v8'
+import { AdConnectionsV8, AdHistoryV8 } from './ad-integration-v8'
+import SiteScriptV8 from '@/v8/inflow-links/site-script'
+import AdsV8 from '@/v8/inflow-links/ads'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import InflowListV8 from '@/v8/inflow-links/list'
 import ReferralQrModal, { type ReferralQrRoute } from './referral-qr-modal'
@@ -850,6 +851,9 @@ function InflowLinksPageInner({
           */}
           {visibility.enabled('site_tracking') ? (
             <Button variant="secondary" href="/inflow-links?tab=script">サイトスクリプト</Button>
+          ) : visibility.status === 'loading' ? (
+            /* 機能の見え方を読む間も場所を取る。後から出すと説明が折り返し直し、下が 19px 跳ねていた（動きの点検 8 番）。 */
+            <span aria-hidden="true" className="invisible"><Button variant="secondary" tabIndex={-1}>サイトスクリプト</Button></span>
           ) : null}
         </>}
       />
@@ -928,12 +932,6 @@ function InflowLinksPageInner({
         </div>
       </div>
 
-      {routeCountAvailable && unconfiguredCount > 0 ? (
-        <Notice tone="info">
-          友だちになっても何も起きない経路が {formatNumber(unconfiguredCount)}件あります。「動きが未設定」で絞って、タグやメッセージを決めてください。
-        </Notice>
-      ) : null}
-
       {!readonly ? (
         <div className={styles.createRow}>
           <Button href="/inflow-links/new" variant="primary">＋ 流入リンクを作る</Button>
@@ -967,6 +965,15 @@ function InflowLinksPageInner({
         </div>
 
         <section className="flex min-w-0 flex-col gap-4" aria-label={`${selectedGenreLabel}の流入経路（${genreRows.length}件）`}>
+          {/*
+            未設定の知らせは絵（xbHxg）どおり一覧の列の頭に置く。以前は数の帯と作るボタンの
+            間に後から差し込まれ、フォルダの列ごと 56px 押し下げていた（動きの点検 8 番）。
+          */}
+          {routeCountAvailable && unconfiguredCount > 0 ? (
+            <Notice tone="info">
+              友だちになっても何も起きない経路が {formatNumber(unconfiguredCount)}件あります。「動きが未設定」で絞って、タグやメッセージを決めてください。
+            </Notice>
+          ) : null}
           {/*
             板 xbHxg の道具。絵どおり、よく使う2枚だけ外に出し、残りの絞り込みと
             並び順は「よく使う絞り込み」の中に置く。
@@ -1663,9 +1670,13 @@ function InflowLinksPageHost() {
   */
   const v8List = theme === 'v8' && tab === 'links' && !tabBlocked
   if (v8List) return <InflowListV8 onRouteCountChange={setLinksCount} />
+  /*
+    ★V8 のサイトスクリプト（XjOte）・広告連携（qSTVR）の絵にもタブは無い。見出しの「流入と計測へ」で戻る。
+  */
+  const v8NoTabs = theme === 'v8' && !tabBlocked
   return (
     <div>
-      <MergedTabs basePath="/inflow-links" tabs={visibleTabs} active={tab} />
+      {v8NoTabs ? null : <MergedTabs basePath="/inflow-links" tabs={visibleTabs} active={tab} />}
       {tabBlocked ? (
         <FeatureDisabledScreen featureId={tabFeature} />
       ) : (
@@ -1675,7 +1686,7 @@ function InflowLinksPageHost() {
               一瞬に計測APIを呼ぶと、offのaccountで403が画面全体のゲートを
               起こしてしまう。 */}
           {tab === 'script' && visibility.status === 'ready' && (theme === 'v8' ? <SiteScriptV8 /> : <SiteScript />)}
-          {tab === 'ads' && (theme === 'v8' ? <AdMetricsV8 /> : <AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />)}
+          {tab === 'ads' && (theme === 'v8' ? <AdsV8 /> : <AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />)}
           {tab === 'connections' && (theme === 'v8' ? adView === 'history' ? <AdHistoryV8 /> : <AdConnectionsV8 /> : <AdIntegration view={adView} onPlatformCountsChange={handleAdCounts} />)}
         </>
       )}

@@ -240,7 +240,8 @@ describe('V8 シナリオの通し：作る→1通目→詳細', () => {
     expect(timeMode, '時刻指定の選択が見つかりません').toBeTruthy()
     fireEvent.click(timeMode)
 
-    fireEvent.click(screen.getByRole('button', { name: 'この方式で作る' }))
+    // ★V8 作る①（src/v8/scenarios/create.tsx・dnzqC）の主ボタンは絵どおり「この方式で保存する」。
+    fireEvent.click(screen.getByRole('button', { name: 'この方式で保存する' }))
     await waitFor(() => expect(createScenario).toHaveBeenCalledTimes(1))
     await screen.findByText('シナリオを作りました')
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/scenarios/first-step?id=sc-new'))
@@ -255,11 +256,13 @@ describe('V8 シナリオの通し：作る→1通目→詳細', () => {
     const body = host.querySelector('#first-step-body') as HTMLTextAreaElement
     expect(body, '本文の入力が見つかりません').toBeTruthy()
     fireEvent.change(body, { target: { value: 'ようこそ' } })
-    const timeInput = screen.getByLabelText('配信する時刻')
-    fireEvent.change(timeInput, { target: { value: '15:00' } })
+    // ★V8（src/v8/scenario-first-step）の時刻は30分きざみの選択。開いて 15:00 を選ぶ。
+    fireEvent.click(screen.getByRole('button', { name: '配信する時刻' }))
+    fireEvent.click(within(await screen.findByRole('listbox')).getByRole('button', { name: '15:00' }))
 
-    fireEvent.click(screen.getByRole('button', { name: '作って編集へ →' }))
+    fireEvent.click(screen.getByRole('button', { name: '作って編集へ' }))
     await waitFor(() => expect(addStep).toHaveBeenCalledTimes(1))
+    expect((addStep.mock.calls[0] as unknown[])[1]).toMatchObject({ deliveryTime: '15:00', messageContent: 'ようこそ' })
     await screen.findByText('1通目を保存しました')
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/scenarios/detail?id=sc-new'))
   })
@@ -312,11 +315,12 @@ describe('V8 シナリオの通し：配信を始める→止める', () => {
     renderNode(<ScenarioDetailPage />)
     await flush()
 
-    fireEvent.click(await screen.findByRole('button', { name: '止める' }))
+    // ★V8（PMLkX・OPGU2）：③の箱のボタンは「一時停止する」、確認の窓は「配信を止めますか」。
+    fireEvent.click(await screen.findByRole('button', { name: '一時停止する' }))
     // 止める窓は destructive のため role は alertdialog。
     const dialog = await screen.findByRole('alertdialog')
-    expect(dialog.textContent).toContain('止めますか')
-    fireEvent.click(within(dialog).getByRole('button', { name: '止める' }))
+    expect(dialog.textContent).toContain('配信を止めますか')
+    fireEvent.click(within(dialog).getByRole('button', { name: '一時停止する' }))
     await waitFor(() => expect(updateScenario).toHaveBeenCalledWith('sc-new', { isActive: false }))
     await screen.findByText('配信を一時停止しました')
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())

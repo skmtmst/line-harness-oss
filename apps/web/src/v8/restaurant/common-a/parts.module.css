@@ -1,0 +1,139 @@
+/*
+ * ★V8 飲食店向けの小さな部品（担当 a）。値は `--tpl-rt-*`。
+ */
+
+/* 数の並び（CHz31「数の並び」）：同じ幅のカード、間12、上そろえ（高さは中身なり）。 */
+.stats {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-rt-stat-row-gap);
+  min-width: 0;
+}
+
+.stats > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 数のカード：余白16・段の間4・見出し11/600・数22/700・下11。 */
+.stat {
+  gap: var(--tpl-rt-stat-gap);
+  padding: var(--tpl-rt-stat-pad);
+  border-radius: var(--tpl-rt-card-radius);
+}
+
+.stat > :first-child {
+  min-height: 0;
+}
+
+.stat > :first-child > p {
+  gap: var(--tpl-rt-stat-label-gap);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  line-height: normal;
+}
+
+.stat [data-kpi-number] {
+  font-family: var(--font-inter), Inter, var(--font-sans);
+  font-size: var(--text-metric);
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: 0;
+}
+
+/* 6つ並びの数（xLpnS）は 20px。 */
+.statSmall [data-kpi-number] {
+  font-size: var(--tpl-rt-stat-value-sm);
+}
+
+/* 「38件」のように日本語を含む数は、絵では日本語の書体の行の高さ（22px で 32）。 */
+.statJp [data-kpi-number] {
+  font-family: var(--font-noto-sans-jp), var(--font-sans);
+}
+
+.stat > :last-child {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+/* 白い枠：線は外の輪郭（場所を取らない）、頭の下の線は内側の影。 */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: var(--tpl-rt-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rt-panel-head-gap);
+  padding: var(--tpl-rt-panel-head-pad);
+  box-shadow: var(--tpl-rt-line-bottom);
+}
+
+.panelHeadText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-rt-panel-text-gap);
+  min-width: 0;
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: normal;
+}
+
+.panelDescription {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+.panelAside {
+  flex: 0 0 auto;
+  color: var(--color-warning);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.panelAsideOk {
+  color: var(--color-success);
+}
+
+.panelNarrow {
+  flex: 0 0 var(--tpl-rt-tree-w);
+}
+
+.panelBody {
+  padding: var(--tpl-rt-panel-body-pad);
+  min-width: 0;
+}
+
+.halfGrid {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-rt-half-gap);
+  min-width: 0;
+}
+
+.halfGrid > * {
+  flex: 1 1 0;
+}
+
+.status {
+  flex: 0 0 auto;
+}

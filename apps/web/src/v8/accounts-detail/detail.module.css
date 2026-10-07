@@ -1,0 +1,301 @@
+/*
+ * ★V8 LINEアカウントの詳細（ihjfd）。
+ * 設定の型（SettingsPage）の中身の欄は幅 720・余白 24/28 の既定なので、絵の幅
+ * （設定の中のメニューの右から板の右 24 まで・上 16）に広げる。包みは display: contents。
+ * 共通の設定の中のメニューは幅 225（絵は 199.5）なので、中身の左の余白は 0 にして絵の位置にそろえる。
+ */
+.screen {
+  display: contents;
+}
+.screen [data-template-region='body'] {
+  gap: 0;
+}
+.screen [data-template-region='body'] > [data-template-region='content'] {
+  max-width: none;
+  padding: var(--tpl-acd-pad);
+  gap: var(--tpl-acd-stack-gap);
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-acd-head-actions-gap);
+}
+
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: 0;
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-acd-wide-size);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+.columns {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-acd-gap);
+  width: 100%;
+  min-width: 0;
+}
+.main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-acd-stack-gap);
+  min-width: 0;
+}
+.side {
+  display: flex;
+  flex: 0 0 var(--tpl-acd-side-w);
+  flex-direction: column;
+  gap: var(--tpl-acd-stack-gap);
+  min-width: 0;
+}
+
+.card,
+.inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-acd-card-gap);
+  min-width: 0;
+  padding: var(--tpl-acd-card-pad);
+  border-radius: var(--tpl-acd-card-radius);
+  background: var(--color-canvas);
+  box-shadow: var(--tpl-acd-ring);
+}
+.inner {
+  padding: var(--tpl-acd-inner-pad);
+}
+
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-acd-head-gap);
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-acd-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-acd-title-lh);
+}
+.cardSub {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-acd-label-size);
+  line-height: var(--tpl-acd-sub-lh);
+}
+
+/* 札（幅150）と値の1行。上に線（場所を取らない内側の影）。 */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-acd-row-gap);
+  min-width: 0;
+  padding: var(--tpl-acd-row-pad);
+  box-shadow: var(--tpl-acd-line-top);
+}
+.rowLabel {
+  flex: 0 0 var(--tpl-acd-label-w);
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-acd-label-size);
+  line-height: var(--tpl-acd-label-lh);
+}
+.rowValue {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-acd-value-size);
+  line-height: var(--tpl-acd-value-lh);
+  overflow-wrap: anywhere;
+}
+
+.actionValue {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--tpl-acd-inline-gap);
+  min-width: 0;
+}
+.spacer {
+  flex: 1;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-acd-inline-gap);
+  min-width: 0;
+  max-width: 100%;
+}
+.truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.muted {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--tpl-acd-value-size);
+  line-height: var(--tpl-acd-value-lh);
+}
+.faint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-acd-label-size);
+  line-height: var(--tpl-acd-sub-lh);
+  white-space: nowrap;
+}
+
+.textButton {
+  flex-shrink: 0;
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-accent-deep);
+  font: inherit;
+  font-size: var(--tpl-acd-label-size);
+  font-weight: 600;
+  cursor: pointer;
+}
+.textButton:hover {
+  text-decoration: underline;
+}
+
+/* つづきの段：札と値を半分ずつ・下に線。 */
+.pair {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-acd-row-gap);
+  min-width: 0;
+  padding: var(--tpl-acd-wide-pad);
+  box-shadow: var(--tpl-acd-line-bottom);
+  font-size: var(--tpl-acd-wide-size);
+  line-height: var(--tpl-acd-wide-lh);
+}
+.pairLabel {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink-secondary);
+}
+.pairValue {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink);
+}
+.end {
+  margin-left: auto;
+}
+
+/* 札と値を半分ずつ・右に操作（チャネルアクセストークン）。 */
+.wide {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-acd-row-gap);
+  min-width: 0;
+  padding: var(--tpl-acd-wide-pad);
+  box-shadow: var(--tpl-acd-line-top);
+  font-size: var(--tpl-acd-wide-size);
+  line-height: var(--tpl-acd-wide-lh);
+}
+.wideLabel {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-ink-secondary);
+}
+.wideValue {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skippedList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-acd-inline-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.skippedRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--tpl-acd-row-gap);
+  padding: var(--tpl-acd-row-pad);
+  box-shadow: var(--tpl-acd-line-top);
+  font-size: var(--tpl-acd-value-size);
+  line-height: var(--tpl-acd-value-lh);
+}
+
+.bullets {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-acd-note-size);
+  line-height: var(--tpl-acd-note-lh);
+  white-space: pre-line;
+}
+
+.links {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-acd-link-size);
+  font-weight: 600;
+  line-height: var(--tpl-acd-link-lh);
+}
+.links a {
+  color: inherit;
+  text-decoration: none;
+}
+.links a:hover {
+  text-decoration: underline;
+}
+
+.fit {
+  align-self: flex-start;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-acd-actions-gap);
+}
+.note {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-acd-note-size);
+}
+
+/* 狭い幅（1152 など）では右の列を下へ回す。右の列が細くなって文字が数文字ずつ折れないように。 */
+@container v8-page (max-width: 1099px) {
+  .columns {
+    flex-direction: column;
+  }
+  .side {
+    flex-basis: auto;
+    width: 100%;
+  }
+}

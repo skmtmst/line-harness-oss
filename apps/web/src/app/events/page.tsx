@@ -8,7 +8,7 @@ import { withRequestTimeout } from '@/lib/request-timeout'
 import { useAccount } from '@/contexts/account-context'
 import { useAdminTheme } from '@/lib/use-admin-theme'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import EventsListV8 from './events-list-v8'
+import EventsListV8 from '@/v8/events/list'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -566,7 +566,7 @@ function EventsListPageV7() {
 
 /*
  * ★V8-B（板 `e2ekFu`）：見た目テーマが v8 のときだけ新しい一覧
- * （`events-list-v8.tsx`）に切り替える。v7 の見た目は
+ * （src/v8/events/list.tsx）に切り替える。v7 の見た目は
  * `EventsListPageV7` のまま変えない。
  */
 export default function EventsListPage() {

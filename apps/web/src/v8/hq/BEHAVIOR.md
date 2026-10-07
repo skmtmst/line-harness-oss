@@ -1,0 +1,49 @@
+# 統括（/hq）の画面の動き（BEHAVIOR.md）
+
+対象：v7 の `app/hq/page.tsx`（＋`account-browser-v8.tsx`・`account-settings-dialogs.tsx`）・`app/hq/members/page.tsx`・`app/hq/billing/page.tsx`・`app/hq/support/page.tsx`・`app/hq/support/detail/page.tsx`。
+動き（呼ぶ API・保存・権限・失敗時・読み直し）を写して、見た目だけを Pencil の絵どおりに一から書いた。v7 の画面ファイルと試験は切り替えの日まで残す。
+
+| 画面 | ファイル | 板 |
+|---|---|---|
+| アカウント（ホーム） | `home.tsx`・`account-dialogs.tsx` | `JKjsE`・設定の窓 `HMpVx`・アーカイブ `D6ljr`・戻す `HFsO9` |
+| メンバー | `members.tsx` | `r4ARpV`・招待 `yLKwV`・権限の変更 `BHEl9`・確認 `M4jS9` |
+| 請求 | `billing.tsx`・`billing-failure.ts` | `JB8V1` |
+| お問い合わせ | `support.tsx`・`notice-line-dialog.tsx` | `b8xBtZ`・運営の LINE を登録 `D6fh3` |
+| お問い合わせのやり取り | `support-detail.tsx` | `OhguS` |
+| 統括の設定の列 | `settings-nav.tsx` | 上の4画面の左の列 |
+
+## 入口
+- 各 `app/hq/**/page.tsx` の先頭で `useAdminTheme() === 'v8'` のときだけ `@/v8/hq/*` を出す。v7 の画面はそのまま（関数名に `V7` を付けただけ）。
+
+## 受け付ける URL と指定（今までと同じ）
+- `/hq?return=…`：アカウントへ入ったあとに戻る店舗画面（`resolveStoreReturnPath` で店舗画面のパスだけ受け付ける：NEXT-07）。
+- `/hq/billing?checkout=success|cancel`：Stripe から戻ったときの知らせ。`success` は 4 秒後に読み直す。
+- `/hq/support/detail?id=…`：開くお問い合わせ。無い・見つからない・読めないを分ける（U099）。
+- 絞り込み・並び・表示件数・カード／表は URL に残さない（画面の中だけ。v7 と同じ）。
+
+## 読み込み（API）
+- ホーム：`GET /api/line-accounts`（タグ・接続状態・数を含む）・`GET /api/line-account-tags`・`GET /api/tenants/me`（説明の統括名）・運営のお知らせ（`PlatformNotices`）。
+- メンバー：`GET /api/staff/me` → 担当範囲が限られる人は一覧を呼ばない（M025）→ `GET /api/staff`・`GET /api/line-accounts`・最終ログイン。
+- 請求：`GET /api/hq/billing/summary`・`GET /api/hq/billing/invoices`（履歴だけの失敗は概要と分ける：R118、502 は決済サービスの案内：M023）。
+- お問い合わせ：`GET /api/hq/support/context`・`GET /api/hq/support/requests`。やり取り：`GET /api/hq/support/requests/:id` と、送信者・一覧・店舗名のために `staff/me`・`tenants/me`・`requests`・`context`。
+
+## 書き込み（今までと同じ口・同じ形）
+- ホーム：接続情報の更新（各アカウントへ `POST /api/line-accounts/:id/connection-checks`、`Idempotency-Key`・`expectedRevision`）・タグの追加（色つき）・タグの削除（確認の窓を挟む）・設定の窓（名前・親・タグの付け替え）・アーカイブ／戻す（6桁の本人確認 `line_account.archive`）。
+- メンバー：招待（`api.staff.create`）・変更（確認の窓 `M4jS9` を挟んで `api.staff.update`、`STEP_UP_REQUIRED` は本人確認してやり直す）・招待メールの再送。
+- 請求：申込（Stripe Checkout へ）・支払い方法の管理（ポータルへ）。
+- お問い合わせ：送信（添付は PNG・JPEG 3枚まで）・続きを送る。
+
+## 権限
+- 役割はサーバ（`/api/staff/me`）から読む。手元の保存値（`lh_staff_role`）は使わない。
+- 閲覧のみ・変える権限が無い人には、押せないボタンを置かずに隠す（2026-10-06 オーナー決定）。
+  - ホーム：「アカウントを登録」「タグを追加」「設定」「LINE ID・接続状態を更新する」はオーナー・管理者だけ。「戻す」はオーナーだけ。
+  - メンバー：「権限者を招待」「変更」「再送」はオーナー・管理者だけ。見るだけの人には「閲覧のみで見ています…」の帯。
+  - 請求：「このプランにする」はオーナーだけ。「支払い方法を管理」はオーナー・管理者だけ。担当者（staff）は見られない（今までどおり）。
+
+## 今までと変えたところ
+- ホームの「設定」「戻す」の可否を、アカウントの `role`（アカウントの説明の欄で、人の役割ではない）からサーバの役割に直した。v7 は実データで常に押せなくなっていた。
+- 言葉を絵に合わせた：メンバーの役割「スタッフ」→「担当者」、状態「無効」→「停止中」、担当範囲「全アカウント」→「すべて」。請求の未払い「未払い」→「請求中」、日付は「2026/10/01」。お問い合わせの状態「受付済み」→「対応中」・「解決」→「解決済み」、日時は「9/30 11:00」。
+- 請求の注（料金は Stripe の価格です…）は、押せない理由があるとき（決済の設定がまだ・オーナー以外）だけ出す。「次回の更新日」は括弧の外に出した（絵の文面）。
+- お問い合わせの「必須」札と「任意」の注は絵に無いので出さない（送れない理由は今までどおり送信の上に出る）。「運営からの大事なお知らせを LINE で受け取る」は送信者の帯の右端へ。
+- やり取りの画面は、自分の送ったものを右（緑）、運営を左（灰）に並べる（絵どおり。v7 は逆）。下に固定した帯（一覧へ戻る・送る）はやめ、「送る」は続きを送るカードの中へ（一覧へは左の列の「お問い合わせ」で戻る）。
+- 運営の LINE を登録する窓は、6 桁を1字ずつの箱で出し、「あとで確認する」を真ん中に置いた（絵 `D6fh3`）。

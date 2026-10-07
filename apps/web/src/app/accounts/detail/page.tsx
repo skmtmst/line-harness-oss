@@ -32,6 +32,8 @@ import {
   toTab,
 } from './account-detail-view'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import AccountDetailV8 from '@/v8/accounts-detail/detail'
 
 type AccountDetailView = LineAccount & {
   timezone?: string
@@ -779,10 +781,12 @@ function CredentialRow({
 }
 
 export default function AccountDetailPage() {
+  // ★V8：data-theme="v8" のときだけ新しい画面（src/v8/accounts-detail）を出す。
+  const theme = useAdminTheme()
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <AccountDetail />
+      {theme === 'v8' ? <AccountDetailV8 /> : <AccountDetail />}
     </Suspense>
   )
 }

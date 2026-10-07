@@ -30,6 +30,8 @@ import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { formatNumber } from '@/lib/format'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import OpsTenantDetailV8 from '@/v8/ops/tenant-detail'
 
 /**
  * 契約先アカウント詳細。★V6 37-4 `vhwld`。第 1 段は 概要／店舗／権限者／監査 のタブ。
@@ -48,6 +50,11 @@ type TabKey = (typeof TABS)[number]['key']
 type StatusTarget = 'suspended' | 'archived' | 'active'
 
 export default function OpsTenantDetailPage() {
+  // ★V8 は src/v8/ops/tenant-detail.tsx（Oub6x・停止の窓 okXoi）。v7 は下のまま。
+  return useAdminTheme() === 'v8' ? <OpsTenantDetailV8 /> : <OpsTenantDetailV7 />
+}
+
+function OpsTenantDetailV7() {
   return (
     <Suspense fallback={<ListState kind="loading" title="契約先を読み込んでいます" />}>
       <OpsTenantDetailContent />

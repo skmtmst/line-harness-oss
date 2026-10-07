@@ -8,7 +8,8 @@ const OPERATOR_RULES = fs.readFileSync(
   'utf8',
 )
 const OPERATOR_NEW = fs.readFileSync(
-  path.join(__dirname, 'operator/new/operator-new-v8.tsx'),
+  // 2026-10-07：作る・なおす画面は src/v8 に移った。入口が出している画面を見る。
+  path.join(__dirname, '../../v8/line-notifications/operator-edit.tsx'),
   'utf8',
 )
 const RUN_LIST = fs.readFileSync(

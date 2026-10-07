@@ -17,7 +17,7 @@ export type BannerTab = 'projects' | 'library'
 /**
  * 35-1 / 35-3 の1行目。タブ（プロジェクト一覧／画像ライブラリ）と、右端の操作。
  * Pencil `jGeAF` / `bpdek`。タブの切り替えは `?tab=` で、Link にしない
- * （`docs/v6-common-rules.md` §2-2）。
+ * （`docs/v8-design-rules.md` §5）。
  */
 export function BannerTabs({
   current,

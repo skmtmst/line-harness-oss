@@ -1,0 +1,60 @@
+/*
+ * ★V8 設定の板の外側（SbSettingsScreen）。型の値をこの画面の中だけで差し替える。
+ * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-sb-*）。
+ */
+.screen {
+  display: contents;
+}
+
+:global([data-theme='v8'] [data-page-template='settings']):has(.screen) {
+  --tpl-setnav-w: var(--tpl-sb-nav-w);
+  --tpl-settings-gap: 0px;
+}
+
+:global([data-theme='v8'] [data-page-template='settings']):has(.screen[data-sb-layout='wide-nav']) {
+  --tpl-head-gap: var(--tpl-sb-head-gap);
+  --tpl-head-pad-bottom: var(--tpl-sb-head-pad-bottom);
+  --tpl-desc-size: var(--tpl-sb-desc-size);
+  --tpl-desc-lh: var(--tpl-sb-desc-lh);
+}
+
+/* 本文の幅の上限（型は 720）を外し、板の右端まで使う。 */
+:global([data-theme='v8'] [data-page-template='settings'] [data-template-region='body'] > [data-template-region='content']):has(> .screen) {
+  max-width: none;
+}
+
+/* 型は板が 1100 未満で中のメニューを上へ積むが、絵（bKipf 1152）は左の列のまま。 */
+:global([data-theme='v8'] [data-page-template='settings'] [data-template-region='body']):has(> [data-template-region='content'] > .screen) {
+  flex-direction: row;
+  gap: 0px;
+}
+
+:global([data-theme='v8'] [data-page-template='settings'] [data-template-region='body'] > [data-template-region='navigation']):has(~ [data-template-region='content'] > .screen) {
+  width: auto;
+  flex-direction: column;
+}
+
+/* 下の帯は板の左右 12（絵の「下の帯（追従・常に画面の下）」）。 */
+:global([data-theme='v8'] [data-page-template='settings']):has(.screen) > [data-template-region='footer'] {
+  margin-inline: var(--tpl-sb-footer-side);
+}
+
+/* 戻るリンク（← 機能設定へ）があるときは、板の頭を縦に積む（戻る・題・説明、間 8）。 */
+:global([data-theme='v8'] [data-page-template='settings']):has(.screen[data-sb-identity]) > [data-template-region='heading'] {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--tpl-sb-head-gap);
+}
+
+.back {
+  font-size: var(--tpl-sb-band-text);
+  white-space: nowrap;
+}
+
+/* EC連携・LINE通知・運用状態の板：中のメニュー 200、本文の余白 16/24・間 14。頭は型のまま。 */
+:global([data-theme='v8'] [data-page-template='settings']):has(.screen[data-sb-layout='narrow-nav']) {
+  --tpl-setnav-w: var(--tpl-sb-nav-w-narrow);
+  --tpl-settings-content-pad-block: var(--tpl-sb-narrow-pad-top) var(--tpl-sb-narrow-pad-bottom);
+  --tpl-settings-content-pad-side: var(--tpl-sb-narrow-pad-side);
+  --tpl-settings-content-gap: var(--tpl-sb-narrow-gap);
+}

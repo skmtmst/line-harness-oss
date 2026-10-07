@@ -53,12 +53,13 @@ export default function StaffList({
     <div className="space-y-3.5">
       <div>
         <h2 className="text-xl font-bold text-ink">担当を選んでください</h2>
-        <p className="mt-1 text-xs text-liff-sub">
-          {menu.name}・{menu.duration_minutes}分・
-          {menu.base_price === 0 ? '無料' : `¥${menu.base_price.toLocaleString()}`}
+        <p className="mt-3.5 text-xs leading-[18px] text-liff-sub">
+          {`${menu.name}・${menu.duration_minutes}分・${
+            menu.base_price === 0 ? '無料' : `¥${menu.base_price.toLocaleString()}`
+          }`}
         </p>
       </div>
-      <ul className="space-y-2.5">
+      <ul className="space-y-3.5">
         {list.map((s) => {
           const selected = s.id === selectedId;
           const optional = s.is_designation_optional === 1;

@@ -1,0 +1,270 @@
+/*
+ * ★V8 イベント予約の一覧（e2ekFu）。頭・数の帯・フォルダの列・道具の段・本文の置き場は型（ListPage）が持つ。
+ * ここは案内の帯の段・表の中身・状態の札・ページ送りの文だけ。値は --tpl-fm-*（回答フォーム一覧と同じ）と --tpl-ev-*。
+ */
+:global([data-theme='v8']) .kpiStrip.kpiStrip { border-top: 0; }
+.createSpace {
+  display: block;
+  height: var(--tpl-fm-control-h);
+}
+.noticeRow {
+  flex-basis: 100%;
+  min-width: 0;
+}
+.chipGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.savedBox {
+  position: relative;
+  width: var(--tpl-ev-ls-saved-w);
+}
+.savedBox :global(*) { max-width: 100%; }
+.savedBox :global(button) {
+  width: 100%;
+  padding-left: calc(var(--tpl-chip-row-gap) * 8);
+}
+.savedIcon {
+  position: absolute;
+  top: 50%;
+  left: var(--tpl-rule-row-gap);
+  z-index: 1;
+  color: var(--color-ink-secondary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.perPageBox { flex-shrink: 0; }
+
+/* 表。 */
+.tableBox {
+  min-width: 0;
+}
+.colWhen { width: var(--tpl-ev-ls-col-when); }
+.colSeats { width: var(--tpl-ev-ls-col-seats); }
+.colPending { width: var(--tpl-ev-ls-col-pending); }
+.colState { width: var(--tpl-ev-ls-col-state); }
+.colMenu { width: var(--tpl-fm-col-menu); }
+.headName { text-align: left; }
+/* 絵の表は名前の列の左が広い（見出し 500・名前 516）。状態の列も左を少し空ける。 */
+.tableBox .firstCell.firstCell.firstCell { padding-left: var(--tpl-ev-ls-first-pad); }
+.tableBox .stateCell.stateCell.stateCell { padding-left: var(--tpl-ev-ls-state-pad); }
+.tableBox tbody td {
+  height: var(--tpl-ev-ls-row-h);
+  padding-block: 0;
+}
+.headWithTip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-compact-gap);
+}
+.nameButton {
+  display: block;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: 600;
+  line-height: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.nameButton:hover { text-decoration: underline; }
+.cellSub {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  padding-inline-start: var(--tpl-folder-dot-indent);
+  color: var(--color-ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.whenMain {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--tpl-fm-cell-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.whenSub {
+  display: block;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-fm-answer-sub-lh);
+}
+.num { font-variant-numeric: tabular-nums; }
+.pendingLink {
+  color: var(--color-status-warn-deep);
+  font-weight: 600;
+}
+.pendingLink:hover { text-decoration: underline; }
+.faint { color: var(--color-ink-faint); }
+.stateLine {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-compact-gap);
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-fm-pill-gap);
+  padding: var(--tpl-fm-badge-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-fm-badge-lh);
+  white-space: nowrap;
+}
+.pill::before {
+  content: '';
+  width: var(--tpl-fm-dot);
+  height: var(--tpl-fm-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.pillOn { background: var(--color-accent-soft); color: var(--color-success); }
+.pillWarn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
+.pillLow { background: var(--color-status-info-soft); color: var(--color-status-info); }
+.pillOff { background: var(--color-shell); color: var(--color-ink-secondary); }
+.audience {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menuCell { text-align: right; }
+.menuBox {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.menuBox > button {
+  width: var(--tpl-fm-menu-size);
+  min-width: 0;
+  height: var(--tpl-fm-menu-size);
+  min-height: 0;
+}
+.skeletonName {
+  display: block;
+  width: 75%;
+  height: var(--tpl-fm-skeleton-bar);
+}
+.skeletonShort {
+  display: block;
+  width: 50%;
+  height: var(--tpl-fm-skeleton-bar);
+}
+
+/* 空・失敗。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-cell-gap-half);
+  padding: var(--tpl-fm-state-pad);
+  text-align: center;
+}
+.stateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-fm-state-icon);
+  height: var(--tpl-fm-state-icon);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+}
+.stateIcon[data-tone='error'] { background: var(--color-danger-bg); color: var(--color-danger); }
+.stateTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 600; }
+.stateDesc { margin: 0; color: var(--color-ink-faint); font-size: var(--text-label); }
+
+/* 表の下。 */
+.pagerBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-toolbar-gap);
+}
+.footNote {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-row-sub-lh);
+}
+.pagerCount {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-fm-pager-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+/* フォルダの列。 */
+.folderNote {
+  margin: 0;
+  word-break: normal;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-fm-note-lh);
+}
+.textButton {
+  margin-left: var(--tpl-fm-text-button-gap);
+  border: 0;
+  background: none;
+  color: var(--color-action);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 見るだけの人の帯（見出しの下・数の帯の上）。 */
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-fm-band-gap);
+  margin-bottom: var(--tpl-fm-band-after);
+  padding: var(--tpl-fm-band-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-fm-band-lh);
+}
+.viewerBand > svg { flex-shrink: 0; color: var(--color-action); }
+
+/* 右の詳細。 */
+.panelBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-fm-panel-label-gap);
+}
+.panelLabel {
+  margin: var(--tpl-rule-row-gap) 0 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+.panelText {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-variant-numeric: tabular-nums;
+}
+.panelActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--tpl-toolbar-gap);
+  margin-top: var(--tpl-toolbar-gap);
+}
