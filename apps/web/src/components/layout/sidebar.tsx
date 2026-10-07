@@ -16,7 +16,7 @@ import SidebarIdentity from './sidebar-identity'
 import { brandInitial } from './brand-initial'
 import SidebarVersion from './sidebar-version'
 import Notice from '@/components/shared/notice'
-import HqAccountMenu from '@/components/hq/account-menu'
+import HqAccountMenu, { SidebarAccountMenu } from '@/components/hq/account-menu'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   SIDEBAR_FEATURE_BY_HREF,
@@ -891,6 +891,12 @@ export default function Sidebar({
         V8 の統括は店の画面と同じ形（名前・ログアウトは上の帯、メンバー・お問い合わせは「統括の設定」の中）。
       */}
       {isHq && !isV8 ? <div className={styles.collapseHide}><HqAccountMenu /></div> : <div className={styles.footer} />}
+      {/*
+        ★V8 左下の自分とメニュー（オーナー 2026-10-07・絵 `zUg8S/T7XSI6/shBJJ`・`ZBjxY/Xn3xt`）。
+        店・統括の両方で版の下に置く。上の帯の名前・ログアウト・［統括へ］はここへまとめた。
+        畳んだ左メニューでは顔だけ。v7 は上の行のまま（統括の HqAccountMenu・店は上の帯）。
+      */}
+      {isV8 && !preview ? <SidebarAccountMenu hq={isHq} collapsed={collapsed && !drawer} /> : null}
     </>
   )
 
