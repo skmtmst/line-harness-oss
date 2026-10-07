@@ -23,6 +23,36 @@ import {
   SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
 import styles from './sidebar.module.css'
+import {
+  Bell, CalendarCheck, CalendarCog, Clipboard, ClipboardList, Clock, FileText, Folder, House, Inbox,
+  LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Type, UserPlus, Users, Video, type LucideIcon,
+} from 'lucide-react'
+
+/*
+ * ★V8 の左メニューの印（絵 d8X09・WQmep の「項目 〇〇 / 印」は lucide）。
+ * V8 のときだけ使い、v7 は MENU_SECTIONS の線画のまま。載っていない項目も v7 の線画。鍵は MENU_SECTIONS の id。
+ */
+const V8_NAV_ICONS: Record<string, LucideIcon> = {
+  dashboard: House,
+  inbox: Inbox,
+  friends: Users,
+  'friend-attributes': Tag,
+  scenarios: ClipboardList,
+  broadcasts: Send,
+  reminders: Bell,
+  'auto-replies': MessageCircleMore,
+  'friend-add-settings': UserPlus,
+  webinars: Video,
+  templates: FileText,
+  'rich-menus': LayoutGrid,
+  forms: Clipboard,
+  'common-vars': Type,
+  contents: Folder,
+  'booking-bookings': CalendarCheck,
+  'booking-menus': CalendarCog,
+  events: Ticket,
+  'booking-own-shifts': Clock,
+}
 
 /* SSR では useLayoutEffect が警告になるので、描き込み前に畳み状態を
    反映するため同型のエイリアスを使う（描画後の1回分のズレを防ぐ）。 */
@@ -798,7 +828,10 @@ export default function Sidebar({
                         : ''
                   }`}
                 >
-                  <span className="shrink-0"><NavIcon d={item.icon} /></span>
+                  <span className="shrink-0">{(() => {
+                    const V8Icon = isV8 && !isHq ? V8_NAV_ICONS[item.id] : undefined
+                    return V8Icon ? <V8Icon className={styles.v8NavIcon} aria-hidden="true" /> : <NavIcon d={item.icon} />
+                  })()}</span>
                   <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>{visibleLabel}</span>
                   {badgeCount(item) > 0 && (
                     <>

@@ -88,9 +88,10 @@
 
 :global([data-theme='v8']) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 
-:global([data-theme='v8']) .dashboardRow[data-row='trend'] { height: 300px; }
-:global([data-theme='v8']) .dashboardRow[data-row='inbox'] { height: 350px; }
-:global([data-theme='v8']) .dashboardRow[data-row='link'] { height: 172px; }
+/* 段の高さは絵の高さを下限に、右の列の中身（理由の行など）が増えたら伸びる（下の段に重ねない）。 */
+:global([data-theme='v8']) .dashboardRow[data-row='trend'] { min-height: 300px; }
+:global([data-theme='v8']) .dashboardRow[data-row='inbox'] { min-height: 350px; }
+:global([data-theme='v8']) .dashboardRow[data-row='link'] { min-height: 172px; }
 
 :global([data-theme='v8']) [data-page-template='list'] .stats { border-top: 0; }
 
@@ -180,7 +181,6 @@
   :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardCell,
   :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: 1 / -1; }
   :global([data-theme='v8']) .dashboardRow[data-aside-size='column'] > .dashboardAside { border-left: 0; border-top: 1px solid var(--color-hairline); }
-  :global([data-theme='v8']) .dashboardRow[data-aside-size='column'][data-row] { height: auto; }
   :global([data-theme='v8']) .detailSummary { width: 100%; border-right: 0; border-bottom: 1px solid var(--color-hairline); }
   :global([data-theme='v8']) .preview { width: 100%; border-left: 0; border-top: 1px solid var(--color-hairline); }
 }
