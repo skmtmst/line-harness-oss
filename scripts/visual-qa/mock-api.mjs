@@ -99,7 +99,7 @@ import {
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_SEND_COUNTS, LINE_NOTIFICATION_DELIVERIES,
-  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_FOLDERS, EVENT_DETAIL, EVENT_SLOTS, EVENT_OCCURRENCE_APPLICANTS, EVENT_WAITLIST, EVENT_BOOKINGS, EVENT_CHANGE_PREVIEW, EVENT_CHANGE_APPLY_RESULT, EVENT_LIFECYCLE_RESULT, EVENT_WAITLIST_REORDER_RESULT, EVENT_WAITLIST_SKIP_RESULT, EVENT_LIFF_CHANGE_RESULT, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, OPERATOR_NOTIFICATION_TEAMS, ADMIN_EVENTS, EVENT_FOLDERS, EVENT_DETAIL, EVENT_SLOTS, EVENT_OCCURRENCE_APPLICANTS, EVENT_WAITLIST, EVENT_BOOKINGS, EVENT_CHANGE_PREVIEW, EVENT_CHANGE_APPLY_RESULT, EVENT_LIFECYCLE_RESULT, EVENT_WAITLIST_REORDER_RESULT, EVENT_WAITLIST_SKIP_RESULT, EVENT_LIFF_CHANGE_RESULT, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
   NEN_PHOTO_REWARD_POLICY_VERSIONS,
@@ -2067,6 +2067,14 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   }
   if (method === 'POST' && /^\/api\/(line-)?notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
     return { accepted: 2, excluded: 0, failed: 0, duplicate: 0 }
+  }
+  /*
+   * 運用者へのお知らせを作る（板 gjUz3）→ 公開前の確認（板 sDXNy）。公開を押すと先に下書きを保存し、
+   * 保存できたときだけ確認の窓が出る。405 だと窓が出ず「下書きを保存できませんでした」で撮られていた。
+   */
+  if ((method === 'POST' && pathname === '/api/line-notifications/operator-rules')
+    || (method === 'PUT' && /^\/api\/line-notifications\/operator-rules\/[^/]+\/draft$/.test(pathname))) {
+    return { ...OPERATOR_NOTIFICATION_RULES[0], id: 'operator-rule-new', status: 'draft', isActive: false, version: 1 }
   }
   const scenarioSimulation = /^\/api\/scenarios\/([^/]+)\/simulate$/.exec(pathname)
   if (method === 'POST' && scenarioSimulation) {
@@ -4695,6 +4703,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       : LINE_NOTIFICATION_DELIVERIES.items
     ).map(toPublic)
     return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
+  }
+  /* 運用者へのお知らせのチーム（板 gjUz3 の「チーム」欄・sDXNy の宛先）。高橋・佐々木・中川の3人（LINE は2人）。 */
+  if (pathname === '/api/notifications/teams') {
+    return { success: true, data: OPERATOR_NOTIFICATION_TEAMS }
   }
   if (pathname === '/api/notifications/operator-rules' || pathname === '/api/line-notifications/operator-rules') {
     /*

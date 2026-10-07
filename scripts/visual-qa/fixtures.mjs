@@ -6579,6 +6579,11 @@ const operatorRule = (id, name, eventType, recipientLabel, occurredToday, status
   createdAt: '2026-09-01T09:00:00+09:00', updatedAt: '2026-09-07T10:00:00+09:00',
 })
 
+/* 運用者へのお知らせのチーム。作る画面（gjUz3）は最初のチームを選んでおき、スタッフの箱を出さない。 */
+export const OPERATOR_NOTIFICATION_TEAMS = [
+  { id: 'team-nakameguro', lineAccountId: 'visual-qa-account', name: '中目黒店', staffIds: ['staff-owner', 'staff-support', 'staff-store'], version: 1, archivedAt: null },
+]
+
 export const OPERATOR_NOTIFICATION_RULES = [
   operatorRule('operator-rule-1', '新しい予約が入りました', 'message_received', '予約チーム 3人', 18, 'published', ['staff-owner', 'staff-support', 'staff-store']),
   operatorRule('operator-rule-2', '審査を待っている写真があります', 'cv_fire', '審査チーム 2人', 4),

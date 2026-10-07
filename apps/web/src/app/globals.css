@@ -706,6 +706,9 @@
   /* 友だち追加時の配信の実行の詳細（N43uVX）：左（余白24/28・間16）と右の欄（380・余白24・間14）。 */
   --tpl-fm2-rd-main-pad: 24px 28px; --tpl-fm2-rd-main-gap: 16px; --tpl-fm2-rd-card-pad: 20px; --tpl-fm2-rd-card-gap: 12px; --tpl-fm2-rd-card-title-size: 15px; --tpl-fm2-rd-card-title-lh: 22px; --tpl-fm2-rd-title-lh: 19px; --tpl-fm2-rd-sub-lh: 16px; --tpl-fm2-rd-step-pad: 12px 14px; --tpl-fm2-rd-step-gap: 10px; --tpl-fm2-rd-step-icon: 18px; --tpl-fm2-rd-side-w: 380px; --tpl-fm2-rd-side-pad: 24px; --tpl-fm2-rd-side-gap: 14px; --tpl-fm2-rd-box-pad: 16px; --tpl-fm2-rd-box-gap: 4px; --tpl-fm2-rd-row-pad: 9px 0; --tpl-fm2-rd-row-gap: 8px; --tpl-fm2-rd-row-line: #eceef1; --tpl-fm2-rd-actions-gap: 8px; --tpl-fm2-rd-time-lh: 13px;
   --tpl-fx4-viewer-create-h: 36px; /* 一斉配信の閲覧のみ（NtCE3）：隠した「配信を作る」の場所 */ --tpl-fx4-viewer-add-h: 28px; /* 隠した「フォルダを追加」の場所 */ --tpl-fx4-footer-inset: 12px; /* 型の下の帯の左右（絵の下の帯 left 12） */ --tpl-fx4-bc-col-result-wide: 230px; /* 一斉配信の広い板の結果の列（絵 214＋間16） */
+  --tpl-r2-op-sum-gap: 6px; --tpl-r2-op-key-w: 150px; --tpl-r2-op-name-w: 200px; --tpl-r2-op-confirm-row-h: 36px;
+  --tpl-r2-ch-band-bg: #e6f4ea; --tpl-r2-ch-band-ink: #1f7a3a; --tpl-r2-ch-row-h: 54px; --tpl-r2-ch-col-60: 60px; --tpl-r2-ch-col-100: 100px; --tpl-r2-ch-col-110: 110px; --tpl-r2-ch-col-120: 120px; --tpl-r2-ch-col-200: 200px;
+  --tpl-r2-rail-compact-pad: 16px; --tpl-r2-rail-compact-content-width: 247px;
   /* 統括 LINEアカウントを登録（xj3zz・JYfda・GwKE2・v2KMj・TvXII・qw80E）と統括のテンプレート（LRc93・X4JcOf・meBRB）。 */
   --tpl-htn-body-pad: 16px 24px 24px; --tpl-htn-gap: 16px; --tpl-htn-gap-s: 8px; --tpl-htn-gap-xs: 6px; --tpl-htn-steps-pad: 4px 0 8px; --tpl-htn-step-pad: 8px 12px; --tpl-htn-step-mark: 22px;
   --tpl-htn-radius-m: 10px; --tpl-htn-radius-l: 12px; --tpl-htn-radius-pill: 999px; --tpl-htn-line-2: 2px; --tpl-htn-soft-bg: #fafafc;
