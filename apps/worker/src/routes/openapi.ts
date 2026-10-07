@@ -2260,6 +2260,44 @@ const spec = {
         responses: { '200': { description: 'Upcoming items' }, '400': { description: 'LINEアカウント未指定' }, '404': { description: 'LINEアカウント範囲外' } },
       },
     },
+    '/api/dashboard/activity': {
+      get: {
+        tags: ['Dashboard'], summary: '配信・予約・回答・友だち追加の最近の動きを新しい順に読む',
+        description: '所有者・管理者・スタッフが閲覧できるLINEアカウントの記録だけを返す。試し回答は除く。',
+        parameters: [
+          { name: 'account_id', in: 'query', schema: { type: 'string' }, description: 'LINEアカウントID。accountIdとどちらか一方が必須。' },
+          { name: 'accountId', in: 'query', schema: { type: 'string' }, description: 'account_idの別名。' },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 10, minimum: 1, maximum: 100 } },
+        ],
+        responses: {
+          '200': {
+            description: '最近の動きの一覧',
+            content: { 'application/json': { schema: {
+              type: 'object', required: ['success', 'data'],
+              properties: {
+                success: { const: true },
+                data: {
+                  type: 'object', required: ['items'],
+                  properties: { items: { type: 'array', items: {
+                    type: 'object', required: ['id', 'kind', 'summary', 'occurredAt', 'href'],
+                    properties: {
+                      id: { type: 'string' },
+                      kind: { type: 'string', enum: ['broadcast_sent', 'booking_created', 'event_booking_created', 'form_submitted', 'friend_added'] },
+                      summary: { type: 'string' }, occurredAt: { type: 'string' }, href: { type: 'string' },
+                    },
+                  } } },
+                },
+              },
+            } } },
+          },
+          '400': { description: 'アカウント未指定、または件数が1〜100の整数ではない' },
+          '401': { description: '認証が必要' },
+          '403': { description: '所有者・管理者・スタッフの権限が必要' },
+          '404': { description: 'アカウントが見つからない、または閲覧範囲外' },
+          '500': { description: '最近の動きを取得できない' },
+        },
+      },
+    },
     '/api/dashboard/delivery-failure-origins': {
       get: {
         tags: ['Dashboard'], summary: '失敗の数を通知の送達台帳から出どころ別に数える（同じ失敗は1件・送り直し除外）',
@@ -2414,6 +2452,51 @@ const spec = {
         responses: {
           '200': { description: 'Form submissions page with total count and nextCursor' },
           '404': { description: 'Friend not found in account scope' },
+        },
+      },
+    },
+    '/api/friends/{id}/summary': {
+      get: {
+        tags: ['Friends'], summary: '閲覧できる友だちの直近90日間の集計を読む',
+        description: '取消・全額返金を除き、部分返金は金額から差し引く。個人の開封率は未計測のためnull。EC未連携なら購入集計もnull。複数通貨は合算しない。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': {
+            description: '集計期間、開封の計測状態、通貨別の購入件数・金額',
+            content: { 'application/json': { schema: {
+              type: 'object', required: ['success', 'data'],
+              properties: {
+                success: { const: true },
+                data: {
+                  type: 'object', required: ['periodDays', 'from', 'to', 'deliveryOpenRate90Days', 'deliveryOpenMeasuredCount90Days', 'purchases90Days'],
+                  properties: {
+                    periodDays: { const: 90 },
+                    from: { type: 'string', format: 'date-time' }, to: { type: 'string', format: 'date-time' },
+                    deliveryOpenRate90Days: { type: ['number', 'null'] },
+                    deliveryOpenMeasuredCount90Days: { type: 'integer', minimum: 0 },
+                    purchases90Days: {
+                      type: ['object', 'null'], required: ['count', 'totalAmountMinor', 'currency', 'byCurrency'],
+                      properties: {
+                        count: { type: 'integer', minimum: 0 },
+                        totalAmountMinor: { type: ['integer', 'null'], description: '通貨の最小単位。複数通貨または金額不明ならnull。' },
+                        currency: { type: ['string', 'null'] },
+                        byCurrency: { type: 'array', items: {
+                          type: 'object', required: ['currency', 'count', 'totalAmountMinor'],
+                          properties: {
+                            currency: { type: 'string' }, count: { type: 'integer', minimum: 0 },
+                            totalAmountMinor: { type: ['integer', 'null'] },
+                          },
+                        } },
+                      },
+                    },
+                  },
+                },
+              },
+            } } },
+          },
+          '401': { description: '認証が必要' },
+          '404': { description: '友だちが見つからない、または閲覧範囲外' },
+          '500': { description: '集計を取得できない' },
         },
       },
     },
@@ -8228,6 +8311,58 @@ const spec = {
           '200': { description: '未割り当てフォームの一覧' },
           '403': { description: 'Owner or admin role required' },
           '404': { description: '権限範囲外（一般staff・制限付き・別テナント）' },
+        },
+      },
+    },
+    '/api/forms/{id}/submissions/{submissionId}': {
+      get: {
+        tags: ['Forms'], summary: 'フォーム回答1件と後処理の済んだ工程を読み直す',
+        description: '所有者・管理者・スタッフの閲覧範囲とフォームとの一致を確認する。試し回答は404。過去の工程で日時が不明ならcompletedAtはnull。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'submissionId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': {
+            description: '回答の詳細、書き込み結果、後処理の未完了・完了工程',
+            content: { 'application/json': { schema: {
+              type: 'object', required: ['success', 'data'],
+              properties: {
+                success: { const: true },
+                data: {
+                  type: 'object', required: ['id', 'formId', 'formVersionId', 'friendId', 'friendName', 'data', 'destinationWrite', 'postActions', 'createdAt'],
+                  properties: {
+                    id: { type: 'string' }, formId: { type: 'string' }, formVersionId: { type: ['string', 'null'] },
+                    friendId: { type: ['string', 'null'] }, friendName: { type: ['string', 'null'] },
+                    data: { type: 'object', additionalProperties: true }, createdAt: { type: 'string' },
+                    destinationWrite: {
+                      type: 'object', required: ['status', 'attempted', 'succeeded', 'failed'],
+                      properties: {
+                        status: { type: 'string', enum: ['pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown'] },
+                        attempted: { type: ['integer', 'null'] }, succeeded: { type: ['integer', 'null'] }, failed: { type: ['integer', 'null'] },
+                      },
+                    },
+                    postActions: {
+                      type: ['object', 'null'], required: ['state', 'pending', 'completed'],
+                      properties: {
+                        state: { type: 'string', enum: ['completed', 'failed', 'in_progress', 'untracked'] },
+                        pending: { type: 'array', items: { type: 'string' } },
+                        completed: { type: 'array', items: {
+                          type: 'object', required: ['step', 'completedAt'],
+                          properties: { step: { type: 'string' }, completedAt: { type: ['string', 'null'] } },
+                        } },
+                      },
+                    },
+                  },
+                },
+              },
+            } } },
+          },
+          '401': { description: '認証が必要' },
+          '403': { description: '所有者・管理者・スタッフの権限が必要' },
+          '404': { description: 'フォーム・回答が無い、試し回答、または閲覧範囲外' },
+          '500': { description: '回答の詳細を取得できない' },
         },
       },
     },

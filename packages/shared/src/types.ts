@@ -1453,6 +1453,10 @@ export interface IncomingWebhookCreated extends Omit<IncomingWebhook, 'hasSecret
 // -----------------------------------------------------------------------------
 
 export interface OutgoingWebhook {
+  /** 編集の版。旧サーバーとの互換性のため省略を許す。 */
+  version?: number;
+  /** 最後に設定を更新した担当のID。記録のない旧行・自動停止はnull。 */
+  updatedBy?: string | null;
   folderId?: string | null;
   id: string;
   name: string;
@@ -2705,6 +2709,88 @@ export type PhotoPublicationOrderInput = {
   items: Array<{ id: string; expectedVersion: number }>;
 };
 export type PhotoPublicationPublishResult = { id: string; version: number; status: 'published' };
+
+/** 友だちに進行中の配信・処理。日時未確定と件数不明は null。 */
+export interface FriendUpcomingItem {
+  kind: 'scenario' | 'reminder' | 'broadcast' | 'automation';
+  id: string;
+  name: string;
+  scheduledAt: string | null;
+  sentCount: number | null;
+  totalCount: number | null;
+  href: string;
+  /** 一斉配信の対象条件を評価した日時。送信時には再判定される。 */
+  audienceEvaluatedAt?: string;
+}
+
+/** 直近90日の友だち集計。率は0〜1、分母0はnull。金額は通貨の最小単位。 */
+export interface FriendSummary {
+  periodDays: 90;
+  from: string;
+  to: string;
+  deliveryOpenRate90Days: number | null;
+  deliveryOpenMeasuredCount90Days: number;
+  purchases90Days: {
+    count: number;
+    /** 複数通貨・金額不明はnull。購入なしは0。取消・全額返金を除き、部分返金を引く。 */
+    totalAmountMinor: number | null;
+    currency: string | null;
+    byCurrency: Array<{ currency: string; count: number; totalAmountMinor: number | null }>;
+  } | null;
+}
+
+export interface DashboardActivityItem {
+  id: string;
+  kind: 'broadcast_sent' | 'booking_created' | 'event_booking_created' | 'form_submitted' | 'friend_added';
+  summary: string;
+  occurredAt: string;
+  href: string;
+}
+
+export interface FormSubmissionPostActions {
+  state: 'completed' | 'failed' | 'in_progress' | 'untracked';
+  pending: string[];
+  /** 記録された済み工程。過去の記録で日時が不明ならnull。 */
+  completed: Array<{ step: string; completedAt: string | null }>;
+}
+export interface FormSubmissionDetail {
+  id: string;
+  formId: string;
+  formVersionId: string | null;
+  friendId: string | null;
+  friendName: string | null;
+  data: Record<string, unknown>;
+  destinationWrite: {
+    status: 'pending' | 'succeeded' | 'partial' | 'failed' | 'not_requested' | 'unknown';
+    attempted: number | null;
+    succeeded: number | null;
+    failed: number | null;
+  };
+  postActions: FormSubmissionPostActions | null;
+  createdAt: string;
+}
+
+/** 送り先の409応答のdata。ApiError.dataから読み取る。 */
+export interface OutgoingWebhookVersionConflict {
+  currentVersion: number;
+  updatedBy: string | null;
+  updatedAt: string;
+}
+export interface FormSubmissionPage {
+  items: FormSubmissionDetail[];
+  total: number;
+  page: number;
+  limit: number;
+  summary: {
+    startedUnique: number;
+    submitted: number;
+    completionRate: number | null;
+    destinationWrites: Record<FormSubmissionDetail['destinationWrite']['status'], number>;
+    dateAnsweredUniqueFriends: number;
+    dateFields: Array<{ key: string; label: string; answered: number; uniqueFriends: number; minDate: string | null; maxDate: string | null }>;
+    ratingFields: Array<{ key: string; label: string; answered: number; average: number | null }>;
+  };
+}
 
 /** F-22: 同じ出来事の目印を維持した広告送信のやり直し結果。 */
 export interface AdConversionRetryResult {

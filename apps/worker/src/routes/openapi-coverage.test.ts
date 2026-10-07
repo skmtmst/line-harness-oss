@@ -133,6 +133,9 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/booking/admin/sync-notices',
   'POST /api/booking/admin/sync-notices/{id}/done',
   // V8 integration endpoints.
+  'GET /api/dashboard/activity',
+  'GET /api/forms/{id}/submissions/{submissionId}',
+  'GET /api/friends/{id}/summary',
   'DELETE /api/hq/templates/folders/{id}',
   'DELETE /api/notifications/teams/{id}',
   'GET /api/ad-platforms/mappings',
