@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import { FolderDotName } from '@/components/shared/folder-dot'
+import { brandInitial } from '@/components/layout/brand-initial'
 import EmptyList from '@/components/shared/empty-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -439,7 +440,7 @@ export default function HqHomeV8() {
             return (
               <article key={account.id} className={warned ? `${styles.card} ${styles.cardWarn}` : styles.card} aria-label={name}>
                 <div className={styles.cardHead}>
-                  <span className={styles.logo} aria-hidden="true">{name.slice(0, 1)}</span>
+                  <span className={styles.logo} aria-hidden="true">{brandInitial(name)}</span>
                   <div className={styles.cardName}>
                     {/* 絵 `JKjsE`：名前の前に左の列（タグ）の色の丸。付けたタグが無ければ色の無い輪。 */}
                     <p className={styles.name} title={name}>
@@ -490,7 +491,7 @@ export default function HqHomeV8() {
             return (
               <div key={account.id} className={styles.row} role="row">
                 <span role="cell" className={styles.rowName}>
-                  <span className={styles.logo} aria-hidden="true">{name.slice(0, 1)}</span>
+                  <span className={styles.logo} aria-hidden="true">{brandInitial(name)}</span>
                   <span className={styles.cardName}>
                     <span className={styles.name} title={name}>{name}</span>
                     <span className={styles.meta}>{metaOf(account)}</span>

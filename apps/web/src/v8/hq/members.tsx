@@ -15,7 +15,7 @@ import { ListPage } from '@/components/templates'
 import StepUpPrompt from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api, ApiError } from '@/lib/api'
 import { canResendInvite, lastLoginLabel, memberKpis, memberStatus, sortMembers, type MemberStatus } from '@/lib/hq-members'
@@ -52,7 +52,9 @@ export default function HqMembersV8() {
 }
 
 function MembersInner() {
-  usePageTitle('メンバー管理')
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/r4ARpV`）。
+  usePageTitle('メンバー')
+  usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
 
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [members, setMembers] = useState<StaffMember[]>([])
