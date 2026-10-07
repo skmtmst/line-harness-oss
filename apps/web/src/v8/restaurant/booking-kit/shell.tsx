@@ -22,6 +22,7 @@ import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import StoreTabs, { type StoreTabKey } from '../store-tabs/store-tabs'
 import styles from './shell.module.css'
 
 export interface RestaurantV8Context {
@@ -130,7 +131,7 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', children }: {
+export default function RestaurantShell({ boardId, title, description, query, headAfter, bare = false, layout = 'standard', storeTab, children }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
@@ -148,6 +149,8 @@ export default function RestaurantShell({ boardId, title, description, query, he
    * ledgerTight＝予約台帳の今日（さらに段の間が 14）。
    */
   layout?: 'standard' | 'ledger' | 'ledgerTight'
+  /** 板の頭の下に店のタブ（提案 E-1：ダッシュボード・予約・座席・卓・予約枠・在庫）を出す。今の画面の印。 */
+  storeTab?: StoreTabKey
   children: (ctx: RestaurantV8Context) => ReactNode
 }) {
   usePageTitle(title)
@@ -250,6 +253,7 @@ export default function RestaurantShell({ boardId, title, description, query, he
         </div>
         {headAfter ? headAfter(ctx, storePicker) : storePicker}
       </div>
+      {storeTab ? <StoreTabs current={storeTab} flush /> : null}
       <div className={`${styles.body} ${layout === 'ledgerTight' ? styles.bodyTight : ''}`}>
         <BoundaryBanner />
         {noticeBand}
