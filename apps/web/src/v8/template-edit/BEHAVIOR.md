@@ -1,13 +1,14 @@
 # テンプレートの作る・編集の動き（BEHAVIOR.md）
 
 対象：`message.tsx`（メッセージを作る・編集：u5YC6／1152 は a1k3d／競合は NCbYn）と
-`asset.tsx`（クーポンを作る S6FEuB・リサーチを作る EsYo4）。
+`asset.tsx`（クーポンを作る S6FEuB・リサーチを作る EsYo4）と `rich.tsx`（リッチメッセージを作る EFV8l）。
 写し元：`app/templates/edit-v8.tsx`・`edit/edit-core.tsx`・`template-detail-data.ts`・
 `edit/template-conflict-diff.ts`・`asset-editor-v8.tsx`・`template-asset-editor.tsx`・
 `app/contents/media-picker-dialog.tsx`（`media-picker.tsx` に写した）。
 
 ## 入口と受け付ける URL・指定（今と同じ名前・同じ意味）
-- `app/templates/edit/page.tsx`：`theme === 'v8'` のとき、`?kind=rich_message` は今の V8 の画面（`app/templates/edit-v8.tsx`）、それ以外は `edit.tsx`。v7 はそのまま。
+- `app/templates/edit/page.tsx`：`theme === 'v8'` のときは `edit.tsx`（2026-10-07 からリッチメッセージも）。v7 はそのまま。
+- `?kind=rich_message`：リッチメッセージを作る（`rich.tsx`）。
 - `?id=<テンプレートID>`：編集。無ければ作る。
 - `?kind=coupon` ／ `?kind=research`：資産の作る画面（`asset.tsx`）。
 - `?visual=1`：見本の中身を入れて開く（撮影・見本用。今と同じ値）。
@@ -50,3 +51,14 @@
 - リサーチ：受付の開始・終了・はじめのあいさつ・質問（10問まで・選択肢は13まで・必ず答えてもらう・答え方・並べ替えは問の左の印から「上へ／下へ」・消す）・答え終わったときに行うこと・答えてもらう人（タグ、任意）。
   答えてもらう人は絵に無いので、いちばん下の箱に置いた（今ある機能を落とさないため）。
 - 右の列：クーポンは「公開したあとに見られる数」（保存前は —、抽選しないときは「抽選なし」）、リサーチは「回答フォームとの使い分け」。届き方はスマホの中のカード。
+
+## リッチメッセージ（rich.tsx）
+- 写し元：`app/templates/asset-editor-v8.tsx`・`template-asset-editor.tsx`（形・面の座標・保存値の組み立て）。
+- 保存：`POST /api/broadcast-message-assets`（`kind: rich_message`・`payload` は imageUrl・imageMediaId・imageMediaKind・shape・tapAreas・folder）。今と同じ形。
+  公開の口が無いので、下書きを保存は保存して留まり、保存して公開は保存して一覧へ戻る（クーポン・リサーチと同じ）。
+- 面の分け方：1面・上下2面・左右2面・上1・下2・4面・6面。設定のある面が消える形へ替えるときは確かめの窓を出す。
+- 画像：160角の枠か「登録メディアから選ぶ」で選ぶ。URL を直接書く欄も残した（絵には無い。今の画面にある機能）。
+- 押した面ごとの動き：1面1行（面の札「A 上」・押したら（未設定／URLを開く／動きを実行する）・中身）。
+  動きの中身は行の右の欄を押して窓で編集する（`InlineActionRowsV8`）。未設定の面があれば下に注意を出す。
+- 右の列：リッチメニューとの違い・届き方（正方形の画像に面の線を重ねた見本）。
+- `?visual=1`：見本の中身（夏のキャンペーン告知・上下2面・上は URL・下は動き）。
