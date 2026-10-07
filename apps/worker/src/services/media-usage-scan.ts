@@ -49,6 +49,14 @@ const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; c
   { refKind: 'webinar', table: 'webinars', idColumn: 'id', columns: ['video_prefix'] },
 ];
 
+/** 店の6種類は同じテンプレート参照として点検する。 */
+function sourceTable(source: typeof SOURCES[number]): string {
+  if (source.refKind !== 'template') return source.table;
+  return `(SELECT id, message_content, draft_message_content FROM templates
+    UNION ALL SELECT id, payload_json AS message_content,
+      draft_payload_json AS draft_message_content FROM broadcast_message_assets)`;
+}
+
 export interface ScanResult {
   scanned: number;
   matched: number;
@@ -111,7 +119,7 @@ async function findMatches(
         const binds = source.columns.flatMap(() => chunk.map((token) => token));
         const rows = await db
           .prepare(
-            `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions}`,
+            `SELECT ${source.idColumn} AS ref_id FROM ${sourceTable(source)} WHERE ${conditions}`,
           )
           .bind(...binds)
           .all<{ ref_id: string }>();
@@ -126,7 +134,8 @@ async function findMatches(
       // 表そのものが無い読み口だけ飛ばす。全部を例外にすると、どの画像でも
       // 取得が失敗し、読み直しても直らない（R34）。一時的なD1障害は
       // 例外のままにして、0件と偽らない。
-      if (!isMissingSourceTable(err, source.table)) throw err;
+      if (!isMissingSourceTable(err, source.table)
+        && !(source.refKind === 'template' && isMissingSourceTable(err, 'broadcast_message_assets'))) throw err;
       console.error(`media usage single scan skipped ${source.table}:`, err);
       skippedTables.push(source.table);
     }
@@ -255,7 +264,7 @@ export async function scanMediaUsage(
   try {
     const result = await db.prepare(
       `SELECT ${source.idColumn} AS ref_id${selectedColumns}
-         FROM ${source.table}
+         FROM ${sourceTable(source)}
         WHERE ${source.idColumn} > ?
         ORDER BY ${source.idColumn} ASC
         LIMIT ?`,
@@ -264,7 +273,8 @@ export async function scanMediaUsage(
   } catch (err) {
     // 古い検証環境などで機能の表がまだ無ければ、その読み口だけ次へ送る。
     // 一時的なD1障害まで「走査済み」にすると、1周後の整理で使用先を消してしまう。
-    if (!isMissingSourceTable(err, source.table)) throw err;
+    if (!isMissingSourceTable(err, source.table)
+        && !(source.refKind === 'template' && isMissingSourceTable(err, 'broadcast_message_assets'))) throw err;
     console.error(`media usage scan skipped ${source.table}:`, err);
     sourceMissing = true;
   }

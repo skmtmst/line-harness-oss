@@ -9424,7 +9424,15 @@ export const api = {
     ),
     jobs: () => fetchApi<ApiResponse<FriendMigrationJob[]>>('/api/friends/migration-jobs'),
   },
-  /** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。形は `apps/worker/src/routes/line-account-tags.ts`。 */
+  /** 統括のアカウントフォルダ（板 `JKjsE`）。店のFolder型を共用する。 */
+  lineAccountFolders: {
+    list: () => fetchApi<ApiResponse<import('@line-crm/shared').LineAccountFolderList>>('/api/line-account-folders'),
+    create: (input: import('@line-crm/shared').LineAccountFolderInput) => fetchApi<ApiResponse<import('@line-crm/shared').Folder>>('/api/line-account-folders', {method:'POST',body:JSON.stringify(input)}),
+    update: (id:string,input:Partial<import('@line-crm/shared').LineAccountFolderInput>) => fetchApi<ApiResponse<import('@line-crm/shared').Folder>>(`/api/line-account-folders/${encodeURIComponent(id)}`, {method:'PATCH',body:JSON.stringify(input)}),
+    remove: (id:string) => fetchApi<ApiResponse<{id:string}>>(`/api/line-account-folders/${encodeURIComponent(id)}`, {method:'DELETE'}),
+    move: (id:string,folderId:string|null) => fetchApi<ApiResponse<{id:string;folderId:string|null;folder:import('@line-crm/shared').Folder|null}>>(`/api/line-accounts/${encodeURIComponent(id)}/folder`, {method:'PUT',body:JSON.stringify({folderId})}),
+  },
+  /** 移行期間用の旧タグAPI。複数タグは先頭1件をフォルダにする。 */
   lineAccountTags: {
     setForAccount: (id: string, tagIds: string[]) =>
       fetchApi<ApiResponse<{ id: string; tags: LineAccountTag[] }>>(
@@ -9448,8 +9456,12 @@ export const api = {
     update: (id: string, input: Partial<import("@line-crm/shared").LineAccountTagInput>) => fetchApi<ApiResponse<import("@line-crm/shared").LineAccountTagSummary>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
   },
   lineAccounts: {
-    list: (live = false) =>
-      fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '?live=1' : ''}`),
+    list: (live = false, folderId?:string|null) => {
+      const query=new URLSearchParams()
+      if(live) query.set('live','1')
+      if(folderId!==undefined) query.set('folderId',folderId ?? '__none__')
+      return fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${query.size?`?${query}`:''}`)
+    },
     summary: () =>
       fetchApi<ApiResponse<{ uniqueFriendCount: number }>>('/api/line-accounts/summary'),
     get: (id: string) =>

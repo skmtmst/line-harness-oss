@@ -133,6 +133,12 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/line-account-folders',
+  'POST /api/line-account-folders',
+  'PATCH /api/line-account-folders/{id}',
+  'DELETE /api/line-account-folders/{id}',
+  'PUT /api/line-accounts/{id}/folder',
+  'GET /api/hq/templates/kind-counts',
   'GET /api/restaurant-test/opening-hours',
   'PUT /api/restaurant-test/opening-hours',
   'POST /api/restaurant-test/reservation-link',
