@@ -86,7 +86,7 @@ import {
   ACTION_SCORE_RULES,
   SUPPORT_MARKS, SUPPORT_MARK_ARCHIVE_IMPACT, SUPPORT_MARK_AUTOMATION_RULES,
   OUTGOING_WEBHOOKS, OUTGOING_WEBHOOK_TEST_RESULT, INCOMING_WEBHOOKS, INCOMING_WEBHOOK_DETAILS, INCOMING_WEBHOOK_UNMATCHED, ENTRY_ROUTES, INFLOW_SUMMARY,
-  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, MEASUREMENT_SITES, AD_PLATFORMS, AD_CONVERSION_LOGS, TRACKED_LINKS,
+  SITE_TRACKING_SUMMARY, SITE_TRACKING_PAGES, MEASUREMENT_SITES, AD_PLATFORMS, AD_CONVERSION_LOGS, AD_CONVERSION_LOG_SUMMARY, AD_EVENT_MAPPINGS, TRACKED_LINKS,
   AD_COST_ROWS, AD_COST_PLATFORMS, AD_COST_MANUAL_ENTRIES, AD_CONVERSION_COST,
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
@@ -3647,6 +3647,21 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
    * 顔ぶれを見る）を確かめられない。人数・顔ぶれ・数え直しは
    * `REMINDER_VALIDATE` / `REMINDER_AUDIENCE` が固定で返す。
    */
+  /*
+   * テスト送信先の状態。無いと既定の器が返って「未設定」の案内と
+   * 「送信先を再確認」が出て、確認の段（ltAaq）が 84px 下へずれていた。
+   * 絵は「送り先：Kenta Kawano（自分）」。
+   */
+  if (/^\/api\/reminders\/[^/]+\/test-recipient$/.test(pathname)) {
+    return {
+      success: true,
+      data: {
+        state: 'ready',
+        recipient: { id: 'visual-staff-self', displayName: 'Kenta Kawano', pictureUrl: null },
+        recipientKind: 'self',
+      },
+    }
+  }
   if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
     const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
     if (draftId === 'reminder-new') return { success: true, data: { ...REMINDER_NEW_DRAFT } }
@@ -4138,6 +4153,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       data: { conversionCost: AD_CONVERSION_COST, rows: AD_COST_ROWS, platforms: AD_COST_PLATFORMS, manualEntries: AD_COST_MANUAL_ENTRIES },
     }
   }
+  /* F-21 成果地点と広告に返す名前の対応（板 FDBsG）。 */
+  if (pathname === '/api/ad-platforms/mappings') return { success: true, data: AD_EVENT_MAPPINGS }
   if (pathname === '/api/ad-platforms/logs') {
     const page = Math.max(1, Number(query.get('page')) || 1)
     const limit = Math.min(200, Math.max(1, Number(query.get('limit')) || 20))
@@ -4155,6 +4172,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       data: {
         items: filtered.slice((page - 1) * limit, page * limit),
         total: filtered.length,
+        summary: AD_CONVERSION_LOG_SUMMARY,
         page,
         limit,
         sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }],
@@ -5103,6 +5121,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/nen-campaigns/overview') {
     // `jobs` が入っていないと `overview.jobs.pending` で落ちる。
     return { success: true, data: { activeCampaigns: 6, jobs: { total: 2640, pending: 148, sent: 2486, failed: 6 }, columns: 24, pets: 864, coupons: 28 } }
+  }
+  /*
+   * やり取りの中身（F-18：伏せ字にした本文）。板 `DA0Ag` の中身の箱。
+   * 予約台帳（wi-2）だけ絵の本文を返し、ほかは「残っていない」。
+   */
+  const interactionPayload = /^\/api\/webhooks\/interactions\/([^/]+)\/payload$/.exec(pathname)
+  if (interactionPayload) {
+    const id = decodeURIComponent(interactionPayload[1])
+    return id === 'wi-2'
+      ? { success: true, data: { id, available: true, body: { event: 'booking_created', booking_id: 'bk_8f2…', menu: 'カウンセリング 30分', friend: 'Masato S.（伏せ字）' } } }
+      : { success: true, data: { id, available: false, body: null } }
   }
   if (pathname === '/api/webhooks/interactions') {
     /*

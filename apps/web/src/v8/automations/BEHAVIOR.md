@@ -10,9 +10,10 @@
 | 動いた記録 | `runs.tsx` | `g98F9` | `app/automations/runs/page.tsx` |
 | 共通アクション | `common-actions.tsx` | `LnGNw` | `app/common-actions/page.tsx` |
 | 版と使われている場所 | `versions.tsx` | `ziSgL` | `app/common-actions/versions/page.tsx` |
+| 見本 | `templates.tsx` | `c7dxp` | `app/automations/page.tsx`（`?tab=templates`） |
 | 共通（頭・タブ・数の帯・閲覧のみの帯・権限） | `shell.tsx` | 上のすべて | — |
 
-見本（`?tab=templates`・`c7dxp`）と、ルールを作る（`/automations/new`・`M4torY`・`tJqST`）は今の V8 のまま。
+ルールを作る（`/automations/new`・`M4torY`・`tJqST`）は今の V8 のまま。見本（`c7dxp`）は 2026-10-07 にここへ一から書いた（今までの V8 は `app/automations/templates-v8.tsx`）。
 
 ## 受け付ける URL と指定（今と同じ）
 - `/automations`（ルール）、`/automations?tab=templates`（見本）。
@@ -44,3 +45,14 @@
 - 動いた記録：結果の札は「動いた・失敗・条件に外れた」の3つ（すべては数の帯）。テスト実行を含めるのは「よく使う絞り込み」から。中身は右の詳細パネル。行の「…」に ルールを開く・トークを開く を足した。
 - 共通アクション：状態の絞り込みは札（公開中・下書き・古い版あり・呼ばれていない・保管）。「中の処理」は処理の数（一覧の口に処理の並びが無い）。
 - 版と使われている場所：下書きがある間は「この版から新しい版」を押せない形で出す（サーバが draft_exists で断るため。理由は title）。
+
+## 見本（`templates.tsx`・`c7dxp`）
+- 呼ぶ口（今と同じ）：見本＝`api.automations.templates`、数の帯＝`api.automations.list`（ルールの数・`summary`）と `/api/automation-runs?limit=1` の `summary.skipped`。
+- 「この見本で下書きを作る」＝`api.automations.createDraftFromTemplate`（同じ操作のやり直しだけ同じ鍵）→ `/automations/drafts?id=<下書き>`。失敗は赤い帯「下書きを作れませんでした…」、下書きは作らない。
+- 読めないときは「見本を表示できませんでした」と再読み込み。0件の絞り込みは「条件に合う見本はありません」。
+- 閲覧のみ：「この見本で下書きを作る」と右上の「見本から作る」を置かない（カードの高さは同じ）。閲覧のみの帯は出す。
+
+### 今の V8 と違うところ
+- きっかけの言い方は口の「〇〇とき」から「とき」を落として出す（絵：「友だちになった」）。
+- きっかけの札は、かっこの補足を外した同じきっかけを1つにまとめ（「注文が確定した（初回）」→「注文が確定した」）、**先に出てきた順に6つまで**（絵は「すべて」＋6つ）。7つ目以降のきっかけの見本は「すべて」から見る。
+- 数の帯はルールの一覧と同じ4つ（今月動いた＝この30日に動いた回数。「先月より」は口が無いので出さない）。

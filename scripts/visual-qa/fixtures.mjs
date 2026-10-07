@@ -3524,10 +3524,12 @@ export const SCENARIO_SIMULATION = {
 
 export const SCENARIO_RUNS = {
   summary: { active: 116, paused: 0, completed: 312, delivering: 18 },
-  /* 板 `X4STXS`（配信結果）の参加中の友だちの先頭2人。 */
+  /* 板 `X4STXS`（配信結果）の参加中の友だちの4行（途中・途中・止まっている・読み終えた）。 */
   subscriptions: [
-    { id: 'scenario-sub-1', friendId: 'friend-1', friendName: '中村 彩', status: 'active', currentStepOrder: 2, startedAt: '2026-09-05T01:00:00.000Z', nextDeliveryAt: '2026-09-06T11:00:00.000Z', updatedAt: '2026-09-05T01:00:00.000Z' },
-    { id: 'scenario-sub-2', friendId: 'friend-2', friendName: '木村 亮', status: 'completed', currentStepOrder: 4, startedAt: '2026-08-28T01:00:00.000Z', nextDeliveryAt: null, updatedAt: '2026-09-04T11:00:00.000Z' },
+    { id: 'scenario-sub-1', friendId: 'friend-1', friendName: '高橋 直人', status: 'active', currentStepOrder: 3, startedAt: '2026-09-27T01:00:00.000Z', nextDeliveryAt: '2026-10-04T01:00:00.000Z', updatedAt: '2026-09-30T01:00:00.000Z' },
+    { id: 'scenario-sub-3', friendId: 'friend-3', friendName: '佐藤 美咲', status: 'active', currentStepOrder: 2, startedAt: '2026-09-30T01:00:00.000Z', nextDeliveryAt: '2026-10-02T11:00:00.000Z', updatedAt: '2026-10-01T11:00:00.000Z' },
+    { id: 'scenario-sub-4', friendId: 'friend-4', friendName: '山田 花子', status: 'paused', currentStepOrder: 1, startedAt: '2026-09-29T01:00:00.000Z', nextDeliveryAt: null, updatedAt: '2026-09-30T01:00:00.000Z' },
+    { id: 'scenario-sub-2', friendId: 'friend-2', friendName: 'Kyohei Yamamoto', status: 'completed', currentStepOrder: 4, startedAt: '2026-08-28T01:00:00.000Z', nextDeliveryAt: null, updatedAt: '2026-09-04T11:00:00.000Z' },
   ],
   pagination: { total: 428, limit: 20, cursor: '', nextCursor: null },
   testSends: [{ id: 'scenario-test-1', friendId: 'friend-1', friendName: '高橋 直人', sentAt: '2026-09-07T00:05:00.000Z', messageCount: 4 }],
@@ -4780,13 +4782,28 @@ export const AD_COST_PLATFORMS = [
   #514-8: 本番の口が返す形だけにする。friendName・conversionName・nextRetryAt は
   口が返さない(画面も読まない)。豊富な形を返すとずれを隠す。
 */
+/* 板 `p0kA3`（広告への送信履歴）の5行。数の帯（`FDBsG`）は口の summary（この30日 送った15・待っている2・断られた1）を読む。 */
 export const AD_CONVERSION_LOGS = [
-  { id: 'adlog-1', adPlatformId: 'ad-meta', friendId: 'friend-inflow-1', eventName: '体験申込フォームの送信', clickId: 'fixed-fbclid-1', clickIdType: 'fbclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:32:00.000Z' },
-  { id: 'adlog-2', adPlatformId: 'ad-google', friendId: 'friend-inflow-2', eventName: '初回のご購入', clickId: 'fixed-gclid-1', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:18:00.000Z' },
-  { id: 'adlog-3', adPlatformId: 'ad-meta', friendId: 'friend-inflow-3', eventName: '予約が入った', clickId: 'fixed-fbclid-2', clickIdType: 'fbclid', status: 'pending', errorMessage: null, createdAt: '2026-08-25T10:54:00.000Z' },
-  { id: 'adlog-4', adPlatformId: 'ad-meta', friendId: 'friend-inflow-4', eventName: '体験申込フォームの送信', clickId: 'fixed-fbclid-3', clickIdType: 'fbclid', status: 'failed', errorMessage: '接続設定を確認してください', createdAt: '2026-08-25T09:41:00.000Z' },
-  { id: 'adlog-5', adPlatformId: 'ad-google', friendId: 'friend-inflow-5', eventName: '初回のご購入', clickId: 'fixed-gclid-2', clickIdType: 'gclid', status: 'failed', errorMessage: '広告アカウントをつなぎ直してください', createdAt: '2026-08-25T08:20:00.000Z' },
-  { id: 'adlog-6', adPlatformId: 'ad-meta', friendId: '', eventName: '定期便のお申し込み', clickId: null, clickIdType: null, status: 'skipped', errorMessage: '対応が付いていないため送っていません', createdAt: '2026-08-24T22:05:00.000Z' },
+  { id: 'adlog-1', adPlatformId: 'ad-google', friendId: 'friend-inflow-1', eventName: '初回購入', clickId: 'fixed-gclid-1', clickIdType: 'gclid', status: 'pending', errorMessage: null, createdAt: '2026-10-01T12:14:00.000Z' },
+  { id: 'adlog-2', adPlatformId: 'ad-meta', friendId: 'friend-inflow-2', eventName: '定期便の申し込み', clickId: 'fixed-fbclid-1', clickIdType: 'fbclid', status: 'pending', errorMessage: null, createdAt: '2026-10-01T09:02:00.000Z' },
+  { id: 'adlog-3', adPlatformId: 'ad-google', friendId: 'friend-inflow-3', eventName: '初回購入', clickId: 'fixed-gclid-2', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-09-30T11:40:00.000Z' },
+  { id: 'adlog-4', adPlatformId: 'ad-meta', friendId: 'friend-inflow-4', eventName: '初回購入', clickId: 'fixed-fbclid-2', clickIdType: 'fbclid', status: 'failed', errorMessage: 'クリックの目印の期限（90日）が切れていました', createdAt: '2026-09-29T03:11:00.000Z' },
+  { id: 'adlog-5', adPlatformId: 'ad-google', friendId: 'friend-inflow-5', eventName: '定期便の申し込み', clickId: 'fixed-gclid-3', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-09-28T00:30:00.000Z' },
+]
+export const AD_CONVERSION_LOG_SUMMARY = { sentLast30Days: 15, pendingLast30Days: 2, failedLast30Days: 1 }
+
+/*
+ * 板 `FDBsG`（広告とのつなぎ）の対応表（F-21 `GET /api/ad-platforms/mappings`）。
+ * 口は成果地点ごとに Google・Meta の2行を返す。来店予約は両方「結びつけない」で、
+ * Meta だけ自動の名前（Schedule）があるので選ぶ欄が出る（絵どおり）。
+ */
+export const AD_EVENT_MAPPINGS = [
+  { pointId: 'cp-first', pointName: '初回購入', eventType: 'purchase_first', provider: 'google', mode: 'manual', eventName: 'purchase_first', automaticEventName: 'purchase', googleActionId: null, version: 2 },
+  { pointId: 'cp-first', pointName: '初回購入', eventType: 'purchase_first', provider: 'meta', mode: 'auto', eventName: 'Purchase', automaticEventName: 'Purchase', googleActionId: null, version: 1 },
+  { pointId: 'cp-teiki', pointName: '定期便の申し込み', eventType: 'subscribe_teiki', provider: 'google', mode: 'manual', eventName: 'subscribe_teiki', automaticEventName: 'subscribe', googleActionId: null, version: 1 },
+  { pointId: 'cp-teiki', pointName: '定期便の申し込み', eventType: 'subscribe_teiki', provider: 'meta', mode: 'auto', eventName: 'Subscribe', automaticEventName: 'Subscribe', googleActionId: null, version: 1 },
+  { pointId: 'cp-visit', pointName: '来店予約', eventType: 'store_visit', provider: 'google', mode: 'off', eventName: null, automaticEventName: null, googleActionId: null, version: 1 },
+  { pointId: 'cp-visit', pointName: '来店予約', eventType: 'store_visit', provider: 'meta', mode: 'off', eventName: null, automaticEventName: 'Schedule', googleActionId: null, version: 1 },
 ]
 
 /*
@@ -5700,7 +5717,6 @@ export const AUTOMATION_RUNS = {
   pagination: { total: 4234, limit: 20, offset: 0 },
 }
 
-/** 設計 `WjYAC` と同じ12件。選択後に利用者の実データを選び直す見本。 */
 /*
  * 見本テンプレートの `triggerLabel` は、**きっかけの種類名ではなく説明文**。
  *
@@ -5714,19 +5730,23 @@ export const AUTOMATION_RUNS = {
  * `automationTriggerLabel(row.trigger_type)` で正本から引くので、
  * そちらは正本の値でなければならない。`cross-contracts.test.ts` が見張る。
  */
+/*
+ * 板 `c7dxp`（オートメーション 見本）の12枚。きっかけは本物の口と同じ「〇〇とき」の言い方で返し、
+ * 画面が「とき」を落として出す（絵：「友だちになった」）。
+ */
 export const AUTOMATION_TEMPLATES = [
-  { key: 'welcome', name: 'はじめての人にあいさつする', description: '追加された友だちへ案内を始めます', triggerLabel: '友だちが追加されたとき', actionLabel: 'シナリオ「はじめての方へ」を始める' },
-  { key: 'reservation', name: '「予約」と送られたら予約画面を出す', description: '予約したい人を迷わせません', triggerLabel: 'メッセージに「予約」が入ったとき', actionLabel: 'リッチメニューを切り替える＋回答フォームを送る' },
-  { key: 'inactive', name: '7日 反応がない人に声をかける', description: '対応漏れを見つけます', triggerLabel: '最終接触から7日たったとき', actionLabel: '対応マーク「気にかける」を付ける' },
-  { key: 'first-order', name: 'はじめて買った人にお礼を送る', description: '初回購入のお礼を自動化します', triggerLabel: '注文が確定したとき（はじめての人だけ）', actionLabel: 'テンプレート「はじめてのご注文ありがとうございます」を送る' },
-  { key: 'tag-scenario', name: 'タグが付いたらシナリオを始める', description: '自由に組み替えられる見本です', triggerLabel: 'タグが付いたとき', actionLabel: '選んだシナリオを始める' },
-  { key: 'birthday', name: '誕生月にクーポンを送る', description: '誕生日に合わせて特典を届けます', triggerLabel: '誕生日の◯日前になったとき', actionLabel: 'クーポンを送る＋マイルを付ける' },
-  { key: 'review', name: '口コミを書いてくれた人にマイル', description: '回答後のお礼を自動化します', triggerLabel: '回答フォームが送られたとき', actionLabel: 'マイルを付ける＋タグを付ける' },
-  { key: 'winback', name: '買っていない人を掘り起こす', description: '休眠した友だちへ定期的に案内します', triggerLabel: '90日 買っていない人（毎週 月曜に見る）', actionLabel: '一斉配信「おひさしぶりです」に入れる' },
-  { key: 'block', name: 'ブロックされたら記録する', description: '解除後の対応に備えます', triggerLabel: 'ブロックされたとき', actionLabel: 'タグ「ブロック」を付ける＋外部連携に知らせる' },
-  { key: 'booking', name: '予約前日に確認を送る', description: '来店忘れを減らします', triggerLabel: '予約日の前日になったとき', actionLabel: '確認メッセージを送る' },
-  { key: 'score', name: '関心が高まった人を担当へ知らせる', description: '対応の優先順位を揃えます', triggerLabel: '行動スコアが80になったとき', actionLabel: '担当者タグを付ける＋外部連携に知らせる' },
-  { key: 'cancel', name: '解約相談を受けたら案内する', description: '相談窓口をすぐ案内します', triggerLabel: '「解約」と送られたとき', actionLabel: '相談予約フォームを送る' },
+  { key: 'welcome', name: '友だち追加のあいさつとタグ', description: '追加された友だちへあいさつします', triggerLabel: '友だちになったとき', actionLabel: 'メッセージを送る・タグを付ける' },
+  { key: 'reservation', name: '「予約」と送られたら担当へ', description: '予約したい人を迷わせません', triggerLabel: 'メッセージを受け取ったとき（含まれる言葉）', actionLabel: '担当に知らせる・タグを付ける' },
+  { key: 'vip-scenario', name: 'VIP タグでシナリオ開始', description: '自由に組み替えられる見本です', triggerLabel: 'タグが付いたとき', actionLabel: 'シナリオを始める' },
+  { key: 'survey-tag', name: 'アンケートの回答でタグ', description: '回答で友だちを分けます', triggerLabel: 'フォームに答えたとき', actionLabel: 'タグを付ける' },
+  { key: 'booking', name: '予約のお礼と前日リマインド', description: '来店忘れを減らします', triggerLabel: '予約が確定したとき', actionLabel: 'メッセージを送る' },
+  { key: 'purchase', name: '購入のお礼とフォロー', description: '購入後のお礼を自動化します', triggerLabel: '注文が確定したとき', actionLabel: '共通アクション「購入のお礼」' },
+  { key: 'first-order', name: '初回購入でマイル付与', description: '初回購入のお礼を自動化します', triggerLabel: '注文が確定したとき（初回）', actionLabel: 'マイルを付ける' },
+  { key: 'winback', name: '休眠の人へ声かけ', description: '休眠した友だちへ定期的に案内します', triggerLabel: '決めた時刻・曜日（毎週月曜）', actionLabel: 'メッセージを送る' },
+  { key: 'birthday', name: '誕生月のクーポン', description: '誕生日に合わせて特典を届けます', triggerLabel: '決めた時刻・曜日（毎月1日）', actionLabel: 'クーポンを送る' },
+  { key: 'unblock', name: 'ブロック解除で再あいさつ', description: '解除後にもう一度あいさつします', triggerLabel: '友だちになったとき（再追加）', actionLabel: 'メッセージを送る' },
+  { key: 'shipping', name: '発送のお知らせ', description: '発送を知らせます', triggerLabel: '注文が発送されたとき', actionLabel: 'メッセージを送る' },
+  { key: 'pause', name: '定期便の休止で引き止め', description: '休止した人へ案内します', triggerLabel: '定期便が休止されたとき', actionLabel: 'メッセージを送る・タグを付ける' },
 ]
 
 const caStep = (id, type, params = {}, onFailure = 'stop') => ({ id, type, params, onFailure })
