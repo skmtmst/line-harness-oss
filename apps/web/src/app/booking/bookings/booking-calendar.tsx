@@ -297,7 +297,7 @@ function DayGrid({ items, staff, day, hours, bookable, canCreate, onOpen }: {
   )
 }
 
-function WeekGrid({ days, items, hours, bookable, canCreate, onOpen }: {
+function WeekGrid({ days, items, hours, bookable, canCreate, onOpen, onDateClick }: {
   days: string[]
   items: BookingRequest[]
   hours: number[]
@@ -305,6 +305,8 @@ function WeekGrid({ days, items, hours, bookable, canCreate, onOpen }: {
   bookable: Map<string, CalendarSlot>
   canCreate: boolean
   onOpen: (id: string) => void
+  /** V8 の「週」：日付を押すとその日の「日」へ。渡さなければ従来どおり押せない。 */
+  onDateClick?: (day: string) => void
 }) {
   const columns = '64px repeat(7, minmax(0, 1fr))'
   // 格子ごとにfilterし直さない。日×時間の辞書へ1回で束ねる(点検#516の中1)。
@@ -342,7 +344,13 @@ function WeekGrid({ days, items, hours, bookable, canCreate, onOpen }: {
           const count = dayCounts.get(day) ?? 0
           return (
             <div key={day} className="border-hairline border-l px-1 py-2 text-center">
-              <p className="text-ink text-xs font-semibold">{dateLabel(day)}</p>
+              {onDateClick ? (
+                <button type="button" className="text-ink text-xs font-semibold hover:underline" onClick={() => onDateClick(day)} aria-label={`${dateLabel(day)}の日で見る`}>
+                  {dateLabel(day)}
+                </button>
+              ) : (
+                <p className="text-ink text-xs font-semibold">{dateLabel(day)}</p>
+              )}
               <p className="text-success mt-0.5 text-xs font-semibold">{count}件</p>
             </div>
           )
@@ -448,7 +456,7 @@ function hoursText(ms: number): string {
   return `${hours}時間`
 }
 
-export default function BookingCalendar({ mode, items, onOpen, staffNames, canCreate = false, anchorDay, onAnchorChange, availability, onRetryAvailability, dataState = 'ready' }: {
+export default function BookingCalendar({ mode, items, onOpen, staffNames, canCreate = false, anchorDay, onAnchorChange, availability, onRetryAvailability, dataState = 'ready', onDateClick }: {
   mode: 'day' | 'week'
   items: BookingRequest[]
   onOpen: (id: string) => void
@@ -475,6 +483,8 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
    * 失敗の帯の中に置く。渡さないときは開き直しの案内だけを出す。
    */
   onRetryAvailability?: () => void
+  /** V8 の「週」：日付を押すとその日の「日」へ。渡さなければ従来どおり。 */
+  onDateClick?: (day: string) => void
 }) {
   const weekStart = startOfWeek(anchorDay)
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => moveDay(weekStart, index)), [weekStart])
@@ -701,7 +711,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
               onNext={() => onAnchorChange(moveDay(anchorDay, 7))}
               onToday={() => onAnchorChange(todayKey())}
             >
-              <WeekGrid days={days} items={weekItems} hours={hours} bookable={bookableByDayHour} canCreate={canCreate} onOpen={onOpen} />
+              <WeekGrid days={days} items={weekItems} hours={hours} bookable={bookableByDayHour} canCreate={canCreate} onOpen={onOpen} onDateClick={onDateClick} />
             </CalendarFrame>
           )}
         </div>

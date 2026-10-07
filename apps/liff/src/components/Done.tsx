@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import liff from '@line/liff';
 import { formatJpLong } from '../lib/datetime.js';
+import { api } from '../lib/api.js';
+import { logFailure } from '../lib/user-message.js';
 import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import Icon from './ui/Icon.js';
@@ -15,16 +18,41 @@ export default function Done({
   menuName,
   slot,
   status,
+  bookingId,
+  prepayNotice,
 }: {
   menuName: string;
   slot: SlotPick;
   /** 作られた予約の状態。confirmed なら未承認の表示を出さない。 */
   status: string;
+  /** 予約ID（前払いのみの案内があるときだけ使う）。 */
+  bookingId?: string | null;
+  /** 無断キャンセルが続いている人への前払いのみの案内。無いときは出さない。 */
+  prepayNotice?: string | null;
 }) {
   // initLiff() は ?liffId=... をクエリから読むので、内部遷移でも保持する。
   // search を維持しないと「予約の履歴を見る」→ WebView 再読み込みで liffId が失われる。
   const { search } = useLocation();
   const navigate = useNavigate();
+  /** お支払いへ進む：starting | phone（決済が無い店）| failed。 */
+  const [payState, setPayState] = useState<'idle' | 'starting' | 'phone' | 'failed'>('idle');
+
+  async function startPayment() {
+    if (!bookingId || payState === 'starting') return;
+    setPayState('starting');
+    try {
+      const res = await api.startBookingPayment(bookingId);
+      if (res.checkoutUrl) {
+        window.location.href = res.checkoutUrl;
+        return;
+      }
+      // 決済の用意が無い店では電話での確認に案内する。
+      setPayState('phone');
+    } catch (e) {
+      logFailure('start-booking-payment', e);
+      setPayState('failed');
+    }
+  }
 
   return (
     <div className="space-y-3.5" data-design-node="VU6Xi">
@@ -76,6 +104,34 @@ export default function Done({
           </dd>
         </div>
       </dl>
+      {prepayNotice && (
+        <section
+          aria-label="事前のお支払いのお願い"
+          className="rounded-(--liff-radius-lg) bg-canvas p-3.5 outline-1 -outline-offset-1 outline-liff-line"
+        >
+          <p className="text-[15px] font-bold text-ink">事前のお支払いをお願いしています</p>
+          <p className="mt-1 text-[13px] leading-6 text-liff-sub">{prepayNotice}</p>
+          {payState === 'phone' ? (
+            <p className="mt-2 text-[13px] leading-6 text-ink" role="status">
+              このお店ではアプリでのお支払いができません。お手数ですが、お店に電話で確認してください。
+            </p>
+          ) : (
+            <Button
+              variant="primary"
+              onClick={startPayment}
+              disabled={payState === 'starting'}
+              className="mt-3"
+            >
+              {payState === 'starting' ? 'お支払いへ進んでいます…' : 'お支払いへ進む'}
+            </Button>
+          )}
+          {payState === 'failed' && (
+            <p className="mt-2 text-[13px] leading-6 text-danger" role="alert">
+              お支払いの用意に失敗しました。電波の良い所でもう一度押してください。
+            </p>
+          )}
+        </section>
+      )}
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
         <Button variant="primary" onClick={() => liff.closeWindow()}>
