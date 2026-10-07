@@ -59,11 +59,11 @@ describe('V8 仕上げ3回目の動き', () => {
     expect(tsx).toMatch(/data-leaving=\{leaving \|\| undefined\}/)
   })
 
-  it('①④ 表の行は上から順に少しずつ（200ms・40msずらし・4行目以降同時）', () => {
+  it('①④ 表の行は上から順に少しずつ（200ms・40msずらし・4行目以降同時）。初回だけ・消える行には当てない', () => {
     const css = read('../../app/globals.css')
-    expect(css).toMatch(/\[data-theme="v8"\] tbody > tr \{\s*animation:\s*v8-content-in var\(--motion-base\)/s)
+    expect(css).toMatch(/\[data-theme="v8"\] tbody:not\(\[data-rows-settled\]\) > tr:not\(\[data-leaving="true"\]\) \{\s*animation:\s*v8-content-in var\(--motion-base\)/s)
     expect(css).toMatch(/--motion-stagger:\s*40ms;/)
-    expect(css).toMatch(/tbody > tr:nth-child\(2\) \{\s*animation-delay:\s*var\(--motion-stagger\)/s)
-    expect(css).toMatch(/tbody > tr:nth-child\(n \+ 4\) \{\s*animation-delay:\s*calc\(var\(--motion-stagger\) \* 3\)/s)
+    expect(css).toMatch(/tbody:not\(\[data-rows-settled\]\) > tr:nth-child\(2\) \{\s*animation-delay:\s*var\(--motion-stagger\)/s)
+    expect(css).toMatch(/tbody:not\(\[data-rows-settled\]\) > tr:nth-child\(n \+ 4\) \{\s*animation-delay:\s*calc\(var\(--motion-stagger\) \* 3\)/s)
   })
 })

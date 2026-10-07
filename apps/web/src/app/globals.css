@@ -1720,29 +1720,32 @@ aside[aria-label="フォルダ"] .shadow-lg {
 }
 
 /*
- * ★V8 仕上げ3回目（M10）①④：表の行は上から順に少しずつ出る。
- * 載せ替わり（タブ・絞り込み・ページ送り）や行の追加で載った行も
- * 同じ速さで出る。v8-content-in（200ms ease-out）を使い回し、
- * 1 行ずつ 40ms ずらし・4 行目以降は同時（全体 320ms 以内。
- * v7 の v7-stagger と同じ刻み）。`both` の終端が最終表示なので、
- * 動きを減らす設定では出ない代わりに正しく表示される。
- * 層の外に書く（部品の CSS Module より勝つ必要はなく、
- * 行に animation を持つ部品は今ないため）。
+ * ★V8 動きの決まり（提案 F・採用）：表の行の順番出しは、その表が最初に
+ * 中身を出したときだけ。v8-content-in（200ms ease-out）を使い回し、
+ * 1 行ずつ 40ms ずらし・4 行目以降は同時（全体 320ms 以内）。
+ *
+ * - 最初の順番出しが終わると、共通部品 RowEntranceSettle（外枠に1つ）が
+ *   tbody に data-rows-settled を付ける。その後の更新（読み直し・行の追加・
+ *   タブや絞り込みの載せ替え）では行を出し直さない。
+ * - 消える行（data-leaving）には当てない。`both` の保持値（opacity:1）が
+ *   部品の「消える行は薄く」（data-table.module.css）に勝ち、消えずに残っていた。
+ * - 動きを減らす設定では当てない（最初から最終表示）。
+ * 層の外に書く（手組みの表の行にも同じ動きを付けるため）。
  */
 @media (prefers-reduced-motion: no-preference) {
-  [data-theme="v8"] tbody > tr {
+  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:not([data-leaving="true"]) {
     animation: v8-content-in var(--motion-base) var(--motion-ease-out) both;
   }
 
-  [data-theme="v8"] tbody > tr:nth-child(2) {
+  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:nth-child(2) {
     animation-delay: var(--motion-stagger);
   }
 
-  [data-theme="v8"] tbody > tr:nth-child(3) {
+  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:nth-child(3) {
     animation-delay: calc(var(--motion-stagger) * 2);
   }
 
-  [data-theme="v8"] tbody > tr:nth-child(n + 4) {
+  [data-theme="v8"] tbody:not([data-rows-settled]) > tr:nth-child(n + 4) {
     animation-delay: calc(var(--motion-stagger) * 3);
   }
 }
