@@ -1,7 +1,9 @@
 # Lステップ・Liny 実機調査 — V4 設計の一次資料
 
 Lステップの管理画面を実際に操作して採取した仕様と、Liny の公開情報、現行実装との差分。
-**V4 の画面仕様を決めるときの参照元**として使う。
+**V4 の画面仕様を決めるときの参照元**として使った（当時）。
+
+> **2026-10-07**：外部サービスの調査の記録として残す。V4 の画面仕様の指示としては使わない。今の見た目の正本は ★V8（`docs/v8-design-rules.md`）、比較の根拠は `docs/lstep-liny-screen-behavior-research-2026-08.md` と `docs/lstep-unverified-assumptions.md`。
 
 - 調査日: 2026-08-22
 - 対象: Lステップ `manager.linestep.net`（meauty渋谷店・スタートプラン）**実機操作 25画面**
