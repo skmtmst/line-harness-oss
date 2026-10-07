@@ -12,10 +12,11 @@
  * ここは見た目だけを受け持つ。
  */
 import type { RefObject } from 'react'
-import { CornerDownLeft, Folder, FolderOpen, Inbox, Search, Send } from 'lucide-react'
+import { CornerDownLeft, Folder, FolderOpen, Inbox, Send } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import Toggle from '@/components/shared/toggle'
+import SearchField from '@/components/shared/search-field'
 import styles from './inbox-chat.module.css'
 
 export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${string}`
@@ -98,18 +99,15 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               {sideRow('none', '未分類', <Folder aria-hidden="true" className={styles.tpSideIcon} />, side.noneCount)}
             </nav>
             <div className={styles.tpList}>
-              <label className={styles.tpSearch}>
-                <Search aria-hidden="true" className={styles.tpSideIcon} />
-                <input
-                  ref={props.searchInputRef}
-                  type="search"
-                  value={props.search}
-                  onChange={(event) => props.onSearch(event.target.value)}
-                  placeholder="テンプレート名・本文で探す"
-                  aria-label="テンプレート名・本文で探す"
-                  className={styles.tpSearchInput}
-                />
-              </label>
+              <SearchField
+                ref={props.searchInputRef}
+                value={props.search}
+                onChange={props.onSearch}
+                onClear={() => props.onSearch('')}
+                placeholder="テンプレート名・本文で探す"
+                aria-label="テンプレート名・本文で探す"
+                className={styles.tpSearchField}
+              />
               {props.frequentNote ? (
                 <p className={styles.tpNote}>まだ送信・使用の実績がないため、実績順ではなく登録順で表示しています。</p>
               ) : null}

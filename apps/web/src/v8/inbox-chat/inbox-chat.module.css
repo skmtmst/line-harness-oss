@@ -61,22 +61,6 @@
 .schGroup { display: flex; flex-direction: column; gap: var(--tpl-inbox-composer-gap); width: 100%; }
 .schLabel { color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; }
 .schChips { display: flex; flex-wrap: wrap; gap: var(--tpl-inbox-head-tools-gap); }
-.schChip {
-  height: var(--tpl-inbox-sch-chip-h);
-  padding: var(--tpl-inbox-sch-chip-pad);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.schChip:hover { background: var(--color-canvas-sunken); }
-.schChip[aria-pressed='true'] { background: var(--color-action-soft); outline-color: var(--color-action); color: var(--color-action); }
 .schField { width: 100%; }
 .schNote { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--text-caption--line-height); }
 .schWarn { color: var(--color-warning); font-size: var(--text-caption); font-weight: 600; }
@@ -103,38 +87,9 @@
 .composerToolsRow { margin-bottom: var(--tpl-inbox-composer-gap); }
 .composerTools { gap: var(--tpl-inbox-composer-gap); }
 
-.tool {
-  flex: none;
-  gap: var(--tpl-inbox-head-tools-gap);
-  height: var(--tpl-inbox-composer-btn-h);
-  min-height: 0;
-  padding: var(--tpl-inbox-composer-btn-pad);
-  border: 0;
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  box-shadow: var(--tpl-inbox-tool-shadow);
-  color: var(--color-ink);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-inbox-row-preview-lh);
-  white-space: nowrap;
-}
-.tool svg { flex: none; width: var(--tpl-inbox-composer-btn-icon); height: var(--tpl-inbox-composer-btn-icon); }
+.tool, .send { flex: none; white-space: nowrap; }
+/* 開いている間（送信の設定・内部メモ）は緑の地と枠（段2「2.」「3.」の絵）。共通の副ボタンに無い状態だけ足す。 */
 .tool[data-active] { background: var(--color-accent-soft); outline-color: var(--color-accent-deep); color: var(--color-accent-deep); }
-
-.send {
-  flex: none;
-  gap: var(--tpl-inbox-head-tools-gap);
-  height: var(--tpl-inbox-composer-btn-h);
-  min-height: 0;
-  padding: var(--tpl-inbox-composer-btn-pad);
-  font-size: var(--text-label);
-  font-weight: 600;
-  white-space: nowrap;
-}
-.send svg { flex: none; width: var(--tpl-inbox-composer-btn-icon); height: var(--tpl-inbox-composer-btn-icon); }
 
 /* ── 送信の設定（段2「2.」） ─────────────────────── */
 .sendKey {
@@ -202,21 +157,7 @@
   padding: var(--tpl-inbox-tp-list-pad);
   overflow-y: auto;
 }
-.tpSearch {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--tpl-inbox-composer-gap);
-  height: var(--tpl-inbox-control-h);
-  padding: var(--tpl-inbox-control-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-}
-.tpSearch:focus-within { outline-color: var(--color-accent-deep); }
-.tpSearchInput { min-width: 0; flex: 1; border: 0; background: transparent; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-inbox-row-preview-lh); outline: none; }
-.tpSearchInput::placeholder { color: var(--color-ink-faint); }
+.tpSearchField { flex: none; }
 .tpNote { color: var(--color-ink-faint); font-size: var(--text-caption); }
 .tpError { width: 100%; padding: var(--tpl-inbox-tp-band-pad); color: var(--color-danger); font-size: var(--text-caption); }
 .tpList .tpError { padding: 0; }

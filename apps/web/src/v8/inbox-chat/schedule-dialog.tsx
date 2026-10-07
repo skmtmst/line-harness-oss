@@ -11,6 +11,7 @@
 import { Clock3, FileText } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import DateTimeField from '@/components/shared/date-time-field'
+import FilterChip from '@/components/shared/filter-chip'
 import { isNightJst, schedulePresets, shortJst } from './schedule-presets'
 import styles from './inbox-chat.module.css'
 
@@ -89,15 +90,13 @@ export default function ScheduleSendDialog({
         <p className={styles.schLabel}>すぐ選ぶ</p>
         <div className={styles.schChips}>
           {presets.map((preset) => (
-            <button
+            <FilterChip
               key={preset.key}
-              type="button"
-              className={styles.schChip}
-              aria-pressed={value === preset.value}
-              onClick={() => onChange(preset.value)}
+              selected={value === preset.value}
+              onChange={() => onChange(preset.value)}
             >
               {preset.label}
-            </button>
+            </FilterChip>
           ))}
         </div>
       </div>

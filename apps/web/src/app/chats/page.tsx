@@ -3700,11 +3700,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 <div className={`mb-2 flex items-center gap-2 ${isV8 ? chatStyles.composerToolsRow : ''}`}>
                   <div className={`flex min-w-0 flex-wrap items-center gap-2 ${isV8 ? chatStyles.composerTools : ''}`}>
                     {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
-                    <Button variant="secondary" className={isV8 ? chatStyles.tool : 'h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action'} type="button" onClick={() => setShowTemplatePicker(true)}>
+                    <Button variant="secondary" size={isV8 ? 'compact' : undefined} className={isV8 ? chatStyles.tool : 'h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action'} type="button" onClick={() => setShowTemplatePicker(true)}>
                       <FileText aria-hidden="true" size={14} />
                       テンプレートを選択
                     </Button>
-                    <Button variant="secondary" className={isV8 ? chatStyles.tool : 'h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action'} data-active={isV8 && showComposerOptions ? '' : undefined} aria-expanded={isV8 ? showComposerOptions : undefined} type="button" onClick={() => setShowComposerOptions((v) => !v)}>
+                    <Button variant="secondary" size={isV8 ? 'compact' : undefined} className={isV8 ? chatStyles.tool : 'h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs text-action'} data-active={isV8 && showComposerOptions ? '' : undefined} aria-expanded={isV8 ? showComposerOptions : undefined} type="button" onClick={() => setShowComposerOptions((v) => !v)}>
                       {isV8 ? <Settings2 aria-hidden="true" size={14} /> : <SlidersHorizontal aria-hidden="true" size={14} />}
                       {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
                     </Button>
@@ -3714,7 +3714,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       琥珀色に変わる。窓が上に出るので、どのボタンから出た窓
                       なのかが分かる印が要る。
                     */}
-                    <Button variant="secondary" className={isV8 ? chatStyles.tool : `h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-xs font-semibold ${
+                    <Button variant="secondary" size={isV8 ? 'compact' : undefined} className={isV8 ? chatStyles.tool : `h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border px-3 text-xs font-semibold ${
                         showMemoEditor
                           ? 'border-status-warn bg-status-warn-soft text-status-warn-deep'
                           : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
@@ -3723,7 +3723,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       内部メモ
                     </Button>
                     {isV8 ? (
-                      <Button variant="secondary" className={chatStyles.tool} type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading} title="画像・動画・ファイルを添付" aria-label="添付するものを選ぶ">
+                      <Button variant="secondary" size="compact" className={chatStyles.tool} type="button" onClick={() => imageInputRef.current?.click()} disabled={imageUploading} title="画像・動画・ファイルを添付" aria-label="添付するものを選ぶ">
                         <Paperclip aria-hidden="true" size={14} />
                         添付
                       </Button>
@@ -4081,7 +4081,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       {isV8 ? <Clock3 aria-hidden="true" size={15} /> : null}
                       予約{scheduledSends.length > 0 ? `(${scheduledSends.length})` : ''}
                     </Button>
-                    <Button variant="primary" className={isV8 ? chatStyles.send : 'shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto'} onClick={handleSendMessage} disabled={sending || messageOverLimit || (!messageContent.trim() && !pendingImage)}>
+                    <Button variant="primary" size={isV8 ? 'compact' : undefined} className={isV8 ? chatStyles.send : 'shrink-0 whitespace-nowrap px-5 py-2 hover:bg-accent-deep/90 disabled:opacity-50 border-0 h-auto'} onClick={handleSendMessage} disabled={sending || messageOverLimit || (!messageContent.trim() && !pendingImage)}>
                       {isV8 && !sending ? <Send aria-hidden="true" size={15} /> : null}
                       {sending ? '送っています…' : '送信'}
                     </Button>
