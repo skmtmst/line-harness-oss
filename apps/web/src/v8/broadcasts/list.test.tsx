@@ -45,8 +45,9 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
+const routerPush = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 
@@ -192,5 +193,22 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     expect(host.textContent).not.toContain('閲覧のみで見ています')
     const create = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('配信を作る')) as HTMLButtonElement
     expect(create.disabled).toBe(false)
+  })
+
+  it('配信を作る ▾ は絵（Xr6eu）の分け方：かんたんに送る・詳しく作る（説明つき）。詳しく作るは5つの手順へ移る', async () => {
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    const create = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('配信を作る')) as HTMLButtonElement
+    act(() => { create.click() })
+    await flush()
+    const items = [...document.querySelectorAll('[role="menuitem"]')]
+    const labels = items.map((item) => item.textContent ?? '')
+    expect(labels[0]).toContain('かんたんに送る')
+    expect(labels[0]).toContain('文字1通を、全員かタグで。1画面で送れる')
+    expect(labels[1]).toContain('詳しく作る')
+    expect(labels[1]).toContain('画像・カード・細かい絞り込み・承認（5つの手順）')
+    routerPush.mockClear()
+    act(() => { (items[1] as HTMLElement).click() })
+    expect(routerPush).toHaveBeenCalledWith('/broadcasts/new')
   })
 })

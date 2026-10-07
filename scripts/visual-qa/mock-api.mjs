@@ -119,7 +119,7 @@ import {
   TEST_RECIPIENT_LOGIN_USERS,
   HQ_BANNER_PRESETS, HQ_BANNER_USAGE, HQ_BANNER_STATS, HQ_BANNER_PROJECTS, HQ_BANNER_IMAGES,
   HQ_BANNER_ARCHIVED_PROJECTS, HQ_BANNER_IMAGE_COUNTS,
-  NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST,
+  NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST, NEN_FEEDING_PRODUCTS, NEN_HEALTH_SUMMARY_KOMUGI,
   FRIEND_ADD_RUN_DETAIL, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
 } from './fixtures.mjs'
 
@@ -4457,13 +4457,23 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/nen/health') {
     return { success: true, data: NEN_HEALTH_LIST }
   }
+  if (pathname === '/api/nen/feeding-products') {
+    /*
+     * 本物は `GET/PUT /api/nen/feeding-products`（apps/worker/src/routes/nen-ranks.ts）。
+     * 無いと既定の器が返り、ごはんの目安（板 h7A2F）が読み込めなかった。
+     */
+    return { success: true, data: method === 'PUT' ? { ...NEN_FEEDING_PRODUCTS, refreshedPets: 5 } : NEN_FEEDING_PRODUCTS }
+  }
   const nenHealthSummary = /^\/api\/nen\/health\/([^/]+)\/summary$/.exec(pathname)
   if (method === 'GET' && nenHealthSummary) {
     /*
      * 本物は `GET /api/nen/health/:petId/summary` の形（apps/worker/src/routes/nen-pets.ts）。
      * 無いと既定の器が返り、まとめ窓の `summary.pet.callName` で `/nen/health` が落ちていた。
      */
-    const item = NEN_HEALTH_LIST.items.find((entry) => entry.pet.id === decodeURIComponent(nenHealthSummary[1]))
+    const petId = decodeURIComponent(nenHealthSummary[1])
+    // 板 BVuYh（こむぎの 30日のまとめ）は絵の記録をそのまま返す。
+    if (petId === NEN_HEALTH_SUMMARY_KOMUGI.pet.id) return { success: true, data: NEN_HEALTH_SUMMARY_KOMUGI }
+    const item = NEN_HEALTH_LIST.items.find((entry) => entry.pet.id === petId)
     if (!item) return { success: false, error: 'Pet not found' }
     const weights = (item.weightSeries ?? []).filter((value) => value != null)
     const stoolCounts = item.latestStool ? { [item.latestStool]: item.count30d } : {}

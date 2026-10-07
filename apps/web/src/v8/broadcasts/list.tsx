@@ -1136,9 +1136,10 @@ export default function BroadcastListV8() {
           anchorRef={createAnchorRef}
           ariaLabel="配信の作り方"
           items={[
-            /* 絵 `Xr6eu`：文字1通を全員かタグで、1画面で送る（板 `P6vbxn`）。 */
-            { id: 'create-quick', label: 'かんたんに送る', onSelect: () => { setCreateMenuOpen(false); setQuickSendOpen(true) } },
-            { id: 'create-new', label: '新しく作る', onSelect: () => openCreate(false) },
+            /* 絵 `Xr6eu` の分け方：かんたんに送る（1画面・板 `P6vbxn`）と詳しく作る（5つの手順 `/broadcasts/new`）。
+               テンプレートから作るは絵に無いが今ある機能なので、その下に残す。 */
+            { id: 'create-quick', label: 'かんたんに送る', description: '文字1通を、全員かタグで。1画面で送れる', onSelect: () => { setCreateMenuOpen(false); setQuickSendOpen(true) } },
+            { id: 'create-new', label: '詳しく作る', description: '画像・カード・細かい絞り込み・承認（5つの手順）', onSelect: () => { setCreateMenuOpen(false); router.push('/broadcasts/new') } },
             { id: 'create-template', label: 'テンプレートから作る', onSelect: () => openCreate(true) },
           ]}
         />

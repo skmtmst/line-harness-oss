@@ -1,0 +1,507 @@
+/*
+ * ★V8-B 健康日記（mIwA4・BVuYh・z2tvtX）。
+ * 枠・見出し・タブの段・数の帯の並びは型（ListPage）が持つ。ここは板の中の寸法だけ。
+ * 数字は app/globals.css の [data-theme="v8"] の --tpl-nph-* に置く（マイペットと同じ物差し）。
+ */
+
+/* タブ（絵：高さ28・文字の下10）。 */
+.tabs {
+  min-width: 0;
+  margin-bottom: var(--tpl-nph-tab-pull);
+}
+:global([data-theme='v8']) .tabs [role='tab'] {
+  box-sizing: border-box;
+  height: var(--tpl-nph-tab-h);
+  min-height: 0;
+  align-items: flex-start;
+  padding-bottom: 0;
+  line-height: var(--tpl-tabs-text-lh);
+}
+
+/* 数の帯。 */
+:global([data-theme='v8']) .band[data-kpi-presentation='band'] {
+  border-block-width: 0;
+  box-shadow: var(--tpl-nph-band-top-line);
+}
+.kpiMenu {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-nph-kpi-menu);
+}
+:global([data-theme='v8']) .kpiMenu > .kpiMenuButton {
+  width: var(--tpl-nph-kpi-menu);
+  height: var(--tpl-nph-kpi-menu);
+  min-height: 0;
+  flex-basis: var(--tpl-nph-kpi-menu);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+:global([data-theme='v8']) .kpiMenu > .kpiMenuButton:not(:focus-visible) {
+  outline-color: transparent;
+}
+
+.noteRow {
+  padding: var(--tpl-nph-note-pad);
+}
+
+/* 道具の段（上下14・左右24・間8）。 */
+.toolsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+  padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side);
+}
+.searchBox {
+  display: block;
+  width: var(--tpl-nph-search-w);
+  min-width: 0;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+}
+.toolsTail {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  margin-left: auto;
+}
+.savedBox {
+  display: inline-flex;
+}
+
+/* 表（見出し 36・行 56・欄の間 16・左右 24）。 */
+.table {
+  border: 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nph-col-gap);
+  box-sizing: border-box;
+  height: var(--tpl-nph-head-h);
+  padding: var(--tpl-nph-head-pad);
+  background: var(--color-table-head);
+  box-shadow: var(--shadow-row-line);
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  gap: var(--tpl-nph-col-gap);
+  box-sizing: border-box;
+  height: var(--tpl-nph-row-h);
+  padding: var(--tpl-nph-row-pad);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+  flex-shrink: 0;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: normal;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  white-space: nowrap;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colChange,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colChange {
+  flex: 1 1 0;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colCount,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colCount {
+  padding-right: var(--tpl-nph-num-pad-end);
+  text-align: right;
+}
+.colPet { width: var(--tpl-nph-col-pet); }
+.colOwner { width: var(--tpl-nph-hcol-owner); }
+.colLast { width: var(--tpl-nph-hcol-last); }
+.colCount { width: var(--tpl-nph-hcol-count); }
+.colWeight { width: var(--tpl-nph-hcol-weight); }
+.colStool { width: var(--tpl-nph-hcol-stool); }
+.colMenu { width: var(--tpl-nph-menu-size); }
+
+.petCell {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nph-face-gap);
+  min-width: 0;
+}
+.face {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-nph-face);
+  height: var(--tpl-nph-face);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  object-fit: cover;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-sub-gap);
+  min-width: 0;
+}
+.nameText,
+.cell {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nameText {
+  font-weight: 600;
+}
+.sub {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.num {
+  display: block;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: normal;
+  white-space: nowrap;
+}
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-nph-sub-gap);
+}
+
+/* 体重の推移（8週）の小さな棒。高さは4段。 */
+.bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: var(--tpl-nph-bar-gap);
+  height: var(--tpl-nph-bar-h);
+}
+.bar,
+.barEmpty {
+  width: var(--tpl-nph-bar-w);
+  border-radius: var(--radius-chart-dot);
+  background: var(--color-accent);
+}
+.bars[data-warn] .bar {
+  background: var(--color-warning);
+}
+.barEmpty {
+  height: 1px;
+  background: var(--color-hairline);
+}
+.bar[data-level='1'] { height: var(--tpl-nph-bar-l1); }
+.bar[data-level='2'] { height: var(--tpl-nph-bar-l2); }
+.bar[data-level='3'] { height: var(--tpl-nph-bar-l3); }
+.bar[data-level='4'] { height: var(--tpl-nph-bar-h); }
+
+/* 状態の札（点＋文字）。 */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-nph-pill-gap);
+  padding: var(--tpl-nph-pill-pad);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: var(--tpl-nph-pill-lh);
+  white-space: nowrap;
+}
+.pillDot {
+  width: var(--tpl-nph-pill-dot);
+  height: var(--tpl-nph-pill-dot);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  flex-shrink: 0;
+}
+.pill[data-tone='ok'] { background: var(--color-success-bg); color: var(--color-success); }
+.pill[data-tone='warn'] { background: var(--color-status-warn-soft); color: var(--color-warning); }
+.pill[data-tone='off'] { background: var(--color-track); color: var(--color-ink-secondary); }
+
+/* 行の右端の「…」。 */
+.menuBox {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-nph-menu-size);
+  height: var(--tpl-nph-menu-size);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+.menuButton:hover {
+  background: var(--color-table-head);
+}
+
+/* 表の下（件数・ヒント）。 */
+.pagerRow {
+  padding: var(--tpl-nph-pager-pad);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--tpl-nph-pager-h);
+  padding: var(--tpl-nph-pager-inner-pad);
+}
+.pagerCount {
+  flex: 1 1 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-nph-pager-lh);
+}
+.hint {
+  margin: 0;
+  padding: var(--tpl-nph-hint-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+/* 記録の項目（z2tvtX）。数の帯の直下に表（見出し 36・行は中身なり・上下 10）。 */
+.itemTable {
+  display: flex;
+  flex-direction: column;
+}
+.itemHead,
+.itemRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-nph-col-gap);
+  padding: var(--tpl-nph-row-pad);
+  box-shadow: var(--shadow-row-line);
+  line-height: normal;
+}
+.itemHead {
+  min-height: var(--tpl-nph-head-h);
+  box-sizing: border-box;
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.itemRow {
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+}
+.itemName { flex: 0 0 var(--tpl-nph-icol-name); }
+.itemShape { flex: 0 0 var(--tpl-nph-icol-shape); }
+.itemValues { flex: 0 0 var(--tpl-nph-icol-values); min-width: 0; }
+.itemCondition { flex: 1 1 0; min-width: 0; }
+.itemSummary { flex: 0 0 var(--tpl-nph-icol-summary); }
+.itemStrong {
+  font-weight: 600;
+}
+.itemsNote {
+  margin: 0;
+  padding: var(--tpl-nph-hint-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+
+/*
+ * 30日のまとめ（BVuYh）。共通の引き出し（幅 660・頭に線）を、絵の幅 600・
+ * 頭の線なし・余白 24・間 16 に合わせる（NEN配信の oqSJP と同じやり方）。
+ */
+:global([data-theme='v8'] [data-design-part='drawer']):has(.summaryBody) {
+  width: min(var(--tpl-nph-drawer-w), 100%);
+}
+:global([data-theme='v8'] [data-design-part='drawer']):has(.summaryBody) > :global(header) {
+  padding: var(--tpl-nph-drawer-head-pad);
+  border-bottom: 0;
+}
+:global([data-theme='v8'] [data-design-part='drawer']):has(.summaryBody) > :global(div) {
+  padding: var(--tpl-nph-drawer-body-pad);
+}
+.summaryBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-drawer-gap);
+}
+.summaryNote {
+  margin: 0;
+  padding: var(--tpl-nph-summary-note-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tpl-nph-pair-gap);
+  margin: 0;
+}
+.statBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-sub-gap);
+  padding: var(--tpl-nph-summary-note-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+}
+.statLabel {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: normal;
+}
+.statValue {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+  line-height: var(--tpl-nph-stat-lh);
+  white-space: nowrap;
+}
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-nph-chart-gap);
+}
+.chartHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-nph-pair-gap);
+}
+.chartTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-nph-label-lh);
+}
+.chartCaption {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: normal;
+}
+.chartBars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--tpl-nph-bar-gap);
+  height: var(--tpl-nph-chart-h);
+}
+.chartBar,
+.chartBarEmpty {
+  flex: 1 1 0;
+  border-radius: var(--radius-chart-dot);
+  background: var(--color-accent);
+}
+.chartBarEmpty {
+  height: 1px;
+  background: var(--color-hairline);
+}
+.chartBar[data-level='1'] { height: var(--tpl-nph-chart-l1); }
+.chartBar[data-level='2'] { height: var(--tpl-nph-chart-l2); }
+.chartBar[data-level='3'] { height: var(--tpl-nph-chart-l3); }
+.chartBar[data-level='4'] { height: var(--tpl-nph-chart-h); }
+
+/* 記録の表（見出し 30・行は中身なり上下 8・左右 12・間 12）。 */
+.logTable {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+.logHead,
+.logRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-nph-pair-gap);
+  box-shadow: var(--shadow-row-line);
+  line-height: normal;
+}
+.logHead {
+  padding: var(--tpl-nph-log-head-pad);
+  background: var(--color-table-head);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.logRow {
+  padding: var(--tpl-nph-log-row-pad);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+}
+.logRow:last-child {
+  box-shadow: none;
+}
+.logDate { flex: 0 0 var(--tpl-nph-lcol-date); }
+.logWeight { flex: 0 0 var(--tpl-nph-lcol-weight); }
+.logStool { flex: 0 0 var(--tpl-nph-lcol-stool); }
+.logSkin { flex: 0 0 var(--tpl-nph-lcol-skin); }
+.logTear { flex: 0 0 var(--tpl-nph-lcol-tear); }
+.logMemo { flex: 1 1 0; min-width: 0; }
+.summaryEmpty {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+.summaryFoot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 印刷面（画面には出さない。印刷のときだけ紙にする）。今の画面の print.css と同じ決まり。 */
+.printSheet {
+  display: none;
+}
+@media print {
+  :global(body) > :not(.printSheet) {
+    display: none !important;
+  }
+  .printSheet {
+    display: block;
+    padding: var(--tpl-nph-print-pad);
+    color: var(--color-ink);
+    font-size: var(--text-caption);
+    line-height: var(--text-lh);
+  }
+  .printSheet table {
+    width: 100%;
+    margin-top: var(--tpl-nph-pair-gap);
+    border-collapse: collapse;
+  }
+  .printSheet td {
+    padding: var(--tpl-nph-print-cell-pad);
+    border: 1px solid var(--color-hairline);
+    text-align: left;
+  }
+}
