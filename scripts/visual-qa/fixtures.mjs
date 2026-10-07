@@ -1039,9 +1039,9 @@ export const FORM_DETAIL = {
   ],
   /* 編集画面（m1cWEy・ijxur・XXFT4・tpRRT・J1pdB・Z9wXm・ITBAB）の絵の中身。
    * 1ページ目：店のロゴ・見出し・本文・ラジオ・5段階。2ページ目：見出し・予約を入れる・自由に書く。 */
-  contentRevision: 7,
+  contentRevision: 4,
   publishedVersionId: 'form-1-version-3',
-  publishedContentRevision: 6,
+  publishedContentRevision: 3,
   layout: {
     version: 2,
     header: [],
@@ -1084,6 +1084,29 @@ export const FORM_DETAIL = {
     tags: [{ id: 'tag-visit-survey-answered', name: '来店アンケート回答済み' }],
     mileage: [{ id: 'mileage-visit-survey', label: '回答で50マイル', amount: 50 }],
     reminders: [{ id: 'reminder-next-visit', name: '次回来店の希望日をお知らせ' }],
+  },
+}
+
+/**
+ * 公開中の版（Z9wXm「変わること」の比べ元）。編集画面は `?view=published` で読む。
+ * 下書きとの違いは絵の3行に合わせる：目的の質問を足した・きっかけの質問を消した・答え終わったあとの言葉を変えた。
+ */
+export const FORM_DETAIL_PUBLISHED = {
+  id: FORM_DETAIL.id,
+  name: FORM_DETAIL.name,
+  description: FORM_DETAIL.description,
+  fields: FORM_DETAIL.fields,
+  isActive: true,
+  layout: {
+    ...FORM_DETAIL.layout,
+    sections: FORM_DETAIL.layout.sections.map((section) => section.id !== 'form-section-visit' ? section : {
+      ...section,
+      blocks: section.blocks.map((block) => block.id !== 'form-purpose' ? block : {
+        id: 'form-trigger', kind: 'input', type: 'radio', name: 'visit_trigger', label: 'ご来店のきっかけ', required: false,
+        choices: [{ id: 'trigger-1', label: '紹介' }, { id: 'trigger-2', label: 'SNS' }],
+      }),
+    }),
+    options: { ...FORM_DETAIL.layout.options, thanksText: 'ご回答ありがとうございました！' },
   },
 }
 
