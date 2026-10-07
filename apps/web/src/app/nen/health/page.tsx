@@ -12,7 +12,7 @@ import { nenPetsApi, type NenHealthKpis, type NenHealthSummaryData } from '@/lib
 import HealthTab from './health-tab'
 import ItemsTab from './items-tab'
 import SummaryDrawer, { SummarySheet } from './summary-drawer'
-import HealthPageV8 from './health-v8'
+import HealthPageV8 from '@/v8/nen-health/health'
 
 export type HealthTabKey = 'logs' | 'concern' | 'items'
 export type SummaryStatus = 'loading' | 'ready' | 'error'
