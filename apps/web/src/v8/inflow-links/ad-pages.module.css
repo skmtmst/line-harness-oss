@@ -1,0 +1,207 @@
+/*
+ * ★V8 広告とのつなぎ（FDBsG）・広告への送信履歴（p0kA3）。頭・本文の間・注は広告連携（ads.module.css）と同じ。
+ * ここは返すしくみの3枚・対応の表・送信履歴の道具の段と表だけ。値は globals.css の `--tpl-wb-ad-*`。
+ */
+
+/* 返すしくみ：3枚・間12・薄い地・角12・余白14・中の間6。 */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-wb-ad-steps-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wb-ad-step-gap);
+  min-width: 0;
+  padding: var(--tpl-wb-ad-step-pad);
+  border-radius: var(--tpl-wb-ad-radius);
+  background: var(--color-surface-pearl);
+}
+.stepHead {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wb-ad-step-head-gap);
+  min-width: 0;
+}
+.stepNum {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-wb-ad-step-num);
+  height: var(--tpl-wb-ad-step-num);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  color: var(--color-canvas);
+  font-size: var(--text-micro);
+  font-weight: var(--tpl-wb-ad-bold);
+}
+.stepTitle {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: var(--tpl-wb-ad-bold);
+  line-height: var(--tpl-wb-ad-step-title-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stepText {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-wb-ad-text-lh);
+  /* 絵は字の途中で折る（言葉のまとまりで折ると行が増える）。 */
+  word-break: normal;
+}
+
+/* 対応の表・送信履歴の表：枠1・角12。見出しは薄い地、行は上の線。欄の間16。 */
+.table {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--tpl-wb-ad-radius);
+  box-shadow: var(--tpl-wb-ad-ring);
+}
+.tableHead,
+.tableRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wb-ad-col-gap);
+  min-width: 0;
+}
+.tableHead {
+  padding: var(--tpl-wb-ad-head-pad);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--tpl-wb-ad-head-lh);
+  white-space: nowrap;
+}
+.tableRow {
+  min-height: var(--tpl-wb-ad-row-h);
+  padding: var(--tpl-wb-ad-row-pad);
+  box-shadow: var(--tpl-wb-ad-line-t);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-wb-ad-cell-lh);
+}
+.colPoint {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.colName {
+  flex-shrink: 0;
+  width: var(--tpl-wb-ad-col-name);
+  min-width: 0;
+}
+.colState {
+  flex-shrink: 0;
+  width: var(--tpl-wb-ad-col-state);
+}
+.cellText {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cellFaint {
+  color: var(--color-ink-faint);
+}
+
+/* 送信履歴：道具の段（探す300・選ぶ160×2・右に件数）。 */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+}
+.searchBox {
+  flex-shrink: 0;
+  width: var(--tpl-wb-ad-search-w);
+}
+.selectBox {
+  flex-shrink: 0;
+  width: var(--tpl-wb-ad-select-w);
+}
+.selectBox :global(*) {
+  max-width: 100%;
+}
+.toolsSpacer {
+  flex: 1;
+}
+.toolsCount {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  white-space: nowrap;
+}
+
+/* 送信履歴の表：行55（余白10/16）・欄 いつ（残り）・媒体100・流入元200・状態110・次の予定110・操作120。 */
+.historyHead {
+  padding: var(--tpl-wb-ad-history-head-pad);
+}
+.historyRow {
+  min-height: var(--tpl-wb-ad-history-row-h);
+}
+.colWhen {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--tpl-wb-ad-when-gap);
+  min-width: 0;
+}
+.whenMain {
+  overflow: hidden;
+  font-weight: var(--font-weight-bold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.whenSub {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-wb-ad-sub-lh);
+}
+.colMedia {
+  flex-shrink: 0;
+  width: var(--tpl-wb-ad-col-media);
+  min-width: 0;
+}
+.colSource {
+  flex-shrink: 0;
+  width: var(--tpl-wb-ad-col-source);
+  min-width: 0;
+}
+.colStatus {
+  flex-shrink: 0;
+  width: var(--tpl-wb-ad-col-status);
+}
+.colNext {
+  flex-shrink: 0;
+  width: var(--tpl-wb-ad-col-next);
+  min-width: 0;
+}
+.colOps {
+  display: flex;
+  flex-shrink: 0;
+  width: var(--tpl-wb-ad-col-ops);
+}
+.reasonRow {
+  padding: var(--tpl-wb-ad-row-pad);
+  box-shadow: var(--tpl-wb-ad-line-t);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-wb-ad-text-lh);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-toolbar-gap);
+}

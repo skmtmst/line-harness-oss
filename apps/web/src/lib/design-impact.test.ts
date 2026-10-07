@@ -329,6 +329,7 @@ describe('共通部品の影響範囲', () => {
       // ★V8 流入と計測の詳細（Q5le3）。来た友だちの表と注文の明細（写し）の下にページ送り。
       'v8/inflow-links/detail.tsx',
       'v8/inflow-links/ref-orders.tsx',
+      'v8/inflow-links/ad-history.tsx',
     ].sort())
   })
 

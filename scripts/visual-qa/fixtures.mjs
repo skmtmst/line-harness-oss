@@ -4782,13 +4782,28 @@ export const AD_COST_PLATFORMS = [
   #514-8: 本番の口が返す形だけにする。friendName・conversionName・nextRetryAt は
   口が返さない(画面も読まない)。豊富な形を返すとずれを隠す。
 */
+/* 板 `p0kA3`（広告への送信履歴）の5行。数の帯（`FDBsG`）は口の summary（この30日 送った15・待っている2・断られた1）を読む。 */
 export const AD_CONVERSION_LOGS = [
-  { id: 'adlog-1', adPlatformId: 'ad-meta', friendId: 'friend-inflow-1', eventName: '体験申込フォームの送信', clickId: 'fixed-fbclid-1', clickIdType: 'fbclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:32:00.000Z' },
-  { id: 'adlog-2', adPlatformId: 'ad-google', friendId: 'friend-inflow-2', eventName: '初回のご購入', clickId: 'fixed-gclid-1', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-08-25T11:18:00.000Z' },
-  { id: 'adlog-3', adPlatformId: 'ad-meta', friendId: 'friend-inflow-3', eventName: '予約が入った', clickId: 'fixed-fbclid-2', clickIdType: 'fbclid', status: 'pending', errorMessage: null, createdAt: '2026-08-25T10:54:00.000Z' },
-  { id: 'adlog-4', adPlatformId: 'ad-meta', friendId: 'friend-inflow-4', eventName: '体験申込フォームの送信', clickId: 'fixed-fbclid-3', clickIdType: 'fbclid', status: 'failed', errorMessage: '接続設定を確認してください', createdAt: '2026-08-25T09:41:00.000Z' },
-  { id: 'adlog-5', adPlatformId: 'ad-google', friendId: 'friend-inflow-5', eventName: '初回のご購入', clickId: 'fixed-gclid-2', clickIdType: 'gclid', status: 'failed', errorMessage: '広告アカウントをつなぎ直してください', createdAt: '2026-08-25T08:20:00.000Z' },
-  { id: 'adlog-6', adPlatformId: 'ad-meta', friendId: '', eventName: '定期便のお申し込み', clickId: null, clickIdType: null, status: 'skipped', errorMessage: '対応が付いていないため送っていません', createdAt: '2026-08-24T22:05:00.000Z' },
+  { id: 'adlog-1', adPlatformId: 'ad-google', friendId: 'friend-inflow-1', eventName: '初回購入', clickId: 'fixed-gclid-1', clickIdType: 'gclid', status: 'pending', errorMessage: null, createdAt: '2026-10-01T12:14:00.000Z' },
+  { id: 'adlog-2', adPlatformId: 'ad-meta', friendId: 'friend-inflow-2', eventName: '定期便の申し込み', clickId: 'fixed-fbclid-1', clickIdType: 'fbclid', status: 'pending', errorMessage: null, createdAt: '2026-10-01T09:02:00.000Z' },
+  { id: 'adlog-3', adPlatformId: 'ad-google', friendId: 'friend-inflow-3', eventName: '初回購入', clickId: 'fixed-gclid-2', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-09-30T11:40:00.000Z' },
+  { id: 'adlog-4', adPlatformId: 'ad-meta', friendId: 'friend-inflow-4', eventName: '初回購入', clickId: 'fixed-fbclid-2', clickIdType: 'fbclid', status: 'failed', errorMessage: 'クリックの目印の期限（90日）が切れていました', createdAt: '2026-09-29T03:11:00.000Z' },
+  { id: 'adlog-5', adPlatformId: 'ad-google', friendId: 'friend-inflow-5', eventName: '定期便の申し込み', clickId: 'fixed-gclid-3', clickIdType: 'gclid', status: 'sent', errorMessage: null, createdAt: '2026-09-28T00:30:00.000Z' },
+]
+export const AD_CONVERSION_LOG_SUMMARY = { sentLast30Days: 15, pendingLast30Days: 2, failedLast30Days: 1 }
+
+/*
+ * 板 `FDBsG`（広告とのつなぎ）の対応表（F-21 `GET /api/ad-platforms/mappings`）。
+ * 口は成果地点ごとに Google・Meta の2行を返す。来店予約は両方「結びつけない」で、
+ * Meta だけ自動の名前（Schedule）があるので選ぶ欄が出る（絵どおり）。
+ */
+export const AD_EVENT_MAPPINGS = [
+  { pointId: 'cp-first', pointName: '初回購入', eventType: 'purchase_first', provider: 'google', mode: 'manual', eventName: 'purchase_first', automaticEventName: 'purchase', googleActionId: null, version: 2 },
+  { pointId: 'cp-first', pointName: '初回購入', eventType: 'purchase_first', provider: 'meta', mode: 'auto', eventName: 'Purchase', automaticEventName: 'Purchase', googleActionId: null, version: 1 },
+  { pointId: 'cp-teiki', pointName: '定期便の申し込み', eventType: 'subscribe_teiki', provider: 'google', mode: 'manual', eventName: 'subscribe_teiki', automaticEventName: 'subscribe', googleActionId: null, version: 1 },
+  { pointId: 'cp-teiki', pointName: '定期便の申し込み', eventType: 'subscribe_teiki', provider: 'meta', mode: 'auto', eventName: 'Subscribe', automaticEventName: 'Subscribe', googleActionId: null, version: 1 },
+  { pointId: 'cp-visit', pointName: '来店予約', eventType: 'store_visit', provider: 'google', mode: 'off', eventName: null, automaticEventName: null, googleActionId: null, version: 1 },
+  { pointId: 'cp-visit', pointName: '来店予約', eventType: 'store_visit', provider: 'meta', mode: 'off', eventName: null, automaticEventName: 'Schedule', googleActionId: null, version: 1 },
 ]
 
 /*
