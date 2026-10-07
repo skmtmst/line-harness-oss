@@ -22,7 +22,9 @@ import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
+import ExportSizeChip from '@/components/hq/banners/export-size-chip'
 import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -33,6 +35,7 @@ import {
   BANNER_MAX_REFERENCE_IMAGES,
   EMPTY_GENERATION_INPUT,
   activeGeneration,
+  exportSizeText,
   inputFromGeneration,
   packedTextLines,
   readFileAsBase64,
@@ -493,13 +496,15 @@ function ProjectInner() {
               <span className={styles.hint}>画像を押すと詳細・アカウントへ渡す</span>
             </div>
 
+            {/*
+              * 生成中の注記（承認済み `qIp42` の `k7sbSR`「注記 生成中のとき」）。
+              * 止める操作は下の帯（`An26R` の `CzXI2`「生成をやめる」）だけに置く。
+              * 同じ操作のボタンを2か所に出すと、どちらを押したか分からなくなる。
+              */}
             {running ? (
               <div className={styles.runningBand} role="status" aria-live="polite">
                 <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
                 <span className={styles.runningText}>{`${Math.min(doneSoFar + 1, running.requestedCount)} / ${running.requestedCount} 枚目を作っています。この画面を閉じるとここで止まります（できた枚数は残ります）`}</span>
-                {canManage ? (
-                  <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">止める</Button>
-                ) : null}
               </div>
             ) : null}
             {generationError ? <Notice tone="danger" message={generationError} onClose={() => setGenerationError('')} /> : null}
@@ -554,23 +559,63 @@ function ProjectInner() {
                 usage={usage}
                 onReloadUsage={loadUsage}
               />
-              <Button variant="primary" className={styles.full} onClick={() => void startGeneration()} disabled={busy || Boolean(blockedReason) || Boolean(running)}>
-                {running ? <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} /> : <Sparkles aria-hidden="true" className={styles.icon} />}
-                {running ? '生成中…' : `画像を生成（${input.count}枚）`}
-              </Button>
-              <div className={styles.panelFoot}>
-                <span className={blockedReason && input.presetKey ? styles.warnText : styles.hint}>
-                  {running
-                    ? `${running.requestedCount}枚中 ${running.doneCount}枚できました・今月の残り ${usage?.month.remaining ?? '—'}枚`
-                    : blockedReason && input.presetKey ? blockedReason : usageStatusText(usage, input.count)}
-                </span>
-                <button type="button" className={styles.linkButton} onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy || Boolean(running)}>
-                  条件をクリア
-                </button>
-              </div>
             </div>
           ) : null}
         </div>
+
+        {/*
+          * 下の帯（承認済み ★BG-B `qIp42` → `X2oLn`「下部追従バー」）。
+          * 左=残り枚数 `M118zK`／中=大きさの札 `WDJak`／
+          * 右=`wCvLN`「条件をクリア」＋`abZle` 生成するボタン。
+          * 生成中は `An26R`「帯（生成中）」——`CzXI2`「生成をやめる」＋
+          * `q9hrn`「生成中（押せない）」。
+          *
+          * 2026-10-07: ここをパネルの中（全幅ボタン＋その下の行）に置いていたが、
+          * 絵と配置が違っていた（差し戻し）。v7（app/hq/banners/project/page.tsx）と
+          * 同じ並び・同じ札の部品にそろえた。生成の押し場所は帯だけにする。
+          * 変えられない人（閲覧のみ）には押せないボタンを置かないので帯ごと出さない。
+          */}
+        {canManage ? (
+          <StickyBar
+            /*
+             * 承認済み ★BG-B `qIp42` の帯 `X2oLn` は **枠線つき・高さ72・影なし**。
+             * V8 の既定（★A/M10 の浮かせ）は**別の板**なので、この画面は板どおりに戻す。
+             * 根拠は `docs/v8-design-rules.md` §1「画面ごとに、その板の絵のとおり」。
+             */
+            outlined
+            status={
+              running
+                ? `${running.requestedCount}枚中 ${running.doneCount}枚できました・今月の残り ${usage?.month.remaining ?? '—'}枚`
+                : blockedReason && input.presetKey
+                  ? <span className={styles.warnText}>{blockedReason}</span>
+                  : usageStatusText(usage, input.count)
+            }
+            info={
+              exportSizeText(presets, input.presetKey) ? (
+                <ExportSizeChip text={exportSizeText(presets, input.presetKey)} />
+              ) : undefined
+            }
+            actions={
+              running ? (
+                <>
+                  <Button onClick={() => void cancelGeneration()} disabled={cancelling} busy={cancelling} busyLabel="止めています…">生成をやめる</Button>
+                  <Button variant="primary" disabled>
+                    <LoaderCircle aria-hidden="true" className={`${styles.icon} ${styles.spin}`} />
+                    生成中… 画面を離れても続きます
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button onClick={() => setInput({ ...EMPTY_GENERATION_INPUT, presetKey: presets[0]?.key ?? '' })} disabled={busy}>条件をクリア</Button>
+                  <Button variant="primary" onClick={() => void startGeneration()} disabled={busy || Boolean(blockedReason)}>
+                    <Sparkles aria-hidden="true" className={styles.icon} />
+                    画像を生成（{input.count}枚）
+                  </Button>
+                </>
+              )
+            }
+          />
+        ) : null}
       </div>
 
       <CreateProjectDialogV8

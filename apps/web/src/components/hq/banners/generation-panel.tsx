@@ -1,12 +1,14 @@
 'use client'
 
-import { ChevronDown, Images, Plus, Sparkles, Upload, X } from 'lucide-react'
+import { ChevronDown, Images, Layers, Plus, Scissors, Sparkles, Upload, X } from 'lucide-react'
 import { useId, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import ColorWell from '@/components/shared/color-well'
 import LimitState from './limit-state'
 import styles from './generation-panel.module.css'
+import Radio from '@/components/shared/radio'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import {
@@ -30,6 +32,16 @@ import {
   type BannerReferenceMode,
   type BannerUsage,
 } from '@/lib/hq-banners'
+
+/**
+ * 使い方の説明に添える印。★BG-B `R6MBHf` の子の icon そのまま（lucide・14px・`$ink-secondary`）。
+ * `pBYPP`=layers（土台にする）／`L2e1G`=scissors（素材を一部使う）／`q0T2d`=sparkles（雰囲気を参考にする）。
+ */
+const BANNER_REFERENCE_MODE_ICON: Record<BannerReferenceMode, typeof Layers> = {
+  edit: Layers,
+  parts: Scissors,
+  inspire: Sparkles,
+}
 
 /**
  * 右 390px の生成パネル。Pencil 35-2 `GcJHv`（2026-09-13 に参照画像欄を足して作り直し）。
@@ -194,17 +206,29 @@ export default function GenerationPanel({
               </p>
             )}
 
-            {/* 使い方の説明（★BG-B `R6MBHf`）。3 つの違いをここで読み切れるようにする。 */}
-            <div data-design-node="R6MBHf" className="flex flex-col gap-1 rounded-control bg-canvas-sunken p-3">
-              <p className="text-micro font-medium text-ink">{`使い方は ${BANNER_REFERENCE_MODES.length} つから選べます`}</p>
-              {/* 行の間は正規の 4px 段で取る（#704：半端な段を新規で増やさない）。 */}
-              <ul className="flex flex-col gap-1">
-                {BANNER_REFERENCE_MODES.map((mode) => (
-                  <li key={mode} className="text-micro text-ink-faint">
-                    <span className="font-medium text-ink-secondary">{BANNER_REFERENCE_MODE_LABEL[mode]}</span>
-                    ：{BANNER_REFERENCE_MODE_DESCRIPTION[mode]}
-                  </li>
-                ))}
+            {/*
+              * 使い方の説明（★BG-B `R6MBHf`）。3 つの違いをここで読み切れるようにする。
+              * 絵のとおり、行ごとに「印（14px）＋名前＋説明」を置き、名前と説明は**縦に**積む
+              * （板では `UPIq5`「土台にする」と `Z55Iao`「構図と配色を…」が別の行。`：` でつないだ
+              * 1行にはしない）。器は `$surface-pearl`・角丸10・内側12・行間8。
+              * 角丸 10 は V7 で 12px の段に畳まれている（`globals.css` の `--radius-card` の但し書き）ので
+              * `rounded-card` を使う。半端な段は新規で増やさない（#704）。
+              */}
+            <div data-design-node="R6MBHf" className="flex flex-col gap-2 rounded-card bg-surface-pearl p-3">
+              <p className="text-caption font-semibold text-ink">{`使い方は ${BANNER_REFERENCE_MODES.length} つから選べます`}</p>
+              <ul className="flex flex-col gap-2">
+                {BANNER_REFERENCE_MODES.map((mode) => {
+                  const ModeIcon = BANNER_REFERENCE_MODE_ICON[mode]
+                  return (
+                    <li key={mode} className="flex gap-2">
+                      <ModeIcon aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-secondary" />
+                      <span className={styles.howToText}>
+                        <span className="text-micro font-semibold text-ink">{BANNER_REFERENCE_MODE_LABEL[mode]}</span>
+                        <span className="text-micro text-ink-faint">{BANNER_REFERENCE_MODE_DESCRIPTION[mode]}</span>
+                      </span>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           </div>
@@ -215,7 +239,12 @@ export default function GenerationPanel({
           * 入れた行だけを強調カラーで目立たせる。丸やタグの印は出さず、
           * 入っていることは地と枠と文字の色で示す。
           */}
-        <Field label="画像に入れるテキスト" note={`1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」`}>
+        <Field
+          label="画像に入れるテキスト"
+          note={`1行に1つ・${TEXT_LINE_LENGTH_MAX}文字まで／強調したい行は「強調」`}
+          noteSpread
+          footNote="「強調」を押した行は大きく・目立つ色で描きます（1〜2行まで推奨）"
+        >
           <div className="flex flex-col gap-2 rounded-control border border-hairline p-3">
             {value.textLines.map((line, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -279,11 +308,23 @@ export default function GenerationPanel({
 
         <ColorRoles value={value} onPick={(key, next) => set(key, next)} disabled={disabled} />
 
-        <Field label="人物">
-          <fieldset className="grid grid-cols-2 gap-1.5" disabled={disabled}>
+        <Field
+          label="人物"
+          note="写真に人を入れるかどうか"
+        >
+          {/*
+            * ★BG-B `z14gEG`：人物は素の2択（丸＋ラベル）を間隔 20 で左から並べる。
+            * カード（枠つきの箱）ではありません。2026-10-06 オーナー指示
+            *「人物のボタンも太くてスマートじゃない」どおり。
+            */}
+          <fieldset className="flex items-center gap-5" disabled={disabled}>
             <legend className="sr-only">人物</legend>
-            <SegmentOption name={`${uid}-person`} value="without" checked={value.personOption === 'without'} onSelect={() => set('personOption', 'without')} label="入れない" />
-            <SegmentOption name={`${uid}-person`} value="with" checked={value.personOption === 'with'} onSelect={() => set('personOption', 'with')} label="入れる" />
+            <Radio name={`${uid}-person`} value="without" size="small" checked={value.personOption === 'without'} onChange={() => set('personOption', 'without')}>
+              入れない
+            </Radio>
+            <Radio name={`${uid}-person`} value="with" size="small" checked={value.personOption === 'with'} onChange={() => set('personOption', 'with')}>
+              入れる
+            </Radio>
           </fieldset>
         </Field>
 
@@ -301,25 +342,45 @@ export default function GenerationPanel({
           />
         </Field>
 
-        <Field label="枚数">
-          <fieldset className="grid grid-cols-4 gap-1.5" disabled={disabled}>
-            <legend className="sr-only">枚数</legend>
-            {Array.from({ length: maxCount }, (_, i) => i + 1).map((n) => (
-              <SegmentOption
-                key={n}
-                name={`${uid}-count`}
-                value={String(n)}
-                checked={value.count === n}
-                onSelect={() => set('count', n)}
-                label={`${n}枚`}
-              />
-            ))}
-          </fieldset>
+        {/*
+          * ★BG-B `ELZIS`：枚数の注記は2つとも「つくる枚数」に付く。
+          * 置き場所も絵のまま——`KCFAX`「一度に 4 枚まで」はラベル行
+          * （4択の上）、`swcu2`「同じ条件で…」は4択の下。
+          */}
+        <Field
+          label="つくる枚数"
+          note={`一度に ${maxCount} 枚まで`}
+          footNote="同じ条件で指定した枚数ぶん作ります（絵柄は毎回少しずつ変わります）"
+        >
+          {/*
+            * ★BG-B `SLgY5`：枚数は区切りスイッチ（灰色の器に4つのチップ）。
+            * カードを4つ並べる形ではありません。器が role="group"
+            * aria-label="枚数" を持つので、外側に fieldset+legend「枚数」を
+            * 重ねない（group が2つになる）。操作停止は disabled で渡す。
+            */}
+          <SegmentedControl
+            aria-label="枚数"
+            size="panel"
+            disabled={disabled}
+            options={Array.from({ length: maxCount }, (_, i) => ({
+              value: String(i + 1),
+              label: `${i + 1}枚`,
+            }))}
+            value={String(value.count)}
+            onChange={(next) => set('count', Number(next))}
+          />
         </Field>
 
         <UsageBars usage={usage ?? null} />
 
         <LimitState usage={usage ?? null} onReload={onReloadUsage} compact />
+
+        {/*
+          * 「1040 × 1040 で書き出します」（★BG-B `GcuH5`）はここに出さない。
+          * 絵では下部追従バーの中ほど（左=残り枚数／中=サイズ／右=ボタン）。
+          * 画面側（`app/hq/banners/project/page.tsx`・`v8/hq-banners/project.tsx`）の
+          * 下の帯で `exportSizeText()` を出す。
+          */}
       </div>
     </aside>
   )
@@ -393,30 +454,60 @@ function EmphasisToggle({
   )
 }
 
+/**
+ * 脇のパネルの1項目（ラベル行＋中身）。
+ *
+ * ラベルの字は ★BG-B の板どおり **12px・600・`$ink`**（`text-caption font-semibold`）。
+ * 共通部品の既定（`text-label` = 13px・500）より板が優先です
+ * （`docs/v8-design-rules.md` §1 の2「画面ごとに、その板の絵のとおり」＞ §1 の4「共通部品」）。
+ * 13px だと日本語ラベルが1文字あたり約1px太り、右の一言が板より5〜7px外へずれます。
+ */
 function Field({
   label,
   note,
+  noteSpread,
+  footNote,
   htmlFor,
-  help,
   children,
 }: {
   label: string
+  /**
+   * ラベルの**すぐ右**に添える一言。**入れる前に読んでおく**たぐい
+   * （上限・単位・任意かどうか）。例: ★BG-B `KCFAX`「一度に 4 枚まで」。
+   *
+   * ★BG-B のラベル行は8本のうち7本が **gap 6 の左詰め**（`Z69t7`・`iENp8`・`PVn0V`・
+   * `U4lxzo`・`AOkUL`・`b3r9d`・`VH9vI`。`justifyContent` の指定なし＝左詰め、`alignItems: center`）。
+   * なので既定は左詰め。右端へ寄せるのは `noteSpread` のときだけ。
+   */
   note?: string
+  /**
+   * ラベル行を両端に開く（ラベル左・一言右）。★BG-B で唯一そうなっている
+   * `KqqEY`（項目 画像に入れるテキスト・gap 8・`space_between`）のための口。
+   * ここだけ一言が226px・2行に折れて右端まで届くため、絵では両端に開いています。
+   * 板では label と note の上辺がそろうので縦は `items-start`。
+   */
+  noteSpread?: boolean
+  /**
+   * 中身の**下**に置く一言。選んだあとの結果を説明するたぐい。
+   * 例: ★BG-B `swcu2`「同じ条件で指定した枚数ぶん作ります…」。
+   * 絵では4択の下にあるので、`note` と同じ行にまとめない。
+   */
+  footNote?: string
   htmlFor?: string
-  help?: ReactNode
   children: ReactNode
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-2">
+      <div className={noteSpread ? 'flex items-start justify-between gap-2' : 'flex items-center gap-1.5'}>
         {htmlFor ? (
-          <label htmlFor={htmlFor} className="text-label font-medium text-ink">{label}</label>
+          <label htmlFor={htmlFor} className="shrink-0 text-caption font-semibold text-ink">{label}</label>
         ) : (
-          <span className="text-label font-medium text-ink">{label}{help ? <span className="ml-1">{help}</span> : null}</span>
+          <span className="shrink-0 text-caption font-semibold text-ink">{label}</span>
         )}
-        {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
+        {note ? <span className="min-w-0 text-micro text-ink-faint">{note}</span> : null}
       </div>
       {children}
+      {footNote ? <p className="text-nano text-ink-faint">{footNote}</p> : null}
     </div>
   )
 }
@@ -452,9 +543,9 @@ function OutputSize({
 
   return (
     <div data-design-node="xy4EW" className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-label font-medium text-ink">出力サイズ</span>
-        <span className="text-micro text-ink-faint">LINEの規格から選ぶ</span>
+      <div className="flex items-center gap-1.5">
+        <span className="shrink-0 text-caption font-semibold text-ink">出力サイズ</span>
+        <span className="min-w-0 text-micro text-ink-faint">LINEの規格から選ぶ</span>
       </div>
       <RadioCardGroup legend="出力サイズ" className="grid grid-cols-2 gap-1.5">
         {[...line, ...(showOthers ? others : [])].map((preset) => (
@@ -488,28 +579,6 @@ function OutputSize({
 }
 
 /**
- * 人物・枚数の選択肢。Pencil `UgooV` / `ndNQM`。共通の選ぶ部品で出す。
- *
- * 1語だけの短い選択肢なので小さい箱（compact）で細く出し、文字は中央に置く
- * （2026-10-06 オーナー指示「人物のボタンも太くてスマートじゃない」）。
- * `items-center text-center` は utilities 層なので CSS Module の
- * `align-items: flex-start` に勝つ（各 module の @layer 宣言順）。
- */
-function SegmentOption({ name, value, checked, onSelect, label }: { name: string; value: string; checked: boolean; onSelect: () => void; label: string }) {
-  return (
-    <RadioCard
-      name={name}
-      value={value}
-      checked={checked}
-      onChange={onSelect}
-      variant="compact"
-      title={label}
-      className="items-center text-center"
-    />
-  )
-}
-
-/**
  * 色の4つの役割。Pencil ★BG-B `KkTNS`。
  *
  * ベース＝背景、メイン＝主役、サブ＝差し色、強調＝目立たせたい文字。
@@ -528,14 +597,14 @@ export function ColorRoles({
   const used = Array.from(new Set(COLOR_ROLES.map((role) => value[role.key]).filter((c): c is string => Boolean(c))))
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-label font-medium text-ink">カラー</span>
-        <span className="text-micro text-ink-faint">4つの役割で指定します</span>
+      <div className="flex items-center gap-1.5">
+        <span className="shrink-0 text-caption font-semibold text-ink">カラー</span>
+        <span className="min-w-0 text-micro text-ink-faint">4つの役割で指定します</span>
       </div>
       <div className="grid grid-cols-2 gap-3">
         {COLOR_ROLES.map((role) => (
           <div key={role.key} className="flex flex-col gap-1.5">
-            <span className="text-label font-medium text-ink">{role.label}</span>
+            <span className="text-caption font-semibold text-ink">{role.label}</span>
             <ColorWell
               block
               label={role.label}
@@ -550,7 +619,7 @@ export function ColorRoles({
       </div>
       {/* 補足（Pencil `pQlYK`）。色の役割の意味を言葉で置いておく。 */}
       <div className="rounded-mini bg-canvas-sunken p-3">
-        <p className="text-label font-semibold text-ink">色の決め方</p>
+        <p className="text-caption font-semibold text-ink">色の決め方</p>
         <p className="mt-1 text-micro text-ink-secondary">
           色をタップすると、好きな色を選べる画面が開きます。画面の中の色をそのまま拾うスポイトも使えます。ベースは背景、メインは主役、サブは差し色、強調は特に目立たせたい文字に使います。
         </p>
