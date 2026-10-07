@@ -29,6 +29,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   if (root) await act(async () => { root!.unmount() })
   if (container) container.remove()
   root = null
@@ -112,9 +113,12 @@ describe('対象の友だちの複数選択（R22）', () => {
     )
     const input = el.querySelector('input[aria-label="友だちを名前で探す"]')
     if (!(input instanceof HTMLInputElement)) throw new Error('検索欄が見つかりません')
+    // 待ちは偽の時計で進める（本物の時間を待たない）。250ms の待ちは打った瞬間から数えるので、打つ前に替える。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await typeText(input, 'やま')
     // 250ms の待ちの間は読み込み中。
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 300)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+    vi.useRealTimers()
     // まだ返事が無いので読み込み中のまま。
     expect(el.textContent).toContain('探しています…')
     await act(async () => {
@@ -136,8 +140,10 @@ describe('対象の友だちの複数選択（R22）', () => {
     )
     const input = el.querySelector('input[aria-label="友だちを名前で探す"]')
     if (!(input instanceof HTMLInputElement)) throw new Error('検索欄が見つかりません')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await typeText(input, 'やま')
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 400)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    vi.useRealTimers()
     expect(el.textContent).toContain('探せませんでした')
     expect(onChange).not.toHaveBeenCalled()
   })

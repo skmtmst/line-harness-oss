@@ -59,7 +59,7 @@ vi.mock('@/lib/api', () => {
 
 vi.mock('@/components/broadcasts/broadcast-form', () => ({ default: () => null }))
 
-import BroadcastListV8 from './list-v8'
+import BroadcastListV8 from '@/v8/broadcasts/list'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 function broadcast() {
@@ -87,6 +87,11 @@ let host: HTMLDivElement
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  /* 広い板（1440）のふり。happy-dom は狭い板扱いになり、フォルダが左の列でなく選ぶ欄になる。 */
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: () => ({ matches: false, media: '', addEventListener: () => {}, removeEventListener: () => {} }),
+  })
   fixture.broadcastsList.mockResolvedValue({
     success: true,
     data: [broadcast()],

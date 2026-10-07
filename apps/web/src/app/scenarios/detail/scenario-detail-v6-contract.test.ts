@@ -7,9 +7,9 @@ const PAGE = fs.readFileSync(
   path.join(__dirname, 'scenario-detail-client.tsx'),
   'utf8',
 )
-/* 完全切り替え：v7 の一覧 page.tsx・scenario-list.tsx は捨て、V8 の list-v8.tsx を見る。 */
-const LIST = fs.readFileSync(path.join(__dirname, '..', 'list-v8.tsx'), 'utf8')
-const LIST_TABLE = fs.readFileSync(path.join(__dirname, '..', 'list-v8.tsx'), 'utf8')
+/* 一覧の入口は src/v8/scenarios/list.tsx（2026-10-06〜。古い list-v8.tsx はもう描かれない）。 */
+const LIST = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'v8', 'scenarios', 'list.tsx'), 'utf8')
+const LIST_TABLE = LIST
 const DIALOGS = fs.readFileSync(
   path.join(__dirname, '..', '..', '..', 'components', 'scenarios', 'scenario-dialogs.tsx'),
   'utf8',
@@ -63,15 +63,16 @@ describe('V6 シナリオ編集の契約', () => {
     expect(LIST).not.toContain('title="準備中です"\n          className="border-hairline text-ink-faint rounded-control border px-4')
   })
 
-  it('一覧本文は題ブロックを置かず、開始案内からKPIへ続く', () => {
+  it('一覧本文は題ブロックを置かず、開始案内を出す', () => {
     expect(LIST).not.toContain("import Header from '@/components/layout/header'")
     expect(LIST).not.toContain('<Header')
     expect(LIST).not.toContain('配信のタイミングを指定して複数のメッセージを順に送ります。')
-    expect(LIST).toContain('作っただけでは送れません')
+    // 新しい一覧の案内の帯の言い方は「作っただけでは送られません」。
+    expect(LIST).toContain('作っただけでは送られません')
     expect(LIST).toContain('配信を始める方法・3手順')
-    expect(LIST.indexOf('作っただけでは送れません')).toBeLessThan(
-      LIST.indexOf('data-design="KPIs"'),
-    )
+    // 並びは絵（axFrW）どおり：案内の帯は道具の段の先頭（表の上の主列）に置く。
+    // 古い一覧の「案内の帯 → 数の帯」の順は新しい絵で変わったので見ない。
+    expect(LIST).toContain('{noteBand}')
   })
 
   it('作ったフォルダへ一覧からシナリオを移せる', () => {
@@ -95,9 +96,12 @@ describe('V6 シナリオ編集の契約', () => {
 
   it('「今月作成」は日本時間の月初を共通一覧APIへ渡して絞り込む', () => {
     expect(LIST).toContain("timeZone: 'Asia/Tokyo'")
-    expect(LIST).toContain('active: stoppedOnly ? 0 : undefined')
+    // 新しい一覧は「停止中のみ」（0）と「稼働中のみ」（1）を1つの値にまとめて口へ渡す。
+    expect(LIST).toContain("stoppedOnly ? 0 : savedFilter === 'active' ? 1 : undefined")
+    expect(LIST).toContain('active: activeParam,')
     // m13i: 札は共通 FilterChip になった（選択表示は部品が持つ）。絞りの動きは同じ。
-    expect(LIST).toContain('今月作成')
+    // 新しい一覧の札の言い方は「今月作った」。
+    expect(LIST).toContain('今月作った')
     expect(LIST).toContain('createdFrom: createdThisMonthOnly ? currentMonthStart() : undefined')
     expect(LIST).not.toContain('createdThisMonthOnly ? isCreatedThisMonth(sc.createdAt) : true')
   })
