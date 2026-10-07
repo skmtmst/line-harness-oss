@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import PrivacyNote from '../../components/ui/PrivacyNote.js';
 import { changeRule, longDate, remainingText, stayText, zonedParts } from '../../lib/seat-reserve.js';
 
 /**
@@ -98,6 +99,7 @@ export default function SeatConfirm({
           {error}
         </p>
       )}
+      <PrivacyNote />
       <div className="flex">
         <button
           type="button"

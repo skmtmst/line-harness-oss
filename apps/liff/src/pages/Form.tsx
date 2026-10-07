@@ -38,6 +38,7 @@ import LoadingView from '../components/LoadingView.js';
 import Button from '../components/ui/Button.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import BottomBar from '../components/ui/BottomBar.js';
+import PrivacyNote from '../components/ui/PrivacyNote.js';
 import StatusView from '../components/ui/StatusView.js';
 import Icon from '../components/ui/Icon.js';
 
@@ -714,6 +715,9 @@ export default function Form() {
               </Button>
             </div>
           )}
+
+          {/* 送る最後のページだけ、個人情報の取り扱いの一行。 */}
+          {isLast && <PrivacyNote />}
         </div>
       </div>
 

@@ -8,6 +8,7 @@ import LoadingView from '../components/LoadingView.js';
 import Icon from '../components/ui/Icon.js';
 import Button from '../components/ui/Button.js';
 import BottomBar from '../components/ui/BottomBar.js';
+import PrivacyNote from '../components/ui/PrivacyNote.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
 
@@ -291,6 +292,7 @@ export default function EventConfirm() {
             {submitError}
           </p>
         )}
+        <PrivacyNote />
       </div>
       <BottomBar>
         <Button variant="primary" onClick={submit} disabled={submitting}>
