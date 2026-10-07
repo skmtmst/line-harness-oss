@@ -16,6 +16,7 @@ import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { GripVertical, X } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import { useAdminTheme } from '@/lib/use-admin-theme'
+import v8 from '@/v8/inbox-chat/customer-panel.module.css'
 
 interface FriendDetail {
   id: string
@@ -104,6 +105,14 @@ const DETAIL_SETTING_GROUPS: Array<{
 ]
 
 const DEFAULT_SECTION_ORDER = DETAIL_SETTING_GROUPS.flatMap((group) => group.sections)
+
+/** ★V8 顔の下の「2025年8月14日に友だち追加」。日本時間の暦で書く。 */
+function formatAddedDate(iso: string | null): string {
+  if (!iso) return '友だち追加日は未登録'
+  const d = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000)
+  if (Number.isNaN(d.getTime())) return '友だち追加日は未登録'
+  return `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月${d.getUTCDate()}日に友だち追加`
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) return '-'
@@ -854,6 +863,61 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
         ) : friend ? (
           <div className="flex flex-col divide-y divide-hairline">
             {/* Profile Header — V4は相手・対応・担当をひとまとまりにする。 */}
+            {isV8 ? (
+              <>
+                {/*
+                  ★V8（M0393 XqSvX「その人の要点」）：大きい丸の顔 → 名前 → 友だち追加日 →
+                  タグ・シナリオ・購入・マイル → 顧客情報の節。顔と要点はいつも上（並べ替えの外）。
+                  対応・担当の札は会話の頭にあるので、ここには重ねて出さない。
+                */}
+                <div style={{ order: -3 }} className={`${sectionVisibility('profile')} ${v8.person}`}>
+                  <Avatar name={friend.displayName} src={friend.pictureUrl} size={52} />
+                  <ExpandableText value={friend.displayName} empty="名前なし" className={v8.personName} />
+                  <p className={v8.personSub}>{formatAddedDate(friend.createdAt)}</p>
+                  {!friend.isFollowing ? <span className={v8.blocked}>ブロック済</span> : null}
+                  <div className={v8.personActions}>
+                    <Button variant="secondary" size="compact" className="text-action" href={`/friends/detail?id=${friend.id}`}>
+                      友だち詳細
+                    </Button>
+                    {settingsButton}
+                  </div>
+                </div>
+                <dl style={{ order: -2 }} className={v8.summary} data-inbox-v8="customer-summary">
+                  <div className={v8.summaryRow}>
+                    <dt>タグ</dt>
+                    <dd title={(effectiveTags ?? []).map((t) => t.name).join('・')}>
+                      {(effectiveTags ?? []).length > 0 ? (effectiveTags ?? []).map((t) => t.name).join('・') : <span className={v8.empty}>なし</span>}
+                    </dd>
+                  </div>
+                  <div className={v8.summaryRow}>
+                    <dt>シナリオ</dt>
+                    <dd>
+                      {upcoming.kind === 'data' && upcoming.data.nextAutoDelivery?.kind === 'scenario'
+                        ? upcoming.data.nextAutoDelivery.name
+                        : upcoming.kind === 'loading' ? <span className={v8.empty}>…</span> : <span className={v8.empty}>なし</span>}
+                    </dd>
+                  </div>
+                  <div className={v8.summaryRow}>
+                    <dt>購入</dt>
+                    <dd>
+                      {purchase.kind === 'data'
+                        ? `${purchase.count}件・${formatNumber(purchase.total)}円`
+                        : purchase.kind === 'loading' ? <span className={v8.empty}>…</span>
+                        : purchase.reason === 'none' ? <span className={v8.empty}>0件</span> : <span className={v8.empty}>—</span>}
+                    </dd>
+                  </div>
+                  <div className={v8.summaryRow}>
+                    <dt>マイル</dt>
+                    <dd>
+                      {mileage.kind === 'data'
+                        ? `${formatNumber(mileage.summary.available)} mile`
+                        : mileage.kind === 'loading' ? <span className={v8.empty}>…</span> : <span className={v8.empty}>—</span>}
+                    </dd>
+                  </div>
+                </dl>
+                <h3 style={{ order: -1 }} className={v8.infoTitle}>顧客情報</h3>
+              </>
+            ) : (
             <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} flex flex-col items-center px-5 py-5 text-center`}>
               <Avatar name={friend.displayName} src={friend.pictureUrl} size={56} />
               <ExpandableText
@@ -882,20 +946,11 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
                   ブロック済
                 </span>
               )}
-              {isV8 ? (
-                /* ★V8：「友だち詳細」の横に「表示項目」。同じ高さの副ボタンを2つ並べる。 */
-                <div className="mt-3 flex items-center justify-center gap-2">
-                  <Button variant="secondary" size="compact" className="text-action items-center whitespace-nowrap" href={`/friends/detail?id=${friend.id}`}>
-                    友だち詳細
-                  </Button>
-                  {settingsButton}
-                </div>
-              ) : (
               <Button variant="secondary" className="text-action mt-3 items-center px-3 py-2 text-xs h-auto whitespace-normal" href={`/friends/detail?id=${friend.id}`}>
                 友だち詳細
               </Button>
-              )}
             </div>
+            )}
             {/* 前払いのみの印（友だち詳細と同じ置き場所・顔の下）。前払いの人だけ出る。 */}
             {accountId && friendId ? (
               /* ★V8：前払いでない人は中身が空。空の帯（上下12＋線）を残さない（オーナー指摘）。 */
