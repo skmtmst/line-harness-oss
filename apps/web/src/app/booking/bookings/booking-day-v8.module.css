@@ -1,0 +1,242 @@
+/* 予約管理の「日」（時刻順）。V8 のときだけ使う。 */
+
+.root {
+  display: block;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: var(--tpl-bkd-tiles-mb);
+}
+
+.tile {
+  background: var(--color-surface-pearl);
+  border-radius: var(--radius-card);
+  padding: var(--tpl-bkd-tile-pad);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tileTitle {
+  font-size: var(--tpl-bkd-tile-title-size);
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+}
+
+.tileNum {
+  font-size: var(--tpl-bkd-tile-num-size);
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cols {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.timeline {
+  flex: 1;
+  min-width: 0;
+  list-style: none;
+  margin: var(--tpl-bkd-none);
+  padding: var(--tpl-bkd-none);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  padding: var(--tpl-bkd-row-pad);
+}
+
+.row.isLate {
+  border-color: var(--color-warning);
+}
+
+.time {
+  font-size: var(--tpl-bkd-time-size);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  font-size: var(--tpl-bkd-name-size);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kind {
+  display: inline-block;
+  margin-left: var(--tpl-bkd-kind-ml);
+  font-size: var(--tpl-bkd-kind-size);
+  font-weight: 500;
+  color: var(--color-ink-secondary);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-mini);
+  padding: var(--tpl-bkd-kind-pad);
+  vertical-align: 1px;
+}
+
+.sub {
+  font-size: var(--tpl-bkd-sub-size);
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ops {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pill {
+  font-size: var(--tpl-bkd-pill-size);
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  padding: var(--tpl-bkd-pill-pad);
+  white-space: nowrap;
+}
+
+.isDone {
+  color: var(--color-success);
+  background: var(--color-success-bg);
+}
+
+.isLatePill {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+}
+
+.isMiss {
+  color: var(--color-ink-secondary);
+  background: var(--color-surface-pearl);
+}
+
+.undo {
+  font-size: var(--tpl-bkd-undo-size);
+  color: var(--color-ink-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--tpl-bkd-undo-pad);
+}
+
+.undo:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.menuwrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.empty {
+  font-size: var(--tpl-bkd-empty-size);
+  color: var(--color-ink-secondary);
+}
+
+.now {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-danger);
+  font-size: var(--tpl-bkd-now-size);
+  font-weight: 600;
+  margin: var(--tpl-bkd-none);
+  padding: var(--tpl-bkd-none);
+  list-style: none;
+}
+
+.now::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--color-danger);
+}
+
+.wait {
+  width: 340px;
+  flex-shrink: 0;
+  background: var(--color-surface-pearl);
+  border-radius: var(--radius-card);
+  padding: var(--tpl-bkd-wait-pad);
+}
+
+.wait h3 {
+  font-size: var(--tpl-bkd-wait-size);
+  font-weight: 600;
+  margin: var(--tpl-bkd-wait-m);
+}
+
+.waitCount {
+  font-size: var(--tpl-bkd-wait-count-size);
+  font-weight: 400;
+  color: var(--color-ink-secondary);
+  margin-left: var(--tpl-bkd-wait-count-ml);
+}
+
+.wait ul {
+  list-style: none;
+  margin: var(--tpl-bkd-none);
+  padding: var(--tpl-bkd-none);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.waitRow {
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  padding: var(--tpl-bkd-wait-row-pad);
+}
+
+.waitTitle {
+  font-size: var(--tpl-bkd-wait-title-size);
+  font-weight: 600;
+  margin: var(--tpl-bkd-wait-title-m);
+}
+
+.waitSub {
+  font-size: var(--tpl-bkd-wait-sub-size);
+  color: var(--color-ink-secondary);
+  margin: var(--tpl-bkd-none);
+}
+
+.waitEmpty {
+  font-size: var(--tpl-bkd-wait-empty-size);
+  color: var(--color-ink-secondary);
+  margin: var(--tpl-bkd-wait-empty-m);
+}
+
+.waitNote {
+  font-size: var(--tpl-bkd-wait-note-size);
+  color: var(--color-ink-secondary);
+  margin: var(--tpl-bkd-wait-note-m);
+  line-height: var(--tpl-bkd-wait-note-lh);
+}

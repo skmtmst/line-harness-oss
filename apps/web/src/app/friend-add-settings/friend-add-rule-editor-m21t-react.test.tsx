@@ -123,6 +123,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  vi.useRealTimers()
   await act(async () => { root.unmount() })
   host.remove()
 })
@@ -282,13 +283,16 @@ describe('R262 確認段のテストは経路・日時・友だちを指定で�
     await renderExisting()
     await choose('試す流入リンク', 'route-1')
     await input('想定日時', '2026-09-28T10:00')
+    // 待ちは偽の時計で進める（本物の時間を待たない）。検索の 300ms は打った瞬間から数えるので、打つ前に替える。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     await input('試す友だちを検索', '山田')
     // 検索は300ms待ってから一覧口を叩く
     api.friends.list.mockResolvedValue({
       success: true,
       data: { items: [{ id: 'friend-1', displayName: '山田 太郎' }] },
     })
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 400)) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+    vi.useRealTimers()
     const result = [...host.querySelectorAll('.friend-add-editor-friendResults button')]
       .find((item) => item.textContent?.includes('山田 太郎'))
     if (!result) throw new Error(`friend result: ${host.textContent}`)

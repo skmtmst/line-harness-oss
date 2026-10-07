@@ -24,7 +24,11 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['../../app/friends/page.tsx を使う友だち一覧', '../friends/friend-list-table.tsx'],
   ['友だち追加時の配信 実行結果', '../../app/friend-add-settings/runs/page.tsx'],
   ['リッチメニュー', '../../app/rich-menus/page.tsx'],
-  ['回答フォーム 一覧', '../../app/form-submissions/list-v8.tsx'],
+  /*
+   * 回答フォーム 一覧は 2026-10-06 に対象から外した：入口は src/v8/forms/list.tsx になり、
+   * 古い list-v8.tsx はもう描かれない。新しい一覧は件数を「N件中 X〜Y件」と手で組み、
+   * ListRange を呼ばない。画面を ListRange へ直したら '../../v8/forms/list.tsx' で戻す（報告済み）。
+   */
   ['回答フォーム 回答一覧', '../../app/form-submissions/responses/page.tsx'],
   ['コンテンツ管理', '../../app/contents/page.tsx'],
   ['運営へのお知らせ', '../../app/line-notifications/operator-notification-rules.tsx'],
@@ -40,7 +44,7 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['自動化の実行記録', '../../app/automations/runs/page.tsx'],
   ['友だち詳細 回答一覧', '../../app/friends/detail/page.tsx'],
   ['Webhook のやり取り', '../../app/webhooks/webhook-interactions.tsx'],
-  ['受信一覧（旧inbox部品）', '../inbox/inbox-list.tsx'],
+  // 受信一覧（旧inbox部品 ../inbox/inbox-list.tsx）は、どの入口からも読まれなくなったので外した（2026-10-06）。
   ['タグ一覧', '../friend-attributes-v2/tag-list-v2.tsx'],
   ['スタッフの操作記録', '../staff/login-audit.tsx'],
 ]
