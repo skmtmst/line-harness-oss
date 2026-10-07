@@ -526,9 +526,10 @@
     "581_banner_emphasis_lines.sql",
     "582_automation_integration_folders.sql",
     "583_restaurant_inventory_rules.sql",
+    "584_booking_sync_rules.sql",
     "585_booking_seat_waitlist_fifo.sql",
     "586_outgoing_webhook_version.sql",
     "587_form_step_completion_times.sql"
   ],
-  "migrationCount": 529
+  "migrationCount": 530
 }

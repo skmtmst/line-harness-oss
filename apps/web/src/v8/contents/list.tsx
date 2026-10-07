@@ -1118,12 +1118,8 @@ export default function MediaLibraryListV8() {
               setFolderFilter(id)
               setPage(1)
             }}
-            onAddFolder={() => setAddingFolder(true)}
-            addFolderDisabled={!canManageMedia}
-            addFolderTitle={canManageMedia ? undefined : managementPermissionReason}
-            addFolderNote={canManageMedia ? undefined : (
-              <p>{managementPermissionReason}。</p>
-            )}
+            /* 閲覧のみ：フォルダを追加は置かない（理由は上の閲覧のみの帯で伝える。2026-10-06 オーナー決定）。 */
+            onAddFolder={canManageMedia ? () => setAddingFolder(true) : undefined}
             rows={[
               // R38: 「すべて」は絞り込み前の総数。絞り込み後の件数を
               // 入れると「すべて0・未分類2」のように母集団が混ざる。

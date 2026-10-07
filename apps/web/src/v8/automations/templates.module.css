@@ -1,0 +1,108 @@
+/*
+ * ★V8 オートメーションの見本（Pencil `c7dxp`）。枠・見出し・タブ・数の帯は型（ListPage）と shell が持つ。
+ * ここは本文（きっかけの札の段・4列のカード・注記）だけ。値は globals.css の `--tpl-wb-tm-*`。
+ */
+
+/* 本文：上16・左右24・下24、段の間14（絵の「本文」）。 */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wb-tm-body-gap);
+  padding: var(--tpl-wb-tm-body-pad);
+}
+
+/* きっかけの札の段（1行・右端に再読み込み）。 */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-wb-tm-tools-gap);
+  min-width: 0;
+}
+.toolsLabel {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-wb-tm-tools-gap);
+  min-width: 0;
+}
+.spacer {
+  flex: 1;
+}
+
+/* カード：4列・横12・縦14。高さは絵の162を最低にそろえ、ボタンは下にそろえる。 */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--tpl-wb-tm-grid-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wb-tm-card-gap);
+  min-width: 0;
+  min-height: var(--tpl-wb-tm-card-h);
+  padding: var(--tpl-wb-tm-card-pad);
+  border-radius: var(--tpl-wb-tm-card-radius);
+  box-shadow: var(--tpl-wb-tm-ring);
+}
+.cardTitle {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: var(--tpl-wb-tm-title-weight);
+  line-height: var(--tpl-wb-tm-title-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-wb-tm-card-gap);
+  margin: 0;
+}
+.fact {
+  display: flex;
+  gap: var(--tpl-wb-tm-fact-gap);
+  min-width: 0;
+  font-size: var(--text-micro);
+  line-height: var(--tpl-wb-tm-fact-lh);
+}
+.fact dt {
+  flex-shrink: 0;
+  width: var(--tpl-wb-tm-fact-key-w);
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+}
+.fact dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-ink-secondary);
+}
+.cardSpacer {
+  flex: 1;
+}
+.cardButton {
+  width: 100%;
+  justify-content: center;
+}
+
+/* 注記（薄い地・角丸8）。 */
+.note {
+  margin: 0;
+  padding: var(--tpl-wb-tm-note-pad);
+  border-radius: var(--tpl-wb-tm-note-radius);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-wb-tm-note-lh);
+}

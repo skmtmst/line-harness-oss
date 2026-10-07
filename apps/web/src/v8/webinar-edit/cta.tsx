@@ -299,13 +299,14 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
             <div><Button disabled={busy} onClick={() => { setCtas((prev) => [...(prev ?? []), EMPTY_CARD(0)]); setTimes((prev) => [...prev, '0:00']); setSelected(ctas.length) }}><Plus size={15} aria-hidden="true" />CTA カードを足す</Button></div>
           )}
           {current ? (
-            <fieldset className={styles.editor} disabled={readOnly || busy}>
+            <fieldset className={styles.editor} disabled={busy}>
+              {/* 閲覧のみ：文字の欄は読み取りだけ、選ぶ部品は選んでいる値を文字で見せる（2026-10-06 オーナー決定）。 */}
               <p className={styles.editorTitle}>{`選んでいるカード：${times[currentIndex] ?? fmtMinSec(current.atSeconds)}`}</p>
               <div className={form.pair}>
-                <label className={form.field}><span className={form.label}>見出し</span><TextField value={current.title} onChange={(event) => update(currentIndex, { title: event.target.value })} /></label>
-                <label className={form.field}><span className={form.label}>出す時刻（分:秒）</span><TextField value={times[currentIndex] ?? ''} inputMode="numeric" placeholder="12:00" onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} /></label>
+                <label className={form.field}><span className={form.label}>見出し</span><TextField value={current.title} readOnly={readOnly} onChange={(event) => update(currentIndex, { title: event.target.value })} /></label>
+                <label className={form.field}><span className={form.label}>出す時刻（分:秒）</span><TextField value={times[currentIndex] ?? ''} readOnly={readOnly} inputMode="numeric" placeholder="12:00" onChange={(event) => setTimes((prev) => prev.map((value, j) => (j === currentIndex ? event.target.value : value)))} /></label>
               </div>
-              <label className={form.field}><span className={form.label}>ボタンの言葉</span><TextField value={current.buttonLabel} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} /></label>
+              <label className={form.field}><span className={form.label}>ボタンの言葉</span><TextField value={current.buttonLabel} readOnly={readOnly} onChange={(event) => update(currentIndex, { buttonLabel: event.target.value })} /></label>
               <div className={form.pair}>
                 <div className={form.field}>
                   <span className={form.labelSmall}>リンクの種類</span>
@@ -321,7 +322,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
                       : <Select aria-label="使うフォーム" size="full" value={current.formId ?? ''} onChange={(value) => update(currentIndex, { formId: value || null })} options={[{ value: '', label: 'フォームを選ぶ' }, ...published.map((item) => ({ value: item.id, label: `${item.name}（公開中）` }))]} />}
                   </div>
                 ) : (
-                  <label className={form.field}><span className={form.labelSmall}>開く URL</span><TextField value={current.url ?? ''} inputMode="url" placeholder="https://" onChange={(event) => update(currentIndex, { url: event.target.value })} /></label>
+                  <label className={form.field}><span className={form.labelSmall}>開く URL</span><TextField value={current.url ?? ''} readOnly={readOnly} inputMode="url" placeholder="https://" onChange={(event) => update(currentIndex, { url: event.target.value })} /></label>
                 )}
               </div>
               <div className={styles.toggleRow}>
