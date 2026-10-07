@@ -4067,7 +4067,7 @@ async function getTodaySeatReservations(
         .prepare(
           `SELECT reservation_id, kind, late_minutes, marked_by_name, marked_at
              FROM rt_seat_visit_marks
-            WHERE store_id = ? AND reservation_id IN (${list.map(() => '?').join(',')})
+            WHERE store_id = ? AND undone_at IS NULL AND reservation_id IN (${list.map(() => '?').join(',')})
             ORDER BY marked_at DESC`,
         )
         .bind(store.id, ...list.map((reservation) => reservation.id))

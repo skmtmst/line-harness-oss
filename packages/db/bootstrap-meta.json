@@ -528,7 +528,8 @@
     "583_restaurant_inventory_rules.sql",
     "585_booking_seat_waitlist_fifo.sql",
     "586_outgoing_webhook_version.sql",
-    "587_form_step_completion_times.sql"
+    "587_form_step_completion_times.sql",
+    "594_restaurant_walk_in.sql"
   ],
-  "migrationCount": 529
+  "migrationCount": 530
 }

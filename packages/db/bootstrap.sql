@@ -6472,10 +6472,10 @@ CREATE TABLE rt_organizations (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 , tenant_id TEXT REFERENCES tenants(id));
 
-CREATE TABLE rt_reservations (
+CREATE TABLE "rt_reservations" (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
-  source TEXT NOT NULL CHECK (source IN ('restaurant_board', 'reszaiko', 'hotpepper', 'tabelog', 'gurunavi', 'ikyu', 'retty', 'line', 'phone', 'manual')),
+  source TEXT NOT NULL CHECK (source IN ('restaurant_board', 'reszaiko', 'hotpepper', 'tabelog', 'gurunavi', 'ikyu', 'retty', 'line', 'phone', 'manual', 'walk_in')),
   external_id TEXT,
   hub_source TEXT,
   customer_name TEXT NOT NULL,
@@ -6515,7 +6515,7 @@ CREATE TABLE rt_seat_visit_marks (
   marked_by_name        TEXT,
   -- UTC ISO8601。付けた時刻。
   marked_at             TEXT NOT NULL,
-  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')), undone_at TEXT, undone_by TEXT,
   CHECK ((kind = 'late' AND late_minutes IS NOT NULL)
       OR (kind != 'late' AND late_minutes IS NULL))
 );

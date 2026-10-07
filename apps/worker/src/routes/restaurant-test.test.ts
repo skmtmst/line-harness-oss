@@ -1603,3 +1603,33 @@ describe('枠の自動調整ルールと媒体閉鎖通知のAPI',()=>{
   expect((await requestWithMethod(done,'POST',{})).status).toBe(409);
  });
 });
+
+
+describe('提案E 来店記録', () => {
+  it('来店の印と取消が履歴に反映され、過去の案内済みも数える', async () => {
+    seedRestaurantFixture();
+    testDb.raw.exec("UPDATE rt_reservations SET customer_phone='09000000000' WHERE id='reservation-ginza'");
+    const path='/api/restaurant-test/reservations/reservation-ginza/visit?account_id=account-1';
+    expect((await request(path,{kind:'visited'})).status).toBe(200);
+    expect((await request(path,{kind:'visited'})).status).toBe(409);
+    const history=()=>request('/api/restaurant-test/customers/history?account_id=account-1&storeId=store-ginza&phone=09000000000');
+    expect((await (await history()).json() as any).data.visitCount).toBe(1);
+    expect((await requestWithMethod(path,'DELETE')).status).toBe(200);
+    expect((await (await history()).json() as any).data.visitCount).toBe(0);
+    expect(testDb.raw.prepare('SELECT undone_at FROM rt_seat_visit_marks').get()).toMatchObject({undone_at:expect.any(String)});
+    testDb.raw.exec("UPDATE rt_reservations SET status='seated' WHERE id='reservation-ginza'");
+    expect((await (await history()).json() as any).data.visitCount).toBe(1);
+  });
+  it('予約なしの来店は名前なしで記録でき、同じ卓の重なり・人数違い・他店を拒否する', async () => {
+    seedRestaurantFixture();
+    const path='/api/restaurant-test/reservations/walk-in?account_id=account-1';
+    const body={storeId:'store-ginza',tableId:'table-ginza',guestCount:2};
+    expect((await request(path,{...body,guestCount:5})).status).toBe(400);
+    expect((await request(path,{...body,storeId:'store-yokohama'})).status).toBe(400);
+    const res=await request(path,body);expect(res.status).toBe(201);
+    const data=(await res.json() as any).data;
+    expect(data).toMatchObject({status:'visited',source:'walk_in',tableId:'table-ginza'});
+    expect(Math.abs(Date.now()-Date.parse(data.startsAt))).toBeLessThan(10000);
+    expect((await request(path,body)).status).toBe(409);
+  });
+});

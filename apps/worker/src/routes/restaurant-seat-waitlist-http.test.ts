@@ -206,14 +206,14 @@ describe('席の空き待ち', () => {
 });
 
 describe('席の来店の印', () => {
-  test('来店→案内済み・遅れる→分数だけ・取り消せる', async () => {
+  test('来店→来店済み・遅れる→分数だけ・取り消せる', async () => {
     seedReservation('res-1');
     const visited = await post('/api/restaurant-test/reservations/res-1/visit', { kind: 'visited' });
     expect(visited.status).toBe(200);
     const visitedBody = await visited.json() as {
       success: boolean; data: { status: string; visit_mark: { kind: string; marked_at: string } };
     };
-    expect(visitedBody.data.status).toBe('seated');
+    expect(visitedBody.data.status).toBe('visited');
     expect(visitedBody.data.visit_mark.kind).toBe('visited');
 
     const undone = await del('/api/restaurant-test/reservations/res-1/visit');

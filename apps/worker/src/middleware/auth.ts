@@ -418,6 +418,7 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/menus'],
   ['GET', '/api/restaurant-test/channels'],
   ['POST', '/api/restaurant-test/reservations/manual'],
+  ['POST', '/api/restaurant-test/reservations/walk-in'],
   // 席の空き待ち（booking-plus 席版）：担当者も日の帯から印を付ける。
   ['GET', '/api/restaurant-test/seat-waitlist'],
   ['POST', '/api/restaurant-test/seat-waitlist'],

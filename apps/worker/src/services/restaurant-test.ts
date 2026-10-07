@@ -16,6 +16,7 @@ export const RESTAURANT_RESERVATION_SOURCES = [
   'line',
   'phone',
   'manual',
+  'walk_in',
 ] as const;
 
 export type RestaurantReservationSource = (typeof RESTAURANT_RESERVATION_SOURCES)[number];
