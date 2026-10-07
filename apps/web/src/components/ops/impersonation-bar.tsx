@@ -7,12 +7,21 @@ import { api, type OpsImpersonation } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import { formatDateTime } from '@/lib/format'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { forgetSessionSnapshot } from '@/lib/session-snapshot'
+import v8 from './impersonation-bar-v8.module.css'
+
+/** 帯の「10/1 15:20」（日本時間）。 */
+function startedLabel(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(date)
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+}
 
 /**
  * 代理ログイン帯（★V6 37 共通 `WXp5T`）。代理ログイン中は全画面の上に常時出す。
@@ -84,26 +93,19 @@ export default function ImpersonationBar({
    * 書き込み中・理由の窓・止め方は今のまま。押す先・API は変えない。
    */
   const v8ReadBanner = theme === 'v8' && !writing ? (
-    <div
-      data-design-node="VtJQ6"
-      role="status"
-      className="bg-warning-bg text-ink flex min-h-12 flex-wrap items-center justify-between gap-2 px-5 py-2"
-    >
-      <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
-        <Eye aria-hidden="true" className="h-4 w-4 shrink-0" />
-        <span className="truncate">
-          代理ログイン中：{name}（閲覧のみ）
-          {state.piiRevealed ? '・個人情報を表示中' : ''}
-        </span>
-        <span className="text-ink-secondary shrink-0 text-xs font-normal">{formatDateTime(state.startedAt)}開始</span>
+    <div data-design-node="VtJQ6" role="status" className={v8.banner}>
+      <Eye aria-hidden="true" className={v8.icon} />
+      <span className={v8.title}>
+        {`代理ログイン中：${name}（閲覧のみ）${state.piiRevealed ? '・個人情報を表示中' : ''}`}
       </span>
-      <span className="flex shrink-0 items-center gap-2">
-        {!state.piiRevealed ? (
-          <Button size="field" variant="secondary" onClick={() => setDialog('pii')} disabled={busy}>個人情報を表示する</Button>
-        ) : null}
-        <Button size="field" variant="secondary" onClick={() => setDialog('write')} disabled={busy}>書き込みに切り替える</Button>
-        <Button size="field" variant="danger" onClick={() => void end()} disabled={busy}>代理ログインを終える</Button>
-      </span>
+      {/* 絵は「理由：…・運営 〇〇・10/1 15:20〜」。理由と運営の名前はまだ受け口が返さないので、始めた時刻だけ。 */}
+      <span className={v8.sub}>{`${startedLabel(state.startedAt)}〜`}</span>
+      <span className={v8.spacer} />
+      {!state.piiRevealed ? (
+        <button type="button" className={v8.outline} onClick={() => setDialog('pii')} disabled={busy}>個人情報を表示する</button>
+      ) : null}
+      <button type="button" className={v8.outline} onClick={() => setDialog('write')} disabled={busy}>書き込みに切り替える</button>
+      <button type="button" className={v8.solid} onClick={() => void end()} disabled={busy}>代理ログインを終える</button>
     </div>
   ) : null
 

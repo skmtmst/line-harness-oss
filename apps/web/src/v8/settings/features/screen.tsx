@@ -135,7 +135,13 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
 }
 
 /** 既定で開く区分（絵では「メイン」「配信」「設定」が開いている）。 */
-const DEFAULT_OPEN = new Set(['basic', 'delivery', 'settings'])
+/* 絵（ywFJT・bKipf）では、最初に開いているのはメインと配信だけ。 */
+const DEFAULT_OPEN = new Set(['basic', 'delivery'])
+/** 絵の並び：「設定」の区分はいちばん下（飲食店向けのあと）。ほかは今までの並びのまま。 */
+const LAST_GROUP_IDS = ['settings']
+function settingsGroupLast<T extends { id: string }>(groups: T[]): T[] {
+  return [...groups.filter((group) => !LAST_GROUP_IDS.includes(group.id)), ...groups.filter((group) => LAST_GROUP_IDS.includes(group.id))]
+}
 
 function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, usageRetry, open, canManage, onOpenChange, onItemToggle, onGroupToggle }: {
   group: FeatureGroup
@@ -373,8 +379,8 @@ export default function FeatureSettingsScreen() {
 
   const filteredGroups = useMemo(() => {
     const q = query.trim()
-    if (!q) return groups
-    return groups
+    if (!q) return settingsGroupLast(groups)
+    return settingsGroupLast(groups)
       .map((group) => ({ ...group, items: group.items.filter((item) => item.label.includes(q) || item.note.includes(q)) }))
       .filter((group) => group.items.length > 0)
   }, [groups, query])

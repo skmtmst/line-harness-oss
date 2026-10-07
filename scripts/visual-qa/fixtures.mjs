@@ -5415,7 +5415,8 @@ export const CONVERSION_DEFINITION_REPORT = {
     netValue: netCount * CONVERSION_DAILY_VALUES[index]
       - (day === '2026-08-25' ? CONVERSION_DAILY_FINAL_ADJUSTMENTS[index] : 0),
   }))),
-  byDefinition: CONVERSION_REPORT_CURRENT.map((current) => {
+  /* 板 `AzrZq`：成果地点ごとの表は 商品を買った・予約が入った・初回の定期便が確定・体験申込… の順（絵の並び）。 */
+  byDefinition: ['cp-1', 'cp-3', 'cp-4', 'cp-2', 'cp-5', 'cp-6'].map((id) => CONVERSION_CURRENT_BY_ID.get(id)).map((current) => {
     const previous = CONVERSION_PREVIOUS_BY_ID.get(current.conversionPointId)
     return {
       conversionPointId: current.conversionPointId,
