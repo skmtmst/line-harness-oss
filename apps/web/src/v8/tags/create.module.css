@@ -205,3 +205,219 @@ a.way:hover {
   font-size: var(--text-caption);
   line-height: var(--tpl-tg2-aside-text-lh);
 }
+
+/* ★友だち情報欄を作る・編集（w9zY5）。 */
+.labelStrong {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-tg2-label-lh);
+}
+
+.keyRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-tg2-key-gap);
+}
+
+.keyBrace {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+
+.keyInput {
+  width: var(--tpl-tg2-key-w);
+  font-size: var(--text-label);
+}
+
+.keyFixed {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-canvas-sunken);
+}
+
+.keyNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tg2-safety-body-size);
+  line-height: var(--tpl-tg2-note-lh);
+}
+
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-tg2-ways-gap);
+}
+
+.typeCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-type-card-gap);
+  height: var(--tpl-tg2-type-card-h);
+  padding: var(--tpl-tg2-way-pad);
+  border: 0;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.typeCard[aria-checked='true'] {
+  outline: var(--tpl-tg2-ring-thin) solid var(--color-accent-deep);
+  background: var(--color-accent-soft);
+}
+
+.typeCard:disabled {
+  cursor: not-allowed;
+}
+
+.typeCard:disabled:not([aria-checked='true']) {
+  opacity: 0.6;
+}
+
+.typeCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.typeRadio {
+  width: var(--tpl-tg2-type-radio);
+  height: var(--tpl-tg2-type-radio);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--tpl-tg2-radio-off);
+  background: var(--color-canvas);
+}
+
+.typeCard[aria-checked='true'] .typeRadio {
+  box-shadow: var(--tpl-tg2-radio-on);
+}
+
+.typeCardLabel {
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--tpl-cn-label-lh);
+}
+
+.typeCardHint {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-tg2-chip-lh);
+}
+
+/* 右の列の箱（枠1・角12・余白16・間12）。 */
+.sideStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-side-gap);
+}
+
+.sideCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-side-gap);
+  padding: var(--tpl-tg2-side-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+
+.sideCardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-tg2-side-title-size);
+  font-weight: 700;
+  line-height: var(--tpl-cn-label-lh);
+}
+
+.sideNote {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-tg2-chip-lh);
+}
+
+.chipColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--tpl-tg2-option-gap);
+}
+
+.typeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-tg2-pill-gap);
+  height: var(--tpl-tg2-chip-h);
+  padding: var(--tpl-tg2-chip-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-tg2-chip-lh);
+  cursor: pointer;
+}
+
+.typeChip[aria-checked='true'] {
+  outline: var(--tpl-tg2-ring-thin) solid var(--color-accent-deep);
+  background: var(--color-accent-soft);
+}
+
+.typeChip:disabled {
+  cursor: not-allowed;
+}
+
+.typeChip:disabled:not([aria-checked='true']) {
+  color: var(--color-ink-faint);
+}
+
+.typeChipIcon {
+  width: var(--tpl-tg2-chip-icon);
+  height: var(--tpl-tg2-chip-icon);
+  color: var(--color-ink-secondary);
+}
+
+.optionStack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--tpl-tg2-option-gap);
+}
+
+.defaultBox {
+  width: var(--tpl-tg2-default-w);
+  max-width: 100%;
+}
+
+.placeList {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.placeRow {
+  display: flex;
+  padding: var(--tpl-tg2-place-pad);
+  line-height: var(--tpl-tg2-note-lh);
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: var(--text-caption);
+}
+
+.placeRow dt {
+  width: var(--tpl-tg2-place-name-w);
+  flex-shrink: 0;
+  color: var(--color-ink);
+}
+
+.placeRow dd {
+  margin: 0;
+  color: var(--color-ink-secondary);
+}
