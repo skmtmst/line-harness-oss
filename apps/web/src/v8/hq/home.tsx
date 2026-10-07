@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -430,7 +431,10 @@ export default function HqHomeV8() {
                 <div className={styles.cardHead}>
                   <span className={styles.logo} aria-hidden="true">{name.slice(0, 1)}</span>
                   <div className={styles.cardName}>
-                    <p className={styles.name} title={name}>{name}</p>
+                    {/* 絵 `JKjsE`：名前の前に左の列（タグ）の色の丸。付けたタグが無ければ色の無い輪。 */}
+                    <p className={styles.name} title={name}>
+                      <FolderDotName folder={(account.tags ?? [])[0] ? { name: (account.tags ?? [])[0].name, color: (account.tags ?? [])[0].color } : null}>{name}</FolderDotName>
+                    </p>
                     <p className={styles.meta}>{metaOf(account)}</p>
                   </div>
                   <span className={state.tone === 'ok' ? `${styles.pill} ${styles.pill_ok}` : state.tone === 'warn' ? `${styles.pill} ${styles.pill_warn}` : `${styles.pill} ${styles.pill_idle}`}><span className={styles.dot} aria-hidden="true" />{state.label}</span>

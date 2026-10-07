@@ -3,7 +3,7 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import SupportMarkEditor from '@/components/friend-fields/support-mark-editor'
-import MarkEditorV8 from '@/app/tags/mark-editor-v8'
+import MarkEditorV8 from '@/v8/tags/mark-editor'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import FeatureGate from '@/components/feature-gate'

@@ -187,7 +187,10 @@ describe('V8 会員（src/v8/nen-members）', () => {
       expect(buttons().some((b) => b.textContent?.includes(text))).toBe(false)
     }
     expect(buttons().some((b) => b.textContent?.includes('CSV で書き出す'))).toBe(true)
-    expect(Array.from(host.querySelectorAll('input')).every((input) => input.disabled)).toBe(true)
+    // 欄は読み取りだけ（押せない形ではなく、値は読める）。2026-10-06 オーナー決定。
+    const inputs = Array.from(host.querySelectorAll('input'))
+    expect(inputs.length).toBeGreaterThan(0)
+    expect(inputs.every((input) => input.readOnly && !input.disabled)).toBe(true)
     // 押せないボタン（disabled）を飾りとして残していない。
     expect(Array.from(host.querySelectorAll('button')).filter((b) => b.disabled).map((b) => b.textContent?.trim())).toEqual([])
     await act(async () => { root.render(<MembersV8 accountId="acc-1" tab="lifetime" status="ready" settings={SETTINGS} onRetry={() => {}} onSaved={() => {}} onChangeTab={() => {}} />) })

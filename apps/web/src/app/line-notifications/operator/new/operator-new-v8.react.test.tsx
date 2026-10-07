@@ -124,11 +124,11 @@ test('公開の前に確認の窓（sDXNy）で宛先と届く人数を確かめ
   })
   /* 確認の窓は body 直下に出る（ポータル）。 */
   expect(document.body.textContent).toContain('このお知らせを公開しますか？')
-  expect(document.body.textContent).toContain('LINEが届く人')
+  expect(document.body.textContent).toContain('LINE が届く人')
   const confirmButton = Array.from(document.body.querySelectorAll('button'))
-    .find((button) => button.textContent?.includes('人にLINEで送る'))
+    .find((button) => button.textContent?.includes('人に LINE で送る'))
   expect(confirmButton).toBeDefined()
-  expect(confirmButton?.textContent).toContain('2人')
+  expect(confirmButton?.textContent).toContain('2 人')
 })
 
 test('staff では閲覧のみの帯が出て、保存・公開・テスト送信のボタンは置かない（2026-10-06 オーナー決定）', async () => {

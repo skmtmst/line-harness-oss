@@ -128,7 +128,11 @@ test('v7 では従来の記録タブが出て Uv9AA は出ない', async () => {
   expect(host.querySelector('[data-design-node="KNG00"]')).not.toBeNull()
 })
 
-test('v8 で中身を見ると一覧の右に詳細パネルが出て前後の行へ移れる', async () => {
+/*
+ * 中身は絵 `DA0Ag` どおり真ん中の窓（2026-10-07 右の詳細パネルから変えた）。
+ * 絵の窓に前後の行へ移る操作は無いので、前後送りの確かめは外した（BEHAVIOR.md）。
+ */
+test('v8 で中身を見ると中身の窓（DA0Ag）が出て、伏せ字の本文と送り直しが出る', async () => {
   items = [
     interaction(),
     interaction({ id: 'whk_20260930_0601_01', webhookName: '顧客台帳', triggerSummary: '友だちが追加された' }),
@@ -136,39 +140,37 @@ test('v8 で中身を見ると一覧の右に詳細パネルが出て前後の�
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="Uv9AA"]')!
-  const panelOf = () => board.querySelector('[data-design-part="detail-panel"]')
-  // まだ閉じているときはパネルは無い。
-  expect(panelOf()).toBeNull()
-  const openButtons = [...board.querySelectorAll('button')].filter((button) => button.textContent === '中身を見る')
-  await act(async () => { openButtons[0]!.click() })
-  // 一覧は左に見えたまま、右に詳細が出る。
+  const dialogOf = () => document.querySelector('[data-design-node="DA0Ag"]')
+  // まだ閉じているときは窓は無い。
+  expect(dialogOf()).toBeNull()
+  const openButton = board.querySelector('button[aria-label="「予約台帳」の中身を見る"]') as HTMLElement
+  expect(openButton.textContent).toBe('中身を見る')
+  await act(async () => { openButton.click() })
+  await act(async () => {})
+  const dialog = dialogOf() as HTMLElement
+  expect(dialog).not.toBeNull()
+  expect(dialog.textContent).toContain('やり取りの中身')
+  expect(dialog.textContent).toContain('予約台帳')
+  expect(dialog.textContent).toContain('相手先のサーバが応えませんでした')
+  // 本文は F-18 の口から読む（伏せ字のまま出す）。
+  expect(dialog.textContent).toContain('"friend": "Masato S.（伏せ字）"')
+  expect(dialog.textContent).toContain('届いたか確かめてから送り直す')
+  // 一覧は後ろに残る。
   expect(board.querySelector('tbody tr')).not.toBeNull()
-  const panel = panelOf() as HTMLElement
-  expect(panel).not.toBeNull()
-  expect(panel.textContent).toContain('やり取りの中身')
-  expect(panel.textContent).toContain('予約台帳')
-  // 次の行へ移る。
-  const nextButton = panel.querySelector('button[aria-label="次の行"]') as HTMLElement
-  await act(async () => { nextButton.click() })
-  expect(panelOf()?.textContent).toContain('顧客台帳')
-  // 前の行へ戻る。
-  const prevButton = board.querySelector('button[aria-label="前の行"]') as HTMLElement
-  await act(async () => { prevButton.click() })
-  expect(panelOf()?.textContent).toContain('予約台帳')
 })
 
-test('v8 の詳細パネルはEscで閉じて一覧だけに戻る', async () => {
+test('v8 の中身の窓は閉じるで閉じて一覧だけに戻る', async () => {
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="Uv9AA"]')!
-  const panelOf = () => board.querySelector('[data-design-part="detail-panel"]')
+  const dialogOf = () => document.querySelector('[data-design-node="DA0Ag"]')
   const openButton = [...board.querySelectorAll('button')].find((button) => button.textContent === '中身を見る') as unknown as HTMLElement
   await act(async () => { openButton.click() })
-  expect(panelOf()).not.toBeNull()
-  await act(async () => {
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-  })
-  expect(panelOf()).toBeNull()
+  expect(dialogOf()).not.toBeNull()
+  const close = [...(dialogOf() as HTMLElement).querySelectorAll('button')].find((button) => button.textContent === '閉じる') as HTMLElement
+  await act(async () => { close.click() })
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 400)) })
+  expect(dialogOf()).toBeNull()
   expect(board.querySelector('tbody tr')).not.toBeNull()
 })
 

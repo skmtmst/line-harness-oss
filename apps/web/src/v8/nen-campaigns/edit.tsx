@@ -448,14 +448,22 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           <p className={styles.cardNote}>誕生日のきっかけ・日時は配信の実行処理で固定されています。</p>
         ) : (
           <div className={styles.checks}>
-            <Checkbox checked={merged.dedupWindowDays > 0} disabled={!canEdit} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, dedupWindowDays: checked ? 30 : 0 }))}>
-              同じ人に何度も送らない（30日のあいだに1回だけ）
-            </Checkbox>
-            {merged.campaignKey === 'review_request' ? (
-              <Checkbox checked={Boolean(formAction) && merged.excludeFormRespondents} disabled={!canEdit || !formAction} title={formAction ? undefined : '回答フォームをつなぐと選べます'} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, excludeFormRespondents: checked }))}>
-                すでに口コミを書いた人には送らない
+            {canEdit ? <>
+              <Checkbox checked={merged.dedupWindowDays > 0} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, dedupWindowDays: checked ? 30 : 0 }))}>
+                同じ人に何度も送らない（30日のあいだに1回だけ）
               </Checkbox>
-            ) : null}
+              {merged.campaignKey === 'review_request' ? (
+                <Checkbox checked={Boolean(formAction) && merged.excludeFormRespondents} disabled={!formAction} title={formAction ? undefined : '回答フォームをつなぐと選べます'} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, excludeFormRespondents: checked }))}>
+                  すでに口コミを書いた人には送らない
+                </Checkbox>
+              ) : null}
+            </> : <>
+              {/* 閲覧のみ：チェックは置かず、いまの設定を文字で見せる（2026-10-06 オーナー決定）。 */}
+              <StaticBox label="同じ人に何度も送らない" value={merged.dedupWindowDays > 0 ? '同じ人に何度も送らない（30日のあいだに1回だけ）' : '同じ人にも毎回送る'} />
+              {merged.campaignKey === 'review_request' ? (
+                <StaticBox label="すでに口コミを書いた人" value={Boolean(formAction) && merged.excludeFormRespondents ? 'すでに口コミを書いた人には送らない' : 'すでに口コミを書いた人にも送る'} />
+              ) : null}
+            </>}
           </div>
         )}
       </section>
