@@ -240,7 +240,10 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
       <section className={`${styles.card} ${styles.cardWide}`} aria-labelledby="ec-connector-events">
         <h2 id="ec-connector-events" className={styles.cardTitle}>どこの出来事を取り込むか</h2>
         <div className={styles.checks}>
-          {CONNECTOR_EVENT_TYPES.map((value) => <Checkbox key={value} checked={form.eventTypes.includes(value)} onCheckedChange={() => toggle('eventTypes', value)} disabled={!canEdit}>{EC_EVENT_LABELS[value]}</Checkbox>)}
+          {/* 閲覧のみは押せるチェックを置かず、いまの選び方を文字で見せる。 */}
+          {CONNECTOR_EVENT_TYPES.map((value) => canEdit
+            ? <Checkbox key={value} checked={form.eventTypes.includes(value)} onCheckedChange={() => toggle('eventTypes', value)}>{EC_EVENT_LABELS[value]}</Checkbox>
+            : <span key={value} className={styles.readValue}>{`${EC_EVENT_LABELS[value]}：${form.eventTypes.includes(value) ? '取り込む' : '取り込まない'}`}</span>)}
         </div>
         <p className={styles.note}>チェックを外すと、その出来事を起点にした配信や集計も止まります。</p>
       </section>
@@ -251,7 +254,9 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
         <div className={styles.rules}>
           {IDENTITY_RULES.map(([value, label, help], index) => (
             <span key={value} className={styles.rule} title={help}>
-              <Checkbox checked={form.identityRules.includes(value)} onCheckedChange={() => toggle('identityRules', value)} disabled={!canEdit}>{`${index + 1}. ${label}`}</Checkbox>
+              {canEdit
+                ? <Checkbox checked={form.identityRules.includes(value)} onCheckedChange={() => toggle('identityRules', value)}>{`${index + 1}. ${label}`}</Checkbox>
+                : <span className={styles.readValue}>{`${index + 1}. ${label}：${form.identityRules.includes(value) ? '使う' : '使わない'}`}</span>}
             </span>
           ))}
         </div>

@@ -23,6 +23,7 @@ import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import ListRange from '@/components/ui/list-range'
 import { ApiError, api, type OperatorNotificationRule } from '@/lib/api'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { EVENT_OPTIONS } from '../../line-notifications/operator-words'
 import styles from './screen.module.css'
 
@@ -108,7 +109,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       setNotice({ text: done, error: false })
       await load()
     } catch (error) {
-      setNotice({ text: error instanceof ApiError ? error.message : failed, error: true })
+      setNotice({ text: japaneseDetailOf(error) || failed, error: true })
     } finally { setBusy(null) }
   }
 
@@ -121,7 +122,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       setNotice({ text: result.data.accepted > 0 ? '自分へのテスト送信を受け付けました。' : '受け取れる通知方法がありません。受信設定を確認してください。', error: result.data.accepted === 0 })
       await load()
     } catch (error) {
-      setNotice({ text: error instanceof ApiError ? error.message : 'テスト送信できませんでした。', error: true })
+      setNotice({ text: japaneseDetailOf(error) || 'テスト送信できませんでした。', error: true })
     } finally { setBusy(null) }
   }
 
@@ -142,7 +143,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       setExportReason('')
       onExportClose()
     } catch (error) {
-      setExportError(error instanceof ApiError ? error.message : 'CSVを書き出せませんでした。')
+      setExportError(japaneseDetailOf(error) || 'CSVを書き出せませんでした。')
     } finally { setBusy(null) }
   }
 

@@ -162,7 +162,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const kpiNote = (ready: string): string => {
     if (!lineAccountId) return 'LINEアカウントを選ぶと出ます'
-    if (visibleState === 'error') return '取得できませんでした'
+    if (visibleState === 'error') return '読み込めませんでした'
     if (visibleState === 'forbidden') return '見る権限がありません'
     return ready
   }
@@ -249,7 +249,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
     {visibleState === 'ready' && items.length > 0 ? (
       <div className={styles.runFoot}>
         {mode === 'failures'
-          ? <p className={`${styles.infoBand} ${styles.opBand}`}>個人の既読は取得できません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。</p>
+          ? <p className={`${styles.infoBand} ${styles.opBand}`}>個人の既読は見られません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。</p>
           : <p className={styles.minor}>{`表示中の20件を絞り込み・${formatNumber(total)}件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, total)}件`}</p>}
         {pageCount > 1 ? <Pagination page={page} pageCount={pageCount} onPageChange={setPage} /> : null}
       </div>

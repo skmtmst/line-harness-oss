@@ -265,3 +265,9 @@
 
 .noticeGood { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .noticeBad { background: var(--color-status-danger-soft); color: var(--color-danger); }
+
+.readValue {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-rest3-ec-body);
+  line-height: var(--tpl-rest3-ec-body-lh);
+}
