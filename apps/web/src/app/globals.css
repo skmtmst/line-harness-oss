@@ -2278,7 +2278,8 @@ select:not([multiple]):not(.appearance-none) {
   --color-avatar-purple-ink: #6b3fa0;
 }
 
-/* 触り心地 5 回目：左メニューの組の開閉（組の見出しと項目の間）。 */
+/* 触り心地 5 回目：左メニューの組の開閉（組の見出しと項目の間）・「?」の印の字の書体。 */
 [data-theme="v8"] {
   --tpl-ux5-nav-group-gap: 1px;
+  --tpl-ux5-help-mark-font: var(--font-inter), Inter, sans-serif;
 }
