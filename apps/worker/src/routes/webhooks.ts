@@ -1,3 +1,4 @@
+import { FolderAssignmentError } from '@line-crm/db';
 import { Hono, type Context } from 'hono';
 import {
   getIncomingWebhooks,
@@ -423,6 +424,7 @@ webhooks.get('/api/webhooks/incoming', requireRole('owner', 'admin', 'staff'), a
       data: items.map((w) => ({
         id: w.id,
         name: w.name,
+        folderId: w.folder_id ?? null,
         sourceType: w.source_type,
         hasSecret: hasWebhookSecret(w),
         isActive: Boolean(w.is_active),
@@ -472,6 +474,7 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
       data: {
         id: item.id,
         name: item.name,
+        folderId: item.folder_id ?? null,
         sourceType: item.source_type,
         hasSecret: hasWebhookSecret(item),
         // S: 入れ替え中なら「前の合言葉が使える期限」。併用期間外は null。
@@ -549,7 +552,7 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
     if (!await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
       return stepUpRequiredResponse(c, '秘密の値の登録には本人確認が必要です');
     }
-    const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId: string }>();
+    const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId: string; folderId?: unknown }>();
     const nameError = validateWebhookName(body.name);
     if (nameError) {
       return c.json({ success: false, error: nameError }, 400);
@@ -566,6 +569,7 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
     const item = await createIncomingWebhook(c.env.DB, {
       name: body.name,
       sourceType: body.sourceType,
+      folderId: body.folderId,
       secret: body.secret as string,
       lineAccountId,
     }, webhookKeysOf(c));
@@ -576,6 +580,7 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
         data: {
           id: item.id,
           name: item.name,
+          folderId: item.folder_id ?? null,
           sourceType: item.source_type,
           // secret is returned exactly once on create so the operator can copy it.
           // Subsequent GETs never expose it. The row itself holds only ciphertext.
@@ -587,6 +592,7 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
       201,
     );
   } catch (err) {
+    if (err instanceof FolderAssignmentError) return c.json({ success: false, code: err.code, error: err.message }, 422);
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
@@ -605,7 +611,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
     }
     const existing = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    const body = await c.req.json<{ name?: string; sourceType?: string; secret?: string; isActive?: boolean }>();
+    const body = await c.req.json<{ name?: string; sourceType?: string; secret?: string; isActive?: boolean; folderId?: unknown }>();
     // 秘密値の入れ替えを伴う更新は鍵・トークンの操作（V）。
     if (body.secret !== undefined && !await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
       return stepUpRequiredResponse(c, '秘密の値の変更には本人確認が必要です');
@@ -660,7 +666,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
     if (body.secret !== undefined) {
       auditLog(c, 'webhook.incoming.secret.rotate', { kind: 'incoming_webhook', id }, { lineAccountId });
     }
-    if (body.name !== undefined || body.sourceType !== undefined) {
+    if (body.folderId !== undefined || body.name !== undefined || body.sourceType !== undefined) {
       auditLog(c, 'webhook.incoming.update', { kind: 'incoming_webhook', id }, { lineAccountId });
     }
     return c.json({
@@ -668,6 +674,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
       data: {
         id: updated.id,
         name: updated.name,
+        folderId: updated.folder_id ?? null,
         sourceType: updated.source_type,
         hasSecret: hasWebhookSecret(updated),
         previousSecretUsableUntil: previousSecretUsableUntil(updated),
@@ -675,6 +682,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
       },
     });
   } catch (err) {
+    if (err instanceof FolderAssignmentError) return c.json({ success: false, code: err.code, error: err.message }, 422);
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
@@ -726,6 +734,7 @@ webhooks.post('/api/webhooks/incoming/:id/restore', requireRole('owner'), async 
       data: {
         id: item.id,
         name: item.name,
+        folderId: item.folder_id ?? null,
         sourceType: item.source_type,
         hasSecret: hasWebhookSecret(item),
         previousSecretUsableUntil: previousSecretUsableUntil(item),
@@ -986,6 +995,7 @@ webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), a
         return {
           id: w.id,
           name: w.name,
+          folderId: w.folder_id ?? null,
           url: w.url,
           eventTypes: outgoingEventTypes(w.event_types, w.id),
           hasSecret: hasWebhookSecret(w),
@@ -1010,6 +1020,8 @@ webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), a
           },
           createdAt: w.created_at,
           updatedAt: w.updated_at,
+          version: w.version ?? 1,
+          updatedBy: w.updated_by_staff_id ?? null,
         };
       }),
     });
@@ -1038,6 +1050,7 @@ webhooks.get('/api/webhooks/outgoing/:id', requireRole('owner', 'admin', 'staff'
       data: {
         id: item.id,
         name: item.name,
+        folderId: item.folder_id ?? null,
         url: item.url,
         eventTypes: outgoingEventTypes(item.event_types, item.id),
         hasSecret: hasWebhookSecret(item),
@@ -1047,6 +1060,8 @@ webhooks.get('/api/webhooks/outgoing/:id', requireRole('owner', 'admin', 'staff'
         lastFailedAt: item.last_failed_at ?? null,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
+        version: item.version ?? 1,
+        updatedBy: item.updated_by_staff_id ?? null,
       },
     });
   } catch (err) {
@@ -1067,6 +1082,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       eventTypes?: string[];
       secret?: string;
       maxRetries?: unknown;
+      folderId?: unknown;
       lineAccountId: string;
     }>();
     const nameError = validateWebhookName(body.name);
@@ -1101,6 +1117,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
     const item = await createOutgoingWebhook(c.env.DB, {
       name: body.name,
       url: body.url,
+      folderId: body.folderId,
       eventTypes: (body.eventTypes ?? []).map((item) => item.trim()),
       secret: body.secret as string,
       maxRetries,
@@ -1113,6 +1130,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
         data: {
           id: item.id,
           name: item.name,
+          folderId: item.folder_id ?? null,
           url: item.url,
           eventTypes: outgoingEventTypes(item.event_types, item.id),
           // Returned exactly once on create. The row itself holds only ciphertext.
@@ -1125,6 +1143,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       201,
     );
   } catch (err) {
+    if (err instanceof FolderAssignmentError) return c.json({ success: false, code: err.code, error: err.message }, 422);
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
@@ -1150,7 +1169,21 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
       secret?: string;
       isActive?: boolean;
       maxRetries?: unknown;
+      expectedVersion?: number;
+      folderId?: unknown;
     }>();
+    if (body.expectedVersion !== undefined &&
+        (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1)) {
+      return c.json({ success: false, error: 'expectedVersion は1以上の整数を指定してください' }, 400);
+    }
+    const conflict = (current: typeof existing) => c.json({
+      success: false, code: 'VERSION_CONFLICT', error: '送り先が更新されています。読み直してください',
+      data: { currentVersion: current.version ?? 1, updatedBy: current.updated_by_staff_id ?? null,
+        updatedAt: current.updated_at },
+    }, 409);
+    if (body.expectedVersion !== undefined && body.expectedVersion !== (existing.version ?? 1)) {
+      return conflict(existing);
+    }
     // 秘密値の入れ替えを伴う更新は鍵・トークンの操作（V）。
     if (body.secret !== undefined && !await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
       return stepUpRequiredResponse(c, '秘密の値の変更には本人確認が必要です');
@@ -1223,13 +1256,14 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         );
       }
     }
-    await updateOutgoingWebhook(c.env.DB, id, lineAccountId, {
+    const saved = await updateOutgoingWebhook(c.env.DB, id, lineAccountId, {
       ...body,
       eventTypes: body.eventTypes?.map((item) => item.trim()),
       maxRetries,
-    }, webhookKeysOf(c));
+    }, webhookKeysOf(c), { expectedVersion: body.expectedVersion, updatedByStaffId: c.get('staff')?.id });
     const updated = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
+    if (saved === false) return conflict(updated);
     // N-379 (#939): 動かす/止める・合言葉の入れ直し・その他の変更を分けて記録する。
     if (body.isActive !== undefined) {
       auditLog(c, body.isActive ? 'webhook.outgoing.activate' : 'webhook.outgoing.deactivate',
@@ -1238,7 +1272,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
     if (body.secret !== undefined) {
       auditLog(c, 'webhook.outgoing.secret.rotate', { kind: 'outgoing_webhook', id }, { lineAccountId });
     }
-    if (body.name !== undefined || body.url !== undefined
+    if (body.folderId !== undefined || body.name !== undefined || body.url !== undefined
       || body.eventTypes !== undefined || body.maxRetries !== undefined) {
       auditLog(c, 'webhook.outgoing.update', { kind: 'outgoing_webhook', id }, { lineAccountId });
     }
@@ -1247,6 +1281,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
       data: {
         id: updated.id,
         name: updated.name,
+        folderId: updated.folder_id ?? null,
         url: updated.url,
         eventTypes: outgoingEventTypes(updated.event_types, updated.id),
         hasSecret: hasWebhookSecret(updated),
@@ -1254,9 +1289,14 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         maxRetries: updated.max_retries ?? 0,
         consecutiveFailures: updated.consecutive_failures ?? 0,
         lastFailedAt: updated.last_failed_at ?? null,
+        version: updated.version ?? 1,
+        updatedBy: updated.updated_by_staff_id ?? null,
+        createdAt: updated.created_at,
+        updatedAt: updated.updated_at,
       },
     });
   } catch (err) {
+    if (err instanceof FolderAssignmentError) return c.json({ success: false, code: err.code, error: err.message }, 422);
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
@@ -1377,6 +1417,7 @@ webhooks.post('/api/webhooks/outgoing/:id/restore', requireRole('owner'), async 
       data: {
         id: item.id,
         name: item.name,
+        folderId: item.folder_id ?? null,
         url: item.url,
         eventTypes: outgoingEventTypes(item.event_types, item.id),
         hasSecret: hasWebhookSecret(item),
@@ -1653,6 +1694,7 @@ webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'),
     });
     return c.json({ success: true, data: report });
   } catch (err) {
+    if (err instanceof FolderAssignmentError) return c.json({ success: false, code: err.code, error: err.message }, 422);
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret の移行に必要な鍵がありません' }, 503);
     }

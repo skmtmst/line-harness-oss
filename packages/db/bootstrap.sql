@@ -1139,7 +1139,7 @@ CREATE TABLE automation_definitions (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE automation_logs (
   id             TEXT PRIMARY KEY,
@@ -1574,6 +1574,39 @@ CREATE TABLE booking_settings (
   CHECK (liff_date_view IN ('list', 'calendar')), waitlist_hold_minutes INTEGER NOT NULL DEFAULT 30
   CHECK (waitlist_hold_minutes BETWEEN 1 AND 1440));
 
+CREATE TABLE booking_sync_notice_outbox (
+ id TEXT PRIMARY KEY, notice_id TEXT NOT NULL REFERENCES booking_sync_notices(id), generation INTEGER NOT NULL,
+ retry_key TEXT NOT NULL, sent_at TEXT, lease_until TEXT, lease_token TEXT,
+ UNIQUE(notice_id,generation)
+);
+
+CREATE TABLE booking_sync_notice_queue (
+ line_account_id TEXT PRIMARY KEY, generation INTEGER NOT NULL DEFAULT 1,
+ updated_at TEXT NOT NULL DEFAULT(datetime('now'))
+);
+
+CREATE TABLE booking_sync_notices (
+ id TEXT PRIMARY KEY, line_account_id TEXT NOT NULL REFERENCES line_accounts(id), notice_key TEXT NOT NULL,
+ staff_id TEXT NOT NULL REFERENCES staff(id), target_date TEXT NOT NULL,
+ kind TEXT NOT NULL CHECK(kind IN ('calendar_disconnected','daily_limit','conflict')),
+ status TEXT NOT NULL CHECK(status IN ('open','done','resolved')), booking_id TEXT,
+ booking_count INTEGER NOT NULL DEFAULT 0, daily_limit INTEGER, message TEXT NOT NULL,
+ generation INTEGER NOT NULL DEFAULT 1,
+ created_at TEXT NOT NULL DEFAULT(datetime('now')), updated_at TEXT NOT NULL DEFAULT(datetime('now')),
+ UNIQUE(line_account_id,notice_key)
+);
+
+CREATE TABLE booking_sync_rules (
+ line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id),
+ auto_assign INTEGER NOT NULL CHECK(auto_assign IN (0,1)),
+ notify_conflicts INTEGER NOT NULL CHECK(notify_conflicts IN (0,1)),
+ notify_calendar_disconnected INTEGER NOT NULL CHECK(notify_calendar_disconnected IN (0,1)),
+ notify_daily_limit INTEGER NOT NULL CHECK(notify_daily_limit IN (0,1)),
+ daily_limit INTEGER NOT NULL CHECK(daily_limit BETWEEN 1 AND 1000),
+ near_limit_remaining INTEGER NOT NULL CHECK(near_limit_remaining>=0 AND near_limit_remaining<daily_limit),
+ version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL DEFAULT(datetime('now'))
+);
+
 CREATE TABLE booking_visit_marks (
   id                    TEXT PRIMARY KEY,
   booking_id            TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -1952,7 +1985,7 @@ CREATE TABLE common_actions (
   created_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
   archived_at                  TEXT
-, client_request_key TEXT);
+, client_request_key TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE common_var_export_jobs (
   id TEXT PRIMARY KEY,
@@ -2148,7 +2181,7 @@ CREATE TABLE "conversion_points" (
   tenant_id  TEXT REFERENCES tenants(id),
   ingest_secret_encrypted TEXT,
   ingest_disabled_at TEXT
-, count_anonymous INTEGER NOT NULL DEFAULT 0);
+, count_anonymous INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -2758,7 +2791,8 @@ CREATE TABLE form_submit_claims (
   effect_stats TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  expires_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL, step_completed_at_json TEXT NOT NULL DEFAULT '{}'
+  CHECK (json_valid(step_completed_at_json) AND json_type(step_completed_at_json) = 'object'),
   PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key)
 );
 
@@ -3754,7 +3788,7 @@ CREATE TABLE incoming_webhooks (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , version INTEGER NOT NULL DEFAULT 1
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
-  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT);
+  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE integration_api_tokens (
   id              TEXT PRIMARY KEY,
@@ -5403,7 +5437,7 @@ CREATE TABLE outgoing_webhooks (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
+, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1), updated_by_staff_id TEXT);
 
 CREATE TABLE photo_reward_policies (
   id TEXT PRIMARY KEY,
@@ -7762,6 +7796,8 @@ CREATE TABLE webinars (
   updated_at TEXT NOT NULL
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL);
 
+CREATE INDEX booking_sync_notices_account ON booking_sync_notices(line_account_id,status,target_date);
+
 CREATE INDEX idx_account_handovers_from ON account_handovers (from_account_id);
 
 CREATE INDEX idx_account_handovers_status ON account_handovers (status);
@@ -8023,6 +8059,8 @@ CREATE INDEX idx_auto_reply_versions_status
 CREATE INDEX idx_automation_definitions_account_status
   ON automation_definitions(line_account_id, status, priority DESC);
 
+CREATE INDEX idx_automation_definitions_folder ON automation_definitions(line_account_id, folder_id);
+
 CREATE INDEX idx_automation_logs_automation ON automation_logs (automation_id);
 
 CREATE INDEX idx_automation_run_daily_counts_day
@@ -8255,6 +8293,8 @@ CREATE INDEX idx_common_action_versions_action_status
 CREATE INDEX idx_common_actions_account_status
   ON common_actions(line_account_id, status, updated_at DESC);
 
+CREATE INDEX idx_common_actions_folder ON common_actions(line_account_id, folder_id);
+
 CREATE UNIQUE INDEX idx_common_actions_request_key
   ON common_actions(line_account_id, client_request_key);
 
@@ -8318,6 +8358,8 @@ CREATE INDEX idx_conversion_events_tenant
 
 CREATE INDEX idx_conversion_ingestion_events_point
   ON conversion_ingestion_events(conversion_point_id, created_at DESC);
+
+CREATE INDEX idx_conversion_points_folder ON conversion_points(line_account_id, folder_id);
 
 CREATE INDEX idx_conversion_points_ingest ON conversion_points(id)
   WHERE ingest_secret_encrypted IS NOT NULL;
@@ -8785,6 +8827,8 @@ CREATE INDEX idx_incoming_webhook_receipts_received
 CREATE INDEX idx_incoming_webhook_unmatched_account_status
   ON incoming_webhook_unmatched_events (line_account_id, status, received_at);
 
+CREATE INDEX idx_incoming_webhooks_folder ON incoming_webhooks(line_account_id, folder_id);
+
 CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
 
 CREATE INDEX idx_integration_api_tokens_account
@@ -9198,6 +9242,8 @@ CREATE INDEX idx_outgoing_webhook_deliveries_due
 
 CREATE INDEX idx_outgoing_webhook_deliveries_webhook
   ON outgoing_webhook_deliveries(webhook_id, queued_at DESC);
+
+CREATE INDEX idx_outgoing_webhooks_folder ON outgoing_webhooks(line_account_id, folder_id);
 
 CREATE INDEX idx_outgoing_webhooks_line_account
   ON outgoing_webhooks(line_account_id, is_active, updated_at DESC);
@@ -9827,6 +9873,23 @@ CREATE TRIGGER analytics_projection_friend_stage_count
 AFTER INSERT ON analytics_projection_friend_stage
 BEGIN UPDATE analytics_projection_metric_stage SET unique_friend_count = unique_friend_count + 1 WHERE line_account_id = NEW.line_account_id AND cycle_id = NEW.cycle_id AND metric_date = NEW.metric_date AND event_type = NEW.event_type; END;
 
+CREATE TRIGGER automation_definitions_folder_delete AFTER DELETE ON folders
+BEGIN UPDATE automation_definitions SET folder_id = NULL WHERE folder_id = OLD.id; END;
+
+CREATE TRIGGER automation_definitions_folder_insert BEFORE INSERT ON automation_definitions
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'automation' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER automation_definitions_folder_update BEFORE UPDATE OF folder_id, line_account_id ON automation_definitions
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'automation' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER booking_auto_assign_sync_rules_insert AFTER INSERT ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
+
+CREATE TRIGGER booking_auto_assign_sync_rules_update AFTER UPDATE ON account_settings WHEN NEW.key='booking_auto_assign' BEGIN UPDATE booking_sync_rules SET auto_assign=CASE WHEN NEW.value='true' THEN 1 ELSE 0 END,version=version+1,updated_at=datetime('now') WHERE line_account_id=NEW.line_account_id AND auto_assign<>CASE WHEN NEW.value='true' THEN 1 ELSE 0 END; END;
+
 CREATE TRIGGER booking_resource_consumptions_account_insert
 BEFORE INSERT ON booking_resource_consumptions
 FOR EACH ROW
@@ -9847,6 +9910,16 @@ FOR EACH ROW
 BEGIN
   SELECT RAISE(ABORT, 'booking_resource_consumption_immutable'); END;
 
+CREATE TRIGGER booking_sync_notice_booking_delete AFTER DELETE ON bookings BEGIN INSERT INTO booking_sync_notice_queue(line_account_id) VALUES(OLD.line_account_id) ON CONFLICT(line_account_id) DO UPDATE SET generation=generation+1,updated_at=datetime('now'); END;
+
+CREATE TRIGGER booking_sync_notice_booking_insert AFTER INSERT ON bookings BEGIN INSERT INTO booking_sync_notice_queue(line_account_id) VALUES(NEW.line_account_id) ON CONFLICT(line_account_id) DO UPDATE SET generation=generation+1,updated_at=datetime('now'); END;
+
+CREATE TRIGGER booking_sync_notice_booking_update AFTER UPDATE ON bookings BEGIN INSERT INTO booking_sync_notice_queue(line_account_id) VALUES(NEW.line_account_id) ON CONFLICT(line_account_id) DO UPDATE SET generation=generation+1,updated_at=datetime('now'); END;
+
+CREATE TRIGGER booking_sync_rules_insert AFTER INSERT ON booking_sync_rules BEGIN INSERT INTO account_settings(id,line_account_id,key,value) VALUES(lower(hex(randomblob(16))),NEW.line_account_id,'booking_auto_assign',CASE WHEN NEW.auto_assign=1 THEN 'true' ELSE 'false' END) ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value; INSERT INTO booking_sync_notice_queue(line_account_id) VALUES(NEW.line_account_id) ON CONFLICT(line_account_id) DO UPDATE SET generation=generation+1,updated_at=datetime('now'); END;
+
+CREATE TRIGGER booking_sync_rules_update AFTER UPDATE ON booking_sync_rules BEGIN INSERT INTO account_settings(id,line_account_id,key,value) VALUES(lower(hex(randomblob(16))),NEW.line_account_id,'booking_auto_assign',CASE WHEN NEW.auto_assign=1 THEN 'true' ELSE 'false' END) ON CONFLICT(line_account_id,key) DO UPDATE SET value=excluded.value; INSERT INTO booking_sync_notice_queue(line_account_id) VALUES(NEW.line_account_id) ON CONFLICT(line_account_id) DO UPDATE SET generation=generation+1,updated_at=datetime('now'); END;
+
 CREATE TRIGGER booking_waitlist_booking_insert BEFORE INSERT ON bookings WHEN NEW.status IN ('requested','confirmed') AND ((NEW.waitlist_entry_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM booking_waitlist w JOIN bookings b ON b.waitlist_entry_id=w.id WHERE b.id=NEW.id AND w.id=NEW.waitlist_entry_id AND w.status='converted') AND NOT EXISTS(SELECT 1 FROM booking_waitlist w WHERE w.id=NEW.waitlist_entry_id AND w.line_account_id=NEW.line_account_id AND w.friend_id=NEW.friend_id AND w.staff_id=NEW.staff_id AND w.menu_id=NEW.menu_id AND julianday(w.starts_at)=julianday(NEW.starts_at) AND ((w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')) OR (w.status='converted' AND EXISTS(SELECT 1 FROM bookings b WHERE b.id=NEW.id AND b.waitlist_entry_id=w.id))))) OR (EXISTS(SELECT 1 FROM booking_waitlist w WHERE w.line_account_id=NEW.line_account_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')) AND (EXISTS(SELECT 1 FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.staff_id=NEW.staff_id AND a.menu_id<>NEW.menu_id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at)) OR (SELECT COUNT(*) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.staff_id=NEW.staff_id AND a.menu_id=NEW.menu_id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at))>=COALESCE((SELECT concurrent_capacity FROM menus WHERE id=NEW.menu_id),1) OR EXISTS(SELECT 1 FROM booking_menu_resources mr JOIN booking_resources r ON r.id=mr.resource_id WHERE mr.menu_id=NEW.menu_id AND (r.is_active<>1 OR r.line_account_id<>NEW.line_account_id OR mr.quantity+(SELECT COALESCE(SUM(a.quantity),0) FROM booking_slot_resources a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.resource_id=r.id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at))>r.capacity)) OR EXISTS(SELECT 1 FROM json_each(COALESCE((SELECT json_group_array(json(value)) FROM booking_waitlist w,json_each(w.capacity_windows_json) WHERE w.line_account_id=NEW.line_account_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND julianday(w.starts_at)<julianday(NEW.block_ends_at) AND julianday(w.block_ends_at)>julianday(NEW.starts_at)),'[]')) win WHERE EXISTS(SELECT 1 FROM (SELECT julianday(json_extract(win.value,'$.start')) point UNION ALL SELECT julianday(a.starts_at) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND julianday(a.starts_at)>julianday(json_extract(win.value,'$.start')) AND julianday(a.starts_at)<julianday(json_extract(win.value,'$.end'))) p WHERE (SELECT COUNT(*) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND julianday(a.starts_at)<=p.point AND julianday(a.block_ends_at)>p.point)>=json_extract(win.value,'$.capacity')))))) BEGIN SELECT RAISE(ABORT,'waitlist_hold_conflict'); END;
 
 CREATE TRIGGER booking_waitlist_booking_update BEFORE UPDATE OF staff_id,menu_id,starts_at,block_ends_at,status ON bookings WHEN NEW.status IN ('requested','confirmed') AND ((NEW.waitlist_entry_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM booking_waitlist w JOIN bookings b ON b.waitlist_entry_id=w.id WHERE b.id=NEW.id AND w.id=NEW.waitlist_entry_id AND w.status='converted') AND NOT EXISTS(SELECT 1 FROM booking_waitlist w WHERE w.id=NEW.waitlist_entry_id AND w.line_account_id=NEW.line_account_id AND w.friend_id=NEW.friend_id AND w.staff_id=NEW.staff_id AND w.menu_id=NEW.menu_id AND julianday(w.starts_at)=julianday(NEW.starts_at) AND ((w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')) OR (w.status='converted' AND EXISTS(SELECT 1 FROM bookings b WHERE b.id=NEW.id AND b.waitlist_entry_id=w.id))))) OR (EXISTS(SELECT 1 FROM booking_waitlist w WHERE w.line_account_id=NEW.line_account_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now')) AND (EXISTS(SELECT 1 FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.staff_id=NEW.staff_id AND a.menu_id<>NEW.menu_id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at)) OR (SELECT COUNT(*) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.staff_id=NEW.staff_id AND a.menu_id=NEW.menu_id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at))>=COALESCE((SELECT concurrent_capacity FROM menus WHERE id=NEW.menu_id),1) OR EXISTS(SELECT 1 FROM booking_menu_resources mr JOIN booking_resources r ON r.id=mr.resource_id WHERE mr.menu_id=NEW.menu_id AND (r.is_active<>1 OR r.line_account_id<>NEW.line_account_id OR mr.quantity+(SELECT COALESCE(SUM(a.quantity),0) FROM booking_slot_resources a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND a.resource_id=r.id AND julianday(a.starts_at)<julianday(NEW.block_ends_at) AND julianday(a.block_ends_at)>julianday(NEW.starts_at))>r.capacity)) OR EXISTS(SELECT 1 FROM json_each(COALESCE((SELECT json_group_array(json(value)) FROM booking_waitlist w,json_each(w.capacity_windows_json) WHERE w.line_account_id=NEW.line_account_id AND w.status='invited' AND julianday(w.hold_expires_at)>julianday('now') AND julianday(w.starts_at)<julianday(NEW.block_ends_at) AND julianday(w.block_ends_at)>julianday(NEW.starts_at)),'[]')) win WHERE EXISTS(SELECT 1 FROM (SELECT julianday(json_extract(win.value,'$.start')) point UNION ALL SELECT julianday(a.starts_at) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND julianday(a.starts_at)>julianday(json_extract(win.value,'$.start')) AND julianday(a.starts_at)<julianday(json_extract(win.value,'$.end'))) p WHERE (SELECT COUNT(*) FROM booking_slot_allocations a WHERE a.line_account_id=NEW.line_account_id AND a.id<>NEW.id AND (NEW.waitlist_entry_id IS NULL OR COALESCE(a.waitlist_id,'')<>NEW.waitlist_entry_id) AND julianday(a.starts_at)<=p.point AND julianday(a.block_ends_at)>p.point)>=json_extract(win.value,'$.capacity')))))) BEGIN SELECT RAISE(ABORT,'waitlist_hold_conflict'); END;
@@ -9860,6 +9933,32 @@ CREATE TRIGGER booking_waitlist_registration BEFORE INSERT ON booking_waitlist B
 CREATE TRIGGER booking_waitlist_resource_snapshot AFTER UPDATE OF status ON booking_waitlist WHEN NEW.status='invited' AND OLD.status='waiting' BEGIN INSERT OR REPLACE INTO booking_waitlist_resources SELECT NEW.id,resource_id,quantity FROM booking_menu_resources WHERE menu_id=NEW.menu_id; END;
 
 CREATE TRIGGER capture_ad_conversion_account AFTER INSERT ON conversion_events BEGIN INSERT INTO ad_conversion_event_accounts(conversion_event_id,line_account_id,platform_ids_json) SELECT NEW.id,f.line_account_id,(SELECT json_group_array(p.id) FROM ad_platforms p WHERE p.line_account_id = f.line_account_id AND p.is_active = 1 AND p.verified_at IS NOT NULL AND p.name IN ('meta','google')) FROM friends f WHERE f.id = NEW.friend_id AND f.line_account_id IS NOT NULL; END;
+
+CREATE TRIGGER common_actions_folder_delete AFTER DELETE ON folders
+BEGIN UPDATE common_actions SET folder_id = NULL WHERE folder_id = OLD.id; END;
+
+CREATE TRIGGER common_actions_folder_insert BEFORE INSERT ON common_actions
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'common_action' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER common_actions_folder_update BEFORE UPDATE OF folder_id, line_account_id ON common_actions
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'common_action' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER conversion_points_folder_delete AFTER DELETE ON folders
+BEGIN UPDATE conversion_points SET folder_id = NULL WHERE folder_id = OLD.id; END;
+
+CREATE TRIGGER conversion_points_folder_insert BEFORE INSERT ON conversion_points
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'conversion' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER conversion_points_folder_update BEFORE UPDATE OF folder_id, line_account_id ON conversion_points
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'conversion' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
 
 CREATE TRIGGER conversion_points_prevent_delete
 BEFORE DELETE ON conversion_points
@@ -9991,6 +10090,19 @@ WHEN NEW.id != OLD.id
   OR NEW.version != OLD.version
 BEGIN SELECT RAISE(ABORT, 'HQ_TEMPLATE_VERSION_BINDING_IMMUTABLE'); END;
 
+CREATE TRIGGER incoming_webhooks_folder_delete AFTER DELETE ON folders
+BEGIN UPDATE incoming_webhooks SET folder_id = NULL WHERE folder_id = OLD.id; END;
+
+CREATE TRIGGER incoming_webhooks_folder_insert BEFORE INSERT ON incoming_webhooks
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER incoming_webhooks_folder_update BEFORE UPDATE OF folder_id, line_account_id ON incoming_webhooks
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
 CREATE TRIGGER line_account_tag_links_scope
 BEFORE INSERT ON line_account_tag_links
 WHEN NOT EXISTS (
@@ -9999,6 +10111,28 @@ WHEN NOT EXISTS (
     AND archived_at IS NULL
 )
 BEGIN SELECT RAISE(ABORT, 'ACCOUNT_TAG_SCOPE_INVALID'); END;
+
+CREATE TRIGGER outgoing_webhook_config_version
+AFTER UPDATE OF name, url, event_types, secret, secret_encrypted, is_active, max_retries, deleted_at
+ON outgoing_webhooks
+WHEN NEW.version = OLD.version
+BEGIN
+  UPDATE outgoing_webhooks SET version = OLD.version + 1, updated_by_staff_id = NULL,
+    updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours') || '+09:00'
+  WHERE id = NEW.id; END;
+
+CREATE TRIGGER outgoing_webhooks_folder_delete AFTER DELETE ON folders
+BEGIN UPDATE outgoing_webhooks SET folder_id = NULL WHERE folder_id = OLD.id; END;
+
+CREATE TRIGGER outgoing_webhooks_folder_insert BEFORE INSERT ON outgoing_webhooks
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
+
+CREATE TRIGGER outgoing_webhooks_folder_update BEFORE UPDATE OF folder_id, line_account_id ON outgoing_webhooks
+WHEN NEW.folder_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM folders WHERE id = NEW.folder_id AND kind = 'webhook' AND account_id = NEW.line_account_id
+) BEGIN SELECT RAISE(ABORT, 'folder_assignment_invalid'); END;
 
 CREATE TRIGGER rt_inventory_reservation_delete AFTER DELETE ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE store_id IN (OLD.store_id); END;
 

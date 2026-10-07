@@ -52,6 +52,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
     affiliateOffers: { create: offersCreate, update: offersUpdate },
     tags: { list: vi.fn(async () => ({ success: true, data: [] })) },
     scenarios: { list: vi.fn(async () => ({ success: true, data: [] })) },
+    // 案件を作る（src/v8/affiliate-offer-new）は役割を読んで、閲覧のみなら保存を隠す。
+    staff: { me: vi.fn(async () => ({ success: true, data: { role: 'owner' } })) },
   },
   }
 })

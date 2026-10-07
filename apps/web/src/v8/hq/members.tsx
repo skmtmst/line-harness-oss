@@ -12,17 +12,15 @@ import { Plus } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import { ListPage } from '@/components/templates'
-import MemberDialog, { type MemberDialogValue } from '@/components/hq/members/member-dialog'
 import StepUpPrompt from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
-import Chip from '@/components/shared/chip'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { api, ApiError } from '@/lib/api'
 import { canResendInvite, lastLoginLabel, memberKpis, memberStatus, sortMembers, type MemberStatus } from '@/lib/hq-members'
 import HqSettingsNavV8 from './settings-nav'
+import MemberDialogV8, { MemberChangeConfirmV8, type MemberDialogValue } from './member-dialog'
 import styles from './members.module.css'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -62,6 +60,7 @@ function MembersInner() {
   const [me, setMe] = useState<StaffMember | null>(null)
   const [lastLogins, setLastLogins] = useState<Record<string, string>>({})
   const [dialog, setDialog] = useState<{ open: boolean; member: StaffMember | null }>({ open: false, member: null })
+  const [dialogSession, setDialogSession] = useState(0)
   const [dialogBusy, setDialogBusy] = useState(false)
   const [dialogError, setDialogError] = useState('')
   const [actionError, setActionError] = useState('')
@@ -116,7 +115,8 @@ function MembersInner() {
     try {
       if (dialog.member) {
         const res = await api.staff.update(dialog.member.id, {
-          role: value.role,
+          /* 役割は変えたときだけ送る（担当者のまま保存しても管理者へ上がらない）。 */
+          ...(value.role !== dialog.member.role ? { role: value.role } : {}),
           isActive: value.isActive,
           assignedLineAccountId: value.assignedLineAccountId,
           accountScope: value.accountScope,
@@ -172,8 +172,8 @@ function MembersInner() {
     }
   }
 
-  const openInvite = () => { setDialogError(''); setDialog({ open: true, member: null }) }
-  const openChange = (member: StaffMember) => { setDialogError(''); setDialog({ open: true, member }) }
+  const openInvite = () => { setDialogError(''); setDialogSession((n) => n + 1); setDialog({ open: true, member: null }) }
+  const openChange = (member: StaffMember) => { setDialogError(''); setDialogSession((n) => n + 1); setDialog({ open: true, member }) }
   const ready = status === 'ready' && !restricted
 
   return (
@@ -260,8 +260,10 @@ function MembersInner() {
         )}
       </div>
 
-      <MemberDialog
-        open={dialog.open}
+      <MemberDialogV8
+        /* 確認（M4jS9）を出す間は閉じる。確認をやめたら入れた中身のまま戻る。 */
+        open={dialog.open && !confirmChange}
+        session={dialogSession}
         member={dialog.member}
         accounts={accounts}
         isSelf={dialog.member?.id === me?.id}
@@ -277,7 +279,7 @@ function MembersInner() {
         }}
       />
       {confirmChange ? (
-        <MemberChangeConfirm
+        <MemberChangeConfirmV8
           member={confirmChange.member}
           value={confirmChange.value}
           accountNames={accountNames}
@@ -313,63 +315,5 @@ function StatCard({ label, value, unit, sub }: { label: string; value: number; u
       </span>
       <span className={styles.cardSub}>{sub}</span>
     </div>
-  )
-}
-
-const ROLE_LABEL: Record<string, string> = { owner: '所有者', admin: '管理者', staff: 'スタッフ', viewer: '閲覧のみ' }
-
-/** 板 `M4jS9`「権限を変える確認」。変更前→変更後を並べてから変える（v7 と同じ）。 */
-function MemberChangeConfirm({ member, value, accountNames, busy, error, onCancel, onConfirm }: {
-  member: StaffMember
-  value: MemberDialogValue
-  accountNames: Map<string, string>
-  busy: boolean
-  error: string
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  const roleOf = (role: string) => ROLE_LABEL[role] ?? role
-  const scopeOf = (scope: 'all' | 'accounts', ids: string[]) => (
-    scope === 'all' ? 'すべてのアカウント' : ids.map((id) => accountNames.get(id) ?? id).join('・') || '（選択なし）'
-  )
-  const beforeScope = member.accountScope ?? 'all'
-  const beforeIds = member.scopedLineAccountIds ?? []
-  const rows = [
-    { label: '役割', before: roleOf(member.role), after: roleOf(value.role), changed: member.role !== value.role },
-    {
-      label: '担当範囲',
-      before: scopeOf(beforeScope, beforeIds),
-      after: scopeOf(value.accountScope, value.scopedLineAccountIds),
-      changed: beforeScope !== value.accountScope || beforeIds.join(',') !== value.scopedLineAccountIds.join(','),
-    },
-    {
-      label: '状態',
-      before: member.isActive ? '有効' : '停止中',
-      after: value.isActive ? '有効' : '停止中',
-      changed: member.isActive !== value.isActive,
-    },
-  ]
-  return (
-    <ConfirmDialog
-      open
-      title={`${member.name}さんの権限を変えますか？`}
-      description="変える内容を確かめてから変えてください。管理者が1人だけのときは、その管理者を外せません。"
-      confirmLabel="変える"
-      busy={busy}
-      error={error || undefined}
-      designNode="M4jS9"
-      onConfirm={onConfirm}
-      onCancel={onCancel}
-    >
-      <dl className={styles.confirmList}>
-        {rows.map((row) => (
-          <div key={row.label} className={styles.confirmRow}>
-            <dt className={styles.confirmLabel}>{row.label}</dt>
-            <dd className={styles.confirmValue}>{row.before} → {row.after}</dd>
-            {row.changed ? <Chip tone="warn">変わる</Chip> : null}
-          </div>
-        ))}
-      </dl>
-    </ConfirmDialog>
   )
 }

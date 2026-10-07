@@ -18,7 +18,7 @@ import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import CarouselEditorV8 from './carousel-v8'
+import CarouselEditorV8 from '@/v8/templates/carousel'
 import { readInlineActions } from '@/components/auto-replies/draft-fields'
 import Button from '@/components/shared/button'
 import {

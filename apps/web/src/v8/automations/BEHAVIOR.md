@@ -10,9 +10,10 @@
 | 動いた記録 | `runs.tsx` | `g98F9` | `app/automations/runs/page.tsx` |
 | 共通アクション | `common-actions.tsx` | `LnGNw` | `app/common-actions/page.tsx` |
 | 版と使われている場所 | `versions.tsx` | `ziSgL` | `app/common-actions/versions/page.tsx` |
+| 見本 | `templates.tsx` | `c7dxp` | `app/automations/page.tsx`（`?tab=templates`） |
 | 共通（頭・タブ・数の帯・閲覧のみの帯・権限） | `shell.tsx` | 上のすべて | — |
 
-見本（`?tab=templates`・`c7dxp`）と、ルールを作る（`/automations/new`・`M4torY`・`tJqST`）は今の V8 のまま。
+ルールを作る（`/automations/new`・`M4torY`・`tJqST`）は今の V8 のまま。見本（`c7dxp`）は 2026-10-07 にここへ一から書いた（今までの V8 は `app/automations/templates-v8.tsx`）。
 
 ## 受け付ける URL と指定（今と同じ）
 - `/automations`（ルール）、`/automations?tab=templates`（見本）。
@@ -44,3 +45,23 @@
 - 動いた記録：結果の札は「動いた・失敗・条件に外れた」の3つ（すべては数の帯）。テスト実行を含めるのは「よく使う絞り込み」から。中身は右の詳細パネル。行の「…」に ルールを開く・トークを開く を足した。
 - 共通アクション：状態の絞り込みは札（公開中・下書き・古い版あり・呼ばれていない・保管）。「中の処理」は処理の数（一覧の口に処理の並びが無い）。
 - 版と使われている場所：下書きがある間は「この版から新しい版」を押せない形で出す（サーバが draft_exists で断るため。理由は title）。
+
+## 共通アクションを作る（common-action-new.tsx・絵 j2hfkS）
+今の V8（`app/common-actions/common-action-new-v8.tsx`）と同じ口と動き：`api.commonActions.resources`（選択肢。失敗は帯と「もう一度読み込む」）、
+`api.commonActions.create`（名前・説明・処理・要求キー）→ `/common-actions/versions?id=`。閲覧のみ（権限なし）は作らせない。
+- 入口：`app/common-actions/new/page.tsx`（`/common-actions/new`）
+- 見せ方：処理は「番号・何を・どれを」の1行で並べ、押すとその処理の設定（今の部品 CommonActionEditor／分岐は BranchEditors の写し）を開く。↑↓は開いた設定の中
+- 足す：処理を足す・待ち時間を入れる・条件で分ける・見本から受け渡す（公開版を呼ぶ処理を足す）。足した行は閉じたまま
+- 「失敗したとき」の段：全部の処理の「失敗したとき」をまとめて決める。違うものがあれば「処理ごとに違う」と出す
+- 写したもの：`branch-editor.tsx`・`action-order.ts`（app/common-actions から。src/v8 は @/app を読めない）
+
+## 見本（`templates.tsx`・`c7dxp`）
+- 呼ぶ口（今と同じ）：見本＝`api.automations.templates`、数の帯＝`api.automations.list`（ルールの数・`summary`）と `/api/automation-runs?limit=1` の `summary.skipped`。
+- 「この見本で下書きを作る」＝`api.automations.createDraftFromTemplate`（同じ操作のやり直しだけ同じ鍵）→ `/automations/drafts?id=<下書き>`。失敗は赤い帯「下書きを作れませんでした…」、下書きは作らない。
+- 読めないときは「見本を表示できませんでした」と再読み込み。0件の絞り込みは「条件に合う見本はありません」。
+- 閲覧のみ：「この見本で下書きを作る」と右上の「見本から作る」を置かない（カードの高さは同じ）。閲覧のみの帯は出す。
+
+### 今の V8 と違うところ
+- きっかけの言い方は口の「〇〇とき」から「とき」を落として出す（絵：「友だちになった」）。
+- きっかけの札は、かっこの補足を外した同じきっかけを1つにまとめ（「注文が確定した（初回）」→「注文が確定した」）、**先に出てきた順に6つまで**（絵は「すべて」＋6つ）。7つ目以降のきっかけの見本は「すべて」から見る。
+- 数の帯はルールの一覧と同じ4つ（今月動いた＝この30日に動いた回数。「先月より」は口が無いので出さない）。

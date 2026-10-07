@@ -128,7 +128,14 @@ const ALLOWLIST_MAX = 772;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/booking/admin/sync-rules',
+  'PUT /api/booking/admin/sync-rules',
+  'GET /api/booking/admin/sync-notices',
+  'POST /api/booking/admin/sync-notices/{id}/done',
   // V8 integration endpoints.
+  'GET /api/dashboard/activity',
+  'GET /api/forms/{id}/submissions/{submissionId}',
+  'GET /api/friends/{id}/summary',
   'DELETE /api/hq/templates/folders/{id}',
   'DELETE /api/notifications/teams/{id}',
   'GET /api/ad-platforms/mappings',
@@ -486,8 +493,13 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/integrations/tiktok-pnl/sync',
   'POST /api/liff/booking/{id}/cancel',
   'POST /api/liff/booking/{id}/reschedule',
+  'GET /api/liff/events/me/waitlist',
+  'GET /api/liff/events/me/waitlist/{waitlistId}',
+  'GET /api/liff/events/waitlist/{token}',
+  'GET /api/liff/webinars/{slug}/audience',
   'POST /api/liff/booking/payments/start',
   'POST /api/liff/booking/waitlist',
+  'POST /api/liff/events/me/waitlist/{waitlistId}/cancel',
   'POST /api/liff/events/waitlist/{token}/accept',
   'POST /api/nen-campaigns/pets',
   'POST /api/ops/announcements',

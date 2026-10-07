@@ -22,6 +22,40 @@ const spec = {
       },
     },
     schemas: {
+      BookingSyncRules: {
+        type: 'object',
+        required: ['lineAccountId', 'excludeCalendarBusy', 'writeLineBookingsToCalendar', 'autoAssign', 'notifyConflicts', 'notifyCalendarDisconnected', 'notifyDailyLimit', 'dailyLimit', 'nearLimitRemaining', 'version'],
+        properties: {
+          lineAccountId: { type: 'string' },
+          excludeCalendarBusy: { type: 'boolean', const: true },
+          writeLineBookingsToCalendar: { type: 'boolean', const: true },
+          autoAssign: { type: 'boolean' },
+          notifyConflicts: { type: 'boolean' },
+          notifyCalendarDisconnected: { type: 'boolean' },
+          notifyDailyLimit: { type: 'boolean' },
+          dailyLimit: { type: 'integer', minimum: 1, maximum: 1000 },
+          nearLimitRemaining: { type: 'integer', minimum: 0, maximum: 999, description: 'dailyLimit より小さい値' },
+          version: { type: 'integer', minimum: 0 },
+        },
+      },
+      BookingSyncNotice: {
+        type: 'object',
+        required: ['id', 'lineAccountId', 'staffId', 'date', 'kind', 'status', 'bookingId', 'bookingCount', 'dailyLimit', 'message', 'createdAt', 'updatedAt'],
+        properties: {
+          id: { type: 'string' },
+          lineAccountId: { type: 'string' },
+          staffId: { type: 'string' },
+          date: { type: 'string', format: 'date' },
+          kind: { type: 'string', enum: ['calendar_disconnected', 'daily_limit', 'conflict'] },
+          status: { type: 'string', enum: ['open', 'done', 'resolved'] },
+          bookingId: { type: ['string', 'null'] },
+          bookingCount: { type: 'integer' },
+          dailyLimit: { type: ['integer', 'null'] },
+          message: { type: 'string' },
+          createdAt: { type: 'string' },
+          updatedAt: { type: 'string' },
+        },
+      },
       ApiResponse: {
         type: 'object',
         properties: {
@@ -2226,6 +2260,44 @@ const spec = {
         responses: { '200': { description: 'Upcoming items' }, '400': { description: 'LINEアカウント未指定' }, '404': { description: 'LINEアカウント範囲外' } },
       },
     },
+    '/api/dashboard/activity': {
+      get: {
+        tags: ['Dashboard'], summary: '配信・予約・回答・友だち追加の最近の動きを新しい順に読む',
+        description: '所有者・管理者・スタッフが閲覧できるLINEアカウントの記録だけを返す。試し回答は除く。',
+        parameters: [
+          { name: 'account_id', in: 'query', schema: { type: 'string' }, description: 'LINEアカウントID。accountIdとどちらか一方が必須。' },
+          { name: 'accountId', in: 'query', schema: { type: 'string' }, description: 'account_idの別名。' },
+          { name: 'limit', in: 'query', schema: { type: 'integer', default: 10, minimum: 1, maximum: 100 } },
+        ],
+        responses: {
+          '200': {
+            description: '最近の動きの一覧',
+            content: { 'application/json': { schema: {
+              type: 'object', required: ['success', 'data'],
+              properties: {
+                success: { const: true },
+                data: {
+                  type: 'object', required: ['items'],
+                  properties: { items: { type: 'array', items: {
+                    type: 'object', required: ['id', 'kind', 'summary', 'occurredAt', 'href'],
+                    properties: {
+                      id: { type: 'string' },
+                      kind: { type: 'string', enum: ['broadcast_sent', 'booking_created', 'event_booking_created', 'form_submitted', 'friend_added'] },
+                      summary: { type: 'string' }, occurredAt: { type: 'string' }, href: { type: 'string' },
+                    },
+                  } } },
+                },
+              },
+            } } },
+          },
+          '400': { description: 'アカウント未指定、または件数が1〜100の整数ではない' },
+          '401': { description: '認証が必要' },
+          '403': { description: '所有者・管理者・スタッフの権限が必要' },
+          '404': { description: 'アカウントが見つからない、または閲覧範囲外' },
+          '500': { description: '最近の動きを取得できない' },
+        },
+      },
+    },
     '/api/dashboard/delivery-failure-origins': {
       get: {
         tags: ['Dashboard'], summary: '失敗の数を通知の送達台帳から出どころ別に数える（同じ失敗は1件・送り直し除外）',
@@ -2380,6 +2452,51 @@ const spec = {
         responses: {
           '200': { description: 'Form submissions page with total count and nextCursor' },
           '404': { description: 'Friend not found in account scope' },
+        },
+      },
+    },
+    '/api/friends/{id}/summary': {
+      get: {
+        tags: ['Friends'], summary: '閲覧できる友だちの直近90日間の集計を読む',
+        description: '取消・全額返金を除き、部分返金は金額から差し引く。個人の開封率は未計測のためnull。EC未連携なら購入集計もnull。複数通貨は合算しない。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': {
+            description: '集計期間、開封の計測状態、通貨別の購入件数・金額',
+            content: { 'application/json': { schema: {
+              type: 'object', required: ['success', 'data'],
+              properties: {
+                success: { const: true },
+                data: {
+                  type: 'object', required: ['periodDays', 'from', 'to', 'deliveryOpenRate90Days', 'deliveryOpenMeasuredCount90Days', 'purchases90Days'],
+                  properties: {
+                    periodDays: { const: 90 },
+                    from: { type: 'string', format: 'date-time' }, to: { type: 'string', format: 'date-time' },
+                    deliveryOpenRate90Days: { type: ['number', 'null'] },
+                    deliveryOpenMeasuredCount90Days: { type: 'integer', minimum: 0 },
+                    purchases90Days: {
+                      type: ['object', 'null'], required: ['count', 'totalAmountMinor', 'currency', 'byCurrency'],
+                      properties: {
+                        count: { type: 'integer', minimum: 0 },
+                        totalAmountMinor: { type: ['integer', 'null'], description: '通貨の最小単位。複数通貨または金額不明ならnull。' },
+                        currency: { type: ['string', 'null'] },
+                        byCurrency: { type: 'array', items: {
+                          type: 'object', required: ['currency', 'count', 'totalAmountMinor'],
+                          properties: {
+                            currency: { type: 'string' }, count: { type: 'integer', minimum: 0 },
+                            totalAmountMinor: { type: ['integer', 'null'] },
+                          },
+                        } },
+                      },
+                    },
+                  },
+                },
+              },
+            } } },
+          },
+          '401': { description: '認証が必要' },
+          '404': { description: '友だちが見つからない、または閲覧範囲外' },
+          '500': { description: '集計を取得できない' },
         },
       },
     },
@@ -7014,6 +7131,99 @@ const spec = {
         },
       },
     },
+    '/api/booking/admin/sync-rules': {
+      get: {
+        tags: ['Booking'], summary: '予約の同期・自動割り当て・通知ルールを取得',
+        description: '未保存なら既定値と version=0 を返す。カレンダーの空き時間除外とLINE予約の書き込みは常に有効。Cache-Control: no-store。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '現在の予約ルール', content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'data'], properties: {
+              success: { type: 'boolean', const: true }, data: { $ref: '#/components/schemas/BookingSyncRules' },
+            },
+          } } } },
+          '400': { description: 'account_id 未指定' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+      put: {
+        tags: ['Booking'], summary: '予約の同期・通知ルールを版付きで保存',
+        description: '予約設定の編集権限が必要。expectedVersion=0 は初回保存、既存行は版一致時だけ更新する。nearLimitRemaining は dailyLimit より小さい値。保存後に通知条件を再評価する。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['expectedVersion', 'autoAssign', 'notifyConflicts', 'notifyCalendarDisconnected', 'notifyDailyLimit', 'dailyLimit', 'nearLimitRemaining'],
+          properties: {
+            expectedVersion: { type: 'integer', minimum: 0 },
+            autoAssign: { type: 'boolean' },
+            notifyConflicts: { type: 'boolean' },
+            notifyCalendarDisconnected: { type: 'boolean' },
+            notifyDailyLimit: { type: 'boolean' },
+            dailyLimit: { type: 'integer', minimum: 1, maximum: 1000 },
+            nearLimitRemaining: { type: 'integer', minimum: 0, maximum: 999 },
+            excludeCalendarBusy: { type: 'boolean', const: true },
+            writeLineBookingsToCalendar: { type: 'boolean', const: true },
+          },
+        } } } },
+        responses: {
+          '200': { description: '保存後の予約ルール', content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'data'], properties: {
+              success: { type: 'boolean', const: true }, data: { $ref: '#/components/schemas/BookingSyncRules' },
+            },
+          } } } },
+          '400': { description: 'account_id 未指定、入力または版が不正' },
+          '403': { description: '予約設定の編集権限がない、または担当外のLINEアカウント' },
+          '409': { description: '別の担当者が先に保存した', content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'error', 'currentVersion'], properties: {
+              success: { type: 'boolean', const: false }, error: { type: 'string' },
+              currentVersion: { type: 'integer', minimum: 0 },
+            },
+          } } } },
+        },
+      },
+    },
+    '/api/booking/admin/sync-notices': {
+      get: {
+        tags: ['Booking'], summary: '予約のカレンダー未接続・上限接近・重複の知らせを取得',
+        description: '対応済み・解消済みも含め、対象日と作成日時の降順で最大500件を返す。Cache-Control: no-store。',
+        parameters: [{ name: 'account_id', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '予約の知らせ一覧', content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'data'], properties: {
+              success: { type: 'boolean', const: true },
+              data: { type: 'array', maxItems: 500, items: { $ref: '#/components/schemas/BookingSyncNotice' } },
+            },
+          } } } },
+          '400': { description: 'account_id 未指定' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+    },
+    '/api/booking/admin/sync-notices/{id}/done': {
+      post: {
+        tags: ['Booking'], summary: '予約の知らせを対応済みにする',
+        description: 'owner・admin・staff が操作可能。対応済みの再操作も成功する。条件が解消済みなら409、担当外の知らせは404。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '対応済みの知らせ', content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'data'], properties: {
+              success: { type: 'boolean', const: true }, data: {
+                type: 'object', required: ['id', 'status'], properties: {
+                  id: { type: 'string' }, status: { type: 'string', const: 'done' },
+                },
+              },
+            },
+          } } } },
+          '400': { description: 'account_id 未指定' },
+          '403': { description: '操作できる役割がない、または担当外のLINEアカウント' },
+          '404': { description: 'このLINEアカウントの知らせが存在しない' },
+          '409': { description: '知らせの条件がすでに解消している' },
+        },
+      },
+    },
     // ── Booking payments（決済の差し替え制 #1318） ──────────────────────────
     '/api/booking/admin/payment-config': {
       get: {
@@ -8104,6 +8314,58 @@ const spec = {
         },
       },
     },
+    '/api/forms/{id}/submissions/{submissionId}': {
+      get: {
+        tags: ['Forms'], summary: 'フォーム回答1件と後処理の済んだ工程を読み直す',
+        description: '所有者・管理者・スタッフの閲覧範囲とフォームとの一致を確認する。試し回答は404。過去の工程で日時が不明ならcompletedAtはnull。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'submissionId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': {
+            description: '回答の詳細、書き込み結果、後処理の未完了・完了工程',
+            content: { 'application/json': { schema: {
+              type: 'object', required: ['success', 'data'],
+              properties: {
+                success: { const: true },
+                data: {
+                  type: 'object', required: ['id', 'formId', 'formVersionId', 'friendId', 'friendName', 'data', 'destinationWrite', 'postActions', 'createdAt'],
+                  properties: {
+                    id: { type: 'string' }, formId: { type: 'string' }, formVersionId: { type: ['string', 'null'] },
+                    friendId: { type: ['string', 'null'] }, friendName: { type: ['string', 'null'] },
+                    data: { type: 'object', additionalProperties: true }, createdAt: { type: 'string' },
+                    destinationWrite: {
+                      type: 'object', required: ['status', 'attempted', 'succeeded', 'failed'],
+                      properties: {
+                        status: { type: 'string', enum: ['pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown'] },
+                        attempted: { type: ['integer', 'null'] }, succeeded: { type: ['integer', 'null'] }, failed: { type: ['integer', 'null'] },
+                      },
+                    },
+                    postActions: {
+                      type: ['object', 'null'], required: ['state', 'pending', 'completed'],
+                      properties: {
+                        state: { type: 'string', enum: ['completed', 'failed', 'in_progress', 'untracked'] },
+                        pending: { type: 'array', items: { type: 'string' } },
+                        completed: { type: 'array', items: {
+                          type: 'object', required: ['step', 'completedAt'],
+                          properties: { step: { type: 'string' }, completedAt: { type: ['string', 'null'] } },
+                        } },
+                      },
+                    },
+                  },
+                },
+              },
+            } } },
+          },
+          '401': { description: '認証が必要' },
+          '403': { description: '所有者・管理者・スタッフの権限が必要' },
+          '404': { description: 'フォーム・回答が無い、試し回答、または閲覧範囲外' },
+          '500': { description: '回答の詳細を取得できない' },
+        },
+      },
+    },
     '/api/forms/{id}/submissions/{submissionId}/retry-effects': {
       post: {
         tags: ['Forms'],
@@ -8463,6 +8725,79 @@ const spec = {
       },
     },
     // ── Event waitlist ────────────────────────────────────────────────────
+    '/api/liff/events/waitlist/{token}': {
+      get: {
+        tags: ['Events'],
+        summary: 'キャンセル待ちの繰上げ案内を本人が確認',
+        description: '案内対象の本人だけに、イベント名・日時・会場・人数・回答期限と残り秒数・承諾できるかを返す。',
+        security: [],
+        parameters: [
+          { name: 'token', in: 'path', required: true, schema: { type: 'string', minLength: 32, maxLength: 256 }, description: 'LINEで本人へ送った期限付き案内token' },
+        ],
+        responses: {
+          '200': { description: '{ success・data: 案内の詳細 }' },
+          '401': { description: 'LINE本人確認に失敗' },
+          '404': { description: '案内なし、または案内対象と異なるLINEユーザー' },
+        },
+      },
+    },
+    '/api/liff/events/me/waitlist': {
+      get: {
+        tags: ['Events'],
+        summary: '本人のイベントのキャンセル待ちを一覧',
+        description: '本人の待ちを、自分のイベントの行と同じ項目に source=waitlist と待機中の順番（queue_position）を足して返す。',
+        security: [],
+        parameters: [{ name: 'liffId', in: 'query', required: true, schema: { type: 'string' }, description: 'LIFF ID。LINEアカウントの解決に使う' }],
+        responses: {
+          '200': { description: '{ items: 待ちの行 }' },
+          '400': { description: 'LIFF IDからLINEアカウントを解決できない' },
+          '401': { description: 'LINE本人確認に失敗' },
+        },
+      },
+    },
+    '/api/liff/events/me/waitlist/{waitlistId}': {
+      get: {
+        tags: ['Events'],
+        summary: '本人のイベントのキャンセル待ちを1件取得',
+        security: [],
+        parameters: [{ name: 'waitlistId', in: 'path', required: true, schema: { type: 'string' } }, { name: 'liffId', in: 'query', required: true, schema: { type: 'string' }, description: 'LIFF ID。LINEアカウントの解決に使う' }],
+        responses: {
+          '200': { description: '待ちの行（順番付き）' },
+          '400': { description: 'LIFF IDからLINEアカウントを解決できない' },
+          '401': { description: 'LINE本人確認に失敗' },
+          '404': { description: '待ちが無い、または本人・アカウント範囲外' },
+        },
+      },
+    },
+    '/api/liff/events/me/waitlist/{waitlistId}/cancel': {
+      post: {
+        tags: ['Events'],
+        summary: '本人がイベントのキャンセル待ちを取り下げる',
+        security: [],
+        parameters: [{ name: 'waitlistId', in: 'path', required: true, schema: { type: 'string' } }, { name: 'liffId', in: 'query', required: true, schema: { type: 'string' }, description: 'LIFF ID。LINEアカウントの解決に使う' }],
+        responses: {
+          '200': { description: '{ ok: true }' },
+          '400': { description: 'LIFF IDからLINEアカウントを解決できない' },
+          '401': { description: 'LINE本人確認に失敗' },
+          '404': { description: '待ちが無い、または本人・アカウント範囲外' },
+          '409': { description: '予約化済みなど取り下げできない状態' },
+        },
+      },
+    },
+    '/api/liff/webinars/{slug}/audience': {
+      get: {
+        tags: ['Webinars'],
+        summary: 'ウェビナーの配信中の視聴人数を本人が取得',
+        description: '既存の視聴状態の返しとは別に、人数の更新だけに使う。LINE本人確認とウェビナー機能の有効判定を通す。配信中でない・登録の無い回は live=false・viewerCount=null。',
+        parameters: [{ name: 'slug', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '{ live・sessionStartAt・viewerCount・activeWindowSeconds・lecturerName }' },
+          '401': { description: 'LINE本人確認に失敗' },
+          '403': { description: 'このアカウントの友だちではない' },
+          '404': { description: 'ウェビナーが無い、または公開期間外' },
+        },
+      },
+    },
     '/api/liff/events/waitlist/{token}/accept': {
       post: {
         tags: ['Events'],

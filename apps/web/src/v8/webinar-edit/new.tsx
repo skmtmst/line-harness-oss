@@ -145,7 +145,8 @@ function NewInner() {
       >
         {readOnly ? <Notice tone="info">閲覧のみで見ています。ウェビナーを作るのはオーナーか管理者です。</Notice> : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
-        <BasicForm
+        {/* 閲覧のみと分かったら、押せない入力の欄は置かず閲覧のみの帯だけを出す（作る画面なので見せる中身は無い。2026-10-06 オーナー決定）。 */}
+        {readOnly ? null : <BasicForm
           idPrefix="webinar-new"
           values={values}
           onChange={(patch) => {
@@ -160,9 +161,8 @@ function NewInner() {
           onReloadFolders={() => void loadFolders()}
           audienceLabel="申込者向け"
           fieldErrors={fieldErrors}
-          disabled={readOnly || saving !== false}
-          readOnly={readOnly}
-        />
+          disabled={saving !== false}
+        />}
       </CreatePage>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </>

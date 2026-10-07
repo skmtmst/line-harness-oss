@@ -1,3 +1,4 @@
+import type { BookingSyncRules, BookingSyncRulesInput, BookingSyncNotice } from '@line-crm/shared';
 import type { BookingWaitlistSlotSummary,SeatWaitlistSlotSummary,CustomerSeatWaitlist } from '@line-crm/shared';
 import { adminSessionHeaders } from './admin-session'
 import type { SegmentCondition } from './segment-condition'
@@ -31,6 +32,11 @@ import type {
   AutoReplyPublishResult,
   AutoReplyValidationResult,
   Friend,
+  FriendUpcomingItem,
+  FriendSummary,
+  DashboardActivityItem,
+  FormSubmissionDetail,
+  FormSubmissionPage,
   FriendAddEventKind,
   FriendAddEventAttributionStatus,
   FriendAddEventRoutingStatus,
@@ -1332,6 +1338,7 @@ export type ConversionDefinitionUsageKind =
   | 'nen_campaign' | 'mileage_rule' | 'automation' | 'ad_platform'
 
 export type ConversionDefinitionListItem = {
+  folderId?: string | null
   id: string
   name: string
   sourceType: string
@@ -1997,6 +2004,7 @@ export type CommonActionStep = {
 };
 
 export type CommonActionSummary = {
+  folderId?: string | null
   id: string;
   name: string;
   description: string | null;
@@ -2013,6 +2021,7 @@ export type CommonActionSummary = {
 };
 
 export type AutomationListItem = Automation & {
+  folderId?: string | null
   triggerConfig: Record<string, unknown>;
   status: 'draft' | 'active' | 'stopped';
   versionId: string;
@@ -2398,6 +2407,7 @@ export type CommonActionBinding = {
 };
 
 export type CommonActionDetail = {
+  folderId?: string | null
   id: string;
   name: string;
   description: string | null;
@@ -3166,6 +3176,8 @@ export type FriendDetail = FriendWithTags & {
  * 確定した予定だけを返す。動的条件の将来配信は含まない。
  */
 export type FriendUpcoming = {
+  items?: FriendUpcomingItem[]
+  itemsError?: boolean
   nextBooking: {
     kind: 'booking' | 'event_booking' | 'meet_consultation'
     /** booking は予約ID、event_booking はイベントID、meet_consultation は相談ID */
@@ -3600,6 +3612,7 @@ export type AutomationDraftAction = {
   onFailure: 'stop'
 }
 export type AutomationDraftDetail = {
+  folderId?: string | null
   id: string
   draftVersionId: string
   name: string
@@ -6350,6 +6363,8 @@ export const api = {
      * 受信箱の顧客情報に出す「次の予定」（IDEA-02）。
      * 値が null = 予定なし、*_Error=true = 取得失敗（未取得）を区別する。
      */
+    summary: (id: string) =>
+      fetchApi<ApiResponse<FriendSummary>>(`/api/friends/${encodeURIComponent(id)}/summary`),
     upcoming: (id: string) =>
       fetchApi<ApiResponse<FriendUpcoming>>(`/api/friends/${id}/upcoming`),
     mileage: (id: string, params?: number | { limit?: number; accountId?: string }) => {
@@ -7406,6 +7421,17 @@ export const api = {
   },
   /** 回答フォーム。 */
   forms: {
+    submission: (formId: string, submissionId: string, accountId: string) =>
+      fetchApi<ApiResponse<FormSubmissionDetail>>(
+        `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    submissions: (formId: string, accountId: string, params: { page?: number; limit?: number; query?: string } = {}) => {
+      const query = new URLSearchParams({ account_id: accountId, page: String(params.page ?? 1), limit: String(params.limit ?? 20) })
+      if (params.query) query.set('q', params.query)
+      return fetchApi<ApiResponse<FormSubmissionPage>>(
+        `/api/forms/${encodeURIComponent(formId)}/submissions?${query}`,
+      )
+    },
     list: (accountId: string) =>
       fetchApi<ApiResponse<Array<{ id: string; name: string; description: string | null; isActive: boolean }>>>(
         `/api/forms?account_id=${encodeURIComponent(accountId)}`,
@@ -9589,6 +9615,7 @@ export const api = {
       )
     },
     createDefinition: (data: {
+      folderId?: string | null
       name: string
       sourceType: string
       sourceConfig: Record<string, unknown>
@@ -9640,6 +9667,7 @@ export const api = {
     ),
     /** 成果地点を、履歴を保ったまま編集して次の版にする（N-252）。 */
     reviseDefinition: (id: string, data: {
+      folderId?: string | null
       expectedVersion: number
       name: string
       sourceType: string
@@ -10629,10 +10657,10 @@ export const api = {
      * 同じ鍵を使う。別の新規作成は必ず別の鍵で呼ぶ——同じ鍵だとサーバーは
      * 同じ下書きを返し、鍵が無い呼び出しは Worker が 422 で断る。
      */
-    createDraftFromTemplate: (templateKey: string, accountId: string, operationKey: string) =>
+    createDraftFromTemplate: (templateKey: string, accountId: string, operationKey: string, folderId?: string | null) =>
       fetchApi<ApiResponse<{ id: string; draftVersionId: string }>>(
         `/api/automation-templates/${encodeURIComponent(templateKey)}/drafts?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ operationKey }) },
+        { method: 'POST', body: JSON.stringify({ operationKey, folderId }) },
       ),
     getDraft: (id: string, accountId: string) =>
       fetchApi<ApiResponse<AutomationDraftDetail>>(
@@ -10646,6 +10674,7 @@ export const api = {
         commonActions: Array<{ id: string; name: string }>
       }>>(`/api/automation-draft-resources?account_id=${encodeURIComponent(accountId)}`),
     updateDraft: (id: string, accountId: string, data: {
+      folderId?: string | null
       expectedDraftVersionId: string
       name: string
       eventType: AutomationDraftDetail['eventType']
@@ -10763,6 +10792,7 @@ export const api = {
       ),
     // 監査 R475: 初回保存から再試行まで同じ鍵を送り、二重作成にしない。
     create: (accountId: string, data: {
+      folderId?: string | null;
       name: string;
       description?: string | null;
       actions: CommonActionStep[];
@@ -10773,6 +10803,7 @@ export const api = {
     ),
     // 監査 R473: 保存ごとに進む改訂番号を照合する。古い画面の保存は409で止まる。
     updateDraft: (id: string, accountId: string, data: {
+      folderId?: string | null
       expectedDraftVersionId: string;
       expectedDraftRevision: number;
       name: string;
@@ -10826,6 +10857,10 @@ export const api = {
       fetchApi<ApiResponse<Array<{ id: string; name: string }>>>('/api/operators'),
   },
   dashboard: {
+    activity: (accountId: string, limit = 10) =>
+      fetchApi<ApiResponse<{ items: DashboardActivityItem[] }>>(
+        `/api/dashboard/activity?account_id=${encodeURIComponent(accountId)}&limit=${encodeURIComponent(String(limit))}`,
+      ),
     overview: (params: { period?: 'today' | 'last7' | 'last28'; accountId: string }) => {
       const query = new URLSearchParams()
       if (params?.period) query.set('period', params.period)
@@ -12332,13 +12367,13 @@ export const api = {
         fetchApi<ApiResponse<IncomingWebhookDetail>>(
           `/api/webhooks/incoming/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; name: string; sourceType?: string; secret: string }, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret: string }, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhookCreated>>('/api/webhooks/incoming', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
-      update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string }, stepUpToken?: string) =>
+      update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string; folderId?: string | null }, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhook>>(`/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
@@ -12390,7 +12425,7 @@ export const api = {
         fetchApi<ApiResponse<OutgoingWebhook>>(
           `/api/webhooks/outgoing/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }, stepUpToken?: string) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
@@ -12399,7 +12434,7 @@ export const api = {
       update: (
         id: string,
         lineAccountId: string,
-        data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string },
+        data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string; expectedVersion?: number; folderId?: string | null },
         stepUpToken?: string,
       ) =>
         fetchApi<ApiResponse<OutgoingWebhook>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
@@ -16262,3 +16297,10 @@ export const webinarApi = {
   userComments: (id: string) =>
     fetchApi<{ data: WebinarUserComment[] }>(`/api/webinars/${id}/user-comments`),
 }
+
+export const bookingSyncApi = {
+  rules: (accountId:string)=>fetchApi<{success:true;data:BookingSyncRules}>(`/api/booking/admin/sync-rules?account_id=${encodeURIComponent(accountId)}`),
+  saveRules: (accountId:string,body:BookingSyncRulesInput)=>fetchApi<{success:true;data:BookingSyncRules}>(`/api/booking/admin/sync-rules?account_id=${encodeURIComponent(accountId)}`,{method:'PUT',body:JSON.stringify(body)}),
+  notices: (accountId:string)=>fetchApi<{success:true;data:BookingSyncNotice[]}>(`/api/booking/admin/sync-notices?account_id=${encodeURIComponent(accountId)}`),
+  completeNotice: (accountId:string,id:string)=>fetchApi<{success:true;data:{id:string;status:'done'}}>(`/api/booking/admin/sync-notices/${encodeURIComponent(id)}/done?account_id=${encodeURIComponent(accountId)}`,{method:'POST'}),
+};

@@ -2,7 +2,7 @@
 /*
  * V8 流入と計測の一覧（src/v8）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * 行の「…」から QR コードの小窓（GtI4Y）が開く・停止中の行は URL を出さない・
- * 閲覧のみは作る／編集が押せない・未登録 ref は「登録する」・数の帯の未設定の数。
+ * 閲覧のみは作る／編集を出さない・未登録 ref は「登録する」・数の帯の未設定の数。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -138,15 +138,14 @@ describe('V8 流入と計測の一覧', () => {
     expect(chips?.textContent).toContain('動きが未設定 2')
   })
 
-  it('閲覧のみ（staff）は帯を出し、作る・編集・チェックを押せない形にする（隠さない）', async () => {
+  // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
+  it('閲覧のみ（staff）は帯を出し、作る・編集・チェックを出さない', async () => {
     role.value = 'staff'
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
-    const create = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('流入リンクを作る'))
-    expect(create?.disabled).toBe(true)
-    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')?.disabled).toBe(true)
-    const check = host.querySelector<HTMLElement>('[aria-label="夏のInstagram投稿をまとめて操作の対象にする"]')
-    expect(check).toBeTruthy()
-    expect(check?.hasAttribute('disabled') || check?.getAttribute('aria-disabled') === 'true').toBe(true)
+    const create = [...host.querySelectorAll('button')].filter((button) => button.textContent?.includes('流入リンクを作る'))
+    expect(create).toHaveLength(0)
+    expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeFalsy()
+    expect(host.querySelector('[aria-label="夏のInstagram投稿をまとめて操作の対象にする"]')).toBeNull()
   })
 })

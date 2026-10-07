@@ -89,7 +89,6 @@ type EditorRule = {
 /** 流入リンクを使っているほかの設定（「いま〇〇（順番N）が動いています」）。 */
 type RouteUse = { ruleId: string; name: string; priority: number }
 
-const READONLY_REASON = 'この操作にはオーナーか管理者の権限が要ります'
 const MESSAGE_LIMIT = 5000
 /* 手順の輪の文言は板どおり。 */
 const STEPS: Array<{ key: Step; label: string; node: string }> = [
@@ -626,20 +625,19 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         {step === 'basic'
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'
           : `名前：${rule.name || '（未入力）'}・いまは${statusLabel}です`}
-        {/* 先に保存されたとき（h5rm8t）：頭の中、説明の下に横いっぱいの帯。 */}
-        {conflict ? (
-          /* 帯は共通部品（save-conflict）に寄せた。比べる窓は項目を左右に並べるこの画面のものを使う。 */
-          <div className={styles.conflictSlot}>
-            <SaveConflictBand
-              title={`ほかの人が先に初回案内「${rule.name}」を保存しました`}
-              designNode="h5rm8t"
-              compareBusy={compareBusy}
-              onCompare={() => void openCompare()}
-              onReload={() => void reloadAfterConflict()}
-            />
-          </div>
-        ) : null}
       </>}
+      /* 先に保存されたとき（h5rm8t）：板の頭の下に、入力欄と右の列にまたがる帯（型の notice の置き場）。
+         帯は共通部品（save-conflict）。比べる窓は項目を左右に並べるこの画面のものを使う。 */
+      notice={conflict ? (
+        <SaveConflictBand
+          title={`ほかの人が先に初回案内「${rule.name}」を保存しました`}
+          designNode="h5rm8t"
+          compareBusy={compareBusy}
+          onCompare={() => void openCompare()}
+          onReload={() => void reloadAfterConflict()}
+        />
+      ) : null}
+      noticeSpacing="band"
       preview={preview}
       footerActions={canEdit ? (
         <>
@@ -779,7 +777,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError }: {
   const folderOptions = options.folders.some((folder) => folder.name === (rule.folderName ?? ''))
     ? options.folders
     : rule.folderName ? [...options.folders, { id: rule.folderName, name: rule.folderName }] : options.folders
-  const lockReason = !canEdit ? READONLY_REASON : locked ? '保存したあとの設定では変えられません' : undefined
+  const lockReason = locked ? '保存したあとの設定では変えられません' : undefined
   return (
     <>
       <Card padding="roomy" layout="vertical" className={styles.card} aria-label="名前とフォルダ">
@@ -794,7 +792,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError }: {
               id="fa-name"
               value={rule.name}
               maxLength={60}
-              disabled={!canEdit}
+              readOnly={!canEdit}
               invalid={Boolean(nameError)}
               placeholder="例：秋フェアの初回案内"
               onChange={(event) => setRule((current) => ({ ...current, name: event.target.value }))}
@@ -803,18 +801,21 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError }: {
           </div>
           <div className={styles.field}>
             <label htmlFor="fa-folder" className={styles.label}>フォルダ</label>
-            <Select
-              id="fa-folder"
-              aria-label="フォルダ"
-              size="full"
-              value={rule.folderName ?? ''}
-              disabled={!canEdit}
-              onChange={(value) => setRule((current) => ({ ...current, folderName: value || null }))}
-              options={[
-                { value: '', label: '未分類' },
-                ...folderOptions.map((folder) => ({ value: folder.name, label: folder.name })),
-              ]}
-            />
+            {canEdit ? (
+              <Select
+                id="fa-folder"
+                aria-label="フォルダ"
+                size="full"
+                value={rule.folderName ?? ''}
+                onChange={(value) => setRule((current) => ({ ...current, folderName: value || null }))}
+                options={[
+                  { value: '', label: '未分類' },
+                  ...folderOptions.map((folder) => ({ value: folder.name, label: folder.name })),
+                ]}
+              />
+            ) : (
+              <ReadOnlyText id="fa-folder" label="フォルダ" value={rule.folderName || '未分類'} />
+            )}
           </div>
         </div>
       </Card>
@@ -823,12 +824,15 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError }: {
           <h2 className={styles.cardTitle}>だれに送るか</h2>
           <p className={styles.cardDesc}>保存したあとは変えられません</p>
         </div>
+        {!canEdit ? (
+          <ReadOnlyText label="だれに送るか" value={rule.friendKind === 'returning' ? '以前からの友だち・ブロック解除した人' : 'はじめて友だち追加した人'} />
+        ) : (
         <RadioCardGroup legend="だれに送るか" className={styles.kindPair}>
           <RadioCard
             name="fa-kind"
             value="first_time"
             checked={rule.friendKind === 'first_time'}
-            disabled={!canEdit || locked}
+            disabled={locked}
             disabledReason={rule.friendKind === 'first_time' ? undefined : lockReason}
             onChange={() => setRule((current) => ({ ...current, friendKind: 'first_time' }))}
             icon={<UserPlus size={16} />}
@@ -840,7 +844,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError }: {
             name="fa-kind"
             value="returning"
             checked={rule.friendKind === 'returning'}
-            disabled={!canEdit || locked}
+            disabled={locked}
             disabledReason={rule.friendKind === 'returning' ? undefined : lockReason}
             onChange={() => setRule((current) => ({ ...current, friendKind: 'returning' }))}
             icon={<UserRound size={16} />}
@@ -849,6 +853,7 @@ function BasicStep({ rule, setRule, options, canEdit, isExisting, nameError }: {
             className={styles.kindCard}
           />
         </RadioCardGroup>
+        )}
         <Notice tone="info" icon={<CircleAlert size={16} aria-hidden="true" />} message="この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。" />
       </Card>
     </>
@@ -897,15 +902,23 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
-        {visibleRoutes.map((route) => {
+        {/* 閲覧のみ：選ぶチェックは置かず、選んでいるリンクの名前だけを並べる。 */}
+        {(canEdit ? visibleRoutes : visibleRoutes.filter((route) => definition.routeIds.includes(route.id))).map((route) => {
           const checked = definition.routeIds.includes(route.id)
           const use = routeUses.get(route.id)
+          if (!canEdit) {
+            return (
+              <p key={route.id} className={styles.readOnlyRoute}>
+                <span className={styles.readOnlyRouteName} title={route.name}>{route.name}</span>
+                <span className={styles.routeSub}>{route.kind ? `QR・URL｜${route.kind}` : 'QR・URL'}</span>
+              </p>
+            )
+          }
           return (
             <CheckCard
               key={route.id}
               className={styles.routeCard}
               checked={checked}
-              disabled={!canEdit}
               onChange={() => toggleRoute(route.id)}
               title={route.name}
               note={use && !checked ? (
@@ -939,7 +952,7 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
                 id="fa-from"
                 type="datetime-local"
                 value={localInputValue(definition.activeFrom)}
-                disabled={!canEdit}
+                readOnly={!canEdit}
                 onChange={(event) => setDefinition((current) => ({ ...current, activeFrom: event.target.value || null }))}
               />
             </div>
@@ -949,7 +962,7 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
                 id="fa-until"
                 type="datetime-local"
                 value={localInputValue(definition.activeUntil)}
-                disabled={!canEdit}
+                readOnly={!canEdit}
                 onChange={(event) => setDefinition((current) => ({ ...current, activeUntil: event.target.value || null }))}
               />
             </div>
@@ -958,22 +971,28 @@ function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggl
             <p className={styles.fieldError} role="alert">以前の形式の条件が入っているため、今は配信を止めています。下の条件を作り直してください。</p>
           ) : null}
           <div className={styles.conditionRow}>
-            <button
-              type="button"
-              className={styles.conditionSummary}
-              aria-expanded={conditionOpen}
-              onClick={() => setConditionOpen((open) => !open)}
-            >
-              <span className={styles.conditionText}>{conditionSummary(parsed, options.tags)}</span>
-              <span aria-hidden="true" className={styles.conditionChevron}>⌄</span>
-            </button>
+            {canEdit ? (
+              <button
+                type="button"
+                className={styles.conditionSummary}
+                aria-expanded={conditionOpen}
+                onClick={() => setConditionOpen((open) => !open)}
+              >
+                <span className={styles.conditionText}>{conditionSummary(parsed, options.tags)}</span>
+                <span aria-hidden="true" className={styles.conditionChevron}>⌄</span>
+              </button>
+            ) : (
+              // 閲覧のみ：条件を開いて変える部品は置かず、条件の中身を文字で見せる。
+              <span className={styles.conditionSummary}>
+                <span className={styles.conditionText}>{conditionSummary(parsed, options.tags)}</span>
+              </span>
+            )}
             {canEdit ? <Button type="button" onClick={() => setConditionOpen(true)}>条件を足す</Button> : null}
           </div>
-          {conditionOpen ? (
+          {canEdit && conditionOpen ? (
             <ConditionBuilder
               value={parsed}
               onChange={(next) => {
-                if (!canEdit) return
                 const pruned = pruneCondition(next)
                 setDefinition((current) => ({ ...current, friendCondition: pruned ? JSON.stringify(pruned) : '' }))
               }}
@@ -1036,6 +1055,9 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>最初に送るもの</h2>
         </div>
+        {!canEdit ? (
+          <ReadOnlyText label="最初に送るものの種類" value={MESSAGE_TABS.find((tab) => tab.key === definition.messageType)?.label ?? MESSAGE_TYPE_LABEL[definition.messageType] ?? '未設定'} />
+        ) : (
         <div className={styles.chipRow} role="group" aria-label="最初に送るものの種類">
           {MESSAGE_TABS.map((tab) => {
             const selected = definition.messageType === tab.key
@@ -1044,7 +1066,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
                 key={tab.key}
                 type="button"
                 aria-pressed={selected}
-                disabled={!tab.enabled || !canEdit}
+                disabled={!tab.enabled}
                 title={tab.reason}
                 className={styles.pickChip}
                 data-selected={selected || undefined}
@@ -1056,6 +1078,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             )
           })}
         </div>
+        )}
         <div className={styles.bodyBox}>
           <textarea
             ref={messageRef}
@@ -1064,20 +1087,23 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
             rows={2}
             maxLength={MESSAGE_LIMIT}
             value={definition.messageText}
-            disabled={!canEdit}
+            readOnly={!canEdit}
             onChange={(event) => setDefinition((current) => ({ ...current, messageText: event.target.value }))}
           />
           <div className={styles.insertRow}>
-            <span className={styles.insertLabel}>差し込む</span>
-            <Button type="button" variant="text" disabled={!canEdit} onClick={() => insertToken('{{name}}')}>
-              <User size={15} aria-hidden="true" />名前
-            </Button>
-            <Button type="button" variant="text" disabled title="友だち情報の欄を選ぶ口はこの版にありません">
-              <IdCard size={15} aria-hidden="true" />友だち情報
-            </Button>
-            <Button type="button" variant="text" disabled title="共通情報の値を選ぶ口はこの版にありません">
-              <Braces size={15} aria-hidden="true" />共通情報
-            </Button>
+            {/* 閲覧のみ：差し込むボタンは置かない（文字数だけ見せる）。 */}
+            {canEdit ? (<>
+              <span className={styles.insertLabel}>差し込む</span>
+              <Button type="button" variant="text" onClick={() => insertToken('{{name}}')}>
+                <User size={15} aria-hidden="true" />名前
+              </Button>
+              <Button type="button" variant="text" disabled title="友だち情報の欄を選ぶ口はこの版にありません">
+                <IdCard size={15} aria-hidden="true" />友だち情報
+              </Button>
+              <Button type="button" variant="text" disabled title="共通情報の値を選ぶ口はこの版にありません">
+                <Braces size={15} aria-hidden="true" />共通情報
+              </Button>
+            </>) : null}
             <span className={styles.spacer} aria-hidden="true" />
             <span className={styles.charCount}>{`${formatNumber(definition.messageText.length)} / ${formatNumber(MESSAGE_LIMIT)}`}</span>
           </div>
@@ -1088,11 +1114,13 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
           <h2 className={styles.cardTitle}>いつ送るか</h2>
         </div>
         <div className={styles.segRow}>
+          {!canEdit ? (
+            <ReadOnlyText label="送るタイミング" value={scheduled ? '時間帯を決める' : '追加してすぐ'} />
+          ) : (
           <SegmentedControl
             aria-label="送るタイミング"
             value={scheduled ? 'window' : 'now'}
             onChange={(next) => {
-              if (!canEdit) return
               setDefinition((current) => next === 'now'
                 ? { ...current, weekdays: [0, 1, 2, 3, 4, 5, 6], timeWindows: [] }
                 : { ...current, timeWindows: current.timeWindows && current.timeWindows.length > 0 ? current.timeWindows : addTimeWindow(current.timeWindows) })
@@ -1102,11 +1130,15 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
               { value: 'window', label: '時間帯を決める' },
             ]}
           />
+          )}
         </div>
         <p className={styles.cardDesc}>「時間帯を決める」にすると、時間帯の外に追加した人には、次の時間帯の始めに届きます。</p>
         {scheduled ? (
           <div className={styles.field}>
             <span className={styles.label}>曜日</span>
+            {!canEdit ? (
+              <ReadOnlyText label="曜日" value={['日', '月', '火', '水', '木', '金', '土'].filter((_, day) => (definition.weekdays ?? []).includes(day)).join('・') || '選んでいません'} />
+            ) : (
             <div className={styles.weekRow}>
               {['日', '月', '火', '水', '木', '金', '土'].map((label, day) => {
                 const checked = (definition.weekdays ?? []).includes(day)
@@ -1117,7 +1149,6 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
                     role="checkbox"
                     aria-checked={checked}
                     aria-label={`${label}曜日`}
-                    disabled={!canEdit}
                     className={styles.pickChip}
                     data-selected={checked || undefined}
                     onClick={() => setDefinition((current) => {
@@ -1130,13 +1161,14 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
                 )
               })}
             </div>
+            )}
             {(definition.timeWindows ?? []).map((slot, index) => (
               <div key={index} className={styles.timeRow}>
                 <TextField
                   type="time"
                   aria-label={`時間帯${index + 1}の開始`}
                   value={slot.start}
-                  disabled={!canEdit}
+                  readOnly={!canEdit}
                   onChange={(event) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: event.target.value }) }))}
                 />
                 <span aria-hidden="true">〜</span>
@@ -1144,7 +1176,7 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
                   type="time"
                   aria-label={`時間帯${index + 1}の終了`}
                   value={slot.end}
-                  disabled={!canEdit}
+                  readOnly={!canEdit}
                   onChange={(event) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { end: event.target.value }) }))}
                 />
                 {canEdit ? (
@@ -1167,15 +1199,34 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit
         <div className={styles.switchRow}>
           <span className={styles.switchText}>{`同じ人へは ${resendSuppressionText(definition.resendSuppressionHours)}まで`}</span>
           <span className={styles.spacer} aria-hidden="true" />
-          <Toggle
-            checked={suppressOn}
-            label="同じ人に何度も送らない"
-            onChange={canEdit ? (next) => setDefinition((current) => ({ ...current, resendSuppressionHours: next ? 24 : 0 })) : undefined}
-          />
+          {/* 閲覧のみ：つまみは置かない（左の文で今の設定が読める）。 */}
+          {canEdit ? (
+            <Toggle
+              checked={suppressOn}
+              label="同じ人に何度も送らない"
+              onChange={(next) => setDefinition((current) => ({ ...current, resendSuppressionHours: next ? 24 : 0 }))}
+            />
+          ) : null}
         </div>
       </Card>
     </>
   )
+}
+
+const RETURNING_MODES = [
+  { key: 'none', title: '何も送らない', desc: '案内後の操作だけを行う' },
+  { key: 'same', title: 'はじめてと同じ', desc: 'はじめての人と同じ案内を送る' },
+  { key: 'other', title: '別のシナリオ', desc: '選んだシナリオから始める' },
+] as const
+
+const START_POSITIONS = [
+  { key: 'beginning', title: '最初から', desc: '一度も届いていない人にも最初から届きます' },
+  { key: 'resume', title: '前回送った次から', desc: '途中まで届いた人へ続きを送ります' },
+] as const
+
+/** 閲覧のみ：選ぶ部品（RadioCard・Select・つまみ・曜日の札）の代わりに、選んでいる値を読み取りだけの欄で見せる。 */
+function ReadOnlyText({ id, label, value }: { id?: string; label: string; value: string }) {
+  return <TextField id={id} aria-label={label} value={value} readOnly aria-readonly="true" title={value} />
 }
 
 function ReturningMessage({ definition, setDefinition, scenarios, canEdit }: {
@@ -1193,36 +1244,38 @@ function ReturningMessage({ definition, setDefinition, scenarios, canEdit }: {
           <h2 className={styles.cardTitle}>追加のときに送るもの</h2>
           <p className={styles.cardDesc}>戻ってきた人に何を送るか選びます。</p>
         </div>
+        {!canEdit ? (
+          <ReadOnlyText label="追加のときに送るもの" value={RETURNING_MODES.find((option) => option.key === mode)?.title ?? ''} />
+        ) : (
         <RadioCardGroup legend="追加のときに送るもの" className={styles.kindTriple}>
-          {([
-            { key: 'none', title: '何も送らない', desc: '案内後の操作だけを行う' },
-            { key: 'same', title: 'はじめてと同じ', desc: 'はじめての人と同じ案内を送る' },
-            { key: 'other', title: '別のシナリオ', desc: '選んだシナリオから始める' },
-          ] as const).map((option) => (
+          {RETURNING_MODES.map((option) => (
             <RadioCard
               key={option.key}
               name="fa-returning"
               value={option.key}
               checked={mode === option.key}
-              disabled={!canEdit}
               onChange={() => setDefinition((current) => ({ ...current, returningMode: option.key }))}
               title={option.title}
               note={option.desc}
             />
           ))}
         </RadioCardGroup>
+        )}
         {mode === 'other' ? (
           <div className={styles.field}>
             <label htmlFor="fa-returning-scenario" className={styles.label}>始めるシナリオ</label>
-            <Select
-              id="fa-returning-scenario"
-              aria-label="始めるシナリオ"
-              size="full"
-              value={definition.scenarioId ?? ''}
-              disabled={!canEdit}
-              onChange={(value) => setDefinition((current) => ({ ...current, scenarioId: value || null }))}
-              options={[{ value: '', label: '選んでください' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
-            />
+            {canEdit ? (
+              <Select
+                id="fa-returning-scenario"
+                aria-label="始めるシナリオ"
+                size="full"
+                value={definition.scenarioId ?? ''}
+                onChange={(value) => setDefinition((current) => ({ ...current, scenarioId: value || null }))}
+                options={[{ value: '', label: '選んでください' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
+              />
+            ) : (
+              <ReadOnlyText id="fa-returning-scenario" label="始めるシナリオ" value={scenarios.find((scenario) => scenario.id === definition.scenarioId)?.name ?? '選んでいません'} />
+            )}
           </div>
         ) : null}
       </Card>
@@ -1230,23 +1283,23 @@ function ReturningMessage({ definition, setDefinition, scenarios, canEdit }: {
         <div className={styles.cardHead}>
           <h2 className={styles.cardTitle}>どこから始めるか</h2>
         </div>
+        {!canEdit ? (
+          <ReadOnlyText label="どこから始めるか" value={START_POSITIONS.find((option) => option.key === start)?.title ?? ''} />
+        ) : (
         <RadioCardGroup legend="どこから始めるか" className={styles.kindPair}>
-          {([
-            { key: 'beginning', title: '最初から', desc: '一度も届いていない人にも最初から届きます' },
-            { key: 'resume', title: '前回送った次から', desc: '途中まで届いた人へ続きを送ります' },
-          ] as const).map((option) => (
+          {START_POSITIONS.map((option) => (
             <RadioCard
               key={option.key}
               name="fa-start"
               value={option.key}
               checked={start === option.key}
-              disabled={!canEdit}
               onChange={() => setDefinition((current) => ({ ...current, startPosition: option.key }))}
               title={option.title}
               note={option.desc}
             />
           ))}
         </RadioCardGroup>
+        )}
       </Card>
     </>
   )

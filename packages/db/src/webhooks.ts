@@ -1,3 +1,4 @@
+import { readFolderAssignment } from './folder-assignment.js';
 import { EC_EVENT_TYPES } from '@line-crm/shared';
 import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from './credential-crypto.js';
 import { jstNow, toJstString } from './utils.js';
@@ -46,6 +47,7 @@ export function isKnownOutgoingEventType(eventType: string): boolean {
 }
 
 export interface IncomingWebhookRow {
+  folder_id?: string | null;
   id: string;
   name: string;
   source_type: string;
@@ -88,6 +90,9 @@ export interface OutgoingWebhookDeliverySummaryRow {
 }
 
 export interface OutgoingWebhookRow {
+  version?: number;
+  updated_by_staff_id?: string | null;
+  folder_id?: string | null;
   id: string;
   name: string;
   url: string;
@@ -1187,9 +1192,10 @@ export async function updateIncomingWebhookMaskedSample(
 
 export async function createIncomingWebhook(
   db: D1Database,
-  input: { name: string; sourceType?: string; secret?: string; lineAccountId: string },
+  input: { name: string; sourceType?: string; secret?: string; lineAccountId: string; folderId?: unknown },
   keys?: WebhookKeyInput | string,
 ): Promise<IncomingWebhookRow> {
+  const folderId = await readFolderAssignment(db, 'webhook', input.lineAccountId, input.folderId);
   const id = crypto.randomUUID();
   const now = jstNow();
   // secret があるときは暗号化して保存し、平文は残さない。鍵がなければ例外にする。
@@ -1197,8 +1203,8 @@ export async function createIncomingWebhook(
     ? null
     : await encryptWebhookSecret(input.secret, keys);
   await db
-    .prepare(`INSERT INTO incoming_webhooks (id, name, source_type, secret, secret_encrypted, line_account_id, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.sourceType ?? 'custom', encrypted, input.lineAccountId, now, now)
+    .prepare(`INSERT INTO incoming_webhooks (id, name, source_type, secret, secret_encrypted, line_account_id, created_at, updated_at, folder_id) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)`)
+    .bind(id, input.name, input.sourceType ?? 'custom', encrypted, input.lineAccountId, now, now, folderId ?? null)
     .run();
   return (await getIncomingWebhookById(db, id, input.lineAccountId))!;
 }
@@ -1220,11 +1226,13 @@ export async function updateIncomingWebhook(
   db: D1Database,
   id: string,
   lineAccountId: string,
-  updates: Partial<{ name: string; sourceType: string; secret: string; isActive: boolean }>,
+  updates: Partial<{ name: string; sourceType: string; secret: string; isActive: boolean; folderId: unknown }>,
   keys?: WebhookKeyInput | string,
 ): Promise<void> {
+  const folderId = await readFolderAssignment(db, 'webhook', lineAccountId, updates.folderId);
   const sets: string[] = [];
   const values: unknown[] = [];
+  if (folderId !== undefined) { sets.push('folder_id = ?'); values.push(folderId); }
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.sourceType !== undefined) { sets.push('source_type = ?'); values.push(updates.sourceType); }
   if (updates.secret !== undefined) {
@@ -1333,9 +1341,10 @@ export async function getOutgoingWebhookById(
 
 export async function createOutgoingWebhook(
   db: D1Database,
-  input: { name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number; lineAccountId: string },
+  input: { name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number; lineAccountId: string; folderId?: unknown },
   keys?: WebhookKeyInput | string,
 ): Promise<OutgoingWebhookRow> {
+  const folderId = await readFolderAssignment(db, 'webhook', input.lineAccountId, input.folderId);
   const id = crypto.randomUUID();
   const now = jstNow();
   // secret があるときは暗号化して保存し、平文は残さない。鍵がなければ例外にする。
@@ -1343,8 +1352,8 @@ export async function createOutgoingWebhook(
     ? null
     : await encryptWebhookSecret(input.secret, keys);
   await db
-    .prepare(`INSERT INTO outgoing_webhooks (id, name, url, event_types, secret, secret_encrypted, max_retries, line_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), encrypted, input.maxRetries ?? 0, input.lineAccountId, now, now)
+    .prepare(`INSERT INTO outgoing_webhooks (id, name, url, event_types, secret, secret_encrypted, max_retries, line_account_id, created_at, updated_at, folder_id) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), encrypted, input.maxRetries ?? 0, input.lineAccountId, now, now, folderId ?? null)
     .run();
   return (await getOutgoingWebhookById(db, id, input.lineAccountId))!;
 }
@@ -1360,11 +1369,15 @@ export async function updateOutgoingWebhook(
     secret: string;
     isActive: boolean;
     maxRetries: number;
+    folderId: unknown;
   }>,
   keys?: WebhookKeyInput | string,
-): Promise<void> {
+  options: { expectedVersion?: number; updatedByStaffId?: string } = {},
+): Promise<boolean> {
+  const folderId = await readFolderAssignment(db, 'webhook', lineAccountId, updates.folderId);
   const sets: string[] = [];
   const values: unknown[] = [];
+  if (folderId !== undefined) { sets.push('folder_id = ?'); values.push(folderId); }
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.url !== undefined) { sets.push('url = ?'); values.push(updates.url); }
   if (updates.eventTypes !== undefined) { sets.push('event_types = ?'); values.push(JSON.stringify(updates.eventTypes)); }
@@ -1382,13 +1395,21 @@ export async function updateOutgoingWebhook(
     if (updates.isActive) sets.push('auto_stopped_at = NULL');
   }
   if (updates.maxRetries !== undefined) { sets.push('max_retries = ?'); values.push(updates.maxRetries); }
-  if (sets.length === 0) return;
+  if (sets.length === 0) {
+    const current = await getOutgoingWebhookById(db, id, lineAccountId);
+    return Boolean(current && (options.expectedVersion === undefined || current.version === options.expectedVersion));
+  }
+  sets.push('version = version + 1', 'updated_by_staff_id = ?');
+  values.push(options.updatedByStaffId ?? null);
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
   values.push(lineAccountId);
-  await db.prepare(`UPDATE outgoing_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
+  const versionClause = options.expectedVersion === undefined ? '' : ' AND version = ?';
+  if (options.expectedVersion !== undefined) values.push(options.expectedVersion);
+  const result = await db.prepare(`UPDATE outgoing_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL${versionClause}`)
     .bind(...values).run();
+  return (result.meta.changes ?? 0) > 0;
 }
 
 /** N-368 (#939): 受信側と同じく、削除は履歴を残す印。返り値は印を付けられたか。 */

@@ -1391,6 +1391,13 @@ async function runFrequentHeavyJobs(
       },
     },
     {
+      name: 'booking sync notices',
+      run: async () => {
+        const { processBookingSyncNoticeQueue } = await import('./services/booking-sync-rules.js');
+        await processBookingSyncNoticeQueue(env);
+      },
+    },
+    {
       // 取消時の Calendar 削除の残り (retry_wait) を自動回収する。
       // 初回 200 の後に残っても次の tick で直る。安定キーで二重実行なし。
       name: 'booking calendar delete retry',

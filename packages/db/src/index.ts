@@ -99,6 +99,7 @@ export function createDb(d1: D1Database): D1Database {
   return d1;
 }
 export * from './folders';
+export * from './folder-assignment';
 export * from './getting-started';
 export * from './manual-links';
 export * from './error-messages';
@@ -167,4 +168,7 @@ export * from './operator-notification-teams.js';
 export * from './ad-event-mappings.js';
 export * from './photo-publications';
 
+export * from './booking-sync-rules.js';
 export * from './restaurant-inventory-rules.js';
+export * from './friend-summary.js';
+export * from './dashboard-activity.js';

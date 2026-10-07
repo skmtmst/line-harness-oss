@@ -53,7 +53,7 @@
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] { flex-wrap: nowrap; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .steps { flex-basis: auto; order: 0; margin-inline: auto; }
 :global([data-theme='v8']) [data-page-template='create'] .heading[data-steps-placement='inline'] > .actions { order: 0; margin-left: 0; }
-:global([data-theme='v8']) .footer { position: sticky; bottom: 12px; z-index: 20; margin: 12px 24px; } /* 採用 A-1 浮いた下の帯（オーナー 2026-10-04） */
+:global([data-theme='v8']) .footer { position: sticky; bottom: 12px; z-index: 20; margin: 12px var(--tpl-fx4-footer-inset); } /* 採用 A-1 浮いた下の帯（オーナー 2026-10-04）。左右は絵の下の帯（left 12）に合わせる */
 :global([data-theme='v8']) .detailSummary { width: 320px; padding: 20px 24px; border-right: 1px solid var(--color-hairline); flex-shrink: 0; }
 :global([data-theme='v8']) .detailContent { padding: 20px 28px; display: flex; flex-direction: column; gap: var(--tpl-detail-content-gap); flex: 1; min-width: 0; }
 :global([data-theme='v8']) .inbox { display: flex; flex: 1; min-height: 0; min-width: 0; }
@@ -72,6 +72,7 @@
 :global([data-theme='v8']) .analyticsAside { width: 300px; flex-shrink: 0; padding: 20px; border-left: 1px solid var(--color-divider); display: flex; flex-direction: column; gap: 12px; }
 :global([data-theme='v8']) .asideToggle { display: none; padding: 12px 24px; }
 :global([data-theme='v8']) .createNotice { padding: var(--tpl-create-notice-pad); }
+:global([data-theme='v8']) .createNotice[data-notice-spacing='band'] { padding: var(--tpl-fe-band-slot-pad); }
 
 :global([data-theme='v8']) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 

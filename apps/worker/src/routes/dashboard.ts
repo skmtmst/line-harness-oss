@@ -4,6 +4,7 @@ import {
   DASHBOARD_TODAY_VISIBLE_LIMIT,
 } from '@line-crm/shared';
 import {
+  getDashboardActivity,
   getDashboardOverview,
   getDashboardDefaultPreference,
   getDashboardPreference,
@@ -33,6 +34,22 @@ import { auditLog } from '../lib/audit-log.js';
  * まとめて1回で返す。
  */
 export const dashboard = new Hono<Env>();
+
+dashboard.get('/api/dashboard/activity', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const access = await requireVisibleAccount(c);
+    if ('response' in access) return access.response;
+    const limit = Number(c.req.query('limit') ?? 10);
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      return c.json({ success: false, error: 'limit は1〜100の整数を指定してください' }, 400);
+    }
+    const items = await getDashboardActivity(c.env.DB, access.accountId, limit);
+    return c.json({ success: true, data: { items } });
+  } catch {
+    console.error('最近の動きを取得できませんでした');
+    return c.json({ success: false, error: '最近の動きを取得できませんでした' }, 500);
+  }
+});
 
 const PERIODS: DashboardPeriod[] = ['today', 'last7', 'last28'];
 
