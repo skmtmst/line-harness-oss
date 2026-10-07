@@ -8,7 +8,7 @@
  *   「…」は配信中・止まっている行だけ、閲覧のみには置かない。配信失敗の行だけ「失敗を再送」。
  */
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -137,6 +137,55 @@ describe('作る①（dnzqC）', () => {
     expect(screen.queryByRole('button', { name: /この方式で保存する/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /あとで決める/ })).toBeNull()
     expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+  })
+})
+
+describe('作る①：書きかけをこのブラウザに残す（シナリオは下書きの口が無い）', () => {
+  function memoryStorage() {
+    const map = new Map<string, string>()
+    return {
+      getItem: (key: string) => map.get(key) ?? null,
+      setItem: (key: string, value: string) => { map.set(key, String(value)) },
+      removeItem: (key: string) => { map.delete(key) },
+      get length() { return map.size },
+    }
+  }
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('localStorage', memoryStorage())
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+  const settle = async (ms: number) => { await act(async () => { await vi.advanceTimersByTimeAsync(ms) }) }
+
+  test('名前を打って2秒で残し、開き直すと「前の入力を戻す」で戻る。サーバには作らない', async () => {
+    const first = render(<ScenarioCreateV8 />)
+    await settle(0)
+    fireEvent.change(screen.getByRole('textbox', { name: 'シナリオ名' }), { target: { value: '春のフォロー' } })
+    fireEvent.click(screen.getByRole('radio', { name: /経過時間で指定/ }))
+    await settle(2100)
+    expect(document.body.textContent).toContain('入力をこのブラウザに一時保存済み・0秒前')
+    expect(create).not.toHaveBeenCalled()
+    first.unmount()
+
+    render(<ScenarioCreateV8 />)
+    await settle(0)
+    expect((screen.getByRole('textbox', { name: 'シナリオ名' }) as HTMLInputElement).value).toBe('')
+    expect(document.body.textContent).toContain('保存していない入力が残っています')
+    fireEvent.click(screen.getByRole('button', { name: '前の入力を戻す' }))
+    await settle(0)
+    expect((screen.getByRole('textbox', { name: 'シナリオ名' }) as HTMLInputElement).value).toBe('春のフォロー')
+    expect((screen.getByRole('radio', { name: /経過時間で指定/ }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  test('閲覧のみには残さず、戻す帯も出さない', async () => {
+    localStorage.setItem('lh:v8-draft:scenario-create:account-a:new', JSON.stringify({ savedAt: Date.now(), value: { name: '前の入力', folderId: '', mode: 'elapsed' } }))
+    role = 'staff'
+    render(<ScenarioCreateV8 />)
+    await settle(2100)
+    expect(screen.queryByRole('button', { name: '前の入力を戻す' })).toBeNull()
   })
 })
 

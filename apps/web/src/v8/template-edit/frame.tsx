@@ -20,6 +20,7 @@ export function TemplateEditFrame({
   children,
   side,
   footerActions,
+  status,
 }: {
   boardId: string
   title: string
@@ -29,6 +30,8 @@ export function TemplateEditFrame({
   side: ReactNode
   /** 閲覧のみでは渡さない（押せない操作は置かない）。 */
   footerActions?: ReactNode
+  /** 下の帯の左の文（下書きの自動保存の状態）。 */
+  status?: ReactNode
 }) {
   return (
     <PageFrame kind="create" boardId={boardId} hasFooter={Boolean(footerActions)}>
@@ -45,7 +48,7 @@ export function TemplateEditFrame({
         </aside>
       </div>
       {footerActions ? (
-        <div className={tpl.footer} data-template-region="footer"><StickyBar actions={footerActions} /></div>
+        <div className={tpl.footer} data-template-region="footer"><StickyBar actions={footerActions} status={status} /></div>
       ) : null}
     </PageFrame>
   )

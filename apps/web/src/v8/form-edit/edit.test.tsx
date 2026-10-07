@@ -46,6 +46,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     api: {
       ...actual.api,
       forms: { ...actual.api.forms, get: formsGet, update: formsUpdate, publish: formsPublish },
+      // 下書きの自動保存は閲覧のみの人には動かさないため、役割を読む（通信させない）。
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: 'owner' } }) },
       friendFields: { ...actual.api.friendFields, list: emptyList },
       scenarios: { ...actual.api.scenarios, list: emptyList },
       reminders: { ...actual.api.reminders, list: emptyList },
@@ -196,5 +198,45 @@ describe('回答フォームの編集（V8）', () => {
     await screen.findByText('ページ1 のブロック')
     fireEvent.click(screen.getByRole('button', { name: /5段階の評価/ }))
     expect(await screen.findByText('5段階の評価', { selector: '[class*="openType"]' })).toBeTruthy()
+  })
+})
+
+describe('回答フォームの下書き自動保存（一斉配信と同じ形）', () => {
+  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: false }) })
+  afterEach(() => { vi.useRealTimers() })
+  const wait = async (ms: number) => { await act(async () => { await vi.advanceTimersByTimeAsync(ms) }) }
+  const status = () => host.querySelector('[data-autosave-status]')?.textContent ?? null
+
+  it('打って2秒止まると下書きへ静かに保存し、次の手の保存は新しい版で送る', async () => {
+    await render('id=form-1')
+    fireEvent.change(screen.getByDisplayValue('今日のご来店の目的は？'), { target: { value: '今日のご来店の目的を教えてください' } })
+    expect(status()).toBe('下書きはまだ保存していません')
+    await wait(1900)
+    expect(formsUpdate).not.toHaveBeenCalled()
+    await wait(200)
+    for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve() })
+    expect(formsUpdate).toHaveBeenCalledTimes(1)
+    expect(formsUpdate.mock.calls[0][2]).toEqual(expect.objectContaining({ expectedContentRevision: 7 }))
+    expect(formsPublish).not.toHaveBeenCalled()
+    expect(status()).toBe('下書き保存済み・0秒前')
+    // 自動保存ではトースト・緑の帯を出さない。
+    expect(document.body.textContent).not.toContain('下書きを保存しました')
+
+    formsUpdate.mockImplementation(async () => ({ success: true, data: { id: 'form-1', contentRevision: 9, updatedAt: '' } }))
+    fireEvent.change(screen.getByDisplayValue('今日のご来店の目的を教えてください'), { target: { value: '今日の目的は？' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve() })
+    expect(formsUpdate).toHaveBeenCalledTimes(2)
+    expect(formsUpdate.mock.calls[1][2]).toEqual(expect.objectContaining({ expectedContentRevision: 8 }))
+  })
+
+  it('保存に失敗したら帯に出し、赤い帯は出さない', async () => {
+    formsUpdate.mockImplementation(async () => { throw new Error('network') })
+    await render('id=form-1')
+    fireEvent.change(screen.getByDisplayValue('今日のご来店の目的は？'), { target: { value: '今日の目的は？' } })
+    await wait(2100)
+    for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve() })
+    expect(status()).toContain('自動保存できませんでした')
+    expect(host.querySelector('[role="alert"]')).toBeNull()
   })
 })

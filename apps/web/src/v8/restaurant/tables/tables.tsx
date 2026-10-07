@@ -349,7 +349,7 @@ function TablesBoard({ ctx }: { ctx: RestaurantV8Context }) {
 
 export default function TablesPage() {
   return (
-    <RestaurantShell boardId="BERxg" title="座席・卓管理" description="フロア配置、席種、収容人数、結合ルールを管理します。">
+    <RestaurantShell storeTab="tables" boardId="BERxg" title="座席・卓管理" description="フロア配置、席種、収容人数、結合ルールを管理します。">
       {(ctx) => <TablesBoard ctx={ctx} />}
     </RestaurantShell>
   )
