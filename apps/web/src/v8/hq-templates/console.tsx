@@ -58,6 +58,8 @@ const LIST_DESCRIPTIONS: Record<TemplateType, string> = {
 /** 左の列の「種類」。絵の順（テンプレート・リッチメニュー・回答フォーム・タグ）＋シナリオ。 */
 const TYPE_ORDER: TemplateType[] = ['template', 'rich_menu', 'form', 'tag', 'scenario']
 const TYPE_COLORS: Record<TemplateType, string | null> = { template: null, rich_menu: 'var(--color-icon-tile-blue)', form: 'var(--color-icon-tile-green)', tag: 'var(--color-icon-tile-orange)', scenario: 'var(--color-icon-tile-purple)' }
+/** 種類ごとの正規の住所（左メニューと同じ）。シナリオは専用の住所が無いので旧URLのまま。 */
+const TYPE_ROUTES: Record<TemplateType, string> = { template: '/hq/templates', tag: '/hq/friend-attributes', rich_menu: '/hq/rich-menus', form: '/hq/form-submissions', scenario: '/hq/templates?type=scenario' }
 const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る' }
 
 type Stage = 'list' | 'edit' | 'accounts' | 'duplicates' | 'result'
@@ -409,7 +411,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
       ? <Button variant="primary" disabled={!ready || busy} onClick={startCreate}><Plus size={15} aria-hidden="true" />{CREATE_LABELS[type]}</Button>
       : null
     const typeRows = TYPE_ORDER.map((kind) => ({ id: kind, label: LABELS[kind], count: typeCounts(kind), color: TYPE_COLORS[kind] }))
-    const selectType = (id: string) => { if (id !== type) window.location.assign(`/hq/templates?type=${id}`) }
+    const selectType = (id: string) => { if (id !== type) window.location.assign(TYPE_ROUTES[id as TemplateType] ?? `/hq/templates?type=${id}`) }
     const folderNavRows = [{ id: 'all', label: 'すべて' }, { id: 'none', label: '未分類' }, ...folders.map((folder) => ({ id: folder.id, label: folder.name }))]
     return (
       <ListPage
