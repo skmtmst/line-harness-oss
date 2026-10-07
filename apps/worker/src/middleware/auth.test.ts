@@ -136,6 +136,8 @@ function app() {
   a.get('/api/hq/notices', (c) => c.json({ success: true }));
   a.post('/api/hq/notices/:id/read', (c) => c.json({ success: true }));
   a.get('/api/tenants/me', (c) => c.json({ success: true }));
+  a.get('/api/settings/company', (c) => c.json({ success: true }));
+  a.put('/api/settings/company', (c) => c.json({ success: true }));
   a.get('/api/ops/me', requirePlatformAdmin(), (c) => c.json({ success: true, data: c.get('staff') }));
   a.get('/api/auto-reply-runs', (c) => c.json({ success: true }));
   a.get('/api/automation-runs', (c) => c.json({ success: true }));
@@ -973,6 +975,7 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['POST', '/api/staff/abc/two-factor/confirm'],
       ['DELETE', '/api/staff/abc/two-factor'],
       ['GET', '/api/tenants/me'],
+      ['GET', '/api/settings/company'],
       ['POST', '/api/client-errors'],
       ['GET', '/api/capabilities'],
       ['GET', '/api/line-accounts'],
@@ -995,6 +998,8 @@ describe('N-423 staff deny-by-default (#670)', () => {
       ['GET', '/api/staff'],
       ['POST', '/api/staff'],
       ['PATCH', '/api/tenants/me'],
+      ['PUT', '/api/settings/company'],
+      ['GET', '/api/settings/company/other'],
       ['GET', '/api/client-errors'],
       ['POST', '/api/capabilities'],
       ['POST', '/api/line-accounts'],

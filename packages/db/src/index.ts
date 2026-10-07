@@ -6,6 +6,7 @@
 export { jstNow, toJstString, isTimeBefore, jstDateString, nextDateString, nextVersionToken, MAX_LIST_LIMIT } from './utils';
 export { DEFAULT_TENANT_ID } from '@line-crm/shared';
 export * from './credential-crypto';
+export * from './company-settings';
 export * from './friends';
 export * from './tags';
 export * from './tag-definitions';

@@ -80,16 +80,16 @@ export interface PreflightItem {
 }
 export interface Preflight {
   preflightId: string; expiresAt: string
-  stores: { accountId: string; accountName: string; items: PreflightItem[]; textOverride?: string }[]
+  stores: ({ accountId: string; accountName: string; items: PreflightItem[]; textOverride?: string } & import('@line-crm/shared').HqTemplatePreflightDisplay)[]
 }
 export interface Resolution { accountId: string; sourceId: string; mode: DistributionMode }
 export interface DistributionResult {
   runId: string; status: 'running' | 'completed' | 'partial' | 'failed'
-  stores: {
+  stores: ({
     accountId: string; accountName?: string
     status: 'pending' | 'staged' | 'succeeded' | 'failed' | 'version_conflict' | 'unsupported'
     reason?: string | null; cleanupPending?: boolean; counts: { created: number; overwritten: number; aliased: number; reused?: number }
-  }[]
+  } & import('@line-crm/shared').HqTemplateResultDisplay)[]
 }
 export class HqTemplatesApiError extends Error {
   constructor(message: string, public readonly status?: number, public readonly responseReceived = false, public readonly requestNotApplied = false) {

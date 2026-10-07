@@ -529,7 +529,9 @@
     "584_booking_sync_rules.sql",
     "585_booking_seat_waitlist_fifo.sql",
     "586_outgoing_webhook_version.sql",
-    "587_form_step_completion_times.sql"
+    "587_form_step_completion_times.sql",
+    "588_company_settings.sql",
+    "589_hq_distribution_created_name.sql"
   ],
-  "migrationCount": 530
+  "migrationCount": 532
 }
