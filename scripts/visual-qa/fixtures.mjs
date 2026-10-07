@@ -568,10 +568,23 @@ export const FRIEND_ADD_RUNS = {
       scenario: null,
       actions: { total: 1, failed: 1 }, deliveryCount: 0, status: 'failed', errorCode: 'delivery_failed',
     },
+    /* 絵 REIxB の5行目：以前からの友だち（再追加）→ 案内なし・タグだけ。 */
+    {
+      id: 'friend-add-run-5', receivedAt: '2026-09-07T01:02:00.000Z', processedAt: null,
+      friend: { id: 'visual-friend-add-5', displayName: '坂本 真人' }, friendKind: 'returning',
+      attribution: { status: 'captured', routeId: 'route-instagram', routeName: 'Instagram プロフィール', reason: 'instagram-profile' },
+      rule: { id: 'rule-shop', name: '店頭QRの初回案内', versionId: 'rule-shop-v1', versionNumber: 1 },
+      scenario: null,
+      actions: { total: 1, failed: 0 }, deliveryCount: 0, status: 'suppressed', errorCode: null,
+    },
   ],
   total: 214,
-  nextCursor: null,
+  nextCursor: 'friend-add-run-cursor-2',
   summary: {
+    /* 絵 REIxB の数の帯（直近28日 214人・送った案内 1,842通）。 */
+    recentFriends: 214,
+    recentEvents: 226,
+    lastDeliveryAt: '2026-09-07T01:32:00.800Z',
     totalRuns: 214,
     cumulativeDeliveries: 1842,
     scenarioStarts: 198,
