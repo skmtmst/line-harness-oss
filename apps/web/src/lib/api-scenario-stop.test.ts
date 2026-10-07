@@ -10,7 +10,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('シナリオ停止の呼び出し', () => {
   test.each([undefined, { reason: '画像差し替え' }])('任意の理由と停止状態を送り、停止記録を返す', async (input) => {
     const data = { id: 'sc-1', isActive: false, stoppedReason: input?.reason ?? null, stoppedBy: 'staff-1', stoppedAt: '2026-10-07T11:00:00+09:00' }
-    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ success: true, data }), {
+    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ success: true, data }), {
       status: 200, headers: { 'content-type': 'application/json' },
     }))
     vi.stubGlobal('fetch', fetchSpy)
@@ -23,7 +23,7 @@ describe('シナリオ停止の呼び出し', () => {
   })
 
   test('既存の更新関数でも理由を渡せる', async () => {
-    const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ success: true, data: { id: 'sc-1' } }), {
+    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ success: true, data: { id: 'sc-1' } }), {
       status: 200, headers: { 'content-type': 'application/json' },
     }))
     vi.stubGlobal('fetch', fetchSpy)
