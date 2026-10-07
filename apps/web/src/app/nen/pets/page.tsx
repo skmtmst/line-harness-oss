@@ -13,7 +13,7 @@ import { nenPetsApi, petAnimalTypeLabel, type NenPetRow } from '@/lib/nen-pets-a
 import { csvCell } from '@/lib/presentation'
 import FeedingTab from './feeding-tab'
 import PetsTab, { type PetsQuery } from './pets-tab'
-import PetsPageV8 from './pets-v8'
+import PetsPageV8 from '@/v8/nen-pets/pets'
 
 export type PetTab = 'pets' | 'feeding'
 
@@ -64,7 +64,7 @@ function PetsInner() {
   const changeTab = (next: PetTab) => router.replace(next === 'pets' ? '/nen/pets' : `/nen/pets?tab=${next}`)
 
   /*
-   * ★V8-B：data-theme="v8" のときだけ新しいマイペット画面
+   * ★V8-B：data-theme="v8" のときだけ新しいマイペット画面（src/v8/nen-pets）
    * （wTIej・h7A2F・eLjeQ）へ切り替える。v7 の見た目はそのまま。
    */
   const theme = useAdminTheme()

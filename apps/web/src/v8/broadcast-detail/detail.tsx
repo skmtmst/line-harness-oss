@@ -465,15 +465,16 @@ export function CancelReservationDialog({
       description={description}
       designNode="BeNtj"
       designWidth={480}
+      designHeaderPadding="24px 24px 0"
       busy={busy}
       error={error || undefined}
       onCancel={onClose}
       footer={
-        <div className={styles.dialogButtons}>
+        <div className={`${styles.dialogButtons} ${styles.cancelButtons}`}>
           <Button type="button" variant="danger" onClick={onConfirm} disabled={busy} busy={busy} busyLabel="取り消しています…">
             予約を取り消す
           </Button>
-          <Button type="button" onClick={onClose} disabled={busy}>
+          <Button type="button" className={styles.cancelKeep} onClick={onClose} disabled={busy}>
             やめる
           </Button>
           <Button type="button" variant="primary" onClick={onClose} disabled={busy}>

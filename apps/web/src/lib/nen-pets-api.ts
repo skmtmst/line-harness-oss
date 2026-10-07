@@ -156,7 +156,7 @@ function qs(params: Record<string, string | number | undefined>): string {
 export const nenPetsApi = {
   pets: (accountId: string, params: { q?: string; species?: string; product?: string; weight?: NenPetWeightFilter; sort?: NenPetSort; page?: number; pageSize?: number | 'all' } = {}) =>
     fetchApi<ApiResponse<NenPetListData>>(`/api/nen/pets?${qs({ accountId, ...params })}`),
-  health: (accountId: string, params: { q?: string; change?: NenHealthChangeFilter; last?: NenHealthLastFilter; sort?: NenHealthSort; page?: number } = {}) =>
+  health: (accountId: string, params: { q?: string; change?: NenHealthChangeFilter; last?: NenHealthLastFilter; sort?: NenHealthSort; page?: number; pageSize?: number } = {}) =>
     fetchApi<ApiResponse<NenHealthListData>>(`/api/nen/health?${qs({ accountId, ...params })}`),
   healthSummary: (accountId: string, petId: string) =>
     fetchApi<ApiResponse<NenHealthSummaryData>>(`/api/nen/health/${encodeURIComponent(petId)}/summary?${qs({ accountId })}`),
