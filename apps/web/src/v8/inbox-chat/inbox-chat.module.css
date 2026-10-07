@@ -5,6 +5,9 @@
 
 /* ── 対応ルールの小窓 ─────────────────────────── */
 .popWrap { position: relative; display: inline-flex; }
+/* 受信箱の頭の印のボタン（絵 XqSvX：32角・印14・ink-secondary）。共通の副ボタン（compact）に大きさだけ。 */
+.popTrigger { flex: none; width: var(--tpl-inbox-tool-size); padding: 0; color: var(--color-ink-secondary); }
+.popTrigger svg { width: var(--tpl-inbox-tool-icon); height: var(--tpl-inbox-tool-icon); }
 
 .pop {
   display: flex;
@@ -28,7 +31,7 @@
   align-items: center;
   gap: var(--tpl-inbox-chead-gap);
   padding: var(--tpl-inbox-pop-row-pad);
-  box-shadow: inset 0 -1px 0 var(--color-divider);
+  box-shadow: var(--tpl-inbox-line-bottom-soft);
   font-size: var(--text-caption);
 }
 .popRow:last-child { box-shadow: none; }
@@ -111,7 +114,7 @@
   width: 100%;
   height: var(--tpl-inbox-tp-body-h);
   max-height: var(--tpl-inbox-tp-body-max);
-  box-shadow: inset 0 1px 0 var(--color-hairline);
+  box-shadow: var(--tpl-inbox-line-top);
 }
 .tpSide {
   display: flex;
@@ -121,7 +124,7 @@
   width: var(--tpl-inbox-tp-side-w);
   padding: var(--tpl-inbox-tp-side-pad);
   overflow-y: auto;
-  box-shadow: inset -1px 0 0 var(--color-hairline);
+  box-shadow: var(--tpl-inbox-line-right);
 }
 .tpSideRow {
   display: flex;
@@ -220,7 +223,7 @@
   gap: var(--tpl-inbox-composer-gap);
   width: 100%;
   padding: var(--tpl-inbox-tp-foot-pad);
-  box-shadow: inset 0 1px 0 var(--color-hairline);
+  box-shadow: var(--tpl-inbox-line-top);
 }
 .tpFootLead { display: flex; min-width: 0; flex: 1; align-items: center; gap: var(--tpl-inbox-composer-gap); }
 .tpFootText { display: flex; min-width: 0; flex-direction: column; }
@@ -236,7 +239,7 @@
   align-items: center;
   gap: var(--tpl-inbox-chead-gap);
   padding: var(--tpl-inbox-chead-pad);
-  box-shadow: inset 0 -1px 0 var(--color-hairline);
+  box-shadow: var(--tpl-inbox-search-line-bottom);
   background: var(--color-canvas);
 }
 .cheadWho { display: flex; min-width: var(--tpl-inbox-chead-who-min); flex: 1 1 0; align-items: center; gap: var(--tpl-inbox-chead-gap); }
@@ -395,14 +398,14 @@
   white-space: nowrap;
 }
 .pillDot { flex: none; width: var(--tpl-inbox-menu-dot); height: var(--tpl-inbox-menu-dot); border-radius: var(--radius-pill); background: currentColor; }
-.st_unread { background: var(--color-status-danger-soft); color: var(--color-status-danger); }
-.st_in_progress { background: var(--color-status-warn-soft); color: var(--tpl-inbox-st-progress); }
-.st_on_hold { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
-.st_resolved { background: var(--color-accent-soft); color: var(--color-success); }
-.dot_unread { background: var(--color-danger); }
-.dot_in_progress { background: var(--tpl-inbox-st-progress); }
-.dot_on_hold { background: var(--color-ink-secondary); }
-.dot_resolved { background: var(--color-success); }
+.pill[data-status='unread'] { background: var(--color-status-danger-soft); color: var(--color-status-danger); }
+.pill[data-status='in_progress'] { background: var(--color-status-warn-soft); color: var(--tpl-inbox-st-progress); }
+.pill[data-status='on_hold'] { background: var(--color-surface-pearl); color: var(--color-ink-secondary); }
+.pill[data-status='resolved'] { background: var(--color-accent-soft); color: var(--color-success); }
+.ctlDot[data-status='unread'] { background: var(--color-danger); }
+.ctlDot[data-status='in_progress'] { background: var(--tpl-inbox-st-progress); }
+.ctlDot[data-status='on_hold'] { background: var(--color-ink-secondary); }
+.ctlDot[data-status='resolved'] { background: var(--color-success); }
 
 /* ── やりとり（XqSvX「やりとり」） ───────────────── */
 .thread { padding: var(--tpl-inbox-thread-pad); background: var(--color-table-head); }

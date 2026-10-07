@@ -122,7 +122,7 @@ export function HeadStatusMenu({
         aria-expanded={open}
         onClick={() => setOpen((now) => !now)}
       >
-        <span aria-hidden="true" className={`${styles.ctlDot} ${styles[`dot_${value}`] ?? ''}`} />
+        <span aria-hidden="true" className={styles.ctlDot} data-status={value} />
         {label}
         <ChevronDown aria-hidden="true" />
       </button>
@@ -141,7 +141,7 @@ export function HeadStatusMenu({
                   className={styles.menuRow}
                   onClick={() => { onChange(status); setOpen(false) }}
                 >
-                  <span className={`${styles.pill} ${styles[`st_${status}`]}`}>
+                  <span className={styles.pill} data-status={status}>
                     <span aria-hidden="true" className={styles.pillDot} />
                     {HEAD_STATUS_LABEL[status]}
                   </span>

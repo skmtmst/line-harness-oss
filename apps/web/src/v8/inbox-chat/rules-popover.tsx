@@ -24,7 +24,7 @@ export function markRuleText(mark: SupportMarkListItem): string {
   return mark.autoOnInbound ? '受信したとき自動で付く' : '手動だけ'
 }
 
-export default function InboxRulesPopover({ accountId, className }: { accountId: string | null; className?: string }) {
+export default function InboxRulesPopover({ accountId }: { accountId: string | null }) {
   const [open, setOpen] = useState(false)
   const [status, setStatus] = useState<Status>('idle')
   const [marks, setMarks] = useState<SupportMarkListItem[]>([])
@@ -54,7 +54,7 @@ export default function InboxRulesPopover({ accountId, className }: { accountId:
       <Button
         type="button"
         size="compact"
-        className={className}
+        className={styles.popTrigger}
         aria-label="対応ルール"
         title="対応ルール"
         aria-haspopup="dialog"

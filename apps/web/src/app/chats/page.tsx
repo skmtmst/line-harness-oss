@@ -257,7 +257,7 @@ const INBOX_TIME_ZONE = 'Asia/Tokyo'
  * いま 文字・Flex・画像 だけを受ける。動画・ファイルは選んだときに理由を出して止める（送ったつもりにさせない）。
  */
 const ATTACH_ACCEPT_V8 = 'image/jpeg,image/png,video/mp4,application/pdf,.pdf,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv'
-const ATTACH_NOTE_V8 = '画像は JPEG / PNG・1枚 1MB まで（動画・ファイルは準備中）'
+const ATTACH_NOTE_V8 = '画像は JPEG / PNG・1枚 1MB まで（動画・ファイルはまだ送れません）'
 
 function formatJstScheduledAt(iso: string): string {
   const d = new Date(iso)
@@ -2666,7 +2666,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
            * ★V8：絵（XqSvX）の「対応ルール」は settings-2 の印。押してもページを移らず、
            * その場で小窓を開く（オーナー指摘：別のページへ飛ぶのはおかしい）。
            */
-          <InboxRulesPopover accountId={selectedAccountId ?? null} className={`shrink-0 h-8 w-8 p-0 ${styles.tool}`} />
+          <InboxRulesPopover accountId={selectedAccountId ?? null} />
         ) : (
         <Button href="/tags?tab=marks" aria-label="対応ルール" title="対応ルール" size="compact" className={`shrink-0 h-8 w-8 p-0 ${styles.tool}`}>
           <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6" /></svg>
