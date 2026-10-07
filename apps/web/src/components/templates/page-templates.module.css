@@ -72,6 +72,7 @@
 :global([data-theme='v8']) .analyticsAside { width: 300px; flex-shrink: 0; padding: 20px; border-left: 1px solid var(--color-divider); display: flex; flex-direction: column; gap: 12px; }
 :global([data-theme='v8']) .asideToggle { display: none; padding: 12px 24px; }
 :global([data-theme='v8']) .createNotice { padding: var(--tpl-create-notice-pad); }
+:global([data-theme='v8']) .createNotice[data-notice-spacing='band'] { padding: var(--tpl-fe-band-slot-pad); }
 
 :global([data-theme='v8']) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 

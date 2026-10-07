@@ -170,6 +170,18 @@
   white-space: nowrap;
 }
 
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 v19Ivv の説明の行）。 */
+.dotLine {
+  /* 丸と名前の行。ブロックの flex にして、行の箱が字の高さより伸びないようにする（絵 v19Ivv の名の行）。 */
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.dotIndent {
+  padding-inline-start: var(--tpl-folder-dot-indent);
+}
+
 /* 種類の札（白い地・薄い枠・角6）。 */
 .kindBadge {
   display: inline-block;

@@ -41,6 +41,8 @@ import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { FolderDotName } from '@/components/shared/folder-dot'
+import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import { ListPagePagination } from '@/components/templates'
 import {
   describeMileageCsvExportFailure,
@@ -101,13 +103,22 @@ function folderOf(rule: MileageEarningRuleV6): Exclude<FolderKey, 'all'> {
   return 'other'
 }
 
-const FOLDERS: Array<{ key: FolderKey; label: string }> = [
+/* 色は行の名前の前の丸と左のフォルダの列で同じものを使う（絵 OC0gy：購入は青・配信の反応は緑・紹介は橙・未分類は色の無い輪）。 */
+const FOLDERS: Array<{ key: FolderKey; label: string; color?: string }> = [
   { key: 'all', label: 'すべて' },
-  { key: 'purchase', label: '購入' },
-  { key: 'reaction', label: '配信の反応' },
-  { key: 'referral', label: '紹介' },
+  { key: 'purchase', label: '購入', color: FOLDER_COLORS[0] },
+  { key: 'reaction', label: '配信の反応', color: FOLDER_COLORS[1] },
+  { key: 'referral', label: '紹介', color: FOLDER_COLORS[2] },
   { key: 'other', label: '未分類' },
 ]
+
+/** 行の名前の前の丸に渡すフォルダ。未分類は null（色の無い輪）。 */
+function folderDotOf(rule: MileageEarningRuleV6): { name: string; color?: string } | null {
+  const key = folderOf(rule)
+  if (key === 'other') return null
+  const item = FOLDERS.find((f) => f.key === key)
+  return item ? { name: item.label, color: item.color } : null
+}
 
 function isOverview(value: unknown): value is MileageEarningRulesV6Overview {
   if (!value || typeof value !== 'object') return false
@@ -542,7 +553,7 @@ export default function EarningRulesTab() {
   const folderPanel = (
     <FolderPanel
       heading="フォルダ"
-      rows={FOLDERS.map((item) => ({ id: item.key, label: item.label, count: folderCounts.get(item.key) ?? 0 }))}
+      rows={FOLDERS.map((item) => ({ id: item.key, label: item.label, count: folderCounts.get(item.key) ?? 0, color: item.color }))}
       activeId={folder}
       onSelect={(id) => resetPage(() => setFolder(id as FolderKey))}
       addFolderNote="フォルダを消しても、中の経路は未分類に残ります"
@@ -787,8 +798,12 @@ export default function EarningRulesTab() {
             return (
               <Tr key={rule.id} className={styles.row} data-table-layout="columns">
                 <Td className={styles.colName}>
-                  <span className={styles.rowName} title={rule.draft.name}>{rule.draft.name}</span>
-                  <span className={styles.rowSub}>
+                  <div className={styles.rowNameLine}>
+                    <FolderDotName folder={folderDotOf(rule)} dot={!narrow}>
+                      <span className={styles.rowName} title={rule.draft.name}>{rule.draft.name}</span>
+                    </FolderDotName>
+                  </div>
+                  <span className={narrow ? styles.rowSub : `${styles.rowSub} ${styles.dotIndent}`}>
                     {`${rule.draft.targetConditions ? '条件あり' : '全員'}・${rule.publishedVersion == null ? `下書き v${rule.draftVersion}` : `公開版 v${rule.publishedVersion}`}`}
                   </span>
                 </Td>
