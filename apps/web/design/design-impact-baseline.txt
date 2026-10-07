@@ -691,6 +691,11 @@ shared-button-importer v8/restaurant/closures/closures.tsx
 shared-button-importer v8/restaurant/closures/closure-dialog.tsx
 shared-button-importer v8/restaurant/inventory/inventory.tsx
 shared-button-importer v8/settings/sns/sns.tsx
+# ★V8 提案 E-4 予約サイト・グルメ媒体（aSmph）・E-9 統括の一括配信（p17Qku・xOXuY）。
+shared-button-importer v8/settings/booking-media/screen.tsx
+shared-button-importer v8/hq-broadcasts/create.tsx
+shared-button-importer v8/hq-broadcasts/detail.tsx
+shared-button-importer v8/hq-broadcasts/list.tsx
 shared-button-importer v8/friends/list/list.tsx
 shared-button-importer v8/friends/merged/merged.tsx
 shared-button-importer v8/friends/merged/person.tsx

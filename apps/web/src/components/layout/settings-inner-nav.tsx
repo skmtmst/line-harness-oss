@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
-import { Activity, BellRing, Layers, MessageCircle, Rocket, Share2, ShoppingCart, SlidersHorizontal, Users, type LucideIcon } from 'lucide-react'
+import { Activity, BellRing, Layers, MessageCircle, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Users, type LucideIcon } from 'lucide-react'
+import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
 
@@ -38,6 +39,7 @@ const SETTINGS_ORDER = [
   '/ec-commerce', // EC連携
   '/line-notifications', // LINE通知
   '/settings/sns', // SNS 連携（提案 E-6）。今ある絵の並びを動かさないよう末尾に足す
+  '/settings/booking-media', // 予約サイト・グルメ媒体（提案 E-4）。飲食店向け（テスト）が使える環境だけ出す
 ] as const
 
 /** 絵の印（lucide）。 */
@@ -51,11 +53,13 @@ const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
   '/ec-commerce': ShoppingCart,
   '/line-notifications': BellRing,
   '/settings/sns': Share2,
+  '/settings/booking-media': Store,
 }
 
 /** 左のメニュー（lib/menu）に無く、設定の中のメニューにだけ出す項目。 */
 const SETTINGS_ONLY_ITEMS: MenuItem[] = [
   { id: 'settings-sns', href: '/settings/sns', label: 'SNS 連携', icon: '', note: 'Google ビジネスと Instagram をつなぎます', required: true },
+  { id: 'settings-booking-media', href: '/settings/booking-media', label: '予約サイト・グルメ媒体', icon: '', note: '店ごとの予約サイト・グルメ媒体の URL と、他のサイトの枠を閉じる知らせ', required: true },
 ]
 
 /** 機能設定の下に付く2つの画面（絵の「下にマニュアルの正本表・ファイルの検査」）。 */
@@ -130,6 +134,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
    * 設定の中のメニュー）。出し分けの決まりは左のメニューと同じ。
    */
   const itemVisible = (item: MenuItem): boolean => {
+    if (item.href === '/settings/booking-media' && !restaurantTestUiEnabled()) return false
     if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
     if (item.href === '/accounts' && staffRole === 'staff') return false
     const permissionKey = item.permissionKey ?? item.href

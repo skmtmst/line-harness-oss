@@ -2080,6 +2080,18 @@ const UID_MIGRATION_DONE = {
 }
 
 function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
+  /* 提案 E-4・E-9：媒体リンクの保存・グルメ媒体・予約ページの URL、統括の一括配信の作る・確かめる・外す・送る・止める・やり直す。 */
+  if (method === 'POST' && pathname === '/api/restaurant-test/media') return { code: 'gourmet_new', name: 'グルメ媒体', acceptsReservations: false }
+  if (method === 'PUT' && pathname.startsWith('/api/restaurant-test/media-links/')) {
+    const row = RESTAURANT_MEDIA_LINKS.find((m) => m.code === pathname.split('/').pop()) ?? RESTAURANT_MEDIA_LINKS[0]
+    return { ...row, storeId: 'store-sby', closeOnBooking: !!row.closeOnBooking, version: row.version + 1 }
+  }
+  if (method === 'POST' && pathname === '/api/restaurant-test/reservation-link') return RESTAURANT_RESERVATION_LINK
+  if (method === 'POST' && pathname === '/api/hq/broadcasts') return { ...HQ_RUN_DRAFT, id: 'hq-run-new', version: 1 }
+  if (method === 'POST' && /^\/api\/hq\/broadcasts\/[^/]+\/preflight$/.test(pathname)) return HQ_PREFLIGHT.map((c) => ({ ...c, excluded: false }))
+  if (method === 'PUT' && /^\/api\/hq\/broadcasts\/[^/]+\/exclusions$/.test(pathname)) return { ...HQ_RUN_DRAFT, id: pathname.split('/')[4], version: 3 }
+  if (method === 'POST' && /^\/api\/hq\/broadcasts\/[^/]+\/(send|stop|cancel)$/.test(pathname)) return { ...HQ_RUN_SENT, id: pathname.split('/')[4] }
+  if (method === 'POST' && /^\/api\/hq\/broadcasts\/[^/]+\/targets\/[^/]+\/retry$/.test(pathname)) return HQ_RUN_SENT
   /* 自動応答のかんたんに作る（板 G4GejG）：作った下書き。重なりは ar-quick の口が返す。 */
   if (method === 'POST' && pathname === '/api/auto-replies/drafts') {
     return { autoReplyId: 'ar-quick', versionId: 'arv-quick', versionNumber: 1, status: 'draft', settings: null, lastTestStatus: null, lastTestedAt: null, publishedAt: null }
@@ -2545,7 +2557,51 @@ function nenMetricsBody(data, query) {
   return { ...data, range: nenRangeFor(query) }
 }
 
+/* 提案 E-4 予約サイト・グルメ媒体（aSmph）：店ごとの媒体リンク。口（restaurant-test/media-links）と同じ形。 */
+const RESTAURANT_MEDIA_LINKS = [
+  { code: 'hotpepper', name: 'ホットペッパー', acceptsReservations: 1, pageUrl: 'https://hotpepper.jp/strJ001234567/', loginUrl: 'https://manager.hotpepper.jp/', closeOnBooking: 1, version: 3 },
+  { code: 'tabelog', name: '食べログ', acceptsReservations: 1, pageUrl: 'https://tabelog.com/tokyo/A1301/A130101/13250000/', loginUrl: 'https://owner.tabelog.com/', closeOnBooking: 1, version: 2 },
+  { code: 'gurunavi', name: 'ぐるなび', acceptsReservations: 1, pageUrl: 'https://r.gnavi.co.jp/abc1234/', loginUrl: 'https://pro.gnavi.co.jp/', closeOnBooking: 1, version: 1 },
+  { code: 'retty', name: 'Retty', acceptsReservations: 0, pageUrl: 'https://retty.me/area/PRE13/ARE1/SUB101/100001234567/', loginUrl: null, closeOnBooking: 0, version: 1 },
+  { code: 'ikyu', name: '一休', acceptsReservations: 1, pageUrl: 'https://restaurant.ikyu.com/123456/', loginUrl: 'https://admin.restaurant.ikyu.com/', closeOnBooking: 0, version: 1 },
+  { code: 'google', name: 'Google', acceptsReservations: 1, pageUrl: 'https://g.page/nen-ginza', loginUrl: 'https://business.google.com/', closeOnBooking: 0, version: 1 },
+]
+const RESTAURANT_RESERVATION_LINK = {
+  url: 'https://liff.line.me/2001234567-AbCdEf/booking',
+  html: '<a href="https://liff.line.me/2001234567-AbCdEf/booking" target="_blank" rel="noopener noreferrer">LINE で予約する</a>',
+  available: false,
+}
+/* 提案 E-9 統括の一括配信（p17Qku・xOXuY）：口（/api/hq/broadcasts）と同じ形。店の名前・数は絵のとおり。 */
+const hqCheck = (accountId, accountName, audienceCount, remaining, blockedReasons = [], extra = {}) => ({
+  accountId, accountName, audienceCount, remaining, connected: !blockedReasons.some((r) => r.includes('LINE')), paused: blockedReasons.some((r) => r.includes('停止')),
+  blockedReasons, excluded: blockedReasons.length > 0, broadcastId: null, ...extra,
+})
+const HQ_PREFLIGHT = [
+  hqCheck('hq-ginza', '銀座店', 6120, 18400),
+  hqCheck('hq-shinjuku', '新宿店', 5880, 2100, ['今月の送信枠が足りません']),
+  hqCheck('hq-yokohama', '横浜店', 4300, 9000, ['LINEに接続されていません']),
+  hqCheck('hq-umeda', '梅田店', 3950, 12000, ['店舗または配信が停止中']),
+  ...[['hq-ikebukuro', '池袋店', 4050], ['hq-nagoya', '名古屋店', 460], ['hq-shibuya', '渋谷店', 3900], ['hq-ueno', '上野店', 3600], ['hq-kyoto', '京都店', 3500], ['hq-kobe', '神戸店', 3450], ['hq-sendai', '仙台店', 3500], ['hq-hakata', '博多店', 5500]]
+    .map(([id, name, count]) => hqCheck(id, name, count, 20000)),
+]
+const hqTarget = (check, status, totalCount, successCount, extra = {}) => ({ ...check, status, totalCount, successCount, version: 2, retryableCount: 0, stopped: false, ...extra })
+const HQ_RUN_DRAFT = { id: 'hq-run-draft', title: '1月の限定メニュー「寒ぶりのしゃぶしゃぶ」を始めました', status: 'prepared', version: 2, scheduledAt: '2027-01-15T02:00:00.000Z', targets: HQ_PREFLIGHT.map((c) => hqTarget(c, c.excluded ? 'excluded' : 'prepared', 0, 0)) }
+const HQ_RUN_SENT = {
+  id: 'hq-run-sent', title: '1月の限定メニュー「寒ぶりのしゃぶしゃぶ」を始めました', status: 'scheduled', version: 4, scheduledAt: '2026-01-15T02:00:00.000Z',
+  targets: [
+    hqTarget(hqCheck('hq-ginza', '銀座店', 6120, 18400), 'sent', 6120, 6118, { broadcastId: 'b-ginza' }),
+    hqTarget(hqCheck('hq-ikebukuro', '池袋店', 4050, 20000), 'sent', 4050, 4050, { broadcastId: 'b-ikebukuro' }),
+    hqTarget(hqCheck('hq-nagoya', '名古屋店', 460, 20000), 'failed', 460, 0, { broadcastId: 'b-nagoya', retryableCount: 460 }),
+    hqTarget(hqCheck('hq-shinjuku', '新宿店', 5880, 2100, ['今月の送信枠が足りません']), 'excluded', 0, 0),
+    hqTarget(hqCheck('hq-others', 'ほか 6店', 23450, 120000), 'sent', 23450, 23450, { broadcastId: 'b-others' }),
+  ],
+}
+
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  if (method === 'GET' && pathname === '/api/restaurant-test/media-links') return { success: true, data: RESTAURANT_MEDIA_LINKS }
+  if (method === 'GET' && pathname === '/api/restaurant-test/media') return { success: true, data: RESTAURANT_MEDIA_LINKS.map(({ code, name, acceptsReservations }) => ({ code, name, acceptsReservations })) }
+  if (method === 'GET' && pathname === '/api/hq/broadcasts') return { success: true, data: [HQ_RUN_SENT, HQ_RUN_DRAFT] }
+  if (method === 'GET' && /^\/api\/hq\/broadcasts\/[^/]+$/.test(pathname)) return { success: true, data: pathname.endsWith('/hq-run-sent') ? HQ_RUN_SENT : HQ_RUN_DRAFT }
   /*
     友だちのマイル詳細（V8 R6kIG・手で増やす・減らす M8zhjL）は1人に絞って読む。
     絞ったときだけ絵の数（残高 1,240・確定待ち 120・期限が近い 200）と5行の明細を返す。

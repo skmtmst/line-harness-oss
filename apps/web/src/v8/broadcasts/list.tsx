@@ -25,6 +25,7 @@ import {
   FileText,
   Gauge,
   List as ListIcon,
+  Lock,
   MailOpen,
   MoreHorizontal,
   Plus,
@@ -156,6 +157,21 @@ function summaryInsight(summary: ApiBroadcast['insightSummary']): BroadcastInsig
     openRate: summary.openRate,
     clickRate: summary.clickRate,
   }
+}
+
+/** 統括の一括配信から来た配信か（口が fromHeadquarters を返す。型にはまだ無いので読むだけ）。 */
+function isFromHeadquarters(broadcast: ApiBroadcast): boolean {
+  return (broadcast as ApiBroadcast & { fromHeadquarters?: boolean }).fromHeadquarters === true
+}
+
+/** 名前の横の「統括から」の札と鍵（店では変えられない印。l3RQH）。 */
+function HqMark() {
+  return (
+    <span className={styles.hqMark} title="統括から送った配信です。店では変えられません（見る・複製するだけ）">
+      <span className={styles.hqChip}>統括から</span>
+      <Lock size={14} aria-label="店では変えられません" className={styles.hqLock} />
+    </span>
+  )
 }
 
 export default function BroadcastListV8() {
@@ -634,6 +650,16 @@ export default function BroadcastListV8() {
         ...folders.map((f) => ({ id: `move-${f.id}`, label: f.name, onSelect: () => void moveBroadcastToFolder(broadcast, f.id) })),
       ]
     }
+    /*
+     * 統括から来た配信（提案 E-9・l3RQH）は店では変えられない（口が 403）。「…」は見る・複製するだけ。
+     * 閲覧のみには押せない項目を置かないので、閲覧のみは「見る」だけ。
+     */
+    if (isFromHeadquarters(broadcast)) {
+      return [
+        { id: 'view', label: '見る', external: true, onSelect: () => goDetail(broadcast.id) },
+        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: true, icon: <Copy size={14} aria-hidden="true" />, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
+      ]
+    }
     // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
     if (!canEdit) return []
     const items: ActionMenuItem[] = []
@@ -1015,7 +1041,7 @@ export default function BroadcastListV8() {
             >
               <Td>
                 {/* 左にフォルダの列がある広い板は、名前の前にフォルダの色の丸（絵 l5V9a・NtCE3）。1152（jjFNi）は列が無いので出さない。 */}
-                {narrow ? titleLink : <div className={styles.titleLine}><FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName></div>}
+                {narrow ? (isFromHeadquarters(broadcast) ? <div className={styles.titleLine}>{titleLink}<HqMark /></div> : titleLink) : <div className={styles.titleLine}><FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName>{isFromHeadquarters(broadcast) ? <HqMark /> : null}</div>}
                 <span className={narrow ? styles.cellSub : `${styles.cellSub} ${styles.dotIndent}`}>{messageTypeLabel(broadcast.messageType)}</span>
               </Td>
               <Td><StatusBadge broadcast={broadcast} /></Td>
@@ -1194,7 +1220,9 @@ export default function BroadcastListV8() {
         {panelRow ? (() => {
           const audience = audienceSummary(panelRow, getTagName, getScenarioName)
           const insight = insights[panelRow.id] ?? summaryInsight(panelRow.insightSummary)
-          const canResume = panelRow.status === 'draft' || panelRow.status === 'scheduled'
+          /* 統括から来た配信は店では変えられない（編集・削除を出さない。複製はできる）。 */
+          const fromHq = isFromHeadquarters(panelRow)
+          const canResume = !fromHq && (panelRow.status === 'draft' || panelRow.status === 'scheduled')
           return (
             <DetailPanel
               open
@@ -1223,12 +1251,14 @@ export default function BroadcastListV8() {
                   >
                     複製する
                   </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => { setPanelId(null); requestDelete(panelRow) }}
-                  >
-                    削除する
-                  </Button>
+                  {fromHq ? null : (
+                    <Button
+                      variant="secondary"
+                      onClick={() => { setPanelId(null); requestDelete(panelRow) }}
+                    >
+                      削除する
+                    </Button>
+                  )}
                 </> : null}
               </>}
             >

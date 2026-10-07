@@ -1,0 +1,330 @@
+/* ★V8 統括 一括配信を作る（E-9 p17Qku）。寸法は globals.css の --tpl-e49-* だけを使う。板の頭・右の列・下の帯は型（CreatePage）が持つ。 */
+
+/* 型の中身の欄は余白 24/28・段の間 16 の既定。絵（上 4・左右 24・下 24、段の間 28）に合わせる。包みは display: contents。 */
+.screen {
+  display: contents;
+}
+
+.screen [data-template-region='body'] > [data-template-region='content'] {
+  padding: var(--tpl-e49-content-pad);
+  gap: var(--tpl-e49-body-gap);
+}
+
+.screen [data-template-region='body'] > [data-template-region='preview'] {
+  padding: var(--tpl-e49-content-pad);
+  background: transparent;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-body-gap);
+  min-width: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-section-gap);
+  min-width: 0;
+}
+
+.muted {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e49-lh-20);
+}
+
+.radios {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e49-radio-gap);
+}
+
+/* 選ぶ札（高さ 36・丸・選んだら墨の地に白い字） */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-e49-gap-s);
+}
+
+.pick {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-e49-chip-gap);
+  height: var(--tpl-e49-control-h);
+  padding: var(--tpl-e49-chip-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--tpl-e49-radius-pill);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-e49-lh-18);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pickOn {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-on-accent);
+}
+
+.pick:focus-visible {
+  outline: var(--tpl-e49-focus-ring) solid var(--color-action);
+  outline-offset: var(--tpl-e49-focus-ring);
+}
+
+/* 選んだ数（地の色・角丸 12・上下 12 左右 16） */
+.count {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e49-count-gap);
+  padding: var(--tpl-e49-count-pad);
+  border-radius: var(--tpl-e49-radius-l);
+  background: var(--color-surface-pearl);
+}
+
+.countItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--tpl-e49-chip-gap);
+}
+
+.countNum {
+  color: var(--color-ink);
+  font-size: var(--tpl-e49-count-size);
+  font-weight: 700;
+  line-height: var(--tpl-e49-count-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+.countUnit {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e49-lh-20);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-field-gap);
+}
+
+.fieldLabel {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--tpl-e49-lh-20);
+}
+
+.textarea {
+  min-height: var(--tpl-e49-textarea-h);
+}
+
+.inserts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-e49-gap-s);
+}
+
+.insertChip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--tpl-e49-insert-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--tpl-e49-radius-chip);
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-e49-lh-18);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.insertMenu {
+  position: relative;
+  display: inline-flex;
+}
+
+.timeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-e49-time-gap);
+}
+
+.dateBox,
+.timeBox {
+  display: inline-flex;
+}
+
+.dateBox :global(*),
+.timeBox :global(*) {
+  max-width: 100%;
+}
+
+.dateBox {
+  width: var(--tpl-e49-date-w);
+}
+
+.timeBox {
+  width: var(--tpl-e49-time-w);
+}
+
+.band {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e49-gap-m);
+  padding: var(--tpl-e49-band-pad);
+  border-radius: var(--tpl-e49-radius-ml);
+  background: var(--color-status-info-soft);
+}
+
+.bandIcon {
+  flex: 0 0 auto;
+  color: var(--color-action);
+}
+
+.bandText {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e49-lh-20);
+}
+
+.checkEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-e49-gap-l);
+  padding: var(--tpl-e49-count-pad);
+  border: 1px dashed var(--color-hairline);
+  border-radius: var(--tpl-e49-radius-l);
+}
+
+/* 表（見出し 46・行 55。左右 20・列の間 16） */
+.table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+:global([data-theme='v8']) .table .headRow.headRow > th {
+  height: auto;
+  padding: var(--tpl-e49-head-pad);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-e49-lh-18);
+}
+
+:global([data-theme='v8']) .table .row.row > td {
+  height: var(--tpl-e49-row-h);
+  padding: var(--tpl-e49-row-pad);
+}
+
+:global([data-theme='v8']) .table .headRow.headRow > th:first-child,
+:global([data-theme='v8']) .table .row.row > td:first-child {
+  padding-left: var(--tpl-e49-edge);
+}
+
+:global([data-theme='v8']) .table .headRow.headRow > th:last-child,
+:global([data-theme='v8']) .table .row.row > td:last-child {
+  padding-right: var(--tpl-e49-edge);
+}
+
+.colStore {
+  width: auto;
+}
+
+.colPeople {
+  width: var(--tpl-e49-col-people);
+}
+
+.colQuota {
+  width: var(--tpl-e49-col-quota);
+}
+
+.colCheck {
+  width: var(--tpl-e49-col-check);
+}
+
+.colSend {
+  width: var(--tpl-e49-col-send);
+}
+
+.colMenu {
+  width: var(--tpl-e49-col-menu);
+}
+
+.store {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 500;
+  line-height: var(--tpl-e49-lh-21);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.num {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e49-lh-20);
+  white-space: nowrap;
+}
+
+.sub {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-e49-lh-20);
+  white-space: nowrap;
+}
+
+.totals {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-e49-count-gap);
+  margin: 0;
+  padding: var(--tpl-e49-switch-pad);
+  font-size: var(--text-body);
+  line-height: var(--tpl-e49-lh-21);
+}
+
+.totalSend {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.totalSkip {
+  color: var(--color-ink-secondary);
+}
+
+/* 右の列（LINE の見え方） */
+.previewCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-e49-gap-l);
+}
+
+
+.storeList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-e49-gap-s);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.storeItem {
+  display: flex;
+}

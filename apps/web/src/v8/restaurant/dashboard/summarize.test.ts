@@ -3,8 +3,8 @@ import type { RestaurantChannelCloseTask } from '@line-crm/shared'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 import { reservation, tables } from '../booking-kit/test-data'
 import { WALK_IN_NOTE } from '../front-desk/walk-in'
-import { canMarkVisited, canWriteRole, groupCloseTasks, openItems, summarizeToday, visitState } from './summarize'
-import { toMedia } from './use-store-today'
+import { canMarkVisited, canWriteRole, closeGroupKey, groupCloseTasks, openItems, reasonText, summarizeToday, visitState } from './summarize'
+import { mergeMediaLinks, toMedia } from './use-store-today'
 
 const today = (hour: number, minute = 0) => { const d = new Date(); d.setHours(hour, minute, 0, 0); return d.toISOString() }
 const row = (id: string, over: Record<string, unknown>) => reservation(id, { starts_at: today(18), ends_at: today(20), ...over }) as unknown as RestaurantReservation
@@ -84,5 +84,38 @@ describe('枠を閉じる知らせ（E-1 の帯・E-5）', () => {
     const order = toMedia([{ code: 'tabelog', name: '食べログ' }, { code: 'ikyu', name: '一休' }])
     const groups = groupCloseTasks([task('1', 'x', 'ikyu', 'close'), task('2', 'x', 'zzz', 'close'), task('3', 'x', 'tabelog', 'close')], order)
     expect(groups[0].items.map((i) => i.channel)).toEqual(['tabelog', 'ikyu', 'zzz'])
+  })
+})
+
+describe('媒体のリンク（提案 E-4 の設定で保存した URL）', () => {
+  it('受け取りの一覧に、保存した店舗ページ・管理画面の URL を重ねる。URL のあるグルメ媒体は末尾に足す', () => {
+    const merged = mergeMediaLinks(
+      [{ code: 'hotpepper', name: 'ホットペッパー' }, { code: 'tabelog', name: '食べログ' }],
+      [
+        { code: 'hotpepper', name: 'ホットペッパー', pageUrl: 'https://hotpepper.jp/x/', loginUrl: 'https://manager.hotpepper.jp/' },
+        { code: 'gourmet_a', name: 'OZmall', pageUrl: 'https://ozmall.example/', loginUrl: null },
+        { code: 'gourmet_b', name: 'URL なし', pageUrl: null, loginUrl: null },
+      ],
+    )
+    expect(merged).toEqual([
+      { code: 'hotpepper', name: 'ホットペッパー', storePageUrl: 'https://hotpepper.jp/x/', adminUrl: 'https://manager.hotpepper.jp/' },
+      { code: 'tabelog', name: '食べログ' },
+      { code: 'gourmet_a', name: 'OZmall', storePageUrl: 'https://ozmall.example/', adminUrl: null },
+    ])
+  })
+})
+
+describe('枠の無い知らせ（予約・臨時休業から出たもの）', () => {
+  it('在庫の枠が無い知らせは予約ごとにまとめ、席数の代わりに「予約が入りました」と出す', () => {
+    const at = '2026-10-07T10:00:00.000Z'
+    const task = (id: string, channel: string, reservationId: string) => ({
+      id, storeId: 's', slotId: null, startsAt: at, channel, status: 'close' as const, reason: 'limited' as const,
+      remainingSeats: null, recipientIds: [], createdAt: at, updatedAt: at, reservationId,
+    })
+    const groups = groupCloseTasks([task('t1', 'hotpepper', 'r1'), task('t2', 'tabelog', 'r1'), task('t3', 'hotpepper', 'r2')], [])
+    expect(groups).toHaveLength(2)
+    expect(groups[0].items.map((item) => item.channel)).toEqual(['hotpepper', 'tabelog'])
+    expect(closeGroupKey({ slotId: null, reservationId: 'r1', startsAt: at })).toBe(`reservation:r1:${at}`)
+    expect(reasonText(groups[0])).toBe('LINE・電話で予約が入りました')
   })
 })
