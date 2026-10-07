@@ -95,7 +95,7 @@ describe('V8 タグの並び替えの保存の失敗', () => {
     const before = await moveFirstDown()
     expect(reorder).toHaveBeenCalledTimes(1)
     expect(order()).toEqual(before)
-    expect(toasts.at(-1)).toEqual({ message: '並び順を保存できませんでした（network down）', actionLabel: 'もう一度' })
+    expect(toasts.at(-1)).toEqual({ message: '並び順を保存できませんでした。通信を確かめて、もう一度お試しください。', actionLabel: 'もう一度' })
   })
 
   it('失敗の返事でも同じく元へ戻す', async () => {

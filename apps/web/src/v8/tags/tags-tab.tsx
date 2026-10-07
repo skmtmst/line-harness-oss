@@ -43,6 +43,7 @@ import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { notifyToast } from '@/components/shared/toast'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -370,16 +371,16 @@ export default function TagsTab({
   const applyTagOrder = async (order: string[]) => {
     const previous = items
     /* 返事が失敗でも、通信が例外で落ちても、元の順へ戻して「もう一度」を出す。 */
-    let error: string | null = null
+    let message: string | null = null
     try {
       const result = await api.tags.reorder(order)
-      if (!result.success) error = result.error || '保存に失敗しました'
+      if (!result.success) message = `並び順を保存できませんでした（${result.error}）`
     } catch (caught) {
-      error = caught instanceof Error && caught.message ? caught.message : '通信できませんでした'
+      const detail = japaneseDetailOf(caught)
+      message = `並び順を保存できませんでした。${detail ? `${detail}。` : ''}通信を確かめて、もう一度お試しください。`
     }
-    if (error !== null) {
+    if (message !== null) {
       setItems(previous)
-      const message = `並び順を保存できませんでした（${error}）`
       setActionError(message)
       notifyToast(message, {
         tone: 'error',
