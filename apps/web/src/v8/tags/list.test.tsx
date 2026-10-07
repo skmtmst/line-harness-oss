@@ -85,7 +85,8 @@ describe('V8 友だち属性 タグの一覧', () => {
     expect(screen.getAllByText('1月13日（火）登録').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
   })
 
-  it('1152 の板 ID は aPeD8、閲覧のみは fkGUR で帯を出し、作る・CSV を押せない', async () => {
+  // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
+  it('1152 の板 ID は aPeD8、閲覧のみは fkGUR で帯を出し、作る・CSV・行の「…」を出さない', async () => {
     narrow.value = true
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelector('[data-design-node="aPeD8"]')).not.toBeNull()
@@ -96,10 +97,10 @@ describe('V8 友だち属性 タグの一覧', () => {
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelector('[data-design-node="fkGUR"]')).not.toBeNull()
     expect(screen.getByText('閲覧のみで見ています。変える操作は管理者に頼んでください。')).toBeTruthy()
-    expect((screen.getByRole('button', { name: 'CSVで一括登録する' }) as HTMLButtonElement).disabled).toBe(true)
-    for (const button of screen.getAllByRole('button', { name: 'タグを作る' })) {
-      expect((button as HTMLButtonElement).disabled).toBe(true)
-    }
+    expect(screen.queryByRole('button', { name: 'CSVで一括登録する' })).toBeNull()
+    expect(screen.queryAllByRole('button', { name: 'タグを作る' })).toHaveLength(0)
+    expect(screen.queryAllByRole('link', { name: 'タグを作る' })).toHaveLength(0)
+    expect(screen.queryAllByRole('button', { name: /^タグ「.+」の操作$/ })).toHaveLength(0)
   })
 
   it('「よく使う絞り込み」で ★のみ表示 に絞れる', async () => {

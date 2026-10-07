@@ -88,18 +88,16 @@ export default function TagsList({
 
   const boardId = tab !== 'tags' ? undefined : readOnly ? 'fkGUR' : narrow ? 'aPeD8' : 'I1E7Bt'
 
-  /* 見出しの右はタブごとの作る口。 */
+  /* 見出しの右はタブごとの作る口。閲覧のみには押せない作る口を置かない（2026-10-06 オーナー決定）。 */
   const actions = currentTabBlocked ? null : tab === 'tags' ? (
-    <Button type="button" disabled={!canEdit} onClick={() => setCsvOpen(true)}>
-      <Upload size={15} aria-hidden="true" />
-      CSVで一括登録する
-    </Button>
-  ) : tab === 'marks' ? (
     canEdit ? (
-      <Button href="/tags/marks/new" variant="primary">＋ マークを作る</Button>
-    ) : (
-      <Button type="button" variant="primary" disabled>＋ マークを作る</Button>
-    )
+      <Button type="button" onClick={() => setCsvOpen(true)}>
+        <Upload size={15} aria-hidden="true" />
+        CSVで一括登録する
+      </Button>
+    ) : null
+  ) : tab === 'marks' ? (
+    canEdit ? <Button href="/tags/marks/new" variant="primary">＋ マークを作る</Button> : null
   ) : tab === 'searches' ? (
     <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button>
   ) : null

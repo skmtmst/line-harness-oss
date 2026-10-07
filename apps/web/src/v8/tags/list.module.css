@@ -517,3 +517,8 @@
     display: none;
   }
 }
+
+/* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
+.viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
+/* 閲覧のみ：つまみと同じ大きさの見えない印で、名前の位置を保つ。 */
+.gripSpace { display: inline-flex; visibility: hidden; }

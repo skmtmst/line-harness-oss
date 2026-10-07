@@ -171,7 +171,7 @@ export default function BasicPane({ ctx, chrome, onDirtyChange, registerSave }: 
         onReloadFolders={() => void loadFolders()}
         audienceLabel={editor.viewingCondition.label || '申込者向け'}
         fieldErrors={fieldErrors}
-        disabled={readOnly || saving || testing}
+        disabled={saving || testing}
         readOnly={readOnly}
       />
       {error ? <Notice tone="danger">{error}</Notice> : null}
