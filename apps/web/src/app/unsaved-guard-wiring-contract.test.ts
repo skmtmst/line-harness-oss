@@ -65,6 +65,8 @@ const GUARDED = [
   'app/nen/members/rank-settings-tab.tsx',
   'app/nen/pets/feeding-tab.tsx',
   'app/nen/pets/pets-v8.tsx',
+  // ★V8 マイペットのごはんの目安（h7A2F）。下の帯の保存まで画面に残る変更を useUnsavedGuard で守る。
+  'v8/nen-pets/feeding.tsx',
   'app/ops/announcements/page.tsx',
   'app/reminders/edit/edit-v8.tsx',
   'app/reminders/edit/issue469-reminder-screens.tsx',
@@ -380,6 +382,8 @@ const EXEMPTIONS: Record<string, string> = {
     'app/tags/tags-tab-v8.tsx と同じ一覧の★V8版（I1E7Bt）。一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、フォルダの窓は閉じると戻る',
   'v8/templates/list.tsx':
     '★V8 のテンプレート一覧（v19Ivv）。一覧上の操作（フォルダ移動・複製・削除・まとめて操作）は押した直後に確認窓か即時保存で確定し、画面に残る下書きを持たない。種類を選ぶ窓は行き先を選ぶだけ',
+  'v8/nen-pets/editor.tsx':
+    'app/nen/pets/pet-editor.tsx と同じ窓の★V8版（eLjeQ）。入力はすべて窓の中で、閉じると戻る。番兵の要否は元の窓（未判定）と一緒に決めるため同じ扱い',
 }
 
 /*
