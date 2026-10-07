@@ -167,7 +167,8 @@ export default function AppTopBar() {
    * バーの印と同じ言葉が2つ並ぶので、印のほうへ畳んだ。統括以外は押せない。
    * すでに統括の画面にいるときも押せない。
    */
-  const canReturnToHq = staffRole === 'owner' && !pathname.startsWith('/hq') && !hqShell
+  // 統括へ戻る口はオーナーと管理者に出す（管理者も統括を開ける。2026-10-07 オーナーの役割が管理者のため）
+  const canReturnToHq = (staffRole === 'owner' || staffRole === 'admin') && !pathname.startsWith('/hq') && !hqShell
   const returnToHq = () => {
     clearSelectedAccountId()
     router.push('/hq')
