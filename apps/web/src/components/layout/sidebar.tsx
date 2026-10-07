@@ -97,6 +97,12 @@ export function clearSidebarCountCache(): void {
   sidebarCountCache.clear()
 }
 
+/** 統括の左メニューを出す住所（/hq の下と、統括から開く LINEアカウントの登録）。 */
+export function isHqShellPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new'
+}
+
 export default function Sidebar({
   friendAttributesV2Mode = false,
   preview = false,
@@ -105,7 +111,11 @@ export default function Sidebar({
   preview?: boolean
 } = {}) {
   const pathname = usePathname()
-  const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
+  /*
+   * 統括の左メニューは住所が /hq のときに出す。LINEアカウントの登録（/accounts/new）は
+   * 統括の「アカウント」から開く統括の画面なので、統括のメニューのままにする（絵 xj3zz・JYfda）。
+   */
+  const isHq = isHqShellPath(pathname)
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const brand = useBrand()
   /*

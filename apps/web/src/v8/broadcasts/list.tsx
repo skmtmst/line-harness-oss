@@ -42,6 +42,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -672,8 +673,9 @@ export default function BroadcastListV8() {
   const panelRow = panelIndex >= 0 ? visibleBroadcasts[panelIndex] : null
 
   /* ===== 部品（広い板・1152 で同じものを並べ替えて使う） ===== */
-  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
-  const createButton = (full: boolean) => !canEdit ? null : (
+  /* 閲覧のみには押せない「配信を作る」を置かずに隠す（2026-10-06 オーナー決定）。
+     広い板では場所だけ空けて、フォルダの列の並びを絵（NtCE3）どおりに保つ。 */
+  const createButton = (full: boolean) => (!canEdit ? (full ? <span className={styles.viewerCreateSpace} aria-hidden="true" /> : null) : (
     <Button
       type="button"
       variant="primary"
@@ -685,7 +687,7 @@ export default function BroadcastListV8() {
       <Plus size={15} aria-hidden="true" />
       {full ? <>配信を作る<ChevronDown size={14} aria-hidden="true" /></> : '配信を作る'}
     </Button>
-  )
+  ))
 
   const searchBox = (
     <div className={narrow ? `${styles.searchBox} ${styles.searchNarrow}` : styles.searchBox}>
@@ -727,7 +729,8 @@ export default function BroadcastListV8() {
     </div>
   )
 
-  const saveCurrentButton = !canEdit ? null : (
+  /* 閲覧のみは保存できないので置かない。場所だけ空けて「保存した検索」までの並びを保つ。 */
+  const saveCurrentButton = canEdit ? (
     <button
       type="button"
       className={styles.ghostButton}
@@ -736,6 +739,11 @@ export default function BroadcastListV8() {
       <Bookmark size={14} aria-hidden="true" />
       この条件を保存する
     </button>
+  ) : (
+    <span className={`${styles.ghostButton} ${styles.viewerSpace}`} aria-hidden="true">
+      <Bookmark size={14} aria-hidden="true" />
+      この条件を保存する
+    </span>
   )
 
   const savedSearchBox = (
@@ -761,6 +769,7 @@ export default function BroadcastListV8() {
             onSelect: () => { setSavedMenuOpen(false); applySavedView(view.id) },
           })),
           ...(savedViewId ? [{ id: 'view-clear', label: '保存した検索を外す', onSelect: () => { setSavedMenuOpen(false); clearFilters() } }] : []),
+          // 閲覧のみは保存できないので、押せない項目を置かない
           ...(canEdit ? [{
             id: 'view-save',
             label: '＋ この条件を保存する',
@@ -876,6 +885,11 @@ export default function BroadcastListV8() {
   )
 
   /* ===== 表 ===== */
+  const folderDotOf = (folderId: string | null | undefined) => {
+    const folder = folderId ? folders.find((f) => f.id === folderId) : undefined
+    return folder ? { name: folder.name, color: folder.color } : null
+  }
+
   const tableHead = (
     <thead>
       <TableHeadRow>
@@ -883,7 +897,7 @@ export default function BroadcastListV8() {
         <Th className={styles.colStatus}>状態</Th>
         {narrow ? null : <Th className={styles.colAudience}>配信条件</Th>}
         <Th className={styles.colDate}>配信日時</Th>
-        <Th className={styles.colResult}>結果</Th>
+        <Th className={narrow ? styles.colResult : styles.colResultWide}>結果</Th>
         <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
       </TableHeadRow>
     </thead>
@@ -941,6 +955,21 @@ export default function BroadcastListV8() {
           const audience = audienceSummary(broadcast, getTagName, getScenarioName)
           const detailHref = `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`
           const menuLabel = `配信「${broadcast.title}」の操作`
+          const titleLink = (
+            <Link
+              href={detailHref}
+              className={styles.cellTitle}
+              title={broadcast.title}
+              onClick={(event) => {
+                event.stopPropagation()
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
+                event.preventDefault()
+                goDetail(broadcast.id)
+              }}
+            >
+              {broadcast.title}
+            </Link>
+          )
           return (
             <Tr
               key={broadcast.id}
@@ -957,20 +986,9 @@ export default function BroadcastListV8() {
               }}
             >
               <Td>
-                <Link
-                  href={detailHref}
-                  className={styles.cellTitle}
-                  title={broadcast.title}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-                    event.preventDefault()
-                    goDetail(broadcast.id)
-                  }}
-                >
-                  {broadcast.title}
-                </Link>
-                <span className={styles.cellSub}>{messageTypeLabel(broadcast.messageType)}</span>
+                {/* 左にフォルダの列がある広い板は、名前の前にフォルダの色の丸（絵 l5V9a・NtCE3）。1152（jjFNi）は列が無いので出さない。 */}
+                {narrow ? titleLink : <div className={styles.titleLine}><FolderDotName folder={folderDotOf(broadcast.folderId)}>{titleLink}</FolderDotName></div>}
+                <span className={narrow ? styles.cellSub : `${styles.cellSub} ${styles.dotIndent}`}>{messageTypeLabel(broadcast.messageType)}</span>
               </Td>
               <Td><StatusBadge broadcast={broadcast} /></Td>
               {narrow ? null : (
@@ -1093,6 +1111,8 @@ export default function BroadcastListV8() {
           addFolderLabel="フォルダを追加"
           rows={folderRows}
         >
+          {/* 閲覧のみ：「フォルダを追加」は置かず、場所だけ空ける */}
+          {canEdit ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
           <p className={styles.note}>フォルダを消しても、入っていたものは未分類に残ります</p>
           {folderError ? (
             <p role="alert" className={styles.note}>
@@ -1159,7 +1179,7 @@ export default function BroadcastListV8() {
               hasNext={panelIndex < visibleBroadcasts.length - 1}
               footer={<>
                 <Button variant="primary" onClick={() => goDetail(panelRow.id)}>開く</Button>
-                {canEdit && canResume ? (
+                {canResume && canEdit ? (
                   <Button
                     variant="secondary"
                     onClick={() => withViewTransition(() => { router.push(`/broadcasts/new?draft=${encodeURIComponent(panelRow.id)}`) })}
@@ -1167,18 +1187,21 @@ export default function BroadcastListV8() {
                     編集を続ける
                   </Button>
                 ) : null}
-                {canEdit ? <Button
-                  variant="secondary"
-                  onClick={() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) })}
-                >
-                  複製する
-                </Button> : null}
-                {canEdit ? <Button
-                  variant="secondary"
-                  onClick={() => { setDeleteError(''); setDeleteTarget(panelRow); setPanelId(null) }}
-                >
-                  削除する
-                </Button> : null}
+                {/* 閲覧のみには押せない操作を置かない */}
+                {canEdit ? <>
+                  <Button
+                    variant="secondary"
+                    onClick={() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) })}
+                  >
+                    複製する
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => { setDeleteError(''); setDeleteTarget(panelRow); setPanelId(null) }}
+                  >
+                    削除する
+                  </Button>
+                </> : null}
               </>}
             >
               <p>
