@@ -7925,6 +7925,7 @@ CREATE TABLE webinars (
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL);
 
 CREATE INDEX booking_sync_notices_account ON booking_sync_notices(line_account_id,status,target_date);
+
 CREATE INDEX broadcasts_hq_run ON broadcasts(hq_run_id);
 
 CREATE INDEX idx_account_handovers_from ON account_handovers (from_account_id);
