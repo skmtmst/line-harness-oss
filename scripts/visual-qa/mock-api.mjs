@@ -4874,6 +4874,31 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           },
         }
       }
+      /*
+       * ★V8 下書きを仕上げる（J1VA8）の撮影用の下書き。見本「「予約」と送られたら担当へ」から作った形
+       * （メッセージを受け取ったとき・言葉「予約」・タグを付ける→メッセージを送る→担当へ知らせる）。
+       */
+      if (id === 'automation-v8-template-draft') {
+        return {
+          success: true,
+          data: {
+            id,
+            draftVersionId: `${id}-version`,
+            name: '見本：「予約」と送られたら担当へ（下書き）',
+            description: null,
+            eventType: 'message_received',
+            triggerConfig: { keyword: '予約' },
+            conditions: {},
+            actions: [
+              { id: `${id}-action-1`, type: 'add_tag', params: { tagId: 'tag-trial' }, onFailure: 'stop' },
+              { id: `${id}-action-2`, type: 'send_message', params: { messageType: 'text', content: '予約の受付をはじめます。ご希望の日時を送ってください。' }, onFailure: 'stop' },
+              { id: `${id}-action-3`, type: 'notify_staff', params: { notificationRuleId: 'notification-rule-booking', message: '河野・坂本に LINE で' }, onFailure: 'stop' },
+            ],
+            commonActionRefs: [],
+            commonActionVersions: {},
+          },
+        }
+      }
       const source = AUTOMATIONS.find((item) => `${item.id}-draft` === id || `${item.id}-copy-draft` === id)
         ?? (id === 'automation-visual-draft' ? AUTOMATIONS[0] : null)
       if (!source) return { success: false, error: '下書きが見つかりません' }

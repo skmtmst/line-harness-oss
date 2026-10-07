@@ -219,8 +219,6 @@ const EXEMPTIONS: Record<string, string> = {
     'new/page.tsx と同じ画面の★V8版（M4torY・tJqST・J1VA8）。サーバーへ下書き保存する多段入力で、離脱の扱いは元の画面と一緒に決めるため同じ扱い',
   'app/common-actions/common-action-new-v8.tsx':
     'new/page.tsx（s3 未判定）と同じ画面の★V8版。番兵の要否は元の画面と一緒に決めるため、同じ扱いでここに置く',
-  'app/automations/drafts/draft-v8.tsx':
-    '見本から作った下書きの仕上げ面。保存は下書き保存・つくって動かすの明示操作でサーバーへ送り、離脱の扱いは new と同じく別途検討',
   'app/accounts/new/page.tsx':
     '登録ウィザードでdirty管理なし（コメント中の「未保存」記述のみ。R523の復帰案内の文言）',
   'app/accounts/new/register-v8.tsx':
