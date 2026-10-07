@@ -520,8 +520,8 @@
     "579_banner_color_roles.sql",
     "580_banner_reference_images.sql",
     "581_banner_emphasis_lines.sql",
-    "586_company_settings.sql",
-    "587_hq_distribution_created_name.sql"
+    "588_company_settings.sql",
+    "589_hq_distribution_created_name.sql"
   ],
   "migrationCount": 522
 }
