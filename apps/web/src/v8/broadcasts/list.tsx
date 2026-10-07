@@ -35,6 +35,7 @@ import {
 } from 'lucide-react'
 import type { Folder, Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastListKpis, type BroadcastSavedView } from '@/lib/api'
+import { loadFailureNotice } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -325,6 +326,11 @@ export default function BroadcastListV8() {
     setLoading(true)
     setError('')
     setForbidden(false)
+    let searchError: string | undefined
+    const stopSearch = (message: string): never => {
+      searchError = message
+      throw new Error(message)
+    }
     try {
       const chip = STATUS_CHIPS.find((item) => item.key === statusFilter)
       const searching = titleQuery.trim() !== ''
@@ -341,19 +347,19 @@ export default function BroadcastListV8() {
       const res = await api.broadcasts.list(params)
       if (searching && res.success) {
         if ((res.pagination?.total ?? res.data.length) > SEARCH_LIMIT) {
-          throw new Error('検索できる上限は10,000件です。状態・フォルダ・配信日で絞ってから検索してください。')
+          stopSearch('検索できる上限は10,000件です。状態・フォルダ・配信日で絞ってから検索してください。')
         }
         const rows = [...res.data]
         let nextCursor = res.pagination?.nextCursor
         const seen = new Set<string>()
         while (nextCursor != null) {
           if (seq !== loadSeqRef.current) return
-          if (seen.has(nextCursor) || rows.length >= SEARCH_LIMIT) throw new Error('検索結果を取得できませんでした。条件を絞ってから再試行してください。')
+          if (seen.has(nextCursor) || rows.length >= SEARCH_LIMIT) stopSearch('検索結果を読み込めませんでした。条件を絞ってから再試行してください。')
           seen.add(nextCursor)
           const next = await api.broadcasts.list({ ...params, cursor: Number(nextCursor) })
           if (!next.success) throw new Error(next.error)
           rows.push(...next.data)
-          if (rows.length > SEARCH_LIMIT) throw new Error('検索できる上限は10,000件です。条件を絞ってください。')
+          if (rows.length > SEARCH_LIMIT) stopSearch('検索できる上限は10,000件です。条件を絞ってください。')
           nextCursor = next.pagination?.nextCursor
         }
         res.data = rows
@@ -370,7 +376,7 @@ export default function BroadcastListV8() {
     } catch (err) {
       if (seq !== loadSeqRef.current) return
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
-      else setError(err instanceof Error ? err.message : 'データの読み込みに失敗しました。もう一度お試しください。')
+      else setError(searchError || loadFailureNotice(err, '一斉配信'))
     } finally {
       if (seq === loadSeqRef.current) setLoading(false)
     }

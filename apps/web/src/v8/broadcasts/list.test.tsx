@@ -344,3 +344,12 @@ it('検索保存は現在の並び順と表示件数を保存する', async () =
   await flush()
   expect(createView).toHaveBeenCalledWith('account-a', expect.objectContaining({ sortKey: 'oldest', pageSize: 20 }))
 })
+
+it('検索の通信失敗は内部の英語を出さず、読み直す案内を出す', async () => {
+  listBroadcasts.mockRejectedValue(new Error('API error: 500'))
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  expect(host.textContent).not.toContain('API error: 500')
+  expect(host.textContent).toContain('再読み込みしても直らない場合はエラー報告へ')
+  expect(buttonByText('もう一度試す')).toBeTruthy()
+})
