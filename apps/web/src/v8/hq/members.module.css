@@ -63,6 +63,7 @@
 .cardValue {
   color: var(--color-ink);
   font-size: var(--text-metric);
+  font-family: var(--font-inter), Inter, system-ui, sans-serif;
   font-weight: 700;
   line-height: var(--tpl-hq-metric-lh);
   font-variant-numeric: tabular-nums;
@@ -143,31 +144,6 @@
 }
 
 .textButton:disabled { opacity: 0.5; }
-
-/* 状態の札（点つき・角丸の札） */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-hq-pill-gap);
-  padding: var(--tpl-hq-pill-pad);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-hq-pill-lh);
-  white-space: nowrap;
-}
-
-.dot {
-  width: var(--tpl-hq-dot);
-  height: var(--tpl-hq-dot);
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-
-.pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-.pillInfo { background: var(--color-status-info-soft); color: var(--color-status-info); }
-.pillDanger { background: var(--color-status-danger-soft); color: var(--color-danger); }
-.pillIdle { background: var(--color-step-idle); color: var(--color-ink-secondary); }
 
 .legend {
   margin: 0;
