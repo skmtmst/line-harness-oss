@@ -468,6 +468,8 @@ export default function HqHomeV8() {
                     <dd>{`${formatNumber(account.stats?.messagesThisMonth ?? 0)} 通`}</dd>
                   </div>
                 </dl>
+                {/* 絵 JKjsE の「すき間（ボタンを下にそろえる）」。 */}
+                <span className={styles.cardGap} aria-hidden="true" />
                 {cardActions(account)}
                 {warned ? (() => {
                   /* 要確認の理由を、引っかかった確認ごとの言葉で1行に。長ければ省略し title で全文。 */
