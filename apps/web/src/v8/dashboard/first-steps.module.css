@@ -1,0 +1,149 @@
+/*
+ * はじめにやること（★V8 修正案 D-3・絵 `r3X34`）。
+ * 白い角丸カード（枠 hairline・角12・内側 18/20・段の間14）。
+ * 頭：題 15/700・数 13・進みの線 160×6・閉じる 13/500。
+ * 手順：3列×2行（間8）。済みは薄い灰の地＋青い丸の ✓、まだは白地に枠＋空の丸＋右に行き先。
+ */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-d23-ob-gap);
+  padding: var(--tpl-d23-ob-pad);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--tpl-d23-ob-radius);
+  background: var(--color-canvas);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-d23-ob-head-gap);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-d23-ob-title);
+  font-weight: 700;
+  line-height: var(--tpl-d23-ob-title-lh);
+  white-space: nowrap;
+}
+
+.count {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-d23-ob-text);
+  line-height: var(--tpl-d23-ob-text-lh);
+  white-space: nowrap;
+}
+
+.track {
+  position: relative;
+  flex-shrink: 0;
+  width: var(--tpl-d23-ob-bar-w);
+  height: var(--tpl-d23-ob-bar-h);
+  overflow: hidden;
+  border-radius: var(--tpl-d23-ob-bar-radius);
+  background: var(--color-surface-pearl);
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--tpl-d23-ob-bar-radius);
+  background: var(--color-action);
+}
+
+.spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.close {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--tpl-d23-ob-text);
+  font-weight: 500;
+  line-height: var(--tpl-d23-ob-text-lh);
+  white-space: nowrap;
+}
+
+.close:hover { color: var(--color-ink); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--tpl-d23-ob-grid-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-d23-ob-step-gap);
+  min-width: 0;
+  padding: var(--tpl-d23-ob-step-pad);
+  border-radius: var(--tpl-d23-ob-step-radius);
+  background: var(--color-canvas);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+}
+
+.step[data-done] {
+  background: var(--color-surface-pearl);
+  outline: 0;
+}
+
+.check {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-d23-ob-check);
+  height: var(--tpl-d23-ob-check);
+  border-radius: var(--tpl-d23-ob-check-radius);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  color: var(--color-canvas);
+  font-size: var(--tpl-d23-ob-check-size);
+  font-weight: 700;
+  line-height: var(--tpl-d23-ob-check);
+}
+
+.step[data-done] .check {
+  background: var(--color-action);
+  outline: 0;
+}
+
+.label {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-d23-ob-text);
+  font-weight: 600;
+  line-height: var(--tpl-d23-ob-text-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step[data-done] .label {
+  color: var(--color-ink-secondary);
+  font-weight: 400;
+}
+
+.link {
+  flex-shrink: 0;
+  color: var(--color-action);
+  font-size: var(--tpl-d23-ob-text);
+  font-weight: 600;
+  line-height: var(--tpl-d23-ob-text-lh);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.link:hover { text-decoration: underline; }

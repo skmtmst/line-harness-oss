@@ -7,7 +7,7 @@
 .body { display: flex; flex-direction: column; min-width: 0; }
 .spacer { flex: 1; min-width: 0; }
 
-/* ── 板の頭の下の帯（閲覧のみ・はじめの設定・失敗） ── */
+/* ── 板の頭の下の帯（閲覧のみ・失敗）。はじめにやることのカードは first-steps.module.css ── */
 .notices { display: flex; flex-direction: column; gap: var(--tpl-db-row-gap); }
 .viewerBand {
   display: flex; align-items: center; gap: var(--tpl-ro-band-gap);
@@ -23,31 +23,6 @@
   color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-db-text-lh);
 }
 .errorBand > span { flex: 1; min-width: 0; }
-.startBand {
-  display: flex; align-items: center; gap: var(--tpl-db-band-gap);
-  padding: var(--tpl-db-band-pad); border-radius: var(--tpl-db-band-radius);
-  background: var(--color-surface-pearl); outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
-}
-.startTitle { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-db-text-lh); white-space: nowrap; }
-.startTrack {
-  position: relative; flex-shrink: 0; width: var(--tpl-db-progress-w); height: var(--tpl-db-progress-h);
-  border-radius: var(--tpl-db-bar-radius); background: var(--color-track); overflow: hidden;
-}
-.startFill { position: absolute; inset: 0 auto 0 0; border-radius: var(--tpl-db-bar-radius); background: var(--color-accent-deep); }
-.startNext {
-  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-db-text-lh);
-}
-.textLink {
-  display: inline-flex; align-items: center; gap: var(--tpl-db-quota-gap); flex-shrink: 0;
-  color: var(--color-action); font-size: var(--text-label); font-weight: 500; line-height: var(--tpl-db-text-lh); white-space: nowrap;
-}
-.textLink:hover { text-decoration: underline; }
-.startClose.startClose {
-  min-width: 0; min-height: 0; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: var(--tpl-db-close); height: var(--tpl-db-close); padding: 0; border: 0; background: transparent;
-  color: var(--color-ink-faint); cursor: pointer;
-}
 
 /* ── 数の帯（ダッシュボードは大きい帯：数28・上下16） ── */
 :global([data-theme='v8']) .todayBand.todayBand > * { padding: var(--tpl-db-cell-pad); gap: var(--tpl-db-cell-gap); }

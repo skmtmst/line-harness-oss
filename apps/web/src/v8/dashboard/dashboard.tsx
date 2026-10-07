@@ -20,7 +20,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { formatWaitRough } from '@/lib/format-duration'
 import { formatNumber, formatTime } from '@/lib/format'
 import { PERIODS, jstDay, useDashboard, type PeriodKey } from './use-dashboard'
-import { GettingStartedBand, useGettingStarted } from './getting-started'
+import { FirstStepsCard, useFirstSteps } from './first-steps'
 import { FriendTrend, trendRangeNote } from './trend'
 import { InboxSection } from './inbox'
 import { FriendAddLink } from './friend-add'
@@ -99,7 +99,8 @@ export default function DashboardV8() {
   const role = useStaffRole()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
   const canManage = role === null || canManageRole(role)
-  const start = useGettingStarted(d.selectedAccountId)
+  /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
+  const start = useFirstSteps(d.selectedAccountId, role)
   const [openDetail, setOpenDetail] = useState<DashboardCardId | null>(null)
   const data = d.data
   const reference = d.reference
@@ -352,7 +353,7 @@ export default function DashboardV8() {
           <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>
         </div>
       ) : null}
-      {start.summary ? <GettingStartedBand summary={start.summary} onDismiss={start.dismiss} /> : null}
+      {start.summary ? <FirstStepsCard summary={start.summary} onDismiss={start.dismiss} /> : null}
       {d.error ? (
         <div className={styles.errorBand} role="alert">
           <span>{d.error}</span>
