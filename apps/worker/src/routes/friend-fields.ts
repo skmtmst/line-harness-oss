@@ -275,6 +275,12 @@ function convertMigrationValue(value: string, targetType: FriendFieldType): Omit
       ? { convertedValue: null, status: 'review', reason: '存在する日付か確認してください' }
       : { convertedValue: result, status: 'convertible', reason: null };
   }
+  if (targetType === 'time') {
+    const checked = validateFriendFieldValue({ type: 'time', options_json: null }, trimmed);
+    return checked.ok
+      ? { convertedValue: checked.value, status: 'convertible', reason: null }
+      : { convertedValue: null, status: 'review', reason: checked.error };
+  }
   if (targetType === 'datetime') {
     const date = new Date(trimmed);
     return Number.isNaN(date.getTime())

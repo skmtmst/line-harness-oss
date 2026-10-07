@@ -86,17 +86,17 @@ describe('カルーセル素材の変換', () => {
 });
 
 describe('リッチメッセージの変換', () => {
-  it('画像・説明・リンクを1つの Flex に直す', () => {
+  it('タップ範囲を持つイメージマップに直す', () => {
     const result = convertBroadcastAsset('rich_message', '秋の便り', {
-      imageUrl: 'https://example.com/a.png',
+      imageUrl: 'https://example.com/a.png',baseUrl:'https://example.com/images/map',baseSize:{width:1040,height:520},tapAreas:[{x:0,y:0,width:100,height:100,actionType:'uri',uri:'https://example.com/lp'}],
       description: '新米の季節です',
       actionUrl: 'https://example.com/lp',
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.message.messageType).toBe('flex');
+    expect(result.message.messageType).toBe('imagemap');
     const bubble = JSON.parse(result.message.messageContent) as Record<string, unknown>;
-    expect(bubble.type).toBe('bubble');
+    expect(bubble.baseSize).toEqual({width:1040,height:520});
     expect(result.message.messageContent).toContain('新米の季節です');
     expect(result.message.messageContent).not.toContain('assetId');
   });
@@ -108,7 +108,7 @@ describe('リッチメッセージの変換', () => {
 });
 
 describe('クーポン・リサーチの変換', () => {
-  it.each(['coupon', 'research'] as const)('%sは内容とリンク先を読める文にする', (kind) => {
+  it.each(['research'] as const)('%sは内容とリンク先を読める文にする', (kind) => {
     const result = convertBroadcastAsset(kind, '案内', {
       description: '500円引き',
       actionUrl: 'https://example.com/c',

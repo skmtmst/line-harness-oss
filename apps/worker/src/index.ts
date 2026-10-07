@@ -1,3 +1,7 @@
+import { broadcastMediaDirect } from './routes/broadcast-media-direct.js';
+import { hqBroadcasts } from './routes/hq-broadcasts.js';
+import { visitStamps } from './routes/visit-stamps.js';
+import { processVisitStampQueue } from './services/visit-stamps.js';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { LineClient } from '@line-crm/line-sdk';
@@ -478,6 +482,7 @@ app.route('/', webhook);
 app.route('/', gettingStarted);
 app.route('/', recipes);
 app.route('/', hqTemplates);
+app.route('/', hqBroadcasts);
 app.route('/', ops);
 app.route('/', manualLinks);
 app.route('/', errorMessages);
@@ -496,6 +501,7 @@ app.route('/', scenarios);
 app.route('/', broadcastApprovals);
 app.route('/', broadcasts);
 app.route('/', broadcastMessageAssets);
+app.route('/', broadcastMediaDirect);
 app.route('/', users);
 app.route('/', lineAccountTags);
 app.route('/', lineAccounts);
@@ -589,6 +595,7 @@ app.route('/', analyticsExports);
 app.route('/', dashboard);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
+app.route('/', visitStamps);
 app.route('/', restaurantTest);
 app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
@@ -1366,6 +1373,11 @@ async function runFrequentHeavyJobs(
   for (const account of dbAccounts) {
     if (account.is_active) lineClients.set(account.id, new LineClient(account.channel_access_token));
   }
+  try {
+    const { processAutoReplyDeliveries } = await import('./services/auto-reply-delivery.js');
+    await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
+  } catch (error) { console.error('delayed auto reply error:',error); }
+
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
     {name:'booking waitlist expiry and promotion',run:async()=>{const {processBookingWaitlists}=await import('./services/waitlist-tick.js');await processBookingWaitlists(env);}},
@@ -1634,6 +1646,7 @@ async function runFrequentHeavyJobs(
         }
       },
     },
+    { name: 'visit stamps', run: () => processVisitStampQueue(env) },
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
       name: 'broadcast insights',
@@ -2065,6 +2078,11 @@ async function scheduled(
   } catch (error) {
     console.error('outgoing webhook delivery sweep error:', error);
   }
+
+  try {
+    const { processAutoReplyDeliveries } = await import('./services/auto-reply-delivery.js');
+    await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
+  } catch (error) { console.error('delayed auto reply error:',error); }
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const dispatchObservedAt = new Date(event.scheduledTime).toISOString();

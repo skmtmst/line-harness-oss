@@ -557,3 +557,37 @@ describe('Googleビジネス：変更履歴（GB-17）', () => {
     expect(((await detail.json()) as { change: { status: string }; canSend: boolean }).canSend).toBe(true);
   });
 });
+
+describe('休業・貸切からGoogleの変更案',()=>{
+ async function close(kind='temporary_closed',tables:string[]=[],allDay=true){
+  const {validateClosure}=await import('../services/restaurant-closures.js');
+  const checked=validateClosure({storeId:'store-shibuya',startDate:'2026-09-25',endDate:'2026-09-25',allDay,startTime:'12:00',endTime:'14:00',kind,tableIds:tables},'Asia/Tokyo',NOW)!;
+  const r=checked.input;
+  testDb.raw.prepare(`INSERT INTO rt_closures(id,store_id,start_date,end_date,all_day,start_time,end_time,kind,table_ids_json,periods_json) VALUES('closure','store-shibuya',?,?,?,?,?,?,?,?)`)
+   .run(r.startDate,r.endDate,Number(r.allDay),r.startTime,r.endTime,r.kind,JSON.stringify(r.tableIds),JSON.stringify(checked.periods));
+ }
+ it('案だけを作り、外部を呼ばず、通常の確認済み送信で初めて書き換える',async()=>{
+  await call('/api/restaurant-test/google/profile');await close();googleCalls=[];
+  const res=await call('/api/restaurant-test/google/hours/from-closure',{body:{closureId:'closure',expectedVersion:1}});expect(res.status).toBe(200);
+  const result=await res.json() as any;expect(result.change).toMatchObject({kind:'special_hours',source:'calendar',status:'draft',after:[{date:'2026-09-25',closed:true,periods:[]}]});
+  expect(googleCalls).toEqual([]);expect((await send(result.change.id,undefined,false)).status).toBe(400);expect(patchCalls()).toEqual([]);
+  expect((await send(result.change.id)).status).toBe(200);expect(patchCalls()).toHaveLength(1);
+ });
+ it('貸切は明示したときだけ案を作る。古い版と別店舗の記録は拒否する',async()=>{
+  await call('/api/restaurant-test/google/profile');await close('private_event');
+  const propose=(body:unknown)=>call('/api/restaurant-test/google/hours/from-closure',{body});
+  expect((await propose({closureId:'closure',expectedVersion:1})).status).toBe(409);
+  expect((await propose({closureId:'closure',expectedVersion:2,includePrivateEvent:true})).status).toBe(409);
+  expect((await propose({closureId:'other',expectedVersion:1,includePrivateEvent:true})).status).toBe(404);
+  expect((await propose({closureId:'closure',expectedVersion:1,includePrivateEvent:true})).status).toBe(200);
+ });
+ it('時間帯の休業は営業時間を分割し、全体を終日にしない',async()=>{
+  await call('/api/restaurant-test/google/profile');await close('temporary_closed',[],false);
+  const res=await call('/api/restaurant-test/google/hours/from-closure',{body:{closureId:'closure',expectedVersion:1}});expect(res.status).toBe(200);
+  expect((await res.json() as any).change.after).toEqual([{date:'2026-09-25',closed:false,periods:[{open:'11:00',close:'12:00'},{open:'14:00',close:'15:00'},{open:'17:00',close:'22:00'}]}]);
+ });
+ it('一部の卓の貸切から店舗全体の営業時間を変える案は作らない',async()=>{
+  await call('/api/restaurant-test/google/profile');await close('private_event',['a-table']);
+  const res=await call('/api/restaurant-test/google/hours/from-closure',{body:{closureId:'closure',expectedVersion:1,includePrivateEvent:true}});expect(res.status).toBe(409);expect((await res.json() as any).code).toBe('partial_tables');
+ });
+});

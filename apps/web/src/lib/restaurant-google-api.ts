@@ -290,6 +290,7 @@ export const restaurantGoogleApi = {
   syncProfile: (accountId: string) => fetchApi<GoogleProfileData>(withAccount(`${base}/profile/sync`, accountId), { method: 'POST', body: '{}' }),
   holidays: (accountId: string, days = 30) => fetchApi<{ success: true; today: string; days: number; holidays: GoogleHoliday[] }>(withAccount(`${base}/holidays`, accountId, { days })),
   photos: (accountId: string) => fetchApi<{ success: true; photos: GooglePhoto[] }>(withAccount(`${base}/photos`, accountId)),
+  proposeClosureHours: (accountId:string,closureId:string,expectedVersion:number,includePrivateEvent=false)=>fetchApi<{success:true;change:GoogleChange}>(withAccount(`${base}/hours/from-closure`,accountId),{method:'POST',body:JSON.stringify({closureId,expectedVersion,includePrivateEvent})}),
   proposeHours: (accountId: string, proposal: GoogleHoursProposal) =>
     fetchApi<{ success: true; change?: GoogleChange; question?: string }>(withAccount(`${base}/hours/propose`, accountId), { method: 'POST', body: JSON.stringify(proposal) }),
   proposeProfile: (accountId: string, proposal: GoogleProfileProposal) =>

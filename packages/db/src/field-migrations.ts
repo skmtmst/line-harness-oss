@@ -219,7 +219,7 @@ export async function executeFieldMigration(
   const run = await db.prepare(`SELECT * FROM field_migration_runs WHERE id = ?`).bind(runId).first<FieldMigrationRun>();
   if (!run) return;
   const target = await db.prepare(
-    `SELECT COALESCE(type_v6, type) AS resolved_type, options_json
+    `SELECT COALESCE(type_v8, type_v6, type) AS resolved_type, options_json
        FROM friend_fields WHERE id = ?`,
   ).bind(run.target_field_id).first<{ resolved_type: string; options_json: string | null }>();
   const failItem = async (friendId: string, reason: string) => {

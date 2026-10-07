@@ -51,6 +51,7 @@ const mocks = {
     'number',
     'date',
     'datetime',
+    'time',
     'select',
     'multi_select',
     'checkbox',
@@ -260,7 +261,7 @@ describe('項目の作成', () => {
     expect(res.status).toBe(409);
   });
 
-  it.each(['datetime', 'image', 'pdf'])('V6の%s項目を作れる', async (type) => {
+  it.each(['datetime', 'time', 'image', 'pdf'])('%s項目を作れる', async (type) => {
     const res = await createReq(makeApp(), {
       name: type,
       fieldKey: `field_${type}`,

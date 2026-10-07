@@ -197,6 +197,7 @@ export type FriendFieldType =
   | "number"
   | "date"
   | "datetime"
+  | "time"
   | "select"
   | "multi_select"
   | "checkbox"
@@ -805,6 +806,12 @@ export interface Scenario {
   lineAccountId: string | null;
   /** 有効/無効フラグ */
   isActive: boolean;
+  /** 最後の停止理由（200字まで）。停止記録が無い・理由未入力なら null。 */
+  stoppedReason?: string | null;
+  /** 最後に止めた担当者ID。停止記録が無いなら null。 */
+  stoppedBy?: string | null;
+  /** 最後に止めた日時（日本時間）。再開しても停止記録を残す。 */
+  stoppedAt?: string | null;
   /** 配信モード (作成後の変更不可)。レスポンスでは常にセット、Create リクエストでは省略可 (default: 'relative') */
   deliveryMode?: DeliveryMode;
   /**
@@ -847,7 +854,12 @@ export type MessageType =
   | "video"
   | "audio"
   | "sticker"
-  | "carousel";
+  | "carousel"
+  | "rich_message"
+  | "coupon";
+
+/** LINEに渡す種類。編集画面はリッチメッセージとして保持する。 */
+export type LineMessageType = MessageType | 'imagemap';
 
 export interface ScenarioStep {
   /** 主キー (UUIDv4) */
@@ -2181,6 +2193,8 @@ export interface AutoReplyDraftInput {
   respondToAll: boolean;
   name: string | null;
   keywordMatchMode: "any" | "all";
+  /** true（既定）: 全角半角・大小文字・前後空白をそろえる。false: そのまま当てる。 */
+  normalizeKeywords?: boolean;
   folderId: string | null;
   /** 管理者だけが読む補足。友だちへ送る本文には含めない。 */
   internalMemo: string | null;
