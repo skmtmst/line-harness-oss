@@ -5,6 +5,12 @@
 .body { display: flex; flex-direction: column; gap: var(--tpl-hb-body-gap); padding: var(--tpl-hb-project-pad); min-width: 0; }
 .split { display: flex; align-items: flex-start; gap: var(--tpl-hb-project-gap); min-width: 0; }
 .gallery { display: flex; flex-direction: column; flex: 1; gap: var(--tpl-hb-gallery-gap); min-width: 0; }
+/*
+ * 見出しの行（`KWlQY` 154x20 ＝ 文字14・行の高さ20の太字／`LWv01`・`h4yzAO` は小さい字）。
+ * 板では3つが左から間8で続くので、右へ押し出す詰め物（`.spacer`）は置かない。
+ */
+.galleryHead { display: flex; align-items: center; flex-wrap: wrap; gap: var(--tpl-hb-tool-gap); min-width: 0; }
+.galleryTitle { font-size: var(--text-body); line-height: var(--tpl-hb-label-lh); font-weight: 700; color: var(--color-ink); }
 .galleryTools { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); min-width: 0; }
 .chips { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
 .spacer { flex: 1; }
@@ -13,7 +19,6 @@
 .icon { width: var(--tpl-hb-button-icon); height: var(--tpl-hb-button-icon); }
 .hiddenInput { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .headActions { display: flex; align-items: center; gap: var(--tpl-hb-tool-gap); }
-.menuBox { position: relative; display: inline-flex; }
 
 .runningBand {
   display: flex;

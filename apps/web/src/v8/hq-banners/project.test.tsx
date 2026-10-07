@@ -120,13 +120,14 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     expect(host.textContent).toContain('お気に入り 1')
     expect(host.textContent).toContain('アカウントへ渡し済み 1')
     expect(host.textContent).toContain('リッチメッセージ・1:1')
-    expect(buttonNamed('画像を生成（1枚）') ?? buttonNamed('画像を生成（4枚）')).toBeTruthy()
+    // 下の帯のボタンは板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。
+    expect(buttonNamed('生成する（1枚）') ?? buttonNamed('生成する（4枚）')).toBeTruthy()
   })
 
   it('アーカイブは確かめてから行い、一覧へ戻る', async () => {
     act(() => { root.render(<HqBannerProjectV8 />) })
     await flush()
-    act(() => { buttonNamed('アーカイブする')!.click() })
+    act(() => { buttonNamed('アーカイブ')!.click() })
     await flush()
     expect(document.body.textContent).toContain('「秋のキャンペーン」をアーカイブしますか？')
     const confirm = Array.from(document.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent?.includes('アーカイブする')) as HTMLButtonElement
@@ -159,7 +160,7 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     await flush()
     expect(host.textContent).toContain('秋のキャンペーン')
     expect(buttonNamed('画像を取り込む')).toBeUndefined()
-    expect(buttonNamed('アーカイブする')).toBeUndefined()
+    expect(buttonNamed('アーカイブ')).toBeUndefined()
     expect(host.querySelector('[aria-label="画像を生成"]')).toBeNull()
     expect(host.querySelector('[aria-label="お気に入りにする"]')).toBeNull()
     act(() => { (host.querySelector('[aria-label="画像 1 を開く"]') as HTMLButtonElement).click() })
