@@ -21,6 +21,8 @@ import { formatNumber } from '@/lib/format'
 import styles from './quick-send.module.css'
 
 /** 承認を頼む境目（絵の文どおり）。 */
+/** 「名前」を押して入る文字。送るときに友だちの名前へ置き換わる形（{{name}}）。 */
+export const QUICK_SEND_NAME_TOKEN = '{{name}}'
 export const APPROVAL_THRESHOLD = 1000
 export const TEXT_LIMIT = 5000
 const ROLE_LABELS: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: 'スタッフ' }
@@ -124,10 +126,10 @@ export default function QuickSendV8({
     && (!needsApproval || approverId !== '')
     && !busy
 
-  /** 差し込む：今のカーソルの位置に {名前} を入れる。 */
+  /** 差し込む：今のカーソルの位置に {{name}} を入れる（送るときに名前へ置き換わる形。{名前} は置き換わらずに届いていた）。 */
   const insertName = () => {
     const el = textRef.current
-    const token = '{名前}'
+    const token = QUICK_SEND_NAME_TOKEN
     if (!el) return setText((prev) => `${prev}${token}`)
     const start = el.selectionStart ?? text.length
     const end = el.selectionEnd ?? text.length
