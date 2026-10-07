@@ -2277,3 +2277,8 @@ select:not([multiple]):not(.appearance-none) {
   --color-avatar-purple-bg: #f3ecfb;
   --color-avatar-purple-ink: #6b3fa0;
 }
+
+/* 触り心地 5 回目：左メニューの組の開閉（組の見出しと項目の間）。 */
+[data-theme="v8"] {
+  --tpl-ux5-nav-group-gap: 1px;
+}
