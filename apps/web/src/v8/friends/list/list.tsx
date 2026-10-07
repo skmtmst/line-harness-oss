@@ -244,6 +244,18 @@ export default function FriendsListV8() {
       attentionOnly, sortMode, page, pageSize, advanced,
     })
   }, [restored, selectedAccountId, searchInput, searchSubmitted, selectedTagId, responseFilter, operatorId, scenarioId, attentionOnly, sortMode, page, pageSize, advanced])
+  /*
+   * 打って 300ms 止まったら自動で絞り込む（Enter 不要。動きの点検・9）。Enter はすぐ絞る。
+   * 控えから戻した直後（入力と絞り込みが同じ）は何もしない。
+   */
+  useEffect(() => {
+    if (!restored) return
+    const next = searchInput.trim()
+    if (next === searchSubmitted) return
+    const timer = window.setTimeout(() => { setSearchSubmitted(next); setPage(1) }, 300)
+    return () => window.clearTimeout(timer)
+  }, [restored, searchInput, searchSubmitted])
+
   /* 絞り込みは上の控えが戻す。スクロール位置も、戻ったときだけ同じ所へ戻す（動きの点検 5 番）。 */
   useListScrollMemory(restored && loadStatus === 'ready')
 
