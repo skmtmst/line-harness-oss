@@ -363,5 +363,10 @@
     "color": 2,
     "radius": 0,
     "shadow": 0
+  },
+  "v8/tags/mark-editor.tsx": {
+    "color": 6,
+    "radius": 0,
+    "shadow": 0
   }
 }

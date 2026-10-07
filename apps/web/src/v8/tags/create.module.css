@@ -421,3 +421,116 @@ a.way:hover {
   margin: 0;
   color: var(--color-ink-secondary);
 }
+
+/* ★対応マークの作る・編集（ulq9Y）。 */
+.colorField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tg2-option-gap);
+  min-width: 0;
+}
+
+.colorRow {
+  display: flex;
+  align-items: center;
+  height: var(--tpl-tg2-swatch);
+  gap: var(--tpl-tg2-swatch-gap);
+}
+
+.colorSwatch {
+  width: var(--tpl-tg2-swatch);
+  height: var(--tpl-tg2-swatch);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.colorSwatch[aria-pressed='true'] {
+  outline: var(--tpl-tg2-swatch-ring) solid var(--color-ink);
+  outline-offset: var(--tpl-tg2-swatch-ring);
+}
+
+.infoNote {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-tg2-swatch-gap);
+  margin: 0;
+  padding: var(--tpl-tg2-info-band-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-tg2-info-band-lh);
+}
+
+.infoNote > svg {
+  flex-shrink: 0;
+  margin-top: var(--tpl-tag-sub-gap);
+}
+
+.ruleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-tg2-swatch-gap);
+  box-sizing: border-box;
+  height: var(--tpl-tg2-rule-h);
+  padding: var(--tpl-tg2-rule-pad);
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+
+.ruleRow[data-off] {
+  color: var(--color-ink-secondary);
+}
+
+.ruleIcon {
+  width: var(--tpl-tg2-rule-icon);
+  height: var(--tpl-tg2-rule-icon);
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+}
+
+.ruleWhen {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ruleThen {
+  flex-shrink: 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-tg2-icon-btn);
+  height: var(--tpl-tg2-icon-btn);
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.ruleForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-cn-card-gap);
+}
