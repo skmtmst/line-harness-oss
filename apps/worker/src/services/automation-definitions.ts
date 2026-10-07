@@ -26,6 +26,7 @@ export class AutomationDefinitionError extends Error {
 
 interface DefinitionListRow {
   id: string;
+  folder_id: string | null;
   line_account_id: string;
   name: string;
   description: string | null;
@@ -46,6 +47,7 @@ interface DefinitionListRow {
 
 export interface AutomationDefinitionSummary {
   id: string;
+  folderId: string | null;
   name: string;
   description: string | null;
   eventType: string;
@@ -128,7 +130,7 @@ export async function listAutomationDefinitions(
   const offset = paging?.offset === undefined ? 0
     : Math.max(0, Math.floor(paging.offset));
   const result = await db.prepare(
-    `SELECT d.id, d.line_account_id, d.name, d.description, d.status, d.priority,
+    `SELECT d.id, d.folder_id, d.line_account_id, d.name, d.description, d.status, d.priority,
             v.id AS version_id, v.version_number, v.trigger_type, v.trigger_config,
             v.condition_config, v.action_config,
             (SELECT COUNT(*) FROM automation_runs r
@@ -154,6 +156,7 @@ export async function listAutomationDefinitions(
   ).bind(...lineAccountIds, ...(limit === null ? [] : [limit, offset])).all<DefinitionListRow>();
   const items = (result.results ?? []).map((row): AutomationDefinitionSummary => ({
     id: row.id,
+    folderId: row.folder_id ?? null,
     name: row.name,
     description: row.description,
     eventType: row.trigger_type,
