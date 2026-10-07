@@ -170,6 +170,6 @@ export * from './ad-event-mappings.js';
 export * from './photo-publications';
 
 export * from './booking-sync-rules.js';
-export * from './restaurant-inventory-rules.js';
 export * from './friend-summary.js';
 export * from './dashboard-activity.js';
+export * from './restaurant-inventory-rules.js';
