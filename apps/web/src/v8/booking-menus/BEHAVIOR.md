@@ -22,7 +22,7 @@
 - 担当：`listStaff`・`createStaff`・`updateStaff`・`deleteStaff`・`getStaffMenus`・`putStaffMenus`・`listStaffMenusBulk`・`putStaffMenusBulk`（「指名なし」は全員の `is_designation_optional`）
 - 作る・直す：`createMenu`・`updateMenu`・`saveMenuResources`・`listMenuVersions`・`revertMenuVersion`
 - 予約経路：`/api/booking/admin/channels`・`conflicts`・`channels/settings`（自動割り当て）・`staff/:id/google-calendar`
-- 右の写し：`getAvailability(menuId, from, to)`
+- 右の写し：`getAvailability(menuId, from, to, applyStoreRules)`。お客さまの予約画面の写しなので、店舗のルール（休業日・受付の範囲）を当てた空きを読む（`apply_store_rules=1`。勤務とシフトの v7 のお客さまの見本と同じ口）
 
 ## 権限
 - 変えられるかはサーバーの役割（`/api/staff/me`）で決める：オーナー・管理者は変えられる、担当者は項目キー（`/booking/menus`・`booking.settings`）を持つときだけ。答えが来るまでは今までどおり手元の判定（`canEditFeature`）。
@@ -36,6 +36,7 @@
 - 下の帯：受付枠・予約のルール・担当まとめ・作るは、キャンセルと保存を中央に置いた帯をいつも出す（変更が無いときに保存を押すと「変更はありません。」）。
 - 右の写し：日付は5日（LIFF の週の並びと同じ）で、空きのある先頭の日から。担当は「指名なし」（全員の空きを合わせる）。メニューのカードは説明が無くても1行空ける。
 - 予約経路のタブは右の写しを出さず全幅。
+- 中身が短いタブでも、下の帯は板の下に置く（板の高さを画面いっぱいにする。絵 x1OZS6）。
 - 作る：灰の段に「受け方」「予約を受けたときにすること」「使う設備」を白い小段で積み、その下にお支払い。付けるタグは打って絞れる1つ選び（「付けるタグ：〇〇」）。担当の札は3つ横に並べ、トリマーは名前だけ。
 - 作る：タグの候補を、`lineAccountId` が無いタグもこのアカウントのものとして出す（一覧の口は `lineAccountId` を返さないので、前は全部はじかれて「使えるタグがありません」になっていた）。
 - 担当まとめ：メニューは `sort_order` の順。読み込んだら上書きのある最初の升を選んでおく。「指名なし」「止めている」の印は名前の横（title にも）。
