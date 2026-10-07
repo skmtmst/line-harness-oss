@@ -378,8 +378,10 @@ export default function Sidebar({
          * ★V7 C6: 統括のひな形配布（4画面）は Worker の受け口が無いあいだ
          * 「利用できません」だけのページになるため、サイドバーには出さない。
          * ページ自体は残し、配布が有効になれば再表示する。
+         * ★V8 は4画面とも中身を出す（app/hq/hq-template-page.tsx と同じ条件）ので、
+         * 左メニューにも出す（絵 `V8-B/JKjsE`・`LRc93` の6項目）。v7 は今までどおり。
          */
-        if (isHq && !HQ_TEMPLATE_DISTRIBUTION_ENABLED && HQ_UNAVAILABLE_DISTRIBUTION_HREFS.has(item.href)) return false
+        if (isHq && !isV8 && !HQ_TEMPLATE_DISTRIBUTION_ENABLED && HQ_UNAVAILABLE_DISTRIBUTION_HREFS.has(item.href)) return false
         if (isHq) return true
         // 移行中のV2画面では、承認画像どおり「友だち属性」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
