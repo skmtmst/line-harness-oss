@@ -108,6 +108,7 @@
   flex-direction: column;
   gap: var(--tpl-hq-form-gap);
   min-width: 0;
+  min-height: var(--tpl-hq-home-account-h);
   padding: var(--tpl-hq-home-account-pad);
   border-radius: var(--radius-card);
   outline: 1px solid var(--color-hairline);
@@ -116,6 +117,8 @@
 }
 
 .cardWarn { outline-color: var(--color-status-warn); }
+/* 接続の注意の行を持つカードも、ほかのカードと同じ高さ（226）に収める（下の余白を詰める）。 */
+.cardWarn { padding-bottom: var(--tpl-hq-home-warn-pad-end); }
 
 .cardHead {
   display: flex;
@@ -136,6 +139,10 @@
   font-size: var(--tpl-hq-logo-font);
   font-weight: 700;
 }
+
+.card .meta { padding-left: var(--tpl-folder-dot-indent); }
+/* 丸＋名前の行（inline-flex）が行の高さを 2px 押し上げないよう、名前の段を flex にする。 */
+.card .name { display: flex; min-width: 0; }
 
 .cardName {
   display: flex;
