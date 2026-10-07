@@ -87,12 +87,11 @@ function HeadControls({ storePicker, view, day, storeId, busy, onView, onPhone }
     <div className={styles.headControls}>
       {storePicker}
       <ViewSwitch view={view} counts={counts} onChange={onView} />
-      {view === 'today' ? (
-        <span className={styles.headButtons}>
-          <Button disabled={busy} onClick={() => onPhone({ date: day, hold: true })}><Lock size={15} aria-hidden="true" />枠を押さえる</Button>
-          <Button variant="primary" disabled={busy} onClick={() => onPhone({ date: day })}><Plus size={15} aria-hidden="true" />電話の予約を入れる</Button>
-        </span>
-      ) : null}
+      {/* 絵 l9NlC0（今日）・Z3FoM（一覧）とも頭の右に置く。 */}
+      <span className={styles.headButtons}>
+        <Button disabled={busy} onClick={() => onPhone({ date: day, hold: true })}><Lock size={15} aria-hidden="true" />枠を押さえる</Button>
+        <Button variant="primary" disabled={busy} onClick={() => onPhone({ date: day })}><Plus size={15} aria-hidden="true" />電話の予約を入れる</Button>
+      </span>
     </div>
   )
 }

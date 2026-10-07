@@ -73,6 +73,9 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     fireEvent.click(screen.getByRole('tab', { name: '一覧' }))
     await screen.findByText('予約タイムライン')
     expect(document.querySelector('[data-design-node="Z3FoM"]')).not.toBeNull()
+    // 絵 Z3FoM：一覧でも頭の右に「枠を押さえる」「電話の予約を入れる」を置く。
+    expect(screen.getByRole('button', { name: /枠を押さえる/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /電話の予約を入れる/ })).toBeTruthy()
     const row = screen.getByText('佐藤 健', { selector: 'td p' }).closest('tr')!
     fireEvent.click(within(row).getByRole('button', { name: '取消' }))
     fireEvent.click(screen.getByRole('button', { name: '取り消す' }))
