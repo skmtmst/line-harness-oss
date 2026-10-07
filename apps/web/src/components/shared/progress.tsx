@@ -11,7 +11,7 @@ export type ProgressState = 'preparing' | 'active' | 'done' | 'partial'
  * 処理の進み。Pencil ★V7 `xiHO8`「★V7 処理の進み」。
  *
  * 一斉配信の送信・CSV取り込み・一括操作で「押した後いま何が起きているか」を見せる。
- * 形の手本は kobra.systems の Progress（コードは写していない。docs/v7-reference-ui-adoption.md §5）。
+ * 形の手本は kobra.systems の Progress（コードは写していない）。
  *
  * - 数が分かる時は数と割合（active）、分からない時は段階の名前（preparing）
  * - 棒の伸びは幅ではなく `scaleX` で動かす（周りが揺れない）

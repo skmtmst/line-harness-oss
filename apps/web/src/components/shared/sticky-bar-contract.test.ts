@@ -47,7 +47,8 @@ function readWithParts(file: string, depth = 0, seen = new Set<string>()): strin
     return ''
   }
   let combined = source
-  for (const m of source.matchAll(/from '@\/(components|app|lib)\/([^']+)'/g)) {
+  // ★V8 の画面は src/v8 に一から書く（入口は @/v8 から読む）。そこも辿る。
+  for (const m of source.matchAll(/from '@\/(components|app|lib|v8)\/([^']+)'/g)) {
     const base = path.join(SRC, m[1], m[2])
     for (const ext of ['.tsx', '.ts', '/index.tsx']) {
       if (fs.existsSync(base + ext)) {
@@ -91,8 +92,7 @@ const EDIT_PAGES = pages(path.join(SRC, 'app'))
 /**
  * **まだ帯を使っていない作成・編集画面。減る一方の表。**
  *
- * 帯へ寄せるのは画面ごとの作業で、担当は S1〜S3（`docs/v6-parallel-plan.md`
- * §4「守ること」で S0 は機能の画面を触らない）。ここは**増やせないこと**
+ * 帯へ寄せるのは画面ごとの作業（共通部品の作業では機能の画面を触らない）。ここは**増やせないこと**
  * だけを見張る。使い始めたら行ごと消す——消し忘れるとこの試験が落ちる。
  *
  * 2026-09-04: 24 画面と数えていたが、**数え方が2つ間違っていた**（台帳 #109）。

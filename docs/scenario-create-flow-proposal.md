@@ -123,4 +123,4 @@
 |---|---|
 | `apps/web/src/app/scenarios/mode/page.tsx` | 2段目。ここまでは実装済み |
 | `apps/web/src/app/scenarios/detail/scenario-detail-client.tsx` | いまの送り先 |
-| `docs/v025-design-pass.md` §2-1 | 絵に無いものは外す、の決まり |
+| 8月の設計の見直しメモ §2-1（2026-10-07 にリポジトリから外した） | 絵に無いものは外す、の決まり |

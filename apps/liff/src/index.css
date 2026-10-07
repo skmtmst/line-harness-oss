@@ -45,6 +45,8 @@
   --color-liff-star: #f5a623;
   /* マイルの貯まった箱の深い緑 (S3uBl)。主の緑より濃い。 */
   --color-liff-deep: #0f3d24;
+  /* 深い緑の箱の上の小さな字 (S3uBl の「使えるマイル」「マイル」)。 */
+  --color-liff-deep-sub: #d7dbe0;
   --color-liff-wait-bg: #fff6e5;
   --color-liff-wait-ink: #b26b00;
   --color-liff-ok-bg: #e8f8ee;
@@ -62,16 +64,34 @@
   /* ── ウェビナー配信中 (RpW2h。値は板の書き出しから) ── */
   --color-night-body: #e6e8eb;
   --color-night-dim: #8a9098;
+  /* ── ウェビナー配信中 ★V8 (RpW2h) の地・動画の枠・副の字・途中のボタン。
+   * 途中のボタン (個別相談を申し込む) は板どおり LINE の緑。ここだけで使う。 ── */
+  --color-night-deep: #111214;
+  --color-night-panel: #2a2c30;
+  --color-night-sub: #a8adb4;
+  --color-night-cta: #06c755;
   /* 押せない枠の地。設計の満席の枠 (2-event.png の 14:00〜15:00) の灰色。 */
   --color-shell-gray: #ebedf1;
   /* 空きの点の金 (残りわずか)。型ごとに替える。 */
   --color-liff-dot-few: #b26b00;
   /* 満席の字。今は押せない薄字と同じ。型ごとに替える。 */
   --color-liff-full: #c3c8cf;
+  /* 行の高さ。板 (Pencil) の文字はすべて line-height: normal (Noto Sans JP の字の高さ)。
+   * Tailwind の text-xs〜text-4xl が持つ行の高さを板に合わせる。 */
+  --text-xs--line-height: normal;
+  --text-sm--line-height: normal;
+  --text-base--line-height: normal;
+  --text-lg--line-height: normal;
+  --text-xl--line-height: normal;
+  --text-2xl--line-height: normal;
+  --text-3xl--line-height: normal;
+  --text-4xl--line-height: normal;
 }
 
 /* 角丸の素。今の値 (10・箱は14) を既定にし、型ごとに替える。 */
 :root {
+  /* 上の LIFF の帯の中の高さ (下の線 1px を足して 44)。 */
+  --liff-header-h: 43px;
   --liff-radius: 10px;
   --liff-radius-lg: 14px;
 }
@@ -83,12 +103,18 @@
 
 body {
   margin: 0;
+  line-height: normal;
   background: var(--color-canvas);
   color: var(--color-ink);
-  /* ★V8: 日本語は Noto Sans JP、英数字は Inter (Inter に日本語
-   * グリフが無いので、かなと漢字は自動で Noto Sans JP に落ちる)。 */
-  font-family: "Inter", "Noto Sans JP", system-ui, -apple-system,
+  /* ★V8: 地の文は Noto Sans JP (板の書き出しと同じ。行の高さも Noto の
+   * 字の高さで決まる)。日付・時刻・マイルなど数字だけの所は .liff-num で Inter。 */
+  font-family: "Noto Sans JP", "Inter", system-ui, -apple-system,
     BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+}
+
+/* 数字だけの所 (日付の数字・時刻・マイル)。板では Inter。 */
+.liff-num {
+  font-family: "Inter", "Noto Sans JP", sans-serif;
 }
 
 /* 読み込み中は中身の形 (LoadingView の骨組み) を出す。回る印は使わない。 */

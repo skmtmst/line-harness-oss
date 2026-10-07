@@ -74,6 +74,7 @@ export default function QrDialog({ route, onClose }: { route: QrRoute; onClose: 
       title={`${route.name} の QR コード`}
       onCancel={onClose}
       designNode="GtI4Y"
+      designWidth={480}
       footer={stopped ? undefined : (
         <div className={styles.actions}>
           {route.id ? (

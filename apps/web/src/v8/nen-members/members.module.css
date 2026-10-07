@@ -1,0 +1,614 @@
+/*
+ * ★V8-B 会員（一覧 AOWoJ・ランク設定 fb9NJ・ランクを消す dEv6G・競合 e5yBLx・ライフタイム zQ5vY）。
+ * 寸法は globals.css の [data-theme="v8"] の --tpl-mb-* が持つ。ここに数は書かない。
+ */
+
+/* ---------- 外枠 ---------- */
+/* タブの段は絵の高さ（28.5）。共通のタブは下に余白が多く、数の帯が下がる。下線もこの高さの下端に置く。 */
+:global([data-theme='v8']) nav.tabs {
+  height: var(--tpl-mb-tabs-h);
+}
+:global([data-theme='v8']) nav.tabs > span {
+  height: 100%;
+}
+.band {
+  border-block: 1px solid var(--color-hairline);
+}
+.band [data-kpi-number] {
+  font-variant-numeric: normal;
+}
+.kpiMenu {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-mb-kpi-menu);
+}
+/* 数の帯の「…」は枠なしの小さな印（絵の 16 の印）。共通の枠つき 36 を外す。 */
+:global([data-theme='v8']) .kpiMenu > .kpiMenuButton {
+  width: var(--tpl-mb-kpi-menu);
+  height: var(--tpl-mb-kpi-menu);
+  min-height: 0;
+  flex-basis: var(--tpl-mb-kpi-menu);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+/* 枠の線（outline）も外す。キーボードで選んだときの輪は残す。 */
+:global([data-theme='v8']) .kpiMenu > .kpiMenuButton:not(:focus-visible) {
+  outline-color: transparent;
+}
+.csvWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-mb-gap-s);
+}
+.csvError {
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: var(--tpl-mb-ro-margin);
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  line-height: var(--tpl-ro-band-lh);
+}
+.viewerBand > svg {
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* 競合の帯（e5yBLx）：タブの下に、琥珀の地・左に注意の印・右に2つのボタン。 */
+.conflictSlot {
+  padding: var(--tpl-mb-conflict-slot-pad);
+}
+.conflictBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-mb-gap);
+  padding: var(--tpl-mb-conflict-pad);
+  border-radius: var(--tpl-mb-conflict-radius);
+  background: var(--color-status-warn-soft);
+}
+.conflictIcon {
+  flex-shrink: 0;
+  color: var(--color-status-warn-deep);
+}
+.conflictText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-mb-head-gap);
+  min-width: 0;
+}
+.conflictTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-mb-text-13);
+  font-weight: 700;
+  line-height: var(--tpl-mb-conflict-title-lh);
+}
+.conflictSub {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-mb-text-12);
+  line-height: var(--tpl-mb-lh-17);
+}
+
+/* ---------- 本文（ランク設定・ライフタイム） ---------- */
+.rankBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-mb-gap);
+  padding: var(--tpl-mb-body-pad);
+  container-type: inline-size;
+}
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-mb-gap-xs);
+}
+.notice {
+  margin: 0;
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-mb-text-12);
+  font-weight: 600;
+}
+.errorText {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--tpl-mb-text-12);
+}
+.rankSplit {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--tpl-mb-gap);
+}
+.rankMain {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-mb-gap);
+  min-width: 0;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-mb-gap);
+  min-width: 0;
+  padding: var(--tpl-mb-card-pad);
+  border-radius: var(--tpl-mb-card-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.sideCard {
+  flex-shrink: 0;
+  width: var(--tpl-mb-side-w);
+}
+.cardHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-mb-head-gap);
+  min-width: 0;
+}
+.cardTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-mb-card-title);
+  font-weight: 700;
+  line-height: var(--tpl-mb-card-title-lh);
+}
+.cardDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-mb-text-12);
+  line-height: var(--tpl-mb-lh-17);
+}
+
+/* ランクの決まり：2つずつ横に。値は灰の地の箱（変えられない）。 */
+.ruleRow {
+  display: flex;
+  gap: var(--tpl-mb-gap);
+}
+.ruleBox {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-mb-field-gap);
+  min-width: 0;
+}
+.ruleLabel {
+  color: var(--color-ink);
+  font-size: var(--tpl-mb-text-12);
+  font-weight: 600;
+  line-height: var(--tpl-mb-lh-17);
+}
+.ruleValue,
+.fixedBox {
+  display: flex;
+  align-items: center;
+  height: var(--tpl-mb-field-h);
+  padding: var(--tpl-mb-field-pad);
+  border-radius: var(--tpl-mb-field-radius);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-mb-text-13);
+  line-height: var(--tpl-mb-lh-19);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fixedBox {
+  color: var(--color-ink-faint);
+}
+
+/* ランクの行：名前（残り）・しきい値・還元・ごみ箱。 */
+.rankHeadRow,
+.rankRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-mb-gap);
+}
+.rankHeadRow {
+  padding-bottom: var(--tpl-mb-rank-head-pad-bottom);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-mb-text-12);
+  line-height: var(--tpl-mb-lh-17);
+}
+.rankRow {
+  padding: var(--tpl-mb-rank-row-pad);
+}
+.rankColName {
+  flex: 1;
+  min-width: 0;
+}
+.rankColThreshold {
+  flex-shrink: 0;
+  width: var(--tpl-mb-col-threshold);
+}
+.rankColRate {
+  flex-shrink: 0;
+  width: var(--tpl-mb-col-rate);
+}
+.rankColAction {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  width: var(--tpl-mb-col-action);
+}
+.addRow {
+  display: flex;
+}
+
+.syncRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-mb-gap-s);
+}
+.syncText {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-mb-text-12);
+  line-height: var(--tpl-mb-lh-17);
+}
+.syncAction {
+  display: flex;
+}
+
+/* 下の中央の キャンセル・保存。 */
+.saveRow {
+  display: flex;
+  justify-content: center;
+  gap: var(--tpl-mb-gap-s);
+}
+
+/* ランクを消す（dEv6G）の中身。 */
+.removeBody,
+.editBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-mb-dialog-gap);
+}
+.removeBody {
+  /* 共通の窓は題の行（×36）と中身の上に余白を持つ。説明を絵の位置（題の下14）へ寄せる。 */
+  margin-top: var(--tpl-mb-dialog-pull);
+  margin-bottom: var(--tpl-mb-dialog-tail);
+}
+.removeDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-mb-text-12);
+  line-height: var(--tpl-mb-lh-17);
+}
+.removeField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-mb-field-gap);
+}
+.removeLabel {
+  color: var(--color-ink);
+  font-size: var(--tpl-mb-text-12);
+  font-weight: 600;
+  line-height: var(--tpl-mb-lh-17);
+}
+.removeNote {
+  margin: 0;
+  padding: var(--tpl-mb-note-pad);
+  border-radius: var(--tpl-mb-field-radius);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+  font-size: var(--tpl-mb-text-11);
+  line-height: var(--tpl-mb-lh-16);
+}
+.editToggle {
+  display: flex;
+}
+
+/* 違いを比べる。 */
+.diffGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--tpl-mb-gap);
+}
+.diffHead {
+  margin: 0 0 var(--tpl-mb-field-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-mb-text-11);
+  font-weight: 600;
+}
+.diffList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-ink);
+  font-size: var(--tpl-mb-text-12);
+  line-height: var(--tpl-mb-diff-lh);
+}
+
+/* ---------- ライフタイム ---------- */
+.lifetimeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-mb-gap-s);
+}
+.lifetimeTotal {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: var(--tpl-mb-head-gap);
+  width: var(--tpl-mb-total-w);
+  padding: var(--tpl-mb-total-pad);
+  border-radius: var(--tpl-mb-total-radius);
+  background: var(--color-surface-pearl);
+}
+.lifetimeTotalLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-mb-text-11);
+  line-height: var(--tpl-mb-lh-16);
+}
+.lifetimeTotalValue {
+  color: var(--color-ink);
+  font-size: var(--tpl-mb-total-value);
+  font-weight: 700;
+  line-height: var(--tpl-mb-total-value-lh);
+}
+.lifeTable {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--tpl-mb-total-radius);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  overflow: hidden;
+}
+.lifeHeadRow,
+.lifeRow,
+.lifeEmpty {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-mb-life-gap);
+  padding: var(--tpl-mb-life-pad);
+}
+.lifeHeadRow {
+  height: var(--tpl-mb-life-head-h);
+  box-shadow: var(--shadow-row-line);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-mb-text-11);
+  font-weight: 600;
+  line-height: var(--tpl-mb-lh-16);
+}
+.lifeRow,
+.lifeEmpty {
+  height: var(--tpl-mb-life-row-h);
+  box-shadow: var(--shadow-row-line);
+  color: var(--color-ink);
+  font-size: var(--tpl-mb-text-12);
+  line-height: var(--tpl-mb-lh-17);
+}
+.lifeEmpty {
+  color: var(--color-ink-secondary);
+}
+.lifeRow:last-child,
+.lifeEmpty:last-child {
+  box-shadow: none;
+}
+.lifeColThreshold,
+.lifeColReached {
+  flex-shrink: 0;
+  padding-right: var(--tpl-mb-life-num-pad);
+  text-align: right;
+}
+.lifeColThreshold {
+  width: var(--tpl-mb-life-col-threshold);
+}
+.lifeColTitle {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: var(--tpl-mb-head-gap);
+  width: var(--tpl-mb-life-col-title);
+  min-width: 0;
+}
+.lifeColBenefit {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lifeColReached {
+  width: var(--tpl-mb-life-col-reached);
+}
+.lifeColNotify {
+  flex-shrink: 0;
+  width: var(--tpl-mb-life-col-notify);
+}
+.lifeColAction {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  width: var(--tpl-mb-col-action);
+}
+.lifeTitle,
+.lifeTitleTop {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lifeTitleTop {
+  font-weight: 600;
+}
+.lifeTitleSub {
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-mb-text-11);
+  line-height: var(--tpl-mb-lh-16);
+}
+.lifeAdd {
+  display: flex;
+}
+.textAction {
+  /* 素のボタンは高さ 32 を持つ（押しやすさ）。文字の行を絵の位置に置くため、上下へはみ出させる。 */
+  margin-block: var(--tpl-mb-text-action-pull);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-size: var(--tpl-mb-text-12);
+  font-weight: 600;
+  line-height: var(--tpl-mb-lh-17);
+  cursor: pointer;
+}
+.textAction:disabled {
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+}
+
+/* ---------- 会員一覧（AOWoJ） ---------- */
+.listBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-mb-gap);
+  padding: var(--tpl-mb-body-pad);
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-mb-gap-s);
+}
+.searchWrap {
+  width: var(--tpl-mb-search-w);
+}
+.toolbarRight {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--tpl-mb-gap-s);
+  margin-left: auto;
+}
+.tableWrap {
+  overflow-x: auto;
+}
+.listFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--tpl-mb-gap-s);
+  margin-top: var(--tpl-mb-gap);
+}
+.listHint {
+  margin: var(--tpl-mb-gap) 0 0;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-mb-text-11);
+  line-height: var(--tpl-mb-lh-16);
+}
+.memberCell {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-mb-gap);
+  min-width: 0;
+}
+.avatar,
+.avatarInitial {
+  flex-shrink: 0;
+  width: var(--tpl-mb-avatar);
+  height: var(--tpl-mb-avatar);
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+}
+.avatarInitial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--tpl-mb-text-12);
+  font-weight: 500;
+}
+.memberText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.memberName {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-mb-text-13);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memberSub {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-mb-text-11);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rankChip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-mb-chip-h);
+  padding: var(--tpl-mb-chip-pad);
+  border-radius: var(--radius-pill);
+  background: var(--color-shell);
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-mb-text-11);
+  font-weight: 500;
+}
+.rankChip[data-tone='top'] {
+  background: var(--color-ink);
+  color: var(--color-on-accent);
+}
+.rankChip[data-tone='second'] {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+.rankChip[data-tone='base'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+.rankChip[data-tone='middle'] {
+  color: var(--color-ink-secondary);
+}
+.cellText {
+  display: block;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-mb-text-13);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.numStrong,
+.numSoft,
+.numPlain {
+  font-size: var(--tpl-mb-text-13);
+  font-variant-numeric: tabular-nums;
+}
+.numStrong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.numSoft {
+  color: var(--color-ink-secondary);
+}
+.numPlain {
+  color: var(--color-ink);
+}
+
+/* 板が狭いとき：ランク設定は1列に畳む。 */
+@container (max-width: 900px) {
+  .rankSplit {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sideCard {
+    width: auto;
+  }
+}

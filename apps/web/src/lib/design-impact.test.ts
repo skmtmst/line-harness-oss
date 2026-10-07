@@ -235,6 +235,10 @@ describe('共通部品の影響範囲', () => {
       'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
+      // ★V8 友だち属性 タグの一覧（I1E7Bt）。一から書いた画面。表の下にページ送りを置く。
+      'v8/tags/tags-tab.tsx',
+      // ★V8 テンプレートの一覧（v19Ivv）。新しい置き場（src/v8）に一から書いた。
+      'v8/templates/list.tsx',
       // ★V8 一斉配信の一覧（l5V9a）。新しい置き場（src/v8）に一から書いた。
       'v8/broadcasts/list.tsx',
       // ★V8 回答フォームの一覧（I3L41O）。新しい置き場（src/v8）に一から書いた。
@@ -245,6 +249,8 @@ describe('共通部品の影響範囲', () => {
       'v8/rich-menus/list.tsx',
       // ★V8 自動応答の一覧（uE9gf）。新しい置き場（src/v8）に一から書いた。
       'v8/auto-replies/list.tsx',
+      // ★V8 共通情報の一覧（FM94M）。新しい置き場（src/v8）に一から書いた。
+      'v8/common-vars/list.tsx',
       // ★V8-B 流入と計測の一覧（xbHxg）。新しい置き場（src/v8）に一から書いた。
       'v8/inflow-links/list.tsx',
       // ★V8 自動応答の実行結果（nWmLg）。表の下にページ送りを置く。
@@ -253,10 +259,54 @@ describe('共通部品の影響範囲', () => {
       'v8/scenarios/list.tsx',
       // ★V8 ウェビナーの一覧（UyUMw）。新しい置き場（src/v8）に一から書いた。
       'v8/webinars/list.tsx',
+      // ★V8 マイル（OC0gy・S35pO・CJlf4・oRbJi・IRPw8・R6kIG）。src/v8 に一から書いた。
+      'v8/mileage/earning-rules.tsx',
+      'v8/mileage/rewards.tsx',
+      'v8/mileage/balances.tsx',
+      'v8/mileage/history.tsx',
+      'v8/mileage/score.tsx',
+      'v8/mileage/friend-detail.tsx',
+      // ★V8 予約設定のメニュー・担当スタッフのタブ（owaS3）。src/v8/booking-menus に書き直した。
+      'v8/booking-menus/tabs/menus-tab.tsx',
+      'v8/booking-menus/tabs/staff-tab.tsx',
+      // ★V8 統括のアカウント（JKjsE）。新しい置き場（src/v8）に一から書いた。
+      'v8/hq/home.tsx',
+      // ★V8 成果とアフィリエイト（nJlxX・h7dmB・OylSV・aINnz）。src/v8 に一から書いた。
+      'v8/affiliates/affiliators.tsx',
+      'v8/affiliates/offers.tsx',
+      'v8/affiliates/approvals.tsx',
+      'v8/affiliates/payment.tsx',
+      // ★V8-B NEN配信の一覧（MuhWR・Jxmqh・Tj7n4）。新しい置き場（src/v8）に一から書いた。表の下にページ送りを置く。
+      'v8/nen-campaigns/list.tsx',
       // ★V8 外部連携の送る一覧（ZSbFY）。新しい置き場（src/v8）に一から書いた。
       'v8/webhooks/outgoing.tsx',
       // ★V8 外部連携のやり取りの記録（Uv9AA）。表の下にページ送りを置く。
       'v8/webhooks/interactions.tsx',
+      // ★V8 会員一覧（AOWoJ）を src/v8 に一から書いた。ページ送りは共通のまま。
+      'v8/nen-members/list.tsx',
+      // ★V8 オートメーション（LWQXd・g98F9・LnGNw）。新しい置き場（src/v8）に一から書いた。
+      'v8/automations/list.tsx',
+      'v8/automations/runs.tsx',
+      'v8/automations/common-actions.tsx',
+      // ★V8 運営の監査ログ（e7ljE）・ナレッジ（h114s）。src/v8/ops に一から書いた。
+      'v8/ops/audit.tsx',
+      'v8/ops/knowledge.tsx',
+      // ★V8 テンプレートのクーポンを作る（S6FEuB）。登録メディアの選ぶ窓を src/v8 に写した。
+      'v8/template-edit/media-picker.tsx',
+      // ★V8 リマインダの詳細（rbAig・loVfW）。配信予定・実行結果・登録者の表の下にページ送り。
+      'v8/reminders/detail.tsx',
+      // ★V8 ウェビナーの参加者（uNsEy）。表の下にページ送りを置く。
+      'v8/webinar-edit/participants.tsx',
+      // ★V8 Googleビジネスの口コミ・投稿（j0Wcg・Cfed0）。2ページ以上のときだけ表の下にページ送り。
+      'v8/restaurant/google/reviews.tsx',
+      'v8/restaurant/google/posts.tsx',
+      // ★V8 予約台帳の一覧（Z3FoM）。src/v8/restaurant に一から書いた。表の下にページ送りを置く。
+      'v8/restaurant/reservations/list.tsx',
+      // ★V8 ログインユーザー（nku0f）。新しい置き場（src/v8/settings）に書いた。表の下にページ送りを置く。
+      'v8/settings/staff/staff.tsx',
+      // ★V8 設定のEC連携（GmVR5）・ファイルの検査（PfA4o）。src/v8/settings に一から書いた。表の下にページ送りを置く。
+      'v8/settings/ec-commerce/screen.tsx',
+      'v8/settings/file-scan/screen.tsx',
       // ★V8 友だち（x6QsVz 一覧・ADjK8 統合ユーザー・hn6Y8 重複検出・Z0jHp UID移行）を src/v8/friends に一から書いた。
       'v8/friends/list/list.tsx',
       'v8/friends/merged/merged.tsx',
@@ -264,6 +314,18 @@ describe('共通部品の影響範囲', () => {
       'v8/friends/migrations/uid.tsx',
       // ★V8 コンバージョンの一覧（r6dJFy）。新しい置き場（src/v8）に一から書いた。
       'v8/conversions/list.tsx',
+      // ★V8 ダッシュボード（WQmep）。対応が必要な受信の表の下にページ送り（v7 と同じ）。
+      'v8/dashboard/inbox.tsx',
+      // ★V8 集まった回答の1件ずつ見る（MKQyJ）。表の下にページ送りを置く。
+      'v8/form-responses/responses.tsx',
+      // ★V8 イベント予約の一覧（e2ekFu）。新しい置き場（src/v8）に一から書いた。
+      'v8/events/list.tsx',
+      // ★V8 登録メディア一覧（O7hUt7）と、写した差し替えの窓（候補のページ送り）。
+      'v8/contents/list.tsx',
+      'v8/contents/media-replacement-dialog.tsx',
+      // ★V8 流入と計測の詳細（Q5le3）。来た友だちの表と注文の明細（写し）の下にページ送り。
+      'v8/inflow-links/detail.tsx',
+      'v8/inflow-links/ref-orders.tsx',
     ].sort())
   })
 

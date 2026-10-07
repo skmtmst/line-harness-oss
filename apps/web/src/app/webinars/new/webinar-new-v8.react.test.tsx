@@ -7,7 +7,8 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import NewWebinarPage from './page'
+/* 入口（page.tsx）は V8 のとき src/v8/webinar-edit/new を出す。この試験は今の作る画面（new-v8）の動きを見る。 */
+import NewWebinarPage from './new-v8'
 
 /*
  * ★V8-B ウェビナー①基本設定（作る）（板 `j7PP04`）の契約。

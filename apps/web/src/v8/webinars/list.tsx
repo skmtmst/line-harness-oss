@@ -227,6 +227,8 @@ function ArchiveConfirm({
     <ConfirmDialog
       open
       designNode="VXZ6T"
+      designWidth={500}
+      designTop={380}
       title={restoring ? 'ウェビナーを下書きに戻しますか？' : 'ウェビナーをアーカイブしますか？'}
       description={restoring ? '通常の一覧に戻します。公開するまでは、新しい申込は受け付けません。' : 'アーカイブすると、一覧から外れて新しく使えなくなります。記録は残ります。'}
       confirmLabel={restoring ? '下書きに戻す' : 'アーカイブする'}
@@ -965,7 +967,8 @@ function WebinarList() {
         </Button>
       }
       stats={<>
-        {!canEdit ? (
+        {/* 役割が取れるまで（null）は閲覧のみの帯を出さない。出してから消すと一覧が 64px 跳ねていた（動きの点検 8 番）。 */}
+        {role !== null && !canEdit ? (
           <div className={styles.viewerBand} role="status">
             <Eye size={16} aria-hidden="true" />
             <span>閲覧のみで見ています。変える操作は管理者に頼んでください。</span>

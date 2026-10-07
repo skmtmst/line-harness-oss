@@ -91,7 +91,7 @@ describe('流入経路のURLコピーに失敗したとき（V6R-S3-f）', () =>
       value: { writeText: vi.fn(async () => { throw new Error('denied') }) },
     })
     render(<InflowLinkDetailPage />)
-    const button = await screen.findByRole('button', { name: 'URLをコピー' })
+    const button = await screen.findByRole('button', { name: 'URL をコピー' })
     await act(async () => { fireEvent.click(button) })
 
     const alerts = await screen.findAllByRole('alert')
@@ -109,7 +109,7 @@ describe('流入経路のURLコピーに失敗したとき（V6R-S3-f）', () =>
       value: { writeText: vi.fn(async () => undefined) },
     })
     render(<InflowLinkDetailPage />)
-    const button = await screen.findByRole('button', { name: 'URLをコピー' })
+    const button = await screen.findByRole('button', { name: 'URL をコピー' })
     await act(async () => { fireEvent.click(button) })
 
     expect(await screen.findByRole('button', { name: 'コピーしました' })).toBeTruthy()
@@ -118,7 +118,7 @@ describe('流入経路のURLコピーに失敗したとき（V6R-S3-f）', () =>
 })
 
  it('shows server totals and monthly detail even when the friend page is empty',async()=>{
-  render(<InflowLinkDetailPage />); await screen.findByRole('button',{name:'URLをコピー'});
+  render(<InflowLinkDetailPage />); await screen.findByRole('button',{name:'URL をコピー'});
   expect(await screen.findByText(/いま残っている 98人/)).toBeTruthy();
   expect(screen.getByRole('region',{name:'月別内訳'}).textContent).toContain('100人');
   expect(screen.getByText(/1人あたり.*1,200/)).toBeTruthy();

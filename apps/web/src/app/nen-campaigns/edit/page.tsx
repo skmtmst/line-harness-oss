@@ -8,6 +8,8 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import CampaignEditorV8 from './campaign-editor-v8'
+import CampaignEdit from '@/v8/nen-campaigns/edit'
+import { useAdminTheme } from '@/lib/use-admin-theme'
 import { useAccount } from '@/contexts/account-context'
 import { formatDay } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -240,8 +242,11 @@ function NenColumnEditInner() {
 
 function NenEditRoute() {
   const params = useSearchParams()
+  const theme = useAdminTheme()
   const campaignKey = params.get('key') ?? ''
-  return campaignKey ? <CampaignEditorV8 campaignKey={campaignKey} /> : <NenColumnEditInner />
+  if (!campaignKey) return <NenColumnEditInner />
+  // ★V8-B：data-theme="v8" のときだけ新しい「配信を直す」（src/v8/nen-campaigns/edit.tsx：w5pwG）。
+  return theme === 'v8' ? <CampaignEdit campaignKey={campaignKey} /> : <CampaignEditorV8 campaignKey={campaignKey} />
 }
 
 export default function NenColumnEditPage() {

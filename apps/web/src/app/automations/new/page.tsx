@@ -3,7 +3,7 @@
 import Select from '@/components/shared/select'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useAdminTheme } from '@/lib/use-admin-theme'
-import { NewAutomationV8 } from './new-v8'
+import { NewAutomationV8 } from '@/v8/automations/create/create'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Automation } from '@line-crm/shared'
@@ -56,7 +56,7 @@ import { formatNumber, formatTime } from '@/lib/format'
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
  *
  * **画面名を本文に置かない。** 共通トップバーへ `usePageTitle` で渡す
- * （`docs/v6-common-rules.md` §1-1）。以前はトップバー・パンくず・本文の
+ * （`docs/v8-design-rules.md` §5）。以前はトップバー・パンくず・本文の
  * h1 で「ルールを作る」が三重に出ていた。説明文（サブタイトル）も本文には
  * 置かず、右カラムの固有カードへ移した（§1-1、`side-cards.tsx`）。
  *

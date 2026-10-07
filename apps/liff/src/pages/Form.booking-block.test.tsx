@@ -122,7 +122,7 @@ describe('予約を入れる', () => {
     submitForm.mockResolvedValue({ status: 200, body: { success: true, data: {} } });
     createRequest.mockResolvedValue({ booking_id: 'bk1', status: 'requested' });
     fireEvent.click(screen.getByRole('button', { name: '送信する' }));
-    expect(await screen.findByText('送信しました')).toBeTruthy();
+    expect(await screen.findByText('ご回答ありがとうございました')).toBeTruthy();
     expect(createRequest).toHaveBeenCalledOnce();
     const [body, key] = createRequest.mock.calls[0];
     expect(body.menu_id).toBe('m1');
@@ -146,7 +146,7 @@ describe('予約を入れる', () => {
     // 同じキーで取り直す
     createRequest.mockResolvedValue({ booking_id: 'bk1', status: 'requested' });
     fireEvent.click(screen.getByRole('button', { name: '予約を取り直す' }));
-    await screen.findByText('送信しました');
+    await screen.findByText('ご回答ありがとうございました');
     expect(createRequest).toHaveBeenCalledTimes(2);
     expect(createRequest.mock.calls[0][1]).toBe(createRequest.mock.calls[1][1]);
   });
@@ -158,5 +158,47 @@ describe('予約を入れる', () => {
     const frame = document.querySelector('[data-design-node="g9osGN"]');
     expect(frame).toBeTruthy();
     expect(frame?.textContent).toContain('トリミング（小型犬）');
+  });
+
+  it('★V8 g9osGN：満席の日も灰色で並べて押せなくし、送った後は予約の日時と確認待ちを出す', async () => {
+    getForm.mockResolvedValue({
+      id: 'f1', name: '来店アンケート', description: '', layout: layout(), isActive: true,
+    });
+    menus.mockResolvedValue({
+      menus: [{
+        id: 'm1', name: 'トリミング（小型犬）', category_label: null, description: null,
+        duration_minutes: 105, buffer_after_minutes: 0, base_price: 0, sort_order: 0,
+      }],
+    });
+    const at = (n: number) => new Date(Date.now() + 9 * 3600_000 + n * 86400_000).toISOString().slice(0, 10);
+    const open = at(3);
+    const full = at(4);
+    availability.mockResolvedValue({
+      by_staff: [{
+        staff_id: 's1', display_name: '花子',
+        slots: [
+          { date: open, start: '13:00', end: '14:45' },
+          { date: full, start: '13:00', end: '14:45', remaining: 0, state: 'full' },
+        ],
+      }],
+    });
+    render(
+      <MemoryRouter initialEntries={['/forms/f1?liffId=test']}>
+        <Routes>
+          <Route path="/forms/:id" element={<Form />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const fullLabel = `${Number(full.slice(5, 7))}月${Number(full.slice(8, 10))}日 空きなし`;
+    const fullDay = (await screen.findByRole('button', { name: fullLabel })) as HTMLButtonElement;
+    expect(fullDay.disabled).toBe(true);
+    fireEvent.click(await screen.findByRole('button', { name: '13:00' }));
+    submitForm.mockResolvedValue({ status: 200, body: { success: true, data: {} } });
+    createRequest.mockResolvedValue({ booking_id: 'bk1', status: 'requested' });
+    fireEvent.click(screen.getByRole('button', { name: '送信する' }));
+    const md = `${Number(open.slice(5, 7))}月${Number(open.slice(8, 10))}日 13:00`;
+    expect(
+      await screen.findByText(`次回のご予約（${md}）はお店の確認待ちです。決まったらLINEでお知らせします。`),
+    ).toBeTruthy();
   });
 });

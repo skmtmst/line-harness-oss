@@ -26,6 +26,8 @@ import {
   sortMembers,
 } from '@/lib/hq-members'
 import './hq-members-v8.css'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import HqMembersV8 from '@/v8/hq/members'
 
 type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
@@ -36,6 +38,11 @@ type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
  * 「統括の情報」（統括名の変更）は /hq/settings に置く。
  */
 export default function HqMembersPage() {
+  const theme = useAdminTheme()
+  return theme === 'v8' ? <HqMembersV8 /> : <HqMembersPageV7 />
+}
+
+function HqMembersPageV7() {
   return (
     <Suspense fallback={null}>
       <MembersInner />

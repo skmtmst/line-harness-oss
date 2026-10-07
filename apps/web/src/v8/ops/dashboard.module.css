@@ -1,0 +1,125 @@
+/* 運営ダッシュボード V8（CyW0E）。値は --tpl-op-*。 */
+
+.colCount {
+  width: var(--tpl-op-dash-count-w);
+}
+
+.colOpen {
+  display: flex;
+  width: var(--tpl-op-dash-open-w);
+}
+
+.alertRow {
+  height: var(--tpl-op-dash-alert-h);
+}
+
+.colPlan {
+  width: var(--tpl-op-dash-plan-w);
+}
+
+.colRate {
+  width: var(--tpl-op-dash-rate-w);
+}
+
+.colMedia {
+  width: var(--tpl-op-dash-media-w);
+}
+
+.tickets.tickets {
+  flex: 0 0 var(--tpl-op-dash-tickets-w);
+}
+
+.stats {
+  display: flex;
+  gap: var(--tpl-op-me-gap);
+}
+
+.stat {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--tpl-op-dash-stat-gap);
+  border-radius: var(--tpl-op-caution-radius);
+  background: var(--color-surface-pearl);
+  padding: var(--tpl-op-dash-stat-pad);
+}
+
+.statLabel {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  line-height: var(--tpl-op-mini-head-lh);
+}
+
+.statValue {
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+  line-height: var(--tpl-op-dash-stat-lh);
+  white-space: nowrap;
+}
+
+.chart {
+  display: flex;
+  height: var(--tpl-op-dash-chart-h);
+  align-items: flex-end;
+  gap: var(--tpl-op-me-gap);
+}
+
+.column {
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--tpl-op-dash-col-gap);
+}
+
+.bar {
+  display: block;
+  width: 100%;
+  max-height: calc(100% - var(--tpl-op-dash-label-h) - var(--tpl-op-dash-col-gap));
+  border-radius: var(--radius-icon);
+  background: var(--color-accent);
+}
+
+.barCurrent {
+  background: var(--color-accent-deep);
+}
+
+.columnLabel {
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  line-height: var(--tpl-op-dash-label-h);
+  white-space: nowrap;
+}
+
+.chartFoot {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+}
+
+.chartFoot > p {
+  min-width: 0;
+  flex: 1;
+}
+
+@media (max-width: 1023.98px) {
+  .tickets.tickets {
+    flex: 1 1 auto;
+  }
+}
+
+.lineRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tpl-op-me-gap);
+}
+
+.lineRow > p {
+  min-width: 0;
+  flex: 1;
+}

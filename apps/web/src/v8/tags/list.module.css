@@ -1,0 +1,519 @@
+/*
+ * ★V8 友だち属性 タグの一覧（Pencil I1E7Bt・1152 aPeD8・閲覧のみ fkGUR）。
+ * 寸法は app/globals.css の [data-theme="v8"] の --tpl-tag-* と型の --tpl-*。
+ */
+
+/* 閲覧のみの帯（fkGUR「帯の段 閲覧のみ」：左右24・下8、中は 10/14・印16・間10・字13/20）。 */
+.readonlyRow {
+  padding: var(--tpl-tag-ro-pad);
+  flex-shrink: 0;
+}
+
+.readonlyBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-tag-ro-gap);
+  margin: 0;
+  padding: var(--tpl-tag-ro-band-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-info-soft);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--tpl-tag-ro-lh);
+}
+
+.readonlyIcon {
+  width: var(--tpl-tag-ro-icon);
+  height: var(--tpl-tag-ro-icon);
+  flex-shrink: 0;
+  color: var(--color-action);
+}
+
+/* タブの段（I1E7Bt「タブの段」：左右24・字の下12・高さ約31・下に線）。
+   共通のタブは字の下12＋線で 35 になるので、この段だけ 31 に詰める。
+   入口の折り返しの決まり（data-tabs-row）より強くするため .tabs を重ねる。 */
+.tabs {
+  padding: 0 var(--tpl-head-pad-side);
+  border-bottom: 1px solid var(--color-hairline);
+  flex-shrink: 0;
+}
+
+/* 線は段（板の端から端）に引く。タブの線は消して、選んだタブの下線だけ段の線に重ねる。 */
+.tabs.tabs > :global(nav) {
+  height: var(--tpl-tag-tabs-h);
+  border-bottom: 0;
+}
+
+.tabs.tabs > :global(nav) button {
+  padding-bottom: var(--tpl-tag-tabs-pad-bottom);
+  margin-bottom: -1px;
+}
+
+/* タグ以外のタブ（今の V8 の本文をそのまま置く）。 */
+.otherTab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-tag-other-gap);
+  padding: var(--tpl-tag-other-pad);
+  min-width: 0;
+}
+
+/* 数の帯は板の端から端まで。 */
+.kpis {
+  flex-shrink: 0;
+}
+
+/* 道具の段。 */
+.search {
+  display: flex;
+  width: var(--tpl-tag-search-w);
+  flex-shrink: 0;
+}
+
+.searchNarrow {
+  display: flex;
+  width: var(--tpl-tag-search-w-narrow);
+  flex-shrink: 0;
+}
+
+.search > *,
+.searchNarrow > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.toolbarSpacer {
+  flex: 1;
+}
+
+/* 1152 の道具の段の2段目（付け方・よく使う・右端に表示件数）。 */
+.toolbarRow2 {
+  display: flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: var(--tpl-toolbar-gap);
+  min-width: 0;
+}
+
+.menuAnchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.quickButton[data-active] {
+  outline: 1px solid var(--color-action);
+  color: var(--color-action);
+}
+
+.checkSpace {
+  display: inline-block;
+  width: var(--tpl-tag-grip);
+}
+
+.createWide {
+  width: 100%;
+}
+
+/* フォルダの列の下の注（字11/17・2行）。 */
+.folderNote {
+  margin: 0;
+  padding: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tag-note-size);
+  line-height: var(--tpl-tag-note-lh);
+}
+
+.inlineRetry {
+  margin-left: var(--tpl-tag-name-gap);
+  border: 0;
+  background: transparent;
+  color: var(--color-action);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 表（I1E7Bt「表の見出し」「行」：左右24・欄の間16・行 12/24）。 */
+.table table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.colStar { width: var(--tpl-tag-col-star); }
+.colName { width: auto; }
+.colFolder { width: var(--tpl-tag-col-folder); }
+.colCount { width: var(--tpl-tag-col-count); }
+.colSource { width: var(--tpl-tag-col-source); }
+.colLink { width: var(--tpl-tag-col-link); }
+.colUsage { width: var(--tpl-tag-col-usage); }
+.colMenu { width: var(--tpl-tag-col-menu); text-align: right; }
+
+.headStar {
+  width: var(--tpl-tag-star-head);
+  height: var(--tpl-tag-star-head);
+  color: var(--color-ink-faint);
+  vertical-align: middle;
+}
+
+.row {
+  cursor: pointer;
+}
+
+.starButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-tag-menu-btn);
+  height: var(--tpl-tag-menu-btn);
+  margin: 0 calc((var(--tpl-tag-star) - var(--tpl-tag-menu-btn)) / 2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.starButton:disabled {
+  cursor: not-allowed;
+}
+
+.starIcon {
+  width: var(--tpl-tag-star);
+  height: var(--tpl-tag-star);
+  fill: none;
+}
+
+.starButton[data-on='true'] .starIcon {
+  fill: var(--color-star-on);
+  stroke: var(--color-star-on-edge);
+}
+
+.starButton:disabled .starIcon {
+  opacity: 0.6;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-tag-name-gap);
+  min-width: 0;
+}
+
+.gripBox {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+}
+
+.gripBox > * {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-tag-grip);
+  height: var(--tpl-tag-grip);
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+}
+
+.gripIcon {
+  width: var(--tpl-tag-grip);
+  height: var(--tpl-tag-grip);
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--tpl-row-name-size);
+  font-weight: 600;
+  line-height: var(--tpl-row-name-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name:hover {
+  color: var(--color-action);
+  text-decoration: underline;
+}
+
+.miniBadge {
+  flex-shrink: 0;
+  padding: 0 var(--tpl-tag-name-gap);
+  border-radius: var(--radius-pill);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  font-size: var(--tpl-tag-note-size);
+  font-weight: 500;
+  line-height: var(--tpl-row-sub-lh);
+  white-space: nowrap;
+}
+
+.miniBadgeWarn {
+  color: var(--color-warning);
+}
+
+.sub {
+  margin: var(--tpl-tag-sub-gap) 0 0;
+  overflow: hidden;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-row-sub-size);
+  line-height: var(--tpl-row-sub-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folderCell {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-tag-folder-gap);
+  min-width: 0;
+  color: var(--color-ink);
+  font-size: var(--tpl-tag-cell-size);
+  line-height: var(--tpl-tag-cell-lh);
+}
+
+.folderIcon {
+  width: var(--tpl-tag-folder-icon);
+  height: var(--tpl-tag-folder-icon);
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+}
+
+.truncate,
+.cellText {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cellText {
+  color: var(--color-ink);
+  font-size: var(--tpl-tag-cell-size);
+  line-height: var(--tpl-tag-cell-lh);
+}
+
+.countLink {
+  color: var(--color-action);
+  font-size: var(--tpl-tag-cell-size);
+  font-weight: 600;
+  line-height: var(--tpl-tag-cell-lh);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.countLink:hover {
+  text-decoration: underline;
+}
+
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-tag-menu-btn);
+  height: var(--tpl-tag-menu-btn);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.menuButton:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.menuIcon {
+  width: var(--tpl-tag-ro-icon);
+  height: var(--tpl-tag-ro-icon);
+}
+
+/* ページ送り（I1E7Bt：10/20・件数 13/20）。 */
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-tag-name-gap);
+  padding: var(--tpl-tag-pager-pad);
+}
+
+.pagerCount {
+  flex: 1;
+  color: var(--color-ink-secondary);
+  font-size: var(--tpl-tag-pager-size);
+  line-height: var(--tpl-tag-pager-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 操作の失敗の帯。 */
+.errorBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-tag-name-gap);
+  margin: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-gap);
+  padding: var(--tpl-tag-ro-band-pad);
+  border-radius: var(--radius-control);
+  background: var(--color-status-danger-soft);
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+.errorBand button {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--color-danger);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.errorIcon {
+  width: var(--tpl-tag-grip);
+  height: var(--tpl-tag-grip);
+  flex-shrink: 0;
+}
+
+/* 空・失敗の1枚。 */
+.stateCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-body-gap);
+  margin: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-pad-side);
+  padding: var(--tpl-create-content-pad-side) var(--tpl-toolbar-pad-side);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  text-align: center;
+}
+
+.stateIcon,
+.stateIconError {
+  width: var(--tpl-tag-ro-icon);
+  height: var(--tpl-tag-ro-icon);
+  color: var(--color-ink-faint);
+}
+
+.stateIconError {
+  color: var(--color-danger);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.stateDesc {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+}
+
+.skeleton {
+  min-height: var(--tpl-starter-card-h);
+  margin: 0 var(--tpl-toolbar-pad-side);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas-sunken);
+}
+
+/* フォルダの窓（右のパネル）。 */
+.formField {
+  display: block;
+  margin-top: var(--tpl-body-gap);
+}
+
+.formLabel {
+  display: block;
+  margin-bottom: var(--tpl-chip-row-gap);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+}
+
+.required {
+  color: var(--color-danger);
+}
+
+.formInput {
+  width: 100%;
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-kw-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border, var(--color-toggle-off));
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+
+.formInput:focus-visible {
+  outline: var(--tpl-tag-ring) solid var(--color-action);
+}
+
+.colorRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--tpl-body-gap);
+}
+
+.colorDot {
+  display: inline-flex;
+  width: var(--tpl-tag-menu-btn);
+  height: var(--tpl-tag-menu-btn);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+}
+
+.colorDot svg {
+  width: 100%;
+  height: 100%;
+}
+
+.colorDot[aria-pressed='true'] {
+  outline: var(--tpl-tag-ring) solid var(--color-accent);
+  outline-offset: var(--tpl-tag-ring);
+}
+
+.formError {
+  margin: var(--tpl-body-gap) 0 0;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}
+
+/* 行の詳細パネルの中身。 */
+.detailList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-body-gap);
+  margin: 0;
+}
+
+.detailList dt {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.detailList dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+
+/* 1152 の板（型がフォルダの列を道具の段へ畳む幅）では「使っている所」を隠す（aPeD8）。 */
+@container v8-page (max-width: 1099px) {
+  .colUsage {
+    display: none;
+  }
+}

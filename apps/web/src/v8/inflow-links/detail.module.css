@@ -1,0 +1,248 @@
+/*
+ * ★V8 流入と計測の詳細（Pencil Q5le3）。
+ * 頭・本文の余白・数の帯は型（DetailPage・KpiBand）が持つ。ここは その後の段・友だちになったときの帯・表・下の2つの箱だけ。
+ * 表と下の箱は自動応答の実行結果（nWmLg）と同じ寸法なので、その変数を使う。
+ */
+.backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); font-weight: 600; text-decoration: none; }
+.headActions { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); position: relative; top: var(--tpl-ar-run-actions-lift); }
+
+/* 数の帯：この絵は 余白14/16・段の間2。 */
+.kpis {
+  --tpl-band-cell-gap: var(--tpl-compact-gap);
+  --tpl-band-cell-pad-block: var(--tpl-ar-run-kpi-pad-block);
+  --tpl-band-cell-pad-side: var(--tpl-ar-run-kpi-pad-side);
+}
+
+.viewerBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-ro-band-gap);
+  margin: 0;
+  padding: var(--tpl-ro-band-pad);
+  border-radius: var(--tpl-ro-band-radius);
+  background: var(--color-info-bg);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  line-height: var(--tpl-ro-band-lh);
+}
+.note { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+.copyFallback { display: flex; flex-direction: column; gap: var(--tpl-body-gap); }
+.fieldInput {
+  width: 100%;
+  height: var(--tpl-cn-control-h);
+  padding: var(--tpl-cn-input-pad);
+  border: 0;
+  border-radius: var(--radius-control);
+  outline: 1px solid var(--color-control-border);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+}
+
+/* その後（この経路から来た人）：左右24の内側に、枠1・角12・余白20・間12 の段。 */
+.afterWrap { padding: var(--tpl-rsa-after-inset); }
+.afterCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-section-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.afterHead { position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-body-gap); }
+.afterHead > .menuBox { position: absolute; top: 0; right: 0; }
+.afterTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-ar-run-box-title-lh); }
+.afterNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-rsa-after-note-lh); }
+.minis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--tpl-body-gap); }
+.mini {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-compact-gap);
+  min-width: 0;
+  padding: var(--tpl-rsa-mini-pad);
+  border-radius: var(--radius-segment);
+  background: var(--color-surface-pearl);
+}
+.miniTitle,
+.miniSub { overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-micro); line-height: var(--tpl-cn-sub-lh); text-overflow: ellipsis; white-space: nowrap; }
+.miniValue { color: var(--color-ink); font-size: var(--tpl-rsa-mini-value-size); font-weight: 700; line-height: var(--tpl-rsa-mini-value-lh); font-variant-numeric: tabular-nums; }
+.funnelError { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--tpl-rule-row-gap); }
+.monthly > summary { color: var(--color-action); font-size: var(--text-caption); font-weight: 600; cursor: pointer; }
+.monthlyTable { margin-top: var(--tpl-body-gap); }
+.ordersRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-rule-row-gap); padding: var(--tpl-rsa-orders-pad); }
+.ordersTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-cn-name-lh); }
+
+/* 友だちになったときの帯：うすい青の地・角12・余白12/16・間12。 */
+.happenBand {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-rule-row-gap);
+  padding: var(--tpl-ar-ed-band-pad);
+  border-radius: var(--radius-card);
+  background: var(--color-info-bg);
+}
+.happenIcon { flex-shrink: 0; color: var(--color-action); }
+.happenText { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
+.happenTitle { margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-ar-run-fail-title-lh); text-overflow: ellipsis; white-space: nowrap; }
+.happenNote { margin: 0; overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); text-overflow: ellipsis; white-space: nowrap; }
+
+/* この経路から来た友だち：枠1本・角12。上に道具の段（余白12/20・間8）。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-ar-run-tools-pad); }
+.searchBox { width: var(--tpl-ar-run-search-w); }
+.searchBox :global(*) { max-width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--tpl-toolbar-gap); }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: var(--tpl-chip-h);
+  padding: var(--tpl-chip-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: var(--tpl-ar-run-chip-lh);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chip[aria-pressed='true'] { outline-color: var(--color-ink); background: var(--color-ink); color: var(--color-canvas); }
+.toolsSpacer { flex: 1 1 0; }
+.periodBox { width: var(--tpl-ar-run-period-w); }
+.periodBox :global(*) { max-width: 100%; }
+.periodBox :global(button) { width: 100%; }
+.sizeBox { width: var(--tpl-ar-run-size-w); }
+.sizeBox :global(*) { max-width: 100%; }
+.sizeBox :global(button) { width: 100%; }
+
+/* 表：見出し 35（余白10/20）・行 49.5（余白11/20）・欄の間16。 */
+.table { border: 0; border-radius: var(--tpl-ar-run-table-radius); }
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] {
+  gap: var(--tpl-wb-col-gap);
+  height: var(--tpl-ar-run-head-h);
+  padding: var(--tpl-ar-run-head-pad);
+  background: var(--color-table-head);
+  box-shadow: var(--tpl-ar-run-head-lines);
+}
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] {
+  gap: var(--tpl-wb-col-gap);
+  height: var(--tpl-ar-run-row-h);
+  padding: var(--tpl-ar-run-row-pad);
+  border-bottom: 0;
+  box-shadow: var(--shadow-row-line);
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td {
+  display: flex;
+  align-items: center;
+  height: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  line-height: normal;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+:global([data-theme='v8']) .table .headRow[data-table-layout='columns'] > th.colTags,
+:global([data-theme='v8']) .table .row[data-table-layout='columns'] > td.colTags {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.colWhen { width: var(--tpl-ar-run-col-when); flex-shrink: 0; }
+.colFriend { width: var(--tpl-ar-run-col-friend); flex-shrink: 0; gap: var(--tpl-body-gap); min-width: 0; }
+.colAccount { width: var(--tpl-ar-run-col-input); flex-shrink: 0; min-width: 0; }
+.colState { width: var(--tpl-ar-run-col-result); flex-shrink: 0; }
+.colTags { min-width: 0; }
+.colResult { width: var(--tpl-ar-run-col-time); flex-shrink: 0; min-width: 0; }
+.colMenu { width: var(--tpl-ar-run-col-menu); flex-shrink: 0; }
+.when { color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
+.face {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--tpl-ar-run-face);
+  height: var(--tpl-ar-run-face);
+  border-radius: var(--radius-pill);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+  font-weight: 700;
+}
+.friendName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-action);
+  font-size: var(--text-label);
+  font-weight: 600;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cellText,
+.cellSub,
+.cellFaint { min-width: 0; overflow: hidden; font-size: var(--text-caption); text-overflow: ellipsis; white-space: nowrap; }
+.cellText { color: var(--color-ink); }
+.cellSub { color: var(--color-ink-secondary); }
+.cellFaint { color: var(--color-ink-faint); }
+/* 行の「…」：メニューの位置の目印が行を1段増やさないよう横並びの箱で包む。 */
+.menuBox { display: flex; align-items: center; }
+:global([data-theme='v8']) .menuBox :global(button) { width: var(--tpl-ar-run-col-menu); min-width: 0; height: var(--tpl-ar-run-col-menu); min-height: 0; }
+.pager { padding: var(--tpl-rsa-pager-pad); }
+.pagerSummary { display: flex; align-items: center; min-height: var(--tpl-rsa-pager-h); margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-ro-band-lh); }
+
+/* 下の2つの箱：間16・余白20・題15/700・行 34.5（線は下）。 */
+.bottom { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-ar-run-bottom-gap); }
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-side-card-gap);
+  min-width: 0;
+  min-height: var(--tpl-ar-run-box-h);
+  padding: var(--tpl-section-pad);
+  border-radius: var(--radius-card);
+  outline: 1px solid var(--color-hairline);
+  outline-offset: -1px;
+  background: var(--color-canvas);
+}
+.boxTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-ar-run-box-title-lh); }
+.kv { display: flex; flex-direction: column; gap: var(--tpl-side-card-gap); margin: 0; }
+.kvRow {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-body-gap);
+  min-height: var(--tpl-rsa-kv-row-h);
+  padding: var(--tpl-side-row-pad) 0;
+}
+.kvRow > dt { flex: 1 1 auto; min-width: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.kvRow > dd { margin: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.kvRow > dd.kvAccent { color: var(--color-accent-deep); }
+.boxFoot { display: flex; justify-content: flex-end; padding-top: var(--tpl-ar-run-foot-pad); }
+
+/* 削除の窓（UIaM7）の中身。 */
+.deleteBody { display: flex; flex-direction: column; gap: var(--tpl-cn-panel-inner-gap); }
+.deleteEffects { margin: 0; padding-left: var(--tpl-rsa-list-indent); font-size: var(--text-caption); line-height: var(--tpl-rsa-after-note-lh); }
+.deleteSafe { margin: 0; padding: var(--tpl-ro-band-pad); border-radius: var(--radius-control); background: var(--color-success-bg); color: var(--color-success); font-size: var(--text-caption); font-weight: 600; }
+.deleteChoices { display: flex; flex-direction: column; gap: var(--tpl-body-gap); }
+.deleteChoiceTitle { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; }
+.deleteField { display: flex; flex-direction: column; gap: var(--tpl-cn-field-gap); }

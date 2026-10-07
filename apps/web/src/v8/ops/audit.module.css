@@ -1,0 +1,52 @@
+/* 運営の監査ログ V8（e7ljE）。値は --tpl-op-*。 */
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.dateLabel {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.date {
+  width: var(--tpl-op-audit-date-w);
+}
+
+.date :global(*) {
+  max-width: 100%;
+}
+
+/* 絵の日付の欄は高さ36（共通の欄は40）。この画面の道具の段だけ。 */
+.date.date :global(button) {
+  height: var(--tpl-op-control-h);
+}
+
+.colAt {
+  width: var(--tpl-op-audit-at-w);
+}
+
+.colWho {
+  width: var(--tpl-op-mem-state-w);
+}
+
+.colWhat {
+  width: var(--tpl-op-audit-what-w);
+}
+
+/* 操作の名前は長いと2行に折る（絵の「代理ログイン（書き込み）」）。 */
+.colWhat.colWhat {
+  padding-right: var(--tpl-op-audit-what-pad);
+  white-space: normal;
+}
+
+.colTenant {
+  width: var(--tpl-op-audit-tenant-w);
+}

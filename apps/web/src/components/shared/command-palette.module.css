@@ -109,8 +109,27 @@
   }
 }
 
+/* 閉じるときは開くの逆（--motion-exit）。印 data-closing は command-palette.tsx が付ける。 */
+.backdrop[data-closing] {
+  animation: palette-out var(--motion-exit) var(--motion-ease-out) forwards;
+  pointer-events: none;
+}
+
+@keyframes palette-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .backdrop {
+  .backdrop,
+  .backdrop[data-closing] {
     animation: none;
   }
 }

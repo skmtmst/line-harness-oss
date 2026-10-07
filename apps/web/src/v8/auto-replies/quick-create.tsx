@@ -6,11 +6,12 @@
  * 言葉（どれか1つを含む）と返す文だけ聞いて、その場で有効にする。
  * 重なりは作った下書きで確かめ、あるときは相手の名前を帯に出してから
  * 有効にする（確かめた分だけ承認する）。並び替えは詳しく作るで行う。
- * 詳しい手順（Xr6eu の分け方）は P6vbxn 未統合のため別途。
+ * 見た目は絵どおりに組み直した（2026-10-07）：× は題の行に重ねる、キャンセル・保存は窓の真ん中、
+ * 言葉は札（緑の地・青の字）、重なりは琥珀の帯。インラインの style は使わない。
  */
 import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { Info, ListOrdered, Send } from 'lucide-react'
+import { HelpCircle, ListOrdered, Send, X } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import { api, describeSaveFailure } from '@/lib/api'
@@ -72,7 +73,18 @@ export default function QuickCreateV8({
     setKeywords((current) => current.filter((keyword) => keyword !== value))
   }
 
-  const blurKeywords = () => setKeywordError(validateKeywords(keywords) ?? '')
+  /* 欄を離れたとき、入れかけの言葉があれば札にする（Enter を押し忘れても消えない）。 */
+  const blurKeywords = () => {
+    const word = draft.trim()
+    if (word) {
+      const next = keywords.includes(word) ? keywords : [...keywords, word]
+      setKeywords(next)
+      setDraft('')
+      setKeywordError(validateKeywords(next) ?? '')
+      return
+    }
+    setKeywordError(validateKeywords(keywords) ?? '')
+  }
   const blurReply = () => setReplyError(validateReply(reply) ?? '')
 
   const buildInput = (words: string[], text: string): AutoReplyDraftInput => ({
@@ -167,17 +179,18 @@ export default function QuickCreateV8({
       open
       confirmation
       designNode="G4GejG"
+      designWidth={560}
       title="言葉に自動で返す"
       busy={saving}
       error={saveError || undefined}
       onCancel={onClose}
       footer={(
         <div className={styles.footer}>
-          <Link href="/auto-replies/edit" className={styles.detailLink} style={{ gap: 6 }}>
+          <Link href="/auto-replies/edit" className={styles.detailLink}>
             <ListOrdered size={15} aria-hidden="true" />
             詳しく作るへ
           </Link>
-          <span className={styles.footerSpacer} />
+          <span className={styles.footerSpacer} aria-hidden="true" />
           <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>
             キャンセル
           </Button>
@@ -189,74 +202,79 @@ export default function QuickCreateV8({
             busyLabel={phase === 'confirming' ? '有効にしています…' : '保存しています…'}
             onClick={() => void save()}
           >
-            <Send size={15} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -2 }} />
+            <Send size={15} aria-hidden="true" />
             有効にして保存
           </Button>
+          <span className={styles.footerSpacer} aria-hidden="true" />
+          {/* 左の「詳しく作るへ」と釣り合いを取り、キャンセル・保存を窓の真ん中に置く。 */}
+          <span className={styles.footerBalance} aria-hidden="true" />
         </div>
       )}
     >
-      <div className={styles.field} style={{ marginBottom: 16 }}>
-        <p className={styles.label} id="quick-create-keywords-label" style={{ marginBottom: 6 }}>この言葉が来たら（どれか1つを含む）</p>
-        <div
-          className={styles.chipBox} style={{ gap: 6, minHeight: 36, padding: '4px 8px' }}
-          role="group"
-          aria-labelledby="quick-create-keywords-label"
-        >
-          {keywords.map((keyword) => (
-            <span key={keyword} className={styles.chip} style={{ padding: '2px 4px 2px 10px' }}>
-              {keyword}
-              <button
-                type="button"
-                className={styles.chipRemove} style={{ width: 20, height: 20 }}
-                aria-label={`「${keyword}」を外す`}
-                onClick={() => removeKeyword(keyword)}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onBlur={blurKeywords}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                addKeyword(draft)
-                setDraft('')
-              }
-            }}
-            placeholder={keywords.length === 0 ? '言葉を入れて Enter' : ''}
-            aria-label="追加する言葉"
-            className={styles.chipInput} style={{ minWidth: 140 }}
-          />
+      <div className={styles.body}>
+        <div className={styles.field}>
+          <p className={styles.label} id="quick-create-keywords-label">この言葉が来たら（どれか1つを含む）</p>
+          <div className={styles.chipBox} role="group" aria-labelledby="quick-create-keywords-label">
+            {keywords.map((keyword) => (
+              <span key={keyword} className={styles.chip}>
+                {keyword}
+                <button
+                  type="button"
+                  className={styles.chipRemove}
+                  aria-label={`「${keyword}」を外す`}
+                  onClick={() => removeKeyword(keyword)}
+                >
+                  <X size={12} aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onBlur={blurKeywords}
+              onKeyDown={(event) => {
+                // 空の欄で Backspace を押すと、最後の札を外す（札の×は指を乗せたとき・選んだときだけ見せる）。
+                if (event.key === 'Backspace' && !draft && keywords.length > 0) {
+                  removeKeyword(keywords[keywords.length - 1])
+                  return
+                }
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  addKeyword(draft)
+                  setDraft('')
+                }
+              }}
+              placeholder="言葉を入れて Enter"
+              aria-label="追加する言葉"
+              className={styles.chipInput}
+            />
+          </div>
+          {keywordError ? <p className={styles.fieldError} role="alert">{keywordError}</p> : null}
         </div>
-        {keywordError ? <p className={styles.fieldError} role="alert">{keywordError}</p> : null}
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="quick-create-reply">返す文</label>
+          <textarea
+            id="quick-create-reply"
+            value={reply}
+            onChange={(event) => {
+              const next = event.target.value
+              setReply(next)
+              if (replyError && validateReply(next) === null) setReplyError('')
+            }}
+            onBlur={blurReply}
+            placeholder="例：営業時間は10:00〜19:00です"
+            className={styles.textarea}
+            aria-invalid={replyError ? true : undefined}
+          />
+          {replyError ? <p className={styles.fieldError} role="alert">{replyError}</p> : null}
+        </div>
+        {overlaps.length > 0 ? (
+          <p className={styles.overlapBand} role="status">
+            <HelpCircle size={16} aria-hidden="true" className={styles.overlapIcon} />
+            <span>{`「${overlapNames(overlaps)}」と重なります。こちらが先に動きます（並びは詳しく作るで変えられる）`}</span>
+          </p>
+        ) : null}
       </div>
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor="quick-create-reply" style={{ marginBottom: 6 }}>返す文</label>
-        <textarea
-          id="quick-create-reply"
-          value={reply}
-          onChange={(event) => {
-            const next = event.target.value
-            setReply(next)
-            if (replyError && validateReply(next) === null) setReplyError('')
-          }}
-          onBlur={blurReply}
-          placeholder="例：営業時間は10:00〜19:00です"
-          rows={4}
-          className={styles.textarea} style={{ padding: '8px 12px' }}
-          aria-invalid={replyError ? true : undefined}
-        />
-        {replyError ? <p className={styles.fieldError} role="alert">{replyError}</p> : null}
-      </div>
-      {overlaps.length > 0 ? (
-        <p className={styles.overlapBand} role="status" style={{ gap: 12, margin: '12px 0 0', padding: '8px 12px' }}>
-          <Info size={14} aria-hidden="true" className={styles.overlapIcon} />
-          <span>「{overlapNames(overlaps)}」と重なります。こちらが先に動きます（並びは詳しく作るで変えられる）</span>
-        </p>
-      ) : null}
     </Dialog>
   )
 }

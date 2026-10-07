@@ -373,6 +373,10 @@
 
 /* まとめての帯（選ぶと表の下に出る）：フォルダへ移す・削除。 */
 .bulkRow {
+  /* 長い一覧でも画面の下に付いてくる（動きの点検 12 番）。表が短ければ今までどおり表のすぐ下。 */
+  position: sticky;
+  bottom: var(--bulk-bar-float-gap);
+  z-index: 10;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

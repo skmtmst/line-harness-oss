@@ -36,9 +36,10 @@ describe('友だち属性の残りの板ID', () => {
   })
 
   it('タグの編集の競合に xn95q の帯と比較み・読み込みが出る', () => {
-    expect(EDIT).toContain('data-design-node="xn95q"')
-    expect(EDIT).toContain('違いを比べる')
-    expect(EDIT).toContain('最新を読み込んで続ける')
+    // 帯・比べる窓は共通の save-conflict に寄せた（2026-10-07）。文言・ボタンは共通部品が持つ。
+    expect(EDIT).toMatch(/<SaveConflictBand[\s\S]{0,200}designNode="xn95q"/)
+    expect(EDIT).toContain('onCompare={() => void openCompare()}')
+    expect(EDIT).toContain('<SaveConflictCompareDialog')
     expect(EDIT).toContain('describeTagDiff')
   })
 })

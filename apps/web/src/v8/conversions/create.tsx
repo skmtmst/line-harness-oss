@@ -12,6 +12,7 @@
  * - 競合（cXqlS）：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
  *   板の頭の下に帯を出し、主ボタンは「比べてから保存」になる
  */
+import { SaveConflictBand } from '@/components/shared/save-conflict'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -509,19 +510,18 @@ function ConversionCreate() {
     <Button href="/conversions?tab=points">一覧へ戻る</Button>
   )
 
+  /* 帯は共通部品（save-conflict）に寄せた。名前の重なりと先の保存で題を言い分ける。 */
   const conflictBand = conflict ? (
-    <div className={styles.conflictBand} role="alert">
-      <TriangleAlert size={16} aria-hidden="true" className={styles.conflictIcon} />
-      <div className={styles.conflictText}>
-        <p className={styles.conflictTitle}>
-          {serverConflict && !duplicateName
-            ? `ほかの人が「${name.trim()}」を先に保存しました`
-            : `同じ名前の「${duplicateName?.name ?? name.trim()}」がすでにあります`}
-        </p>
-        <p className={styles.conflictNote}>このまま保存すると、同じ意味の成果地点が2つになり、分析の数字が二重になります</p>
-      </div>
-      <Button href={compareHref}><ArrowLeftRight size={15} aria-hidden="true" />違いを比べる</Button>
-      <Button onClick={reloadLatest}><RefreshCw size={15} aria-hidden="true" />最新を読み込んで続ける</Button>
+    <div className={styles.conflictSlot}>
+    <SaveConflictBand
+      designNode="cXqlS"
+      title={serverConflict && !duplicateName
+        ? `ほかの人が「${name.trim()}」を先に保存しました`
+        : `同じ名前の「${duplicateName?.name ?? name.trim()}」がすでにあります`}
+      description="このまま保存すると、同じ意味の成果地点が2つになり、分析の数字が二重になります"
+      compareHref={compareHref}
+      onReload={reloadLatest}
+    />
     </div>
   ) : null
 
