@@ -5961,6 +5961,31 @@ for (const staff of BOOKING_AVAILABILITY.by_staff) {
 }
 
 /*
+  予約設定の右の写し（お客さまの予約画面）が読む空き。店舗のルールを当てた見え方（apply_store_rules=1）。
+  板 yRPxl・KRgTQ・x1OZS6 の写し：金 10/2 から5日（空き・空き・満・休み・空き）、10/2 は 9:00〜16:00 の6枠で 10:00・16:00 が満。
+  ほかの画面（予約台帳・新しい予約・勤務）は BOOKING_AVAILABILITY のまま。
+*/
+const storeSlot = (date, start, end, remaining) => ({ date, start, end, capacity: 2, remaining, state: remaining > 0 ? 'limited' : 'full' })
+export const BOOKING_AVAILABILITY_STORE_VIEW = {
+  by_staff: [
+    {
+      staff_id: 'bs-1', display_name: '佐々木',
+      slots: [
+        storeSlot('2026-10-02', '09:00', '10:45', 1),
+        storeSlot('2026-10-02', '10:00', '11:45', 0),
+        storeSlot('2026-10-02', '13:00', '14:45', 1),
+        storeSlot('2026-10-02', '14:00', '15:45', 1),
+        storeSlot('2026-10-02', '15:00', '16:45', 1),
+        storeSlot('2026-10-02', '16:00', '17:45', 0),
+        storeSlot('2026-10-03', '10:00', '11:45', 1),
+        storeSlot('2026-10-06', '13:00', '14:45', 1),
+      ],
+    },
+  ],
+  closed_dates: ['2026-10-05'],
+}
+
+/*
   受付枠画面 `tksPc` が読む、担当者ごとの通常応答。
   現行APIが持つのは1曜日1区間と特別営業で、休けい・店舗上限・
   明示休業はまだ返せない。その項目は画面側で作らず「—」にする。
