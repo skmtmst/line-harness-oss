@@ -115,6 +115,8 @@ import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifyToast } from '@/components/shared/toast'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StatusChip from '@/components/shared/status-chip'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -1198,6 +1200,12 @@ export default function ScenarioDetailV8({
   useEffect(() => {
     if (editDirty) setSaveDone(false)
   }, [editDirty])
+
+  /*
+   * 追従バーに「未保存の変更があります」と出ている間（鉛筆の窓で変えた名前・説明・フォルダ・
+   * 同時配信）は、左メニューなどで画面を離れる前に確かめる。保存すると印が消えて番兵も外れる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: editDirty, busy: saving })
 
   /** 追従バーの「キャンセル」。未保存があれば戻し、なければ一覧へ。 */
   const handleCancel = () => {
@@ -2949,6 +2957,8 @@ export default function ScenarioDetailV8({
       >
         <VersionCompare before={latestSummary} after={currentSummary} />
       </Dialog>
+
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="シナリオの名前・説明などの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
 
       {/* 配信を始める前の確認（F1LK4e）。試算と運用記録は画面の持つ実データ。 */}
       <ConfirmDialog
