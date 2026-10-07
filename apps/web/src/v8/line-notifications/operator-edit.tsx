@@ -665,6 +665,7 @@ function OperatorEditInner() {
       {/* 公開前の確認（板 `sDXNy`）。選んだスタッフと LINE の届く人数を確かめる。 */}
       <Dialog
         open={confirmOpen}
+        busy={publishing}
         designNode="sDXNy"
         // 絵 sDXNy：窓の余白24・題の行36・本文までの間14
         designWidth={580}

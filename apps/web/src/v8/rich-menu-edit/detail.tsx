@@ -12,14 +12,15 @@
  * 受け付ける指定・呼ぶ API は BEHAVIOR.md。
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Circle, CircleCheck, CircleAlert, CircleX, GitBranch, MoreHorizontal, Pencil, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Circle, CircleCheck, CircleAlert, CircleX, GitBranch, Pencil, RefreshCw } from 'lucide-react'
 import { api, ApiError, type RichMenuPublishRun, type RichMenuTargetPreview } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import TargetMissing from '@/components/shared/target-missing'
@@ -65,8 +66,6 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
   const [republishing, setRepublishing] = useState(false)
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
-  const [menuOpen, setMenuOpen] = useState(false)
-  const moreRef = useRef<HTMLButtonElement>(null)
   const [unpublishOpen, setUnpublishOpen] = useState(false)
   const [unpublishing, setUnpublishing] = useState(false)
   const [duplicateOpen, setDuplicateOpen] = useState(false)
@@ -362,10 +361,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
               <div className={styles.sideActions}>
                 <Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}&step=shape`} variant="secondary"><Pencil size={14} aria-hidden="true" />編集する</Button>
                 <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} variant="secondary"><GitBranch size={14} aria-hidden="true" />切替のつながり</Button>
-                <button ref={moreRef} type="button" className={styles.moreButton} aria-label="そのほかの操作" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
-                  <MoreHorizontal size={16} aria-hidden="true" />
-                </button>
-                <ActionMenu open={menuOpen} onClose={() => setMenuOpen(false)} anchorRef={moreRef} ariaLabel={`リッチメニュー「${group.name}」の操作`} items={menuItems} />
+                <RowMenu className={styles.moreButton} label="そのほかの操作" menuLabel={`リッチメニュー「${group.name}」の操作`} items={menuItems} />
               </div>
             ) : (
               <div className={styles.sideActions}>

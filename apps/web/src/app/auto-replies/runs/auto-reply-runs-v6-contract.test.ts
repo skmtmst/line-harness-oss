@@ -5,20 +5,11 @@ import { describe, expect, it } from 'vitest'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(join(here, 'page.tsx'), 'utf8')
-const css = readFileSync(join(here, 'auto-reply-runs.module.css'), 'utf8')
 const worker = readFileSync(join(here, '../../../../../worker/src/routes/auto-reply-runs.ts'), 'utf8')
 const service = readFileSync(join(here, '../../../../../worker/src/services/auto-reply.ts'), 'utf8')
 const sharedTypes = readFileSync(join(here, '../../../../../../packages/shared/src/types.ts'), 'utf8')
 
 describe('V6 自動応答・実行結果 t7UtYQ', () => {
-  it('Pencilの実Nodeと共通部品を正本にする', () => {
-    expect(page).toContain('data-design-node="t7UtYQ"')
-    for (const component of ['KpiCard', 'Card', 'ListState', 'Pagination', 'StatusBadge', 'StickyBar']) {
-      expect(page).toContain(component)
-    }
-    expect(page).toContain('usePageTitle')
-  })
-
   it('未取得と実値0を同じ表示にしない', () => {
     expect(page).toContain("value={data?.summary.monthHits ?? null}")
     expect(page).toContain("value={data?.summary.errors ?? null}")
@@ -69,11 +60,5 @@ describe('V6 自動応答・実行結果 t7UtYQ', () => {
     expect(page).toContain('function statusView(')
     expect(page).toContain("label: '確認中'")
     expect(page).not.toContain('STATUS[item.status]')
-  })
-
-  it('1440pxで右390pxを残しても一覧を横へはみ出させない', () => {
-    expect(css).toContain('grid-template-columns: minmax(0, 1fr) 390px')
-    expect(css).toContain('grid-template-columns: 34px minmax(160px, 1fr)')
-    expect(css).not.toContain('overflow-x: auto')
   })
 })

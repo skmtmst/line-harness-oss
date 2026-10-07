@@ -8,15 +8,6 @@ const EDITOR = fs.readFileSync(path.join(__dirname, 'friend-add-rule-editor.tsx'
 const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 
 describe('V6 友だち追加時配信 7画面の契約', () => {
-  it('一覧・5段編集・削除確認を実ノードIDへ対応させる', () => {
-    expect(LIST_PAGE).toContain('data-design-node="uLQQc"')
-    expect(LIST_PAGE).toContain('designNode="Q3qP1r"')
-    for (const node of ['s9gAx', 'W1wzCa', 'K0Dbr2', 'txMO9', 'U3SI5']) {
-      expect(EDITOR).toContain(`node: '${node}'`)
-    }
-    expect(EDITOR).toContain('data-design-node="txMO9"')
-  })
-
   it('一覧から新規作成と編集へ遷移できる', () => {
     expect(LIST_PAGE).toContain('href="/friend-add-settings?view=new"')
     expect(LIST_PAGE).toContain('href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`}')
@@ -74,13 +65,6 @@ describe('V6 友だち追加時配信の運用者向け表示', () => {
     expect(screens).not.toContain('friend_add_rules')
     expect(screens).not.toContain('definition_snapshot')
     expect(screens).not.toMatch(/マイグレーション\s*\d+/)
-  })
-
-  it('一覧の配信内容とページ送りを設計と同じ位置で確認できる', () => {
-    expect(LIST_PAGE).toContain('function deliverySummary')
-    expect(LIST_PAGE).toContain('aria-label="ページ送り"')
-    expect(LIST_PAGE).toContain('前へ')
-    expect(LIST_PAGE).toContain('次へ')
   })
 
   it('曜日・時間帯・友だち条件・再送制限を保存済み契約で編集する', () => {

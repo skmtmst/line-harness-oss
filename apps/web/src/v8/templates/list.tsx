@@ -30,7 +30,6 @@ import {
   List,
   Mail,
   MessageSquare,
-  MoreHorizontal,
   Plus,
   Send,
   SquareArrowOutUpRight,
@@ -53,7 +52,7 @@ import { ListPage } from '@/components/templates'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
+import { RowMenu } from '@/components/shared/row-actions'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
@@ -1222,19 +1221,11 @@ export default function TemplatesListV8() {
                     <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                       {/* 横並びにして、メニューの位置の目印が行を1段増やさないようにする。 */}
                       <div className={styles.menuBox}>
-                        <IconButton
-                          title={`テンプレート「${t.name}」の操作`}
-                          aria-label={`テンプレート「${t.name}」の操作`}
-                          aria-expanded={openMenuId === t.id}
-                          onClick={() => setOpenMenuId((current) => (current === t.id ? null : t.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
-                        <ActionMenu
-                          open={openMenuId === t.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={`テンプレート「${t.name}」の操作`}
+                        <RowMenu
+                          label={`テンプレート「${t.name}」の操作`}
                           items={rowMenuItems(t)}
+                          open={openMenuId === t.id}
+                          onOpenChange={(next) => setOpenMenuId(next ? t.id : null)}
                         />
                       </div>
                     </Td>

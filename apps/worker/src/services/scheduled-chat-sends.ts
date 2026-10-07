@@ -13,6 +13,8 @@ import {
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { resolveLineToken } from './line-token.js';
 import { classifyLineOutboundFailure } from './outbound-idempotency.js';
+import { buildChatMessage, ChatAttachmentError } from './chat-attachments.js';
+import type { Message } from '@line-crm/line-sdk';
 import { renderChatMessageContent } from './manual-send-interpolation.js';
 
 // N-025: 期限が来た送信予約をLINEへpushするcron側の処理。
@@ -22,6 +24,8 @@ import { renderChatMessageContent } from './manual-send-interpolation.js';
 type ScheduleDispatchEnv = {
   DB: D1Database;
   LINE_CHANNEL_ACCESS_TOKEN: string;
+  IMAGES?: R2Bucket;
+  WORKER_URL?: string;
 };
 
 const RETRY_BACKOFF_MS = 5 * 60_000;
@@ -134,26 +138,25 @@ async function dispatchOne(
     return;
   }
 
-  // 展開でLINEの上限を超えた分はLINEを呼ばず失敗で残す(400で落ちるのが分かりきっている)。
-  if (rendered.content.length > 5000) {
+  let message: Message;
+  try {
+    const built = await buildChatMessage({ messageType: row.message_type, content: rendered.content,
+      bucket: env.IMAGES, origin: env.WORKER_URL ?? '',
+      owner: { friendId: target.friend.id, lineAccountId: target.friend.line_account_id ?? null },
+    });
+    message = built.message;
+    rendered.content = built.content;
+  } catch (error) {
+    if (!(error instanceof ChatAttachmentError)) throw error;
     await markScheduledChatSendFailed(env.DB, {
-      id: row.id,
-      leaseToken: row.lease_token!,
-      errorCode: 'content_too_long',
-      error: '差し込みを解決した本文が5000文字を超えています',
-      retryable: false,
-      now: nowIso,
+      id: row.id, leaseToken: row.lease_token!, errorCode: error.code,
+      error: error.message, retryable: false, now: nowIso,
     });
     return;
   }
-
+  if (quoteToken) message.quoteToken = quoteToken;
   const { LineClient } = await import('@line-crm/line-sdk');
   const lineClient = new LineClient(target.accessToken);
-  const message = {
-    type: 'text' as const,
-    text: rendered.content,
-    ...(quoteToken ? { quoteToken } : {}),
-  };
 
   try {
     await lineClient.pushMessage(target.friend.line_user_id, [message], row.idempotency_key);

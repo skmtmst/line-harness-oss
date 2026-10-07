@@ -24,7 +24,6 @@ import {
   Folder as FolderIcon,
   Lightbulb,
   ListVideo,
-  MoreHorizontal,
   Pause,
   Play,
   Plus,
@@ -57,7 +56,6 @@ import SearchField from '@/components/shared/search-field'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
@@ -70,7 +68,8 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -78,7 +77,7 @@ import { TextField } from '@/components/shared/text-field'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import Pagination from '@/components/shared/pagination'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs'
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario'
 import styles from './list.module.css'
@@ -612,13 +611,26 @@ export default function ScenariosListV8() {
 
   /* ===== 並び替え ===== */
 
+  /*
+   * 動かせるのは絞り込みが無く、全件が1ページに出ているときだけ（リマインダ・リッチメニューと同じ決まり）。
+   * 保存は渡した行に 0 から番号を振り直すため、一部の行だけで保存すると隠れた行と番号がぶつかる。
+   */
+  const reorderDisabledReason = !canEdit
+    ? '閲覧のみのため並び替えできません'
+    : serverQuery || activeParam !== undefined || createdThisMonthOnly || folderFilter
+      ? '絞り込みを外すと動かせます'
+      : scenarioList.pageCount > 1
+        ? '全件が1ページに収まる表示件数にすると動かせます'
+        : null
+  const canReorder = reorderDisabledReason === null
+
   /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
   const liveOrder = useLiveReorder(scenarios, (row) => row.id, dragId)
 
   const dropOn = (targetId: string) => {
     const from = dragId
     setDragId(null)
-    if (!from || from === targetId || !canEdit) return
+    if (!from || from === targetId || !canReorder) return
     const order = scenarios.map((s) => s.id)
     const fromIdx = order.indexOf(from)
     const toIdx = order.indexOf(targetId)
@@ -632,7 +644,7 @@ export default function ScenariosListV8() {
     const fromIdx = order.indexOf(id)
     const toIdx = fromIdx + direction
     const name = scenarios.find((s) => s.id === id)?.name ?? 'このシナリオ'
-    if (fromIdx < 0 || !canEdit) return
+    if (fromIdx < 0 || !canReorder) return
     if (toIdx < 0 || toIdx >= order.length) {
       setMoveNotice(`「${name}」は${direction < 0 ? '先頭' : '末尾'}にあるため、これ以上動かせません`)
       return
@@ -938,18 +950,19 @@ export default function ScenariosListV8() {
                     <Td
                       className={styles.gripCell}
                       onClick={(event) => event.stopPropagation()}
-                      draggable={canEdit}
+                      draggable={canReorder}
                       onDragStart={() => setDragId(s.id)}
                       onDragEnd={() => setDragId(null)}
-                      title={canEdit ? '上下に動かして並び替え' : undefined}
+                      title={canReorder ? '上下に動かして並び替え' : undefined}
                     >
-                      {/* 閲覧のみ：つまみは置かない（列の幅は残る） */}
-                      {canEdit && <ReorderGrip
+                      {/* 閲覧のみ：つまみは置かない（列の幅は残る）。絞り込み中などはつまみを出さず理由を言う。 */}
+                      {canEdit && <ReorderHandle
                         label={s.name}
+                        disabledReason={reorderDisabledReason}
                         onMove={(direction) => keyboardMove(s.id, direction)}
                       >
                         <span aria-hidden>⠿</span>
-                      </ReorderGrip>}
+                      </ReorderHandle>}
                     </Td>
                     <NameCell
                       name={
@@ -995,21 +1008,13 @@ export default function ScenariosListV8() {
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
                       <div className={styles.menuBox}>
                         <ContextMenu label={`シナリオ「${s.name}」の操作`} items={rowContextItems(s)}>
-                          <IconButton
-                            title={`シナリオ「${s.name}」の操作`}
-                            aria-label={`シナリオ「${s.name}」の操作`}
-                            aria-expanded={openMenuId === s.id}
-                            onClick={() => setOpenMenuId((current) => (current === s.id ? null : s.id))}
-                          >
-                            <MoreHorizontal size={16} aria-hidden="true" />
-                          </IconButton>
+                          <RowMenu
+                            label={`シナリオ「${s.name}」の操作`}
+                            items={rowMenuItems(s)}
+                            open={openMenuId === s.id}
+                            onOpenChange={(next) => setOpenMenuId(next ? s.id : null)}
+                          />
                         </ContextMenu>
-                        <ActionMenu
-                          open={openMenuId === s.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={`シナリオ「${s.name}」の操作`}
-                          items={rowMenuItems(s)}
-                        />
                       </div>
                     </Td>
                   </Tr>

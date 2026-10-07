@@ -33,7 +33,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import TargetMissing from '@/components/shared/target-missing'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { TextInput } from '@/components/shared/form-controls'
+import { TextField } from '@/components/shared/text-field'
 import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
@@ -294,7 +294,7 @@ function ConditionControls({
           {isSavedSearchValueOptionalOp(condition.op) ? (
             <span className={styles.growNote}>値の有無だけで絞ります。入力は不要です。</span>
           ) : (
-            <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値" className={styles.grow} />
+            <TextField value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値" className={styles.grow} />
           )}
         </>
       ) : condition.kind === 'mark' ? (
@@ -384,7 +384,7 @@ function ConditionControls({
             options={[{ value: 'exists', label: '購入がある' }, { value: 'not_exists', label: '購入がない' }]}
             width={120}
           />
-          <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="空欄はすべての購入" aria-label="購入イベントの種類（空欄可）" className={styles.grow} />
+          <TextField value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="空欄はすべての購入" aria-label="購入イベントの種類（空欄可）" className={styles.grow} />
         </>
       ) : condition.kind === 'common_event' ? (
         <>
@@ -395,7 +395,7 @@ function ConditionControls({
             options={[{ value: 'exists', label: '発生がある' }, { value: 'not_exists', label: '発生がない' }]}
             width={120}
           />
-          <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="イベント種別（例：conversion）" aria-label="イベント種別" className={styles.grow} />
+          <TextField value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="イベント種別（例：conversion）" aria-label="イベント種別" className={styles.grow} />
         </>
       ) : condition.kind === 'memo' ? (
         <>
@@ -414,7 +414,7 @@ function ConditionControls({
           {isSavedSearchValueOptionalOp(condition.op) ? (
             <span className={styles.growNote}>有無だけで絞ります。入力は不要です。</span>
           ) : (
-            <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="メモの内容" aria-label="メモの内容" className={styles.grow} />
+            <TextField value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="メモの内容" aria-label="メモの内容" className={styles.grow} />
           )}
         </>
       ) : EXISTENCE_KINDS.has(condition.kind) ? (
@@ -428,7 +428,7 @@ function ConditionControls({
       ) : DATE_RANGE_KINDS.has(condition.kind) ? (
         <DateRangeEditor condition={condition} onChange={onChange} />
       ) : (
-        <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値を入力" className={styles.grow} />
+        <TextField value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値を入力" className={styles.grow} />
       )}
     </>
   )
@@ -881,13 +881,13 @@ export default function SavedSearchEditV8() {
           <h2 className={styles.cardTitle}>名前と共有</h2>
           <label className={styles.field}>
             <span className={styles.labelStrong}>条件名</span>
-            <TextInput value={name} maxLength={80} onChange={(event) => setName(event.target.value)} aria-label="条件名" className={styles.input} />
+            <TextField value={name} maxLength={80} onChange={(event) => setName(event.target.value)} aria-label="条件名" className={styles.input} />
             {/* IDEA-04：同名の検索がすでにあるとき、保存する前に知らせる。 */}
             <DuplicateNameNote duplicates={nameDuplicates} kindLabel="保存した検索" />
           </label>
           <label className={styles.field}>
             <span className={styles.labelStrong}>説明</span>
-            <TextInput value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} />
+            <TextField value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" aria-label="説明" className={styles.input} />
           </label>
           <div className={styles.field}>
             <span className={styles.labelRow}>

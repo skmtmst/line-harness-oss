@@ -13,12 +13,13 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeftRight, ArrowRight, GitFork, MoreHorizontal, Pencil, Plus, TriangleAlert } from 'lucide-react'
+import { ArrowLeftRight, ArrowRight, GitFork, Pencil, Plus, TriangleAlert } from 'lucide-react'
 import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
@@ -81,7 +82,6 @@ function Connections() {
   const [error, setError] = useState('')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
 
   usePageTitle('切替のつながり')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'リッチメニュー', href: '/rich-menus' }])
@@ -163,10 +163,7 @@ function Connections() {
         <Button href={editHref} className={styles.asideButton}><Pencil size={15} aria-hidden="true" />編集する</Button>
         <Button href={`/rich-menus/connections?id=${encodeURIComponent(group.id)}`} aria-current="page" className={styles.asideButton}><GitFork size={15} aria-hidden="true" />切替のつながり</Button>
         <span className={styles.menuAnchor}>
-          <button type="button" className={styles.moreButton} aria-label="そのほかの操作" aria-haspopup="menu" aria-expanded={menuOpen} title="そのほかの操作" onClick={() => setMenuOpen((open) => !open)}>
-            <MoreHorizontal className={styles.icon} aria-hidden="true" />
-          </button>
-          <ActionMenu open={menuOpen} onClose={() => setMenuOpen(false)} ariaLabel="そのほかの操作" items={menuItems} />
+          <RowMenu className={styles.moreButton} label="そのほかの操作" items={menuItems} />
         </span>
       </div>
       <section className={styles.box} aria-labelledby="rm-state">

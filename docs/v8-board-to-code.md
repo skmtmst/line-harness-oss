@@ -305,7 +305,7 @@
 | V8-B | Oub6x | 運営 契約先の詳細 V8 | /ops/tenants/detail | `app/ops/tenants/detail/page.tsx` | （別ファイルなし：page.tsx の中で分けている・または V8 なし） |
 | V8-B | okXoi | 運営 契約先を停止 V8 | /ops/tenants/detail?id=visual-tenant-1 | （page.tsx なし） | — |
 | V8-B | qod6X | 運営 2要素認証を設定 V8 | /ops/two-factor | `app/ops/two-factor/page.tsx` | （別ファイルなし：page.tsx の中で分けている・または V8 なし） |
-| V8-B | D0AOyx | プール管理 プールを作る V8 | /pools/new | `app/pools/new/page.tsx` | `app/pools/new/pool-new-v8.tsx` |
+| V8-B | D0AOyx | プール管理 プールを作る V8 | /pools/new | `app/pools/new/page.tsx` | `v8/settings/pools/create.tsx` |
 | V8 | Iffil | リマインダ 一覧（1152）V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
 | V8 | RrYYJ | ★V8 リマインダ 状態 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
 | V8 | RwVo5 | リマインダ 一時停止ダイアログ V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |

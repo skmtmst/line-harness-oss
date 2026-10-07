@@ -77,7 +77,7 @@ describe('予約の履歴：本人の日時変更・キャンセル（F-6）', (
   });
 
   it('キャンセルは確認してから版を添えて送り、一覧を読み直す', async () => {
-    cancelMyBooking.mockResolvedValue({ lock_version: 5, status: 'cancelled' });
+    cancelMyBooking.mockResolvedValue({ lock_version: 5, status: 'cancelled', calendar_sync: 'not_applicable', meet_sync: 'not_applicable' });
     setup([item()]);
     fireEvent.click(await screen.findByRole('button', { name: 'キャンセル' }));
     expect(await screen.findByText(/トリミング（小型犬）をキャンセルしますか/)).toBeTruthy();
@@ -105,7 +105,7 @@ describe('予約の履歴：本人の日時変更・キャンセル（F-6）', (
         ],
       }],
     });
-    rescheduleMyBooking.mockResolvedValue({ lock_version: 5, status: 'confirmed' });
+    rescheduleMyBooking.mockResolvedValue({ lock_version: 5, status: 'confirmed', calendar_sync: 'not_applicable', meet_sync: 'not_applicable' });
     setup([item()]);
     fireEvent.click(await screen.findByRole('button', { name: '日時を変える' }));
     await vi.waitFor(() => expect(availability).toHaveBeenCalled());

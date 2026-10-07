@@ -22,7 +22,6 @@ import {
   FolderOpen,
   GripVertical,
   Inbox,
-  MoreHorizontal,
   Plus,
   Sparkles,
   Star,
@@ -38,11 +37,13 @@ import { ListPageBody } from '@/components/templates'
 import { FOLDER_COLORS } from '@/components/shared/folder-add-dialog'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { notifyToast } from '@/components/shared/toast'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import Select from '@/components/shared/select'
@@ -54,7 +55,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { mergeVisibleOrder } from '@/components/friend-fields/reorder-utils'
 import TagCsvImportDialog from '@/components/friend-fields/tag-csv-import-dialog'
@@ -369,10 +370,17 @@ export default function TagsTab({
   /* 並び替え。絞り込み中は見えている行だけを入れ替え、隠れた行の位置を保つ。失敗は元に戻す。 */
   const applyTagOrder = async (order: string[]) => {
     const previous = items
-    const result = await api.tags.reorder(order)
-    if (!result.success) {
+    /* 返事が失敗でも、通信が例外で落ちても、元の順へ戻して「もう一度」を出す。 */
+    let message: string | null = null
+    try {
+      const result = await api.tags.reorder(order)
+      if (!result.success) message = `並び順を保存できませんでした（${result.error}）`
+    } catch (caught) {
+      const detail = japaneseDetailOf(caught)
+      message = `並び順を保存できませんでした。${detail ? `${detail}。` : ''}通信を確かめて、もう一度お試しください。`
+    }
+    if (message !== null) {
       setItems(previous)
-      const message = `並び順を保存できませんでした（${result.error}）`
       setActionError(message)
       notifyToast(message, {
         tone: 'error',
@@ -424,7 +432,7 @@ export default function TagsTab({
       }
       notifyToast(next ? `「${tag.name}」を一覧に出します` : `「${tag.name}」を一覧から外します`, {
         actionLabel: '元に戻す',
-        onAction: () => { void toggleStar({ ...tag, isStarred: next }) },
+        onAction: () => { void toggleStar({ ...tag, isStarred: next, version: typeof version === 'number' ? version : tag.version }) },
       })
     } catch (reason) {
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, isStarred: tag.isStarred } : item))
@@ -816,9 +824,9 @@ export default function TagsTab({
                       >
                         {/* 閲覧のみ：つまみは隠し、幅だけ空けて名前の位置を保つ */}
                         {canEdit ? (
-                          <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}>
+                          <ReorderHandle label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}>
                             <GripVertical className={styles.gripIcon} aria-hidden="true" />
-                          </ReorderGrip>
+                          </ReorderHandle>
                         ) : (
                           <span className={styles.gripSpace} aria-hidden="true"><GripVertical className={styles.gripIcon} /></span>
                         )}
@@ -862,25 +870,15 @@ export default function TagsTab({
                 <Td className={styles.colMenu} onClick={(event) => event.stopPropagation()}>
                   {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                   {canEdit ? <span className={styles.menuAnchor}>
-                    <button
-                      type="button"
+                    <RowMenu
                       className={styles.menuButton}
-                      aria-label={`タグ「${tag.name}」の操作`}
-                      aria-haspopup="menu"
-                      aria-expanded={openMenuId === tag.id}
-                      title={`タグ「${tag.name}」の操作`}
-                      onClick={() => {
-                        setMenuMoveFor(null)
-                        setOpenMenuId((current) => (current === tag.id ? null : tag.id))
-                      }}
-                    >
-                      <MoreHorizontal className={styles.menuIcon} aria-hidden="true" />
-                    </button>
-                    <ActionMenu
-                      open={openMenuId === tag.id}
-                      onClose={() => { setOpenMenuId(null); setMenuMoveFor(null) }}
-                      ariaLabel={`タグ「${tag.name}」の操作`}
+                      label={`タグ「${tag.name}」の操作`}
                       items={rowMenuItems(tag)}
+                      open={openMenuId === tag.id}
+                      onOpenChange={(next) => {
+                        setMenuMoveFor(null)
+                        setOpenMenuId(next ? tag.id : null)
+                      }}
                     />
                   </span> : null}
                 </Td>

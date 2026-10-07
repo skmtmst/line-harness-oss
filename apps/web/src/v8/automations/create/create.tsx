@@ -12,7 +12,7 @@ import {
 } from '@/lib/api'
 import Link from 'next/link'
 import {
-  ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, FilePen, MessageCircle, MoreHorizontal, Pencil, Play,
+  ArrowDown, ArrowLeftRight, ArrowUp, ChevronDown, FilePen, MessageCircle, Pencil, Play,
   RefreshCw, Tag as TagIcon, Trash2, TriangleAlert, UserPlus, UserRound, Zap,
 } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
@@ -21,7 +21,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import HelpTip from '@/components/shared/help-tip'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -2682,21 +2682,11 @@ export function NewAutomationV8({
                 </span>
                 {canEdit ? (
                   <span className={styles.menuBox}>
-                    <button
-                      type="button"
+                    <RowMenu
                       className={styles.menuButton}
-                      aria-label={menuLabel}
-                      aria-haspopup="menu"
-                      aria-expanded={actionMenuKey === row.key}
-                      title={menuLabel}
-                      onClick={() => setActionMenuKey((current) => (current === row.key ? null : row.key))}
-                    >
-                      <MoreHorizontal size={16} aria-hidden="true" />
-                    </button>
-                    <ActionMenu
+                      label={menuLabel}
                       open={actionMenuKey === row.key}
-                      onClose={() => setActionMenuKey(null)}
-                      ariaLabel={menuLabel}
+                      onOpenChange={(next) => setActionMenuKey(next ? row.key : null)}
                       items={[
                         { id: 'edit', label: '中身を直す', icon: <Pencil size={14} />, onSelect: () => { setActionMenuKey(null); setEditingActionKey(row.key) } },
                         { id: 'up', label: '上へ', icon: <ArrowUp size={14} />, disabled: index === 0, onSelect: () => { setActionMenuKey(null); moveAction(row.key, -1) } },

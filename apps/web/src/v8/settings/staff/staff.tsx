@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Eye, MoreHorizontal, UserPlus, X } from 'lucide-react'
+import { Eye, UserPlus, X } from 'lucide-react'
 import Link from 'next/link'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import LoginAudit from '@/components/staff/login-audit'
@@ -22,8 +22,8 @@ import NotificationSwitch from '@/components/ui/notification-switch'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
-import IconButton from '@/components/shared/icon-button'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import styles from './staff.module.css'
 import StatusBadge from '@/components/shared/status-badge'
 import { useAccount } from '@/contexts/account-context'
@@ -1020,10 +1020,7 @@ function StaffPageHost() {
                 <span className={styles.colRole} role="cell">{user.status === 'suspended' ? <span className={styles.roleChip} data-role="view_only">止めた</span> : <RoleChip role={roleOf(user)} />}</span>
                 <span className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</span>
                 <span className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
-                  <IconButton className={styles.menuButton} aria-label={`${user.name}の操作`} aria-haspopup="menu" aria-expanded={openMenuId === user.id} onClick={() => setOpenMenuId(openMenuId === user.id ? null : user.id)}>
-                    <MoreHorizontal size={16} aria-hidden="true" />
-                  </IconButton>
-                  <ActionMenu open={openMenuId === user.id} onClose={() => setOpenMenuId(null)} ariaLabel={`${user.name}の操作`} items={items} />
+                  <RowMenu className={styles.menuButton} label={`${user.name}の操作`} items={items} open={openMenuId === user.id} onOpenChange={(next) => setOpenMenuId(next ? user.id : null)} />
                 </span>
               </div>
             )

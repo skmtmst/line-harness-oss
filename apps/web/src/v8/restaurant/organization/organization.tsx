@@ -135,7 +135,7 @@ function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel }: {
         <StoreLineAccountSelect accounts={accounts} stores={stores} currentStore={store} />
       </div>
       <div className={styles.formActions}>
-        <Button type="button" onClick={onCancel}>キャンセル</Button>
+        <Button type="button" disabled={busy} onClick={onCancel}>キャンセル</Button>
         <Button variant="primary" type="submit" disabled={busy}>{store ? '保存する' : '店舗を登録する'}</Button>
       </div>
     </form>
@@ -302,7 +302,7 @@ function MemberForm({ member, stores, busy, onSubmit, onCancel, login }: {
       </div>
       {login}
       <div className={`${styles.formActions} ${styles.memberActions}`}>
-        <Button type="button" onClick={onCancel}>キャンセル</Button>
+        <Button type="button" disabled={busy} onClick={onCancel}>キャンセル</Button>
         <Button variant="primary" type="submit" disabled={busy}>{member ? null : <Plus aria-hidden className={styles.buttonIcon} />}{member ? '保存する' : '追加する'}</Button>
       </div>
     </form>
@@ -429,6 +429,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           </Panel>
           <Dialog
             open={showStoreForm || editingStore !== undefined}
+            busy={busy}
             designNode="vCEKM"
             title={editingStore ? `${editingStore.name}を編集` : '店舗を追加する'}
             onCancel={closeStoreDialog}
@@ -494,6 +495,7 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
           </Panel>
           <Dialog
             open={showMemberForm || editingMember !== undefined}
+            busy={busy}
             designNode="ou60i"
             designWidth={560}
             designTop={140}

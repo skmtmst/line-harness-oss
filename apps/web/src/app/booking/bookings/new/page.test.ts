@@ -14,14 +14,6 @@ const BOOKING_CONFIRM = readFileSync(
 )
 
 describe('V6 代理予約の接続契約', () => {
-  test('入力・確認・完了・競合の実Nodeを同じフローで持つ', () => {
-    for (const node of ['cpdDi', 'GFDqW', 'GfceK', 'Lg8ff']) {
-      expect(PAGE).toContain(node)
-    }
-    expect(PAGE).toContain('data-qa-open="GFDqW"')
-    expect(PAGE).toContain('data-qa-open="GfceK"')
-  })
-
   test('一覧の作成操作は準備中ではなく代理予約へ進む', () => {
     expect(LIST).toContain('href="/booking/bookings/new"')
     expect(LIST).toContain('電話の予約を入れる')

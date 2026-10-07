@@ -127,8 +127,9 @@ async function openSettings() {
 }
 
 function rowOrder(): string[] {
-  return screen.getAllByRole('button', { name: /を並び替える/ })
-    .map((el) => el.getAttribute('aria-label') ?? '')
+  // 保存中はつまみを出さない（共通の並び替えの決まり）ので、行そのものの並びを読む。
+  return [...document.querySelectorAll<HTMLElement>('[data-reorder-id]')]
+    .map((el) => el.textContent ?? '')
 }
 
 beforeEach(() => {

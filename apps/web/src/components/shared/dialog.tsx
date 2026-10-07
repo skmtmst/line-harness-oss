@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import React, { useContext, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, X } from 'lucide-react'
 import Button from './button'
 import IconButton from './icon-button'
-import { useOverlayFocus, useV8Leave } from './overlay-utils'
+import { OverlayDepthContext, useOverlayFocus, useV8Leave } from './overlay-utils'
 import styles from './dialog.module.css'
 
 export type DialogProps = {
@@ -106,6 +106,7 @@ export default function Dialog({
   primaryAction = 'confirm',
   footerAlign,
 }: DialogProps) {
+  const depth = useContext(OverlayDepthContext)
   const titleId = useId()
   const descriptionId = useId()
   const [mounted, setMounted] = useState(false)
@@ -231,7 +232,7 @@ export default function Dialog({
     </div>
   )
 
-  if (!modal) return panel
+  if (!modal) return <OverlayDepthContext.Provider value={depth + 1}>{panel}</OverlayDepthContext.Provider>
   const overlay = (
     <div className={`${styles.overlay} ${confirmation && compact ? styles.confirmationOverlay : ''}`} role="presentation" data-closing={leaving || undefined} data-design-node={designNode} data-design-top={designTop ? '' : undefined} style={designTop ? ({ '--dialog-design-top': `${designTop}px` } as CSSProperties) : undefined} onMouseDown={(event) => {
       if (!busy && event.target === event.currentTarget) onCancel()
@@ -239,7 +240,7 @@ export default function Dialog({
       {panel}
     </div>
   )
-  return mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay
+  return <OverlayDepthContext.Provider value={depth + 1}>{mounted && typeof document !== 'undefined' ? createPortal(overlay, document.body) : overlay}</OverlayDepthContext.Provider>
 }
 
 /** q3DPdz の手順。済みは戻れるボタン、現在は aria-current で伝える。 */

@@ -6,7 +6,7 @@
  * 枠は型（PageFrame）。頭の中にタブを持つ形（絵の「板の頭」）は型の頭に無いので、ここで組む。
  * 読む口・操作は今の画面（app/reminders/detail/detail-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
  */
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -17,7 +17,6 @@ import {
   Copy,
   Download,
   Info,
-  MoreHorizontal,
   Pause,
   Pencil,
   Play,
@@ -41,12 +40,12 @@ import { csvCell } from '@/lib/presentation'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
 import FilterChip from '@/components/shared/filter-chip'
-import IconButton from '@/components/shared/icon-button'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -223,8 +222,6 @@ function ReminderDetailV8() {
   const [missing, setMissing] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
   const [exporting, setExporting] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const menuAnchorRef = useRef<HTMLSpanElement>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -548,25 +545,14 @@ function ReminderDetailV8() {
                 {isUnpublishedDraft ? '編集を続ける' : '編集する'}
               </Button>
             ) : null}
-            <span ref={menuAnchorRef} className={styles.menuAnchor}>
-              <IconButton
+            <span className={styles.menuAnchor}>
+              <RowMenu
                 className={styles.menuButton}
-                aria-label={`リマインダ「${data.reminder.name}」のその他の操作`}
+                label={`リマインダ「${data.reminder.name}」のその他の操作`}
                 title="その他の操作"
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-                onClick={() => setMenuOpen((open) => !open)}
-              >
-                <MoreHorizontal size={16} aria-hidden="true" />
-              </IconButton>
+                items={menuItems}
+              />
             </span>
-            <ActionMenu
-              open={menuOpen}
-              onClose={() => setMenuOpen(false)}
-              ariaLabel={`リマインダ「${data.reminder.name}」のその他の操作`}
-              items={menuItems}
-              anchorRef={menuAnchorRef}
-            />
           </div>
 
           <CreateSummaryCard

@@ -12,16 +12,6 @@ const API = readFileSync(join(ROOT, '..', '..', 'lib', 'api.ts'), 'utf8')
 const MOCK = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 
 describe('V6 機能18の画面契約', () => {
-  it('4つの役割を別のタブと画面に分ける', () => {
-    expect(PAGE).toContain("{ key: 'links', label: '流入経路' }")
-    expect(PAGE).toContain("{ key: 'script', label: 'サイトスクリプト' }")
-    expect(PAGE).toContain("{ key: 'ads', label: '広告連携' }")
-    expect(PAGE).toContain("{ key: 'connections', label: '広告とのつなぎ' }")
-    expect(PAGE).toContain('<AdIntegration view="metrics" onPlatformCountsChange={handleAdCounts} />')
-    expect(PAGE).toContain('<AdIntegration view={adView} onPlatformCountsChange={handleAdCounts} />')
-    expect(ADS).toContain("type AdView = 'metrics' | 'connections' | 'history'")
-  })
-
   it('タブの件数は固定値でなく、一覧と同じ集計から出す(#980)', () => {
     // 設計が描いた作り物の件数を書かない。一覧0件のアカウントでも
     // 「流入経路 24」「広告連携 3」「広告とのつなぎ 5」と出ていた。

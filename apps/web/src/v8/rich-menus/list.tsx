@@ -23,7 +23,6 @@ import {
   Hand,
   Image as ImageIcon,
   ListOrdered,
-  MoreHorizontal,
   Plus,
   Split,
   TriangleAlert,
@@ -47,7 +46,6 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import Notice from '@/components/shared/notice'
@@ -57,11 +55,12 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import {
@@ -1045,14 +1044,13 @@ export default function RichMenusListV8() {
                     <span className={styles.orderInner}>
                       {/* 閲覧のみ：つまみは隠し、幅だけ空けて順番の数字の位置を保つ */}
                       {!canEdit && <span className={styles.gripSpace} aria-hidden="true">⠿</span>}
-                      {canEdit && <ReorderGrip
+                      {canEdit && <ReorderHandle
                         label={g.name}
-                        disabled={reorderDisabledReason !== null}
-                        disabledReason={reorderDisabledReason ?? undefined}
+                        disabledReason={reorderDisabledReason}
                         onMove={(direction) => void keyboardMove(g.id, direction)}
                       >
                         <span aria-hidden>⠿</span>
-                      </ReorderGrip>}
+                      </ReorderHandle>}
                       <span className={styles.orderNumber}>{g.targetingPriority + 1}</span>
                     </span>
                   </Td>
@@ -1112,20 +1110,12 @@ export default function RichMenusListV8() {
                     </Td>
                   <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                     <div className={styles.menuBox}>
-                      <IconButton
+                      <RowMenu
                         className={styles.menuBtn}
-                        title={menuLabel}
-                        aria-label={menuLabel}
-                        aria-expanded={openMenuId === g.id}
-                        onClick={() => setOpenMenuId((current) => (current === g.id ? null : g.id))}
-                      >
-                        <MoreHorizontal size={16} aria-hidden="true" />
-                      </IconButton>
-                      <ActionMenu
-                        open={openMenuId === g.id}
-                        onClose={() => setOpenMenuId(null)}
-                        ariaLabel={menuLabel}
+                        label={menuLabel}
                         items={rowMenuItems(g)}
+                        open={openMenuId === g.id}
+                        onOpenChange={(next) => setOpenMenuId(next ? g.id : null)}
                       />
                     </div>
                   </Td>

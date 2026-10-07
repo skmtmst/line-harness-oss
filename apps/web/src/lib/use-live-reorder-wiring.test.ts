@@ -24,6 +24,15 @@ const SCREENS = [
 describe('並べ替えのある一覧は付いてくる動きを使う', () => {
   it.each(SCREENS)('%s', (file) => {
     const source = readFileSync(join(SRC, file), 'utf8')
+    // 共通の並び替え（components/shared/reorder-handle の useReorder）に乗った画面は、
+    // 付いてくる動きを部品の中で使う（下の「共通の並び替え」で部品側を確かめる）。
+    if (source.includes("from '@/components/shared/reorder-handle'") && /useReorder\(/.test(source)) {
+      expect(source).toMatch(/\.shown\.map\(/)
+      expect(source).toMatch(/\.rowProps\(/)
+      expect(source).toMatch(/\.handleProps\(/)
+      expect(source).toMatch(/reorderKey=\{\w+\.shown|useFlipRows\(/)
+      return
+    }
     expect(source).toContain("from '@/lib/use-live-reorder'")
     expect(source).toMatch(/useLiveReorder\(/)
     expect(source).toMatch(/liveOrder\.shown\.map\(/)
@@ -33,5 +42,17 @@ describe('並べ替えのある一覧は付いてくる動きを使う', () => {
     expect(source).toContain('onDragEnd={() => setDragId(null)}')
     // 表の本体が滑らかに動く（RovingTbody の reorderKey か、useFlipRows のどちらか）
     expect(source).toMatch(/reorderKey=\{liveOrder\.shown|useFlipRows\(/)
+  })
+})
+
+describe('共通の並び替え（useReorder）は付いてくる動きを使う', () => {
+  it('components/shared/reorder-handle.tsx', () => {
+    const source = readFileSync(join(SRC, 'components/shared/reorder-handle.tsx'), 'utf8')
+    expect(source).toContain("from '@/lib/use-live-reorder'")
+    expect(source).toMatch(/useLiveReorder\(/)
+    expect(source).toMatch(/'data-reorder-id': id/)
+    expect(source).toMatch(/onDragEnter: \(\) => live\.enter\(id\)/)
+    expect(source).toMatch(/live\.dropTarget\(id\)/)
+    expect(source).toMatch(/onDragEnd: \(\) => \{ setDragId\(null\)/)
   })
 })

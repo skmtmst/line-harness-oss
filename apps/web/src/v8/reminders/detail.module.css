@@ -63,7 +63,8 @@
 .sideActions { display: flex; align-items: center; gap: var(--tpl-rm-side-row-gap); }
 .sideAction { flex: 1 1 0; min-width: 0; }
 .menuAnchor { display: inline-flex; flex: none; }
-.menuButton { width: var(--tpl-rm-icon-btn); height: var(--tpl-rm-icon-btn); }
+/* 「…」は共通の RowMenu。大きさを共通の印ボタンより強く当てる。 */
+.menuAnchor > button.menuButton { width: var(--tpl-rm-icon-btn); height: var(--tpl-rm-icon-btn); flex: 0 0 var(--tpl-rm-icon-btn); }
 .valueState[data-tone='ok'] { color: var(--color-accent-deep); }
 .valueDanger { color: var(--color-danger); }
 

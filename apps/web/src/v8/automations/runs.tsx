@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Activity, Bookmark, Download, Filter, Layers, MoreHorizontal, TriangleAlert } from 'lucide-react'
+import { Activity, Bookmark, Download, Filter, Layers, TriangleAlert } from 'lucide-react'
 import { api, ApiError, downloadApiFile, fetchApi, type AutomationRunDetail } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -20,13 +20,13 @@ import { formatNumber } from '@/lib/format'
 import { ListPage } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel from '@/components/shared/detail-panel'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -535,19 +535,10 @@ export default function AutomationRunsV8() {
                     <Td className={styles.colOps}>
                       <div className={styles.opsBox}>
                         <Button onClick={() => setSelectedRun(run)}>中身を見る</Button>
-                        <IconButton
-                          title={menuLabel}
-                          aria-label={menuLabel}
-                          aria-haspopup="menu"
-                          aria-expanded={openMenuId === run.id}
-                          onClick={() => setOpenMenuId((current) => (current === run.id ? null : run.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
-                        <ActionMenu
+                        <RowMenu
+                          label={menuLabel}
                           open={openMenuId === run.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={menuLabel}
+                          onOpenChange={(next) => setOpenMenuId(next ? run.id : null)}
                           items={rowMenuItems(run).map((item) => ({ ...item, onSelect: () => { setOpenMenuId(null); item.onSelect() } }))}
                         />
                       </div>

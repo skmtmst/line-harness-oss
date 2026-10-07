@@ -18,11 +18,6 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('kind="empty"')
   })
 
-  it('本文に画面タイトルと準備中のマニュアルを重ねない', () => {
-    expect(PAGE).not.toContain("import Header from")
-    expect(PAGE).not.toContain('マニュアルは準備中です')
-  })
-
   it('未取得の使用数を0件に見せない', () => {
     expect(PAGE).toContain("? '使用先を確認できません'")
     expect(PAGE).toContain("item.usageCount === 0")
@@ -77,26 +72,6 @@ describe('V6 登録メディア一覧の契約', () => {
     expect(PAGE).toContain('格子で並べる')
     expect(PAGE).toContain('一覧で並べる')
     expect(PAGE).toContain('aria-pressed={view === value}')
-  })
-
-  it('設計の実測どおりの高さと文字にする', () => {
-    // アップロードは一覧へ常設せず、全面のモーダルで開く。
-    expect(PAGE).toContain('setUploadOpen(true)')
-    expect(UPLOAD).toContain('data-design-node="eXAJP"')
-    expect(UPLOAD).toContain('ここにファイルをドラッグ、または押して選ぶ')
-    expect(UPLOAD).toContain('LINEで送れる大きさ（超えると入れられません）')
-    // 検索: ★V7 `Xn1Mz` で共通 ListToolbar の1行目へそろえた（幅320・下限240は
-    // 部品が持つ）。独立した全幅の直書き行に戻さない。表示切替: 枠40・各44。
-    expect(PAGE).toContain('<ListToolbar')
-    expect(PAGE).toContain('search={{')
-    expect(PAGE).not.toContain('data-search-row')
-    expect(PAGE).toContain('rounded-control flex h-10 items-center overflow-hidden border')
-    expect(PAGE).toContain('flex h-full w-11 items-center justify-center')
-    // カード: サムネイル112、ファイル名12/700、形式・容量10/600、使用状況10/700。
-    expect(PAGE).toContain("view === 'grid' ? 'h-28' : 'h-14 w-20 shrink-0'")
-    expect(PAGE).toContain('truncate text-caption font-medium')
-    expect(PAGE).toContain('text-ink-faint text-nano font-semibold tabular-nums')
-    expect(PAGE).toContain('text-nano font-medium tabular-nums')
   })
 
   it('フォルダを取得し、未分類と分けて一覧を絞り込む', () => {

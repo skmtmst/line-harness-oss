@@ -34,7 +34,6 @@ import {
   Inbox,
   Layers,
   MessageSquare,
-  MoreHorizontal,
   Pause,
   Pencil,
   Square,
@@ -64,7 +63,6 @@ import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shar
 import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import KpiBand from '@/components/shared/kpi-band'
@@ -77,11 +75,12 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import Pagination from '@/components/shared/pagination'
-import ReorderGrip from '@/components/friend-fields/reorder-grip'
+import ReorderHandle from '@/components/shared/reorder-handle'
 import { movePriorityUpdates } from './order'
 import {
   LOAD_STATE_WORDS,
@@ -1213,14 +1212,13 @@ export default function AutoRepliesListV8() {
                     onDragStart={() => setDragId(r.id)}
                     onDragEnd={() => setDragId(null)}
                   >
-                    {canEdit && <ReorderGrip
+                    {canEdit && <ReorderHandle
                       label={name}
-                      disabled={sortKey !== 'priority'}
-                      disabledReason={sortKey !== 'priority' ? '並びを「評価順」にすると動かせます' : undefined}
+                      disabledReason={sortKey !== 'priority' ? '並びを「評価順」にすると動かせます' : null}
                       onMove={(direction) => keyboardMove(r.id, direction)}
                     >
                       <span aria-hidden>⠿</span>
-                    </ReorderGrip>}
+                    </ReorderHandle>}
                   </Td>
                   <NameCell
                     name={<div className={styles.nameRow}>
@@ -1318,21 +1316,13 @@ export default function AutoRepliesListV8() {
                         label={`自動応答「${name}」の操作`}
                         items={rowContextItems(r)}
                       >
-                        <IconButton
-                          title={`自動応答「${name}」の操作`}
-                          aria-label={`自動応答「${name}」の操作`}
-                          aria-expanded={openMenuId === r.id}
-                          onClick={() => setOpenMenuId((current) => (current === r.id ? null : r.id))}
-                        >
-                          <MoreHorizontal size={16} aria-hidden="true" />
-                        </IconButton>
+                        <RowMenu
+                          label={`自動応答「${name}」の操作`}
+                          items={rowMenuItems(r)}
+                          open={openMenuId === r.id}
+                          onOpenChange={(next) => setOpenMenuId(next ? r.id : null)}
+                        />
                       </ContextMenu>
-                      <ActionMenu
-                        open={openMenuId === r.id}
-                        onClose={() => setOpenMenuId(null)}
-                        ariaLabel={`自動応答「${name}」の操作`}
-                        items={rowMenuItems(r)}
-                      />
                       </div>
                     </Td>
                 </Tr>

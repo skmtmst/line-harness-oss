@@ -1,5 +1,6 @@
 'use client'
 
+import { partialFailureLabels } from '@/components/dashboard/partial-failure-labels'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -1727,7 +1728,7 @@ function DashboardPageInner() {
       */}
       {data?.partialFailures?.length ? (
         <p className="text-ink-secondary text-xs" role="status">
-          一部のデータを{STATE_TEXT.error}（{data.partialFailures.join('、')}）。0件としては表示していません。
+          一部のデータを{STATE_TEXT.error}（{partialFailureLabels(data.partialFailures)}）。0件としては表示していません。
         </p>
       ) : null}
 

@@ -4383,6 +4383,14 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/chats') return { success: true, data: CHATS }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
+  /* 受信箱の件数（実口 /api/chats/quick-counts と同じ形）。状態で絞ると、その状態の会話だけ数える。 */
+  if (pathname === '/api/chats/quick-counts') {
+    const status = query.get('status')
+    const rows = status ? CHATS.filter((chat) => chat.status === status) : CHATS
+    const reply = rows.filter((chat) => chat.status === 'unread').length
+    const counts = { all: rows.length, reply, overdue: reply }
+    return { success: true, data: { ...counts, line: counts, email: { all: 0, reply: 0, overdue: 0 } } }
+  }
   /*
     メールの会話の中身。実口（`support-inbox.ts`）と同じ
     `{thread, messages, …}` の形。無いと既定の `{items,total,…}` に落ち、

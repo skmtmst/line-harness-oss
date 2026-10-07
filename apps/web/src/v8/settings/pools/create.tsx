@@ -19,6 +19,8 @@ import { TextField } from '@/components/shared/text-field'
 import { createPageErrorMessage, createPageReturnHref } from '@/components/shared/create-page'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { api } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import styles from './create.module.css'
 
@@ -46,6 +48,11 @@ export default function PoolCreateV8() {
   const [accountsError, setAccountsError] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  const guard = useUnsavedGuard({
+    dirty: name !== '' || slug !== '' || (accounts.length > 0 && accountIds.join(',') !== accounts[0].id),
+    busy: saving,
+  })
 
   /* 一覧が取れないときに「0件」と見せない。失敗したことと読み直す口を出す。 */
   const loadAccounts = useCallback(async () => {
@@ -96,6 +103,7 @@ export default function PoolCreateV8() {
     try {
       const res = await api.pools.create({ name: name.trim(), slug: slug.trim(), activeAccountId: accountIds[0], accountIds })
       if (!res.success) throw new Error(res.error)
+      guard.disarm()
       router.push(createPageReturnHref(LIST_HREF, res.data.id))
     } catch (e) {
       setError(createPageErrorMessage(e))
@@ -105,6 +113,7 @@ export default function PoolCreateV8() {
   }
 
   return (
+    <>
     <SbSettingsScreen
       boardId="D0AOyx"
       layout="narrow-nav"
@@ -197,5 +206,7 @@ export default function PoolCreateV8() {
         </aside>
       </form>
     </SbSettingsScreen>
+    <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="入力したプールの内容" busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
+    </>
   )
 }

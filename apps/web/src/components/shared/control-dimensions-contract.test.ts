@@ -6,7 +6,8 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 describe('Pencil V6 の入力・選択・押し口規定', () => {
   it('役割ごとの高さと白背景を共通部品で維持する', () => {
     const button = read('./button.module.css')
-    const formControls = read('./form-controls.module.css')
+    // 入力欄の正本は text-field.module.css（form-controls の TextInput・TextArea はその包み）。
+    const textField = read('./text-field.module.css')
     const select = read('./select.module.css')
     const selectTsx = read('./select.tsx')
     const search = read('./search-field.module.css')
@@ -18,8 +19,8 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
      */
     expect(button).toMatch(/\.standard\s*{[^}]*height:\s*40px/s)
     expect(button).toMatch(/\.field\s*{[^}]*height:\s*40px/s)
-    expect(formControls).toMatch(/\.control\s*{[^}]*background:\s*var\(--color-canvas\)/s)
-    expect(formControls).toMatch(/\.input\s*{[^}]*height:\s*40px/s)
+    expect(textField).toMatch(/\.field\s*{[^}]*background:\s*var\(--color-canvas\)/s)
+    expect(textField).toMatch(/\.single\s*{[^}]*height:\s*40px/s)
     expect(select).toMatch(/\.trigger\s*{[^}]*height:\s*40px/s)
     expect(select).toMatch(/background:\s*var\(--color-canvas\)/)
     // 開いた候補は DOM に描き、矢印はアイコンで出す（ブラウザ任せにしない）。

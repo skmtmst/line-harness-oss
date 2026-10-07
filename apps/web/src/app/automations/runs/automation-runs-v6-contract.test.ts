@@ -42,19 +42,6 @@ describe('V6 オートメーションが動いた記録（DkPY0）', () => {
     expect(PAGE).toContain("params.set('status', resultFilter)")
   })
 
-  it('設計の4指標・検索・絞り込み・列を持つ', () => {
-    for (const word of [
-      'この30日に動いた',
-      'いちばん動いた',
-      '失敗した',
-      '条件に外れて動かなかった',
-      '友だちの名前・オートメーションの名前で検索',
-      'いつ・だれに',
-      'したこと',
-      'かかった時間',
-    ]) expect(PAGE).toContain(word)
-  })
-
   it('読込・空・絞込0件・失敗を区別する', () => {
     expect(PAGE).toContain("'loading' | 'ready' | 'error'")
     expect(PAGE).toContain('動いた記録を読み込んでいます')

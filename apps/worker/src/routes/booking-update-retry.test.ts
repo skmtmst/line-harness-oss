@@ -270,13 +270,41 @@ describe('PATCH /api/booking/admin/bookings/:id (N-389)', () => {
     insertBooking(sqlite,{ id:'b1',friend:'f1' });
     const { app, env } = makeApp(db);
     const move = (staffId: string) => app.request('/api/booking/admin/bookings/b1/reassign?account_id=acc1',{ method:'POST',headers:{ 'Content-Type':'application/json' },body:JSON.stringify({ staffId,notifyCustomer:true }) },env as never,execCtx);
-    expect((await move('s2')).status).toBe(200);
+    const moved = await move('s2');
+    expect(moved.status).toBe(200);
+    expect(await moved.json()).toMatchObject({ customerNotification: { channel: 'line', status: 'queued', guidance: null } });
     expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
     sqlite.prepare('INSERT INTO operation_control_sets (scope_key,version,states_json,updated_at) VALUES (?,?,?,?)').run('*',1,JSON.stringify({ broadcast_dispatch:'stopped' }),new Date().toISOString());
     const stopped = await move('s1');
     expect(stopped.status).toBe(200);
     expect(await stopped.json()).toMatchObject({ change_notification:'not_applicable',change_notification_reason:'sending_stopped' });
     expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
+  });
+
+  test('LINE未連携の移動は電話連絡を案内し、通知OFFなら案内も送信も行わない', async () => {
+    insertBooking(sqlite,{ id:'b1',customer:'customer-1' });
+    const { app, env } = makeApp(db);
+    const move = (staffId: string, notifyCustomer: boolean) => app.request('/api/booking/admin/bookings/b1/reassign?account_id=acc1', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({staffId,notifyCustomer}),
+    }, env as never, execCtx);
+    const moved = await move('s2', true);
+    expect(moved.status).toBe(200);
+    expect(await moved.json()).toMatchObject({ customerNotification: { channel:'phone',status:'action_required',guidance:expect.stringContaining('電話') } });
+    const silent = await move('s1', false);
+    expect(silent.status).toBe(200);
+    expect(await silent.json()).toMatchObject({ customerNotification: { channel:'phone',status:'not_requested',guidance:null } });
+    expect(notifierMocks.sendBookingNotification).not.toHaveBeenCalled();
+  });
+
+  test('予約管理の編集権限がないスタッフは移動も通知もできない', async () => {
+    insertBooking(sqlite,{ id:'b1',friend:'f1' });
+    const { app, env } = makeApp(db, 'staff');
+    const result = await app.request('/api/booking/admin/bookings/b1/reassign?account_id=acc1', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({staffId:'s2',notifyCustomer:true}),
+    }, env as never, execCtx);
+    expect(result.status).toBe(403);
+    expect(sqlite.prepare('SELECT staff_id,lock_version FROM bookings WHERE id=?').get('b1')).toEqual({staff_id:'s1',lock_version:0});
+    expect(notifierMocks.sendBookingNotification).not.toHaveBeenCalled();
   });
 
   test('移動先が埋まっていれば409で旧スタッフを保つ', async () => {

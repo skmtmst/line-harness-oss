@@ -1,5 +1,7 @@
 /*
- * Pencil V5を共通基盤とし、V6がある対象はV6を優先して、実際のCSSと突き合わせる。
+ * 部品の設計値（design/design-parts.json）と実際のCSSを突き合わせる。
+ * 見た目の正本は ★V8 の絵。ここの部品の値は本番の v7 の見た目を守るためのもの
+ * （V5/V6 を優先する決まりは 2026-10-08 に外した）。V8 部品の実寸は末尾で別に見る。
  *
  * これが無かったため「35項目一致」という報告が再現できなかった。
  * 手元でその場かぎりに数えたものは証拠にならないので、ここへ置く。
@@ -160,32 +162,11 @@ export function checkShape(data) {
   const req = data.required
   if (!req) return ['design-parts.json に required がありません']
 
-  const priority = data.$designPriority
-  if (!priority || priority.base !== 'V5' || !String(priority.override ?? '').includes('V6')) {
-    problems.push('設計の優先順位は「共通基盤V5、対象にV6があればV6優先」でなければなりません')
-  }
-  if (!priority?.tokenResult || !priority?.lastCheckedAt) {
-    problems.push('$designPriority に tokenResult または lastCheckedAt がありません')
-  }
-
-  const v6 = data.$v6Verification
-  const v6Nodes = v6?.representativeNodes
-  if (!Array.isArray(v6Nodes) || v6Nodes.length < (req.v6RepresentativeNodes ?? 1)) {
-    problems.push(
-      `V6代表ノードが ${Array.isArray(v6Nodes) ? v6Nodes.length : 0} 件。必須 ${req.v6RepresentativeNodes ?? 1} 件を下回っています`,
-    )
-  }
-  if (!v6?.summary || !v6?.lastCheckedAt) {
-    problems.push('$v6Verification に summary または lastCheckedAt がありません')
-  }
-  if (!v6?.partResult) {
-    problems.push('$v6Verification に partResult がありません')
-  }
-  for (const id of req.v6PartNodes ?? []) {
-    if (typeof v6?.partReferences?.[id] !== 'number') {
-      problems.push(`V6部品 ${id} の参照数が記録されていません`)
-    }
-  }
+  /*
+   * 2026-10-08: 「共通基盤 V5・V6 があれば V6 優先」の決まり（$designPriority・
+   * $v6Verification）の検査は外した。見た目の正本は ★V8 の絵（docs/v8-design-rules.md）。
+   * ここに残る部品の値の照合は、本番の v7 の見た目を守るためのもの。
+   */
 
   const tokens = Object.keys(data.tokens || {}).filter((k) => !k.startsWith('$'))
   const parts = Object.keys(data.parts || {}).filter((k) => !k.startsWith('$'))
@@ -265,7 +246,6 @@ export function checkInventoryShape(data, inventory) {
   const CLASSIFICATION = declaration.requiredClassifications ?? ['global', 'feature', 'screen']
   const STATUS = ['pending', 'implemented', 'active']
   const ROLE = ['canonical', 'sample', 'deprecated']
-  const V6 = ['same', 'variant', 'unverified']
   const ACTION = ['reuse', 'implement', 'merge', 'replace', 'investigate']
   const usedClassifications = new Set()
   const activePencilNodes = Object.entries(data.parts ?? {})
@@ -298,12 +278,6 @@ export function checkInventoryShape(data, inventory) {
     }
     if (!STATUS.includes(component.status)) problems.push(`${prefix}: status が不正です（${component.status}）`)
     if (!ROLE.includes(component.role)) problems.push(`${prefix}: role が不正です（${component.role}）`)
-    if (component.version?.base !== declaration.requiredVersionBase) {
-      problems.push(`${prefix}: version.base は ${declaration.requiredVersionBase} でなければなりません`)
-    }
-    if (!V6.includes(component.version?.v6)) {
-      problems.push(`${prefix}: version.v6 が不正です（${component.version?.v6}）`)
-    }
     if (!Array.isArray(component.impactRoutes) || component.impactRoutes.length === 0) {
       problems.push(`${prefix}: impactRoutes がありません`)
     }
@@ -707,7 +681,7 @@ export function verify() {
 
 if (process.argv[1] && process.argv[1].endsWith('verify-design-values.mjs')) {
   const r = verify()
-  console.log('Pencil V5/V6 とCSSの照合\n')
+  console.log('部品の設計値とCSSの照合（本番 v7 の値・V8 部品の実寸）\n')
   console.log(r.lines.join('\n'))
   console.log('\n' + '─'.repeat(60))
   console.log(`照合対象 ${r.checked} 件 / 一致 ${r.matched} / 不一致 ${r.checked - r.matched}`)

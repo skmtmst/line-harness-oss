@@ -5,14 +5,15 @@
 import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import { notifyToast } from '@/components/shared/toast'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Pagination from '@/components/shared/pagination'
-import { DragHandle, MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
+import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import SearchField from '@/components/shared/search-field'
 import ListRange from '@/components/ui/list-range'
 import { bookingApi, type BookingMenu } from '@/lib/api'
@@ -53,6 +54,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   const [orderOverride, setOrderOverride] = useState<string[] | null>(null)
   const menusRef = useRef(menus)
   menusRef.current = menus
+  const reorderBusyRef = useRef(false)
 
   const orderedBase = useMemo(() => {
     const sorted = sortedMenus(menus)
@@ -70,62 +72,90 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   }, [orderedBase, query])
   const pageCount = Math.max(1, Math.ceil(shown.length / MENU_PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
-  const visible = shown.slice((safePage - 1) * MENU_PAGE_SIZE, safePage * MENU_PAGE_SIZE)
 
   /* 中身の直しはメニュー作成ページ（?menu=<id>、node QqER7）に集約する。 */
   function openMenuForm(menu: BookingMenu) {
     router.push(`/booking/menus/new?menu=${menu.id}`)
   }
 
-  /* 「…」の上へ・下へ。先に並びを変えて裏で保存する。 */
-  async function moveMenu(menu: BookingMenu, delta: -1 | 1) {
-    if (reorderBusy) return
-    const ordered = orderedBase
-    const index = ordered.findIndex((item) => item.id === menu.id)
-    const nextIndex = index + delta
-    if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return
-    const other = ordered[nextIndex]
-    const version = menu.version
-    const otherVersion = other.version
-    if (typeof version !== 'number' || !Number.isInteger(version) || version < 1
-      || typeof otherVersion !== 'number' || !Number.isInteger(otherVersion) || otherVersion < 1) {
+  /*
+   * 並び替え（共通の並び替え）。つまみのドラッグ・上下キー・「…」の上へ／下へは
+   * どれも persistOrder を通る。先に並びを変えて裏で保存する。
+   * 保存は今の API のまま（メニューごとの sort_order の書き換え）。動いた範囲の
+   * メニューに、その位置にあった sort_order を振り直す。途中で失敗したら、
+   * 書き換えた分を元の sort_order へ戻し、元の位置で理由を出す。
+   */
+  async function persistOrder(movedId: string, nextIds: string[], undoable = true) {
+    if (reorderBusyRef.current) return
+    /* 知らせから押し直すときも、読み直した最新の版で計算する。 */
+    const ordered = sortedMenus(menusRef.current)
+    const byId = new Map(ordered.map((item) => [item.id, item]))
+    const moved = byId.get(movedId)
+    const changes = ordered
+      .map((item, index) => ({ menu: byId.get(nextIds[index]), sortOrder: item.sort_order }))
+      .filter((entry): entry is { menu: BookingMenu; sortOrder: number } => Boolean(entry.menu) && entry.menu!.sort_order !== entry.sortOrder)
+    if (!moved || nextIds.length !== ordered.length || changes.length === 0) return
+    if (changes.some(({ menu }) => typeof menu.version !== 'number' || !Number.isInteger(menu.version) || menu.version < 1)) {
       onReload()
       setReorderError('最新の状態を読み直しました。もう一度お試しください。')
       return
     }
-    const nextIds = ordered.map((item) => item.id)
-    const moved = nextIds[index]
-    nextIds[index] = nextIds[nextIndex]
-    nextIds[nextIndex] = moved
+    const fromIndex = ordered.findIndex((item) => item.id === movedId)
+    const toIndex = nextIds.indexOf(movedId)
+    const previousIds = ordered.map((item) => item.id)
     setOrderOverride(nextIds)
+    reorderBusyRef.current = true
     setReorderBusy(true)
     setReorderError(null)
+    const written: Array<{ menu: BookingMenu; version: number }> = []
     try {
-      await bookingApi.updateMenu(accountId, menu.id, version, { ...menu, sort_order: other.sort_order })
-      await bookingApi.updateMenu(accountId, other.id, otherVersion, { ...other, sort_order: menu.sort_order })
+      for (const { menu, sortOrder } of changes) {
+        const res = await bookingApi.updateMenu(accountId, menu.id, menu.version as number, { ...menu, sort_order: sortOrder })
+        written.push({ menu, version: res.version })
+      }
       setOrderOverride(null)
       onReload()
-      notifyToast(`「${menu.name}」を${delta < 0 ? '上' : '下'}へ移しました。`, {
+      notifyToast(`「${moved.name}」を${toIndex < fromIndex ? '上' : '下'}へ移しました。`, undoable ? {
         actionLabel: '元に戻す',
-        onAction: () => {
-          const latest = menusRef.current.find((item) => item.id === menu.id) ?? menu
-          void moveMenu(latest, delta < 0 ? 1 : -1)
-        },
-      })
+        onAction: () => { void persistOrder(movedId, previousIds, false) },
+      } : undefined)
     } catch (cause) {
+      /* 書き換えた分を元の sort_order へ戻す（戻せなかった分は読み直しで本当の並びを出す）。 */
+      for (const { menu, version } of written.reverse()) {
+        try {
+          await bookingApi.updateMenu(accountId, menu.id, version, { ...menu, sort_order: menu.sort_order })
+        } catch {
+          /* 読み直しに任せる */
+        }
+      }
       setOrderOverride(null)
       onReload()
       notifyToast(bookingErrorMessage(cause, '保存'), {
         actionLabel: 'もう一度',
-        onAction: () => {
-          const latest = menusRef.current.find((item) => item.id === menu.id) ?? menu
-          void moveMenu(latest, delta)
-        },
+        onAction: () => { void persistOrder(movedId, nextIds, undoable) },
       })
     } finally {
+      reorderBusyRef.current = false
       setReorderBusy(false)
     }
   }
+
+  const reorderDisabledReason = !canEdit
+    ? '閲覧のみのため並び替えできません'
+    : query.trim()
+      ? '検索を外すと動かせます'
+      : reorderBusy
+        ? '並び替えを保存しています'
+        : null
+  const reorder = useReorder({
+    items: orderedBase,
+    idOf: (menu) => menu.id,
+    disabledReason: reorderDisabledReason,
+    onReorder: ({ id, ids }) => persistOrder(id, ids),
+  })
+  /* ドラッグ中は置き場所を入れ替えて見せる（検索中は動かせないので、絞った並びのまま）。 */
+  const visibleBase = reorder.blocked ? shown : reorder.shown
+  const visible = visibleBase.slice((safePage - 1) * MENU_PAGE_SIZE, safePage * MENU_PAGE_SIZE)
 
   /* 公開・止める。先に札を変えて裏で保存する。 */
   async function toggleVisibility(menu: BookingMenu, force?: boolean) {
@@ -253,46 +283,32 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
           </div>
           {visible.map((menu) => {
             const orderIndex = shown.findIndex((item) => item.id === menu.id)
-            const canMoveUp = orderIndex > 0
-            const canMoveDown = orderIndex >= 0 && orderIndex < shown.length - 1
             const staffNames = (menu.assigned_staff ?? []).map((person) => person.display_name)
             const menuItems: ActionMenuItem[] = [
               { id: 'history', label: '版の履歴', onSelect: () => setHistoryTarget(menu) },
               ...(canEdit ? [
-                {
-                  id: 'move-up',
-                  label: '上へ',
-                  disabled: reorderBusy || !canMoveUp,
-                  disabledReason: !canMoveUp ? 'いちばん上です' : '並び替えを保存中です',
-                  onSelect: () => void moveMenu(menu, -1),
-                },
-                {
-                  id: 'move-down',
-                  label: '下へ',
-                  disabled: reorderBusy || !canMoveDown,
-                  disabledReason: !canMoveDown ? 'いちばん下です' : '並び替えを保存中です',
-                  onSelect: () => void moveMenu(menu, 1),
-                },
+                /* つまみと同じ入口の「上へ／下へ」。検索中・保存中は出さない（つまみも出さない）。 */
+                ...reorder.menuItems(menu.id, () => setOpenMenuId(null)),
                 {
                   id: 'visibility',
                   label: (visOverride[menu.id] ?? menu.is_active) ? '止める' : '出す',
-                  dividerBefore: true,
+                  dividerBefore: !reorder.blocked,
                   onSelect: () => void toggleVisibility(menu),
                 },
               ] satisfies ActionMenuItem[] : []),
             ]
             return (
-              <div key={menu.id} className={styles.menuRow}>
+              <div key={menu.id} className={styles.menuRow} {...reorder.rowProps(menu.id)}>
                 <span className={styles.colOrder}>
-                  {canEdit ? <DragHandle
-                    label={`「${menu.name}」を並び替える（↑↓キー）`}
-                    disabled={reorderBusy}
-                    onKeyDown={(event) => {
-                      if (event.key === 'ArrowUp' && canMoveUp) { event.preventDefault(); void moveMenu(menu, -1) }
-                      if (event.key === 'ArrowDown' && canMoveDown) { event.preventDefault(); void moveMenu(menu, 1) }
-                    }}
+                  {/* 動かせない時（閲覧のみ・検索中・保存中）はつまみを出さず、理由を title と読み上げで言う。 */}
+                  <ReorderHandle
+                    look="icon"
+                    label={menu.name}
+                    ariaLabel={`「${menu.name}」を並び替える（ドラッグ・↑↓キー）`}
                     className={styles.grip}
-                  /> : <span className={styles.gripSlot} aria-hidden="true" />}
+                    {...reorder.handle(menu.id)}
+                    {...reorder.handleProps(menu.id)}
+                  />
                   <span className={styles.orderNum}>{orderIndex + 1}</span>
                 </span>
                 <span className={styles.colName}>
@@ -331,17 +347,13 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                   </span>
                 </span>
                 <span className={styles.colMenu}>
-                  <MoreAction
-                    label={`「${menu.name}」のそのほかの操作`}
-                    aria-expanded={openMenuId === menu.id}
-                    onClick={() => setOpenMenuId((current) => (current === menu.id ? null : menu.id))}
+                  <RowMenu
+                    appearance="plain"
                     className={styles.rowMenuButton}
-                  />
-                  <ActionMenu
+                    label={`「${menu.name}」のそのほかの操作`}
+                    menuLabel={`「${menu.name}」の操作`}
                     open={openMenuId === menu.id}
-                    inline
-                    ariaLabel={`「${menu.name}」の操作`}
-                    onClose={() => setOpenMenuId(null)}
+                    onOpenChange={(next) => setOpenMenuId(next ? menu.id : null)}
                     items={[
                       { id: 'edit', label: '中身を編集', onSelect: () => openMenuForm(menu) },
                       ...menuItems,

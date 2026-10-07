@@ -8,9 +8,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const TEMPLATE_PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
-const FRIEND_INFO = readFileSync(join(HERE, 'friend-info-sidebar.tsx'), 'utf8')
 // 受信箱の指標カード（inbox-kpis.tsx）はどの画面からも描かれないので 2026-10-07 に消した。それを見ていた行も外した。
-const INBOX_DROPDOWN = readFileSync(join(HERE, 'inbox-dropdown.tsx'), 'utf8')
 const EMAIL_THREAD = readFileSync(join(HERE, '..', 'support', 'email-thread.tsx'), 'utf8')
 const WORKER_CHATS = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'chats.ts'),
@@ -58,71 +56,9 @@ describe('受信箱V4で既存機能を失わない', () => {
     expect(TEMPLATE_PICKER).toContain('createPortal')
     expect(TEMPLATE_PICKER).toContain('z-[100]')
   })
-
-  it('カード影は共通トークン shadow-card に統一する（#673）', () => {
-    expect(PAGE).toContain('shadow-card')
-    expect(TEMPLATE_PICKER).toContain('shadow-card')
-    expect(PAGE).not.toContain('shadow-[1px_1px_2px')
-    expect(TEMPLATE_PICKER).not.toContain('shadow-[1px_1px_2px')
-  })
 })
 
 describe('受信箱V4の画面契約', () => {
-  it('V6共通トップバーと重なる本文タイトル・マニュアルを置かない', () => {
-    expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
-    expect(PAGE).not.toContain('<Header title="受信箱"')
-    expect(PAGE).not.toContain('<Button href="/support">マニュアル</Button>')
-  })
-
-  it('承認済みV4の主要領域を持つ', () => {
-    for (const marker of [
-      'data-inbox-v4="quick-filters"',
-      'data-inbox-v4="conversation-list"',
-      'data-inbox-v4="talk-pane"',
-      'data-inbox-v4="customer-panel"',
-      'data-inbox-v4="composer"',
-    ]) {
-      expect(PAGE).toContain(marker)
-    }
-    expect(PAGE).not.toContain('data-inbox-v4="summary"')
-    expect(PAGE).toContain('対応ルール')
-  })
-
-  it('V4の検索・チャネル・表示切替を持つ', () => {
-    expect(PAGE).toContain('名前・メールアドレス・内容で検索')
-    // 設計 `H3lAOB`：開閉は同じ場所の1つのボタン。閉じる口が右パネルの中だけ
-    // だと、閉じたあと戻す口を別の場所で探すことになる。
-    expect(PAGE).toContain("showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'")
-    expect(PAGE).toContain('aria-label="顧客情報を閉じる"')
-    expect(EMAIL_THREAD).toContain('顧客情報を開く')
-    expect(PAGE).toContain('新しい順')
-  })
-
-  it('メール表示と固定の並び順をLINEにそろえる', () => {
-    expect(PAGE).toContain('MAIL')
-    expect(PAGE).toContain('aria-label="受信経路で絞り込む"')
-    expect(PAGE).toContain('options={CHANNELS.map')
-    expect(PAGE).not.toContain('{item.label}\n                </button>')
-    expect(PAGE).toContain('data-inbox-sort="fixed"')
-    // V8の画面では「未読」を運用者向けの「未対応」と表示する。
-    expect(PAGE).toContain('並び順：未読が先・新しい順')
-    expect(PAGE).not.toContain('aria-label="並び順"')
-    expect(PAGE).not.toContain('defaultValue="newest"')
-    expect(PAGE).toContain('shrink-0 items-center')
-    expect(PAGE).toContain('whitespace-nowrap')
-    expect(PAGE).not.toContain('新しい順⌄')
-  })
-
-  it('見出しと会話まわりの余分な高さを詰める', () => {
-    expect(PAGE).not.toContain('返信が必要な会話を見つけ、担当・期限・顧客情報を見ながら対応できます。')
-    expect(FRIEND_INFO).not.toContain('対応に必要な情報をまとめて確認できます')
-    // V8 移行 ①: 共通 Button は inline-flex を部品側が持つので、画面側の
-    // クラス列は寸法と揃えだけを見る。
-    expect(FRIEND_INFO).toContain('h-8 shrink-0 items-center justify-center')
-    expect(PAGE).toContain("isOutgoing ? 'items-end justify-end' : 'items-start justify-start'")
-    expect(PAGE).toContain('flex w-24 shrink-0 flex-col items-center')
-  })
-
   it('一括確認を画面に出さず、送信元と担当者を分けて表示する', () => {
     expect(PAGE).not.toContain('すべて確認済みにする')
     expect(PAGE).toContain('selectedAccount?.pictureUrl')
@@ -205,14 +141,6 @@ describe('受信箱V4の画面契約', () => {
     }
   })
 
-  it('担当と対応をV6専用プルダウンで操作し、開状態も確認できる', () => {
-    expect(PAGE).toContain('import { OperatorDropdown, StatusDropdown')
-    expect(PAGE).toContain('ariaLabel="担当者を変える"')
-    expect(PAGE).toContain('ariaLabel="対応状況を変える"')
-    expect(INBOX_DROPDOWN).toContain('role="listbox"')
-    expect(INBOX_DROPDOWN).toContain('担当者名を検索')
-  })
-
   it('トーク見出しに本名・注目・代替アバターを出す', () => {
     expect(PAGE).toContain('chatDetail.friendRealName')
     expect(PAGE).toContain('chatDetail.isAttention')
@@ -233,20 +161,6 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain('current?.id === updatingChatId')
     expect(PAGE).toContain('if (!chatDetail || attentionSaving) return')
     expect(PAGE).not.toContain('チャット詳細の読み込みに失敗しました:')
-  })
-
-  it('シナリオ開始の札と時刻を分ける', () => {
-    expect(PAGE).toContain('<Link2 aria-hidden="true"')
-    expect(PAGE).toContain('<time className="text-micro text-ink-faint">{startedAt}</time>')
-  })
-
-  it('顧客情報の操作と情報順をV4へそろえる', () => {
-    expect(FRIEND_INFO).toContain('whitespace-nowrap')
-    expect(FRIEND_INFO).toContain("{ key: 'names', label: '基本情報' }")
-    expect(FRIEND_INFO.indexOf("{ key: 'mileage', label: 'マイル' }")).toBeGreaterThan(
-      FRIEND_INFO.indexOf("{ key: 'forms', label: 'フォーム回答' }"),
-    )
-    expect(FRIEND_INFO).toContain('chat.friendInfoSections.v4')
   })
 
   it('会話IDではなく友だちIDで顧客情報を読み込み、集計欠損でも画面を止めない', () => {

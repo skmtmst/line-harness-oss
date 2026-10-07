@@ -11,6 +11,8 @@ import TemplateFolderSelect, {
   type TemplateFolderStatus,
 } from './template-folder-select'
 import Button from '@/components/shared/button'
+import { useAdminTheme } from '@/lib/use-admin-theme'
+import TemplatePickerView, { type TemplatePickerSideKey } from '@/v8/inbox-chat/template-picker-view'
 
 type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -103,7 +105,9 @@ export default function TemplatePicker({
    * Tab は窓の中で回し、Escape で閉じ、閉じたら起点（テンプレートを
    * 開いたボタン）へフォーカスを戻す。未挿入で閉じても下書きは変えない。
    */
-  const dialogRef = useOverlayFocus(open, onClose)
+  // ★V8 は共通の窓（Dialog）が開閉とフォーカスを受け持つので、ここの約束は v7 の窓だけに掛ける。
+  const isV8 = useAdminTheme() === 'v8'
+  const dialogRef = useOverlayFocus(open && !isV8, onClose)
   const searchInputRef = useRef<HTMLInputElement>(null)
   /*
    * 初期フォーカスは検索欄へ。useOverlayFocus は先頭の閉じるボタンへ
@@ -332,6 +336,84 @@ export default function TemplatePicker({
     resolvedPreview && selected && resolvedPreview.forId === selected.id
       ? resolvedPreview.content
       : null
+
+  const togglePackItem = (template: UsageAwareTemplate) => {
+    setPackItems((prev) => {
+      const inPack = prev.some((item) => item.id === template.id)
+      if (inPack) return prev.filter((item) => item.id !== template.id)
+      return prev.length >= 5 ? prev : [...prev, { id: template.id, name: template.name, content: template.messageContent }]
+    })
+  }
+
+  const confirmPick = () => {
+    if (packMode && onPickPack) {
+      if (packItems.length === 0) return
+      onPickPack(packItems.map((item) => item.content))
+    } else {
+      if (!selected) return
+      onPick(selected.messageContent)
+    }
+    onClose()
+  }
+
+  if (isV8) {
+    /*
+     * ★V8（M0393 段2「4. テンプレートを選ぶ」）：左はテンプレートの画面と同じフォルダの列。
+     * 「予約」「EC」の文字で拾う絞り込みはフォルダに統一したので出さない（絵の注）。
+     */
+    const sideActive: TemplatePickerSideKey = category === 'frequent'
+      ? 'frequent'
+      : folderId === '__none__'
+        ? 'none'
+        : folderId
+          ? `folder:${folderId}`
+          : 'all'
+    const countReady = folderCounts !== null
+    const colorOf = new Map(scopedFolders.map((folder) => [folder.id, folder.color]))
+    return (
+      <TemplatePickerView
+        onClose={onClose}
+        search={search}
+        onSearch={setSearch}
+        searchInputRef={searchInputRef}
+        side={{
+          active: sideActive,
+          allCount: folderOptions[0]?.count ?? null,
+          noneCount: countReady ? folderCounts?.[''] ?? 0 : null,
+          folders: folderOptions
+            .filter((option) => option.value && option.value !== '__none__')
+            .map((option) => ({ id: option.value, name: option.label, color: colorOf.get(option.value) ?? null, count: option.count, depth: option.depth })),
+          status: visibleFoldersStatus === 'error' ? 'error' : visibleFoldersStatus === 'ready' ? 'ready' : 'loading',
+        }}
+        onPickSide={(key) => {
+          if (key === 'frequent') { setCategory('frequent'); setFolderId(''); return }
+          setCategory('all')
+          setFolderId(key === 'all' ? '' : key === 'none' ? '__none__' : key.slice('folder:'.length))
+        }}
+        status={visibleTemplatesStatus}
+        emptyText={search.trim() || folderId || category !== 'all' ? '見つかりませんでした。' : '文字のテンプレートがまだありません。'}
+        frequentNote={category === 'frequent' && visibleTemplatesStatus === 'ready' && shown.length > 0 && !frequentHasUsage}
+        templates={shown.map((template) => ({ id: template.id, name: template.name, content: template.messageContent }))}
+        selectedId={selected?.id ?? null}
+        onSelect={(id) => {
+          setSelectedId(id)
+          if (!packMode) return
+          const template = shown.find((item) => item.id === id)
+          if (template) togglePackItem(template)
+        }}
+        canPack={Boolean(onPickPack)}
+        packMode={packMode}
+        onPackMode={(next) => { setPackMode(next); setPackItems([]) }}
+        packItems={packItems}
+        remaining={visibleTemplatesStatus === 'ready' && category !== 'frequent' ? Math.max(0, total - templates.length) : 0}
+        loadingMore={loadingMore}
+        onLoadMore={loadMore}
+        unresolved={previewContent !== null && resolvedPreview?.unresolved.length ? resolvedPreview.unresolved : null}
+        onConfirm={confirmPick}
+        confirmDisabled={packMode && onPickPack ? packItems.length === 0 : !selected}
+      />
+    )
+  }
 
   return createPortal(
     <div

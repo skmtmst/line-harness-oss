@@ -46,7 +46,7 @@
   padding: 0 12px; /* padding: [0, 12] */
 }
 
-/* keKe3 共通 入力欄（複数行） */
+/* keKe3 共通 入力欄（複数行）／★V8 i5BW8b。最小の高さ120・縦にだけ広げられる（下の層の外の決まり）。 */
 .multi {
   min-height: 120px; /* height: 120 */
   padding: 14px; /* padding: 14 */
@@ -87,4 +87,22 @@
 [data-theme='v8'] .single[aria-invalid='true'] { outline-color: var(--color-danger); }
 [data-theme='v8'] .single:focus-visible { outline: 2px solid var(--color-action); outline-offset: 2px; }
 [data-theme='v8'] .single { gap: 0; }
+
+/*
+ * 打ち直している間（Field の data-field-quiet）は v8 の複数行も普段の枠に戻す。
+ * 1行は outline 側で form-controls.module.css が戻す。
+ */
+[data-theme='v8'] [data-field-quiet] .multi[aria-invalid='true'] { border-color: var(--color-control-border); }
+}
+
+/*
+ * 複数行の入力欄の決まり（2026-10-08 共通部品の1本化）。
+ * 縦にだけ手で広げられる・横は広げられない。層の外に置くのは、画面が
+ * className で resize-none などを渡しても、この決まりを上書きさせないため。
+ * v7 の TextArea（form-controls の包み）は form-controls.module.css が
+ * v7 のときだけ元の resize: none に戻す（v7 の見た目は変えない）。
+ */
+.multi {
+  resize: vertical;
+  max-width: 100%;
 }

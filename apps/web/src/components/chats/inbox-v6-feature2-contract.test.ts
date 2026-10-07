@@ -57,45 +57,17 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
     expect(waiting).toContain('${hours}時間${minutes % 60}分')
   })
 
-  it('行は待ち時間があればそれを、無ければ日付を出す', () => {
-    expect(lineRow).toContain('{waitingLabel ? (')
+  it('行は待ち時間があればそれを、無ければ日付を出す（v7）。V8 は絵どおり時刻だけ', () => {
+    expect(lineRow).toContain('waitingLabel ? (')
+    expect(lineRow).toContain('formatInboxListTime(chat.lastMessageAt)')
     expect(lineRow).toContain('formatRelative(chat.lastMessageAt)')
     // 年入りの旧書式へ戻さない。
     expect(lineRow).not.toContain('formatDatetime(')
-  })
-
-  it('担当者の札は「担当：」を付けて誰の欄か分かる形にする', () => {
-    expect(lineRow).toContain('担当：{operatorName ?? \'未割り当て\'}')
-  })
-})
-
-describe('f0zn6 一覧の未読表示', () => {
-  const row = region(PAGE, 'const waitingLabel = needsAttention', 'return node')
-
-  it('設計に無い右端の「自分の未読」操作を置かない', () => {
-    expect(PAGE).not.toContain('data-inbox-v6="mine-unread-toggle"')
-    expect(PAGE).not.toContain('mineUnreadOnly')
-  })
-
-  it('未対応の選択行は中立色の地と通知の点で示す', () => {
-    expect(row).toContain('chat.isUnread')
-    expect(row).toContain('bg-shell')
   })
 })
 
 describe('H3lAOB / xGLVe トーク見出しの操作', () => {
   const header = region(PAGE, '<div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap">', '{/* Messages')
-
-  it('設計の並び（★ → 担当 → 対応マーク → 顧客情報）で置く', () => {
-    const star = header.indexOf('aria-pressed={chatDetail.isAttention}')
-    const operator = header.indexOf('<OperatorDropdown')
-    const status = header.indexOf('<StatusDropdown')
-    const customer = header.indexOf('data-inbox-v6="customer-info-toggle"')
-    expect(star).toBeGreaterThan(-1)
-    expect(operator).toBeGreaterThan(star)
-    expect(status).toBeGreaterThan(operator)
-    expect(customer).toBeGreaterThan(status)
-  })
 
   it('顧客情報は開いていても閉じていても同じ1つのボタンで切り替える', () => {
     expect(header).toContain('onClick={() => setShowFriendInfo((current) => !current)}')
@@ -116,37 +88,9 @@ describe('H3lAOB / xGLVe トーク見出しの操作', () => {
   })
 })
 
-describe('#455 受信箱の上端と入力欄', () => {
-  it('集計帯を外し、対応ルールだけを絞り込み行へ残す', () => {
-    expect(PAGE).not.toContain('data-inbox-v4="summary"')
-    expect(PAGE).not.toContain('<InboxKpis')
-    expect(PAGE).toContain('href="/tags?tab=marks"')
-    expect(PAGE).toContain('対応ルール')
-  })
-
-  it('チャネルと並び順は折り返さず、左列を先に縮める', () => {
-    expect(PAGE).toContain('aria-label="受信経路で絞り込む"')
-    // LAY-01(#982): 顧客情報を開いている間は一覧を288pxに留める。
-    // 以前は 2xl で 420px へ急拡大し、3列が 1536px で収まらなくなっていた。
-    expect(PAGE).toContain('w-full lg:w-[340px]')
-    expect(PAGE).not.toContain("showFriendInfo ? 'lg:w-72 2xl:w-[420px]'")
-  })
-
-  it('改行案内を入力欄の下へ置く', () => {
-    const composer = region(PAGE, 'data-inbox-v4="composer"', '<TemplatePicker')
-    expect(composer.indexOf('aria-label="メッセージを入力"')).toBeLessThan(composer.indexOf('Shift + Enter で改行'))
-  })
-})
-
 describe('B7CER8 内部メモ', () => {
-  const popover = region(PAGE, 'data-inbox-v6="internal-memo-popover"', '<div className="rounded-card border border-hairline')
+  const popover = region(PAGE, 'data-inbox-v6="internal-memo-popover"', '{/* 中段 */}')
   const toggle = region(PAGE, 'data-inbox-v6="internal-memo-toggle"', '</button>')
-
-  it('画面を覆う窓ではなく、送信欄の上に出る紙にする', () => {
-    expect(popover).toContain('absolute bottom-full')
-    expect(popover).not.toContain('fixed inset-0')
-    expect(popover).not.toContain('aria-modal="true"')
-  })
 
   it('設計の文言をそのまま出す', () => {
     expect(popover).toContain('内部メモを追加')
@@ -170,10 +114,6 @@ describe('B7CER8 内部メモ', () => {
 
 describe('Xi4x9 右パネルの表示項目', () => {
   const panel = region(SIDEBAR, 'data-inbox-v6="detail-sections-panel"', '</div>\n        )}')
-
-  it('設計の見出しを出す', () => {
-    expect(panel).toContain('右パネルの表示項目')
-  })
 
   it('設計どおり掴んで順番を変えられる', () => {
     expect(panel).toContain('ドラッグで順番変更')

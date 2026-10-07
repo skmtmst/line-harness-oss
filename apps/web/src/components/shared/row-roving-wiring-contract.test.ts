@@ -22,7 +22,8 @@ describe('主な一覧の行は RovingTbody に入っている', () => {
   })
 
   it('並び替えのつまみは ↑↓ を一覧の行移動に渡さない', () => {
-    const grip = readFileSync(join(SRC, 'components/friend-fields/reorder-grip.tsx'), 'utf8')
+    // つまみの本体は共通の並び替え部品（旧 ReorderGrip・DragHandle はその別名）。
+    const grip = readFileSync(join(SRC, 'components/shared/reorder-handle.tsx'), 'utf8')
     expect(grip).toContain('data-roving-own="vertical"')
   })
 })

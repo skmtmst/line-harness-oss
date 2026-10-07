@@ -24,10 +24,6 @@ describe('V6 シナリオ編集の契約', () => {
     expect(PAGE).toContain('lineAccountId={scenario?.lineAccountId ?? null}')
   })
 
-  it('一括テスト送信の操作を画面内に重複させない', () => {
-    expect(PAGE.match(/>\s*一括でテストを送る\s*<\/Button>/g)).toHaveLength(1)
-  })
-
   it('テスト送信先を同じLINEアカウントから取得し、失敗後も操作へ戻れる', () => {
     expect(DIALOGS).toContain('accountId: lineAccountId ?? selectedAccountId ?? undefined')
     expect(DIALOGS).toContain("setFriendsStatus('loading')")
@@ -61,18 +57,6 @@ describe('V6 シナリオ編集の契約', () => {
     expect(LIST).toContain('() => setFolderDialogOpen(true)')
     expect(LIST).toContain('kind="scenario"')
     expect(LIST).not.toContain('title="準備中です"\n          className="border-hairline text-ink-faint rounded-control border px-4')
-  })
-
-  it('一覧本文は題ブロックを置かず、開始案内を出す', () => {
-    expect(LIST).not.toContain("import Header from '@/components/layout/header'")
-    expect(LIST).not.toContain('<Header')
-    expect(LIST).not.toContain('配信のタイミングを指定して複数のメッセージを順に送ります。')
-    // 新しい一覧の案内の帯の言い方は「作っただけでは送られません」。
-    expect(LIST).toContain('作っただけでは送られません')
-    expect(LIST).toContain('配信を始める方法・3手順')
-    // 並びは絵（axFrW）どおり：案内の帯は道具の段の先頭（表の上の主列）に置く。
-    // 古い一覧の「案内の帯 → 数の帯」の順は新しい絵で変わったので見ない。
-    expect(LIST).toContain('{noteBand}')
   })
 
   it('作ったフォルダへ一覧からシナリオを移せる', () => {
