@@ -530,18 +530,21 @@ export default function SearchesTab({ accountId, canEdit }: { accountId: string 
             <div>
               <dt>検索名</dt>
               <dd>
-                <InlineEdit
-                  label="検索名"
-                  value={activeSearch.name}
-                  maxLength={60}
-                  disabled={!canEdit || !activeSearch.lineAccountId}
-                  onSave={async (next) => {
-                    if (!activeSearch.lineAccountId) throw new Error('no account')
-                    const res = await api.savedSearches.update(activeSearch.id, activeSearch.lineAccountId, { name: next })
-                    if (!res.success) throw new Error(res.error)
-                    void load()
-                  }}
-                />
+                {/* 閲覧のみ：鉛筆は置かず、名前だけを見せる（2026-10-06 オーナー決定）。 */}
+                {canEdit ? (
+                  <InlineEdit
+                    label="検索名"
+                    value={activeSearch.name}
+                    maxLength={60}
+                    disabled={!activeSearch.lineAccountId}
+                    onSave={async (next) => {
+                      if (!activeSearch.lineAccountId) throw new Error('no account')
+                      const res = await api.savedSearches.update(activeSearch.id, activeSearch.lineAccountId, { name: next })
+                      if (!res.success) throw new Error(res.error)
+                      void load()
+                    }}
+                  />
+                ) : activeSearch.name}
               </dd>
             </div>
             <div><dt>条件</dt><dd>{conditionSummary(splitConditions(activeSearch.conditions, tags, conditionLabels))}</dd></div>

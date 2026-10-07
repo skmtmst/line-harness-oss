@@ -444,18 +444,21 @@ function TagEditForm({
         )}
       >
         {error ? <Notice tone="danger" message={error} /> : null}
-        <fieldset disabled={readOnly} className={styles.fieldset}>
+        {/* 閲覧のみには入力の部品・押す口を置かず、いまの値を文字で見せる（2026-10-06 オーナー決定）。 */}
+        <fieldset className={styles.fieldset}>
           <section className={styles.card} aria-label="基本">
             <h2 className={styles.cardTitle}>基本</h2>
             <label className={styles.field}>
               <span className={styles.labelStrong}>タグ名</span>
-              <input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={styles.input} aria-required="true" />
+              {readOnly ? <span className={styles.roValue}>{name}</span> : <input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={styles.input} aria-required="true" />}
               <DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" />
             </label>
             <div className={styles.field}>
               <span className={styles.label}>所属フォルダ</span>
               <div className={styles.folderBox}>
-                <Select aria-label="所属フォルダ" value={groupId} onChange={setGroupId} options={[{ value: '', label: '未分類' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]} size="full" />
+                {readOnly
+                  ? <span className={styles.roValue}>{groups.find((group) => group.id === groupId)?.name ?? '未分類'}</span>
+                  : <Select aria-label="所属フォルダ" value={groupId} onChange={setGroupId} options={[{ value: '', label: '未分類' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]} size="full" />}
               </div>
             </div>
             <div className={styles.switchRow}>
@@ -463,7 +466,7 @@ function TagEditForm({
                 <span className={styles.label}>友だち一覧に出す</span>
                 <span className={styles.hint}>オンにすると、友だち一覧の名前の下にこのタグが出ます</span>
               </div>
-              <Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" />
+              {readOnly ? <span className={styles.linkedState}>{isStarred ? 'オン' : 'オフ'}</span> : <Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" />}
             </div>
           </section>
 
@@ -475,7 +478,7 @@ function TagEditForm({
                   <HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。</HelpTip>
                   <span className={styles.titleSpacer} />
                   <span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>
-                  <Toggle checked={linked} onChange={setLinked} label="タグ連動" />
+                  {readOnly ? null : <Toggle checked={linked} onChange={setLinked} label="タグ連動" />}
                 </div>
                 <div className={styles.noteRow}>
                   <p className={styles.cardNote}>上から順に動きます。並べ替えは上下の印で</p>
@@ -499,10 +502,12 @@ function TagEditForm({
                         <span className={styles.actionIndex}>{index + 1}</span>
                         <span className={styles.actionLabel} title={`${action.type}：${action.label}`}>{action.label}</span>
                         {action.timing && action.timing !== 'すぐに' ? <span className={styles.actionTiming}>{action.timing}</span> : null}
-                        <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を上へ`} disabled={index === 0} onClick={() => moveAction(index, -1)}><ArrowUp size={14} aria-hidden="true" /></button>
-                        <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を下へ`} disabled={index === actions.length - 1} onClick={() => moveAction(index, 1)}><ArrowDown size={14} aria-hidden="true" /></button>
-                        <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を複製`} onClick={() => duplicateAction(action, index)}><Copy size={14} aria-hidden="true" /></button>
-                        <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を削除`} onClick={() => removeAction(action.id)}><Trash2 size={14} aria-hidden="true" /></button>
+                        {readOnly ? null : <>
+                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を上へ`} disabled={index === 0} onClick={() => moveAction(index, -1)}><ArrowUp size={14} aria-hidden="true" /></button>
+                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を下へ`} disabled={index === actions.length - 1} onClick={() => moveAction(index, 1)}><ArrowDown size={14} aria-hidden="true" /></button>
+                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を複製`} onClick={() => duplicateAction(action, index)}><Copy size={14} aria-hidden="true" /></button>
+                          <button type="button" className={styles.iconButton} aria-label={`「${action.label}」を削除`} onClick={() => removeAction(action.id)}><Trash2 size={14} aria-hidden="true" /></button>
+                        </>}
                       </div>
                     ))}
                     {readOnly ? null : (
@@ -535,11 +540,15 @@ function TagEditForm({
                   <div className={styles.pair}>
                     <div className={styles.field}>
                       <span className={styles.label}>今後のマイル倍率</span>
-                      <div className={styles.selectBox}><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS} size="full" /></div>
+                      {readOnly
+                        ? <span className={styles.roValue}>{MULTIPLIERS.find((option) => option.value === multiplier)?.label ?? '倍率を設定しない'}</span>
+                        : <div className={styles.selectBox}><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS} size="full" /></div>}
                     </div>
                     <div className={styles.field}>
                       <span className={styles.label}>倍率の優先度</span>
-                      <div className={styles.selectBox}><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={PRIORITIES} size="full" /></div>
+                      {readOnly
+                        ? <span className={styles.roValue}>{PRIORITIES.find((option) => option.value === priority)?.label ?? '標準'}</span>
+                        : <div className={styles.selectBox}><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={PRIORITIES} size="full" /></div>}
                     </div>
                   </div>
                   <div className={styles.switchRow}>
@@ -547,7 +556,7 @@ function TagEditForm({
                       <span className={styles.label}>今付いている人にもさかのぼって積む（倍率は次の付与から）</span>
                       <span className={styles.hint}>{`オンにすると、すでに付いている ${tag.friendCount ?? 0} 人にも本人・紹介者のマイルをさかのぼって積みます（倍率は次の付与から）。積む前に人数の確認が開きます`}</span>
                     </div>
-                    <Toggle checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" />
+                    {readOnly ? <span className={styles.linkedState}>{applyToExisting ? 'オン' : 'オフ'}</span> : <Toggle checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" />}
                   </div>
                   {applyToExisting ? (
                     <div className={styles.statGrid}>
@@ -565,19 +574,26 @@ function TagEditForm({
                   <div className={styles.pair}>
                     <label className={styles.field}>
                       <span className={styles.label}>本人へのマイル付与</span>
-                      <span className={styles.numberRow}><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
+                      <span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{reward || '0'}</span> : <input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
                       <span className={styles.hint}>このタグが付いた本人へ、一度だけ積みます。</span>
                     </label>
                     <label className={styles.field}>
                       <span className={styles.label}>紹介者へのマイル付与</span>
-                      <span className={styles.numberRow}><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} /><span className={styles.unit}>mile</span></span>
+                      <span className={styles.numberRow}>{readOnly ? <span className={styles.roValue}>{referralReward || '0'}</span> : <input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={styles.input} />}<span className={styles.unit}>mile</span></span>
                       <span className={styles.hint}>紹介経由の友だちなら、その紹介者にも積みます。</span>
                     </label>
                   </div>
+                  {readOnly ? (
+                    <div className={styles.field}>
+                      <span className={styles.label}>タグを外して付け直したときの扱い</span>
+                      <span className={styles.roValue}>{reapplyMode === 'every' ? '付け直すたびに積む' : '最初の1回だけ積む'}</span>
+                    </div>
+                  ) : (
                   <RadioCardGroup legend="タグを外して付け直したときの扱い" legendVisible>
                     <RadioCard name="reapplyMode" value="once" checked={reapplyMode === 'once'} onChange={() => setReapplyMode('once')} title="最初の1回だけ積む" note="誤操作や付け直しで、同じマイルが重複しません。" />
                     <RadioCard name="reapplyMode" value="every" checked={reapplyMode === 'every'} onChange={() => setReapplyMode('every')} title="付け直すたびに積む" note="購入回数など、同じタグを繰り返し使う運用向けです。" />
                   </RadioCardGroup>
+                  )}
                 </>
               ) : null}
             </section>

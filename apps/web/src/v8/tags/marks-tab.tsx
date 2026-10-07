@@ -531,22 +531,25 @@ export default function MarksTab({ accountId, canEdit }: { accountId: string | n
             <div>
               <dt>マーク名</dt>
               <dd>
-                <InlineEdit
-                  label="マーク名"
-                  value={activeMark.name}
-                  maxLength={30}
-                  disabled={!canEdit || !accountId}
-                  onSave={async (next) => {
-                    if (!accountId) throw new Error('no account')
-                    // R513: 読んだときの版を送る。先に変えていたら409で止める（編集画面と同じ）。
-                    const res = await api.supportMarks.update(activeMark.id, accountId, {
-                      name: next,
-                      ...(typeof activeMark.version === 'number' ? { expectedVersion: activeMark.version } : {}),
-                    })
-                    if (!res.success) throw new Error(res.error)
-                    void load()
-                  }}
-                />
+                {/* 閲覧のみ：鉛筆は置かず、名前だけを見せる（2026-10-06 オーナー決定）。 */}
+                {canEdit ? (
+                  <InlineEdit
+                    label="マーク名"
+                    value={activeMark.name}
+                    maxLength={30}
+                    disabled={!accountId}
+                    onSave={async (next) => {
+                      if (!accountId) throw new Error('no account')
+                      // R513: 読んだときの版を送る。先に変えていたら409で止める（編集画面と同じ）。
+                      const res = await api.supportMarks.update(activeMark.id, accountId, {
+                        name: next,
+                        ...(typeof activeMark.version === 'number' ? { expectedVersion: activeMark.version } : {}),
+                      })
+                      if (!res.success) throw new Error(res.error)
+                      void load()
+                    }}
+                  />
+                ) : activeMark.name}
               </dd>
             </div>
             <div><dt>付いている人</dt><dd>{`${activeMark.friendCount}人`}</dd></div>

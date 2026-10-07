@@ -37,6 +37,8 @@
 .label { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-eds-label2-lh); }
 .hint { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-eds-hint-lh); }
 .input { width: 100%; min-width: 0; height: var(--tpl-eds-input-h); padding: var(--tpl-eds-input-pad); border: 0; border-radius: var(--radius-control); outline: 1px solid var(--color-control-border); outline-offset: -1px; background: var(--color-canvas); color: var(--color-ink); font-size: var(--text-body); line-height: var(--tpl-eds-input-lh); }
+/* 閲覧のみ：入力の部品の代わりに、いまの値を文字で出す。 */
+.roValue { min-width: 0; color: var(--color-ink); font-size: var(--text-body); line-height: var(--tpl-eds-input-lh); overflow-wrap: anywhere; }
 .input:focus-visible { outline: var(--tpl-nt-focus-ring) solid var(--color-action); }
 .folderBox { width: var(--tpl-eds-folder-w); max-width: 100%; }
 .folderBox :global(*),

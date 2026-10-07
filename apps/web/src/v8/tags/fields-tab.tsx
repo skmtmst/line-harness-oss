@@ -508,7 +508,6 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
             activeId={folderFilter}
             onSelect={setFolderFilter}
             onAddFolder={canEdit ? () => setFolderDialog('new') : undefined}
-            addFolderDisabled={!canEdit}
             addFolderLabel="フォルダを追加"
             rows={folderRows}
           >
@@ -585,18 +584,21 @@ export default function FieldsTab({ accountId, canEdit, narrow = false }: { acco
             <div>
               <dt>項目名</dt>
               <dd>
-                <InlineEdit
-                  label="項目名"
-                  value={activeField.name}
-                  maxLength={40}
-                  disabled={!canEdit || !accountId || activeField.isInherited}
-                  onSave={async (next) => {
-                    if (!accountId) throw new Error('no account')
-                    const res = await api.friendFields.update(activeField.id, accountId, { name: next })
-                    if (!res.success) throw new Error(res.error)
-                    void load()
-                  }}
-                />
+                {/* 閲覧のみ：鉛筆は置かず、名前だけを見せる（2026-10-06 オーナー決定）。 */}
+                {canEdit ? (
+                  <InlineEdit
+                    label="項目名"
+                    value={activeField.name}
+                    maxLength={40}
+                    disabled={!accountId || activeField.isInherited}
+                    onSave={async (next) => {
+                      if (!accountId) throw new Error('no account')
+                      const res = await api.friendFields.update(activeField.id, accountId, { name: next })
+                      if (!res.success) throw new Error(res.error)
+                      void load()
+                    }}
+                  />
+                ) : activeField.name}
               </dd>
             </div>
             <div><dt>差し込み名</dt><dd>{`{{field.${activeField.fieldKey}}}`}</dd></div>
