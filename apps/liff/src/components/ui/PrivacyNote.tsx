@@ -3,7 +3,8 @@
  *
  * 基本は musubo のプライバシーポリシーへつなぐ。お店ごとのポリシーの URL が
  * 設定されていればそちらを優先する（いまは設定の口が無いので、呼ぶ側は渡さない）。
- * 予約・申し込み・フォームの送る画面の、中身の最後に置く。リンクは押しやすい高さ（44）を取る。
+ * 予約・申し込み・フォームの送る画面の、中身の最後に置く。リンクは押しやすい高さ（44）を取るが、
+ * 行の高さ（18）は変えない（liff-hit の見えない押し範囲。min-h で行を高くすると絵より 13px 下がる）。
  */
 export const MUSUBO_PRIVACY_URL = 'https://musubo.jp/privacy/';
 
@@ -20,7 +21,7 @@ export default function PrivacyNote({ shopPrivacyUrl }: { shopPrivacyUrl?: strin
         href={privacyPolicyUrl(shopPrivacyUrl)}
         target="_blank"
         rel="noreferrer"
-        className="inline-flex min-h-11 items-center px-1 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-ink"
+        className="liff-hit underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-ink"
       >
         プライバシーポリシー
       </a>
