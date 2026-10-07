@@ -659,13 +659,14 @@ export default function TagsTab({
   ) : ready && items.length === 0 ? (
     <div className={styles.stateCard} data-design-node="U0aKD">
       <TagIcon className={styles.stateIcon} aria-hidden="true" />
-      <p className={styles.stateTitle}>まだタグがありません</p>
-      <p className={styles.stateDesc}>「＋ タグを作る」から最初の1つを作ると、ここに並びます。</p>
+      <p className={styles.stateTitle}>まだタグはありません</p>
+      <p className={styles.stateDesc}>友だちを分けたり、配信の宛先を決めたりするときに使います</p>
+      {canEdit ? <Button href="/tags/new" variant="primary"><Plus size={15} aria-hidden="true" />タグを作る</Button> : null}
     </div>
   ) : ready && visible.length === 0 ? (
     <div className={styles.stateCard} data-design-node="U0aKD">
-      <p className={styles.stateTitle}>条件に合うタグはありません</p>
-      <p className={styles.stateDesc}>検索語・フォルダ・絞り込みを変えてください。</p>
+      <p className={styles.stateTitle}>条件に合うものはありません</p>
+      <p className={styles.stateDesc}>検索や絞り込みを外すと、すべて出ます</p>
       {filterActive ? <Button type="button" onClick={clearFilters}>条件を外す</Button> : null}
     </div>
   ) : (
