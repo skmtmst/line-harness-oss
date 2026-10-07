@@ -40,6 +40,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
+import { FolderDotName } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -323,8 +324,11 @@ export default function CommonActionsV8() {
                 return (
                   <Tr key={item.id} className={styles.row} data-table-layout="columns" data-row-id={item.id}>
                     <Td className={styles.colName}>
-                      <a className={styles.name} href={versionsHref(item.id)} title={item.name} onClick={(event) => { event.preventDefault(); router.push(versionsHref(item.id)) }}>{item.name}</a>
-                      <span className={styles.sub} title={item.description ?? undefined}>{item.description || '説明はありません'}</span>
+                      {/* 名前の前にフォルダの丸（共通アクションはフォルダに入れないので未分類の輪）。説明は名前の頭にそろえる。 */}
+                      <FolderDotName folder={null}>
+                        <a className={styles.name} href={versionsHref(item.id)} title={item.name} onClick={(event) => { event.preventDefault(); router.push(versionsHref(item.id)) }}>{item.name}</a>
+                      </FolderDotName>
+                      <span className={`${styles.sub} ${styles.subIndent}`} title={item.description ?? undefined}>{item.description || '説明はありません'}</span>
                     </Td>
                     <Td className={styles.colState}>
                       <span className={styles.pill} data-tone={item.status === 'published' ? 'active' : 'neutral'}>
