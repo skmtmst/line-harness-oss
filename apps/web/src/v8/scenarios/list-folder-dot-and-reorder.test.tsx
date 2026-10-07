@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * V8 シナリオ一覧：行の名前の前の「フォルダの色の丸」（2026-10-07 オーナー決定・絵 axFrW）。
- * 左のフォルダの列と同じフォルダを引いて色を付け、フォルダの無い行は未分類の輪にする。
+ * 並び替えのつまみ（オーナー点検 2026-10-08）：絞り込み中・2ページ以上のときは、
+ * つまみを出さず理由を言う（一部の行だけで番号を振り直さない）。
  */
 import React from 'react'
 import { cleanup, render, waitFor } from '@testing-library/react'
@@ -26,6 +26,7 @@ const scenario = (id: string, name: string, folderId: string | null) => ({
   updatedAt: '2026-08-01T00:00:00.000Z',
 })
 
+const total = vi.hoisted(() => ({ value: null as number | null }))
 const items = [
   scenario('s-filed', '新規登録7日間フォロー', 'sf-onboarding'),
   scenario('s-unfiled', '会員更新リマインド', null),
@@ -61,7 +62,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       ...api,
       scenarios: {
         ...api.scenarios,
-        listPage: () => Promise.resolve({ success: true, data: { items, total: items.length, limit: 20, sort: [] } }),
+        listPage: () => Promise.resolve({ success: true, data: { items, total: total.value ?? items.length, limit: 20, sort: [] } }),
       },
       folders: {
         ...api.folders,
@@ -80,6 +81,25 @@ import ScenariosListV8 from './list'
 
 afterEach(() => {
   cleanup()
+})
+
+describe('V8 シナリオ一覧の並び替えのつまみ', () => {
+  test('絞り込みが無く全件が1ページなら、つまみを出す', async () => {
+    total.value = null
+    const view = render(<ScenariosListV8 />)
+    await view.findByText('新規登録7日間フォロー')
+    await waitFor(() => expect(view.container.querySelectorAll('button[data-reorder-handle]')).toHaveLength(2))
+  })
+
+  test('2ページ以上あるときは、つまみを出さず理由を言う', async () => {
+    total.value = 30
+    const view = render(<ScenariosListV8 />)
+    await view.findByText('新規登録7日間フォロー')
+    await waitFor(() => expect(view.container.querySelector('[data-reorder-disabled]')?.getAttribute('title')).toBe('全件が1ページに収まる表示件数にすると動かせます'))
+    expect(view.container.querySelector('button[data-reorder-handle]')).toBeNull()
+    expect(view.container.querySelector('td[draggable="true"]')).toBeNull()
+    total.value = null
+  })
 })
 
 describe('V8 シナリオ一覧のフォルダの丸', () => {
