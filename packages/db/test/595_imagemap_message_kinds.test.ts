@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { checkMigration } from '../../../scripts/check-migrations.js';
-const sql=readFileSync(new URL('../migrations/593_imagemap_message_kinds.sql',import.meta.url),'utf8');
-describe('593の配信種類追加（外部キー有効）',()=>{
+const sql=readFileSync(new URL('../migrations/595_imagemap_message_kinds.sql',import.meta.url),'utf8');
+describe('595の配信種類追加（外部キー有効）',()=>{
  it('履歴・参照を残し、新しい種類を保存できる',()=>{
   const db=new Database(':memory:');
   db.exec(readFileSync(new URL('../bootstrap.sql',import.meta.url),'utf8').replaceAll(", 'imagemap', 'rich_message', 'coupon'",''));
@@ -39,10 +39,10 @@ describe('593の配信種類追加（外部キー有効）',()=>{
    db.prepare('UPDATE templates SET message_type=?').run(kind);
    db.prepare('UPDATE scenario_steps SET message_type=?').run(kind);
   }
-  expect(db.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'migration_593_%'").all()).toEqual([]);
+  expect(db.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'migration_595_%'").all()).toEqual([]);
   db.close();
  });
  it('表の作り直しの安全規則を満たす',()=>{
-  expect(checkMigration(sql,'593_imagemap_message_kinds.sql')).toEqual({ok:true});
+  expect(checkMigration(sql,'595_imagemap_message_kinds.sql')).toEqual({ok:true});
  });
 });

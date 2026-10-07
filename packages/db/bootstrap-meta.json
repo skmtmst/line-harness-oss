@@ -532,10 +532,10 @@
     "587_form_step_completion_times.sql",
     "590_scenario_stop_reason.sql",
     "591_friend_field_time.sql",
-    "592_message_type_delivery.sql",
     "592_mileage_reward_folders.sql",
-    "593_imagemap_message_kinds.sql",
-    "593_webinar_cta_version.sql"
+    "593_webinar_cta_version.sql",
+    "594_message_type_delivery.sql",
+    "595_imagemap_message_kinds.sql"
   ],
   "migrationCount": 536
 }

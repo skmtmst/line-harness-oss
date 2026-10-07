@@ -3,15 +3,15 @@
 -- イメージマップと配信用素材を一斉配信・シナリオの正式な種類に加える。
 -- D1は外部キーが有効。CASCADEの履歴を退避し、参照を戻してから控えを片付ける。
 PRAGMA defer_foreign_keys = ON;
-CREATE TABLE migration_593_broadcast_after_action_runs_backup AS SELECT * FROM broadcast_after_action_runs;
-CREATE TABLE migration_593_broadcast_approval_events_backup AS SELECT * FROM broadcast_approval_events;
-CREATE TABLE migration_593_broadcast_insights_backup AS SELECT * FROM broadcast_insights;
-CREATE TABLE migration_593_broadcast_lifecycle_events_backup AS SELECT * FROM broadcast_lifecycle_events;
-CREATE TABLE migration_593_broadcast_send_claims_backup AS SELECT * FROM broadcast_send_claims;
-CREATE TABLE migration_593_broadcast_tracked_links_backup AS SELECT * FROM broadcast_tracked_links;
-CREATE TABLE migration_593_scenario_actions_backup AS SELECT * FROM scenario_actions;
-CREATE TABLE migration_593_scenario_action_fires_backup AS SELECT * FROM scenario_action_fires;
-CREATE TABLE migration_593_message_refs_backup AS SELECT id,broadcast_id,scenario_step_id FROM messages_log WHERE broadcast_id IS NOT NULL OR scenario_step_id IS NOT NULL;
+CREATE TABLE migration_595_broadcast_after_action_runs_backup AS SELECT * FROM broadcast_after_action_runs;
+CREATE TABLE migration_595_broadcast_approval_events_backup AS SELECT * FROM broadcast_approval_events;
+CREATE TABLE migration_595_broadcast_insights_backup AS SELECT * FROM broadcast_insights;
+CREATE TABLE migration_595_broadcast_lifecycle_events_backup AS SELECT * FROM broadcast_lifecycle_events;
+CREATE TABLE migration_595_broadcast_send_claims_backup AS SELECT * FROM broadcast_send_claims;
+CREATE TABLE migration_595_broadcast_tracked_links_backup AS SELECT * FROM broadcast_tracked_links;
+CREATE TABLE migration_595_scenario_actions_backup AS SELECT * FROM scenario_actions;
+CREATE TABLE migration_595_scenario_action_fires_backup AS SELECT * FROM scenario_action_fires;
+CREATE TABLE migration_595_message_refs_backup AS SELECT id,broadcast_id,scenario_step_id FROM messages_log WHERE broadcast_id IS NOT NULL OR scenario_step_id IS NOT NULL;
 
 CREATE TABLE broadcasts_new (
   id                 TEXT PRIMARY KEY,
@@ -83,31 +83,31 @@ INSERT INTO scenario_steps_new (id,scenario_id,step_order,delay_minutes,message_
 DROP TABLE scenario_steps;
 ALTER TABLE scenario_steps_new RENAME TO scenario_steps;
 CREATE INDEX idx_scenario_steps_scenario_lookup ON scenario_steps (scenario_id);
-INSERT INTO broadcast_after_action_runs SELECT * FROM migration_593_broadcast_after_action_runs_backup;
-INSERT INTO broadcast_approval_events SELECT * FROM migration_593_broadcast_approval_events_backup;
-INSERT INTO broadcast_insights SELECT * FROM migration_593_broadcast_insights_backup;
-INSERT INTO broadcast_lifecycle_events SELECT * FROM migration_593_broadcast_lifecycle_events_backup;
-INSERT INTO broadcast_send_claims SELECT * FROM migration_593_broadcast_send_claims_backup;
-INSERT INTO broadcast_tracked_links SELECT * FROM migration_593_broadcast_tracked_links_backup;
-INSERT INTO scenario_actions SELECT * FROM migration_593_scenario_actions_backup;
-INSERT INTO scenario_action_fires SELECT * FROM migration_593_scenario_action_fires_backup;
-UPDATE messages_log SET broadcast_id=(SELECT broadcast_id FROM migration_593_message_refs_backup b WHERE b.id=messages_log.id),scenario_step_id=(SELECT scenario_step_id FROM migration_593_message_refs_backup b WHERE b.id=messages_log.id) WHERE id IN (SELECT id FROM migration_593_message_refs_backup);
-DROP TABLE migration_593_broadcast_after_action_runs_backup;
-DROP TABLE migration_593_broadcast_approval_events_backup;
-DROP TABLE migration_593_broadcast_insights_backup;
-DROP TABLE migration_593_broadcast_lifecycle_events_backup;
-DROP TABLE migration_593_broadcast_send_claims_backup;
-DROP TABLE migration_593_broadcast_tracked_links_backup;
-DROP TABLE migration_593_scenario_actions_backup;
-DROP TABLE migration_593_scenario_action_fires_backup;
-DROP TABLE migration_593_message_refs_backup;
+INSERT INTO broadcast_after_action_runs SELECT * FROM migration_595_broadcast_after_action_runs_backup;
+INSERT INTO broadcast_approval_events SELECT * FROM migration_595_broadcast_approval_events_backup;
+INSERT INTO broadcast_insights SELECT * FROM migration_595_broadcast_insights_backup;
+INSERT INTO broadcast_lifecycle_events SELECT * FROM migration_595_broadcast_lifecycle_events_backup;
+INSERT INTO broadcast_send_claims SELECT * FROM migration_595_broadcast_send_claims_backup;
+INSERT INTO broadcast_tracked_links SELECT * FROM migration_595_broadcast_tracked_links_backup;
+INSERT INTO scenario_actions SELECT * FROM migration_595_scenario_actions_backup;
+INSERT INTO scenario_action_fires SELECT * FROM migration_595_scenario_action_fires_backup;
+UPDATE messages_log SET broadcast_id=(SELECT broadcast_id FROM migration_595_message_refs_backup b WHERE b.id=messages_log.id),scenario_step_id=(SELECT scenario_step_id FROM migration_595_message_refs_backup b WHERE b.id=messages_log.id) WHERE id IN (SELECT id FROM migration_595_message_refs_backup);
+DROP TABLE migration_595_broadcast_after_action_runs_backup;
+DROP TABLE migration_595_broadcast_approval_events_backup;
+DROP TABLE migration_595_broadcast_insights_backup;
+DROP TABLE migration_595_broadcast_lifecycle_events_backup;
+DROP TABLE migration_595_broadcast_send_claims_backup;
+DROP TABLE migration_595_broadcast_tracked_links_backup;
+DROP TABLE migration_595_scenario_actions_backup;
+DROP TABLE migration_595_scenario_action_fires_backup;
+DROP TABLE migration_595_message_refs_backup;
 
 -- テンプレートへ保存しても同じ種類を保ち、公開版と参照を復元する。
-CREATE TABLE migration_593_template_versions_backup AS SELECT * FROM template_versions;
-CREATE TABLE migration_593_template_references_backup AS SELECT * FROM template_references;
-CREATE TABLE migration_593_template_publish_keys_backup AS SELECT * FROM template_publish_keys;
-CREATE TABLE migration_593_auto_replies_template_refs_backup AS SELECT id,template_id FROM auto_replies WHERE template_id IS NOT NULL;
-CREATE TABLE migration_593_scenario_steps_template_refs_backup AS SELECT id,template_id FROM scenario_steps WHERE template_id IS NOT NULL;
+CREATE TABLE migration_595_template_versions_backup AS SELECT * FROM template_versions;
+CREATE TABLE migration_595_template_references_backup AS SELECT * FROM template_references;
+CREATE TABLE migration_595_template_publish_keys_backup AS SELECT * FROM template_publish_keys;
+CREATE TABLE migration_595_auto_replies_template_refs_backup AS SELECT id,template_id FROM auto_replies WHERE template_id IS NOT NULL;
+CREATE TABLE migration_595_scenario_steps_template_refs_backup AS SELECT id,template_id FROM scenario_steps WHERE template_id IS NOT NULL;
 CREATE TABLE templates_new (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
@@ -136,14 +136,14 @@ CREATE INDEX idx_templates_category ON templates (category);
 CREATE INDEX idx_templates_line_account
   ON templates(line_account_id, display_order, id);
 CREATE INDEX idx_templates_publish_key ON templates (publish_idempotency_key);
-INSERT INTO template_versions SELECT * FROM migration_593_template_versions_backup;
-INSERT INTO template_references SELECT * FROM migration_593_template_references_backup;
-INSERT INTO template_publish_keys SELECT * FROM migration_593_template_publish_keys_backup;
-UPDATE auto_replies SET template_id=(SELECT b.template_id FROM migration_593_auto_replies_template_refs_backup b WHERE b.id=auto_replies.id) WHERE id IN (SELECT id FROM migration_593_auto_replies_template_refs_backup);
-UPDATE scenario_steps SET template_id=(SELECT b.template_id FROM migration_593_scenario_steps_template_refs_backup b WHERE b.id=scenario_steps.id) WHERE id IN (SELECT id FROM migration_593_scenario_steps_template_refs_backup);
-DROP TABLE migration_593_template_versions_backup;
-DROP TABLE migration_593_template_references_backup;
-DROP TABLE migration_593_template_publish_keys_backup;
-DROP TABLE migration_593_auto_replies_template_refs_backup;
-DROP TABLE migration_593_scenario_steps_template_refs_backup;
+INSERT INTO template_versions SELECT * FROM migration_595_template_versions_backup;
+INSERT INTO template_references SELECT * FROM migration_595_template_references_backup;
+INSERT INTO template_publish_keys SELECT * FROM migration_595_template_publish_keys_backup;
+UPDATE auto_replies SET template_id=(SELECT b.template_id FROM migration_595_auto_replies_template_refs_backup b WHERE b.id=auto_replies.id) WHERE id IN (SELECT id FROM migration_595_auto_replies_template_refs_backup);
+UPDATE scenario_steps SET template_id=(SELECT b.template_id FROM migration_595_scenario_steps_template_refs_backup b WHERE b.id=scenario_steps.id) WHERE id IN (SELECT id FROM migration_595_scenario_steps_template_refs_backup);
+DROP TABLE migration_595_template_versions_backup;
+DROP TABLE migration_595_template_references_backup;
+DROP TABLE migration_595_template_publish_keys_backup;
+DROP TABLE migration_595_auto_replies_template_refs_backup;
+DROP TABLE migration_595_scenario_steps_template_refs_backup;
 PRAGMA defer_foreign_keys = OFF;

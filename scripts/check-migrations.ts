@@ -174,21 +174,21 @@ const REBUILD_MARKER = /--\s*migration-policy:\s*table-rebuild\b/i;
  */
 const SIDECAR_BACKUP_TABLES: Record<string, ReadonlySet<string>> = {
   // イメージマップ種類追加：D1のCASCADE履歴とログの参照を退避・復元する。
-  '593_imagemap_message_kinds.sql': new Set([
-    'migration_593_broadcast_after_action_runs_backup',
-    'migration_593_broadcast_approval_events_backup',
-    'migration_593_broadcast_insights_backup',
-    'migration_593_broadcast_lifecycle_events_backup',
-    'migration_593_broadcast_send_claims_backup',
-    'migration_593_broadcast_tracked_links_backup',
-    'migration_593_scenario_actions_backup',
-    'migration_593_scenario_action_fires_backup',
-    'migration_593_message_refs_backup',
-    'migration_593_template_versions_backup',
-    'migration_593_template_references_backup',
-    'migration_593_template_publish_keys_backup',
-    'migration_593_auto_replies_template_refs_backup',
-    'migration_593_scenario_steps_template_refs_backup',
+  '595_imagemap_message_kinds.sql': new Set([
+    'migration_595_broadcast_after_action_runs_backup',
+    'migration_595_broadcast_approval_events_backup',
+    'migration_595_broadcast_insights_backup',
+    'migration_595_broadcast_lifecycle_events_backup',
+    'migration_595_broadcast_send_claims_backup',
+    'migration_595_broadcast_tracked_links_backup',
+    'migration_595_scenario_actions_backup',
+    'migration_595_scenario_action_fires_backup',
+    'migration_595_message_refs_backup',
+    'migration_595_template_versions_backup',
+    'migration_595_template_references_backup',
+    'migration_595_template_publish_keys_backup',
+    'migration_595_auto_replies_template_refs_backup',
+    'migration_595_scenario_steps_template_refs_backup',
   ]),
   // 予約媒体のCHECK制約拡張で、既存予約と日次件数の参照を退避・復元する。
   '545_restaurant_channels.sql': new Set([
