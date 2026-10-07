@@ -11,7 +11,7 @@
  * - 発行・入れ替え・停止は統括だけ（R32）。閲覧のみの人には押せないボタンを置かず、場所だけ空ける。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Copy, KeyRound, LayoutTemplate, MoreHorizontal, Plus, RefreshCw } from 'lucide-react'
+import { Check, Copy, KeyRound, LayoutTemplate, Plus, RefreshCw } from 'lucide-react'
 import { api, ApiError, type IntegrationApiTokenInfo } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -26,7 +26,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import {
@@ -550,19 +550,11 @@ export default function WebhooksApiTokensV8() {
                             >
                               <RefreshCw size={15} aria-hidden="true" />入れ替える
                             </Button>
-                            <Button
+                            <RowMenu
                               className={styles.moreButton}
-                              aria-label={`「${token.name}」の操作`}
-                              aria-haspopup="menu"
-                              aria-expanded={menuId === token.id}
-                              onClick={() => setMenuId(menuId === token.id ? null : token.id)}
-                            >
-                              <MoreHorizontal size={16} aria-hidden="true" />
-                            </Button>
-                            <ActionMenu
+                              label={`「${token.name}」の操作`}
                               open={menuId === token.id}
-                              onClose={() => setMenuId(null)}
-                              ariaLabel={`「${token.name}」の操作`}
+                              onOpenChange={(next) => setMenuId(next ? token.id : null)}
                               items={[{
                                 id: 'revoke',
                                 label: '止める',

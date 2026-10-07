@@ -268,6 +268,8 @@ const EXEMPTIONS: Record<string, string> = {
     '一覧と絞り込みが中心。作る操作は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/inflow-links/page.tsx':
     '一覧の一括操作（移動・再開）は押した直後に即時保存し、下書きを持たない',
+  'v8/automations/list.tsx':
+    '自動化の一覧。入力欄は「試しに動かす」の窓の友だちIDだけで、押して試すまでの一時の値。保存する下書きを持たない（2026-10-08 入力欄を正本の TextField へ移したので見張りに拾われた）',
   'v8/automations/common-action-new.tsx':
     'app/common-actions/common-action-new-v8.tsx と同じ画面を src/v8 に一から書いたもの（j2hfkS）。番兵の要否は元の画面（new/page.tsx・s3 未判定）と一緒に決めるため、同じ扱いでここに置く',
   'v8/tags/field-migrate.tsx':

@@ -1,12 +1,13 @@
 'use client'
 
-import React, { forwardRef, useEffect, useState } from 'react'
+import React, { forwardRef, useEffect, useId, useState } from 'react'
 import type {
-  InputHTMLAttributes,
+  ComponentPropsWithoutRef,
   ReactNode,
-  TextareaHTMLAttributes,
 } from 'react'
+import { FieldContext } from './field-context'
 import HelpTip from './help-tip'
+import { TextArea as BaseTextArea, TextField } from './text-field'
 import styles from './form-controls.module.css'
 
 /**
@@ -46,6 +47,7 @@ export function Field({
   help,
   helpLabel,
   helpHref,
+  count,
   children,
 }: {
   label: string
@@ -62,6 +64,11 @@ export function Field({
   helpLabel?: string
   /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
   helpHref?: string
+  /**
+   * 文字数の表示（「12/100文字」）。欄の下の右に出し、上限を超えたら赤くする。
+   * 読み上げは欄の説明（aria-describedby）につなぐ。
+   */
+  count?: { value: number; max: number }
   children: ReactNode
 }) {
   const hasHelp = help !== undefined && help !== null
@@ -76,7 +83,20 @@ export function Field({
   const errorKey = typeof error === 'string' ? error : error ? 'node' : ''
   useEffect(() => { setQuiet(false) }, [errorKey])
   const shownError = quiet ? null : error
+  /*
+   * 読み上げのつなぎ（共通部品の1本化・2026-10-08）。説明・誤りの文・文字数に id を振り、
+   * 中の入力欄（TextField・TextArea・TextInput）へ aria-describedby / aria-invalid /
+   * aria-required として渡す。画面ごとに書かない。
+   */
+  const baseId = useId()
+  const noteId = `${baseId}-note`
+  const errorId = `${baseId}-error`
+  const countId = `${baseId}-count`
+  const showNote = !shownError && Boolean(note)
+  const over = count ? count.value > count.max : false
+  const describedBy = [shownError ? errorId : null, showNote ? noteId : null, count ? countId : null].filter(Boolean).join(' ') || undefined
   return (
+    <FieldContext.Provider value={{ controlId: htmlFor, describedBy, invalid: Boolean(shownError), required: Boolean(required) }}>
     <div
       className={styles.field}
       data-field-quiet={quiet && error ? '' : undefined}
@@ -95,53 +115,60 @@ export function Field({
         {hasHelp ? (
           <HelpTip label={`${helpLabel ?? label}の説明`}>
             {help}
-            {helpHref ? <a href={helpHref}>くわしく</a> : null}
+            {helpHref ? <a href={helpHref} className={styles.helpLink}>くわしく</a> : null}
           </HelpTip>
         ) : null}
       </div>
       {children}
-      {shownError ? <p className={styles.error} role="alert">{shownError}</p> : null}
-      {!shownError && note ? <p className={styles.note}>{note}</p> : null}
+      {shownError ? <p id={errorId} className={styles.error} role="alert">{shownError}</p> : null}
+      {showNote ? <p id={noteId} className={styles.note}>{note}</p> : null}
+      {count ? (
+        <p id={countId} className={[styles.count, over && styles.countOver].filter(Boolean).join(' ')} data-field-count={over ? 'over' : ''}>
+          {count.value.toLocaleString('ja-JP')}/{count.max.toLocaleString('ja-JP')}文字
+        </p>
+      ) : null}
     </div>
+    </FieldContext.Provider>
   )
 }
 
-type TextInputProps = InputHTMLAttributes<HTMLInputElement> & {
-  invalid?: boolean
-}
+/*
+ * 1行・複数行の入力欄の正本は text-field.tsx（★V8 Ume2U・i5BW8b）。
+ * ここの TextInput・TextArea は、その部品を呼ぶだけの薄い包み。
+ * 足すのは v7 の見た目の差（読み取り専用の地・押せないときの薄さ・複数行の
+ * 大きさ固定）だけで、v8 では TextField・TextArea と同じ物になる。
+ * 新しく書く画面は text-field.tsx を直接使う。
+ */
+type TextInputProps = ComponentPropsWithoutRef<typeof TextField>
 
-/** Pencil V5 `ytG7l` を正本にした1行入力。 */
+/** 1行入力（Pencil V5 `ytG7l`）。正本 TextField の包み。 */
 export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function TextInput(
-  { className, invalid = false, ...props },
+  { className, ...props },
   ref,
 ) {
   return (
-    <input
+    <TextField
       ref={ref}
-      className={[styles.control, styles.input, className].filter(Boolean).join(' ')}
-      aria-invalid={invalid || undefined}
       data-design-node="ytG7l"
       {...props}
+      className={[styles.legacyControl, className].filter(Boolean).join(' ')}
     />
   )
 })
 
-type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
-  invalid?: boolean
-}
+type TextAreaProps = ComponentPropsWithoutRef<typeof BaseTextArea>
 
-/** Pencil V5 `keKe3` を正本にした複数行入力。 */
+/** 複数行入力（Pencil V5 `keKe3`）。正本 TextArea の包み。 */
 export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea(
-  { className, invalid = false, ...props },
+  { className, ...props },
   ref,
 ) {
   return (
-    <textarea
+    <BaseTextArea
       ref={ref}
-      className={[styles.control, styles.textarea, className].filter(Boolean).join(' ')}
-      aria-invalid={invalid || undefined}
       data-design-node="keKe3"
       {...props}
+      className={[styles.legacyControl, styles.legacyTextarea, className].filter(Boolean).join(' ')}
     />
   )
 })

@@ -9,12 +9,11 @@
  */
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Bell, CircleX, MoreHorizontal, Send, Users } from 'lucide-react'
+import { Bell, CircleX, Send, Users } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -209,11 +208,10 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
                 <span role="cell" className={styles.opActions}>
                   {canManage ? <>
                     <Button variant="secondary" onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>
-                    <IconButton aria-label={`${rule.name}の操作`} aria-haspopup="menu" aria-expanded={openMenuId === rule.id} onClick={() => setOpenMenuId(openMenuId === rule.id ? null : rule.id)}><MoreHorizontal aria-hidden="true" size={16} /></IconButton>
-                    <ActionMenu
+                    <RowMenu
+                      label={`${rule.name}の操作`}
                       open={openMenuId === rule.id}
-                      onClose={() => setOpenMenuId(null)}
-                      ariaLabel={`${rule.name}の操作`}
+                      onOpenChange={(next) => setOpenMenuId(next ? rule.id : null)}
                       items={rule.status === 'draft'
                         ? [{ id: 'publish', label: '公開', disabled: busy === rule.id || rule.recipientCount === 0, disabledReason: rule.recipientCount === 0 ? '受け取る人を決めてください' : undefined, onSelect: () => { setOpenMenuId(null); void run(rule, () => api.lineNotifications.operatorRules.publish(rule.id, lineAccountId), `「${rule.name}」を公開しました。`, '公開できませんでした。') } }]
                         : [{ id: 'stop', label: '止める', disabled: busy === rule.id, onSelect: () => { setOpenMenuId(null); void run(rule, () => api.lineNotifications.operatorRules.stop(rule.id, lineAccountId), `「${rule.name}」を止めました。`, '停止できませんでした。') } }]}

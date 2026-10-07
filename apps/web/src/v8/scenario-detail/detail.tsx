@@ -111,8 +111,7 @@ import ScheduleInput, {
   type ScheduleValue,
 } from '@/components/scenarios/schedule-input'
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
-import ActionMenu from '@/components/shared/action-menu'
-import { MoreAction } from '@/components/shared/row-actions'
+import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { notifyToast } from '@/components/shared/toast'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -2340,15 +2339,12 @@ export default function ScenarioDetailV8({
           ) : null}
           {canEdit ? (
             <span className={styles.menuBox}>
-              <MoreAction
+              <RowMenu
+                appearance="plain"
                 label="このシナリオのその他操作"
-                aria-expanded={stepMenuId === '__head__'}
-                onClick={() => setStepMenuId((current) => (current === '__head__' ? null : '__head__'))}
-              />
-              <ActionMenu
+                menuLabel="このシナリオの操作"
                 open={stepMenuId === '__head__'}
-                ariaLabel="このシナリオの操作"
-                onClose={() => setStepMenuId(null)}
+                onOpenChange={(next) => setStepMenuId(next ? '__head__' : null)}
                 items={[
                   {
                     id: 'duplicate',
@@ -2677,17 +2673,12 @@ export default function ScenarioDetailV8({
                             <ArrowDown aria-hidden />
                           </button>
                           <span className={styles.menuBox} onClick={(e) => e.stopPropagation()}>
-                            <MoreAction
+                            <RowMenu
+                              appearance="plain"
                               label={`${step.stepOrder}通目のその他操作`}
-                              aria-expanded={stepMenuId === step.id}
-                              onClick={() =>
-                                setStepMenuId((current) => (current === step.id ? null : step.id))
-                              }
-                            />
-                            <ActionMenu
+                              menuLabel={`${step.stepOrder}通目の操作`}
                               open={stepMenuId === step.id}
-                              ariaLabel={`${step.stepOrder}通目の操作`}
-                              onClose={() => setStepMenuId(null)}
+                              onOpenChange={(next) => setStepMenuId(next ? step.id : null)}
                               items={[
                                 { id: 'edit', label: '編集', onSelect: () => openEditStep(step) },
                                 { id: 'preview', label: 'プレビュー', onSelect: () => setSelectedStepId(step.id) },

@@ -14,15 +14,15 @@
  * が今の編集部品を `DefinitionEditor` として渡す（src/v8 から @/app を読まないため）。
  */
 import { useEffect, useRef, useState, type ComponentType } from 'react'
-import { ArrowLeft, Check, Copy, Inbox, MoreHorizontal, Pencil, Plus, RotateCw, Search, Send, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Inbox, Pencil, Plus, RotateCw, Search, Send, Trash2 } from 'lucide-react'
 import type { HqTemplateFolder } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import FolderPanel from '@/components/shared/folder-panel'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -534,10 +534,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
                           {canEdit ? <>
                             <Button disabled={busy} onClick={() => open(row.id, 'accounts')} aria-label={`${row.name}をアカウントへ配る`}><Send size={15} aria-hidden="true" />アカウントへ配る</Button>
                             <span className={styles.menuBox}>
-                              <IconButton title={`${row.name}の操作`} aria-label={`${row.name}の操作`} aria-expanded={openMenuId === row.id} onClick={() => setOpenMenuId((current) => current === row.id ? null : row.id)}>
-                                <MoreHorizontal size={16} aria-hidden="true" />
-                              </IconButton>
-                              <ActionMenu open={openMenuId === row.id} onClose={() => setOpenMenuId(null)} ariaLabel={`${row.name}の操作`} items={rowMenu(row)} />
+                              <RowMenu label={`${row.name}の操作`} items={rowMenu(row)} open={openMenuId === row.id} onOpenChange={(next) => setOpenMenuId(next ? row.id : null)} />
                             </span>
                           </> : null}
                         </span>

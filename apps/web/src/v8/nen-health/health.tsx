@@ -10,12 +10,12 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, MoreHorizontal, PawPrint } from 'lucide-react'
+import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, PawPrint } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import FilterChip from '@/components/shared/filter-chip'
-import IconButton from '@/components/shared/icon-button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -210,10 +210,7 @@ function KpiMenu({ title, items }: { title: string; items: ActionMenuItem[] }) {
   const [open, setOpen] = useState(false)
   return (
     <span className={styles.kpiMenu}>
-      <IconButton className={styles.kpiMenuButton} aria-label={`${title}のメニュー`} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </IconButton>
-      <ActionMenu open={open} onClose={() => setOpen(false)} ariaLabel={`${title}のメニュー`} items={items.map((item) => ({ ...item, onSelect: () => { setOpen(false); item.onSelect() } }))} />
+      <SharedRowMenu className={styles.kpiMenuButton} label={`${title}のメニュー`} open={open} onOpenChange={setOpen} items={items.map((item) => ({ ...item, onSelect: () => { setOpen(false); item.onSelect() } }))} />
     </span>
   )
 }

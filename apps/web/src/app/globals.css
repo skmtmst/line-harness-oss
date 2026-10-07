@@ -2002,6 +2002,16 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
   }
 
   /*
+   * ★V8 複数行の入力欄の決まり（2026-10-08 共通部品の1本化）：縦にだけ手で広げられ、
+   * 横には広げられない。共通の TextArea（text-field.tsx）は部品の中で持つ。ここは
+   * 画面に直接書いた <textarea> の既定（ブラウザの既定は縦横どちらも広がる both）。
+   * base 層なので、画面が自分で resize を決めた欄（中身に合わせて伸びる欄など）はそちらが勝つ。
+   */
+  [data-theme='v8'] textarea {
+    resize: vertical;
+  }
+
+  /*
    * #673 押した感触。★V7 仕上げ §2「押した」にそろえて、沈む動きは
    * 上の `scale` 規定（0.98倍・motion-instant）に一本化した。
    * ここに残すのは色と影のなめらか化だけ。

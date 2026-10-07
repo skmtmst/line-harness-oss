@@ -58,7 +58,7 @@ import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
-import { TextArea, TextInput } from '@/components/shared/form-controls'
+import { TextArea, TextField } from '@/components/shared/text-field'
 import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { firstReminderStepMessage, reminderStepTimings, reminderStopSummary, reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
@@ -1365,7 +1365,7 @@ function TimingEditor({
   return (
     <div className={styles.timingRow}>
       <span className={styles.timingWord}>基準日の</span>
-      <TextInput
+      <TextField
         type="number"
         min={0}
         max={unit === 'day' ? 365 : undefined}
@@ -1394,7 +1394,7 @@ function TimingEditor({
       {dayWritten ? (
         <>
           <span className={styles.timingWord}>の</span>
-          <TextInput
+          <TextField
             type="time"
             aria-label="送る時刻"
             className={styles.timingTime}

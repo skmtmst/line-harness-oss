@@ -5,9 +5,9 @@
  * 今の画面（app/nen/pets の page.tsx・pet-editor.tsx）から写した。
  * src/v8 は @/app を読めないので、同じ約束のまま持つ。
  */
-import { useRef, useState, type ReactNode } from 'react'
-import { MoreHorizontal } from 'lucide-react'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { useState, type ReactNode } from 'react'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import { csvCell } from '@/lib/presentation'
 import { formatNumber } from '@/lib/format'
 import { petAnimalTypeLabel, type NenPetRow, type NenPetSort, type NenPetWeightFilter } from '@/lib/nen-pets-api'
@@ -93,27 +93,14 @@ export function Pill({ tone, children, title }: { tone: 'ok' | 'warn' | 'off'; c
 /** 行の右端の「…」。押すと行の操作のメニュー（右クリックだけにしない）。 */
 export function RowMenu({ subject, items }: { subject: string; items: ActionMenuItem[] }) {
   const [open, setOpen] = useState(false)
-  const anchorRef = useRef<HTMLButtonElement | null>(null)
   if (items.length === 0) return <span className={styles.menuSpace} aria-hidden="true" />
   return (
     <span className={styles.menuBox}>
-      <button
-        ref={anchorRef}
-        type="button"
+      <SharedRowMenu
         className={styles.menuButton}
-        aria-label={`「${subject}」の操作`}
-        title={`「${subject}」の操作`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </button>
-      <ActionMenu
+        label={`「${subject}」の操作`}
         open={open}
-        onClose={() => setOpen(false)}
-        anchorRef={anchorRef}
-        ariaLabel={`「${subject}」の操作`}
+        onOpenChange={setOpen}
         items={items.map((item) => ({ ...item, onSelect: () => { setOpen(false); item.onSelect?.() } }))}
       />
     </span>

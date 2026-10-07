@@ -309,12 +309,14 @@
 
 /* 行の「…」：28 の四角・薄い線。メニューの目印が行を伸ばさないよう箱で包む。 */
 .menuBox { display: flex; align-items: center; justify-content: flex-end; }
-.menuButton {
+/* 「…」は共通の RowMenu（右クリックの囲みの中）。四角と3点（四角の半分）を共通の印ボタンより強く当てる。 */
+.menuBox button.menuButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: var(--tpl-bc-menu-size);
   height: var(--tpl-bc-menu-size);
+  flex: 0 0 var(--tpl-bc-menu-size);
   padding: 0;
   border: 0;
   border-radius: var(--radius-control);
@@ -324,7 +326,8 @@
   color: var(--color-ink-secondary);
   cursor: pointer;
 }
-.menuButton:hover { background: var(--color-canvas-sunken); }
+.menuBox button.menuButton:hover { background: var(--color-canvas-sunken); }
+.menuBox button.menuButton > svg { width: calc(var(--tpl-bc-menu-size) / 2); height: calc(var(--tpl-bc-menu-size) / 2); }
 
 .pagerCount {
   color: var(--color-ink-secondary);

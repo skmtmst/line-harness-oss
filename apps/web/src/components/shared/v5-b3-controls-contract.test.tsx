@@ -91,7 +91,8 @@ describe('V5 B3 入力・検索・選択部品', () => {
     // 複合部品のうち外枠の `:focus-within` を正本にするものは、中の input の
     // `outline: none` をその場合だけ許す（二重の輪郭を避けるため）。
     // SearchField は外枠ではなく中の input 自身に輪郭を出す（2026-09-25）。
-    for (const name of ['form-controls.module.css', 'search-field.module.css', 'select.module.css']) {
+    // 入力欄の正本は text-field.module.css（form-controls の TextInput・TextArea はその包み）。
+    for (const name of ['text-field.module.css', 'search-field.module.css', 'select.module.css']) {
       const css = withoutComments(read(name))
       expect(css, `${name} に生の色がある`).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
       expect(css, `${name} がローカル変数を定義している`).not.toMatch(/^\s*--(?!tw-)[a-z-]+:/m)

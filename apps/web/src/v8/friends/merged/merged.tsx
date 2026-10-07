@@ -9,17 +9,17 @@
  * 絵の列「配信に使うアカウント」「結び付けた日」は一覧の API に無い。
  * 今の列（状態・最終接触）をその位置に出す（情報を落とさない）。
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronUp, Download, MoreHorizontal, RotateCw } from 'lucide-react'
+import { ChevronUp, Download, RotateCw } from 'lucide-react'
 import { api } from '@/lib/api'
 import { formatDateTime, formatDay, formatNumber } from '@/lib/format'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu as SharedRowMenu } from '@/components/shared/row-actions'
 import Checkbox from '@/components/shared/checkbox'
 import KpiCard from '@/components/shared/kpi-card'
 import Pagination from '@/components/shared/pagination'
@@ -269,13 +269,9 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
 }
 
 function RowMenu({ label, items, open, onOpenChange }: { label: string; items: ActionMenuItem[]; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const anchorRef = useRef<HTMLSpanElement>(null)
   return (
-    <span className={styles.menuBox} ref={anchorRef}>
-      <IconButton title={label} aria-label={label} aria-expanded={open} onClick={() => onOpenChange(!open)}>
-        <MoreHorizontal size={16} aria-hidden="true" />
-      </IconButton>
-      <ActionMenu open={open} onClose={() => onOpenChange(false)} ariaLabel={label} items={items} anchorRef={anchorRef} />
+    <span className={styles.menuBox}>
+      <SharedRowMenu label={label} items={items} open={open} onOpenChange={onOpenChange} />
     </span>
   )
 }

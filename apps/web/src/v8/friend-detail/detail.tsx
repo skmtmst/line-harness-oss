@@ -10,10 +10,11 @@
  */
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, CircleCheck, Copy, List, MessageCircle, MessageSquare, MoreHorizontal, Star, Workflow, Zap } from 'lucide-react'
+import { ArrowLeft, CircleCheck, Copy, List, MessageCircle, MessageSquare, Star, Workflow, Zap } from 'lucide-react'
 import Avatar from '@/components/shared/avatar'
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
@@ -149,16 +150,14 @@ function FriendDetailV8Inner() {
           <p className={styles.sub} title={subtitle}>{subtitle}</p>
         </div>
         <span className={styles.menuAnchor}>
-          <Button
+          <RowMenu
             className={styles.square}
-            aria-label="その他の操作"
-            aria-haspopup="menu"
-            aria-expanded={moreMenuOpen}
-            onClick={() => { setMoreMenuOpen((v) => !v); setActionMenuOpen(false) }}
-          >
-            <MoreHorizontal aria-hidden />
-          </Button>
-          <ActionMenu open={moreMenuOpen} items={secondaryActions} ariaLabel="関連する画面を開く" onClose={() => setMoreMenuOpen(false)} />
+            label="その他の操作"
+            menuLabel="関連する画面を開く"
+            items={secondaryActions}
+            open={moreMenuOpen}
+            onOpenChange={(next) => { setMoreMenuOpen(next); setActionMenuOpen(false) }}
+          />
         </span>
         <span className={styles.menuAnchor}>
           <Button

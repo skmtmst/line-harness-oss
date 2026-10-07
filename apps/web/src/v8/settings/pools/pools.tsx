@@ -10,7 +10,7 @@
  * 「新規プール」は V8 の作る画面（/pools/new・`D0AOyx`）へ移る。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Copy, Info, MoreHorizontal, Plus } from 'lucide-react'
+import { Copy, Info, Plus } from 'lucide-react'
 import type { LineAccount, PoolAccount, TrafficPool } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -22,7 +22,7 @@ import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import IconButton from '@/components/shared/icon-button'
+import { RowMenu } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import frame from '../sa-frame.module.css'
 import styles from './pools.module.css'
@@ -190,12 +190,11 @@ function PoolCard({ pool, accounts, canManage, onChange }: {
         </div>
         {canManage && !isMain ? (
           <div className={styles.menuBox}>
-            <IconButton aria-label={`${pool.name}の操作`} onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen}>
-              <MoreHorizontal size={16} aria-hidden="true" />
-            </IconButton>
-            <ActionMenu
+            <RowMenu
+              label={`${pool.name}の操作`}
+              menuLabel="操作"
               open={menuOpen}
-              onClose={() => setMenuOpen(false)}
+              onOpenChange={setMenuOpen}
               items={[{ id: 'delete', label: '削除する', tone: 'danger', onSelect: () => { setMenuOpen(false); setDeleteError(''); setConfirmOpen(true) } }]}
             />
           </div>

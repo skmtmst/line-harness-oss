@@ -23,7 +23,6 @@ import {
   Hand,
   Image as ImageIcon,
   ListOrdered,
-  MoreHorizontal,
   Plus,
   Split,
   TriangleAlert,
@@ -47,7 +46,6 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
 import Notice from '@/components/shared/notice'
@@ -57,7 +55,8 @@ import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-pan
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton } from '@/components/shared/skeleton'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
@@ -1112,20 +1111,12 @@ export default function RichMenusListV8() {
                     </Td>
                   <Td className={styles.menuCell} onClick={(event) => event.stopPropagation()}>
                     <div className={styles.menuBox}>
-                      <IconButton
+                      <RowMenu
                         className={styles.menuBtn}
-                        title={menuLabel}
-                        aria-label={menuLabel}
-                        aria-expanded={openMenuId === g.id}
-                        onClick={() => setOpenMenuId((current) => (current === g.id ? null : g.id))}
-                      >
-                        <MoreHorizontal size={16} aria-hidden="true" />
-                      </IconButton>
-                      <ActionMenu
-                        open={openMenuId === g.id}
-                        onClose={() => setOpenMenuId(null)}
-                        ariaLabel={menuLabel}
+                        label={menuLabel}
                         items={rowMenuItems(g)}
+                        open={openMenuId === g.id}
+                        onOpenChange={(next) => setOpenMenuId(next ? g.id : null)}
                       />
                     </div>
                   </Td>

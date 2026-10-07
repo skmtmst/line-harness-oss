@@ -27,7 +27,6 @@ import {
   List as ListIcon,
   Lock,
   MailOpen,
-  MoreHorizontal,
   Plus,
   Send,
   SendHorizontal,
@@ -46,6 +45,7 @@ import { FolderDotName } from '@/components/shared/folder-dot'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
@@ -1077,33 +1077,27 @@ export default function BroadcastListV8() {
                 {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
                 {canEdit ? <div className={styles.menuBox}>
                   <ContextMenu label={menuLabel} items={rowContextItems(broadcast)}>
-                    <button
-                      type="button"
+                    <RowMenu
                       className={styles.menuButton}
-                      aria-label={menuLabel}
-                      aria-haspopup="menu"
-                      aria-expanded={openMenuId === broadcast.id}
-                      title={menuLabel}
-                      onClick={() => {
-                        setMenuMoveFor(null)
-                        setOpenMenuId((current) => (current === broadcast.id ? null : broadcast.id))
+                      label={menuLabel}
+                      items={rowMenuItems(broadcast)}
+                      open={openMenuId === broadcast.id}
+                      onOpenChange={(next) => {
+                        /* 開く：サブメニュー（フォルダへ移す）を戻してから開く。 */
+                        if (next) {
+                          setMenuMoveFor(null)
+                          setOpenMenuId(broadcast.id)
+                          return
+                        }
+                        /* 閉じる：サブメニューへの切り替え・戻る では開いたままにする。 */
+                        if (keepMenuOpenRef.current) {
+                          keepMenuOpenRef.current = false
+                          return
+                        }
+                        setOpenMenuId(null)
                       }}
-                    >
-                      <MoreHorizontal size={14} aria-hidden="true" />
-                    </button>
+                    />
                   </ContextMenu>
-                  <ActionMenu
-                    open={openMenuId === broadcast.id}
-                    onClose={() => {
-                      if (keepMenuOpenRef.current) {
-                        keepMenuOpenRef.current = false
-                        return
-                      }
-                      setOpenMenuId(null)
-                    }}
-                    ariaLabel={menuLabel}
-                    items={rowMenuItems(broadcast)}
-                  />
                 </div> : null}
               </Td>
             </Tr>

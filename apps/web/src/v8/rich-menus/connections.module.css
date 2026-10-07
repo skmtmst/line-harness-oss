@@ -197,12 +197,14 @@
   display: inline-flex;
 }
 
-.moreButton {
+/* 「…」は共通の RowMenu。今の見た目（大きさ・枠・乗せても地を変えない）を共通の印ボタンより強く当てる。 */
+.menuAnchor > button.moreButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: var(--tpl-cn-control-h);
   height: var(--tpl-cn-control-h);
+  flex: 0 0 var(--tpl-cn-control-h);
   padding: 0;
   border: 0;
   border-radius: var(--radius-control);
@@ -211,6 +213,10 @@
   background: var(--color-canvas);
   color: var(--color-ink-secondary);
   cursor: pointer;
+}
+
+.menuAnchor > button.moreButton:hover {
+  background: var(--color-canvas);
 }
 
 .box {

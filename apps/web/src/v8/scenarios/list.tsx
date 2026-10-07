@@ -24,7 +24,6 @@ import {
   Folder as FolderIcon,
   Lightbulb,
   ListVideo,
-  MoreHorizontal,
   Pause,
   Play,
   Plus,
@@ -57,7 +56,6 @@ import SearchField from '@/components/shared/search-field'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
-import IconButton from '@/components/shared/icon-button'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
@@ -70,7 +68,8 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
+import { RowMenu } from '@/components/shared/row-actions'
 import DetailPanel from '@/components/shared/detail-panel'
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu'
 import InlineEdit from '@/components/shared/inline-edit'
@@ -995,21 +994,13 @@ export default function ScenariosListV8() {
                       {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
                       <div className={styles.menuBox}>
                         <ContextMenu label={`シナリオ「${s.name}」の操作`} items={rowContextItems(s)}>
-                          <IconButton
-                            title={`シナリオ「${s.name}」の操作`}
-                            aria-label={`シナリオ「${s.name}」の操作`}
-                            aria-expanded={openMenuId === s.id}
-                            onClick={() => setOpenMenuId((current) => (current === s.id ? null : s.id))}
-                          >
-                            <MoreHorizontal size={16} aria-hidden="true" />
-                          </IconButton>
+                          <RowMenu
+                            label={`シナリオ「${s.name}」の操作`}
+                            items={rowMenuItems(s)}
+                            open={openMenuId === s.id}
+                            onOpenChange={(next) => setOpenMenuId(next ? s.id : null)}
+                          />
                         </ContextMenu>
-                        <ActionMenu
-                          open={openMenuId === s.id}
-                          onClose={() => setOpenMenuId(null)}
-                          ariaLabel={`シナリオ「${s.name}」の操作`}
-                          items={rowMenuItems(s)}
-                        />
                       </div>
                     </Td>
                   </Tr>
