@@ -7389,7 +7389,7 @@ const spec = {
           '201': { description: '登録した待ち' },
           '400': { description: 'account_id 未指定、または JSON・値が正しくない' },
           '404': { description: '担当・メニューが無い' },
-          '409': { description: '同じ枠に既に待ちがある' },
+          '409': { description: '同じ枠に既に待ちがある・枠が空いている・開始1時間前を過ぎた' },
         },
       },
     },
@@ -7504,6 +7504,75 @@ const spec = {
           '200': { description: 'status=cancelled' },
           '401': { description: '本人確認ができない' },
           '404': { description: '待ちが無い、または締め切っている' },
+        },
+      },
+    },
+    '/api/liff/booking/seat-waitlist': {
+      get: {
+        tags: ['Booking'],
+        summary: '自分の席のキャンセル待ち一覧（お客さま用・飲食店）',
+        security: [],
+        description: '本人の分だけ、開始時刻の新しい順で最大100件。?id= で1件に絞れる。仮押さえの期限切れは先に片付ける。飲食店向け機能が無い環境では 404。',
+        parameters: [
+          { name: 'id', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'waitlist の配列' },
+          '401': { description: '本人確認ができない' },
+          '404': { description: '飲食店向け機能が無い' },
+        },
+      },
+      post: {
+        tags: ['Booking'],
+        summary: '席のキャンセル待ちを自分で登録（お客さま用・飲食店）',
+        security: [],
+        description: '人数に合う卓がすべて予約か仮押さえで埋まっている枠だけ受け付ける。開始1時間前で締め切る。',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['store_id', 'starts_at', 'guest_count'], properties: {
+          store_id: { type: 'string' },
+          starts_at: { type: 'string' },
+          guest_count: { type: 'integer', minimum: 1, maximum: 100 },
+        } } } } },
+        responses: {
+          '201': { description: '登録した待ちの id' },
+          '400': { description: 'JSON・日時・人数が正しくない、または人数に合う卓が無い' },
+          '401': { description: '本人確認ができない' },
+          '404': { description: '店舗が無い、または飲食店向け機能が無い' },
+          '409': { description: '空いている卓がある・締め切り後・同じ枠に待ちがある・登録数の上限' },
+        },
+      },
+    },
+    '/api/liff/booking/seat-waitlist/{id}': {
+      delete: {
+        tags: ['Booking'],
+        summary: '席のキャンセル待ちを自分で取り消す（お客さま用・飲食店）',
+        security: [],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'status=cancelled' },
+          '401': { description: '本人確認ができない' },
+          '404': { description: '待ちが無い、または取り消せない状態' },
+        },
+      },
+    },
+    '/api/liff/booking/seat-waitlist/{id}/accept': {
+      post: {
+        tags: ['Booking'],
+        summary: '席のキャンセル待ちの案内を受けて予約にする（お客さま用・飲食店）',
+        security: [],
+        description: 'Idempotency-Key が必須。同じ待ちから作った予約があればそれを返す。仮押さえの期限が過ぎていたら 409。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '同じ待ちから作った予約が既にある（reservation_id と status）' },
+          '201': { description: '予約を作った（reservation_id と status=confirmed）' },
+          '400': { description: 'Idempotency-Key が無い、または予約の値が正しくない' },
+          '401': { description: '本人確認ができない' },
+          '404': { description: '待ちが無い、または飲食店向け機能が無い' },
+          '409': { description: '案内の期限が切れている、または卓がふさがった' },
         },
       },
     },

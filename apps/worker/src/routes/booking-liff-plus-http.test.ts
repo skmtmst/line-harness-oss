@@ -189,11 +189,34 @@ describe('LIFF 前回と同じで予約', () => {
 });
 
 describe('LIFF 自分のキャンセル待ち', () => {
+  // キャンセル待ちは「埋まっている枠」だけ受け付ける（F-6）。営業時間・担当の出勤を置き、別の人の予約で枠を埋める。
+  function fillSlot() {
+    sqlite.exec(`INSERT INTO booking_settings(id,line_account_id,business_hours_configured,cutoff_minutes_before,booking_window_days) VALUES('settings-a','account-a',1,0,365);`);
+    for (let i = 0; i < 7; i++) {
+      sqlite.prepare(`INSERT INTO booking_business_hours(id,booking_settings_id,weekday,start_time,end_time,capacity) VALUES(?,'settings-a',?,'00:00','23:59',10)`).run('h' + i, i);
+      sqlite.prepare(`INSERT INTO staff_availability_rules(id,staff_id,weekday,start_time,end_time) VALUES(?,'staff-a',?,'00:00','23:59')`).run('staff-h' + i, i);
+    }
+    sqlite.prepare(`INSERT INTO bookings
+      (id, line_account_id, friend_id, staff_id, menu_id, starts_at, ends_at, block_ends_at,
+       status, price_at_booking, requested_at)
+      VALUES ('full', 'account-a', 'friend-b', 'staff-a', 'menu-a', ?, '2026-11-10T06:00:00.000Z', '2026-11-10T06:00:00.000Z', 'confirmed', 0, ?)`)
+      .run(SLOT, SLOT);
+  }
+
+  test('空いている枠には登録できない', async () => {
+    const res = await selfPost('/api/liff/booking/waitlist', {
+      staff_id: 'staff-a', menu_id: 'menu-a', starts_at: SLOT,
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: 'slot_not_full' });
+  });
+
   test('登録・自分の枠の照会・取り消し', async () => {
+    fillSlot();
     const registered = await selfPost('/api/liff/booking/waitlist', {
       staff_id: 'staff-a', menu_id: 'menu-a', starts_at: SLOT,
     });
-    expect(registered.status).toBe(201);
+    expect(registered.status, await registered.clone().text()).toBe(201);
     const { id } = await registered.json() as { id: string };
 
     const mine = await selfGet(
