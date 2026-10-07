@@ -14,7 +14,7 @@
  * が今の編集部品を `DefinitionEditor` として渡す（src/v8 から @/app を読まないため）。
  */
 import { useEffect, useRef, useState, type ComponentType } from 'react'
-import { ArrowLeft, Check, Copy, MoreHorizontal, Pencil, Plus, Search, Send, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Inbox, MoreHorizontal, Pencil, Plus, RotateCw, Search, Send, Trash2 } from 'lucide-react'
 import type { HqTemplateFolder } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
@@ -25,6 +25,8 @@ import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { Th } from '@/components/shared/table'
@@ -58,6 +60,8 @@ const LIST_DESCRIPTIONS: Record<TemplateType, string> = {
 /** 左の列の「種類」。絵の順（テンプレート・リッチメニュー・回答フォーム・タグ）＋シナリオ。 */
 const TYPE_ORDER: TemplateType[] = ['template', 'rich_menu', 'form', 'tag', 'scenario']
 const TYPE_COLORS: Record<TemplateType, string | null> = { template: null, rich_menu: 'var(--color-icon-tile-blue)', form: 'var(--color-icon-tile-green)', tag: 'var(--color-icon-tile-orange)', scenario: 'var(--color-icon-tile-purple)' }
+/** 1280 などで畳んだ「種類：リッチメニュー」が切れない幅（共通の 150 では「種類：回答フォ…」になる）。 */
+const TYPE_PICK_WIDTH = 176
 const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る' }
 
 type Stage = 'list' | 'edit' | 'accounts' | 'duplicates' | 'result'
@@ -115,6 +119,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   const [bulkMode, setBulkMode] = useState<'' | DistributionMode>('')
   const [result, setResult] = useState<DistributionResult | null>(null)
   const [pendingRun, setPendingRun] = useState<string | null>(null)
+  /** 配った結果の窓（★V8-B dEvJM）。結果が出たら開く。閉じても同じ画面の進み具合と操作は残る。 */
+  const [resultDialogFor, setResultDialogFor] = useState<string | null>(null)
   const [requestBusy, setBusy] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
   const busy = requestBusy || uploadBusy
@@ -149,8 +155,9 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
   }
 
   const editTitle = `${EDIT_TITLES[type]}を${detail ? '編集' : '作る'}`
-  const pageTitle = stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : stage === 'result' ? '配布結果' : `アカウントへ配る：${detail?.template.name ?? ''}`
-  usePageTitle(stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? `${PAGE_TITLES[type]} › ${type === 'template' ? 'ひな形を作る' : editTitle}` : PAGE_TITLES[type])
+  /* 絵（meBRB の進み具合・dEvJM の窓の後ろ）：配っている間も結果のあとも題は「アカウントへ配る：名前」のまま。 */
+  const pageTitle = stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : `アカウントへ配る：${detail?.template.name ?? ''}`
+  usePageTitle(stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? `${PAGE_TITLES[type]} › ${type === 'template' ? (detail ? 'ひな形を編集' : 'ひな形を作る') : editTitle}` : PAGE_TITLES[type])
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   useEffect(() => {
@@ -363,6 +370,9 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready])
 
+  useEffect(() => {
+    if (result && result.status !== 'running') setResultDialogFor(`${result.runId}:${result.status}`)
+  }, [result])
   const reloadFolders = async () => setFolders(await hqTemplatesApi.folders.list())
   const expiry = preflight ? Date.parse(preflight.expiresAt) : NaN
   const expired = !Number.isFinite(expiry) || expiry <= now
@@ -408,7 +418,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     const createButton = canEdit
       ? <Button variant="primary" disabled={!ready || busy} onClick={startCreate}><Plus size={15} aria-hidden="true" />{CREATE_LABELS[type]}</Button>
       : null
-    const typeRows = TYPE_ORDER.map((kind) => ({ id: kind, label: LABELS[kind], count: typeCounts(kind), color: TYPE_COLORS[kind] }))
+    /* 絵：テンプレートの行は受信箱の印（inbox）、ほかは色付きのフォルダ。 */
+    const typeRows = TYPE_ORDER.map((kind) => ({ id: kind, label: LABELS[kind], count: typeCounts(kind), color: TYPE_COLORS[kind], ...(kind === 'template' ? { icon: <Inbox size={15} /> } : {}) }))
     const selectType = (id: string) => { if (id !== type) window.location.assign(`/hq/templates?type=${id}`) }
     const folderNavRows = [{ id: 'all', label: 'すべて' }, { id: 'none', label: '未分類' }, ...folders.map((folder) => ({ id: folder.id, label: folder.name }))]
     return (
@@ -417,7 +428,7 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
         title={PAGE_TITLES[type]}
         description={LIST_DESCRIPTIONS[type]}
         folderNav={[
-          { label: '種類', rows: typeRows, activeId: type, onSelect: selectType, createAction: createButton ?? undefined },
+          { label: '種類', rows: typeRows, activeId: type, onSelect: selectType, createAction: createButton ?? undefined, width: TYPE_PICK_WIDTH },
           ...(folderLoadFailed ? [] : [{ label: '分類', rows: folderNavRows, activeId: folderFilter, onSelect: setFolderFilter }]),
         ]}
         folders={(
@@ -635,7 +646,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     const store = storeOf(accountId)
     if (!store) return '—'
     const main = store.items[0]
-    return main?.duplicate ? (main.expectedRevision != null ? `版 ${main.expectedRevision}` : '配布済み') : '未配布'
+    /* 絵（meBRB）：ひな形と同じ版が配布先にあれば「版 2（最新）」。 */
+    return main?.duplicate ? (main.expectedRevision != null ? `版 ${main.expectedRevision}${detail && main.expectedRevision === detail.template.revision ? '（最新）' : ''}` : '配布済み') : '未配布'
   }
   const rowsForTable = stage === 'accounts' ? shownAccounts : accounts.filter((account) => selected.includes(account.id) || shownAccounts.includes(account))
   const targetIds = stage === 'accounts' ? selected : preflight?.stores.map((store) => store.accountId) ?? selected
@@ -647,7 +659,6 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
     return store.status === 'succeeded' ? '完了' : failures.includes(store) ? '失敗' : '作成中'
   }
   const shortName = (accountName: string) => accountName.replace(/^然\s*-NEN-\s*/, '')
-  const selectAll = (checked: boolean) => setSelected((current) => checked ? [...new Set([...current, ...shownAccounts.map((a) => a.id)])] : current.filter((id) => !shownAccounts.some((a) => a.id === id)))
 
   return (
     <PageFrame kind="wizard" boardId={stage === 'result' ? 'dEvJM' : 'meBRB'}>
@@ -674,7 +685,8 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
           <table className={styles.table} data-kind="distribute">
             <colgroup><col className={styles.colCheck} /><col /><col className={styles.colItem} /><col className={styles.colVersion} /><col className={styles.colMode} /></colgroup>
             <thead><tr>
-              <Th><Checkbox aria-label="表示中をすべて選択" disabled={busy || stage !== 'accounts' || !shownAccounts.length} checked={!!shownAccounts.length && shownAccounts.every((a) => selected.includes(a.id))} onCheckedChange={selectAll} /></Th>
+              {/* 絵（meBRB）の頭の1列目は空。まとめて選ぶ箱は置かない（行ごとに選ぶ）。 */}
+              <Th><span className={styles.srOnly}>選ぶ</span></Th>
               <Th>アカウント</Th><Th>項目</Th><Th>配布先の版</Th><Th>配布方法</Th>
             </tr></thead>
             <tbody>
@@ -765,8 +777,51 @@ export default function HqTemplatesV8({ type, DefinitionEditor }: { type: Templa
           </>}
         </div>
       </div>
+      <Dialog
+        open={Boolean(result && done && resultDialogFor === `${result.runId}:${result.status}`)}
+        designWidth={640}
+        designTop={220}
+        title={`配った結果：${detail?.template.name ?? ''}`}
+        designHeaderPadding="24px 24px 0"
+        busy={busy}
+        cancelLabel="閉じる"
+        onCancel={() => setResultDialogFor(null)}
+        {...(failures.length ? {
+          confirmLabel: `失敗した ${failures.length} 件をやり直す`,
+          confirmIcon: <RotateCw size={15} />,
+          onConfirm: () => { setResultDialogFor(null); checkStores(failures.map((s) => s.accountId)) },
+        } : {})}
+      >
+        {result ? <p className={styles.resultSummary}>{`${result.stores.length} アカウントへ配りました。成功 ${successes.length}・失敗 ${failures.length}。${successes.length ? '成功した所はもう使えます。' : ''}`}</p> : null}
+        <div className={styles.resultList}>
+          {result?.stores.map((store) => {
+            const failed = failures.includes(store)
+            const name = store.accountName ?? accountName(accounts, store.accountId)
+            return (
+              <div key={store.accountId} className={styles.resultRow}>
+                <span className={styles.resultName} title={name}>{name}</span>
+                <span className={styles.resultText}>{failed ? (store.reason || '配布できませんでした。アカウントの現在版を再確認してください。') : resultSentence(store)}</span>
+                {store.status === 'succeeded' ? <StatusBadge tone="success" size="compact">成功</StatusBadge>
+                  : failed ? <StatusBadge tone="danger" size="compact">失敗</StatusBadge>
+                  : <StatusBadge tone="neutral" size="compact">作成中</StatusBadge>}
+              </div>
+            )
+          })}
+        </div>
+        {failures.length ? <p className={styles.resultBand}>{`失敗した ${failures.length} 件だけやり直せます。各行の理由を直してから、やり直してください。`}</p> : null}
+      </Dialog>
     </PageFrame>
   )
+}
+
+/** 配った結果の1行の文（dEvJM）。成功したアカウントで何をしたか。 */
+function resultSentence(store: DistributionResult['stores'][number]): string {
+  if (store.status !== 'succeeded') return '配っています'
+  if (store.counts.aliased > 0) return store.createdName ? `同じ名前があったため「${store.createdName}」で作りました` : '同じ名前があったため、別名で作りました'
+  if (store.counts.overwritten > 0) return '上書きしました'
+  if (store.counts.created > 0) return '新しく作りました'
+  if ((store.counts.reused ?? 0) > 0) return '今あるものを使いました'
+  return '配りました'
 }
 
 function accountName(accounts: HqAccount[], id: string): string {
